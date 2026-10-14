@@ -1,0 +1,1637 @@
+{
+  "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+  "samples": [
+    {
+      "map": "apt_949",
+      "soft": false,
+      "moving": false,
+      "round": 0,
+      "quality": "high",
+      "drawMedian": 65.70000000001164,
+      "completedMedian": 70,
+      "completedP90": 76.29999999998836,
+      "gamma": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": 45
+      },
+      "shadows": {
+        "casters": 64,
+        "pairs": 197,
+        "blocked": 122,
+        "rays": 0,
+        "builds": 0,
+        "hits": 24,
+        "dropped": 30,
+        "captures": 0,
+        "sources": 24,
+        "doors": 8
+      },
+      "layer": [
+        1280,
+        720
+      ]
+    },
+    {
+      "map": "apt_949",
+      "soft": false,
+      "moving": false,
+      "round": 0,
+      "quality": "gamma",
+      "drawMedian": 343.4000000000233,
+      "completedMedian": 349.29999999998836,
+      "completedP90": 402.9000000000233,
+      "gamma": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 0,
+        "contributions": 48,
+        "tileMax": 28,
+        "frameId": 90
+      },
+      "shadows": {
+        "casters": 64,
+        "pairs": 197,
+        "blocked": 122,
+        "rays": 0,
+        "builds": 0,
+        "hits": 24,
+        "dropped": 30,
+        "captures": 0,
+        "sources": 24,
+        "doors": 8
+      },
+      "layer": [
+        1280,
+        720
+      ]
+    },
+    {
+      "map": "apt_949",
+      "soft": false,
+      "moving": false,
+      "round": 1,
+      "quality": "gamma",
+      "drawMedian": 351,
+      "completedMedian": 355.79999999998836,
+      "completedP90": 413.0999999999767,
+      "gamma": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 0,
+        "contributions": 48,
+        "tileMax": 28,
+        "frameId": 135
+      },
+      "shadows": {
+        "casters": 64,
+        "pairs": 197,
+        "blocked": 122,
+        "rays": 0,
+        "builds": 0,
+        "hits": 24,
+        "dropped": 30,
+        "captures": 0,
+        "sources": 24,
+        "doors": 8
+      },
+      "layer": [
+        1280,
+        720
+      ]
+    },
+    {
+      "map": "apt_949",
+      "soft": false,
+      "moving": false,
+      "round": 1,
+      "quality": "high",
+      "drawMedian": 65.70000000001164,
+      "completedMedian": 69.89999999996508,
+      "completedP90": 73.59999999997672,
+      "gamma": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": 180
+      },
+      "shadows": {
+        "casters": 64,
+        "pairs": 197,
+        "blocked": 122,
+        "rays": 0,
+        "builds": 0,
+        "hits": 24,
+        "dropped": 30,
+        "captures": 0,
+        "sources": 24,
+        "doors": 8
+      },
+      "layer": [
+        1280,
+        720
+      ]
+    },
+    {
+      "map": "apt_949",
+      "soft": false,
+      "moving": false,
+      "round": 2,
+      "quality": "high",
+      "drawMedian": 66.60000000003492,
+      "completedMedian": 70.60000000003492,
+      "completedP90": 75.70000000001164,
+      "gamma": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": 225
+      },
+      "shadows": {
+        "casters": 64,
+        "pairs": 197,
+        "blocked": 122,
+        "rays": 0,
+        "builds": 0,
+        "hits": 24,
+        "dropped": 30,
+        "captures": 0,
+        "sources": 24,
+        "doors": 8
+      },
+      "layer": [
+        1280,
+        720
+      ]
+    },
+    {
+      "map": "apt_949",
+      "soft": false,
+      "moving": false,
+      "round": 2,
+      "quality": "gamma",
+      "drawMedian": 361.79999999998836,
+      "completedMedian": 368.4000000000233,
+      "completedP90": 399.5999999999767,
+      "gamma": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 0,
+        "contributions": 48,
+        "tileMax": 28,
+        "frameId": 270
+      },
+      "shadows": {
+        "casters": 64,
+        "pairs": 197,
+        "blocked": 122,
+        "rays": 0,
+        "builds": 0,
+        "hits": 24,
+        "dropped": 30,
+        "captures": 0,
+        "sources": 24,
+        "doors": 8
+      },
+      "layer": [
+        1280,
+        720
+      ]
+    },
+    {
+      "map": "apt_949",
+      "soft": false,
+      "moving": true,
+      "round": 0,
+      "quality": "high",
+      "drawMedian": 73.39999999996508,
+      "completedMedian": 78.90000000002328,
+      "completedP90": 94.40000000002328,
+      "gamma": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": 315
+      },
+      "shadows": {
+        "casters": 64,
+        "pairs": 197,
+        "blocked": 122,
+        "rays": 6,
+        "builds": 2,
+        "hits": 22,
+        "dropped": 30,
+        "captures": 0,
+        "sources": 24,
+        "doors": 8
+      },
+      "layer": [
+        1280,
+        720
+      ]
+    },
+    {
+      "map": "apt_949",
+      "soft": false,
+      "moving": true,
+      "round": 0,
+      "quality": "gamma",
+      "drawMedian": 358.3999999999651,
+      "completedMedian": 363.29999999998836,
+      "completedP90": 427.29999999998836,
+      "gamma": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 4,
+        "contributions": 48,
+        "tileMax": 28,
+        "frameId": 360
+      },
+      "shadows": {
+        "casters": 64,
+        "pairs": 197,
+        "blocked": 122,
+        "rays": 6,
+        "builds": 2,
+        "hits": 22,
+        "dropped": 30,
+        "captures": 0,
+        "sources": 24,
+        "doors": 8
+      },
+      "layer": [
+        1280,
+        720
+      ]
+    },
+    {
+      "map": "apt_949",
+      "soft": false,
+      "moving": true,
+      "round": 1,
+      "quality": "gamma",
+      "drawMedian": 359.20000000001164,
+      "completedMedian": 363.79999999998836,
+      "completedP90": 394.5,
+      "gamma": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 4,
+        "contributions": 48,
+        "tileMax": 28,
+        "frameId": 405
+      },
+      "shadows": {
+        "casters": 64,
+        "pairs": 197,
+        "blocked": 122,
+        "rays": 6,
+        "builds": 2,
+        "hits": 22,
+        "dropped": 30,
+        "captures": 0,
+        "sources": 24,
+        "doors": 8
+      },
+      "layer": [
+        1280,
+        720
+      ]
+    },
+    {
+      "map": "apt_949",
+      "soft": false,
+      "moving": true,
+      "round": 1,
+      "quality": "high",
+      "drawMedian": 75.59999999997672,
+      "completedMedian": 79.69999999995343,
+      "completedP90": 84.29999999998836,
+      "gamma": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": 450
+      },
+      "shadows": {
+        "casters": 64,
+        "pairs": 197,
+        "blocked": 122,
+        "rays": 6,
+        "builds": 2,
+        "hits": 22,
+        "dropped": 30,
+        "captures": 0,
+        "sources": 24,
+        "doors": 8
+      },
+      "layer": [
+        1280,
+        720
+      ]
+    },
+    {
+      "map": "apt_949",
+      "soft": false,
+      "moving": true,
+      "round": 2,
+      "quality": "high",
+      "drawMedian": 68,
+      "completedMedian": 72,
+      "completedP90": 81.79999999998836,
+      "gamma": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": 495
+      },
+      "shadows": {
+        "casters": 64,
+        "pairs": 197,
+        "blocked": 122,
+        "rays": 6,
+        "builds": 2,
+        "hits": 22,
+        "dropped": 30,
+        "captures": 0,
+        "sources": 24,
+        "doors": 8
+      },
+      "layer": [
+        1280,
+        720
+      ]
+    },
+    {
+      "map": "apt_949",
+      "soft": false,
+      "moving": true,
+      "round": 2,
+      "quality": "gamma",
+      "drawMedian": 359.29999999998836,
+      "completedMedian": 370.9000000000233,
+      "completedP90": 612.5,
+      "gamma": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 4,
+        "contributions": 48,
+        "tileMax": 28,
+        "frameId": 540
+      },
+      "shadows": {
+        "casters": 64,
+        "pairs": 197,
+        "blocked": 122,
+        "rays": 6,
+        "builds": 2,
+        "hits": 22,
+        "dropped": 30,
+        "captures": 0,
+        "sources": 24,
+        "doors": 8
+      },
+      "layer": [
+        1280,
+        720
+      ]
+    },
+    {
+      "map": "apt_949",
+      "soft": true,
+      "moving": false,
+      "round": 0,
+      "quality": "high",
+      "drawMedian": 27,
+      "completedMedian": 31.100000000034925,
+      "completedP90": 34.70000000001164,
+      "gamma": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": 585
+      },
+      "shadows": {
+        "casters": 64,
+        "pairs": 197,
+        "blocked": 122,
+        "rays": 0,
+        "builds": 0,
+        "hits": 24,
+        "dropped": 30,
+        "captures": 0,
+        "sources": 24,
+        "doors": 8
+      },
+      "layer": [
+        640,
+        360
+      ]
+    },
+    {
+      "map": "apt_949",
+      "soft": true,
+      "moving": false,
+      "round": 0,
+      "quality": "gamma",
+      "drawMedian": 164,
+      "completedMedian": 196.89999999996508,
+      "completedP90": 269.29999999998836,
+      "gamma": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 0,
+        "contributions": 48,
+        "tileMax": 28,
+        "frameId": 630
+      },
+      "shadows": {
+        "casters": 64,
+        "pairs": 197,
+        "blocked": 122,
+        "rays": 0,
+        "builds": 0,
+        "hits": 24,
+        "dropped": 30,
+        "captures": 0,
+        "sources": 24,
+        "doors": 8
+      },
+      "layer": [
+        640,
+        360
+      ]
+    },
+    {
+      "map": "apt_949",
+      "soft": true,
+      "moving": false,
+      "round": 1,
+      "quality": "gamma",
+      "drawMedian": 108.39999999996508,
+      "completedMedian": 113.20000000001164,
+      "completedP90": 144.30000000004657,
+      "gamma": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 0,
+        "contributions": 48,
+        "tileMax": 28,
+        "frameId": 675
+      },
+      "shadows": {
+        "casters": 64,
+        "pairs": 197,
+        "blocked": 122,
+        "rays": 0,
+        "builds": 0,
+        "hits": 24,
+        "dropped": 30,
+        "captures": 0,
+        "sources": 24,
+        "doors": 8
+      },
+      "layer": [
+        640,
+        360
+      ]
+    },
+    {
+      "map": "apt_949",
+      "soft": true,
+      "moving": false,
+      "round": 1,
+      "quality": "high",
+      "drawMedian": 31.099999999976717,
+      "completedMedian": 35.79999999998836,
+      "completedP90": 44.90000000002328,
+      "gamma": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": 720
+      },
+      "shadows": {
+        "casters": 64,
+        "pairs": 197,
+        "blocked": 122,
+        "rays": 0,
+        "builds": 0,
+        "hits": 24,
+        "dropped": 30,
+        "captures": 0,
+        "sources": 24,
+        "doors": 8
+      },
+      "layer": [
+        640,
+        360
+      ]
+    },
+    {
+      "map": "apt_949",
+      "soft": true,
+      "moving": false,
+      "round": 2,
+      "quality": "high",
+      "drawMedian": 45.79999999998836,
+      "completedMedian": 51.70000000001164,
+      "completedP90": 72.40000000002328,
+      "gamma": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": 765
+      },
+      "shadows": {
+        "casters": 64,
+        "pairs": 197,
+        "blocked": 122,
+        "rays": 0,
+        "builds": 0,
+        "hits": 24,
+        "dropped": 30,
+        "captures": 0,
+        "sources": 24,
+        "doors": 8
+      },
+      "layer": [
+        640,
+        360
+      ]
+    },
+    {
+      "map": "apt_949",
+      "soft": true,
+      "moving": false,
+      "round": 2,
+      "quality": "gamma",
+      "drawMedian": 169.20000000001164,
+      "completedMedian": 173.40000000002328,
+      "completedP90": 228.29999999998836,
+      "gamma": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 0,
+        "contributions": 48,
+        "tileMax": 28,
+        "frameId": 810
+      },
+      "shadows": {
+        "casters": 64,
+        "pairs": 197,
+        "blocked": 122,
+        "rays": 0,
+        "builds": 0,
+        "hits": 24,
+        "dropped": 30,
+        "captures": 0,
+        "sources": 24,
+        "doors": 8
+      },
+      "layer": [
+        640,
+        360
+      ]
+    },
+    {
+      "map": "apt_949",
+      "soft": true,
+      "moving": true,
+      "round": 0,
+      "quality": "high",
+      "drawMedian": 30.400000000023283,
+      "completedMedian": 36.59999999997672,
+      "completedP90": 58.5,
+      "gamma": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": 855
+      },
+      "shadows": {
+        "casters": 64,
+        "pairs": 197,
+        "blocked": 122,
+        "rays": 6,
+        "builds": 2,
+        "hits": 22,
+        "dropped": 30,
+        "captures": 0,
+        "sources": 24,
+        "doors": 8
+      },
+      "layer": [
+        640,
+        360
+      ]
+    },
+    {
+      "map": "apt_949",
+      "soft": true,
+      "moving": true,
+      "round": 0,
+      "quality": "gamma",
+      "drawMedian": 170.10000000003492,
+      "completedMedian": 182.29999999998836,
+      "completedP90": 237.90000000002328,
+      "gamma": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 4,
+        "contributions": 48,
+        "tileMax": 28,
+        "frameId": 900
+      },
+      "shadows": {
+        "casters": 64,
+        "pairs": 197,
+        "blocked": 122,
+        "rays": 6,
+        "builds": 2,
+        "hits": 22,
+        "dropped": 30,
+        "captures": 0,
+        "sources": 24,
+        "doors": 8
+      },
+      "layer": [
+        640,
+        360
+      ]
+    },
+    {
+      "map": "apt_949",
+      "soft": true,
+      "moving": true,
+      "round": 1,
+      "quality": "gamma",
+      "drawMedian": 198.89999999996508,
+      "completedMedian": 205.70000000001164,
+      "completedP90": 272.5,
+      "gamma": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 4,
+        "contributions": 48,
+        "tileMax": 28,
+        "frameId": 945
+      },
+      "shadows": {
+        "casters": 64,
+        "pairs": 197,
+        "blocked": 122,
+        "rays": 6,
+        "builds": 2,
+        "hits": 22,
+        "dropped": 30,
+        "captures": 0,
+        "sources": 24,
+        "doors": 8
+      },
+      "layer": [
+        640,
+        360
+      ]
+    },
+    {
+      "map": "apt_949",
+      "soft": true,
+      "moving": true,
+      "round": 1,
+      "quality": "high",
+      "drawMedian": 38,
+      "completedMedian": 42.399999999965075,
+      "completedP90": 67.09999999997672,
+      "gamma": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": 990
+      },
+      "shadows": {
+        "casters": 64,
+        "pairs": 197,
+        "blocked": 122,
+        "rays": 6,
+        "builds": 2,
+        "hits": 22,
+        "dropped": 30,
+        "captures": 0,
+        "sources": 24,
+        "doors": 8
+      },
+      "layer": [
+        640,
+        360
+      ]
+    },
+    {
+      "map": "apt_949",
+      "soft": true,
+      "moving": true,
+      "round": 2,
+      "quality": "high",
+      "drawMedian": 31.199999999953434,
+      "completedMedian": 35.70000000001164,
+      "completedP90": 58,
+      "gamma": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": 1035
+      },
+      "shadows": {
+        "casters": 64,
+        "pairs": 197,
+        "blocked": 122,
+        "rays": 6,
+        "builds": 2,
+        "hits": 22,
+        "dropped": 30,
+        "captures": 0,
+        "sources": 24,
+        "doors": 8
+      },
+      "layer": [
+        640,
+        360
+      ]
+    },
+    {
+      "map": "apt_949",
+      "soft": true,
+      "moving": true,
+      "round": 2,
+      "quality": "gamma",
+      "drawMedian": 182,
+      "completedMedian": 186.79999999998836,
+      "completedP90": 236.29999999998836,
+      "gamma": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 4,
+        "contributions": 48,
+        "tileMax": 28,
+        "frameId": 1080
+      },
+      "shadows": {
+        "casters": 64,
+        "pairs": 197,
+        "blocked": 122,
+        "rays": 6,
+        "builds": 2,
+        "hits": 22,
+        "dropped": 30,
+        "captures": 0,
+        "sources": 24,
+        "doors": 8
+      },
+      "layer": [
+        640,
+        360
+      ]
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": false,
+      "moving": false,
+      "round": 0,
+      "quality": "high",
+      "drawMedian": 67.5,
+      "completedMedian": 75.79999999998836,
+      "completedP90": 85.09999999997672,
+      "gamma": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": 1125
+      },
+      "shadows": {
+        "casters": 76,
+        "pairs": 178,
+        "blocked": 82,
+        "rays": 0,
+        "builds": 0,
+        "hits": 17,
+        "dropped": 46,
+        "captures": 0,
+        "sources": 17,
+        "doors": 8
+      },
+      "layer": [
+        1280,
+        720
+      ]
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": false,
+      "moving": false,
+      "round": 0,
+      "quality": "gamma",
+      "drawMedian": 397.5,
+      "completedMedian": 401.8999999999651,
+      "completedP90": 695.2999999999884,
+      "gamma": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 0,
+        "contributions": 34,
+        "tileMax": 12,
+        "frameId": 1170
+      },
+      "shadows": {
+        "casters": 76,
+        "pairs": 178,
+        "blocked": 82,
+        "rays": 0,
+        "builds": 0,
+        "hits": 17,
+        "dropped": 46,
+        "captures": 0,
+        "sources": 17,
+        "doors": 8
+      },
+      "layer": [
+        1280,
+        720
+      ]
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": false,
+      "moving": false,
+      "round": 1,
+      "quality": "gamma",
+      "drawMedian": 368.29999999998836,
+      "completedMedian": 378.5,
+      "completedP90": 462.20000000001164,
+      "gamma": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 0,
+        "contributions": 34,
+        "tileMax": 12,
+        "frameId": 1215
+      },
+      "shadows": {
+        "casters": 76,
+        "pairs": 178,
+        "blocked": 82,
+        "rays": 0,
+        "builds": 0,
+        "hits": 17,
+        "dropped": 46,
+        "captures": 0,
+        "sources": 17,
+        "doors": 8
+      },
+      "layer": [
+        1280,
+        720
+      ]
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": false,
+      "moving": false,
+      "round": 1,
+      "quality": "high",
+      "drawMedian": 72.09999999997672,
+      "completedMedian": 79.80000000004657,
+      "completedP90": 100.39999999996508,
+      "gamma": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": 1260
+      },
+      "shadows": {
+        "casters": 76,
+        "pairs": 178,
+        "blocked": 82,
+        "rays": 0,
+        "builds": 0,
+        "hits": 17,
+        "dropped": 46,
+        "captures": 0,
+        "sources": 17,
+        "doors": 8
+      },
+      "layer": [
+        1280,
+        720
+      ]
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": false,
+      "moving": false,
+      "round": 2,
+      "quality": "high",
+      "drawMedian": 67.79999999998836,
+      "completedMedian": 72.30000000004657,
+      "completedP90": 90.29999999998836,
+      "gamma": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": 1305
+      },
+      "shadows": {
+        "casters": 76,
+        "pairs": 178,
+        "blocked": 82,
+        "rays": 0,
+        "builds": 0,
+        "hits": 17,
+        "dropped": 46,
+        "captures": 0,
+        "sources": 17,
+        "doors": 8
+      },
+      "layer": [
+        1280,
+        720
+      ]
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": false,
+      "moving": false,
+      "round": 2,
+      "quality": "gamma",
+      "drawMedian": 374.0999999999767,
+      "completedMedian": 381.69999999995343,
+      "completedP90": 420,
+      "gamma": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 0,
+        "contributions": 34,
+        "tileMax": 12,
+        "frameId": 1350
+      },
+      "shadows": {
+        "casters": 76,
+        "pairs": 178,
+        "blocked": 82,
+        "rays": 0,
+        "builds": 0,
+        "hits": 17,
+        "dropped": 46,
+        "captures": 0,
+        "sources": 17,
+        "doors": 8
+      },
+      "layer": [
+        1280,
+        720
+      ]
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": false,
+      "moving": true,
+      "round": 0,
+      "quality": "high",
+      "drawMedian": 81.5,
+      "completedMedian": 86.90000000002328,
+      "completedP90": 103.79999999993015,
+      "gamma": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": 1395
+      },
+      "shadows": {
+        "casters": 76,
+        "pairs": 178,
+        "blocked": 82,
+        "rays": 2,
+        "builds": 2,
+        "hits": 15,
+        "dropped": 46,
+        "captures": 0,
+        "sources": 17,
+        "doors": 8
+      },
+      "layer": [
+        1280,
+        720
+      ]
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": false,
+      "moving": true,
+      "round": 0,
+      "quality": "gamma",
+      "drawMedian": 400.69999999995343,
+      "completedMedian": 408.79999999993015,
+      "completedP90": 475.29999999993015,
+      "gamma": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 4,
+        "contributions": 34,
+        "tileMax": 12,
+        "frameId": 1440
+      },
+      "shadows": {
+        "casters": 76,
+        "pairs": 178,
+        "blocked": 82,
+        "rays": 2,
+        "builds": 2,
+        "hits": 15,
+        "dropped": 46,
+        "captures": 0,
+        "sources": 17,
+        "doors": 8
+      },
+      "layer": [
+        1280,
+        720
+      ]
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": false,
+      "moving": true,
+      "round": 1,
+      "quality": "gamma",
+      "drawMedian": 371.19999999995343,
+      "completedMedian": 376.0999999999767,
+      "completedP90": 430.5999999999767,
+      "gamma": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 4,
+        "contributions": 34,
+        "tileMax": 12,
+        "frameId": 1485
+      },
+      "shadows": {
+        "casters": 76,
+        "pairs": 178,
+        "blocked": 82,
+        "rays": 2,
+        "builds": 2,
+        "hits": 15,
+        "dropped": 46,
+        "captures": 0,
+        "sources": 17,
+        "doors": 8
+      },
+      "layer": [
+        1280,
+        720
+      ]
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": false,
+      "moving": true,
+      "round": 1,
+      "quality": "high",
+      "drawMedian": 71.19999999995343,
+      "completedMedian": 76.39999999990687,
+      "completedP90": 94.90000000002328,
+      "gamma": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": 1530
+      },
+      "shadows": {
+        "casters": 76,
+        "pairs": 178,
+        "blocked": 82,
+        "rays": 2,
+        "builds": 2,
+        "hits": 15,
+        "dropped": 46,
+        "captures": 0,
+        "sources": 17,
+        "doors": 8
+      },
+      "layer": [
+        1280,
+        720
+      ]
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": false,
+      "moving": true,
+      "round": 2,
+      "quality": "high",
+      "drawMedian": 80.90000000002328,
+      "completedMedian": 85.29999999993015,
+      "completedP90": 101.70000000006985,
+      "gamma": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": 1575
+      },
+      "shadows": {
+        "casters": 76,
+        "pairs": 178,
+        "blocked": 82,
+        "rays": 2,
+        "builds": 2,
+        "hits": 15,
+        "dropped": 46,
+        "captures": 0,
+        "sources": 17,
+        "doors": 8
+      },
+      "layer": [
+        1280,
+        720
+      ]
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": false,
+      "moving": true,
+      "round": 2,
+      "quality": "gamma",
+      "drawMedian": 387.5,
+      "completedMedian": 392.70000000006985,
+      "completedP90": 541.5,
+      "gamma": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 4,
+        "contributions": 34,
+        "tileMax": 12,
+        "frameId": 1620
+      },
+      "shadows": {
+        "casters": 76,
+        "pairs": 178,
+        "blocked": 82,
+        "rays": 2,
+        "builds": 2,
+        "hits": 15,
+        "dropped": 46,
+        "captures": 0,
+        "sources": 17,
+        "doors": 8
+      },
+      "layer": [
+        1280,
+        720
+      ]
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": true,
+      "moving": false,
+      "round": 0,
+      "quality": "high",
+      "drawMedian": 36.09999999997672,
+      "completedMedian": 41.29999999993015,
+      "completedP90": 64.30000000004657,
+      "gamma": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": 1665
+      },
+      "shadows": {
+        "casters": 76,
+        "pairs": 178,
+        "blocked": 82,
+        "rays": 0,
+        "builds": 0,
+        "hits": 17,
+        "dropped": 46,
+        "captures": 0,
+        "sources": 17,
+        "doors": 8
+      },
+      "layer": [
+        640,
+        360
+      ]
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": true,
+      "moving": false,
+      "round": 0,
+      "quality": "gamma",
+      "drawMedian": 112.79999999993015,
+      "completedMedian": 125.79999999993015,
+      "completedP90": 158.19999999995343,
+      "gamma": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 0,
+        "contributions": 34,
+        "tileMax": 16,
+        "frameId": 1710
+      },
+      "shadows": {
+        "casters": 76,
+        "pairs": 178,
+        "blocked": 82,
+        "rays": 0,
+        "builds": 0,
+        "hits": 17,
+        "dropped": 46,
+        "captures": 0,
+        "sources": 17,
+        "doors": 8
+      },
+      "layer": [
+        640,
+        360
+      ]
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": true,
+      "moving": false,
+      "round": 1,
+      "quality": "gamma",
+      "drawMedian": 124.40000000002328,
+      "completedMedian": 133.19999999995343,
+      "completedP90": 162.69999999995343,
+      "gamma": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 0,
+        "contributions": 34,
+        "tileMax": 16,
+        "frameId": 1755
+      },
+      "shadows": {
+        "casters": 76,
+        "pairs": 178,
+        "blocked": 82,
+        "rays": 0,
+        "builds": 0,
+        "hits": 17,
+        "dropped": 46,
+        "captures": 0,
+        "sources": 17,
+        "doors": 8
+      },
+      "layer": [
+        640,
+        360
+      ]
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": true,
+      "moving": false,
+      "round": 1,
+      "quality": "high",
+      "drawMedian": 33.40000000002328,
+      "completedMedian": 41.09999999997672,
+      "completedP90": 59.800000000046566,
+      "gamma": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": 1800
+      },
+      "shadows": {
+        "casters": 76,
+        "pairs": 178,
+        "blocked": 82,
+        "rays": 0,
+        "builds": 0,
+        "hits": 17,
+        "dropped": 46,
+        "captures": 0,
+        "sources": 17,
+        "doors": 8
+      },
+      "layer": [
+        640,
+        360
+      ]
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": true,
+      "moving": false,
+      "round": 2,
+      "quality": "high",
+      "drawMedian": 28.699999999953434,
+      "completedMedian": 34.09999999997672,
+      "completedP90": 59.199999999953434,
+      "gamma": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": 1845
+      },
+      "shadows": {
+        "casters": 76,
+        "pairs": 178,
+        "blocked": 82,
+        "rays": 0,
+        "builds": 0,
+        "hits": 17,
+        "dropped": 46,
+        "captures": 0,
+        "sources": 17,
+        "doors": 8
+      },
+      "layer": [
+        640,
+        360
+      ]
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": true,
+      "moving": false,
+      "round": 2,
+      "quality": "gamma",
+      "drawMedian": 116.19999999995343,
+      "completedMedian": 124,
+      "completedP90": 166.20000000006985,
+      "gamma": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 0,
+        "contributions": 34,
+        "tileMax": 16,
+        "frameId": 1890
+      },
+      "shadows": {
+        "casters": 76,
+        "pairs": 178,
+        "blocked": 82,
+        "rays": 0,
+        "builds": 0,
+        "hits": 17,
+        "dropped": 46,
+        "captures": 0,
+        "sources": 17,
+        "doors": 8
+      },
+      "layer": [
+        640,
+        360
+      ]
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": true,
+      "moving": true,
+      "round": 0,
+      "quality": "high",
+      "drawMedian": 49.09999999997672,
+      "completedMedian": 54.79999999993015,
+      "completedP90": 76.20000000006985,
+      "gamma": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": 1935
+      },
+      "shadows": {
+        "casters": 76,
+        "pairs": 178,
+        "blocked": 82,
+        "rays": 2,
+        "builds": 2,
+        "hits": 15,
+        "dropped": 46,
+        "captures": 0,
+        "sources": 17,
+        "doors": 8
+      },
+      "layer": [
+        640,
+        360
+      ]
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": true,
+      "moving": true,
+      "round": 0,
+      "quality": "gamma",
+      "drawMedian": 201.40000000002328,
+      "completedMedian": 213.69999999995343,
+      "completedP90": 279.4000000000233,
+      "gamma": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 4,
+        "contributions": 34,
+        "tileMax": 12,
+        "frameId": 1980
+      },
+      "shadows": {
+        "casters": 76,
+        "pairs": 178,
+        "blocked": 82,
+        "rays": 2,
+        "builds": 2,
+        "hits": 15,
+        "dropped": 46,
+        "captures": 0,
+        "sources": 17,
+        "doors": 8
+      },
+      "layer": [
+        640,
+        360
+      ]
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": true,
+      "moving": true,
+      "round": 1,
+      "quality": "gamma",
+      "drawMedian": 72.69999999995343,
+      "completedMedian": 77.19999999995343,
+      "completedP90": 88.5,
+      "gamma": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 4,
+        "contributions": 34,
+        "tileMax": 12,
+        "frameId": 2025
+      },
+      "shadows": {
+        "casters": 76,
+        "pairs": 178,
+        "blocked": 82,
+        "rays": 2,
+        "builds": 2,
+        "hits": 15,
+        "dropped": 46,
+        "captures": 0,
+        "sources": 17,
+        "doors": 8
+      },
+      "layer": [
+        640,
+        360
+      ]
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": true,
+      "moving": true,
+      "round": 1,
+      "quality": "high",
+      "drawMedian": 36.29999999993015,
+      "completedMedian": 41.59999999997672,
+      "completedP90": 44.59999999997672,
+      "gamma": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": 2070
+      },
+      "shadows": {
+        "casters": 76,
+        "pairs": 178,
+        "blocked": 82,
+        "rays": 2,
+        "builds": 2,
+        "hits": 15,
+        "dropped": 46,
+        "captures": 0,
+        "sources": 17,
+        "doors": 8
+      },
+      "layer": [
+        640,
+        360
+      ]
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": true,
+      "moving": true,
+      "round": 2,
+      "quality": "high",
+      "drawMedian": 34.300000000046566,
+      "completedMedian": 38.59999999997672,
+      "completedP90": 43.800000000046566,
+      "gamma": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": 2115
+      },
+      "shadows": {
+        "casters": 76,
+        "pairs": 178,
+        "blocked": 82,
+        "rays": 2,
+        "builds": 2,
+        "hits": 15,
+        "dropped": 46,
+        "captures": 0,
+        "sources": 17,
+        "doors": 8
+      },
+      "layer": [
+        640,
+        360
+      ]
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": true,
+      "moving": true,
+      "round": 2,
+      "quality": "gamma",
+      "drawMedian": 77.30000000004657,
+      "completedMedian": 81.70000000006985,
+      "completedP90": 96.40000000002328,
+      "gamma": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 4,
+        "contributions": 34,
+        "tileMax": 12,
+        "frameId": 2160
+      },
+      "shadows": {
+        "casters": 76,
+        "pairs": 178,
+        "blocked": 82,
+        "rays": 2,
+        "builds": 2,
+        "hits": 15,
+        "dropped": 46,
+        "captures": 0,
+        "sources": 17,
+        "doors": 8
+      },
+      "layer": [
+        640,
+        360
+      ]
+    }
+  ]
+}

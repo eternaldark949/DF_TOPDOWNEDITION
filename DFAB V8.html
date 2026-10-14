@@ -1520,8 +1520,23 @@
         #dev-prof[data-tier="gold"] .dp-ms { color: var(--df-gold); }
         #dev-prof[data-tier="crimson"] .dp-ms { color: #ff6a78; }
         #dev-prof .dp-spark { width: 96px; height: 22px; align-self: center; border-left: 1px solid rgba(202, 176, 250, 0.2); padding-left: 4px; }
+        #dev-prof .dp-shadows { display: none; }
+        #dev-prof.full .dp-shadows { display: block; margin-top: 8px; }
+        #dev-prof .dp-shadow-status { font-size: max(6px, 0.6rem - var(--font-trim)); color: var(--df-lilac-grey); }
+        #dev-prof .dp-shadow-status[data-state="active"] { color: #9be8dc; }
+        #dev-prof .dp-shadow-status[data-state="fallback"] { color: #ffc248; }
+        #dev-prof .dp-shadow-note { margin-top: 5px; font-size: max(6px, 0.5rem - var(--font-trim)); color: var(--df-lilac-grey); line-height: 1.5; }
+        #dev-prof .dp-light-detail { margin-top: 8px; }
+        #dev-prof .dp-light-detail summary { cursor: pointer; font-size: .65rem; color: var(--df-cream); }
+        #dev-prof .dp-light-detail button { margin: 6px 0; padding: 5px 8px; font-size: .65rem; color: var(--df-cream); background: #37223e; border: 1px solid #715379; border-radius: 5px; }
+        #dev-prof .dp-light-detail label { display: block; }
+        #dev-prof [data-gamma-case] { max-width: 100%; display: block; margin-top: 4px; background: #231529; color: var(--df-cream); font-size: .65rem; padding: 4px; border: 1px solid #715379; }
+        #dev-prof .dp-light-device { overflow-wrap: anywhere; font-size: .55rem; color: #9be8dc; }
+        #dev-prof .dp-light-stage { display: grid; grid-template-columns: 1fr auto; gap: 2px 5px; padding: 4px 0; font-size: .6rem; color: var(--df-lilac-grey); border-bottom: 1px solid #ffffff12; }
+        #dev-prof .dp-light-stage b { font-variant-numeric: tabular-nums; color: var(--df-cream); }
+        #dev-prof .dp-light-stage small { grid-column: 1 / -1; font-size: .5rem; }
         #dev-prof .dp-rows { display: none; }
-        #dev-prof.full { width: 260px; max-height: calc(100vh - 160px); overflow-y: auto; }
+        #dev-prof.full { width: min(360px, calc(100vw - 32px)); max-height: calc(100vh - 160px); overflow-y: auto; }
         #dev-prof.full .dp-rows { display: block; margin-top: 8px; }
         #dev-prof .dp-total { display: flex; justify-content: space-between; padding-bottom: 5px; margin-bottom: 4px; font-size: max(6px, 0.6rem - var(--font-trim)); letter-spacing: 2px; text-transform: uppercase; color: var(--df-cream); border-bottom: 1px solid rgba(216, 198, 162, 0.35); }
         #dev-prof .dp-row { display: grid; grid-template-columns: 1fr 38px 56px; align-items: center; gap: 6px; font-size: max(6px, 0.6rem - var(--font-trim)); line-height: 1.75; color: rgba(225, 214, 245, 0.72); }
@@ -4482,8 +4497,8 @@
                     <span class="settings-value val-high" id="set-wetreflections" data-key="reflections">HIGH</span>
                 </div>
                 <div class="settings-row">
-                    <span class="settings-label">Lamp Shadows</span>
-                    <span class="settings-value val-low" id="set-lampshadows" data-key="lampShadows">LOW</span>
+                    <span class="settings-label">Light Shadows</span>
+                    <span class="settings-value val-low" id="set-lampshadows" data-key="lampShadows" title="Beta: 512 px masks and expanded coverage. Gamma: High shadows with one tiled WebGL2 lighting resolve; falls back to High. Both experimental.">LOW</span>
                 </div>
                 </section>
                 
@@ -5056,19 +5071,9 @@
                 RIM_R: 180,             // a lamp this close (px) rims them in its colour
                 RIM_A: 0.6,
                 RIM_PEDS: 8,            // pedestrians rimmed per frame (named characters always are)
-                // Lamp shadows (how much: Settings → Lamp Shadows, ui/humanoid-render.js)
-                LAMP_SHADOW_R: 230,     // … from a lamp this close (px); it fades out toward here
-                LAMP_SHADOW_K: 0.4,     // shadow length per px from the lamp
-                LAMP_SHADOW_MAX: 60,    // … capped (px)
-                LAMP_SHADOW_A: 0.35,    // alpha on the ground at full strength
-                LAMP_SHADOW_DARK: 0.5,  // … and in the light layer (how much of the lamp's light it takes back)
-                LAMP_SHADOW_PEDS: 24,   // pedestrians given lamp shadows per frame (named characters always are)
-                LAMP_SHADOW_HIGH_MAX: 16,   // High: bodies a frame whose shadow is their silhouette (the rest: the soft shade)
-                LAMP_SHADOW_CAP_R: 40,  // … captured this far round the body (world px)
-                LAMP_SHADOW_DEPTH: 24,  // … the body's depth the silhouette stretches from (px)
-                LAMP_SHADOW_SIL: 0.8,   // … its alpha against the soft shade's (it's solid where the shade is soft)
-                LAMP_BLOCK_R: 9,        // Ultra: a body blocks lamp light as a disc this wide (px)
-                LAMP_BLOCK_A: 0.5       // … taking back this much of the lamp's light right behind it
+                // Body capture bounds for shared dynamic lamp silhouettes.
+                LAMP_SHADOW_CAP_R: 40,
+                LAMP_SHADOW_DEPTH: 24
             },
             GAIT: {
                 CADENCE: 0.2,           // sqrt curve: within ~5% of the old 0.25 + 0.04v at speeds 3.5-7, but slows down at crawl speeds instead of shuffling
@@ -8218,7 +8223,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             foliageDensity: _lvl(_deviceDensity.foliageDensity, 'high'),         // 'low' | 'medium' | 'high'
             rainDensity: _lvl(_deviceDensity.rainDensity, 'high'),               // 'low' | 'medium' | 'high'
             crowdQuality: _lvl(_deviceDensity.crowdQuality, 'high'),             // 'high' (live) | 'medium' (cheaper live) | 'low' (baked) — ui/crowd-impostors.js
-            lampShadows: ['off', 'low', 'high', 'ultra'].includes(_deviceDensity.lampShadows) ? _deviceDensity.lampShadows : 'low',   // people's shadows from street lamps — ui/humanoid-render.js
+            lampShadows: ['off', 'low', 'high', 'ultra', 'beta', 'gamma'].includes(_deviceDensity.lampShadows) ? _deviceDensity.lampShadows : 'low',   // shared dynamic light shadows, including opt-in beta — engine/dynamic-shadows.js
             saveDensity() {
                 try { localStorage.setItem('dfab_density', JSON.stringify({ trafficDensity: this.trafficDensity, pedestrianDensity: this.pedestrianDensity, foliageDensity: this.foliageDensity, rainDensity: this.rainDensity, crowdQuality: this.crowdQuality, lampShadows: this.lampShadows })); } catch (e) { /* private mode */ }
             },
@@ -12447,6 +12452,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.angle = 0;
                 this.angVel = 0;
                 this.thickness = 6;
+                this.shadowOpacity = config.shadowOpacity ?? (this.type === 'sliding' ? 0.35 : 1);
+                this.shadowElevation = config.shadowElevation || 40;
                 if (this.orientation === 'H') {
                     this.hx = this.hingeSide === 'left' ? this.x : this.x + this.w; this.hy = this.y + this.h / 2;
                     this.baseAngle = this.hingeSide === 'left' ? 0 : Math.PI; this.length = this.w;
@@ -18993,6 +19000,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Painting or replaying a split run draws body art only. The outer pass
                 // adds exactly one ground shadow, including vector fallback and live props.
                 if (PropPass.mode === 0) {
+                    DynamicShadows.noteProp(this);
                     drawGroundContactShadow(ctx, this.x + this.width / 2, this.y + this.height / 2,
                         this.width / 2 + 5, this.height / 2 + 5, this.angle || 0);
                 }
@@ -19656,6 +19664,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              */
             draw(ctx) {
                 if (!this.visible) return;
+                DynamicShadows.noteVehicle(this);
                 
                 ctx.save();
                 ctx.translate(this.x, this.y);
@@ -19990,6 +19999,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
             draw(ctx) {
                 if (!this.visible) return;
+                DynamicShadows.noteVehicle(this);
                 
                 ctx.save();
                 ctx.translate(this.x, this.y);
@@ -26698,6 +26708,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             draw(ctx) {
                 if (!this.visible || this.inCar) return;
+                DynamicShadows.note(this, { kind: 'circle', radius: 8, elevation: 8 });
 
                 // A missing/unrecognized selector uses the exact original coat colors.
                 const coatColors = Object.prototype.hasOwnProperty.call(VELVET_CAT_PALETTES, this.coatPalette)
@@ -39827,6 +39838,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         /** Stamp the body, then the light sliding over it. */
         function drawCarBody(ctx, v, farLOD) {
+            DynamicShadows.noteVehicle(v);
             const sp = carSprite(v), P = CAR_ART.PAD;
             drawCarFrontTyres(ctx, v);
             // The body rides on its springs: out of the turn (bodyRoll), forward under the brakes (load)
@@ -48451,6 +48463,715 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             cache[laser ? 1 : 0] = out; _weaponSprites.set(key, cache);
             return out;
         }
+        // Explicit, unsaved Full-profiler experiments. Normal rendering is baseline.
+        const GammaExperiment = {
+            modes: {baseline:'Baseline', 'no-blur':'Blur off', 'freeze-all':'Freeze all uploads', 'freeze-masks':'Freeze mask uploads', 'freeze-layers':'Freeze Canvas layer uploads', 'simple-resolve':'Simple fullscreen resolve', overlay:'Separate WebGL overlay'},
+            mode:'baseline',generation:0,warmRemaining:0,samples:0,current:{mode:'baseline',phase:'measurement'},
+            select(mode) {
+                if(!Object.hasOwn(this.modes,mode))return false;
+                this.hideOverlay();this.mode=mode;this.generation++;this.resetWarm();this.current={mode,phase:'starting'};return true;
+            },
+            resetWarm(){this.warmRemaining=10;this.settleRemaining=5;this.samples=0;this.current={mode:this.mode,phase:'warmup',noBlur:this.mode==='no-blur',simple:this.mode==='simple-resolve',overlay:this.mode==='overlay',freezeMasks:false,freezeLayers:false};},
+            stop(){this.hideOverlay();this.mode='baseline';this.signature=null;this.warmRemaining=0;this.settleRemaining=0;this.samples=0;this.current={mode:'baseline',phase:'production'};},
+            begin(game) {
+                if(GameSettings.lampShadows!=='gamma'){this.stop();return;}
+                const signature=[game.activeMap?.id,game.canvas.width,game.canvas.height,game.lightingScale,GameSettings.softShadows].join('|');
+                if(signature!==this.signature){this.signature=signature;this.hideOverlay();this.resetWarm();}
+                const warming=this.warmRemaining>0,m=this.mode;
+                this.current={mode:m,phase:warming?'warmup':this.settleRemaining>0?'settling':'measurement',noBlur:m==='no-blur',freezeMasks:!warming&&(m==='freeze-all'||m==='freeze-masks'),freezeLayers:!warming&&(m==='freeze-all'||m==='freeze-layers'),simple:m==='simple-resolve',overlay:m==='overlay'};
+            },
+            advance(){if(this.warmRemaining>0)this.warmRemaining--;else if(this.settleRemaining>0)this.settleRemaining--;else this.samples=Math.min(60,this.samples+1);return {...this.current,warmupCompleted:10-this.warmRemaining,settlingCompleted:5-(this.settleRemaining||0),sampledFrames:this.samples,ready:this.samples>=60};},
+            hideOverlay(){if(this.overlay){GammaShadows.canvas?.remove();this.overlay.remove();this.overlay=null;GammaShadows.canvas.style.cssText='';}},
+            showOverlay(game,canvas,opacity) {
+                if(!this.overlay){this.overlay=document.createElement('div');this.overlay.id='gamma-diagnostic-overlay';document.body.appendChild(this.overlay);this.overlay.appendChild(canvas);}
+                const r=game.canvas.getBoundingClientRect(),crop=GameSettings.softShadows?1:0,w=Math.max(1,canvas.width-2*crop),h=Math.max(1,canvas.height-2*crop);
+                this.overlay.style.cssText=`position:fixed;pointer-events:none;overflow:hidden;z-index:4;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;opacity:${Math.max(0,Math.min(1,opacity))};`;
+                canvas.style.cssText=`position:absolute;left:${-crop*r.width/w}px;top:${-crop*r.height/h}px;width:${canvas.width*r.width/w}px;height:${canvas.height*r.height/h}px;`;
+            }
+        };
+        // Full-profiler diagnostics only. CPU values include browser/driver waits;
+        // GPU timer queries are asynchronous, bounded, and never force completion.
+        const LightingProfile = {
+            enabled: false, history: [], pending: [], gpu: {}, deviceInfo: null, wrapped: [],
+            start() { return this.enabled && this.recording ? performance.now() : null; },
+            end(name,t) {
+                if(t===null || !this.enabled)return;
+                const ms=Math.max(0,performance.now()-t),m=this.stages[name] || (this.stages[name]={ms:0,calls:0,maxCall:0});
+                m.ms+=ms;m.calls++;m.maxCall=Math.max(m.maxCall,ms);
+            },
+            wrap(object,key,label) {
+                const original=object[key],p=this;
+                const wrapped=object[key]=function(...args){const t=p.start();try{return original.apply(this,args);}finally{p.end(label,t);}};
+                this.wrapped.push({object,key,original,wrapped});
+            },
+            disable() {
+                for(const w of this.wrapped)if(w.object[w.key]===w.wrapped)w.object[w.key]=w.original;
+                this.wrapped.length=0;this.instrumented=false;
+                GammaExperiment.stop();this.previousStart=null;this.previousEnd=null;
+                this.clearQueries();this.enabled=false;this.recording=false;this.history.length=0;this.latest=null;this.gpu={};this.key=null;
+            },
+            begin(game) {
+                const on=!!(game.showProfiler && GameSettings.profilerMode==='full');
+                if(!on){if(this.enabled)this.disable();return;}
+                GammaExperiment.begin(game);
+                const beginAt=performance.now();
+                const key=[GammaExperiment.mode,GammaExperiment.generation,GammaExperiment.current.phase,game.activeMap?.id,GameSettings.lampShadows,GameSettings.softShadows,game.canvas.width,game.canvas.height,game.lightingScale].join('|');
+                if(key!==this.key){this.clearQueries();this.history.length=0;this.latest=null;this.gpu={};this.gpuStatus=this.timer?'awaiting sample':'GPU timer unavailable';this.previousStart=null;this.previousEnd=null;}
+                this.intervalMs=Number.isFinite(this.previousStart)?beginAt-this.previousStart:null;
+                this.gapMs=Number.isFinite(this.previousEnd)?beginAt-this.previousEnd:null;this.beginAt=beginAt;this.previousStart=beginAt;
+                this.key=key;this.enabled=on;this.recording=true;this.frameId=game._renderDrawId;this.stages={};this.bytes={mask:0,layers:0};this.churn={new:0,changed:0,evicted:0};
+                if(!this.instrumented){
+                    this.instrumented=true;
+                    for(const [key,label]of [['begin','caster registry'],['prepare','shadow preparation'],['_pairs','source/caster pairs'],['_path','visibility paths'],['keepSilhouette','silhouette cache copy']])this.wrap(DynamicShadows,key,label);
+                }
+                this.poll();
+            },
+            device(gl) {
+                if(!this.enabled || this.gl===gl)return;
+                this.clearQueries();this.gl=gl;
+                try {
+                    const d=gl.getExtension('WEBGL_debug_renderer_info');
+                    this.timer=gl.getExtension('EXT_disjoint_timer_query_webgl2');
+                    this.deviceInfo={renderer:gl.getParameter(d?d.UNMASKED_RENDERER_WEBGL:gl.RENDERER),vendor:gl.getParameter(d?d.UNMASKED_VENDOR_WEBGL:gl.VENDOR),version:gl.getParameter(gl.VERSION),maxTextureSize:gl.getParameter(gl.MAX_TEXTURE_SIZE),timerAvailable:!!this.timer};
+                    this.gpuStatus=this.timer?'awaiting sample':'GPU timer unavailable';
+                } catch(_){this.timer=null;this.gpuStatus='GPU timer unavailable';}
+            },
+            beginGPU(label) {
+                if(!this.enabled||!this.recording||!this.timer||this.activeQuery||this.pending.length>=8||this.frameId%4!==0)return false;
+                let q;
+                try {q=this.gl.createQuery();if(!q)return false;this.gl.beginQuery(this.timer.TIME_ELAPSED_EXT,q);this.activeQuery={q,label,frameId:this.frameId};return true;}
+                catch(_){if(q)try{this.gl.deleteQuery(q);}catch(_){}this.gpuStatus='GPU query unavailable';return false;}
+            },
+            endGPU() {
+                if(!this.activeQuery)return;
+                const entry=this.activeQuery;this.activeQuery=null;
+                try{this.gl.endQuery(this.timer.TIME_ELAPSED_EXT);this.pending.push(entry);}
+                catch(_){try{this.gl.deleteQuery(entry.q);}catch(_){}this.gpuStatus='GPU query interrupted';}
+            },
+            clearQueries() {
+                this.endGPU();
+                for(const p of this.pending)try{this.gl.deleteQuery(p.q);}catch(_){}
+                this.pending.length=0;
+            },
+            poll() {
+                if(!this.pending.length||!this.timer)return;
+                try {
+                    if(this.gl.isContextLost()){this.clearQueries();this.gpu={};this.gpuStatus='GPU context lost';return;}
+                    if(this.gl.getParameter(this.timer.GPU_DISJOINT_EXT)){this.clearQueries();this.gpu={};this.gpuStatus='disjoint samples discarded';return;}
+                    const keep=[];
+                    for(const p of this.pending){
+                        if(this.gl.getQueryParameter(p.q,this.gl.QUERY_RESULT_AVAILABLE)){
+                            this.gpu[p.label]={ms:this.gl.getQueryParameter(p.q,this.gl.QUERY_RESULT)/1e6,frameId:p.frameId};this.gl.deleteQuery(p.q);this.gpuStatus='asynchronous GPU samples';
+                        } else if(this.frameId-p.frameId>120){this.gl.deleteQuery(p.q);this.gpuStatus='GPU query expired';}
+                        else keep.push(p);
+                    }
+                    this.pending=keep;
+                } catch(_){this.clearQueries();this.gpu={};this.gpuStatus='GPU query unavailable';}
+            },
+            finish(game) {
+                if(!this.enabled)return;
+                const g=GammaShadows,s=g.stats,fresh=s.frameId===this.frameId;
+                const at=performance.now(),experiment=GammaExperiment.advance();
+                this.latest={frameId:this.frameId,at,experiment,cadence:{startAt:this.beginAt,intervalMs:this.intervalMs??null,renderMs:Number.isFinite(this.beginAt)?at-this.beginAt:null,gapMs:this.gapMs??null,loopMs:game._renderFrameMs??null},mode:GameSettings.lampShadows,backend:fresh?s.backend:'idle',stages:this.stages,bytes:{...this.bytes},churn:{...this.churn},shadows:{...DynamicShadows.stats},maskCacheBytes:DynamicShadows.bytes,sourceFamilies:{...DynamicShadows._families},
+                    layer:[game.lightCanvas.width,game.lightCanvas.height],scene:[game.canvas.width,game.canvas.height],lightingScale:game.lightingScale,adaptiveFactor:game._adaptiveLighting?.factor||1,soft:GameSettings.softShadows,
+                    gamma:fresh?{...s}:null,atlasSlots:g.slots?.length||0,atlasResident:g.slots?.filter(s=>s.cv).length||0,atlasBytes:g.atlasSize*g.atlasHeight*4||0,gpuTextureBytes:(g.atlasSize*g.atlasHeight*4||0)+(g.textureSizes||[]).reduce((n,s)=>{if(typeof s!=='string')return n;const [w,h]=s.split(':').map(Number);return n+(Number.isFinite(w*h)?w*h*4:0);},0)};
+                if(experiment.phase==='measurement'||experiment.phase==='production'){this.history.push(this.latest);if(this.history.length>60)this.history.shift();}
+                this.previousEnd=at;this.recording=false;
+            },
+            summary() {
+                const keys=new Set(this.history.flatMap(f=>Object.keys(f.stages))),rows=[];
+                for(const name of keys){const values=this.history.map(f=>f.stages[name]?.ms||0).sort((a,b)=>a-b),last=this.latest?.stages[name];
+                    rows.push({name,last:last?.ms||0,mean:values.reduce((a,b)=>a+b,0)/values.length,p95:values[Math.ceil(values.length*.95)-1],peak:values[values.length-1],calls:last?.calls||0,maxCall:last?.maxCall||0});}
+                return rows.sort((a,b)=>b.mean-a.mean);
+            },
+            cadenceSummary() {
+                const values=this.history.map(f=>f.cadence?.intervalMs).filter(v=>Number.isFinite(v)&&v>0).sort((a,b)=>a-b),total=values.reduce((a,b)=>a+b,0);
+                return {intervals:values.length,fps:total?1000*values.length/total:null,meanMs:values.length?total/values.length:null,p95Ms:values.length?values[Math.ceil(values.length*.95)-1]:null,peakMs:values.length?values[values.length-1]:null,pausesOver250ms:values.filter(v=>v>250).length,pausesOver1000ms:values.filter(v=>v>1000).length};
+            },
+            snapshot(game) {
+                return {format:'dfab-lighting-profile-v1',experiment:this.latest?.experiment||GammaExperiment.current,cadence:this.cadenceSummary(),gammaErrorChecks:'initialization-only',createdAt:new Date().toISOString(),device:this.deviceInfo,gpuStatus:this.gpuStatus||'not sampled',gpu:{...this.gpu},gpuPending:this.pending.length,
+                    jsHeapBytes:Number.isFinite(performance.memory?.usedJSHeapSize)?performance.memory.usedJSHeapSize:null,frameMs:game._renderFrameMs,pixelRatio:window.devicePixelRatio||1,map:game.activeMap?.id,zoom:game.camera.zoom,settings:{shadows:GameSettings.lampShadows,soft:GameSettings.softShadows,adaptive:GameSettings.adaptiveLighting,lightingScale:game.lightingScale,renderScale:game._renderScale||1,fpsLimit:GameSettings.fpsLimit},
+                    gameSections:game.profiler?.report||[],latest:this.latest,summary:this.summary(),frames:this.history.slice(),memory:DevOverlay._canvasMB(game),note:'CPU timings are inclusive and can contain driver waits; nested rows overlap. GPU samples are asynchronous and identify their source frame. No forced readback or gl.finish. Gamma experiment summaries exclude warm-up/settling; cadence includes between-render waits.'};
+            },
+            download(game) {
+                const blob=new Blob([JSON.stringify(this.snapshot(game),null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+                a.href=url;a.download=`dfab-lighting-${this.latest?.experiment?.mode||GammaExperiment.mode}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+            }
+        };
+        // Gamma keeps High's shadow preparation, but batches cached sprites using
+        // fixed-function blending. GPU blur feeds the scene directly; no tile lists
+        // or intermediate WebGL -> Canvas light-layer copy on the game path.
+        const GammaShadows = {
+            LIMIT: 96, active: false, records: [], frame: 0,
+            stats: { backend: 'high-fallback', resolves: 0, draws: 0, uploads: 0, layerUploads: 0, contributions: 0, blurPasses: 0 },
+            _init() {
+                if (this.failed) return false;
+                if (this.ready && this.gl && !this.gl.isContextLost()) return true;
+                try {
+                    const cv = this.canvas = this.canvas || document.createElement('canvas');
+                    const gl = this.gl = this.gl || cv.getContext('webgl2', { alpha: true, premultipliedAlpha: true, antialias: false, depth: false, stencil: false, preserveDrawingBuffer: false });
+                    if (!gl) throw new Error('WebGL2 unavailable');
+                    cv.addEventListener('webglcontextlost', e => { e.preventDefault(); this.failed = true; });
+                    const program = (vertex, fragment) => {
+                        const p = gl.createProgram();
+                        for (const [type, code] of [[gl.VERTEX_SHADER, vertex], [gl.FRAGMENT_SHADER, fragment]]) {
+                            const s = gl.createShader(type); gl.shaderSource(s, '#version 300 es\n' + code); gl.compileShader(s);
+                            if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+                            gl.attachShader(p, s); gl.deleteShader(s);
+                        }
+                        gl.linkProgram(p);
+                        if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+                        return p;
+                    };
+                    this.copyProgram = program(`out vec2 uv;
+                        void main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);uv=p;gl_Position=vec4(p*2.0-1.0,0,1);}`, `
+                        precision highp float; uniform sampler2D image; uniform bool flip; uniform vec2 stepUV; in vec2 uv; out vec4 outColor;
+                        vec4 sampleAt(vec2 p){if(any(lessThan(p,vec2(0)))||any(greaterThan(p,vec2(1))))return vec4(0);return texture(image,p);}
+                        void main(){vec2 p=vec2(uv.x,flip?1.0-uv.y:uv.y);outColor=(sampleAt(p-stepUV)+sampleAt(p)+sampleAt(p+stepUV))/3.0;}`);
+                    this.spriteProgram = program(`
+                        layout(location=0)in vec4 rect; layout(location=1)in vec4 region; layout(location=2)in float alpha;
+                        uniform vec2 size; out vec2 uv; out float opacity;
+                        void main(){vec2 p=vec2((gl_VertexID==1||gl_VertexID==2||gl_VertexID==4)?1.0:0.0,(gl_VertexID>=2&&gl_VertexID<=4)?1.0:0.0);
+                        vec2 screen=(rect.xy+p*rect.zw)/size;gl_Position=vec4(screen.x*2.0-1.0,1.0-screen.y*2.0,0,1);uv=region.xy+p*region.zw;opacity=alpha;}`, `
+                        precision highp float; uniform sampler2D image; in vec2 uv; in float opacity; out vec4 outColor;
+                        void main(){outColor=texture(image,uv)*opacity;}`);
+                    this.copyUniforms = {};
+                    for (const n of ['image','flip','stepUV']) this.copyUniforms[n] = gl.getUniformLocation(this.copyProgram,n);
+                    this.spriteSize = gl.getUniformLocation(this.spriteProgram,'size');
+                    gl.useProgram(this.spriteProgram); gl.uniform1i(gl.getUniformLocation(this.spriteProgram,'image'),0);
+                    gl.useProgram(this.copyProgram); gl.uniform1i(this.copyUniforms.image,0);
+                    this.copyVAO = gl.createVertexArray(); this.spriteVAO = gl.createVertexArray();
+                    gl.bindVertexArray(this.spriteVAO);
+                    this.buffer = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
+                    gl.bufferData(gl.ARRAY_BUFFER,this.LIMIT*9*4,gl.DYNAMIC_DRAW);
+                    for (const [i,n,offset] of [[0,4,0],[1,4,16],[2,1,32]]) {
+                        gl.enableVertexAttribArray(i); gl.vertexAttribPointer(i,n,gl.FLOAT,false,36,offset); gl.vertexAttribDivisor(i,1);
+                    }
+                    gl.bindVertexArray(this.copyVAO);
+                    this.textures = []; this.textureSizes = [];
+                    for (let i=0;i<6;i++) {
+                        const t=gl.createTexture(); this.textures.push(t); gl.bindTexture(gl.TEXTURE_2D,t);
+                        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+                        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+                    }
+                    this.maxSize=gl.getParameter(gl.MAX_TEXTURE_SIZE); this.pitch=258;
+                    this.atlasColumns=Math.min(8,Math.floor(this.maxSize/this.pitch)); this.atlasSize=this.atlasColumns*this.pitch;
+                    const atlasRows=Math.min(12,Math.floor(this.maxSize/this.pitch));
+                    this.slots=Array.from({length:Math.min(this.LIMIT,this.atlasColumns*atlasRows)},(_,i)=>({x:i%this.atlasColumns*this.pitch,y:Math.floor(i/this.atlasColumns)*this.pitch,at:0}));
+                    this.atlasHeight=Math.ceil(this.slots.length/this.atlasColumns)*this.pitch;
+                    gl.bindTexture(gl.TEXTURE_2D,this.textures[3]); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,this.atlasSize,this.atlasHeight,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+                    this.fbos=[gl.createFramebuffer(),gl.createFramebuffer()];
+                    this.slotMap=new WeakMap(); this.pad=document.createElement('canvas');
+                    this.hole=document.createElement('canvas'); this.veil=document.createElement('canvas');
+                    this.recordData=new Float32Array(this.LIMIT*9);
+                    if(gl.getError()!==gl.NO_ERROR)throw new Error('Gamma initialization failed');
+                    this.ready=true; return true;
+                } catch (_) { this.failed=true; return false; }
+            },
+            reset() {
+                if(LightingProfile.enabled)GammaExperiment.resetWarm();GammaExperiment.hideOverlay();
+                this.records.length=0; this.active=false; this.slotMap=new WeakMap();
+                for(const s of this.slots || []){s.cv=null;s.signature=null;s.at=0;}
+            },
+            begin(ctx, frameId = null) {
+                this.frame++; this.records.length=0; this.holeReady=false; this.uploadFailed=false;this._frozenSeen=GammaExperiment.current.freezeMasks?new Set():null;
+                this.stats={backend:'high-fallback',resolves:0,draws:0,uploads:0,layerUploads:0,contributions:0,blurPasses:0,frozenMasks:0,frozenLayers:0,missingFrozenSprites:0,frameId};
+                const initTime=LightingProfile.start();
+                this.active=GameSettings.lampShadows==='gamma' && this._init();
+                if(this.active){this.stats.backend='webgl2';this.target=ctx.canvas;LightingProfile.device(this.gl);}
+                LightingProfile.end('backend initialization',initTime);
+                return this.active;
+            },
+            collect(ctx,s,mode) {
+                const t=LightingProfile.start();try{return this._collect(ctx,s,mode);}finally{LightingProfile.end('atlas collection (includes uploads)',t);}
+            },
+            _collect(ctx,s,mode) {
+                if(!this.active||this.uploadFailed||ctx.canvas!==this.target||this.records.length>=this.LIMIT)return false;
+                const m=ctx.getTransform();
+                if(Math.abs(m.b)>1e-6||Math.abs(m.c)>1e-6||m.a<=0||m.d<=0)return false;
+                const cv=s[mode]; let slot=this.slotMap.get(cv);
+                if(GammaExperiment.current.freezeMasks && (!slot || slot.signature===null)){if(!this._frozenSeen.has(cv)){this._frozenSeen.add(cv);this.stats.missingFrozenSprites++;}return true;}
+                if(!slot){
+                    // Prefer unused slots, then least-recently-used sprites. Never evict
+                    // a sprite referenced by this frame's queued draws.
+                    slot=this.slots.filter(t=>t.at!==this.frame).reduce((best,t)=>!best||!t.cv||(best.cv&&t.at<best.at)?t:best,null);
+                    if(!slot)return false;
+                    if(slot.cv){this.slotMap.delete(slot.cv);if(LightingProfile.enabled)LightingProfile.churn.evicted++;}
+                    if(LightingProfile.enabled)LightingProfile.churn.new++;
+                    slot.cv=cv;slot.signature=null;this.slotMap.set(cv,slot);
+                }
+                slot.at=this.frame;
+                if(GammaExperiment.current.freezeMasks && slot.signature!==s.signature && !this._frozenSeen.has(cv)){this._frozenSeen.add(cv);this.stats.frozenMasks++;}
+                if(slot.signature!==s.signature && !GammaExperiment.current.freezeMasks){
+                    if(LightingProfile.enabled && slot.signature!==null)LightingProfile.churn.changed++;
+                    try {
+                    const padTime=LightingProfile.start();
+                    const gl=this.gl,pad=this.pad;pad.width=cv.width+2;pad.height=cv.height+2;
+                    const g=pad.getContext('2d');g.drawImage(cv,1,1);
+                    g.drawImage(cv,0,0,cv.width,1,1,0,cv.width,1);g.drawImage(cv,0,cv.height-1,cv.width,1,1,cv.height+1,cv.width,1);
+                    g.drawImage(pad,1,0,1,pad.height,0,0,1,pad.height);g.drawImage(pad,cv.width,0,1,pad.height,cv.width+1,0,1,pad.height);
+                    LightingProfile.end('mask padding',padTime);
+                    const uploadTime=LightingProfile.start();
+                    gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.textures[3]);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);
+                    gl.texSubImage2D(gl.TEXTURE_2D,0,slot.x,slot.y,gl.RGBA,gl.UNSIGNED_BYTE,pad);
+                    LightingProfile.end('mask uploads (CPU wait)',uploadTime);
+                    if(LightingProfile.enabled)LightingProfile.bytes.mask+=pad.width*pad.height*4;
+                    slot.signature=s.signature;slot.width=cv.width;slot.height=cv.height;this.stats.uploads++;
+                    } catch (_) { this.uploadFailed=true; return false; }
+                }
+                this.records.push({cv,mode,alpha:ctx.globalAlpha,x:m.a*s.x+m.e,y:m.d*s.y+m.f,w:m.a*s.w,h:m.d*s.h,slot});
+                this.stats.contributions=this.records.length;return true;
+            },
+            split(ctx,paintVeil) {
+                const t=LightingProfile.start();try{return this._split(ctx,paintVeil);}finally{LightingProfile.end('Canvas hole snapshot + room veil',t);}
+            },
+            _split(ctx,paintVeil) {
+                if(!this.active)return;
+                this.hasVeil=!!paintVeil;
+                for(const cv of this.hasVeil?[this.hole,this.veil]:[this.hole]){if(cv.width!==ctx.canvas.width)cv.width=ctx.canvas.width;if(cv.height!==ctx.canvas.height)cv.height=ctx.canvas.height;}
+                const hc=this.hole.getContext('2d');hc.globalCompositeOperation='copy';hc.drawImage(ctx.canvas,0,0);this.holeReady=true;
+                if(this.hasVeil){const v=this.veil.getContext('2d');v.setTransform(1,0,0,1,0,0);v.clearRect(0,0,this.veil.width,this.veil.height);v.setTransform(ctx.getTransform());paintVeil(v);}
+                ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);ctx.restore();
+            },
+            _cpu(ctx) {
+                const color=this.fallbackColor || (this.fallbackColor=document.createElement('canvas'));color.width=ctx.canvas.width;color.height=ctx.canvas.height;color.getContext('2d').drawImage(ctx.canvas,0,0);
+                ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='copy';ctx.drawImage(this.hole,0,0);
+                for(const r of this.records)if(r.mode==='hole'){ctx.globalCompositeOperation='destination-out';ctx.globalAlpha=r.alpha;ctx.drawImage(r.cv,r.x,r.y,r.w,r.h);}
+                ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';if(this.hasVeil)ctx.drawImage(this.veil,0,0);ctx.globalCompositeOperation='lighter';ctx.drawImage(color,0,0);
+                for(const r of this.records)if(r.mode==='color'){ctx.globalAlpha=r.alpha;ctx.drawImage(r.cv,r.x,r.y,r.w,r.h);}ctx.restore();
+            },
+            _copy(texture,flip=false,dx=0,dy=0) {
+                const gl=this.gl;gl.useProgram(this.copyProgram);gl.bindVertexArray(this.copyVAO);gl.bindTexture(gl.TEXTURE_2D,texture);
+                gl.uniform1i(this.copyUniforms.flip,flip);gl.uniform2f(this.copyUniforms.stepUV,dx,dy);gl.drawArrays(gl.TRIANGLES,0,3);this.stats.draws++;
+            },
+            _sprites(mode,w,h) {
+                let n=0;
+                for(const r of this.records)if(r.mode===mode){this.recordData.set([r.x,r.y,r.w,r.h,(r.slot.x+1)/this.atlasSize,(r.slot.y+1)/this.atlasHeight,(r.slot.width||r.cv.width)/this.atlasSize,(r.slot.height||r.cv.height)/this.atlasHeight,r.alpha],n++*9);}
+                if(!n)return;
+                const gl=this.gl;gl.useProgram(this.spriteProgram);gl.bindVertexArray(this.spriteVAO);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
+                gl.bufferSubData(gl.ARRAY_BUFFER,0,this.recordData.subarray(0,n*9));gl.uniform2f(this.spriteSize,w,h);gl.bindTexture(gl.TEXTURE_2D,this.textures[3]);
+                gl.drawArraysInstanced(gl.TRIANGLES,0,6,n);this.stats.draws++;
+            },
+            finish(ctx, options = null) {
+                if(!this.active||!this.holeReady){this.active=false;return null;}
+                let result=null;
+                try {
+                    const setupTime=LightingProfile.start();
+                    const gl=this.gl,w=ctx.canvas.width,h=ctx.canvas.height,soft=!!options?.soft && !GammaExperiment.current.noBlur;
+                    if(this.uploadFailed||w>this.maxSize||h>this.maxSize||gl.isContextLost())throw new Error('Gamma surface limit');
+                    if(this.canvas.width!==w)this.canvas.width=w;if(this.canvas.height!==h)this.canvas.height=h;
+                    gl.viewport(0,0,w,h);gl.activeTexture(gl.TEXTURE0);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);
+                    LightingProfile.end('surface setup',setupTime);
+                    for(const [i,cv]of this.hasVeil?[[0,this.hole],[1,ctx.canvas],[2,this.veil]]:[[0,this.hole],[1,ctx.canvas]]){
+                        if(GammaExperiment.current.freezeLayers && this.textureSizes[i]===w+':'+h){this.stats.frozenLayers++;continue;}
+                        const uploadTime=LightingProfile.start();
+                        gl.bindTexture(gl.TEXTURE_2D,this.textures[i]);
+                        if(this.textureSizes[i]!==w+':'+h){gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,cv);this.textureSizes[i]=w+':'+h;}
+                        else gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,gl.RGBA,gl.UNSIGNED_BYTE,cv);
+                        LightingProfile.end(['base darkness upload','base colour upload','room veil upload'][i],uploadTime);
+                        if(LightingProfile.enabled)LightingProfile.bytes.layers+=cv.width*cv.height*4;
+                        this.stats.layerUploads++;
+                    }
+                    const targetsTime=LightingProfile.start();
+                    if(soft)for(let i=0;i<2;i++){
+                        gl.bindTexture(gl.TEXTURE_2D,this.textures[4+i]);
+                        if(this.textureSizes[4+i]!==w+':'+h){
+                            gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);this.textureSizes[4+i]=w+':'+h;
+                            gl.bindFramebuffer(gl.FRAMEBUFFER,this.fbos[i]);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,this.textures[4+i],0);
+                            if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw new Error('Gamma blur target failed');
+                        }
+                    }
+                    LightingProfile.end('blur target allocation/setup',targetsTime);
+                    const renderTime=LightingProfile.start();LightingProfile.beginGPU('resolve');
+                    gl.bindFramebuffer(gl.FRAMEBUFFER,soft?this.fbos[0]:null);gl.disable(gl.BLEND);this._copy(this.textures[0],true);
+                    if(!GammaExperiment.current.simple){
+                    gl.enable(gl.BLEND);gl.blendFunc(gl.ZERO,gl.ONE_MINUS_SRC_ALPHA);this._sprites('hole',w,h);
+                    if(this.hasVeil){gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);this._copy(this.textures[2],true);}
+                    gl.blendFunc(gl.ONE,gl.ONE);this._copy(this.textures[1],true);this._sprites('color',w,h);
+                    }
+                    gl.disable(gl.BLEND);LightingProfile.endGPU();LightingProfile.end('GPU resolve submission',renderTime);
+                    const blurTime=LightingProfile.start();
+                    if(soft){
+                        LightingProfile.beginGPU('blur');
+                        gl.bindFramebuffer(gl.FRAMEBUFFER,this.fbos[1]);this._copy(this.textures[4],false,1/w,0);
+                        gl.bindFramebuffer(gl.FRAMEBUFFER,null);this._copy(this.textures[5],false,0,1/h);this.stats.blurPasses=2;LightingProfile.endGPU();
+                    }
+                    LightingProfile.end('GPU blur submission',blurTime);
+                    // getError is a synchronous command-stream checkpoint on some
+                    // mobile drivers. Validate initialization, not every resolve;
+                    // context loss and thrown execution failures still recover below.
+                    this.stats.resolves=1;
+                    if(options?.direct)result=this.canvas;
+                    else {const copyTime=LightingProfile.start();ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='copy';ctx.drawImage(this.canvas,0,0);ctx.restore();LightingProfile.end('GPU to Canvas light copy',copyTime);}
+                } catch (error) {LightingProfile.endGPU();const t=LightingProfile.start();this._cpu(ctx);LightingProfile.end('High failure recovery',t);this.failed=true;this.stats.backend='high-fallback';this.stats.failure=String(error?.message||error);}
+                this.active=false;this.records.length=0;return result;
+            }
+        };
+        // Dynamic lamp occlusion belongs to each light's contribution, never to
+        // a darkness overlay added after unrelated lights have been combined.
+        // Renderers only register a caster; light selection, visibility, projection
+        // and bounded caches live here. Contact / sun shadows are independent.
+        const DYNAMIC_SHADOW = {
+            CELL: 128, MAX_CASTERS: 256, MAX_BYTES: 24 * 1048576,
+            MAX_CAPTURES: 16, SILHOUETTE_SIDE: 40,
+            low: { maxSources: 24, otherLights: 4, maxLights: 8, perLight: 12, density: 0.25, side: 128, reach: 90 },
+            high: { maxSources: 48, otherLights: 8, maxLights: 16, perLight: 24, density: 0.5, side: 256, reach: 120 },
+            ultra: { maxSources: 80, otherLights: 12, maxLights: 32, perLight: 32, density: 0.5, side: 256, reach: Infinity },
+            // Opt-in beta: twice Ultra's raster resolution, expanded coverage; same memory ceiling.
+            gamma: { maxSources: 48, otherLights: 8, maxLights: 16, perLight: 24, density: 0.5, side: 256, reach: 120 },
+            beta: { maxSources: 128, otherLights: 20, maxLights: 48, perLight: 48, density: 1, side: 512, reach: Infinity }
+        };
+        const DynamicShadows = {
+            map: null, frame: 0, engine: null, quality: 'off', bytes: 0,
+            entries: new WeakMap(), lights: new Map(), keeps: new WeakMap(), sources: new WeakMap(), doorLeaves: new WeakMap(),
+            casters: [], cells: new Map(), geometry: new Map(), wallRefs: new Set(), revision: 0, wallRevision: 0,
+            _nextId: 0, _captureCount: 0, _mask: null, _casterMask: null, _white: null,
+            stats: { casters: 0, pairs: 0, blocked: 0, rays: 0, builds: 0, hits: 0, dropped: 0, captures: 0, sources: 0, doors: 0 },
+
+            clear() {
+                GammaShadows.reset();
+                this.entries = new WeakMap(); this.keeps = new WeakMap(); this.sources = new WeakMap(); this.doorLeaves = new WeakMap();
+                this.lights.clear(); this.cells.clear(); this.geometry.clear(); this.wallRefs.clear(); this.wallRevision++;
+                this.casters.length = 0; this.bytes = 0; this.revision++;
+            },
+            begin(engine) {
+                const quality = GameSettings.lampShadows || 'low';
+                if (this.map !== engine.activeMap || quality !== this.quality) this.clear();
+                this.engine = engine; this.map = engine.activeMap; this.quality = quality;
+                this.frame++; this._captureCount = 0; this._shadowLightCount = 0; this._families = Object.create(null); this.casters.length = 0; this.cells.clear();
+                this.visible = !!(this.map && (engine.getAmbientDarkness() > 0.01 || (engine.projectiles || []).some(p => p.isFireball && p.active !== false) || (engine._fireTrail || []).length));
+                for (const k in this.stats) this.stats[k] = 0;
+                if (quality === 'off' || !this.map) return;
+                // Check geometry once for all lamps. Queries share the existing spatial index.
+                const obstacles = getOccluders(this.map), seen = new Set(), walls = new Set(); let changed = false, staticChanged = false;
+                for (const o of obstacles) {
+                    if (!o) continue;
+                    seen.add(o); walls.add(o);
+                    const values = [o.x, o.y, o.w ?? o.width, o.h ?? o.height];
+                    const old = this.geometry.get(o);
+                    if (!old || values.some((v, i) => !Object.is(v, old[i]))) { this.geometry.set(o, values); changed = staticChanged = true; }
+                }
+                if (walls.size !== this.wallRefs.size || [...walls].some(o => !this.wallRefs.has(o))) staticChanged = true;
+                this.wallRefs = walls;
+                if (staticChanged) this.wallRevision++;
+                const rs = engine.roomSystem;
+                for (const d of (rs && rs.active ? rs.doors : []) || []) {
+                    seen.add(d); const leaves = typeof d.leaves === 'function' ? d.leaves() : [];
+                    const values = [d.openAmount, d.x, d.y, d.angle, d.shadowOpacity, ...leaves.flat()];
+                    const old = this.geometry.get(d);
+                    if (!old || values.some((v, i) => !Object.is(v, old[i]))) { this.geometry.set(d, values); changed = true; }
+                }
+                for (const o of this.geometry.keys()) if (!seen.has(o)) { this.geometry.delete(o); changed = true; }
+                if (changed) { this.revision++; _physicsSpatial.invalidate(obstacles); }
+                // Release unseen sources, including maps with edited lamp membership.
+                const sources = new Set(engine.lamps || []);
+                for (const [light, s] of this.lights) if ((!light.dynamic && !sources.has(light)) || this.frame - s.used > 120) {
+                    this.bytes -= s.bytes; this.lights.delete(light);
+                }
+                if (rs && rs.active) for (const d of rs.doors || []) this.noteDoor(d);
+            },
+
+            // Shapes are in an entity's local ground frame. elevation controls the
+            // cast length; radius / width / depth describe the footprint, not height.
+            note(entity, shape = {}) {
+                if (!this.map || !this.visible || this.quality === 'off' || _zoomLOD >= 2 || !entity || entity.visible === false || entity.active === false || entity.dead || entity.inCar || entity._reflectionProxy) return;
+                const x = entity.x + (shape.dx || 0), y = entity.y + (shape.dy || 0);
+                if (!Number.isFinite(x + y)) return;
+                let e = this.entries.get(entity);
+                if (!e) { e = { entity, id: ++this._nextId, revision: 0, frame: -1 }; this.entries.set(entity, e); }
+                if (e.frame === this.frame) return;
+                if (this.casters.length >= DYNAMIC_SHADOW.MAX_CASTERS) { this.stats.dropped++; return; }
+                if (shape.points && (!Array.isArray(shape.points) || shape.points.length < 3 || shape.points.length > 32 || shape.points.some(p => !Array.isArray(p) || !Number.isFinite(p[0] + p[1])))) return;
+                const kind = shape.kind || 'circle', width = shape.width || (shape.points ? Math.max(1, ...shape.points.map(p => Math.abs(p[0]))) * 2 : (shape.radius || entity.radius || 9) * 2);
+                const depth = shape.depth || (shape.points ? Math.max(1, ...shape.points.map(p => Math.abs(p[1]))) * 2 : width), angle = entity.angle || 0, elevation = shape.elevation ?? 24;
+                const opacity = shape.opacity ?? 0.85;
+                if (!(width > 0 && depth > 0 && elevation > 0 && opacity > 0) || !Number.isFinite(width + depth + angle + elevation + opacity)) return;
+                const pointsKey = shape.points ? shape.points.flat().join(',') : null;
+                if (e.pointsKey !== pointsKey) e.revision++;
+                e.pointsKey = pointsKey;
+                if (e.x !== x || e.y !== y || e.angle !== angle || e.width !== width || e.depth !== depth || e.kind !== kind || e.elevation !== elevation || e.opacity !== opacity || e.points !== shape.points || e.door !== shape.door || e.fullBlocker !== !!shape.fullBlocker) e.revision++;
+                Object.assign(e, { x, y, angle, width, depth, kind, elevation, opacity, points: shape.points, door: shape.door, fullBlocker: !!shape.fullBlocker, frame: this.frame });
+                const c = Math.abs(Math.cos(angle)), s = Math.abs(Math.sin(angle));
+                const ex = (c * width + s * depth) / 2, ey = (s * width + c * depth) / 2, C = DYNAMIC_SHADOW.CELL;
+                for (let bx = Math.floor((x - ex) / C); bx <= Math.floor((x + ex) / C); bx++) for (let by = Math.floor((y - ey) / C); by <= Math.floor((y + ey) / C); by++) {
+                    const key = bx + ',' + by;
+                    let cell = this.cells.get(key); if (!cell) this.cells.set(key, cell = []);
+                    cell.push(e);
+                }
+                this.casters.push(e); this.stats.casters++;
+            },
+            noteHuman(e) { this.note(e, { kind: 'human', width: 18, depth: 18, elevation: 24 }); },
+            noteVehicle(e) { this.note(e, { kind: 'box', width: e.length, depth: e.vehicleWidth || e.width, elevation: 15 }); },
+            noteProp(e) {
+                if (!e.hasCollision || e.noNav) return;
+                this.note(e, { kind: 'box', dx: e.width / 2, dy: e.height / 2, width: e.width, depth: e.height, elevation: Math.min(24, Math.max(6, Math.min(e.width, e.height) * 0.5)) });
+            },
+            noteDoor(door) {
+                if (door.type === 'arch' || typeof door.leaves !== 'function') return;
+                let entries = this.doorLeaves.get(door);
+                if (!entries) this.doorLeaves.set(door, entries = []);
+                const leaves = door.leaves();
+                for (let i = 0; i < leaves.length; i++) {
+                    const L = leaves[i], dx = L[2] - L[0], dy = L[3] - L[1];
+                    const e = entries[i] || (entries[i] = {});
+                    Object.assign(e, { x: (L[0] + L[2]) / 2, y: (L[1] + L[3]) / 2, angle: Math.atan2(dy, dx) });
+                    const before = this.casters.length;
+                    this.note(e, { kind: 'box', width: Math.hypot(dx, dy), depth: Math.max(2, (door.halfThick || 3) * 2), elevation: door.shadowElevation || 40,
+                        opacity: door.shadowOpacity ?? (door.type === 'sliding' ? 0.35 : 1), fullBlocker: true, door });
+                    if (this.casters.length > before) this.stats.doors++;
+                }
+            },
+            source(owner, family, description) {
+                let byKind = this.sources.get(owner);
+                if (!byKind) this.sources.set(owner, byKind = new Map());
+                let light = byKind.get(family);
+                if (!light) byKind.set(family, light = { dynamic: true, family, owner });
+                Object.assign(light, description); light.family = description.family || family; light.seen = this.frame;
+                return light;
+            },
+            _doorBlocked(light, x, y, ignore) {
+                const rs = this.engine.roomSystem;
+                if (!rs || !rs.active) return false;
+                let physical = false;
+                for (const d of rs.doors || []) {
+                    if (typeof d.leaves !== 'function') continue;
+                    physical = true;
+                    if (d === ignore || d.type === 'arch' || (d.shadowOpacity ?? (d.type === 'sliding' ? 0.35 : 1)) < 0.95) continue;
+                    for (const L of d.leaves()) if (segmentsCross(light.x, light.y, x, y, ...L)) return true;
+                }
+                return !physical && typeof rs.doorBlocks === 'function' && rs.doorBlocks(light.x, light.y, x, y);
+            },
+            _staticReachable(light, x, y) {
+                this.stats.rays++;
+                if (light.noWorldWalls) {
+                    for (const s of light.segments || []) if (segmentsCross(light.x, light.y, x, y, s.x1, s.y1, s.x2, s.y2)) return false;
+                    return true;
+                }
+                const obstacles = getOccluders(this.map);
+                const candidates = _physicsSpatial.query(obstacles, { left: Math.min(light.x, x), right: Math.max(light.x, x), top: Math.min(light.y, y), bottom: Math.max(light.y, y) });
+                for (const o of candidates) if (o && segCrossesRect(light.x, light.y, x, y, o.x, o.y, o.w ?? o.width, o.h ?? o.height)) return false;
+                return true;
+            },
+            reachable(light, x, y, ignoreDoor) { return this._staticReachable(light, x, y) && !this._doorBlocked(light, x, y, ignoreDoor); },
+            wantsSilhouette(e, config) {
+                if ((this.quality !== 'high' && this.quality !== 'gamma') || config._crowdBake || config.isDriving || config.noShadow || e._reflectionProxy || _zoomLOD >= 2 || !this.map || !this.visible) return false;
+                if (this._captureCount >= DYNAMIC_SHADOW.MAX_CAPTURES) return false;
+                const key = JSON.stringify([config.body, config.hair, config.top, config.bottom, config.shoes, config.hat, config.weapon, config.pose, config.stance]);
+                const keep = this.keeps.get(e), moving = e._gait && e._gait.speed > CONFIG.GAIT.STOP_SPEED;
+                if (keep && keep.key === key && keep.angle === e.angle && _frameTime - keep.at < (moving ? 100 : 1000)) return false;
+                const lights = [...(this.engine.lamps || []), ...[...this.lights.keys()].filter(l => l.dynamic && l.seen >= this.frame - 1 && (l.elevation ?? 84) > 24)];
+                let near = false;
+                const rs = this.engine.roomSystem;
+                for (const l of lights) if ((l.intensity ?? 1) > 0 && (!rs || !rs.active || !rs.lampLight || rs.lampLight(l) > 0.01) && lampWake(l) > 0.01 && Math.hypot(l.x - e.x, l.y - e.y) < l.radius && this.reachable(l, e.x, e.y)) { near = true; break; }
+                if (!near) return false;
+                e._dynamicShadowCaptureKey = key;
+                this._captureCount++; this.stats.captures++;
+                return true;
+            },
+            keepSilhouette(e, cv, ox, oy, side) {
+                const W = typeof _worldMatrix !== 'undefined' ? _worldMatrix : null;
+                if (!W || !side || typeof DOMMatrix === 'undefined' || !this.map) return;
+                let k = this.keeps.get(e);
+                if (!k) {
+                    const canvas = document.createElement('canvas'); canvas.width = canvas.height = DYNAMIC_SHADOW.SILHOUETTE_SIDE;
+                    k = { cv: canvas, revision: 0 }; this.keeps.set(e, k);
+                }
+                const g = k.cv.getContext('2d'), half = side / 2;
+                const cut = Math.min(half, CONFIG.HUMAN_SHADE.LAMP_SHADOW_CAP_R * Math.hypot(W.a, W.b)), offset = half - cut;
+                g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'copy';
+                g.drawImage(cv, offset, offset, cut * 2, cut * 2, 0, 0, k.cv.width, k.cv.height);
+                g.globalCompositeOperation = 'source-in'; g.fillStyle = '#fff'; g.fillRect(0, 0, k.cv.width, k.cv.height); g.globalCompositeOperation = 'source-over';
+                const scale = cut * 2 / k.cv.width;
+                k.m = new DOMMatrix([W.a, W.b, W.c, W.d, W.e, W.f]).inverse().multiply(new DOMMatrix([scale, 0, 0, scale, ox + offset, oy + offset]));
+                k.x = e.x; k.y = e.y; k.angle = e.angle; k.at = _frameTime; k.key = e._dynamicShadowCaptureKey; k.revision++;
+            },
+
+            _state(light) {
+                let s = this.lights.get(light);
+                if (!s) { s = { pairs: new Map(), used: this.frame, bytes: 0, signature: null, path: null }; this.lights.set(light, s); }
+                s.used = this.frame;
+                return s;
+            },
+            _inside(e, x, y) {
+                const c = Math.cos(e.angle), s = Math.sin(e.angle), dx = x - e.x, dy = y - e.y;
+                const lx = dx * c + dy * s, ly = -dx * s + dy * c;
+                if (e.kind === 'box') return Math.abs(lx) < e.width / 2 && Math.abs(ly) < e.depth / 2;
+                if (!e.points) return (lx / (e.width / 2)) ** 2 + (ly / (e.depth / 2)) ** 2 < 1;
+                let inside = false;
+                for (let i = 0, j = e.points.length - 1; i < e.points.length; j = i++) {
+                    const a = e.points[i], b = e.points[j];
+                    if ((a[1] > ly) !== (b[1] > ly) && lx < (b[0] - a[0]) * (ly - a[1]) / (b[1] - a[1]) + a[0]) inside = !inside;
+                }
+                return inside;
+            },
+            _pairs(light, s, policy) {
+                const candidates = [], seen = new Set(), R = light.radius, C = DYNAMIC_SHADOW.CELL;
+                light.segmentKey = light.noWorldWalls ? (light.segments || []).map(s => [s.x1, s.y1, s.x2, s.y2].join(',')).join(';') : '';
+                for (let bx = Math.floor((light.x - R) / C); bx <= Math.floor((light.x + R) / C); bx++) for (let by = Math.floor((light.y - R) / C); by <= Math.floor((light.y + R) / C); by++) {
+                    const cell = this.cells.get(bx + ',' + by);
+                    if (cell) for (const e of cell) {
+                        if (seen.has(e)) continue; seen.add(e);
+                        const d = Math.hypot(e.x - light.x, e.y - light.y);
+                        if ((!light.acceptCaster || light.acceptCaster(e)) && e.entity !== light.owner && d > 0.001 && !this._inside(e, light.x, light.y) && d < R + Math.hypot(e.width, e.depth) / 2) candidates.push({ e, d });
+                    }
+                }
+                candidates.sort((a, b) => a.d - b.d || a.e.id - b.e.id);
+                const out = [], present = new Set();
+                for (let i = 0; i < candidates.length; i++) {
+                    if (out.length >= policy.perLight) { this.stats.dropped += candidates.length - i; break; }
+                    const { e, d } = candidates[i];
+                    present.add(e);
+                    let p = s.pairs.get(e);
+                    if (!p || p.revision !== e.revision || p.geometry !== this.wallRevision || p.lx !== light.x || p.ly !== light.y || p.radius !== R || p.segmentKey !== light.segmentKey) {
+                        p = { e, d, revision: e.revision, geometry: this.wallRevision, lx: light.x, ly: light.y, radius: R, segmentKey: light.segmentKey, staticVisible: this._staticReachable(light, e.x, e.y) };
+                        s.pairs.set(e, p);
+                    }
+                    p.visible = p.staticVisible && !this._doorBlocked(light, e.x, e.y, e.door);
+                    if (!p.visible) { this.stats.blocked++; continue; }
+                    if (out.length >= policy.perLight) { this.stats.dropped++; continue; }
+                    out.push(p);
+                }
+                for (const e of s.pairs.keys()) if (!present.has(e)) s.pairs.delete(e);
+                return out;
+            },
+            _path(light, s) {
+                if (light.clipPath) return light.clipPath;
+                if (light.noWorldWalls) {
+                    const p = new Path2D(), b = light.bounds || { x: light.x - light.radius, y: light.y - light.radius, w: light.radius * 2, h: light.radius * 2 };
+                    p.rect(b.x, b.y, b.w, b.h); return p;
+                }
+                if (s.path && s.pathRevision === this.wallRevision && s.pathX === light.x && s.pathY === light.y && s.pathR === light.radius && s.poly === light._shadowPoly) return s.path;
+                // The lamp's static visibility is native too; recompute when the
+                // source or map geometry moves, rather than using a stale bake.
+                const poly = computeVisibilityPoly(light.x, light.y, light.radius, getOccluders(this.map), { aMin: 0, aMax: Math.PI * 2, arcStep: 0.18 });
+                const path = new Path2D();
+                if (poly.length) { path.moveTo(poly[0].x, poly[0].y); for (let i = 1; i < poly.length; i++) path.lineTo(poly[i].x, poly[i].y); path.closePath(); }
+                Object.assign(s, { path, pathRevision: this.wallRevision, pathX: light.x, pathY: light.y, pathR: light.radius, poly: light._shadowPoly });
+                return path;
+            },
+            _hull(points) {
+                points.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+                const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+                const lo = [], hi = [];
+                for (const p of points) { while (lo.length >= 2 && cross(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+                for (let i = points.length - 1; i >= 0; i--) { const p = points[i]; while (hi.length >= 2 && cross(hi[hi.length - 2], hi[hi.length - 1], p) <= 0) hi.pop(); hi.push(p); }
+                lo.pop(); hi.pop(); return lo.concat(hi);
+            },
+            _cast(g, light, pair, policy) {
+                const e = pair.e, d = pair.d, ang = Math.atan2(e.y - light.y, e.x - light.x);
+                const slope = e.elevation / Math.max(1, (light.elevation ?? 84) - e.elevation);
+                const full = e.fullBlocker || (this.quality === 'ultra' || this.quality === 'beta') || (light.elevation !== undefined && light.elevation <= e.elevation);
+                const len = Math.min(policy.reach, Math.max(0, light.radius - d), d * slope);
+                const keep = this.quality === 'low' ? null : this.keeps.get(e.entity);
+                g.save(); g.globalAlpha = Math.max(0, Math.min(1, e.opacity));
+                if (keep && keep.m && keep.angle === e.angle && !full) {
+                    const D = CONFIG.HUMAN_SHADE.LAMP_SHADOW_DEPTH;
+                    g.translate(e.x, e.y); g.rotate(ang); g.translate(-D / 2, 0); g.scale((D + len) / D, 1); g.translate(D / 2, 0);
+                    g.rotate(-ang); g.translate(-keep.x, -keep.y);
+                    const m = keep.m; g.transform(m.a, m.b, m.c, m.d, m.e, m.f); g.drawImage(keep.cv, 0, 0);
+                } else if (!full && this.quality === 'low' && e.kind !== 'box' && e.kind !== 'polygon') {
+                    g.translate(e.x, e.y); g.rotate(ang);
+                    g.drawImage(this._white || (this._white = glowSprite('255, 255, 255', 0.55)), -e.width / 2, -e.depth / 2, e.width + len, e.depth);
+                } else {
+                    const local = e.points || (e.kind === 'box' ? [[-e.width / 2, -e.depth / 2], [e.width / 2, -e.depth / 2], [e.width / 2, e.depth / 2], [-e.width / 2, e.depth / 2]]
+                        : Array.from({ length: 12 }, (_, i) => [Math.cos(i * Math.PI / 6) * e.width / 2, Math.sin(i * Math.PI / 6) * e.depth / 2]));
+                    const c = Math.cos(e.angle), s = Math.sin(e.angle), points = [];
+                    const scale = full ? Math.max(1, light.radius / d) : 1 + len / d;
+                    for (const p of local) {
+                        const x = e.x + p[0] * c - p[1] * s, y = e.y + p[0] * s + p[1] * c;
+                        const projection = full ? Math.max(1, light.radius / Math.max(0.001, Math.hypot(x - light.x, y - light.y))) : scale;
+                        points.push([x, y], [light.x + (x - light.x) * projection, light.y + (y - light.y) * projection]);
+                    }
+                    const hull = this._hull(points); g.fillStyle = '#fff'; g.beginPath();
+                    hull.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); g.fill();
+                }
+                g.restore();
+            },
+            _base(g, e) {
+                // A caster receives its own lamp light. Remove its original body
+                // from this one cast before unioning it with other casters' masks.
+                g.save(); g.globalAlpha = 1; g.globalCompositeOperation = 'destination-out';
+                const keep = this.quality === 'low' ? null : this.keeps.get(e.entity);
+                if (keep && keep.m && keep.angle === e.angle && this.quality !== 'ultra' && this.quality !== 'beta') {
+                    g.translate(e.x - keep.x, e.y - keep.y);
+                    const m = keep.m; g.transform(m.a, m.b, m.c, m.d, m.e, m.f); g.drawImage(keep.cv, 0, 0);
+                } else {
+                    g.translate(e.x, e.y); g.rotate(e.angle); g.fillStyle = '#fff'; g.beginPath();
+                    if (e.points) { e.points.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); }
+                    else if (e.kind === 'box') g.rect(-e.width / 2, -e.depth / 2, e.width, e.depth);
+                    else g.ellipse(0, 0, e.width / 2, e.depth / 2, 0, 0, Math.PI * 2);
+                    g.fill();
+                }
+                g.restore();
+            },
+            prepare(light) {
+                if (this.quality === 'off' || _zoomLOD >= 2 || !this.map || !(light.radius > 0) || !Number.isFinite(light.x + light.y + light.radius)) return null;
+                const policy = DYNAMIC_SHADOW[this.quality] || DYNAMIC_SHADOW.low, s = this._state(light);
+                if (s.prepared === this.frame) return s.ready ? s : null;
+                s.prepared = this.frame; s.ready = false;
+                const family = light.family || 'lamp', limit = family === 'lamp' ? policy.maxLights : policy.otherLights;
+                if (this._shadowLightCount >= policy.maxSources || (this._families[family] || 0) >= limit) { s.pairs.clear(); this.stats.dropped++; return null; }
+                const pairs = this._pairs(light, s, policy); this.stats.pairs += pairs.length;
+                if (!pairs.length) { if (s.bytes) { this.bytes -= s.bytes; s.bytes = 0; s.hole = s.color = null; } s.signature = null; return null; }
+                this._shadowLightCount++; this._families[family] = (this._families[family] || 0) + 1; this.stats.sources++; s.maskUsed = this.frame;
+                const path = this._path(light, s), R = light.radius;
+                const bounds = light.bounds || { x: light.x - R, y: light.y - R, w: R * 2, h: R * 2 };
+                if (!(bounds.w > 0 && bounds.h > 0) || !Number.isFinite(bounds.x + bounds.y + bounds.w + bounds.h)) return null;
+                const scale = Math.min(policy.density, policy.side / Math.max(bounds.w, bounds.h));
+                const width = Math.max(16, Math.ceil(bounds.w * scale)), height = Math.max(16, Math.ceil(bounds.h * scale));
+                const signature = [light.x, light.y, light.radius, light.elevation, light.color, light.style, light.segmentKey, light.samePaint, light.noWorldWalls, this.wallRevision, this.quality, bounds.x, bounds.y, bounds.w, bounds.h, width, height, ...pairs.map(p => p.e.id + ':' + p.e.revision + ':' + (this.keeps.get(p.e.entity)?.revision || 0))].join('|');
+                if (signature === s.signature && s.baseRef === light.baseRef && s.clipRef === light.clipPath && s.hole) { this.stats.hits++; s.ready = true; return s; }
+                const bytes = width * height * (light.samePaint ? 4 : 8);
+                while (this.bytes - s.bytes + bytes > DYNAMIC_SHADOW.MAX_BYTES) {
+                    let oldest = null;
+                    for (const [l, cached] of this.lights) if (cached !== s && cached.bytes && (cached.maskUsed || 0) < this.frame && (!oldest || (cached.maskUsed || 0) < (oldest[1].maskUsed || 0))) oldest = [l, cached];
+                    if (!oldest) { this.stats.dropped += pairs.length; return null; }
+                    this.bytes -= oldest[1].bytes; this.lights.delete(oldest[0]);
+                }
+                this.bytes += bytes - s.bytes; s.bytes = bytes;
+                const rasterTime=LightingProfile.start();
+                const mask = this._mask || (this._mask = document.createElement('canvas')); mask.width = width; mask.height = height;
+                const mg = mask.getContext('2d'), x = bounds.x, y = bounds.y, sx = width / bounds.w, sy = height / bounds.h;
+                const casterMask = this._casterMask || (this._casterMask = document.createElement('canvas'));
+                casterMask.width = width; casterMask.height = height;
+                const cg = casterMask.getContext('2d');
+                for (const p of pairs) {
+                    cg.setTransform(1, 0, 0, 1, 0, 0); cg.clearRect(0, 0, width, height);
+                    cg.setTransform(sx, 0, 0, sy, -x * sx, -y * sy);
+                    this._cast(cg, light, p, policy); this._base(cg, p.e);
+                    mg.drawImage(casterMask, 0, 0);
+                }
+                if (!light.samePaint && s.color === s.hole) s.color = null;
+                for (const mode of light.samePaint ? ['hole'] : ['hole', 'color']) {
+                    const cv = s[mode] || (s[mode] = document.createElement('canvas')); cv.width = width; cv.height = height;
+                    const g = cv.getContext('2d'); g.setTransform(sx, 0, 0, sy, -x * sx, -y * sy);
+                    g.save(); g.clip(path);
+                    if (light.paint) light.paint(g, mode);
+                    else {
+                    const grad = g.createRadialGradient(light.x, light.y, mode === 'hole' ? Math.min(10, R * 0.1) : 0, light.x, light.y, R);
+                    if (mode === 'hole') { grad.addColorStop(0, '#fff'); grad.addColorStop(1, 'rgba(255,255,255,0)'); }
+                    else { grad.addColorStop(0, '#fff'); grad.addColorStop(0.1, light.color || '#fff'); grad.addColorStop(0.6, light.color || '#fff'); grad.addColorStop(1, 'rgba(0,0,0,0)'); }
+                    g.fillStyle = grad; g.fillRect(x, y, R * 2, R * 2);
+                    } g.restore();
+                    g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'destination-out'; g.drawImage(mask, 0, 0); g.globalCompositeOperation = 'source-over';
+                }
+                LightingProfile.end('mask raster + sprite painting',rasterTime);
+                if (light.samePaint) s.color = s.hole;
+                Object.assign(s, { signature, x, y, size: R * 2, w: bounds.w, h: bounds.h, baseRef: light.baseRef, clipRef: light.clipPath, ready: true }); this.stats.builds++;
+                return s;
+            },
+            visibilityPath(light) {
+                if (!this.map || this.quality === 'off' || !(light.radius > 0) || !Number.isFinite(light.x + light.y + light.radius)) return null;
+                return this._path(light, this._state(light));
+            },
+            drawLight(ctx, light, mode) {
+                const s = this.prepare(light);
+                if (!s) return false;
+                if (GammaShadows.collect(ctx, s, mode)) return true;
+                ctx.drawImage(s[mode], s.x, s.y, s.w, s.h);
+                return true;
+            }
+        };
         const HAIR_SIM = {
             STEP: 1 / 120,          // game seconds per physics slice
             MAX_STEPS: 12,          // catch-up cap after a stall
@@ -49527,26 +50248,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
             return best ? { l: best, d: bd } : null;
         }
-        /** The (up to) two nearest street lamps within R of x, y, nearest first: [{ l, d }] (reused array). */
-        const _lampPair = [{ l: null, d: 0 }, { l: null, d: 0 }];
-        let _lampPairN = 0;
-        function _lampsNear2(x, y, R) {
-            _lampPairN = 0;
-            const cells = _lampCells();
-            if (!cells) return 0;
-            const cx = Math.floor(x / 200), cy = Math.floor(y / 200), A = _lampPair[0], B = _lampPair[1];
-            for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
-                const c = cells.get((cx + i) + ',' + (cy + j));
-                if (c) for (const l of c) {
-                    const d = Math.hypot(l.x - x, l.y - y);
-                    if (d >= R) continue;
-                    if (!_lampPairN || d < A.d) { B.l = A.l; B.d = A.d; A.l = l; A.d = d; _lampPairN = Math.min(2, _lampPairN + 1); }
-                    else if (_lampPairN < 2 || d < B.d) { B.l = l; B.d = d; _lampPairN = 2; }
-                }
-            }
-            return _lampPairN;
-        }
-
         /**
          * The light on this body right now, in its own frame: level (0 flat · 1 limbs only · 2 all),
          * lx/ly (unit-ish toward the light, 0 when it's overhead), hl/sh (shine and shade fills),
@@ -49616,7 +50317,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 c.fillStyle = g; c.fillRect(0, 0, 96, 96);
             }
             // Lamp shadows from dusk, while the sun's cast fades.
-            if (entity && entity.x !== undefined && _lampShadowLevel() && sunNow().night > 0.3) _noteLampShadowBody(entity, C);
+            if (entity && entity.x !== undefined) DynamicShadows.noteHuman(entity);
             ctx.save();
             // Undo the body facing once: neither the contact ellipse nor the sun's
             // anchor should acquire a rotating local offset. Keep parent scale/alpha.
@@ -49633,167 +50334,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             ctx.drawImage(_humanContactSprite, -C.CONTACT_RX, -C.CONTACT_RY, C.CONTACT_RX * 2, C.CONTACT_RY * 2);
             ctx.restore();
         }
-        /** Lamp shadows (Settings → Graphics → Lamp Shadows): cast away from the nearest burning lamps at night.
-         *   low   — a soft shade stretched away from each of the two nearest lamps, longer the farther off a
-         *           person stands (a lamp is only a few heads taller than a person), fading with the lamp's
-         *           falloff; the light layer takes the lamp's light back past the feet (cheap: a few sprites)
-         *   high  — the shade is the body's own silhouette, stretched away from the lamp: the body is drawn
-         *           into SilhouetteFX's capture and stamped back (nothing ticks twice), and the capture kept
-         *           small for the next frame's shadow (costs a capture and a copy per lit body)
-         *   ultra — and every lit lamp near a person is blocked by them, like a wall: a wedge of the dark
-         *           from the body out to the lamp's reach in the light layer (bodies × lamps, every frame)
-         *   off   — none
-         *  They lie on their own layer under everyone: a body's draw only notes that it was drawn
-         *  (_noteLampShadowBody), and draw.js paints the shadows of the bodies noted last frame, at where they
-         *  stand now, before the people pass (drawLampShadowsUnder). The light layer's half is
-         *  drawLampShadowsInto (lighting.js). */
-        const LampShadows = { frame: -1, n: 0, list: [], noted: [], drawn: [], noteFrame: -1, peds: 0, tint: null, sprite: null, ground: null,
-                              seq: 0, captures: 0, captureFrame: -1, keeps: new WeakMap(), bodies: [] };
-        const LAMP_KEEP = 40;                                                    // kept silhouette, px a side
-        /** 0 off · 1 low · 2 high · 3 ultra */
-        function _lampShadowLevel() {
-            const v = typeof GameSettings !== 'undefined' ? GameSettings.lampShadows : 'low';
-            return v === 'ultra' ? 3 : v === 'high' ? 2 : v === 'off' ? 0 : 1;
-        }
-        /** A firmer blob than the contact shadow's: a person's length of shade with a soft rim, so it reads as a shape. */
-        function _lampShadowSprite(rgb, cv) {
-            cv = cv || document.createElement('canvas'); cv.width = cv.height = 64;
-            const c = cv.getContext('2d'), g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
-            g.addColorStop(0, `rgba(${rgb}, 1)`); g.addColorStop(0.55, `rgba(${rgb}, 0.85)`); g.addColorStop(1, `rgba(${rgb}, 0)`);
-            c.fillStyle = g; c.fillRect(0, 0, 64, 64);
-            return cv;
-        }
-        function _noteLampShadowBody(entity, C) {
-            const S = LampShadows;
-            if (S.noteFrame !== _frameTime) { S.noteFrame = _frameTime; S.peds = 0; }
-            if (entity._lampShadowFrame === _frameTime) return;               // once a frame, however many times it's drawn
-            const ped = typeof Pedestrian !== 'undefined' && entity instanceof Pedestrian;
-            if ((ped && S.peds >= C.LAMP_SHADOW_PEDS) || S.noted.length >= 128) return;   // (a view that never paints them can't pile up)
-            if (ped) S.peds++;
-            entity._lampShadowFrame = _frameTime;
-            S.noted.push(entity);
-        }
-        /** High and up: should this body be drawn through the capture, so its silhouette can cast the shadow? */
-        function _lampShadowWants(entity, config) {
-            if (_lampShadowLevel() < 2 || config._crowdBake || config.isDriving || config.noShadow || entity._reflectionProxy) return false;
-            if (entity.x === undefined || (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2) || typeof sunNow !== 'function' || sunNow().night <= 0.3) return false;
-            const S = LampShadows;
-            if (S.captureFrame !== _frameTime) { S.captureFrame = _frameTime; S.captures = 0; }
-            if (S.captures >= CONFIG.HUMAN_SHADE.LAMP_SHADOW_HIGH_MAX) return false;
-            if (!_lampsNear2(entity.x, entity.y, CONFIG.HUMAN_SHADE.LAMP_SHADOW_R)) return false;
-            S.captures++;
-            return true;
-        }
-        /** SilhouetteFX.end hands over a finished capture (before any tint): kept small, in the shadow's colour,
-         *  with where its pixels sit in the world, for the next frame's shadow. */
-        function keepLampSilhouette(entity, cv, ox, oy, side) {
-            const W = typeof _worldMatrix !== 'undefined' ? _worldMatrix : null;
-            if (!W || !side || typeof DOMMatrix === 'undefined') return;
-            const S = LampShadows;
-            let k = S.keeps.get(entity);
-            if (!k) {
-                const kc = document.createElement('canvas'); kc.width = kc.height = LAMP_KEEP;
-                k = { cv: kc, m: null, x: 0, y: 0, seq: -1 };
-                S.keeps.set(entity, k);
-            }
-            const g = k.cv.getContext('2d');
-            if (!g) return;
-            g.setTransform(1, 0, 0, 1, 0, 0);
-            g.globalCompositeOperation = 'copy';
-            // Only the middle LAMP_SHADOW_CAP_R round the body (her glow's capture reaches farther)
-            const half = side / 2, cut = Math.min(half, CONFIG.HUMAN_SHADE.LAMP_SHADOW_CAP_R * Math.hypot(W.a, W.b)), o = half - cut;
-            g.drawImage(cv, o, o, cut * 2, cut * 2, 0, 0, LAMP_KEEP, LAMP_KEEP);
-            g.globalCompositeOperation = 'source-in';
-            g.fillStyle = `rgb(${_SHADOW_RGB})`; g.fillRect(0, 0, LAMP_KEEP, LAMP_KEEP);
-            g.globalCompositeOperation = 'source-over';
-            // kept px → capture px → screen → world
-            const sc = cut * 2 / LAMP_KEEP;
-            k.m = new DOMMatrix([W.a, W.b, W.c, W.d, W.e, W.f]).inverse().multiply(new DOMMatrix([sc, 0, 0, sc, ox + o, oy + o]));
-            k.x = entity.x; k.y = entity.y; k.seq = S.seq;
-        }
-        /** The ground layer (draw.js, before the people pass, world transform): last frame's bodies, where they stand now. */
-        function drawLampShadowsUnder(ctx) {
-            const S = LampShadows, C = CONFIG.HUMAN_SHADE, bodies = S.noted, level = _lampShadowLevel();
-            S.noted = S.drawn; S.noted.length = 0; S.drawn = bodies;            // swap: this frame's draws note into the other list
-            S.frame = _frameTime; S.n = 0; S.bodies.length = 0; S.seq++;
-            if (!bodies.length || !level || (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2)) return;
-            const sun = sunNow();
-            if (sun.night <= 0.3) return;
-            const dusk = Math.min(1, (sun.night - 0.3) / 0.4), sp = S.ground || (S.ground = _lampShadowSprite(_SHADOW_RGB));
-            const a0 = ctx.globalAlpha, D = C.LAMP_SHADOW_DEPTH;
-            for (const e of bodies) {
-                if (e.visible === false || e.dead || e.inCar) continue;
-                const n = _lampsNear2(e.x, e.y, C.LAMP_SHADOW_R);
-                if (!n) continue;
-                S.bodies.push(e);
-                const keep = level >= 2 ? S.keeps.get(e) : null, sil = keep && keep.m && S.seq - keep.seq <= 2 ? keep : null;
-                for (let i = 0; i < n; i++) {
-                    const { l, d } = _lampPair[i];
-                    const k = lampWake(l) * lampFlicker(l) * (l.intensity ?? 1) * (1 - d / C.LAMP_SHADOW_R) * dusk;
-                    if (k < 0.03) continue;
-                    const len = Math.min(C.LAMP_SHADOW_MAX, d * C.LAMP_SHADOW_K), ang = Math.atan2(e.y - l.y, e.x - l.x);
-                    const a = Math.min(1, k * 1.6);
-                    ctx.save();
-                    ctx.translate(e.x, e.y); ctx.rotate(ang);
-                    if (sil) {
-                        // The body's silhouette, stretched away from the lamp from its near edge
-                        ctx.translate(-D / 2, 0); ctx.scale((D + len) / D, 1); ctx.translate(D / 2, 0);
-                        ctx.rotate(-ang); ctx.translate(-sil.x, -sil.y);
-                        const m = sil.m; ctx.transform(m.a, m.b, m.c, m.d, m.e, m.f);
-                        ctx.globalAlpha = a0 * C.LAMP_SHADOW_A * C.LAMP_SHADOW_SIL * a;
-                        ctx.drawImage(sil.cv, 0, 0);
-                    } else {
-                        ctx.translate(len / 2 - 2, 0); ctx.scale((20 + len) / 64, (9 + len * 0.06) / 32);
-                        ctx.globalAlpha = a0 * C.LAMP_SHADOW_A * a;
-                        ctx.drawImage(sp, -32, -32);
-                    }
-                    ctx.restore();
-                    const rec = S.list[S.n] || (S.list[S.n] = {});
-                    S.n++;
-                    rec.x = e.x; rec.y = e.y; rec.ang = ang; rec.len = len; rec.a = a;
-                }
-            }
-            ctx.globalAlpha = a0;
-        }
-        /** The light layer's half (lighting.js, after its colour pass): this frame's lamp shadows, in the dark's own colour.
-         *  Ultra: each body blocks every lit lamp it stands in, out to the lamp's reach (lit: the lamps lit this frame). */
-        function drawLampShadowsInto(lc, tintRGB, lit) {
-            const S = LampShadows, C = CONFIG.HUMAN_SHADE;
-            if (S.frame !== _frameTime || !S.n || !C.LAMP_SHADOW_DARK) return;
-            const a0 = lc.globalAlpha;
-            lc.globalCompositeOperation = 'source-over';
-            if (_lampShadowLevel() >= 3 && lit && lit.length) {
-                const r = C.LAMP_BLOCK_R, dusk = Math.min(1, Math.max(0, (sunNow().night - 0.3) / 0.4));
-                for (const e of S.bodies) for (const l of lit) {
-                    const dx = e.x - l.x, dy = e.y - l.y, d = Math.hypot(dx, dy), R = l.radius;
-                    if (d <= r * 1.5 || d >= R * 0.9) continue;
-                    const k = Math.min(1, l._litK || 1) * (1 - d / R) * dusk;
-                    if (k < 0.03) continue;
-                    const ux = dx / d, uy = dy / d, nx = -uy, ny = ux, t = r / d;   // t: the spread (tan of the half-angle, near enough)
-                    const fx = l.x + ux * R, fy = l.y + uy * R, w = R * t;
-                    const g = lc.createLinearGradient(e.x, e.y, fx, fy);
-                    g.addColorStop(0, `rgba(${tintRGB}, ${(C.LAMP_BLOCK_A * k).toFixed(3)})`); g.addColorStop(1, `rgba(${tintRGB}, 0)`);
-                    lc.fillStyle = g;
-                    lc.beginPath();
-                    lc.moveTo(e.x + nx * r, e.y + ny * r); lc.lineTo(fx + nx * w, fy + ny * w);
-                    lc.lineTo(fx - nx * w, fy - ny * w); lc.lineTo(e.x - nx * r, e.y - ny * r);
-                    lc.closePath(); lc.fill();
-                }
-                lc.globalAlpha = a0;
-                return;
-            }
-            if (S.tint !== tintRGB) { S.sprite = _lampShadowSprite(tintRGB, S.sprite); S.tint = tintRGB; }    // rebuilt when the dark's colour shifts
-            for (let i = 0; i < S.n; i++) {
-                const r = S.list[i];
-                lc.save();
-                lc.translate(r.x, r.y); lc.rotate(r.ang);
-                lc.translate(r.len / 2 + 9, 0); lc.scale((10 + r.len) / 64, (11 + r.len * 0.08) / 32);   // from just past the feet
-                lc.globalAlpha = C.LAMP_SHADOW_DARK * r.a;
-                lc.drawImage(S.sprite, -32, -32);
-                lc.restore();
-            }
-            lc.globalAlpha = a0;
-        }
+        // The silhouette capture is an optional shape provider for the lighting
+        // engine. Visibility, projection and lamp compositing are shared with cars.
+        function _lampShadowWants(entity, config) { return DynamicShadows.wantsSilhouette(entity, config); }
+        function keepLampSilhouette(entity, cv, ox, oy, side) { DynamicShadows.keepSilhouette(entity, cv, ox, oy, side); }
 
         /**
          * Draw a procedural character. Builds and height (ui/bodies.js) scale the body
@@ -49816,6 +50360,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
         /** The body drawn into SilhouetteFX's capture (its contact shadow stays on the frame), then stamped back with its effect. */
         function _drawHumanoidSilhouette(ctx, entity, config, fx, lampSil) {
+            const t=lampSil?LightingProfile.start():null;
+            try{return _drawHumanoidSilhouetteBody(ctx,entity,config,fx,lampSil);}
+            finally{LightingProfile.end('silhouette body capture',t);}
+        }
+        function _drawHumanoidSilhouetteBody(ctx, entity, config, fx, lampSil) {
             // The body itself is drawn through the capture, so the capture must hold all of it: a lamp shadow
             // alone captures tightly (LAMP_SHADOW_CAP_R), unless a weapon in hand reaches past that (a sniper: ~65px)
             const armed = (entity.type === 'player' && entity._game && entity._game.currentWeapon) || (config.weapon && config.weapon.id);
@@ -60628,11 +61177,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             sync(game) {
                 game._syncProfiler();
                 const mode = game.showProfiler ? (GameSettings.profilerMode && GameSettings.profilerMode !== 'off' ? GameSettings.profilerMode : 'compact') : 'off';
+                if(mode!=='full' && LightingProfile.enabled)LightingProfile.disable();
+                if(GameSettings.lampShadows!=='gamma')GammaExperiment.stop();
                 if (mode !== 'off') this._ensureProf();
                 if (this._prof) {
                     this._prof.style.display = mode === 'off' ? 'none' : '';
                     this._prof.classList.toggle('full', mode === 'full');
                     this._report = null;
+                    if (mode === 'full') this._shadowPanel(game);
                 }
                 this._countCalls(this._wantCalls(game));
                 if (game.debugMode) this._ensureDbg();
@@ -60644,15 +61196,19 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             _ensureProf() {
                 if (this._prof) return;
                 const el = document.createElement('div'); el.id = 'dev-prof';
-                el.innerHTML = '<div class="dp-head"><b class="dp-fps">--</b><span>fps</span><b class="dp-ms">--</b><span>ms</span><canvas class="dp-spark" width="96" height="22"></canvas></div><div class="dp-rows"></div>';
+                el.innerHTML = '<div class="dp-head"><b class="dp-fps">--</b><span>fps</span><b class="dp-ms">--</b><span>ms</span><canvas class="dp-spark" width="96" height="22"></canvas></div><div class="dp-shadows" aria-label="Shadow renderer status"></div><div class="dp-rows"></div>';
                 el.addEventListener('click', (e) => {
                     e.stopPropagation();
+                    if(e.target.closest('[data-gamma-restart]')){GammaExperiment.select(GammaExperiment.mode);this._shadowPanel(game);return;}
+                    if(e.target.closest('[data-light-export]')){LightingProfile.download(game);return;}
+                    if(e.target.closest('details'))return;
                     GameSettings.profilerMode = GameSettings.profilerMode === 'full' ? 'compact' : 'full';
                     this.sync(game);
                 });
+                el.addEventListener('change',e=>{if(e.target.matches('[data-gamma-case]')){e.stopPropagation();GammaExperiment.select(e.target.value);e.target.blur();this._shadowPanel(game);}});
                 document.body.appendChild(el);
                 this._prof = el; this._spark = el.querySelector('.dp-spark'); this._sctx = this._spark.getContext('2d');
-                this._fpsEl = el.querySelector('.dp-fps'); this._msEl = el.querySelector('.dp-ms'); this._rowsEl = el.querySelector('.dp-rows');
+                this._fpsEl = el.querySelector('.dp-fps'); this._msEl = el.querySelector('.dp-ms'); this._rowsEl = el.querySelector('.dp-rows'); this._shadowEl = el.querySelector('.dp-shadows');
             },
 
             /** The call counter: the Full profiler with Count Canvas Calls, or Baseline's layer panel */
@@ -60699,11 +61255,70 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._n++;
                 if (game.showProfiler && this._prof) {
                     if (this._n % 3 === 0) this._sparkStep(dt);
-                    if (this._n % 15 === 0) this._numbers();
+                    if (this._n % 15 === 0) { this._numbers(); if (this._prof.classList.contains('full')) this._shadowPanel(game); }
+                    if(this._prof.classList.contains('full') && now-(this._shadowAt||0)>500){this._shadowAt=now;this._numbers();this._shadowPanel(game);}
                     const rep = game.profiler.report;
                     if (rep !== this._report && this._prof.classList.contains('full')) { this._report = rep; this._rows(game, rep); }
                 }
                 if (game.debugMode && this._dbg && this._n % 30 === 0) this._counts(game);
+            },
+
+            /** Read existing counters only; no GPU probes or timings added by the panel. */
+            _shadowLine(game) {
+                const mode = GameSettings.lampShadows || 'low', s = GammaShadows.stats;
+                const fresh = Number.isFinite(s.frameId) && s.frameId === game._renderDrawId;
+                const status = mode !== 'gamma' ? (mode === 'off' ? 'Shadows off' : 'Canvas 2D')
+                    : !fresh ? 'Gamma idle — no lighting pass'
+                    : s.backend === 'webgl2' && s.resolves === 1 ? 'WebGL2 active'
+                    : s.backend === 'high-fallback' ? 'High fallback — WebGL2 inactive' : 'Gamma awaiting resolve';
+                const tier = mode !== 'gamma' || !fresh ? 'idle' : s.backend === 'webgl2' && s.resolves === 1 ? 'active' : 'fallback';
+                let html = `<div class="dp-total"><span>Shadow renderer</span><b>${mode.toUpperCase()}</b></div>`
+                    + `<div class="dp-shadow-status" data-state="${tier}">${status}</div>`;
+                if (mode === 'gamma' && fresh) html += `<div class="dp-counts"><span>GPU resolves <b>${s.resolves}</b>/frame</span>`
+                    + `<span>contributions <b>${s.contributions}</b></span><span>mask uploads <b>${s.uploads}</b>/frame</span>`
+                    + `<span>GPU draws <b>${s.draws}</b>/frame</span><span>layer uploads <b>${s.layerUploads}</b>/frame</span><span>GPU blur passes <b>${s.blurPasses}</b></span></div>`
+                    + '<div class="dp-shadow-note">Cached masks can need 0 uploads; Canvas input layers still upload. GPU blur stays on the GPU; scene composition remains Canvas 2D.</div>';
+                html += this._lightingDetails(game);
+                return html;
+            },
+            _lightingDetails(game) {
+                const p=LightingProfile,f=p.latest;
+                if(!p.enabled||!f||f.frameId!==game._renderDrawId||f.mode!==GameSettings.lampShadows)return '';
+                const esc=s=>String(s??'unknown').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+                const ms=n=>Number.isFinite(n)?n.toFixed(2):'—',mb=n=>(n/1048576).toFixed(2);
+                let html='<details class="dp-light-detail" open><summary>Lighting diagnostics</summary><button type="button" data-light-export '+(GammaExperiment.current.phase==='starting'?'disabled':'')+'>Save JSON report</button>';
+                if(f.mode==='gamma'){
+                    html+=`<label class="dp-shadow-note">GPU test <select data-gamma-case>${Object.entries(GammaExperiment.modes).map(([value,label])=>`<option value="${value}" ${value===GammaExperiment.mode?'selected':''}>${label}</option>`).join('')}</select></label><button type="button" data-gamma-restart>Restart test</button>`;
+                    const e=f.experiment,starting=GammaExperiment.current.phase==='starting';
+                    html+=`<div class="dp-shadow-note">${starting?'Starting new test':e.phase==='warmup'?`Warm-up ${e.warmupCompleted}/10`:e.phase==='settling'?`Settling ${e.settlingCompleted}/5`:`Recorded ${e.sampledFrames}/60 frames${e.ready?' · ready to export':''}`} · unsaved test; leaving Full restores baseline.</div>`;
+                    if(GammaExperiment.mode.includes('freeze'))html+='<div class="dp-shadow-note">Frozen textures become stale. Keep camera/scene comparable; preparation still runs.</div>';
+                    if(GammaExperiment.mode==='simple-resolve')html+='<div class="dp-shadow-note">Draws only the base darkness texture; uploads and selected blur still run.</div>';
+                    if(GammaExperiment.mode==='overlay')html+='<div class="dp-shadow-note">Direct browser overlay: some glows/Canvas UI are shaded in a different order.</div>';
+                    html+=`<div class="dp-shadow-note">Skipped uploads: masks ${f.gamma?.frozenMasks||0}, layers ${f.gamma?.frozenLayers||0} · missing frozen sprites ${f.gamma?.missingFrozenSprites||0}</div>`;
+                }
+                const cadence=p.cadenceSummary();
+                html+=`<div class="dp-total"><span>Actual frame cadence</span><b>${ms(cadence.fps)} FPS</b></div><div class="dp-shadow-note">${cadence.intervals} intervals · mean ${ms(cadence.meanMs)} ms · p95 ${ms(cadence.p95Ms)} · peak ${ms(cadence.peakMs)}<br>Pauses &gt;250 ms: ${cadence.pausesOver250ms} · &gt;1 s: ${cadence.pausesOver1000ms}<br>Last render ${ms(f.cadence.renderMs)} ms · between renders ${ms(f.cadence.gapMs)} ms (includes logic/browser waits)</div>`;
+                if(f.mode==='gamma' && p.deviceInfo)html+=`<div class="dp-light-device">${esc(p.deviceInfo.renderer)}<br>${esc(p.deviceInfo.vendor)} · ${esc(p.deviceInfo.version)}</div>`;
+                html+=`<div class="dp-shadow-note">Layer ${f.layer.join(' × ')} · scene ${f.scene.join(' × ')} · DPR ${window.devicePixelRatio||1}<br>Lighting scale ${f.lightingScale} · adaptive ${f.adaptiveFactor} · soft ${f.soft?'on':'off'}<br>Uploads: masks ${mb(f.bytes.mask)} MiB + layers ${mb(f.bytes.layers)} MiB/frame<br>Atlas ${f.atlasResident}/${f.atlasSlots} slots · ${mb(f.atlasBytes)} MiB · GPU textures ≈ ${mb(f.gpuTextureBytes)} MiB · new ${f.churn.new}, changed ${f.churn.changed}, evicted ${f.churn.evicted}<br>Shadow cache ${mb(f.maskCacheBytes)} MiB · builds ${f.shadows.builds}, hits ${f.shadows.hits}, captures ${f.shadows.captures}<br>Casters ${f.shadows.casters} · sources ${f.shadows.sources} · pairs ${f.shadows.pairs} · blocked ${f.shadows.blocked} · rays ${f.shadows.rays} · dropped ${f.shadows.dropped}</div>`;
+                if(f.gamma?.failure)html+=`<div class="dp-shadow-note">Failure: ${esc(f.gamma.failure)}</div>`;
+                html+=`<div class="dp-total"><span>CPU timings · ${p.history.length} frames</span></div>`;
+                for(const r of p.summary())html+=`<div class="dp-light-stage"><span>${esc(r.name)}</span><b>${ms(r.last)} ms</b><small>avg ${ms(r.mean)} · p95 ${ms(r.p95)} · peak ${ms(r.peak)} · calls ${r.calls} · max/call ${ms(r.maxCall)}</small></div>`;
+                html+='<div class="dp-shadow-note">CPU values include driver waits. Parent/child rows overlap; do not add them. No forced GPU readback; no per-frame gl.getError.</div>';
+                if(f.mode==='gamma'){
+                    html+=`<div class="dp-total"><span>GPU execution</span></div><div class="dp-shadow-note">${esc(p.gpuStatus||'not sampled')} · ${p.pending.length} pending</div>`;
+                    for(const [name,g]of Object.entries(p.gpu))html+=`<div class="dp-light-stage"><span>${esc(name)}</span><b>${ms(g.ms)} ms</b><small>sample frame ${g.frameId} · ${Math.max(0,f.frameId-g.frameId)} frames old</small></div>`;
+                }
+                return html+'</details>';
+            },
+            _shadowPanel(game) {
+                if (!this._shadowEl) return;
+                if(document.activeElement?.matches('[data-gamma-case]') && this._shadowEl.contains(document.activeElement))return;
+                const html = this._shadowLine(game);
+                if (html !== this._shadowHTML) {
+                    const open=this._shadowEl.querySelector('details')?.open;
+                    this._shadowHTML=html;this._shadowEl.innerHTML=html;
+                    const detail=this._shadowEl.querySelector('details');if(detail && open!==undefined)detail.open=open;
+                }
             },
 
             _numbers() {
@@ -60766,7 +61381,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const frameMs = k ? sum / k : 0, other = Math.max(0, frameMs - workMs);
                 const P = game.pedestrians, T = game.traffic;
                 const parts = [
-                    `<span>browser/GPU <b>${other.toFixed(1)}</b> ms</span>`,
+                    `<span>unattributed/wait <b>${other.toFixed(1)}</b> ms</span>`,
                     `<span>ticks/frame <b>${RenderStats.ticks}</b></span>`,
                     `<span>bodies <b>${RenderStats.bodies}</b> drawn / <b>${RenderStats.culled}</b> culled</span>`,
                     `<span>live <b>${RenderStats.liveBodies}</b> / sprites <b>${RenderStats.cachedBodies}</b> / bake poses <b>${RenderStats.bakedBodies}</b></span>`,
@@ -60782,7 +61397,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const mem = this._canvasMB(game);
                 if (mem.groundN) parts.push(`<span>ground <b>${mem.groundN}</b> tiles (${mem.ground.toFixed(0)} MB)</span>`);
                 if (mem.props) parts.push(`<span>furniture sprites <b>${mem.props.toFixed(1)}</b> MB</span>`);
-                parts.push(`<span>image caches ≈ <b>${mem.total.toFixed(0)}</b> MB</span>`);
+                parts.push(`<span>image caches ≈ <b>${mem.total.toFixed(0)}</b> MB${mem.unknown?` (${mem.unknown} unknown entries)`:''}</span>`);
                 return parts.join('');
             },
 
@@ -60791,15 +61406,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             _canvasMB(game) {
                 const now = performance.now();
                 if (this._memAt && now - this._memAt < 500) return this._mem;
-                const px = (cv) => cv ? cv.width * cv.height : 0, MB = 4 / 1048576;
+                let unknown=0;
+                const px = cv => {if(!cv)return 0;const n=cv.width*cv.height;if(Number.isFinite(n)&&n>=0)return n;unknown++;return 0;}, MB = 4 / 1048576;
                 let ground = 0, groundN = 0, floors = 0, cars = 0, crowd = 0;
                 const gb = game.groundBaker;
                 if (gb) for (const cv of gb.cache.values()) { ground += px(cv); groundN++; }
                 if (typeof MAP_BAKES !== 'undefined') { const seen = new Set(); for (const id in MAP_BAKES) for (const k of MAP_BAKES[id]) if (!seen.has(k)) { seen.add(k); floors += px(game[k]); } }
                 if (typeof _carSprites !== 'undefined') for (const sp of _carSprites.values()) cars += px(sp.cv);
                 if (typeof CrowdImpostors !== 'undefined') for (const b of CrowdImpostors.cache.values()) crowd += px(b.cv);
-                const props = typeof PropSprites !== 'undefined' ? PropSprites.bytes / 4 : 0;
-                this._mem = { ground: ground * MB, groundN, floors: floors * MB, cars: cars * MB, crowd: crowd * MB, props: props * MB, total: (ground + floors + cars + crowd + props) * MB };
+                const props = typeof PropSprites !== 'undefined' && Number.isFinite(PropSprites.bytes) ? PropSprites.bytes / 4 : 0;
+                this._mem = { unknown, ground: ground * MB, groundN, floors: floors * MB, cars: cars * MB, crowd: crowd * MB, props: props * MB, total: (ground + floors + cars + crowd + props) * MB };
                 this._memAt = now;
                 return this._mem;
             },
@@ -69361,6 +69977,8 @@ engineMixin({
                 if (!this.running || (this.paused && !this.cineCam)) return;   // (Cinematic View keeps drawing the held world: ui/save-slots-pause-menu.js)
             
                 this._renderDrawId = (this._renderDrawId || 0) + 1;
+                LightingProfile.begin(this);
+                DynamicShadows.begin(this);
                 // Baseline's layer panel (ui/render-layers.js): RL.at(layer) says whether a layer draws, and
                 // bills the canvas calls since the last ask to the layer before. Outside Baseline it's always true.
                 const RL = RenderLayers;
@@ -69924,9 +70542,6 @@ engineMixin({
                 if (RL.at('combat')) this.drawHunterDashes(this.ctx);   // crimson flits (engine/palace-art.js)
                 if (RL.at('markers')) this.drawExecuteCue(this.ctx);    // a gold reticle under an unaware back (engine/executions.js)
                 
-                // Lamp shadows: their own layer, under every person (ui/humanoid-render.js)
-                if (RL.at('characters')) drawLampShadowsUnder(this.ctx);
-
                 if (RenderStats.timed) this._entLap('Entities: Effects');
                 // PERFORMANCE: AABB viewport culling for entities
                 {
@@ -70617,6 +71232,7 @@ engineMixin({
                 RL.at('frame');
                 PerfBench.draw(this.ctx, 20, this.canvas.height - 110);
                 RL.endFrame();                            // Baseline's layer panel: the frame's calls billed
+                LightingProfile.finish(this);
                 this.profiler.tick(); 
                 DevOverlay.frame(this);                   // the profiler pill and debug counts (DOM)
             },
@@ -72619,6 +73235,7 @@ engineMixin({
             },
         });
         // Shared immutable falloff tables; softArea only reads these stops.
+        const INTERIOR_EMPTY_SEGS = Object.freeze([]);
         const HOLE_AREA = [[0, 'rgba(255,255,255,1)'], [0.5, 'rgba(255,255,255,0.9)'], [1, 'rgba(255,255,255,0)']];
         const HOLE_AREA_SOFT = [[0, 'rgba(255,255,255,1)'], [0.3, 'rgba(255,255,255,0.85)'], [0.7, 'rgba(255,255,255,0.35)'], [1, 'rgba(255,255,255,0)']];   // long, gentle edge
         // One warm, wide falloff reused for the fireball and its dying flame stream.
@@ -72639,6 +73256,57 @@ engineMixin({
         // GameEngine — Lighting, bloom, wet reflections, atmosphere.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
+            _drawTransientSource(ctx, owner, mode, muzzle = false) {
+                const radius = muzzle ? owner.radius * 1.6 : 50, colorRadius = muzzle ? owner.radius * 1.4 : 40;
+                const color = typeof owner.color === 'string' && /^#[0-9a-f]{6}$/i.test(owner.color) ? owner.color : muzzle ? '#ffcc88' : '#ffd9a0';
+                this._shadowSource(ctx, owner, 'transient', { x: owner.x, y: owner.y, radius, elevation: 12, style: [color, colorRadius].join('|') }, mode,
+                    (g, phase) => drawGlow(g, owner.x, owner.y, phase === 'hole' ? radius : colorRadius,
+                        phase === 'hole' ? '255, 255, 255' : color, phase === 'hole' ? 0.3 : 0.25));
+            },
+            _drawPropGlow(ctx, record, mode, radius) {
+                const p = record.p, color = record.medbay ? '#00ff00' : '#00f3ff';
+                this._shadowSource(ctx, p, 'propGlow', { family: 'decor', owner: p, x: record.x, y: record.y, radius: 180, elevation: 30,
+                    style: [radius, color].join('|') }, mode,
+                    (g, phase) => drawGlow(g, record.x, record.y, phase === 'hole' ? radius : 180,
+                        phase === 'hole' ? '255, 255, 255' : color, phase === 'hole' ? 0.4 : 0.3));
+            },
+            /** Preserve a source's authored falloff; occlude only its own contribution. */
+            _shadowSource(ctx, owner, family, description, mode, paint) {
+                const source = DynamicShadows.source(owner, family, { ...description, paint });
+                if (DynamicShadows.drawLight(ctx, source, mode)) return;
+                ctx.save();
+                // Budget / Off fallback retains the authored source path. Beams,
+                // fire and interior sprites already supply their static wall clip;
+                // don't introduce a fresh visibility solve for every skipped spark.
+                paint(ctx, mode); ctx.restore();
+            },
+            _paintSoftLight(ctx, s, mode) {
+                const src = s.src, color = mode === 'color', rgb = src.color || '#ffd9b0';
+                const stops = color ? [[0, rgb], [0.55, rgb], [1, 'rgba(0,0,0,0)']] : src.soft ? HOLE_AREA_SOFT : HOLE_AREA;
+                if (!src.w) {
+                    const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r);
+                    if (color) { g.addColorStop(0, rgb); g.addColorStop(1, 'rgba(0,0,0,0)'); }
+                    else { g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.45, 'rgba(255,255,255,.45)'); g.addColorStop(1, 'rgba(255,255,255,0)'); }
+                    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill(); return;
+                }
+                const hw = src.w / 2, hh = src.h / 2, r = Math.min(hw, src.round ?? hh), x0 = s.x - hw + r, x1 = s.x + hw - r;
+                const band = ctx.createLinearGradient(0, s.y - hh, 0, s.y + hh);
+                for (const [o, c] of stops) { band.addColorStop(.5 - o / 2, c); band.addColorStop(.5 + o / 2, c); }
+                ctx.fillStyle = band; ctx.fillRect(x0, s.y - hh, x1 - x0, hh * 2);
+                for (const side of [-1, 1]) {
+                    ctx.save(); ctx.beginPath(); ctx.rect(side < 0 ? x0 - r : x1, s.y - hh, r, hh * 2); ctx.clip();
+                    ctx.translate(side < 0 ? x0 : x1, s.y); ctx.scale(r, hh);
+                    const cap = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+                    for (const [o, c] of stops) cap.addColorStop(o, c);
+                    ctx.fillStyle = cap; ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+                }
+            },
+            _drawSoftSource(ctx, s, mode) {
+                const src = s.src, radius = src.w ? Math.hypot(src.w, src.h) / 2 : s.r;
+                const bounds = src.w ? { x: s.x - src.w / 2, y: s.y - src.h / 2, w: src.w, h: src.h } : undefined;
+                this._shadowSource(ctx, src, 'decor', { x: s.x, y: s.y, radius, bounds, owner: s.owner || src, elevation: src.elevation ?? 44,
+                    style: [src.color, src.w, src.h, src.round, src.soft].join('|') }, mode, (g, phase) => this._paintSoftLight(g, s, phase));
+            },
             /**
              * Clip the light canvas to what a headlight beam can reach: a visibility polygon cast
              * from where the beam's edges meet (just behind the bumper), ignoring anything nearer
@@ -72649,7 +73317,8 @@ engineMixin({
                 const back = 15 / slope, half = Math.atan(slope) + 0.02;
                 const c = owner._beamCache, tick = _simTick;
                 let poly, dx = 0, dy = 0;
-                const same = c && c.L === beamLength && c.map === this.activeMap;
+                const revision = DynamicShadows.map === this.activeMap ? DynamicShadows.wallRevision : 0;
+                const same = c && c.L === beamLength && c.map === this.activeMap && c.revision === revision;
                 if (same && Math.abs(c.x - cx) < 1.5 && Math.abs(c.y - cy) < 1.5 && Math.abs(c.a - a) < 0.01) poly = c.poly;
                 // A moving car: reuse its last shape (slid along with it) for a couple of ticks
                 else if (same && tick - c.tick < 3 && Math.hypot(c.x - cx, c.y - cy) < 30 && Math.abs(c.a - a) < 0.08) { poly = c.poly; dx = cx - c.x; dy = cy - c.y; }
@@ -72658,11 +73327,15 @@ engineMixin({
                     poly = computeVisibilityPoly(ax, ay, beamLength + back, getOccluders(this.activeMap),
                         { aMin: a - half, aMax: a + half, arcStep: 0.1, minDist: back });
                     poly.ax = ax; poly.ay = ay;
-                    owner._beamCache = { x: cx, y: cy, a, L: beamLength, map: this.activeMap, poly, tick };
+                    owner._beamCache = { x: cx, y: cy, a, L: beamLength, map: this.activeMap, poly, tick, revision };
                 }
-                ctx.beginPath(); ctx.moveTo(poly.ax + dx, poly.ay + dy);
-                for (const pt of poly) ctx.lineTo(pt.x + dx, pt.y + dy);
-                ctx.closePath(); ctx.clip();
+                let stored = owner._beamPath;
+                if (!stored || stored.poly !== poly || stored.dx !== dx || stored.dy !== dy) {
+                    const path = new Path2D(); path.moveTo(poly.ax + dx, poly.ay + dy);
+                    for (const pt of poly) path.lineTo(pt.x + dx, pt.y + dy); path.closePath();
+                    stored = owner._beamPath = { poly, dx, dy, path };
+                }
+                ctx.clip(stored.path); return stored.path;
             },
 
             /** A headlight beam, pre-rendered once per colour and size: fades along its length and toward its edges. */
@@ -72689,17 +73362,23 @@ engineMixin({
 
             /** Stamp one headlight beam (clipped by walls and buildings) into the light layer. */
             _drawBeam(b) {
-                const ctx = this.lightCtx;
-                ctx.save();
-                this._clipBeam(ctx, b.owner, b.cx, b.cy, b.L, b.W);
-                ctx.translate(b.cx, b.cy); ctx.rotate(b.owner.angle);
-                ctx.drawImage(this._beamSprite(b.color, b.L, b.W), 0, -b.W, b.L, 2 * b.W);
+                const ctx = this.lightCtx, angle = b.owner.angle, c = Math.cos(angle), s = Math.sin(angle);
+                const points = [[0, -b.W], [b.L, -b.W], [b.L, b.W], [0, b.W]].map(([x, y]) => [b.cx + x * c - y * s, b.cy + x * s + y * c]);
+                const xs = points.map(p => p[0]), ys = points.map(p => p[1]);
+                const bounds = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+                const sprite = this._beamSprite(b.color, b.L, b.W), cx = b.cx, cy = b.cy, L = b.L, W = b.W;
+                ctx.save(); const clipPath = this._clipBeam(ctx, b.owner, cx, cy, L, W);
+                this._shadowSource(ctx, b.owner, 'headlight', { x: cx, y: cy, radius: Math.hypot(L, W), bounds, elevation: 8,
+                    samePaint: true, baseRef: sprite, clipPath, style: [angle, L, W, b.color].join('|'),
+                    acceptCaster: e => { const dx = e.x - cx, dy = e.y - cy, forward = dx * c + dy * s, lateral = -dx * s + dy * c, pad = Math.hypot(e.width, e.depth) / 2;
+                        return forward >= -pad && forward <= L + pad && Math.abs(lateral) <= 15 + (W - 15) * Math.max(0, forward) / L + pad; }
+                }, 'hole', g => { g.save(); g.translate(cx, cy); g.rotate(angle); g.drawImage(sprite, 0, -W, L, W * 2); g.restore(); });
                 ctx.restore();
             },
 
             /** Firelight follows the same opaque walls/buildings as vehicle headlights. */
             _clipFireLight(ctx, owner, x, y, r) {
-                const map = this.activeMap, revision = map._renderSpatialRevision || 0;
+                const map = this.activeMap, revision = (map._renderSpatialRevision || 0) + ':' + (DynamicShadows.map === map ? DynamicShadows.wallRevision : 0);
                 // Runtime geometry edits invalidate the joined obstacle list as well as the clip.
                 if (map._fireLightOccluderRevision !== revision) { map._occluderCache = null; map._fireLightOccluderRevision = revision; }
                 const occluders = getOccluders(map);
@@ -72726,7 +73405,8 @@ engineMixin({
                     ctx.save();
                     this._clipFireLight(ctx, owner, x, y, r);
                     ctx.globalAlpha = Math.min(1, strength * gain);
-                    ctx.drawImage(sprite, x - r, y - r, r * 2, r * 2);
+                    this._shadowSource(ctx, owner, 'fire', { x, y, radius: r, elevation: 6, samePaint: true, baseRef: sprite, clipPath: owner._fireLightClip.path }, mode,
+                        g => g.drawImage(sprite, x - r, y - r, r * 2, r * 2));
                     ctx.restore();
                 };
                 for (const p of this.projectiles) {
@@ -72768,7 +73448,9 @@ engineMixin({
              * a hole sprite and a colour sprite. Each light only ever shadows its own light.
              */
             _interiorLightSprites(lamp, segs) {
-                if (lamp._sprites) return lamp._sprites;
+                const key = [lamp.x, lamp.y, lamp.radius, lamp.colorRadius, lamp.color, lamp.intensity, this.activeMap._renderSpatialRevision || 0, segs.map(s => [s.x1, s.y1, s.x2, s.y2].join(',')).join(';')].join('|');
+                if (lamp._sprites && lamp._spritesKey === key && lamp._spritesSegs === segs) return lamp._sprites;
+                lamp._spritesKey = key; lamp._spritesSegs = segs;
                 const R = Math.max(lamp.radius, lamp.colorRadius || 0), S = 0.5, size = Math.max(2, Math.ceil(2 * R * S));
                 const wedges = new Path2D(), ext = lamp.radius * 1.2;
                 for (const seg of segs) {
@@ -72801,6 +73483,13 @@ engineMixin({
                 return (lamp._sprites = { hole, color, x: lamp.x - R, y: lamp.y - R, d: 2 * R });
             },
 
+            _drawInteriorSource(ctx, lamp, mode) {
+                const segs = (this.activeMap._interiorShadowSegs || {})[lamp.level] || INTERIOR_EMPTY_SEGS;
+                const sp = this._interiorLightSprites(lamp, segs);
+                this._shadowSource(ctx, lamp, 'interior', { x: lamp.x, y: lamp.y, radius: sp.d / 2, bounds: { x: sp.x, y: sp.y, w: sp.d, h: sp.d },
+                    noWorldWalls: true, segments: segs, baseRef: sp, elevation: lamp.elevation ?? 84 }, mode,
+                    (g, phase) => g.drawImage(sp[phase], sp.x, sp.y, sp.d, sp.d));
+            },
             /* =====================================================================
                LIGHTING — the darkness layer
                ---------------------------------------------------------------------
@@ -72853,7 +73542,7 @@ engineMixin({
             /** Scratch records never retain a map's lights or vehicles between frames. */
             _releaseLightingScratch(scratch) {
                 for (const b of scratch.beams) b.owner = null;
-                for (const s of scratch.softLights) s.src = null;
+                for (const s of scratch.softLights) { s.src = null; s.owner = null; }
                 for (const g of scratch.propGlows) g.p = null;
                 scratch.iVisible.length = scratch.litLamps.length = scratch.visibleLamps.length = 0;
                 scratch.beams.length = scratch.softLights.length = scratch.propGlows.length = 0;
@@ -72927,6 +73616,9 @@ engineMixin({
             },
 
             drawLightingSystem(ctx) {
+                const t=LightingProfile.start();try{return this._drawLightingSystemProfiled(ctx);}finally{LightingProfile.end('lighting total (inclusive)',t);}
+            },
+            _drawLightingSystemProfiled(ctx) {
                 this._lightingAdaptiveScale();
                 const ambient = this.getAmbientDarkness();
                 const flash = this.weather.lightningFlash > 0 ? this.weather.lightningFlash : 0;
@@ -72934,7 +73626,7 @@ engineMixin({
                 const finalOpacity = ambient * (1.0 - this.nvIntensity) * (1 - 0.8 * flash);
                 
                 // Optimization: If shadows are invisible and we don't need the NV boost, stop.
-                if (finalOpacity <= 0.01 && !this.nightVision) return;
+                if (finalOpacity <= 0.01 && !this.nightVision) {GammaExperiment.hideOverlay();return;}
 
                 let scratch = this._lightingScratch;
                 if (!scratch || scratch.busy) {
@@ -72965,6 +73657,8 @@ engineMixin({
                 
                 // 1. CLEAR BUFFER
                 lc.clearRect(0, 0, lw, lh);
+                GammaShadows.begin(lc, this._renderDrawId);
+                const inputsTime=LightingProfile.start();
                 lc.save();
                 lc.scale(LS, LS);
             
@@ -72996,8 +73690,8 @@ engineMixin({
                     lc.globalCompositeOperation = 'destination-out';
                     for (const lamp of iLights) {
                         if (!inView(lamp.x, lamp.y, lamp.radius)) continue;
-                        const sp = this._interiorLightSprites(lamp, iSegsByLevel[lamp.level] || []);
-                        lc.drawImage(sp.hole, sp.x, sp.y, sp.d, sp.d);
+                        const sp = this._interiorLightSprites(lamp, iSegsByLevel[lamp.level] || INTERIOR_EMPTY_SEGS);
+                        this._drawInteriorSource(lc, lamp, 'hole');
                         iVisible.push(lamp);
                     }
                 }
@@ -73035,21 +73729,21 @@ engineMixin({
                             g.addColorStop(0, 'rgba(255, 255, 255, 1)'); g.addColorStop(1, 'rgba(255, 255, 255, 0)');
                             lamp._holeGrad = g; lamp._holeGradX = lamp.x; lamp._holeGradY = lamp.y; lamp._holeGradRadius = lamp.radius;
                         }
+                        lamp._lightingVisibilityPath = DynamicShadows.visibilityPath(lamp) || lamp._shadowPath;
                         lc.globalAlpha = Math.min(1, lamp._litK);
                         lc.fillStyle = lamp._holeGrad;
-                        lc.fill(lamp._shadowPath);
+                        if (!DynamicShadows.drawLight(lc, lamp, 'hole')) lc.fill(lamp._lightingVisibilityPath);
                         litLamps.push(lamp);
                     }
                     lc.globalAlpha = 1;
                 }
             
                 // 5. DYNAMIC HOLES — shots and muzzle flashes light softly around them
-                const white = glowSprite('255, 255, 255', 0.3);
-                for (const p of this.projectiles) if (!p.isFireball && inView(p.x, p.y, 50)) lc.drawImage(white, p.x - 50, p.y - 50, 100, 100);
+                                for (const p of this.projectiles) if (!p.isFireball && inView(p.x, p.y, 50)) this._drawTransientSource(lc, p, 'hole');
                 this._drawFireLights(lc, 'hole', inView);
                 for (const f of this.muzzleFlashes) {
                     const r = f.radius * 1.6;
-                    if (inView(f.x, f.y, r)) lc.drawImage(white, f.x - r, f.y - r, r * 2, r * 2);
+                    if (inView(f.x, f.y, r)) this._drawTransientSource(lc, f, 'hole', true);
                 }
                 // Reflections in the wet street lift the dark where they shine (engine/reflections.js)
                 this.liftReflections(lc, lw, lh);
@@ -73101,8 +73795,9 @@ engineMixin({
                     lc.globalAlpha = 0.55;
                     for (const v of cars) {
                         if (!v.glowColor || !v.visible || v.dead || !v.length || !inView(v.x, v.y, 80)) continue;
-                        lc.save(); lc.translate(v.x, v.y); lc.rotate(v.angle);
-                        lc.drawImage(soft, -v.length / 2 - 16, -v.width / 2 - 16, v.length + 32, v.width + 32); lc.restore();
+                        lc.save();
+                        this._shadowSource(lc, v, 'underglow', { family: 'decor', x: v.x, y: v.y, radius: Math.hypot(v.length + 32, v.width + 32) / 2, elevation: 6, samePaint: true, baseRef: soft, style: [v.angle, v.length, v.width].join('|') }, 'hole',
+                            g => { g.save(); g.translate(v.x, v.y); g.rotate(v.angle); g.drawImage(soft, -v.length / 2 - 16, -v.width / 2 - 16, v.length + 32, v.width + 32); g.restore(); }); lc.restore();
                     }
                     lc.globalAlpha = 1;
                 }
@@ -73117,7 +73812,7 @@ engineMixin({
                 const softLights = scratch.softLights, propGlows = scratch.propGlows;
                 {
                     const tNow = _frameTime / 1000;
-                    const push = (src, x, y) => {
+                    const push = (src, x, y, owner = src) => {
                         if (!src.radius) src.radius = Math.max(src.w || 0, src.h || 0) / 2;
                         const r = src.radius || Math.max(src.w, src.h) / 2;
                         if (!inView(x, y, r)) return;
@@ -73126,11 +73821,11 @@ engineMixin({
                         const f = src.flicker ? 0.82 + 0.18 * Math.sin(tNow * src.flicker + x * 0.7) * Math.sin(tNow * src.flicker * 0.37 + y) : 1;
                         const s = scratch.softPool[softLights.length] || (scratch.softPool[softLights.length] = {});
                         softLights.push(s);
-                        s.src = src; s.x = x; s.y = y; s.r = r; s.a = (src.intensity ?? 0.8) * f * k;
+                        s.src = src; s.owner = owner; s.x = x; s.y = y; s.r = r; s.a = (src.intensity ?? 0.8) * f * k;
                     };
                     for (const s of (this.activeMap.softLights || [])) push(s, s.x, s.y);
                     for (const p of this.props) {
-                        if (p.light && p.visible !== false) { const c = p.getCenter(); push(p.light, c.x + (p.light.dx || 0), c.y + (p.light.dy || 0)); }
+                        if (p.light && p.visible !== false) { const c = p.getCenter(); push(p.light, c.x + (p.light.dx || 0), c.y + (p.light.dy || 0), p); }
                         if (p.interactionType === 'medbay_refill' || p.interactionType === 'vending_machine') {
                             const c = p.getCenter();
                             if (inView(c.x, c.y, 180)) {
@@ -73141,61 +73836,24 @@ engineMixin({
                         }
                     }
                 }
-                const softGrad = (s, key, make) => {               // gradients are reused while the light stays put
-                    const src = s.src;
-                    if (src[key] && src[key + 'X'] === s.x && src[key + 'Y'] === s.y) return src[key];
-                    src[key + 'X'] = s.x; src[key + 'Y'] = s.y; return (src[key] = make());
-                };
-                // Area lights (w × h): a rounded rectangle with a soft edge. A band across the
-                // middle plus two half-oval end caps that share the same falloff, so no seams.
-                // stops: [[offset from the centre line 0..1, colour], …]
-                const softArea = (s, key, stops) => {
-                    const hw = s.src.w / 2, hh = s.src.h / 2, r = Math.min(hw, s.src.round ?? hh);
-                    const x0 = s.x - hw + r, x1 = s.x + hw - r;
-                    const band = softGrad(s, key + 'Band', () => {
-                        const g = lc.createLinearGradient(0, s.y - hh, 0, s.y + hh);
-                        for (const [o, c] of stops) { g.addColorStop(0.5 - o / 2, c); g.addColorStop(0.5 + o / 2, c); }
-                        return g;
-                    });
-                    lc.fillStyle = band; lc.fillRect(x0, s.y - hh, x1 - x0, hh * 2);
-                    const cap = s.src[key + 'Cap'] || (s.src[key + 'Cap'] = (() => {
-                        const g = lc.createRadialGradient(0, 0, 0, 0, 0, 1);
-                        for (const [o, c] of stops) g.addColorStop(o, c);
-                        return g;
-                    })());
-                    for (const side of [-1, 1]) {
-                        lc.save();
-                        lc.beginPath(); lc.rect(side < 0 ? x0 - r : x1, s.y - hh, r, hh * 2); lc.clip();
-                        lc.translate(side < 0 ? x0 : x1, s.y); lc.scale(r, hh);
-                        lc.fillStyle = cap; lc.beginPath(); lc.arc(0, 0, 1, 0, Math.PI * 2); lc.fill();
-                        lc.restore();
-                    }
-                };
                 for (const s of softLights) {
-                    lc.globalAlpha = Math.min(1, s.a);
-                    if (s.src.w) { softArea(s, '_hole', s.src.soft ? HOLE_AREA_SOFT : HOLE_AREA); continue; }
-                    lc.fillStyle = softGrad(s, '_holeGrad', () => {
-                        const g = lc.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r);
-                        g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.45, 'rgba(255,255,255,0.45)'); g.addColorStop(1, 'rgba(255,255,255,0)');
-                        return g;
-                    });
-                    lc.beginPath(); lc.arc(s.x, s.y, s.r, 0, Math.PI * 2); lc.fill();
+                    lc.globalAlpha = Math.min(1, s.a); this._drawSoftSource(lc, s, 'hole');
                 }
                 lc.globalAlpha = 1;
 
                 // Vending machines and medbays glow (pulsing; they can be pushed, so sprites, not cached gradients)
                 const time = _frameTime;
-                const holeGlow = glowSprite('255, 255, 255', 0.4);
                 for (const g of propGlows) {
                     const offset = (g.p.id || 0) * 1337;
                     const r = 170 * (g.medbay ? 1.0 + Math.sin((time + offset) / 400) * 0.05 : 1.0 + Math.sin((time + offset) / 50) * 0.02);
-                    lc.drawImage(holeGlow, g.x - r, g.y - r, r * 2, r * 2);
+                    this._drawPropGlow(lc, g, 'hole', r);
                 }
                 
                 if (this.activeMap.id === 'moon_city_nightclub') this.clubLightLayer(lc, 'hole');   // the dance floor, through the dark
 
                 // Rooms she isn't in: the veil dims their pools of light (their glow stays, below)
-                if (rsOn && ambient >= 0.5) { lc.globalCompositeOperation = 'source-over'; rs.drawVeil(lc, 1); }
+                if (GammaShadows.active) GammaShadows.split(lc, rsOn && ambient >= 0.5 ? g => rs.drawVeil(g, 1) : null);
+                else if (rsOn && ambient >= 0.5) { lc.globalCompositeOperation = 'source-over'; rs.drawVeil(lc, 1); }
 
                 // 6. COLOR PASS (Lighter Blend)
                 lc.globalCompositeOperation = 'lighter'; 
@@ -73208,30 +73866,29 @@ engineMixin({
                 for (const lamp of iVisible) {
                     const sp = lamp._sprites;
                     lc.globalAlpha = 0.08 * lamp.intensity;
-                    lc.drawImage(sp.color, sp.x, sp.y, sp.d, sp.d);
+                    this._drawInteriorSource(lc, lamp, 'color');
                 }
             
                 // Lamps — the same ones lit above
                 for (const l of litLamps) {
-                    if (!l._cachedGrad) {
+                    if (!l._cachedGrad || l._cachedGradX !== l.x || l._cachedGradY !== l.y || l._cachedGradRadius !== l.radius || l._cachedGradColor !== l.color) {
                         l._cachedGrad = lc.createRadialGradient(l.x, l.y, 0, l.x, l.y, l.radius);
+                        l._cachedGradX = l.x; l._cachedGradY = l.y; l._cachedGradRadius = l.radius; l._cachedGradColor = l.color;
                         l._cachedGrad.addColorStop(0, '#ffffff'); l._cachedGrad.addColorStop(0.1, l.color); l._cachedGrad.addColorStop(0.6, l.color); l._cachedGrad.addColorStop(1, 'rgba(0,0,0,0)');
                     }
                     lc.globalAlpha = baseAlpha * Math.min(1, l._litK);
-                    lc.fillStyle = l._cachedGrad; lc.beginPath(); lc.arc(l.x, l.y, l.radius, 0, Math.PI*2); lc.fill();
+                    if (!DynamicShadows.drawLight(lc, l, 'color')) {
+                        lc.fillStyle = l._cachedGrad; lc.fill(l._lightingVisibilityPath || l._shadowPath);
+                    }
                 }
             
                 // Neon Signs — cached gradients; the odd one buzzes
                 for (const s of this.neonSigns) {
                     if (!inView(s.x, s.y, 150)) continue;
-                    if (!s._cachedGrad) {
-                        const radius = 150;
-                        s._cachedGrad = lc.createRadialGradient(s.x, s.y, 0, s.x, s.y, radius);
-                        s._cachedGrad.addColorStop(0, s.color); s._cachedGrad.addColorStop(1, 'rgba(0,0,0,0)');
-                        s._cachedRadius = radius;
-                    }
                     lc.globalAlpha = baseAlpha * 1.5 * lampFlicker(s);
-                    lc.fillStyle = s._cachedGrad; lc.beginPath(); lc.arc(s.x, s.y, s._cachedRadius, 0, Math.PI*2); lc.fill();
+                    this._shadowSource(lc, s, 'neon', { x: s.x, y: s.y, radius: 150, color: s.color, elevation: 48, style: s.color }, 'color',
+                        (g, phase) => { if (phase !== 'color') return; const grad = g.createRadialGradient(s.x, s.y, 0, s.x, s.y, 150);
+                            grad.addColorStop(0, s.color); grad.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = grad; g.beginPath(); g.arc(s.x, s.y, 150, 0, Math.PI * 2); g.fill(); });
                 }
             
                 // Vending / medbay colour
@@ -73239,21 +73896,15 @@ engineMixin({
                     const offset = (g.p.id || 0) * 1337;
                     const mod = g.medbay ? 0.9 + Math.sin((time + offset) / 400) * 0.2 : 1.0 + Math.sin((time + offset) / 50) * 0.05;
                     lc.globalAlpha = Math.min(1.0, 0.2 * mod);
-                    drawGlow(lc, g.x, g.y, 180, g.medbay ? '#00ff00' : '#00f3ff', 0.3);
+                    const holeRadius = 170 * (g.medbay ? 1.0 + Math.sin((time + offset) / 400) * 0.05 : 1.0 + Math.sin((time + offset) / 50) * 0.02);
+                    this._drawPropGlow(lc, g, 'color', holeRadius);
                 }
             
                 if (this.activeMap.id === 'moon_city_nightclub') this.clubLightLayer(lc, 'color');  // the floor's colour on whoever dances on it
 
-                // Soft light colour (the warm pool each decor light casts)
+                // Soft light colour uses the same caster mask as its illumination.
                 for (const s of softLights) {
-                    lc.globalAlpha = Math.min(1, 0.22 * s.a);
-                    if (s.src.w) { softArea(s, '_tint', [[0, s.src.color || '#ffd9b0'], [0.55, s.src.color || '#ffd9b0'], [1, 'rgba(0,0,0,0)']]); continue; }
-                    lc.fillStyle = softGrad(s, '_tintGrad', () => {
-                        const g = lc.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r);
-                        g.addColorStop(0, s.src.color || '#ffd9b0'); g.addColorStop(1, 'rgba(0,0,0,0)');
-                        return g;
-                    });
-                    lc.beginPath(); lc.arc(s.x, s.y, s.r, 0, Math.PI * 2); lc.fill();
+                    lc.globalAlpha = Math.min(1, 0.22 * s.a); this._drawSoftSource(lc, s, 'color');
                 }
 
                 // Fireballs and their dying flames cast a wide orange pool, not the small ordinary-shot tint.
@@ -73263,12 +73914,12 @@ engineMixin({
                 const hexOr = (c, d) => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c) ? c : d;
                 for (const p of this.projectiles) {
                     if (p.isFireball || !inView(p.x, p.y, 40)) continue;
-                    lc.globalAlpha = 0.3; drawGlow(lc, p.x, p.y, 40, hexOr(p.color, '#ffd9a0'), 0.25);
+                    lc.globalAlpha = 0.3; this._drawTransientSource(lc, p, 'color');
                 }
                 for (const f of this.muzzleFlashes) {
                     const r = f.radius * 1.4;
                     if (!inView(f.x, f.y, r)) continue;
-                    lc.globalAlpha = 0.45 * Math.min(1, (f.life || 3) / 3); drawGlow(lc, f.x, f.y, r, hexOr(f.color, '#ffcc88'), 0.25);
+                    lc.globalAlpha = 0.45 * Math.min(1, (f.life || 3) / 3); this._drawTransientSource(lc, f, 'color', true);
                 }
 
                 // Headlight haze, and a glow at each headlamp
@@ -73278,12 +73929,19 @@ engineMixin({
                     this._drawBeam(b);
                     const nx = -Math.sin(b.owner.angle), ny = Math.cos(b.owner.angle), side = (b.owner.width || 22) * 0.35;
                     lc.globalAlpha = Math.min(1, baseAlpha * 2.2 * b.haze);
-                    for (const sgn of [-1, 1]) drawGlow(lc, b.cx + nx * side * sgn, b.cy + ny * side * sgn, 22, hexOr(b.color, '#ffffdd'), 0.2);
+                    for (const sgn of [-1, 1]) {
+                        const x = b.cx + nx * side * sgn, y = b.cy + ny * side * sgn, color = hexOr(b.color, '#ffffdd');
+                        this._shadowSource(lc, b.owner, 'headlamp' + sgn, { family: 'headlight', owner: b.owner, x, y, radius: 22, elevation: 8, samePaint: true, style: color }, 'color',
+                            g => drawGlow(g, x, y, 22, color, 0.2));
+                    }
                 }
                 lc.globalAlpha = 1;
 
-                // 6b. LAMP SHADOWS — behind each person in a lamp's light, the dark and its colour come back (ui/humanoid-render.js)
-                drawLampShadowsInto(lc, tint, litLamps);
+                LightingProfile.end('Canvas inputs + shadow work (inclusive)',inputsTime);
+                const gammaLayer = GammaShadows.finish(lc, { direct: true, soft: GameSettings.softShadows });
+
+                // Lamp contributions already include dynamic occlusion. Other lamps,
+                // headlights and transient lights can illuminate their shadows.
 
                 lc.restore();
             
@@ -73291,8 +73949,9 @@ engineMixin({
                 ctx.save();
                 ctx.setTransform(1, 0, 0, 1, 0, 0); 
                 ctx.globalAlpha = finalOpacity;
-                let layer = this.lightCanvas;
-                if (GameSettings.softShadows) {
+                const canvasBlurTime=LightingProfile.start();
+                let layer = gammaLayer || this.lightCanvas;
+                if (GameSettings.softShadows && !gammaLayer) {
                     // Soft edges, the same in every browser and no ctx.filter (Safari before 18 has none): a separable
                     // box blur on the half-resolution light layer — three whole-pixel shifts across, then three down,
                     // each a third, added up. Six plain copies of a small canvas.
@@ -73312,10 +73971,18 @@ engineMixin({
                     }
                     layer = src;
                 }
+                LightingProfile.end('Canvas blur / layer selection',canvasBlurTime);
+                const sceneCopyTime=LightingProfile.start();
                 ctx.imageSmoothingEnabled = true;
-                if (layer === this.lightCanvas) ctx.drawImage(layer, 0, 0, this.canvas.width, this.canvas.height);
+                const overlay=gammaLayer && GammaExperiment.current.overlay;
+                if(overlay)GammaExperiment.showOverlay(this,gammaLayer,finalOpacity);
+                else {GammaExperiment.hideOverlay();
+                if (layer === this.lightCanvas || (gammaLayer && !GameSettings.softShadows)) ctx.drawImage(layer, 0, 0, this.canvas.width, this.canvas.height);
                 else ctx.drawImage(layer, 1, 1, lw - 2, lh - 2, 0, 0, this.canvas.width, this.canvas.height);   // the blur's outer pixel is half-covered: crop it
                 
+                }
+                LightingProfile.end(overlay?'WebGL overlay layout':gammaLayer?'WebGL to scene Canvas copy (CPU wait)':'Canvas to scene copy',sceneCopyTime);
+
                 // 8. NV SIGNAL BOOST
                 if (this.nvIntensity > 0.01) {
                     ctx.globalCompositeOperation = 'soft-light';
@@ -77559,14 +78226,14 @@ engineMixin({
                 const el = document.getElementById(id);
                 if (!el) return;
                 
-                const display = value.toUpperCase();
+                const display = id === 'set-lampshadows' && (value === 'beta' || value === 'gamma') ? value.toUpperCase() + ' (EXPERIMENTAL)' : value.toUpperCase();
                 el.textContent = display;
                 
                 // Update CSS class for color coding
                 el.className = 'settings-value';
                 if (value === 'low' || value === 'off') el.classList.add('val-low');
                 else if (value === 'medium') el.classList.add('val-medium');
-                else if (value === 'ultra' || value === 'high' || value === 'on') el.classList.add('val-high');
+                else if (value === 'ultra' || value === 'high' || value === 'beta' || value === 'gamma' || value === 'on') el.classList.add('val-high');
                 else if (value === 'none') el.classList.add('val-off');
             }
             
@@ -77598,7 +78265,7 @@ engineMixin({
                     this._updateValueEl(el.id, GameSettings.reflections);
                     
                 } else if (key === 'lampShadows') {
-                    const order = ['off', 'low', 'high', 'ultra'];
+                    const order = ['off', 'low', 'high', 'ultra', 'beta', 'gamma'];
                     GameSettings.lampShadows = order[(order.indexOf(GameSettings.lampShadows || 'low') + 1) % order.length];
                     GameSettings.saveDensity();                                    // this device's, like the crowd's detail
                     this._updateValueEl(el.id, GameSettings.lampShadows);

@@ -1,0 +1,291 @@
+{
+  "passed": true,
+  "pixels": {
+    "shadow": 244,
+    "unshadowed": 178,
+    "second": 110,
+    "secondReference": 110,
+    "both": 105,
+    "body": 133,
+    "bodyReference": 134
+  },
+  "extended": {
+    "shut": 255,
+    "swung": 164,
+    "transmitted": 195,
+    "retracted": 164,
+    "inCone": {
+      "alpha": 246,
+      "bytes": 30000,
+      "paired": 1
+    },
+    "outsideCone": {
+      "alpha": 195,
+      "bytes": 0,
+      "paired": 0
+    }
+  },
+  "gamma": {
+    "plain": {
+      "worst": 3.5450980392156843,
+      "mean": 0.4890716094772544,
+      "stats": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 4,
+        "contributions": 4,
+        "tileMax": 4,
+        "frameId": null
+      },
+      "samples": [
+        {
+          "high": [
+            48,
+            26,
+            53,
+            158
+          ],
+          "gamma": [
+            48,
+            27,
+            53,
+            159
+          ]
+        },
+        {
+          "high": [
+            43,
+            43,
+            86,
+            119
+          ],
+          "gamma": [
+            40,
+            40,
+            83,
+            120
+          ]
+        },
+        {
+          "high": [
+            24,
+            16,
+            52,
+            180
+          ],
+          "gamma": [
+            24,
+            14,
+            52,
+            180
+          ]
+        }
+      ]
+    },
+    "veiled": {
+      "worst": 2.6745098039215733,
+      "mean": 0.48725981413408576,
+      "stats": {
+        "backend": "webgl2",
+        "draws": 1,
+        "uploads": 4,
+        "contributions": 4,
+        "tileMax": 4,
+        "frameId": null
+      },
+      "samples": [
+        {
+          "high": [
+            48,
+            26,
+            53,
+            158
+          ],
+          "gamma": [
+            48,
+            27,
+            53,
+            159
+          ]
+        },
+        {
+          "high": [
+            44,
+            35,
+            79,
+            167
+          ],
+          "gamma": [
+            44,
+            35,
+            79,
+            168
+          ]
+        },
+        {
+          "high": [
+            24,
+            16,
+            52,
+            180
+          ],
+          "gamma": [
+            24,
+            14,
+            52,
+            180
+          ]
+        }
+      ]
+    },
+    "warm": {
+      "backend": "webgl2",
+      "draws": 1,
+      "uploads": 0,
+      "contributions": 4,
+      "tileMax": 4,
+      "frameId": null
+    },
+    "fallback": {
+      "worst": 0,
+      "mean": 0,
+      "stats": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 0,
+        "contributions": 0,
+        "tileMax": 0,
+        "frameId": null
+      },
+      "samples": [
+        {
+          "high": [
+            48,
+            26,
+            53,
+            158
+          ],
+          "gamma": [
+            48,
+            26,
+            53,
+            158
+          ]
+        },
+        {
+          "high": [
+            44,
+            35,
+            79,
+            167
+          ],
+          "gamma": [
+            44,
+            35,
+            79,
+            167
+          ]
+        },
+        {
+          "high": [
+            24,
+            16,
+            52,
+            180
+          ],
+          "gamma": [
+            24,
+            16,
+            52,
+            180
+          ]
+        }
+      ]
+    },
+    "interrupted": {
+      "worst": 0,
+      "mean": 0,
+      "stats": {
+        "backend": "high-fallback",
+        "draws": 0,
+        "uploads": 4,
+        "contributions": 4,
+        "tileMax": 4,
+        "frameId": null
+      },
+      "samples": [
+        {
+          "high": [
+            48,
+            26,
+            53,
+            158
+          ],
+          "gamma": [
+            48,
+            26,
+            53,
+            158
+          ]
+        },
+        {
+          "high": [
+            44,
+            35,
+            79,
+            167
+          ],
+          "gamma": [
+            44,
+            35,
+            79,
+            167
+          ]
+        },
+        {
+          "high": [
+            24,
+            16,
+            52,
+            180
+          ],
+          "gamma": [
+            24,
+            16,
+            52,
+            180
+          ]
+        }
+      ]
+    }
+  },
+  "scene": {
+    "gamma": {
+      "backend": "webgl2",
+      "draws": 1,
+      "uploads": 0,
+      "contributions": 48,
+      "tileMax": 28,
+      "frameId": 3
+    },
+    "shadows": {
+      "casters": 64,
+      "pairs": 197,
+      "blocked": 122,
+      "rays": 0,
+      "builds": 0,
+      "hits": 24,
+      "dropped": 30,
+      "captures": 0,
+      "sources": 24,
+      "doors": 8
+    }
+  },
+  "profiler": {
+    "active": "Shadow rendererGAMMAWebGL2 activeGPU resolves 1/framecontributions 48mask uploads 0/framemax lights/tile 280 mask uploads is normal when cached. Resolve count excludes shadow preparation and final compositing.",
+    "visible": true,
+    "fallback": "Shadow rendererGAMMAHigh fallback \u2014 WebGL2 inactiveGPU resolves 0/framecontributions 0mask uploads 0/framemax lights/tile 00 mask uploads is normal when cached. Resolve count excludes shadow preparation and final compositing.",
+    "idle": "Shadow rendererGAMMAGamma idle \u2014 no lighting pass",
+    "high": "Shadow rendererHIGHCanvas 2D"
+  }
+}

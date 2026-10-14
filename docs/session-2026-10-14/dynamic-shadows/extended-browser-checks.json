@@ -1,0 +1,28 @@
+{
+  "passed": true,
+  "pixels": {
+    "shadow": 244,
+    "unshadowed": 178,
+    "second": 110,
+    "secondReference": 110,
+    "both": 105,
+    "body": 133,
+    "bodyReference": 134
+  },
+  "extended": {
+    "shut": 255,
+    "swung": 164,
+    "transmitted": 195,
+    "retracted": 164,
+    "inCone": {
+      "alpha": 246,
+      "bytes": 30000,
+      "paired": 1
+    },
+    "outsideCone": {
+      "alpha": 195,
+      "bytes": 0,
+      "paired": 0
+    }
+  }
+}

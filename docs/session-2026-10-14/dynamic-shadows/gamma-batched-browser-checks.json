@@ -1,0 +1,542 @@
+{
+  "passed": true,
+  "pixels": {
+    "shadow": 244,
+    "unshadowed": 178,
+    "second": 110,
+    "secondReference": 110,
+    "both": 105,
+    "body": 133,
+    "bodyReference": 134
+  },
+  "extended": {
+    "shut": 255,
+    "swung": 164,
+    "transmitted": 195,
+    "retracted": 164,
+    "inCone": {
+      "alpha": 246,
+      "bytes": 30000,
+      "paired": 1
+    },
+    "outsideCone": {
+      "alpha": 195,
+      "bytes": 0,
+      "paired": 0
+    }
+  },
+  "gamma": {
+    "plain": {
+      "worst": 3.435294117647061,
+      "mean": 0.3350237234477403,
+      "stats": {
+        "backend": "webgl2",
+        "resolves": 1,
+        "draws": 4,
+        "uploads": 4,
+        "layerUploads": 2,
+        "contributions": 4,
+        "blurPasses": 0,
+        "frameId": null
+      },
+      "samples": [
+        {
+          "high": [
+            48,
+            26,
+            53,
+            158
+          ],
+          "gamma": [
+            48,
+            26,
+            53,
+            158
+          ]
+        },
+        {
+          "high": [
+            43,
+            43,
+            86,
+            119
+          ],
+          "gamma": [
+            43,
+            43,
+            84,
+            119
+          ]
+        },
+        {
+          "high": [
+            24,
+            16,
+            52,
+            180
+          ],
+          "gamma": [
+            24,
+            14,
+            52,
+            180
+          ]
+        }
+      ]
+    },
+    "veiled": {
+      "worst": 3,
+      "mean": 0.3595608660131176,
+      "stats": {
+        "backend": "webgl2",
+        "resolves": 1,
+        "draws": 5,
+        "uploads": 4,
+        "layerUploads": 3,
+        "contributions": 4,
+        "blurPasses": 0,
+        "frameId": null
+      },
+      "samples": [
+        {
+          "high": [
+            48,
+            26,
+            53,
+            158
+          ],
+          "gamma": [
+            48,
+            26,
+            53,
+            158
+          ]
+        },
+        {
+          "high": [
+            44,
+            35,
+            79,
+            167
+          ],
+          "gamma": [
+            44,
+            37,
+            79,
+            167
+          ]
+        },
+        {
+          "high": [
+            24,
+            16,
+            52,
+            180
+          ],
+          "gamma": [
+            24,
+            14,
+            52,
+            180
+          ]
+        }
+      ]
+    },
+    "direct": {
+      "worst": 3,
+      "mean": 0.3595608660131176,
+      "stats": {
+        "backend": "webgl2",
+        "resolves": 1,
+        "draws": 5,
+        "uploads": 4,
+        "layerUploads": 3,
+        "contributions": 4,
+        "blurPasses": 0,
+        "frameId": null
+      },
+      "samples": [
+        {
+          "high": [
+            48,
+            26,
+            53,
+            158
+          ],
+          "gamma": [
+            48,
+            26,
+            53,
+            158
+          ]
+        },
+        {
+          "high": [
+            44,
+            35,
+            79,
+            167
+          ],
+          "gamma": [
+            44,
+            37,
+            79,
+            167
+          ]
+        },
+        {
+          "high": [
+            24,
+            16,
+            52,
+            180
+          ],
+          "gamma": [
+            24,
+            14,
+            52,
+            180
+          ]
+        }
+      ]
+    },
+    "soft": {
+      "worst": 5.396078431372548,
+      "mean": 1.3754880718953746,
+      "stats": {
+        "backend": "webgl2",
+        "resolves": 1,
+        "draws": 7,
+        "uploads": 4,
+        "layerUploads": 3,
+        "contributions": 4,
+        "blurPasses": 2,
+        "frameId": null
+      },
+      "samples": [
+        {
+          "high": [
+            49,
+            29,
+            53,
+            160
+          ],
+          "gamma": [
+            48,
+            26,
+            53,
+            158
+          ]
+        },
+        {
+          "high": [
+            46,
+            36,
+            82,
+            168
+          ],
+          "gamma": [
+            44,
+            37,
+            79,
+            167
+          ]
+        },
+        {
+          "high": [
+            25,
+            17,
+            55,
+            181
+          ],
+          "gamma": [
+            24,
+            14,
+            52,
+            180
+          ]
+        }
+      ]
+    },
+    "warm": {
+      "backend": "webgl2",
+      "resolves": 1,
+      "draws": 5,
+      "uploads": 0,
+      "layerUploads": 3,
+      "contributions": 4,
+      "blurPasses": 0,
+      "frameId": null
+    },
+    "fallback": {
+      "worst": 0,
+      "mean": 0,
+      "stats": {
+        "backend": "high-fallback",
+        "resolves": 0,
+        "draws": 0,
+        "uploads": 0,
+        "layerUploads": 0,
+        "contributions": 0,
+        "blurPasses": 0,
+        "frameId": null
+      },
+      "samples": [
+        {
+          "high": [
+            48,
+            26,
+            53,
+            158
+          ],
+          "gamma": [
+            48,
+            26,
+            53,
+            158
+          ]
+        },
+        {
+          "high": [
+            44,
+            35,
+            79,
+            167
+          ],
+          "gamma": [
+            44,
+            35,
+            79,
+            167
+          ]
+        },
+        {
+          "high": [
+            24,
+            16,
+            52,
+            180
+          ],
+          "gamma": [
+            24,
+            16,
+            52,
+            180
+          ]
+        }
+      ]
+    },
+    "interrupted": {
+      "worst": 0,
+      "mean": 0,
+      "stats": {
+        "backend": "high-fallback",
+        "resolves": 0,
+        "draws": 0,
+        "uploads": 4,
+        "layerUploads": 3,
+        "contributions": 4,
+        "blurPasses": 0,
+        "frameId": null
+      },
+      "samples": [
+        {
+          "high": [
+            48,
+            26,
+            53,
+            158
+          ],
+          "gamma": [
+            48,
+            26,
+            53,
+            158
+          ]
+        },
+        {
+          "high": [
+            44,
+            35,
+            79,
+            167
+          ],
+          "gamma": [
+            44,
+            35,
+            79,
+            167
+          ]
+        },
+        {
+          "high": [
+            24,
+            16,
+            52,
+            180
+          ],
+          "gamma": [
+            24,
+            16,
+            52,
+            180
+          ]
+        }
+      ]
+    }
+  },
+  "atlas": {
+    "cold": {
+      "backend": "webgl2",
+      "resolves": 1,
+      "draws": 6,
+      "uploads": 90,
+      "layerUploads": 2,
+      "contributions": 90,
+      "blurPasses": 2,
+      "frameId": null
+    },
+    "warm": {
+      "backend": "webgl2",
+      "resolves": 1,
+      "draws": 6,
+      "uploads": 0,
+      "layerUploads": 2,
+      "contributions": 90,
+      "blurPasses": 2,
+      "frameId": null
+    },
+    "changed": {
+      "backend": "webgl2",
+      "resolves": 1,
+      "draws": 6,
+      "uploads": 1,
+      "layerUploads": 2,
+      "contributions": 90,
+      "blurPasses": 2,
+      "frameId": null
+    },
+    "accepted": false,
+    "failed": {
+      "backend": "high-fallback",
+      "resolves": 0,
+      "draws": 0,
+      "uploads": 0,
+      "layerUploads": 0,
+      "contributions": 1,
+      "blurPasses": 0,
+      "frameId": null
+    }
+  },
+  "scene": {
+    "gamma": {
+      "backend": "webgl2",
+      "resolves": 1,
+      "draws": 7,
+      "uploads": 0,
+      "layerUploads": 3,
+      "contributions": 48,
+      "blurPasses": 2,
+      "frameId": 3
+    },
+    "shadows": {
+      "casters": 64,
+      "pairs": 197,
+      "blocked": 122,
+      "rays": 0,
+      "builds": 0,
+      "hits": 24,
+      "dropped": 30,
+      "captures": 0,
+      "sources": 24,
+      "doors": 8
+    }
+  },
+  "profiler": {
+    "active": "Shadow rendererGAMMAWebGL2 activeGPU resolves 1/framecontributions 48mask uploads 0/frameGPU draws 7/framelayer uploads 3/frameGPU blur passes 2Cached masks can need 0 uploads; Canvas input layers still upload. GPU blur stays on the GPU; scene composition remains Canvas 2D.",
+    "visible": true,
+    "fallback": "Shadow rendererGAMMAHigh fallback — WebGL2 inactiveGPU resolves 0/framecontributions 0mask uploads 0/frameGPU draws 0/framelayer uploads 0/frameGPU blur passes 0Cached masks can need 0 uploads; Canvas input layers still upload. GPU blur stays on the GPU; scene composition remains Canvas 2D.",
+    "idle": "Shadow rendererGAMMAGamma idle — no lighting pass",
+    "high": "Shadow rendererHIGHCanvas 2D"
+  },
+  "sceneParity": [
+    {
+      "map": "apt_949",
+      "soft": false,
+      "mean": 0.5836846245659723,
+      "worst": 34,
+      "stats": {
+        "backend": "webgl2",
+        "resolves": 1,
+        "draws": 5,
+        "uploads": 0,
+        "layerUploads": 3,
+        "contributions": 48,
+        "blurPasses": 0,
+        "frameId": 9
+      }
+    },
+    {
+      "map": "apt_949",
+      "soft": true,
+      "mean": 1.5250811089409722,
+      "worst": 9,
+      "stats": {
+        "backend": "webgl2",
+        "resolves": 1,
+        "draws": 7,
+        "uploads": 0,
+        "layerUploads": 3,
+        "contributions": 48,
+        "blurPasses": 2,
+        "frameId": 13
+      }
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": false,
+      "mean": 0.5868112521701389,
+      "worst": 27,
+      "stats": {
+        "backend": "webgl2",
+        "resolves": 1,
+        "draws": 5,
+        "uploads": 0,
+        "layerUploads": 3,
+        "contributions": 34,
+        "blurPasses": 0,
+        "frameId": 17
+      }
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": true,
+      "mean": 1.4473491753472223,
+      "worst": 8,
+      "stats": {
+        "backend": "webgl2",
+        "resolves": 1,
+        "draws": 7,
+        "uploads": 0,
+        "layerUploads": 3,
+        "contributions": 34,
+        "blurPasses": 2,
+        "frameId": 21
+      }
+    }
+  ],
+  "defaultBackend": {
+    "active": true,
+    "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "stats": {
+      "backend": "webgl2",
+      "resolves": 0,
+      "draws": 0,
+      "uploads": 0,
+      "layerUploads": 0,
+      "contributions": 0,
+      "blurPasses": 0,
+      "frameId": null
+    }
+  }
+}

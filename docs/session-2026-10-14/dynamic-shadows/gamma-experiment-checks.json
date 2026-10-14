@@ -1,0 +1,461 @@
+{
+  "passed": true,
+  "note": "Real Chromium isolation/cleanup checks, not a target-device performance benchmark.",
+  "cases": [
+    {
+      "mode": "baseline",
+      "warmupFrames": 10,
+      "settlingFrames": 5,
+      "measuredFrames": 6,
+      "layer": [
+        300,
+        170
+      ],
+      "gamma": {
+        "backend": "webgl2",
+        "resolves": 1,
+        "draws": 7,
+        "uploads": 6,
+        "layerUploads": 3,
+        "contributions": 48,
+        "blurPasses": 2,
+        "frozenMasks": 0,
+        "frozenLayers": 0,
+        "missingFrozenSprites": 0,
+        "frameId": 21
+      },
+      "uploadBytes": {
+        "mask": 1597536,
+        "layers": 612000
+      },
+      "experiment": {
+        "mode": "baseline",
+        "phase": "measurement",
+        "noBlur": false,
+        "freezeMasks": false,
+        "freezeLayers": false,
+        "simple": false,
+        "overlay": false,
+        "warmupCompleted": 10,
+        "settlingCompleted": 5,
+        "sampledFrames": 6,
+        "ready": false
+      },
+      "stages": [
+        "caster registry",
+        "silhouette cache copy",
+        "silhouette body capture",
+        "backend initialization",
+        "visibility paths",
+        "source/caster pairs",
+        "shadow preparation",
+        "atlas collection (includes uploads)",
+        "mask raster + sprite painting",
+        "mask padding",
+        "mask uploads (CPU wait)",
+        "Canvas hole snapshot + room veil",
+        "Canvas inputs + shadow work (inclusive)",
+        "surface setup",
+        "base darkness upload",
+        "base colour upload",
+        "room veil upload",
+        "blur target allocation/setup",
+        "GPU resolve submission",
+        "GPU blur submission",
+        "Canvas blur / layer selection",
+        "WebGL to scene Canvas copy (CPU wait)",
+        "lighting total (inclusive)"
+      ]
+    },
+    {
+      "mode": "no-blur",
+      "warmupFrames": 10,
+      "settlingFrames": 5,
+      "measuredFrames": 6,
+      "layer": [
+        300,
+        170
+      ],
+      "gamma": {
+        "backend": "webgl2",
+        "resolves": 1,
+        "draws": 5,
+        "uploads": 0,
+        "layerUploads": 3,
+        "contributions": 48,
+        "blurPasses": 0,
+        "frozenMasks": 0,
+        "frozenLayers": 0,
+        "missingFrozenSprites": 0,
+        "frameId": 42
+      },
+      "uploadBytes": {
+        "mask": 0,
+        "layers": 612000
+      },
+      "experiment": {
+        "mode": "no-blur",
+        "phase": "measurement",
+        "noBlur": true,
+        "freezeMasks": false,
+        "freezeLayers": false,
+        "simple": false,
+        "overlay": false,
+        "warmupCompleted": 10,
+        "settlingCompleted": 5,
+        "sampledFrames": 6,
+        "ready": false
+      },
+      "stages": [
+        "caster registry",
+        "backend initialization",
+        "visibility paths",
+        "source/caster pairs",
+        "shadow preparation",
+        "atlas collection (includes uploads)",
+        "Canvas hole snapshot + room veil",
+        "Canvas inputs + shadow work (inclusive)",
+        "surface setup",
+        "base darkness upload",
+        "base colour upload",
+        "room veil upload",
+        "blur target allocation/setup",
+        "GPU resolve submission",
+        "GPU blur submission",
+        "Canvas blur / layer selection",
+        "WebGL to scene Canvas copy (CPU wait)",
+        "lighting total (inclusive)"
+      ]
+    },
+    {
+      "mode": "freeze-all",
+      "warmupFrames": 10,
+      "settlingFrames": 5,
+      "measuredFrames": 6,
+      "layer": [
+        300,
+        170
+      ],
+      "gamma": {
+        "backend": "webgl2",
+        "resolves": 1,
+        "draws": 7,
+        "uploads": 0,
+        "layerUploads": 0,
+        "contributions": 48,
+        "blurPasses": 2,
+        "frozenMasks": 6,
+        "frozenLayers": 3,
+        "missingFrozenSprites": 0,
+        "frameId": 63
+      },
+      "uploadBytes": {
+        "mask": 0,
+        "layers": 0
+      },
+      "experiment": {
+        "mode": "freeze-all",
+        "phase": "measurement",
+        "noBlur": false,
+        "freezeMasks": true,
+        "freezeLayers": true,
+        "simple": false,
+        "overlay": false,
+        "warmupCompleted": 10,
+        "settlingCompleted": 5,
+        "sampledFrames": 6,
+        "ready": false
+      },
+      "stages": [
+        "caster registry",
+        "backend initialization",
+        "visibility paths",
+        "source/caster pairs",
+        "shadow preparation",
+        "atlas collection (includes uploads)",
+        "Canvas hole snapshot + room veil",
+        "Canvas inputs + shadow work (inclusive)",
+        "surface setup",
+        "blur target allocation/setup",
+        "GPU resolve submission",
+        "GPU blur submission",
+        "Canvas blur / layer selection",
+        "WebGL to scene Canvas copy (CPU wait)",
+        "lighting total (inclusive)"
+      ]
+    },
+    {
+      "mode": "freeze-masks",
+      "warmupFrames": 10,
+      "settlingFrames": 5,
+      "measuredFrames": 6,
+      "layer": [
+        300,
+        170
+      ],
+      "gamma": {
+        "backend": "webgl2",
+        "resolves": 1,
+        "draws": 7,
+        "uploads": 0,
+        "layerUploads": 3,
+        "contributions": 48,
+        "blurPasses": 2,
+        "frozenMasks": 6,
+        "frozenLayers": 0,
+        "missingFrozenSprites": 0,
+        "frameId": 84
+      },
+      "uploadBytes": {
+        "mask": 0,
+        "layers": 612000
+      },
+      "experiment": {
+        "mode": "freeze-masks",
+        "phase": "measurement",
+        "noBlur": false,
+        "freezeMasks": true,
+        "freezeLayers": false,
+        "simple": false,
+        "overlay": false,
+        "warmupCompleted": 10,
+        "settlingCompleted": 5,
+        "sampledFrames": 6,
+        "ready": false
+      },
+      "stages": [
+        "caster registry",
+        "backend initialization",
+        "visibility paths",
+        "source/caster pairs",
+        "shadow preparation",
+        "atlas collection (includes uploads)",
+        "Canvas hole snapshot + room veil",
+        "Canvas inputs + shadow work (inclusive)",
+        "surface setup",
+        "base darkness upload",
+        "base colour upload",
+        "room veil upload",
+        "blur target allocation/setup",
+        "GPU resolve submission",
+        "GPU blur submission",
+        "Canvas blur / layer selection",
+        "WebGL to scene Canvas copy (CPU wait)",
+        "lighting total (inclusive)"
+      ]
+    },
+    {
+      "mode": "freeze-layers",
+      "warmupFrames": 10,
+      "settlingFrames": 5,
+      "measuredFrames": 6,
+      "layer": [
+        300,
+        170
+      ],
+      "gamma": {
+        "backend": "webgl2",
+        "resolves": 1,
+        "draws": 7,
+        "uploads": 0,
+        "layerUploads": 0,
+        "contributions": 48,
+        "blurPasses": 2,
+        "frozenMasks": 0,
+        "frozenLayers": 3,
+        "missingFrozenSprites": 0,
+        "frameId": 105
+      },
+      "uploadBytes": {
+        "mask": 0,
+        "layers": 0
+      },
+      "experiment": {
+        "mode": "freeze-layers",
+        "phase": "measurement",
+        "noBlur": false,
+        "freezeMasks": false,
+        "freezeLayers": true,
+        "simple": false,
+        "overlay": false,
+        "warmupCompleted": 10,
+        "settlingCompleted": 5,
+        "sampledFrames": 6,
+        "ready": false
+      },
+      "stages": [
+        "caster registry",
+        "backend initialization",
+        "visibility paths",
+        "source/caster pairs",
+        "shadow preparation",
+        "atlas collection (includes uploads)",
+        "Canvas hole snapshot + room veil",
+        "Canvas inputs + shadow work (inclusive)",
+        "surface setup",
+        "blur target allocation/setup",
+        "GPU resolve submission",
+        "GPU blur submission",
+        "Canvas blur / layer selection",
+        "WebGL to scene Canvas copy (CPU wait)",
+        "lighting total (inclusive)"
+      ]
+    },
+    {
+      "mode": "simple-resolve",
+      "warmupFrames": 10,
+      "settlingFrames": 5,
+      "measuredFrames": 6,
+      "layer": [
+        300,
+        170
+      ],
+      "gamma": {
+        "backend": "webgl2",
+        "resolves": 1,
+        "draws": 3,
+        "uploads": 0,
+        "layerUploads": 3,
+        "contributions": 48,
+        "blurPasses": 2,
+        "frozenMasks": 0,
+        "frozenLayers": 0,
+        "missingFrozenSprites": 0,
+        "frameId": 126
+      },
+      "uploadBytes": {
+        "mask": 0,
+        "layers": 612000
+      },
+      "experiment": {
+        "mode": "simple-resolve",
+        "phase": "measurement",
+        "noBlur": false,
+        "freezeMasks": false,
+        "freezeLayers": false,
+        "simple": true,
+        "overlay": false,
+        "warmupCompleted": 10,
+        "settlingCompleted": 5,
+        "sampledFrames": 6,
+        "ready": false
+      },
+      "stages": [
+        "caster registry",
+        "backend initialization",
+        "visibility paths",
+        "source/caster pairs",
+        "shadow preparation",
+        "atlas collection (includes uploads)",
+        "Canvas hole snapshot + room veil",
+        "Canvas inputs + shadow work (inclusive)",
+        "surface setup",
+        "base darkness upload",
+        "base colour upload",
+        "room veil upload",
+        "blur target allocation/setup",
+        "GPU resolve submission",
+        "GPU blur submission",
+        "Canvas blur / layer selection",
+        "WebGL to scene Canvas copy (CPU wait)",
+        "lighting total (inclusive)"
+      ]
+    },
+    {
+      "mode": "overlay",
+      "warmupFrames": 10,
+      "settlingFrames": 5,
+      "measuredFrames": 6,
+      "layer": [
+        300,
+        170
+      ],
+      "gamma": {
+        "backend": "webgl2",
+        "resolves": 1,
+        "draws": 7,
+        "uploads": 0,
+        "layerUploads": 3,
+        "contributions": 48,
+        "blurPasses": 2,
+        "frozenMasks": 0,
+        "frozenLayers": 0,
+        "missingFrozenSprites": 0,
+        "frameId": 147
+      },
+      "uploadBytes": {
+        "mask": 0,
+        "layers": 612000
+      },
+      "experiment": {
+        "mode": "overlay",
+        "phase": "measurement",
+        "noBlur": false,
+        "freezeMasks": false,
+        "freezeLayers": false,
+        "simple": false,
+        "overlay": true,
+        "warmupCompleted": 10,
+        "settlingCompleted": 5,
+        "sampledFrames": 6,
+        "ready": false
+      },
+      "stages": [
+        "caster registry",
+        "backend initialization",
+        "visibility paths",
+        "source/caster pairs",
+        "shadow preparation",
+        "atlas collection (includes uploads)",
+        "Canvas hole snapshot + room veil",
+        "Canvas inputs + shadow work (inclusive)",
+        "surface setup",
+        "base darkness upload",
+        "base colour upload",
+        "room veil upload",
+        "blur target allocation/setup",
+        "GPU resolve submission",
+        "GPU blur submission",
+        "Canvas blur / layer selection",
+        "WebGL overlay layout",
+        "lighting total (inclusive)"
+      ]
+    }
+  ],
+  "cleanup": {
+    "quality": {
+      "mode": "baseline",
+      "overlay": false
+    },
+    "cleared": {
+      "mode": "baseline",
+      "overlay": false,
+      "pending": 0
+    },
+    "selected": {
+      "mode": "no-blur",
+      "profiler": "full"
+    },
+    "restart": {
+      "samples": 0,
+      "phase": "starting"
+    }
+  },
+  "completedWindow": {
+    "frames": 60,
+    "cadenceIntervals": 59,
+    "experiment": {
+      "mode": "baseline",
+      "phase": "measurement",
+      "noBlur": false,
+      "freezeMasks": false,
+      "freezeLayers": false,
+      "simple": false,
+      "overlay": false,
+      "warmupCompleted": 10,
+      "settlingCompleted": 5,
+      "sampledFrames": 60,
+      "ready": true
+    }
+  }
+}

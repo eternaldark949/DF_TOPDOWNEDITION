@@ -32,11 +32,14 @@
             sync(game) {
                 game._syncProfiler();
                 const mode = game.showProfiler ? (GameSettings.profilerMode && GameSettings.profilerMode !== 'off' ? GameSettings.profilerMode : 'compact') : 'off';
+                if(mode!=='full' && LightingProfile.enabled)LightingProfile.disable();
+                if(GameSettings.lampShadows!=='gamma')GammaExperiment.stop();
                 if (mode !== 'off') this._ensureProf();
                 if (this._prof) {
                     this._prof.style.display = mode === 'off' ? 'none' : '';
                     this._prof.classList.toggle('full', mode === 'full');
                     this._report = null;
+                    if (mode === 'full') this._shadowPanel(game);
                 }
                 this._countCalls(this._wantCalls(game));
                 if (game.debugMode) this._ensureDbg();
@@ -48,15 +51,19 @@
             _ensureProf() {
                 if (this._prof) return;
                 const el = document.createElement('div'); el.id = 'dev-prof';
-                el.innerHTML = '<div class="dp-head"><b class="dp-fps">--</b><span>fps</span><b class="dp-ms">--</b><span>ms</span><canvas class="dp-spark" width="96" height="22"></canvas></div><div class="dp-rows"></div>';
+                el.innerHTML = '<div class="dp-head"><b class="dp-fps">--</b><span>fps</span><b class="dp-ms">--</b><span>ms</span><canvas class="dp-spark" width="96" height="22"></canvas></div><div class="dp-shadows" aria-label="Shadow renderer status"></div><div class="dp-rows"></div>';
                 el.addEventListener('click', (e) => {
                     e.stopPropagation();
+                    if(e.target.closest('[data-gamma-restart]')){GammaExperiment.select(GammaExperiment.mode);this._shadowPanel(game);return;}
+                    if(e.target.closest('[data-light-export]')){LightingProfile.download(game);return;}
+                    if(e.target.closest('details'))return;
                     GameSettings.profilerMode = GameSettings.profilerMode === 'full' ? 'compact' : 'full';
                     this.sync(game);
                 });
+                el.addEventListener('change',e=>{if(e.target.matches('[data-gamma-case]')){e.stopPropagation();GammaExperiment.select(e.target.value);e.target.blur();this._shadowPanel(game);}});
                 document.body.appendChild(el);
                 this._prof = el; this._spark = el.querySelector('.dp-spark'); this._sctx = this._spark.getContext('2d');
-                this._fpsEl = el.querySelector('.dp-fps'); this._msEl = el.querySelector('.dp-ms'); this._rowsEl = el.querySelector('.dp-rows');
+                this._fpsEl = el.querySelector('.dp-fps'); this._msEl = el.querySelector('.dp-ms'); this._rowsEl = el.querySelector('.dp-rows'); this._shadowEl = el.querySelector('.dp-shadows');
             },
 
             /** The call counter: the Full profiler with Count Canvas Calls, or Baseline's layer panel */
@@ -103,11 +110,70 @@
                 this._n++;
                 if (game.showProfiler && this._prof) {
                     if (this._n % 3 === 0) this._sparkStep(dt);
-                    if (this._n % 15 === 0) this._numbers();
+                    if (this._n % 15 === 0) { this._numbers(); if (this._prof.classList.contains('full')) this._shadowPanel(game); }
+                    if(this._prof.classList.contains('full') && now-(this._shadowAt||0)>500){this._shadowAt=now;this._numbers();this._shadowPanel(game);}
                     const rep = game.profiler.report;
                     if (rep !== this._report && this._prof.classList.contains('full')) { this._report = rep; this._rows(game, rep); }
                 }
                 if (game.debugMode && this._dbg && this._n % 30 === 0) this._counts(game);
+            },
+
+            /** Read existing counters only; no GPU probes or timings added by the panel. */
+            _shadowLine(game) {
+                const mode = GameSettings.lampShadows || 'low', s = GammaShadows.stats;
+                const fresh = Number.isFinite(s.frameId) && s.frameId === game._renderDrawId;
+                const status = mode !== 'gamma' ? (mode === 'off' ? 'Shadows off' : 'Canvas 2D')
+                    : !fresh ? 'Gamma idle — no lighting pass'
+                    : s.backend === 'webgl2' && s.resolves === 1 ? 'WebGL2 active'
+                    : s.backend === 'high-fallback' ? 'High fallback — WebGL2 inactive' : 'Gamma awaiting resolve';
+                const tier = mode !== 'gamma' || !fresh ? 'idle' : s.backend === 'webgl2' && s.resolves === 1 ? 'active' : 'fallback';
+                let html = `<div class="dp-total"><span>Shadow renderer</span><b>${mode.toUpperCase()}</b></div>`
+                    + `<div class="dp-shadow-status" data-state="${tier}">${status}</div>`;
+                if (mode === 'gamma' && fresh) html += `<div class="dp-counts"><span>GPU resolves <b>${s.resolves}</b>/frame</span>`
+                    + `<span>contributions <b>${s.contributions}</b></span><span>mask uploads <b>${s.uploads}</b>/frame</span>`
+                    + `<span>GPU draws <b>${s.draws}</b>/frame</span><span>layer uploads <b>${s.layerUploads}</b>/frame</span><span>GPU blur passes <b>${s.blurPasses}</b></span></div>`
+                    + '<div class="dp-shadow-note">Cached masks can need 0 uploads; Canvas input layers still upload. GPU blur stays on the GPU; scene composition remains Canvas 2D.</div>';
+                html += this._lightingDetails(game);
+                return html;
+            },
+            _lightingDetails(game) {
+                const p=LightingProfile,f=p.latest;
+                if(!p.enabled||!f||f.frameId!==game._renderDrawId||f.mode!==GameSettings.lampShadows)return '';
+                const esc=s=>String(s??'unknown').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+                const ms=n=>Number.isFinite(n)?n.toFixed(2):'—',mb=n=>(n/1048576).toFixed(2);
+                let html='<details class="dp-light-detail" open><summary>Lighting diagnostics</summary><button type="button" data-light-export '+(GammaExperiment.current.phase==='starting'?'disabled':'')+'>Save JSON report</button>';
+                if(f.mode==='gamma'){
+                    html+=`<label class="dp-shadow-note">GPU test <select data-gamma-case>${Object.entries(GammaExperiment.modes).map(([value,label])=>`<option value="${value}" ${value===GammaExperiment.mode?'selected':''}>${label}</option>`).join('')}</select></label><button type="button" data-gamma-restart>Restart test</button>`;
+                    const e=f.experiment,starting=GammaExperiment.current.phase==='starting';
+                    html+=`<div class="dp-shadow-note">${starting?'Starting new test':e.phase==='warmup'?`Warm-up ${e.warmupCompleted}/10`:e.phase==='settling'?`Settling ${e.settlingCompleted}/5`:`Recorded ${e.sampledFrames}/60 frames${e.ready?' · ready to export':''}`} · unsaved test; leaving Full restores baseline.</div>`;
+                    if(GammaExperiment.mode.includes('freeze'))html+='<div class="dp-shadow-note">Frozen textures become stale. Keep camera/scene comparable; preparation still runs.</div>';
+                    if(GammaExperiment.mode==='simple-resolve')html+='<div class="dp-shadow-note">Draws only the base darkness texture; uploads and selected blur still run.</div>';
+                    if(GammaExperiment.mode==='overlay')html+='<div class="dp-shadow-note">Direct browser overlay: some glows/Canvas UI are shaded in a different order.</div>';
+                    html+=`<div class="dp-shadow-note">Skipped uploads: masks ${f.gamma?.frozenMasks||0}, layers ${f.gamma?.frozenLayers||0} · missing frozen sprites ${f.gamma?.missingFrozenSprites||0}</div>`;
+                }
+                const cadence=p.cadenceSummary();
+                html+=`<div class="dp-total"><span>Actual frame cadence</span><b>${ms(cadence.fps)} FPS</b></div><div class="dp-shadow-note">${cadence.intervals} intervals · mean ${ms(cadence.meanMs)} ms · p95 ${ms(cadence.p95Ms)} · peak ${ms(cadence.peakMs)}<br>Pauses &gt;250 ms: ${cadence.pausesOver250ms} · &gt;1 s: ${cadence.pausesOver1000ms}<br>Last render ${ms(f.cadence.renderMs)} ms · between renders ${ms(f.cadence.gapMs)} ms (includes logic/browser waits)</div>`;
+                if(f.mode==='gamma' && p.deviceInfo)html+=`<div class="dp-light-device">${esc(p.deviceInfo.renderer)}<br>${esc(p.deviceInfo.vendor)} · ${esc(p.deviceInfo.version)}</div>`;
+                html+=`<div class="dp-shadow-note">Layer ${f.layer.join(' × ')} · scene ${f.scene.join(' × ')} · DPR ${window.devicePixelRatio||1}<br>Lighting scale ${f.lightingScale} · adaptive ${f.adaptiveFactor} · soft ${f.soft?'on':'off'}<br>Uploads: masks ${mb(f.bytes.mask)} MiB + layers ${mb(f.bytes.layers)} MiB/frame<br>Atlas ${f.atlasResident}/${f.atlasSlots} slots · ${mb(f.atlasBytes)} MiB · GPU textures ≈ ${mb(f.gpuTextureBytes)} MiB · new ${f.churn.new}, changed ${f.churn.changed}, evicted ${f.churn.evicted}<br>Shadow cache ${mb(f.maskCacheBytes)} MiB · builds ${f.shadows.builds}, hits ${f.shadows.hits}, captures ${f.shadows.captures}<br>Casters ${f.shadows.casters} · sources ${f.shadows.sources} · pairs ${f.shadows.pairs} · blocked ${f.shadows.blocked} · rays ${f.shadows.rays} · dropped ${f.shadows.dropped}</div>`;
+                if(f.gamma?.failure)html+=`<div class="dp-shadow-note">Failure: ${esc(f.gamma.failure)}</div>`;
+                html+=`<div class="dp-total"><span>CPU timings · ${p.history.length} frames</span></div>`;
+                for(const r of p.summary())html+=`<div class="dp-light-stage"><span>${esc(r.name)}</span><b>${ms(r.last)} ms</b><small>avg ${ms(r.mean)} · p95 ${ms(r.p95)} · peak ${ms(r.peak)} · calls ${r.calls} · max/call ${ms(r.maxCall)}</small></div>`;
+                html+='<div class="dp-shadow-note">CPU values include driver waits. Parent/child rows overlap; do not add them. No forced GPU readback; no per-frame gl.getError.</div>';
+                if(f.mode==='gamma'){
+                    html+=`<div class="dp-total"><span>GPU execution</span></div><div class="dp-shadow-note">${esc(p.gpuStatus||'not sampled')} · ${p.pending.length} pending</div>`;
+                    for(const [name,g]of Object.entries(p.gpu))html+=`<div class="dp-light-stage"><span>${esc(name)}</span><b>${ms(g.ms)} ms</b><small>sample frame ${g.frameId} · ${Math.max(0,f.frameId-g.frameId)} frames old</small></div>`;
+                }
+                return html+'</details>';
+            },
+            _shadowPanel(game) {
+                if (!this._shadowEl) return;
+                if(document.activeElement?.matches('[data-gamma-case]') && this._shadowEl.contains(document.activeElement))return;
+                const html = this._shadowLine(game);
+                if (html !== this._shadowHTML) {
+                    const open=this._shadowEl.querySelector('details')?.open;
+                    this._shadowHTML=html;this._shadowEl.innerHTML=html;
+                    const detail=this._shadowEl.querySelector('details');if(detail && open!==undefined)detail.open=open;
+                }
             },
 
             _numbers() {
@@ -170,7 +236,7 @@
                 const frameMs = k ? sum / k : 0, other = Math.max(0, frameMs - workMs);
                 const P = game.pedestrians, T = game.traffic;
                 const parts = [
-                    `<span>browser/GPU <b>${other.toFixed(1)}</b> ms</span>`,
+                    `<span>unattributed/wait <b>${other.toFixed(1)}</b> ms</span>`,
                     `<span>ticks/frame <b>${RenderStats.ticks}</b></span>`,
                     `<span>bodies <b>${RenderStats.bodies}</b> drawn / <b>${RenderStats.culled}</b> culled</span>`,
                     `<span>live <b>${RenderStats.liveBodies}</b> / sprites <b>${RenderStats.cachedBodies}</b> / bake poses <b>${RenderStats.bakedBodies}</b></span>`,
@@ -186,7 +252,7 @@
                 const mem = this._canvasMB(game);
                 if (mem.groundN) parts.push(`<span>ground <b>${mem.groundN}</b> tiles (${mem.ground.toFixed(0)} MB)</span>`);
                 if (mem.props) parts.push(`<span>furniture sprites <b>${mem.props.toFixed(1)}</b> MB</span>`);
-                parts.push(`<span>image caches ≈ <b>${mem.total.toFixed(0)}</b> MB</span>`);
+                parts.push(`<span>image caches ≈ <b>${mem.total.toFixed(0)}</b> MB${mem.unknown?` (${mem.unknown} unknown entries)`:''}</span>`);
                 return parts.join('');
             },
 
@@ -195,15 +261,16 @@
             _canvasMB(game) {
                 const now = performance.now();
                 if (this._memAt && now - this._memAt < 500) return this._mem;
-                const px = (cv) => cv ? cv.width * cv.height : 0, MB = 4 / 1048576;
+                let unknown=0;
+                const px = cv => {if(!cv)return 0;const n=cv.width*cv.height;if(Number.isFinite(n)&&n>=0)return n;unknown++;return 0;}, MB = 4 / 1048576;
                 let ground = 0, groundN = 0, floors = 0, cars = 0, crowd = 0;
                 const gb = game.groundBaker;
                 if (gb) for (const cv of gb.cache.values()) { ground += px(cv); groundN++; }
                 if (typeof MAP_BAKES !== 'undefined') { const seen = new Set(); for (const id in MAP_BAKES) for (const k of MAP_BAKES[id]) if (!seen.has(k)) { seen.add(k); floors += px(game[k]); } }
                 if (typeof _carSprites !== 'undefined') for (const sp of _carSprites.values()) cars += px(sp.cv);
                 if (typeof CrowdImpostors !== 'undefined') for (const b of CrowdImpostors.cache.values()) crowd += px(b.cv);
-                const props = typeof PropSprites !== 'undefined' ? PropSprites.bytes / 4 : 0;
-                this._mem = { ground: ground * MB, groundN, floors: floors * MB, cars: cars * MB, crowd: crowd * MB, props: props * MB, total: (ground + floors + cars + crowd + props) * MB };
+                const props = typeof PropSprites !== 'undefined' && Number.isFinite(PropSprites.bytes) ? PropSprites.bytes / 4 : 0;
+                this._mem = { unknown, ground: ground * MB, groundN, floors: floors * MB, cars: cars * MB, crowd: crowd * MB, props: props * MB, total: (ground + floors + cars + crowd + props) * MB };
                 this._memAt = now;
                 return this._mem;
             },

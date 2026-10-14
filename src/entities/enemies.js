@@ -225,6 +225,7 @@
 
             draw(ctx) {
                 if (!this.visible || this.inCar) return;
+                DynamicShadows.note(this, { kind: 'circle', radius: 8, elevation: 8 });
 
                 // A missing/unrecognized selector uses the exact original coat colors.
                 const coatColors = Object.prototype.hasOwnProperty.call(VELVET_CAT_PALETTES, this.coatPalette)

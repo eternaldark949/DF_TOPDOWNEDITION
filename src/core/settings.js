@@ -140,7 +140,7 @@
             foliageDensity: _lvl(_deviceDensity.foliageDensity, 'high'),         // 'low' | 'medium' | 'high'
             rainDensity: _lvl(_deviceDensity.rainDensity, 'high'),               // 'low' | 'medium' | 'high'
             crowdQuality: _lvl(_deviceDensity.crowdQuality, 'high'),             // 'high' (live) | 'medium' (cheaper live) | 'low' (baked) — ui/crowd-impostors.js
-            lampShadows: ['off', 'low', 'high', 'ultra'].includes(_deviceDensity.lampShadows) ? _deviceDensity.lampShadows : 'low',   // people's shadows from street lamps — ui/humanoid-render.js
+            lampShadows: ['off', 'low', 'high', 'ultra', 'beta', 'gamma'].includes(_deviceDensity.lampShadows) ? _deviceDensity.lampShadows : 'low',   // shared dynamic light shadows, including opt-in beta — engine/dynamic-shadows.js
             saveDensity() {
                 try { localStorage.setItem('dfab_density', JSON.stringify({ trafficDensity: this.trafficDensity, pedestrianDensity: this.pedestrianDensity, foliageDensity: this.foliageDensity, rainDensity: this.rainDensity, crowdQuality: this.crowdQuality, lampShadows: this.lampShadows })); } catch (e) { /* private mode */ }
             },

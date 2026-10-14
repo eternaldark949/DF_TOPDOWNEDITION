@@ -1,0 +1,78 @@
+{
+  "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+  "method": "median of three per-round completed-frame medians, forced WebGL on software GPU",
+  "scenarios": [
+    {
+      "map": "apt_949",
+      "soft": false,
+      "movingPlayer": false,
+      "originalGammaMs": 355.79999999998836,
+      "batchedGammaMs": 261.20000000006985,
+      "currentHighMs": 69.30000000004657,
+      "gammaReductionPercent": 26.58797077007352
+    },
+    {
+      "map": "apt_949",
+      "soft": false,
+      "movingPlayer": true,
+      "originalGammaMs": 363.79999999998836,
+      "batchedGammaMs": 260.80000000004657,
+      "currentHighMs": 75,
+      "gammaReductionPercent": 28.31225948321745
+    },
+    {
+      "map": "apt_949",
+      "soft": true,
+      "movingPlayer": false,
+      "originalGammaMs": 173.40000000002328,
+      "batchedGammaMs": 92,
+      "currentHighMs": 31.900000000023283,
+      "gammaReductionPercent": 46.94348327567033
+    },
+    {
+      "map": "apt_949",
+      "soft": true,
+      "movingPlayer": true,
+      "originalGammaMs": 186.79999999998836,
+      "batchedGammaMs": 96.30000000004657,
+      "currentHighMs": 36.699999999953434,
+      "gammaReductionPercent": 48.44753747320526
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": false,
+      "movingPlayer": false,
+      "originalGammaMs": 381.69999999995343,
+      "batchedGammaMs": 193.5,
+      "currentHighMs": 53.300000000046566,
+      "gammaReductionPercent": 49.30573749016934
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": false,
+      "movingPlayer": true,
+      "originalGammaMs": 392.70000000006985,
+      "batchedGammaMs": 209.19999999995343,
+      "currentHighMs": 57.5,
+      "gammaReductionPercent": 46.727782021921
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": true,
+      "movingPlayer": false,
+      "originalGammaMs": 125.79999999993015,
+      "batchedGammaMs": 87.29999999993015,
+      "currentHighMs": 33.59999999997672,
+      "gammaReductionPercent": 30.604133545327006
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": true,
+      "movingPlayer": true,
+      "originalGammaMs": 81.70000000006985,
+      "batchedGammaMs": 83.09999999997672,
+      "currentHighMs": 37.79999999993015,
+      "gammaReductionPercent": -1.7135862911942024
+    }
+  ]
+}

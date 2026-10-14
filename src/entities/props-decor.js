@@ -2263,6 +2263,7 @@
                 // Painting or replaying a split run draws body art only. The outer pass
                 // adds exactly one ground shadow, including vector fallback and live props.
                 if (PropPass.mode === 0) {
+                    DynamicShadows.noteProp(this);
                     drawGroundContactShadow(ctx, this.x + this.width / 2, this.y + this.height / 2,
                         this.width / 2 + 5, this.height / 2 + 5, this.angle || 0);
                 }

@@ -329,6 +329,8 @@
                 this.angle = 0;
                 this.angVel = 0;
                 this.thickness = 6;
+                this.shadowOpacity = config.shadowOpacity ?? (this.type === 'sliding' ? 0.35 : 1);
+                this.shadowElevation = config.shadowElevation || 40;
                 if (this.orientation === 'H') {
                     this.hx = this.hingeSide === 'left' ? this.x : this.x + this.w; this.hy = this.y + this.h / 2;
                     this.baseAngle = this.hingeSide === 'left' ? 0 : Math.PI; this.length = this.w;
