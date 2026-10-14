@@ -35,47 +35,80 @@ is expensive, turn off bloom, atmosphere, softness, and decor animation one at a
 time and repeat the recording. These switches make real changes to GPU work;
 they do not choose another rendering backend.
 
-## How the new passes work
+## Animated characters and shape shadows
 
-Wall visibility polygons and projected furniture/player/door footprints are
-drawn into each light's own GPU render texture. Shadows therefore remove only
-that light's contribution, and another light can still illuminate the area.
-The caster's footprint is cut out of its projected shadow so its own surface
-stays lit. Furniture/player shadows have finite reach; doors block to the edge
-of the light. Geometry is quantized slightly to avoid subpixel cache churn.
+The build identifier is `native-webgl-silhouettes-v3`. **Canvas look** enables
+all 28 switches. **Lighting + shadows** also enables continuous character
+animation, silhouette shadows, high shadow detail and curtains.
 
-Static light images are reused. Moving nearby geometry refreshes only affected
-light images, using GPU geometry draws. There are no Canvas mask uploads or
-WebGL-to-Canvas scene copies. Texture allocation/baking on first use is excluded
-by warmup; new player poses or genuinely changed prop art can still require an
-asset upload during gameplay. Small geometry buffers are updated during drawing
-and are reported separately from bitmap uploads.
+For a controlled moving test, use the same route, view, zoom, resolution and FPS
+limit for each recording. Walk, turn, sneak, aim/holster a weapon, and push a
+piece of furniture near a light. Record these variants:
 
-Room switches fade light strengths and emissive glows. The room veil follows
-the original room visibility state. Glow sprites draw after scene lighting.
-Decor animation uses prewarmed phase textures and GPU opacity changes. The
-veranda's area lights use the authored rectangular falloff rather than circular
-approximations. Lamp fixtures reuse asset variants. Door panels move as GPU
-geometry, and door leaves participate in occlusion.
+1. Canvas look with all layers enabled.
+2. Same configuration, **Player shadows** off: isolates the character-shadow cost.
+3. Player shadows on, **Shape-accurate shadows** off: compares geometric casts.
+4. Shape-accurate shadows on, **High-resolution shadows** off: tests lower density.
+5. Original configuration, **Character animation** off: freezes the body image
+   while position/rotation and gameplay continue. This is a diagnostic control.
 
-Bloom extracts bright pixels, blurs quarter-resolution GPU targets, and adds the
-result to the original full-resolution scene. Atmosphere adds a mild amber wash,
-vignette, and grain. These are visual approximations of the Canvas passes, not
-a promise of identical pixels or guaranteed mobile FPS.
+The original character's gait, stance transitions, recoil, poses, hair, clothing,
+held items and weapon models generate GPU geometry. A persistent 384×384 GPU
+character target supplies the visible body and its alpha silhouette. The same
+world-space hair/cloth simulations run once, without a baking clone. Gradients
+are rendered into reusable GPU targets; translating a gradient does not recreate
+its pixels. Existing weapon/glow image assets may upload once on first use;
+continuous animation does not require new Canvas bitmaps.
 
-## Evidence and limits
+Static wall/door/furniture light images and pose-dependent light images have
+separate caches. Animated alpha is stretched using the Canvas High projection,
+and its unprojected body is subtracted so the caster stays lit. Gaps in the
+silhouette remain gaps in its shadow. Each light owns its cast, so another light
+can illuminate the region. Bounds come from the drawing geometry, without pixel
+readback. Wall/door visibility and screen bounds reject irrelevant sources.
 
-`tools/test-native-webgl-layers-browser.cjs` checks every switch, sample resets,
-stationary animated texture reuse, opaque walls, finite shadows, lit caster
-surfaces, independent overlapping lights, grab hints, automatic recording,
-recording cancellation/immutability, odd-size resize, and context recovery.
-Cached render-texture pixels are explicitly invalidated after context loss.
-Pixel readback is confined to tests.
+High shadow detail uses at most 256px per light target and density .5; lower
+detail uses at most 128px and density .25. These limits bound large-light memory.
+Moving doors or furniture still update affected static images. Restore after
+context loss rebuilds all GPU-only character, gradient, veil and light images.
 
-Compare `native-webgl-canvas-look.png` with `native-webgl-canvas-reference.png`.
-Both use the living-room camera and the same room-fade clock. The city backdrop
-and daylight glass remain snapshots, player animation uses eight phases, and
-shadow footprints approximate silhouettes. NPCs and advanced combat/cinematic
-passes remain outside this apartment slice. Texture estimates exclude shared
-filter-pool overhead and depth/stencil storage; CPU timings do not measure GPU
-execution. Phone profiles are the basis for further performance decisions.
+## Apartment passes and profiling
+
+Curtains follow their original drawing routines through the native path adapter.
+Lamp bodies reuse cached authored on/off assets, while their original particle
+motion is batched into one GPU geometry pass; switches crossfade the assets. Glass updates with daylight and shattering.
+Authored apartment glows retain their source strengths/flicker; the player's
+halo follows the body silhouette. Room switches fade lights. Neutral light
+holes use screen blending, reproducing destination-out on Canvas darkness;
+color remains additive. The room veil is rendered at the original coarse world
+resolution and composited before colored light at night. Outdoor rooms receive
+sky illumination. Bloom follows Canvas' one-third/sixth/twelfth downscale chain
+and .15/.08 strengths. Atmosphere uses the original tint setting.
+
+Per-frame `animation` rows report pose revision, changed/frozen state, geometry
+CPU time, raster-submission CPU time, phase/stance and position. `shadows` splits
+`staticRebuilds`, `dynamicRebuilds`, `dynamicHits` and `silhouettePairs`.
+`animationSummary` aggregates measured animation and shadow-refresh frames.
+`initializationMs`, `entryTiming` and `startup.firstFrames` preserve renderer
+construction and entry/startup work excluded from
+warmed FPS. They do not measure downloading/parsing the HTML. Optional `gpu`
+samples have labels and source frame IDs; unsupported devices explicitly say
+`GPU timer unavailable`. CPU submission time is not GPU execution time.
+
+## Evidence and remaining differences
+
+The three browser suites check the real main WebGL surface, all switches,
+recording/export, moving gameplay, texture reuse, context recovery, odd-size
+resize, walls, finite casts, lit bodies, overlapping light sources, continuous
+poses, and projected silhouette gaps/rotation. Pixel readback is test-only.
+`native-webgl-character-checks.json` contains the comparisons;
+`native-webgl-character-parity.png` shows WebGL on the left, Canvas on the right.
+Compare `native-webgl-canvas-look.png` and `native-webgl-canvas-reference.png` for
+the apartment. These are comparison evidence, not a claim of identical pixels.
+
+The city backdrop/parallax, city glow/traffic, NPCs and advanced combat/cinematic
+passes remain unported. Decor props retain phase-texture animation. Furniture
+uses the original geometric shadow footprints; some tiny blur/dash accents,
+color falloff and GPU softness/halo remain approximate. Memory estimates exclude
+shared filter-pool overhead and depth/stencil storage. Workspace Chromium uses
+SwiftShader, so its frame rate is not a phone benchmark.

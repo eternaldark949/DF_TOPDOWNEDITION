@@ -13,22 +13,23 @@
     const notice=document.createElement('div');renderer.notice=notice;notice.hidden=true;toolbar.append(notice);
     const button=(text,action)=>{const b=document.createElement('button');b.textContent=text;b.style.marginLeft='6px';b.onclick=action;toolbar.append(b);};
     const launch=()=>{
+        const startAt=performance.now(),entry=renderer.entryTiming={pageAgeMs:startAt,stages:{}};let lap=startAt;
         toolbar.style.display='block';
         if(renderer.failure){renderer.message('WebGL unavailable: '+renderer.failure);return;}
-        game.resetGameState();game._doLoadMap('apt_949');game.player.visible=true;game.paused=false;
+        game.resetGameState();entry.stages.resetMs=performance.now()-lap;lap=performance.now();game._doLoadMap('apt_949');entry.stages.mapLoadMs=performance.now()-lap;lap=performance.now();game.player.visible=true;game.paused=false;
         // Sandbox entry has no story step: the default chapter would otherwise
         // initialize on the first simulation tick and teleport into an unported scene.
         game.story.state.part=0;game.story.currentStepData=null;game.story.initializedStep=true;
         renderer.map=null;game.showProfiler=false;
         // No auto-transition to unported maps; original apartment interactions remain.
         game.activeMap.transitions=[];
-        game.enterWorld();game.draw();
+        game.enterWorld();entry.stages.enterWorldMs=performance.now()-lap;lap=performance.now();game.draw();entry.stages.firstDrawMs=performance.now()-lap;entry.totalMs=performance.now()-startAt;
     };
     start.onclick=()=>{try{audioSys.init();}catch(e){}launch();};
     const layers=document.createElement('div');layers.id='native-webgl-layers';layers.hidden=true;
     layers.style.cssText='position:fixed;top:68px;left:8px;max-width:330px;max-height:65vh;overflow:auto;background:#1b1228;color:white;border:1px solid #a887cd;padding:12px;z-index:10001;font:13px sans-serif';
     const heading=document.createElement('strong');heading.textContent='APARTMENT LAYERS';layers.append(heading);
-    const note=document.createElement('p');note.textContent='Changes reset the sample. Shadows require Lighting. Record 20s exports after warmup; Export repeats the finished run.';layers.append(note);
+    const note=document.createElement('p');note.textContent='Changes reset the sample. Shadows require Lighting. Freeze Character animation or switch Shape-accurate shadows to compare their cost. Record 20s exports after warmup; Export repeats the finished run.';layers.append(note);
     const presets=document.createElement('div');
     for(const [name,label] of [['baseline','Baseline'],['shadows','Lighting + shadows'],['canvas','Canvas look']]){
         const b=document.createElement('button');b.textContent=label;b.onclick=()=>renderer.preset(name);presets.append(b);
@@ -45,7 +46,7 @@
     const download=()=>{
         const report=renderer.completedCapture||renderer.report();
         const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));
-        const a=document.createElement('a');a.href=url;a.download='dfab-native-webgl-layers-'+report.configurationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+        const a=document.createElement('a');a.href=url;a.download='dfab-native-webgl-v3-'+(report.capture?.finished?'recorded-'+Math.round(report.capture.durationMs/1000)+'s':'rolling-'+Math.round(report.sampleDurationMs/1000)+'s')+'-config-'+report.configurationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     };
     button('Record 20s',()=>{
         layers.hidden=true;renderer.frames=[];renderer.warmFrames=15;renderer.lastStart=renderer.lastEnd=0;

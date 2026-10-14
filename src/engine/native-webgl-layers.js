@@ -3,8 +3,8 @@
 const NATIVE_LAYER_LABELS={floor:'Floor art',backdrop:'City backdrop',windows:'Window glass',walls:'Walls',doors:'Doors',fixtures:'Lamp fixtures',furniture:'Furniture',player:'Player',
     lighting:'Lighting',colorWash:'Colored light wash',decorLights:'Decor light sources',wallOcclusion:'Wall occlusion',propShadows:'Furniture shadows',
     playerShadows:'Player shadows',indicators:'Player marker',furnitureHints:'Grab hints',contactShadows:'Contact shadows',roomVeil:'Room veil',nightTint:'Night tint',
-    glows:'Emissive glows',softShadows:'Soft edges',bloom:'Bloom',atmosphere:'Atmosphere',decorAnimation:'Decor animation'};
-const NATIVE_LAYER_BASELINE={floor:true,backdrop:true,walls:true,furniture:true,player:true,lighting:true};
+    glows:'Emissive glows',softShadows:'Soft edges',bloom:'Bloom',atmosphere:'Atmosphere',decorAnimation:'Decor animation',characterAnimation:'Character animation',shapeShadows:'Shape-accurate shadows',linens:'Curtains',shadowDetail:'High-resolution shadows'};
+const NATIVE_LAYER_BASELINE={floor:true,backdrop:true,walls:true,furniture:true,player:true,lighting:true,characterAnimation:true};
 const NATIVE_LAYER_DEFAULTS=Object.fromEntries(Object.keys(NATIVE_LAYER_LABELS).map(k=>[k,true]));
 Object.assign(NativeWebGLRenderer.prototype,{
     setLayers(values){
@@ -15,7 +15,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         if(this.onLayersChanged)this.onLayersChanged();
     },
     preset(name){
-        const shadows=new Set(['colorWash','decorLights','wallOcclusion','propShadows','playerShadows','contactShadows','indicators','furnitureHints','roomVeil','nightTint','glows','doors','windows','fixtures']);
+        const shadows=new Set(['colorWash','decorLights','wallOcclusion','propShadows','playerShadows','contactShadows','indicators','furnitureHints','roomVeil','nightTint','glows','doors','windows','fixtures','shapeShadows','linens','shadowDetail']);
         this.setLayers(Object.fromEntries(Object.keys(this.layers).map(k=>[k,name==='canvas'||!!NATIVE_LAYER_BASELINE[k]||(name==='shadows'&&shadows.has(k))])));
     },
     initLayers(){
@@ -28,37 +28,42 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.fixtures=new PIXI.Container();this.world.addChildAt(this.fixtures,this.world.getChildIndex(this.objects));this.fixtureNodes=new Map();this.fixtureAssets=new Map();
         // Emissive passes follow scene lighting; they must not be multiplied by
         // the darkness filter. The room veil sits between lighting and glows.
-        this.postWorld=new PIXI.Container();this.postWorld.addChild(this.veil,this.emissive);this.stage.addChild(this.postWorld);
+        this.postWorld=new PIXI.Container();this.veilDisplay=new PIXI.Sprite();this.postWorld.addChild(this.veilDisplay,this.emissive);this.stage.addChild(this.postWorld);
         this.marker=new PIXI.Graphics();this.marker.lineStyle(1,0x08080c,.9).beginFill(0xffffff,.95).drawPolygon([0,-3,3,0,0,3,-3,0]).endFill();this.postWorld.addChild(this.marker);
         this.hints=new PIXI.Container();this.hintOutline=new PIXI.Graphics();this.hints.addChild(this.hintOutline);this.postWorld.addChild(this.hints);
         this.chevrons=Array.from({length:4},()=>{const g=new PIXI.Graphics();g.lineStyle(.8,0x28140a,.6).beginFill(0xffe2a0).drawPolygon([-5,-7,4,0,-5,7,-2,0]).endFill();this.hints.addChild(g);return g;});
-        this.contactSprites=new Map();this.roomSprites=new Map();this.areaCookies=new Map();this.glowSprites=[];
+        this.contactSprites=new Map();this.roomSprites=new Map();this.areaCookies=new Map();
         const hole=document.createElement('canvas');hole.width=hole.height=256;const hc=hole.getContext('2d'),hg=hc.createRadialGradient(128,128,0,128,128,128);
-        for(const [p,a] of [[0,1],[.3,.85],[.7,.35],[1,0]])hg.addColorStop(p,'rgba(255,255,255,'+a+')');
+        for(const [p,a] of [[0,1],[.04,1],[1,0]])hg.addColorStop(p,'rgba(255,255,255,'+a+')');
         hc.fillStyle=hg;hc.fillRect(0,0,256,256);this.holeGradient=PIXI.Texture.from(hole);
-        const halo=document.createElement('canvas');halo.width=halo.height=128;const ac=halo.getContext('2d'),ag=ac.createRadialGradient(64,64,0,64,64,64);
-        for(const [p,a] of [[0,0],[.32,0],[.42,.8],[1,0]])ag.addColorStop(p,'rgba(255,255,255,'+a+')');
-        ac.fillStyle=ag;ac.fillRect(0,0,128,128);this.haloGradient=PIXI.Texture.from(halo);
+        const decor=document.createElement('canvas');decor.width=decor.height=128;const dc=decor.getContext('2d'),dg=dc.createRadialGradient(64,64,0,64,64,64);
+        for(const [p,a]of [[0,1],[.45,.45],[1,0]])dg.addColorStop(p,'rgba(255,255,255,'+a+')');dc.fillStyle=dg;dc.fillRect(0,0,128,128);this.decorGradient=PIXI.Texture.from(decor);
+        this.linenContext=new NativeVectorContext(this);this.linenStage=this.linenContext.root;this.world.addChild(this.linenStage);
+        this.glassContext=new NativeVectorContext(this);this.windows.addChild(this.glassContext.root);
+        this.glowContext=new NativeVectorContext(this);this.emissive.addChild(this.glowContext.root);
+        this.fixtureContext=new NativeVectorContext(this);this.fixtures.addChild(this.fixtureContext.root);
+        this.actorHalo=new NativeActorHaloMesh();this.postWorld.addChild(this.actorHalo);
         this.softFilter=new PIXI.BlurFilter(1.2,1,.5);this.softFilter.padding=0;
         this.sceneBloom=new NativeSceneBloomFilter();
         this.atmosphereFilter=new PIXI.Filter(undefined,`
             precision highp float;varying vec2 vTextureCoord;uniform sampler2D uSampler;
-            uniform vec4 inputSize;uniform vec4 outputFrame;uniform vec2 viewport;uniform float clock;
+            uniform vec4 inputSize;uniform vec4 outputFrame;uniform vec2 viewport;uniform float clock;uniform vec4 tint;
             void main(){vec4 c=texture2D(uSampler,vTextureCoord);vec2 p=(outputFrame.xy+vTextureCoord*inputSize.xy)/viewport;
-                vec2 q=(p-.5)*1.5;float vignette=clamp(1.0-dot(q,q)*.25,.72,1.0);
-                float grain=fract(52.9829189*fract(dot(p*viewport,vec2(.06711,.00583))+clock*.07))-.5;
-                gl_FragColor=vec4(mix(c.rgb,vec3(1.0,.627,.196)*c.a,.04)*vignette+grain*.012*c.a,c.a);}`,{viewport:new Float32Array(2),clock:0});
+                gl_FragColor=vec4(mix(c.rgb,tint.rgb*c.a,tint.a),c.a);}`,{viewport:new Float32Array(2),clock:0,tint:new Float32Array([1,.627,.196,.04])});
         this.atmosphereFilter.padding=0;
     },
     clearLayers(){
-        for(const r of this.shadowCache.values()){r.stage.destroy({children:true});r.texture.destroy(true);}
-        this.shadowCache.clear();
+        for(const r of this.shadowCache.values()){r.stage.destroy({children:true});r.texture.destroy(true);if(r.dynamicStage){r.dynamicStage.destroy({children:true});r.dynamicTexture.destroy(true);}}
+        this.shadowCache.clear();if(this.veilTarget){this.veilTarget.destroy(true);this.veilTarget=null;}this.veilKey=null;
+        for(const ctx of [this.linenContext,this.glassContext,this.glowContext,this.fixtureContext]){ctx.destroy();}
+        this.linenContext=new NativeVectorContext(this);this.linenStage=this.linenContext.root;this.world.addChild(this.linenStage);
+        this.glassContext=new NativeVectorContext(this);this.glowContext=new NativeVectorContext(this);this.fixtureContext=new NativeVectorContext(this);
         for(const c of [this.backdrop,this.floorArt,this.windows,this.doors,this.fixtures,this.contacts,this.veil,this.emissive]){
             for(const child of c.removeChildren())child.destroy({children:true});
         }
-        this.contactSprites.clear();this.roomSprites.clear();this.doorNodes.clear();this.fixtureNodes.clear();this.fixtureAssets.clear();this.areaCookies.clear();this.glowSprites=[];
+        this.contactSprites.clear();this.roomSprites.clear();this.doorNodes.clear();this.fixtureNodes.clear();this.fixtureAssets.clear();this.areaCookies.clear();
     },
-    shadowBytes(){let bytes=0;for(const r of this.shadowCache.values())bytes+=r.texture.baseTexture.realWidth*r.texture.baseTexture.realHeight*4;return bytes;},
+    shadowBytes(){let bytes=0;for(const r of this.shadowCache.values())for(const t of [r.texture,r.dynamicTexture].filter(Boolean))bytes+=t.baseTexture.realWidth*t.baseTexture.realHeight*4;return bytes;},
     areaCookie(game,source){
         const key=[source.w,source.h,source.round,source.soft].join(':');let r=this.areaCookies.get(source);
         if(r&&r.key===key)return r.texture;
@@ -72,34 +77,18 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.clearMap();this.map=game.activeMap;const map=this.map,top=map.cameraBounds?.top||0;
         this.floor.addChild(new PIXI.Sprite(this.bake(map.width,map.height,c=>{
             c.fillStyle=map.floorColor;c.fillRect(0,0,map.width,map.height);
-            for(const z of map.zones||[]){c.fillStyle=z.color;c.fillRect(z.x,z.y,z.w,z.h);}
+            for(const z of map.zones||[]){c.fillStyle=z.color;c.fillRect(z.x,z.y,z.w,z.h);
+                if(z.texture==='wood'){c.fillStyle='rgba(0,0,0,.15)';for(let py=z.y;py<z.y+z.h;py+=24)c.fillRect(z.x,py,z.w,1);c.fillStyle='rgba(255,255,255,.03)';c.fillRect(z.x,z.y,z.w,z.h);}
+                else if(z.texture==='carpet'){c.fillStyle='rgba(0,0,0,.06)';c.fillRect(z.x,z.y,z.w,4);c.fillRect(z.x,z.y+z.h-4,z.w,4);c.fillRect(z.x,z.y,4,z.h);c.fillRect(z.x+z.w-4,z.y,4,z.h);}}
         })));
         const backdrop=new PIXI.Sprite(this.bake(map.width,map.height-top,c=>{c.translate(0,-top);game.drawApartmentBackdrop(c);}));
         backdrop.y=top;this.backdrop.addChild(backdrop);
-        this.floorArt.addChild(new PIXI.Sprite(this.bake(map.width,map.height,c=>game.drawApartmentInterior(c))));
-        if(game.roomSystem.active)this.windows.addChild(new PIXI.Sprite(this.bake(map.width,map.height,c=>game.roomSystem.drawWindows(c,game.dayCycle().darkness))));
+        this.floorArt.addChild(new PIXI.Sprite(this.bake(map.width,map.height,c=>{game.drawApartmentInterior(c);game.roomSystem.drawFloors(c);})));
+        this.windows.addChild(this.glassContext.root);
         this.walls.beginFill(0x222222).lineStyle(1,0x00f3ff,.3);
         for(const w of map.walls||[])this.walls.drawRect(w.x,w.y,w.w,w.h);this.walls.endFill();
         this.playerSprite=new PIXI.Sprite();this.playerSprite.anchor.set(.5);this.objects.addChild(this.playerSprite);
-        this.buildGlows(game);this.message('');
-    },
-    glow(x,y,r,color,alpha=1,owner=null){
-        const sprite=new PIXI.Sprite(this.lightGradient);sprite.anchor.set(.5);sprite.position.set(x,y);sprite.width=sprite.height=r*2;
-        sprite.tint=color;sprite.blendMode=PIXI.BLEND_MODES.ADD;this.emissive.addChild(sprite);
-        const record={sprite,x,y,r,alpha,owner};this.glowSprites.push(record);return record;
-    },
-    buildGlows(game){
-        for(const [x,y,r] of [[991,232,28],[1115,232,28],[307,439,34],[700,700,34],[109,463,34],[231,759,22],[350,759,22],[469,759,22]]){
-            this.glow(x,y,r,0xffd2a0,.45);this.glow(x,y,2.5,0xffecd2,.95);
-        }
-        const hearth=HEARTHS.apt_949;this.fireGlow=this.glow(hearth.x,hearth.y,60,0xff8c3c,.5);
-        for(const [x,y] of [[433,864],[460,877]])this.glow(x,y,12,0xff4628,.55);
-        for(const [x,y] of [[312,859],[329,873]])this.glow(x,y,12,0x5a96ff,.5);
-        for(const [x,y] of [[1248,619],[1256,612],[1368,619]])this.glow(x,y,12,0xffc882,.6);
-        for(let s=0;s<8;s++)for(let i=0;i<=8;i++){const u=i/8;this.glow(20+s*170+170*u,14+Math.sin(u*Math.PI)*12,9,0xffd6a0,.5);}
-        for(const p of game.props||[])if(p.decorType==='apt_side'&&p.light){const c=p.getCenter();this.glow(c.x-2,c.y-1,30,0xffd2a0,.5,p);}
-        this.halo=this.glow(0,0,26,0xe2ceff,.6);this.halo.sprite.texture=this.haloGradient;
-        this.halo.sprite.width=this.halo.sprite.height=52;
+        this.emissive.addChild(this.glowContext.root);this.fixtures.addChild(this.fixtureContext.root);this.message('');
     },
     propCanvas(p,time){
         const pad=48,w=p.width||p.w||24,h=p.height||p.h||24;
@@ -114,6 +103,9 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.postWorld.position.copyFrom(this.world.position);this.postWorld.scale.copyFrom(this.world.scale);
         this.floor.visible=this.floorArt.visible=L.floor;this.backdrop.visible=L.backdrop;this.walls.visible=L.walls;
         this.windows.visible=L.windows;this.doors.visible=L.doors;
+        if(L.windows){const ctx=this.glassContext;ctx.begin();for(const win of game.roomSystem.windows||[])win.draw(ctx,game.dayCycle().daylight);}
+        this.linenStage.visible=L.linens;
+        if(L.linens){const ctx=this.linenContext;ctx.begin();for(const linen of game.roomSystem.linens||[])linen.draw(ctx,game.weather?.wind??.3,game.weather?.windDirection??1,L.decorAnimation?_gameTimeSec:0);}
         if(L.doors)this.syncDoors(game);
         this.fixtures.visible=L.fixtures;if(L.fixtures)this.syncFixtures(game);
         const animated=new Set(['apt_fireplace','apt_stove','apt_craft','apt_tub','apt_plant','apt_telescope']);
@@ -138,13 +130,26 @@ Object.assign(NativeWebGLRenderer.prototype,{
             }
             for(const [p,s] of this.contactSprites)if(p!==game.player&&!this.props.has(p)){s.destroy();this.contactSprites.delete(p);}
         }
-        this.veil.visible=L.roomVeil;
+        this.veil.visible=true;this.veilDisplay.visible=L.roomVeil&&(!L.lighting||game.getAmbientDarkness()<.5);
         if(L.roomVeil&&game.roomSystem.active)for(const [id,r] of Object.entries(game.roomSystem.rooms)){
-            let g=this.roomSprites.get(id);if(!g){g=new PIXI.Graphics();g.beginFill(0x080513);
+            let g=this.roomSprites.get(id);if(!g){g=new PIXI.Graphics();g.beginFill(0x100822);
                 for(const q of r.rects)g.drawRect(q.x,q.y,q.w,q.h);g.endFill();this.veil.addChild(g);this.roomSprites.set(id,g);}
             g.alpha=Math.min(1,(1-r.vis)*ROOM_LOOK.VEIL_MAX);
         }
+        if(L.roomVeil&&game.roomSystem.active){
+            if(!this.veilTarget){this.veilTarget=PIXI.RenderTexture.create({width:game.activeMap.width+48,height:game.activeMap.height+48,resolution:1/ROOM_LOOK.FEATHER,scaleMode:PIXI.SCALE_MODES.LINEAR});
+                this.veilDisplay.texture=this.veilTarget;this.veilDisplay.position.set(-24,-24);this.veil.position.set(24,24);this.lighting.uniforms.veilMap=this.veilTarget;}
+            const key=[...this.roomSprites.values()].map(g=>g.alpha.toFixed(3)).join(':');if(key!==this.veilKey){this.renderer.render(this.veil,{renderTexture:this.veilTarget,clear:true});this.veilKey=key;}
+        }
+        this.lighting.uniforms.veilGain=L.roomVeil&&L.lighting&&game.getAmbientDarkness()>=.5?1:0;
+        this.lighting.uniforms.inverseWorld.set([-this.world.x/view.zoom,-this.world.y/view.zoom,1/view.zoom]);
+        if(this.veilTarget)this.lighting.uniforms.veilSize.set([this.veilTarget.width,this.veilTarget.height]);
         this.emissive.visible=L.glows;
+        if(L.glows){const ctx=this.glowContext,city=game._cityView,clock=_frameTime;ctx.begin();
+            try{game._cityView=null;if(!L.decorAnimation)_frameTime=0;game.drawApartmentGlow(ctx);}finally{game._cityView=city;_frameTime=clock;}}
+        this.actorHalo.visible=L.glows&&L.player&&game._playerGlowOn();
+        if(this.actorHalo.visible){this.actorHalo.shader.uniforms.body=this.actorTexture;this.actorHalo.shader.uniforms.blur=9*(game._renderScale||1)/view.zoom/192;
+            this.actorHalo.position.set(game.player.x,game.player.y);this.actorHalo.rotation=game.player.angle||0;}
         const markerOffset=(Math.max(16*view.zoom,10*(game._renderScale||1))+5*(game._renderScale||1))/view.zoom;
         this.marker.visible=L.indicators&&L.player&&game.player.visible!==false;
         this.marker.position.set(game.player.x,game.player.y+markerOffset);this.marker.scale.set(1/view.zoom);
@@ -156,17 +161,11 @@ Object.assign(NativeWebGLRenderer.prototype,{
                 g.position.set(h.x,h.y);g.rotation=(p.angle||0)+i*Math.PI/2+Math.PI;g.alpha=i===F.side?1:.75;g.scale.set(i===F.side?1.35:1);}
         }
         const t=_frameTime/1000;
-        for(const g of this.glowSprites){
-            let x=g.x,y=g.y;if(g.owner){const c=g.owner.getCenter();x=c.x-2;y=c.y-1;}
-            const k=g===this.halo?(game._playerGlowOn()&&L.player?1:0):game.roomSystem.lightAt(x,y);
-            const pulse=L.decorAnimation ? .85+.15*Math.sin(t*2.1+x*.01) : 1;
-            g.sprite.alpha=g.alpha*k*pulse;
-            if(g===this.halo){x=game.player.x;y=game.player.y;}
-            g.sprite.position.set(x,y);
-        }
         const filters=[];if(L.bloom)filters.push(this.sceneBloom);if(L.atmosphere)filters.push(this.atmosphereFilter);
         this.stage.filters=filters.length?filters:null;
         this.stage.filterArea=this.world.filterArea;this.atmosphereFilter.uniforms.viewport.set([game.canvas.width,game.canvas.height]);
+        const tint={amber:[1,.627,.196,.04],violet:[.471,.235,.784,.04],crimson:[.784,.196,.275,.03],teal:[.196,.706,.784,.03]}[GameSettings.atmosphereTint]||[0,0,0,0];
+        this.atmosphereFilter.uniforms.tint.set(tint);
         this.atmosphereFilter.uniforms.clock=Math.floor(t*30)/30;
         this.layerStages={sceneLayersMs:performance.now()-start};
     },
@@ -184,25 +183,25 @@ Object.assign(NativeWebGLRenderer.prototype,{
             const points=[[-w/2,-h/2],[w/2,-h/2],[w/2,h/2],[-w/2,h/2]].map(([a,b])=>[x+a*c-b*s,y+a*s+b*c]);
             out.push({owner:p,x,y,w,h,points,elevation:Math.min(24,Math.max(6,Math.min(w,h)*.5)),key:[x,y,w,h,angle].join(',')});
         }
-        if(this.layers.playerShadows&&game.player.visible!==false){const p=game.player,x=Math.round(p.x/2)*2,y=Math.round(p.y/2)*2;
+        if(this.layers.playerShadows&&!this.layers.shapeShadows&&game.player.visible!==false){const p=game.player,x=p.x,y=p.y;
             out.push({owner:p,x,y,w:18,h:18,elevation:24,key:x+','+y,points:Array.from({length:12},(_,i)=>[x+Math.cos(i*Math.PI/6)*9,y+Math.sin(i*Math.PI/6)*9])});}
         return out;
     },
     shadowTexture(source,casters,walls,wallKey){
-        const start=performance.now(),radius=source.radius;
+        const start=performance.now(),radius=source.radius,density=Math.min(this.layers.shadowDetail ? .5 : .25,(this.layers.shadowDetail?256:128)/(radius*2));
         const nearby=casters.filter(c=>c.owner!==source.owner&&Math.hypot(c.x-source.x,c.y-source.y)<radius+Math.max(c.w,c.h));
-        const key=[source.x,source.y,radius,source.w||0,source.h||0,source.cookie?.baseTexture.uid||0,this.layers.colorWash?'wide':'baseline',this.layers.wallOcclusion?wallKey:'open',...nearby.map(c=>c.key)].join('|');
+        const key=[source.x,source.y,radius,density,source.w||0,source.h||0,source.cookie?.baseTexture.uid||0,this.layers.wallOcclusion?wallKey:'open',...nearby.map(c=>c.key)].join('|');
         let r=this.shadowCache.get(source.owner);
         if(r&&r.key===key){this.shadowStats.hits++;return r.texture;}
-        if(!r||r.radius!==radius){
-            if(r){r.stage.destroy({children:true});r.texture.destroy(true);}
+        if(!r||r.radius!==radius||r.density!==density){
+            if(r){r.stage.destroy({children:true});r.texture.destroy(true);if(r.dynamicStage){r.dynamicStage.destroy({children:true});r.dynamicTexture.destroy(true);}}
             const stage=new PIXI.Container(),sprite=new PIXI.Sprite(this.lightGradient),mask=new PIXI.Graphics(),shadow=new PIXI.Graphics();
             sprite.position.set(radius,radius);sprite.anchor.set(.5);sprite.width=sprite.height=radius*2;
             shadow.blendMode=PIXI.BLEND_MODES.ERASE;stage.addChild(sprite,mask,shadow);
-            const texture=PIXI.RenderTexture.create({width:radius*2,height:radius*2,resolution:.35,scaleMode:PIXI.SCALE_MODES.LINEAR});
-            r={stage,sprite,mask,shadow,texture,radius};this.shadowCache.set(source.owner,r);
+            const texture=PIXI.RenderTexture.create({width:radius*2,height:radius*2,resolution:density,scaleMode:PIXI.SCALE_MODES.LINEAR});
+            r={stage,sprite,mask,shadow,texture,radius,density};this.shadowCache.set(source.owner,r);
         }
-        r.sprite.texture=source.cookie||(this.layers.colorWash?this.holeGradient:this.lightGradient);
+        r.sprite.texture=source.cookie||((source.wash??.08)===.08?this.holeGradient:this.decorGradient);
         r.sprite.width=source.w||radius*2;r.sprite.height=source.h||radius*2;
         const staticKey=[source.x,source.y,radius,this.layers.wallOcclusion?wallKey:'open'].join('|');
         if(r.staticKey!==staticKey){
@@ -226,8 +225,40 @@ Object.assign(NativeWebGLRenderer.prototype,{
             this.shadowStats.pairs++;
         }
         this.renderer.render(r.stage,{renderTexture:r.texture,clear:true});r.key=key;
-        this.shadowStats.rebuilds++;this.layerStages.shadowRefreshMs=(this.layerStages.shadowRefreshMs||0)+performance.now()-start;
+        this.shadowStats.rebuilds++;this.shadowStats.staticRebuilds++;this.layerStages.shadowRefreshMs=(this.layerStages.shadowRefreshMs||0)+performance.now()-start;
         return r.texture;
+    },
+    animatedShadowTexture(source,base,actor,walls=[]){
+        const dx=actor.x-source.x,dy=actor.y-source.y,d=Math.hypot(dx,dy);
+        if(d<1||d>=source.radius||!this.actorTexture)return base;
+        if(this.layers.wallOcclusion&&(walls.some(w=>segCrossesRect(source.x,source.y,actor.x,actor.y,w.x,w.y,w.w,w.h))||
+            (this.map&&game.roomSystem.doors.some(door=>door.leaves().some(([ax,ay,bx,by])=>segmentsCross(source.x,source.y,actor.x,actor.y,ax,ay,bx,by))))))return base;
+        const start=performance.now(),r=this.shadowCache.get(source.owner);
+        if(!r)return base;
+        const key=[r.key,this.actorRevision,actor.x,actor.y,actor.angle||0].join('|');
+        this.shadowStats.silhouettePairs++;
+        if(r.dynamicKey===key){this.shadowStats.dynamicHits++;return r.dynamicTexture;}
+        if(!r.dynamicStage){
+            r.dynamicStage=new PIXI.Container();r.dynamicBase=new PIXI.Sprite(base);r.dynamicStage.addChild(r.dynamicBase);
+            r.actorShadow=new NativeActorShadowMesh();r.dynamicStage.addChild(r.actorShadow);
+            r.dynamicTexture=PIXI.RenderTexture.create({width:source.radius*2,height:source.radius*2,resolution:r.density,scaleMode:PIXI.SCALE_MODES.LINEAR});
+        }
+        r.dynamicBase.texture=base;r.dynamicBase.width=r.dynamicBase.height=source.radius*2;
+        const len=Math.min(120,source.radius-d,d*24/60),u=r.actorShadow.shader.uniforms;
+        u.body=this.actorTexture;u.direction.set([dx/d,dy/d]);u.rotation.set([Math.cos(actor.angle||0),Math.sin(actor.angle||0)]);
+        u.stretch=1+len/CONFIG.HUMAN_SHADE.LAMP_SHADOW_DEPTH;u.offset=len/2;
+        // Project the body's CPU geometry bounds, not its 192px padded texture
+        // square. The fragment shader then touches only the useful silhouette.
+        const b=this.actorBounds||{x:0,y:0,width:192,height:192},coords=[];
+        for(const x of [b.x-96,b.x+b.width-96])for(const y of [b.y-96,b.y+b.height-96]){
+            const wx=x*u.rotation[0]-y*u.rotation[1],wy=x*u.rotation[1]+y*u.rotation[0],along=wx*u.direction[0]+wy*u.direction[1],shift=along*(u.stretch-1)+u.offset;
+            coords.push([wx+u.direction[0]*shift,wy+u.direction[1]*shift]);}
+        const x0=Math.min(...coords.map(p=>p[0]))-2,y0=Math.min(...coords.map(p=>p[1]))-2,x1=Math.max(...coords.map(p=>p[0]))+2,y1=Math.max(...coords.map(p=>p[1]))+2;
+        u.bounds.set([x0,y0,x1-x0,y1-y0]);r.actorShadow.position.set(dx+source.radius,dy+source.radius);
+        this.renderer.render(r.dynamicStage,{renderTexture:r.dynamicTexture,clear:true});r.dynamicKey=key;
+        this.shadowStats.rebuilds++;this.shadowStats.dynamicRebuilds++;
+        this.layerStages.animatedShadowMs=(this.layerStages.animatedShadowMs||0)+performance.now()-start;
+        return r.dynamicTexture;
     },
     syncDoors(game){
         for(const d of game.roomSystem.doors||[]){
@@ -257,18 +288,39 @@ Object.assign(NativeWebGLRenderer.prototype,{
         }
     },
     syncFixtures(game){
-        for(const l of game.lamps||[]){
-            const key=l.lampType+':'+l.color;let asset=this.fixtureAssets.get(key);
-            if(!asset){asset=this.bake(192,192,c=>{
-                c.translate(96-l.x,96-l.y);const a=l.angle;
-                try{l.angle=0;l.draw(c,game.dayCycle().darkness);}finally{l.angle=a;}
-            });this.fixtureAssets.set(key,asset);}
-            let s=this.fixtureNodes.get(l);if(!s){s=new PIXI.Sprite(asset);s.anchor.set(.5);this.fixtures.addChild(s);this.fixtureNodes.set(l,s);}
-            s.texture=asset;s.position.set(l.x,l.y);s.rotation=l.angle||0;s.visible=l.visible!==false;
+        const day=game.dayCycle(),v=game.view,particles=this.fixtureContext;particles.begin();const dots=particles.node(PIXI.Graphics);
+        const live=new Set(game.lamps||[]);
+        for(const [lamp,r]of this.fixtureNodes)if(!live.has(lamp)){r.off.destroy();r.on.destroy();this.fixtureNodes.delete(lamp);}
+        for(const lamp of live){
+            const inView=lamp.visible!==false&&Math.abs(lamp.x-v.x)<=game.canvas.width/(2*v.zoom)+160&&Math.abs(lamp.y-v.y)<=game.canvas.height/(2*v.zoom)+160;
+            let r=this.fixtureNodes.get(lamp);if(!inView){if(r)r.off.visible=r.on.visible=false;continue;}
+            const key=lamp.lampType+':'+lamp.color;let assets=this.fixtureAssets.get(key);
+            if(!assets){assets=[];
+                for(const on of [false,true])assets.push(this.bake(192,192,c=>{
+                    const saved={angle:lamp.angle,k:lamp._lightK,forced:lamp._forcedOff,visible:lamp.visible,lod:_zoomLOD};
+                    try{lamp.angle=0;lamp._lightK=1;lamp._forcedOff=false;lamp.visible=true;_zoomLOD=1;c.translate(96-lamp.x,96-lamp.y);lamp.draw(c,on?0:1);}
+                    finally{lamp.angle=saved.angle;lamp._lightK=saved.k;lamp._forcedOff=saved.forced;lamp.visible=saved.visible;_zoomLOD=saved.lod;}
+                }));this.fixtureAssets.set(key,assets);}
+            if(!r){r={off:new PIXI.Sprite(),on:new PIXI.Sprite()};for(const s of [r.off,r.on]){s.anchor.set(.5);this.fixtures.addChild(s);}this.fixtureNodes.set(lamp,r);}
+            lamp._lightK=game.roomSystem.lampLight(lamp)*lampFlicker(lamp);lamp._forcedOff=lamp._lightK<.02;
+            const room=game.roomSystem.rooms[lamp._roomId],on=!lamp._forcedOff&&(room?.type!=='outdoor'||day.lampsOn),k=on?Math.min(1,lamp._lightK):0;
+            r.off.texture=assets[0];r.on.texture=assets[1];r.off.visible=k<1;r.on.visible=k>0;r.on.alpha=k;
+            for(const s of [r.off,r.on]){s.position.set(lamp.x,lamp.y);s.rotation=lamp.angle||0;}
+            if(on&&_zoomLOD<1){
+                const style=LAMP_TYPE_STYLE[lamp.lampType],bulbs=style?LAMP_STYLES[style].bulbs:[{x:0,y:0}];
+                const time=((this.layers.decorAnimation?_frameTime:0)+lamp.animOffset)/1000;
+                const c=Math.cos(lamp.angle||0),s=Math.sin(lamp.angle||0),scale=style?LAMP_POST_SCALE:1;
+                for(const bulb of bulbs)for(let i=0;i<4;i++){
+                    const angle=time*(.8+i*.2)+i*2,dist=12+Math.sin(time*2+i)*6,alpha=.4+Math.sin(time*5+i)*.4;
+                    if(alpha>0){const x=(bulb.x+Math.cos(angle)*dist)*scale,y=(bulb.y+Math.sin(angle)*dist)*scale;
+                        dots.beginFill(0xffffff,alpha).drawCircle(lamp.x+x*c-y*s,lamp.y+x*s+y*c,1.2*scale).endFill();}}
+
+            }
         }
+        this.fixtures.setChildIndex(particles.root,this.fixtures.children.length-1);
     },
     syncLighting(game,view){
-        const start=performance.now(),L=this.layers;this.shadowStats={hits:0,rebuilds:0,sources:0,pairs:0};
+        const start=performance.now(),L=this.layers;this.shadowStats={hits:0,rebuilds:0,staticRebuilds:0,dynamicRebuilds:0,dynamicHits:0,silhouettePairs:0,sources:0,pairs:0};
         this.world.filters=L.lighting?[this.lighting]:null;if(!L.lighting)return;
         const w=game.canvas.width,h=game.canvas.height;
         if(!this.lightTarget||this.lightSize!==w+':'+h){
@@ -280,9 +332,14 @@ Object.assign(NativeWebGLRenderer.prototype,{
             this.lighting.uniforms.colorMap=this.colorTarget;
         }
         const level=Math.round((1-Math.min(.85,Math.max(0,game.getAmbientDarkness())))*255);this.lightBase.tint=(level<<16)|(level<<8)|level;
+        if(!this.skyLight){this.skyLight=new PIXI.Graphics();this.skyLight.blendMode=PIXI.BLEND_MODES.SCREEN;this.lightStage.addChildAt(this.skyLight,1);}
+        const ambient=game.getAmbientDarkness(),sky=game.dayCycle().darkness,skyKey=[this.map.id,ambient,sky].join(':');
+        if(this.skyKey!==skyKey){this.skyLight.clear();const a=ambient>0?1-Math.min(1,sky/ambient):0;
+            this.skyLight.beginFill(0xffffff,a);for(const room of Object.values(game.roomSystem.rooms))if(room.type==='outdoor')for(const q of room.rects)this.skyLight.drawRect(q.x,q.y,q.w,q.h);this.skyLight.endFill();this.skyKey=skyKey;}
+        this.skyLight.visible=true;this.skyLight.scale.set(view.zoom);this.skyLight.position.copyFrom(this.world.position);
         this.lightSprites.scale.set(view.zoom);this.lightSprites.position.copyFrom(this.world.position);
-        const sources=(game.lamps||[]).filter(l=>l.visible!==false&&!l._forcedOff).map(l=>({owner:l,x:l.x,y:l.y,radius:l.lightRadius||l.radius||200,
-            color:l.color||'#ffeebb',wash:.08,alpha:game.roomSystem.lampLight(l)*(l.intensity??1)}));
+        const sources=(game.lamps||[]).filter(l=>l.visible!==false).map(l=>({owner:l,x:l.x,y:l.y,radius:l.lightRadius||l.radius||200,
+            color:l.color||'#ffeebb',wash:.08,alpha:game.roomSystem.lampLight(l)*lampFlicker(l)*lampWake(l)*(l.intensity??1)}));
         if(L.decorLights){
             for(const p of game.props||[])if(p.visible!==false&&p.light){const c=p.getCenter(),q=p.light;
                 sources.push({owner:p,x:c.x+(q.dx||0),y:c.y+(q.dy||0),radius:q.radius||Math.max(q.w||0,q.h||0)/2||180,
@@ -291,15 +348,17 @@ Object.assign(NativeWebGLRenderer.prototype,{
                 w:q.w,h:q.h,cookie:q.w?this.areaCookie(game,q):null,
                 color:q.rgb?'rgb('+q.rgb+')':q.color||'#ffd2a0',wash:.22,flicker:q.flicker||0,alpha:(q.intensity??.8)*game.roomSystem.lightAt(q.x,q.y)});
         }
+        for(let i=sources.length-1;i>=0;i--){const q=sources[i];if(q.alpha<.005||Math.abs(q.x-view.x)>w/(2*view.zoom)+q.radius||Math.abs(q.y-view.y)>h/(2*view.zoom)+q.radius)sources.splice(i,1);}
         sources.sort((a,b)=>Math.hypot(a.x-view.x,a.y-view.y)-Math.hypot(b.x-view.x,b.y-view.y));sources.length=Math.min(sources.length,L.decorLights?40:24);
         const occlusion=L.wallOcclusion||L.propShadows||L.playerShadows,casters=occlusion?this.casters(game):[],walls=getOccluders(game.activeMap);
         const wallKey=walls.map(w=>[w.x,w.y,w.w,w.h].join(',')).join(';');
         for(let i=0;i<this.lightSprites.children.length;i++){
             const s=this.lightSprites.children[i],source=sources[i];s.visible=!!source;if(!source)continue;
-            s.texture=occlusion?this.shadowTexture(source,casters,walls,wallKey):source.cookie||(L.colorWash?this.holeGradient:this.lightGradient);
+            s.texture=occlusion?this.shadowTexture(source,casters,walls,wallKey):source.cookie||((source.wash??.08)===.08?this.holeGradient:this.decorGradient);
+            if(L.playerShadows&&L.shapeShadows&&game.player.visible!==false&&!game.player.dead)s.texture=this.animatedShadowTexture(source,s.texture,game.player,walls);
             s.position.set(source.x,source.y);s.width=occlusion?source.radius*2:source.w||source.radius*2;s.height=occlusion?source.radius*2:source.h||source.radius*2;
-            const t=_frameTime/1000,pulse=(L.decorAnimation&&source.flicker) ? .82+.18*Math.sin(t*source.flicker+source.x*.7)*Math.sin(t*source.flicker*.37+source.y) : 1;
-            s.tint=L.colorWash?0xffffff:PIXI.Color.shared.setValue(source.color).toNumber();s.alpha=Math.min(1,Math.max(0,source.alpha*pulse));
+            s.blendMode=PIXI.BLEND_MODES.SCREEN;const t=_frameTime/1000,pulse=(L.decorAnimation&&source.flicker) ? .82+.18*Math.sin(t*source.flicker+source.x*.7)*Math.sin(t*source.flicker*.37+source.y) : 1;
+            s.tint=0xffffff;s.alpha=Math.min(1,Math.max(0,source.alpha*pulse));
         }
         this.shadowStats.sources=sources.length;
         this.lightStage.filters=L.softShadows?[this.softFilter]:null;
@@ -308,33 +367,31 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.renderer.render(this.lightStage,{renderTexture:this.lightTarget,clear:true});
         this.lighting.uniforms.colorGain=L.colorWash ? game.getAmbientDarkness() : 0;
         if(L.colorWash){
-            this.lightBase.visible=false;
-            for(let i=0;i<sources.length;i++){const s=this.lightSprites.children[i];s.tint=PIXI.Color.shared.setValue(sources[i].color).toNumber();s.alpha*=sources[i].wash;}
-            this.renderer.render(this.lightStage,{renderTexture:this.colorTarget,clear:true});this.lightBase.visible=true;
+            this.lightBase.visible=false;this.skyLight.visible=false;
+            for(let i=0;i<sources.length;i++){const s=this.lightSprites.children[i];s.tint=PIXI.Color.shared.setValue(sources[i].color).toNumber();s.alpha*=sources[i].wash;s.blendMode=PIXI.BLEND_MODES.ADD;}
+            this.renderer.render(this.lightStage,{renderTexture:this.colorTarget,clear:true});this.lightBase.visible=true;this.skyLight.visible=true;
         }
         this.layerStages.lightingMs=performance.now()-start;
     }
 });
 Object.defineProperty(NativeWebGLRenderer.prototype,'lightsOn',{get(){return this.layers.lighting;},set(v){this.setLayers({lighting:!!v});}});
 
-// Extract highlights at quarter resolution, blur on the GPU, then combine with
-// the untouched full-resolution scene. Changing an effect never rasterizes the
+// Match Canvas light bleed with GPU downscales at one third, sixth and twelfth
+// resolution, then combine with the untouched full-resolution scene. Changing an effect never rasterizes the
 // complete scene through Canvas. FilterPool retains temporary GPU allocations.
 class NativeSceneBloomFilter extends PIXI.Filter{
     constructor(){
         super();this.padding=0;
         this.bright=new PIXI.Filter(undefined,`precision highp float;varying vec2 vTextureCoord;uniform sampler2D uSampler;
-            void main(){vec4 c=texture2D(uSampler,vTextureCoord);float l=max(c.r,max(c.g,c.b));gl_FragColor=c*clamp((l-.3)*2.0,0.0,1.0);}`);
-        this.blur=new PIXI.Filter(undefined,`precision highp float;varying vec2 vTextureCoord;uniform sampler2D uSampler;uniform vec2 stepUV;
-            void main(){gl_FragColor=(texture2D(uSampler,vTextureCoord-stepUV)+texture2D(uSampler,vTextureCoord)*2.0+texture2D(uSampler,vTextureCoord+stepUV))*.25;}`,
-            {stepUV:new Float32Array(2)});
+            void main(){vec4 c=texture2D(uSampler,vTextureCoord);gl_FragColor=vec4(min(vec3(1.0),c.rgb*1.5),c.a);}`);
+        this.downsample=new PIXI.Filter();
         this.combine=new PIXI.Filter(undefined,`precision highp float;varying vec2 vTextureCoord;uniform sampler2D uSampler;
-            uniform sampler2D scene;uniform vec2 sceneScale;
-            void main(){vec4 c=texture2D(scene,vTextureCoord*sceneScale);gl_FragColor=vec4(c.rgb+texture2D(uSampler,vTextureCoord).rgb*.25,c.a);}`,
-            {scene:PIXI.Texture.EMPTY,sceneScale:new Float32Array(2)});
+            uniform sampler2D scene;uniform sampler2D wide;uniform vec2 sceneScale;uniform vec2 wideScale;
+            void main(){vec4 c=texture2D(scene,vTextureCoord*sceneScale);gl_FragColor=vec4(c.rgb+texture2D(uSampler,vTextureCoord).rgb*.15+texture2D(wide,vTextureCoord*wideScale).rgb*.08,c.a);}`,
+            {scene:PIXI.Texture.EMPTY,wide:PIXI.Texture.EMPTY,sceneScale:new Float32Array(2),wideScale:new Float32Array(2)});
     }
     apply(manager,input,output,clearMode){
-        const targets=[manager.getFilterTexture(input,.25),manager.getFilterTexture(input,.25),manager.getFilterTexture(input,.25)];
+        const targets=[manager.getFilterTexture(input,1/3),manager.getFilterTexture(input,1/6),manager.getFilterTexture(input,1/12)];
         const u=manager.globalUniforms.uniforms,saved={};
         for(const key of ['inputSize','inputPixel','inputClamp'])saved[key]=u[key].slice();
         const frame=input.filterFrame||u.outputFrame;
@@ -345,16 +402,46 @@ class NativeSceneBloomFilter extends PIXI.Filter{
         };
         try{
             configure(input);manager.applyFilter(this.bright,input,targets[0],PIXI.CLEAR_MODES.CLEAR);
-            configure(targets[0]);this.blur.uniforms.stepUV.set([1.5/targets[0].baseTexture.realWidth,0]);
-            manager.applyFilter(this.blur,targets[0],targets[1],PIXI.CLEAR_MODES.CLEAR);
-            configure(targets[1]);this.blur.uniforms.stepUV.set([0,1.5/targets[1].baseTexture.realHeight]);
-            manager.applyFilter(this.blur,targets[1],targets[2],PIXI.CLEAR_MODES.CLEAR);
-            configure(targets[2]);this.combine.uniforms.scene=input;
-            this.combine.uniforms.sceneScale.set([targets[2].width/input.width,targets[2].height/input.height]);
-            manager.applyFilter(this.combine,targets[2],output,clearMode);
+            configure(targets[0]);manager.applyFilter(this.downsample,targets[0],targets[1],PIXI.CLEAR_MODES.CLEAR);
+            configure(targets[1]);manager.applyFilter(this.downsample,targets[1],targets[2],PIXI.CLEAR_MODES.CLEAR);
+            configure(targets[1]);this.combine.uniforms.scene=input;this.combine.uniforms.wide=targets[2];
+            this.combine.uniforms.sceneScale.set([targets[1].width/input.width,targets[1].height/input.height]);
+            this.combine.uniforms.wideScale.set([targets[1].width/targets[2].width,targets[1].height/targets[2].height]);
+            manager.applyFilter(this.combine,targets[1],output,clearMode);
         }finally{
             for(const [key,value] of Object.entries(saved))u[key].set(value);manager.globalUniforms.update();
             for(const target of targets)manager.returnFilterTexture(target);
         }
+    }
+}
+
+// Same affine silhouette stretch and body subtraction as DynamicShadows High,
+// evaluated directly from the live GPU character target for each light.
+class NativeActorShadowMesh extends PIXI.Mesh {
+    constructor(){
+        const geometry=new PIXI.Geometry().addAttribute('aVertexPosition',[-1,-1,1,-1,1,1,-1,1],2).addIndex([0,1,2,0,2,3]);
+        const shader=PIXI.Shader.from(`precision highp float;attribute vec2 aVertexPosition;uniform mat3 projectionMatrix;uniform mat3 translationMatrix;uniform vec4 bounds;varying vec2 q;
+            void main(){q=(aVertexPosition+1.0)*.5*bounds.zw+bounds.xy;gl_Position=vec4((projectionMatrix*translationMatrix*vec3(q,1.0)).xy,0.0,1.0);}`,
+            `precision highp float;varying vec2 q;uniform sampler2D body;uniform vec2 direction;uniform vec2 rotation;uniform float stretch;uniform float offset;
+            float sampleBody(vec2 world){vec2 local=vec2(world.x*rotation.x+world.y*rotation.y,-world.x*rotation.y+world.y*rotation.x);vec2 uv=(local+96.0)/192.0;
+                if(uv.x<0.0||uv.y<0.0||uv.x>1.0||uv.y>1.0)return 0.0;return texture2D(body,uv).a;}
+            void main(){float along=dot(q,direction);vec2 original=q+direction*((along-offset)/stretch-along);
+                float alpha=sampleBody(original)*(1.0-sampleBody(q))*.85;gl_FragColor=vec4(0.0,0.0,0.0,alpha);}`,
+            {body:PIXI.Texture.EMPTY,direction:new Float32Array(2),rotation:new Float32Array(2),stretch:1,offset:0,bounds:new Float32Array([-96,-96,192,192])});
+        super(geometry,shader);this.blendMode=PIXI.BLEND_MODES.ERASE;
+    }
+}
+
+class NativeActorHaloMesh extends PIXI.Mesh {
+    constructor(){
+        const geometry=new PIXI.Geometry().addAttribute('aVertexPosition',[-96,-96,96,-96,96,96,-96,96],2).addIndex([0,1,2,0,2,3]);
+        const shader=PIXI.Shader.from(`precision highp float;attribute vec2 aVertexPosition;uniform mat3 projectionMatrix;uniform mat3 translationMatrix;varying vec2 uv;
+            void main(){uv=(aVertexPosition+96.0)/192.0;gl_Position=vec4((projectionMatrix*translationMatrix*vec3(aVertexPosition,1.0)).xy,0.0,1.0);}`,
+            `precision highp float;varying vec2 uv;uniform sampler2D body;uniform float blur;
+            void main(){float a=0.0;for(int i=0;i<16;i++){float angle=float(i)*2.39996323;float r=sqrt((float(i)+.5)/16.0)*blur;
+                a+=texture2D(body,uv+vec2(cos(angle),sin(angle))*r).a/16.0;}
+                a=(1.0-(1.0-a)*(1.0-a))*(1.0-texture2D(body,uv).a)*.85;gl_FragColor=vec4(vec3(.886,.808,1.0)*a,a);}`,
+            {body:PIXI.Texture.EMPTY,blur:.03});
+        super(geometry,shader);
     }
 }

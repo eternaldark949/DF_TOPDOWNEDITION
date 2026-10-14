@@ -26,17 +26,26 @@ Current implementation:
 - Apartment floor/backdrop art and individual props are baked as assets and kept
   in GPU textures. Furniture movement and rotation update sprite transforms.
   Art state changes replace and release the affected texture.
-- Player art uses an eight-phase, bounded pose texture cache; appearance and map
-  changes release the old cache. Baking uses a separate gait object so it cannot
-  change the live player's simulation state.
-- Batched light sprites render to a persistent half-resolution GPU texture.
-  Cached per-light GPU images include wall, door, furniture, and player occlusion.
-  A separate colored-light target restores the Canvas renderer's colored wash.
-  Odd viewport dimensions do not cause recurring target allocation.
-- Room shading, contact shadows, fixtures, door panels, window glass, glows,
-  player/grab indicators, animated decor, soft edges, scene bloom, and atmosphere
-  can be tested separately. Bloom extracts/blur highlights at quarter resolution
-  and combines them with the full-resolution scene.
+- Player art uses the same live procedural animation and configuration as Canvas.
+  A native path adapter tessellates its body, clothing, hair, weapons and held
+  items into WebGL geometry. One small GPU target supplies the visible body,
+  animated silhouette shadows and the silhouette-shaped halo. There is no
+  eight-frame pose cache or per-frame Canvas body capture.
+- Static per-light wall/door/furniture images stay cached. A separate GPU pass
+  projects the current character alpha into affected lights, using Canvas High's
+  finite stretch and self-body subtraction. Position, angle and pose revision
+  invalidate that pass. Its quad follows the actual geometry bounds, avoiding
+  shading the whole padded body texture. Shadow resolution is bounded to 256px
+  at high detail or 128px at low detail; shape and detail have separate switches.
+- Screen-blended neutral light holes and additive color reproduce the Canvas
+  dark-mask composition. Outdoor room illumination and a low-resolution,
+  world-aligned feathered room veil are GPU passes. Window glass is live, and
+  authored curtains, lamp particles/fades, and apartment glows use GPU geometry
+  and cached image assets. Bloom uses the Canvas downscale scales/strengths;
+  atmosphere follows the original tint setting.
+- All 28 visual switches remain independent, including Character animation,
+  Shape-accurate shadows, High-resolution shadows, and Curtains. Decor props
+  still use prewarmed phase textures. Odd viewport sizes reuse allocations.
 - The original game loop, collision, interactions, and DOM controls remain.
   This sandbox prevents the default story step from teleporting to an unported
   scene on its first update.
@@ -44,22 +53,34 @@ Current implementation:
   drawing until Pixi and the browser restore the context. There is no Canvas
   renderer fallback in the preview.
 
-The city backdrop and glass daylight are snapshots. Geometric shadow footprints
-approximate detailed silhouettes; NPCs, cinematic camera features, and advanced
-combat effects are not migrated. The apartment now has the main visual passes,
-but the screenshots document differences from Canvas rather than claiming exact
-visual parity.
+The city backdrop is still a snapshot; its camera-dependent parallax, animated
+traffic and city emissive pass are not migrated. Detailed furniture shadows keep
+Canvas's geometric footprints. Decor phase sampling, a few tiny shadowBlur/dash
+accents, light-color falloff and the GPU halo/softness kernel remain approximate.
+NPCs, cinematic camera features and advanced combat effects are outside this
+apartment slice. Character parity is measured below; complete apartment pixel
+parity and mobile performance still require comparison on the target phone.
 
 ## Verification
 
 Run `node tools/test-native-webgl-browser.cjs` and
-`node tools/test-native-webgl-layers-browser.cjs` after building the preview.
+`node tools/test-native-webgl-layers-browser.cjs`, plus
+`node tools/test-native-webgl-character-browser.cjs` after building the preview.
 Chromium checks the real WebGL surface, linked shader, warmed texture reuse,
 movement, camera/screen round trips, furniture invalidation, resize/zoom, visible
 lighting across repeated frames, the actual gameplay loop, context loss and
 restoration, unavailable WebGL, and storage isolation. The fixture starts at an
 880×411 viewport specifically to exercise odd half-resolution dimensions.
 Pixel readback is used only in the test, never in the live renderer.
+
+Character tests compare 15 poses/outfits/held-item cases against the actual
+Canvas procedural routine, including pistol/rifle/sniper models. Alpha-mask
+intersection-over-union is approximately 98.8–99.6%; opaque RGB channel error
+averages about 2–3 levels out of 255. The projector test verifies lit silhouette
+gaps, self-body exclusion, finite reach, angle/pose invalidation and cache reuse.
+A real requestAnimationFrame run exercises walking, continuous poses and shadow
+refreshes with zero warmed bitmap uploads or asset bakes. Static light images
+remain cached while pose-dependent images update.
 
 Warmed stationary layer tests make zero bitmap uploads. Draw counts depend on
 the enabled passes and the device's batch capacity; exports include actual counts.
@@ -69,8 +90,13 @@ the Mali phone. The export excludes warmup (15 frames after layer changes), reta
 frames, and reports cadence, stalls, CPU render time, gap outside rendering,
 uploads, bakes, draw calls, GPU identification, settings, asset texture bytes,
 lighting/shadow target bytes, geometry buffer bytes, configuration flags, and
-per-frame shadow refresh counts. GPU execution time, depth/stencil buffers, and
-Pixi's full allocation overhead are not measured. See `native-webgl-canvas-look.png`
+per-frame character geometry/raster-submission stages, pose changes, and separate
+static/dynamic shadow refresh counts. Startup exports include apartment-entry
+stages and the first 15 renderer frames separately from the warmed sample.
+Optional disjoint timer queries provide asynchronous GPU samples on supported
+WebGL2 devices; no checkpoints/readback force GPU completion. Unsupported phones
+explicitly report timer unavailability. Depth/stencil buffers and Pixi's full
+allocation overhead are not measured. See `native-webgl-canvas-look.png`
 and `native-webgl-canvas-reference.png` for the same apartment camera.
 
 ## Goal

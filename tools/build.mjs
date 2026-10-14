@@ -206,7 +206,7 @@ const read = (p) => p === '@assets' ? assetsScript() : readFileSync(join(ROOT, '
 export function build() {
     let html = read('index.html');
     const styles = STYLES.map(read).join('');
-    const order = WEBGL ? ['core/native-webgl-storage.js', ...SCRIPTS.flatMap(p => p === 'engine/game-engine.js'
+    const order = WEBGL ? ['core/native-webgl-storage.js', 'engine/native-webgl-vector.js', ...SCRIPTS.flatMap(p => p === 'engine/game-engine.js'
         ? ['vendor/pixi-7.4.3.min.js', 'engine/native-webgl.js', 'engine/native-webgl-layers.js', p] : [p]), 'app/native-webgl-menu.js'] : SCRIPTS;
     const scripts = order.map(p => {
         const source=read(p);

@@ -2,9 +2,10 @@
    PixiJS 7.4.3 is bundled under MIT; see src/vendor/pixi-LICENSE.txt. */
 class NativeWebGLRenderer {
     constructor(canvas) {
+        const initStart=performance.now();
         this.canvas = canvas;
         this.layers={...NATIVE_LAYER_DEFAULTS};this.configurationId=0;
-        this.textures = new Set(); this.props = new Map(); this.poses = new Map();
+        this.textures = new Set(); this.props = new Map();
         this.frames = []; this.lastStart = 0; this.uploads = 0; this.bakes = 0;this.warmFrames=10;this.drawCalls=0;this.bufferBytes=0;
         this.map = null; this.failure = null; this.lightsOn = true;
         try {
@@ -32,15 +33,19 @@ class NativeWebGLRenderer {
                 uniform sampler2D colorMap;
                 uniform float colorGain;
                 uniform float nightTint;
+                uniform sampler2D veilMap;uniform float veilGain;uniform vec3 inverseWorld;uniform vec2 veilSize;
                 void main() {
                     vec4 scene = texture2D(uSampler, vTextureCoord);
                     vec2 screen = outputFrame.xy + vTextureCoord * inputSize.xy;
                     vec3 illumination = texture2D(lightMap,screen/viewport).rgb;
                     float shade=1.0-max(illumination.r,max(illumination.g,illumination.b));
                     vec4 color=vec4(0.0);if(colorGain>0.0)color=texture2D(colorMap,screen/viewport)*colorGain;
-                    vec3 shaded=scene.rgb*illumination+vec3(.086,.039,.188)*shade*nightTint*scene.a;
-                    gl_FragColor = vec4(shaded*(1.0-color.a)+color.rgb*scene.a,scene.a);
-                }`, {viewport:new Float32Array(2),lightMap:PIXI.Texture.EMPTY,colorMap:PIXI.Texture.EMPTY,colorGain:0,nightTint:0});
+                    vec4 veil=vec4(0.0);if(veilGain>0.0)veil=texture2D(veilMap,(screen*inverseWorld.z+inverseWorld.xy+vec2(24.0))/veilSize);
+                    float darkAlpha=shade*(1.0-veil.a)+veil.a;
+                    vec3 darkRGB=vec3(.086,.039,.188)*shade*nightTint*(1.0-veil.a)+veil.rgb;
+                    vec3 shaded=scene.rgb*max(0.0,1.0-darkAlpha-color.a)+darkRGB*scene.a;
+                    gl_FragColor = vec4(shaded+color.rgb*scene.a,scene.a);
+                }`, {viewport:new Float32Array(2),lightMap:PIXI.Texture.EMPTY,colorMap:PIXI.Texture.EMPTY,colorGain:0,nightTint:0,veilMap:PIXI.Texture.EMPTY,veilGain:0,inverseWorld:new Float32Array(3),veilSize:new Float32Array([1,1])});
             this.lighting.padding = 0;
             this.world.filters = [this.lighting];
             this.world.filterArea = new PIXI.Rectangle(0,0,canvas.width,canvas.height);
@@ -63,16 +68,17 @@ class NativeWebGLRenderer {
             }
             for(const name of ['bufferData','bufferSubData']){const original=gl[name].bind(gl);gl[name]=(...args)=>{
                 const data=args[name==='bufferData'?1:2];this.bufferBytes+=typeof data==='number'?data:data?.byteLength||0;return original(...args);};}
-            canvas.addEventListener('webglcontextlost',()=>{this.lost=true;this.message('WebGL context lost. Waiting for restoration…');});
+            canvas.addEventListener('webglcontextlost',()=>{this.lost=true;this.gpuTimer.clear();this.message('WebGL context lost. Waiting for restoration…');});
             canvas.addEventListener('webglcontextrestored',()=>{
-                this.lost=false;this.contextRestores=(this.contextRestores||0)+1;
+                this.lost=false;this.gpuTimer.extension=this.renderer.gl.getExtension('EXT_disjoint_timer_query_webgl2');this.contextRestores=(this.contextRestores||0)+1;
                 // Render-texture pixels cannot survive context loss. CPU geometry
                 // remains valid, but every cached GPU light image must be redrawn.
-                for(const r of this.shadowCache.values())r.key=null;
+                for(const r of this.shadowCache.values()){r.key=null;r.dynamicKey=null;}this.actorHash=null;this.veilKey=null;for(const ctx of [this.actorContext,this.linenContext,this.glassContext,this.glowContext,this.fixtureContext])for(const r of ctx?.gradients||[])r.key=null;
                 this.frames=[];this.warmFrames=15;this.lastStart=this.lastEnd=0;this.capture=this.completedCapture=null;this.message('');
             });
-            this.initLayers();
+            this.gpuTimer=new NativeGpuTimer(gl);this.frameId=0;this.initLayers();
         } catch(e) { this.failure=String(e.message||e); }
+        this.initializationMs=performance.now()-initStart;
     }
     message(text) { if(this.notice) {this.notice.textContent=text;this.notice.hidden=!text;} }
     texture(canvas) {
@@ -84,10 +90,11 @@ class NativeWebGLRenderer {
         paint(canvas.getContext('2d'));return this.texture(canvas);
     }
     clearMap() {
+        if(this.actorContext){this.actorContext.destroy();this.actorContext=null;this.actorTexture.destroy(true);this.actorTexture=null;this.actorHash=null;}
         this.clearLayers();
         this.floor.removeChildren(); this.objects.removeChildren(); this.walls.clear(); this.effects.clear();
         for(const t of this.textures)t.destroy(true);
-        this.textures.clear();this.props.clear();this.poses.clear();this.appearance=null;
+        this.textures.clear();this.props.clear();
         this.frames=[];this.lastStart=0;this.lastEnd=0;this.warmFrames=10;this.lastPanel=0;
         this.capture=this.completedCapture=null;
     }
@@ -119,38 +126,32 @@ class NativeWebGLRenderer {
         this.objects.setChildIndex(this.playerSprite,this.objects.children.length-1);
     }
     pose(game) {
-        const cosmetics=game.cosmetics.getRenderConfig();const appearance=JSON.stringify(cosmetics);
-        if(this.appearance!==appearance) {
-            for(const t of this.poses.values()){this.textures.delete(t);t.destroy(true);}
-            this.poses.clear();this.appearance=appearance;
-        }
-        const p=game.player,moving=Math.hypot(p.vx||0,p.vy||0)>.1;
-        const phase=moving?Math.floor((((p.walkPhase||0)%(Math.PI*2))+Math.PI*2)%(Math.PI*2)/(Math.PI*2)*8):0;
-        const armed=!game.weaponHolstered&&['normal','sniper'].includes(game.weaponMode);
-        const stance=armed?(game.currentWeapon?stanceForWeapon(game.currentWeapon.id):'pistol'):'idle';
-        const pose=game.furniture?.holding?'push':game.sneaking?'sneak':undefined;
-        const key=[moving,phase,stance,pose||'idle'].join(':');
-        if(!this.poses.has(key)) {
-            // Bounded pose cache; appearance and map changes release every texture.
-            if(this.poses.size>=64){const [k,t]=this.poses.entries().next().value;this.poses.delete(k);this.textures.delete(t);t.destroy(true);}
-            const entity={...p,x:0,y:0,angle:0,walkPhase:phase*Math.PI/4,
-                vx:moving?1:0,vy:0,_ipActive:false,_animState:undefined,_pose:undefined,
-                _gait:{tick:_simTick,prevX:0,prevY:0,speed:moving?3:0,dirX:1,dirY:0,cmdX:0,cmdY:0,driven:false}};
-            const outfit=cosmetics.outfit;
-            const texture=this.bake(192,192,c=>{
-                c.translate(96,96);
-                drawProceduralHumanoid(c,entity,{...cosmetics,...outfit,gender:APPEARANCES['949'].gender,
-                    skinColor:cosmetics.skinColor,stance,pose,poseWhileMoving:!!pose,_crowdBake:true,noShadow:true});
-            });this.poses.set(key,texture);
-        }
-        return this.poses.get(key);
+        const start=performance.now();
+        if(this.actorTexture&&!this.layers.characterAnimation){this.actorStats={...this.actorStats,frozen:true,changed:false,geometryMs:0,rasterSubmitMs:0,position:{x:game.player.x,y:game.player.y,angle:game.player.angle||0}};return this.actorTexture;}
+        if(!this.actorContext){this.actorContext=new NativeVectorContext(this);
+            this.actorTexture=PIXI.RenderTexture.create({width:192,height:192,resolution:2,scaleMode:PIXI.SCALE_MODES.LINEAR});this.actorRevision=0;}
+        this.gpuTimer.begin('character',this.frameId);const ctx=this.actorContext,p=game.player;
+        ctx.begin();ctx.translate(96,96);
+        const ca=Math.cos(p.angle||0),sa=Math.sin(p.angle||0);
+        ctx.worldFrame=_worldMatrix.multiply(new DOMMatrix([ca,sa,-sa,ca,p.x,p.y]));
+        // Existing hair/cloth helpers see the real world transform, while their
+        // vertices are rasterized in the local GPU target. No simulation clone.
+        ctx.canvas=this.canvas;
+        drawProceduralHumanoid(ctx,p,{...game.playerRenderConfig(),_crowdBake:true,noShadow:true});
+        this.actorBounds=ctx.root.getLocalBounds();const prepared=performance.now();
+        const changed=this.actorHash!==ctx.hash;
+        if(changed){this.renderer.render(ctx.root,{renderTexture:this.actorTexture,clear:true});this.actorHash=ctx.hash;this.actorRevision++;}
+        this.gpuTimer.end();this.actorStats={revision:this.actorRevision,frozen:false,changed,paths:ctx.pathsPainted,geometryMs:prepared-start,rasterSubmitMs:performance.now()-prepared,
+            position:{x:p.x,y:p.y,angle:p.angle||0},phase:p.walkPhase||0,stance:game.playerRenderConfig().stance};
+        return this.actorTexture;
     }
     draw(game) {
         if(this.failure||this.lost){this.message(this.failure||'WebGL context lost.');return;}
         if(game.activeMap?.id!=='apt_949'){this.message('This WebGL slice supports the apartment. Use Restart apartment to return.');return;}
         const start=performance.now(),beforeUploads=this.uploads,beforeBakes=this.bakes,beforeDraws=this.drawCalls,beforeBuffers=this.bufferBytes;
         this.settings={resolutionScale:GameSettings.resolutionScale,baseZoom:GameSettings.baseZoom,fpsLimit:GameSettings.fpsLimit};
-        if(this.map!==game.activeMap)this.buildMap(game);
+        this.frameId++;this.gpuTimer.poll();
+        if(this.map!==game.activeMap){const mapStart=performance.now();this.buildMap(game);this.startup={mapBuildMs:performance.now()-mapStart,firstFrames:[],ready:false};}
         const w=game.canvas.width,h=game.canvas.height;
         if(this.renderer.screen.width!==w||this.renderer.screen.height!==h)this.renderer.resize(w,h);
         this.world.filterArea.width=w;this.world.filterArea.height=h;
@@ -162,21 +163,24 @@ class NativeWebGLRenderer {
         game.camera.x=c.x;game.camera.y=c.y;
         this.world.scale.set(zoom);this.world.position.set(w/2-(view.x-view.shakeX)*zoom,h/2-(view.y-view.shakeY)*zoom);
         _worldMatrix=new DOMMatrix([zoom,0,0,zoom,this.world.x,this.world.y]);_worldCanvas=game.canvas;
+        const LZ=CONFIG.LOD_ZOOM,lodZoom=game.camera.zoom/(GameSettings.baseZoom||1);let lod=game._zoomLOD||0;
+        while(lod<2&&lodZoom<LZ[lod].in)lod++;while(lod>0&&lodZoom>LZ[lod-1].out)lod--;game._zoomLOD=_zoomLOD=lod;
         this.syncProps(game);
         this.playerSprite.texture=this.pose(game);this.playerSprite.position.set(game.player.x,game.player.y);
         this.playerSprite.rotation=game.player.angle||0;this.playerSprite.visible=game.player.visible!==false;
         this.playerSprite.alpha=(game.player.isHidden||game.flitState.active) ? .5 : 1;
         this.playerSprite.visible&&=this.layers.player;
         this.syncLayers(game,view);
-        this.syncLighting(game,view);
+        this.gpuTimer.begin('lighting',this.frameId);this.syncLighting(game,view);this.gpuTimer.end();
         this.effects.clear();
         for(const p of game.projectiles||[]){this.effects.beginFill(0xffdd88);this.effects.drawCircle(p.x,p.y,3);this.effects.endFill();}
-        this.renderer.render(this.stage);
+        this.gpuTimer.begin('scene',this.frameId);this.renderer.render(this.stage);this.gpuTimer.end();
         const end=performance.now();
-        const f={at:start,intervalMs:this.lastStart?start-this.lastStart:null,gapMs:this.lastEnd?start-this.lastEnd:null,renderMs:end-start,
+        const f={frame:this.frameId,at:start,intervalMs:this.lastStart?start-this.lastStart:null,gapMs:this.lastEnd?start-this.lastEnd:null,renderMs:end-start,
             uploads:this.uploads-beforeUploads,bakes:this.bakes-beforeBakes,draws:this.drawCalls-beforeDraws,bufferBytes:this.bufferBytes-beforeBuffers,
-            shadows:{...this.shadowStats},stages:{...this.layerStages}};this.lastStart=start;
+            animation:{...this.actorStats},shadows:{...this.shadowStats},stages:{...this.layerStages}};this.lastStart=start;
         this.lastEnd=end;
+        if(this.startup&&!this.startup.ready){this.startup.firstFrames.push({...f});if(this.startup.firstFrames.length>=15)this.startup.ready=true;}
         if(this.warmFrames>0)this.warmFrames--;
         else {if(!this.frames.length)f.intervalMs=f.gapMs=null;this.frames.push(f);if(this.frames.length>6000)this.frames.shift();}
         if(this.capture&&!this.warmFrames&&this.frames.length&&!this.capture.finished){
@@ -190,8 +194,10 @@ class NativeWebGLRenderer {
     report() {
         const frames=this.frames.slice(),intervals=frames.map(f=>f.intervalMs).filter(v=>v>0),sum=intervals.reduce((a,b)=>a+b,0);
         const sorted=intervals.slice().sort((a,b)=>a-b);
-        return {renderer:'native-webgl-apartment',build:'native-webgl-layers-v2',pixiVersion:PIXI.VERSION,device:this.device,map:this.map?.id,view:this.lastView,
+        return {renderer:'native-webgl-apartment',build:'native-webgl-silhouettes-v3',pixiVersion:PIXI.VERSION,device:this.device,map:this.map?.id,view:this.lastView,
             settings:this.settings,resolution:[this.canvas.width,this.canvas.height],lighting:this.lightsOn,warmFramesRemaining:this.warmFrames,frames,
+            animationSummary:{changedFrames:frames.filter(f=>f.animation?.changed).length,geometryMeanMs:frames.length?frames.reduce((n,f)=>n+(f.animation?.geometryMs||0),0)/frames.length:0,
+                shadowRefreshFrames:frames.filter(f=>f.shadows.dynamicRebuilds>0).length,dynamicRebuilds:frames.reduce((n,f)=>n+(f.shadows.dynamicRebuilds||0),0),staticRebuilds:frames.reduce((n,f)=>n+(f.shadows.staticRebuilds||0),0)},
             layers:{...this.layers},configurationId:this.configurationId,sampleDurationMs:sum,
             contextRestores:this.contextRestores||0,
             capture:this.capture?{...this.capture}:null,player:this.playerSprite?{x:this.playerSprite.x,y:this.playerSprite.y}:null,
@@ -200,9 +206,13 @@ class NativeWebGLRenderer {
             renderMeanMs:frames.length?frames.reduce((a,f)=>a+f.renderMs,0)/frames.length:0,
             textureBytes:[...this.textures].reduce((a,t)=>a+t.width*t.height*4,0)+(128*128*2+256*256)*4,
             lightingTargetBytes:[this.lightTarget,this.colorTarget].filter(Boolean).reduce((a,t)=>a+t.baseTexture.realWidth*t.baseTexture.realHeight*4,0),
-            timing:'CPU render submission and frame cadence; GPU execution is not timed',
-            shadowCache:this.shadowStats,layerStages:this.layerStages,
+            timing:this.gpuTimer.extension?'CPU submission, actual frame cadence, and optional asynchronous GPU samples':'CPU render submission and frame cadence; GPU timer unavailable',
+            shadowCache:this.shadowStats,layerStages:this.layerStages,animation:this.actorStats,startup:this.startup,entryTiming:this.entryTiming,initializationMs:this.initializationMs,
+            gpu:{status:this.gpuTimer.status,pending:this.gpuTimer.pending.length,samples:this.gpuTimer.samples.filter(s=>s.frame>=(frames[0]?.frame??Infinity))},
+            gradientTargetBytes:[this.actorContext,this.linenContext,this.glassContext,this.glowContext,this.fixtureContext].filter(Boolean).reduce((n,c)=>n+c.gradients.length*128*128*4,0),
+            veilTargetBytes:this.veilTarget?this.veilTarget.baseTexture.realWidth*this.veilTarget.baseTexture.realHeight*4:0,
+            characterTargetBytes:this.actorTexture?this.actorTexture.baseTexture.realWidth*this.actorTexture.baseTexture.realHeight*4:0,
             shadowTextureBytes:this.shadowBytes(),
-            limitations:['Apartment slice; static city backdrop','Eight-phase player animation','Geometric shadow footprints approximate detailed silhouettes','NPCs and advanced combat effects not migrated']};
+            limitations:['Apartment slice; static city backdrop','Procedural character paths use GPU tessellation; tiny Canvas shadowBlur accents remain approximate','Furniture shadows use the original geometric footprints','NPCs and advanced combat effects not migrated']};
     }
 }

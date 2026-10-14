@@ -1,0 +1,119 @@
+{
+  "passed": true,
+  "animation": {
+    "unique": 80,
+    "freeze": true,
+    "resumes": true
+  },
+  "parity": [
+    {
+      "name": "idle",
+      "iou": 0.9926315789473684,
+      "rgbMeanError": 1.897563676633444,
+      "pixels": 1900
+    },
+    {
+      "name": "walk",
+      "iou": 0.9915035094200222,
+      "rgbMeanError": 2.754771241830065,
+      "pixels": 2707
+    },
+    {
+      "name": "sneak",
+      "iou": 0.9903093551994037,
+      "rgbMeanError": 2.734100224778527,
+      "pixels": 2683
+    },
+    {
+      "name": "push",
+      "iou": 0.9895405304445275,
+      "rgbMeanError": 2.921716171617162,
+      "pixels": 2677
+    },
+    {
+      "name": "phone",
+      "iou": 0.9936373276776246,
+      "rgbMeanError": 1.8862832681928159,
+      "pixels": 1886
+    },
+    {
+      "name": "punch",
+      "iou": 0.9928647877274349,
+      "rgbMeanError": 1.9518194497273995,
+      "pixels": 2803
+    },
+    {
+      "name": "rifle",
+      "iou": 0.9936180657830143,
+      "rgbMeanError": 1.8288705801579128,
+      "pixels": 2037
+    },
+    {
+      "name": "sniper",
+      "iou": 0.9935705100728676,
+      "rgbMeanError": 1.9254110612855007,
+      "pixels": 2333
+    },
+    {
+      "name": "pistol-model",
+      "iou": 0.9943478260869565,
+      "rgbMeanError": 2.0424628450106157,
+      "pixels": 2300
+    },
+    {
+      "name": "rifle-model",
+      "iou": 0.9877913429522752,
+      "rgbMeanError": 1.8885362951209836,
+      "pixels": 2703
+    },
+    {
+      "name": "sniper-model",
+      "iou": 0.993823347745522,
+      "rgbMeanError": 2.0464434674783,
+      "pixels": 3238
+    },
+    {
+      "name": "coat",
+      "iou": 0.9943181818181818,
+      "rgbMeanError": 1.8981937602627257,
+      "pixels": 2816
+    },
+    {
+      "name": "dress",
+      "iou": 0.9949534161490683,
+      "rgbMeanError": 2.027629599234031,
+      "pixels": 2576
+    },
+    {
+      "name": "hood",
+      "iou": 0.9962121212121212,
+      "rgbMeanError": 2.786213408876298,
+      "pixels": 1848
+    },
+    {
+      "name": "umbrella",
+      "iou": 0.9956843403205918,
+      "rgbMeanError": 3.135253054101222,
+      "pixels": 3244
+    }
+  ],
+  "shadow": {
+    "unshadowed": 161,
+    "finger": 24,
+    "gap": 162,
+    "body": 191,
+    "beyond": 126,
+    "cached": true,
+    "poseInvalidates": true,
+    "rotatedGap": 25
+  },
+  "movingValidation": {
+    "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "frames": 80,
+    "uploads": 0,
+    "bakes": 0,
+    "animatedShadowFrames": 66,
+    "staticRebuilds": 0,
+    "note": "Real requestAnimationFrame gameplay validation on SwiftShader, not a phone performance benchmark."
+  }
+}
