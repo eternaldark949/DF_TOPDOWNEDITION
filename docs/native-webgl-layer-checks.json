@@ -1,0 +1,482 @@
+{
+  "passed": true,
+  "layers": [
+    {
+      "key": "floor",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "backdrop",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "windows",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "walls",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "doors",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "fixtures",
+      "draws": [
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "furniture",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "player",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "lighting",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "colorWash",
+      "draws": [
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "decorLights",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "wallOcclusion",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "propShadows",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "playerShadows",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "indicators",
+      "draws": [
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "furnitureHints",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "contactShadows",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "roomVeil",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "nightTint",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "glows",
+      "draws": [
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "softShadows",
+      "draws": [
+        9,
+        9,
+        9,
+        9,
+        9
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "bloom",
+      "draws": [
+        11,
+        11,
+        11,
+        11,
+        11
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "atmosphere",
+      "draws": [
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "decorAnimation",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "enabledLayers": {
+    "floor": true,
+    "backdrop": true,
+    "windows": true,
+    "walls": true,
+    "doors": true,
+    "fixtures": true,
+    "furniture": true,
+    "player": true,
+    "lighting": true,
+    "colorWash": true,
+    "decorLights": true,
+    "wallOcclusion": true,
+    "propShadows": true,
+    "playerShadows": true,
+    "indicators": true,
+    "furnitureHints": true,
+    "contactShadows": true,
+    "roomVeil": true,
+    "nightTint": true,
+    "glows": true,
+    "softShadows": true,
+    "bloom": true,
+    "atmosphere": true,
+    "decorAnimation": true
+  },
+  "warmDrawCalls": [
+    22
+  ],
+  "warmTextureUploads": 0,
+  "warmAssetBakes": 0,
+  "shadowCache": {
+    "hits": 40,
+    "rebuilds": 0,
+    "sources": 40,
+    "pairs": 0
+  },
+  "assetTextureBytes": 35358848,
+  "shadowTextureBytes": 10066004,
+  "lightingTargetBytes": 725120,
+  "shadowPixelChecks": {
+    "wallCheck": {
+      "before": 137,
+      "behind": 0
+    },
+    "finite": {
+      "unshadowed": 119,
+      "shadow": 18,
+      "body": 167,
+      "beyond": 56
+    },
+    "cached": true,
+    "otherAlpha": 137
+  },
+  "controls": {
+    "checked": true,
+    "bloom": false,
+    "frames": 0
+  },
+  "recording": {
+    "immutable": true,
+    "canceled": true
+  },
+  "recordedFrames": 3,
+  "note": "Synchronous layer isolation fixture, not an FPS benchmark. Workspace GPU is SwiftShader."
+}

@@ -9,8 +9,10 @@ Canvas renderer. The branch starts from the Gamma diagnostics work.
 Build with `node tools/build.mjs --webgl`, open `DFAB WebGL.html` in a browser,
 then choose **PLAY WEBGL APARTMENT**. Use the usual keyboard or touch controls
 to explore, interact, and move furniture. City exits and story entry points are
-disabled in this slice. The toolbar can toggle lighting, restart the apartment,
-or export `dfab-native-webgl-profile.json`.
+disabled in this slice. **Layers** opens independent visual switches and the
+Baseline, Lighting + shadows, and Canvas look presets. **Record 20s** warms the
+selected configuration, measures it, and automatically downloads a profile.
+**Export** also downloads the latest sample. See [layer testing](native-webgl-layers.md).
 
 The HTML includes its scripts, art, audio, and pinned PixiJS 7.4.3 distribution
 with its MIT license. It makes no runtime CDN dependency. The preview routes
@@ -28,8 +30,13 @@ Current implementation:
   changes release the old cache. Baking uses a separate gait object so it cannot
   change the live player's simulation state.
 - Batched light sprites render to a persistent half-resolution GPU texture.
-  One filter combines that lighting with the scene in the same context. Odd
-  viewport dimensions do not cause recurring target allocation.
+  Cached per-light GPU images include wall, door, furniture, and player occlusion.
+  A separate colored-light target restores the Canvas renderer's colored wash.
+  Odd viewport dimensions do not cause recurring target allocation.
+- Room shading, contact shadows, fixtures, door panels, window glass, glows,
+  player/grab indicators, animated decor, soft edges, scene bloom, and atmosphere
+  can be tested separately. Bloom extracts/blur highlights at quarter resolution
+  and combines them with the full-resolution scene.
 - The original game loop, collision, interactions, and DOM controls remain.
   This sandbox prevents the default story step from teleporting to an unported
   scene on its first update.
@@ -37,14 +44,16 @@ Current implementation:
   drawing until Pixi and the browser restore the context. There is no Canvas
   renderer fallback in the preview.
 
-Lighting currently has no occlusion, room veil, or bloom. Decor and city backdrop
-animations are snapshots; NPCs, cinematic camera features, and advanced combat
-effects are not migrated. This is the first playable slice, not a complete game
-renderer replacement or a visual-parity benchmark.
+The city backdrop and glass daylight are snapshots. Geometric shadow footprints
+approximate detailed silhouettes; NPCs, cinematic camera features, and advanced
+combat effects are not migrated. The apartment now has the main visual passes,
+but the screenshots document differences from Canvas rather than claiming exact
+visual parity.
 
 ## Verification
 
-Run `node tools/test-native-webgl-browser.cjs` after building the preview.
+Run `node tools/test-native-webgl-browser.cjs` and
+`node tools/test-native-webgl-layers-browser.cjs` after building the preview.
 Chromium checks the real WebGL surface, linked shader, warmed texture reuse,
 movement, camera/screen round trips, furniture invalidation, resize/zoom, visible
 lighting across repeated frames, the actual gameplay loop, context loss and
@@ -52,14 +61,17 @@ restoration, unavailable WebGL, and storage isolation. The fixture starts at an
 880×411 viewport specifically to exercise odd half-resolution dimensions.
 Pixel readback is used only in the test, never in the live renderer.
 
-The tested warmed slice makes five draw calls per frame and zero texture uploads.
+Warmed stationary layer tests make zero bitmap uploads. Draw counts depend on
+the enabled passes and the device's batch capacity; exports include actual counts.
 The original Canvas build also passed all 98 regressions / 1,379 assertions.
 Workspace Chromium uses SwiftShader; its FPS does not establish performance on
-the Mali phone. The export excludes ten initial frames, retains up to 120 recent
+the Mali phone. The export excludes warmup (15 frames after layer changes), retains up to 6,000 recent
 frames, and reports cadence, stalls, CPU render time, gap outside rendering,
 uploads, bakes, draw calls, GPU identification, settings, asset texture bytes,
-and lighting target bytes. GPU execution time and Pixi's full allocation overhead
-are not measured. See `native-webgl-apartment.png` for the preview.
+lighting/shadow target bytes, geometry buffer bytes, configuration flags, and
+per-frame shadow refresh counts. GPU execution time, depth/stencil buffers, and
+Pixi's full allocation overhead are not measured. See `native-webgl-canvas-look.png`
+and `native-webgl-canvas-reference.png` for the same apartment camera.
 
 ## Goal
 
@@ -67,10 +79,9 @@ Present gameplay through one WebGL context, with scene textures, lighting target
 and postprocessing resident on the GPU. Preserve simulation, maps, saves, story,
 input, audio, and the DOM interface while replacing their drawing dependencies.
 
-The mobile target is the user's Mali-G68 phone. The existing captures establish
-approximately 3.5–3.9 FPS for the hybrid Gamma pipeline, including long gaps outside
-the measured render calls. They do not establish how fast a native renderer will
-be or whether rendering accounts for every stall.
+The mobile target is the user's Mali-G68 phone. The first lightweight native
+slice improved substantially over hybrid Gamma. The new visual passes require
+fresh device measurements; the earlier result is not a benchmark of Canvas look.
 
 ## Rendering architecture
 

@@ -17,7 +17,7 @@ const {chromium}=require('playwright');
             NativeWebGLStorage.removeItem('native-storage-test');localStorage.removeItem('native-storage-test');return result;
         });
         assert.deepEqual(storage,{original:'original',preview:'preview'},'preview storage is isolated from Canvas saves');
-        await page.evaluate(()=>{game.loop=()=>{};document.getElementById('btn-native-apartment').click();});
+        await page.evaluate(()=>{game.loop=()=>{};document.getElementById('btn-native-apartment').click();game.nativeRenderer.preset('baseline');});
         const warmed=await page.evaluate(()=>{
             const r=game.nativeRenderer,gl=r.renderer.gl;let polls=0;
             const getError=gl.getError.bind(gl);gl.getError=()=>{polls++;return getError();};
