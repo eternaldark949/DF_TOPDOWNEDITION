@@ -3,9 +3,11 @@
  * Factories come from callers. Nothing here imports a named toy or game asset.
  * A lease pins one resource; releasing the last lease destroys it immediately.
  */
+import { WorldResidency } from './residency.js';
+
 export class Directory {
   /** Registration is inert: no world or GPU asset is allocated until requested. */
-  constructor() { this.libraries = new Map(); this.resources = new Map(); this.worlds = new Map(); this.disposed = false; }
+  constructor() { this.residency = new WorldResidency(); this.libraries = new Map(); this.resources = new Map(); this.worlds = new Map(); this.disposed = false; }
 
   /** Register a unique library factory; duplicate names are an error, not a silent override. */
   register(name, factory) {
@@ -50,17 +52,20 @@ export class Directory {
     return world;
   }
 
-  /** Release one adopted world. Safe when scene cleanup and engine cleanup overlap. */
-  releaseWorld(id) {
+  /**
+   * Release an adopted world. Async loaders pass expected to prevent a stale cleanup
+   * from deleting a newer reconstruction that intentionally reuses the same world ID.
+   */
+  releaseWorld(id, expected) {
     const world = this.worlds.get(id);
-    if (!world) return;
+    if (!world || (expected && world !== expected)) return;
     this.worlds.delete(id); world.dispose();
   }
 
   /** Final owner cleanup also invalidates outstanding leases; release closures remain harmless. */
   dispose() {
     if (this.disposed) return;
-    this.disposed = true;
+    this.disposed = true; this.residency.dispose();
     for (const world of this.worlds.values()) world.dispose();
     for (const resource of this.resources.values()) resource.value.dispose();
     this.worlds.clear(); this.resources.clear(); this.libraries.clear();

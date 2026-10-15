@@ -43,12 +43,13 @@ const server=http.createServer((req,res)=>{
       }
     };
     await context.addInitScript(installGuard);
-    const page=await context.newPage();
+    let page=await context.newPage();
     await page.evaluate(installGuard);page.on('pageerror',e=>errors.push(e.message));
     page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
     const remote=[];page.on('request',request=>{if(/^https?:/.test(request.url()))remote.push(request.url());});
     await page.setContent(fs.readFileSync(path.join(root,'dist/ETRNLNINE-Atrium.html'),'utf8'));
-    await page.waitForFunction(()=>document.querySelector('#status').dataset.time>0.1);
+    await page.waitForFunction(()=>document.querySelector('#status').dataset.actor && document.querySelector('#status').dataset.buffers==='3')
+      .catch(async error=>{console.error('Startup state:',await page.locator('body').innerText(),errors);throw error;});
     assert.equal(await page.locator('#error').isVisible(),false);
     const before=Number(await page.locator('#status').getAttribute('data-x'));
     await page.keyboard.down('KeyD');
@@ -61,7 +62,7 @@ const server=http.createServer((req,res)=>{
     await page.waitForFunction(old=>document.querySelector('#status').dataset.cool!==old,oldCool);
     assert.notEqual(await page.locator('#status').getAttribute('data-cool'),oldCool,'Action changes light');
     // HTML template buttons are also operable by focused Enter/Space activation.
-    await page.locator('.engine-action').focus();
+    await page.getByRole('button',{name:'Light',exact:true}).focus();
     const keyboardCool=await page.locator('#status').getAttribute('data-cool');
     await page.keyboard.press('Space');
     await page.waitForFunction(old=>document.querySelector('#status').dataset.cool!==old,keyboardCool);
@@ -73,13 +74,55 @@ const server=http.createServer((req,res)=>{
     for(let i=0;i<12;i++){
       const previous=await page.locator('#status').getAttribute('data-world');
       await page.locator('#restart').click();
-      await page.waitForFunction(old=>document.querySelector('#status').dataset.world!==old,previous);
+      await page.waitForFunction(old=>{const s=document.querySelector('#status').dataset;return s.world!==old && s.world!=='preparing' && s.buffers==='3';},previous);
       assert.equal(await page.locator('.engine-joystick').count(),1);
-      assert.equal(await page.locator('.engine-action').count(),1);
-      assert.equal(await page.locator('#status').getAttribute('data-buffers'),'2');
-      assert.equal(await page.locator('#status').getAttribute('data-vaos'),'1');
+      assert.equal(await page.locator('.engine-action').count(),2);
+      assert.equal(await page.locator('#status').getAttribute('data-buffers'),'3');
+      assert.equal(await page.locator('#status').getAttribute('data-vaos'),'2');
     }
-    await page.screenshot({path:path.join(artifacts,'atrium-desktop.png')});
+    await page.screenshot({path:path.join(artifacts,'worlds-amber-desktop.png')});
+    const actorId=await page.locator('#status').getAttribute('data-actor');
+    const amberId=await page.locator('#status').getAttribute('data-world');
+    const amberCount=await page.locator('#status').getAttribute('data-entities');
+    await page.keyboard.press('KeyE');
+    await page.waitForFunction(()=>document.querySelector('#status').dataset.cool==='false');
+    await page.keyboard.press('KeyG');
+    await page.waitForFunction(()=>document.querySelector('#status').dataset.prop==='-6');
+    await page.keyboard.press('KeyF');
+    await page.waitForFunction(()=>document.querySelector('#status').dataset.committed==='1');
+    assert.notEqual(await page.locator('#status').getAttribute('data-world'),amberId);
+    assert.equal(await page.locator('#status').getAttribute('data-actor'),actorId);
+    assert.equal(await page.locator('#status').getAttribute('data-cool'),'true','Other world has independent light state');
+    assert.equal(await page.locator('#status').getAttribute('data-prop'),'6','Other world has independent prop position');
+    await page.screenshot({path:path.join(artifacts,'worlds-violet-desktop.png')});
+    await page.locator('#world-directory summary').click();
+    await page.locator('#release-inactive').click();
+    await page.waitForFunction(()=>document.querySelector('#status').dataset.resident==='1');
+    assert.equal(await page.locator('#status').getAttribute('data-buffers'),'2');
+    assert.ok(Number(await page.locator('#status').getAttribute('data-snapshot-bytes'))>0);
+    await page.screenshot({path:path.join(artifacts,'worlds-directory.png')});
+    await page.keyboard.press('KeyE');
+    await page.waitForFunction(()=>document.querySelector('#status').dataset.cool==='false');
+    await page.keyboard.press('KeyG');
+    await page.waitForFunction(()=>document.querySelector('#status').dataset.prop==='-6');
+    await page.keyboard.press('KeyF');
+    await page.waitForFunction(()=>document.querySelector('#status').dataset.committed==='2');
+    assert.equal(await page.locator('#status').getAttribute('data-world'),amberId,'World identity survives reconstruction');
+    assert.equal(await page.locator('#status').getAttribute('data-actor'),actorId,'Actor identity survives reconstruction');
+    assert.equal(await page.locator('#status').getAttribute('data-cool'),'false','Evicted light state restored');
+    assert.equal(await page.locator('#status').getAttribute('data-prop'),'-6','Evicted prop position restored');
+    assert.equal(await page.locator('#status').getAttribute('data-entities'),amberCount,'No duplicated actor on reconstruction');
+    for(let i=3;i<=10;i++){
+      await page.keyboard.press('KeyF');
+      await page.waitForFunction(count=>document.querySelector('#status').dataset.committed===String(count),i);
+      assert.equal(await page.locator('#status').getAttribute('data-actor'),actorId);
+      assert.equal(await page.locator('#status').getAttribute('data-buffers'),'3');
+      assert.equal(await page.locator('#status').getAttribute('data-resident'),'2');
+    }
+    report.worlds={transfers:10,stableActor:true,persistenceAfterEviction:true,
+      snapshotBytes:Number(await page.locator('#status').getAttribute('data-snapshot-bytes')),
+      diagnostics:await page.locator('#transfer-time').innerText()};
+    await page.locator('#world-directory summary').click();
     await page.setViewportSize({width:1024,height:720});
     await page.waitForFunction(()=>document.querySelector('canvas').width===1024 && document.querySelector('canvas').height===720);
     report.resize=await page.evaluate(()=>{
@@ -88,13 +131,14 @@ const server=http.createServer((req,res)=>{
     assert.deepEqual(report.resize,{width:1024,height:720,error:0});
     report.offline={networkRequests:remote.length,sceneReplacements:12,status:await page.locator('#status').innerText()};
     assert.equal(remote.length,0,'Offline artifact makes zero network requests');
+    await page.close(); // Do not keep an unrelated software-rendered world consuming GPU/CPU during touch checks.
 
     // Exercise the actual DOM control templates with simultaneous touch pointers.
     const mobile=await browser.newContext({viewport:{width:412,height:892},isMobile:true,hasTouch:true,deviceScaleFactor:1});
     const phone=await mobile.newPage();await phone.evaluate(installGuard);phone.on('pageerror',e=>errors.push(e.message));
     await phone.setContent(fs.readFileSync(path.join(root,'dist/ETRNLNINE-Atrium.html'),'utf8'));
-    await phone.waitForFunction(()=>document.querySelector('#status').dataset.time>0.1);
-    const stick=await phone.locator('.engine-joystick').boundingBox(),button=await phone.locator('.engine-action').boundingBox();
+    await phone.waitForFunction(()=>document.querySelector('#status').dataset.actor && document.querySelector('#status').dataset.buffers==='3');
+    const stick=await phone.locator('.engine-joystick').boundingBox(),button=await phone.getByRole('button',{name:'Light',exact:true}).boundingBox();
     const cdp=await mobile.newCDPSession(phone);
     const x0=Number(await phone.locator('#status').getAttribute('data-x'));
     const c0=await phone.locator('#status').getAttribute('data-cool');
@@ -103,17 +147,27 @@ const server=http.createServer((req,res)=>{
       {x:button.x+button.width/2,y:button.y+button.height/2,id:2}]});
     await phone.waitForFunction(x=>Number(document.querySelector('#status').dataset.x)>x+0.5,x0);
     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-    await phone.waitForTimeout(300);
+    assert.equal(await phone.locator('.engine-joystick span').evaluate(element=>element.style.transform),'','Released stick recenters');
     assert.ok(Number(await phone.locator('#status').getAttribute('data-x'))>x0+0.4,'Touch joystick moves while button is held');
     assert.notEqual(await phone.locator('#status').getAttribute('data-cool'),c0,'Second finger activates button independently');
+    // Steering intentionally coasts after release. Wait in simulation time, not wall
+    // time, so software GPU scheduling cannot masquerade as a stuck touch input.
+    const releasedAt=Number(await phone.locator('#status').getAttribute('data-time'));
+    await phone.waitForFunction(time=>Number(document.querySelector('#status').dataset.time)>time+1,releasedAt);
     const x1=Number(await phone.locator('#status').getAttribute('data-x'));
-    await phone.waitForTimeout(400);
+    const settledAt=Number(await phone.locator('#status').getAttribute('data-time'));
+    await phone.waitForFunction(time=>Number(document.querySelector('#status').dataset.time)>time+0.3,settledAt);
     assert.ok(Math.abs(Number(await phone.locator('#status').getAttribute('data-x'))-x1)<0.3,'Touch release stops movement');
-    await phone.screenshot({path:path.join(artifacts,'atrium-mobile.png')});
+    await phone.getByRole('button',{name:'Flit',exact:true}).tap();
+    await phone.waitForFunction(()=>document.querySelector('#status').dataset.committed==='1');
+    await phone.screenshot({path:path.join(artifacts,'worlds-violet-mobile.png')});
     report.touch={simultaneousPointers:2,status:await phone.locator('#status').innerText()};
     await mobile.close();
 
     // A second, empty engine and independent primitive scene exercise public interfaces.
+    page=await context.newPage();
+    page.on('pageerror',error=>errors.push(error.message));
+    page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
     await page.goto(`http://127.0.0.1:${server.address().port}/fixture`);
     report.engine=await page.evaluate(async()=>{
       const {ETRNLNINE}=await import('/engine/etrnlnine.js');
@@ -157,6 +211,48 @@ const server=http.createServer((req,res)=>{
         worlds:f.engine.directory.worlds.size,resources:f.engine.directory.resources.size,running:f.engine.lobby.running};
     });
     assert.deepEqual(report.disposal,{buffers:0,programs:0,vaos:0,worlds:0,resources:0,running:false});
+    // Exercise actual chunked world preparation and collision queries using public modules.
+    await page.evaluate(async()=>{
+      const {ETRNLNINE}=await import('/engine/etrnlnine.js');
+      const {createJourney}=await import('/examples/atrium/journey.js');
+      const engine=new ETRNLNINE(document.querySelector('canvas'));engine.basement.renderer.resize();
+      const journey=createJourney(engine);engine.start();await journey.ready;
+      window.journeyFixture={engine,journey,initialId:journey.actor.root.id,sourceId:journey.current.world.id};
+    });
+    await page.waitForFunction(()=>window.journeyFixture.engine.directory.residency.inspect().worlds.every(w=>w.status==='ready'));
+    await page.evaluate(()=>{
+      const {journey}=window.journeyFixture;
+      journey.actor.root.x=7;journey.actor.root.y=-3;journey.flit();
+    });
+    await page.waitForFunction(()=>window.journeyFixture.journey.travel.stats.failed===1);
+    assert.equal(await page.evaluate(()=>window.journeyFixture.journey.actor.root.worldId===window.journeyFixture.sourceId),true,'Real destination obstacle refuses transfer');
+    await page.evaluate(()=>{
+      const {journey}=window.journeyFixture;journey.actor.root.x=0;journey.actor.root.y=-8;
+      journey.releaseInactive();journey.flit();journey.cancel();
+    });
+    await page.waitForTimeout(100);
+    assert.equal(await page.evaluate(()=>window.journeyFixture.engine.directory.residency.records.size),1,'Cancelled preparation leaves active world only');
+    await page.evaluate(()=>{
+      const {engine,journey}=window.journeyFixture;engine.lobby.pause('test-pause');journey.flit();
+    });
+    await page.waitForTimeout(100);
+    assert.equal(await page.evaluate(()=>window.journeyFixture.journey.actor.root.worldId===window.journeyFixture.sourceId),true,'Pause cannot commit or prepare destination');
+    await page.evaluate(()=>window.journeyFixture.engine.lobby.pause('test-pause',false));
+    await page.waitForFunction(()=>window.journeyFixture.journey.travel.stats.committed===1);
+    report.worldLifecycle=await page.evaluate(()=>{
+      const {engine,journey,initialId}=window.journeyFixture;
+      const result={blocked:journey.travel.stats.failed,cancelled:journey.travel.stats.cancelled,
+        committed:journey.travel.stats.committed,stableActor:journey.actor.root.id===initialId,
+        peakResident:engine.directory.residency.stats.peakResident,preparation:engine.lobby.preparation.stats};
+      journey.dispose();
+      result.afterScene={worlds:engine.directory.worlds.size,resources:engine.directory.resources.size,
+        residency:engine.directory.residency.records.size,definitions:engine.directory.residency.definitions.size,
+        buffers:engine.basement.renderer.stats.buffers,jobs:engine.lobby.preparation.jobs.size};
+      engine.dispose();result.afterEngine={...engine.basement.renderer.stats};return result;
+    });
+    assert.equal(report.worldLifecycle.stableActor,true);assert.equal(report.worldLifecycle.peakResident,2);
+    assert.deepEqual(report.worldLifecycle.afterScene,{worlds:0,resources:0,residency:0,definitions:0,buffers:1,jobs:0});
+    assert.equal(report.worldLifecycle.afterEngine.buffers,0);
     assert.deepEqual(errors,[],'No browser errors');
     fs.writeFileSync(path.join(artifacts,'browser-results.json'),JSON.stringify(report,null,2)+'\n');
     console.log(JSON.stringify(report,null,2));

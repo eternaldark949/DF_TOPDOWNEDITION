@@ -15,7 +15,7 @@ export class Basement {
     catch (error) { this.renderer.dispose(); throw error; }
   }
   /** Empty worlds have no game content and allocate no GPU batch until requested. */
-  createWorld() { return new World(this.identities.create('world'), this.identities); }
+  createWorld(id = this.identities.create('world')) { return new World(id, this.identities); }
   /** Release devices before the surface resources they target. */
   dispose() { this.input.dispose(); this.renderer.dispose(); }
 }

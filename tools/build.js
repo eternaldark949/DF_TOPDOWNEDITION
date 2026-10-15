@@ -26,8 +26,12 @@ async function bundle(path) {
     const dependency=await bundle(resolve(dirname(path),match[2]));
     source=source.replace(match[0],`const {${match[1]}} = ${dependency};`);
   }
-  const exports=[...source.matchAll(/^export (?:class|function|const) (\w+)/gm)].map(m=>m[1]);
-  source=source.replace(/^export (?=class|function|const)/gm,'');
+  const exports=[];
+  // Collect and remove a supported export in ONE pass. Separate regexes can silently
+  // strip a declaration without adding its name (notably generator functions).
+  source=source.replace(/^export (class\s+|function\s*\*?\s+|const\s+)(\w+)/gm,(_match,kind,name)=>{
+    exports.push(name);return `${kind}${name}`;
+  });
   if (/^\s*(import|export)\s/m.test(source)) throw new Error(`Unsupported module syntax in ${path}`);
   const record=modules.get(path); modules.delete(path); modules.set(path,record);
   record.code=`// Source: ${relative(root,path)}\nconst ${id}=(()=>{\n${source}\nreturn {${exports.join(',')}};\n})();`;

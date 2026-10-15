@@ -3,11 +3,14 @@
  * All elapsed values are seconds. The engine advances fixed simulation steps and
  * interpolates render poses; long browser suspensions never trigger unlimited work.
  */
+import { PreparationQueue } from './preparation.js';
+
 export class Runtime {
   /** Inject scheduling for deterministic lifecycle tests; browser defaults allocate no loop yet. */
   constructor({ request = cb => requestAnimationFrame(cb), cancel = id => cancelAnimationFrame(id), step = 1 / 60, maxSteps = 5 } = {}) {
     this.request = request; this.cancel = cancel; this.step = step; this.maxSteps = maxSteps;
-    this.phases = { input: new Set(), update: new Set(), render: new Set(), pause: new Set() };
+    this.preparation = new PreparationQueue();
+    this.phases = { boundary: new Set(), input: new Set(), update: new Set(), render: new Set(), pause: new Set() };
     this.reasons = new Set(); this.running = false; this.disposed = false;
     this.frameId = null; this.last = null; this.accumulator = 0; this.time = 0;
     this.stats = { frames: 0, steps: 0, droppedSeconds: 0 };
@@ -52,13 +55,14 @@ export class Runtime {
     }
   }
 
-  /** Execute input -> bounded fixed updates -> interpolated render -> schedule next frame. */
+  /** Execute budgeted preparation -> input -> boundary/fixed updates -> interpolated render. */
   tick(milliseconds) {
     if (!this.running) return;
     this.frameId = null;
     try {
       const elapsed = this.last === null ? 0 : Math.max(0, (milliseconds - this.last) / 1000);
       this.last = milliseconds;
+      if (!this.reasons.size) this.preparation.advance();
       this.emit('input');
       if (!this.reasons.size) {
         const admitted = Math.min(elapsed, this.step * this.maxSteps);
@@ -66,6 +70,7 @@ export class Runtime {
         this.accumulator += admitted;
         let count = 0;
         while (this.accumulator + 1e-10 >= this.step && count < this.maxSteps) {
+          this.emit('boundary', this.time);
           this.emit('update', this.step, this.time);
           this.accumulator = Math.max(0, this.accumulator - this.step);
           this.time += this.step; this.stats.steps++; count++;
@@ -82,7 +87,7 @@ export class Runtime {
   /** Stop scheduling and remove registrations, allowing the composed engine to release resources. */
   dispose() {
     if (this.disposed) return;
-    this.stop(); this.disposed = true;
+    this.stop(); this.preparation.dispose(); this.disposed = true;
     for (const phase of Object.values(this.phases)) phase.clear();
     this.reasons.clear();
   }

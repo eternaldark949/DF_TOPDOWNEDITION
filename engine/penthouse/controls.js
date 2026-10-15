@@ -59,10 +59,15 @@ export class Joystick {
 
 export class ActionButton {
   /** A held button template; press edges are generated once by Basement input aggregation. */
-  constructor({ input, sourceId, action, host, label = 'Action', diameter = 72 }) {
+  constructor({ input, sourceId, action, host, label = 'Action', diameter = 72, placement = {} }) {
     this.life = new Lifetime(); this.element = document.createElement('button');
     this.element.className = 'engine-action'; this.element.type = 'button'; this.element.textContent = label;
-    this.element.style.width = this.element.style.height = `${diameter}px`; host.append(this.element);
+    this.element.style.width = this.element.style.height = `${diameter}px`;
+    // Optional edge offsets are CSS pixels; omitted offsets retain the game's responsive CSS.
+    for (const edge of ['left','right','top','bottom']) {
+      if (placement[edge] !== undefined) this.element.style[edge] = `${placement[edge]}px`;
+    }
+    host.append(this.element);
     /** State and appearance are instance-local, with no shared pressed flags. */
     const release = () => {
       input.removeSource(sourceId); this.element.classList.remove('held');

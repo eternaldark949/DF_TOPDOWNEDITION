@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#10101b">
-<title>ETRNLNINE · The First Atrium</title>
+<title>ETRNLNINE · Between Worlds</title>
 <style>
 /* Page presentation belongs to the example. Control classes style reusable template instances. */
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#10101b;color:#e5ded4;font-family:system-ui,sans-serif}
@@ -23,16 +23,22 @@ footer{position:absolute;bottom:max(25px,env(safe-area-inset-bottom));left:50%;t
 .engine-joystick{position:absolute;left:max(28px,env(safe-area-inset-left));bottom:max(30px,env(safe-area-inset-bottom));border:1px solid #b8a17c4d;border-radius:50%;background:#17172488;touch-action:none;display:grid;place-items:center}
 .engine-joystick span{width:38px;height:38px;border-radius:50%;border:1px solid #cbb58a80;background:#7d6c4e50;pointer-events:none}
 .engine-action{position:absolute;right:max(40px,env(safe-area-inset-right));bottom:max(46px,env(safe-area-inset-bottom));border-radius:50%;font-size:11px;letter-spacing:.1em;padding:0}
+/* These controls expose engine-demo residency deliberately, separate from game touch actions. */
+#world-directory{position:absolute;left:36px;top:205px;max-width:340px;padding:14px 16px;background:#11111dcc;border:1px solid #a6957633;border-radius:6px;font-size:11px;color:#bbb4c9;line-height:1.8}
+#world-directory summary{cursor:pointer;color:#d1bf9b;letter-spacing:.12em;font-size:10px;text-transform:uppercase}
+#world-directory output{display:block}#world-directory p{margin:7px 0}#world-directory button{padding:6px 9px;font-size:10px;margin-top:8px}
+#world-slots,#transfer-time{font-size:10px;color:#8f8ca6}button:disabled{opacity:.4;cursor:default}
 #error{position:absolute;top:40%;left:10%;width:80%;padding:24px;border:1px solid #bf8a6e;background:#241b24;z-index:3}
-@media(max-width:650px){header{left:20px;top:22px}.subtitle{max-width:180px;font-size:10px}nav{right:15px;top:24px}nav button{padding:9px;font-size:11px}h1{font-size:30px}.eyebrow{font-size:8px}footer{bottom:150px;width:90%}.hint{font-size:10px}.engine-joystick{left:22px}.engine-action{right:25px}}
+@media(max-width:650px){header{left:20px;top:22px}.subtitle{max-width:180px;font-size:10px}nav{right:15px;top:24px}nav button{padding:9px;font-size:11px}h1{font-size:30px}.eyebrow{font-size:8px}footer{bottom:150px;width:90%}.hint{font-size:10px}.engine-joystick{left:22px}.engine-action{right:25px}#world-directory{left:20px;top:145px;max-width:245px;padding:9px 12px;font-size:10px}#world-directory:not([open]){background:#11111dcc}footer{bottom:215px}.hint{max-width:300px;margin:auto}}
 </style>
 </head>
 <body>
-<canvas id="world" tabindex="0" aria-label="Interactive WebGL courtyard. Use WASD or arrows to walk, E to change the lantern, B to change the pack response."></canvas>
-<header><div class="eyebrow">ETRNLNINE / First light</div><h1>The First Atrium</h1><div class="subtitle">A house begins with its foundation.<br>A world begins with a little movement.</div></header>
+<canvas id="world" tabindex="0" aria-label="Interactive WebGL courtyard. Use WASD or arrows to walk, E to change the lantern, B to change the pack response, F to flit between worlds, G to move the prop."></canvas>
+<header><div class="eyebrow">ETRNLNINE / Between worlds</div><h1>The Amber Atrium</h1><div class="subtitle">Two worlds. One continuous journey.<br>Flit between them; leave a little change behind.</div></header>
 <nav aria-label="Demonstration controls"><button id="pause" aria-pressed="false">Pause</button><button id="restart">New scene</button></nav>
+<details id="world-directory"><summary>World directory</summary><p><output id="directory-status">Preparing worlds…</output><output id="world-slots"></output><output id="gpu-status"></output></p><output id="travel-status">Preparing the first world</output><output id="transfer-time"></output><button id="release-inactive">Release inactive</button> <button id="cancel-flit" disabled>Cancel flit</button></details>
 <div id="controls" aria-label="Touch controls"></div>
-<footer><output id="status" aria-label="Engine status">Opening the house…</output><div class="hint"><kbd>WASD / arrows</kbd> walk &nbsp;·&nbsp; <kbd>mouse</kbd> look &nbsp;·&nbsp; <kbd>E / click</kbd> light &nbsp;·&nbsp; <kbd>B</kbd> pack<br>Touch controls available · Gamepad: left stick / A / X</div></footer>
+<footer><output id="status" aria-label="Engine status">Opening the house…</output><div class="hint"><kbd>WASD / arrows</kbd> walk &nbsp;·&nbsp; <kbd>mouse</kbd> look &nbsp;·&nbsp; <kbd>E / click</kbd> light &nbsp;·&nbsp; <kbd>B</kbd> pack<br><kbd>F</kbd> flit · <kbd>X</kbd> cancel · <kbd>G</kbd> move prop<br>Gamepad: left stick / A light / B flit / X pack / Y cancel</div></footer>
 <div id="error" role="alert" hidden></div>
 <script type="module" src="./main.js"></script>
 </body>

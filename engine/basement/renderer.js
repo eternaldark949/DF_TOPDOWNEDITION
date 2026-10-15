@@ -92,6 +92,18 @@ export class Renderer {
     const batch = new InstanceBatch(this, world, capacity); this.batches.add(batch); return batch;
   }
 
+  /**
+   * Prepare a world's retained GPU data before it becomes an active destination.
+   * Content loaders use this public contract rather than manipulating GL buffers.
+   * Camera-specific culling is refreshed again on render; the underlying geometry is resident.
+   */
+  prepare(batch) {
+    if (this.disposed || this.lost) throw new Error('GPU is not ready for world preparation');
+    if (batch.renderer !== this || batch.disposed) throw new Error('Invalid preparation batch');
+    this.resize(); batch.world.resolve();
+    const view = this.view(); batch.sync(view.halfWidth, view.halfHeight);
+  }
+
   /** Resize backing pixels only when necessary. CSS layout belongs to the application. */
   resize() {
     const ratio = Math.min(globalThis.devicePixelRatio || 1, this.pixelRatio);
@@ -225,5 +237,7 @@ class InstanceBatch {
     const { gl, stats } = this.renderer;
     gl.deleteBuffer(this.buffer); gl.deleteVertexArray(this.vao);
     stats.buffers--; stats.vaos--; this.renderer.batches.delete(this);
+    // Disposal releases CPU storage too, even if a caller retains the old handle.
+    this.data = null; this.world = null;
   }
 }

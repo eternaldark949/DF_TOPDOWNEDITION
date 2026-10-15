@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#10101b">
-<title>ETRNLNINE · The First Atrium</title>
+<title>ETRNLNINE · Between Worlds</title>
 <style>
 /* Page presentation belongs to the example. Control classes style reusable template instances. */
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#10101b;color:#e5ded4;font-family:system-ui,sans-serif}
@@ -23,16 +23,22 @@ footer{position:absolute;bottom:max(25px,env(safe-area-inset-bottom));left:50%;t
 .engine-joystick{position:absolute;left:max(28px,env(safe-area-inset-left));bottom:max(30px,env(safe-area-inset-bottom));border:1px solid #b8a17c4d;border-radius:50%;background:#17172488;touch-action:none;display:grid;place-items:center}
 .engine-joystick span{width:38px;height:38px;border-radius:50%;border:1px solid #cbb58a80;background:#7d6c4e50;pointer-events:none}
 .engine-action{position:absolute;right:max(40px,env(safe-area-inset-right));bottom:max(46px,env(safe-area-inset-bottom));border-radius:50%;font-size:11px;letter-spacing:.1em;padding:0}
+/* These controls expose engine-demo residency deliberately, separate from game touch actions. */
+#world-directory{position:absolute;left:36px;top:205px;max-width:340px;padding:14px 16px;background:#11111dcc;border:1px solid #a6957633;border-radius:6px;font-size:11px;color:#bbb4c9;line-height:1.8}
+#world-directory summary{cursor:pointer;color:#d1bf9b;letter-spacing:.12em;font-size:10px;text-transform:uppercase}
+#world-directory output{display:block}#world-directory p{margin:7px 0}#world-directory button{padding:6px 9px;font-size:10px;margin-top:8px}
+#world-slots,#transfer-time{font-size:10px;color:#8f8ca6}button:disabled{opacity:.4;cursor:default}
 #error{position:absolute;top:40%;left:10%;width:80%;padding:24px;border:1px solid #bf8a6e;background:#241b24;z-index:3}
-@media(max-width:650px){header{left:20px;top:22px}.subtitle{max-width:180px;font-size:10px}nav{right:15px;top:24px}nav button{padding:9px;font-size:11px}h1{font-size:30px}.eyebrow{font-size:8px}footer{bottom:150px;width:90%}.hint{font-size:10px}.engine-joystick{left:22px}.engine-action{right:25px}}
+@media(max-width:650px){header{left:20px;top:22px}.subtitle{max-width:180px;font-size:10px}nav{right:15px;top:24px}nav button{padding:9px;font-size:11px}h1{font-size:30px}.eyebrow{font-size:8px}footer{bottom:150px;width:90%}.hint{font-size:10px}.engine-joystick{left:22px}.engine-action{right:25px}#world-directory{left:20px;top:145px;max-width:245px;padding:9px 12px;font-size:10px}#world-directory:not([open]){background:#11111dcc}footer{bottom:215px}.hint{max-width:300px;margin:auto}}
 </style>
 </head>
 <body>
-<canvas id="world" tabindex="0" aria-label="Interactive WebGL courtyard. Use WASD or arrows to walk, E to change the lantern, B to change the pack response."></canvas>
-<header><div class="eyebrow">ETRNLNINE / First light</div><h1>The First Atrium</h1><div class="subtitle">A house begins with its foundation.<br>A world begins with a little movement.</div></header>
+<canvas id="world" tabindex="0" aria-label="Interactive WebGL courtyard. Use WASD or arrows to walk, E to change the lantern, B to change the pack response, F to flit between worlds, G to move the prop."></canvas>
+<header><div class="eyebrow">ETRNLNINE / Between worlds</div><h1>The Amber Atrium</h1><div class="subtitle">Two worlds. One continuous journey.<br>Flit between them; leave a little change behind.</div></header>
 <nav aria-label="Demonstration controls"><button id="pause" aria-pressed="false">Pause</button><button id="restart">New scene</button></nav>
+<details id="world-directory"><summary>World directory</summary><p><output id="directory-status">Preparing worlds…</output><output id="world-slots"></output><output id="gpu-status"></output></p><output id="travel-status">Preparing the first world</output><output id="transfer-time"></output><button id="release-inactive">Release inactive</button> <button id="cancel-flit" disabled>Cancel flit</button></details>
 <div id="controls" aria-label="Touch controls"></div>
-<footer><output id="status" aria-label="Engine status">Opening the house…</output><div class="hint"><kbd>WASD / arrows</kbd> walk &nbsp;·&nbsp; <kbd>mouse</kbd> look &nbsp;·&nbsp; <kbd>E / click</kbd> light &nbsp;·&nbsp; <kbd>B</kbd> pack<br>Touch controls available · Gamepad: left stick / A / X</div></footer>
+<footer><output id="status" aria-label="Engine status">Opening the house…</output><div class="hint"><kbd>WASD / arrows</kbd> walk &nbsp;·&nbsp; <kbd>mouse</kbd> look &nbsp;·&nbsp; <kbd>E / click</kbd> light &nbsp;·&nbsp; <kbd>B</kbd> pack<br><kbd>F</kbd> flit · <kbd>X</kbd> cancel · <kbd>G</kbd> move prop<br>Gamepad: left stick / A light / B flit / X pack / Y cancel</div></footer>
 <div id="error" role="alert" hidden></div>
 <script type="module">
 // Source: engine/basement/world.js
@@ -493,6 +499,18 @@ class Renderer {
     const batch = new InstanceBatch(this, world, capacity); this.batches.add(batch); return batch;
   }
 
+  /**
+   * Prepare a world's retained GPU data before it becomes an active destination.
+   * Content loaders use this public contract rather than manipulating GL buffers.
+   * Camera-specific culling is refreshed again on render; the underlying geometry is resident.
+   */
+  prepare(batch) {
+    if (this.disposed || this.lost) throw new Error('GPU is not ready for world preparation');
+    if (batch.renderer !== this || batch.disposed) throw new Error('Invalid preparation batch');
+    this.resize(); batch.world.resolve();
+    const view = this.view(); batch.sync(view.halfWidth, view.halfHeight);
+  }
+
   /** Resize backing pixels only when necessary. CSS layout belongs to the application. */
   resize() {
     const ratio = Math.min(globalThis.devicePixelRatio || 1, this.pixelRatio);
@@ -626,6 +644,8 @@ class InstanceBatch {
     const { gl, stats } = this.renderer;
     gl.deleteBuffer(this.buffer); gl.deleteVertexArray(this.vao);
     stats.buffers--; stats.vaos--; this.renderer.batches.delete(this);
+    // Disposal releases CPU storage too, even if a caller retains the old handle.
+    this.data = null; this.world = null;
   }
 }
 
@@ -650,12 +670,77 @@ class Basement {
     catch (error) { this.renderer.dispose(); throw error; }
   }
   /** Empty worlds have no game content and allocate no GPU batch until requested. */
-  createWorld() { return new World(this.identities.create('world'), this.identities); }
+  createWorld(id = this.identities.create('world')) { return new World(id, this.identities); }
   /** Release devices before the surface resources they target. */
   dispose() { this.input.dispose(); this.renderer.dispose(); }
 }
 
 return {Basement};
+})();
+// Source: engine/lobby/preparation.js
+const module9=(()=>{
+/**
+ * Lobby / preparation: cooperatively budgeted generator work in the existing frame loop.
+ * Each next() must be a small, synchronous chunk; JavaScript cannot preempt a huge chunk.
+ * Both a step ceiling and a time budget apply. No timers or secondary animation loop.
+ */
+class PreparationQueue {
+  /** Budget is milliseconds per frame; next() count is also bounded for reliable tests. */
+  constructor({ budgetMs = 2, maxSteps = 2, now = () => performance.now() } = {}) {
+    if (!(budgetMs > 0) || !Number.isFinite(budgetMs) || !Number.isInteger(maxSteps) || maxSteps < 1) {
+      throw new RangeError('Preparation requires a positive time budget and integer step limit');
+    }
+    this.budgetMs = budgetMs; this.maxSteps = maxSteps; this.now = now;
+    this.jobs = new Set(); this.disposed = false;
+    this.stats = { steps: 0, peakChunkMs: 0, cancelled: 0 };
+  }
+
+  /** Queue an iterator; its finally block must release partially prepared resources. */
+  enqueue(iterator, { signal } = {}) {
+    if (this.disposed) return Promise.reject(new Error('Preparation queue is disposed'));
+    return new Promise((resolve, reject) => {
+      const job = { iterator, resolve, reject, signal, abort: null };
+      job.abort = () => {
+        if (!this.jobs.delete(job)) return;
+        signal?.removeEventListener('abort', job.abort);
+        this.stats.cancelled++;
+        try { iterator.return?.(); } catch (error) { reject(error); return; }
+        reject(new DOMException('Preparation cancelled', 'AbortError'));
+      };
+      this.jobs.add(job); signal?.addEventListener('abort', job.abort, { once: true });
+      if (signal?.aborted) job.abort();
+    });
+  }
+
+  /** Advance jobs round-robin; a long chunk is measured rather than hidden by the budget. */
+  advance() {
+    const start = this.now(); let steps = 0;
+    while (this.jobs.size && steps < this.maxSteps && this.now() - start < this.budgetMs) {
+      const job = this.jobs.values().next().value;
+      this.jobs.delete(job); this.jobs.add(job);
+      const before = this.now();
+      try {
+        const result = job.iterator.next();
+        if (result.done) {
+          this.jobs.delete(job); job.signal?.removeEventListener('abort', job.abort); job.resolve(result.value);
+        }
+      } catch (error) {
+        this.jobs.delete(job); job.signal?.removeEventListener('abort', job.abort); job.reject(error);
+      }
+      steps++; this.stats.steps++;
+      this.stats.peakChunkMs = Math.max(this.stats.peakChunkMs, this.now() - before);
+    }
+  }
+
+  /** Cancel every queued iterator, running its cleanup even during engine shutdown. */
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    for (const job of [...this.jobs]) job.abort();
+  }
+}
+
+return {PreparationQueue};
 })();
 // Source: engine/lobby/runtime.js
 const module8=(()=>{
@@ -664,11 +749,14 @@ const module8=(()=>{
  * All elapsed values are seconds. The engine advances fixed simulation steps and
  * interpolates render poses; long browser suspensions never trigger unlimited work.
  */
+const { PreparationQueue } = module9;
+
 class Runtime {
   /** Inject scheduling for deterministic lifecycle tests; browser defaults allocate no loop yet. */
   constructor({ request = cb => requestAnimationFrame(cb), cancel = id => cancelAnimationFrame(id), step = 1 / 60, maxSteps = 5 } = {}) {
     this.request = request; this.cancel = cancel; this.step = step; this.maxSteps = maxSteps;
-    this.phases = { input: new Set(), update: new Set(), render: new Set(), pause: new Set() };
+    this.preparation = new PreparationQueue();
+    this.phases = { boundary: new Set(), input: new Set(), update: new Set(), render: new Set(), pause: new Set() };
     this.reasons = new Set(); this.running = false; this.disposed = false;
     this.frameId = null; this.last = null; this.accumulator = 0; this.time = 0;
     this.stats = { frames: 0, steps: 0, droppedSeconds: 0 };
@@ -713,13 +801,14 @@ class Runtime {
     }
   }
 
-  /** Execute input -> bounded fixed updates -> interpolated render -> schedule next frame. */
+  /** Execute budgeted preparation -> input -> boundary/fixed updates -> interpolated render. */
   tick(milliseconds) {
     if (!this.running) return;
     this.frameId = null;
     try {
       const elapsed = this.last === null ? 0 : Math.max(0, (milliseconds - this.last) / 1000);
       this.last = milliseconds;
+      if (!this.reasons.size) this.preparation.advance();
       this.emit('input');
       if (!this.reasons.size) {
         const admitted = Math.min(elapsed, this.step * this.maxSteps);
@@ -727,6 +816,7 @@ class Runtime {
         this.accumulator += admitted;
         let count = 0;
         while (this.accumulator + 1e-10 >= this.step && count < this.maxSteps) {
+          this.emit('boundary', this.time);
           this.emit('update', this.step, this.time);
           this.accumulator = Math.max(0, this.accumulator - this.step);
           this.time += this.step; this.stats.steps++; count++;
@@ -743,7 +833,7 @@ class Runtime {
   /** Stop scheduling and remove registrations, allowing the composed engine to release resources. */
   dispose() {
     if (this.disposed) return;
-    this.stop(); this.disposed = true;
+    this.stop(); this.preparation.dispose(); this.disposed = true;
     for (const phase of Object.values(this.phases)) phase.clear();
     this.reasons.clear();
   }
@@ -751,16 +841,158 @@ class Runtime {
 
 return {Runtime};
 })();
+// Source: engine/directory/residency.js
+const module11=(()=>{
+/**
+ * Directory / residency: bounded prepared worlds, preparation tickets, and compact state.
+ * Factories are game/library supplied. They return {world, ready, capture, dispose, ...}.
+ * Pending and ready records both consume a slot. Tickets pin records until released.
+ * Snapshots are JSON data, never live entities/GPU handles, and have a separate byte budget.
+ */
+class WorldResidency {
+  /** capacity counts managed world contexts; maxStateBytes bounds serialized snapshot data. */
+  constructor({ capacity = 2, maxStateBytes = 65536 } = {}) {
+    if (!Number.isInteger(capacity) || capacity < 1) throw new RangeError('World capacity must be a positive integer');
+    if (!Number.isInteger(maxStateBytes) || maxStateBytes < 0) throw new RangeError('Snapshot byte budget must be a nonnegative integer');
+    this.capacity = capacity; this.maxStateBytes = maxStateBytes;
+    this.definitions = new Map(); this.records = new Map(); this.serial = 0; this.disposed = false;
+    this.stats = { evictions: 0, preparations: 0, snapshotBytes: 0, peakResident: 0 };
+  }
+
+  /** Register an inert world factory. Each definition retains at most one bounded snapshot. */
+  register(key, factory) {
+    if (this.disposed) throw new Error('Residency is disposed');
+    if (this.definitions.has(key)) throw new Error(`Duplicate world definition: ${key}`);
+    this.definitions.set(key, { factory, snapshot: null, bytes: 0 });
+  }
+
+  /**
+   * Acquire a ticket immediately. Await ticket.ready, then read ticket.value.
+   * Call release even if preparation fails. Shared tickets coalesce work; one owner
+   * cancelling cannot abort preparation while another owner still needs it.
+   */
+  prepare(key) {
+    if (this.disposed) throw new Error('Residency is disposed');
+    const definition = this.definitions.get(key);
+    if (!definition) throw new Error(`Unavailable world: ${key}`);
+    let record = this.records.get(key);
+    if (!record) {
+      if (this.records.size >= this.capacity) {
+        const candidate = [...this.records.values()].filter(r => !r.owners.size)
+          .sort((a,b) => a.used - b.used)[0];
+        if (!candidate) throw new Error('World residency budget is pinned');
+        this.evict(candidate, true);
+      }
+      record = { key, owners: new Set(), used: ++this.serial, value: null, status: 'preparing',
+        controller: new AbortController(), promise: null, error: null };
+      this.records.set(key, record); this.stats.preparations++;
+      this.stats.peakResident = Math.max(this.stats.peakResident, this.records.size);
+      // Defer factory execution so the caller obtains a cancellable ticket first.
+      record.promise = Promise.resolve().then(() => {
+        if (record.controller.signal.aborted) throw new DOMException('Preparation cancelled', 'AbortError');
+        const state = definition.snapshot === null ? null : JSON.parse(definition.snapshot);
+        return definition.factory({ signal: record.controller.signal, state });
+      }).then(value => {
+        if (this.records.get(key) !== record || record.controller.signal.aborted) {
+          value.dispose(); throw new DOMException('Stale world preparation', 'AbortError');
+        }
+        if (!value?.world || value.world.disposed || value.ready?.geometry !== true || value.ready?.collision !== true || value.ready?.landing !== true
+          || typeof value.capture !== 'function' || typeof value.dispose !== 'function') {
+          value?.dispose?.(); throw new Error(`World ${key} did not satisfy destination readiness`);
+        }
+        record.value = value; record.status = 'ready';
+        // Resolve readiness without the resource itself: a retained completed promise
+        // must not pin an evicted world. Live access always goes through ticket.value.
+        return undefined;
+      }).catch(error => {
+        record.status = 'failed'; record.error = error;
+        if (this.records.get(key) === record) this.records.delete(key);
+        throw error;
+      });
+      // Cancellation may release the only ticket before a caller awaits its promise.
+      // Mark the shared rejection observed; individual ticket.ready still rejects normally.
+      record.promise.catch(() => {});
+    }
+    const owner = {}; record.owners.add(owner); record.used = ++this.serial;
+    let released = false;
+    return {
+      key,
+      get value() { return released ? null : record.value; },
+      ready: record.promise.then(() => {
+        if (released) throw new DOMException('Ticket released', 'AbortError');
+      }),
+      release: () => {
+        if (released) return;
+        released = true; record.owners.delete(owner); record.used = ++this.serial;
+        if (!record.owners.size && record.status === 'preparing' && this.records.get(key) === record) this.evict(record, false);
+      },
+    };
+  }
+
+  /**
+   * Evict only unpinned records. Capture/encode first: if serialization or the state
+   * budget fails, leave the resident world intact rather than silently losing changes.
+   */
+  evict(record, save) {
+    if (record.owners.size) throw new Error(`World ${record.key} is pinned`);
+    const definition = this.definitions.get(record.key);
+    if (save && record.value) {
+      const snapshot = JSON.stringify(record.value.capture());
+      if (snapshot === undefined) throw new Error('World capture must return JSON data');
+      const bytes = new TextEncoder().encode(snapshot).byteLength;
+      if (this.stats.snapshotBytes - definition.bytes + bytes > this.maxStateBytes) throw new Error('World snapshot byte budget exceeded');
+      this.stats.snapshotBytes += bytes - definition.bytes;
+      definition.snapshot = snapshot; definition.bytes = bytes;
+    }
+    this.records.delete(record.key); record.controller.abort();
+    const value = record.value; record.value = null; record.status = 'evicted';
+    value?.dispose(); this.stats.evictions++;
+  }
+
+  /** Explicitly release every inactive/unpinned world; active/preparation owners are protected. */
+  trim() {
+    for (const record of [...this.records.values()]) if (!record.owners.size) this.evict(record, true);
+  }
+
+  /** Remove a scene's definition and snapshot after its tickets have been released. */
+  unregister(key) {
+    const record = this.records.get(key), definition = this.definitions.get(key);
+    if (record) this.evict(record, false);
+    if (definition) this.stats.snapshotBytes -= definition.bytes;
+    this.definitions.delete(key);
+  }
+
+  /** Bounded diagnostic copy, requested by UI/tests rather than allocated every frame. */
+  inspect() {
+    return { capacity: this.capacity, resident: this.records.size, ...this.stats,
+      worlds: [...this.records.values()].map(r => ({ key: r.key, status: r.status, owners: r.owners.size })) };
+  }
+
+  /** Final shutdown invalidates all tickets and cleans ready/partially prepared worlds. */
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    for (const record of this.records.values()) {
+      record.controller.abort(); const value = record.value; record.value = null; value?.dispose();
+    }
+    this.records.clear(); this.definitions.clear(); this.stats.snapshotBytes = 0;
+  }
+}
+
+return {WorldResidency};
+})();
 // Source: engine/directory/directory.js
-const module9=(()=>{
+const module10=(()=>{
 /**
  * Directory: named libraries, lazy shared resources, and explicit world ownership.
  * Factories come from callers. Nothing here imports a named toy or game asset.
  * A lease pins one resource; releasing the last lease destroys it immediately.
  */
+const { WorldResidency } = module11;
+
 class Directory {
   /** Registration is inert: no world or GPU asset is allocated until requested. */
-  constructor() { this.libraries = new Map(); this.resources = new Map(); this.worlds = new Map(); this.disposed = false; }
+  constructor() { this.residency = new WorldResidency(); this.libraries = new Map(); this.resources = new Map(); this.worlds = new Map(); this.disposed = false; }
 
   /** Register a unique library factory; duplicate names are an error, not a silent override. */
   register(name, factory) {
@@ -805,17 +1037,20 @@ class Directory {
     return world;
   }
 
-  /** Release one adopted world. Safe when scene cleanup and engine cleanup overlap. */
-  releaseWorld(id) {
+  /**
+   * Release an adopted world. Async loaders pass expected to prevent a stale cleanup
+   * from deleting a newer reconstruction that intentionally reuses the same world ID.
+   */
+  releaseWorld(id, expected) {
     const world = this.worlds.get(id);
-    if (!world) return;
+    if (!world || (expected && world !== expected)) return;
     this.worlds.delete(id); world.dispose();
   }
 
   /** Final owner cleanup also invalidates outstanding leases; release closures remain harmless. */
   dispose() {
     if (this.disposed) return;
-    this.disposed = true;
+    this.disposed = true; this.residency.dispose();
     for (const world of this.worlds.values()) world.dispose();
     for (const resource of this.resources.values()) resource.value.dispose();
     this.worlds.clear(); this.resources.clear(); this.libraries.clear();
@@ -825,7 +1060,7 @@ class Directory {
 return {Directory};
 })();
 // Source: engine/penthouse/toys.js
-const module11=(()=>{
+const module13=(()=>{
 /**
  * Penthouse / toys: reusable procedural box-based architecture and actor assemblies.
  * These are early test toys, not Freelancer art or the final procedural humanoid.
@@ -882,7 +1117,7 @@ function actor({ world, color = [0.42,0.34,0.58], bagColor = [0.54,0.30,0.17] })
 return {box,pavilion,actor};
 })();
 // Source: engine/penthouse/controls.js
-const module12=(()=>{
+const module14=(()=>{
 /**
  * Penthouse / controls: parameterized HTML control templates over Basement actions.
  * HTML is intentional for accessible interface text; the world remains pure WebGL.
@@ -944,10 +1179,15 @@ class Joystick {
 
 class ActionButton {
   /** A held button template; press edges are generated once by Basement input aggregation. */
-  constructor({ input, sourceId, action, host, label = 'Action', diameter = 72 }) {
+  constructor({ input, sourceId, action, host, label = 'Action', diameter = 72, placement = {} }) {
     this.life = new Lifetime(); this.element = document.createElement('button');
     this.element.className = 'engine-action'; this.element.type = 'button'; this.element.textContent = label;
-    this.element.style.width = this.element.style.height = `${diameter}px`; host.append(this.element);
+    this.element.style.width = this.element.style.height = `${diameter}px`;
+    // Optional edge offsets are CSS pixels; omitted offsets retain the game's responsive CSS.
+    for (const edge of ['left','right','top','bottom']) {
+      if (placement[edge] !== undefined) this.element.style[edge] = `${placement[edge]}px`;
+    }
+    host.append(this.element);
     /** State and appearance are instance-local, with no shared pressed flags. */
     const release = () => {
       input.removeSource(sourceId); this.element.classList.remove('held');
@@ -977,13 +1217,13 @@ class ActionButton {
 return {Joystick,ActionButton};
 })();
 // Source: engine/penthouse/penthouse.js
-const module10=(()=>{
+const module12=(()=>{
 /**
  * Penthouse assembly: expose inert libraries without coupling Directory to toy names.
  * ETRNLNINE installs these factories; games request them through Directory.
  */
-const { pavilion, actor, box } = module11;
-const { Joystick, ActionButton } = module12;
+const { pavilion, actor, box } = module13;
+const { Joystick, ActionButton } = module14;
 
 class Penthouse {
   /** Catalog creation is inert: allocation begins only when a factory is requested. */
@@ -1010,8 +1250,8 @@ const module1=(()=>{
 const { Basement } = module2;
 const { Lifetime } = module5;
 const { Runtime } = module8;
-const { Directory } = module9;
-const { Penthouse } = module10;
+const { Directory } = module10;
+const { Penthouse } = module12;
 
 class ETRNLNINE {
   /** Build an empty engine. No implicit game start or scene-specific allocations. */
@@ -1045,8 +1285,157 @@ class ETRNLNINE {
 
 return {ETRNLNINE};
 })();
+// Source: engine/basement/transfer.js
+const module18=(()=>{
+/**
+ * Basement / transfer: validated, synchronous movement of one attachment tree.
+ * No loading, scheduling, game rules, callbacks during mutation, or resource ownership.
+ * Lobby calls this at a simulation boundary after Directory prepares the destination.
+ */
+
+/**
+ * Move a root and all descendants without changing object references or entity IDs.
+ * landing uses destination world units/radians. Omitted z/yaw preserve current values.
+ * validate is a pure destination query: return true or a human-readable refusal string.
+ * All fallible validation happens before membership changes; failures leave both worlds intact.
+ */
+function transferTree({ source, destination, root, landing, validate = () => true }) {
+  if (source.disposed || destination.disposed) throw new Error('Transfer world is disposed');
+  if (source === destination) throw new Error('Transfer requires distinct worlds');
+  if (source.identities !== destination.identities) throw new Error('Worlds use different identity domains');
+  if (source.entities.get(root.id) !== root || root.parent) throw new Error('Transfer requires a source-owned root');
+  const pose = { x: landing.x, y: landing.y, z: landing.z ?? root.z, yaw: landing.yaw ?? root.yaw };
+  if (!Object.values(pose).every(Number.isFinite)) throw new Error('Landing must contain finite coordinates');
+
+  // World insertion order is parent-before-child. One pass gathers the entire tree,
+  // preserving that order for destination transform resolution. Unrelated actors stay put.
+  const members = [], ids = new Set([root.id]);
+  for (const entity of source.entities.values()) {
+    if (entity !== root && !ids.has(entity.parent?.id)) continue;
+    if (entity.worldId !== source.id) throw new Error('Inconsistent source membership');
+    if (destination.entities.has(entity.id)) throw new Error('Destination identity collision');
+    members.push(entity); ids.add(entity.id);
+  }
+  const result = validate(destination, pose, root);
+  if (result !== true) throw new Error(typeof result === 'string' ? result : 'Destination landing is blocked');
+
+  // No user callbacks run in this mutation block. JavaScript executes it synchronously;
+  // simulation/render observers can see only the fully committed destination membership.
+  for (const entity of members) source.entities.delete(entity.id);
+  Object.assign(root, pose);
+  for (const entity of members) {
+    entity.worldId = destination.id; destination.entities.set(entity.id, entity);
+    // Reset interpolation history: never draw a streak through the old world/anchor.
+    Object.assign(entity.previous, { x: entity.x, y: entity.y, z: entity.z, yaw: entity.yaw });
+  }
+  source.revision++; destination.revision++;
+  return Object.freeze({ sourceId: source.id, destinationId: destination.id,
+    rootId: root.id, entityIds: Object.freeze(members.map(entity => entity.id)) });
+}
+
+return {transferTree};
+})();
+// Source: engine/lobby/travel.js
+const module17=(()=>{
+/**
+ * Lobby / travel: asynchronous preparation becomes a synchronous boundary commit.
+ * It consumes generic residency tickets; it does not import Directory or game content.
+ * The active ticket pins the source until a successful transfer replaces it.
+ */
+const { transferTree } = module18;
+
+class WorldTravel {
+  /** Adopt an already-ready initial ticket/root. The owner must call advance at a boundary. */
+  constructor({ residency, initial, root, now = () => performance.now() }) {
+    if (!initial.value || initial.value.world.entities.get(root.id) !== root) throw new Error('Initial travel ownership is invalid');
+    this.residency = residency; this.current = initial; this.root = root; this.now = now;
+    this.pending = null; this.listeners = new Set(); this.disposed = false;
+    this.stats = { committed: 0, cancelled: 0, failed: 0, waitMs: 0, transferMs: 0, observerErrors: 0 };
+    this.last = { status: 'idle', message: 'Ready to flit' };
+  }
+
+  /** Observe completed commits only; listeners see fully coherent membership and active ownership. */
+  onCommit(callback) {
+    if (this.disposed) throw new Error('Travel is disposed');
+    this.listeners.add(callback); return () => this.listeners.delete(callback);
+  }
+
+  /**
+   * Latest request wins. Preparing/ready requests never mutate the active actor.
+   * A landing object is copied; a pure landing resolver instead evaluates the current
+   * actor/destination at commit. This supports a moving source without stale coordinates.
+   */
+  request(key, landing, validate) {
+    if (this.disposed) throw new Error('Travel is disposed');
+    this.cancel();
+    if (key === this.current.key) return;
+    let ticket;
+    try { ticket = this.residency.prepare(key); }
+    catch (error) { this.fail(error); return; }
+    const pending = { ticket, landing: typeof landing === 'function' ? landing : { ...landing }, validate, ready: false, started: this.now() };
+    this.pending = pending; this.last = { status: 'preparing', message: 'Preparing destination' };
+    ticket.ready.then(() => {
+      if (this.pending !== pending || this.disposed) return;
+      pending.ready = true; this.last = { status: 'ready', message: 'Awaiting simulation boundary' };
+    }).catch(error => {
+      if (this.pending !== pending || this.disposed) return;
+      this.pending = null; ticket.release(); this.fail(error);
+    });
+  }
+
+  /** Cancel before commit, including a ready request waiting behind a pause. */
+  cancel() {
+    if (!this.pending) return;
+    this.pending.ticket.release(); this.pending = null; this.stats.cancelled++;
+    this.last = { status: 'cancelled', message: 'Flit cancelled; source preserved' };
+  }
+
+  /** Store a readable refusal without throwing through the game loop or consuming game costs. */
+  fail(error) {
+    this.stats.failed++; this.last = { status: 'failed', message: error instanceof Error ? error.message : String(error) };
+  }
+
+  /**
+   * Call only between fixed simulation steps. Validate again here, not merely when
+   * preparation completed: landing geometry may have changed while the request waited.
+   */
+  advance(simulationTime) {
+    const pending = this.pending;
+    if (!pending?.ready || this.disposed) return;
+    const source = this.current, destination = pending.ticket;
+    let event;
+    const before = this.now();
+    try {
+      event = transferTree({ source: source.value.world, destination: destination.value.world,
+        root: this.root, landing: typeof pending.landing === 'function' ? pending.landing(this.root, destination.value) : pending.landing,
+        validate: (world, pose, root) => pending.validate ? pending.validate(world, pose, root, destination.value) : true });
+    } catch (error) {
+      this.pending = null; destination.release(); this.fail(error); return;
+    }
+    this.current = destination; this.pending = null; source.release();
+    this.stats.committed++; this.stats.waitMs = this.now() - pending.started;
+    this.stats.transferMs = this.now() - before;
+    this.last = { status: 'committed', message: 'Flit complete', event: Object.freeze({ ...event, simulationTime }) };
+    for (const listener of this.listeners) {
+      try { listener(this.last.event); }
+      catch (error) {
+        // Notification failures cannot undo an already completed membership transaction.
+        this.stats.observerErrors++; this.last.message = `Flit complete; observer failed: ${error.message}`;
+      }
+    }
+  }
+
+  /** Release active/preparation pins and notifications without disposing game-owned actor state. */
+  dispose() {
+    if (this.disposed) return;
+    this.cancel(); this.current.release(); this.listeners.clear(); this.disposed = true;
+  }
+}
+
+return {WorldTravel};
+})();
 // Source: engine/basement/geometry.js
-const module14=(()=>{
+const module20=(()=>{
 /** Basement / geometry: pure horizontal collision helpers, with no world or game dependency. */
 
 /** Does a horizontal circle overlap an axis-aligned box? Touching is permitted. */
@@ -1059,22 +1448,26 @@ function circleOverlapsBox(x, y, radius, box) {
 return {circleOverlapsBox};
 })();
 // Source: examples/atrium/layout.js
-const module15=(()=>{
+const module21=(()=>{
 /**
  * Atrium example / authored layout. This is game content, deliberately outside engine/.
  * Change these placements/materials without editing renderer or toy implementations.
+ * This generator yields actual construction chunks to Lobby preparation. It is not a timer.
  * This little courtyard is an engine exercise, not a replacement Enni Cole asset.
  */
-function buildLayout(engine, world) {
+function* buildLayout(engine, world, profile) {
   const directory = engine.directory;
   /** Every visible object is requested through registered Penthouse library factories. */
   const box = options => directory.create('toy.box', { world, ...options });
-  const stone = [0.19,0.18,0.24], gold = [0.62,0.42,0.19];
-  box({ z: -0.25, size: [58,68,0.5], color: [0.12,0.115,0.18] });
+  const stone = profile.stone, gold = profile.trim;
+  box({ z: -0.25, size: [58,68,0.5], color: profile.floor });
   // Inlaid paths define a readable floor, all retained geometry rather than painted textures.
   box({ y: -5, z: 0.015, size: [7,38,0.025], color: [0.22,0.20,0.25] });
   for (const x of [-3.6,3.6]) box({ x, y:-5, z:0.035, size:[0.05,38,0.035], color:gold });
-  directory.create('toy.pavilion', { world, y: 11, width: 24, depth: 9, height: 7 });
+  yield; // Floor and paths are one bounded preparation chunk.
+  directory.create('toy.pavilion', { world, y: 11, width: 24, depth: 9, height: profile.height,
+    stone, trim:gold, glow:profile.glow });
+  yield; // Architecture is prepared separately from side galleries and collision data.
   const colliders = [{ x:0, y:15.2, width:24, depth:0.7 }];
   for (const x of [-12,-6,6,12]) colliders.push({ x, y:6.5, width:0.6, depth:0.6 });
   // Side galleries frame the courtyard without teaching the engine what an atrium is.
@@ -1084,129 +1477,305 @@ function buildLayout(engine, world) {
     box({ x, y:3, z:4.3, size:[2.4,29.5,0.3], color:gold });
     colliders.push({ x, y:3, width:2, depth:29 });
     for (let y=-9; y<=15; y+=4) {
-      box({ x:x-side*1.05, y, z:2.3, size:[0.06,1.8,2.7], color:[0.34,0.15,0.23], emission:0.55 });
-      box({ x:x-side*1.13, y, z:3.7, size:[0.08,2,0.07], color:[1,0.42,0.19], emission:2 });
+      box({ x:x-side*1.05, y, z:2.3, size:[0.06,1.8,2.7], color:profile.window, emission:0.55 });
+      box({ x:x-side*1.13, y, z:3.7, size:[0.08,2,0.07], color:profile.glow, emission:2 });
     }
     for (const y of [-12,1]) {
       const px = side * 10;
       box({ x:px, y, z:0.55, size:[2.4,2.4,1.1], color:gold });
       for (let level=0;level<4;level++) box({ x:px, y, z:1.4+level*0.65,
-        size:[2.2-level*0.4,2.2-level*0.4,0.9], color:[0.045,0.12+level*0.01,0.10] });
+        size:[2.2-level*0.4,2.2-level*0.4,0.9], color:profile.foliage });
       colliders.push({ x:px, y, width:2.4, depth:2.4 });
     }
     for (const y of [-18,-4,9]) {
       box({ x:side*15, y, z:1.8, size:[0.18,0.18,3.6], color:gold });
-      box({ x:side*15, y, z:3.7, size:[0.6,0.6,0.8], color:[1,0.55,0.24], emission:3 });
+      box({ x:side*15, y, z:3.7, size:[0.6,0.6,0.8], color:profile.glow, emission:3 });
       box({ x:side*15, y, z:4.15, size:[0.9,0.9,0.12], color:gold });
     }
+    yield; // One gallery/planting side per chunk; no per-frame full-world rebuild.
   }
   const lantern = box({ x:0,y:2,z:0.65,size:[1.9,1.9,1.3],color:stone });
   box({ parent:lantern,z:0.85,size:[2.1,2.1,0.22],color:gold });
   const crystal = box({ parent:lantern,z:1.75,yaw:Math.PI/4,size:[0.7,0.7,1.4],color:[0.25,0.62,1],emission:2 });
   colliders.push({x:0,y:2,width:2.1,depth:2.1});
-  return { colliders, crystal };
+  const prop = box({x:6,y:-12,z:0.65,size:[2,2,1.3],color:gold});
+  const propCollider = {x:6,y:-12,width:2,depth:2}; colliders.push(propCollider);
+  if (profile.ethereal) {
+    // Alternate geometry makes this a distinct world, not just a palette uniform swap.
+    for (const x of [-7,7]) {
+      box({x,y:-3,z:2.5,yaw:Math.PI/4,size:[0.7,0.7,3.8],color:[0.22,0.50,0.67],emission:0.5});
+      colliders.push({x,y:-3,width:1,depth:1});
+    }
+  }
+  yield; // All geometry and horizontal collision information now exist.
+  return { colliders, crystal, prop, propCollider };
 }
 
 return {buildLayout};
 })();
-// Source: examples/atrium/scene.js
-const module13=(()=>{
+// Source: examples/atrium/worlds.js
+const module19=(()=>{
 /**
- * Atrium example / game behavior. Owns one world, one GPU lease, controls and phase hooks.
- * This is intentionally outside engine/: movement rules, obstacles, palette changes,
- * and the player identity can all change without editing ETRNLNINE or its levels.
+ * Atrium example / world definitions: authored realms, reconstruction and state schema.
+ * Directory receives factories, not these names. Lobby budgets actual procedural work.
+ * Persisted data is deliberately small: light selection, crystal rotation and prop position.
  */
 const { Lifetime } = module5;
-const { circleOverlapsBox } = module14;
-const { buildLayout } = module15;
+const { circleOverlapsBox } = module20;
+const { buildLayout } = module21;
 
-/** Create a self-contained scene. dispose() releases every registration and owned resource. */
-function createScene(engine, { controlsHost, onStatus = () => {} }) {
-  const life = new Lifetime(), { basement, lobby, directory } = engine;
-  const world = directory.adopt(basement.createWorld());
-  life.own(() => directory.releaseWorld(world.id));
-  try {
-    const layout = buildLayout(engine, world);
-    const actor = directory.create('toy.actor', { world }); actor.root.y = -8;
-    // Resolve the edited start pose without interpolating from the toy's origin.
-    for (const entity of world.entities.values()) Object.assign(entity.previous,
-      { x:entity.x, y:entity.y, z:entity.z, yaw:entity.yaw });
-    const lease = directory.acquire(`batch:${world.id}`, () => basement.renderer.createBatch(world));
-    life.own(lease.release);
-    const input = basement.input, renderer = basement.renderer;
-    input.bind({
-      move: { kind:'vector', negativeX:['KeyA','ArrowLeft'], positiveX:['KeyD','ArrowRight'],
-        negativeY:['KeyW','ArrowUp'], positiveY:['KeyS','ArrowDown'], axes:[0,1], deadZone:0.18 },
-      interact: { kind:'button', keys:['KeyE'], pointerButtons:[0], buttons:[0] },
-      load: { kind:'button', keys:['KeyB'], buttons:[2] },
-    });
-    life.own(() => input.bind({}));
-    const stick = directory.create('control.joystick', { input, host:controlsHost,
-      sourceId:`${world.id}:stick`, action:'move', radius:52 });
-    life.own(() => stick.dispose());
-    const button = directory.create('control.button', { input, host:controlsHost,
-      sourceId:`${world.id}:button`, action:'interact', label:'Light', diameter:70 });
-    life.own(() => button.dispose());
-    life.own(lobby.on('pause', () => { stick.cancel(); button.cancel(); }));
+/** Immutable-by-convention authoring profiles; runtime mutable state is created per world. */
+const PROFILES = [
+  { key:'amber',name:'The Amber Atrium',stone:[0.24,0.18,0.20],trim:[0.68,0.43,0.18],floor:[0.14,0.115,0.14],
+    glow:[1,0.47,0.17],window:[0.38,0.15,0.16],foliage:[0.045,0.14,0.10],height:7,ethereal:false,ambient:[0.15,0.11,0.15] },
+  { key:'violet',name:'The Violet Court',stone:[0.14,0.16,0.31],trim:[0.35,0.56,0.70],floor:[0.075,0.09,0.18],
+    glow:[0.24,0.58,1],window:[0.15,0.19,0.46],foliage:[0.10,0.20,0.27],height:8.5,ethereal:true,ambient:[0.09,0.11,0.26] },
+];
 
-    // Renderer inputs are generic numeric light slots; the game authors their arrangement.
-    renderer.camera.x = 0; renderer.camera.y = 0; renderer.camera.halfHeight = 22;
-    renderer.lights.fill(0); renderer.lightColors.fill(0);
-    const lightPositions = [[0,7,5,16],[-15,-4,4,12],[15,-4,4,12],[-15,9,4,12],[15,9,4,12],[0,2,3,10],[-15,-18,4,12],[15,-18,4,12]];
-    for (let i=0;i<lightPositions.length;i++) {
-      renderer.lights.set(lightPositions[i],i*4);
-      renderer.lightColors.set(i===5 ? [0.3,1.1,2.7] : [2.4,0.85,0.3],i*3);
-    }
-    let vx=0, vy=0, distance=0, loaded=true, cool=true, statusAt=-1;
-    const pointerGround = {};
-    /** Keep movement legal against the example's horizontal geometry and world boundary. */
-    const legal = (x,y) => Math.abs(x)<18.3 && y>-23 && y<17
-      && !layout.colliders.some(box => circleOverlapsBox(x,y,0.5,box));
+/** Horizontal destination query shared by movement and final flit validation. */
+function legalLanding(resource, pose) {
+  return Number.isFinite(pose.x) && Number.isFinite(pose.y) && pose.z >= 0 && pose.z < 0.5
+    && Math.abs(pose.x)<18.3 && pose.y>-23 && pose.y<17
+    && !resource.layout.colliders.some(box => circleOverlapsBox(pose.x,pose.y,0.5,box));
+}
 
-    life.own(lobby.on('update', (dt,time) => {
-      world.snapshot();
-      if (input.consume('load')) loaded = !loaded;
-      if (input.consume('interact')) {
-        cool = !cool;
-        const color = cool ? [0.25,0.62,1] : [1,0.34,0.19];
-        layout.crystal.shape.color = color;
-        renderer.lightColors.set(cool ? [0.3,1.1,2.7] : [3,0.5,0.2],15);
-      }
-      const move = input.read('move');
-      // Illustrative steering profile: load slows directional response, widening turns.
-      // This is not the planned mass-distribution/body simulation from section 10.4.
-      const response = 1-Math.exp(-(loaded?4:10)*dt), speed = loaded?6:7;
-      vx += (move.x*speed-vx)*response;
-      vy += (-move.y*speed-vy)*response;
+/** Apply the game-specific light selection to that world's crystal and retained light data. */
+function applyLight(resource) {
+  const {state,profile,layout}=resource;
+  const cool=state.cool;
+  layout.crystal.shape.color=cool ? [0.25,0.62,1] : [1,0.34,0.19];
+  resource.lightColors.set(cool ? [0.3,1.1,2.7] : [3,0.5,0.2],15);
+  // Other light slots differ between the worlds; actor transfer never mutates their profiles.
+  for(let i=0;i<8;i++)if(i!==5)resource.lightColors.set(profile.ethereal?[0.35,0.9,2.5]:[2.4,0.85,0.3],i*3);
+}
+
+/**
+ * Make a factory with stable world identity across eviction/reconstruction.
+ * The generator's finally cleans partial geometry and GPU leases on abort or failure.
+ */
+function worldFactory(engine, profile, id) {
+  return ({signal,state}) => engine.lobby.preparation.enqueue((function* () {
+    const life=new Lifetime(); let complete=false;
+    const world=engine.directory.adopt(engine.basement.createWorld(id));
+    life.own(()=>engine.directory.releaseWorld(world.id,world));
+    try {
+      const saved=state ?? {version:1,cool:true,crystalYaw:0,propX:6};
+      if(saved.version!==1 || typeof saved.cool!=='boolean' || !Number.isFinite(saved.crystalYaw)
+        || ![-6,6].includes(saved.propX))throw new Error('Unsupported world snapshot');
+      const layout=yield* buildLayout(engine,world,profile);
+      layout.crystal.yaw=saved.crystalYaw; layout.prop.x=saved.propX; layout.propCollider.x=saved.propX;
+      world.snapshot(); world.resolve();
+      const lease=engine.directory.acquire(`batch:${world.id}`,()=>engine.basement.renderer.createBatch(world));
+      life.own(lease.release);
+      // Upload before readiness, so committing cannot expose collisionless placeholder art.
+      engine.basement.renderer.prepare(lease.value);
+      yield;
+      const resource={ world,profile,layout,state:saved,batch:lease.value,
+        lights:new Float32Array(32),lightColors:new Float32Array(24),
+        ready:Object.freeze({geometry:true,collision:true,landing:true}),
+        // Capture selected game facts, not transient actors, GPU buffers, or scene objects.
+        capture:()=>({...saved,crystalYaw:layout.crystal.yaw,propX:layout.prop.x}),
+        dispose:()=>life.dispose() };
+      const positions=[[0,7,5,16],[-15,-4,4,12],[15,-4,4,12],[-15,9,4,12],[15,9,4,12],[0,2,3,10],[-15,-18,4,12],[15,-18,4,12]];
+      positions.forEach((position,i)=>resource.lights.set(position,i*4)); applyLight(resource);
+      complete=true; return resource;
+    } finally { if(!complete)life.dispose(); }
+  })(),{signal});
+}
+
+return {PROFILES,legalLanding,applyLight,worldFactory};
+})();
+// Source: examples/atrium/journey.js
+const module16=(()=>{
+/**
+ * Atrium example / journey: game-specific realm links, initial actor and prewarming policy.
+ * Loading/lifetime algorithms live in Directory; transaction scheduling lives in Lobby.
+ * This module chooses the destination and asks for those mechanisms through public contracts.
+ */
+const { Lifetime } = module5;
+const { WorldTravel } = module17;
+const { PROFILES, worldFactory, legalLanding, applyLight } = module19;
+
+/** Own the two realm definitions and their tickets for one example session. */
+function createJourney(engine) {
+  const life=new Lifetime(),{directory,basement,lobby}=engine,residency=directory.residency;
+  const session=basement.identities.create('journey');
+  const keys=PROFILES.map(profile=>`${session}:${profile.key}`);
+  // Register cleanup before acquisitions: release tickets before removing definitions.
+  for(let i=0;i<keys.length;i++){
+    residency.register(keys[i],worldFactory(engine,PROFILES[i],basement.identities.create('world')));
+    life.own(()=>residency.unregister(keys[i]));
+  }
+  let travel=null,actor=null,warm=null,disposed=false;
+  const initial=residency.prepare(keys[0]); life.own(()=>initial.release());
+
+  /** Prewarm the only linked neighbor. A ticket, not a permanent hidden reference, pins it. */
+  function prewarm() {
+    warm?.release();
+    const other=keys.find(key=>key!==travel.current.key);
+    warm=residency.prepare(other);
+    warm.ready.catch(error=>{if(error.name!=='AbortError'&&!disposed)message=error.message;});
+  }
+  let message='Preparing the first world';
+  const ready=initial.ready.then(()=>{
+    if(disposed)return;
+    const resource=initial.value;
+    actor=directory.create('toy.actor',{world:resource.world});actor.root.y=-8;
+    resource.world.snapshot();
+    travel=new WorldTravel({residency,initial,root:actor.root});
+    life.own(()=>travel.dispose());
+    life.own(lobby.on('boundary',time=>travel.advance(time)));
+    life.own(travel.onCommit(()=>{
+      // Destination's active ticket replaces its warm pin. The departed world becomes
+      // an unpinned cache entry, allowing explicit trimming or future LRU eviction.
+      warm?.release();warm=null;message='Flit complete';
+    }));
+    prewarm();message='Ready to flit';
+  });
+  // Disposal order: cancel the warm ticket, release travel/initial pins, then definitions.
+  life.own(()=>{warm?.release();warm=null;});
+
+  return {
+    ready,keys,
+    get actor(){return actor;},
+    get travel(){return travel;},
+    get current(){return travel?.current.value ?? null;},
+    /** Preserve momentum/orientation in the game controller; map the current ground point directly. */
+    flit(){
+      if(!travel)return;
+      const root=actor.root,key=keys.find(candidate=>candidate!==travel.current.key);
+      travel.request(key,()=>({x:root.x,y:root.y,z:root.z,yaw:root.yaw}),(destination,pose,_root,value)=>{
+        return value.world===destination && legalLanding(value,pose) ? true : 'Destination landing is blocked';
+      });
+    },
+    /** User cancellation releases only the request; a prewarm owner may still need that world. */
+    cancel(){travel?.cancel();},
+    /** Release preparation/cache ownership and snapshot inactive worlds; the active pin is retained. */
+    releaseInactive(){travel?.cancel();warm?.release();warm=null;residency.trim();message='Inactive geometry released; changes retained';},
+    /** Change only the active world's authored state, for persistence demonstrations. */
+    toggleLight(){const value=travel?.current.value;if(value){value.state.cool=!value.state.cool;applyLight(value);}},
+    /** Move the example prop between two legal authored positions; refuse overlap with the actor. */
+    moveProp(){
+      const value=travel?.current.value;if(!value)return;
+      const {prop,propCollider}=value.layout,next=prop.x===6?-6:6;
       const root=actor.root;
-      if (legal(root.x+vx*dt,root.y)) root.x+=vx*dt; else vx=0;
-      if (legal(root.x,root.y+vy*dt)) root.y+=vy*dt; else vy=0;
-      const moving=Math.hypot(vx,vy);
-      let heading = root.yaw;
-      if (moving>0.1) heading=Math.atan2(vy,vx)+Math.PI/2;
-      else if (input.pointer.active) {
+      if(Math.abs(root.x-next)<1.5 && Math.abs(root.y-prop.y)<1.5){message='Move away from the prop landing';return;}
+      prop.x=next;propCollider.x=next;value.state.propX=next;message='Prop moved';
+    },
+    /** Diagnostics contain only data; UI cannot mutate residency through this copy. */
+    inspect(){return {message,travel:travel?{...travel.last,...travel.stats}:null,residency:residency.inspect()};},
+    /** Invalidate asynchronous completion before releasing pins and definitions. */
+    dispose(){if(disposed)return;disposed=true;life.dispose();},
+  };
+}
+
+return {createJourney};
+})();
+// Source: examples/atrium/player.js
+const module22=(()=>{
+/**
+ * Atrium example / locomotion: game-owned steering/gait profile, independent of realm residency.
+ * Actor references and velocity survive transfers. This is not a full physical body solver.
+ */
+const { legalLanding } = module19;
+
+/** Create one controller whose mutable velocity/load state belongs only to this actor. */
+function playerController(actor, input, renderer) {
+  let vx=0,vy=0,distance=0,loaded=true;
+  const pointerGround={};
+  return {
+    get loaded(){return loaded;},
+    /** Advance movement against the active destination's actual collision data. dt is seconds. */
+    update(dt,resource){
+      if(input.consume('load'))loaded=!loaded;
+      const move=input.read('move');
+      const response=1-Math.exp(-(loaded?4:10)*dt),speed=loaded?6:7;
+      vx+=(move.x*speed-vx)*response;vy+=(-move.y*speed-vy)*response;
+      const root=actor.root;
+      if(legalLanding(resource,{x:root.x+vx*dt,y:root.y,z:root.z}))root.x+=vx*dt;else vx=0;
+      if(legalLanding(resource,{x:root.x,y:root.y+vy*dt,z:root.z}))root.y+=vy*dt;else vy=0;
+      const moving=Math.hypot(vx,vy);let heading=root.yaw;
+      if(moving>0.1)heading=Math.atan2(vy,vx)+Math.PI/2;
+      else if(input.pointer.active){
         renderer.groundPoint(input.pointer.x,input.pointer.y,pointerGround);
         heading=Math.atan2(pointerGround.y-root.y,pointerGround.x-root.x)+Math.PI/2;
       }
       const turn=Math.atan2(Math.sin(heading-root.yaw),Math.cos(heading-root.yaw));
-      root.yaw+=turn*(1-Math.exp(-9*dt)); distance+=moving*dt;
-      // Procedural gait derives from actual distance, so blocked movement doesn't moonwalk.
+      root.yaw+=turn*(1-Math.exp(-9*dt));distance+=moving*dt;
       actor.body.z=1+Math.sin(distance*5)*Math.min(moving,1)*0.035;
-      actor.legs[0].y=Math.sin(distance*5)*Math.min(moving,1)*0.18;
-      actor.legs[1].y=-actor.legs[0].y;
-      actor.arms[0].y=-actor.legs[0].y*0.6; actor.arms[1].y=-actor.arms[0].y;
+      actor.legs[0].y=Math.sin(distance*5)*Math.min(moving,1)*0.18;actor.legs[1].y=-actor.legs[0].y;
+      actor.arms[0].y=-actor.legs[0].y*0.6;actor.arms[1].y=-actor.arms[0].y;
       actor.bag.shape.emission=loaded?0:0.12;
-      layout.crystal.yaw+=dt*0.3;
-      if (time-statusAt>0.2) {
-        statusAt=time;
-        onStatus({ worldId:world.id, x:root.x, y:root.y, loaded, cool, time, entities:world.entities.size });
-      }
-    }));
-    life.own(lobby.on('render', alpha => {
-      world.resolve(alpha); renderer.render(lease.value);
-    }));
-    return { world, actor, dispose: () => life.dispose() };
-  } catch (error) { life.dispose(); throw error; }
+    },
+  };
+}
+
+return {playerController};
+})();
+// Source: examples/atrium/scene.js
+const module15=(()=>{
+/**
+ * Atrium example / scene: owns controls, phase registrations and the game's journey.
+ * Layout/reconstruction, locomotion and world policy have their own focused modules.
+ * Nothing here installs an engine patch or creates an independent animation loop.
+ */
+const { Lifetime } = module5;
+const { createJourney } = module16;
+const { playerController } = module22;
+
+/** Start preparing the scene immediately. Rendering remains valid while the first world loads. */
+function createScene(engine,{controlsHost,onStatus=()=>{},onError=()=>{}}){
+  const life=new Lifetime(),{basement,lobby,directory}=engine;
+  const journey=createJourney(engine);life.own(()=>journey.dispose());
+  const {input,renderer}=basement;
+  input.bind({
+    move:{kind:'vector',negativeX:['KeyA','ArrowLeft'],positiveX:['KeyD','ArrowRight'],negativeY:['KeyW','ArrowUp'],positiveY:['KeyS','ArrowDown'],axes:[0,1],deadZone:0.18},
+    interact:{kind:'button',keys:['KeyE'],pointerButtons:[0],buttons:[0]},
+    load:{kind:'button',keys:['KeyB'],buttons:[2]},
+    flit:{kind:'button',keys:['KeyF'],buttons:[1]},
+    cancel:{kind:'button',keys:['KeyX'],buttons:[3]},
+    prop:{kind:'button',keys:['KeyG']},
+  });
+  life.own(()=>input.bind({}));
+  const prefix=basement.identities.create('controls');
+  const controls=[
+    directory.create('control.joystick',{input,host:controlsHost,sourceId:`${prefix}:stick`,action:'move',radius:52}),
+    directory.create('control.button',{input,host:controlsHost,sourceId:`${prefix}:light`,action:'interact',label:'Light',diameter:70}),
+    directory.create('control.button',{input,host:controlsHost,sourceId:`${prefix}:flit`,action:'flit',label:'Flit',diameter:62,placement:{right:44,bottom:132}}),
+  ];
+  controls.forEach(control=>life.own(()=>control.dispose()));
+  life.own(lobby.on('pause',()=>controls.forEach(control=>control.cancel())));
+  renderer.camera.x=0;renderer.camera.y=0;renderer.camera.halfHeight=22;
+  let player=null,statusAt=-1;
+  journey.ready.then(()=>{if(!life.disposed)player=playerController(journey.actor,input,renderer);})
+    .catch(error=>{if(!life.disposed&&error.name!=='AbortError')onError(error);});
+
+  life.own(lobby.on('update',(dt,time)=>{
+    const resource=journey.current;
+    if(resource&&player){
+      resource.world.snapshot();
+      if(input.consume('cancel'))journey.cancel();
+      else if(input.consume('flit'))journey.flit();
+      if(input.consume('interact'))journey.toggleLight();
+      if(input.consume('prop'))journey.moveProp();
+      player.update(dt,resource);resource.layout.crystal.yaw+=dt*0.3;
+    }
+    if(time-statusAt>0.12){
+      statusAt=time;
+      const root=journey.actor?.root;
+      onStatus({worldId:resource?.world.id??'preparing',name:resource?.profile.name??'Opening the worlds',
+        actorId:root?.id??'',x:root?.x??0,y:root?.y??0,loaded:player?.loaded??true,
+        cool:resource?.state.cool??true,propX:resource?.layout.prop.x??6,time,
+        entities:resource?.world.entities.size??0,...journey.inspect()});
+    }
+  }));
+  life.own(lobby.on('render',alpha=>{
+    const resource=journey.current;
+    if(!resource){renderer.render();return;}
+    renderer.ambient.set(resource.profile.ambient);renderer.lights.set(resource.lights);renderer.lightColors.set(resource.lightColors);
+    resource.world.resolve(alpha);renderer.render(resource.batch);
+  }));
+  return {journey,dispose:()=>life.dispose()};
 }
 
 return {createScene};
@@ -1220,11 +1789,14 @@ const module0=(()=>{
  */
 const { ETRNLNINE } = module1;
 const { Lifetime } = module5;
-const { createScene } = module13;
+const { createScene } = module15;
 
 const canvas=document.querySelector('#world'), controlsHost=document.querySelector('#controls');
 const status=document.querySelector('#status'), errorBox=document.querySelector('#error');
 const pauseButton=document.querySelector('#pause'), restartButton=document.querySelector('#restart');
+const directoryStatus=document.querySelector('#directory-status'), travelStatus=document.querySelector('#travel-status');
+const releaseButton=document.querySelector('#release-inactive'), cancelButton=document.querySelector('#cancel-flit');
+const heading=document.querySelector('h1');
 const life=new Lifetime();
 let engine, scene;
 
@@ -1236,13 +1808,27 @@ function report(error) {
 /** Replace the scene through its public lifetime; no game state is stored inside engine/. */
 function replaceScene() {
   scene?.dispose(); scene=null;
-  scene=createScene(engine,{ controlsHost, onStatus: state => {
+  scene=createScene(engine,{ controlsHost, onError:report, onStatus: state => {
     const r=engine.basement.renderer.stats;
     status.textContent=`${state.loaded?'Weighted':'Light'} pack · ${state.entities} forms · ${r.draws} draw · ${r.uploadedBytes} B updated`;
     // Small DOM diagnostics aid accessibility and automated verification; no engine globals.
     status.dataset.world=state.worldId; status.dataset.x=state.x.toFixed(3); status.dataset.y=state.y.toFixed(3);
     status.dataset.buffers=r.buffers; status.dataset.vaos=r.vaos;
     status.dataset.time=state.time.toFixed(2); status.dataset.cool=String(state.cool);
+    status.dataset.actor=state.actorId;status.dataset.prop=state.propX;status.dataset.entities=state.entities;
+    status.dataset.resident=state.residency.resident;status.dataset.snapshotBytes=state.residency.snapshotBytes;
+    status.dataset.evictions=state.residency.evictions;status.dataset.committed=state.travel?.committed??0;
+    status.dataset.cancelled=state.travel?.cancelled??0;status.dataset.failed=state.travel?.failed??0;
+    heading.textContent=state.name;
+    directoryStatus.textContent=`${state.residency.resident}/${state.residency.capacity} worlds resident · ${state.residency.snapshotBytes} B saved state`;
+    travelStatus.textContent=state.travel?.status==='preparing'||state.travel?.status==='ready'||state.travel?.status==='failed'||state.travel?.status==='cancelled'
+      ? state.travel.message : state.message;
+    document.querySelector('#transfer-time').textContent=state.travel?.committed
+      ? `Last transfer ${state.travel.transferMs.toFixed(2)} ms · preparation/wait ${state.travel.waitMs.toFixed(1)} ms` : 'Destination preparation runs in bounded chunks';
+    const slots=state.residency.worlds.map(world=>`${world.key.endsWith('amber')?'Amber':'Violet'}: ${world.status} / ${world.owners} owner${world.owners===1?'':'s'}${world.key===scene?.journey.travel?.current.key?' / active':''}`);
+    document.querySelector('#world-slots').textContent=slots.join(' · ');
+    document.querySelector('#gpu-status').textContent=`${r.buffers} GPU buffers · ${r.vaos} world batches`;
+    cancelButton.disabled=!scene?.journey.travel?.pending;
   }});
 }
 
@@ -1254,6 +1840,10 @@ try {
     engine.lobby.pause('example-menu',paused);
     pauseButton.textContent=paused?'Resume':'Pause'; pauseButton.setAttribute('aria-pressed',String(paused));
   });
+  life.listen(releaseButton,'click',()=>{
+    try { scene.journey.releaseInactive(); } catch(error) { report(error); }
+  });
+  life.listen(cancelButton,'click',()=>scene.journey.cancel());
   life.listen(restartButton,'click',() => {
     try { replaceScene(); } catch(error) { report(error); }
   });

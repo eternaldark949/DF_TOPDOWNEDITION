@@ -1,6 +1,6 @@
 # ETRNLNINE — Engine foundation plan
 
-**Status: agreed architectural direction; first runnable foundation implemented and verified.**
+**Status: first foundation and two-world flitting milestone implemented; broader engine work remains planned.**
 
 **Owner: ETERNAL / @eternaldark949.**
 
@@ -14,9 +14,11 @@ This document records the owner's requirements and the architectural agreement r
 
 The branch was intentionally created with only this plan. On 2026-10-15, after reviewing the plan and first-milestone proposal, the owner invited implementation to begin. The first runnable foundation follows [First Light decisions and source guide](docs/decisions/0001-first-light.md). No wholesale legacy import or expansion into every brainstorm is implied.
 
-**Milestone evidence:** [screenshots, checks, and limitations](docs/milestones/first-light/README.md).
+**Current milestone:** [Between Worlds decisions and editing guide](docs/decisions/0002-between-worlds.md) · [screenshots and verification](docs/milestones/between-worlds/README.md).
 
-**Try the current milestone:** [self-contained Atrium HTML](dist/ETRNLNINE-Atrium.html). Download the file and open it in a WebGL 2 browser, or serve the repository and open `examples/atrium/`. Run `npm test` and `npm run build` for source checks/building. See the source guide for browser checks, editing examples, and known limitations.
+**First Light evidence:** [original foundation screenshots and checks](docs/milestones/first-light/README.md).
+
+**Try the current milestone:** [self-contained two-world HTML](dist/ETRNLNINE-Atrium.html). Download the file and open it in a WebGL 2 browser, or serve the repository and open `examples/atrium/`. Run `npm test` and `npm run build` for source checks/building. See the source guide for browser checks, editing examples, and known limitations.
 
 New ideas are welcome. Distinguish agreed requirements from proposed details and unresolved choices. Record subsequent architectural decisions here or in explicitly linked decision documents so the owner does not have to repeat them across conversations.
 
@@ -43,7 +45,7 @@ New ideas are welcome. Distinguish agreed requirements from proposed details and
 - **Proposed implementation direction:** a concrete way to realize that intent. These details guide design review; they are not finalized APIs, algorithms, or numeric budgets.
 - **Open decision:** an unresolved choice that must be recorded before dependent implementation.
 
-Section 10 records the carryovers the owner asked to include. Carrying over a feature means preserving and improving its purpose, not copying unfinished Python methods or committing to every mechanism proposed below. The first runnable milestone is implemented; the broader carryover scope remains a plan. Adding detail does not automatically authorize every proposed extension.
+Section 10 records the carryovers the owner asked to include. Carrying over a feature means preserving and improving its purpose, not copying unfinished Python methods or committing to every mechanism proposed below. The first foundation and two-world preparation/transfer milestone are implemented; the broader carryover scope remains a plan. Adding detail does not automatically authorize every proposed extension.
 
 ## 1. Purpose and philosophy
 
@@ -399,6 +401,8 @@ The following features were selected in discussion and are now part of the plann
 
 ### 10.9 Realtime world switching and streaming for flitting
 
+**Implementation checkpoint:** two bounded world contexts, cooperative preparation, boundary commits, selected-state restoration, cancellation, and diagnostics are implemented in the independent example. See the Between Worlds decision record. Partition streaming, full-state capture, off-world simulation, and production-game integration remain planned.
+
 **Agreed intent:** support realtime switching between worlds as well as streaming within them. The original flitting concept is instantaneous dimensional transfer, with uses in traversal, evasion, stealth, and combat. Pocket dimensions and distinct material/ethereal environments are important design references. This capability must be considered in the foundation, not added later as a reload workaround.
 
 **Proposed implementation direction:**
@@ -490,11 +494,11 @@ Use explicit world identity and shared clock/ownership contracts now so streamin
 5. Verify repeated start/stop and scene replacement without accumulating loops, event listeners, entities, or GPU resources. Check meaningful input/lifecycle boundaries, browser errors, and representative frame/resource costs.
 6. Produce a self-contained offline HTML artifact and actual runtime screenshots. Provide a short source-reading guide and parameter-editing examples so the owner can navigate and customize the implementation.
 
-The immediate follow-on should exercise the existing contracts with two small world contexts and prepared flits between them, including cancelled/unready transfers and resource cleanup. Then build richer locomotion/body response, traversal/perception, and state recording in coherent integrated increments. Exact follow-on order remains a planning decision; the feature scope in section 10 is retained.
+The two-world follow-on is implemented and verified against prepared transfers, blocked/cancelled/unready requests, selected-state reconstruction, and resource cleanup. Then build richer locomotion/body response, traversal/perception, and state recording in coherent integrated increments. Exact follow-on order remains a planning decision; the feature scope in section 10 is retained.
 
 ## 14. Remaining planning decisions
 
-The First Light decision document settles the minimum contracts for the first milestone. For subsequent capabilities, agree and record the relevant details before dependent implementation:
+The First Light and Between Worlds decision documents settle the contracts for the two completed milestones. For subsequent capabilities, agree and record the relevant details before dependent implementation:
 
 1. Precise responsibilities and public interfaces inside each level, including the small ETRNLNINE assembly interface.
 2. Library registration, stable identities, ownership, disposal, and cross-level access contracts.

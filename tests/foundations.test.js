@@ -131,3 +131,11 @@ test('a new tap after release is preserved even while the last sampled action sa
   input.setSource('fresh-tap','action',1);input.removeSource('fresh-tap');input.sample();
   assert.equal(input.consume('action'),true);input.dispose();
 });
+
+
+test('late world cleanup cannot release a newer reconstruction with the same world identity',() => {
+  const directory=new Directory(),ids=new Identities(),old=new World('stable',ids),rebuilt=new World('stable',ids);
+  directory.adopt(old);directory.releaseWorld(old.id,old);directory.adopt(rebuilt);
+  directory.releaseWorld(old.id,old);assert.equal(rebuilt.disposed,false);
+  assert.equal(directory.worlds.get('stable'),rebuilt);directory.dispose();
+});

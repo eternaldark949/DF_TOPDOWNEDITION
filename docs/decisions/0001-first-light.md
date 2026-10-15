@@ -2,6 +2,8 @@
 
 Recorded 2026-10-15 after the owner invited implementation to begin. This scopes the first runnable milestone; the broader engine plan remains in the root README.
 
+> Historical milestone record. The current example and runtime are extended by [Between Worlds](0002-between-worlds.md), including changes to the phases, file map, and implemented world capabilities below.
+
 ## Scope and delivery
 
 - Native WebGL 2, JavaScript ES modules, no runtime libraries, no CDN, and no Canvas 2D preparation/rendering.

@@ -1,6 +1,6 @@
 # Working in ETRNLNINE
 
-Read README.md and docs/decisions/0001-first-light.md before changing source. The owner's house architecture and commenting requirements govern this branch.
+Read README.md and the applicable docs/decisions records (First Light and Between Worlds) before changing source. The owner's house architecture and commenting requirements govern this branch.
 
 - Basement defines reusable mechanisms; Lobby alone owns runtime scheduling; Directory manages registered libraries/worlds/resource ownership; Penthouse supplies reusable toys. ETRNLNINE remains a small composition root.
 - Game/example rules and content stay outside engine/. Engine code never imports them or looks up game DOM IDs.
@@ -11,3 +11,5 @@ Read README.md and docs/decisions/0001-first-light.md before changing source. Th
 - Keep adopted decisions, implementation status, and open proposals distinct. Do not claim planned systems or scaffolds are implemented.
 - Run npm test and npm run build after relevant source changes. Use npm run test:browser for rendering/input/lifecycle changes when Playwright/Chromium are available; see the decision guide for setup and environmental limitations.
 - Commit the rebuilt dist HTML with source changes. Record real verification results and limitations; emulated mobile and software WebGL do not prove physical-device performance.
+
+For world work, preserve active/preparation ownership and final-boundary validation. Readiness promises resolve without resource values; use the owned ticket.value. Never move actor membership from an asynchronous completion or retain borrowed world resources after releasing their ticket.
