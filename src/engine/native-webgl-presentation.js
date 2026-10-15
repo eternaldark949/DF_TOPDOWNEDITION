@@ -102,6 +102,7 @@ class NativePresentation{
         const glass=(x,y,w,h)=>{if(u.glassCount>=24)return;const sx=x*view.zoom+r.world.x,sy=y*view.zoom+r.world.y;if(sx+w*view.zoom<0||sx>game.canvas.width||sy+h*view.zoom<0||sy>game.canvas.height)return;u.glass.set([sx,sy,w*view.zoom,h*view.zoom],u.glassCount++*4);};
         if(L.glassRefraction){if(L.windows)for(const w of game.roomSystem.windows||[])if(!w.shattered&&!(game.activeMap.id==='apt_949'&&w.y===0))glass(w.x,w.y,w.w,w.h);
             if(L.doors)for(const d of game.roomSystem.doors||[])if(d.type==='sliding')for(const [ax,ay,bx,by]of d.leaves())d.orientation==='H'?glass(Math.min(ax,bx),d.y,Math.abs(bx-ax),d.h):glass(d.x,Math.min(ay,by),d.w,Math.abs(by-ay));}
+        if(typeof GameSettings!=='undefined'&&L.bloom!==!!GameSettings.bloom)r.setLayers({bloom:!!GameSettings.bloom});   // follow Settings → Bloom
         const filters=[];if(u.ringCount||u.glassCount)filters.push(this.optics);if(L.bloom)filters.push(r.sceneBloom);if(L.atmosphere)filters.push(r.atmosphereFilter);r.scene.filters=filters.length?filters:null;r.scene.filterArea=new PIXI.Rectangle(0,0,game.canvas.width,game.canvas.height);r.stage.filters=null;
         this.stats.rings=u.ringCount;this.stats.glass=u.glassCount;
     }

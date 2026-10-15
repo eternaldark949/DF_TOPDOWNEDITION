@@ -9,13 +9,15 @@ const NATIVE_LAYER_DEFAULTS=Object.fromEntries(Object.keys(NATIVE_LAYER_LABELS).
 Object.assign(NativeWebGLRenderer.prototype,{
     setLayers(values){
         let changed=false;for(const [k,v] of Object.entries(values))if(k in this.layers&&this.layers[k]!==!!v){this.layers[k]=!!v;changed=true;}
+        // Bloom is the game's own setting (Settings → Bloom): the toggle here and that one are the same switch
+        if('bloom' in values&&typeof GameSettings!=='undefined')GameSettings.bloom=this.layers.bloom;
         if(!changed)return;
         this.resetSample();
         if(this.onLayersChanged)this.onLayersChanged();
     },
     preset(name){
         const shadows=new Set(['colorWash','decorLights','wallOcclusion','propShadows','playerShadows','contactShadows','indicators','furnitureHints','roomVeil','nightTint','glows','doors','windows','fixtures','shapeShadows','linens','shadowDetail','npcShadows','vehicleShadows']);
-        this.setLayers(Object.fromEntries(Object.keys(this.layers).map(k=>[k,name==='canvas'||!!NATIVE_LAYER_BASELINE[k]||(name==='shadows'&&shadows.has(k))])));
+        this.setLayers(Object.fromEntries(Object.keys(this.layers).filter(k=>k!=='bloom').map(k=>[k,name==='canvas'||!!NATIVE_LAYER_BASELINE[k]||(name==='shadows'&&shadows.has(k))])));   // (bloom stays the player's setting)
     },
     initLayers(){
         this.shadowCache=new Map();this.shadowStats={};this.layerStages={};
@@ -155,6 +157,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
                 g.position.set(h.x,h.y);g.rotation=(p.angle||0)+i*Math.PI/2+Math.PI;g.alpha=i===F.side?1:.75;g.scale.set(i===F.side?1.35:1);}
         }
         const t=_frameTime/1000;
+        if(typeof GameSettings!=='undefined'&&L.bloom!==!!GameSettings.bloom)this.setLayers({bloom:!!GameSettings.bloom});   // follow Settings → Bloom
         const filters=[];if(L.bloom)filters.push(this.sceneBloom);if(L.atmosphere)filters.push(this.atmosphereFilter);
         this.stage.filters=filters.length?filters:null;
         this.stage.filterArea=this.world.filterArea;this.atmosphereFilter.uniforms.viewport.set([game.canvas.width,game.canvas.height]);
