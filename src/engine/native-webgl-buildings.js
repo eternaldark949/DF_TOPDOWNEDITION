@@ -22,7 +22,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         return [...textures].reduce((n,t)=>n+t.realWidth*t.realHeight*4,0);
     },
     hideBuilding(r){r.active=false;r.base.root.visible=r.top.root.visible=false;if(r.glowMesh)r.glowMesh.visible=false;if(r.glowLive)r.glowLive.root.visible=false;},
-    evictBuilding(b,r){this.clearBuildingGlow(r,true);this.dropProjected(r,"projBase");this.dropProjected(r,"projTop");r.base.destroy();r.top.destroy();this.nativeBuildings.delete(b);this.buildingStats.evictions++;},
+    evictBuilding(b,r){this.clearBuildingGlow(r,true);this.dropProjected(r,"projGlow");this.dropProjected(r,"projBase");this.dropProjected(r,"projTop");r.base.destroy();r.top.destroy();this.nativeBuildings.delete(b);this.buildingStats.evictions++;},
     trimBuildingRecords(now=performance.now()){
         const hidden=[...this.nativeBuildings].filter(([,r])=>!r.active).sort((a,b)=>a[1].seen-b[1].seen);
         let bytes=hidden.reduce((n,[,r])=>n+this.buildingRecordBytes(r),0),nodes=hidden.reduce((n,[,r])=>n+[r.base,r.top,r.glowContext,r.glowLive].reduce((v,c)=>v+(c?.pool.length||0),0),0),count=hidden.length;
@@ -69,11 +69,12 @@ Object.assign(NativeWebGLRenderer.prototype,{
         return this.buildingGlowBytes()+bytes<=24*1048576;
     },
     clearBuildingGlow(r,recycle=false){
+        this.dropProjected?.(r,'projGlow');
         if(r.glowContext)r.glowContext.destroy();if(r.glowLive)r.glowLive.destroy();
         if(r.glowMesh)r.glowMesh.destroy();if(r.glowTarget){if(recycle)this.recycleBuildingTarget(r.glowTarget);else r.glowTarget.destroy(true);}
         r.glowContext=r.glowLive=r.glowMesh=r.glowTarget=null;r.glowKey=null;
     },
-    syncBuildingGlow(b,r,game,view,key){
+    syncBuildingGlow(b,r,game,view,key,common){
         if(!b.drawEmissive)return true;
         const dark=game.dayCycle().darkness,w=game.canvas.width/view.zoom+128,h=game.canvas.height/view.zoom+128;
         const left=view.x-w/2,top=view.y-h/2,density=Math.min(view.zoom,1536/Math.max(w,h));
@@ -82,8 +83,29 @@ Object.assign(NativeWebGLRenderer.prototype,{
         r.glowContext.sceneFrame=r.glowLive.sceneFrame=_worldMatrix;
         r.glowMesh.visible=r.glowLive.root.visible=this.layers.glows;
         if(!this.layers.glows)return true;
+        // Animated beams/crowns are recorded during the static pass and replayed live each frame.
+        const methods=['_sqDrawCrown','_sqDrawBeams','_sqVeil','_mcBeams'];
+        const drawStatic=ctx=>{
+            const saved=[];r.glowCalls=[];
+            try{
+                for(const name of methods)if(typeof b[name]==='function'){
+                    saved.push({name,own:Object.hasOwn(b,name),method:b[name]});b[name]=(...args)=>r.glowCalls.push({name,args:args.slice(1)});
+                }
+                b.drawEmissive(ctx,dark);
+            }finally{for(const s of saved){if(s.own)b[s.name]=s.method;else delete b[s.name];}}
+        };
+        // Emissive art leans with the building, so it goes through the GPU projector like the
+        // roof: drawn straight into the emissive layer, no per-camera snapshot. Drawing in order
+        // matches the snapshot's composite (source-over and alpha-preserving add are associative).
+        const projected=common!=null&&this.syncProjectedLayer(r,'projGlow',r.glowContext,common+':'+Math.round(dark*64),b,drawStatic,game,view);
+        if(projected){
+            const g=r.glowContext.root;g.position.set(0,0);
+            if(g.parent!==this.emissive||this.emissive.getChildIndex(g)!==this.emissive.getChildIndex(r.glowMesh)+1)this.emissive.addChildAt(g,this.emissive.getChildIndex(r.glowMesh)+1);
+            g.visible=true;r.projGlow.box.pulse=[this.layers.decorAnimation?.03:0,_gameTimeSec,31/Math.max(1,game.canvas.width)];
+            r.glowMesh.visible=false;r.glowKey=null;
+        }else if(r.glowContext.root.parent)r.glowContext.root.parent.removeChild(r.glowContext.root);
         const cacheKey=[key,view.zoom,game.canvas.width,game.canvas.height,Math.round(dark*64)].join(':');
-        if(r.glowKey!==cacheKey){
+        if(!projected&&r.glowKey!==cacheKey){
             if(!r.glowTarget||r.glowSize!==w+':'+h+':'+density){
                 if(r.glowTarget){r.glowTarget.destroy(true);r.glowTarget=null;}
                 r.glowTarget=this.takeBuildingTarget(w,h,density);
@@ -96,13 +118,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
                 r.glowSize=r.glowTarget._nativeBuildingSize=w+':'+h+':'+density;
             }
             const start=performance.now(),ctx=r.glowContext;ctx.begin();ctx.root.position.set(-left,-top);ctx.canvas=game.canvas;
-            const methods=['_sqDrawCrown','_sqDrawBeams','_sqVeil','_mcBeams'],saved=[];r.glowCalls=[];
-            try{
-                for(const name of methods)if(typeof b[name]==='function'){
-                    saved.push({name,own:Object.hasOwn(b,name),method:b[name]});b[name]=(...args)=>r.glowCalls.push({name,args:args.slice(1)});
-                }
-                b.drawEmissive(ctx,dark);
-            }finally{for(const s of saved){if(s.own)b[s.name]=s.method;else delete b[s.name];}}
+            drawStatic(ctx);
             // Store source-over coverage independently of additive RGB. This
             // makes the snapshot an affine composition over the lit scene:
             // output = cachedRGB + sceneRGB * (1 - cachedCoverage).
@@ -112,7 +128,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             }finally{modes[PIXI.BLEND_MODES.ADD]=add;state.blendMode=-1;}
             r.glowMesh.shader.uniforms.image=r.glowTarget;r.glowMesh.position.set(left,top);r.glowMesh.scale.set(w,h);r.glowKey=cacheKey;this.trimBuildingImages(ctx);
             this.buildingStats.rasterizations++;this.buildingStats.rasterMs+=performance.now()-start;
-        }else this.buildingStats.hits++;
+        }else if(!projected)this.buildingStats.hits++;
         const ctx=r.glowLive;ctx.begin();ctx.canvas=game.canvas;b._sqDark=dark;
         for(const call of r.glowCalls){const args=call.args.map(v=>typeof v==='number'?dark:v);b[call.name](ctx,...args);}
         const u=r.glowMesh.shader.uniforms;u.clock=_gameTimeSec;u.animate=this.layers.decorAnimation?1:0;

@@ -52,7 +52,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
     syncWorld(game,view){
         // A late web font must replace its fallback in retained sign geometry.
         // Release all old label pins before any new sign can enter the cache.
-        if(this._fontSeen!==(this.fontRevision||0)){for(const rec of this.nativeBuildings.values()){rec.key=rec.glowKey=null;for(const c of [rec.base,rec.top,rec.glowContext,rec.glowLive])c?.releaseText();}this._fontSeen=this.fontRevision||0;}
+        if(this._fontSeen!==(this.fontRevision||0)){for(const rec of this.nativeBuildings.values()){rec.key=rec.glowKey=null;this.dropProjected(rec,'projBase');this.dropProjected(rec,'projTop');this.dropProjected(rec,'projGlow');for(const c of [rec.base,rec.top,rec.glowContext,rec.glowLive])c?.releaseText();}this._fontSeen=this.fontRevision||0;}
         const start=performance.now();let lap=start;const timings={};this.nightHeat.begin(game);this.nativeCasters.begin(game);this.crowdAtlas.begin();this.projectionStats={hits:0,captures:0,fallbacks:0,captureMs:0,vertices:0};this.buildingStats={hits:0,rasterizations:0,rasterMs:0,livePaths:0,fallbacks:0,evictions:0,returns:0,targetReuses:0,targetBorrows:0,targetCreates:0,baseRebuilds:0,topRebuilds:0};const L=this.layers,map=game.activeMap;
         for(const ctx of [this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.roofDetailContext,this.rainContext,this.occupantContext,this.foliageContext])ctx.canvas=game.canvas;
         for(const ctx of [this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.roofDetailContext,this.occupantContext,this.foliageContext])ctx.sceneFrame=_worldMatrix;
@@ -132,7 +132,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             if(!this.syncProjectedLayer(r,'projTop',r.top,common,b,drawTop,game,view)){
                 if(r.key!==key||r.projTop?.box){if(r.projTop?.box)this.dropProjected(r,'projTop');r.top.begin();drawTop(r.top);r.key=key;this.trimBuildingImages(r.top);this.buildingStats.topRebuilds++;}
             }else r.key=null;
-            if(L.buildingCache){if(!this.syncBuildingGlow(b,r,game,view,key)&&L.glows)b.drawEmissive?.(glow,game.dayCycle().darkness);}
+            if(L.buildingCache){if(!this.syncBuildingGlow(b,r,game,view,key,common)&&L.glows)b.drawEmissive?.(glow,game.dayCycle().darkness);}
             else {if(r.glowMesh)r.glowMesh.visible=r.glowLive.root.visible=false;if(L.glows)b.drawEmissive?.(glow,game.dayCycle().darkness);}
         }
         this.trimBuildingRecords(now);

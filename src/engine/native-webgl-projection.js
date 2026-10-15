@@ -18,9 +18,9 @@ class NativeProjectedMesh extends PIXI.Mesh {
             varying vec4 vColor;varying vec2 vUV;
             void main(){vec2 k=camH/max(vec2(1.),camH-aZ);vec2 p=cam+(aGround-cam)*k;vColor=aColor;vUV=aUV;
                 gl_Position=vec4((projectionMatrix*translationMatrix*vec3(p,1.)).xy,0.,1.);}`,
-            `precision mediump float;varying vec4 vColor;varying vec2 vUV;uniform sampler2D uSampler;
-            void main(){gl_FragColor=texture2D(uSampler,vUV)*vColor;}`,
-            {uSampler:PIXI.Texture.WHITE,cam:new Float32Array(2),camH:1}));
+            `precision mediump float;varying vec4 vColor;varying vec2 vUV;uniform sampler2D uSampler;uniform vec3 uPulse;
+            void main(){gl_FragColor=texture2D(uSampler,vUV)*vColor*(1.-uPulse.x*(.5+.5*sin(uPulse.y*2.7+gl_FragCoord.x*uPulse.z)));}`,
+            {uSampler:PIXI.Texture.WHITE,cam:new Float32Array(2),camH:1,uPulse:new Float32Array(3)}));
     }
     constructor(run){
         const n=run.z.length/2,g=new PIXI.Geometry()
@@ -30,7 +30,10 @@ class NativeProjectedMesh extends PIXI.Mesh {
         super(g,NativeProjectedMesh.shader());this.projTexture=run.texture;this.blendMode=run.blend;this.vertexCount=n;
     }
     // The shader is shared, so the texture lives on the mesh (Mesh.texture would write the shared shader).
-    _render(renderer){this.shader.uniforms.uSampler=this.projTexture;super._render(renderer);}
+    _render(renderer){
+        // Emissive boxes carry the glow shimmer (amplitude, clock, phase per pixel); others none.
+        const u=this.shader.uniforms,p=this.parent?.pulse||this.parent?.parent?.pulse;u.uSampler=this.projTexture;
+        if(p)u.uPulse.set(p);else u.uPulse.fill(0);super._render(renderer);}
 }
 
 (() => {
@@ -116,11 +119,14 @@ class NativeProjectedMesh extends PIXI.Mesh {
             const cam=game.camera,cx=cam.x,cy=cam.y,C=leanCamHeight();
             // Captures take text through the real-font sprite path, which the projector can lean.
             ctxA.retainedOff=ctxB.retainedOff=ctxA.textSprites=ctxB.textSprites=true;
+            // Captured unculled: the meshes serve every camera position in this region, so a
+            // camera move never forces a recapture (building routines cull to game._cullBounds.view).
+            const cull=game._cullBounds;if(cull)game._cullBounds={...cull,view:{left:-Infinity,top:-Infinity,right:Infinity,bottom:Infinity}};
             try{
                 const tape={record:true,list:[],i:0};ctxA.segTape=tape;ctxA.begin();draw(ctxA);
                 tape.record=false;ctxB.segTape=tape;cam.x=cx+D;cam.y=cy+D;try{ctxB.begin();draw(ctxB);}finally{cam.x=cx;cam.y=cy;}
                 if(tape.i!==tape.list.length)this.projectionFail='tape';
-            }finally{ctxA.retainedOff=ctxB.retainedOff=ctxA.textSprites=ctxB.textSprites=false;ctxA.segTape=ctxB.segTape=null;}
+            }finally{ctxA.retainedOff=ctxB.retainedOff=ctxA.textSprites=ctxB.textSprites=false;ctxA.segTape=ctxB.segTape=null;game._cullBounds=cull;}
             const fail=why=>{this.projectionFail=why;return null;};
             const A=collect(ctxA);if(!A)return fail(collect.why);const B=collect(ctxB);if(!B)return fail(collect.why);
             let vertices=0,deviation=0;
@@ -190,9 +196,10 @@ class NativeProjectedMesh extends PIXI.Mesh {
         syncProjectedLayer(r,slot,ctx,common,b,draw,game,view){
             const L=this.layers;if(L.gpuProjection===false||!CONFIG.BUILDINGS.LEAN){this.dropProjected(r,slot);return false;}
             const cam=game.camera,p=r[slot]||(r[slot]={}),region=this.projectionRegion(b,cam),key=common+'|'+region;
-            // Building routines cull to the view; recapture once the camera has travelled a third of it.
+            // Captures are unculled, so only a region change recaptures; a failed key is retried
+            // after the camera has travelled a third of the view.
             const reach=Math.min(game.canvas.width,game.canvas.height)/(3*view.zoom),far=Math.hypot(cam.x-(p.cx??1e9),cam.y-(p.cy??1e9))>reach;
-            if(p.box&&p.key===key&&!far){this.projectionStats.hits++;return this.showProjected(p,ctx,cam);}
+            if(p.box&&p.key===key){this.projectionStats.hits++;return this.showProjected(p,ctx,cam);}
             if(p.fail===key&&!far)return false;
             const start=performance.now();
             p.ctxB||(p.ctxB=new NativeVectorContext(this));p.ctxB.sceneFrame=ctx.sceneFrame;p.ctxB.canvas=ctx.canvas;

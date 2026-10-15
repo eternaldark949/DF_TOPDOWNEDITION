@@ -58494,7 +58494,7 @@ class NativeWebGLRenderer {
                 this.lost=false;this.gpuTimer.extension=this.renderer.gl.getExtension('EXT_disjoint_timer_query_webgl2');this.contextRestores=(this.contextRestores||0)+1;
                 // Render-texture pixels cannot survive context loss. CPU geometry
                 // remains valid, but every cached GPU light image must be redrawn.
-                for(const r of this.shadowCache.values()){r.key=null;r.dynamicKey=null;}this.actorHash=null;this.veilKey=null;this.surfaces?.invalidate();this.presentation?.invalidate();this.crowdAtlas?.clear();this.nativeCasters?.invalidate();for(const r of this.nativeBuildings?.values()||[])r.baseKey=r.key=r.glowKey=null;for(const ctx of [this.actorContext,this.linenContext,this.glassContext,this.glowContext,this.fixtureContext,this.groundDetailContext,this.projectileContext,this.postEffectContext,this.cueContext,this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.rainContext,this.roofDetailContext,this.occupantContext,this.backdropContext,this.foliageContext,...[...(this.nativeBuildings?.values()||[])].flatMap(r=>[r.base,r.top,r.glowContext,r.glowLive]),...[...this.props.values()].map(r=>r.liveContext)])for(const r of ctx?.gradients||[])r.key=null;
+                for(const r of this.shadowCache.values()){r.key=null;r.dynamicKey=null;}this.actorHash=null;this.veilKey=null;this.surfaces?.invalidate();this.presentation?.invalidate();this.crowdAtlas?.clear();this.nativeCasters?.invalidate();for(const r of this.nativeBuildings?.values()||[]){r.baseKey=r.key=r.glowKey=null;this.dropProjected?.(r,'projBase');this.dropProjected?.(r,'projTop');this.dropProjected?.(r,'projGlow');}for(const ctx of [this.actorContext,this.linenContext,this.glassContext,this.glowContext,this.fixtureContext,this.groundDetailContext,this.projectileContext,this.postEffectContext,this.cueContext,this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.rainContext,this.roofDetailContext,this.occupantContext,this.backdropContext,this.foliageContext,...[...(this.nativeBuildings?.values()||[])].flatMap(r=>[r.base,r.top,r.glowContext,r.glowLive]),...[...this.props.values()].map(r=>r.liveContext)])for(const r of ctx?.gradients||[])r.key=null;
                 this.frames=[];this.warmFrames=15;this.lastStart=this.lastEnd=0;this.capture=this.completedCapture=null;this.message('');
             });
             this.gpuTimer=new NativeGpuTimer(gl);this.frameId=0;this.initLayers();this.initDetails();this.initWorld();
@@ -59544,7 +59544,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
     syncWorld(game,view){
         // A late web font must replace its fallback in retained sign geometry.
         // Release all old label pins before any new sign can enter the cache.
-        if(this._fontSeen!==(this.fontRevision||0)){for(const rec of this.nativeBuildings.values()){rec.key=rec.glowKey=null;for(const c of [rec.base,rec.top,rec.glowContext,rec.glowLive])c?.releaseText();}this._fontSeen=this.fontRevision||0;}
+        if(this._fontSeen!==(this.fontRevision||0)){for(const rec of this.nativeBuildings.values()){rec.key=rec.glowKey=null;this.dropProjected(rec,'projBase');this.dropProjected(rec,'projTop');this.dropProjected(rec,'projGlow');for(const c of [rec.base,rec.top,rec.glowContext,rec.glowLive])c?.releaseText();}this._fontSeen=this.fontRevision||0;}
         const start=performance.now();let lap=start;const timings={};this.nightHeat.begin(game);this.nativeCasters.begin(game);this.crowdAtlas.begin();this.projectionStats={hits:0,captures:0,fallbacks:0,captureMs:0,vertices:0};this.buildingStats={hits:0,rasterizations:0,rasterMs:0,livePaths:0,fallbacks:0,evictions:0,returns:0,targetReuses:0,targetBorrows:0,targetCreates:0,baseRebuilds:0,topRebuilds:0};const L=this.layers,map=game.activeMap;
         for(const ctx of [this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.roofDetailContext,this.rainContext,this.occupantContext,this.foliageContext])ctx.canvas=game.canvas;
         for(const ctx of [this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.roofDetailContext,this.occupantContext,this.foliageContext])ctx.sceneFrame=_worldMatrix;
@@ -59624,7 +59624,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             if(!this.syncProjectedLayer(r,'projTop',r.top,common,b,drawTop,game,view)){
                 if(r.key!==key||r.projTop?.box){if(r.projTop?.box)this.dropProjected(r,'projTop');r.top.begin();drawTop(r.top);r.key=key;this.trimBuildingImages(r.top);this.buildingStats.topRebuilds++;}
             }else r.key=null;
-            if(L.buildingCache){if(!this.syncBuildingGlow(b,r,game,view,key)&&L.glows)b.drawEmissive?.(glow,game.dayCycle().darkness);}
+            if(L.buildingCache){if(!this.syncBuildingGlow(b,r,game,view,key,common)&&L.glows)b.drawEmissive?.(glow,game.dayCycle().darkness);}
             else {if(r.glowMesh)r.glowMesh.visible=r.glowLive.root.visible=false;if(L.glows)b.drawEmissive?.(glow,game.dayCycle().darkness);}
         }
         this.trimBuildingRecords(now);
@@ -59763,7 +59763,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         return [...textures].reduce((n,t)=>n+t.realWidth*t.realHeight*4,0);
     },
     hideBuilding(r){r.active=false;r.base.root.visible=r.top.root.visible=false;if(r.glowMesh)r.glowMesh.visible=false;if(r.glowLive)r.glowLive.root.visible=false;},
-    evictBuilding(b,r){this.clearBuildingGlow(r,true);this.dropProjected(r,"projBase");this.dropProjected(r,"projTop");r.base.destroy();r.top.destroy();this.nativeBuildings.delete(b);this.buildingStats.evictions++;},
+    evictBuilding(b,r){this.clearBuildingGlow(r,true);this.dropProjected(r,"projGlow");this.dropProjected(r,"projBase");this.dropProjected(r,"projTop");r.base.destroy();r.top.destroy();this.nativeBuildings.delete(b);this.buildingStats.evictions++;},
     trimBuildingRecords(now=performance.now()){
         const hidden=[...this.nativeBuildings].filter(([,r])=>!r.active).sort((a,b)=>a[1].seen-b[1].seen);
         let bytes=hidden.reduce((n,[,r])=>n+this.buildingRecordBytes(r),0),nodes=hidden.reduce((n,[,r])=>n+[r.base,r.top,r.glowContext,r.glowLive].reduce((v,c)=>v+(c?.pool.length||0),0),0),count=hidden.length;
@@ -59810,11 +59810,12 @@ Object.assign(NativeWebGLRenderer.prototype,{
         return this.buildingGlowBytes()+bytes<=24*1048576;
     },
     clearBuildingGlow(r,recycle=false){
+        this.dropProjected?.(r,'projGlow');
         if(r.glowContext)r.glowContext.destroy();if(r.glowLive)r.glowLive.destroy();
         if(r.glowMesh)r.glowMesh.destroy();if(r.glowTarget){if(recycle)this.recycleBuildingTarget(r.glowTarget);else r.glowTarget.destroy(true);}
         r.glowContext=r.glowLive=r.glowMesh=r.glowTarget=null;r.glowKey=null;
     },
-    syncBuildingGlow(b,r,game,view,key){
+    syncBuildingGlow(b,r,game,view,key,common){
         if(!b.drawEmissive)return true;
         const dark=game.dayCycle().darkness,w=game.canvas.width/view.zoom+128,h=game.canvas.height/view.zoom+128;
         const left=view.x-w/2,top=view.y-h/2,density=Math.min(view.zoom,1536/Math.max(w,h));
@@ -59823,8 +59824,29 @@ Object.assign(NativeWebGLRenderer.prototype,{
         r.glowContext.sceneFrame=r.glowLive.sceneFrame=_worldMatrix;
         r.glowMesh.visible=r.glowLive.root.visible=this.layers.glows;
         if(!this.layers.glows)return true;
+        // Animated beams/crowns are recorded during the static pass and replayed live each frame.
+        const methods=['_sqDrawCrown','_sqDrawBeams','_sqVeil','_mcBeams'];
+        const drawStatic=ctx=>{
+            const saved=[];r.glowCalls=[];
+            try{
+                for(const name of methods)if(typeof b[name]==='function'){
+                    saved.push({name,own:Object.hasOwn(b,name),method:b[name]});b[name]=(...args)=>r.glowCalls.push({name,args:args.slice(1)});
+                }
+                b.drawEmissive(ctx,dark);
+            }finally{for(const s of saved){if(s.own)b[s.name]=s.method;else delete b[s.name];}}
+        };
+        // Emissive art leans with the building, so it goes through the GPU projector like the
+        // roof: drawn straight into the emissive layer, no per-camera snapshot. Drawing in order
+        // matches the snapshot's composite (source-over and alpha-preserving add are associative).
+        const projected=common!=null&&this.syncProjectedLayer(r,'projGlow',r.glowContext,common+':'+Math.round(dark*64),b,drawStatic,game,view);
+        if(projected){
+            const g=r.glowContext.root;g.position.set(0,0);
+            if(g.parent!==this.emissive||this.emissive.getChildIndex(g)!==this.emissive.getChildIndex(r.glowMesh)+1)this.emissive.addChildAt(g,this.emissive.getChildIndex(r.glowMesh)+1);
+            g.visible=true;r.projGlow.box.pulse=[this.layers.decorAnimation?.03:0,_gameTimeSec,31/Math.max(1,game.canvas.width)];
+            r.glowMesh.visible=false;r.glowKey=null;
+        }else if(r.glowContext.root.parent)r.glowContext.root.parent.removeChild(r.glowContext.root);
         const cacheKey=[key,view.zoom,game.canvas.width,game.canvas.height,Math.round(dark*64)].join(':');
-        if(r.glowKey!==cacheKey){
+        if(!projected&&r.glowKey!==cacheKey){
             if(!r.glowTarget||r.glowSize!==w+':'+h+':'+density){
                 if(r.glowTarget){r.glowTarget.destroy(true);r.glowTarget=null;}
                 r.glowTarget=this.takeBuildingTarget(w,h,density);
@@ -59837,13 +59859,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
                 r.glowSize=r.glowTarget._nativeBuildingSize=w+':'+h+':'+density;
             }
             const start=performance.now(),ctx=r.glowContext;ctx.begin();ctx.root.position.set(-left,-top);ctx.canvas=game.canvas;
-            const methods=['_sqDrawCrown','_sqDrawBeams','_sqVeil','_mcBeams'],saved=[];r.glowCalls=[];
-            try{
-                for(const name of methods)if(typeof b[name]==='function'){
-                    saved.push({name,own:Object.hasOwn(b,name),method:b[name]});b[name]=(...args)=>r.glowCalls.push({name,args:args.slice(1)});
-                }
-                b.drawEmissive(ctx,dark);
-            }finally{for(const s of saved){if(s.own)b[s.name]=s.method;else delete b[s.name];}}
+            drawStatic(ctx);
             // Store source-over coverage independently of additive RGB. This
             // makes the snapshot an affine composition over the lit scene:
             // output = cachedRGB + sceneRGB * (1 - cachedCoverage).
@@ -59853,7 +59869,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             }finally{modes[PIXI.BLEND_MODES.ADD]=add;state.blendMode=-1;}
             r.glowMesh.shader.uniforms.image=r.glowTarget;r.glowMesh.position.set(left,top);r.glowMesh.scale.set(w,h);r.glowKey=cacheKey;this.trimBuildingImages(ctx);
             this.buildingStats.rasterizations++;this.buildingStats.rasterMs+=performance.now()-start;
-        }else this.buildingStats.hits++;
+        }else if(!projected)this.buildingStats.hits++;
         const ctx=r.glowLive;ctx.begin();ctx.canvas=game.canvas;b._sqDark=dark;
         for(const call of r.glowCalls){const args=call.args.map(v=>typeof v==='number'?dark:v);b[call.name](ctx,...args);}
         const u=r.glowMesh.shader.uniforms;u.clock=_gameTimeSec;u.animate=this.layers.decorAnimation?1:0;
@@ -59881,9 +59897,9 @@ class NativeProjectedMesh extends PIXI.Mesh {
             varying vec4 vColor;varying vec2 vUV;
             void main(){vec2 k=camH/max(vec2(1.),camH-aZ);vec2 p=cam+(aGround-cam)*k;vColor=aColor;vUV=aUV;
                 gl_Position=vec4((projectionMatrix*translationMatrix*vec3(p,1.)).xy,0.,1.);}`,
-            `precision mediump float;varying vec4 vColor;varying vec2 vUV;uniform sampler2D uSampler;
-            void main(){gl_FragColor=texture2D(uSampler,vUV)*vColor;}`,
-            {uSampler:PIXI.Texture.WHITE,cam:new Float32Array(2),camH:1}));
+            `precision mediump float;varying vec4 vColor;varying vec2 vUV;uniform sampler2D uSampler;uniform vec3 uPulse;
+            void main(){gl_FragColor=texture2D(uSampler,vUV)*vColor*(1.-uPulse.x*(.5+.5*sin(uPulse.y*2.7+gl_FragCoord.x*uPulse.z)));}`,
+            {uSampler:PIXI.Texture.WHITE,cam:new Float32Array(2),camH:1,uPulse:new Float32Array(3)}));
     }
     constructor(run){
         const n=run.z.length/2,g=new PIXI.Geometry()
@@ -59893,7 +59909,10 @@ class NativeProjectedMesh extends PIXI.Mesh {
         super(g,NativeProjectedMesh.shader());this.projTexture=run.texture;this.blendMode=run.blend;this.vertexCount=n;
     }
     // The shader is shared, so the texture lives on the mesh (Mesh.texture would write the shared shader).
-    _render(renderer){this.shader.uniforms.uSampler=this.projTexture;super._render(renderer);}
+    _render(renderer){
+        // Emissive boxes carry the glow shimmer (amplitude, clock, phase per pixel); others none.
+        const u=this.shader.uniforms,p=this.parent?.pulse||this.parent?.parent?.pulse;u.uSampler=this.projTexture;
+        if(p)u.uPulse.set(p);else u.uPulse.fill(0);super._render(renderer);}
 }
 
 (() => {
@@ -59979,11 +59998,14 @@ class NativeProjectedMesh extends PIXI.Mesh {
             const cam=game.camera,cx=cam.x,cy=cam.y,C=leanCamHeight();
             // Captures take text through the real-font sprite path, which the projector can lean.
             ctxA.retainedOff=ctxB.retainedOff=ctxA.textSprites=ctxB.textSprites=true;
+            // Captured unculled: the meshes serve every camera position in this region, so a
+            // camera move never forces a recapture (building routines cull to game._cullBounds.view).
+            const cull=game._cullBounds;if(cull)game._cullBounds={...cull,view:{left:-Infinity,top:-Infinity,right:Infinity,bottom:Infinity}};
             try{
                 const tape={record:true,list:[],i:0};ctxA.segTape=tape;ctxA.begin();draw(ctxA);
                 tape.record=false;ctxB.segTape=tape;cam.x=cx+D;cam.y=cy+D;try{ctxB.begin();draw(ctxB);}finally{cam.x=cx;cam.y=cy;}
                 if(tape.i!==tape.list.length)this.projectionFail='tape';
-            }finally{ctxA.retainedOff=ctxB.retainedOff=ctxA.textSprites=ctxB.textSprites=false;ctxA.segTape=ctxB.segTape=null;}
+            }finally{ctxA.retainedOff=ctxB.retainedOff=ctxA.textSprites=ctxB.textSprites=false;ctxA.segTape=ctxB.segTape=null;game._cullBounds=cull;}
             const fail=why=>{this.projectionFail=why;return null;};
             const A=collect(ctxA);if(!A)return fail(collect.why);const B=collect(ctxB);if(!B)return fail(collect.why);
             let vertices=0,deviation=0;
@@ -60053,9 +60075,10 @@ class NativeProjectedMesh extends PIXI.Mesh {
         syncProjectedLayer(r,slot,ctx,common,b,draw,game,view){
             const L=this.layers;if(L.gpuProjection===false||!CONFIG.BUILDINGS.LEAN){this.dropProjected(r,slot);return false;}
             const cam=game.camera,p=r[slot]||(r[slot]={}),region=this.projectionRegion(b,cam),key=common+'|'+region;
-            // Building routines cull to the view; recapture once the camera has travelled a third of it.
+            // Captures are unculled, so only a region change recaptures; a failed key is retried
+            // after the camera has travelled a third of the view.
             const reach=Math.min(game.canvas.width,game.canvas.height)/(3*view.zoom),far=Math.hypot(cam.x-(p.cx??1e9),cam.y-(p.cy??1e9))>reach;
-            if(p.box&&p.key===key&&!far){this.projectionStats.hits++;return this.showProjected(p,ctx,cam);}
+            if(p.box&&p.key===key){this.projectionStats.hits++;return this.showProjected(p,ctx,cam);}
             if(p.fail===key&&!far)return false;
             const start=performance.now();
             p.ctxB||(p.ctxB=new NativeVectorContext(this));p.ctxB.sceneFrame=ctx.sceneFrame;p.ctxB.canvas=ctx.canvas;
