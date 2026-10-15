@@ -69,7 +69,12 @@ const GLBuildingModel = (() => {
             const cdx = gx1 - gx0, cdy = gy1 - gy0, dr = r1 - r0, px = x - gx0, py = y - gy0;
             const a = cdx * cdx + cdy * cdy - dr * dr, b = px * cdx + py * cdy + r0 * dr, c = px * px + py * py - r0 * r0;
             let t;
-            if (Math.abs(a) < 1e-6) t = c / (2 * b); else { const d = b * b - a * c; t = d < 0 ? 0 : (b + Math.sqrt(d)) / a; }
+            if (Math.abs(a) < 1e-6) t = c / (2 * b);
+            else {                                                       // the largest root whose circle has a radius (Canvas's rule)
+                const d = b * b - a * c; if (d < 0) return 0;
+                const q = Math.sqrt(d), t1 = (b + q) / a, t2 = (b - q) / a, hi = Math.max(t1, t2), lo = Math.min(t1, t2);
+                t = r0 + hi * dr >= 0 ? hi : lo;
+            }
             return t;
         };
         const rings = 8, segs = 36, base = B.n, col = (x, y) => stopColor(stops, tAt(x, y));

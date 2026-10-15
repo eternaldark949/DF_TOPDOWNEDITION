@@ -100,7 +100,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         for(const group of this.trafficContext.root.children.slice())if(group._nativeEntity&&L.depthSort)root.addChild(group);
         if(L.depthSort){this.playerSprite.zIndex=game.player.y;root.addChild(this.playerSprite);root.sortChildren();}
         this.buildingBaseStage.sortableChildren=this.roofStage.sortableChildren=!!L.depthSort;
-        for(const [b,r]of this.nativeBuildings){r.base.root.zIndex=r.top.root.zIndex=b.y+(b.h||b.height||0);}
+        
         this.roofDetailContext.root.zIndex=Infinity;
         if(L.depthSort){this.buildingBaseStage.sortChildren();this.roofStage.sortChildren();}
     },

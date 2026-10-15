@@ -15,7 +15,8 @@
 // The face rides on every vertex, so a building can have any number of walls (a curved tower has hundreds).
 const GLB_STRIDE = 3 + 3 + 3 + 4 + 4 + 4 + 4 + 4 + 4;
 // anim types (vertex shader)
-const GLB_ANIM = { NONE: 0, SPIN: 1, CAUSTIC: 2, SWAY: 3, SHIMMER: 4, BLINK_ON: 5, BLINK_OFF: 6, WINDOW: 7, SKY: 8, SHEEN: 9, RIM: 10, RADIAL: 11, FLICKER: 12, GLOW: 13, TV: 14, WINDOW_TV: 15, BEAM: 16, BREATHE: 17, FADE: 18, SIGN: 19, RIPPLE: 20 };
+const GLB_ANIM = { NONE: 0, SPIN: 1, CAUSTIC: 2, SWAY: 3, SHIMMER: 4, BLINK_ON: 5, BLINK_OFF: 6, WINDOW: 7, SKY: 8, SHEEN: 9, RIM: 10, RADIAL: 11, FLICKER: 12, GLOW: 13, TV: 14, WINDOW_TV: 15, BEAM: 16, BREATHE: 17, FADE: 18, SIGN: 19, RIPPLE: 20,
+                   SQ_LIGHT: 21, SQ_MOVE: 22, SQ_WINDOW: 23, SQ_SIGN: 24 };   // 21-24: the Silver Queen (gl/silver-queen.js)
 // line flags
 const GLB_LINE = { SCALE_K: 1, SQUARE: 2 };
 
@@ -211,13 +212,61 @@ class GLBuildingMesh extends PIXI.Mesh {
             uniform mat3 projectionMatrix; uniform mat3 translationMatrix;
             uniform vec2 uCam; uniform float uC; uniform float uH; uniform float uLod; uniform float uTime; uniform float uPx;
             uniform vec4 uSun; uniform vec3 uSunRGB; uniform vec4 uRim; uniform vec4 uNight; uniform float uFade;
-            varying vec4 vColor; varying vec3 vLine; varying vec4 vText; varying vec2 vWorld; varying vec4 vRadial;
+            varying vec4 vColor; varying vec3 vLine; varying vec4 vText; varying vec2 vWorld; varying vec4 vRadial; varying vec4 vClip;
             float kOf(vec3 p, float mode){ return mode < .5 ? 1. + p.z / (uC - uH) : uC / (uC - min(p.z, uC * .86)); }
             vec2 lean(vec3 p, float mode){ return uCam + (p.xy - uCam) * kOf(p, mode); }
             float hash(float s, float i){ return fract(sin(s * 12.9898 + i * 78.233) * 43758.5453); }
+            // ---- Silver Queen (gl/silver-queen.js): its night factors, one program per kind of light (pr), params b, c.
+            // g is the glow layer's alpha (uNight.x): Canvas drew some of its glow at an absolute alpha, so those divide by it.
+            // Its meshes' uRim: top (wind x, wind y, crown ring fade, 0), glow (wet, 0, crown ring fade, rim); uFade: the portico's fade.
+            float sqFade(float d0, float span){ return clamp((length(aFace.zw - uCam) * uH / (uC - uH) - d0) / span, 0., 1.); }
+            float sqLight(float pr, float b, float c, inout vec4 col, inout float hide){
+                float g = uNight.x, dk = uNight.y, t = uTime, pa = min(1., g * 1.4), f = 1.;
+                if (pr < .5) return 1.;
+                if (pr < 3.5) {                                            // 1 face detail, 2 with the crown's pulse, 3 ledge rims (face fade 4..18 px)
+                    f = sqFade(4., 14.);
+                    if (pr < 2.5 && dk <= .05) hide = 1.;
+                    if (pr > 1.5 && pr < 2.5) f *= .82 + .18 * sin(t * .7 + b);
+                    if (pr > 2.5) { f *= uRim.w; if (uRim.w <= .01) hide = 1.; }
+                } else if (pr < 7.5) {                                     // 4 balcony slab (shaded by the dark), 5 warm, 6 top rail, 7 rail rim
+                    f = sqFade(6., 16.);
+                    if (pr < 4.5) { col.rgb *= 1. - min(1., dk) * .78; f /= g; }
+                    else {
+                        if (dk <= .05) hide = 1.;
+                        if (pr > 5.5 && pr < 6.5) f *= pa / g;
+                        if (pr > 6.5) { f *= uRim.w / g; if (uRim.w <= .01) hide = 1.; }
+                    }
+                } else if (pr < 13.5) {                                    // the portico: 8, 9 faded, 10 marquee chase (c: its zoom set), 11 lanterns, 12, 13 post globes
+                    if (dk < .05) hide = 1.;
+                    f = pa;
+                    if (pr < 10.5 || pr > 12.5) f /= g;
+                    if (pr > 8.5 && pr < 10.5) f *= uFade;
+                    if (pr > 9.5 && pr < 10.5) { f *= .35 + .65 * pow(max(0., cos(b - t * 4.2)), 3.); if ((c < .5) != (uLod < .5)) hide = 1.; }
+                    if (pr > 10.5 && pr < 11.5) f *= .92 + .08 * sin(t * 2.7 + b);
+                    if (pr > 12.5) f *= .96 + .04 * sin(t * 3.1 + b);
+                } else if (pr < 18.5) {                                    // the roof: 14, 15 breathing (c = base% * 100 + rate * 10), 16 pad chase, 17 fairy lights (c: banded), 18 pool
+                    if (dk <= .05) hide = 1.;
+                    if (pr > 14.5 && pr < 15.5) { float base = floor(c / 100.) / 100.; f = base + (1. - base) * sin(t * mod(c, 100.) / 10. + b); }
+                    if (pr > 15.5 && pr < 16.5) f = .25 + .75 * pow(max(0., cos(b - t * 2.4)), 4.);
+                    if (pr > 16.5 && pr < 17.5) {
+                        float on = .55 + .45 * pow(max(0., sin(t * (1.1 + b) + b * 20.)), 4.);
+                        if (c > .5) on = .55 + .45 * (min(3., floor((on - .55) / .45 * 4.)) + .5) / 4.;
+                        f = on;
+                    }
+                } else if (pr < 23.5) {                                    // 19 crown, 20 its ring (uRim.z), 21 beacon, 22 searchlights, 23 night veil
+                    if (pr < 21.5) { f = min(1., dk * 1.3) / g; if (dk <= .05) hide = 1.; }
+                    if (pr > 19.5 && pr < 20.5) f *= uRim.z;
+                    if (pr > 20.5 && pr < 21.5 && !(sin(t * 3.2) > .45)) hide = 1.;
+                    if (pr > 21.5 && pr < 22.5) { f = min(1., (dk - .2) / .3) / g; if (dk < .2) hide = 1.; }
+                    if (pr > 22.5) { f = min(1., (dk - .2) * 1.6) / g; if (dk < .2) hide = 1.; }
+                } else if (pr < 24.5) f = uRim.z;                          // 24 the crown ring by day
+                else if (pr < 25.5) f = uFade;                             // 25 the portico by day
+                else f = sqFade(4., 14.);                                  // 26 face detail by day
+                return f;
+            }
             void main(){
                 vec3 P = aPos; float mode = aLine.w; vec4 col = aColor; float hide = 0.;
-                vRadial = vec4(0.);
+                vRadial = vec4(0.); vClip = vec4(0.);
                 // the face this belongs to: hidden when it turns away; detail gated by how much of the wall shows
                 if (aMeta.x > .5) {
                     if (dot(aFace.xy, uCam - aFace.zw) <= 0.) hide = 1.;
@@ -265,13 +314,123 @@ class GLBuildingMesh extends PIXI.Mesh {
                         float ms = uNight.w, f = .9 + sin(ms / 1300.) * .08 + (sin(ms / 4100.) > .95 ? -.35 : 0.);
                         col.a *= clamp(f, .55, 1.) * (.35 + .65 * min(1., uNight.y * 1.4)) * max(.45, uFade);
                     }
+                    else if (ty > 28.5 && ty < 32.5) {
+                        // ---- Moon City (gl/moon-city.js): anims 29-32. uRim = (the club's beat count mod 32, lamps on, -, -) ----
+                        float bn = uRim.x, kick = pow(1. - fract(bn), 3.), ft = uNight.w / 1000.;
+                        if (ty < 29.5) {                                   // 29 PULSE: a × max(0, a0 + gain·kick + wave); aAnim (a0, flags·10 + gain, wave·100 + phase)
+                            float fl = floor(aAnim.z / 10.), gain = aAnim.z - fl * 10., wv = floor(aAnim.w / 100.), ph = aAnim.w - wv * 100.;
+                            float s = wv < .5 ? 0. : wv < 1.5 ? .22 * sin(t * .9 + ph) : wv < 2.5 ? .1 * sin(t * .8 + ph) : wv < 3.5 ? .2 * sin(t * .6 + ph)
+                                    : wv < 4.5 ? .3 * sin(ft * 1.7 + ph) : .45 * sin(ft * 3. + ph);
+                            float a = max(0., aAnim.y + gain * kick + s);
+                            if (mod(fl, 2.) > .5) a /= max(uNight.x, .01);                         // 1: absolute alpha (undo the glow layer's fade)
+                            if (mod(floor(fl / 2.), 2.) > .5 && uRim.y < .5) hide = 1.;              // 2: only while the lamps are on
+                            if (mod(floor(fl / 4.), 2.) > .5) {                                     // 4: the marquee's flicker, brighter with the dark
+                                float fk = mod(ft, 7.3) < .12 ? .35 : mod(ft, 11.1) < .06 ? .6 : 1.;
+                                a *= max(.15, min(1., uNight.y * 1.3)) * fk;
+                            }
+                            if (mod(floor(fl / 8.), 2.) > .5) { a *= uNight.y; if (uNight.y < .25) hide = 1.; }   // 8: the searchlights, with the dark
+                            if (mod(floor(fl / 16.), 2.) > .5) { a *= uSun.z; if (uSun.z <= .05) hide = 1.; }   // 16: the sky, by day
+                            col.a *= a;
+                        } else if (ty < 30.5) {                            // 30 DOME: a dance-floor cell (i, j): this bar's pattern and colour
+                            float bar = floor(bn / 8.), pat = mod(bar, 4.), i = aAnim.y, j = aAnim.z, ph;
+                            if (pat < .5) ph = length(vec2(i, j)) * .5 - bn * .5;
+                            else if (pat < 1.5) ph = (i + j) * .35 - bn;
+                            else if (pat < 2.5) ph = 0.;                    // (Canvas: 0 or 2, whose sine is 0)
+                            else ph = (abs(i) + abs(j) > .5 ? atan(j, i) : 0.) * 2. + bn;
+                            col.a *= max(0., .25 + .25 * sin(ph * 3.14159265) + .35 * kick) * .55;
+                            float ci = mod(abs(i * 3. + j) + bar, 4.);   // CLUB_PAL: violet, lavender, rose, gold
+                            col.rgb = ci < .5 ? vec3(.690, .471, 1.) : ci < 1.5 ? vec3(.863, .745, 1.) : ci < 2.5 ? vec3(1., .353, .588) : vec3(.910, .761, .478);
+                        } else if (ty < 31.5) {                            // 31 PHASE: phase i lights in turn round the dome, a step a beat
+                            float d = mod(mod(floor(bn), 8.) - aAnim.y + 8., 8.);
+                            col.a *= d < .5 ? .7 + .3 * kick : d < 1.5 ? .35 : d < 2.5 ? .15 : .05;
+                        } else {                                           // 32 MOVE: mist i < 10 drifting at the door (lamps on); 10 + phase: a searchlight about (b, c)
+                            if (aAnim.y < 9.5) { float i = aAnim.y; P.xy += vec2(sin(t * .21 + i * 1.7) * 70., cos(t * .17 + i * 2.3) * 24.); if (uRim.y < .5) hide = 1.; }
+                            else {
+                                float ph = aAnim.y - 10., a = sin(t * .22 + ph) * 1.1 + ph; vec2 d = P.xy - aAnim.zw;
+                                P.xy = aAnim.zw + vec2(d.x * cos(a) - d.y * sin(a), d.x * sin(a) + d.y * cos(a));
+                                col.a *= uNight.y / max(uNight.x, .01); if (uNight.y < .25) hide = 1.;
+                            }
+                        }
+                    }
+                    else if (ty > 20.5 && ty < 24.5) {                     // ---- Silver Queen (gl/silver-queen.js) ----
+                        if (ty < 21.5) col.a *= sqLight(aAnim.y, aAnim.z, aAnim.w, col, hide);   // SQ_LIGHT (program, b, c)
+                        else if (ty < 22.5) {                              // SQ_MOVE (kind, b, c); a fill's (unused) stroke attributes carry its anchor / params
+                            float kd = aAnim.y, b = aAnim.z, c = aAnim.w;
+                            if (kd < 2.5) {                                // 1 spin about aPrev at rate b; 2 turned to point away from the camera
+                                float a = kd < 1.5 ? t * b : atan(aPrev.y - uCam.y, aPrev.x - uCam.x); vec2 d = P.xy - aPrev.xy;
+                                P.xy = aPrev.xy + vec2(d.x * cos(a) - d.y * sin(a), d.x * sin(a) + d.y * cos(a));
+                                col.a *= sqLight(c, 0., 0., col, hide);
+                            } else if (kd < 3.5) {                         // 3 a radial wash about aPrev (wall lean), radius b screen px
+                                vRadial = vec4(lean(aPrev, 0.), b, 1.); col.a *= sqLight(c, 0., 0., col, hide);
+                            } else if (kd < 4.5) {                         // 4 mist drifting b px across: aNext (rate, phase), aPrev (sway, rate, phase)
+                                float u = fract(t * aNext.x + aNext.y);
+                                P.x += b * u; P.y += aPrev.x * sin(t * aPrev.y + aPrev.z);
+                                col.a *= sin(u * 3.14159) * sqLight(c, 0., 0., col, hide);
+                            } else if (kd < 5.5) {                         // 5 a twinkling glint's arm (b: +x -x +y -y), c its kind; aPrev its params
+                                float s = 1., tw = 0.;
+                                if (c < .5) { tw = pow(max(0., sin(t * aPrev.y + aPrev.x)), 10.); if (tw < .04) hide = 1.; s = 1. + tw * 3.5; col.a *= tw * uRim.x * sqLight(8., 0., 0., col, hide); }
+                                else if (c < 1.5) { tw = pow(max(0., sin(t * 1.3 + aPrev.x)), 3.); s = 1. + tw * 2.2; col.a *= (.25 + .6 * tw) * sqLight(18., 0., 0., col, hide); }
+                                else if (c < 2.5) { s = 10. + 3. * sin(t * 2.2); col.a *= sqLight(14., 0., 0., col, hide); }
+                                else {                                     // a mote orbiting the crown ring, screen sized
+                                    float an = -t * .35 + aPrev.x; P.xy += vec2(cos(an), sin(an)) * 44.8;
+                                    tw = .5 + .5 * sin(t * 3. + aPrev.y); s = (.8 + tw * 2.2) / kOf(P, mode); col.a *= sqLight(20., 0., 0., col, hide);
+                                }
+                                P.xy += (b < 1.5 ? vec2(b < .5 ? 1. : -1., 0.) : vec2(0., b < 2.5 ? 1. : -1.)) * s;
+                            } else if (kd < 6.5) {                         // 6 a cabana curtain billowing downwind: side b, weight c, phase aPrev.x
+                                vec2 n = b < .5 ? vec2(0., -1.) : b < 1.5 ? vec2(1., 0.) : b < 2.5 ? vec2(0., 1.) : vec2(-1., 0.);
+                                float wl = length(uRim.xy); vec2 w = uRim.xy / (wl > 0. ? wl : 1.);
+                                P.xy += n * (1.5 + max(0., dot(n, w)) * min(1., wl / 4.) * (3. + 2.5 * sin(t * 1.8 + aPrev.x))) * c;
+                            } else if (kd < 7.5) { P.y += sin(t * .8 + b) * 2. + c * sin(t + b) * 3.; }    // 7 a pool ripple (stroke): row b, weight c
+                            else if (kd < 8.5) { P.x += sin(t * 1.7) * b; col.a *= sqLight(c, 0., 0., col, hide); }   // 8 the moon's wobble on the water
+                            else if (kd < 9.5) col.a *= sqLight(22., 0., 0., col, hide);                       // 9 a searchlight: placed after the lean
+                            else {                                         // 10 moonlight sweeping the roofs: x from b, c wide, aPrev.x its top
+                                float sx = b + c * (mod(t * .012, 1.6) - .3), tt = ((P.x - sx + 140.) * 280. + (P.y - aPrev.x) * 90.) / 86500.;
+                                col.a *= max(0., 1. - abs(2. * tt - 1.)) * sqLight(23., 0., 0., col, hide);
+                            }
+                        }
+                        else if (ty < 23.5) {                              // SQ_WINDOW (seed, index): a window that changes every 7 s, lit warm or lavender
+                            float h = hash(aAnim.y, aAnim.z + uNight.z);
+                            if (!(h < .5) || h < .06) hide = 1.;
+                            if (h > .36) col.rgb = vec3(.851, .761, 1.);
+                        } else {                                           // SQ_SIGN (seed, zoom bits lod 0/1/2, flickers): _paintSign's neon, faded with the portico
+                            float lb = uLod < .5 ? 1. : uLod < 1.5 ? 2. : 4., f = 1.;
+                            if (mod(floor(aAnim.z / lb), 2.) < .5) hide = 1.;
+                            if (aAnim.w > .5) {
+                                float ms = uNight.w, sd = aAnim.y;
+                                f = (.85 + sin((ms + sd) / 1200.) * .1) * (1. + sin((ms + sd * 1.3) / 80.) * .04) * (1. + sin((ms + sd * 2.7) / 30.) * .03);
+                                if (sin((ms + sd * .5) / 4000.) > .92) f *= .4 + hash(sd, floor(ms / 50.)) * .3;
+                                f = clamp(f, .3, 1.);
+                            }
+                            col.a *= f * max(.45, uFade);
+                        }
+                        if (aText.x > -1.5 && aText.x < -.5 && aText.w != 0.) {   // cut by a roof rect at the roof's lean: (x, y, w * 4096 + h); negative keeps inside it
+                            float k = 1. + uH / (uC - uH), w = abs(aText.w);
+                            vec2 lo = uCam + (aText.yz - uCam) * k, hi = uCam + (aText.yz + vec2(floor(w / 4096.), mod(w, 4096.)) - uCam) * k;
+                            vClip = aText.w > 0. ? vec4(lo, hi) : vec4(hi.x, lo.y, lo.x, hi.y);
+                        }
+                    }
                     else if (ty < 15.5) { float h = hash(aAnim.y, aAnim.z + uNight.z); if (!(h < .06)) hide = 1.; if (!(sin(t * 9. + aAnim.w) > 0.)) col.rgb = vec3(.435, .624, .91); }
+                    // ---- Cozy Cafe (gl/cozy-cafe.js) ----
+                    else if (ty > 24.5 && ty < 25.5) {                     // a chimney smoke puff: aAnim (puff 0..4, its rim offset xy); rises 46 px, drifts east, fades
+                        float ph = fract(t * .22 + aAnim.y / 5.);
+                        P += vec3(ph * 26. + sin(t + aAnim.y * 2.) * 3., -ph * 10., ph * 46.);
+                        col.a *= .22 * (1. - ph);
+                    }
                 }
                 vec2 S = lean(P, mode);
                 if (ty > 15.5 && ty < 16.5) {                              // a searchlight: from its lamp (leaned), sweeping; aAnim (phase, heading, side)
                     float ang = -1.5708 + sin(t * .22 + aAnim.y) * .85 + aAnim.z;
                     if (aAnim.w != 0.) S += vec2(cos(ang + aAnim.w * .07), sin(ang + aAnim.w * .07)) * 900.;
                     col.a *= uNight.y; if (uNight.y <= .25) hide = 1.;
+                }
+                if (ty > 24.5 && ty < 25.5) S += aAnim.zw * (5. + fract(t * .22 + aAnim.y / 5.) * 11.);   // Cozy Cafe: the puff's screen radius, 5 to 16 px
+                if (ty > 21.5 && ty < 22.5 && aAnim.y > 8.5 && aAnim.y < 9.5) {   // Silver Queen searchlight (SQ_MOVE 9): phase b, c = step + 3 side + 6 narrow
+                    float ph = aAnim.z, cd = aAnim.w, ti = mod(cd, 3.), sd = mod(floor(cd / 3.), 2.) * 2. - 1., nb = floor(cd / 6.);
+                    float az = -1.5708 + (ph > 0. ? .45 : -.45) + sin(t * .19 + ph) * .95, el = 1.02 + .16 * sin(t * .11 + ph * 1.7), zT = uC * .8;
+                    vec2 p1 = uCam + (P.xy + vec2(cos(az), sin(az)) * ((zT - uH) / tan(el)) - uCam) * (uC / (uC - min(zT, uC * .86)));
+                    vec2 v = p1 - S; float L = length(v); if (L < 1e-3) L = 1.; vec2 n = vec2(-v.y, v.x) / L;
+                    float w0 = nb > .5 ? 2.5 : 8., w1 = max(60., L * .13) * (nb > .5 ? .3 : 1.), tt = ti < .5 ? 0. : ti < 1.5 ? .3 : 1.;
+                    S += v * tt + n * sd * (w0 + (w1 - w0) * tt);
                 }
                 vLine = vec3(0.);
                 if (aLine.x != 0.) {
@@ -294,10 +453,15 @@ class GLBuildingMesh extends PIXI.Mesh {
                 gl_Position = hide > .5 ? vec4(2., 2., 2., 1.) : vec4((projectionMatrix * translationMatrix * vec3(S, 1.)).xy, 0., 1.);
             }`;
         const fs = `precision mediump float;
-            varying vec4 vColor; varying vec3 vLine; varying vec4 vText; varying vec2 vWorld; varying vec4 vRadial;
+            varying vec4 vColor; varying vec3 vLine; varying vec4 vText; varying vec2 vWorld; varying vec4 vRadial; varying vec4 vClip;
             uniform sampler2D uFont; uniform float uAlpha;
             void main(){
                 float a = 1.;
+                if (vClip.x != vClip.z) {                                 // Silver Queen: cut by a roof rect (x0 > x1: kept inside it)
+                    vec2 lo = min(vClip.xy, vClip.zw), hi = max(vClip.xy, vClip.zw);
+                    bool inR = vWorld.x > lo.x && vWorld.x < hi.x && vWorld.y > lo.y && vWorld.y < hi.y;
+                    if (inR == (vClip.x < vClip.z)) discard;
+                }
                 if (vText.x < -1.5) {                                     // a shadow-blurred stroke: a gaussian falloff past its core
                     float d = abs(vLine.x), s = max(.5, vText.y * .5);   // the stroke's coverage spread by a gaussian of sigma blur / 2
                     a = min(1., 2. * vLine.y / (2.5066 * s)) * exp(-d * d / (2. * s * s));

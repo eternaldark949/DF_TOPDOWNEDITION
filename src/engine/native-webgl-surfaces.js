@@ -121,7 +121,8 @@ class NativeWorldSurfaces{
     syncRoofs(game,view){
         const r=this.owner,wet=r.layers.wetRoofs&&r.layers.buildings&&game.activeMap.type==='outdoor'?Math.min(1,game.weather.wetness||0):0;let count=0,dropped=0;
         for(const rec of this.roofs.values())for(const mesh of rec.meshes)mesh.visible=false;
-        if(wet>.01&&r.nativeBuildings.size){
+        const shown=wet>.01?r.glBuildings?.visible()||[]:[];
+        if(shown.length){
             if(!this.roofTile){this.roofTile=PIXI.RenderTexture.create({width:64,height:64,resolution:1});this.roofTile.baseTexture.wrapMode=PIXI.WRAP_MODES.REPEAT;
                 this.roofTileMesh=new PIXI.Mesh(nativeSurfaceGeometry(),PIXI.Shader.from(NATIVE_SURFACE_VERTEX,`precision highp float;varying vec2 uv;uniform float clock;uniform float wet;
                     void main(){float wave=sin(uv.x*6.2831853+uv.y*6.2831853+clock*.7),streak=pow(max(0.,wave),12.);
@@ -131,15 +132,15 @@ class NativeWorldSurfaces{
             const clock=r.layers.decorAnimation?_gameTimeSec:0,key=clock+':'+wet;
             if(this.roofTileKey!==key){this.roofTileMesh.shader.uniforms.clock=clock;this.roofTileMesh.shader.uniforms.wet=wet;r.renderer.render(this.roofTileStage,{renderTexture:this.roofTile,clear:true});this.roofTileKey=key;}
         }
-        if(wet>.01)for(const [b,record]of r.nativeBuildings){if(!record.active||!b._footprint||!b._leanScale)continue;let rec=this.roofs.get(b);if(!rec)this.roofs.set(b,rec={meshes:[]});rec.used=r.frameId;
+        for(const [b,record]of shown){if(!b._footprint||!b._leanScale)continue;let rec=this.roofs.get(b);if(!rec)this.roofs.set(b,rec={meshes:[]});rec.used=r.frameId;
             const k=1+b._leanScale(),key=[record.key,k].join(':');
             for(let i=0;i<b.sections.length;i++){
                 if(count>=48){dropped++;continue;}let mesh=rec.meshes[i];if(!mesh)mesh=rec.meshes[i]=new NativeWetRoof();
                 const points=b._footprint(b.sections[i],i).map(([x,y])=>[game.camera.x+(x-game.camera.x)*k,game.camera.y+(y-game.camera.y)*k]);mesh.polygon(points,key+':'+i);
-                record.top.root.addChild(mesh);mesh.visible=true;mesh.shader.texture=this.roofTile;mesh.alpha=Math.min(b._sqFade??1,b._dnFade??1);count++;
+                record.top.addChild(mesh);mesh.visible=true;mesh.shader.texture=this.roofTile;mesh.alpha=record.fade??1;count++;
             }
         }
-        for(const [b,rec]of this.roofs)if(!r.nativeBuildings.has(b)||rec.used<r.frameId-120){for(const mesh of rec.meshes)mesh.destroy();this.roofs.delete(b);}
+        for(const [b,rec]of this.roofs)if(!r.glBuildings?.records.has(b)||rec.used<r.frameId-120){for(const mesh of rec.meshes)mesh.destroy();this.roofs.delete(b);}
         return {count,dropped,bytes:this.roofTile?64*64*4:0};
     }
     syncSun(game,view,V,S){

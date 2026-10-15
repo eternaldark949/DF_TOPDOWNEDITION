@@ -70,6 +70,8 @@ class GLBuildingsSystem {
         r.rim[3] = this.rimA;
         this.stats.shown++;
     }
+    /** The buildings shown this frame: [[building, record], ...] (record: base, top, glow meshes, key, fade) */
+    visible() { return [...this.records].filter(([, r]) => r.seen === this.frame); }
     /** Hide what wasn't shown; drop geometry long out of view */
     end() {
         let vertices = 0;
@@ -87,4 +89,4 @@ class GLBuildingsSystem {
     clear() { for (const r of this.records.values()) this.destroy(r); this.records.clear(); }
 }
 /** Landmarks with their own GL model (style → { build(b), update?(b, record) }) */
-GLBuildingsSystem.landmarks = { double_nights: GLDoubleNights };
+GLBuildingsSystem.landmarks = { double_nights: GLDoubleNights, enni_cole: GLEnniCole, cozy_cafe: GLCozyCafe, moon_city: GLMoonCity, silver_queen: GLSilverQueen };
