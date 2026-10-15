@@ -188,6 +188,7 @@ class GLFace {
 
 /** The mesh: one building layer, its own face table, the shared shader */
 class GLBuildingMesh extends PIXI.Mesh {
+    containsPoint() { return false; }                                   // scenery, never a pointer target
     static shader() {
         if (GLBuildingMesh._shader) return GLBuildingMesh._shader;
         const vs = `precision highp float;
@@ -234,7 +235,12 @@ class GLBuildingMesh extends PIXI.Mesh {
                     }
                     else if (ty < 10.5) { col.a *= uRim.w; if (uRim.w <= .01) hide = 1.; }
                     else if (ty < 11.5) { vRadial = vec4(aAnim.yz, aAnim.w, 1.); }
-                    else if (ty < 12.5) { col.a *= uNight.w; }
+                    else if (ty < 12.5) {                                  // neon flicker (Canvas _paintSign): breathing, hum, filament, rare brownouts
+                        float ms = uNight.w, sd = aAnim.y;
+                        float f = (.85 + sin((ms + sd) / 1200.) * .1) * (1. + sin((ms + sd * 1.3) / 80.) * .04) * (1. + sin((ms + sd * 2.7) / 30.) * .03);
+                        if (sin((ms + sd * .5) / 4000.) > .92) f *= .4 + hash(sd, floor(ms / 50.)) * .3;
+                        col.a *= clamp(f, .3, 1.);
+                    }
                     else if (ty < 13.5) { col.a *= uNight.x; }
                     else if (ty < 14.5) { if (!(sin(t * 9. + aAnim.w) > 0.)) col.rgb = vec3(.435, .624, .91); }   // a TV: #9ec8ff / #6f9fe8
                     else if (ty < 15.5) { float h = hash(aAnim.y, aAnim.z + uNight.z); if (!(h < .06)) hide = 1.; if (!(sin(t * 9. + aAnim.w) > 0.)) col.rgb = vec3(.435, .624, .91); }
@@ -257,6 +263,7 @@ class GLBuildingMesh extends PIXI.Mesh {
                 vWorld = S;
                 vColor = vec4(col.rgb * col.a, aMeta.w > .5 ? 0. : col.a);              // additive: premultiplied colour, no coverage
                 vText = aText; if (aText.x < -1.5) vText.y = aText.y / uPx;              // a soft (shadow-blurred) stroke: its blur in px
+                else if (aText.x >= 0. && aText.z < 9.) vText.w = max(.02, .7 * uPx / (12. * kOf(P, mode)));   // edge softness: about a screen pixel
                 gl_Position = hide > .5 ? vec4(2., 2., 2., 1.) : vec4((projectionMatrix * translationMatrix * vec3(S, 1.)).xy, 0., 1.);
             }`;
         const fs = `precision mediump float;
@@ -265,14 +272,19 @@ class GLBuildingMesh extends PIXI.Mesh {
             void main(){
                 float a = 1.;
                 if (vText.x < -1.5) {                                     // a shadow-blurred stroke: a gaussian falloff past its core
-                    float d = max(0., abs(vLine.x) - vLine.y), s = max(.5, vText.y * .5);
-                    a = exp(-d * d / (2. * s * s));
+                    float d = abs(vLine.x), s = max(.5, vText.y * .5);   // the stroke's coverage spread by a gaussian of sigma blur / 2
+                    a = min(1., 2. * vLine.y / (2.5066 * s)) * exp(-d * d / (2. * s * s));
                 } else if (vLine.z > .5) {                                // stroke coverage across the line (thin lines fade like Canvas hairlines)
                     float d = abs(vLine.x), w = vLine.y;
                     a = w >= .5 ? clamp(w + .5 - d, 0., 1.) : clamp(1. - d, 0., 1.) * 2. * w;
                 }
                 if (vRadial.w > .5) a *= max(0., 1. - length(vWorld - vRadial.xy) / vRadial.z);
-                if (vText.x >= 0.) { float s = texture2D(uFont, vText.xy).a; a *= smoothstep(vText.z - vText.w, vText.z + vText.w, s); }
+                if (vText.x >= 0.) {                                      // text (gl/text.js): distance field, or a blurred glow channel
+                    vec4 tx = texture2D(uFont, vText.xy);
+                    if (vText.z < 9.) a *= smoothstep(vText.z - vText.w, vText.z + vText.w, tx.r);
+                    else if (vText.z < 19.) a *= tx.g * (vText.z - 10.);
+                    else a *= tx.b * (vText.z - 20.);
+                }
                 gl_FragColor = vColor * (a * uAlpha);
             }`;
         return (GLBuildingMesh._shader = PIXI.Shader.from(vs, fs, {

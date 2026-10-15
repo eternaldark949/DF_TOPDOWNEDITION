@@ -11,6 +11,7 @@
 // Anything the method can't represent (clip masks, bitmap text, custom-shader meshes, shapes
 // that don't follow the lean) makes that layer fall back to the live path.
 class NativeProjectedMesh extends PIXI.Mesh {
+    containsPoint(){return false;}   // never a pointer target (its geometry has no aVertexPosition)
     static shader(){
         return NativeProjectedMesh._shader||(NativeProjectedMesh._shader=PIXI.Shader.from(`precision highp float;
             attribute vec2 aGround;attribute vec2 aZ;attribute vec4 aColor;attribute vec2 aUV;attribute vec4 aFace;
@@ -22,7 +23,7 @@ class NativeProjectedMesh extends PIXI.Mesh {
                 if(aFace.w*uCull>.5&&dot(cam,aFace.xy)<=aFace.z)gl_Position=vec4(2.,2.,2.,1.);}`,
             `precision mediump float;varying vec4 vColor;varying vec2 vUV;uniform sampler2D uSampler;uniform vec3 uPulse;
             void main(){gl_FragColor=texture2D(uSampler,vUV)*vColor*(1.-uPulse.x*(.5+.5*sin(uPulse.y*2.7+gl_FragCoord.x*uPulse.z)));}`,
-            {uSampler:PIXI.Texture.WHITE,cam:new Float32Array(2),camH:1,uCull:1,uPulse:new Float32Array(3)}));
+            {uSampler:PIXI.Texture.WHITE,cam:new Float32Array(2),camH:1,uCull:0,uPulse:new Float32Array(3)}));
     }
     constructor(run){
         const n=run.z.length/2,g=new PIXI.Geometry()
@@ -169,8 +170,8 @@ class NativeProjectedMesh extends PIXI.Mesh {
             // camera move never forces a recapture (building routines cull to game._cullBounds.view).
             const cull=game._cullBounds;if(cull)game._cullBounds={...cull,view:{left:-Infinity,top:-Infinity,right:Infinity,bottom:Infinity}};
             try{
-                const tape={record:true,list:[],i:0};ctxA.segTape=tape;ctxA.begin();withAllFaces(b,ctxA,()=>draw(ctxA));
-                tape.record=false;ctxB.segTape=tape;cam.x=cx+D;cam.y=cy+D;try{ctxB.begin();withAllFaces(b,ctxB,()=>draw(ctxB));}finally{cam.x=cx;cam.y=cy;}
+                const tape={record:true,list:[],i:0};ctxA.segTape=tape;ctxA.begin();draw(ctxA);
+                tape.record=false;ctxB.segTape=tape;cam.x=cx+D;cam.y=cy+D;try{ctxB.begin();draw(ctxB);}finally{cam.x=cx;cam.y=cy;}
                 if(tape.i!==tape.list.length)this.projectionFail='tape';
             }finally{ctxA.retainedOff=ctxB.retainedOff=ctxA.textSprites=ctxB.textSprites=false;ctxA.segTape=ctxB.segTape=null;game._cullBounds=cull;}
             const fail=why=>{this.projectionFail=why;return null;};
@@ -242,7 +243,7 @@ class NativeProjectedMesh extends PIXI.Mesh {
             const L=this.layers;if(L.gpuProjection===false||!CONFIG.BUILDINGS.LEAN){this.dropProjected(r,slot);return false;}
             // Faced buildings are captured with every face and culled in the shader, so the camera's
             // side doesn't matter; other buildings still key on it (their art may branch on it).
-            const cam=game.camera,p=r[slot]||(r[slot]={boxes:new Map()}),key=common+(typeof b._leanFaces==='function'?'':'|'+this.projectionRegion(b,cam));
+            const cam=game.camera,p=r[slot]||(r[slot]={boxes:new Map()}),key=common+'|'+this.projectionRegion(b,cam);
             // Every variant (lamps on/off, zoom detail, darkness step) is captured once and kept, so
             // switching between them is a GPU swap, not a rebuild.
             const hit=p.boxes.get(key);

@@ -13,10 +13,11 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.foliageContext=new NativeVectorContext(this);this.world.addChild(this.foliageContext.root);
         this.cityGlowContext=new NativeVectorContext(this);this.emissive.addChild(this.cityGlowContext.root);
         this.worldCueContext=new NativeVectorContext(this);this.stage.addChild(this.worldCueContext.root);
-        this.rainContext=new NativeVectorContext(this);this.stage.addChild(this.rainContext.root);this.rainBatch=new NativeRainBatch();this.emptyRain=[];this.nativeBuildings=new Map();this.crowdAtlas=new NativeCrowdAtlas(this);this.worldStats={heat:this.nightHeat.report(),};for(const key of ['groundContext','peopleContext','trafficContext','streetContext','cityGlowContext','worldCueContext','roofDetailContext','rainContext','occupantContext','backdropContext','foliageContext'])this[key].label=key;this.presentation=new NativePresentation(this);
+        this.rainContext=new NativeVectorContext(this);this.stage.addChild(this.rainContext.root);this.rainBatch=new NativeRainBatch();this.emptyRain=[];this.nativeBuildings=new Map();this.crowdAtlas=new NativeCrowdAtlas(this);this.worldStats={heat:this.nightHeat.report(),};for(const key of ['groundContext','peopleContext','trafficContext','streetContext','cityGlowContext','worldCueContext','roofDetailContext','rainContext','occupantContext','backdropContext','foliageContext'])this[key].label=key;this.presentation=new NativePresentation(this);this.glBuildings=new GLBuildingsSystem(this);
     },
     clearWorld(){
         if(!this.nativeBuildings)return;
+        this.glBuildings?.clear();
         this.surfaces.clear();
         if(this.playerSprite)this.objects.addChild(this.playerSprite);for(const r of this.fixtureNodes.values())this.fixtures.addChild(r.node);
         this.presentation.clear();this.nightHeat.clear();this.nativeCasters.clear();
@@ -111,8 +112,11 @@ Object.assign(NativeWebGLRenderer.prototype,{
         const active=new Set(visibleBuildings),now=performance.now();
         for(const [b,r]of this.nativeBuildings)if(!active.has(b))this.hideBuilding(r);else {r.returning=!r.active;r.active=true;}
         this.trimBuildingRecords(now);
+        const gl=this.glBuildings;gl.begin(game,view);
         for(const b of visibleBuildings){
             buildings++;
+            // The city's own buildings are native GPU geometry (gl/); the landmarks still come through the vector path.
+            if(L.glBuildings!==false&&gl.supports(b)){gl.show(b,game);continue;}
             let r=this.nativeBuildings.get(b);if(!r){r={base:new NativeVectorContext(this),top:new NativeVectorContext(this),active:true};r.base.label='building-base';r.top.label='building-top';this.nativeBuildings.set(b,r);}
             else if(r.returning)this.buildingStats.returns++;
             r.active=true;r.seen=now;r.base.root.visible=r.top.root.visible=true;
@@ -135,7 +139,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             if(L.buildingCache){if(!this.syncBuildingGlow(b,r,game,view,key,common)&&L.glows)b.drawEmissive?.(glow,game.dayCycle().darkness);}
             else {if(r.glowMesh)r.glowMesh.visible=r.glowLive.root.visible=false;if(L.glows)b.drawEmissive?.(glow,game.dayCycle().darkness);}
         }
-        this.trimBuildingRecords(now);
+        this.trimBuildingRecords(now);gl.end();if(L.buildings)gl.prefetch(map,bounds);
         const roofs=this.roofDetailContext;roofs.begin();this.roofStage.addChild(roofs.root);
         if(L.buildings){
             for(const bb of map.billboards||[])if(!bb.inView||bb.inView(bounds))bb.drawTop(roofs);
@@ -172,7 +176,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.rainStats={mode:L.rainQuads?'quads':'paths',...this.rainBatch.stats,drops:L.rainDrops&&rainK>.01?weather.drops.length:0,splashes:L.rainSplashes&&rainK>.01?weather.splashes.length:0,paths:rain.pathsPainted,cpuMs:performance.now()-rainStart};
         // Bound per-map imported bitmap residency to images still referenced by
         // live contexts (ground, authored sprites and fixtures have own owners).
-        this.worldStats={heat:this.nightHeat.report(),projection:{...this.projectionStats},buildingCache:{...this.buildingStats,bytes:this.buildingGlowBytes()},timings,crowd:{...this.crowdAtlas.stats,entries:this.crowdAtlas.entries.size,bytes:this.crowdAtlas.bytes},buildings,people,vehicles,groundPending:game.groundBaker?.stats?.flat||0,groundTiles:game.groundBaker?.cache.size||0,
+        this.worldStats={heat:this.nightHeat.report(),projection:{...this.projectionStats},buildingCache:{...this.buildingStats,bytes:this.buildingGlowBytes()},glBuildings:{...this.glBuildings.stats},timings,crowd:{...this.crowdAtlas.stats,entries:this.crowdAtlas.entries.size,bytes:this.crowdAtlas.bytes},buildings,people,vehicles,groundPending:game.groundBaker?.stats?.flat||0,groundTiles:game.groundBaker?.cache.size||0,
             paths:actors.pathsPainted+traffic.pathsPainted+street.pathsPainted,cpuMs:performance.now()-start};
         this.nativeCasters.trim();this.worldStats.casters=this.nativeCasters.report();
         this.layerStages.worldMs=this.worldStats.cpuMs;

@@ -59513,10 +59513,11 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.foliageContext=new NativeVectorContext(this);this.world.addChild(this.foliageContext.root);
         this.cityGlowContext=new NativeVectorContext(this);this.emissive.addChild(this.cityGlowContext.root);
         this.worldCueContext=new NativeVectorContext(this);this.stage.addChild(this.worldCueContext.root);
-        this.rainContext=new NativeVectorContext(this);this.stage.addChild(this.rainContext.root);this.rainBatch=new NativeRainBatch();this.emptyRain=[];this.nativeBuildings=new Map();this.crowdAtlas=new NativeCrowdAtlas(this);this.worldStats={heat:this.nightHeat.report(),};for(const key of ['groundContext','peopleContext','trafficContext','streetContext','cityGlowContext','worldCueContext','roofDetailContext','rainContext','occupantContext','backdropContext','foliageContext'])this[key].label=key;this.presentation=new NativePresentation(this);
+        this.rainContext=new NativeVectorContext(this);this.stage.addChild(this.rainContext.root);this.rainBatch=new NativeRainBatch();this.emptyRain=[];this.nativeBuildings=new Map();this.crowdAtlas=new NativeCrowdAtlas(this);this.worldStats={heat:this.nightHeat.report(),};for(const key of ['groundContext','peopleContext','trafficContext','streetContext','cityGlowContext','worldCueContext','roofDetailContext','rainContext','occupantContext','backdropContext','foliageContext'])this[key].label=key;this.presentation=new NativePresentation(this);this.glBuildings=new GLBuildingsSystem(this);
     },
     clearWorld(){
         if(!this.nativeBuildings)return;
+        this.glBuildings?.clear();
         this.surfaces.clear();
         if(this.playerSprite)this.objects.addChild(this.playerSprite);for(const r of this.fixtureNodes.values())this.fixtures.addChild(r.node);
         this.presentation.clear();this.nightHeat.clear();this.nativeCasters.clear();
@@ -59611,8 +59612,11 @@ Object.assign(NativeWebGLRenderer.prototype,{
         const active=new Set(visibleBuildings),now=performance.now();
         for(const [b,r]of this.nativeBuildings)if(!active.has(b))this.hideBuilding(r);else {r.returning=!r.active;r.active=true;}
         this.trimBuildingRecords(now);
+        const gl=this.glBuildings;gl.begin(game,view);
         for(const b of visibleBuildings){
             buildings++;
+            // The city's own buildings are native GPU geometry (gl/); the landmarks still come through the vector path.
+            if(L.glBuildings!==false&&gl.supports(b)){gl.show(b,game);continue;}
             let r=this.nativeBuildings.get(b);if(!r){r={base:new NativeVectorContext(this),top:new NativeVectorContext(this),active:true};r.base.label='building-base';r.top.label='building-top';this.nativeBuildings.set(b,r);}
             else if(r.returning)this.buildingStats.returns++;
             r.active=true;r.seen=now;r.base.root.visible=r.top.root.visible=true;
@@ -59635,7 +59639,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             if(L.buildingCache){if(!this.syncBuildingGlow(b,r,game,view,key,common)&&L.glows)b.drawEmissive?.(glow,game.dayCycle().darkness);}
             else {if(r.glowMesh)r.glowMesh.visible=r.glowLive.root.visible=false;if(L.glows)b.drawEmissive?.(glow,game.dayCycle().darkness);}
         }
-        this.trimBuildingRecords(now);
+        this.trimBuildingRecords(now);gl.end();if(L.buildings)gl.prefetch(map,bounds);
         const roofs=this.roofDetailContext;roofs.begin();this.roofStage.addChild(roofs.root);
         if(L.buildings){
             for(const bb of map.billboards||[])if(!bb.inView||bb.inView(bounds))bb.drawTop(roofs);
@@ -59672,7 +59676,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.rainStats={mode:L.rainQuads?'quads':'paths',...this.rainBatch.stats,drops:L.rainDrops&&rainK>.01?weather.drops.length:0,splashes:L.rainSplashes&&rainK>.01?weather.splashes.length:0,paths:rain.pathsPainted,cpuMs:performance.now()-rainStart};
         // Bound per-map imported bitmap residency to images still referenced by
         // live contexts (ground, authored sprites and fixtures have own owners).
-        this.worldStats={heat:this.nightHeat.report(),projection:{...this.projectionStats},buildingCache:{...this.buildingStats,bytes:this.buildingGlowBytes()},timings,crowd:{...this.crowdAtlas.stats,entries:this.crowdAtlas.entries.size,bytes:this.crowdAtlas.bytes},buildings,people,vehicles,groundPending:game.groundBaker?.stats?.flat||0,groundTiles:game.groundBaker?.cache.size||0,
+        this.worldStats={heat:this.nightHeat.report(),projection:{...this.projectionStats},buildingCache:{...this.buildingStats,bytes:this.buildingGlowBytes()},glBuildings:{...this.glBuildings.stats},timings,crowd:{...this.crowdAtlas.stats,entries:this.crowdAtlas.entries.size,bytes:this.crowdAtlas.bytes},buildings,people,vehicles,groundPending:game.groundBaker?.stats?.flat||0,groundTiles:game.groundBaker?.cache.size||0,
             paths:actors.pathsPainted+traffic.pathsPainted+street.pathsPainted,cpuMs:performance.now()-start};
         this.nativeCasters.trim();this.worldStats.casters=this.nativeCasters.report();
         this.layerStages.worldMs=this.worldStats.cpuMs;
@@ -59903,6 +59907,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
 // Anything the method can't represent (clip masks, bitmap text, custom-shader meshes, shapes
 // that don't follow the lean) makes that layer fall back to the live path.
 class NativeProjectedMesh extends PIXI.Mesh {
+    containsPoint(){return false;}   // never a pointer target (its geometry has no aVertexPosition)
     static shader(){
         return NativeProjectedMesh._shader||(NativeProjectedMesh._shader=PIXI.Shader.from(`precision highp float;
             attribute vec2 aGround;attribute vec2 aZ;attribute vec4 aColor;attribute vec2 aUV;attribute vec4 aFace;
@@ -59914,7 +59919,7 @@ class NativeProjectedMesh extends PIXI.Mesh {
                 if(aFace.w*uCull>.5&&dot(cam,aFace.xy)<=aFace.z)gl_Position=vec4(2.,2.,2.,1.);}`,
             `precision mediump float;varying vec4 vColor;varying vec2 vUV;uniform sampler2D uSampler;uniform vec3 uPulse;
             void main(){gl_FragColor=texture2D(uSampler,vUV)*vColor*(1.-uPulse.x*(.5+.5*sin(uPulse.y*2.7+gl_FragCoord.x*uPulse.z)));}`,
-            {uSampler:PIXI.Texture.WHITE,cam:new Float32Array(2),camH:1,uCull:1,uPulse:new Float32Array(3)}));
+            {uSampler:PIXI.Texture.WHITE,cam:new Float32Array(2),camH:1,uCull:0,uPulse:new Float32Array(3)}));
     }
     constructor(run){
         const n=run.z.length/2,g=new PIXI.Geometry()
@@ -60061,8 +60066,8 @@ class NativeProjectedMesh extends PIXI.Mesh {
             // camera move never forces a recapture (building routines cull to game._cullBounds.view).
             const cull=game._cullBounds;if(cull)game._cullBounds={...cull,view:{left:-Infinity,top:-Infinity,right:Infinity,bottom:Infinity}};
             try{
-                const tape={record:true,list:[],i:0};ctxA.segTape=tape;ctxA.begin();withAllFaces(b,ctxA,()=>draw(ctxA));
-                tape.record=false;ctxB.segTape=tape;cam.x=cx+D;cam.y=cy+D;try{ctxB.begin();withAllFaces(b,ctxB,()=>draw(ctxB));}finally{cam.x=cx;cam.y=cy;}
+                const tape={record:true,list:[],i:0};ctxA.segTape=tape;ctxA.begin();draw(ctxA);
+                tape.record=false;ctxB.segTape=tape;cam.x=cx+D;cam.y=cy+D;try{ctxB.begin();draw(ctxB);}finally{cam.x=cx;cam.y=cy;}
                 if(tape.i!==tape.list.length)this.projectionFail='tape';
             }finally{ctxA.retainedOff=ctxB.retainedOff=ctxA.textSprites=ctxB.textSprites=false;ctxA.segTape=ctxB.segTape=null;game._cullBounds=cull;}
             const fail=why=>{this.projectionFail=why;return null;};
@@ -60134,7 +60139,7 @@ class NativeProjectedMesh extends PIXI.Mesh {
             const L=this.layers;if(L.gpuProjection===false||!CONFIG.BUILDINGS.LEAN){this.dropProjected(r,slot);return false;}
             // Faced buildings are captured with every face and culled in the shader, so the camera's
             // side doesn't matter; other buildings still key on it (their art may branch on it).
-            const cam=game.camera,p=r[slot]||(r[slot]={boxes:new Map()}),key=common+(typeof b._leanFaces==='function'?'':'|'+this.projectionRegion(b,cam));
+            const cam=game.camera,p=r[slot]||(r[slot]={boxes:new Map()}),key=common+'|'+this.projectionRegion(b,cam);
             // Every variant (lamps on/off, zoom detail, darkness step) is captured once and kept, so
             // switching between them is a GPU swap, not a rebuild.
             const hit=p.boxes.get(key);
@@ -61094,6 +61099,1475 @@ function nativeRadar(){
         this.ctx.restore();
     }
 
+}
+// GL engine: building geometry. A building is built once into one vertex buffer (its walls,
+// windows, ledges, roof and night lights as data) and the GPU does everything else each frame:
+// the lean, which faces show, which details are fine enough for the zoom, the window lights,
+// the sun on the glass, the neon flicker. Nothing is redrawn when the camera moves.
+//
+// The lean (as the Canvas building code draws it): a point at height z draws at
+// cam + (p - cam) * k. Walls lean linearly up to the roof, k = 1 + z / (C - H) (H the
+// building's height), the way the Canvas walls lerp from footprint to roof; landmark-kit
+// pieces (ledges, fins, awnings) use the true perspective k = C / (C - z). Both agree at the
+// footprint and at the roof. C is leanCamHeight(), a uniform.
+//
+// Vertex layout (floats): pos xyz, prev xyz, next xyz (strokes only), line (side, half width,
+// flags, lean mode), colour rgba, meta (face, min depth, max LOD, -), anim (type, a, b, c),
+// text (u, v, edge, softness).
+const GLB_STRIDE = 3 + 3 + 3 + 4 + 4 + 4 + 4 + 4;
+const GLB_MAX_FACES = 32;
+// anim types (vertex shader)
+const GLB_ANIM = { NONE: 0, SPIN: 1, CAUSTIC: 2, SWAY: 3, SHIMMER: 4, BLINK_ON: 5, BLINK_OFF: 6, WINDOW: 7, SKY: 8, SHEEN: 9, RIM: 10, RADIAL: 11, FLICKER: 12, GLOW: 13, TV: 14, WINDOW_TV: 15 };
+// line flags
+const GLB_LINE = { SCALE_K: 1, SQUARE: 2 };
+
+const GLColor = {
+    cache: new Map(),
+    /** CSS colour → [r, g, b, a] (0..1) */
+    parse(c) {
+        if (Array.isArray(c)) return c;
+        let v = this.cache.get(c);
+        if (v) return v;
+        const s = String(c).trim();
+        if (s[0] === '#') {
+            let h = s.slice(1);
+            if (h.length === 3 || h.length === 4) h = [...h].map(x => x + x).join('');
+            const n = parseInt(h.slice(0, 6), 16);
+            v = [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255, h.length === 8 ? parseInt(h.slice(6, 8), 16) / 255 : 1];
+        } else {
+            const m = s.match(/rgba?\(([^)]+)\)/i);
+            if (m) { const p = m[1].split(',').map(x => parseFloat(x)); v = [p[0] / 255, p[1] / 255, p[2] / 255, p.length > 3 ? p[3] : 1]; }
+            else v = [1, 0, 1, 1];
+        }
+        this.cache.set(c, v);
+        return v;
+    },
+    alpha(c, a) { const v = this.parse(c); return [v[0], v[1], v[2], v[3] * a]; },
+    mix(a, b, t) { a = this.parse(a); b = this.parse(b); return a.map((x, i) => x + (b[i] - x) * t); }
+};
+
+/**
+ * Builds one building's vertex data. Points are [x, y, z, mode]: z in world px up, mode 0 for
+ * the wall lean (linear to the roof), 1 for true perspective. State (colour, face, gate,
+ * animation, text) applies to every vertex emitted until changed, like a pen.
+ */
+class GLBuildingBuilder {
+    constructor(H) {
+        this.H = H; this.data = new Float32Array(4096); this.n = 0; this.index = []; this.faces = []; this.anchors = [];
+        this._c = [1, 1, 1, 1]; this._face = -1; this._minDepth = 0; this._maxLod = 9; this._anim = [0, 0, 0, 0]; this._text = [-1, 0, 0, 0];
+    }
+    // ---- pen state ----
+    color(c, a = 1) { const v = GLColor.parse(c); this._c = a === 1 ? v : [v[0], v[1], v[2], v[3] * a]; return this; }
+    /** Faces register a plane (visible when dot(n, cam) > c) and an anchor (its depth gauge) */
+    addFace(f) { this.faces.push([f.nx, f.ny, f.nx * (f.side === 'C' ? (f.x1 + f.x2) / 2 : f.x1) + f.ny * (f.side === 'C' ? (f.y1 + f.y2) / 2 : f.y1)]); this.anchors.push([f.x1, f.y1]); return this.faces.length - 1; }
+    face(id) { this._face = id; return this; }
+    gate(minDepth = 0, maxLod = 9) { this._minDepth = minDepth; this._maxLod = maxLod; return this; }
+    anim(type = 0, a = 0, b = 0, c = 0) { this._anim = [type, a, b, c]; return this; }
+    text(u = -1, v = 0, edge = 0, soft = 0) { this._text = [u, v, edge, soft]; return this; }
+    reset() { this._face = -1; this._minDepth = 0; this._maxLod = 9; this._anim = [0, 0, 0, 0]; this._text = [-1, 0, 0, 0]; return this; }
+
+    _grow(n) {
+        if ((this.n + n) * GLB_STRIDE <= this.data.length) return;
+        let len = this.data.length; while ((this.n + n) * GLB_STRIDE > len) len *= 2;
+        const d = new Float32Array(len); d.set(this.data); this.data = d;
+    }
+    /** Draw fn() with points mapped by the affine m = [a, b, c, d, e, f] (a frame onto the footprint) */
+    inFrame(m, fn) { const old = this.m; this.m = old ? GLBuildingBuilder.mul(old, m) : m; try { fn(); } finally { this.m = old; } return this; }
+    static mul(A, B) { return [A[0] * B[0] + A[2] * B[1], A[1] * B[0] + A[3] * B[1], A[0] * B[2] + A[2] * B[3], A[1] * B[2] + A[3] * B[3], A[0] * B[4] + A[2] * B[5] + A[4], A[1] * B[4] + A[3] * B[5] + A[5]]; }
+    _map(p) { const m = this.m; return m ? [m[0] * p[0] + m[2] * p[1] + m[4], m[1] * p[0] + m[3] * p[1] + m[5], p[2], p[3]] : p; }
+    /** Additive ('lighter') for what follows: premultiplied colour with zero alpha adds */
+    additive(on = true) { this._add = on ? 1 : 0; return this; }
+    /** One vertex; returns its index */
+    vertex(p, prev = p, next = p, side = 0, hw = 0, flags = 0, color = this._c, uvText = null) {
+        this._grow(1);
+        if (this.m) { p = this._map(p); prev = this._map(prev); next = this._map(next); }
+        const d = this.data, o = this.n * GLB_STRIDE, t = uvText || this._text, a = this._anim;
+        d[o] = p[0]; d[o + 1] = p[1]; d[o + 2] = p[2] || 0;
+        d[o + 3] = prev[0]; d[o + 4] = prev[1]; d[o + 5] = prev[2] || 0;
+        d[o + 6] = next[0]; d[o + 7] = next[1]; d[o + 8] = next[2] || 0;
+        d[o + 9] = side; d[o + 10] = hw; d[o + 11] = flags; d[o + 12] = p[3] || 0;
+        d[o + 13] = color[0]; d[o + 14] = color[1]; d[o + 15] = color[2]; d[o + 16] = color[3];
+        d[o + 17] = this._face; d[o + 18] = this._minDepth; d[o + 19] = this._maxLod; d[o + 20] = this._add || 0;
+        d[o + 21] = a[0]; d[o + 22] = a[1]; d[o + 23] = a[2]; d[o + 24] = a[3];
+        d[o + 25] = t[0]; d[o + 26] = t[1]; d[o + 27] = t[2]; d[o + 28] = t[3];
+        return this.n++;
+    }
+    // ---- fills ----
+    /** A convex polygon (or any simple polygon with concave: true) */
+    poly(pts, concave = false) {
+        if (pts.length < 3) return this;
+        const base = this.n;
+        for (const p of pts) this.vertex(p);
+        if (!concave) { for (let i = 1; i < pts.length - 1; i++) this.index.push(base, base + i, base + i + 1); return this; }
+        const flat = []; for (const p of pts) flat.push(p[0], p[1]);
+        for (const i of GLEarcut(flat)) this.index.push(base + i);
+        return this;
+    }
+    /** A polygon with per-vertex colours */
+    polyColors(pts, cols) {
+        const base = this.n;
+        pts.forEach((p, i) => this.vertex(p, p, p, 0, 0, 0, GLColor.parse(cols[i])));
+        for (let i = 1; i < pts.length - 1; i++) this.index.push(base, base + i, base + i + 1);
+        return this;
+    }
+    quad(a, b, c, d) { return this.poly([a, b, c, d]); }
+    /** A rect in a plane at height z (roof, ground): x, y, w, h */
+    rect(x, y, w, h, z = 0, mode = 0) { return this.poly([[x, y, z, mode], [x + w, y, z, mode], [x + w, y + h, z, mode], [x, y + h, z, mode]]); }
+    /** A disc in a plane at height z */
+    disc(cx, cy, r, z = 0, mode = 0, seg = 0) {
+        const n = seg || Math.max(10, Math.min(48, Math.ceil(r * 1.4))), pts = [];
+        for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r, z, mode]); }
+        return this.poly(pts);
+    }
+    ellipse(cx, cy, rx, ry, rot, z = 0, mode = 0) {
+        const n = Math.max(12, Math.min(48, Math.ceil(Math.max(rx, ry) * 1.4))), pts = [], c = Math.cos(rot), s = Math.sin(rot);
+        for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2, x = Math.cos(a) * rx, y = Math.sin(a) * ry; pts.push([cx + x * c - y * s, cy + x * s + y * c, z, mode]); }
+        return this.poly(pts);
+    }
+    /** A rounded rect in a plane (radius r or [tl, tr, br, bl]) as points */
+    static roundRectPts(x, y, w, h, r, z = 0, mode = 0) {
+        const R = Array.isArray(r) ? r : [r, r, r, r], pts = [];
+        const corner = (cx, cy, rr, a0) => { if (rr <= 0) { pts.push([cx, cy, z, mode]); return; } const n = Math.max(3, Math.ceil(rr)); for (let i = 0; i <= n; i++) { const a = a0 + i / n * Math.PI / 2; pts.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, z, mode]); } };
+        if (R[0] > 0) corner(x + R[0], y + R[0], R[0], Math.PI); else pts.push([x, y, z, mode]);
+        if (R[1] > 0) corner(x + w - R[1], y + R[1], R[1], -Math.PI / 2); else pts.push([x + w, y, z, mode]);
+        if (R[2] > 0) corner(x + w - R[2], y + h - R[2], R[2], 0); else pts.push([x + w, y + h, z, mode]);
+        if (R[3] > 0) corner(x + R[3], y + h - R[3], R[3], Math.PI / 2); else pts.push([x, y + h, z, mode]);
+        return pts;
+    }
+    // ---- strokes ----
+    /** A polyline (or closed loop) stroked `width` wide. flags: GLB_LINE.SCALE_K widens it with the lean
+        (strokes Canvas drew under a plane's scale), SQUARE squares its open ends (rect corners) */
+    line(pts, width, closed = false, flags = 0) {
+        if (pts.length < 2 || !(width > 0)) return this;
+        const hw = width / 2, n = pts.length, segs = closed ? n : n - 1;
+        for (let i = 0; i < segs; i++) {
+            const a = pts[i], b = pts[(i + 1) % n];
+            const pa = closed ? pts[(i - 1 + n) % n] : (i > 0 ? pts[i - 1] : a);
+            const nb = closed ? pts[(i + 2) % n] : (i + 2 < n ? pts[i + 2] : b);
+            const fA = flags & ~(i > 0 || closed ? GLB_LINE.SQUARE : 0), fB = flags & ~(i + 2 < n || closed ? GLB_LINE.SQUARE : 0);
+            const v0 = this.vertex(a, pa, b, -1, hw, fA), v1 = this.vertex(a, pa, b, 1, hw, fA);
+            const v2 = this.vertex(b, a, nb, 1, hw, fB), v3 = this.vertex(b, a, nb, -1, hw, fB);
+            this.index.push(v0, v1, v2, v0, v2, v3);
+        }
+        return this;
+    }
+    /** A stroke with Canvas's shadowBlur glow under it (blur px, the shadow's alpha scale) */
+    softLine(pts, width, blur, closed = false, flags = 0, color = this._c) {
+        const t = this._text, c = this._c; this._text = [-2, blur, 0, 0]; this._c = color;
+        this.line(pts, width, closed, flags); this._text = t; this._c = c; return this;
+    }
+    seg(a, b, width, flags = 0) { return this.line([a, b], width, false, flags); }
+    rectLine(x, y, w, h, width, z = 0, mode = 0, flags = GLB_LINE.SCALE_K) {
+        return this.line([[x, y, z, mode], [x + w, y, z, mode], [x + w, y + h, z, mode], [x, y + h, z, mode]], width, true, flags);
+    }
+    circleLine(cx, cy, r, width, z = 0, mode = 0, flags = GLB_LINE.SCALE_K, a0 = 0, a1 = Math.PI * 2) {
+        const full = Math.abs(a1 - a0) >= Math.PI * 2 - 1e-6, n = Math.max(12, Math.min(64, Math.ceil(r * 1.2 * Math.abs(a1 - a0) / (Math.PI * 2)))), pts = [];
+        for (let i = 0; i < (full ? n : n + 1); i++) { const a = a0 + (a1 - a0) * i / n; pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r, z, mode]); }
+        return this.line(pts, width, full, flags);
+    }
+    /** Quadratic curve points */
+    static quadPts(a, c, b, n = 12) {
+        const out = [];
+        for (let i = 0; i <= n; i++) { const t = i / n, u = 1 - t; out.push([u * u * a[0] + 2 * u * t * c[0] + t * t * b[0], u * u * a[1] + 2 * u * t * c[1] + t * t * b[1], a[2] || 0, a[3] || 0]); }
+        return out;
+    }
+    /** The finished geometry: interleaved vertices, indices, face planes and anchors */
+    finish() {
+        return { data: this.data.slice(0, this.n * GLB_STRIDE), index: this.n > 65535 ? new Uint32Array(this.index) : new Uint16Array(this.index),
+                 vertices: this.n, faces: this.faces, anchors: this.anchors };
+    }
+}
+
+/** A wall face as a frame: at(u, v) → a point u along the face, v (0..1) up the wall */
+class GLFace {
+    constructor(f, H) { this.f = f; this.H = H; this.L = Math.hypot(f.x2 - f.x1, f.y2 - f.y1); }
+    at(u, v) { const f = this.f; return [f.x1 + (f.x2 - f.x1) * u, f.y1 + (f.y2 - f.y1) * u, v * this.H, 0]; }
+    quad(B, u0, u1, v0, v1) { return B.poly([this.at(u0, v0), this.at(u1, v0), this.at(u1, v1), this.at(u0, v1)]); }
+    line(B, u0, v0, u1, v1, width) { return B.seg(this.at(u0, v0), this.at(u1, v1), width); }
+    /** A point `out` px in front of the face at (u, z px), true perspective */
+    out(u, z, o) { const f = this.f; return [f.x1 + (f.x2 - f.x1) * u + f.nx * o, f.y1 + (f.y2 - f.y1) * u + f.ny * o, z, 1]; }
+}
+
+/** The mesh: one building layer, its own face table, the shared shader */
+class GLBuildingMesh extends PIXI.Mesh {
+    containsPoint() { return false; }                                   // scenery, never a pointer target
+    static shader() {
+        if (GLBuildingMesh._shader) return GLBuildingMesh._shader;
+        const vs = `precision highp float;
+            attribute vec3 aPos; attribute vec3 aPrev; attribute vec3 aNext; attribute vec4 aLine; attribute vec4 aColor;
+            attribute vec4 aMeta; attribute vec4 aAnim; attribute vec4 aText;
+            uniform mat3 projectionMatrix; uniform mat3 translationMatrix;
+            uniform vec2 uCam; uniform float uC; uniform float uH; uniform float uLod; uniform float uTime; uniform float uPx;
+            uniform vec4 uFaces[${GLB_MAX_FACES}]; uniform vec4 uAnchors[${GLB_MAX_FACES}];
+            uniform vec4 uSun; uniform vec3 uSunRGB; uniform vec4 uRim; uniform vec4 uNight;
+            varying vec4 vColor; varying vec3 vLine; varying vec4 vText; varying vec2 vWorld; varying vec4 vRadial;
+            float kOf(vec3 p, float mode){ return mode < .5 ? 1. + p.z / (uC - uH) : uC / (uC - min(p.z, uC * .86)); }
+            vec2 lean(vec3 p, float mode){ return uCam + (p.xy - uCam) * kOf(p, mode); }
+            float hash(float s, float i){ return fract(sin(s * 12.9898 + i * 78.233) * 43758.5453); }
+            void main(){
+                vec3 P = aPos; float mode = aLine.w; vec4 col = aColor; float hide = 0.;
+                vRadial = vec4(0.);
+                // the face this belongs to: hidden when it turns away; detail gated by how much of the wall shows
+                if (aMeta.x > -.5) {
+                    int fi = int(aMeta.x + .5);
+                    vec4 pl = uFaces[fi];
+                    if (dot(pl.xy, uCam) - pl.z <= 0.) hide = 1.;
+                    if (aMeta.y > 0.) { float depth = length(uAnchors[fi].xy - uCam) * uH / (uC - uH); if (depth < aMeta.y) hide = 1.; }
+                }
+                if (uLod > aMeta.z) hide = 1.;
+                float t = uTime, ty = aAnim.x;
+                if (ty > .5) {
+                    if (ty < 1.5) { float a = t * aAnim.w; vec2 d = P.xy - aAnim.yz; P.xy = aAnim.yz + vec2(d.x * cos(a) - d.y * sin(a), d.x * sin(a) + d.y * cos(a)); }
+                    else if (ty < 2.5) { P.y += sin(t * 1.5 + aAnim.y) * 2. + aAnim.z * sin(t * 2. + aAnim.y) * 3.; }
+                    else if (ty < 3.5) { P.x += sin(t * 1.3 + aAnim.y) * 1.2; }
+                    else if (ty < 4.5) { col.a *= .75 + .25 * sin(t * 3. + aAnim.y); }
+                    else if (ty < 5.5) { if (!(sin(t * aAnim.z + aAnim.y) > aAnim.w)) hide = 1.; }
+                    else if (ty < 6.5) { if (sin(t * aAnim.z + aAnim.y) > aAnim.w) hide = 1.; }
+                    else if (ty < 7.5) {
+                        // a window that changes every 7 s: lit when its hash (with the 7 s bucket) is under the threshold
+                        float h = hash(aAnim.y, aAnim.z + uNight.z);
+                        if (!(h < aAnim.w) || h < .06) hide = 1.;
+                    }
+                    else if (ty < 8.5) { float facing = max(0., dot(uFaces[int(aMeta.x + .5)].xy, uSun.xy)); col.a *= uSun.z * (.3 + .34 * facing); if (uSun.z <= .03) hide = 1.; }
+                    else if (ty < 9.5) {
+                        vec2 n = uFaces[int(aMeta.x + .5)].xy; float facing = max(0., dot(n, uSun.xy));
+                        float sheenA = uSun.z * (.18 + .6 * facing), uc = .5 + .55 * (abs(n.y) > .5 ? uSun.x : uSun.y);
+                        float sh = sheenA * max(0., 1. - abs(aAnim.y - uc) / .16) * aAnim.z;
+                        col = vec4(uSunRGB, sh); if (!(sh > .01) || uSun.z <= .03) hide = 1.;
+                    }
+                    else if (ty < 10.5) { col.a *= uRim.w; if (uRim.w <= .01) hide = 1.; }
+                    else if (ty < 11.5) { vRadial = vec4(aAnim.yz, aAnim.w, 1.); }
+                    else if (ty < 12.5) {                                  // neon flicker (Canvas _paintSign): breathing, hum, filament, rare brownouts
+                        float ms = uNight.w, sd = aAnim.y;
+                        float f = (.85 + sin((ms + sd) / 1200.) * .1) * (1. + sin((ms + sd * 1.3) / 80.) * .04) * (1. + sin((ms + sd * 2.7) / 30.) * .03);
+                        if (sin((ms + sd * .5) / 4000.) > .92) f *= .4 + hash(sd, floor(ms / 50.)) * .3;
+                        col.a *= clamp(f, .3, 1.);
+                    }
+                    else if (ty < 13.5) { col.a *= uNight.x; }
+                    else if (ty < 14.5) { if (!(sin(t * 9. + aAnim.w) > 0.)) col.rgb = vec3(.435, .624, .91); }   // a TV: #9ec8ff / #6f9fe8
+                    else if (ty < 15.5) { float h = hash(aAnim.y, aAnim.z + uNight.z); if (!(h < .06)) hide = 1.; if (!(sin(t * 9. + aAnim.w) > 0.)) col.rgb = vec3(.435, .624, .91); }
+                }
+                vec2 S = lean(P, mode);
+                vLine = vec3(0.);
+                if (aLine.x != 0.) {
+                    vec2 A = lean(aPrev, mode), B = lean(aNext, mode);
+                    vec2 d0 = S - A, d1 = B - S;
+                    bool s0 = dot(d0, d0) < 1e-10, s1 = dot(d1, d1) < 1e-10;
+                    vec2 t0 = normalize(s0 ? d1 : d0), t1 = normalize(s1 ? d0 : d1);
+                    vec2 n0 = vec2(-t0.y, t0.x), n1 = vec2(-t1.y, t1.x), m = normalize(n0 + n1);
+                    float hw = aLine.y; if (mod(aLine.z, 2.) > .5) hw *= kOf(P, mode);
+                    float hwPx = hw / uPx, W = max(hwPx, .5) + .75 + (aText.x < -1.5 ? aText.y * 1.5 / uPx : 0.);                          // the quad reaches past the line for its antialiased edge
+                    float len = W * uPx / max(dot(m, n0), .3);
+                    S += m * len * aLine.x;
+                    if (mod(floor(aLine.z / 2.), 2.) > .5) { if (s0) S -= t1 * hw; if (s1) S += t0 * hw; }
+                    vLine = vec3(aLine.x * W, hwPx, 1.);
+                }
+                vWorld = S;
+                vColor = vec4(col.rgb * col.a, aMeta.w > .5 ? 0. : col.a);              // additive: premultiplied colour, no coverage
+                vText = aText; if (aText.x < -1.5) vText.y = aText.y / uPx;              // a soft (shadow-blurred) stroke: its blur in px
+                else if (aText.x >= 0. && aText.z < 9.) vText.w = max(.02, .7 * uPx / (12. * kOf(P, mode)));   // edge softness: about a screen pixel
+                gl_Position = hide > .5 ? vec4(2., 2., 2., 1.) : vec4((projectionMatrix * translationMatrix * vec3(S, 1.)).xy, 0., 1.);
+            }`;
+        const fs = `precision mediump float;
+            varying vec4 vColor; varying vec3 vLine; varying vec4 vText; varying vec2 vWorld; varying vec4 vRadial;
+            uniform sampler2D uFont; uniform float uAlpha;
+            void main(){
+                float a = 1.;
+                if (vText.x < -1.5) {                                     // a shadow-blurred stroke: a gaussian falloff past its core
+                    float d = abs(vLine.x), s = max(.5, vText.y * .5);   // the stroke's coverage spread by a gaussian of sigma blur / 2
+                    a = min(1., 2. * vLine.y / (2.5066 * s)) * exp(-d * d / (2. * s * s));
+                } else if (vLine.z > .5) {                                // stroke coverage across the line (thin lines fade like Canvas hairlines)
+                    float d = abs(vLine.x), w = vLine.y;
+                    a = w >= .5 ? clamp(w + .5 - d, 0., 1.) : clamp(1. - d, 0., 1.) * 2. * w;
+                }
+                if (vRadial.w > .5) a *= max(0., 1. - length(vWorld - vRadial.xy) / vRadial.z);
+                if (vText.x >= 0.) {                                      // text (gl/text.js): distance field, or a blurred glow channel
+                    vec4 tx = texture2D(uFont, vText.xy);
+                    if (vText.z < 9.) a *= smoothstep(vText.z - vText.w, vText.z + vText.w, tx.r);
+                    else if (vText.z < 19.) a *= tx.g * (vText.z - 10.);
+                    else a *= tx.b * (vText.z - 20.);
+                }
+                gl_FragColor = vColor * (a * uAlpha);
+            }`;
+        return (GLBuildingMesh._shader = PIXI.Shader.from(vs, fs, {
+            uCam: new Float32Array(2), uC: 1000, uH: 50, uLod: 0, uTime: 0, uPx: 1,
+            uFaces: new Float32Array(GLB_MAX_FACES * 4), uAnchors: new Float32Array(GLB_MAX_FACES * 4),
+            uSun: new Float32Array(4), uSunRGB: new Float32Array(3), uRim: new Float32Array(4), uNight: new Float32Array(4), uFont: PIXI.Texture.WHITE, uAlpha: 1
+        }));
+    }
+    constructor(built, H, blend = PIXI.BLEND_MODES.NORMAL) {
+        const buf = new PIXI.Buffer(built.data, true, false), S = GLB_STRIDE * 4, g = new PIXI.Geometry();
+        let o = 0; const attr = (name, size) => { g.addAttribute(name, buf, size, false, PIXI.TYPES.FLOAT, S, o * 4); o += size; };
+        attr('aPos', 3); attr('aPrev', 3); attr('aNext', 3); attr('aLine', 4); attr('aColor', 4); attr('aMeta', 4); attr('aAnim', 4); attr('aText', 4);
+        g.addIndex(built.index);
+        super(g, GLBuildingMesh.shader());
+        this.blendMode = blend; this.H = H; this.vertexCount = built.vertices;
+        this.faceData = new Float32Array(GLB_MAX_FACES * 4); this.anchorData = new Float32Array(GLB_MAX_FACES * 4);
+        built.faces.slice(0, GLB_MAX_FACES).forEach((f, i) => this.faceData.set([f[0], f[1], f[2], 0], i * 4));
+        built.anchors.slice(0, GLB_MAX_FACES).forEach((a, i) => this.anchorData.set([a[0], a[1], 0, 0], i * 4));
+        this.alphaScale = 1;
+    }
+    _render(renderer) {
+        const u = this.shader.uniforms, F = GLBuildingMesh.frame;
+        u.uH = this.H; u.uFaces = this.faceData; u.uAnchors = this.anchorData;
+        if (F) { u.uCam[0] = F.cam[0]; u.uCam[1] = F.cam[1]; u.uC = F.C; u.uLod = F.lod; u.uTime = F.time; u.uPx = F.px; u.uSun = F.sun; u.uSunRGB = F.sunRGB; u.uNight = F.night; u.uFont = F.font || PIXI.Texture.WHITE; }
+        u.uRim = this.rim || GLBuildingMesh.noRim; u.uAlpha = this.worldAlpha;
+        super._render(renderer);
+    }
+}
+GLBuildingMesh.frame = null;
+GLBuildingMesh.noRim = new Float32Array(4);
+
+/** Earcut (polygon triangulation, after mapbox/earcut, ISC): flat [x, y, ...] → triangle indices */
+function GLEarcut(data) {
+    const n = data.length / 2, out = [];
+    if (n < 3) return out;
+    let area = 0; for (let i = 0, j = n - 1; i < n; j = i++) area += (data[j * 2] - data[i * 2]) * (data[i * 2 + 1] + data[j * 2 + 1]);
+    const idx = []; for (let i = 0; i < n; i++) idx.push(area > 0 ? i : n - 1 - i);
+    const X = i => data[i * 2], Y = i => data[i * 2 + 1];
+    const cross = (a, b, c) => (X(b) - X(a)) * (Y(c) - Y(a)) - (Y(b) - Y(a)) * (X(c) - X(a));
+    const inside = (a, b, c, p) => cross(a, b, p) >= 0 && cross(b, c, p) >= 0 && cross(c, a, p) >= 0;
+    let guard = 0;
+    while (idx.length > 3 && guard++ < n * n) {
+        let cut = false;
+        for (let i = 0; i < idx.length; i++) {
+            const a = idx[(i - 1 + idx.length) % idx.length], b = idx[i], c = idx[(i + 1) % idx.length];
+            if (cross(a, b, c) <= 0) continue;
+            let ok = true;
+            for (const p of idx) if (p !== a && p !== b && p !== c && inside(a, b, c, p)) { ok = false; break; }
+            if (!ok) continue;
+            out.push(a, b, c); idx.splice(i, 1); cut = true; break;
+        }
+        if (!cut) break;
+    }
+    if (idx.length === 3) out.push(idx[0], idx[1], idx[2]);
+    return out;
+}
+// GL engine: text. Each distinct string (a shop's name, an apartment's sign) is laid out by the
+// browser's font engine once, exactly as Canvas would set it (kerning, script joins), and kept in
+// one atlas texture as a signed distance field (crisp at any zoom) plus pre-blurred glow
+// channels for neon. Text is then just textured quads in a building's geometry; the GPU draws
+// it, fades and flickers it. Rasterising a glyph run once is the only CPU font work.
+//   R: distance field (0.5 at the glyph edge)   G: soft shadow (blur 18)   B: neon bloom (40/20/8)
+const GLText = (() => {
+    const SIZE = 2048, RES = 3, SPREAD = 6;
+    let canvas = null, ctx2d = null, data = null, base = null, texture = null;
+    let shelfX = 0, shelfY = 0, shelfH = 0, revision = 0, dirty = false;
+    const entries = new Map();
+    const fontOf = (size, family) => `${size}px "${family}", "URW Chancery L", "Z003", cursive`;
+    const measurer = () => ctx2d || (canvas = document.createElement('canvas'), canvas.width = canvas.height = 8, ctx2d = canvas.getContext('2d', { willReadFrequently: true }));
+
+    function measure(text, size, family = 'Great Vibes') {
+        const c = measurer(); c.font = fontOf(size, family);
+        return c.measureText(text).width;
+    }
+    function tex() {
+        if (texture) return texture;
+        data = new Uint8Array(SIZE * SIZE * 4);
+        base = PIXI.BaseTexture.fromBuffer(data, SIZE, SIZE, { alphaMode: PIXI.ALPHA_MODES.NO_PREMULTIPLIED_ALPHA, scaleMode: PIXI.SCALE_MODES.LINEAR, mipmap: PIXI.MIPMAP_MODES.OFF });
+        return (texture = new PIXI.Texture(base));
+    }
+    // The distance field and glow channels, from the glyph run's coverage: pure arithmetic, run in a worker
+    // (gl/text.js COMPUTE) so a new sign never stalls a frame. Returns RGBA bytes, w × h.
+    const COMPUTE = function (cov, w, hgt, R, SPREAD, neon) {
+        // 1D squared distance transform (Felzenszwalb)
+        function edt1(f, n, d, v, z) {
+            let k = 0; v[0] = 0; z[0] = -1e20; z[1] = 1e20;
+            for (let q = 1; q < n; q++) {
+                let s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+                while (s <= z[k]) { k--; s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]); }
+                k++; v[k] = q; z[k] = s; z[k + 1] = 1e20;
+            }
+            k = 0;
+            for (let q = 0; q < n; q++) { while (z[k + 1] < q) k++; d[q] = (q - v[k]) * (q - v[k]) + f[v[k]]; }
+        }
+        function edt(grid, w, h) {
+            const n = Math.max(w, h), f = new Float64Array(n), d = new Float64Array(n), v = new Int32Array(n), z = new Float64Array(n + 1);
+            for (let x = 0; x < w; x++) { for (let y = 0; y < h; y++) f[y] = grid[y * w + x]; edt1(f, h, d, v, z); for (let y = 0; y < h; y++) grid[y * w + x] = d[y]; }
+            for (let y = 0; y < h; y++) { for (let x = 0; x < w; x++) f[x] = grid[y * w + x]; edt1(f, w, d, v, z); for (let x = 0; x < w; x++) grid[y * w + x] = Math.sqrt(d[x]); }
+        }
+        function blur(src, w, h, r) {                                    // three box passes ≈ gaussian (sigma ≈ r)
+            const a = Float32Array.from(src), b = new Float32Array(w * h), win = 2 * r + 1;
+            const pass = (from, to, len, lines, step, lineStep) => {
+                for (let l = 0; l < lines; l++) {
+                    const o0 = l * lineStep; let acc = 0;
+                    for (let i = 0; i <= r && i < len; i++) acc += from[o0 + i * step];
+                    for (let i = 0; i < len; i++) {
+                        to[o0 + i * step] = acc / win;
+                        const o = i - r, n = i + r + 1;
+                        if (o >= 0) acc -= from[o0 + o * step];
+                        if (n < len) acc += from[o0 + n * step];
+                    }
+                }
+            };
+            for (let k = 0; k < 3; k++) { pass(a, b, w, h, 1, w); pass(b, a, h, w, w, 1); }
+            return a;
+        }
+
+        const outside = new Float64Array(w * hgt), inside = new Float64Array(w * hgt);
+        for (let i = 0; i < w * hgt; i++) { outside[i] = cov[i] > 0.5 ? 0 : 1e20; inside[i] = cov[i] > 0.5 ? 1e20 : 0; }
+        edt(outside, w, hgt); edt(inside, w, hgt);
+        const sp = SPREAD * R;
+        // Canvas shadowBlur b is a gaussian of sigma b / 2 (three box passes of radius r ≈ sigma r); each layer also fills the text
+        const gauss = sb => blur(cov, w, hgt, Math.max(1, Math.round(sb / 2 * R)));
+        const over = (...layers) => { const o = new Float32Array(cov.length); for (let i = 0; i < cov.length; i++) { let t = 1; for (const [a, m] of layers) t *= 1 - a * Math.max(cov[i], m[i]); o[i] = 1 - t; } return o; };
+        const shadow = neon ? over([0.85, gauss(18)], [0.6, gauss(8)]) : null;
+        const bloom = neon ? over([0.3, gauss(40)], [0.7, gauss(20)], [1, gauss(8)]) : null;
+        const out = new Uint8Array(w * hgt * 4);
+        for (let i = 0; i < w * hgt; i++) {
+            const sd = (outside[i] > 0 ? outside[i] - 0.5 : 0.5 - inside[i]);
+            out[i * 4] = Math.max(0, Math.min(255, Math.round((0.5 - sd / (2 * sp)) * 255)));
+            out[i * 4 + 1] = shadow ? Math.round(shadow[i] * 255) : 0;
+            out[i * 4 + 2] = bloom ? Math.round(bloom[i] * 255) : 0;
+            out[i * 4 + 3] = 255;
+        }
+        return out;
+    };
+    let worker = null, jobs = 0;
+    const pending = new Map();
+    function startWorker() {
+        if (worker !== null) return worker;
+        try {
+            const src = `const COMPUTE = ${COMPUTE.toString()};
+                onmessage = e => { const m = e.data, out = COMPUTE(m.cov, m.w, m.h, m.R, m.SPREAD, m.neon); postMessage({ id: m.id, out }, [out.buffer]); };`;
+            worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+            worker.onmessage = e => { const job = pending.get(e.data.id); pending.delete(e.data.id); if (job) put(job.e, job.w, job.h, e.data.out, job.revision); };
+            worker.onerror = () => { worker = false; for (const job of pending.values()) put(job.e, job.w, job.h, COMPUTE(job.cov, job.w, job.h, job.R, SPREAD, job.neon), job.revision); pending.clear(); };
+        } catch (err) { worker = false; }
+        return worker;
+    }
+    /** Copy a computed entry into the atlas (unless the fonts changed since) */
+    function put(e, w, hgt, out, rev) {
+        if (rev !== revision || !data) return;
+        for (let y = 0; y < hgt; y++) data.set(out.subarray(y * w * 4, (y + 1) * w * 4), ((e.y + y) * SIZE + e.x) * 4);
+        e.ready = true; dirty = true;
+    }
+    /** An atlas entry for text at size (world px): uv rect and its world size, centred on the text's middle */
+    function entry(text, size, family = 'Great Vibes', neon = false) {
+        const key = text + '|' + size + '|' + family + '|' + (neon ? 1 : 0);
+        let e = entries.get(key);
+        if (e && e.revision === revision) return e;
+        const c = measurer(), R = neon ? 1.5 : RES, pad = neon ? 60 : SPREAD + 2;
+        c.font = fontOf(size, family);
+        const tw = Math.ceil(c.measureText(text).width), w = Math.ceil((tw + pad * 2) * R), hgt = Math.ceil((size * 1.6 + pad * 2) * R);
+        if (!e) {
+            if (shelfX + w > SIZE) { shelfX = 0; shelfY += shelfH + 2; shelfH = 0; }
+            if (shelfY + hgt > SIZE) return null;                      // atlas full: the text is left out
+            e = { x: shelfX, y: shelfY, w, h: hgt }; shelfX += w + 2; shelfH = Math.max(shelfH, hgt);
+            entries.set(key, e);
+        }
+        e.revision = revision;
+        canvas.width = w; canvas.height = hgt;
+        const g = canvas.getContext('2d', { willReadFrequently: true });
+        g.setTransform(R, 0, 0, R, 0, 0); g.font = fontOf(size, family); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff';
+        g.fillText(text, w / R / 2, hgt / R / 2);
+        const px = g.getImageData(0, 0, w, hgt).data, cov = new Float32Array(w * hgt);
+        for (let i = 0; i < w * hgt; i++) cov[i] = px[i * 4 + 3] / 255;
+        tex();
+        const w0 = w, h0 = hgt, rev = revision;
+        if (startWorker()) { const id = ++jobs; pending.set(id, { e, w: w0, h: h0, cov, R, neon, revision: rev }); worker.postMessage({ id, cov, w: w0, h: h0, R, SPREAD, neon }); }
+        else put(e, w0, h0, COMPUTE(cov, w0, h0, R, SPREAD, neon), rev);
+        e.u0 = e.x / SIZE; e.v0 = e.y / SIZE; e.u1 = (e.x + w) / SIZE; e.v1 = (e.y + hgt) / SIZE;
+        e.ww = w / R; e.wh = hgt / R;                                   // world size at the given font size
+        return e;
+    }
+    /** Emit text as a quad into builder B, centred at (x, y) in the current frame, at height z (mode).
+        channel: 0 distance field (edge/softness), 1 shadow, 2 bloom; gain scales the blurred channels */
+    function quad(B, e, x, y, z, mode, channel = 0, gain = 1, dy = 0) {
+        if (!e) return;
+        const x0 = x - e.ww / 2, y0 = y - e.wh / 2 + dy, x1 = x0 + e.ww, y1 = y0 + e.wh;
+        const t = (u, v) => [u, v, channel === 0 ? 0.5 : channel * 10 + gain, channel === 0 ? 0.08 : 0];
+        const base = B.n;
+        B.vertex([x0, y0, z, mode], undefined, undefined, 0, 0, 0, B._c, t(e.u0, e.v0));
+        B.vertex([x1, y0, z, mode], undefined, undefined, 0, 0, 0, B._c, t(e.u1, e.v0));
+        B.vertex([x1, y1, z, mode], undefined, undefined, 0, 0, 0, B._c, t(e.u1, e.v1));
+        B.vertex([x0, y1, z, mode], undefined, undefined, 0, 0, 0, B._c, t(e.u0, e.v1));
+        B.index.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    }
+    /** Upload new atlas entries (once a frame, if any) */
+    function flush() { if (dirty && base) { base.update(); dirty = false; } return texture; }
+    /** Fonts arrived: every entry re-renders on its next use */
+    function invalidate() { revision++; }
+    return { measure, entry, quad, flush, invalidate, texture: () => tex() };
+})();
+// GL engine: the building model. Turns a building's description (sections, floors, colours,
+// facing, style, street variant, roof features) into GPU geometry, once. Three layers:
+//   base  on the ground under people: the shadow, the footprint, the pavement dressing
+//   top   over people: walls, windows, ledges, shopfronts, awnings, the roof and its features
+//   glow  after the lighting: lit windows, neon, rims, roof lights (faded by the night)
+// Every piece keeps the Canvas building's look: the same colours, proportions and draw order.
+// What Canvas decided per frame (which walls face the camera, whether a wall shows enough for
+// windows or sills, the zoom detail, the sun on the glass, lit windows, flicker) is decided in
+// the vertex shader from the face table and per-frame uniforms (gl/building-mesh.js).
+const GLBuildingModel = (() => {
+    const FH = () => CONFIG.BUILDINGS.FLOOR_HEIGHT;
+    const hashB = (seed, i) => { const s = Math.sin(seed * 12.9898 + i * 78.233) * 43758.5453; return s - Math.floor(s); };
+    const LOD_FINE = 1;                                   // Canvas's `_zoomLOD < 2`
+
+    /** A plane at height z (mode 0: the wall lean, 1: perspective) for flat art: fills and strokes that
+        widen with the plane's scale, as Canvas drew them under ctx.scale(k) */
+    function plane(B, z, mode = 0) {
+        const p = (x, y) => [x, y, z, mode];
+        const P = {
+            p,
+            rect(x, y, w, h, col) { B.color(col).poly([p(x, y), p(x + w, y), p(x + w, y + h), p(x, y + h)]); return P; },
+            rectLine(x, y, w, h, width, col) { B.color(col).line([p(x, y), p(x + w, y), p(x + w, y + h), p(x, y + h)], width, true, GLB_LINE.SCALE_K); return P; },
+            poly(pts, col, concave = false) { B.color(col).poly(pts.map(q => p(q[0], q[1])), concave); return P; },
+            polyLine(pts, width, col, closed = false, flags = 0) { B.color(col).line(pts.map(q => p(q[0], q[1])), width, closed, GLB_LINE.SCALE_K | flags); return P; },
+            disc(x, y, r, col) { B.color(col).disc(x, y, r, z, mode); return P; },
+            ring(x, y, r, width, col, a0 = 0, a1 = Math.PI * 2) { B.color(col).circleLine(x, y, r, width, z, mode, GLB_LINE.SCALE_K, a0, a1); return P; },
+            ellipse(x, y, rx, ry, rot, col) { B.color(col).ellipse(x, y, rx, ry, rot, z, mode); return P; },
+            /** separate segments [[x0, y0, x1, y1], ...], one stroke */
+            segs(list, width, col, flags = 0) { B.color(col); for (const s of list) B.line([p(s[0], s[1]), p(s[2], s[3])], width, false, GLB_LINE.SCALE_K | flags); return P; },
+            roundRect(x, y, w, h, r, col) { B.color(col).poly(GLBuildingBuilder.roundRectPts(x, y, w, h, r, z, mode)); return P; },
+            roundRectLine(x, y, w, h, r, width, col) { B.color(col).line(GLBuildingBuilder.roundRectPts(x, y, w, h, r, z, mode), width, true, GLB_LINE.SCALE_K); return P; },
+            /** a linear gradient fill over a convex polygon: stops [[t, colour], ...] along (x0, y0) → (x1, y1) */
+            grad(pts, x0, y0, x1, y1, stops) { gradPoly(B, pts.map(q => p(q[0], q[1])), x0, y0, x1, y1, stops); return P; },
+            /** a radial gradient disc (Canvas's two-circle gradient) */
+            radial(cx, cy, r, gx0, gy0, r0, gx1, gy1, r1, stops) { radialDisc(B, cx, cy, r, z, mode, gx0, gy0, r0, gx1, gy1, r1, stops); return P; }
+        };
+        return P;
+    }
+
+    const stopColor = (stops, t) => {
+        if (t <= stops[0][0]) return GLColor.parse(stops[0][1]);
+        for (let i = 1; i < stops.length; i++) if (t <= stops[i][0]) { const [ta, ca] = stops[i - 1], [tb, cb] = stops[i]; return GLColor.mix(ca, cb, tb > ta ? (t - ta) / (tb - ta) : 1); }
+        return GLColor.parse(stops[stops.length - 1][1]);
+    };
+    /** Clip a convex polygon to t >= lo and t <= hi (t along the gradient axis), colour each vertex by its t */
+    function gradPoly(B, pts, x0, y0, x1, y1, stops) {
+        const dx = x1 - x0, dy = y1 - y0, L2 = dx * dx + dy * dy || 1, T = q => ((q[0] - x0) * dx + (q[1] - y0) * dy) / L2;
+        const cuts = [-Infinity, ...stops.map(s => s[0]), Infinity];
+        const clip = (poly, t, keepAbove) => {
+            const out = [];
+            for (let i = 0; i < poly.length; i++) {
+                const a = poly[i], b = poly[(i + 1) % poly.length], ta = T(a) - t, tb = T(b) - t, ina = keepAbove ? ta >= 0 : ta <= 0, inb = keepAbove ? tb >= 0 : tb <= 0;
+                if (ina) out.push(a);
+                if (ina !== inb) { const s = ta / (ta - tb); out.push([a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s, a[2], a[3]]); }
+            }
+            return out;
+        };
+        for (let i = 0; i < cuts.length - 1; i++) {
+            let band = pts;
+            if (cuts[i] > -Infinity) band = clip(band, cuts[i], true);
+            if (cuts[i + 1] < Infinity && band.length) band = clip(band, cuts[i + 1], false);
+            if (band.length < 3) continue;
+            B.polyColors(band, band.map(q => stopColor(stops, T(q))));
+        }
+    }
+    function radialDisc(B, cx, cy, r, z, mode, gx0, gy0, r0, gx1, gy1, r1, stops) {
+        // Canvas two-circle gradient: the t whose circle (centre lerp, radius lerp) passes through the point
+        const tAt = (x, y) => {
+            const cdx = gx1 - gx0, cdy = gy1 - gy0, dr = r1 - r0, px = x - gx0, py = y - gy0;
+            const a = cdx * cdx + cdy * cdy - dr * dr, b = px * cdx + py * cdy + r0 * dr, c = px * px + py * py - r0 * r0;
+            let t;
+            if (Math.abs(a) < 1e-6) t = c / (2 * b); else { const d = b * b - a * c; t = d < 0 ? 0 : (b + Math.sqrt(d)) / a; }
+            return t;
+        };
+        const rings = 8, segs = 36, base = B.n, col = (x, y) => stopColor(stops, tAt(x, y));
+        B.vertex([cx, cy, z, mode], undefined, undefined, 0, 0, 0, col(cx, cy));
+        for (let i = 1; i <= rings; i++) for (let j = 0; j < segs; j++) {
+            const rr = r * i / rings, a = j / segs * Math.PI * 2, x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr;
+            B.vertex([x, y, z, mode], undefined, undefined, 0, 0, 0, col(x, y));
+        }
+        for (let j = 0; j < segs; j++) B.index.push(base, base + 1 + j, base + 1 + (j + 1) % segs);
+        for (let i = 1; i < rings; i++) for (let j = 0; j < segs; j++) {
+            const a = base + 1 + (i - 1) * segs + j, b = base + 1 + (i - 1) * segs + (j + 1) % segs, c = a + segs, d = b + segs;
+            B.index.push(a, c, d, a, d, b);
+        }
+    }
+
+    // ---------------- the landmark kit's depth vocabulary (true perspective) ----------------
+    /** Slabs along wall edges at height z: bands, then tops, then lips. edges [{a, b, nx, ny, face}] */
+    function ledge(B, edges, z, out, th, top, band, lip, lipWidth = 0.9) {
+        if (!edges.length) return;
+        const zb = Math.max(0, z - th), P = (x, y, zz) => [x, y, zz, 1];
+        const geo = edges.map(e => ({ e, ax: e.a[0] + e.nx * out, ay: e.a[1] + e.ny * out, bx: e.b[0] + e.nx * out, by: e.b[1] + e.ny * out }));
+        for (const g of geo) { B.face(g.e.face ?? -1).color(band).quad(P(g.ax, g.ay, zb), P(g.bx, g.by, zb), P(g.bx, g.by, z), P(g.ax, g.ay, z)); }
+        for (const g of geo) { B.face(g.e.face ?? -1).color(top).quad(P(g.e.a[0], g.e.a[1], z), P(g.e.b[0], g.e.b[1], z), P(g.bx, g.by, z), P(g.ax, g.ay, z)); }
+        if (lip) for (const g of geo) { B.face(g.e.face ?? -1).color(lip).seg(P(g.ax, g.ay, z), P(g.bx, g.by, z), lipWidth); }
+        B.face(-1);
+    }
+    function fins(B, anchors, z0, z1, w, out, face, edge) {
+        if (!anchors.length) return;
+        for (const a of anchors) {
+            const tx = -a.ny * w / 2, ty = a.nx * w / 2, fx = a.x + a.nx * out, fy = a.y + a.ny * out;
+            B.face(a.face ?? -1).color(face).quad([fx - tx, fy - ty, z0, 1], [fx + tx, fy + ty, z0, 1], [fx + tx, fy + ty, z1, 1], [fx - tx, fy - ty, z1, 1]);
+        }
+        if (edge) for (const a of anchors) {
+            const tx = -a.ny * w / 2, ty = a.nx * w / 2, fx = a.x + a.nx * out, fy = a.y + a.ny * out;
+            B.face(a.face ?? -1).color(edge).seg([fx + tx, fy + ty, z0, 1], [fx + tx, fy + ty, z1, 1], 0.8);
+        }
+        B.face(-1);
+    }
+    function veranda(B, edges, z, out, step, rh, slabTop, slabBand, rail) {
+        ledge(B, edges, z, out, 2, slabTop, slabBand, null);
+        const posts = [], rails = [];
+        for (const e of edges) {
+            const ax = e.a[0] + e.nx * (out - 1), ay = e.a[1] + e.ny * (out - 1), bx = e.b[0] + e.nx * (out - 1), by = e.b[1] + e.ny * (out - 1);
+            const L = Math.hypot(bx - ax, by - ay), n = Math.max(1, Math.round(L / step));
+            rails.push([e.face, [ax, ay, z + rh, 1], [bx, by, z + rh, 1]]);
+            for (let i = 0; i <= n; i++) { const x = ax + (bx - ax) * i / n, y = ay + (by - ay) * i / n; posts.push([e.face, [x, y, z, 1], [x, y, z + rh, 1]]); }
+        }
+        B.color(rail);
+        for (const [f, a, b] of posts) B.face(f ?? -1).seg(a, b, 0.7);
+        for (const [f, a, b] of rails) B.face(f ?? -1).seg(a, b, 1.2);
+        B.face(-1);
+    }
+
+    // ---------------- the building ----------------
+    function build(b) {
+        const H = Math.min(b.floors, CONFIG.BUILDINGS.MAX_FLOORS) * FH();
+        const out = { H, base: new GLBuildingBuilder(H), top: new GLBuildingBuilder(H), glow: new GLBuildingBuilder(H) };
+        const faces = b._leanFaces();
+        // the three layers share one face table, in the Canvas face order
+        out.faceIds = faces.map(f => { const i = out.top.addFace(f); out.base.addFace(f); out.glow.addFace(f); return i; });
+        drawBase(b, out);
+        drawTop(b, out, faces);
+        drawGlow(b, out, faces);
+        return out;
+    }
+
+    function drawBase(b, o) {
+        const B = o.base, G = plane(B, 0);
+        b.sections.forEach(s => G.rect(b.x + s.x + b.facadeDepth, b.y + s.y + b.facadeDepth, s.w, s.h, 'rgba(0, 0, 0, 0.5)'));
+        b.sections.forEach(s => G.rect(b.x + s.x - 5, b.y + s.y - 5, s.w + 10, s.h + 10, 'rgba(10, 10, 15, 0.3)'));
+        if (b.variant) GLStreetVariants.base(b, B);
+    }
+
+    function drawTop(b, o, faces) {
+        const B = o.top, H = o.H, V = !!b.variant;
+        const wall = b.colors.wall;
+        faces.forEach((f, i) => {
+            const id = o.faceIds[i], F = new GLFace(f, H);
+            B.face(id);
+            const shade = f.side === 'S' ? 18 : f.side === 'N' ? -8 : f.side === 'C' ? Math.round(6 + (f.ny > 0 ? 12 : 14) * f.ny) : 6;
+            const c0 = darkenHex(wall, 6), c1 = shade >= 0 ? lightenHex(wall, shade) : darkenHex(wall, -shade);
+            B.polyColors([F.at(0, 0), F.at(1, 0), F.at(1, 1), F.at(0, 1)], [c0, c0, c1, c1]);
+            B.color('rgba(0,0,0,0.35)').line([F.at(0, 0), F.at(1, 0), F.at(1, 1), F.at(0, 1)], 1, true);
+            if (V) GLStreetVariants.faceUnder(b, B, f, F, H);
+            windows(b, B, f, F, H, false);
+            faceFeature(b, B, f, F, H, false);
+            B.reset();
+        });
+        if (V) GLStreetVariants.faceOver(b, B, faces, o.faceIds, H);
+        sign(b, B, H, false);
+        // --- the roof plane ---
+        const R = plane(B, H);
+        if (V && b.variant.kind === 'shop') GLStreetVariants.shopRoof(b, B, H);
+        else {
+            b.sections.forEach(s => {
+                const sx = b.x + s.x, sy = b.y + s.y;
+                R.rect(sx, sy, s.w, s.h, b.colors.roof);
+                const seams = []; for (let gx = 36; gx < s.w; gx += 36) seams.push([sx + gx, sy, sx + gx, sy + s.h]);
+                R.segs(seams, 1, 'rgba(255,255,255,0.05)');
+                R.rectLine(sx + 2.5, sy + 2.5, s.w - 5, s.h - 5, 5, lightenHex(b.colors.roof, 22));
+            });
+            if (V) GLStreetVariants.aptRoof(b, B, H);
+            if (b.style) roofFeatures(b, B, H, false); else roofProps(b, B, H);
+        }
+    }
+
+    /** The window grid of a face (Canvas _drawFaceWindows): glass, the sky and sun by day, sills */
+    function windows(b, B, f, F, H, emissive) {
+        if (f.side === 'C') return;
+        const floors = Math.min(b.floors, CONFIG.BUILDINGS.MAX_FLOORS), cols = Math.max(1, Math.floor(F.L / 26));
+        const mask = b.variant && b.variant.kind === 'shop' && f.side === b.facing ? (fl => fl === 0) : null;
+        const list = [];
+        for (let fl = 0; fl < floors; fl++) for (let c = 0; c < cols; c++) {
+            if (mask && mask(fl)) continue;
+            list.push({ fl, c, u0: (c + 0.25) / cols, u1: (c + 0.75) / cols, v0: (fl + 0.28) / floors, v1: (fl + 0.78) / floors });
+        }
+        const q = w => B.poly([F.at(w.u0, w.v0), F.at(w.u1, w.v0), F.at(w.u1, w.v1), F.at(w.u0, w.v1)]);
+        const sills = b.sills, sOut = 1.6, nx = f.nx, ny = f.ny;
+        const sill = (w, vv) => { const w0 = w.u0 - 0.06 / cols, w1 = w.u1 + 0.06 / cols, a = F.at(w0, vv), c = F.at(w1, vv);
+            B.seg([a[0] + nx * sOut, a[1] + ny * sOut, a[2], 0], [c[0] + nx * sOut, c[1] + ny * sOut, c[2], 0], B._sillW); };
+        if (!emissive) {
+            B.gate(floors * 1.6);
+            B.color('rgba(20,28,48,0.9)'); for (const w of list) q(w);
+            B.color('rgb(168, 172, 226)').anim(GLB_ANIM.SKY); for (const w of list) q(w);
+            for (const w of list) { B.anim(GLB_ANIM.SHEEN, (w.u0 + w.u1) / 2, 0.7 + 0.3 * (w.fl % 2)); q(w); }
+            B.anim();
+            if (sills) {
+                B.gate(floors * 2.4, LOD_FINE);
+                B._sillW = 1.2; B.color(sills.shade); for (const w of list) sill(w, w.v0 - 0.5 / floors);
+                B._sillW = 1; B.color(sills.lip); for (const w of list) sill(w, w.v0 - 0.2 / floors);
+            }
+            B.gate();
+            return;
+        }
+        // night: lit rooms (most fixed, the few that change every 7 s hashed on the GPU), TVs, sill rims
+        const seed = b._seed || Math.round(b.x + b.y), sSeed = seed + f.section * 31 + f.side.charCodeAt(0), thr = b.style ? 0.5 : 0.3;
+        const lit = b.colors.windowLit || '#ffe2a8';
+        B.gate(floors * 1.6);
+        const fixed = [], tv = [], changing = [];
+        for (const w of list) {
+            const idx = w.fl * 57 + w.c * 13;
+            if (hashB(seed, w.fl + w.c) > 0.93) { changing.push({ w, idx }); continue; }
+            const h = hashB(sSeed, idx);
+            if (!(h < thr)) continue;
+            (h < 0.06 ? tv : fixed).push(w);
+        }
+        B.color(lit); for (const w of fixed) q(w);
+        for (const { w, idx } of changing) { B.anim(GLB_ANIM.WINDOW, sSeed, idx, thr); q(w); }
+        B.color('#9ec8ff');
+        for (const w of tv) { B.anim(GLB_ANIM.TV, 0, 0, w.c); q(w); }
+        for (const { w, idx } of changing) { B.anim(GLB_ANIM.WINDOW_TV, sSeed, idx, w.c); q(w); }
+        B.anim();
+        if (sills) {
+            B.gate(floors * 2.4, LOD_FINE).additive().anim(GLB_ANIM.RIM).color(GLColor.alpha(b.colors.accent || '#ffcf8a', 0.5));
+            B._sillW = 1; for (const w of list) sill(w, w.v0 - 0.2 / floors);
+            B.additive(false).anim();
+        }
+        B.gate();
+    }
+
+    /** Balconies and fire escapes (apartments) */
+    function faceFeature(b, B, f, F, H, emissive) {
+        const ff = b.facadeFeature;
+        if (!ff || ff === 'silver_queen' || ff === 'moon_city') return;
+        const floors = Math.min(b.floors, CONFIG.BUILDINGS.MAX_FLOORS);
+        B.gate(6);
+        if (ff === 'balconies' && f.side === b.facing) {
+            if (!emissive) { B.color('rgba(200,210,225,0.55)'); for (let fl = 1; fl < floors; fl += 2) F.line(B, 0.08, fl / floors, 0.92, fl / floors, 1.4); }
+            else {
+                B.color(b.colors.accent);
+                for (let fl = 1; fl < floors; fl += 2) for (let u = 0.12; u < 0.9; u += 0.19) { const p = F.at(u, fl / floors); B.disc(p[0], p[1], 1.1, p[2], 0, 10); }
+            }
+        } else if (ff === 'fire_escape' && (f.side === 'E' || f.side === 'W') && !emissive) {
+            B.color('rgba(150,120,110,0.7)');
+            for (let fl = 1; fl < floors; fl++) F.line(B, 0.25, fl / floors, 0.65, fl / floors, 1);
+            for (let fl = 1; fl < floors; fl += 2) F.line(B, 0.3, fl / floors, 0.6, (fl + 1) / floors, 1);
+            for (let fl = 2; fl < floors; fl += 2) F.line(B, 0.6, fl / floors, 0.3, (fl + 1) / floors, 1);
+        }
+        B.gate();
+    }
+
+    /** The procedural roof props of the unstyled buildings (AC, tanks, vents, turning fans) */
+    function roofProps(b, B, H) {
+        const R = plane(B, H);
+        let lw = 5;                                                    // Canvas's stroke width carries over from the parapet
+        for (const p of b.roofProps) {
+            const sec = b.sections[p.section] || b.sections[0], x = b.x + sec.x + p.x, y = b.y + sec.y + p.y;
+            if (p.type === 'ac_unit') { R.rect(x, y, p.w, p.h, '#3a3f48'); R.rectLine(x + 3, y + 3, p.w - 6, p.h - 6, lw, '#555c66'); }
+            else if (p.type === 'water_tank') { R.disc(x, y, p.r, '#4a4238'); lw = 2; R.ring(x, y, p.r * 0.7, 2, '#6a5e50'); }
+            else if (p.type === 'vent') R.rect(x, y, p.w, p.h, '#2e333a');
+            else if (p.type === 'roof_fan') {
+                R.disc(x, y, p.r, '#333841'); lw = 1;
+                B.anim(GLB_ANIM.SPIN, x, y, 2).color('#4b525c');
+                for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2; B.line([R.p(x, y), R.p(x + Math.cos(a) * p.r * 0.8, y + Math.sin(a) * p.r * 0.8)], 1, false, GLB_LINE.SCALE_K); }
+                B.anim();
+            }
+        }
+    }
+
+    /** Styled rooftops (apartments): stair hut, pool, garden, laundry, tank, solar, lights, antenna, dish */
+    function roofFeatures(b, B, H, emissive) {
+        const R = plane(B, H), main = b.sections[0], mx = b.x + main.x, my = b.y + main.y, mw = main.w, mh = main.h;
+        const r = i => hashB(b._seed || 1, 100 + i), acc = b.colors.accent;
+        const slots = { stair: [0.08, 0.1, 0.18, 0.2], pool: [0.4, 0.14, 0.42, 0.34], garden: [0.38, 0.12, 0.46, 0.36], laundry: [0.12, 0.56, 0.5, 0.3],
+                        tank: [0.76, 0.6, 0.14, 0.18], solar: [0.56, 0.56, 0.34, 0.32], lights: [0.06, 0.08, 0.88, 0.84], antenna: [0.88, 0.1, 0.05, 0.05], dish: [0.74, 0.12, 0.1, 0.1] };
+        for (const f of b.roofFeatures || []) {
+            if (!slots[f]) continue;
+            const s = slots[f], x = mx + s[0] * mw, y = my + s[1] * mh, w = s[2] * mw, h = s[3] * mh;
+            switch (f) {
+                case 'stair':
+                    if (!emissive) { R.rect(x, y, w, h, lightenHex(b.colors.roof, 18)); R.rect(x + w, y + 4, 4, h, 'rgba(0,0,0,0.35)'); }
+                    else R.rect(x + w * 0.35, y + h - 3, w * 0.3, 3, '#ffd9a0');
+                    break;
+                case 'pool':
+                    if (!emissive) { R.rect(x - 5, y - 5, w + 10, h + 10, '#d9d2c4'); R.grad([[x, y], [x + w, y], [x + w, y + h], [x, y + h]], x, y, x + w, y + h, [[0, '#4fc3e0'], [1, '#1f6fa8']]); }
+                    else {
+                        R.grad([[x, y], [x + w, y], [x + w, y + h], [x, y + h]], x, y, x + w, y + h, [[0, GLColor.alpha('#2bb8d8', 0.8)], [1, GLColor.alpha('#0f4f8a', 0.8)]]);
+                        B.color('rgba(255,255,255,0.45)');
+                        for (let i = 0; i < 4; i++) {
+                            const yy = y + h * (0.2 + i * 0.2), n = 12, pts = [];
+                            for (let k = 0; k <= n; k++) { const t = k / n, u = 1 - t; pts.push({ p: R.p(u * u * (x + 4) + 2 * u * t * (x + w / 2) + t * t * (x + w - 4), yy), wgt: 2 * u * t }); }
+                            // each point sways with the curve's two sines (GPU)
+                            for (let k = 0; k < n; k++) {
+                                const a = pts[k], c = pts[k + 1];
+                                B.anim(GLB_ANIM.CAUSTIC, i, a.wgt); const v0 = B.vertex(a.p, a.p, c.p, -1, 0.5, GLB_LINE.SCALE_K), v1 = B.vertex(a.p, a.p, c.p, 1, 0.5, GLB_LINE.SCALE_K);
+                                B.anim(GLB_ANIM.CAUSTIC, i, c.wgt); const v2 = B.vertex(c.p, a.p, c.p, 1, 0.5, GLB_LINE.SCALE_K), v3 = B.vertex(c.p, a.p, c.p, -1, 0.5, GLB_LINE.SCALE_K);
+                                B.index.push(v0, v1, v2, v0, v2, v3);
+                            }
+                        }
+                        B.anim();
+                    }
+                    break;
+                case 'garden':
+                    if (!emissive) {
+                        R.rect(x, y, w, h, '#3b2e24');
+                        const greens = ['#2f7d3a', '#3c9b47', '#27643a'], rr = Math.min(w, h) * 0.14;
+                        for (let k = 0; k < 3; k++) for (let i = k; i < 9; i += 3) R.disc(x + w * (0.12 + (i % 3) * 0.38), y + h * (0.2 + Math.floor(i / 3) * 0.3), rr, greens[k]);
+                    } else for (let i = 0; i < 4; i++) R.disc(x + w * (0.3 + (i % 2) * 0.4), y + h * (0.35 + Math.floor(i / 2) * 0.3), 1.6, '#ffcf7a');
+                    break;
+                case 'laundry': {
+                    if (emissive) break;
+                    const cloth = ['#ff6b8a', '#6bc6ff', '#ffe066', '#b58cff', '#ffffff', '#7dffb3'];
+                    for (let row = 0; row < 3; row++) {
+                        const yy = y + h * (0.2 + row * 0.3);
+                        R.segs([[x, yy, x + w, yy]], 0.7, 'rgba(220,220,220,0.5)');
+                        for (let i = 0; i < 5; i++) { B.anim(GLB_ANIM.SWAY, i + row); R.rect(x + w * (0.08 + i * 0.18), yy, w * 0.1, h * 0.14, cloth[(i + row * 2 + Math.floor(r(row) * 6)) % cloth.length]); }
+                        B.anim();
+                    }
+                    break;
+                }
+                case 'tank': {
+                    if (emissive) break;
+                    const cx = x + w / 2, cy = y + h / 2, rr = Math.min(w, h) / 2;
+                    R.disc(cx, cy, rr, '#5a4a3a'); R.ring(cx, cy, rr * 0.65, 2, '#7a6650'); R.disc(cx, cy, rr * 0.25, '#3e3328');
+                    break;
+                }
+                case 'solar': {
+                    if (emissive) break;
+                    const cells = [];
+                    for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) cells.push([x + i * w / 3 + 2, y + j * h / 2 + 2, w / 3 - 4, h / 2 - 4]);
+                    for (const c of cells) R.rect(...c, '#1c2a4a');
+                    for (const c of cells) R.rectLine(...c, 0.6, 'rgba(120,160,255,0.35)');
+                    break;
+                }
+                case 'lights': {
+                    if (!emissive) break;
+                    const cols = ['#ffd27a', acc, '#ffd27a', '#ff9ecf'], rows = [];
+                    for (let z = 0; z < 3; z++) {
+                        const y0 = y + h * (0.15 + z * 0.35), y1 = y0 + h * 0.18;
+                        for (let i = 0; i <= 12; i++) (rows[i + z] || (rows[i + z] = [])).push([x + w * i / 12, (i % 2 ? y1 : y0) + Math.sin(i * 0.9) * 2]);
+                    }
+                    rows.forEach((pts, s) => { B.anim(GLB_ANIM.SHIMMER, s); for (const [px, py] of pts) R.disc(px, py, 1.5, cols[s % cols.length]); });
+                    B.anim();
+                    break;
+                }
+                case 'antenna': {
+                    const cx = x + w / 2, cy = y + h / 2;
+                    if (!emissive) R.segs([[cx - 6, cy, cx + 6, cy], [cx, cy - 6, cx, cy + 6]], 1.5, '#8a8f99');
+                    else { B.anim(GLB_ANIM.BLINK_ON, b._seed || 0, 3, 0.3); R.disc(cx, cy, 6, 'rgba(255,48,64,0.25)'); R.disc(cx, cy, 2.2, '#ff3040'); B.anim(); }
+                    break;
+                }
+                case 'dish': {
+                    if (emissive) break;
+                    const cx = x + w / 2, cy = y + h / 2, rr = Math.min(w, h) / 2;
+                    R.ellipse(cx, cy, rr, rr * 0.8, 0.6, '#c9ced6'); R.disc(cx, cy, 1.8, '#8a9099');
+                    break;
+                }
+            }
+        }
+    }
+
+    /** The entrance sign's awning (apartments with a sign); the shops' fronts are their variant's */
+    function sign(b, B, H, emissive) {
+        if (b.variant && b.variant.kind === 'shop') { GLStreetVariants.front(b, B, emissive); return; }
+        const E = b.attachedSign && b._entrance();
+        if (!E || emissive) return;
+        const size = b.attachedSign.fontSize || 45, tw = Math.min((E.nx ? b.h : b.w) - 20, GLText.measure(b.attachedSign.text, size, 'Great Vibes') + 34), d = Math.round(size * 0.95);
+        const z = 2 * FH(), a = [E.cx - E.ux * tw / 2, E.cy - E.uy * tw / 2], c = [E.cx + E.ux * tw / 2, E.cy + E.uy * tw / 2];
+        ledge(B, [{ a, b: c, nx: E.nx, ny: E.ny }], z, d, 3, darkenHex(b.colors.wall || '#2a2436', 8), darkenHex(b.colors.wall || '#2a2436', 22), `rgba(${hexToRgb(b.colors.accent || '#a469ff')}, 0.55)`);
+        // the neon sign lying on it: a dark backdrop, the bloom and the white-hot core, flickering on the GPU
+        const e = GLText.entry(b.attachedSign.text, size, 'Great Vibes', true), rot = E.nx ? E.nx * Math.PI / 2 : 0, cs = Math.cos(rot), sn = Math.sin(rot);
+        const seed = (b.x + b.y) * 7, lamp = b.colors.accent || '#a469ff';
+        B.inFrame([cs, sn, -sn, cs, E.cx + E.nx * d / 2, E.cy + E.ny * d / 2], () => {
+            B.color('#000'); GLText.quad(B, e, 0, 0, z + 0.5, 1, 1, 1, 3);
+            B.anim(GLB_ANIM.FLICKER, seed).color(lamp); GLText.quad(B, e, 0, 0, z + 0.5, 1, 2, 1);
+            B.color('rgba(255,255,255,0.6)'); GLText.quad(B, e, 0, 0, z + 0.5, 1, 0);
+            B.anim();
+        });
+    }
+
+    function drawGlow(b, o, faces) {
+        const B = o.glow, H = o.H;
+        faces.forEach((f, i) => {
+            B.face(o.faceIds[i]);
+            const F = new GLFace(f, H);
+            if (b.style && f.side === b.facing && b._entrance()) frontWash(b, B, f, F);
+            windows(b, B, f, F, H, true);
+            faceFeature(b, B, f, F, H, true);
+            B.reset();
+        });
+        if (b.variant) GLStreetVariants.glow(b, B, faces, o.faceIds, H);
+        // the roof: a rim along the parapets reads the silhouette at night, then the roof lights
+        const R = plane(B, H), rim = b.style ? b.colors.accent : '#8fa0c8', ra = b.style ? 0.55 : 0.18, lw = b.style ? 1.6 : 1;
+        b.sections.forEach(s => {
+            const pts = [[b.x + s.x + 1, b.y + s.y + 1], [b.x + s.x + s.w - 1, b.y + s.y + 1], [b.x + s.x + s.w - 1, b.y + s.y + s.h - 1], [b.x + s.x + 1, b.y + s.y + s.h - 1]].map(q => R.p(q[0], q[1]));
+            if (b.style) B.softLine(pts, lw, 8, true, GLB_LINE.SCALE_K, GLColor.alpha(rim, ra));
+            B.color(GLColor.alpha(rim, ra)).line(pts, lw, true, GLB_LINE.SCALE_K);
+        });
+        if (b.variant) GLStreetVariants.roofGlow(b, B, H);
+        if (b.style) roofFeatures(b, B, H, true);
+    }
+
+    /** Floodlight wash up the front from the entrance lamps (additive, a radial fade on the GPU) */
+    function frontWash(b, B, f, F) {
+        const E = b._entrance(), vert = !!E.nx, door = vert ? E.cy : E.cx;
+        const lo = vert ? Math.min(f.y1, f.y2) : Math.min(f.x1, f.x2), hi = vert ? Math.max(f.y1, f.y2) : Math.max(f.x1, f.x2);
+        if (door < lo - 40 || door > hi + 40) return;
+        const gx = vert ? f.x1 : door, gy = vert ? door : f.y1;
+        B.gate(6).additive().anim(GLB_ANIM.RADIAL, gx, gy, 120).color(GLColor.alpha(b.colors.accent, 0.35));
+        F.quad(B, 0, 1, 0, 1);
+        B.additive(false).anim().gate();
+    }
+
+    return { build, plane, ledge, fins, veranda, gradPoly, radialDisc, hashB, LOD_FINE };
+})();
+// GL engine: the street variants (the city's shops and apartments) as geometry. Same art as
+// buildings/street-variants.js: wall materials, shopfronts, ledges and pilasters on the walls,
+// awnings, canopies and signboards on the front, each variant's roof and pavement dressing,
+// and their night lights. Roofs and pavements are authored in the variant's front frame
+// (x along the front, y in from the back) and mapped onto the footprint by the frame matrix.
+const GLStreetVariants = (() => {
+    const FH = () => CONFIG.BUILDINGS.FLOOR_HEIGHT, K = () => GLBuildingModel, FINE = 1;
+
+    /** The frame matrix: front frame → world */
+    const frameM = b => { const F = b._vFrame(), m = F.m; return [m[0], m[1], m[2], m[3], m[4] + F.ox, m[5] + F.oy]; };
+    /** Clip segment a→b to a convex polygon (Cyrus-Beck); null when outside */
+    function clipSeg(poly, a, b) {
+        let t0 = 0, t1 = 1; const dx = b[0] - a[0], dy = b[1] - a[1];
+        let area = 0; for (let i = 0; i < poly.length; i++) { const p = poly[i], q = poly[(i + 1) % poly.length]; area += p[0] * q[1] - q[0] * p[1]; }
+        const sgn = area > 0 ? 1 : -1;
+        for (let i = 0; i < poly.length; i++) {
+            const p = poly[i], q = poly[(i + 1) % poly.length], nx = -(q[1] - p[1]) * sgn, ny = (q[0] - p[0]) * sgn;   // inward normal
+            const num = (a[0] - p[0]) * nx + (a[1] - p[1]) * ny, den = dx * nx + dy * ny;
+            if (Math.abs(den) < 1e-9) { if (num < 0) return null; continue; }
+            const t = -num / den;
+            if (den > 0) t0 = Math.max(t0, t); else t1 = Math.min(t1, t);
+            if (t0 > t1) return null;
+        }
+        return [a[0] + dx * t0, a[1] + dy * t0, a[0] + dx * t1, a[1] + dy * t1];
+    }
+
+    // ---------------- walls ----------------
+    function faceUnder(b, B, f, F, H) {
+        if (f.side === 'C') return;
+        const v = b.variant, S = v.spec, front = f.side === b.facing;
+        const mat = v.kind === 'shop' ? S.material : v.id === 'brownstone' ? 'brick' : null;
+        const L = F.L;
+        B.gate(3);
+        if (mat === 'stone') {
+            const hi = Math.min(1, FH() * 1.15 / H);
+            B.color(S.stoneLo); F.quad(B, 0, 1, 0, hi * 0.5);
+            B.color(S.stone); F.quad(B, 0, 1, hi * 0.5, hi);
+            if (hi < 1) { B.color(S.steel); F.quad(B, 0, 1, hi, 1); }
+            B.gate(8, FINE).color('rgba(211,166,112,.22)'); for (let u = 0.08; u < 1; u += 30 / L) F.line(B, u, 0, u, hi, 0.7);
+        } else if (mat === 'brick') {
+            B.gate(8, FINE).color(v.kind === 'shop' ? 'rgba(232,190,140,.16)' : 'rgba(232,200,160,.08)');
+            for (let z = 2.5; z < H - 1; z += 2.5) F.line(B, 0, z / H, 1, z / H, 0.7);
+        } else if (mat === 'timber' && front) {
+            const top = Math.min(1, FH() * 1.05 / H);
+            B.color('#25402e'); F.quad(B, 0, 1, 0, top);
+            B.gate(8, FINE).color('rgba(0,0,0,.18)'); for (let u = 0; u < 1; u += 7 / L) F.line(B, u, 0, u, top, 0.6);
+        } else if (mat === 'lacquer') {
+            const zf = Math.max(0.6, 1 - 3.2 / H), n = Math.max(4, Math.round(L / 9));
+            B.gate(8, FINE).color(GLColor.alpha(S.gold, 0.75));
+            for (let i = 0; i < n; i++) { const u0 = i / n, u1 = (i + 0.5) / n, u2 = (i + 1) / n; F.line(B, u0, zf, u1, zf + 1.8 / H, 0.8); F.line(B, u1, zf + 1.8 / H, u2, zf, 0.8); }
+        }
+        if (mat === 'brick' || (v.kind === 'apt' && v.id === 'deco')) {
+            const floors = Math.round(H / FH());
+            B.gate(8, FINE).color(v.kind === 'shop' ? S.trim : lightenHex(b.colors.wall, 30));
+            for (let i = 0; i < floors * 2; i++) {
+                const z0 = i * FH() / 2 + 0.4, z1 = (i + 1) * FH() / 2 - 0.4, w = (i % 2 ? 5 : 8) / L;
+                F.quad(B, 0, w, z0 / H, z1 / H); F.quad(B, 1 - w, 1, z0 / H, z1 / H);
+            }
+        }
+        B.gate();
+    }
+
+    function shopfront(b, B, f, F, H, emissive) {
+        const S = b.variant.spec, du = b._vDoorU(f), L = F.L, dw = 15 / L;
+        const z0 = 1 / H, z1 = Math.min(0.96, FH() * 0.86 / H), zt = Math.min(0.98, FH() * 0.94 / H);
+        const spans = du > 0 ? [[0.05, du - dw - 0.03], [du + dw + 0.03, 0.95]] : [[0.05, 0.95]];
+        const frames = [], glass = [], bars = [];
+        for (const [a, c] of spans) {
+            if (c - a < 0.04) continue;
+            frames.push([a, c, z0 * 0.4, zt]); glass.push([a + 1.6 / L, c - 1.6 / L, z0, z1]);
+            const n = Math.max(1, Math.round((c - a) * L / (S.id === 'boutique' ? 30 : 20)));
+            for (let i = 1; i < n; i++) { const u = a + (c - a) * i / n; bars.push([u - 0.6 / L, u + 0.6 / L, z0, z1]); }
+            if (S.id !== 'lounge') bars.push([a + 1.6 / L, c - 1.6 / L, z1 - 1.6 / H, z1 - 1 / H]);
+        }
+        const fill = (list, col) => { B.color(col); for (const q of list) F.quad(B, ...q); };
+        if (emissive) {
+            if (du > 0) glass.push([du - dw + 4 / L, du + dw - 4 / L, z1 * 0.3, z1 * 0.95]);
+            fill(glass, S.id === 'lounge' ? hexToRgba(b.variant.neon, 0.45) : S.id === 'florist' ? 'rgba(255,236,190,.5)' : 'rgba(255,190,110,.55)');
+            return;
+        }
+        fill(frames, S.frame); fill(glass, S.glass); fill(glass, S.id === 'lounge' ? 'rgba(180,140,255,.14)' : 'rgba(255,200,120,.14)'); fill(bars, S.mull);
+        if (du > 0) {
+            fill([[du - dw, du + dw, 0, zt]], S.frame);
+            fill([[du - dw + 2 / L, du + dw - 2 / L, 0, z1]], S.id === 'lounge' ? S.velvetLo : S.mull);
+            fill([[du - dw + 4 / L, du + dw - 4 / L, z1 * 0.3, z1 * 0.95]], 'rgba(255,200,120,.3)');
+        }
+    }
+
+    function faceOver(b, B, faces, ids, H) {
+        const v = b.variant, S = v.spec, floors = Math.min(b.floors, CONFIG.BUILDINGS.MAX_FLOORS);
+        const edges = [], finList = [];
+        faces.forEach((f, i) => {
+            if (f.side === 'C') return;
+            const id = ids[i], F = new GLFace(f, H), L = F.L, ux = (f.x2 - f.x1) / L, uy = (f.y2 - f.y1) / L;
+            edges.push({ a: [f.x1 - ux * 2, f.y1 - uy * 2], b: [f.x2 + ux * 2, f.y2 + uy * 2], nx: f.nx, ny: f.ny, face: id });
+            const cols = Math.max(1, Math.floor(L / 26));
+            B.face(id).gate(3);
+            if (v.kind === 'shop' && f.side === b.facing) shopfront(b, B, f, F, H, false);
+            if (v.kind === 'apt') {
+                B.gate(floors * 2.4, FINE);
+                if (v.id === 'brownstone') {
+                    B.color('rgba(232,214,180,0.55)');
+                    for (let fl = 0; fl < floors; fl++) for (let c = 0; c < cols; c++) F.line(B, (c + 0.2) / cols, (fl + 0.84) / floors, (c + 0.8) / cols, (fl + 0.84) / floors, 1.1);
+                } else if (v.id === 'loft') {
+                    const sp = [], mu = [];
+                    for (let fl = 1; fl <= floors; fl++) sp.push([0, 1, (fl - 0.16) / floors, Math.min(1, (fl + 0.06) / floors)]);
+                    for (let c = 0; c <= cols; c++) mu.push([Math.max(0, c / cols - 0.9 / L), Math.min(1, c / cols + 0.9 / L), 0, 1]);
+                    B.color('rgba(18,20,26,0.82)'); for (const q of sp) F.quad(B, ...q); for (const q of mu) F.quad(B, ...q);
+                    B.color('rgba(214,190,150,0.22)'); for (const q of sp) B.line([F.at(q[0], q[2]), F.at(q[1], q[2]), F.at(q[1], q[3]), F.at(q[0], q[3])], 0.6, true);
+                    B.color(lightenHex(b.colors.wall, 26)); F.quad(B, 0, 1, 0, 0.3 / floors);
+                }
+            }
+            B.gate();
+            if ((v.kind === 'shop' && v.id === 'lounge') || (v.kind === 'apt' && v.id === 'deco'))
+                for (let c = 0; c <= cols; c++) finList.push({ x: f.x1 + (f.x2 - f.x1) * c / cols, y: f.y1 + (f.y2 - f.y1) * c / cols, nx: f.nx, ny: f.ny, face: id, gated: true });
+        });
+        B.face(-1);
+        const G = K(), FHv = FH();
+        // fins only where their face shows 3 px of wall (as Canvas skipped those faces)
+        const finsGated = (list, ...args) => { B.gate(3); G.fins(B, list, ...args); B.gate(); };
+        if (v.kind === 'shop') {
+            if (finList.length) finsGated(finList, 0, H - 2, 3, 2, '#2a1e33', hexToRgba(v.neon, 0.55));
+            const lipC = S.id === 'bakery' ? S.trim : S.id === 'florist' ? '#e8e2cc' : S.gold;
+            if (S.id !== 'florist') G.ledge(B, edges, FHv * 1.02, 1.6, 1.2, darkenHex(S.wall, -18), darkenHex(S.wall, 10), hexToRgba(lipC, 0.6));
+            G.ledge(B, edges, H, 2.6, 2.2, S.id === 'bakery' ? S.trim : S.id === 'florist' ? '#d9d2b8' : S.id === 'boutique' ? '#5d303e' : '#2a2030',
+                    S.id === 'bakery' ? '#3a2116' : S.id === 'florist' ? '#1f2a22' : '#24161e', hexToRgba(lipC, 0.85));
+        } else {
+            const wall = b.colors.wall, top = lightenHex(wall, 24), band = darkenHex(wall, 4);
+            if (v.id === 'deco') {
+                if (finList.length) finsGated(finList, 0, H, 3.5, 2.2, lightenHex(wall, 14), 'rgba(226,198,146,0.55)');
+                for (let fl = 3; fl < floors; fl += 3) G.ledge(B, edges, fl * FHv, 2.2, 1.4, 'rgba(216,183,122,0.85)', darkenHex(wall, 2), 'rgba(243,221,176,0.6)');
+                G.ledge(B, edges, H, 3.4, 3, top, band, 'rgba(243,221,176,0.75)');
+            } else if (v.id === 'brownstone') {
+                G.ledge(B, edges, FHv, 1.8, 1.4, top, band, 'rgba(239,220,182,0.5)');
+                G.ledge(B, edges, H, 4, 3.2, lightenHex(wall, 30), darkenHex(wall, 6), 'rgba(239,220,182,0.75)');
+            } else if (v.id === 'terrace') {
+                G.ledge(B, edges, FHv * 0.35, 1.6, FHv * 0.35, top, lightenHex(wall, 10), null);
+                const ve = [];
+                faces.forEach((f, i) => { if (f.side !== b.facing || f.side === 'C') return; const L = Math.hypot(f.x2 - f.x1, f.y2 - f.y1), ux = (f.x2 - f.x1) / L, uy = (f.y2 - f.y1) / L;
+                    ve.push({ a: [f.x1 + ux * 10, f.y1 + uy * 10], b: [f.x2 - ux * 10, f.y2 - uy * 10], nx: f.nx, ny: f.ny, face: ids[i] }); });
+                if (ve.length) { B.gate(0, FINE); for (let fl = 1; fl < floors; fl += 2) G.veranda(B, ve, fl * FHv + 0.6, 6, 6, 3.4, lightenHex(wall, 34), darkenHex(wall, 2), 'rgba(236,230,244,0.75)'); B.gate(); }
+                G.ledge(B, edges, H, 3, 2.4, top, band, 'rgba(240,236,228,0.6)');
+            } else G.ledge(B, edges, H, 2.4, 2, '#2a2e36', '#14171d', 'rgba(214,190,150,0.55)');
+        }
+    }
+
+    // ---------------- the street front: awnings, canopies, signboards ----------------
+    function front(b, B, emissive) {
+        const v = b.variant, S = v.spec, FHv = FH(), g = b._frontGeo(), G = K();
+        const F = b._vFrame(), half = F.fw / 2, door = F.door - half, side = b.facing === 'N' || b.facing === 'E' ? -1 : 1;
+        const size = S.id === 'bakery' || S.id === 'florist' ? 15 : 17;
+        const tw = Math.min(F.fw - 40, GLText.measure(v.name, size, 'Great Vibes') + 26);
+        const fp = (s, o, z) => [g.cx + g.ux * s + g.nx * o, g.cy + g.uy * s + g.ny * o, z, 1];
+        const E = b._entrance() || g, os = E.ny > 0 ? 1 : -1;
+        /** a flat board at height z, o out from the wall at the door, x along the front */
+        const board = (z, o, fn) => {
+            const c = E.nx ? Math.cos(E.nx * Math.PI / 2) : 1, s = E.nx ? Math.sin(E.nx * Math.PI / 2) : 0;
+            B.inFrame([c, s, -s, c, E.cx + E.nx * o, E.cy + E.ny * o], () => fn(G.plane(B, z, 1)));
+        };
+        const addText = (z, o, x, y, color) => {
+            const c = E.nx ? Math.cos(E.nx * Math.PI / 2) : 1, s = E.nx ? Math.sin(E.nx * Math.PI / 2) : 0;
+            const e = GLText.entry(v.name, size, 'Great Vibes');
+            B.inFrame([c, s, -s, c, E.cx + E.nx * o, E.cy + E.ny * o], () => { B.color(color); GLText.quad(B, e, x, y, z, 1); });
+        };
+        if (S.id === 'bakery' || S.id === 'florist') {
+            const zt = FHv * 0.98, zf = FHv * 0.56, out = 13, [ca, cb] = v.awning;
+            if (!emissive) {
+                const A = [], Bq = [], sa = [];
+                for (const [s0, s1] of [[-half + 8, door * side - tw / 2 - 2], [door * side + tw / 2 + 2, half - 8]]) {
+                    if (s1 - s0 < 16) continue;
+                    const n = Math.max(2, Math.round((s1 - s0) / 11)), w = (s1 - s0) / n;
+                    for (let i = 0; i < n; i++) { const a = s0 + i * w, c = a + w; (i % 2 ? Bq : A).push([fp(a, 0, zt), fp(c, 0, zt), fp(c, out, zf), fp(a, out, zf)]); }
+                    sa.push([s0, s1, n, w]);
+                }
+                B.color(ca); for (const q of A) B.poly(q);
+                B.color(cb); for (const q of Bq) B.poly(q);
+                if (sa.length) {
+                    B.gate(0, FINE);
+                    const half0 = [], half1 = [], a0 = Math.atan2(g.ny, g.nx) - Math.PI / 2;
+                    for (const [s0, , n, w] of sa) for (let i = 0; i < n; i++) {
+                        const m = s0 + (i + 0.5) * w, x = g.cx + g.ux * m + g.nx * out, y = g.cy + g.uy * m + g.ny * out, pts = [];
+                        for (let k = 0; k <= 10; k++) { const a = a0 + Math.PI * k / 10; pts.push([x + Math.cos(a) * w / 2, y + Math.sin(a) * w / 2, zf, 1]); }
+                        (i % 2 ? half1 : half0).push(pts);
+                    }
+                    B.color(darkenHex(ca, 22)); for (const p of half0) B.poly(p);
+                    B.color(darkenHex(cb, 26)); for (const p of half1) B.poly(p);
+                    B.gate();
+                }
+            }
+            board(FHv * 1.12, 1, P => {
+                const bh = 17, y0 = os > 0 ? 0 : -bh, r = os > 0 ? [2, 2, 7, 7] : [7, 7, 2, 2];
+                if (!emissive) {
+                    P.rect(-tw / 2 + 3, y0 + (os > 0 ? bh : -3), tw - 6, 3, 'rgba(0,0,0,.32)');
+                    P.roundRect(-tw / 2, y0, tw, bh, r, S.board[0]); P.roundRectLine(-tw / 2, y0, tw, bh, r, 1.2, S.edge);
+                } else P.roundRectLine(-tw / 2, y0, tw, bh, r, 1, 'rgba(255,200,120,.4)');
+            });
+            { const bh = 17, y0 = os > 0 ? 0 : -bh; addText(FHv * 1.12, 1, 0, y0 + bh / 2 + 1, emissive ? S.glow : S.ink); }
+        } else {
+            const z = FHv * 1.04, out = S.id === 'lounge' ? 20 : 17, cw = Math.max(64, tw + 6), s = door * side;
+            const a = b._frontPt0(s - cw / 2), c = b._frontPt0(s + cw / 2);
+            if (!emissive) G.ledge(B, [{ a, b: c, nx: g.nx, ny: g.ny }], z, out, 2.6, S.id === 'lounge' ? S.velvet : '#171a21', S.id === 'lounge' ? S.velvetLo : '#0e1116', S.gold);
+            else if (S.id === 'lounge') {
+                const n = Math.round(cw / 7);
+                B.color('rgba(255,226,170,.95)');
+                for (let i = 0; i <= n; i++) { const ss = s - cw / 2 + cw * i / n; B.disc(g.cx + g.ux * ss + g.nx * out, g.cy + g.uy * ss + g.ny * out, 1.2, z, 1, 10); }
+            }
+            addText(z, 0, 0, os * out / 2 + 1, emissive ? S.glow : S.ink);
+        }
+    }
+
+    // ---------------- roofs (in the front frame) ----------------
+    function shopRoof(b, B, H) {
+        const v = b.variant, S = v.spec, F = b._vFrame(), fw = F.fw, fd = F.fd;
+        B.inFrame(frameM(b), () => {
+            const c = K().plane(B, H);
+            if (S.id === 'bakery') {
+                const long = fw >= fd, half = Math.min(fw, fd) / 2, A = [0, 0], Bp = [fw, 0], C = [fw, fd], D = [0, fd];
+                const R0 = long ? [half, fd / 2] : [fw / 2, half], R1 = long ? [fw - half, fd / 2] : [fw / 2, fd - half];
+                const planes = long ? [[[A, Bp, R1, R0], '#3f251c', [0, 1]], [[D, A, R0], '#4e2c1f', [1, 0]], [[Bp, C, R1], '#5c3424', [-1, 0]], [[C, D, R0, R1], '#7a4432', [0, -1]]]
+                                    : [[[A, Bp, R0], '#3f251c', [0, 1]], [[D, A, R0, R1], '#4e2c1f', [1, 0]], [[Bp, C, R1, R0], '#5c3424', [-1, 0]], [[C, D, R1], '#7a4432', [0, -1]]];
+                for (const [pts, col, n] of planes) {
+                    c.poly(pts, col);
+                    const e0 = pts[0], e1 = pts[1], L = Math.hypot(e1[0] - e0[0], e1[1] - e0[1]), ux = (e1[0] - e0[0]) / L, uy = (e1[1] - e0[1]) / L;
+                    const clipped = list => list.map(([ax, ay, bx, by]) => clipSeg(pts, [ax, ay], [bx, by])).filter(Boolean);
+                    const courses = [], joints = [], hi = [];
+                    for (let d = 6; d < half; d += 6) courses.push([e0[0] + n[0] * d - ux * 400, e0[1] + n[1] * d - uy * 400, e0[0] + n[0] * d + ux * 400, e0[1] + n[1] * d + uy * 400]);
+                    for (let d = 0, r = 0; d < half; d += 6, r++) for (let t = -400 + (r % 2) * 6; t < 400; t += 12) {
+                        const x = e0[0] + n[0] * d + ux * t, y = e0[1] + n[1] * d + uy * t; joints.push([x, y, x + n[0] * 6, y + n[1] * 6]);
+                    }
+                    for (let d = 7; d < half; d += 6) hi.push([e0[0] + n[0] * d - ux * 400, e0[1] + n[1] * d - uy * 400, e0[0] + n[0] * d + ux * 400, e0[1] + n[1] * d + uy * 400]);
+                    c.segs(clipped(courses), 1, 'rgba(20,10,6,.38)');
+                    c.segs(clipped(joints), 0.7, 'rgba(20,10,6,.22)');
+                    c.segs(clipped(hi), 0.6, 'rgba(255,214,160,.07)');
+                }
+                const ridge = [];
+                for (const P of [A, Bp, C, D]) { const R = Math.hypot(P[0] - R0[0], P[1] - R0[1]) < Math.hypot(P[0] - R1[0], P[1] - R1[1]) ? R0 : R1; ridge.push([P[0], P[1], R[0], R[1]]); }
+                ridge.push([R0[0], R0[1], R1[0], R1[1]]);
+                c.segs(ridge, 3.2, '#2a1711', GLB_LINE.SQUARE); c.segs(ridge, 1, 'rgba(214,160,104,.42)', GLB_LINE.SQUARE);
+                c.rectLine(1.2, 1.2, fw - 2.4, fd - 2.4, 2.4, '#3a2116');
+                const cx = fw * 0.24, cy = Math.min(fd * 0.24, half * 0.55);
+                c.rect(cx + 4, cy + 5, 18, 18, 'rgba(0,0,0,.35)'); c.rect(cx - 9, cy - 9, 18, 18, '#6a3426');
+                c.rectLine(cx - 9, cy - 9, 18, 18, 1.6, S.trim);
+                const rows = []; for (let y = cy - 6; y < cy + 9; y += 3) rows.push([cx - 9, y, cx + 9, y]);
+                c.segs(rows, 0.6, 'rgba(232,190,140,.25)');
+                c.disc(cx, cy, 5, '#8a4a32'); c.disc(cx, cy, 3, '#1a0f0b');
+                for (const [x, y, w, h] of b._vSkylights(S, fw, fd)) {
+                    c.rect(x + 2, y + 3, w, h, 'rgba(0,0,0,.3)'); c.rect(x, y, w, h, '#2b2422'); c.rect(x, y, w, h, 'rgba(160,190,220,.16)');
+                    c.rectLine(x, y, w, h, 1.4, S.trim); c.segs([[x + w / 2, y, x + w / 2, y + h]], 0.8, S.trim);
+                }
+            } else if (S.id === 'florist') {
+                c.rect(0, 0, fw, fd, '#6a4a3c');
+                for (let y = 0, r = 0; y < fd; y += 14, r++) for (let x = (r % 2) * 14; x < fw; x += 28) c.rect(x, y, Math.min(14, fw - x), Math.min(14, fd - y), 'rgba(255,220,190,.06)');
+                const grid = []; for (let x = 14; x < fw; x += 14) grid.push([x, 0, x, fd]); for (let y = 14; y < fd; y += 14) grid.push([0, y, fw, y]);
+                c.segs(grid, 0.8, 'rgba(30,16,10,.3)');
+                const bed = (x, y, w, h) => {
+                    c.rect(x + 2, y + 3, w, h, 'rgba(0,0,0,.3)'); c.rect(x, y, w, h, '#4a2e1c'); c.rectLine(x + 0.5, y + 0.5, w - 1, h - 1, 1, '#6b4a2e');
+                    const n = Math.round(w * h / 40);
+                    for (let i = 0; i < n; i++) c.disc(x + 3 + (i * 37 % Math.max(1, w - 6)), y + 3 + (i * 17 % Math.max(1, h - 6)), 3.2, ['#3c7d44', '#2f6a3a', '#5c9a4c'][i % 3]);
+                    for (let i = 0; i < n / 3; i++) c.disc(x + 4 + (i * 53 % Math.max(1, w - 8)), y + 4 + (i * 23 % Math.max(1, h - 8)), 1.5, ['#f2c14e', '#e86a8c', '#f6ecd8', '#b58cff'][i % 4]);
+                };
+                bed(8, 8, fw - 96, 18); bed(8, 30, 18, fd - 70); bed(fw - 26, fd - 92, 18, 60);
+                const gx = fw - 82, gy = 8, gw = 74, gh = 56;
+                c.rect(gx + 3, gy + 4, gw, gh, 'rgba(0,0,0,.3)'); c.rect(gx, gy, gw, gh, 'rgba(176,214,200,.45)');
+                for (let i = 0; i < 9; i++) c.disc(gx + 9 + (i * 23 % (gw - 16)), gy + 10 + (i * 13 % (gh - 18)), 4, i % 2 ? '#3c7d44' : '#5c9a4c');
+                c.rect(gx, gy, gw, gh / 2, 'rgba(230,245,240,.18)');
+                c.rectLine(gx, gy, gw, gh, 1.4, '#eef0e6');
+                const mull = []; for (let x = gx + gw / 4; x < gx + gw - 1; x += gw / 4) mull.push([x, gy, x, gy + gh]); mull.push([gx, gy + gh / 2, gx + gw, gy + gh / 2]);
+                c.segs(mull, 0.8, '#eef0e6');
+                c.rect(fw / 2 - 20, fd - 24, 40, 8, '#6b4a2e'); c.rectLine(fw / 2 - 20, fd - 24, 40, 8, 0.8, 'rgba(0,0,0,.35)');
+                for (const x of [fw / 2 - 34, fw / 2 + 34]) { c.disc(x, fd - 20, 6, '#9a5a3a'); c.disc(x, fd - 21, 4.5, '#4f8a46'); }
+                c.rectLine(2.5, 2.5, fw - 5, fd - 5, 5, '#3a4a3c');
+                c.rectLine(5.5, 5.5, fw - 11, fd - 11, 1, 'rgba(232,226,204,.6)');
+            } else if (S.id === 'boutique') {
+                c.grad([[0, 0], [fw, 0], [fw, fd], [0, fd]], 0, 0, fw, fd, [[0, '#382934'], [0.5, '#2d242c'], [1, '#201e27']]);
+                const lines = []; for (let y = 18; y < fd; y += 30) lines.push([8, y, fw - 8, y]);
+                c.segs(lines, 1, 'rgba(143,86,107,.22)');
+                const [lx, ly, lw, lh] = b._vLantern(fw, fd);
+                const lpts = GLBuildingBuilder.roundRectPts(lx, ly, lw, lh, 14).map(p => [p[0], p[1]]);
+                c.grad(lpts, lx, ly, lx + lw, ly + lh, [[0, '#3b3439'], [0.52, '#514034'], [1, '#23282d']]);
+                c.rect(lx + 6, ly + 6, lw - 12, lh - 12, 'rgba(195,145,91,.12)');
+                const cols = Math.max(2, Math.round(lw / 40)), rows = Math.max(2, Math.round(lh / 40));
+                for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+                    const cx = lx + lw * (i + 0.5) / cols, cy = ly + lh * (j + 0.5) / rows;
+                    c.ring(cx, cy, 7, 1, 'rgba(181,136,83,.65)');
+                    for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; c.disc(cx + Math.cos(a) * 6, cy + Math.sin(a) * 6, 1, '#ceaa73'); }
+                }
+                c.poly([[lx, ly], [lx + lw * 0.45, ly], [lx + lw, ly + lh * 0.8], [lx + lw, ly + lh], [lx + lw * 0.75, ly + lh]], 'rgba(183,193,211,.08)');
+                const bars = [];
+                for (let i = 1; i < cols * 2; i++) { const x = lx + lw * i / (cols * 2); bars.push([x, ly, x, ly + lh]); }
+                for (let j = 1; j < rows * 2; j++) { const y = ly + lh * j / (rows * 2); bars.push([lx, y, lx + lw, y]); }
+                c.segs(bars, 4, '#1d2028'); c.segs(bars, 0.8, 'rgba(221,197,153,.2)');
+                c.roundRectLine(lx, ly, lw, lh, 14, 3, S.steel);
+                c.roundRectLine(lx + 3, ly + 3, lw - 6, lh - 6, 11, 1, 'rgba(208,172,114,.62)');
+                for (const x of [16, fw - 34]) { c.rect(x + 2, 14, 18, 12, 'rgba(0,0,0,.35)'); c.rect(x, 12, 18, 12, '#2a2e36'); c.rectLine(x + 0.5, 12.5, 17, 11, 0.8, 'rgba(208,172,114,.35)'); }
+                c.rectLine(3, 3, fw - 6, fd - 6, 6, S.stone);
+                c.rectLine(6.5, 6.5, fw - 13, fd - 13, 1.2, 'rgba(230,199,153,.7)');
+            } else {
+                c.grad([[0, 0], [fw, 0], [fw, fd], [0, fd]], 0, 0, fw, fd, [[0, '#221829'], [1, '#130e18']]);
+                const lines = []; for (let x = 12; x < fw; x += 12) lines.push([x, 6, x, fd - 6]);
+                c.segs(lines, 1, 'rgba(217,178,106,.08)');
+                const [dx, dy, r] = b._vDome(fw, fd), rays = [];
+                for (let i = 0; i < 24; i++) { const a = i * Math.PI / 12; rays.push([dx + Math.cos(a) * r * 1.12, dy + Math.sin(a) * r * 1.12, dx + Math.cos(a) * r * (i % 2 ? 1.36 : 1.55), dy + Math.sin(a) * r * (i % 2 ? 1.36 : 1.55)]); }
+                c.segs(rays, 1, 'rgba(217,178,106,.5)');
+                c.disc(dx + 3, dy + 4, r, 'rgba(0,0,0,.4)');
+                c.radial(dx, dy, r, dx - r * 0.35, dy - r * 0.35, r * 0.1, dx, dy, r, [[0, '#4a3a66'], [0.6, '#2a1f3a'], [1, '#120c19']]);
+                const spokes = []; for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; spokes.push([dx + Math.cos(a) * r * 0.2, dy + Math.sin(a) * r * 0.2, dx + Math.cos(a) * r, dy + Math.sin(a) * r]); }
+                c.segs(spokes, 0.8, 'rgba(217,178,106,.45)'); c.ring(dx, dy, r * 0.55, 0.8, 'rgba(217,178,106,.45)');
+                c.ring(dx, dy, r, 2.6, S.gold);
+                c.disc(dx, dy, r * 0.18, S.gold); c.disc(dx + r * 0.08, dy - r * 0.05, r * 0.16, '#2a1f3a');
+                for (const x of [18, fw - 18]) { c.disc(x, 18, 7, '#0d0a11'); c.ring(x, 18, 7, 1, 'rgba(217,178,106,.5)'); }
+                c.rectLine(3, 3, fw - 6, fd - 6, 6, '#2a2030');
+                c.rectLine(6.5, 6.5, fw - 13, fd - 13, 1.4, S.gold);
+            }
+        });
+    }
+
+    function aptRoof(b, B, H) {
+        const S = b.variant.spec, F = b._vFrame(), fw = F.fw, fd = F.fd;
+        B.inFrame(frameM(b), () => {
+            const c = K().plane(B, H);
+            if (S.id === 'brownstone') {
+                const col = 'rgba(255,232,200,.10)';
+                c.rect(0, 0, fw, 7, col); c.rect(0, fd - 7, fw, 7, col); c.rect(0, 7, 7, fd - 14, col); c.rect(fw - 7, 7, 7, fd - 14, col);
+                const ticks = [];
+                for (let x = 12; x < fw; x += 12) ticks.push([x, 0, x, 7], [x, fd - 7, x, fd]);
+                for (let y = 12; y < fd; y += 12) ticks.push([0, y, 7, y], [fw - 7, y, fw, y]);
+                c.segs(ticks, 0.8, 'rgba(0,0,0,.28)');
+                for (const x of [fw * 0.36, fw * 0.6]) {
+                    c.rect(x + 3, 6, 22, 12, 'rgba(0,0,0,.35)'); c.rect(x, 3, 22, 11, '#5a2e24'); c.rectLine(x + 0.5, 3.5, 21, 10, 1, 'rgba(239,220,182,.6)');
+                    for (let i = 0; i < 3; i++) { c.disc(x + 4.5 + i * 6.5, 8.5, 2.4, '#8a4a32'); c.disc(x + 4.5 + i * 6.5, 8.5, 1.2, '#1a0f0b'); }
+                }
+            } else if (S.id === 'deco') {
+                const col = 'rgba(255,240,215,.09)';
+                for (const [x, y, sx, sy] of [[0, 0, 1, 1], [fw, 0, -1, 1], [fw, fd, -1, -1], [0, fd, 1, -1]]) {
+                    c.rect(Math.min(x, x + sx * 34), Math.min(y, y + sy * 12), 34, 12, col); c.rect(Math.min(x, x + sx * 12), Math.min(y, y + sy * 34), 12, 34, col);
+                    c.rect(Math.min(x, x + sx * 20), Math.min(y, y + sy * 20), 20, 20, col);
+                }
+                c.rectLine(9.5, 9.5, fw - 19, fd - 19, 1, 'rgba(216,183,122,.55)');
+                c.rectLine(13.5, 13.5, fw - 27, fd - 27, 1, 'rgba(216,183,122,.3)');
+                for (const [x, y] of [[9.5, 9.5], [fw - 9.5, 9.5], [fw - 9.5, fd - 9.5], [9.5, fd - 9.5]]) c.disc(x, y, 2, STREET_GOLD);
+            } else if (S.id === 'terrace') {
+                const trough = (x, y, w, h) => {
+                    c.rect(x + 2, y + 2, w, h, 'rgba(0,0,0,.3)'); c.rect(x, y, w, h, '#4a2e1c');
+                    const n = Math.round(w * h / 36);
+                    for (let i = 0; i < n; i++) c.disc(x + 3 + (i * 29 % Math.max(1, w - 6)), y + 3 + (i * 11 % Math.max(1, h - 6)), 2.8, ['#3c7d44', '#2f6a3a', '#5c9a4c'][i % 3]);
+                    for (let i = 0; i < n / 4; i++) c.disc(x + 4 + (i * 41 % Math.max(1, w - 8)), y + 3 + (i * 7 % Math.max(1, h - 6)), 1.3, ['#f2c14e', '#e86a8c', '#f6ecd8'][i % 3]);
+                };
+                c.rect(8, fd - 34, fw - 16, 22, 'rgba(166,118,78,.22)');
+                const deck = []; for (let x = 14; x < fw - 8; x += 6) deck.push([x, fd - 34, x, fd - 12]);
+                c.segs(deck, 0.8, 'rgba(40,24,12,.3)');
+                trough(6, fd - 12, fw - 12, 7); trough(6, fd * 0.45, 7, fd * 0.45 - 14); trough(fw - 13, fd * 0.45, 7, fd * 0.45 - 14);
+            } else {
+                const grid = []; for (let x = 20; x < fw; x += 20) grid.push([x, 8, x, fd - 8]); for (let y = 20; y < fd; y += 20) grid.push([8, y, fw - 8, y]);
+                c.segs(grid, 1, 'rgba(255,255,255,.04)');
+                for (let x = fw * 0.32; x < fw * 0.84; x += 24) {
+                    c.rect(x + 2, 5, 18, 10, 'rgba(0,0,0,.35)'); c.rect(x, 3, 18, 10, '#3a4250'); c.rect(x + 1.5, 4.5, 15, 4, 'rgba(176,196,220,.25)');
+                    c.rectLine(x + 0.5, 3.5, 17, 9, 1, '#1c2028');
+                }
+                c.rectLine(2.5, 2.5, fw - 5, fd - 5, 5, 'rgba(16,18,24,.55)');
+                c.rectLine(5.5, 5.5, fw - 11, fd - 11, 0.8, 'rgba(214,190,150,.35)');
+            }
+        });
+    }
+
+    // ---------------- the pavement in front ----------------
+    function base(b, B) {
+        const v = b.variant, S = v.spec, F = b._vFrame(), fw = F.fw, fd = F.fd, door = Math.round(F.door);
+        B.inFrame(frameM(b), () => {
+            const c = K().plane(B, 0), dot = (x, y, r, col) => c.disc(x, y, r, col);
+            let y = fd;
+            if (v.kind === 'apt') {
+                c.rect(door - 20, y + 2, 44, 14, 'rgba(0,0,0,.3)');
+                c.rect(door - 22, y, 44, 13, S.id === 'loft' ? '#3a3e46' : S.id === 'deco' ? '#4a4038' : '#5a4a44');
+                c.segs([[door - 22, y + 4.5, door + 22, y + 4.5], [door - 22, y + 8.5, door + 22, y + 8.5]], 1, 'rgba(232,214,180,.35)');
+                for (const x of [door - 34, door + 34]) { c.rect(x - 6, y + 3, 14, 12, 'rgba(0,0,0,.3)'); c.rect(x - 7, y + 1, 14, 11, '#3a2a22'); dot(x, y + 6, 5, '#3c7d44'); dot(x - 2, y + 5, 2.4, '#5c9a4c'); }
+                return;
+            }
+            y += 16;
+            if (S.id === 'bakery') {
+                c.rect(12, y + 4, 44, 12, 'rgba(0,0,0,.3)'); c.rect(10, y + 2, 44, 12, '#3a2116'); c.rectLine(10.5, y + 2.5, 43, 11, 1, '#5d3a24');
+                for (let i = 0; i < 13; i++) dot(14 + (i * 37 % 38), y + 5 + (i * 13 % 7), 3.2, i % 3 ? '#4f7d43' : '#77a25d');
+                for (let i = 0; i < 7; i++) dot(15 + i * 6, y + 6 + (i % 2) * 4, 1.5, ['#f2c14e', '#e86a5c', '#f6ecd8'][i % 3]);
+                const bx = door + 62;
+                c.rect(bx + 2, y + 9, 16, 12, 'rgba(0,0,0,.3)'); c.rect(bx, y + 6, 16, 12, '#5d3a24'); c.rect(bx + 2, y + 8, 12, 8, '#1f2421');
+                c.segs([[bx + 3.5, y + 10.5, bx + 12, y + 10.5], [bx + 3.5, y + 13.5, bx + 10, y + 13.5]], 0.8, 'rgba(240,235,220,.75)');
+                const tx = fw - 24, ty = y + 15;
+                c.ellipse(tx + 2, ty + 3, 11, 9, 0, 'rgba(0,0,0,.3)');
+                for (const dx of [-13, 13]) { c.roundRect(tx + dx - 4.5, ty - 4.5, 9, 9, 2.5, '#2b1a12'); c.roundRectLine(tx + dx - 4.5, ty - 4.5, 9, 9, 2.5, 0.8, '#8c6a46'); }
+                dot(tx, ty, 8, '#efe4cc'); c.ring(tx, ty, 8, 1.2, '#7a5a38');
+                dot(tx - 2.5, ty - 1.5, 2.2, '#fff'); dot(tx - 2.5, ty - 1.5, 1.3, '#5b3420'); dot(tx + 3, ty + 2, 1.4, '#ffc66a');
+            } else if (S.id === 'florist') {
+                for (const [x0, x1] of [[10, door - 34], [door + 34, fw - 10]]) {
+                    if (x1 - x0 < 20) continue;
+                    c.rect(x0 + 2, y + 4, x1 - x0, 16, 'rgba(0,0,0,.3)'); c.rect(x0, y + 2, x1 - x0, 15, '#6b4a2e'); c.rectLine(x0 + 0.5, y + 2.5, x1 - x0 - 1, 14, 0.8, '#8c6a46');
+                    for (let x = x0 + 7, i = 0; x < x1 - 4; x += 11, i++) {
+                        dot(x, y + 9.5, 5.2, '#5a6a72');
+                        const col = ['#e86a8c', '#f2c14e', '#f6ecd8', '#b58cff', '#ff8a5c', '#d94a6a'][(i * 5 + x0) % 6];
+                        for (let k = 0; k < 6; k++) dot(x + Math.cos(k * 1.1) * 3, y + 9.5 + Math.sin(k * 1.1) * 3, 2.1, k % 3 ? col : '#4f8a46');
+                    }
+                }
+            } else if (S.id === 'boutique') {
+                for (const x of [door - 62, door + 62]) {
+                    dot(x + 3, y + 14, 10, 'rgba(0,0,0,.35)');
+                    const pts = []; for (let k = 0; k < 28; k++) { const a = k / 28 * Math.PI * 2; pts.push([x + Math.cos(a) * 9.5, y + 12 + Math.sin(a) * 7.5]); }
+                    c.grad(pts, x - 9, 0, x + 9, 0, [[0, '#58432c'], [0.45, S.gold], [1, '#755539']]);
+                    c.polyLine(pts, 0.8, S.goldHi, true);
+                    dot(x, y + 10, 8, '#294b36'); dot(x - 2.5, y + 7.5, 4.2, '#547654');
+                    for (let i = 0; i < 7; i++) { const a = i * 2.4, r = 2 + i % 3 * 1.8; dot(x + Math.cos(a) * r, y + 10 + Math.sin(a) * r, 1.6, 'rgba(124,159,103,.45)'); }
+                }
+            } else {
+                c.rect(door - 10, fd + 2, 24, y + 30 - fd, 'rgba(0,0,0,.3)');
+                c.rect(door - 12, fd, 24, y + 31 - fd, '#8e1a34');
+                c.segs([[door - 11.5, fd, door - 11.5, y + 31], [door + 11.5, fd, door + 11.5, y + 31]], 1, S.gold);
+                for (const s of [-1, 1]) {
+                    const posts = [[door + s * 44, y + 6], [door + s * 60, y + 6], [door + s * 76, y + 6], [door + s * 44, y + 26]];
+                    for (let i = 0; i < 2; i++) { const [ax, ay] = posts[i], [bx, by] = posts[i + 1]; c.polyLine(GLBuildingBuilder.quadPts([ax, ay], [(ax + bx) / 2, ay + 5], [bx, by], 10), 2, '#b0204a'); }
+                    c.polyLine(GLBuildingBuilder.quadPts(posts[0], [posts[0][0] + s * 4, y + 16], posts[3], 10), 2, '#b0204a');
+                    for (const [x, yy] of posts) { dot(x + 1, yy + 1.5, 3, 'rgba(0,0,0,.35)'); dot(x, yy, 2.8, S.gold); dot(x - 0.7, yy - 0.7, 1.1, '#fff2cf'); }
+                }
+            }
+        });
+    }
+
+    // ---------------- the night ----------------
+    function glow(b, B, faces, ids, H) {
+        const v = b.variant, S = v.spec, G = K();
+        B.additive();
+        if (v.kind === 'shop') {
+            faces.forEach((f, i) => { if (f.side === b.facing && f.side !== 'C') { B.face(ids[i]).gate(3); shopfront(b, B, f, new GLFace(f, H), H, true); B.gate(); } });
+            B.face(-1);
+            if (S.id === 'lounge') {
+                const list = [];
+                faces.forEach((f, i) => { if (f.side === 'C') return; const L = Math.hypot(f.x2 - f.x1, f.y2 - f.y1), cols = Math.max(1, Math.floor(L / 26));
+                    for (let c = 0; c <= cols; c++) list.push({ x: f.x1 + (f.x2 - f.x1) * c / cols, y: f.y1 + (f.y2 - f.y1) * c / cols, nx: f.nx, ny: f.ny, face: ids[i] }); });
+                G.fins(B, list, 1, H - 2, 1.4, 2.4, hexToRgba(v.neon, 0.85), null);
+            }
+            front(b, B, true);
+        } else if (v.id === 'deco' || v.id === 'terrace') {
+            const edges = []; faces.forEach((f, i) => { if (f.side !== 'C') edges.push({ a: [f.x1, f.y1], b: [f.x2, f.y2], nx: f.nx, ny: f.ny, face: ids[i] }); });
+            const out = v.id === 'deco' ? 3.4 : 3;
+            B.anim(GLB_ANIM.RIM).color(GLColor.alpha(b.colors.accent || '#ffcf8a', 0.6));
+            for (const e of edges) B.face(e.face).seg([e.a[0] + e.nx * out, e.a[1] + e.ny * out, H, 1], [e.b[0] + e.nx * out, e.b[1] + e.ny * out, H, 1], 0.9);
+            B.anim().face(-1);
+        }
+        B.additive(false);
+    }
+
+    function roofGlow(b, B, H) {
+        const v = b.variant, S = v.spec, F = b._vFrame(), fw = F.fw, fd = F.fd;
+        B.inFrame(frameM(b), () => {
+            const c = K().plane(B, H);
+            const col = v.kind === 'apt' ? 'rgba(255,214,150,.75)' : v.id === 'lounge' ? hexToRgba(v.neon, 0.55) : v.id === 'florist' ? 'rgba(220,255,210,.4)' : 'rgba(255,196,110,.55)';
+            if (v.kind === 'apt') { if (S.id === 'loft') for (let x = fw * 0.32; x < fw * 0.84; x += 24) c.rect(x + 1.5, 4.5, 15, 7, col); }
+            else if (S.id === 'bakery') for (const [x, y, w, h] of b._vSkylights(S, fw, fd)) c.rect(x + 1, y + 1, w - 2, h - 2, col);
+            else if (S.id === 'florist') c.rect(fw - 81, 9, 72, 54, col);
+            else if (S.id === 'boutique') { const [lx, ly, lw, lh] = b._vLantern(fw, fd); c.roundRect(lx + 2, ly + 2, lw - 4, lh - 4, 12, col); }
+            else { const [dx, dy, r] = b._vDome(fw, fd); c.disc(dx, dy, r, col); }
+            const bulb = v.id === 'lounge' ? 'rgba(255,226,170,.95)' : 'rgba(255,224,160,.95)';
+            if (v.kind === 'apt') { if (S.id === 'deco') for (const [x, y] of [[9.5, 9.5], [fw - 9.5, 9.5], [fw - 9.5, fd - 9.5], [9.5, fd - 9.5]]) c.disc(x, y, 2.2, bulb); return; }
+            if (S.id === 'florist') {
+                for (const [ax, ay, bx, by] of [[10, fd * 0.45, fw - 10, fd - 30], [10, fd - 30, fw - 10, fd * 0.45]]) {
+                    const n = Math.round(Math.hypot(bx - ax, by - ay) / 12);
+                    for (let i = 1; i < n; i++) { const t = i / n; c.disc(ax + (bx - ax) * t, ay + (by - ay) * t + Math.sin(t * Math.PI) * 8, 1.6, bulb); }
+                }
+            } else if (S.id === 'boutique') {
+                const [lx, ly, lw, lh] = b._vLantern(fw, fd), cols = Math.max(2, Math.round(lw / 40)), rows = Math.max(2, Math.round(lh / 40));
+                for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) { const cx = lx + lw * (i + 0.5) / cols, cy = ly + lh * (j + 0.5) / rows; for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; c.disc(cx + Math.cos(a) * 6, cy + Math.sin(a) * 6, 1.3, bulb); } }
+            } else if (S.id === 'lounge') {
+                const [dx, dy, r] = b._vDome(fw, fd);
+                for (let i = 0; i < 24; i += 2) { const a = i * Math.PI / 12; c.disc(dx + Math.cos(a) * r * 1.55, dy + Math.sin(a) * r * 1.55, 1.5, bulb); }
+            }
+        });
+    }
+
+    return { faceUnder, faceOver, front, shopRoof, aptRoof, base, glow, roofGlow, clipSeg };
+})();
+// GL engine: the buildings system. Owns every building's GPU geometry (built once from the
+// building model, gl/building-model.js), shows the ones in view, and feeds the shader its
+// per-frame uniforms: the camera, the lean height, the zoom detail, the clock, the sun and the
+// night. Nothing about a building is redrawn while the camera moves.
+class GLBuildingsSystem {
+    constructor(renderer) {
+        this.renderer = renderer; this.records = new Map(); this.frame = 0;
+        this.stats = { builds: 0, buildMs: 0, shown: 0, vertices: 0, resident: 0 };
+        this.fontRevision = -1;
+    }
+    /** The buildings drawn natively: the city's generic buildings, shops and apartments (landmarks follow) */
+    supports(b) { return !!(b && b.isV2 && (!b.style || b.style === 'apartment') && b.sections && b.sections.length && CONFIG.BUILDINGS.LEAN); }
+    key(b) { return [b.x, b.y, b.floors, b.facing, b.style, b.variant && b.variant.id, ...b.sections.flatMap(s => [s.x, s.y, s.w, s.h])].join(':'); }
+
+    begin(game, view) {
+        const R = this.renderer, cam = game.camera, sun = sunNow(), dc = game.dayCycle(), dark = dc.darkness;
+        if (this.fontRevision !== (R.fontRevision || 0)) { this.fontRevision = R.fontRevision || 0; GLText.invalidate(); for (const r of this.records.values()) r.key = null; }
+        const rgb = String(sun.rgb).split(',').map(v => +v / 255);
+        GLBuildingMesh.frame = {
+            cam: [cam.x, cam.y], C: leanCamHeight(), lod: _zoomLOD, time: _gameTimeSec, px: 1 / (R.world.scale.x || 1),
+            sun: new Float32Array([sun.dx, sun.dy, sun.day, 0]), sunRGB: new Float32Array(rgb),
+            night: new Float32Array([Math.max(0.15, Math.min(1, dark * 1.1)), dark, Math.floor(_gameTimeSec / 7), _frameTime % 3769911]),
+            font: GLText.texture()
+        };
+        this.rimA = (dc.lampsOn ? 1 : 0) * Math.max(0, Math.min(1, (dark - 0.15) * 1.6));
+        this.glowA = Math.max(0.15, Math.min(1, dark * 1.1));
+        this.frame++; this.stats.shown = 0;
+    }
+    /** b's geometry, built now if it has none or it changed */
+    record(b) {
+        let r = this.records.get(b);
+        const key = this.key(b);
+        if (r && r.key === key) return r;
+        const start = performance.now();
+        if (r) this.destroy(r);
+        const m = GLBuildingModel.build(b);
+        r = { key, H: m.H, seen: this.frame, base: new GLBuildingMesh(m.base.finish(), m.H), top: new GLBuildingMesh(m.top.finish(), m.H), glow: new GLBuildingMesh(m.glow.finish(), m.H) };
+        r.rim = new Float32Array([...GLColor.parse(b.colors.accent || '#ffcf8a').slice(0, 3), 0]);
+        for (const mesh of [r.base, r.top, r.glow]) { mesh.rim = r.rim; mesh.visible = false; }
+        this.records.set(b, r);
+        this.stats.builds++; this.stats.buildMs += performance.now() - start;
+        return r;
+    }
+    /** Build the buildings just outside the view ahead of time, a few milliseconds a frame */
+    prefetch(map, bounds, budgetMs = 3) {
+        const start = performance.now(), pad = 700;
+        for (const b of map.buildings || []) {
+            if (performance.now() - start > budgetMs) break;
+            if (!this.supports(b) || this.records.has(b)) continue;
+            if (b.x > bounds.right + pad || b.x + (b.w || 0) < bounds.left - pad || b.y > bounds.bottom + pad || b.y + (b.h || 0) < bounds.top - pad) continue;
+            this.record(b).seen = this.frame - 1;
+            this.stats.prefetched = (this.stats.prefetched || 0) + 1;
+            break;                                                     // one a frame: a first sign's text can take a while
+        }
+    }
+    /** Show b this frame */
+    show(b, game) {
+        const R = this.renderer, r = this.record(b);
+        r.seen = this.frame;
+        const z = b.y + (b.h || 0);
+        r.base.zIndex = r.top.zIndex = z;
+        if (r.base.parent !== R.buildingBaseStage) R.buildingBaseStage.addChild(r.base);
+        if (r.top.parent !== R.roofStage) R.roofStage.addChild(r.top);
+        if (r.glow.parent !== R.emissive) R.emissive.addChild(r.glow);
+        r.base.visible = r.top.visible = true;
+        r.glow.visible = !!R.layers.glows;
+        r.glow.alpha = this.glowA;
+        r.rim[3] = this.rimA;
+        this.stats.shown++;
+    }
+    /** Hide what wasn't shown; drop geometry long out of view */
+    end() {
+        let vertices = 0;
+        // keep the most recently seen 64 buildings resident (about the view and its surroundings)
+        const lru = this.records.size > 64 ? [...this.records].sort((x, y) => x[1].seen - y[1].seen) : null;
+        if (lru) for (let i = 0; i < lru.length - 64; i++) { if (lru[i][1].seen === this.frame) break; this.destroy(lru[i][1]); this.records.delete(lru[i][0]); }
+        for (const r of this.records.values()) {
+            if (r.seen !== this.frame) r.base.visible = r.top.visible = r.glow.visible = false;
+            vertices += r.base.vertexCount + r.top.vertexCount + r.glow.vertexCount;
+        }
+        this.stats.vertices = vertices; this.stats.resident = this.records.size;
+        GLText.flush();
+    }
+    destroy(r) { for (const m of [r.base, r.top, r.glow]) { const g = m.geometry; m.parent?.removeChild(m); m.destroy(); g.destroy(); } }
+    clear() { for (const r of this.records.values()) this.destroy(r); this.records.clear(); }
 }
         class GameEngine {
             constructor() {
