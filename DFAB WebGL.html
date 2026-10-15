@@ -61243,7 +61243,7 @@ function GLEarcut(data) {
 const GLText = (() => {
     const SIZE = 2048, RES = 3, SPREAD = 6;
     let canvas = null, ctx2d = null, data = null, base = null, texture = null;
-    let shelfX = 0, shelfY = 0, shelfH = 0, revision = 0, dirty = false;
+    let shelfX = 0, shelfY = 0, shelfH = 0, revision = 0, dirty = false, epoch = 0, full = false, uses = 0;
     const entries = new Map();
     const fontOf = (size, family, weight = '') => `${weight ? weight + ' ' : ''}${size}px "${family}", "URW Chancery L", "Z003", cursive`;
     const measurer = () => ctx2d || (canvas = document.createElement('canvas'), canvas.width = canvas.height = 8, ctx2d = canvas.getContext('2d', { willReadFrequently: true }));
@@ -61340,16 +61340,17 @@ const GLText = (() => {
     /** An atlas entry for text in a CSS font (a vector context's font), at its px size */
     // Live text (labels, markers, numbers that change as you play) has the atlas's bottom quarter to itself:
     // when that fills, it is wiped and refilled by what is still on screen (gen counts the wipes)
-    const LIVE_Y = SIZE * 3 / 4, live = { entries: new Map(), x: 0, y: LIVE_Y, h: 0, gen: 0 };
+    const LIVE_Y = SIZE * 7 / 8, live = { entries: new Map(), x: 0, y: LIVE_Y, h: 0, gen: 0 };
     function css(text, font) {
         const size = Number(/([0-9.]+)px/.exec(font)?.[1] || 10);
         return place(text + '|' + font, text, size, font, false, true);
     }
     function place(key, text, size, font, neon, isLive = false) {
+        uses++;
         const map = isLive ? live.entries : entries;
         let e = map.get(key);
         if (e && e.revision === revision) return e;
-        const c = measurer(), R = neon ? 1.5 : RES, pad = neon ? 60 : SPREAD + 2;
+        const c = measurer(), R = neon ? 1.5 : size >= 16 ? 2 : RES, pad = neon ? 60 : SPREAD + 2;
         c.font = font;
         const adv = c.measureText(text).width, tw = Math.ceil(adv), w = Math.ceil((tw + pad * 2) * R), hgt = Math.ceil((size * 1.6 + pad * 2) * R);
         if (w > SIZE || hgt > SIZE / 4) return null;                   // larger than the atlas allows: left out
@@ -61360,7 +61361,7 @@ const GLText = (() => {
             map.set(key, e);
         } else if (!e) {
             if (shelfX + w > SIZE) { shelfX = 0; shelfY += shelfH + 2; shelfH = 0; }
-            if (shelfY + hgt > LIVE_Y) return null;                    // atlas full: the text is left out
+            if (shelfY + hgt > LIVE_Y) { full = true; return null; }   // atlas full: it is repacked next frame (frame())
             e = { x: shelfX, y: shelfY, w, h: hgt }; shelfX += w + 2; shelfH = Math.max(shelfH, hgt);
             map.set(key, e);
         }
@@ -61397,7 +61398,20 @@ const GLText = (() => {
     function flush() { if (dirty && base) { base.update(); dirty = false; } return texture; }
     /** Fonts arrived: every entry re-renders on its next use */
     function invalidate() { revision++; }
-    return { measure, entry, css, quad, live, flush, invalidate, texture: () => tex() };
+    /** Once a frame, before anything builds text: a full atlas starts over. Everything placed so far is dropped and
+        epoch moves on, so whatever kept geometry with text in it (buildings, road names) builds it again: what is in
+        view now is placed afresh, and text far behind no longer holds space. */
+    let frames = 0, lastReset = -1e9;
+    function frame() {
+        frames++;
+        if (!full || frames - lastReset < 30) return;                 // (not again within a few frames: no thrashing)
+        full = false; lastReset = frames; entries.clear(); shelfX = shelfY = shelfH = 0;
+        for (const old of live.entries.values()) old.dead = true;
+        live.entries.clear(); live.x = 0; live.y = LIVE_Y; live.h = 0; live.gen++;
+        revision++; epoch++;
+    }
+    function stats() { return { big: [...entries].map(([k, e]) => [k.slice(0, 40), e.w, e.h]).sort((a, b) => b[1] * b[2] - a[1] * a[2]).slice(0, 12), y: shelfY + shelfH, limit: LIVE_Y, entries: entries.size, live: live.entries.size, gen: live.gen }; }
+    return { measure, entry, css, quad, live, stats, frame, epoch: () => epoch, uses: () => uses, flush, invalidate, texture: () => tex() };
 })();
 // GL engine: the building model. Turns a building's description (sections, floors, colours,
 // facing, style, street variant, roof features) into GPU geometry, once. Three layers:
@@ -64757,6 +64771,8 @@ class GLBuildingsSystem {
 
     begin(game, view) {
         const R = this.renderer, cam = game.camera, sun = sunNow(), dc = game.dayCycle(), dark = dc.darkness;
+        GLText.frame();
+        if (this.textEpoch !== GLText.epoch()) { this.textEpoch = GLText.epoch(); for (const r of this.records.values()) r.key = null; }
         if (this.fontRevision !== (R.fontRevision || 0)) { this.fontRevision = R.fontRevision || 0; GLText.invalidate(); for (const r of this.records.values()) r.key = null; }
         const rgb = String(sun.rgb).split(',').map(v => +v / 255);
         GLBuildingMesh.frame = {
@@ -65315,7 +65331,9 @@ const GLGround = (() => {
         }
         buildChunk(c) {
             const start = performance.now(), B = new GLBuildingBuilder(0), rnd = seededRandom(c.key + ':949');
+            const uses = GLText.uses();
             for (const paint of c.paint) paint(B, rnd);
+            c.epoch = GLText.uses() !== uses ? GLText.epoch() : -1;          // a chunk with text in it remembers which atlas it used
             c.mesh = new GLBuildingMesh(B.finish(), 0); c.mesh.zIndex = c.layer; c.mesh.visible = false; this.root.addChild(c.mesh);
             this.stats.built++; this.stats.vertices += B.n; this.stats.buildMs += performance.now() - start;
         }
@@ -65326,8 +65344,10 @@ const GLGround = (() => {
             if (this.map !== map) this.plan(map, net);
             const pad = 600, start = performance.now(), hit = (b, p) => b[0] < bounds.right + p && b[2] > bounds.left - p && b[1] < bounds.bottom + p && b[3] > bounds.top - p;
             let shown = 0;
+            GLText.frame();
             for (const c of this.chunks) {
                 const v = hit(c.box, 0);
+                if (c.mesh && c.epoch >= 0 && c.epoch !== GLText.epoch()) { const g = c.mesh.geometry; c.mesh.destroy(); g.destroy(); c.mesh = null; }   // its text was repacked
                 if (!c.mesh && (v || (performance.now() - start < 3 && hit(c.box, pad)))) this.buildChunk(c);
                 if (c.mesh) c.mesh.visible = v;
                 shown += v;

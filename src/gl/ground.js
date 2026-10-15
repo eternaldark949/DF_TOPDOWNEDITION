@@ -207,7 +207,9 @@ const GLGround = (() => {
         }
         buildChunk(c) {
             const start = performance.now(), B = new GLBuildingBuilder(0), rnd = seededRandom(c.key + ':949');
+            const uses = GLText.uses();
             for (const paint of c.paint) paint(B, rnd);
+            c.epoch = GLText.uses() !== uses ? GLText.epoch() : -1;          // a chunk with text in it remembers which atlas it used
             c.mesh = new GLBuildingMesh(B.finish(), 0); c.mesh.zIndex = c.layer; c.mesh.visible = false; this.root.addChild(c.mesh);
             this.stats.built++; this.stats.vertices += B.n; this.stats.buildMs += performance.now() - start;
         }
@@ -218,8 +220,10 @@ const GLGround = (() => {
             if (this.map !== map) this.plan(map, net);
             const pad = 600, start = performance.now(), hit = (b, p) => b[0] < bounds.right + p && b[2] > bounds.left - p && b[1] < bounds.bottom + p && b[3] > bounds.top - p;
             let shown = 0;
+            GLText.frame();
             for (const c of this.chunks) {
                 const v = hit(c.box, 0);
+                if (c.mesh && c.epoch >= 0 && c.epoch !== GLText.epoch()) { const g = c.mesh.geometry; c.mesh.destroy(); g.destroy(); c.mesh = null; }   // its text was repacked
                 if (!c.mesh && (v || (performance.now() - start < 3 && hit(c.box, pad)))) this.buildChunk(c);
                 if (c.mesh) c.mesh.visible = v;
                 shown += v;

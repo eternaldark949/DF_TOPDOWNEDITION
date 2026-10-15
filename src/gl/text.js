@@ -7,7 +7,7 @@
 const GLText = (() => {
     const SIZE = 2048, RES = 3, SPREAD = 6;
     let canvas = null, ctx2d = null, data = null, base = null, texture = null;
-    let shelfX = 0, shelfY = 0, shelfH = 0, revision = 0, dirty = false;
+    let shelfX = 0, shelfY = 0, shelfH = 0, revision = 0, dirty = false, epoch = 0, full = false, uses = 0;
     const entries = new Map();
     const fontOf = (size, family, weight = '') => `${weight ? weight + ' ' : ''}${size}px "${family}", "URW Chancery L", "Z003", cursive`;
     const measurer = () => ctx2d || (canvas = document.createElement('canvas'), canvas.width = canvas.height = 8, ctx2d = canvas.getContext('2d', { willReadFrequently: true }));
@@ -104,16 +104,17 @@ const GLText = (() => {
     /** An atlas entry for text in a CSS font (a vector context's font), at its px size */
     // Live text (labels, markers, numbers that change as you play) has the atlas's bottom quarter to itself:
     // when that fills, it is wiped and refilled by what is still on screen (gen counts the wipes)
-    const LIVE_Y = SIZE * 3 / 4, live = { entries: new Map(), x: 0, y: LIVE_Y, h: 0, gen: 0 };
+    const LIVE_Y = SIZE * 7 / 8, live = { entries: new Map(), x: 0, y: LIVE_Y, h: 0, gen: 0 };
     function css(text, font) {
         const size = Number(/([0-9.]+)px/.exec(font)?.[1] || 10);
         return place(text + '|' + font, text, size, font, false, true);
     }
     function place(key, text, size, font, neon, isLive = false) {
+        uses++;
         const map = isLive ? live.entries : entries;
         let e = map.get(key);
         if (e && e.revision === revision) return e;
-        const c = measurer(), R = neon ? 1.5 : RES, pad = neon ? 60 : SPREAD + 2;
+        const c = measurer(), R = neon ? 1.5 : size >= 16 ? 2 : RES, pad = neon ? 60 : SPREAD + 2;
         c.font = font;
         const adv = c.measureText(text).width, tw = Math.ceil(adv), w = Math.ceil((tw + pad * 2) * R), hgt = Math.ceil((size * 1.6 + pad * 2) * R);
         if (w > SIZE || hgt > SIZE / 4) return null;                   // larger than the atlas allows: left out
@@ -124,7 +125,7 @@ const GLText = (() => {
             map.set(key, e);
         } else if (!e) {
             if (shelfX + w > SIZE) { shelfX = 0; shelfY += shelfH + 2; shelfH = 0; }
-            if (shelfY + hgt > LIVE_Y) return null;                    // atlas full: the text is left out
+            if (shelfY + hgt > LIVE_Y) { full = true; return null; }   // atlas full: it is repacked next frame (frame())
             e = { x: shelfX, y: shelfY, w, h: hgt }; shelfX += w + 2; shelfH = Math.max(shelfH, hgt);
             map.set(key, e);
         }
@@ -161,5 +162,18 @@ const GLText = (() => {
     function flush() { if (dirty && base) { base.update(); dirty = false; } return texture; }
     /** Fonts arrived: every entry re-renders on its next use */
     function invalidate() { revision++; }
-    return { measure, entry, css, quad, live, flush, invalidate, texture: () => tex() };
+    /** Once a frame, before anything builds text: a full atlas starts over. Everything placed so far is dropped and
+        epoch moves on, so whatever kept geometry with text in it (buildings, road names) builds it again: what is in
+        view now is placed afresh, and text far behind no longer holds space. */
+    let frames = 0, lastReset = -1e9;
+    function frame() {
+        frames++;
+        if (!full || frames - lastReset < 30) return;                 // (not again within a few frames: no thrashing)
+        full = false; lastReset = frames; entries.clear(); shelfX = shelfY = shelfH = 0;
+        for (const old of live.entries.values()) old.dead = true;
+        live.entries.clear(); live.x = 0; live.y = LIVE_Y; live.h = 0; live.gen++;
+        revision++; epoch++;
+    }
+    function stats() { return { big: [...entries].map(([k, e]) => [k.slice(0, 40), e.w, e.h]).sort((a, b) => b[1] * b[2] - a[1] * a[2]).slice(0, 12), y: shelfY + shelfH, limit: LIVE_Y, entries: entries.size, live: live.entries.size, gen: live.gen }; }
+    return { measure, entry, css, quad, live, stats, frame, epoch: () => epoch, uses: () => uses, flush, invalidate, texture: () => tex() };
 })();

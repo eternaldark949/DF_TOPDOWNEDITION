@@ -15,6 +15,8 @@ class GLBuildingsSystem {
 
     begin(game, view) {
         const R = this.renderer, cam = game.camera, sun = sunNow(), dc = game.dayCycle(), dark = dc.darkness;
+        GLText.frame();
+        if (this.textEpoch !== GLText.epoch()) { this.textEpoch = GLText.epoch(); for (const r of this.records.values()) r.key = null; }
         if (this.fontRevision !== (R.fontRevision || 0)) { this.fontRevision = R.fontRevision || 0; GLText.invalidate(); for (const r of this.records.values()) r.key = null; }
         const rgb = String(sun.rgb).split(',').map(v => +v / 255);
         GLBuildingMesh.frame = {
