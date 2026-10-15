@@ -158,7 +158,8 @@ Object.assign(NativeWebGLRenderer.prototype,{
         }
         const t=_frameTime/1000;
         if(typeof GameSettings!=='undefined'&&L.bloom!==!!GameSettings.bloom)this.setLayers({bloom:!!GameSettings.bloom});   // follow Settings → Bloom
-        const filters=[];if(L.bloom)filters.push(this.sceneBloom);if(L.atmosphere)filters.push(this.atmosphereFilter);
+        const filters=[];if(L.bloom&&game.getAmbientDarkness()>.2)filters.push(this.sceneBloom);   // Canvas blooms only once it is dark (lighting.js drawBloomPass)
+        if(L.atmosphere)filters.push(this.atmosphereFilter);
         this.stage.filters=filters.length?filters:null;
         this.stage.filterArea=this.world.filterArea;this.atmosphereFilter.uniforms.viewport.set([game.canvas.width,game.canvas.height]);
         const tint={amber:[1,.627,.196,.04],violet:[.471,.235,.784,.04],crimson:[.784,.196,.275,.03],teal:[.196,.706,.784,.03]}[GameSettings.atmosphereTint]||[0,0,0,0];
@@ -311,7 +312,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             if(!r){r={node:new PIXI.Container(),off:new PIXI.Sprite(),on:new PIXI.Sprite(),particles:new PIXI.Graphics()};for(const s of [r.off,r.on]){s.anchor.set(.5);r.node.addChild(s);}r.node.addChild(r.particles);this.fixtures.addChild(r.node);this.fixtureNodes.set(lamp,r);}
             r.node.visible=true;r.node.zIndex=lamp.y;r.particles.clear();const dots=r.particles;
             lamp._lightK=game.roomSystem.lampLight(lamp)*lampFlicker(lamp);lamp._forcedOff=lamp._lightK<.02;
-            const room=game.roomSystem.rooms[lamp._roomId],on=!lamp._forcedOff&&(room?.type!=='outdoor'||day.lampsOn),k=on?Math.min(1,lamp._lightK):0;
+            const room=game.roomSystem.rooms[lamp._roomId],sky=room?room.type==='outdoor':game.activeMap.type==='outdoor',on=!lamp._forcedOff&&(!sky||day.lampsOn),k=on?Math.min(1,lamp._lightK):0;
             r.off.texture=assets[0];r.on.texture=assets[1];r.off.visible=k<1;r.on.visible=k>0;r.on.alpha=k;
             for(const s of [r.off,r.on]){s.position.set(lamp.x,lamp.y);s.rotation=lamp.angle||0;}
             if(on&&_zoomLOD<1){
@@ -361,7 +362,10 @@ Object.assign(NativeWebGLRenderer.prototype,{
         }
         if(L.transientLights)sources.push(...this.transientSources);
         for(let i=sources.length-1;i>=0;i--){const q=sources[i];if(q.alpha<.005||Math.abs(q.x-view.x)>w/(2*view.zoom)+q.radius||Math.abs(q.y-view.y)>h/(2*view.zoom)+q.radius)sources.splice(i,1);}
-        sources.sort((a,b)=>Math.hypot(a.x-view.x,a.y-view.y)-Math.hypot(b.x-view.x,b.y-view.y));sources.length=Math.min(sources.length,L.decorLights?40:24);
+        sources.sort((a,b)=>Math.hypot(a.x-view.x,a.y-view.y)-Math.hypot(b.x-view.x,b.y-view.y));
+        // Canvas lights only the nearest lamps for the zoom (draw.js _maxLitLamps): zoomed out, the far ones stay dark
+        {const budget=_zoomLOD===2?10:_zoomLOD===1?18:40;let lamps=0;for(let i=0;i<sources.length;i++)if(sources[i].lamp&&++lamps>budget)sources.splice(i--,1);}
+        sources.length=Math.min(sources.length,L.decorLights?40:24);
         const occlusion=L.wallOcclusion||L.propShadows||L.playerShadows||L.npcShadows||L.vehicleShadows,casters=occlusion?this.casters(game):[],walls=getOccluders(game.activeMap);
         const wallKey=walls.map(w=>[w.x,w.y,w.w,w.h].join(',')).join(';');
         // Fit this frame's shadow textures (static + animated) into ~40 MB: halve every light's density until they fit.
@@ -383,15 +387,20 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.lightStage.filters=L.softShadows?[this.softFilter]:null;
         this.lighting.uniforms.mapSize.set([game.activeMap.width,game.activeMap.height]);
         this.lighting.uniforms.nightTint=L.nightTint?1:0;
+        // The colour of the dark: the hour's outdoors (violet-indigo at night, gold at dusk, rose at dawn), night's violet indoors (lighting.js step 3)
+        {const t=(game.activeMap.type==='indoor'?'22, 10, 48':game.dayCycle().tintRGB).split(',');for(let i=0;i<3;i++)this.lighting.uniforms.darkTint[i]=+t[i]/255;}
         this.lighting.uniforms.viewport.set([this.lightTarget.width,this.lightTarget.height]);
-        this.paintLightSources(game,view);this.renderer.render(this.lightStage,{renderTexture:this.lightTarget,clear:true});
+        this.paintLightSources(game,view);
+        // Neon pools, headlights, underglow (gl/light-pools.js)
+        if(!this.lightPools)this.lightPools=new GLLightPools(this.lightStage);this.lightPools.sync(game,view,this.lightSprites);this.lightPools.show(false);
+        this.renderer.render(this.lightStage,{renderTexture:this.lightTarget,clear:true});
         this.lighting.uniforms.colorGain=L.colorWash ? game.getAmbientDarkness() : 0;
         if(L.colorWash){
             this.lightBase.visible=false;this.skyLight.visible=false;this.surfaces.windowHole.root.visible=false;this.surfaces.windowColor.root.visible=true;
             if(!this.colorSprites){this.colorSprites=new PIXI.Container();this.lightStage.addChild(this.colorSprites);}this.colorSprites.visible=true;this.colorSprites.position.copyFrom(this.lightSprites.position);this.colorSprites.scale.copyFrom(this.lightSprites.scale);this.lightSprites.visible=false;
             for(let i=0;i<Math.max(sources.length,this.colorSprites.children.length);i++){let m=this.colorSprites.children[i];if(!m){m=new NativeLightColorMesh();this.colorSprites.addChild(m);}const source=sources[i];m.visible=!!source;if(!source)continue;const s=this.lightSprites.children[i],u=m.shader.uniforms;m.position.set(s.x-s.width/2,s.y-s.height/2);m.scale.set(s.width,s.height);u.hole=s.texture;if(m.color!==source.color){m.color=source.color;u.tint.set(new PIXI.Color(source.color).toArray().slice(0,3));}u.strength=s.alpha*(source.colorWash??source.wash);u.lamp=source.lamp?1:0;}
 
-            this.showLightSourceColor(true);this.renderer.render(this.lightStage,{renderTexture:this.colorTarget,clear:true});this.showLightSourceColor(false);this.colorSprites.visible=false;this.lightSprites.visible=true;this.lightBase.visible=true;this.skyLight.visible=true;this.surfaces.windowHole.root.visible=true;this.surfaces.windowColor.root.visible=false;
+            this.showLightSourceColor(true);this.lightPools.show(true);this.renderer.render(this.lightStage,{renderTexture:this.colorTarget,clear:true});this.showLightSourceColor(false);this.lightPools.show(false);this.colorSprites.visible=false;this.lightSprites.visible=true;this.lightBase.visible=true;this.skyLight.visible=true;this.surfaces.windowHole.root.visible=true;this.surfaces.windowColor.root.visible=false;
         }
         this.layerStages.lightingMs=performance.now()-start;
     }

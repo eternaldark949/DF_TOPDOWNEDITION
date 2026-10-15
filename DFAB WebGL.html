@@ -58439,7 +58439,7 @@ class NativeWebGLRenderer {
                 uniform sampler2D colorMap;uniform sampler2D reflectionMap;uniform float reflectionGain;
                 ${NATIVE_DAYLIGHT_GLSL}
                 uniform float colorGain;
-                uniform float nightTint;uniform float vision;
+                uniform float nightTint;uniform vec3 darkTint;uniform float vision;
                 uniform sampler2D veilMap;uniform float veilGain;uniform vec3 inverseWorld;uniform vec2 veilSize;uniform vec2 mapSize;
                 void main() {
                     vec4 scene = texture2D(uSampler, vTextureCoord);
@@ -58455,7 +58455,7 @@ class NativeWebGLRenderer {
                     veil*=inMap;
                     float darkAlpha=shade*(1.0-veil.a)+veil.a;
                     float reflectionLift=reflectionGain>0.0?1.0-texture2D(reflectionMap,screen/viewport).a*reflectionGain:1.0;darkAlpha*=reflectionLift;
-                    vec3 darkRGB=vec3(.086,.039,.188)*shade*nightTint*(1.0-veil.a)+veil.rgb;
+                    vec3 darkRGB=darkTint*shade*nightTint*(1.0-veil.a)+veil.rgb;
                     darkRGB*=reflectionLift;
                     darkAlpha*=1.-vision;darkRGB*=1.-vision;color*=1.-vision;
                     if(lightingOn<.5){darkAlpha=0.0;darkRGB=vec3(0.0);color=vec4(0.0);}
@@ -58463,7 +58463,7 @@ class NativeWebGLRenderer {
                     vec3 rgb=shaded+color.rgb*scene.a;
                     vec3 straight=rgb/max(.00001,scene.a);if(lightingOn>.5)straight=mix(straight,softSun(straight,vec3(1.)),.6*vision);
                     gl_FragColor = vec4(daylight(straight,screen)*scene.a,scene.a);
-                }`, {lightingOn:1,sunColor:new Float32Array(3),sunGrade:new Float32Array(4),sunDirection:new Float32Array(2),reflectionMap:PIXI.Texture.EMPTY,reflectionGain:0,viewport:new Float32Array(2),lightMap:PIXI.Texture.EMPTY,colorMap:PIXI.Texture.EMPTY,colorGain:0,nightTint:0,vision:0,veilMap:PIXI.Texture.EMPTY,veilGain:0,inverseWorld:new Float32Array(3),veilSize:new Float32Array([1,1]),mapSize:new Float32Array(2)});
+                }`, {lightingOn:1,sunColor:new Float32Array(3),sunGrade:new Float32Array(4),sunDirection:new Float32Array(2),reflectionMap:PIXI.Texture.EMPTY,reflectionGain:0,viewport:new Float32Array(2),lightMap:PIXI.Texture.EMPTY,colorMap:PIXI.Texture.EMPTY,colorGain:0,nightTint:0,darkTint:new Float32Array([.086,.039,.188]),vision:0,veilMap:PIXI.Texture.EMPTY,veilGain:0,inverseWorld:new Float32Array(3),veilSize:new Float32Array([1,1]),mapSize:new Float32Array(2)});
             this.lighting.padding = 0;
             this.world.filters = [this.lighting];
             this.world.filterArea = new PIXI.Rectangle(0,0,canvas.width,canvas.height);
@@ -58968,7 +58968,8 @@ Object.assign(NativeWebGLRenderer.prototype,{
         }
         const t=_frameTime/1000;
         if(typeof GameSettings!=='undefined'&&L.bloom!==!!GameSettings.bloom)this.setLayers({bloom:!!GameSettings.bloom});   // follow Settings → Bloom
-        const filters=[];if(L.bloom)filters.push(this.sceneBloom);if(L.atmosphere)filters.push(this.atmosphereFilter);
+        const filters=[];if(L.bloom&&game.getAmbientDarkness()>.2)filters.push(this.sceneBloom);   // Canvas blooms only once it is dark (lighting.js drawBloomPass)
+        if(L.atmosphere)filters.push(this.atmosphereFilter);
         this.stage.filters=filters.length?filters:null;
         this.stage.filterArea=this.world.filterArea;this.atmosphereFilter.uniforms.viewport.set([game.canvas.width,game.canvas.height]);
         const tint={amber:[1,.627,.196,.04],violet:[.471,.235,.784,.04],crimson:[.784,.196,.275,.03],teal:[.196,.706,.784,.03]}[GameSettings.atmosphereTint]||[0,0,0,0];
@@ -59121,7 +59122,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             if(!r){r={node:new PIXI.Container(),off:new PIXI.Sprite(),on:new PIXI.Sprite(),particles:new PIXI.Graphics()};for(const s of [r.off,r.on]){s.anchor.set(.5);r.node.addChild(s);}r.node.addChild(r.particles);this.fixtures.addChild(r.node);this.fixtureNodes.set(lamp,r);}
             r.node.visible=true;r.node.zIndex=lamp.y;r.particles.clear();const dots=r.particles;
             lamp._lightK=game.roomSystem.lampLight(lamp)*lampFlicker(lamp);lamp._forcedOff=lamp._lightK<.02;
-            const room=game.roomSystem.rooms[lamp._roomId],on=!lamp._forcedOff&&(room?.type!=='outdoor'||day.lampsOn),k=on?Math.min(1,lamp._lightK):0;
+            const room=game.roomSystem.rooms[lamp._roomId],sky=room?room.type==='outdoor':game.activeMap.type==='outdoor',on=!lamp._forcedOff&&(!sky||day.lampsOn),k=on?Math.min(1,lamp._lightK):0;
             r.off.texture=assets[0];r.on.texture=assets[1];r.off.visible=k<1;r.on.visible=k>0;r.on.alpha=k;
             for(const s of [r.off,r.on]){s.position.set(lamp.x,lamp.y);s.rotation=lamp.angle||0;}
             if(on&&_zoomLOD<1){
@@ -59171,7 +59172,10 @@ Object.assign(NativeWebGLRenderer.prototype,{
         }
         if(L.transientLights)sources.push(...this.transientSources);
         for(let i=sources.length-1;i>=0;i--){const q=sources[i];if(q.alpha<.005||Math.abs(q.x-view.x)>w/(2*view.zoom)+q.radius||Math.abs(q.y-view.y)>h/(2*view.zoom)+q.radius)sources.splice(i,1);}
-        sources.sort((a,b)=>Math.hypot(a.x-view.x,a.y-view.y)-Math.hypot(b.x-view.x,b.y-view.y));sources.length=Math.min(sources.length,L.decorLights?40:24);
+        sources.sort((a,b)=>Math.hypot(a.x-view.x,a.y-view.y)-Math.hypot(b.x-view.x,b.y-view.y));
+        // Canvas lights only the nearest lamps for the zoom (draw.js _maxLitLamps): zoomed out, the far ones stay dark
+        {const budget=_zoomLOD===2?10:_zoomLOD===1?18:40;let lamps=0;for(let i=0;i<sources.length;i++)if(sources[i].lamp&&++lamps>budget)sources.splice(i--,1);}
+        sources.length=Math.min(sources.length,L.decorLights?40:24);
         const occlusion=L.wallOcclusion||L.propShadows||L.playerShadows||L.npcShadows||L.vehicleShadows,casters=occlusion?this.casters(game):[],walls=getOccluders(game.activeMap);
         const wallKey=walls.map(w=>[w.x,w.y,w.w,w.h].join(',')).join(';');
         // Fit this frame's shadow textures (static + animated) into ~40 MB: halve every light's density until they fit.
@@ -59193,15 +59197,20 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.lightStage.filters=L.softShadows?[this.softFilter]:null;
         this.lighting.uniforms.mapSize.set([game.activeMap.width,game.activeMap.height]);
         this.lighting.uniforms.nightTint=L.nightTint?1:0;
+        // The colour of the dark: the hour's outdoors (violet-indigo at night, gold at dusk, rose at dawn), night's violet indoors (lighting.js step 3)
+        {const t=(game.activeMap.type==='indoor'?'22, 10, 48':game.dayCycle().tintRGB).split(',');for(let i=0;i<3;i++)this.lighting.uniforms.darkTint[i]=+t[i]/255;}
         this.lighting.uniforms.viewport.set([this.lightTarget.width,this.lightTarget.height]);
-        this.paintLightSources(game,view);this.renderer.render(this.lightStage,{renderTexture:this.lightTarget,clear:true});
+        this.paintLightSources(game,view);
+        // Neon pools, headlights, underglow (gl/light-pools.js)
+        if(!this.lightPools)this.lightPools=new GLLightPools(this.lightStage);this.lightPools.sync(game,view,this.lightSprites);this.lightPools.show(false);
+        this.renderer.render(this.lightStage,{renderTexture:this.lightTarget,clear:true});
         this.lighting.uniforms.colorGain=L.colorWash ? game.getAmbientDarkness() : 0;
         if(L.colorWash){
             this.lightBase.visible=false;this.skyLight.visible=false;this.surfaces.windowHole.root.visible=false;this.surfaces.windowColor.root.visible=true;
             if(!this.colorSprites){this.colorSprites=new PIXI.Container();this.lightStage.addChild(this.colorSprites);}this.colorSprites.visible=true;this.colorSprites.position.copyFrom(this.lightSprites.position);this.colorSprites.scale.copyFrom(this.lightSprites.scale);this.lightSprites.visible=false;
             for(let i=0;i<Math.max(sources.length,this.colorSprites.children.length);i++){let m=this.colorSprites.children[i];if(!m){m=new NativeLightColorMesh();this.colorSprites.addChild(m);}const source=sources[i];m.visible=!!source;if(!source)continue;const s=this.lightSprites.children[i],u=m.shader.uniforms;m.position.set(s.x-s.width/2,s.y-s.height/2);m.scale.set(s.width,s.height);u.hole=s.texture;if(m.color!==source.color){m.color=source.color;u.tint.set(new PIXI.Color(source.color).toArray().slice(0,3));}u.strength=s.alpha*(source.colorWash??source.wash);u.lamp=source.lamp?1:0;}
 
-            this.showLightSourceColor(true);this.renderer.render(this.lightStage,{renderTexture:this.colorTarget,clear:true});this.showLightSourceColor(false);this.colorSprites.visible=false;this.lightSprites.visible=true;this.lightBase.visible=true;this.skyLight.visible=true;this.surfaces.windowHole.root.visible=true;this.surfaces.windowColor.root.visible=false;
+            this.showLightSourceColor(true);this.lightPools.show(true);this.renderer.render(this.lightStage,{renderTexture:this.colorTarget,clear:true});this.showLightSourceColor(false);this.lightPools.show(false);this.colorSprites.visible=false;this.lightSprites.visible=true;this.lightBase.visible=true;this.skyLight.visible=true;this.surfaces.windowHole.root.visible=true;this.surfaces.windowColor.root.visible=false;
         }
         this.layerStages.lightingMs=performance.now()-start;
     }
@@ -60092,18 +60101,17 @@ class NativeWetRoof extends PIXI.Mesh{
 }
 class NativeWorldSurfaces{
     constructor(owner){
-        this.owner=owner;this.pads=new Map();this.glass=new Map();this.roofs=new Map();this.doorKeys=new WeakMap();this.sunHulls=new WeakMap();this.labels=new NativeVectorContext(owner);this.labels.label='entrance-labels';
+        this.owner=owner;this.pads=new Map();this.glass=new Map();this.roofs=new Map();this.doorKeys=new WeakMap();this.labels=new NativeVectorContext(owner);this.labels.label='entrance-labels';
         this.floor=new PIXI.Container();this.padStage=new PIXI.Container();this.glassStage=new PIXI.Container();
         owner.world.addChildAt(this.floor,owner.world.getChildIndex(owner.floorArt)+1);this.floor.addChild(this.padStage,this.labels.root);
         owner.postWorld.addChildAt(this.glassStage,owner.postWorld.getChildIndex(owner.marker));
         this.windowHole=new NativeVectorContext(owner);this.windowColor=new NativeVectorContext(owner);this.windowHole.label='window-daylight-holes';this.windowColor.label='window-daylight-color';owner.lightStage.addChild(this.windowHole.root,this.windowColor.root);
         this.cloudContext=new NativeVectorContext(owner);this.cloudContext.label='cloud-shadows';this.floor.addChildAt(this.cloudContext.root,0);
-        this.sunStaticContext=new NativeVectorContext(owner);this.sunStaticContext.label='sun-static';this.sunContext=new NativeVectorContext(owner);this.sunContext.label='sun-cast-shadows';this.sunSprite=new PIXI.Sprite();this.sunSprite.blendMode=PIXI.BLEND_MODES.MULTIPLY;this.floor.addChildAt(this.sunSprite,0);
-        this.sunFilter=new PIXI.Filter(undefined,`precision highp float;varying vec2 vTextureCoord;uniform sampler2D uSampler;uniform float strength;
-            void main(){float a=texture2D(uSampler,vTextureCoord).a*strength;gl_FragColor=vec4(vec3(92.,76.,150.)/255.*a,a);}`,{strength:0});
-        this.sunSprite.filters=[this.sunFilter];this.reflections=new NativeWetReflections(owner,this.floor);
+        // Sun shadows (gl/sun-shadows.js): a mask, multiplied over the ground
+        this.sunSprite=new PIXI.Sprite();this.sunSprite.blendMode=PIXI.BLEND_MODES.MULTIPLY;this.floor.addChildAt(this.sunSprite,0);
+        this.reflections=new NativeWetReflections(owner,this.floor);
     }
-    get contexts(){return [this.labels,this.sunStaticContext,this.sunContext,this.cloudContext,this.windowHole,this.windowColor,...this.reflections.contexts];}
+    get contexts(){return [this.labels,this.cloudContext,this.windowHole,this.windowColor,...this.reflections.contexts];}
     sync(game,view){
         const start=performance.now(),r=this.owner,L=r.layers,W=game.canvas.width,H=game.canvas.height;
         const S=game.sunState(),k=L.daylight?S.k*game._sunReach():0;
@@ -60172,58 +60180,27 @@ class NativeWorldSurfaces{
     syncSun(game,view,V,S){
         const r=this.owner,strength=r.layers.sunShadows&&game.activeMap.type==='outdoor'?S.k*(1-.75*S.overcast):0;
         this.sunSprite.visible=strength>.02;
-        this.sunStats={active:this.sunSprite.visible,casters:0,rebuilds:0,staticRebuilds:0,staticHits:0,dynamicRebuilds:0,staticCasters:0,movingCasters:0,bytes:0};
+        this.sunStats={active:this.sunSprite.visible,casters:0,rebuilds:0,meshed:0,outlines:0,movingCasters:0,bytes:0};
         if(!this.sunSprite.visible)return;
-        const W=game.canvas.width,H=game.canvas.height,P=128,SW=W+2*P,SH=H+2*P,res=Math.min(.5,1024/Math.max(W,H)),size=W+':'+H+':'+res;
-        if(this.sunSize!==size){this.sunTarget?.destroy(true);this.sunTarget=r.target(PIXI.RenderTexture.create({width:W,height:H,resolution:res}),'sun-composite-target');this.sunSize=size;this.sunKey=null;this.sunSprite.texture=this.sunTarget;}
-        // An overscanned world mask scrolls with the camera within a 64px cell.
-        // Minute-by-minute sun changes are quantized below a world pixel for
-        // ordinary building heights; illumination strength remains continuous.
-        const q=v=>Math.round(v*512)/512,dx=q(S.dx*S.len),dy=q(S.dy*S.len),ox=Math.floor(r.world.x/64)*64,oy=Math.floor(r.world.y/64)*64;
-        const B={left:(-P-ox)/view.zoom,right:(W+P-ox)/view.zoom,top:(-P-oy)/view.zoom,bottom:(H+P-oy)/view.zoom};
+        // The mask: screen sized at half resolution (as Canvas), so its edges soften the same way when it is laid over the ground.
+        const W=game.canvas.width,H=game.canvas.height,res=Math.min(.5,1024/Math.max(W,H)),size=W+':'+H+':'+res;
+        if(this.sunSize!==size){this.sunTarget?.destroy(true);this.sunTarget=r.target(PIXI.RenderTexture.create({width:W,height:H,resolution:res}),'sun-mask-target');this.sunSize=size;this.sunKey=null;this.sunSprite.texture=this.sunTarget;}
+        const dx=S.dx*S.len,dy=S.dy*S.len,B={left:-r.world.x/view.zoom,right:(W-r.world.x)/view.zoom,top:-r.world.y/view.zoom,bottom:(H-r.world.y)/view.zoom};
         const buildings=game._queryRenderBuildings({left:B.left-360,right:B.right+360,top:B.top-360,bottom:B.bottom+360},this.sunCandidates||(this.sunCandidates=[])).map(e=>e.item).filter(b=>b.isV2&&b.sections&&b.visible!==false);
         const foliage=game._queryRenderFoliage({left:B.left-120,right:B.right+120,top:B.top-120,bottom:B.bottom+120},this.sunFoliage||(this.sunFoliage=[])).map(e=>e.item).filter(f=>!f.dead&&f.visible!==false);
-        const signature=[SW,SH,view.zoom,ox,oy,dx,dy];
-        for(const b of buildings)signature.push(b.x,b.y,b.w,b.h,b.floors,b.roundR,...b.sections.flatMap(s=>[s.x,s.y,s.w,s.h]));
-        for(const f of foliage)signature.push(f.x,f.y,f.size,f.type,foliageCanopyY(f));
-        const staticKey=signature.join(':'),sr=Math.min(.5,1024/Math.max(SW,SH)),staticSize=[SW,SH,sr].join(':');
-        if(this.sunStaticSize!==staticSize){this.sunStaticTarget?.destroy(true);this.sunStaticTarget=r.target(PIXI.RenderTexture.create({width:SW,height:SH,resolution:sr}),'sun-static-target');this.sunStaticSize=staticSize;this.sunStaticKey=null;}
-        if(this.sunStaticKey!==staticKey){
-            const c=this.sunStaticContext;c.begin();c.canvas=game.canvas;c.setTransform(view.zoom,0,0,view.zoom,ox+P,oy+P);c.fillStyle='#fff';c.beginPath();let count=0;
-            const poly=pts=>{pts.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));c.closePath();count++;};
-            for(const b of buildings){
-                if(b.roundR)b._leanFaces();const height=Math.min(b.floors,CONFIG.BUILDINGS.MAX_FLOORS)*CONFIG.BUILDINGS.FLOOR_HEIGHT;
-                const key=[b.x,b.y,b.w,b.h,height,dx,dy,b.roundR,...b.sections.flatMap(s=>[s.x,s.y,s.w,s.h])].join(':');let rec=this.sunHulls.get(b);
-                if(rec?.key!==key){rec={key,hulls:b.sections.map((s,i)=>{const fp=b._footprint(s,i);return nativeSunHull(fp.concat(fp.map(([x,y])=>[x+dx*height,y+dy*height])));})};this.sunHulls.set(b,rec);}
-                for(const hull of rec.hulls)poly(hull);
-            }
-            for(const f of foliage){
-                const size=f.size||1,height=(f.type==='bush'?8:34)*size,rad=(f.type==='bush'?12:f.type==='palm'?17:19)*size,rot=Math.atan2(dy,dx),N=S.len>.6?4:1;
-                for(let i=N===1?1:0;i<=N;i++){const t=i/N,cx=f.x+dx*height*t,cy=foliageCanopyY(f)+dy*height*t,rr=rad*(.6+.4*t),rx=rr*(1+S.len*.25*t);c.moveTo(cx+rx*Math.cos(rot),cy+rx*Math.sin(rot));c.ellipse(cx,cy,rx,rr*.8,rot,0,Math.PI*2);}count++;
-            }
-            c.fill();r.renderer.render(c.root,{renderTexture:this.sunStaticTarget,clear:true});this.sunStaticKey=staticKey;this.sunStaticCasters=count;this.sunRevision=(this.sunRevision||0)+1;this.sunStats.staticRebuilds++;
-        }else this.sunStats.staticHits++;
         const cars=[...new Set([...(game.traffic?.vehicles||[]),game.car,game.ownedCar,game.deliveryVehicle].filter(Boolean))].filter(e=>e.visible!==false&&e.length&&e.x>=V.left-80&&e.x<=V.right+80&&e.y>=V.top-80&&e.y<=V.bottom+80);
-        const fire=game.projectiles.some(p=>p.isFireball&&p.active!==false)||(game._fireTrail||[]).length;
-        const dynamicKey=[this.sunRevision,r.world.x,r.world.y,...cars.flatMap(e=>[e.x,e.y,e.angle,e.length,e.width,e.model]),fire?_frameTime:0].join(':');
-        if(this.sunKey!==dynamicKey){
-            const c=this.sunContext;c.begin();c.canvas=game.canvas;
-            const n=c.node(PIXI.Sprite);n.texture=this.sunStaticTarget;n.alpha=1;n.blendMode=PIXI.BLEND_MODES.NORMAL;n.position.set(r.world.x-ox-P,r.world.y-oy-P);n.width=SW;n.height=SH;
-            c.current=null;c.setTransform(view.zoom,0,0,view.zoom,r.world.x,r.world.y);c.fillStyle='#fff';c.beginPath();
-            for(const e of cars){
-                const ca=Math.cos(e.angle||0),sa=Math.sin(e.angle||0),height=e.model==='truck'||/suv/.test(e.model)?17:13,points=[];
-                for(const [a,b]of [[1,1],[1,-1],[-1,-1],[-1,1]]){const x=e.x+a*(e.length/2-3)*ca-b*(e.width/2-2)*sa,y=e.y+a*(e.length/2-3)*sa+b*(e.width/2-2)*ca;points.push([x,y],[x+dx*height,y+dy*height]);}
-                nativeSunHull(points).forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));c.closePath();
-            }
-            c.fill();if(fire){c.globalCompositeOperation='destination-out';game._drawFireLights(c,'hole',(x,y,rad)=>x+rad>V.left&&x-rad<V.right&&y+rad>V.top&&y-rad<V.bottom);}
-            r.renderer.render(c.root,{renderTexture:this.sunTarget,clear:true});this.sunKey=dynamicKey;this.sunStats.rebuilds++;this.sunStats.dynamicRebuilds++;
-        }
-        this.sunStats.staticCasters=this.sunStaticCasters||0;this.sunStats.movingCasters=cars.length;this.sunStats.casters=this.sunStats.staticCasters+cars.length;
-        this.sunSprite.position.set(-r.world.x/view.zoom,-r.world.y/view.zoom);this.sunSprite.scale.set(1/view.zoom);this.sunFilter.uniforms.strength=.62*strength;
-        this.sunStats.bytes=[this.sunTarget,this.sunStaticTarget].reduce((n,t)=>n+t.baseTexture.realWidth*t.baseTexture.realHeight*4,0);
+        const fires=[],now=_gameTimeMs();
+        for(const p of game.projectiles)if(p.isFireball&&p.active!==false&&p.visible!==false&&!p.dead&&p.life>0)fires.push({x:p.x,y:p.y,r:280,strength:.98*(.96+.04*Math.sin(now*.023+(p.id||0)))});
+        for(const p of (game._fireTrail||[]).slice(-48)){const f=Math.max(0,Math.min(1,1-(now-p.born)/p.life));if(f>.02)fires.push({x:p.x,y:p.y,r:FIRE_TRAIL_LIGHT_RADIUS,strength:.58*Math.pow(f,1.35)});}
+        const gl=r.glBuildings,key=[W,H,r.world.x,r.world.y,view.zoom,dx,dy,gl?.stats.builds,buildings.length,foliage.length,...cars.flatMap(e=>[e.x,e.y,e.angle]),fires.length?now:0].join(':');
+        if(this.sunKey!==key){(this.sunShadows||(this.sunShadows=new GLSunShadows(r))).render(this.sunTarget,r.world,dx,dy,buildings,foliage,cars,fires,S.len);this.sunKey=key;this.sunStats.rebuilds++;}
+        const st=this.sunShadows.stats;Object.assign(this.sunStats,{meshed:st.meshed,outlines:st.outlines,movingCasters:cars.length,casters:buildings.length+foliage.length+cars.length});
+        // Multiply the ground by the lavender shade where the mask is (Canvas: multiply, alpha .62 × strength)
+        this.sunSprite.position.set(-r.world.x/view.zoom,-r.world.y/view.zoom);this.sunSprite.scale.set(1/view.zoom);this.sunSprite.tint=0x5c4c96;this.sunSprite.alpha=.62*strength;
+        this.sunStats.bytes=this.sunTarget.baseTexture.realWidth*this.sunTarget.baseTexture.realHeight*4;
     }
-    invalidate(){this.sunKey=this.sunStaticKey=this.roofTileKey=null;for(const c of this.contexts)for(const g of c.gradients)g.key=null;this.reflections.invalidate();}
-    clear(){for(const rec of this.pads.values())rec.node.destroy();for(const rec of this.glass.values())rec.node.destroy();for(const rec of this.roofs.values())for(const mesh of rec.meshes)mesh.destroy();this.labels.destroy();this.sunStaticContext.destroy();this.sunContext.destroy();this.cloudContext.destroy();this.windowHole.destroy();this.windowColor.destroy();this.roofTile?.destroy(true);this.roofTileMesh?.destroy();this.roofTileStage?.destroy();this.sunStaticTarget?.destroy(true);this.sunTarget?.destroy(true);this.sunSprite.destroy();this.sunFilter.destroy();this.reflections.clear();this.floor.destroy();this.glassStage.destroy();}
+    invalidate(){this.sunKey=this.roofTileKey=null;for(const c of this.contexts)for(const g of c.gradients)g.key=null;this.reflections.invalidate();}
+    clear(){for(const rec of this.pads.values())rec.node.destroy();for(const rec of this.glass.values())rec.node.destroy();for(const rec of this.roofs.values())for(const mesh of rec.meshes)mesh.destroy();this.labels.destroy();this.sunShadows?.destroy();this.cloudContext.destroy();this.windowHole.destroy();this.windowColor.destroy();this.roofTile?.destroy(true);this.roofTileMesh?.destroy();this.roofTileStage?.destroy();this.sunTarget?.destroy(true);this.sunSprite.destroy();this.reflections.clear();this.floor.destroy();this.glassStage.destroy();}
 }
 // Wet material masks and reflected light/detail remain in GPU render targets.
 class NativeReflectionImage extends PIXI.Mesh{
@@ -60520,7 +60497,7 @@ class NativePresentation{
         if(L.glassRefraction){if(L.windows)for(const w of game.roomSystem.windows||[])if(!w.shattered&&!(game.activeMap.id==='apt_949'&&w.y===0))glass(w.x,w.y,w.w,w.h);
             if(L.doors)for(const d of game.roomSystem.doors||[])if(d.type==='sliding')for(const [ax,ay,bx,by]of d.leaves())d.orientation==='H'?glass(Math.min(ax,bx),d.y,Math.abs(bx-ax),d.h):glass(d.x,Math.min(ay,by),d.w,Math.abs(by-ay));}
         if(typeof GameSettings!=='undefined'&&L.bloom!==!!GameSettings.bloom)r.setLayers({bloom:!!GameSettings.bloom});   // follow Settings → Bloom
-        const filters=[];if(u.ringCount||u.glassCount)filters.push(this.optics);if(L.bloom)filters.push(r.sceneBloom);if(L.atmosphere)filters.push(r.atmosphereFilter);r.scene.filters=filters.length?filters:null;r.scene.filterArea=new PIXI.Rectangle(0,0,game.canvas.width,game.canvas.height);r.stage.filters=null;
+        const filters=[];if(u.ringCount||u.glassCount)filters.push(this.optics);if(L.bloom&&game.getAmbientDarkness()>.2)filters.push(r.sceneBloom);if(L.atmosphere)filters.push(r.atmosphereFilter);r.scene.filters=filters.length?filters:null;r.scene.filterArea=new PIXI.Rectangle(0,0,game.canvas.width,game.canvas.height);r.stage.filters=null;
         this.stats.rings=u.ringCount;this.stats.glass=u.glassCount;
     }
     sync(game,view){
@@ -64792,6 +64769,248 @@ class GLBuildingsSystem {
 }
 /** Landmarks with their own GL model (style → { build(b), update?(b, record) }) */
 GLBuildingsSystem.landmarks = { double_nights: GLDoubleNights, enni_cole: GLEnniCole, cozy_cafe: GLCozyCafe, moon_city: GLMoonCity, silver_queen: GLSilverQueen };
+// GL engine: sun shadows. The shade the sun throws on the ground, cast by the buildings' own 3D
+// geometry: every vertex of a building's mesh (walls, roofs, towers, domes, canopies) is moved
+// along the sun by its height, z, and filled into one mask, so a landmark's shadow has the
+// landmark's shape. Trees and cars, which have no mesh yet, add their swept outlines (the shapes
+// Canvas casts, engine/daylight.js); living fire lifts the shade around it. The mask multiplies
+// the ground by the lavender shade colour (rgb 92, 76, 150) at 0.62 × the sun's strength.
+const GLSunShadows = (() => {
+    const VERT = `precision highp float;
+        attribute vec3 aPos; attribute vec4 aColor; attribute vec4 aText;
+        uniform mat3 projectionMatrix; uniform mat3 translationMatrix; uniform vec2 uSun;
+        varying float vZ; varying float vA;
+        void main(){
+            vZ = aPos.z; vA = aColor.a * step(aText.x, -.5) * step(-1.5, aText.x);   // no glyphs, no blurred drop-shadow strokes
+            gl_Position = vec4((projectionMatrix * translationMatrix * vec3(aPos.xy + uSun * aPos.z, 1.)).xy, 0., 1.);
+        }`;
+    const SOLID_VERT = `precision highp float; attribute vec3 aPos; uniform mat3 projectionMatrix; uniform mat3 translationMatrix;
+        void main(){ gl_Position = vec4((projectionMatrix * translationMatrix * vec3(aPos.xy, 1.)).xy, 0., 1.); }`;
+    const FRAG = `precision highp float; varying float vZ; varying float vA;
+        void main(){ if (vZ < .5 || vA < .35) discard; gl_FragColor = vec4(1.); }`;
+    // A fire's light: a soft disc erased out of the shade
+    const FIRE_FRAG = `precision highp float; varying vec2 uv; uniform float strength;
+        void main(){ float d = length(uv - .5) * 2.; float a = clamp(1. - d, 0., 1.); a = a * a * strength; gl_FragColor = vec4(a); }`;
+
+    class Casters {                                                          // the outline casters: triangles, built on the CPU
+        constructor() { this.pos = []; this.index = []; }
+        reset() { this.pos.length = this.index.length = 0; }
+        fan(points) {                                                        // a convex outline
+            const base = this.pos.length / 3;
+            for (const [x, y] of points) this.pos.push(x, y, 0);
+            for (let i = 1; i + 1 < points.length; i++) this.index.push(base, base + i, base + i + 1);
+        }
+        ellipse(cx, cy, rx, ry, rot, n = 18) {
+            const c = Math.cos(rot), s = Math.sin(rot), pts = [];
+            for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2, x = Math.cos(a) * rx, y = Math.sin(a) * ry; pts.push([cx + x * c - y * s, cy + x * s + y * c]); }
+            this.fan(pts);
+        }
+        geometry() {
+            const g = this.geo || (this.geo = new PIXI.Geometry().addAttribute('aPos', new PIXI.Buffer(new Float32Array(3), false, false), 3)
+.addIndex(new PIXI.Buffer(new Uint32Array(3), false, true)));
+            g.getBuffer('aPos').update(new Float32Array(this.pos)); g.getIndex().update(new Uint32Array(this.index));
+            return g;
+        }
+    }
+
+    // Draws building geometries straight through the renderer (no Mesh per building: the geometry stays the building's own)
+    class GeometryDraw extends PIXI.Container {
+        constructor(shader) { super(); this.shader = shader; this.list = []; this.state = PIXI.State.for2d(); this.state.blend = true; }
+        _render(renderer) {
+            if (!this.list.length) return;
+            renderer.batch.flush();
+            const u = this.shader.uniforms; u.translationMatrix = this.worldTransform.toArray(true);
+            renderer.shader.bind(this.shader); renderer.state.set(this.state);
+            for (const g of this.list) { if (!g.buffers) continue; renderer.geometry.bind(g, this.shader); renderer.geometry.draw(PIXI.DRAW_MODES.TRIANGLES); }
+        }
+    }
+
+    class SunShadows {
+        constructor(renderer) {
+            this.r = renderer; this.stage = new PIXI.Container(); this.casters = new Casters(); this.key = null;
+            this.shader = PIXI.Shader.from(VERT, FRAG, { uSun: new Float32Array(2) });
+            this.solidShader = PIXI.Shader.from(SOLID_VERT, `precision highp float; void main(){ gl_FragColor = vec4(1.); }`);
+            this.draw = new GeometryDraw(this.shader); this.outline = null; this.fires = [];
+            this.stats = { buildings: 0, meshed: 0, outlines: 0, rebuilds: 0 };
+        }
+        fireMesh(i) {
+            let m = this.fires[i];
+            if (!m) { m = this.fires[i] = new PIXI.Mesh(nativeSurfaceGeometry(), PIXI.Shader.from(NATIVE_SURFACE_VERTEX, FIRE_FRAG, { strength: 0 })); m.blendMode = PIXI.BLEND_MODES.ERASE; }
+            return m;
+        }
+        /**
+         * Render the mask into target (screen sized) for the view: world (the world container's
+         * position and scale), the sun's ground offset per px of height (dx, dy), and the casters.
+         */
+        render(target, world, dx, dy, buildings, foliage, cars, fires, len) {
+            const R = this.r, gl = R.glBuildings, C = this.casters, S = this.stats, list = this.draw.list;
+            this.stage.removeChildren(); C.reset(); list.length = 0; this.stage.addChild(this.draw); S.buildings = buildings.length; S.meshed = S.outlines = 0;
+            this.stage.position.copyFrom(world.position); this.stage.scale.copyFrom(world.scale);
+            this.shader.uniforms.uSun[0] = dx; this.shader.uniforms.uSun[1] = dy;
+            for (const b of buildings) {
+                const rec = gl?.records.get(b);
+                if (rec && rec.key) {                                        // its real geometry
+                    list.push(rec.base.geometry, rec.top.geometry);
+                    S.meshed++; continue;
+                }
+                // not built yet (it's just outside the view): its sections swept to the roof height, until it is
+                if (b.roundR) b._leanFaces();
+                const h = Math.min(b.floors, CONFIG.BUILDINGS.MAX_FLOORS) * CONFIG.BUILDINGS.FLOOR_HEIGHT;
+                b.sections.forEach((s, i) => { const fp = b._footprint(s, i); C.fan(nativeSunHull(fp.concat(fp.map(([x, y]) => [x + dx * h, y + dy * h])))); });
+                S.outlines++;
+            }
+            for (const f of foliage) {                                       // canopies swept from under the tree out along the sun (as daylight.js)
+                const size = f.size || 1, height = (f.type === 'bush' ? 8 : 34) * size, rad = (f.type === 'bush' ? 12 : f.type === 'palm' ? 17 : 19) * size;
+                const rot = Math.atan2(dy, dx), N = len > .6 ? 4 : 1;
+                for (let i = N === 1 ? 1 : 0; i <= N; i++) {
+                    const t = i / N, cx = f.x + dx * height * t, cy = foliageCanopyY(f) + dy * height * t, rr = rad * (.6 + .4 * t), rx = rr * (1 + len * .25 * t);
+                    C.ellipse(cx, cy, rx, rr * .8, rot);
+                }
+            }
+            for (const e of cars) {                                          // cars, low and long
+                const ca = Math.cos(e.angle || 0), sa = Math.sin(e.angle || 0), height = e.model === 'truck' || /suv/.test(e.model) ? 17 : 13, points = [];
+                for (const [a, b] of [[1, 1], [1, -1], [-1, -1], [-1, 1]]) {
+                    const x = e.x + a * (e.length / 2 - 3) * ca - b * (e.width / 2 - 2) * sa, y = e.y + a * (e.length / 2 - 3) * sa + b * (e.width / 2 - 2) * ca;
+                    points.push([x, y], [x + dx * height, y + dy * height]);
+                }
+                C.fan(nativeSunHull(points));
+            }
+            if (C.index.length) {
+                if (!this.outline) { this.outline = new PIXI.Mesh(C.geometry(), this.solidShader); this.outline.state.culling = false; }
+                else C.geometry();
+                this.stage.addChild(this.outline);
+            }
+            fires.forEach((f, i) => { const m = this.fireMesh(i); m.shader.uniforms.strength = f.strength; m.position.set(f.x - f.r, f.y - f.r); m.scale.set(f.r * 2); this.stage.addChild(m); });
+            R.renderer.render(this.stage, { renderTexture: target, clear: true }); list.length = 0;
+            S.rebuilds++;
+        }
+        destroy() { this.outline?.geometry.destroy(); this.outline?.destroy(); for (const m of this.fires) m.destroy(); this.stage.destroy(); }
+    }
+    return SunShadows;
+})();
+// GL engine: light pools. The night's lights that aren't lamps, as Canvas lights them
+// (engine/lighting.js steps 5-6): each neon sign's coloured pool, car headlight beams with their
+// haze and the glow at each headlamp, and underglow under the cars that have it. Every pool is a
+// quad whose falloff the fragment shader computes: no baked gradient images. Holes lift the dark
+// (white, screen-blended into the light target, as Canvas's destination-out); colours add the
+// light's colour into the colour wash (additive, as Canvas's 'lighter').
+const GLLightPools = (() => {
+    // kind 0: a radial glow (1 at the centre, through `core` at 0.45, to 0 at the rim; core 0 is a plain linear falloff)
+    // kind 1: a headlight beam, along u from the lamp, a trapezoid 15 px wide at the lamp widening to the full width,
+    //         fading along its length and to 0.3 at its sides (lighting.js _beamSprite)
+    const FRAG = `precision highp float; varying vec2 uv; uniform vec3 rgb; uniform float alpha; uniform float kind; uniform float core; uniform float W;
+        void main(){
+            float a;
+            if (kind < .5) {
+                float d = length(uv - .5) * 2.;
+                if (core > 0.) a = d < core ? mix(1., .45, d / core) : mix(.45, 0., (d - core) / (1. - core));
+                else a = 1. - d;
+            } else {
+                float v = abs(uv.y * 2. - 1.), edge = (15. + (W - 15.) * uv.x) / W;
+                a = (v <= edge ? 1. : 0.) * (1. - uv.x) * mix(1., .3, v);
+            }
+            a = clamp(a, 0., 1.) * alpha;
+            gl_FragColor = vec4(rgb * a, a);
+        }`;
+    const rgbOf = (c, fallback) => { try { return new PIXI.Color(c).toArray().slice(0, 3); } catch (e) { return fallback; } };
+
+    class Pools {
+        constructor(stage) {
+            this.holes = new PIXI.Container(); this.colors = new PIXI.Container(); stage.addChild(this.holes, this.colors);
+            this.geometry = nativeSurfaceGeometry(); this.pool = { holes: [], colors: [] }; this.used = { holes: 0, colors: 0 };
+            this.stats = { neon: 0, beams: 0, underglow: 0 }; this.signs = new Map();
+        }
+        quad(layer, rgb, alpha, kind, core = 0, W = 1) {
+            const list = this.pool[layer], i = this.used[layer]++;
+            let m = list[i];
+            if (!m) {
+                m = list[i] = new PIXI.Mesh(this.geometry, PIXI.Shader.from(NATIVE_SURFACE_VERTEX, FRAG, { rgb: new Float32Array(3), alpha: 0, kind: 0, core: 0, W: 1 }));
+                m.blendMode = layer === 'holes' ? PIXI.BLEND_MODES.SCREEN : PIXI.BLEND_MODES.ADD; this[layer].addChild(m);
+            }
+            const u = m.shader.uniforms; u.rgb.set(rgb); u.alpha = Math.min(1, alpha); u.kind = kind; u.core = core; u.W = W;
+            m.visible = true; m.rotation = 0; m.pivot.set(0, 0);
+            return m;
+        }
+        /** A radial glow of radius r at x, y; sx, sy stretch it (an ellipse), angle turns it */
+        disc(layer, x, y, r, rgb, alpha, core = 0, sx = 1, sy = 1, angle = 0) {
+            const m = this.quad(layer, rgb, alpha, 0, core);
+            m.position.set(x, y); m.rotation = angle; m.pivot.set(.5, .5); m.scale.set(2 * r * sx, 2 * r * sy);
+        }
+        beam(layer, b, rgb, alpha) {
+            const m = this.quad(layer, rgb, alpha, 1, 0, b.W);
+            m.position.set(b.cx, b.cy); m.rotation = b.owner.angle || 0; m.pivot.set(0, .5); m.scale.set(b.L, 2 * b.W);
+        }
+        /** A radial pool at source s (radius r) cut to what it can see past the walls: a fan, built once */
+        lit(s, r, walls) {
+            const key = [s.x, s.y, r, walls.length].join(':');
+            let rec = this.signs.get(s);
+            if (!rec || rec.key !== key) {
+                if (rec) { rec.mesh.geometry.destroy(); rec.mesh.destroy(); }
+                const poly = computeVisibilityPoly(s.x, s.y, r, walls, { aMin: 0, aMax: Math.PI * 2, arcStep: .18 }), pos = [s.x, s.y], uv = [.5, .5], index = [];
+                for (const p of poly) { pos.push(p.x, p.y); uv.push((p.x - s.x) / (2 * r) + .5, (p.y - s.y) / (2 * r) + .5); }
+                for (let i = 1; i <= poly.length; i++) index.push(0, i, i % poly.length + 1);
+                const g = new PIXI.Geometry().addAttribute('aVertexPosition', new Float32Array(pos), 2).addAttribute('aUV', new Float32Array(uv), 2).addIndex(new Uint16Array(index));
+                const mesh = new PIXI.Mesh(g, PIXI.Shader.from(NATIVE_SURFACE_VERTEX, FRAG, { rgb: new Float32Array(3), alpha: 0, kind: 0, core: 0, W: 1 }));
+                mesh.blendMode = PIXI.BLEND_MODES.ADD; this.colors.addChild(mesh);
+                rec = { key, mesh }; this.signs.set(s, rec);
+            }
+            rec.seen = this.frame;
+            return rec.mesh;
+        }
+        sync(game, view, transform) {
+            this.frame = (this.frame || 0) + 1;
+            for (const layer of ['holes', 'colors']) { this.used[layer] = 0; this[layer].position.copyFrom(transform.position); this[layer].scale.copyFrom(transform.scale); }
+            const hw = game.canvas.width / (2 * view.zoom), hh = game.canvas.height / (2 * view.zoom);
+            const inView = (x, y, r) => Math.abs(x - view.x) < hw + r && Math.abs(y - view.y) < hh + r;
+            const base = game.activeMap.type === 'indoor' ? .08 : .22, S = this.stats; S.neon = S.beams = S.underglow = 0;
+            // Neon signs: a coloured pool, radius 150 (the odd one buzzes)
+            // (cut by the walls and buildings round it, as Canvas shadows it: the pool falls on the street, not over the roof)
+            const walls = getOccluders(game.activeMap), live = new Set();
+            for (const s of game.neonSigns || []) {
+                if (!inView(s.x, s.y, 150)) continue;
+                const m = this.lit(s, 150, walls); live.add(s);
+                const u = m.shader.uniforms; u.rgb.set(rgbOf(s.color, [1, .4, .8])); u.alpha = Math.min(1, base * 1.5 * lampFlicker(s)); m.visible = true; S.neon++;
+            }
+            for (const [s, rec] of this.signs) { if (live.has(s)) continue; rec.mesh.visible = false; if (rec.seen < this.frame - 600) { rec.mesh.geometry.destroy(); rec.mesh.destroy(); this.signs.delete(s); } }
+            // Headlights: the car she drives, parked cars with their lamps on, up to six in traffic, bumper cars
+            const beams = [], beamOf = (owner, stat, color, haze) => {
+                const off = owner.length / 2;
+                beams.push({ owner, cx: owner.x + Math.cos(owner.angle) * off, cy: owner.y + Math.sin(owner.angle) * off, L: stat * 6, W: stat * 1.5, color, haze });
+            };
+            if (game.isDriving || (game.car && game.car.forceLights)) beamOf(game.car, game.car.lightRange || 60, game.car.headlightColor || '#ffffdd', game.isDriving ? 1 : 0);
+            for (const v of game.parkedCars ? game.parkedCars([]) : []) {
+                if ((v === game.car && v.forceLights) || !carLampsOn(v) || !inView(v.x, v.y, 260)) continue;
+                beamOf(v, 40, v.headlightColor || '#ffffee', .7);
+            }
+            let n = 0;
+            for (const v of game.traffic?.vehicles || []) {
+                if (n >= 6) break;
+                if (!v.visible || v.dead || v === game.car || !inView(v.x, v.y, 260)) continue;
+                n++; beamOf(v, 40, v.headlightColor || '#ffffee', .7);
+            }
+            if (game.bumperMinigame?.active) for (const car of game.bumperMinigame.cars) if (car !== game.bumperMinigame.playerCar) beamOf(car, car.lightRange || 60, car.headlightColor || car.bodyColor || '#ffffdd', 1);
+            for (const b of beams) {
+                const rgb = rgbOf(/^#[0-9a-f]{6}$/i.test(b.color) ? b.color : '#ffffdc', [1, 1, .86]);
+                this.beam('holes', b, [1, 1, 1], 1); S.beams++;
+                if (!b.haze) continue;
+                this.beam('colors', b, rgb, base * b.haze);
+                const nx = -Math.sin(b.owner.angle), ny = Math.cos(b.owner.angle), side = (b.owner.width || 22) * .35;
+                for (const sgn of [-1, 1]) this.disc('colors', b.cx + nx * side * sgn, b.cy + ny * side * sgn, 22, rgb, base * 2.2 * b.haze, .2);
+            }
+            // Underglow: each pool lights its own patch of street
+            const cars = new Set(game.traffic?.vehicles || []);
+            for (const v of [game.car, game.ownedCar, game.deliveryVehicle]) if (v) cars.add(v);
+            for (const v of cars) {
+                if (!v.glowColor || !v.visible || v.dead || !v.length || !inView(v.x, v.y, 80)) continue;
+                this.disc('holes', v.x, v.y, .5, [1, 1, 1], .55, .5, v.length + 32, v.width + 32, v.angle || 0); S.underglow++;
+            }
+            for (const layer of ['holes', 'colors']) { const list = this.pool[layer]; for (let i = this.used[layer]; i < list.length; i++) list[i].visible = false; }
+        }
+        show(colorPass) { this.holes.visible = !colorPass; this.colors.visible = colorPass; }
+        destroy() { for (const rec of this.signs.values()) rec.mesh.geometry.destroy(); this.signs.clear(); this.holes.destroy({ children: true }); this.colors.destroy({ children: true }); this.geometry.destroy(); }
+    }
+    return Pools;
+})();
         class GameEngine {
             constructor() {
                 

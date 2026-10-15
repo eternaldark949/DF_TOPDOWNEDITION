@@ -35,7 +35,7 @@ class NativeWebGLRenderer {
                 uniform sampler2D colorMap;uniform sampler2D reflectionMap;uniform float reflectionGain;
                 ${NATIVE_DAYLIGHT_GLSL}
                 uniform float colorGain;
-                uniform float nightTint;uniform float vision;
+                uniform float nightTint;uniform vec3 darkTint;uniform float vision;
                 uniform sampler2D veilMap;uniform float veilGain;uniform vec3 inverseWorld;uniform vec2 veilSize;uniform vec2 mapSize;
                 void main() {
                     vec4 scene = texture2D(uSampler, vTextureCoord);
@@ -51,7 +51,7 @@ class NativeWebGLRenderer {
                     veil*=inMap;
                     float darkAlpha=shade*(1.0-veil.a)+veil.a;
                     float reflectionLift=reflectionGain>0.0?1.0-texture2D(reflectionMap,screen/viewport).a*reflectionGain:1.0;darkAlpha*=reflectionLift;
-                    vec3 darkRGB=vec3(.086,.039,.188)*shade*nightTint*(1.0-veil.a)+veil.rgb;
+                    vec3 darkRGB=darkTint*shade*nightTint*(1.0-veil.a)+veil.rgb;
                     darkRGB*=reflectionLift;
                     darkAlpha*=1.-vision;darkRGB*=1.-vision;color*=1.-vision;
                     if(lightingOn<.5){darkAlpha=0.0;darkRGB=vec3(0.0);color=vec4(0.0);}
@@ -59,7 +59,7 @@ class NativeWebGLRenderer {
                     vec3 rgb=shaded+color.rgb*scene.a;
                     vec3 straight=rgb/max(.00001,scene.a);if(lightingOn>.5)straight=mix(straight,softSun(straight,vec3(1.)),.6*vision);
                     gl_FragColor = vec4(daylight(straight,screen)*scene.a,scene.a);
-                }`, {lightingOn:1,sunColor:new Float32Array(3),sunGrade:new Float32Array(4),sunDirection:new Float32Array(2),reflectionMap:PIXI.Texture.EMPTY,reflectionGain:0,viewport:new Float32Array(2),lightMap:PIXI.Texture.EMPTY,colorMap:PIXI.Texture.EMPTY,colorGain:0,nightTint:0,vision:0,veilMap:PIXI.Texture.EMPTY,veilGain:0,inverseWorld:new Float32Array(3),veilSize:new Float32Array([1,1]),mapSize:new Float32Array(2)});
+                }`, {lightingOn:1,sunColor:new Float32Array(3),sunGrade:new Float32Array(4),sunDirection:new Float32Array(2),reflectionMap:PIXI.Texture.EMPTY,reflectionGain:0,viewport:new Float32Array(2),lightMap:PIXI.Texture.EMPTY,colorMap:PIXI.Texture.EMPTY,colorGain:0,nightTint:0,darkTint:new Float32Array([.086,.039,.188]),vision:0,veilMap:PIXI.Texture.EMPTY,veilGain:0,inverseWorld:new Float32Array(3),veilSize:new Float32Array([1,1]),mapSize:new Float32Array(2)});
             this.lighting.padding = 0;
             this.world.filters = [this.lighting];
             this.world.filterArea = new PIXI.Rectangle(0,0,canvas.width,canvas.height);
