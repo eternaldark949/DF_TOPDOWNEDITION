@@ -21,8 +21,13 @@
             return draw.call(this,ctx,...args);
         };
     }
-    const liveHumanoid=drawProceduralHumanoid;
-    drawProceduralHumanoid=(ctx,e,c={})=>{if(ctx.nativeVector&&ctx===ctx.owner.peopleContext&&!ctx.owner.layers.contactShadows)c={...c,noShadow:true};return inBodyGroup(ctx,e,()=>{if(ctx.nativeVector&&ctx===ctx.owner.peopleContext&&ctx.owner.nativeCasters.capture(ctx,e,c,liveHumanoid))return;const result=liveHumanoid(ctx,e,c);if(ctx.nativeVector&&ctx===ctx.owner.peopleContext&&e)ctx.owner.nativeCasters.circle(e,ctx.globalAlpha);return result;});};
+    const liveHumanoid=drawProceduralHumanoid;window.__liveHumanoid=liveHumanoid;
+    // Bodies are GPU geometry: the character code draws onto the path builder (gl/pen.js, gl/people.js).
+    // Her glow and night vision's white-hot hostiles still capture through the vector context.
+    const penHumanoid=(ctx,e,c)=>ctx.nativeVector&&renderer.glPeople&&renderer.layers.glPeople!==false&&!SilhouetteFX.glow&&!(SilhouetteFX.heat>.01&&!c._crowdBake&&!c.isDriving)
+        ?renderer.glPeople.body(ctx,ctx.label+':'+(e?._glKey||(e&&(e._glKey=++penHumanoid.n)))+(c._crowdBake?':bake':''),pen=>liveHumanoid(pen,e,c)):liveHumanoid(ctx,e,c);
+    penHumanoid.n=0;
+    drawProceduralHumanoid=(ctx,e,c={})=>{if(ctx.nativeVector&&ctx===ctx.owner.peopleContext&&!ctx.owner.layers.contactShadows)c={...c,noShadow:true};return inBodyGroup(ctx,e,()=>{if(ctx.nativeVector&&ctx===ctx.owner.peopleContext&&ctx.owner.nativeCasters.capture(ctx,e,c,penHumanoid))return;const result=penHumanoid(ctx,e,c);if(ctx.nativeVector&&ctx===ctx.owner.peopleContext&&e)ctx.owner.nativeCasters.circle(e,ctx.globalAlpha);return result;});};
     const gunnerBody=GatlingGunner.prototype._drawGunnerBody;
     GatlingGunner.prototype._drawGunnerBody=function(ctx){
         if(ctx.nativeVector&&ctx===ctx.owner.peopleContext&&ctx.owner.nightHeat.wants(this)&&ctx.owner.nativeCasters.capture(ctx,this,{noShadow:true},(c,e)=>gunnerBody.call(e,c)))return;

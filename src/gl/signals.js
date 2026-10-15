@@ -13,7 +13,15 @@ class GLDynamic extends GLInstance {
         if (!this.geometry || built.index instanceof Uint32Array !== this.geometry.indexBuffer.data instanceof Uint32Array) {
             this.geometry?.destroy(); this.geometry = GLInstance.geometry(B);
         } else { this.geometry.buffers[0].update(built.data); this.geometry.indexBuffer.update(built.index); }
+        // Its extent (lines widen by their half width, joins up to twice that), for bounds queries
+        const d = built.data; let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        for (let o = 0, n = built.vertices * GLB_STRIDE; o < n; o += GLB_STRIDE) {
+            const w = Math.abs(d[o + 10]) * 2, x = d[o], y = d[o + 1];
+            if (x - w < x0) x0 = x - w; if (x + w > x1) x1 = x + w; if (y - w < y0) y0 = y - w; if (y + w > y1) y1 = y + w;
+        }
+        this.extent = [x0, y0, x1, y1];
     }
+    _calculateBounds() { const e = this.extent; if (e && this.visible) this._bounds.addFrameMatrix(this.worldTransform, e[0], e[1], e[2], e[3]); }
 }
 
 const GLSignals = (() => {

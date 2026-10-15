@@ -169,7 +169,7 @@ class NativeWebGLRenderer {
         if(!game.activeMap)return;
         this.bakeOrigins={};this.uploadGroups.clear();const start=performance.now(),beforeUploads=this.uploads,beforeBakes=this.bakes,beforeDraws=this.drawCalls,beforeBuffers=this.bufferBytes;
         this.settings={resolutionScale:GameSettings.resolutionScale,baseZoom:GameSettings.baseZoom,fpsLimit:GameSettings.fpsLimit};
-        this.frameId++;this.gpuTimer.poll();
+        this.frameId++;this.gpuTimer.poll();if(!this.glPeople)this.glPeople=new GLPeople();this.glPeople.begin();
         if(this.map!==game.activeMap){const mapStart=performance.now();this.buildMap(game);this.startup={mapBuildMs:performance.now()-mapStart,firstFrames:[],ready:false};}
         const w=game.canvas.width,h=game.canvas.height;
         if(this.renderer.screen.width!==w||this.renderer.screen.height!==h)this.renderer.resize(w,h);
