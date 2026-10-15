@@ -53,7 +53,7 @@ class NativeVectorContext {
     destroy(){this.releaseText();for(const n of this.pool)n.mask=null;for(const n of this.pool){if(n.parent)n.parent.removeChild(n);n.destroy();}this.root.destroy();for(const r of this.gradients){r.stage.destroy({children:true});r.texture.destroy(true);}this.gradients=[];this.pool=[];this.pools.clear();for(const t of this.images.values())this.owner.releaseImage(t);this.images.clear();for(const t of this.imageViews.values())t.destroy(false);this.imageViews.clear();}
     node(Type){let list=this.pools.get(Type);if(!list){list=[];list.used=0;this.pools.set(Type,list);}
         let n=list[list.used];if(!n){n=(Type===PIXI.BitmapText?new PIXI.BitmapText('',{fontName:'NativeDetailFont'}):new Type());list.push(n);this.pool.push(n);}list.used++;
-        n.visible=true;n.mask=null;this.container.addChild(n);if(n instanceof PIXI.Graphics)n.clear();else if(Type===PIXI.Container){n.removeChildren();n.zIndex=0;n._nativeEntity=null;}return n;
+        n.visible=true;n.mask=null;n._faceTag=this.faceTag;this.container.addChild(n);if(n instanceof PIXI.Graphics)n.clear();else if(Type===PIXI.Container){n.removeChildren();n.zIndex=0;n._nativeEntity=null;}return n;
     }
     hashValue(v){if(typeof v==='number'){this.hash=Math.imul(this.hash^Math.round(v*1024),16777619);return;}
         const text=String(v);for(let i=0;i<text.length;i++)this.hash=Math.imul(this.hash^text.charCodeAt(i),16777619);
@@ -117,7 +117,7 @@ class NativeVectorContext {
         const previous=this.path,part=this.part;this.beginPath();this.replay(path);const result=fn(this.path);this.path=previous;this.part=part;return result;
     }
     graphics(){const blend=this.globalCompositeOperation==='lighter'?PIXI.BLEND_MODES.ADD:this.globalCompositeOperation==='destination-out'?PIXI.BLEND_MODES.ERASE:this.globalCompositeOperation==='screen'?PIXI.BLEND_MODES.SCREEN:this.globalCompositeOperation==='multiply'?PIXI.BLEND_MODES.MULTIPLY:PIXI.BLEND_MODES.NORMAL;
-        if(!this.current||this.current.parent!==this.container||this.current.blendMode!==blend){this.current=this.node(PIXI.Graphics);this.current.blendMode=blend;}
+        if(!this.current||this.current.parent!==this.container||this.current.blendMode!==blend||this.current._faceTag!==this.faceTag){this.current=this.node(PIXI.Graphics);this.current.blendMode=blend;}
         return this.current;
     }
     polygons(g,path,hole=false){for(let i=0;i<path.length;i++){const p=path[i];if(p.points.length<6)continue;

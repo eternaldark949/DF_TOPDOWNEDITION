@@ -4725,7 +4725,7 @@ class NativeVectorContext {
     destroy(){this.releaseText();for(const n of this.pool)n.mask=null;for(const n of this.pool){if(n.parent)n.parent.removeChild(n);n.destroy();}this.root.destroy();for(const r of this.gradients){r.stage.destroy({children:true});r.texture.destroy(true);}this.gradients=[];this.pool=[];this.pools.clear();for(const t of this.images.values())this.owner.releaseImage(t);this.images.clear();for(const t of this.imageViews.values())t.destroy(false);this.imageViews.clear();}
     node(Type){let list=this.pools.get(Type);if(!list){list=[];list.used=0;this.pools.set(Type,list);}
         let n=list[list.used];if(!n){n=(Type===PIXI.BitmapText?new PIXI.BitmapText('',{fontName:'NativeDetailFont'}):new Type());list.push(n);this.pool.push(n);}list.used++;
-        n.visible=true;n.mask=null;this.container.addChild(n);if(n instanceof PIXI.Graphics)n.clear();else if(Type===PIXI.Container){n.removeChildren();n.zIndex=0;n._nativeEntity=null;}return n;
+        n.visible=true;n.mask=null;n._faceTag=this.faceTag;this.container.addChild(n);if(n instanceof PIXI.Graphics)n.clear();else if(Type===PIXI.Container){n.removeChildren();n.zIndex=0;n._nativeEntity=null;}return n;
     }
     hashValue(v){if(typeof v==='number'){this.hash=Math.imul(this.hash^Math.round(v*1024),16777619);return;}
         const text=String(v);for(let i=0;i<text.length;i++)this.hash=Math.imul(this.hash^text.charCodeAt(i),16777619);
@@ -4789,7 +4789,7 @@ class NativeVectorContext {
         const previous=this.path,part=this.part;this.beginPath();this.replay(path);const result=fn(this.path);this.path=previous;this.part=part;return result;
     }
     graphics(){const blend=this.globalCompositeOperation==='lighter'?PIXI.BLEND_MODES.ADD:this.globalCompositeOperation==='destination-out'?PIXI.BLEND_MODES.ERASE:this.globalCompositeOperation==='screen'?PIXI.BLEND_MODES.SCREEN:this.globalCompositeOperation==='multiply'?PIXI.BLEND_MODES.MULTIPLY:PIXI.BLEND_MODES.NORMAL;
-        if(!this.current||this.current.parent!==this.container||this.current.blendMode!==blend){this.current=this.node(PIXI.Graphics);this.current.blendMode=blend;}
+        if(!this.current||this.current.parent!==this.container||this.current.blendMode!==blend||this.current._faceTag!==this.faceTag){this.current=this.node(PIXI.Graphics);this.current.blendMode=blend;}
         return this.current;
     }
     polygons(g,path,hole=false){for(let i=0;i<path.length;i++){const p=path[i];if(p.points.length<6)continue;
@@ -59892,19 +59892,21 @@ Object.assign(NativeWebGLRenderer.prototype,{
 class NativeProjectedMesh extends PIXI.Mesh {
     static shader(){
         return NativeProjectedMesh._shader||(NativeProjectedMesh._shader=PIXI.Shader.from(`precision highp float;
-            attribute vec2 aGround;attribute vec2 aZ;attribute vec4 aColor;attribute vec2 aUV;
-            uniform mat3 projectionMatrix;uniform mat3 translationMatrix;uniform vec2 cam;uniform float camH;
+            attribute vec2 aGround;attribute vec2 aZ;attribute vec4 aColor;attribute vec2 aUV;attribute vec4 aFace;
+            uniform mat3 projectionMatrix;uniform mat3 translationMatrix;uniform vec2 cam;uniform float camH;uniform float uCull;
             varying vec4 vColor;varying vec2 vUV;
             void main(){vec2 k=camH/max(vec2(1.),camH-aZ);vec2 p=cam+(aGround-cam)*k;vColor=aColor;vUV=aUV;
-                gl_Position=vec4((projectionMatrix*translationMatrix*vec3(p,1.)).xy,0.,1.);}`,
+                gl_Position=vec4((projectionMatrix*translationMatrix*vec3(p,1.)).xy,0.,1.);
+                // Facade faces are back-face culled here, with the building code's own facing test.
+                if(aFace.w*uCull>.5&&dot(cam,aFace.xy)<=aFace.z)gl_Position=vec4(2.,2.,2.,1.);}`,
             `precision mediump float;varying vec4 vColor;varying vec2 vUV;uniform sampler2D uSampler;uniform vec3 uPulse;
             void main(){gl_FragColor=texture2D(uSampler,vUV)*vColor*(1.-uPulse.x*(.5+.5*sin(uPulse.y*2.7+gl_FragCoord.x*uPulse.z)));}`,
-            {uSampler:PIXI.Texture.WHITE,cam:new Float32Array(2),camH:1,uPulse:new Float32Array(3)}));
+            {uSampler:PIXI.Texture.WHITE,cam:new Float32Array(2),camH:1,uCull:1,uPulse:new Float32Array(3)}));
     }
     constructor(run){
         const n=run.z.length/2,g=new PIXI.Geometry()
             .addAttribute('aGround',new Float32Array(run.ground),2).addAttribute('aZ',new Float32Array(run.z),2)
-            .addAttribute('aColor',new Float32Array(run.color),4).addAttribute('aUV',new Float32Array(run.uv),2)
+            .addAttribute('aColor',new Float32Array(run.color),4).addAttribute('aUV',new Float32Array(run.uv),2).addAttribute('aFace',new Float32Array(run.face),4)
             .addIndex(n>65535?new Uint32Array(run.index):new Uint16Array(run.index));
         super(g,NativeProjectedMesh.shader());this.projTexture=run.texture;this.blendMode=run.blend;this.vertexCount=n;
     }
@@ -59943,9 +59945,23 @@ class NativeProjectedMesh extends PIXI.Mesh {
     // tessellation). Both capture passes author the same points in the same order, so lean is
     // measured on these; tessellated vertices, whose count can change with the nudge (a stroke
     // join flipping between mitre and bevel), take the lean of their nearest authored point.
-    function anchors(item){
+    // Both passes' anchors, shape for shape. A shape present in only one pass (detail a routine
+    // skips when it is nearly edge-on to the camera) is left out; its vertices take the lean of
+    // the nearest paired point. Shapes are aligned by a longest-common-subsequence over their
+    // signatures (point count, fill or stroke, colour, width).
+    function pairedAnchors(a,b){
+        const A=a.node.geometry.graphicsData,B=b.node.geometry.graphicsData;
+        if(A.length===B.length){const la=anchors(a),lb=anchors(b);if(!la||!lb||la.length===lb.length)return [la,lb];}
+        const sig=d=>(d.shape.points?.length??d.shape.type)+(d.lineStyle?.visible?'L'+d.lineStyle.width.toFixed(2)+':'+d.lineStyle.color:'F'+d.fillStyle.color)+':'+(d.holes?.length||0);
+        const sa=A.map(sig),sb=B.map(sig),n=sa.length,m=sb.length;if(n*m>4e6)return [null,null];
+        const L=new Uint16Array((n+1)*(m+1));
+        for(let i=n-1;i>=0;i--)for(let j=m-1;j>=0;j--)L[i*(m+1)+j]=sa[i]===sb[j]?L[(i+1)*(m+1)+j+1]+1:Math.max(L[(i+1)*(m+1)+j],L[i*(m+1)+j+1]);
+        const ka=[],kb=[];for(let i=0,j=0;i<n&&j<m;){if(sa[i]===sb[j]){ka.push(A[i]);kb.push(B[j]);i++;j++;}else if(L[(i+1)*(m+1)+j]>=L[i*(m+1)+j+1])i++;else j++;}
+        return [anchors(a,ka),anchors(b,kb)];
+    }
+    function anchors(item,list=item.node.geometry.graphicsData){
         const m=item.m,out=[];
-        for(const d of item.node.geometry.graphicsData){
+        for(const d of list){
             const s=d.shape,pts=s.points||(s.type===PIXI.SHAPES.RECT?[s.x,s.y,s.x+s.width,s.y,s.x+s.width,s.y+s.height,s.x,s.y+s.height]:null);
             if(!pts)return null;const t=d.matrix;
             for(let i=0;i<pts.length;i+=2){let x=pts[i],y=pts[i+1];if(t){const X=t.a*x+t.c*y+t.tx;y=t.b*x+t.d*y+t.ty;x=X;}out.push(m.a*x+m.c*y+m.tx,m.b*x+m.d*y+m.ty);}
@@ -59966,19 +59982,48 @@ class NativeProjectedMesh extends PIXI.Mesh {
             return best;
         };
     }
+    // Facing plane of a building face as (nx, ny, c, 1): visible while dot(cam, n) > c, the same
+    // test as building-v2 _visibleFaces. Untagged geometry gets (0,0,0,0) and is always drawn.
+    function facePlane(f){
+        if(!f)return [0,0,0,0];
+        switch(f.side){case 'S':return [0,1,f.y1,1];case 'N':return [0,-1,-f.y1,1];case 'E':return [1,0,f.x1,1];case 'W':return [-1,0,-f.x1,1];
+            default:return [f.nx,f.ny,f.nx*(f.x1+f.x2)/2+f.ny*(f.y1+f.y2)/2,1];}
+    }
+    // During a capture a building's faces are all drawn, as a list whose iteration tags what each
+    // face draws with that face (ctx.faceTag); the shader then culls back faces per camera, so the
+    // capture holds for every camera position. Derived lists (filter/map) tag the same way.
+    let tagging=null;
+    class FaceList extends Array{
+        static get [Symbol.species](){return FaceList;}
+        [Symbol.iterator](){
+            const list=this,ctx=tagging,prev=ctx?.faceTag;let i=0;
+            return {next(){if(i<list.length){const f=list[i++];if(ctx)ctx.faceTag=f&&typeof f==='object'&&f.side&&Number.isFinite(f.x1)?f:prev;return {value:f,done:false};}
+                    if(ctx)ctx.faceTag=prev;return {value:undefined,done:true};},
+                return(){if(ctx)ctx.faceTag=prev;return {value:undefined,done:true};},[Symbol.iterator](){return this;}};
+        }
+    }
+    function withAllFaces(b,ctx,fn){
+        if(!b||typeof b._leanFaces!=='function'||typeof b._visibleFaces!=='function')return fn();
+        const own=Object.hasOwn(b,'_visibleFaces'),method=b._visibleFaces;
+        b._visibleFaces=()=>FaceList.from(b._leanFaces());tagging=ctx;
+        try{return fn();}finally{tagging=null;ctx.faceTag=undefined;if(own)b._visibleFaces=method;else delete b._visibleFaces;}
+    }
     // Flattened triangles of one node: world positions, premultiplied colours, uvs, indices, texture.
     function triangles(item){
         const n=item.node,m=item.m,tint=n.tint??0xffffff,tr=(tint>>16&255)/255,tg=(tint>>8&255)/255,tb=(tint&255)/255,al=item.alpha;
         if(n instanceof PIXI.Graphics){
             const g=n.geometry;g.updateBatches();if(!g.batches.length)return [];
-            const pts=g.points,cols=g.colors,uvs=g.uvs,idx=g.indices,out=[];
+            const pts=g.points,uvs=g.uvs,idx=g.indices,out=[];
             for(const b of g.batches){
+                // One style per batch. Its colour is taken from the style: small (batchable) geometries
+                // never fill GraphicsGeometry.colors, Pixi tints them per batch at draw time.
                 const tex=b.style.texture,base=tex.baseTexture,piece={base,tex,pos:[],color:[],uv:[],index:[]},map=new Map();
+                const [sr,sg,sb]=PIXI.Color.shared.setValue(b.style.color).toRgbArray(),sa=b.style.alpha*al;
                 for(let i=b.start;i<b.start+b.size;i++){
                     const v=idx[i];let j=map.get(v);
-                    if(j===undefined){j=piece.pos.length/2;map.set(v,j);const x=pts[v*2],y=pts[v*2+1],c=cols[v],a=(c>>>24)/255*al;
+                    if(j===undefined){j=piece.pos.length/2;map.set(v,j);const x=pts[v*2],y=pts[v*2+1];
                         piece.pos.push(m.a*x+m.c*y+m.tx,m.b*x+m.d*y+m.ty);
-                        piece.color.push((c&255)/255*tr*al,(c>>8&255)/255*tg*al,(c>>16&255)/255*tb*al,a);piece.uv.push(uvs[v*2],uvs[v*2+1]);}
+                        piece.color.push(sr*tr*sa,sg*tg*sa,sb*tb*sa,sa);piece.uv.push(uvs[v*2],uvs[v*2+1]);}
                     piece.index.push(j);
                 }
                 out.push(piece);
@@ -59994,7 +60039,7 @@ class NativeProjectedMesh extends PIXI.Mesh {
 
     Object.assign(NativeWebGLRenderer.prototype,{
         /** Draw `draw` into ctxA (and ctxB at a nudged camera); returns a container of projected meshes, or null. */
-        captureProjected(ctxA,ctxB,draw,D=NUDGE){
+        captureProjected(ctxA,ctxB,draw,D=NUDGE,b=null){
             const cam=game.camera,cx=cam.x,cy=cam.y,C=leanCamHeight();
             // Captures take text through the real-font sprite path, which the projector can lean.
             ctxA.retainedOff=ctxB.retainedOff=ctxA.textSprites=ctxB.textSprites=true;
@@ -60002,8 +60047,8 @@ class NativeProjectedMesh extends PIXI.Mesh {
             // camera move never forces a recapture (building routines cull to game._cullBounds.view).
             const cull=game._cullBounds;if(cull)game._cullBounds={...cull,view:{left:-Infinity,top:-Infinity,right:Infinity,bottom:Infinity}};
             try{
-                const tape={record:true,list:[],i:0};ctxA.segTape=tape;ctxA.begin();draw(ctxA);
-                tape.record=false;ctxB.segTape=tape;cam.x=cx+D;cam.y=cy+D;try{ctxB.begin();draw(ctxB);}finally{cam.x=cx;cam.y=cy;}
+                const tape={record:true,list:[],i:0};ctxA.segTape=tape;ctxA.begin();withAllFaces(b,ctxA,()=>draw(ctxA));
+                tape.record=false;ctxB.segTape=tape;cam.x=cx+D;cam.y=cy+D;try{ctxB.begin();withAllFaces(b,ctxB,()=>draw(ctxB));}finally{cam.x=cx;cam.y=cy;}
                 if(tape.i!==tape.list.length)this.projectionFail='tape';
             }finally{ctxA.retainedOff=ctxB.retainedOff=ctxA.textSprites=ctxB.textSprites=false;ctxA.segTape=ctxB.segTape=null;game._cullBounds=cull;}
             const fail=why=>{this.projectionFail=why;return null;};
@@ -60016,9 +60061,9 @@ class NativeProjectedMesh extends PIXI.Mesh {
                 const flush=()=>{for(const r of runs)if(r.index.length){const mesh=new NativeProjectedMesh(r);box.addChild(mesh);vertices+=mesh.vertexCount;}runs.length=0;run=null;};
                 const project=(a,b,into)=>{
                     if(a.node.constructor!==b.node.constructor)return 'type';
-                    const pa=triangles(a);let lean;
+                    const pa=triangles(a),plane=facePlane(a.node._faceTag);let lean;
                     if(a.node instanceof PIXI.Graphics){
-                        const la=anchors(a),lb=anchors(b);if(!la||!lb)return 'shape';if(la.length!==lb.length)return 'anchors '+la.length+'/'+lb.length;
+                        const [la,lb]=pairedAnchors(a,b);if(!la||!lb)return 'shape';if(la.length!==lb.length)return 'anchors '+la.length+'/'+lb.length;
                         const near=nearest(la);lean=(x,y)=>{const p=near(x,y);return p<0?null:[1-(lb[p]-la[p])/D,1-(lb[p+1]-la[p+1])/D];};
                     }else{
                         const pb=triangles(b);if(pa.length!==pb.length)return 'batches';
@@ -60026,7 +60071,7 @@ class NativeProjectedMesh extends PIXI.Mesh {
                     }
                     for(let p=0;p<pa.length;p++){
                         const qa=pa[p],blend=a.node.blendMode;
-                        if(!into.run||into.run.base!==qa.base||into.run.blend!==blend){into.run={base:qa.base,texture:qa.base===PIXI.Texture.WHITE.baseTexture?PIXI.Texture.WHITE:new PIXI.Texture(qa.base),blend,ground:[],z:[],color:[],uv:[],index:[]};into.runs.push(into.run);}
+                        if(!into.run||into.run.base!==qa.base||into.run.blend!==blend){into.run={base:qa.base,texture:qa.base===PIXI.Texture.WHITE.baseTexture?PIXI.Texture.WHITE:new PIXI.Texture(qa.base),blend,ground:[],z:[],color:[],uv:[],face:[],index:[]};into.runs.push(into.run);}
                         const r=into.run,offset=r.z.length/2;
                         for(let v=0;v<qa.pos.length;v+=2){
                             const ax=qa.pos[v],ay=qa.pos[v+1],k=lean(ax,ay,p,v);if(!k)return 'anchor';const [kx,ky]=k;
@@ -60035,7 +60080,7 @@ class NativeProjectedMesh extends PIXI.Mesh {
                             // features with an axis-specific lean (landmark crowns, facade foreshortening) don't.
                             if(kx<.25||kx>8||ky<.25||ky>8)return 'lean '+kx.toFixed(3)+','+ky.toFixed(3);
                             const dev=Math.abs(kx-ky);if(dev>deviation)deviation=dev;
-                            r.ground.push(cx+(ax-cx)/kx,cy+(ay-cy)/ky);r.z.push(C*(1-1/kx),C*(1-1/ky));
+                            r.ground.push(cx+(ax-cx)/kx,cy+(ay-cy)/ky);r.z.push(C*(1-1/kx),C*(1-1/ky));r.face.push(...plane);
                         }
                         r.color.push(...qa.color);r.uv.push(...qa.uv);for(const j of qa.index)r.index.push(j+offset);
                     }
@@ -60067,9 +60112,8 @@ class NativeProjectedMesh extends PIXI.Mesh {
         },
         // Which faces a camera can see changes the drawing itself; recapture when it changes.
         projectionRegion(b,cam){
-            let faces='';try{if(b._visibleFaces)faces=b._visibleFaces(cam).map(f=>f.side+Math.round(f.x1)+','+Math.round(f.y1)).join(';');}catch(e){faces='?';}
             const x0=b.x,y0=b.y,x1=b.x+(b.w||b.width||0),y1=b.y+(b.h||b.height||0);
-            return (cam.x<x0?0:cam.x>x1?2:1)+':'+(cam.y<y0?0:cam.y>y1?2:1)+':'+faces;
+            return (cam.x<x0?0:cam.x>x1?2:1)+':'+(cam.y<y0?0:cam.y>y1?2:1);
         },
         /** One building layer through the projector. Returns false to make the caller draw it live. */
         syncProjectedLayer(r,slot,ctx,common,b,draw,game,view){
@@ -60082,7 +60126,7 @@ class NativeProjectedMesh extends PIXI.Mesh {
             if(p.fail===key&&!far)return false;
             const start=performance.now();
             p.ctxB||(p.ctxB=new NativeVectorContext(this));p.ctxB.sceneFrame=ctx.sceneFrame;p.ctxB.canvas=ctx.canvas;
-            let box=this.captureProjected(ctx,p.ctxB,draw);if(!box&&/^lean|^nodes|^type|^batches|^anchors|^clip/.test(this.projectionFail||''))box=this.captureProjected(ctx,p.ctxB,draw,-NUDGE);this.projectionStats.captureMs+=performance.now()-start;
+            let box=this.captureProjected(ctx,p.ctxB,draw,NUDGE,b);if(!box&&/^lean|^nodes|^type|^batches|^anchors|^clip/.test(this.projectionFail||''))box=this.captureProjected(ctx,p.ctxB,draw,-NUDGE,b);this.projectionStats.captureMs+=performance.now()-start;
             if(p.box){p.box.destroy({children:true});p.box=null;}
             p.cx=cam.x;p.cy=cam.y;
             if(!box){p.fail=key;p.key=null;this.projectionStats.fallbacks++;return false;}
