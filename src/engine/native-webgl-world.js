@@ -17,7 +17,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
     },
     clearWorld(){
         if(!this.glBuildings)return;
-        this.glBuildings?.clear();this.glGround?.clear();
+        this.glBuildings?.clear();if(this.glGround&&!this.glGround.root.destroyed)this.glGround.clear();
         this.surfaces.clear();
         if(this.playerSprite)this.objects.addChild(this.playerSprite);for(const r of this.fixtureNodes.values())this.fixtures.addChild(r.node);
         this.presentation.clear();this.nightHeat.clear();this.nativeCasters.clear();
@@ -61,17 +61,21 @@ Object.assign(NativeWebGLRenderer.prototype,{
         let people=0,vehicles=0,buildings=0;
         const ground=this.groundContext;ground.begin();
         // The city's ground is native GPU geometry (gl/ground.js), built once for the map
-        if(!this.glGround)this.glGround=new GLGround(this,this.floorArt,this.floorArt.getChildIndex(ground.root));
+        if(!this.glGround||this.glGround.root.destroyed)this.glGround=new GLGround(this,this.floorArt,this.floorArt.getChildIndex(ground.root));   // (the floor art is emptied with each map)
         if(game.groundBaker?.activeFor(map)&&L.floor)this.glGround.sync(game,bounds);else this.glGround.hide();
         timings.groundMs=performance.now()-lap;lap=performance.now();
-        const foliage=this.foliageContext;foliage.begin();
+        const foliage=this.foliageContext;foliage.begin();if(this.flora)this.flora.list.length=0;
         const street=this.streetContext;street.begin();if(L.streetDetails){
             if(map.foliage){
                 // Same spatial query and density stride as Canvas's foliage pass (engine/draw.js).
                 const scale=GameSettings.getFoliageScale(),stride=scale<1?Math.round(1/scale):1,wind=game.weather?game.weather.wind:.3,dir=game.weather?game.weather.windDirection:1;
-                for(const {item:f,index}of game._queryRenderFoliage({left:bounds.left-140,right:bounds.right+140,top:bounds.top-140,bottom:bounds.bottom+140},this.foliageCandidates||(this.foliageCandidates=[]))){
-                    if(stride>1&&index%stride!==0)continue;if(visible(f,140))f.draw(foliage,wind,dir,_gameTimeSec);
+                // Each plant is its kind's GPU geometry, swayed by the wind (gl/flora.js)
+                const plants=[];for(const {item:f,index}of game._queryRenderFoliage({left:bounds.left-140,right:bounds.right+140,top:bounds.top-140,bottom:bounds.bottom+140},this.foliageCandidates||(this.foliageCandidates=[]))){
+                    if(stride>1&&index%stride!==0)continue;if(visible(f,140))plants.push(f);
                 }
+                if(!this.flora||this.flora.destroyed)this.flora=new GLFlora();
+                if(this.flora.parent!==this.world||this.world.getChildIndex(this.flora)!==this.world.getChildIndex(foliage.root)-1){this.flora.parent?.removeChild(this.flora);this.world.addChildAt(this.flora,this.world.getChildIndex(foliage.root));}
+                this.flora.sync(plants,wind,dir,_gameTimeSec,_sunShadow.on);
             }
             if(game.leafParticles)game.leafParticles.draw(foliage);   // drifting leaves and petals, with or without trees
             for(const s of game.neonSigns||[])if(visible(s,150))s.draw(street,_frameTime);
