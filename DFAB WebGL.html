@@ -59112,19 +59112,18 @@ Object.assign(NativeWebGLRenderer.prototype,{
         for(const lamp of live){
             const inView=lamp.visible!==false&&Math.abs(lamp.x-v.x)<=game.canvas.width/(2*v.zoom)+160&&Math.abs(lamp.y-v.y)<=game.canvas.height/(2*v.zoom)+160;
             let r=this.fixtureNodes.get(lamp);if(!inView){if(r)r.node.visible=false;continue;}
-            const key=lamp.lampType+':'+lamp.color;let assets=this.fixtureAssets.get(key);
-            if(!assets){assets=[];
-                for(const on of [false,true])assets.push(this.bake(192,192,c=>{
-                    const saved={angle:lamp.angle,k:lamp._lightK,forced:lamp._forcedOff,visible:lamp.visible,lod:_zoomLOD};
-                    try{lamp.angle=0;lamp._lightK=1;lamp._forcedOff=false;lamp.visible=true;_zoomLOD=1;c.translate(96-lamp.x,96-lamp.y);lamp.draw(c,on?0:1);}
-                    finally{lamp.angle=saved.angle;lamp._lightK=saved.k;lamp._forcedOff=saved.forced;lamp.visible=saved.visible;_zoomLOD=saved.lod;}
-                },'fixture'));this.fixtureAssets.set(key,assets);}
-            if(!r){r={node:new PIXI.Container(),off:new PIXI.Sprite(),on:new PIXI.Sprite(),particles:new PIXI.Graphics()};for(const s of [r.off,r.on]){s.anchor.set(.5);r.node.addChild(s);}r.node.addChild(r.particles);this.fixtures.addChild(r.node);this.fixtureNodes.set(lamp,r);}
+            if(!this.glLamps)this.glLamps=new GLLamps();
+            if(!r){r={node:new PIXI.Container(),body:new PIXI.Container(),parts:[],particles:new PIXI.Graphics()};r.node.addChild(r.body,r.particles);this.fixtures.addChild(r.node);this.fixtureNodes.set(lamp,r);}
             r.node.visible=true;r.node.zIndex=lamp.y;r.particles.clear();const dots=r.particles;
             lamp._lightK=game.roomSystem.lampLight(lamp)*lampFlicker(lamp);lamp._forcedOff=lamp._lightK<.02;
             const room=game.roomSystem.rooms[lamp._roomId],sky=room?room.type==='outdoor':game.activeMap.type==='outdoor',on=!lamp._forcedOff&&(!sky||day.lampsOn),k=on?Math.min(1,lamp._lightK):0;
-            r.off.texture=assets[0];r.on.texture=assets[1];r.off.visible=k<1;r.on.visible=k>0;r.on.alpha=k;
-            for(const s of [r.off,r.on]){s.position.set(lamp.x,lamp.y);s.rotation=lamp.angle||0;}
+            // the lamp's body: GPU geometry pieces (gl/lamps.js), each faded as Canvas fades its sprites
+            const pieces=this.glLamps.body(lamp,on,k),postScale=LAMP_TYPE_STYLE[lamp.lampType]?LAMP_POST_SCALE:1;
+            r.body.position.set(lamp.x,lamp.y);r.body.rotation=lamp.angle||0;r.body.scale.set(postScale);
+            for(let i=0;i<Math.max(pieces.length,r.parts.length);i++){
+                let part=r.parts[i];if(!part&&pieces[i]){part=r.parts[i]=new GLInstance();r.body.addChild(part);}
+                if(pieces[i]){part.geometry=pieces[i][0];part.alpha=pieces[i][1];part.visible=true;}else part.visible=false;
+            }
             if(on&&_zoomLOD<1){
                 const style=LAMP_TYPE_STYLE[lamp.lampType],bulbs=style?LAMP_STYLES[style].bulbs:[{x:0,y:0}];
                 const time=((this.layers.decorAnimation?_frameTime:0)+lamp.animOffset)/1000;
@@ -59577,7 +59576,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         if(game.groundBaker?.activeFor(map)&&L.floor)this.glGround.sync(game,bounds);else this.glGround.hide();
         timings.groundMs=performance.now()-lap;lap=performance.now();
         const foliage=this.foliageContext;foliage.begin();if(this.flora)this.flora.list.length=0;
-        const street=this.streetContext;street.begin();if(L.streetDetails){
+        const street=this.streetContext;street.begin();if(this.neonSigns&&!this.neonSigns.destroyed)this.neonSigns.visible=!!L.streetDetails;if(this.glSignals&&!L.streetDetails)this.glSignals.hide();if(L.streetDetails){
             if(map.foliage){
                 // Same spatial query and density stride as Canvas's foliage pass (engine/draw.js).
                 const scale=GameSettings.getFoliageScale(),stride=scale<1?Math.round(1/scale):1,wind=game.weather?game.weather.wind:.3,dir=game.weather?game.weather.windDirection:1;
@@ -59590,8 +59589,14 @@ Object.assign(NativeWebGLRenderer.prototype,{
                 this.flora.sync(plants,wind,dir,_gameTimeSec,_sunShadow.on);
             }
             if(game.leafParticles)game.leafParticles.draw(foliage);   // drifting leaves and petals, with or without trees
-            for(const s of game.neonSigns||[])if(visible(s,150))s.draw(street,_frameTime);
-            if(map.type==='outdoor')game.traffic?.drawSignals(street,bounds,map.crosswalks);
+            // neon signs: their lettering as distance-field text on the GPU (gl/signs.js)
+            if(!this.neonSigns||this.neonSigns.destroyed)this.neonSigns=new GLNeonSigns();
+            if(this.neonSigns.parent!==this.world||this.world.getChildIndex(this.neonSigns)!==this.world.getChildIndex(street.root)+1){this.neonSigns.parent?.removeChild(this.neonSigns);this.world.addChildAt(this.neonSigns,this.world.getChildIndex(street.root)+1);}
+            this.neonSigns.sync((game.neonSigns||[]).filter(s=>visible(s,150)),_frameTime);
+            // the junction lights: ground and glow, GPU geometry rewritten each frame (gl/signals.js)
+            if(!this.glSignals||this.glSignals.ground.destroyed)this.glSignals=new GLSignals();
+            {const sg=this.glSignals.ground;if(sg.parent!==this.world||this.world.getChildIndex(sg)!==this.world.getChildIndex(this.neonSigns)+1){sg.parent?.removeChild(sg);this.world.addChildAt(sg,this.world.getChildIndex(this.neonSigns)+1);}}
+            if(map.type==='outdoor')this.glSignals.sync(game.traffic,bounds,map.crosswalks,L.glows?game.getAmbientDarkness():0,_frameTime);else this.glSignals.hide();
             game.drawDeliveryPackage(street,bounds);game.drawDropZone(street,bounds);
         }
         timings.streetMs=performance.now()-lap;lap=performance.now();
@@ -59634,7 +59639,20 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.buildingBaseStage.sortableChildren=this.roofStage.sortableChildren=!!L.depthSort;
         this.roofDetailContext.root.zIndex=Infinity;
         if(L.depthSort){this.buildingBaseStage.sortChildren();this.roofStage.sortChildren();}
-        if(L.glows&&L.fixtures)for(const lamp of game.lamps||[])if(visible(lamp,180))lamp.drawEmissive?.(glow,game.dayCycle().daylight);
+        // the lamps' luminous panes and bloom, above the dark: GPU geometry (gl/lamps.js)
+        if(!this.lampEmission||this.lampEmission.destroyed){this.lampEmission=new PIXI.Container();this.lampEmissionParts=[];}
+        if(this.lampEmission.parent!==this.emissive||this.emissive.getChildIndex(this.lampEmission)!==this.emissive.getChildIndex(glow.root)+1){this.emissive.removeChild(this.lampEmission);this.emissive.addChildAt(this.lampEmission,this.emissive.getChildIndex(glow.root)+1);}
+        {let n=0;const daylight=game.dayCycle().daylight,parts=this.lampEmissionParts;
+            if(L.glows&&L.fixtures&&daylight<.2)for(const lamp of game.lamps||[]){
+                const k=Math.max(0,Math.min(1,lamp._lightK??1));
+                if(!lamp.visible||lamp._forcedOff||k<.02||!visible(lamp,180))continue;
+                if(!this.glLamps)this.glLamps=new GLLamps();
+                const g=this.glLamps.emission(lamp);if(!g)continue;
+                let part=parts[n];if(!part){part=parts[n]=new GLInstance();this.lampEmission.addChild(part);}n++;
+                part.geometry=g;part.alpha=k;part.visible=true;part.position.set(lamp.x,lamp.y);part.rotation=lamp.angle||0;part.scale.set(LAMP_POST_SCALE);
+            }
+            for(let i=n;i<parts.length;i++)parts[i].visible=false;}
+        if(this.glSignals&&!this.glSignals.glow.destroyed){const sg=this.glSignals.glow;if(sg.parent!==this.emissive||this.emissive.getChildIndex(sg)!==this.emissive.getChildIndex(this.lampEmission)+1){sg.parent?.removeChild(sg);this.emissive.addChildAt(sg,this.emissive.getChildIndex(this.lampEmission)+1);}}
         this.roofStage.visible=this.buildingBaseStage.visible=L.buildings;
         for(const ctx of [street,traffic,actors,glow,roofs,foliage,this.occupantContext]){
             const used=new Set(ctx.pool.filter(n=>n.visible&&n instanceof PIXI.Sprite).map(n=>n.texture.baseTexture));
@@ -65446,6 +65464,343 @@ const GLFlora = (() => {
         destroy() { for (const g of this.kinds.values()) g.destroy(); for (const g of this.pools.values()) g.destroy(); this.kinds.clear(); this.pools.clear(); super.destroy(); }
     }
     return Layer;
+})();
+// GL engine: lamps. Every lamp (the antique street posts, wall lamps, floor lamps, wall strips)
+// is GPU geometry built once per style, colour and lit state from the same painting Canvas
+// bakes into its sprites (entities/lamps.js): the fluted cast-iron foot, the scrolled arms, the
+// hexagonal lanterns, and the soft glow behind each bulb. The luminous panes and their bloom,
+// drawn above the night's darkness, are geometry too. A lamp is a few instances of these pieces,
+// each faded with the room's light the way Canvas fades its sprites.
+
+/** One draw of a shared GPU geometry under this object's transform and alpha, with the building shader */
+class GLInstance extends PIXI.Container {
+    constructor(geometry = null) { super(); this.geometry = geometry; }
+    _render(renderer) {
+        const g = this.geometry;
+        if (!g || !g.buffers || this.worldAlpha <= 0.002) return;
+        renderer.batch.flush();
+        const shader = GLBuildingMesh.shader(), u = shader.uniforms, F = GLBuildingMesh.frame;
+        u.uH = 0;
+        if (F) { u.uCam[0] = F.cam[0]; u.uCam[1] = F.cam[1]; u.uC = F.C; u.uLod = F.lod; u.uTime = F.time; u.uPx = F.px; u.uSun = F.sun; u.uSunRGB = F.sunRGB; u.uNight = F.night; u.uFont = F.font || PIXI.Texture.WHITE; }
+        u.uRim = GLBuildingMesh.noRim; u.uAlpha = this.worldAlpha; u.uFade = 1;
+        u.translationMatrix = this.worldTransform.toArray(true);
+        renderer.state.set(this.state || GLInstance.state); renderer.shader.bind(shader); renderer.geometry.bind(g, shader); renderer.geometry.draw(PIXI.DRAW_MODES.TRIANGLES);
+    }
+}
+GLInstance.state = Object.assign(PIXI.State.for2d(), { blend: true });
+/** A finished GLBuildingBuilder as a PIXI geometry with the building shader's attributes */
+GLInstance.geometry = B => {
+    const built = B.finish(), buf = new PIXI.Buffer(built.data, true, false), S = GLB_STRIDE * 4, g = new PIXI.Geometry();
+    let o = 0; const attr = (name, size) => { g.addAttribute(name, buf, size, false, PIXI.TYPES.FLOAT, S, o * 4); o += size; };
+    attr('aPos', 3); attr('aPrev', 3); attr('aNext', 3); attr('aLine', 4); attr('aColor', 4); attr('aMeta', 4); attr('aAnim', 4); attr('aText', 4); attr('aFace', 4);
+    g.addIndex(built.index); g.vertices = built.vertices;
+    return g;
+};
+
+const GLLamps = (() => {
+    const P = (x, y) => [x, y, 0, 0];
+    const stopColor = (stops, t) => {
+        t = Math.max(0, Math.min(1, t));
+        for (let i = 1; i < stops.length; i++) if (t <= stops[i][0]) {
+            const [t0, c0] = stops[i - 1], [t1, c1] = stops[i], f = t1 > t0 ? (t - t0) / (t1 - t0) : 0, a = GLColor.parse(c0), b = GLColor.parse(c1);
+            const al = a[3] + (b[3] - a[3]) * f;                               // (Canvas interpolates premultiplied)
+            return al > 0 ? [0, 1, 2].map(k => (a[k] * a[3] + (b[k] * b[3] - a[k] * a[3]) * f) / al).concat(al) : [0, 0, 0, 0];
+        }
+        return GLColor.parse(stops[stops.length - 1][1]);
+    };
+    /** A disc filled with Canvas's two-circle radial gradient, as a coloured fan (sx, sy stretch it) */
+    function radial(B, cx, cy, r, x0, y0, r0, x1, y1, r1, stops, rings = 6, segs = 28, sx = 1, sy = 1) {
+        const tAt = (x, y) => {
+            const cdx = x1 - x0, cdy = y1 - y0, dr = r1 - r0, px = x - x0, py = y - y0;
+            const a = cdx * cdx + cdy * cdy - dr * dr, b = px * cdx + py * cdy + r0 * dr, c = px * px + py * py - r0 * r0;
+            if (Math.abs(a) < 1e-6) return c / (2 * b);
+            const d = b * b - a * c; if (d < 0) return 1;
+            const q = Math.sqrt(d), hi = Math.max((b + q) / a, (b - q) / a), lo = Math.min((b + q) / a, (b - q) / a);
+            return r0 + hi * dr >= 0 ? hi : lo;
+        };
+        const at = (x, y) => P(cx + (x - cx) * sx, cy + (y - cy) * sy), base = B.n;
+        B.vertex(at(cx, cy), undefined, undefined, 0, 0, 0, stopColor(stops, tAt(cx, cy)));
+        for (let i = 1; i <= rings; i++) for (let j = 0; j < segs; j++) {
+            const rr = r * i / rings, a = j / segs * Math.PI * 2, x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr;
+            B.vertex(at(x, y), undefined, undefined, 0, 0, 0, stopColor(stops, tAt(x, y)));
+        }
+        for (let j = 0; j < segs; j++) B.index.push(base, base + 1 + j, base + 1 + (j + 1) % segs);
+        for (let i = 1; i < rings; i++) for (let j = 0; j < segs; j++) {
+            const a = base + 1 + (i - 1) * segs + j, b = base + 1 + (i - 1) * segs + (j + 1) % segs, c = a + segs, d = b + segs;
+            B.index.push(a, c, d, a, d, b);
+        }
+    }
+    const rgbOf = color => [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16)).join(',');
+    const bezier = (p0, p1, p2, p3, n = 12) => Array.from({ length: n + 1 }, (_, i) => { const t = i / n, u = 1 - t; return P(u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0], u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1]); });
+    const quadratic = (p0, p1, p2, n = 8) => Array.from({ length: n + 1 }, (_, i) => { const t = i / n, u = 1 - t; return P(u * u * p0[0] + 2 * u * t * p1[0] + t * t * p2[0], u * u * p0[1] + 2 * u * t * p1[1] + t * t * p2[1]); });
+    /** Canvas arc(cx, cy, r, a0, a1, ccw) as points */
+    const arc = (cx, cy, r, a0, a1, ccw = false, n = 10) => {
+        let d = a1 - a0;
+        if (!ccw && d < 0) d += Math.PI * 2; if (ccw && d > 0) d -= Math.PI * 2;
+        return Array.from({ length: n + 1 }, (_, i) => P(cx + Math.cos(a0 + d * i / n) * r, cy + Math.sin(a0 + d * i / n) * r));
+    };
+    /** A stroked path with round caps */
+    const stroke = (B, pts, w) => { B.line(pts, w); B.disc(pts[0][0], pts[0][1], w / 2, 0, 0, 10); const e = pts[pts.length - 1]; B.disc(e[0], e[1], w / 2, 0, 0, 10); };
+
+    // ---- the painters (entities/lamps.js) ----
+    function base(B, x, y, r) {                                         // the fluted cast-iron foot, ringed in brass
+        radial(B, x, y, r, x - r * .35, y - r * .35, r * .1, x, y, r, [[0, '#3a3046'], [.55, '#1c1624'], [1, '#0b080f']], 5, 24);
+        B.color('rgba(0, 0, 0, 0.55)');
+        for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; B.seg(P(x + Math.cos(a) * r * .55, y + Math.sin(a) * r * .55), P(x + Math.cos(a) * r * .92, y + Math.sin(a) * r * .92), .8); }
+        B.color(LAMP_BRASS).circleLine(x, y, r * .5, 1, 0, 0, 0);
+        B.color(LAMP_IRON_HI).line(arc(x, y, r - .6, Math.PI * 1.05, Math.PI * 1.6), .7);
+    }
+    function lantern(B, x, y, r, lit, color) {                          // a hexagonal lantern from above: lit glass round its iron cap
+        const hex = (rr, rot = Math.PI / 6) => Array.from({ length: 6 }, (_, i) => { const a = rot + i * Math.PI / 3; return P(x + Math.cos(a) * rr, y + Math.sin(a) * rr); });
+        if (lit) {                                                      // the glass: white-hot at the centre, the lamp's colour from 0.55 out
+            const inner = hex(r * .55), outer = hex(r), c0 = GLColor.parse('#fffaf0'), c1 = GLColor.parse(color), b0 = B.n;
+            B.vertex(P(x, y), undefined, undefined, 0, 0, 0, c0);
+            for (const p of inner) B.vertex(p, undefined, undefined, 0, 0, 0, c1);
+            for (const p of outer) B.vertex(p, undefined, undefined, 0, 0, 0, c1);
+            for (let i = 0; i < 6; i++) { const j = (i + 1) % 6; B.index.push(b0, b0 + 1 + i, b0 + 1 + j, b0 + 1 + i, b0 + 7 + i, b0 + 7 + j, b0 + 1 + i, b0 + 7 + j, b0 + 1 + j); }
+        } else B.color('#2a2433').poly(hex(r));
+        B.color(LAMP_IRON).line(hex(r), 1.2, true);
+        for (let i = 0; i < 6; i++) { const a = Math.PI / 6 + i * Math.PI / 3; B.seg(P(x + Math.cos(a) * r * .5, y + Math.sin(a) * r * .62), P(x + Math.cos(a) * r, y + Math.sin(a) * r), .8); }
+        B.color(LAMP_IRON).poly(hex(r * .5));                           // the cap
+        B.color('rgba(176, 138, 74, 0.8)').line(hex(r * .5), .7, true);
+        B.color(LAMP_IRON_HI).seg(P(x - r * .45, y - r * .2), P(x - r * .1, y - r * .45), .6);
+        B.color(LAMP_BRASS).disc(x, y, r * .17, 0, 0, 10);
+    }
+    const STYLE = {
+        antique_twin(B, lit, color) {                                   // twin lanterns on a scrolled crossarm over a fluted post
+            base(B, 0, 0, 8);
+            B.color(LAMP_IRON); stroke(B, [P(0, -17), P(0, 17)], 3.4);
+            for (const s of [-1, 1]) for (const side of [-1, 1]) {
+                const curl = bezier([0, s * 9], [side * 6, s * 9], [side * 7, s * 14], [side * 3.5, s * 14.5]);
+                const cx = side * 3.5 + side * -1.4, a0 = side > 0 ? 0 : Math.PI, a1 = side > 0 ? Math.PI * 1.6 : Math.PI * .4;
+                stroke(B, curl.concat(arc(cx, s * 13.6, 1.4, a0, a1, side < 0, 8)), 1.6);
+            }
+            B.color(LAMP_IRON_HI).seg(P(-.9, -16), P(-.9, 16), .8);
+            B.color(LAMP_BRASS).disc(0, 0, 2.2, 0, 0, 12);
+            for (const b of LAMP_STYLES.antique_twin.bulbs) lantern(B, b.x, b.y, 7, lit, color);
+        },
+        antique_crook(B, lit, color) {                                  // a shepherd's crook curling out to one lantern
+            base(B, 0, 0, 6.5);
+            B.color(LAMP_IRON); stroke(B, bezier([0, 0], [8, -10], [20, -11], [24, -6]).concat(quadratic([24, -6], [26, -3], [22, -1]).slice(1)), 3);
+            stroke(B, quadratic([5, -4], [10, -3], [11, -7]).concat(arc(9.8, -7, 1.2, 0, Math.PI * 1.5, true, 8)), 1.4);
+            B.color(LAMP_IRON_HI).line(bezier([1, -1.5], [8, -11], [19, -12], [23, -7.5]), .7);
+            for (const b of LAMP_STYLES.antique_crook.bulbs) lantern(B, b.x, b.y, 6.5, lit, color);
+        }
+    };
+    /** glowSprite(color, core) as geometry: a disc of radius r (sx, sy stretch it) */
+    const glow = (B, x, y, r, color, core = .3, sx = 1, sy = 1) => {
+        const rgb = hexToRgb(color);
+        radial(B, x, y, r, x, y, 0, x, y, r, [[0, `rgba(${rgb}, 1)`], [core, `rgba(${rgb}, 0.45)`], [1, `rgba(${rgb}, 0)`]], 6, 28, sx, sy);
+    };
+
+    class Lamps {
+        constructor() { this.pieces = new Map(); }
+        piece(key, paint) {
+            let g = this.pieces.get(key);
+            if (!g) { const B = new GLBuildingBuilder(0); paint(B); g = GLInstance.geometry(B); this.pieces.set(key, g); }
+            return g;
+        }
+        /**
+         * The pieces of lamp's body, in Canvas's order, each with its alpha: [[geometry, alpha], ...]
+         * on: whether it burns; k: the room's light on it (0..1)
+         */
+        body(lamp, on, k) {
+            const style = LAMP_TYPE_STYLE[lamp.lampType], col = /^#[0-9a-f]{6}$/i.test(lamp.color) ? lamp.color : '#ffeebb', out = [];
+            if (style) {
+                if (on) out.push([this.piece('glow:' + style + col, B => { for (const b of LAMP_STYLES[style].bulbs) glow(B, b.x, b.y, 24, col); }), .85 * k]);
+                if (!on || k < 1) out.push([this.piece(style + ':0:' + col, B => STYLE[style](B, false, col)), 1]);
+                if (on) out.push([this.piece(style + ':1:' + col, B => STYLE[style](B, true, col)), k]);
+                return out;
+            }
+            const t = lamp.lampType, big = t === 4, r = big ? 12 : 8, gr = big ? 34 : 24;
+            if (t === 3) out.push([this.piece('wall', B => B.color('#111').disc(0, 0, 8)), 1]);
+            if (t === 5) {
+                out.push([this.piece('strip', B => B.color('#1a1a1a').rect(-3, -12, 6, 24)), 1]);
+                if (on) { out.push([this.piece('stripGlow:' + col, B => glow(B, 0, 0, 1, col, .3, 12, 22)), .7 * k]); out.push([this.piece('stripLit:' + col, B => B.color(col).rect(-2, -10, 4, 20)), k]); }
+                else out.push([this.piece('stripOff', B => B.color('#333').rect(-2, -10, 4, 20)), 1]);
+            }
+            if (t === 3 || t === 4 || t === 5) {
+                if (on) {
+                    out.push([this.piece('bulbGlow:' + gr + col, B => glow(B, 0, 0, gr, col)), .85 * k]);
+                    if (k < 1) out.push([this.piece('bulbOff:' + r, B => B.color('#444444').disc(0, 0, r)), 1]);
+                    out.push([this.piece('bulb:' + r + col, B => B.color(col).disc(0, 0, r)), k]);
+                } else out.push([this.piece('bulbOff:' + r, B => B.color('#444444').disc(0, 0, r)), 1]);
+            }
+            return out;
+        }
+        /** The luminous panes and their bloom (drawn above the darkness; street posts only) */
+        emission(lamp) {
+            const style = LAMP_TYPE_STYLE[lamp.lampType];
+            if (!style) return null;
+            const color = /^#[0-9a-f]{6}$/i.test(lamp.color) ? lamp.color : '#ffeebb', radius = style === 'antique_twin' ? 7 : 6.5;
+            return this.piece('emit:' + style + color, B => {
+                const rgb = rgbOf(color);
+                for (const b of LAMP_STYLES[style].bulbs) {
+                    const x = b.x, y = b.y;
+                    radial(B, x, y, 24, x, y, radius * .6, x, y, 24, [[0, `rgba(${rgb},0.30)`], [.25, `rgba(${rgb},0.20)`], [.6, `rgba(${rgb},0.07)`], [1, `rgba(${rgb},0)`]], 8, 32);
+                    radial(B, x, y, radius * 1.65, x, y, radius * .45, x, y, radius * 1.65, [[0, 'rgba(255,249,230,0.40)'], [.48, `rgba(${rgb},0.26)`], [1, `rgba(${rgb},0)`]], 5, 28);
+                    // light between the corner ribs: six panes, the face gradient from 0.45 r out
+                    const face = [[0, '#fff8e2'], [.32, '#fffef9'], [.70, '#fff5d9'], [1, color]], at = d => stopColor(face, (d - .45) / .55);
+                    const pts = Array.from({ length: 6 }, (_, i) => { const a = Math.PI / 6 + i * Math.PI / 3; return [Math.cos(a), Math.sin(a)]; });
+                    for (let i = 0; i < 6; i++) {
+                        const p = pts[i], q = pts[(i + 1) % 6], inset = .12;
+                        const a = [p[0] + (q[0] - p[0]) * inset, p[1] + (q[1] - p[1]) * inset], c = [q[0] + (p[0] - q[0]) * inset, q[1] + (p[1] - q[1]) * inset];
+                        const v = (u, s) => B.vertex(P(x + u[0] * radius * s, y + u[1] * radius * s), undefined, undefined, 0, 0, 0, at(s * Math.hypot(u[0], u[1])));
+                        const i0 = v(a, .91), i1 = v(c, .91), i2 = v(c, .59), i3 = v(a, .59);
+                        B.index.push(i0, i1, i2, i0, i2, i3);
+                    }
+                }
+            });
+        }
+        destroy() { for (const g of this.pieces.values()) g.destroy(); this.pieces.clear(); }
+    }
+    return Lamps;
+})();
+// GL engine: the street's neon signs. Each sign's lettering is the text atlas's distance field
+// (gl/text.js) drawn three times, as Canvas draws it (entities/street-objects.js NeonSign): its
+// colour blurred out into a glow, the letters in its colour, and a white core. Built once per
+// sign; each frame only the flicker (the Canvas formula) changes its alpha.
+const GLNeonSigns = (() => {
+    function build(s, e) {
+        const B = new GLBuildingBuilder(0);
+        B.color(s.color, .9); GLText.quad(B, e, 0, 0, 0, 0, 1, 1.15);         // shadowBlur 15 in the sign's colour
+        B.color(s.color, .9); GLText.quad(B, e, 0, 0, 0, 0, 0);
+        B.color('#ffffff', .7); GLText.quad(B, e, 0, 0, 0, 0, 0);
+        return GLInstance.geometry(B);
+    }
+    class Signs extends PIXI.Container {
+        constructor() { super(); this.recs = new Map(); this.stats = { signs: 0 }; }
+        sync(signs, time) {
+            const live = new Set(); let n = 0;
+            for (const s of signs) {
+                const e = GLText.entry(s.text, s.fontSize, s.fontFamily, true, 'bold');
+                if (!e) continue;
+                let r = this.recs.get(s);
+                const key = s.text + '|' + s.color + '|' + e.u0 + '|' + e.v0 + '|' + e.ww;
+                if (!r) { r = new GLInstance(); this.addChild(r); this.recs.set(s, r); }
+                if (r.key !== key) { r.geometry?.destroy(); r.geometry = build(s, e); r.key = key; }
+                const t = time + s.flickerOffset;
+                r.alpha = (Math.sin(t / 50) > .95 || Math.random() < .02) ? .3 : 1;
+                r.position.set(s.x, s.y); r.visible = true; live.add(s); n++;
+            }
+            for (const [s, r] of this.recs) if (!live.has(s)) { if (r.visible) r.visible = false; }
+            this.stats.signs = n;
+        }
+        destroy() { for (const r of this.recs.values()) r.geometry?.destroy(); this.recs.clear(); super.destroy({ children: true }); }
+    }
+    return Signs;
+})();
+// GL engine: the junction lights (traffic/traffic-signals.js), drawn as Canvas draws them: on the
+// ground, each way in's stop bar in its light, the demand gauge, the signal head and turn arrow on
+// the kerb, the crosswalks' walk strips; after dark, the same parts again, added as light, with the
+// glow round each lit lamp. Their state changes every frame, so each frame's geometry is written
+// into one reused buffer for the ground and one for the glow.
+
+/** A GLInstance whose geometry is rewritten from a GLBuildingBuilder each frame (its buffers reused) */
+class GLDynamic extends GLInstance {
+    set(B) {
+        const built = B.finish();
+        if (!built.vertices) { this.visible = false; return; }
+        this.visible = true;
+        if (!this.geometry || built.index instanceof Uint32Array !== this.geometry.indexBuffer.data instanceof Uint32Array) {
+            this.geometry?.destroy(); this.geometry = GLInstance.geometry(B);
+        } else { this.geometry.buffers[0].update(built.data); this.geometry.indexBuffer.update(built.index); }
+    }
+}
+
+const GLSignals = (() => {
+    let RGB = null;   // SIGNAL_RGB as 0..1 (the game's scripts load after this one)
+    const P = (x, y) => [x, y, 0, 0];
+    const rgba = (k, a) => { if (!RGB) { RGB = {}; for (const c in SIGNAL_RGB) RGB[c] = SIGNAL_RGB[c].split(',').map(v => +v / 255); } return [RGB[k][0], RGB[k][1], RGB[k][2], a]; };
+    /** Canvas roundRect(x, y, w, h, r) as points */
+    const roundRect = (x, y, w, h, r) => {
+        const pts = [], c = [[x + w - r, y + r, -Math.PI / 2], [x + w - r, y + h - r, 0], [x + r, y + h - r, Math.PI / 2], [x + r, y + r, Math.PI]];
+        for (const [cx, cy, a0] of c) for (let i = 0; i <= 4; i++) { const a = a0 + i / 4 * Math.PI / 2; pts.push(P(cx + Math.cos(a) * r, cy + Math.sin(a) * r)); }
+        return pts;
+    };
+    /** drawGlow(x, y, r, rgb, core) as a radial fan: alpha 1 at the centre, `core` at 0.45 (none: linear) */
+    const glow = (B, x, y, r, k, a, core = 0) => {
+        const col = t => rgba(k, a * (core ? (t < core ? 1 - (1 - .45) * t / core : .45 * (1 - (t - core) / (1 - core))) : 1 - t));
+        const rings = core ? 2 : 1, ts = core ? [0, core, 1] : [0, 1], segs = 24, base = B.n;
+        B.vertex(P(x, y), undefined, undefined, 0, 0, 0, col(0));
+        for (let i = 1; i <= rings; i++) for (let j = 0; j < segs; j++) { const an = j / segs * Math.PI * 2; B.vertex(P(x + Math.cos(an) * r * ts[i], y + Math.sin(an) * r * ts[i]), undefined, undefined, 0, 0, 0, col(ts[i])); }
+        for (let j = 0; j < segs; j++) B.index.push(base, base + 1 + j, base + 1 + (j + 1) % segs);
+        for (let i = 1; i < rings; i++) for (let j = 0; j < segs; j++) { const a0 = base + 1 + (i - 1) * segs + j, b0 = base + 1 + (i - 1) * segs + (j + 1) % segs; B.index.push(a0, a0 + segs, b0 + segs, a0, b0 + segs, b0); }
+    };
+
+    function ground(B, sig, crosswalks, time) {
+        for (const g of sig._looks()) {
+            const light = sig.lightFor(g.lane), arrow = light === 'arrow', k = arrow ? 'red' : light;
+            B.color('rgba(8, 4, 16, 0.55)').seg(P(g.a.x, g.a.y), P(g.b.x, g.b.y), 8);               // the stop bar
+            B._c = rgba(k, .92); B.seg(P(g.a.x, g.a.y), P(g.b.x, g.b.y), 4);
+            const lit = Math.min(SIGNAL_GAUGE, Math.round(sig.load[g.idx])), gl = arrow ? 'green' : light;   // the gauge
+            for (let i = 0; i < SIGNAL_GAUGE; i++) {
+                const x0 = g.gauge.x - g.ux * i * 18, y0 = g.gauge.y - g.uy * i * 18;
+                if (i < lit) B._c = rgba(gl, sig._segA(gl, i, time)); else B.color('rgba(255, 255, 255, 0.07)');
+                B.seg(P(x0, y0), P(x0 - g.ux * 11, y0 - g.uy * 11), 3.5);
+            }
+            const an = Math.atan2(g.uy, g.ux), c = Math.cos(an), s = Math.sin(an);            // the head on the kerb
+            B.inFrame([c, s, -s, c, g.head.x, g.head.y], () => {
+                const box = roundRect(-16, -6, 32, 12, 5);
+                B.color('#120a1e').poly(box); B.color('rgba(202, 176, 250, 0.35)').line(box, 1, true);
+                const lamps = ['green', 'amber', 'red'];
+                for (let i = 0; i < 3; i++) { B._c = rgba(lamps[i], lamps[i] === k ? 1 : .16); B.disc(-9.5 + i * 9.5, 0, 3.4, 0, 0, 14); }
+                const tb = roundRect(-6, 7, 12, 12, 4);
+                B.color('#120a1e').poly(tb); B.color('rgba(202, 176, 250, 0.35)').line(tb, 1, true);
+                B._c = rgba('green', arrow ? 1 : .16);
+                B.poly([P(0, 8.6), P(3.8, 12.6), P(-3.8, 12.6)]); B.poly([P(1.3, 12.6), P(1.3, 17.4), P(-1.3, 17.4), P(-1.3, 12.6)]);
+            });
+        }
+        for (const w of sig._walkStrips(crosswalks)) {                                            // the walk strips
+            const wl = sig.walkLight(w.p), on = wl !== 'flash' || ((time / 280) | 0) % 2 === 0;
+            B._c = rgba(wl === 'walk' ? 'walk' : 'wait', on ? .9 : .2);
+            for (const s of w.s) B.seg(P(s[0], s[1]), P(s[2], s[3]), 3);
+        }
+    }
+    function lit(B, sig, dark, crosswalks, time) {
+        const a = Math.min(1, dark * 1.4);
+        if (a < .04) return;
+        for (const g of sig._looks()) {
+            const light = sig.lightFor(g.lane), arrow = light === 'arrow', k = arrow ? 'red' : light;
+            const mx = (g.a.x + g.b.x) / 2, my = (g.a.y + g.b.y) / 2;
+            glow(B, mx, my, 70, k, a * .22);
+            B._c = rgba(k, a * .35); B.seg(P(g.a.x, g.a.y), P(g.b.x, g.b.y), 10);
+            const n = Math.min(SIGNAL_GAUGE, Math.round(sig.load[g.idx])), gl = arrow ? 'green' : light;
+            for (let i = 0; i < n; i++) {
+                const x0 = g.gauge.x - g.ux * i * 18, y0 = g.gauge.y - g.uy * i * 18;
+                B._c = rgba(gl, a * .3 * sig._segA(gl, i, time)); B.seg(P(x0, y0), P(x0 - g.ux * 11, y0 - g.uy * 11), 7);
+            }
+            const li = light === 'green' ? 0 : light === 'amber' ? 1 : 2, an = Math.atan2(g.uy, g.ux), c = Math.cos(an), sn = Math.sin(an);
+            glow(B, g.head.x + c * (-9.5 + li * 9.5), g.head.y + sn * (-9.5 + li * 9.5), 16, k, a * .9, .3);
+            if (arrow) glow(B, g.head.x - sn * 13, g.head.y + c * 13, 14, 'green', a * .9, .3);
+        }
+        for (const w of sig._walkStrips(crosswalks)) {
+            const wl = sig.walkLight(w.p);
+            if (wl === 'flash' && ((time / 280) | 0) % 2) continue;
+            B._c = rgba(wl === 'walk' ? 'walk' : 'wait', a * .3);
+            for (const s of w.s) B.seg(P(s[0], s[1]), P(s[2], s[3]), 9);
+        }
+    }
+
+    class Signals {
+        constructor() {
+            this.ground = new GLDynamic(); this.glow = new GLDynamic();
+            this.glow.state = Object.assign(PIXI.State.for2d(), { blend: true, blendMode: PIXI.BLEND_MODES.ADD });
+            this.stats = { junctions: 0 };
+        }
+        /** This frame's lights in view (null: none), and the dark (0..1) */
+        sync(traffic, view, crosswalks, dark, time) {
+            const G = new GLBuildingBuilder(0), L = new GLBuildingBuilder(0); let n = 0;
+            if (traffic) for (const ix of traffic.network.intersections) {
+                if (!ix.signal || !ix.signal.inView(view)) continue;
+                ground(G, ix.signal, crosswalks, time); lit(L, ix.signal, dark, crosswalks, time); n++;
+            }
+            this.ground.set(G); this.glow.set(L); this.stats.junctions = n;
+        }
+        hide() { this.ground.visible = this.glow.visible = false; }
+        destroy() { this.ground.geometry?.destroy(); this.glow.geometry?.destroy(); this.ground.destroy(); this.glow.destroy(); }
+    }
+    return Signals;
 })();
         class GameEngine {
             constructor() {

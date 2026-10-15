@@ -302,19 +302,18 @@ Object.assign(NativeWebGLRenderer.prototype,{
         for(const lamp of live){
             const inView=lamp.visible!==false&&Math.abs(lamp.x-v.x)<=game.canvas.width/(2*v.zoom)+160&&Math.abs(lamp.y-v.y)<=game.canvas.height/(2*v.zoom)+160;
             let r=this.fixtureNodes.get(lamp);if(!inView){if(r)r.node.visible=false;continue;}
-            const key=lamp.lampType+':'+lamp.color;let assets=this.fixtureAssets.get(key);
-            if(!assets){assets=[];
-                for(const on of [false,true])assets.push(this.bake(192,192,c=>{
-                    const saved={angle:lamp.angle,k:lamp._lightK,forced:lamp._forcedOff,visible:lamp.visible,lod:_zoomLOD};
-                    try{lamp.angle=0;lamp._lightK=1;lamp._forcedOff=false;lamp.visible=true;_zoomLOD=1;c.translate(96-lamp.x,96-lamp.y);lamp.draw(c,on?0:1);}
-                    finally{lamp.angle=saved.angle;lamp._lightK=saved.k;lamp._forcedOff=saved.forced;lamp.visible=saved.visible;_zoomLOD=saved.lod;}
-                },'fixture'));this.fixtureAssets.set(key,assets);}
-            if(!r){r={node:new PIXI.Container(),off:new PIXI.Sprite(),on:new PIXI.Sprite(),particles:new PIXI.Graphics()};for(const s of [r.off,r.on]){s.anchor.set(.5);r.node.addChild(s);}r.node.addChild(r.particles);this.fixtures.addChild(r.node);this.fixtureNodes.set(lamp,r);}
+            if(!this.glLamps)this.glLamps=new GLLamps();
+            if(!r){r={node:new PIXI.Container(),body:new PIXI.Container(),parts:[],particles:new PIXI.Graphics()};r.node.addChild(r.body,r.particles);this.fixtures.addChild(r.node);this.fixtureNodes.set(lamp,r);}
             r.node.visible=true;r.node.zIndex=lamp.y;r.particles.clear();const dots=r.particles;
             lamp._lightK=game.roomSystem.lampLight(lamp)*lampFlicker(lamp);lamp._forcedOff=lamp._lightK<.02;
             const room=game.roomSystem.rooms[lamp._roomId],sky=room?room.type==='outdoor':game.activeMap.type==='outdoor',on=!lamp._forcedOff&&(!sky||day.lampsOn),k=on?Math.min(1,lamp._lightK):0;
-            r.off.texture=assets[0];r.on.texture=assets[1];r.off.visible=k<1;r.on.visible=k>0;r.on.alpha=k;
-            for(const s of [r.off,r.on]){s.position.set(lamp.x,lamp.y);s.rotation=lamp.angle||0;}
+            // the lamp's body: GPU geometry pieces (gl/lamps.js), each faded as Canvas fades its sprites
+            const pieces=this.glLamps.body(lamp,on,k),postScale=LAMP_TYPE_STYLE[lamp.lampType]?LAMP_POST_SCALE:1;
+            r.body.position.set(lamp.x,lamp.y);r.body.rotation=lamp.angle||0;r.body.scale.set(postScale);
+            for(let i=0;i<Math.max(pieces.length,r.parts.length);i++){
+                let part=r.parts[i];if(!part&&pieces[i]){part=r.parts[i]=new GLInstance();r.body.addChild(part);}
+                if(pieces[i]){part.geometry=pieces[i][0];part.alpha=pieces[i][1];part.visible=true;}else part.visible=false;
+            }
             if(on&&_zoomLOD<1){
                 const style=LAMP_TYPE_STYLE[lamp.lampType],bulbs=style?LAMP_STYLES[style].bulbs:[{x:0,y:0}];
                 const time=((this.layers.decorAnimation?_frameTime:0)+lamp.animOffset)/1000;

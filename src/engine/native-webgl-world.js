@@ -65,7 +65,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         if(game.groundBaker?.activeFor(map)&&L.floor)this.glGround.sync(game,bounds);else this.glGround.hide();
         timings.groundMs=performance.now()-lap;lap=performance.now();
         const foliage=this.foliageContext;foliage.begin();if(this.flora)this.flora.list.length=0;
-        const street=this.streetContext;street.begin();if(L.streetDetails){
+        const street=this.streetContext;street.begin();if(this.neonSigns&&!this.neonSigns.destroyed)this.neonSigns.visible=!!L.streetDetails;if(this.glSignals&&!L.streetDetails)this.glSignals.hide();if(L.streetDetails){
             if(map.foliage){
                 // Same spatial query and density stride as Canvas's foliage pass (engine/draw.js).
                 const scale=GameSettings.getFoliageScale(),stride=scale<1?Math.round(1/scale):1,wind=game.weather?game.weather.wind:.3,dir=game.weather?game.weather.windDirection:1;
@@ -78,8 +78,14 @@ Object.assign(NativeWebGLRenderer.prototype,{
                 this.flora.sync(plants,wind,dir,_gameTimeSec,_sunShadow.on);
             }
             if(game.leafParticles)game.leafParticles.draw(foliage);   // drifting leaves and petals, with or without trees
-            for(const s of game.neonSigns||[])if(visible(s,150))s.draw(street,_frameTime);
-            if(map.type==='outdoor')game.traffic?.drawSignals(street,bounds,map.crosswalks);
+            // neon signs: their lettering as distance-field text on the GPU (gl/signs.js)
+            if(!this.neonSigns||this.neonSigns.destroyed)this.neonSigns=new GLNeonSigns();
+            if(this.neonSigns.parent!==this.world||this.world.getChildIndex(this.neonSigns)!==this.world.getChildIndex(street.root)+1){this.neonSigns.parent?.removeChild(this.neonSigns);this.world.addChildAt(this.neonSigns,this.world.getChildIndex(street.root)+1);}
+            this.neonSigns.sync((game.neonSigns||[]).filter(s=>visible(s,150)),_frameTime);
+            // the junction lights: ground and glow, GPU geometry rewritten each frame (gl/signals.js)
+            if(!this.glSignals||this.glSignals.ground.destroyed)this.glSignals=new GLSignals();
+            {const sg=this.glSignals.ground;if(sg.parent!==this.world||this.world.getChildIndex(sg)!==this.world.getChildIndex(this.neonSigns)+1){sg.parent?.removeChild(sg);this.world.addChildAt(sg,this.world.getChildIndex(this.neonSigns)+1);}}
+            if(map.type==='outdoor')this.glSignals.sync(game.traffic,bounds,map.crosswalks,L.glows?game.getAmbientDarkness():0,_frameTime);else this.glSignals.hide();
             game.drawDeliveryPackage(street,bounds);game.drawDropZone(street,bounds);
         }
         timings.streetMs=performance.now()-lap;lap=performance.now();
@@ -122,7 +128,20 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.buildingBaseStage.sortableChildren=this.roofStage.sortableChildren=!!L.depthSort;
         this.roofDetailContext.root.zIndex=Infinity;
         if(L.depthSort){this.buildingBaseStage.sortChildren();this.roofStage.sortChildren();}
-        if(L.glows&&L.fixtures)for(const lamp of game.lamps||[])if(visible(lamp,180))lamp.drawEmissive?.(glow,game.dayCycle().daylight);
+        // the lamps' luminous panes and bloom, above the dark: GPU geometry (gl/lamps.js)
+        if(!this.lampEmission||this.lampEmission.destroyed){this.lampEmission=new PIXI.Container();this.lampEmissionParts=[];}
+        if(this.lampEmission.parent!==this.emissive||this.emissive.getChildIndex(this.lampEmission)!==this.emissive.getChildIndex(glow.root)+1){this.emissive.removeChild(this.lampEmission);this.emissive.addChildAt(this.lampEmission,this.emissive.getChildIndex(glow.root)+1);}
+        {let n=0;const daylight=game.dayCycle().daylight,parts=this.lampEmissionParts;
+            if(L.glows&&L.fixtures&&daylight<.2)for(const lamp of game.lamps||[]){
+                const k=Math.max(0,Math.min(1,lamp._lightK??1));
+                if(!lamp.visible||lamp._forcedOff||k<.02||!visible(lamp,180))continue;
+                if(!this.glLamps)this.glLamps=new GLLamps();
+                const g=this.glLamps.emission(lamp);if(!g)continue;
+                let part=parts[n];if(!part){part=parts[n]=new GLInstance();this.lampEmission.addChild(part);}n++;
+                part.geometry=g;part.alpha=k;part.visible=true;part.position.set(lamp.x,lamp.y);part.rotation=lamp.angle||0;part.scale.set(LAMP_POST_SCALE);
+            }
+            for(let i=n;i<parts.length;i++)parts[i].visible=false;}
+        if(this.glSignals&&!this.glSignals.glow.destroyed){const sg=this.glSignals.glow;if(sg.parent!==this.emissive||this.emissive.getChildIndex(sg)!==this.emissive.getChildIndex(this.lampEmission)+1){sg.parent?.removeChild(sg);this.emissive.addChildAt(sg,this.emissive.getChildIndex(this.lampEmission)+1);}}
         this.roofStage.visible=this.buildingBaseStage.visible=L.buildings;
         for(const ctx of [street,traffic,actors,glow,roofs,foliage,this.occupantContext]){
             const used=new Set(ctx.pool.filter(n=>n.visible&&n instanceof PIXI.Sprite).map(n=>n.texture.baseTexture));
