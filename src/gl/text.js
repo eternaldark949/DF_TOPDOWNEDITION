@@ -93,37 +93,55 @@ const GLText = (() => {
     }
     /** Copy a computed entry into the atlas (unless the fonts changed since) */
     function put(e, w, hgt, out, rev) {
-        if (rev !== revision || !data) return;
+        if (rev !== revision || !data || e.dead) return;
         for (let y = 0; y < hgt; y++) data.set(out.subarray(y * w * 4, (y + 1) * w * 4), ((e.y + y) * SIZE + e.x) * 4);
         e.ready = true; dirty = true;
     }
     /** An atlas entry for text at size (world px): uv rect and its world size, centred on the text's middle */
     function entry(text, size, family = 'Great Vibes', neon = false, weight = '') {
-        const key = text + '|' + size + '|' + family + '|' + (neon ? 1 : 0) + '|' + weight;
-        let e = entries.get(key);
+        return place(text + '|' + size + '|' + family + '|' + (neon ? 1 : 0) + '|' + weight, text, size, fontOf(size, family, weight), neon);
+    }
+    /** An atlas entry for text in a CSS font (a vector context's font), at its px size */
+    // Live text (labels, markers, numbers that change as you play) has the atlas's bottom quarter to itself:
+    // when that fills, it is wiped and refilled by what is still on screen (gen counts the wipes)
+    const LIVE_Y = SIZE * 3 / 4, live = { entries: new Map(), x: 0, y: LIVE_Y, h: 0, gen: 0 };
+    function css(text, font) {
+        const size = Number(/([0-9.]+)px/.exec(font)?.[1] || 10);
+        return place(text + '|' + font, text, size, font, false, true);
+    }
+    function place(key, text, size, font, neon, isLive = false) {
+        const map = isLive ? live.entries : entries;
+        let e = map.get(key);
         if (e && e.revision === revision) return e;
         const c = measurer(), R = neon ? 1.5 : RES, pad = neon ? 60 : SPREAD + 2;
-        c.font = fontOf(size, family, weight);
-        const tw = Math.ceil(c.measureText(text).width), w = Math.ceil((tw + pad * 2) * R), hgt = Math.ceil((size * 1.6 + pad * 2) * R);
-        if (!e) {
+        c.font = font;
+        const adv = c.measureText(text).width, tw = Math.ceil(adv), w = Math.ceil((tw + pad * 2) * R), hgt = Math.ceil((size * 1.6 + pad * 2) * R);
+        if (w > SIZE || hgt > SIZE / 4) return null;                   // larger than the atlas allows: left out
+        if (!e && isLive) {
+            if (live.x + w > SIZE) { live.x = 0; live.y += live.h + 2; live.h = 0; }
+            if (live.y + hgt > SIZE) { for (const old of live.entries.values()) old.dead = true; live.entries.clear(); live.x = 0; live.y = LIVE_Y; live.h = 0; live.gen++; }
+            e = { x: live.x, y: live.y, w, h: hgt, gen: live.gen }; live.x += w + 2; live.h = Math.max(live.h, hgt);
+            map.set(key, e);
+        } else if (!e) {
             if (shelfX + w > SIZE) { shelfX = 0; shelfY += shelfH + 2; shelfH = 0; }
-            if (shelfY + hgt > SIZE) return null;                      // atlas full: the text is left out
+            if (shelfY + hgt > LIVE_Y) return null;                    // atlas full: the text is left out
             e = { x: shelfX, y: shelfY, w, h: hgt }; shelfX += w + 2; shelfH = Math.max(shelfH, hgt);
-            entries.set(key, e);
+            map.set(key, e);
         }
         e.revision = revision;
         canvas.width = w; canvas.height = hgt;
         const g = canvas.getContext('2d', { willReadFrequently: true });
-        g.setTransform(R, 0, 0, R, 0, 0); g.font = fontOf(size, family, weight); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff';
+        g.setTransform(R, 0, 0, R, 0, 0); g.font = font; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff';
         g.fillText(text, w / R / 2, hgt / R / 2);
         const px = g.getImageData(0, 0, w, hgt).data, cov = new Float32Array(w * hgt);
         for (let i = 0; i < w * hgt; i++) cov[i] = px[i * 4 + 3] / 255;
         tex();
         const w0 = w, h0 = hgt, rev = revision;
-        if (startWorker()) { const id = ++jobs; pending.set(id, { e, w: w0, h: h0, cov, R, neon, revision: rev }); worker.postMessage({ id, cov, w: w0, h: h0, R, SPREAD, neon }); }
+        if (!neon && w * hgt < 80000) put(e, w0, h0, COMPUTE(cov, w0, h0, R, SPREAD, neon), rev);    // small: ready this frame
+        else if (startWorker()) { const id = ++jobs; pending.set(id, { e, w: w0, h: h0, cov, R, neon, revision: rev }); worker.postMessage({ id, cov, w: w0, h: h0, R, SPREAD, neon }); }
         else put(e, w0, h0, COMPUTE(cov, w0, h0, R, SPREAD, neon), rev);
         e.u0 = e.x / SIZE; e.v0 = e.y / SIZE; e.u1 = (e.x + w) / SIZE; e.v1 = (e.y + hgt) / SIZE;
-        e.ww = w / R; e.wh = hgt / R;                                   // world size at the given font size
+        e.ww = w / R; e.wh = hgt / R; e.tw = adv;                       // world size at the given font size (tw: the text's advance)
         return e;
     }
     /** Emit text as a quad into builder B, centred at (x, y) in the current frame, at height z (mode).
@@ -143,5 +161,5 @@ const GLText = (() => {
     function flush() { if (dirty && base) { base.update(); dirty = false; } return texture; }
     /** Fonts arrived: every entry re-renders on its next use */
     function invalidate() { revision++; }
-    return { measure, entry, quad, flush, invalidate, texture: () => tex() };
+    return { measure, entry, css, quad, live, flush, invalidate, texture: () => tex() };
 })();

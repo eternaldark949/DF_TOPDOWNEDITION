@@ -451,7 +451,7 @@ class GLBuildingMesh extends PIXI.Mesh {
                 vWorld = S;
                 vColor = vec4(col.rgb * col.a, aMeta.w > .5 ? 0. : col.a);              // additive: premultiplied colour, no coverage
                 vText = aText; if (aText.x < -1.5) vText.y = aText.y / uPx;              // a soft (shadow-blurred) stroke: its blur in px
-                else if (aText.x >= 0. && aText.z < 9.) vText.w = max(.02, .7 * uPx / (12. * kOf(P, mode)));   // edge softness: about a screen pixel
+                else if (aText.x >= 0. && aText.z < 9.) vText.w = aText.w < 0. ? -aText.w : max(.02, .7 * uPx / (12. * kOf(P, mode)));   // edge softness: about a screen pixel (negative: given)
                 gl_Position = hide > .5 ? vec4(2., 2., 2., 1.) : vec4((projectionMatrix * translationMatrix * vec3(S, 1.)).xy, 0., 1.);
             }`;
         const fs = `precision mediump float;
