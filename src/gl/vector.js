@@ -104,19 +104,31 @@
         B.vertex([cx - hw, cy + hh, 0, 0], undefined, undefined, 0, 0, 0, c, t(e.u0, e.v1));
         B.index.push(base, base + 1, base + 2, base, base + 2, base + 3);
     }
+    // A string is set in pieces: its runs of letters whole (kerning and script joins kept), each digit on its own,
+    // so a number that changes every frame (a distance, a timer, damage) reuses the digits already in the atlas
+    const pieces = new Map();
+    function layout(text, font) {
+        const key = text + '|' + font; let L = pieces.get(key);
+        if (L && L.gen === GLText.live.gen) return L;
+        const runs = text.match(/\d|\D+/g) || [], parts = []; let w = 0;
+        for (const run of runs) { const e = GLText.css(run, font); if (!e) return null; parts.push([e, w + e.tw / 2]); w += e.tw; }
+        L = { parts, w, gen: GLText.live.gen };
+        if (pieces.size > 512) pieces.clear();
+        pieces.set(key, L); return L;
+    }
     function write(ctx, text, x, y, maxWidth, stroke) {
         text = String(text);
         if (!text || ctx.globalAlpha <= 0) return;
-        const font = ctx.font || '10px sans-serif', e = GLText.css(text, font);
-        if (!e) return;
+        const font = ctx.font || '10px sans-serif', L = layout(text, font);
+        if (!L) return;
         const style = stroke ? ctx.strokeStyle : ctx.fillStyle, c = ink(style), a = c[3] * ctx.globalAlpha;
         if (a <= 0) return;
         ctx.hashValue(text); ctx.hashValue(font); ctx.hashValue(typeof style === 'string' ? style : JSON.stringify(style?.stops || '')); ctx.hashValue(ctx.globalAlpha);
         ctx.hashValue(x); ctx.hashValue(y); ctx.hashValue(ctx.textAlign || ''); ctx.hashValue(ctx.textBaseline || ''); ctx.hashValue(GLText.live.gen);
         const m = ctx.matrix; for (const v of [m.a, m.b, m.c, m.d, m.tx, m.ty]) ctx.hashValue(v);
         if (stroke) ctx.hashValue(ctx.lineWidth);
-        const sx = maxWidth > 0 && e.tw > maxWidth ? maxWidth / e.tw : 1, w = e.tw * sx, align = ctx.textAlign || 'start';
-        const cx = align === 'center' ? x : align === 'right' || align === 'end' ? x - w / 2 : x + w / 2;
+        const sx = maxWidth > 0 && L.w > maxWidth ? maxWidth / L.w : 1, w = L.w * sx, align = ctx.textAlign || 'start';
+        const left = align === 'center' ? x - w / 2 : align === 'right' || align === 'end' ? x - w : x;
         const cy = y + middle(font, ctx.textBaseline || 'alphabetic');
         const P = ctx.pen(), B = P.B, r = ctx.current, k = detail(ctx) * Math.sqrt(Math.abs(m.a * m.d - m.b * m.c)) || 1;
         r._hasText = true;
@@ -125,10 +137,10 @@
             const sc = ctx.shadowBlur > 0 || ctx.shadowOffsetX || ctx.shadowOffsetY ? GLColor.parse(ctx.shadowColor || 'transparent') : null;
             if (sc && sc[3] > 0) {
                 // Canvas's text shadow: the glyphs' soft edge, spread by the blur (the field reaches 6 px past the glyph)
-                const b = (ctx.shadowBlur || 0) / k;
-                quad(B, e, cx + (ctx.shadowOffsetX || 0) / k, cy + (ctx.shadowOffsetY || 0) / k, sx, Math.max(.05, edge - b / 48), Math.max(soft, Math.min(.45, b / 24)), [sc[0], sc[1], sc[2], sc[3] * ctx.globalAlpha]);
+                const b = (ctx.shadowBlur || 0) / k, ox = (ctx.shadowOffsetX || 0) / k, oy = (ctx.shadowOffsetY || 0) / k, col = [sc[0], sc[1], sc[2], sc[3] * ctx.globalAlpha];
+                for (const [e, at] of L.parts) quad(B, e, left + at * sx + ox, cy + oy, sx, Math.max(.05, edge - b / 48), Math.max(soft, Math.min(.45, b / 24)), col);
             }
-            quad(B, e, cx, cy, sx, edge, soft, [c[0], c[1], c[2], a]);
+            for (const [e, at] of L.parts) quad(B, e, left + at * sx, cy, sx, edge, soft, [c[0], c[1], c[2], a]);
         });
     }
     // Measured by the font engine that sets the glyphs (plates and bubbles fit their text as in Canvas)

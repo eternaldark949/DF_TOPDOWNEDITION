@@ -7,7 +7,7 @@
 const GLText = (() => {
     const SIZE = 2048, RES = 3, SPREAD = 6;
     let canvas = null, ctx2d = null, data = null, base = null, texture = null;
-    let shelfX = 0, shelfY = 0, shelfH = 0, revision = 0, dirty = false, epoch = 0, full = false, uses = 0;
+    let shelfX = 0, shelfY = 0, shelfH = 0, revision = 0, dirty = false, rowsLo = 2048, rowsHi = 0, colsLo = 2048, colsHi = 0, puts = 0, epoch = 0, full = false, uses = 0;
     const entries = new Map();
     const fontOf = (size, family, weight = '') => `${weight ? weight + ' ' : ''}${size}px "${family}", "URW Chancery L", "Z003", cursive`;
     const measurer = () => ctx2d || (canvas = document.createElement('canvas'), canvas.width = canvas.height = 8, ctx2d = canvas.getContext('2d', { willReadFrequently: true }));
@@ -19,7 +19,23 @@ const GLText = (() => {
     function tex() {
         if (texture) return texture;
         data = new Uint8Array(SIZE * SIZE * 4);
-        base = PIXI.BaseTexture.fromBuffer(data, SIZE, SIZE, { alphaMode: PIXI.ALPHA_MODES.NO_PREMULTIPLIED_ALPHA, scaleMode: PIXI.SCALE_MODES.LINEAR, mipmap: PIXI.MIPMAP_MODES.OFF });
+        // Uploaded once whole; after that only the rows new entries were written to (a changing label is a few
+        // kilobytes, not the whole 16 MB atlas)
+        class Rows extends PIXI.BufferResource {
+            upload(renderer, baseTexture, glTexture) {
+                const gl = renderer.gl;
+                if (glTexture.width !== SIZE || glTexture.height !== SIZE || rowsLo >= rowsHi) { rowsLo = colsLo = SIZE; rowsHi = colsHi = 0; return super.upload(renderer, baseTexture, glTexture); }
+                gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+                if (renderer.context.webGLVersion >= 2) {          // just the rectangle written to
+                    gl.pixelStorei(gl.UNPACK_ROW_LENGTH, SIZE); gl.pixelStorei(gl.UNPACK_SKIP_PIXELS, colsLo); gl.pixelStorei(gl.UNPACK_SKIP_ROWS, rowsLo);
+                    gl.texSubImage2D(gl.TEXTURE_2D, 0, colsLo, rowsLo, colsHi - colsLo, rowsHi - rowsLo, gl.RGBA, gl.UNSIGNED_BYTE, data);
+                    gl.pixelStorei(gl.UNPACK_ROW_LENGTH, 0); gl.pixelStorei(gl.UNPACK_SKIP_PIXELS, 0); gl.pixelStorei(gl.UNPACK_SKIP_ROWS, 0);
+                } else gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, rowsLo, SIZE, rowsHi - rowsLo, gl.RGBA, gl.UNSIGNED_BYTE, data.subarray(rowsLo * SIZE * 4, rowsHi * SIZE * 4));
+                rowsLo = colsLo = SIZE; rowsHi = colsHi = 0;
+                return true;
+            }
+        }
+        base = new PIXI.BaseTexture(new Rows(data, { width: SIZE, height: SIZE }), { alphaMode: PIXI.ALPHA_MODES.NO_PREMULTIPLIED_ALPHA, scaleMode: PIXI.SCALE_MODES.LINEAR, mipmap: PIXI.MIPMAP_MODES.OFF });
         return (texture = new PIXI.Texture(base));
     }
     // The distance field and glow channels, from the glyph run's coverage: pure arithmetic, run in a worker
@@ -95,7 +111,7 @@ const GLText = (() => {
     function put(e, w, hgt, out, rev) {
         if (rev !== revision || !data || e.dead) return;
         for (let y = 0; y < hgt; y++) data.set(out.subarray(y * w * 4, (y + 1) * w * 4), ((e.y + y) * SIZE + e.x) * 4);
-        e.ready = true; dirty = true;
+        e.ready = true; dirty = true; rowsLo = Math.min(rowsLo, e.y); rowsHi = Math.max(rowsHi, e.y + hgt); colsLo = Math.min(colsLo, e.x); colsHi = Math.max(colsHi, e.x + w); puts++;
     }
     /** An atlas entry for text at size (world px): uv rect and its world size, centred on the text's middle */
     function entry(text, size, family = 'Great Vibes', neon = false, weight = '') {
@@ -174,6 +190,6 @@ const GLText = (() => {
         live.entries.clear(); live.x = 0; live.y = LIVE_Y; live.h = 0; live.gen++;
         revision++; epoch++;
     }
-    function stats() { return { big: [...entries].map(([k, e]) => [k.slice(0, 40), e.w, e.h]).sort((a, b) => b[1] * b[2] - a[1] * a[2]).slice(0, 12), y: shelfY + shelfH, limit: LIVE_Y, entries: entries.size, live: live.entries.size, gen: live.gen }; }
+    function stats() { return { puts, big: [...entries].map(([k, e]) => [k.slice(0, 40), e.w, e.h]).sort((a, b) => b[1] * b[2] - a[1] * a[2]).slice(0, 12), y: shelfY + shelfH, limit: LIVE_Y, entries: entries.size, live: live.entries.size, gen: live.gen }; }
     return { measure, entry, css, quad, live, stats, frame, epoch: () => epoch, uses: () => uses, flush, invalidate, texture: () => tex() };
 })();

@@ -60373,7 +60373,7 @@ class NativeWetReflections{
                 }
             }else{this.light.globalCompositeOperation='destination-out';this.light.fillStyle='#000';for(const m of movers)game._reflShape(this.light,m,.85);}
         }
-        if(L.puddleRipples&&game._ripples?.length){const ripple=this.ripple;ripple.root.visible=true;game._drawRipples(ripple,night>.5);
+        if(L.puddleRipples&&game._ripples?.length){const ripple=this.ripple;ripple.root.visible=true;if(!this.rings||this.rings.destroyed)this.rings=new GLRipples();ripple.root.addChild(this.rings);this.rings.sync(game._ripples,night>.5,(game.camera?.zoom||1)*(game._renderScale||1));
             if(!this.rippleFilter){this.rippleFilter=new PIXI.Filter(undefined,`precision highp float;varying vec2 vTextureCoord;uniform sampler2D uSampler;uniform vec4 inputSize;uniform vec4 outputFrame;uniform sampler2D wetMask;uniform vec2 viewport;
                 void main(){vec2 p=(outputFrame.xy+vTextureCoord*inputSize.xy)/viewport;gl_FragColor=texture2D(uSampler,vTextureCoord)*texture2D(wetMask,p).a;}`,{wetMask:this.maskTarget,viewport:new Float32Array([W,H])});this.rippleFilter.resolution=.5;}
             this.rippleFilter.uniforms.wetMask=this.maskTarget;this.rippleFilter.uniforms.viewport.set([W,H]);ripple.root.filters=[this.rippleFilter];ripple.root.filterArea=new PIXI.Rectangle(0,0,W,H);
@@ -61243,7 +61243,7 @@ function GLEarcut(data) {
 const GLText = (() => {
     const SIZE = 2048, RES = 3, SPREAD = 6;
     let canvas = null, ctx2d = null, data = null, base = null, texture = null;
-    let shelfX = 0, shelfY = 0, shelfH = 0, revision = 0, dirty = false, epoch = 0, full = false, uses = 0;
+    let shelfX = 0, shelfY = 0, shelfH = 0, revision = 0, dirty = false, rowsLo = 2048, rowsHi = 0, colsLo = 2048, colsHi = 0, puts = 0, epoch = 0, full = false, uses = 0;
     const entries = new Map();
     const fontOf = (size, family, weight = '') => `${weight ? weight + ' ' : ''}${size}px "${family}", "URW Chancery L", "Z003", cursive`;
     const measurer = () => ctx2d || (canvas = document.createElement('canvas'), canvas.width = canvas.height = 8, ctx2d = canvas.getContext('2d', { willReadFrequently: true }));
@@ -61255,7 +61255,23 @@ const GLText = (() => {
     function tex() {
         if (texture) return texture;
         data = new Uint8Array(SIZE * SIZE * 4);
-        base = PIXI.BaseTexture.fromBuffer(data, SIZE, SIZE, { alphaMode: PIXI.ALPHA_MODES.NO_PREMULTIPLIED_ALPHA, scaleMode: PIXI.SCALE_MODES.LINEAR, mipmap: PIXI.MIPMAP_MODES.OFF });
+        // Uploaded once whole; after that only the rows new entries were written to (a changing label is a few
+        // kilobytes, not the whole 16 MB atlas)
+        class Rows extends PIXI.BufferResource {
+            upload(renderer, baseTexture, glTexture) {
+                const gl = renderer.gl;
+                if (glTexture.width !== SIZE || glTexture.height !== SIZE || rowsLo >= rowsHi) { rowsLo = colsLo = SIZE; rowsHi = colsHi = 0; return super.upload(renderer, baseTexture, glTexture); }
+                gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+                if (renderer.context.webGLVersion >= 2) {          // just the rectangle written to
+                    gl.pixelStorei(gl.UNPACK_ROW_LENGTH, SIZE); gl.pixelStorei(gl.UNPACK_SKIP_PIXELS, colsLo); gl.pixelStorei(gl.UNPACK_SKIP_ROWS, rowsLo);
+                    gl.texSubImage2D(gl.TEXTURE_2D, 0, colsLo, rowsLo, colsHi - colsLo, rowsHi - rowsLo, gl.RGBA, gl.UNSIGNED_BYTE, data);
+                    gl.pixelStorei(gl.UNPACK_ROW_LENGTH, 0); gl.pixelStorei(gl.UNPACK_SKIP_PIXELS, 0); gl.pixelStorei(gl.UNPACK_SKIP_ROWS, 0);
+                } else gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, rowsLo, SIZE, rowsHi - rowsLo, gl.RGBA, gl.UNSIGNED_BYTE, data.subarray(rowsLo * SIZE * 4, rowsHi * SIZE * 4));
+                rowsLo = colsLo = SIZE; rowsHi = colsHi = 0;
+                return true;
+            }
+        }
+        base = new PIXI.BaseTexture(new Rows(data, { width: SIZE, height: SIZE }), { alphaMode: PIXI.ALPHA_MODES.NO_PREMULTIPLIED_ALPHA, scaleMode: PIXI.SCALE_MODES.LINEAR, mipmap: PIXI.MIPMAP_MODES.OFF });
         return (texture = new PIXI.Texture(base));
     }
     // The distance field and glow channels, from the glyph run's coverage: pure arithmetic, run in a worker
@@ -61331,7 +61347,7 @@ const GLText = (() => {
     function put(e, w, hgt, out, rev) {
         if (rev !== revision || !data || e.dead) return;
         for (let y = 0; y < hgt; y++) data.set(out.subarray(y * w * 4, (y + 1) * w * 4), ((e.y + y) * SIZE + e.x) * 4);
-        e.ready = true; dirty = true;
+        e.ready = true; dirty = true; rowsLo = Math.min(rowsLo, e.y); rowsHi = Math.max(rowsHi, e.y + hgt); colsLo = Math.min(colsLo, e.x); colsHi = Math.max(colsHi, e.x + w); puts++;
     }
     /** An atlas entry for text at size (world px): uv rect and its world size, centred on the text's middle */
     function entry(text, size, family = 'Great Vibes', neon = false, weight = '') {
@@ -61410,7 +61426,7 @@ const GLText = (() => {
         live.entries.clear(); live.x = 0; live.y = LIVE_Y; live.h = 0; live.gen++;
         revision++; epoch++;
     }
-    function stats() { return { big: [...entries].map(([k, e]) => [k.slice(0, 40), e.w, e.h]).sort((a, b) => b[1] * b[2] - a[1] * a[2]).slice(0, 12), y: shelfY + shelfH, limit: LIVE_Y, entries: entries.size, live: live.entries.size, gen: live.gen }; }
+    function stats() { return { puts, big: [...entries].map(([k, e]) => [k.slice(0, 40), e.w, e.h]).sort((a, b) => b[1] * b[2] - a[1] * a[2]).slice(0, 12), y: shelfY + shelfH, limit: LIVE_Y, entries: entries.size, live: live.entries.size, gen: live.gen }; }
     return { measure, entry, css, quad, live, stats, frame, epoch: () => epoch, uses: () => uses, flush, invalidate, texture: () => tex() };
 })();
 // GL engine: the building model. Turns a building's description (sections, floors, colours,
@@ -66772,19 +66788,31 @@ const GLPeople = (() => {
         B.vertex([cx - hw, cy + hh, 0, 0], undefined, undefined, 0, 0, 0, c, t(e.u0, e.v1));
         B.index.push(base, base + 1, base + 2, base, base + 2, base + 3);
     }
+    // A string is set in pieces: its runs of letters whole (kerning and script joins kept), each digit on its own,
+    // so a number that changes every frame (a distance, a timer, damage) reuses the digits already in the atlas
+    const pieces = new Map();
+    function layout(text, font) {
+        const key = text + '|' + font; let L = pieces.get(key);
+        if (L && L.gen === GLText.live.gen) return L;
+        const runs = text.match(/\d|\D+/g) || [], parts = []; let w = 0;
+        for (const run of runs) { const e = GLText.css(run, font); if (!e) return null; parts.push([e, w + e.tw / 2]); w += e.tw; }
+        L = { parts, w, gen: GLText.live.gen };
+        if (pieces.size > 512) pieces.clear();
+        pieces.set(key, L); return L;
+    }
     function write(ctx, text, x, y, maxWidth, stroke) {
         text = String(text);
         if (!text || ctx.globalAlpha <= 0) return;
-        const font = ctx.font || '10px sans-serif', e = GLText.css(text, font);
-        if (!e) return;
+        const font = ctx.font || '10px sans-serif', L = layout(text, font);
+        if (!L) return;
         const style = stroke ? ctx.strokeStyle : ctx.fillStyle, c = ink(style), a = c[3] * ctx.globalAlpha;
         if (a <= 0) return;
         ctx.hashValue(text); ctx.hashValue(font); ctx.hashValue(typeof style === 'string' ? style : JSON.stringify(style?.stops || '')); ctx.hashValue(ctx.globalAlpha);
         ctx.hashValue(x); ctx.hashValue(y); ctx.hashValue(ctx.textAlign || ''); ctx.hashValue(ctx.textBaseline || ''); ctx.hashValue(GLText.live.gen);
         const m = ctx.matrix; for (const v of [m.a, m.b, m.c, m.d, m.tx, m.ty]) ctx.hashValue(v);
         if (stroke) ctx.hashValue(ctx.lineWidth);
-        const sx = maxWidth > 0 && e.tw > maxWidth ? maxWidth / e.tw : 1, w = e.tw * sx, align = ctx.textAlign || 'start';
-        const cx = align === 'center' ? x : align === 'right' || align === 'end' ? x - w / 2 : x + w / 2;
+        const sx = maxWidth > 0 && L.w > maxWidth ? maxWidth / L.w : 1, w = L.w * sx, align = ctx.textAlign || 'start';
+        const left = align === 'center' ? x - w / 2 : align === 'right' || align === 'end' ? x - w : x;
         const cy = y + middle(font, ctx.textBaseline || 'alphabetic');
         const P = ctx.pen(), B = P.B, r = ctx.current, k = detail(ctx) * Math.sqrt(Math.abs(m.a * m.d - m.b * m.c)) || 1;
         r._hasText = true;
@@ -66793,10 +66821,10 @@ const GLPeople = (() => {
             const sc = ctx.shadowBlur > 0 || ctx.shadowOffsetX || ctx.shadowOffsetY ? GLColor.parse(ctx.shadowColor || 'transparent') : null;
             if (sc && sc[3] > 0) {
                 // Canvas's text shadow: the glyphs' soft edge, spread by the blur (the field reaches 6 px past the glyph)
-                const b = (ctx.shadowBlur || 0) / k;
-                quad(B, e, cx + (ctx.shadowOffsetX || 0) / k, cy + (ctx.shadowOffsetY || 0) / k, sx, Math.max(.05, edge - b / 48), Math.max(soft, Math.min(.45, b / 24)), [sc[0], sc[1], sc[2], sc[3] * ctx.globalAlpha]);
+                const b = (ctx.shadowBlur || 0) / k, ox = (ctx.shadowOffsetX || 0) / k, oy = (ctx.shadowOffsetY || 0) / k, col = [sc[0], sc[1], sc[2], sc[3] * ctx.globalAlpha];
+                for (const [e, at] of L.parts) quad(B, e, left + at * sx + ox, cy + oy, sx, Math.max(.05, edge - b / 48), Math.max(soft, Math.min(.45, b / 24)), col);
             }
-            quad(B, e, cx, cy, sx, edge, soft, [c[0], c[1], c[2], a]);
+            for (const [e, at] of L.parts) quad(B, e, left + at * sx, cy, sx, edge, soft, [c[0], c[1], c[2], a]);
         });
     }
     // Measured by the font engine that sets the glyphs (plates and bubbles fit their text as in Canvas)
@@ -66813,6 +66841,60 @@ const GLPeople = (() => {
         render.call(this, r);
     };
 })();
+// GL engine: the rings rain and footsteps make on puddles (engine/reflections.js _drawRipples). Each ring
+// is one quad whose shader draws the 1-unit stroke of its ellipse, antialiased at the current zoom, instead
+// of a stroked polygon of dozens of segments: a downpour of 70 rings is a few kilobytes a frame.
+class GLRipples extends PIXI.Mesh {
+    constructor() {
+        const geometry = new PIXI.Geometry()
+            .addAttribute('aVertexPosition', new PIXI.Buffer(new Float32Array(0), false, false), 2)
+            .addAttribute('aLocal', new PIXI.Buffer(new Float32Array(0), false, false), 2)
+            .addAttribute('aRing', new PIXI.Buffer(new Float32Array(0), false, false), 2)
+            .addIndex(new PIXI.Buffer(new Uint16Array(0), false, true));
+        const shader = PIXI.Shader.from(`precision highp float;
+            attribute vec2 aVertexPosition; attribute vec2 aLocal; attribute vec2 aRing;
+            uniform mat3 translationMatrix; uniform mat3 projectionMatrix;
+            varying vec2 vLocal; varying vec2 vRing;
+            void main() { vLocal = aLocal; vRing = aRing; gl_Position = vec4((projectionMatrix * translationMatrix * vec3(aVertexPosition, 1.)).xy, 0., 1.); }`,
+        `precision highp float;
+            varying vec2 vLocal; varying vec2 vRing; uniform vec3 uColor; uniform float uPx; uniform float uAlpha;
+            void main() {
+                float off = abs(length(vLocal) - 1.) * vRing.x;                 // world units from the ring's line
+                float a = clamp((.5 - off) * uPx + .5, 0., 1.) * vRing.y * uAlpha;   // a 1-unit stroke, its edge a pixel soft
+                gl_FragColor = vec4(uColor * a, a);
+            }`, { uColor: new Float32Array([1, 1, 1]), uPx: 1, uAlpha: 1 });
+        super(geometry, shader);
+        this.cap = 0; this.count = 0;
+    }
+    /** This frame's ripples ([{ x, y, t, life, r, big }]), at night or not, at px screen pixels per world unit */
+    sync(list, night, px) {
+        const rings = [];
+        for (const r of list) {
+            const f = r.t / r.life, a = (1 - f) * (r.big ? 0.55 : 0.4);
+            rings.push([r.x, r.y, 1 + f * r.r, a]);
+            if (r.big && f < 0.6) rings.push([r.x, r.y, 1 + f * r.r * 0.55, a]);
+        }
+        const n = rings.length;
+        if (n > this.cap) {
+            this.cap = Math.max(64, n * 2);
+            const idx = new Uint16Array(this.cap * 6);
+            for (let i = 0; i < this.cap; i++) idx.set([i * 4, i * 4 + 1, i * 4 + 2, i * 4, i * 4 + 2, i * 4 + 3], i * 6);
+            this.geometry.getIndex().update(idx);
+            this.pos = new Float32Array(this.cap * 8); this.loc = new Float32Array(this.cap * 8); this.ring = new Float32Array(this.cap * 8);
+        }
+        const P = this.pos, L = this.loc, G = this.ring;
+        for (let i = 0; i < n; i++) {
+            const [x, y, rx, a] = rings[i], ry = rx * 0.8, mx = (rx + 1.5) / rx, my = (ry + 1.5) / ry;
+            P.set([x - rx * mx, y - ry * my, x + rx * mx, y - ry * my, x + rx * mx, y + ry * my, x - rx * mx, y + ry * my], i * 8);
+            L.set([-mx, -my, mx, -my, mx, my, -mx, my], i * 8);
+            for (let k = 0; k < 4; k++) { G[i * 8 + k * 2] = (rx + ry) / 2; G[i * 8 + k * 2 + 1] = a; }
+        }
+        this.geometry.getBuffer('aVertexPosition').update(P); this.geometry.getBuffer('aLocal').update(L); this.geometry.getBuffer('aRing').update(G);
+        this.size = n * 6; this.visible = n > 0;
+        const u = this.shader.uniforms; u.uColor.set(night ? [0xd8 / 255, 0xc6 / 255, 1] : [1, 1, 1]); u.uPx = px;
+        this.blendMode = PIXI.BLEND_MODES.NORMAL;
+    }
+}
         class GameEngine {
             constructor() {
                 

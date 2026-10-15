@@ -139,7 +139,7 @@ class NativeWetReflections{
                 }
             }else{this.light.globalCompositeOperation='destination-out';this.light.fillStyle='#000';for(const m of movers)game._reflShape(this.light,m,.85);}
         }
-        if(L.puddleRipples&&game._ripples?.length){const ripple=this.ripple;ripple.root.visible=true;game._drawRipples(ripple,night>.5);
+        if(L.puddleRipples&&game._ripples?.length){const ripple=this.ripple;ripple.root.visible=true;if(!this.rings||this.rings.destroyed)this.rings=new GLRipples();ripple.root.addChild(this.rings);this.rings.sync(game._ripples,night>.5,(game.camera?.zoom||1)*(game._renderScale||1));
             if(!this.rippleFilter){this.rippleFilter=new PIXI.Filter(undefined,`precision highp float;varying vec2 vTextureCoord;uniform sampler2D uSampler;uniform vec4 inputSize;uniform vec4 outputFrame;uniform sampler2D wetMask;uniform vec2 viewport;
                 void main(){vec2 p=(outputFrame.xy+vTextureCoord*inputSize.xy)/viewport;gl_FragColor=texture2D(uSampler,vTextureCoord)*texture2D(wetMask,p).a;}`,{wetMask:this.maskTarget,viewport:new Float32Array([W,H])});this.rippleFilter.resolution=.5;}
             this.rippleFilter.uniforms.wetMask=this.maskTarget;this.rippleFilter.uniforms.viewport.set([W,H]);ripple.root.filters=[this.rippleFilter];ripple.root.filterArea=new PIXI.Rectangle(0,0,W,H);
