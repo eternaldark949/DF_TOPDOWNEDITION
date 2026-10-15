@@ -63,15 +63,22 @@
         for(let i=0;i<=n;i++){const a=start+span*i/n,px=x+Math.cos(a)*rx*c-Math.sin(a)*ry*s,py=y+Math.cos(a)*rx*s+Math.sin(a)*ry*c;
             if(!this.part)this.moveTo(px,py);else this.lineTo(px,py);}
     };
-    // Shape key: authored points (1/256 px), closure, rule and stroke shape. Two independent
-    // 32-bit hashes keep accidental collisions out of reach for a few thousand live shapes.
-    // Translation-invariant: points are taken relative to the first one, so the same shape drawn
-    // somewhere else (a bouncing curl, a stepping foot) reuses its geometry.
-    function shapeKey(paths,extra,ox,oy){
+    // Shape key: authored points, closure, rule and stroke shape. Two independent 32-bit hashes
+    // keep accidental collisions out of reach for a few thousand live shapes.
+    // Rigid-motion invariant: points are taken relative to the first one and rotated so the first
+    // point at least a pixel away lies on +x. The same shape moved or turned (a swinging forearm,
+    // a stepping foot, a bouncing curl) reuses its geometry; only its transform changes.
+    // Returns the canonical frame {ox, oy, c, s} with the key.
+    function canonical(paths,extra){
+        const l0=paths[0].local,ox=l0[0],oy=l0[1];let c=1,s=0;
+        for(const p of paths){const l=p.local;let found=false;
+            for(let i=0;i<l.length;i+=2){const dx=l[i]-ox,dy=l[i+1]-oy,d=Math.hypot(dx,dy);if(d>=1){c=dx/d;s=dy/d;found=true;break;}}
+            if(found)break;}
         let h1=2166136261,h2=5381;const mix=v=>{h1=Math.imul(h1^v,16777619);h2=(Math.imul(h2,33)^v)|0;};
         for(let i=0;i<extra.length;i++)mix(extra.charCodeAt(i));
-        for(const p of paths){mix(p.closed?1:2);const l=p.local;mix(l.length);for(let i=0;i<l.length;i+=2){mix(((l[i]-ox)*256)|0);mix(((l[i+1]-oy)*256)|0);}}
-        return (h1>>>0).toString(36)+':'+(h2>>>0).toString(36);
+        for(const p of paths){mix(p.closed?1:2);const l=p.local;mix(l.length);
+            for(let i=0;i<l.length;i+=2){const dx=l[i]-ox,dy=l[i+1]-oy;mix(Math.round((c*dx+s*dy)*64));mix(Math.round((c*dy-s*dx)*64));}}
+        return {key:(h1>>>0).toString(36)+':'+(h2>>>0).toString(36),ox,oy,c,s};
     }
     // Paths built entirely under one transform qualify; returns that transform (the current one).
     function sharedFrame(ctx,paths){
@@ -133,9 +140,10 @@
         if(!path||typeof path==='string'){
             const paths=this.path,m=sharedFrame(this,paths);
             if(m&&typeof style==='string'&&!this.retainedOff){
-                const ox=paths[0].local[0],oy=paths[0].local[1];
-                const local=()=>paths.map(p=>({points:p.local.map((v,i)=>v-(i&1?oy:ox)),closed:p.closed}));
-                if(this.retained(kind,style,build,local,shapeKey(paths,kind,ox,oy),new PIXI.Matrix(m.a,m.b,m.c,m.d,m.a*ox+m.c*oy+m.tx,m.b*ox+m.d*oy+m.ty)))return;
+                const f=canonical(paths,kind),{ox,oy,c,s}=f;
+                const local=()=>paths.map(p=>{const l=p.local,o=new Array(l.length);for(let i=0;i<l.length;i+=2){const dx=l[i]-ox,dy=l[i+1]-oy;o[i]=c*dx+s*dy;o[i+1]=c*dy-s*dx;}return {points:o,closed:p.closed};});
+                // Draw transform: m, then the canonical frame's translation and rotation.
+                if(this.retained(kind,style,build,local,f.key,new PIXI.Matrix(m.a*c+m.c*s,m.b*c+m.d*s,m.c*c-m.a*s,m.d*c-m.b*s,m.a*ox+m.c*oy+m.tx,m.b*ox+m.d*oy+m.ty)))return;
             }
         }
         return live(false);
