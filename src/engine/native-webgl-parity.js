@@ -33,17 +33,18 @@ class NativeCasterBodies {
         let r=this.entries.get(e);
         if(!r){
             if(this.entries.size>=32){const old=[...this.entries].find(([,v])=>v.used<this.owner.frameId-2);if(!old){if(heat)this.owner.nightHeat.stats.dropped++;return false;}this.dispose(old[1]);this.entries.delete(old[0]);}
-            r={ctx:new NativeVectorContext(this.owner),target:this.owner.target(PIXI.RenderTexture.create({width:192,height:192,resolution:1,scaleMode:PIXI.SCALE_MODES.LINEAR}),'body-silhouette-target'),hash:null,revision:0};this.entries.set(e,r);
+            const slot=this.slotFor();if(slot===undefined){if(heat)this.owner.nightHeat.stats.dropped++;return false;}
+            r={ctx:new NativeVectorContext(this.owner),...slot,hash:null,revision:0};r.ctx.label='body-'+slot.slot;r.ctx.root.position.set(slot.x,slot.y);this.atlasStage.addChild(r.ctx.root);this.entries.set(e,r);
         }
         this.captures++;if(heat&&!shadow)this.owner.nightHeat.stats.forcedCaptures++;r.used=this.owner.frameId;r.ctx.begin();r.ctx.canvas=ctx.canvas;r.ctx.translate(96,96);
         const m=ctx.matrix;r.ctx.worldFrame=_worldMatrix.multiply(new DOMMatrix([m.a,m.b,m.c,m.d,m.tx,m.ty]));
         if(this.owner.layers.contactShadows&&!c.noShadow&&_zoomLOD<2){const t=ctx.getTransform();_bodyRot=Math.atan2(t.b,t.a);drawHumanContactShadow(ctx,e);}
         draw(r.ctx,e,{...c,noShadow:true,_crowdBake:true});
-        if(r.hash!==r.ctx.hash){this.owner.renderer.render(r.ctx.root,{renderTexture:r.target,clear:true});r.hash=r.ctx.hash;r.revision++;this.stats.refreshes++;}
-        ctx.current=null;const sprite=ctx.node(PIXI.Sprite);sprite.texture=r.target;sprite.alpha=ctx.globalAlpha;sprite.blendMode=ctx.globalCompositeOperation==='lighter'?PIXI.BLEND_MODES.ADD:PIXI.BLEND_MODES.NORMAL;
+        if(r.hash!==r.ctx.hash){this.atlasDirty=true;r.hash=r.ctx.hash;r.revision++;r.bounds=r.ctx.root.getLocalBounds();this.stats.refreshes++;}
+        ctx.current=null;const sprite=ctx.node(PIXI.Sprite);sprite.texture=r.view;sprite.alpha=ctx.globalAlpha;sprite.blendMode=ctx.globalCompositeOperation==='lighter'?PIXI.BLEND_MODES.ADD:PIXI.BLEND_MODES.NORMAL;
         sprite.transform.setFromMatrix(ctx.matrix.clone().append(new PIXI.Matrix(1,0,0,1,-96,-96)));ctx.current=null;
-        this.owner.nightHeat.paint(ctx,e,{texture:r.target,size:192});
-        const sharedBefore=this.stats.shared;this.note(ctx,e,{texture:r.target,size:192,bounds:r.ctx.root.getLocalBounds(),key:r.target.baseTexture.uid+':'+r.revision});this.stats.shared=sharedBefore;this.stats.captures++;
+        this.owner.nightHeat.paint(ctx,e,{texture:r.view,rect:r.rect,size:192});
+        const sharedBefore=this.stats.shared;this.note(ctx,e,{texture:r.view,rect:r.rect,size:192,bounds:r.bounds,key:'body:'+r.slot+':'+r.revision});this.stats.shared=sharedBefore;this.stats.captures++;
         return true;
     }
     circle(e,opacity=1){
@@ -59,9 +60,20 @@ class NativeCasterBodies {
     }
     invalidate(){for(const r of this.entries.values()){r.hash=null;for(const g of r.ctx.gradients)g.key=null;}}
     trim(){for(const [e,r]of this.entries)if(r.used<this.owner.frameId-120){this.dispose(r);this.entries.delete(e);}}
-    dispose(r){r.ctx.destroy();r.target.destroy(true);}
+    // Every captured body lives in one atlas (8x4 slots of 192px) and the whole atlas is drawn in a
+    // single pass per frame (flush), instead of one render-target switch per body: on tiled mobile
+    // GPUs each switch is a full tile flush.
+    slotFor(){
+        if(!this.atlas){const W=192*8,H=192*4;this.atlas=this.owner.target(PIXI.RenderTexture.create({width:W,height:H,resolution:1,scaleMode:PIXI.SCALE_MODES.LINEAR}),'body-atlas');
+            this.atlasStage=new PIXI.Container();this.freeSlots=Array.from({length:32},(_,i)=>31-i);}
+        const slot=this.freeSlots.pop();if(slot===undefined)return undefined;
+        const W=this.atlas.width,H=this.atlas.height,x=(slot%8)*192,y=Math.floor(slot/8)*192;
+        return {slot,x,y,view:new PIXI.Texture(this.atlas.baseTexture,new PIXI.Rectangle(x,y,192,192)),rect:[x/W,y/H,192/W,192/H]};
+    }
+    flush(){if(!this.atlasDirty)return;this.atlasDirty=false;this.owner.renderer.render(this.atlasStage,{renderTexture:this.atlas,clear:true});this.stats.atlasPasses=(this.stats.atlasPasses||0)+1;}
+    dispose(r){r.ctx.destroy();r.view.destroy(false);this.freeSlots.push(r.slot);}
     clear(){for(const r of this.entries.values())this.dispose(r);this.entries.clear();this.begin();}
-    report(){return {...this.stats,casters:this.bodies.size,liveTargets:this.entries.size,bodyBytes:this.entries.size*192*192*4,gradientBytes:[...this.entries.values()].reduce((n,r)=>n+r.ctx.gradients.length*128*128*4,0)};}
+    report(){return {...this.stats,casters:this.bodies.size,liveTargets:this.entries.size,bodyBytes:this.atlas?192*8*192*4*4:0,gradientBytes:[...this.entries.values()].reduce((n,r)=>n+r.ctx.gradients.length*128*128*4,0)};}
 }
 
 Object.assign(NativeWebGLRenderer.prototype,{
@@ -111,7 +123,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         const start=performance.now();
         if(!r.dynamicStage){
             const needed=r.texture.baseTexture.realWidth*r.texture.baseTexture.realHeight*4;
-            if(this.shadowBytes()+needed>24*1048576){stats.dropped+=nearby.length;return base;}
+            if(this.shadowBytes()+needed>48*1048576){stats.dropped+=nearby.length;return base;}
             r.dynamicStage=new PIXI.Container();r.dynamicBase=new PIXI.Sprite(base);r.dynamicStage.addChild(r.dynamicBase);
             r.dynamicTexture=PIXI.RenderTexture.create({width:source.radius*2,height:source.radius*2,resolution:r.density,scaleMode:PIXI.SCALE_MODES.LINEAR});
         }
@@ -131,7 +143,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             let mesh=r.dynamicMeshes[index++];if(!mesh){mesh=new NativeActorShadowMesh();r.dynamicMeshes.push(mesh);r.dynamicStage.addChild(mesh);}mesh.visible=true;
             const u=mesh.shader.uniforms;u.body=a.texture;u.bodySize=a.size*(a.scale||1);u.direction.set([dx/d,dy/d]);u.rotation.set([Math.cos(a.angle||0),Math.sin(a.angle||0)]);
             u.stretch=1+len/CONFIG.HUMAN_SHADE.LAMP_SHADOW_DEPTH;u.offset=len/2;u.opacity=.85*(a.opacity??1);
-            u.frameA.set(a.frames?[a.frames[0]/17,0,1/17,1]:[0,0,1,1]);u.frameB.set(a.frames?[a.frames[1]/17,0,1/17,1]:[0,0,1,1]);u.blend=a.blend||0;
+            u.frameA.set(a.rect||(a.frames?[a.frames[0]/17,0,1/17,1]:[0,0,1,1]));u.frameB.set(a.rect||(a.frames?[a.frames[1]/17,0,1/17,1]:[0,0,1,1]));u.blend=a.blend||0;
             const b=a.bounds||{x:0,y:0,width:a.size,height:a.size},coords=[];
             for(const x of [b.x-a.size/2,b.x+b.width-a.size/2])for(const y of [b.y-a.size/2,b.y+b.height-a.size/2]){
                 const wx=(x*u.rotation[0]-y*u.rotation[1])*(a.scale||1),wy=(x*u.rotation[1]+y*u.rotation[0])*(a.scale||1),shift=(wx*u.direction[0]+wy*u.direction[1])*(u.stretch-1)+u.offset;coords.push([wx+u.direction[0]*shift,wy+u.direction[1]*shift]);}

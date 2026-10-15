@@ -52,8 +52,8 @@ Object.assign(NativeWebGLRenderer.prototype,{
     syncWorld(game,view){
         // A late web font must replace its fallback in retained sign geometry.
         // Release all old label pins before any new sign can enter the cache.
-        if(this._fontSeen!==(this.fontRevision||0)){for(const rec of this.nativeBuildings.values()){rec.key=rec.glowKey=null;for(const c of [rec.base,rec.top,rec.glowContext,rec.glowLive])c?.releaseText();}this._fontSeen=this.fontRevision||0;}
-        const start=performance.now();let lap=start;const timings={};this.nightHeat.begin(game);this.nativeCasters.begin(game);this.crowdAtlas.begin();this.buildingStats={hits:0,rasterizations:0,rasterMs:0,livePaths:0,fallbacks:0,evictions:0,returns:0,targetReuses:0,targetBorrows:0,targetCreates:0,baseRebuilds:0,topRebuilds:0};const L=this.layers,map=game.activeMap;
+        if(this._fontSeen!==(this.fontRevision||0)){for(const rec of this.nativeBuildings.values()){rec.key=rec.glowKey=null;this.dropProjected(rec,'projBase');this.dropProjected(rec,'projTop');this.dropProjected(rec,'projGlow');for(const c of [rec.base,rec.top,rec.glowContext,rec.glowLive])c?.releaseText();}this._fontSeen=this.fontRevision||0;}
+        const start=performance.now();let lap=start;const timings={};this.nightHeat.begin(game);this.nativeCasters.begin(game);this.crowdAtlas.begin();this.projectionStats={hits:0,captures:0,fallbacks:0,captureMs:0,vertices:0};this.buildingStats={hits:0,rasterizations:0,rasterMs:0,livePaths:0,fallbacks:0,evictions:0,returns:0,targetReuses:0,targetBorrows:0,targetCreates:0,baseRebuilds:0,topRebuilds:0};const L=this.layers,map=game.activeMap;
         for(const ctx of [this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.roofDetailContext,this.rainContext,this.occupantContext,this.foliageContext])ctx.canvas=game.canvas;
         for(const ctx of [this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.roofDetailContext,this.occupantContext,this.foliageContext])ctx.sceneFrame=_worldMatrix;
         const vw=game.canvas.width/(2*view.zoom),vh=game.canvas.height/(2*view.zoom);
@@ -101,6 +101,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
                 game.drawCorpses(actors,bounds);game.scenes?.drawActors(actors);
             }finally{GameSettings.crowdQuality=crowd;}
         }
+        this.nativeCasters.flush();   // all captured bodies, one atlas pass
         this.syncSceneDepth(game);
         timings.peopleMs=performance.now()-lap;lap=performance.now();
         this.syncDrivenCar(game);timings.drivenCarMs=performance.now()-lap;lap=performance.now();
@@ -122,9 +123,16 @@ Object.assign(NativeWebGLRenderer.prototype,{
                 key=[game.camera.x,game.camera.y,common].join(':'),baseKey=b.isV2&&b.drawBase&&b.drawTop?common:key;
             // Ground-plane art has no camera lean. Reproject facades and roofs
             // exactly, while their imported artwork/gradient storage stays resident.
-            if(r.baseKey!==baseKey){r.base.begin();b.drawBase?b.drawBase(r.base):b.draw(r.base);r.baseKey=baseKey;this.trimBuildingImages(r.base);this.buildingStats.baseRebuilds++;}
-            if(r.key!==key){r.top.begin();b.drawTop?.(r.top,game.worldMinutes);b.drawSign?.(r.top);r.key=key;this.trimBuildingImages(r.top);this.buildingStats.topRebuilds++;}
-            if(L.buildingCache){if(!this.syncBuildingGlow(b,r,game,view,key)&&L.glows)b.drawEmissive?.(glow,game.dayCycle().darkness);}
+            // Camera-leaned layers go through the GPU projector (native-webgl-projection.js); a layer it
+            // can't represent is redrawn live whenever the camera moves, as before.
+            const drawBase=c=>b.drawBase?b.drawBase(c):b.draw(c),drawTop=c=>{b.drawTop?.(c,game.worldMinutes);b.drawSign?.(c);};
+            if(baseKey!==key||!this.syncProjectedLayer(r,'projBase',r.base,common,b,drawBase,game,view)){
+                if(r.baseKey!==baseKey||r.projBase?.box){if(r.projBase?.box)this.dropProjected(r,'projBase');r.base.begin();drawBase(r.base);r.baseKey=baseKey;this.trimBuildingImages(r.base);this.buildingStats.baseRebuilds++;}
+            }else r.baseKey=null;
+            if(!this.syncProjectedLayer(r,'projTop',r.top,common,b,drawTop,game,view)){
+                if(r.key!==key||r.projTop?.box){if(r.projTop?.box)this.dropProjected(r,'projTop');r.top.begin();drawTop(r.top);r.key=key;this.trimBuildingImages(r.top);this.buildingStats.topRebuilds++;}
+            }else r.key=null;
+            if(L.buildingCache){if(!this.syncBuildingGlow(b,r,game,view,key,common)&&L.glows)b.drawEmissive?.(glow,game.dayCycle().darkness);}
             else {if(r.glowMesh)r.glowMesh.visible=r.glowLive.root.visible=false;if(L.glows)b.drawEmissive?.(glow,game.dayCycle().darkness);}
         }
         this.trimBuildingRecords(now);
@@ -164,7 +172,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.rainStats={mode:L.rainQuads?'quads':'paths',...this.rainBatch.stats,drops:L.rainDrops&&rainK>.01?weather.drops.length:0,splashes:L.rainSplashes&&rainK>.01?weather.splashes.length:0,paths:rain.pathsPainted,cpuMs:performance.now()-rainStart};
         // Bound per-map imported bitmap residency to images still referenced by
         // live contexts (ground, authored sprites and fixtures have own owners).
-        this.worldStats={heat:this.nightHeat.report(),buildingCache:{...this.buildingStats,bytes:this.buildingGlowBytes()},timings,crowd:{...this.crowdAtlas.stats,entries:this.crowdAtlas.entries.size,bytes:this.crowdAtlas.bytes},buildings,people,vehicles,groundPending:game.groundBaker?.stats?.flat||0,groundTiles:game.groundBaker?.cache.size||0,
+        this.worldStats={heat:this.nightHeat.report(),projection:{...this.projectionStats},buildingCache:{...this.buildingStats,bytes:this.buildingGlowBytes()},timings,crowd:{...this.crowdAtlas.stats,entries:this.crowdAtlas.entries.size,bytes:this.crowdAtlas.bytes},buildings,people,vehicles,groundPending:game.groundBaker?.stats?.flat||0,groundTiles:game.groundBaker?.cache.size||0,
             paths:actors.pathsPainted+traffic.pathsPainted+street.pathsPainted,cpuMs:performance.now()-start};
         this.nativeCasters.trim();this.worldStats.casters=this.nativeCasters.report();
         this.layerStages.worldMs=this.worldStats.cpuMs;

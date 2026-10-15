@@ -181,14 +181,24 @@ Object.assign(NativeWebGLRenderer.prototype,{
             out.push({owner:p,x,y,w:18,h:18,elevation:24,key:x+','+y,points:Array.from({length:12},(_,i)=>[x+Math.cos(i*Math.PI/6)*9,y+Math.sin(i*Math.PI/6)*9])});}
         return out;
     },
+    // Shadow texels follow the light's size on screen: about one texel per 1.5 device pixels,
+    // in power-of-two steps so camera zoom easing doesn't reallocate every frame. High-resolution
+    // shadows allow up to 768 texels across a light (was 256), standard 512 (was 128).
+    retireShadow(r){(this.retiredShadows||(this.retiredShadows=[])).push({r,frame:this.frameId});},
+    releaseShadows(){const keep=[];for(const x of this.retiredShadows||[]){if(this.frameId-x.frame<2){keep.push(x);continue;}const r=x.r;r.stage.destroy({children:true});r.texture.destroy(true);if(r.dynamicStage){r.dynamicStage.destroy({children:true});r.dynamicTexture.destroy(true);}}this.retiredShadows=keep;},
+    shadowDensity(radius){
+        const px=(game.canvas.width/Math.max(1,game.canvas.clientWidth||game.canvas.width))*(game.view?.zoom||1),cap=this.layers.shadowDetail?768:512;
+        const want=Math.min(cap,Math.max(64,radius*2*px/1.5));let density=Math.pow(2,Math.round(Math.log2(want/(radius*2))));
+        while(radius*2*density>cap*1.42)density/=2;return density*(this.shadowScale||1);
+    },
     shadowTexture(source,casters,walls,wallKey){
-        const start=performance.now(),radius=source.radius,density=Math.min(this.layers.shadowDetail ? .5 : .25,(this.layers.shadowDetail?256:128)/(radius*2));
+        const start=performance.now(),radius=source.radius,density=this.shadowDensity(radius);
         const nearby=casters.filter(c=>c.owner!==source.owner&&Math.hypot(c.x-source.x,c.y-source.y)<radius+Math.max(c.w,c.h));
         const key=[source.x,source.y,radius,source.elevation??84,density,source.w||0,source.h||0,source.cookie?.baseTexture.uid||0,this.layers.wallOcclusion?wallKey:'open',...nearby.map(c=>c.key)].join('|');
         let r=this.shadowCache.get(source.owner);
         if(r&&r.key===key){this.shadowStats.hits++;return r.texture;}
         if(!r||r.radius!==radius||r.density!==density){
-            if(r){r.stage.destroy({children:true});r.texture.destroy(true);if(r.dynamicStage){r.dynamicStage.destroy({children:true});r.dynamicTexture.destroy(true);}}
+            if(r)this.retireShadow(r);   // a sprite may still hold it this frame
             const stage=new PIXI.Container(),sprite=new PIXI.Sprite(this.lightGradient),mask=new PIXI.Graphics(),shadow=new PIXI.Graphics();
             sprite.position.set(radius,radius);sprite.anchor.set(.5);sprite.width=sprite.height=radius*2;
             shadow.blendMode=PIXI.BLEND_MODES.ERASE;stage.addChild(sprite,mask,shadow);
@@ -351,6 +361,8 @@ Object.assign(NativeWebGLRenderer.prototype,{
         sources.sort((a,b)=>Math.hypot(a.x-view.x,a.y-view.y)-Math.hypot(b.x-view.x,b.y-view.y));sources.length=Math.min(sources.length,L.decorLights?40:24);
         const occlusion=L.wallOcclusion||L.propShadows||L.playerShadows||L.npcShadows||L.vehicleShadows,casters=occlusion?this.casters(game):[],walls=getOccluders(game.activeMap);
         const wallKey=walls.map(w=>[w.x,w.y,w.w,w.h].join(',')).join(';');
+        // Fit this frame's shadow textures (static + animated) into ~40 MB: halve every light's density until they fit.
+        this.shadowScale=1;if(occlusion){const bytes=()=>sources.reduce((n,q)=>n+(q.radius*2*this.shadowDensity(q.radius))**2*4*2,0);while(this.shadowScale>1/8&&bytes()>40*1048576)this.shadowScale/=2;}
         for(let i=0;i<this.lightSprites.children.length;i++){
             const s=this.lightSprites.children[i],source=sources[i];s.visible=!!source;if(!source)continue;
             s.texture=occlusion?this.shadowTexture(source,casters,walls,wallKey):source.cookie||((source.wash??.08)===.08?this.holeGradient:this.decorGradient);
@@ -362,7 +374,8 @@ Object.assign(NativeWebGLRenderer.prototype,{
         // Visible lights touch the LRU; travelling across the city must not
         // retain every street lamp's targets for the rest of the session.
         for(const source of sources){const r=this.shadowCache.get(source.owner);if(r){this.shadowCache.delete(source.owner);this.shadowCache.set(source.owner,r);}}
-        while(this.shadowCache.size>64||this.shadowBytes()>24*1048576){const owner=this.shadowCache.keys().next().value,r=this.shadowCache.get(owner);r.stage.destroy({children:true});r.texture.destroy(true);if(r.dynamicStage){r.dynamicStage.destroy({children:true});r.dynamicTexture.destroy(true);}this.shadowCache.delete(owner);}
+        const live=new Set(sources.map(q=>q.owner));this.releaseShadows();
+        for(const [owner,r]of this.shadowCache){if(this.shadowCache.size<=64&&this.shadowBytes()<=48*1048576)break;if(live.has(owner))continue;this.shadowCache.delete(owner);this.retireShadow(r);}
         this.shadowStats.sources=sources.length;this.worldStats.casters=this.nativeCasters.report();
         this.lightStage.filters=L.softShadows?[this.softFilter]:null;
         this.lighting.uniforms.mapSize.set([game.activeMap.width,game.activeMap.height]);
