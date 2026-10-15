@@ -10,12 +10,12 @@
 // footprint and at the roof. C is leanCamHeight(), a uniform.
 //
 // Vertex layout (floats): pos xyz, prev xyz, next xyz (strokes only), line (side, half width,
-// flags, lean mode), colour rgba, meta (face, min depth, max LOD, -), anim (type, a, b, c),
-// text (u, v, edge, softness).
-const GLB_STRIDE = 3 + 3 + 3 + 4 + 4 + 4 + 4 + 4;
-const GLB_MAX_FACES = 32;
+// flags, lean mode), colour rgba, meta (on a face, min depth, max LOD, additive), anim (type, a, b, c),
+// text (u, v, edge, softness), face (the wall it belongs to: outward normal xy, a point on it xy).
+// The face rides on every vertex, so a building can have any number of walls (a curved tower has hundreds).
+const GLB_STRIDE = 3 + 3 + 3 + 4 + 4 + 4 + 4 + 4 + 4;
 // anim types (vertex shader)
-const GLB_ANIM = { NONE: 0, SPIN: 1, CAUSTIC: 2, SWAY: 3, SHIMMER: 4, BLINK_ON: 5, BLINK_OFF: 6, WINDOW: 7, SKY: 8, SHEEN: 9, RIM: 10, RADIAL: 11, FLICKER: 12, GLOW: 13, TV: 14, WINDOW_TV: 15 };
+const GLB_ANIM = { NONE: 0, SPIN: 1, CAUSTIC: 2, SWAY: 3, SHIMMER: 4, BLINK_ON: 5, BLINK_OFF: 6, WINDOW: 7, SKY: 8, SHEEN: 9, RIM: 10, RADIAL: 11, FLICKER: 12, GLOW: 13, TV: 14, WINDOW_TV: 15, BEAM: 16, BREATHE: 17, FADE: 18, SIGN: 19, RIPPLE: 20 };
 // line flags
 const GLB_LINE = { SCALE_K: 1, SQUARE: 2 };
 
@@ -51,17 +51,29 @@ const GLColor = {
  */
 class GLBuildingBuilder {
     constructor(H) {
-        this.H = H; this.data = new Float32Array(4096); this.n = 0; this.index = []; this.faces = []; this.anchors = [];
+        this.H = H; this.data = new Float32Array(4096); this.n = 0; this.index = []; this.faces = [];
         this._c = [1, 1, 1, 1]; this._face = -1; this._minDepth = 0; this._maxLod = 9; this._anim = [0, 0, 0, 0]; this._text = [-1, 0, 0, 0];
     }
     // ---- pen state ----
     color(c, a = 1) { const v = GLColor.parse(c); this._c = a === 1 ? v : [v[0], v[1], v[2], v[3] * a]; return this; }
-    /** Faces register a plane (visible when dot(n, cam) > c) and an anchor (its depth gauge) */
-    addFace(f) { this.faces.push([f.nx, f.ny, f.nx * (f.side === 'C' ? (f.x1 + f.x2) / 2 : f.x1) + f.ny * (f.side === 'C' ? (f.y1 + f.y2) / 2 : f.y1)]); this.anchors.push([f.x1, f.y1]); return this.faces.length - 1; }
+    /** Faces register their plane: outward normal and its start point (visible when the camera is in front;
+        the start point is also the depth gauge). Chord faces ('C') have the chord's normal, so any point of it will do */
+    addFace(f) { this.faces.push([f.nx, f.ny, f.x1, f.y1]); return this.faces.length - 1; }
     face(id) { this._face = id; return this; }
     gate(minDepth = 0, maxLod = 9) { this._minDepth = minDepth; this._maxLod = maxLod; return this; }
     anim(type = 0, a = 0, b = 0, c = 0) { this._anim = [type, a, b, c]; return this; }
     text(u = -1, v = 0, edge = 0, soft = 0) { this._text = [u, v, edge, soft]; return this; }
+    /** Pieces drawn far-first, re-sorted as the camera moves (Canvas sorted a curved tower's walls each frame):
+        fn(item) — call item(x, y) before each piece's geometry, (x, y) its distance anchor */
+    sorted(fn) {
+        const g = { i0: this.index.length, items: [] };
+        fn((x, y) => g.items.push({ x, y, i0: this.index.length }));
+        g.i1 = this.index.length;
+        g.items.forEach((it, i) => { it.i1 = i + 1 < g.items.length ? g.items[i + 1].i0 : g.i1; });
+        g.items = g.items.filter(it => it.i1 > it.i0);
+        if (g.items.length > 1) (this.groups || (this.groups = [])).push(g);
+        return this;
+    }
     reset() { this._face = -1; this._minDepth = 0; this._maxLod = 9; this._anim = [0, 0, 0, 0]; this._text = [-1, 0, 0, 0]; return this; }
 
     _grow(n) {
@@ -85,9 +97,11 @@ class GLBuildingBuilder {
         d[o + 6] = next[0]; d[o + 7] = next[1]; d[o + 8] = next[2] || 0;
         d[o + 9] = side; d[o + 10] = hw; d[o + 11] = flags; d[o + 12] = p[3] || 0;
         d[o + 13] = color[0]; d[o + 14] = color[1]; d[o + 15] = color[2]; d[o + 16] = color[3];
-        d[o + 17] = this._face; d[o + 18] = this._minDepth; d[o + 19] = this._maxLod; d[o + 20] = this._add || 0;
+        const fc = this._face >= 0 ? this.faces[this._face] : null;
+        d[o + 17] = fc ? 1 : 0; d[o + 18] = this._minDepth; d[o + 19] = this._maxLod; d[o + 20] = this._add || 0;
         d[o + 21] = a[0]; d[o + 22] = a[1]; d[o + 23] = a[2]; d[o + 24] = a[3];
         d[o + 25] = t[0]; d[o + 26] = t[1]; d[o + 27] = t[2]; d[o + 28] = t[3];
+        if (fc) { d[o + 29] = fc[0]; d[o + 30] = fc[1]; d[o + 31] = fc[2]; d[o + 32] = fc[3]; } else d[o + 29] = d[o + 30] = d[o + 31] = d[o + 32] = 0;
         return this.n++;
     }
     // ---- fills ----
@@ -169,10 +183,10 @@ class GLBuildingBuilder {
         for (let i = 0; i <= n; i++) { const t = i / n, u = 1 - t; out.push([u * u * a[0] + 2 * u * t * c[0] + t * t * b[0], u * u * a[1] + 2 * u * t * c[1] + t * t * b[1], a[2] || 0, a[3] || 0]); }
         return out;
     }
-    /** The finished geometry: interleaved vertices, indices, face planes and anchors */
+    /** The finished geometry: interleaved vertices and indices */
     finish() {
         return { data: this.data.slice(0, this.n * GLB_STRIDE), index: this.n > 65535 ? new Uint32Array(this.index) : new Uint16Array(this.index),
-                 vertices: this.n, faces: this.faces, anchors: this.anchors };
+                 vertices: this.n, groups: this.groups || null };
     }
 }
 
@@ -193,11 +207,10 @@ class GLBuildingMesh extends PIXI.Mesh {
         if (GLBuildingMesh._shader) return GLBuildingMesh._shader;
         const vs = `precision highp float;
             attribute vec3 aPos; attribute vec3 aPrev; attribute vec3 aNext; attribute vec4 aLine; attribute vec4 aColor;
-            attribute vec4 aMeta; attribute vec4 aAnim; attribute vec4 aText;
+            attribute vec4 aMeta; attribute vec4 aAnim; attribute vec4 aText; attribute vec4 aFace;
             uniform mat3 projectionMatrix; uniform mat3 translationMatrix;
             uniform vec2 uCam; uniform float uC; uniform float uH; uniform float uLod; uniform float uTime; uniform float uPx;
-            uniform vec4 uFaces[${GLB_MAX_FACES}]; uniform vec4 uAnchors[${GLB_MAX_FACES}];
-            uniform vec4 uSun; uniform vec3 uSunRGB; uniform vec4 uRim; uniform vec4 uNight;
+            uniform vec4 uSun; uniform vec3 uSunRGB; uniform vec4 uRim; uniform vec4 uNight; uniform float uFade;
             varying vec4 vColor; varying vec3 vLine; varying vec4 vText; varying vec2 vWorld; varying vec4 vRadial;
             float kOf(vec3 p, float mode){ return mode < .5 ? 1. + p.z / (uC - uH) : uC / (uC - min(p.z, uC * .86)); }
             vec2 lean(vec3 p, float mode){ return uCam + (p.xy - uCam) * kOf(p, mode); }
@@ -206,11 +219,9 @@ class GLBuildingMesh extends PIXI.Mesh {
                 vec3 P = aPos; float mode = aLine.w; vec4 col = aColor; float hide = 0.;
                 vRadial = vec4(0.);
                 // the face this belongs to: hidden when it turns away; detail gated by how much of the wall shows
-                if (aMeta.x > -.5) {
-                    int fi = int(aMeta.x + .5);
-                    vec4 pl = uFaces[fi];
-                    if (dot(pl.xy, uCam) - pl.z <= 0.) hide = 1.;
-                    if (aMeta.y > 0.) { float depth = length(uAnchors[fi].xy - uCam) * uH / (uC - uH); if (depth < aMeta.y) hide = 1.; }
+                if (aMeta.x > .5) {
+                    if (dot(aFace.xy, uCam - aFace.zw) <= 0.) hide = 1.;
+                    if (aMeta.y > 0.) { float depth = length(aFace.zw - uCam) * uH / (uC - uH); if (depth < aMeta.y) hide = 1.; }
                 }
                 if (uLod > aMeta.z) hide = 1.;
                 float t = uTime, ty = aAnim.x;
@@ -226,15 +237,15 @@ class GLBuildingMesh extends PIXI.Mesh {
                         float h = hash(aAnim.y, aAnim.z + uNight.z);
                         if (!(h < aAnim.w) || h < .06) hide = 1.;
                     }
-                    else if (ty < 8.5) { float facing = max(0., dot(uFaces[int(aMeta.x + .5)].xy, uSun.xy)); col.a *= uSun.z * (.3 + .34 * facing); if (uSun.z <= .03) hide = 1.; }
+                    else if (ty < 8.5) { float facing = max(0., dot(aFace.xy, uSun.xy)); col.a *= uSun.z * (.3 + .34 * facing); if (uSun.z <= .03) hide = 1.; }
                     else if (ty < 9.5) {
-                        vec2 n = uFaces[int(aMeta.x + .5)].xy; float facing = max(0., dot(n, uSun.xy));
+                        vec2 n = aFace.xy; float facing = max(0., dot(n, uSun.xy));
                         float sheenA = uSun.z * (.18 + .6 * facing), uc = .5 + .55 * (abs(n.y) > .5 ? uSun.x : uSun.y);
                         float sh = sheenA * max(0., 1. - abs(aAnim.y - uc) / .16) * aAnim.z;
                         col = vec4(uSunRGB, sh); if (!(sh > .01) || uSun.z <= .03) hide = 1.;
                     }
                     else if (ty < 10.5) { col.a *= uRim.w; if (uRim.w <= .01) hide = 1.; }
-                    else if (ty < 11.5) { vRadial = vec4(aAnim.yz, aAnim.w, 1.); }
+                    else if (ty < 11.5) { float kr = kOf(P, mode); vRadial = vec4(lean(vec3(aAnim.yz, P.z), mode), aAnim.w * kr, 1.); }
                     else if (ty < 12.5) {                                  // neon flicker (Canvas _paintSign): breathing, hum, filament, rare brownouts
                         float ms = uNight.w, sd = aAnim.y;
                         float f = (.85 + sin((ms + sd) / 1200.) * .1) * (1. + sin((ms + sd * 1.3) / 80.) * .04) * (1. + sin((ms + sd * 2.7) / 30.) * .03);
@@ -243,9 +254,25 @@ class GLBuildingMesh extends PIXI.Mesh {
                     }
                     else if (ty < 13.5) { col.a *= uNight.x; }
                     else if (ty < 14.5) { if (!(sin(t * 9. + aAnim.w) > 0.)) col.rgb = vec3(.435, .624, .91); }   // a TV: #9ec8ff / #6f9fe8
+                    else if (ty > 15.5 && ty < 16.5) { }                    // BEAM: placed after the lean
+                    else if (ty > 16.5 && ty < 17.5) { col.a *= .65 + .35 * sin(t * 1.3 + aAnim.y); }
+                    else if (ty > 17.5 && ty < 18.5) { col.a *= uFade; }
+                    else if (ty > 19.5 && ty < 20.5) {                     // a ripple ring spreading on water: aAnim (phase, angle, span); half width in aLine.y
+                        float k = fract(t * .45 + aAnim.y), rr = 10. + k * aAnim.w + aLine.y;
+                        P.xy += vec2(cos(aAnim.z), sin(aAnim.z) * .92) * rr; col.a *= .5 * (1. - k);
+                    }
+                    else if (ty > 18.5 && ty < 19.5) {                     // a landmark's script sign: its own flicker, brighter with the dark
+                        float ms = uNight.w, f = .9 + sin(ms / 1300.) * .08 + (sin(ms / 4100.) > .95 ? -.35 : 0.);
+                        col.a *= clamp(f, .55, 1.) * (.35 + .65 * min(1., uNight.y * 1.4)) * max(.45, uFade);
+                    }
                     else if (ty < 15.5) { float h = hash(aAnim.y, aAnim.z + uNight.z); if (!(h < .06)) hide = 1.; if (!(sin(t * 9. + aAnim.w) > 0.)) col.rgb = vec3(.435, .624, .91); }
                 }
                 vec2 S = lean(P, mode);
+                if (ty > 15.5 && ty < 16.5) {                              // a searchlight: from its lamp (leaned), sweeping; aAnim (phase, heading, side)
+                    float ang = -1.5708 + sin(t * .22 + aAnim.y) * .85 + aAnim.z;
+                    if (aAnim.w != 0.) S += vec2(cos(ang + aAnim.w * .07), sin(ang + aAnim.w * .07)) * 900.;
+                    col.a *= uNight.y; if (uNight.y <= .25) hide = 1.;
+                }
                 vLine = vec3(0.);
                 if (aLine.x != 0.) {
                     vec2 A = lean(aPrev, mode), B = lean(aNext, mode);
@@ -289,27 +316,38 @@ class GLBuildingMesh extends PIXI.Mesh {
             }`;
         return (GLBuildingMesh._shader = PIXI.Shader.from(vs, fs, {
             uCam: new Float32Array(2), uC: 1000, uH: 50, uLod: 0, uTime: 0, uPx: 1,
-            uFaces: new Float32Array(GLB_MAX_FACES * 4), uAnchors: new Float32Array(GLB_MAX_FACES * 4),
-            uSun: new Float32Array(4), uSunRGB: new Float32Array(3), uRim: new Float32Array(4), uNight: new Float32Array(4), uFont: PIXI.Texture.WHITE, uAlpha: 1
+            uSun: new Float32Array(4), uSunRGB: new Float32Array(3), uRim: new Float32Array(4), uNight: new Float32Array(4), uFont: PIXI.Texture.WHITE, uAlpha: 1, uFade: 1
         }));
     }
     constructor(built, H, blend = PIXI.BLEND_MODES.NORMAL) {
         const buf = new PIXI.Buffer(built.data, true, false), S = GLB_STRIDE * 4, g = new PIXI.Geometry();
         let o = 0; const attr = (name, size) => { g.addAttribute(name, buf, size, false, PIXI.TYPES.FLOAT, S, o * 4); o += size; };
-        attr('aPos', 3); attr('aPrev', 3); attr('aNext', 3); attr('aLine', 4); attr('aColor', 4); attr('aMeta', 4); attr('aAnim', 4); attr('aText', 4);
+        attr('aPos', 3); attr('aPrev', 3); attr('aNext', 3); attr('aLine', 4); attr('aColor', 4); attr('aMeta', 4); attr('aAnim', 4); attr('aText', 4); attr('aFace', 4);
         g.addIndex(built.index);
         super(g, GLBuildingMesh.shader());
         this.blendMode = blend; this.H = H; this.vertexCount = built.vertices;
-        this.faceData = new Float32Array(GLB_MAX_FACES * 4); this.anchorData = new Float32Array(GLB_MAX_FACES * 4);
-        built.faces.slice(0, GLB_MAX_FACES).forEach((f, i) => this.faceData.set([f[0], f[1], f[2], 0], i * 4));
-        built.anchors.slice(0, GLB_MAX_FACES).forEach((a, i) => this.anchorData.set([a[0], a[1], 0, 0], i * 4));
-        this.alphaScale = 1;
+        this.alphaScale = 1; this.fade = 1;
+        if (built.groups) { this.groups = built.groups; this.indexSrc = built.index.slice(); this.sortCam = [NaN, NaN]; }
+    }
+    /** Re-order the far-first pieces for the camera (only when it has moved) */
+    sortFor(cx, cy) {
+        if (Math.abs(cx - this.sortCam[0]) < 0.5 && Math.abs(cy - this.sortCam[1]) < 0.5) return;
+        this.sortCam[0] = cx; this.sortCam[1] = cy;
+        const buf = this.geometry.getIndex(), dst = buf.data, src = this.indexSrc;
+        for (const g of this.groups) {
+            for (const it of g.items) it.d = (it.x - cx) * (it.x - cx) + (it.y - cy) * (it.y - cy);
+            const order = g.items.slice().sort((a, b) => b.d - a.d);
+            let o = g.i0;
+            for (const it of order) { dst.set(src.subarray(it.i0, it.i1), o); o += it.i1 - it.i0; }
+        }
+        buf.update();
     }
     _render(renderer) {
         const u = this.shader.uniforms, F = GLBuildingMesh.frame;
-        u.uH = this.H; u.uFaces = this.faceData; u.uAnchors = this.anchorData;
+        u.uH = this.H;
         if (F) { u.uCam[0] = F.cam[0]; u.uCam[1] = F.cam[1]; u.uC = F.C; u.uLod = F.lod; u.uTime = F.time; u.uPx = F.px; u.uSun = F.sun; u.uSunRGB = F.sunRGB; u.uNight = F.night; u.uFont = F.font || PIXI.Texture.WHITE; }
-        u.uRim = this.rim || GLBuildingMesh.noRim; u.uAlpha = this.worldAlpha;
+        u.uRim = this.rim || GLBuildingMesh.noRim; u.uAlpha = this.worldAlpha; u.uFade = this.fade;
+        if (this.groups && F) this.sortFor(F.cam[0], F.cam[1]);
         super._render(renderer);
     }
 }

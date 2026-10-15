@@ -8,8 +8,9 @@ class GLBuildingsSystem {
         this.stats = { builds: 0, buildMs: 0, shown: 0, vertices: 0, resident: 0 };
         this.fontRevision = -1;
     }
-    /** The buildings drawn natively: the city's generic buildings, shops and apartments (landmarks follow) */
-    supports(b) { return !!(b && b.isV2 && (!b.style || b.style === 'apartment') && b.sections && b.sections.length && CONFIG.BUILDINGS.LEAN); }
+    /** The buildings drawn natively: the city's generic buildings, shops and apartments, and the landmarks ported so far */
+    supports(b) { return !!(b && b.isV2 && (!b.style || b.style === 'apartment' || GLBuildingsSystem.landmarks[b.style]) && b.sections && b.sections.length && CONFIG.BUILDINGS.LEAN); }
+    model(b) { return GLBuildingsSystem.landmarks[b.style] || GLBuildingModel; }
     key(b) { return [b.x, b.y, b.floors, b.facing, b.style, b.variant && b.variant.id, ...b.sections.flatMap(s => [s.x, s.y, s.w, s.h])].join(':'); }
 
     begin(game, view) {
@@ -33,8 +34,8 @@ class GLBuildingsSystem {
         if (r && r.key === key) return r;
         const start = performance.now();
         if (r) this.destroy(r);
-        const m = GLBuildingModel.build(b);
-        r = { key, H: m.H, seen: this.frame, base: new GLBuildingMesh(m.base.finish(), m.H), top: new GLBuildingMesh(m.top.finish(), m.H), glow: new GLBuildingMesh(m.glow.finish(), m.H) };
+        const model = this.model(b), m = model.build(b);
+        r = { key, H: m.H, seen: this.frame, update: model.update || null, base: new GLBuildingMesh(m.base.finish(), m.H), top: new GLBuildingMesh(m.top.finish(), m.H), glow: new GLBuildingMesh(m.glow.finish(), m.H) };
         r.rim = new Float32Array([...GLColor.parse(b.colors.accent || '#ffcf8a').slice(0, 3), 0]);
         for (const mesh of [r.base, r.top, r.glow]) { mesh.rim = r.rim; mesh.visible = false; }
         this.records.set(b, r);
@@ -65,6 +66,7 @@ class GLBuildingsSystem {
         r.base.visible = r.top.visible = true;
         r.glow.visible = !!R.layers.glows;
         r.glow.alpha = this.glowA;
+        if (r.update) r.update(b, r);
         r.rim[3] = this.rimA;
         this.stats.shown++;
     }
@@ -84,3 +86,5 @@ class GLBuildingsSystem {
     destroy(r) { for (const m of [r.base, r.top, r.glow]) { const g = m.geometry; m.parent?.removeChild(m); m.destroy(); g.destroy(); } }
     clear() { for (const r of this.records.values()) this.destroy(r); this.records.clear(); }
 }
+/** Landmarks with their own GL model (style → { build(b), update?(b, record) }) */
+GLBuildingsSystem.landmarks = { double_nights: GLDoubleNights };

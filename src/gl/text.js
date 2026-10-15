@@ -9,7 +9,7 @@ const GLText = (() => {
     let canvas = null, ctx2d = null, data = null, base = null, texture = null;
     let shelfX = 0, shelfY = 0, shelfH = 0, revision = 0, dirty = false;
     const entries = new Map();
-    const fontOf = (size, family) => `${size}px "${family}", "URW Chancery L", "Z003", cursive`;
+    const fontOf = (size, family, weight = '') => `${weight ? weight + ' ' : ''}${size}px "${family}", "URW Chancery L", "Z003", cursive`;
     const measurer = () => ctx2d || (canvas = document.createElement('canvas'), canvas.width = canvas.height = 8, ctx2d = canvas.getContext('2d', { willReadFrequently: true }));
 
     function measure(text, size, family = 'Great Vibes') {
@@ -98,12 +98,12 @@ const GLText = (() => {
         e.ready = true; dirty = true;
     }
     /** An atlas entry for text at size (world px): uv rect and its world size, centred on the text's middle */
-    function entry(text, size, family = 'Great Vibes', neon = false) {
-        const key = text + '|' + size + '|' + family + '|' + (neon ? 1 : 0);
+    function entry(text, size, family = 'Great Vibes', neon = false, weight = '') {
+        const key = text + '|' + size + '|' + family + '|' + (neon ? 1 : 0) + '|' + weight;
         let e = entries.get(key);
         if (e && e.revision === revision) return e;
         const c = measurer(), R = neon ? 1.5 : RES, pad = neon ? 60 : SPREAD + 2;
-        c.font = fontOf(size, family);
+        c.font = fontOf(size, family, weight);
         const tw = Math.ceil(c.measureText(text).width), w = Math.ceil((tw + pad * 2) * R), hgt = Math.ceil((size * 1.6 + pad * 2) * R);
         if (!e) {
             if (shelfX + w > SIZE) { shelfX = 0; shelfY += shelfH + 2; shelfH = 0; }
@@ -114,7 +114,7 @@ const GLText = (() => {
         e.revision = revision;
         canvas.width = w; canvas.height = hgt;
         const g = canvas.getContext('2d', { willReadFrequently: true });
-        g.setTransform(R, 0, 0, R, 0, 0); g.font = fontOf(size, family); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff';
+        g.setTransform(R, 0, 0, R, 0, 0); g.font = fontOf(size, family, weight); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff';
         g.fillText(text, w / R / 2, hgt / R / 2);
         const px = g.getImageData(0, 0, w, hgt).data, cov = new Float32Array(w * hgt);
         for (let i = 0; i < w * hgt; i++) cov[i] = px[i * 4 + 3] / 255;
