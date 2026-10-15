@@ -85,23 +85,28 @@ Object.assign(NativeWebGLRenderer.prototype,{
         if(!this.layers.glows)return true;
         // Animated beams/crowns are recorded during the static pass and replayed live each frame.
         const methods=['_sqDrawCrown','_sqDrawBeams','_sqVeil','_mcBeams'];
+        let drawDark=dark;
         const drawStatic=ctx=>{
             const saved=[];r.glowCalls=[];
             try{
                 for(const name of methods)if(typeof b[name]==='function'){
                     saved.push({name,own:Object.hasOwn(b,name),method:b[name]});b[name]=(...args)=>r.glowCalls.push({name,args:args.slice(1)});
                 }
-                b.drawEmissive(ctx,dark);
+                b.drawEmissive(ctx,drawDark);
             }finally{for(const s of saved){if(s.own)b[s.name]=s.method;else delete b[s.name];}}
         };
         // Emissive art leans with the building, so it goes through the GPU projector like the
         // roof: drawn straight into the emissive layer, no per-camera snapshot. Drawing in order
         // matches the snapshot's composite (source-over and alpha-preserving add are associative).
-        const projected=common!=null&&this.syncProjectedLayer(r,'projGlow',r.glowContext,common+':'+Math.round(dark*64),b,drawStatic,game,view);
+        // Darkness is captured in quarter steps (rounded up) and the step's glow is faded down to the
+        // live darkness on the GPU, so dusk costs at most four captures.
+        const step=Math.ceil(dark*4)/4,glowA=x=>Math.max(.15,Math.min(1,x*1.1));
+        drawDark=step;let projected=false;
+        try{projected=common!=null&&this.syncProjectedLayer(r,'projGlow',r.glowContext,common+':'+step,b,drawStatic,game,view);}finally{drawDark=dark;}
         if(projected){
             const g=r.glowContext.root;g.position.set(0,0);
             if(g.parent!==this.emissive||this.emissive.getChildIndex(g)!==this.emissive.getChildIndex(r.glowMesh)+1)this.emissive.addChildAt(g,this.emissive.getChildIndex(r.glowMesh)+1);
-            g.visible=true;r.projGlow.box.pulse=[this.layers.decorAnimation?.03:0,_gameTimeSec,31/Math.max(1,game.canvas.width)];
+            g.visible=true;r.projGlow.box.alpha=Math.min(1,glowA(dark)/glowA(step));r.projGlow.box.pulse=[this.layers.decorAnimation?.03:0,_gameTimeSec,31/Math.max(1,game.canvas.width)];
             r.glowMesh.visible=false;r.glowKey=null;
         }else if(r.glowContext.root.parent)r.glowContext.root.parent.removeChild(r.glowContext.root);
         const cacheKey=[key,view.zoom,game.canvas.width,game.canvas.height,Math.round(dark*64)].join(':');

@@ -39,6 +39,7 @@ class NativeProjectedMesh extends PIXI.Mesh {
 }
 
 (() => {
+    const PROJECTION_VARIANTS=6;   // resident captures per building layer (lamps x zoom detail x darkness steps)
     const NUDGE=.5;   // camera nudge (world px) between the two capture passes: small, so sort order and face choice don't flip
     // Visible nodes of a vector context in draw order, with their transform relative to its root.
     // A clip group becomes {clip, items}: its mask is projected too and clips its own items.
@@ -239,24 +240,28 @@ class NativeProjectedMesh extends PIXI.Mesh {
         /** One building layer through the projector. Returns false to make the caller draw it live. */
         syncProjectedLayer(r,slot,ctx,common,b,draw,game,view){
             const L=this.layers;if(L.gpuProjection===false||!CONFIG.BUILDINGS.LEAN){this.dropProjected(r,slot);return false;}
-            const cam=game.camera,p=r[slot]||(r[slot]={}),region=this.projectionRegion(b,cam),key=common+'|'+region;
-            // Captures are unculled, so only a region change recaptures; a failed key is retried
-            // after the camera has travelled a third of the view.
+            // Faced buildings are captured with every face and culled in the shader, so the camera's
+            // side doesn't matter; other buildings still key on it (their art may branch on it).
+            const cam=game.camera,p=r[slot]||(r[slot]={boxes:new Map()}),key=common+(typeof b._leanFaces==='function'?'':'|'+this.projectionRegion(b,cam));
+            // Every variant (lamps on/off, zoom detail, darkness step) is captured once and kept, so
+            // switching between them is a GPU swap, not a rebuild.
+            const hit=p.boxes.get(key);
+            if(hit){this.projectionStats.hits++;if(p.box!==hit){if(p.box?.parent)p.box.parent.removeChild(p.box);p.box=hit;}p.boxes.delete(key);p.boxes.set(key,hit);return this.showProjected(p,ctx,cam);}
             const reach=Math.min(game.canvas.width,game.canvas.height)/(3*view.zoom),far=Math.hypot(cam.x-(p.cx??1e9),cam.y-(p.cy??1e9))>reach;
-            if(p.box&&p.key===key){this.projectionStats.hits++;return this.showProjected(p,ctx,cam);}
             if(p.fail===key&&!far)return false;
             const start=performance.now();
             p.ctxB||(p.ctxB=new NativeVectorContext(this));p.ctxB.sceneFrame=ctx.sceneFrame;p.ctxB.canvas=ctx.canvas;
+            if(p.box?.parent)p.box.parent.removeChild(p.box);p.box=null;
             let box=this.captureProjected(ctx,p.ctxB,draw,NUDGE,b);if(!box&&/^lean|^nodes|^type|^batches|^anchors|^clip/.test(this.projectionFail||''))box=this.captureProjected(ctx,p.ctxB,draw,-NUDGE,b);this.projectionStats.captureMs+=performance.now()-start;
-            if(p.box){p.box.destroy({children:true});p.box=null;}
             p.cx=cam.x;p.cy=cam.y;
-            if(!box){p.fail=key;p.key=null;this.projectionStats.fallbacks++;return false;}
-            p.box=box;p.key=key;p.fail=null;this.projectionStats.captures++;return this.showProjected(p,ctx,cam);
+            if(!box){p.fail=key;this.projectionStats.fallbacks++;return false;}
+            p.boxes.set(key,box);while(p.boxes.size>PROJECTION_VARIANTS){const [k,old]=p.boxes.entries().next().value;p.boxes.delete(k);old.destroy({children:true});}
+            p.box=box;p.fail=null;this.projectionStats.captures++;return this.showProjected(p,ctx,cam);
         },
         showProjected(p,ctx,cam){
             const u=NativeProjectedMesh.shader().uniforms;u.cam[0]=cam.x;u.cam[1]=cam.y;u.camH=leanCamHeight();
             if(p.box.parent!==ctx.root)ctx.root.addChild(p.box);p.box.visible=true;this.projectionStats.vertices+=p.box.vertexCount;return true;
         },
-        dropProjected(r,slot){const p=r[slot];if(!p)return;if(p.box){p.box.destroy({children:true});p.box=null;}p.ctxB?.destroy();r[slot]=null;}
+        dropProjected(r,slot){const p=r[slot];if(!p)return;for(const box of p.boxes?.values()||[])box.destroy({children:true});if(p.box&&!p.box.destroyed)p.box.destroy({children:true});p.box=null;p.ctxB?.destroy();r[slot]=null;}
     });
 })();
