@@ -71,12 +71,12 @@ class NativeWorldSurfaces{
         owner.world.addChildAt(this.floor,owner.world.getChildIndex(owner.floorArt)+1);this.floor.addChild(this.padStage,this.labels.root);
         owner.postWorld.addChildAt(this.glassStage,owner.postWorld.getChildIndex(owner.marker));
         this.windowHole=new NativeVectorContext(owner);this.windowColor=new NativeVectorContext(owner);this.windowHole.label='window-daylight-holes';this.windowColor.label='window-daylight-color';owner.lightStage.addChild(this.windowHole.root,this.windowColor.root);
-        this.cloudContext=new NativeVectorContext(owner);this.cloudContext.label='cloud-shadows';this.floor.addChildAt(this.cloudContext.root,0);
+        this.clouds=new GLCloudShadows(this.floor,0);
         // Sun shadows (gl/sun-shadows.js): a mask, multiplied over the ground
         this.sunSprite=new PIXI.Sprite();this.sunSprite.blendMode=PIXI.BLEND_MODES.MULTIPLY;this.floor.addChildAt(this.sunSprite,0);
         this.reflections=new NativeWetReflections(owner,this.floor);
     }
-    get contexts(){return [this.labels,this.cloudContext,this.windowHole,this.windowColor,...this.reflections.contexts];}
+    get contexts(){return [this.labels,this.windowHole,this.windowColor,...this.reflections.contexts];}
     sync(game,view){
         const start=performance.now(),r=this.owner,L=r.layers,W=game.canvas.width,H=game.canvas.height;
         const S=game.sunState(),k=L.daylight?S.k*game._sunReach():0;
@@ -112,10 +112,9 @@ class NativeWorldSurfaces{
         for(const c of [this.windowHole,this.windowColor]){c.begin();c.canvas=game.canvas;c.setTransform(view.zoom,0,0,view.zoom,r.world.x,r.world.y);}
         if(L.windowDaylight){this.windowHole.globalCompositeOperation='screen';this.windowColor.globalCompositeOperation='lighter';game.roomSystem.drawWindowLightProjections(this.windowHole,game.dayCycle().daylight);game.roomSystem.drawWindowColorPass(this.windowColor,game.dayCycle().daylight);}
         this.windowHole.root.visible=true;this.windowColor.root.visible=false;
-        this.cloudContext.begin();this.cloudContext.canvas=game.canvas;this.cloudContext.sceneFrame=_worldMatrix;
-        if(L.cloudShadows&&game.activeMap.type==='outdoor'&&S.k>.02)game._drawCloudShadows(this.cloudContext,V,S.k*(1-.75*S.overcast),S);
+        this.clouds.sync(game,V,L.cloudShadows&&game.activeMap.type==='outdoor'&&S.k>.02?S.k*(1-.75*S.overcast):0,S);
         this.syncSun(game,view,V,S);const roofs=this.syncRoofs(game,view);this.reflections.sync(game,view,V);
-        r.surfaceStats={pads,labels:labelCount,glass:glassCount,roofs,windowHoles:this.windowHole.pathsPainted,windowColor:this.windowColor.pathsPainted,cloudPaths:this.cloudContext.pathsPainted,daylight:r.daylightState,sun:this.sunStats,reflections:this.reflections.stats,cpuMs:performance.now()-start};r.layerStages.surfacesMs=r.surfaceStats.cpuMs;
+        r.surfaceStats={pads,labels:labelCount,glass:glassCount,roofs,windowHoles:this.windowHole.pathsPainted,windowColor:this.windowColor.pathsPainted,clouds:this.clouds.count,daylight:r.daylightState,sun:this.sunStats,reflections:this.reflections.stats,cpuMs:performance.now()-start};r.layerStages.surfacesMs=r.surfaceStats.cpuMs;
     }
     syncRoofs(game,view){
         const r=this.owner,wet=r.layers.wetRoofs&&r.layers.buildings&&game.activeMap.type==='outdoor'?Math.min(1,game.weather.wetness||0):0;let count=0,dropped=0;
@@ -165,5 +164,5 @@ class NativeWorldSurfaces{
         this.sunStats.bytes=this.sunTarget.baseTexture.realWidth*this.sunTarget.baseTexture.realHeight*4;
     }
     invalidate(){this.sunKey=this.roofTileKey=null;for(const c of this.contexts)for(const g of c.gradients)g.key=null;this.reflections.invalidate();}
-    clear(){for(const rec of this.pads.values())rec.node.destroy();for(const rec of this.glass.values())rec.node.destroy();for(const rec of this.roofs.values())for(const mesh of rec.meshes)mesh.destroy();this.labels.destroy();this.sunShadows?.destroy();this.cloudContext.destroy();this.windowHole.destroy();this.windowColor.destroy();this.roofTile?.destroy(true);this.roofTileMesh?.destroy();this.roofTileStage?.destroy();this.sunTarget?.destroy(true);this.sunSprite.destroy();this.reflections.clear();this.floor.destroy();this.glassStage.destroy();}
+    clear(){for(const rec of this.pads.values())rec.node.destroy();for(const rec of this.glass.values())rec.node.destroy();for(const rec of this.roofs.values())for(const mesh of rec.meshes)mesh.destroy();this.labels.destroy();this.sunShadows?.destroy();this.clouds.destroy();this.windowHole.destroy();this.windowColor.destroy();this.roofTile?.destroy(true);this.roofTileMesh?.destroy();this.roofTileStage?.destroy();this.sunTarget?.destroy(true);this.sunSprite.destroy();this.reflections.clear();this.floor.destroy();this.glassStage.destroy();}
 }

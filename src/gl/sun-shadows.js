@@ -117,3 +117,35 @@ const GLSunShadows = (() => {
     }
     return SunShadows;
 })();
+
+// Cloud shadows: soft lavender pools drifting with the wind, one per 900 px cell that the hash
+// gives a cloud (more when it's grey). Each is a disc whose falloff the GPU computes, multiplied
+// over the ground (engine/daylight.js _drawCloudShadows).
+const GLCloudShadows = (() => {
+    const FRAG = `precision highp float; varying vec2 uv; uniform float alpha;
+        void main(){ float a = clamp(1. - length(uv - .5) * 2., 0., 1.) * alpha; gl_FragColor = vec4(vec3(96., 84., 150.) / 255. * a, a); }`;
+    class Clouds {
+        constructor(parent, index = 0) { this.root = new PIXI.Container(); parent.addChildAt(this.root, index); this.geometry = nativeSurfaceGeometry(); this.discs = []; this.count = 0; }
+        sync(game, cull, strength, S) {
+            let n = 0;
+            if (strength > 0) {
+                const t = _gameTimeSec, wind = game.weather && game.weather.windVec ? game.weather.windVec : { x: 1, y: .3 };
+                const cell = 900, drift = { x: t * 14 * (wind.x || 1), y: t * 6 * (wind.y || .3) }, a = (.1 + .08 * S.overcast) * strength;
+                const i0 = Math.floor((cull.left - drift.x) / cell) - 1, i1 = Math.floor((cull.right - drift.x) / cell) + 1;
+                const j0 = Math.floor((cull.top - drift.y) / cell) - 1, j1 = Math.floor((cull.bottom - drift.y) / cell) + 1;
+                for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+                    if (_bldHash(i * 13.1 + j * 7.7, 5) > .55 + .4 * S.overcast) continue;
+                    const cx = i * cell + drift.x + _bldHash(i, j + 3) * cell, cy = j * cell + drift.y + _bldHash(j, i + 9) * cell, r = 280 + _bldHash(i + j, 2) * 320;
+                    if (cx + r < cull.left || cx - r > cull.right || cy + r < cull.top || cy - r > cull.bottom) continue;
+                    let m = this.discs[n];
+                    if (!m) { m = this.discs[n] = new PIXI.Mesh(this.geometry, PIXI.Shader.from(NATIVE_SURFACE_VERTEX, FRAG, { alpha: 0 })); m.blendMode = PIXI.BLEND_MODES.MULTIPLY; this.root.addChild(m); }
+                    m.visible = true; m.position.set(cx - r, cy - r); m.scale.set(2 * r); m.shader.uniforms.alpha = a; n++;
+                }
+            }
+            for (let i = n; i < this.discs.length; i++) this.discs[i].visible = false;
+            this.count = n;
+        }
+        destroy() { this.root.destroy({ children: true }); this.geometry.destroy(); }
+    }
+    return Clouds;
+})();
