@@ -233,11 +233,19 @@ Main's existing scope is substantial. Examples include doors affecting movement,
 
 The supplied `DF_TOPDOWNEDITION_Features_and_Mechanics.md` is retained in [docs/references/DF_TOPDOWNEDITION_Features_and_Mechanics.md](docs/references/DF_TOPDOWNEDITION_Features_and_Mechanics.md). It inventories main at `a376397a995e4513571aed3ba10068b76b4cd077`, prepared 2026-10-13. It is a source inventory, not a playtest certification or the latest-main guarantee. Preserve its section 19 distinctions between implemented behavior, partial work, references, and future content. Do not turn every named item into a claim of working functionality or an automatically approved new feature.
 
+### Original design reference and dimensional travel
+
+The owner's original [Brainstorming Infodump](docs/references/Brainstorming%20Infodump.md) is preserved unchanged as a design reference. It describes dimensions/realms, pocket dimensions, flitting for travel and combat, parkour, and the material/ethereal planes, alongside broader character, multiplayer, and progression ideas.
+
+This is historical design intent, not an implementation inventory or automatic approval to implement every brainstorm. Where it differs from the current game, retain that distinction. Multiplayer convergence in the brainstorm is not a decision to add networking to this engine milestone.
+
+**New explicit goal:** realtime world switching and streaming must support flitting. Flitting must not be designed solely as the current game's same-map displacement. The foundation must accommodate transfer between distinct world contexts, with bounded residency and safe, responsive transitions. See section 10.9 for the proposed implementation direction and unresolved decisions.
+
 ### Shared foundations to design early
 
 | Contract | Why it matters |
 | --- | --- |
-| Stable entity identities and lifecycle events | Recording, relationships, attachments, save references, streaming, and replay must refer to the same entity reliably, without keeping dead objects alive. |
+| Stable entity identities and lifecycle events | Recording, relationships, attachments, save references, streaming, and replay must refer to the same entity reliably, without keeping dead objects alive. World identity must disambiguate local references and support explicitly transferred entities. |
 | Defined clocks and timestamps | Simulation, pause, slow motion, audio, traversal, replay seeking, and atmosphere transitions need explicit time domains. |
 | Spatial queries with declared purpose | Visibility, perception, traversal, residency, and recording can share indexing infrastructure while using different ranges, filters, update rates, and lifetimes. |
 | Transform and attachment ownership | Equipment, passengers, virtual children, traversal contacts, and recorded poses need consistent local/world transforms and disposal rules. |
@@ -383,6 +391,27 @@ The following features were selected in discussion and are now part of the plann
 
 **Open decisions:** clock units and jump semantics, profile schema, weather composition, schedule catch-up rules, renderer representation, and replay/environment capture fidelity.
 
+### 10.9 Realtime world switching and streaming for flitting
+
+**Agreed intent:** support realtime switching between worlds as well as streaming within them. The original flitting concept is instantaneous dimensional transfer, with uses in traversal, evasion, stealth, and combat. Pocket dimensions and distinct material/ethereal environments are important design references. This capability must be considered in the foundation, not added later as a reload workaround.
+
+**Proposed implementation direction:**
+
+- Represent a world context explicitly, with its own spatial membership, collision/navigation data, environment, entities, and resource ownership. Separate world identity from partition identity and from rendering visibility. Support alternate worlds occupying corresponding coordinates without treating their actors as automatically colliding, perceiving, or interacting.
+- Define source/destination mappings and anchors. A destination may be a corresponding location in another realm, a pocket-dimension entrance, or an authored safe zone; do not assume that all worlds have identical geometry or coordinate systems.
+- Prepare likely destinations in advance using a bounded readiness region: enough geometry, collision, landing information, and necessary assets to commit a safe transfer. Use shared immutable resources where appropriate instead of loading complete duplicate worlds. Predictive preparation can follow eligible destinations and player intent; it must have cancellation and priority rules.
+- Validate destination support, clearance, hazards, and game-supplied eligibility using the destination world. Define a minimum readiness contract so a visually loaded destination cannot receive an actor before its required simulation/collision data is ready.
+- Treat the committed transfer as one authoritative lifecycle operation. Update world membership, transform/motion policy, attachments, relevant camera/environment/audio state, and references coherently. Publish completion once; avoid duplicate actors, mixed-world collision, or gameplay updates observing a half-transferred actor.
+- Keep the source valid until transfer succeeds. If preparation fails, the destination changes, or a request is cancelled or superseded, release pending work and leave the actor in a coherent state. Define the game's response to an unready destination explicitly; instant access to arbitrary unprepared worlds is not a demonstrated guarantee.
+- Preserve selected actor state through explicit transfer policies: velocity/orientation, equipment, body state, traversal state, companions, passengers, and vehicles must each have defined behavior. Not every attached or nearby entity should transfer automatically.
+- Choose inactive-world simulation and persistence policies separately from rendering. Store changed world state on departure and restore it on return without duplicate spawns or reset doors/props. Decide which off-world systems continue, sleep, or catch up, within budgets.
+- Record world transitions in GRecorder with world-qualified identities, transfer timing, and the necessary source/destination state. Recording and replay resource leases must remain bounded even when a take spans worlds.
+- Keep dimensional travel mechanisms generic. Attunement costs, safe-zone rules, cooldowns, imprints, combat advantages, and dimensional lore belong to the game. The brainstorm's additional flitting applications are design references, not a promise that they are already approved or implemented.
+
+**Placement:** Basement defines world identity, transfer/lifecycle contracts, coordinate mappings, destination queries, and state-transfer primitives. Directory manages world libraries, readiness, residency, and resource leases. Lobby schedules preparation and commits transfers at a defined simulation boundary. Penthouse can provide reusable transition effects/tools and a two-world demonstration. The game supplies worlds, allowed links, destination-selection rules, transfer policies, and ability costs.
+
+**Open decisions:** simultaneous world-context limits; preparation horizon and budgets; transfer latency targets and behavior when unready; coordinate mappings; momentum/orientation preservation; camera/audio/environment blending; inactive-world simulation; companions/vehicles; persistence and replay fidelity. Target-device measurements must determine budgets; no numeric seamlessness claim is established by this plan.
+
 ## 11. Integration and acceptance scenarios
 
 These are planning targets for meaningful demonstrations after implementation is authorized. They are not a demand to implement every feature before the first engine milestone.
@@ -396,6 +425,7 @@ These are planning targets for meaningful demonstrations after implementation is
 | Repeatedly attach, detach, stream, and dispose | Correct transform ownership and bounded resources without stale registrations, duplicate spawns, or resurrected objects. |
 | Overlap dialogue and ambience, then interrupt a scene | Scoped duplicate handling, concurrency limits, smooth ducking, cancellation, and correct restored user mix. |
 | Cross midnight, change weather, sleep, and restore | Coherent atmosphere, schedule transitions, and explicit clock behavior without duplicated events or unrelated timer advancement. |
+| Flit between two streamed worlds and return | Prepared transfers remain responsive and collision-safe; world changes persist; actor identity and selected equipment/motion survive; repeated transfers and cancelled/unready requests do not leak resources or duplicate actors. Include capture/playback across the transition and test within a declared device budget. |
 | Run an independent example without Freelancer imports | Reusable engine contracts and toys; no hidden reliance on the original game object or content. |
 
 Diagnostics should make the relevant costs observable: recording storage, residency, active voices, perception candidates, traversal queries, entity/attachment counts, and GPU ownership. Establish numeric budgets against representative devices instead of inventing unlimited capacity.
@@ -412,7 +442,7 @@ Before implementation, agree and record:
 6. Target-device budgets, diagnostics, representative comparisons, and meaningful acceptance checks.
 7. Source/build organization and single-file, offline, dependency policy.
 8. Identity, transform/attachment, state-capture, clock, spatial-query, body-state, and resource-lifetime contracts needed by section 10.
-9. The open decisions recorded under each carryover, including traversal elevation and GRecorder capture boundaries/fidelity.
+9. The open decisions recorded under each carryover, including traversal elevation, GRecorder capture boundaries/fidelity, and realtime world-switch readiness, transfer, and residency policies.
 10. A staged implementation sequence that proves an empty engine and independent example game before restoring Freelancer content. Start with shared contracts and a representative integrated slice; do not build disconnected feature demos that bypass the house architecture.
 
 After implementation is authorized, prefer coherent, verifiable portions of the agreed engine over parallel experimental renderers or speculative abstraction layers. Update this plan when a decision changes. Never silently redefine the owner's architecture to fit a convenient implementation.
