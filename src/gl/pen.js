@@ -243,7 +243,7 @@ const GLPen = (() => {
         }
         fill(a, b) {
             const path = a instanceof Path ? a : a && a._gl ? a._gl : null, rule = typeof a === 'string' ? a : b;
-            const subs = this._subs(path);
+            const subs = this._subs(path); this.fillStyle = Pen.style(this.fillStyle);
             this._paint(this.fillStyle, () => {
                 const tris = triangulate(subs, rule === 'evenodd');
                 if (this.shadowBlur > 0 && GLColor.parse(this.shadowColor)[3] > 0) this._shadow(subs, tris);
@@ -261,6 +261,7 @@ const GLPen = (() => {
         stroke(path) {
             const subs = this._subs(path instanceof Path ? path : path && path._gl ? path._gl : null), w = this.lineWidth * this.scaleK, B = this.B;
             if (!(w > 0)) return;
+            this.strokeStyle = Pen.style(this.strokeStyle);
             this._paint(this.strokeStyle, () => {
                 const st = this.strokeStyle, a = this._alpha();
                 let c = st instanceof Gradient ? st.at(.5) : GLColor.parse(st == null ? '#000' : st);
@@ -365,6 +366,12 @@ const GLPen = (() => {
         }
     }
     Pen.Path = Path; Pen.Gradient = Gradient; Pen.stats = { images: 0, text: 0 };
+    /** A gradient made elsewhere (a vector context's, or a Canvas one that kept its stops) as the pen's own; anything else as is */
+    Pen.style = s => {
+        if (!s || typeof s !== 'object' || s instanceof Gradient || !s.nativeGradient) return s;
+        if (!s._pen || s._pen.stops.length !== s.stops.length) { const g = new Gradient(s.type ? 'radial' : 'linear', s.args.slice()); for (const [t, c] of s.stops) g.addColorStop(t, c); s._pen = g; }
+        return s._pen;
+    };
     return Pen;
 })();
 const GLPath = GLPen.Path;
