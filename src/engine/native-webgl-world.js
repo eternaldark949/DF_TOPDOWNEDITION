@@ -44,7 +44,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
                 isShootingFromCar:shooting,carAngle:car.angle,recoil:shooting?.5:0,stance:shooting?'pistol':'idle',held:null});
             ctx.restore();
         }
-        car.drawOccupantOverlay(ctx);
+        if(GLCars.supports(car))stage.addChild(this.glCars.node(car,false,'over'));else car.drawOccupantOverlay(ctx);
         stage.zIndex=car.y;
         const parent=this.peopleContext.root.sortableChildren?this.peopleContext.root:this.objects;
         parent.addChild(stage);if(parent.sortableChildren)parent.sortChildren();
@@ -89,9 +89,17 @@ Object.assign(NativeWebGLRenderer.prototype,{
             game.drawDeliveryPackage(street,bounds);game.drawDropZone(street,bounds);
         }
         timings.streetMs=performance.now()-lap;lap=performance.now();
-        const traffic=this.trafficContext;traffic.begin();if(L.vehicles){
+        const traffic=this.trafficContext;traffic.begin();if(!this.glCars)this.glCars=new GLCars();this.glCars.begin();if(L.vehicles){
             const cars=new Set([...(game.traffic?.vehicles||[]),...(game.cars||[]),game.car,game.ownedCar,game.van,game.deliveryVehicle].filter(Boolean));
-            for(const car of cars)if(visible(car,180)){traffic.save();traffic.globalAlpha=car.fade??1;car._lod=_zoomLOD>0?1:0;if(L.depthSort)traffic.withDepth(car,()=>car.draw(traffic));else car.draw(traffic);this.nativeCasters.vehicle(car);traffic.restore();vehicles++;}
+            // TrafficVehicles are GPU geometry (gl/cars.js); anything else still paints through the vector context
+            for(const car of cars)if(visible(car,180)){
+                {const dx=car.x-view.x,dy=car.y-view.y,far=Math.pow(300/Math.max(.35,view.zoom),2);car._lod=car===game.deliveryVehicle?0:dx*dx+dy*dy>far?1:_zoomLOD>=2?1:0;}   // Canvas's distance LOD (engine/draw.js)
+                if(GLCars.supports(car)){
+                    if(!car.visible){this.nativeCasters.vehicle(car);vehicles++;continue;}
+                    const node=this.glCars.node(car,car._lod===1,game.isDriving&&game.car===car&&car.hasDriver?'under':'all');
+                    if(L.depthSort)traffic.withDepth(car,()=>traffic.container.addChild(node));else traffic.container.addChild(node);
+                }else{traffic.save();traffic.globalAlpha=car.fade??1;if(L.depthSort)traffic.withDepth(car,()=>car.draw(traffic));else car.draw(traffic);traffic.restore();}
+                this.nativeCasters.vehicle(car);vehicles++;}
         }
         timings.vehiclesMs=performance.now()-lap;lap=performance.now();
         const actors=this.peopleContext;actors.begin();this.objects.addChild(actors.root);this.objects.addChild(this.playerSprite);
@@ -111,7 +119,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.nativeCasters.flush();   // all captured bodies, one atlas pass
         this.syncSceneDepth(game);
         timings.peopleMs=performance.now()-lap;lap=performance.now();
-        this.syncDrivenCar(game);timings.drivenCarMs=performance.now()-lap;lap=performance.now();
+        this.syncDrivenCar(game);this.glCars.end();timings.drivenCarMs=performance.now()-lap;lap=performance.now();
         const glow=this.cityGlowContext;glow.begin();
         const topBounds={left:view.x-vw,right:view.x+vw,top:view.y-vh,bottom:view.y+vh};
         const visibleBuildings=(map.buildings||[]).filter(b=>L.buildings&&(b.inView?b.inView(topBounds,game.camera):b.x<bounds.right&&b.y<bounds.bottom&&b.x+(b.width||500)>bounds.left&&b.y+(b.height||500)>bounds.top));
@@ -141,6 +149,9 @@ Object.assign(NativeWebGLRenderer.prototype,{
                 part.geometry=g;part.alpha=k;part.visible=true;part.position.set(lamp.x,lamp.y);part.rotation=lamp.angle||0;part.scale.set(LAMP_POST_SCALE);
             }
             for(let i=n;i<parts.length;i++)parts[i].visible=false;}
+        {const dark=game.getAmbientDarkness(),night=[];
+            if(L.glows&&L.vehicles&&dark>.04){const cars=new Set(game.traffic?.vehicles||[]);for(const v of [game.car,game.ownedCar,game.deliveryVehicle])if(v)cars.add(v);for(const v of cars)if(GLCars.supports(v)&&v.visible&&!v.dead&&visible(v,60))night.push(v);}
+            const ng=this.glCars.glow(night,dark);if(ng.parent!==this.emissive)this.emissive.addChild(ng);ng.visible=night.length>0;}
         if(this.glSignals&&!this.glSignals.glow.destroyed){const sg=this.glSignals.glow;if(sg.parent!==this.emissive||this.emissive.getChildIndex(sg)!==this.emissive.getChildIndex(this.lampEmission)+1){sg.parent?.removeChild(sg);this.emissive.addChildAt(sg,this.emissive.getChildIndex(this.lampEmission)+1);}}
         this.roofStage.visible=this.buildingBaseStage.visible=L.buildings;
         for(const ctx of [street,traffic,actors,glow,roofs,foliage,this.occupantContext]){
