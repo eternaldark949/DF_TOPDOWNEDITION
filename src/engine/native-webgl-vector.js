@@ -156,7 +156,7 @@ class NativeVectorContext {
     }
     measureText(text){const size=Number(/([0-9.]+)px/.exec(this.font)?.[1]||11);return {width:String(text).length*size*.62};}
     fillText(text,x,y){
-        if((/[^\x20-\x7e]/.test(String(text))||/Great Vibes|Chancery|Z003|cursive|Georgia|(?<!sans-)serif|italic/.test(this.font))&&this.owner.presentation&&this.owner.presentation.text(this,text,x,y)!==false)return;
+        if((this.textSprites||/[^\x20-\x7e]/.test(String(text))||/Great Vibes|Chancery|Z003|cursive|Georgia|(?<!sans-)serif|italic/.test(this.font))&&this.owner.presentation&&this.owner.presentation.text(this,text,x,y)!==false)return;
         this.hashValue(text);this.hashValue(this.font);this.hashValue(this.fillStyle);this.hashValue(this.globalAlpha);this.hashValue(x);this.hashValue(y);
         this.current=null;const n=this.node(PIXI.BitmapText),match=/([0-9.]+)px/.exec(this.font),size=match?Number(match[1]):11;
         n.text=String(text);n.fontSize=size;const color=this.color(this.fillStyle);n.tint=color.color;n.alpha=this.globalAlpha*color.alpha;

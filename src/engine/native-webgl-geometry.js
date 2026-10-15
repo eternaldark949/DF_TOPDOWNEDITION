@@ -40,7 +40,7 @@
         const part=this.part;if(!part)return;if(part.mrev!==this.mrev)part.mixed=true;
         const a=part.points,l=part.local,last=a.slice(-2),ll=l.slice(-2),q=points.map(p=>this.point(...p));
         const length=q.reduce((s,p,i)=>s+Math.hypot(p[0]-(i?q[i-1][0]:last[0]),p[1]-(i?q[i-1][1]:last[1])),0);
-        const n=Math.min(24,Math.max(4,Math.ceil(length*(this._flatScale||1)/2)));
+        const n=this.segments(Math.min(24,Math.max(4,Math.ceil(length*(this._flatScale||1)/2))));
         for(let i=1;i<=n;i++){const t=i/n,u=1-t;
             if(quadratic){const [p0,p1]=points;
                 a.push(u*u*last[0]+2*u*t*q[0][0]+t*t*q[1][0],u*u*last[1]+2*u*t*q[0][1]+t*t*q[1][1]);
@@ -51,6 +51,18 @@
         }
     };
 
+    // Segment tape: projection captures (native-webgl-projection.js) draw a layer twice from a
+    // nudged camera and need identical topology, so the second pass replays the first pass's
+    // curve and arc subdivision counts instead of deriving them from slightly different sizes.
+    P.segments=function(n){const t=this.segTape;if(!t)return n;if(t.record){t.list.push(n);return n;}return t.list[t.i++]??n;};
+    P.ellipse=function(x,y,rx,ry,rotation,start,end,anticlockwise=false){
+        const tau=Math.PI*2,raw=end-start;let span=raw;
+        if(!anticlockwise){if(raw>=tau)span=tau;else span=((raw%tau)+tau)%tau;}
+        else {if(raw<=-tau)span=-tau;else span=-(((-raw%tau)+tau)%tau);}
+        const n=this.segments(Math.max(2,Math.ceil(Math.abs(span)*Math.max(4,Math.sqrt(Math.max(rx,ry))*2)))),c=Math.cos(rotation),s=Math.sin(rotation);
+        for(let i=0;i<=n;i++){const a=start+span*i/n,px=x+Math.cos(a)*rx*c-Math.sin(a)*ry*s,py=y+Math.cos(a)*rx*s+Math.sin(a)*ry*c;
+            if(!this.part)this.moveTo(px,py);else this.lineTo(px,py);}
+    };
     // Shape key: authored points (1/256 px), closure, rule and stroke shape. Two independent
     // 32-bit hashes keep accidental collisions out of reach for a few thousand live shapes.
     // Translation-invariant: points are taken relative to the first one, so the same shape drawn

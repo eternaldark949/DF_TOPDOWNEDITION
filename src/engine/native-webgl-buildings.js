@@ -22,7 +22,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         return [...textures].reduce((n,t)=>n+t.realWidth*t.realHeight*4,0);
     },
     hideBuilding(r){r.active=false;r.base.root.visible=r.top.root.visible=false;if(r.glowMesh)r.glowMesh.visible=false;if(r.glowLive)r.glowLive.root.visible=false;},
-    evictBuilding(b,r){this.clearBuildingGlow(r,true);r.base.destroy();r.top.destroy();this.nativeBuildings.delete(b);this.buildingStats.evictions++;},
+    evictBuilding(b,r){this.clearBuildingGlow(r,true);this.dropProjected(r,"projBase");this.dropProjected(r,"projTop");r.base.destroy();r.top.destroy();this.nativeBuildings.delete(b);this.buildingStats.evictions++;},
     trimBuildingRecords(now=performance.now()){
         const hidden=[...this.nativeBuildings].filter(([,r])=>!r.active).sort((a,b)=>a[1].seen-b[1].seen);
         let bytes=hidden.reduce((n,[,r])=>n+this.buildingRecordBytes(r),0),nodes=hidden.reduce((n,[,r])=>n+[r.base,r.top,r.glowContext,r.glowLive].reduce((v,c)=>v+(c?.pool.length||0),0),0),count=hidden.length;
