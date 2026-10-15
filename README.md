@@ -1,6 +1,6 @@
 # ETRNLNINE — Engine foundation plan
 
-**Status: foundation, two-world flitting, and integrated profiler implemented; broader engine work remains planned.**
+**Status: foundation, two-world flitting, integrated profiler, and ambient occlusion implemented; broader engine work remains planned.**
 
 **Owner: ETERNAL / @eternaldark949.**
 
@@ -14,7 +14,9 @@ This document records the owner's requirements and the architectural agreement r
 
 The branch was intentionally created with only this plan. On 2026-10-15, after reviewing the plan and first-milestone proposal, the owner invited implementation to begin. The first runnable foundation follows [First Light decisions and source guide](docs/decisions/0001-first-light.md). No wholesale legacy import or expansion into every brainstorm is implied.
 
-**Current milestone:** [Engine profiler decisions and API](docs/decisions/0003-profiler.md) · [screenshots and verification](docs/milestones/profiler/README.md).
+**Current milestone:** [Ambient occlusion decisions and API](docs/decisions/0004-ambient-occlusion.md) · [screenshots and verification](docs/milestones/ambient-occlusion/README.md).
+
+**Engine profiler:** [decisions and API](docs/decisions/0003-profiler.md) · [screenshots and verification](docs/milestones/profiler/README.md).
 
 **Between Worlds:** [world preparation/transfer decisions](docs/decisions/0002-between-worlds.md) · [screenshots and verification](docs/milestones/between-worlds/README.md).
 
@@ -41,6 +43,7 @@ New ideas are welcome. Distinguish agreed requirements from proposed details and
 13. [First runnable engine milestone](#13-proposed-first-runnable-engine-milestone)
 14. [Remaining decisions and implementation sequence](#14-remaining-planning-decisions)
 15. [Integrated engine profiler](#15-integrated-engine-profiler)
+16. [Ambient occlusion](#16-ambient-occlusion-and-rendering-direction)
 
 ## Decision status
 
@@ -48,7 +51,7 @@ New ideas are welcome. Distinguish agreed requirements from proposed details and
 - **Proposed implementation direction:** a concrete way to realize that intent. These details guide design review; they are not finalized APIs, algorithms, or numeric budgets.
 - **Open decision:** an unresolved choice that must be recorded before dependent implementation.
 
-Section 10 records the carryovers the owner asked to include. Carrying over a feature means preserving and improving its purpose, not copying unfinished Python methods or committing to every mechanism proposed below. The foundation, two-world preparation/transfer, and integrated profiler milestones are implemented; the broader carryover scope remains a plan. Adding detail does not automatically authorize every proposed extension.
+Section 10 records the carryovers the owner asked to include. Carrying over a feature means preserving and improving its purpose, not copying unfinished Python methods or committing to every mechanism proposed below. The foundation, two-world preparation/transfer, integrated profiler, and ambient occlusion milestones are implemented; the broader carryover scope remains a plan. Adding detail does not automatically authorize every proposed extension.
 
 ## 1. Purpose and philosophy
 
@@ -528,3 +531,9 @@ The current implementation distinguishes raw frame intervals, measured CPU frame
 Profiling is off by default in the engine; this example opts in. Closing the viewer removes its scheduled work. Requested buffer sizes are labeled accounting data, not total browser/driver memory. Captures contain copied bounded data and never pin live worlds. Historical frame data and current capture-time owner details are distinguished. Diagnostic captures are separate from GRecorder replay.
 
 Future spatial/motion/audio systems should register measurements with this same facility. Full spatial-query systems, actual heap accounting, full GPU frame debugging and GRecorder remain separate work; instrumentation does not mean those features are implemented.
+
+## 16. Ambient occlusion and rendering direction
+
+The forward renderer now supports analytic geometry AO and an optional depth/normal SSAO tier. Only ambient illumination is attenuated; direct lights and emission retain their brightness. The example exposes Off / Geometry / Geometry + screen in World directory and defaults portrait layouts to the cheaper target-free tier.
+
+[Ambient occlusion decisions](docs/decisions/0004-ambient-occlusion.md) record ownership, quality settings, target budgets, profiling, tests and visual/algorithmic limits. Screen AO is SSAO, not GTAO. Cast shadows and direct-light occlusion remain unimplemented, and this milestone does not introduce deferred rendering, fog or bloom. Shared spatial indexing is still planned; the bounded proxy selection currently scans the small active world.

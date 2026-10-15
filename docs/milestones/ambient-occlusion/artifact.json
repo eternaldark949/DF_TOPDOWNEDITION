@@ -1,0 +1,9 @@
+{
+  "commit": "See enclosing Git commit",
+  "html": "dist/ETRNLNINE-Atrium.html",
+  "bytes": 157885,
+  "sha256": "411f4fa5bca8b99e7b06a45650536e1475bec090b57b7fff5a5a03875c9b2047",
+  "nodeTests": 41,
+  "browser": "Chromium software WebGL / SwiftShader",
+  "phonePerformanceMeasured": false
+}

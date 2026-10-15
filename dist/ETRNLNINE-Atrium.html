@@ -25,6 +25,7 @@ footer{position:absolute;bottom:max(25px,env(safe-area-inset-bottom));left:50%;t
 .engine-action{position:absolute;right:max(40px,env(safe-area-inset-right));bottom:max(46px,env(safe-area-inset-bottom));border-radius:50%;font-size:11px;letter-spacing:.1em;padding:0}
 /* These controls expose engine-demo residency deliberately, separate from game touch actions. */
 #world-directory{position:absolute;left:36px;top:205px;max-width:340px;padding:14px 16px;background:#11111dcc;border:1px solid #a6957633;border-radius:6px;font-size:11px;color:#bbb4c9;line-height:1.8}
+#world-directory label{display:flex;align-items:center;gap:8px;margin-top:10px}#world-directory select{font:inherit;color:inherit;background:#171722;border:1px solid #92816a55;padding:5px;border-radius:4px}
 #world-directory summary{cursor:pointer;color:#d1bf9b;letter-spacing:.12em;font-size:10px;text-transform:uppercase}
 #world-directory output{display:block}#world-directory p{margin:7px 0}#world-directory button{padding:6px 9px;font-size:10px;margin-top:8px}
 #world-slots,#transfer-time{font-size:10px;color:#8f8ca6}button:disabled{opacity:.4;cursor:default}
@@ -36,7 +37,7 @@ footer{position:absolute;bottom:max(25px,env(safe-area-inset-bottom));left:50%;t
 <canvas id="world" tabindex="0" aria-label="Interactive WebGL courtyard. Use WASD or arrows to walk, E to change the lantern, B to change the pack response, F to flit between worlds, G to move the prop."></canvas>
 <header><div class="eyebrow">ETRNLNINE / Between worlds</div><h1>The Amber Atrium</h1><div class="subtitle">Two worlds. One continuous journey.<br>Flit between them; leave a little change behind.</div></header>
 <nav aria-label="Demonstration controls"><button id="pause" aria-pressed="false">Pause</button><button id="restart">New scene</button></nav>
-<details id="world-directory"><summary>World directory</summary><p><output id="directory-status">Preparing worlds…</output><output id="world-slots"></output><output id="gpu-status"></output></p><output id="travel-status">Preparing the first world</output><output id="transfer-time"></output><button id="release-inactive">Release inactive</button> <button id="cancel-flit" disabled>Cancel flit</button></details>
+<details id="world-directory"><summary>World directory</summary><p><output id="directory-status">Preparing worlds…</output><output id="world-slots"></output><output id="gpu-status"></output></p><output id="travel-status">Preparing the first world</output><output id="transfer-time"></output><label>Ambient occlusion <select id="ambient-occlusion" aria-label="Ambient occlusion"><option value="off">Off</option><option value="geometry">Geometry</option><option value="screen">Geometry + screen</option></select></label><output id="ao-status"></output><button id="release-inactive">Release inactive</button> <button id="cancel-flit" disabled>Cancel flit</button></details>
 <div id="controls" aria-label="Touch controls"></div>
 <footer><output id="status" aria-label="Engine status">Opening the house…</output><div class="hint"><kbd>WASD / arrows</kbd> walk &nbsp;·&nbsp; <kbd>mouse</kbd> look &nbsp;·&nbsp; <kbd>E / click</kbd> light &nbsp;·&nbsp; <kbd>B</kbd> pack<br><kbd>F</kbd> flit · <kbd>X</kbd> cancel · <kbd>G</kbd> move prop<br>Gamepad: left stick / A light / B flit / X pack / Y cancel</div></footer>
 <div id="error" role="alert" hidden></div>
@@ -328,13 +329,153 @@ const ZERO_ACTION = Object.freeze({ x: 0, y: 0, down: false, pressed: false });
 
 return {Input};
 })();
+// Source: engine/basement/occlusion-shaders.js
+const module8=(()=>{
+/**
+ * Basement / occlusion shaders: local analytic box approximation and bounded SSAO.
+ * Camera reconstruction matches the orthographic oblique projection in shaders.js.
+ * These are ambient visibility estimates, never a replacement for cast shadows.
+ */
+
+/** Shared world-position reconstruction. Depth texture values span [0,1], not world units. */
+const RECONSTRUCT = `
+vec3 reconstruct(vec2 uv, float depth) {
+  vec2 screen = (uv * 2.0 - 1.0) * uCamera.zw;
+  float d = (depth * 2.0 - 1.0) * 200.0;
+  return vec3(screen.x + uCamera.x,
+    (0.65 * screen.y + 0.76 * d) / 1.0001 + uCamera.y,
+    (0.76 * screen.y - 0.65 * d) / 1.0001);
+}`;
+
+/** No lit color target is needed: retain normals plus hardware depth at bounded resolution. */
+const NORMAL_FRAGMENT = `#version 300 es
+precision highp float;
+in vec3 vNormal;
+out vec4 outColor;
+void main(){outColor=vec4(normalize(vNormal)*0.5+0.5,1.0);}`;
+
+/** Vertex-ID triangle needs no mesh allocation or per-frame uploads. */
+const FULLSCREEN_VERTEX = `#version 300 es
+precision highp float;
+out vec2 vUV;
+void main(){
+  vUV=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));
+  gl_Position=vec4(vUV*2.0-1.0,0.0,1.0);
+}`;
+
+/**
+ * Deterministic eight-direction/two-distance neighborhood estimator. World-unit
+ * radius prevents a fixed-pixel halo as zoom changes. No temporal noise/history.
+ * Missing offscreen samples contribute no occlusion; foreground gaps are range-rejected.
+ */
+const SSAO_FRAGMENT = `#version 300 es
+precision highp float;
+in vec2 vUV;
+uniform sampler2D uDepth;
+uniform sampler2D uNormals;
+uniform vec4 uCamera;
+uniform float uRadius;
+out vec4 outColor;
+${RECONSTRUCT}
+void main(){
+  float depth=texture(uDepth,vUV).r;
+  if(depth>=0.99999){outColor=vec4(1.0);return;}
+  vec3 p=reconstruct(vUV,depth);
+  vec3 n=normalize(texture(uNormals,vUV).xyz*2.0-1.0);
+  float blocked=0.0;
+  for(int i=0;i<8;i++){
+    float angle=(float(i)+0.125)*0.7853981634;
+    vec2 direction=vec2(cos(angle),sin(angle));
+    for(int j=0;j<2;j++){
+      float reach=uRadius*(j==0?0.3:0.8);
+      vec2 uv=vUV+direction*reach/(uCamera.zw*2.0);
+      if(any(lessThan(uv,vec2(0.0)))||any(greaterThan(uv,vec2(1.0))))continue;
+      float other=texture(uDepth,uv).r;
+      if(other>=0.99999)continue;
+      vec3 delta=reconstruct(uv,other)-p;
+      float distanceToSample=length(delta);
+      // Bias is in world units and suppresses self-occlusion of nearly coplanar surfaces.
+      float horizon=max(0.0,(dot(n,delta)-0.035)/max(distanceToSample,0.035));
+      blocked+=horizon*(1.0-smoothstep(uRadius*0.25,uRadius,distanceToSample));
+    }
+  }
+  float visibility=clamp(1.0-blocked*(2.8/16.0),0.35,1.0);
+  outColor=vec4(visibility,0.0,0.0,1.0);
+}`;
+
+/**
+ * Compact analytic box proxies cover nearby offscreen blockers too. For each OBB,
+ * distance to its surface sets falloff; a nearest interior point estimates hemisphere
+ * coverage. Ignore the receiver's own surface/inside, so a convex box never shades
+ * itself as a cavity. This approximates solid-angle coverage, not a physical bake.
+ */
+const AMBIENT_VISIBILITY = `
+uniform int uAOMode; // 0 off, 1 analytic geometry, 2 analytic + screen contacts
+uniform float uAOStrength;
+uniform float uAORadius;
+uniform int uBlockerCount;
+uniform vec4 uBlockerPose[12]; // xyz center, cos(yaw)
+uniform vec4 uBlockerSize[12]; // half extents xyz, sin(yaw)
+uniform sampler2D uAOScreen;
+uniform sampler2D uAODepth;
+uniform sampler2D uAONormals;
+uniform vec2 uAOSize;
+uniform vec4 uCamera;
+${RECONSTRUCT}
+float ambientVisibility(vec3 p,vec3 n){
+  if(uAOMode==0||uAOStrength==0.0)return 1.0;
+  float visibility=1.0;
+  for(int i=0;i<12;i++){
+    if(i>=uBlockerCount)break;
+    vec4 pose=uBlockerPose[i];vec3 h=uBlockerSize[i].xyz;
+    float c=pose.w,s=uBlockerSize[i].w;
+    mat2 localRotation=mat2(c,-s,s,c);
+    vec3 q=vec3(localRotation*(p.xy-pose.xy),p.z-pose.z);
+    vec3 outside=max(abs(q)-h,0.0);
+    float gap=length(outside);
+    if(gap<0.015||gap>=uAORadius)continue;
+    // Aim slightly into the box rather than at a coplanar nearest point on its base.
+    vec3 target=clamp(q,-h*0.75,h*0.75)-q;
+    vec3 direction=vec3(transpose(localRotation)*target.xy,target.z);
+    float facing=max(0.0,dot(n,normalize(direction)));
+    float coverage=1.0-smoothstep(0.0,uAORadius,gap);
+    visibility*=1.0-0.48*coverage*facing;
+  }
+  visibility=max(visibility,0.40);
+  if(uAOMode==2){
+    // Four-tap depth/normal-aware upsampling preserves silhouettes of the full-res
+    // MSAA forward pass. A low-res foreground sample must not darken a distant floor.
+    vec2 uv=gl_FragCoord.xy/uAOSize;
+    vec2 grid=uv*vec2(textureSize(uAOScreen,0))-0.5;
+    vec2 base=floor(grid),f=fract(grid);
+    float sum=0.0,weightSum=0.0;
+    for(int y=0;y<2;y++)for(int x=0;x<2;x++){
+      vec2 sampleUV=(base+vec2(x,y)+0.5)/vec2(textureSize(uAOScreen,0));
+      float depth=texture(uAODepth,sampleUV).r;
+      vec3 other=reconstruct(sampleUV,depth);
+      vec3 normal=normalize(texture(uAONormals,sampleUV).xyz*2.0-1.0);
+      float weight=(x==0?1.0-f.x:f.x)*(y==0?1.0-f.y:f.y);
+      weight*=exp(-abs(dot(other-p,n))*30.0)*pow(max(dot(n,normal),0.0),8.0);
+      sum+=texture(uAOScreen,sampleUV).r*weight;weightSum+=weight;
+    }
+    // max-strength combination avoids stacking two estimates of the same cavity.
+    if(weightSum>0.0001)visibility=min(visibility,sum/weightSum);
+  }
+  return mix(1.0,visibility,uAOStrength);
+}`;
+
+return {RECONSTRUCT,NORMAL_FRAGMENT,FULLSCREEN_VERTEX,SSAO_FRAGMENT,AMBIENT_VISIBILITY};
+})();
 // Source: engine/basement/shaders.js
 const module7=(()=>{
 /**
  * Basement / shaders: GPU-native instanced boxes and inexpensive surface lighting.
- * No textures, font atlas, Canvas preparation, post-processing, or external assets.
+ * Optional ambient visibility is supplied by the Basement occlusion capability.
+ * No Canvas preparation, font atlas or external assets.
  * This is the first renderer material, not the final luxe/bloom renderer.
  */
+const { AMBIENT_VISIBILITY } = module8;
+
 const VERTEX = `#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPosition;
@@ -374,9 +515,11 @@ uniform vec3 uAmbient;
 uniform vec4 uLights[8]; // x/y/z, radius; radius 0 disables a slot
 uniform vec3 uLightColors[8]; // linear RGB irradiance
 out vec4 outColor;
+${AMBIENT_VISIBILITY}
 void main() {
   vec3 n = normalize(vNormal);
-  vec3 light = uAmbient * (0.65 + 0.35 * max(n.z, 0.0));
+  // Occlusion attenuates ambient irradiance only, before exposure and display gamma.
+  vec3 light = uAmbient * (0.65 + 0.35 * max(n.z, 0.0)) * ambientVisibility(vWorld,n);
   light += vec3(0.20,0.22,0.29) * max(dot(n, normalize(vec3(-0.4,-0.5,1.0))), 0.0);
   for (int i=0; i<8; i++) {
     vec3 delta = uLights[i].xyz - vWorld;
@@ -404,7 +547,7 @@ void main() {
 return {VERTEX,FRAGMENT};
 })();
 // Source: engine/basement/render-diagnostics.js
-const module8=(()=>{
+const module9=(()=>{
 /**
  * Basement / rendering diagnostics: per-frame work deltas and requested buffer bytes.
  * Preparation uploads are included even when the later presentation resets legacy stats.
@@ -415,7 +558,7 @@ function renderDiagnostics(renderer,profiler){
   for(const name of ['draws','instances','uploads','uploadedBytes','candidates','culled']){
     ids[name]=profiler.counter(`renderer.${name}`,name==='uploadedBytes'?'bytes':'count');baseline[name]=0;
   }
-  for(const[name,unit]of [['buffers','count'],['programs','count'],['vaos','count'],['cpuBuffers','bytes'],['gpuBuffers','bytes'],['gpuPending','count']])ids[name]=profiler.counter(`renderer.${name}`,unit);
+  for(const[name,unit]of [['buffers','count'],['programs','count'],['vaos','count'],['cpuBuffers','bytes'],['gpuBuffers','bytes'],['gpuPending','count'],['aoTargets','bytes'],['aoBlockers','count']])ids[name]=profiler.counter(`renderer.${name}`,unit);
   return profiler.provider('renderer',{
     begin(){for(const name in baseline)baseline[name]=renderer.totals[name];},
     sample(p){
@@ -424,19 +567,21 @@ function renderDiagnostics(renderer,profiler){
       for(const batch of renderer.batches){cpu+=batch.cpuBytes;gpu+=batch.gpuBufferBytes;}
       p.set(ids.buffers,renderer.stats.buffers);p.set(ids.programs,renderer.stats.programs);p.set(ids.vaos,renderer.stats.vaos);
       p.set(ids.cpuBuffers,cpu);p.set(ids.gpuBuffers,gpu);p.set(ids.gpuPending,renderer.gpuTimer.pending);
+      const ao=renderer.occlusion,t=ao.targets;
+      p.set(ids.aoTargets,t?t.width*t.height*9:0);p.set(ids.aoBlockers,ao.count);
     },
     status:()=>renderer.gpuTimer.inspect(),
     configure:p=>renderer.gpuTimer.configure(p.recording&&p.gpuEnabled),
     details:()=>({gpuTimer:renderer.gpuTimer.inspect(),buffers:renderer.stats.buffers,programs:renderer.stats.programs,
-      vertexArrays:renderer.stats.vaos,viewport:{width:renderer.canvas.width,height:renderer.canvas.height},
-      accounting:'Requested GL buffer bytes only. Default framebuffer, shader/driver storage and browser heap are excluded.'}),
+      vertexArrays:renderer.stats.vaos,ambientOcclusion:renderer.occlusion.inspect(),viewport:{width:renderer.canvas.width,height:renderer.canvas.height},
+      accounting:'Requested GL buffer bytes only. Estimated AO render-target bytes are reported separately in ambientOcclusion/aoTargets. Default framebuffer, shader/driver storage and browser heap are excluded.'}),
   });
 }
 
 return {renderDiagnostics};
 })();
 // Source: engine/basement/gpu-timer.js
-const module9=(()=>{
+const module10=(()=>{
 /**
  * Basement / GPU timer: optional EXT_disjoint_timer_query_webgl2 measurements.
  * At most four reusable queries. Results are polled for availability, never forced
@@ -501,6 +646,217 @@ class GpuTimer {
 
 return {GpuTimer};
 })();
+// Source: engine/basement/gl-program.js
+const module11=(()=>{
+/** Basement / GL programs: shared compilation with complete failure-path ownership. */
+
+/** Link two GLSL stages; delete temporary shaders on success and every failure path. */
+function createProgram(gl, vertexSource, fragmentSource) {
+  const shaders=[]; let program;
+  try {
+    for(const [type,source] of [[gl.VERTEX_SHADER,vertexSource],[gl.FRAGMENT_SHADER,fragmentSource]]) {
+      const shader=gl.createShader(type);
+      if(!shader)throw new Error('WebGL shader allocation failed');
+      shaders.push(shader);
+      gl.shaderSource(shader,source);gl.compileShader(shader);
+      if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS))throw new Error(`WebGL shader: ${gl.getShaderInfoLog(shader)}`);
+    }
+    program=gl.createProgram();
+    if(!program)throw new Error('WebGL program allocation failed');
+    for(const shader of shaders)gl.attachShader(program,shader);
+    gl.linkProgram(program);
+    if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw new Error(`WebGL program: ${gl.getProgramInfoLog(program)}`);
+    return program;
+  } catch(error) {if(program)gl.deleteProgram(program);throw error;}
+  finally {for(const shader of shaders)if(shader)gl.deleteShader(shader);}
+}
+
+return {createProgram};
+})();
+// Source: engine/basement/ambient-occlusion.js
+const module12=(()=>{
+/**
+ * Basement / ambient occlusion: owns bounded proxies, optional GPU targets and settings.
+ * No scheduling, world ownership or game policy lives here. Renderer invokes the passes
+ * with its existing retained batch. Screen targets are lazy and freed when leaving screen.
+ */
+const { createProgram } = module11;
+const { VERTEX } = module7;
+const { NORMAL_FRAGMENT, FULLSCREEN_VERTEX, SSAO_FRAGMENT } = module8;
+
+/** Validate atomically; world lengths and strengths must never become NaN shader uniforms. */
+function occlusionSettings(previous, patch = {}) {
+  const next={...previous,...patch};
+  if(!['off','geometry','screen'].includes(next.mode))throw new RangeError('AO mode must be off, geometry or screen');
+  for(const [key,min,max] of [['strength',0,1],['radius',0.1,4],['resolutionScale',0.25,1],['maxDimension',64,1024]]) {
+    if(!Number.isFinite(next[key])||next[key]<min||next[key]>max)throw new RangeError(`AO ${key} must be between ${min} and ${max}`);
+  }
+  if(!Number.isInteger(next.maxDimension))throw new RangeError('AO maxDimension must be an integer');
+  return Object.freeze(next);
+}
+
+/** Bound both dimensions together, retaining aspect ratio and a positive backing size. */
+function occlusionDimensions(width,height,settings) {
+  const scale=Math.min(settings.resolutionScale,settings.maxDimension/Math.max(width,height));
+  return {width:Math.max(1,Math.round(width*scale)),height:Math.max(1,Math.round(height*scale))};
+}
+
+class AmbientOcclusion {
+  /** Default geometry tier uses no render targets; caller explicitly chooses screen cost. */
+  constructor(renderer,settings={}) {
+    this.renderer=renderer;this.gl=renderer.gl;
+    this.settings=occlusionSettings({mode:'geometry',strength:0.7,radius:1.25,resolutionScale:0.5,maxDimension:768},settings);
+    this.poses=new Float32Array(12*4);this.sizes=new Float32Array(12*4);this.scores=new Float64Array(12);
+    this.count=0;this.candidates=0;this.targets=null;this.normalProgram=null;this.screenProgram=null;
+    this.failure=null;this.disposed=false;
+  }
+
+  /** Configuration is independent of world lifetime. Invalid patches leave current state intact. */
+  configure(patch) {
+    if(this.disposed)throw new Error('Ambient occlusion is disposed');
+    const next=occlusionSettings(this.settings,patch);
+    if(next.mode!=='screen'||next.strength===0)this.release();
+    this.settings=next;this.failure=null;
+  }
+
+  /**
+   * Select at most twelve solid OBBs from the active world, including offscreen geometry.
+   * Rank by projected footprint and proximity to view center; ties retain insertion order.
+   * This bounded scan is a small-world policy. Future shared spatial queries replace the
+   * candidate enumeration; it is explicitly not an unbounded per-pixel scene traversal.
+   */
+  select(world) {
+    this.count=this.candidates=0;this.scores.fill(-Infinity);
+    if(this.settings.mode==='off'||this.settings.strength===0)return;
+    const camera=this.renderer.camera;
+    for(const entity of world.entities.values()) {
+      const shape=entity.shape,p=entity.pose;
+      if(!shape||shape.ambientBlocker===false||Math.min(...shape.size)<0.15)continue;
+      const [sx,sy,sz]=shape.size;
+      if(p.z+sz/2<=0.05)continue; // The ground slab must not consume the blocker budget.
+      this.candidates++;
+      const distance=Math.hypot(Math.max(0,Math.abs(p.x-camera.x)-sx/2),Math.max(0,Math.abs(p.y-camera.y)-sy/2));
+      const score=Math.sqrt(sx*sy+sx*sz+sy*sz)/(1+distance);
+      let slot=this.count;
+      while(slot>0&&score>this.scores[slot-1])slot--;
+      if(slot>=12)continue;
+      const end=Math.min(this.count,11);
+      for(let i=end;i>slot;i--){
+        this.scores[i]=this.scores[i-1];
+        this.poses.copyWithin(i*4,(i-1)*4,i*4);this.sizes.copyWithin(i*4,(i-1)*4,i*4);
+      }
+      this.scores[slot]=score;
+      this.poses[slot*4]=p.x;this.poses[slot*4+1]=p.y;this.poses[slot*4+2]=p.z;this.poses[slot*4+3]=Math.cos(p.yaw);
+      this.sizes[slot*4]=sx/2;this.sizes[slot*4+1]=sy/2;this.sizes[slot*4+2]=sz/2;this.sizes[slot*4+3]=Math.sin(p.yaw);
+      this.count=Math.min(12,this.count+1);
+    }
+  }
+
+  /** Allocate standard WebGL2 formats only; no float-color or external extension required. */
+  ensure(width,height) {
+    if(this.failure)return false; // Retry only after explicit configuration or context restoration.
+    const gl=this.gl,dimensions=occlusionDimensions(width,height,this.settings);
+    if(this.targets?.width===dimensions.width&&this.targets?.height===dimensions.height)return true;
+    this.releaseTargets();
+    const target={...dimensions,textures:[],framebuffers:[]};this.targets=target;
+    try {
+      if(!this.normalProgram){this.normalProgram=createProgram(gl,VERTEX,NORMAL_FRAGMENT);this.renderer.stats.programs++;}
+      if(!this.screenProgram){this.screenProgram=createProgram(gl,FULLSCREEN_VERTEX,SSAO_FRAGMENT);this.renderer.stats.programs++;}
+      this.normalCamera=gl.getUniformLocation(this.normalProgram,'uCamera');
+      this.screenUniforms=Object.fromEntries(['uCamera','uRadius','uDepth','uNormals'].map(n=>[n,gl.getUniformLocation(this.screenProgram,n)]));
+      /** Create immutable single-level storage; nearest sampling avoids depth interpolation. */
+      const texture=(format)=>{
+        const handle=gl.createTexture();if(!handle)throw new Error('AO texture allocation failed');
+        target.textures.push(handle);gl.bindTexture(gl.TEXTURE_2D,handle);
+        gl.texStorage2D(gl.TEXTURE_2D,1,format,target.width,target.height);
+        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+        return handle;
+      };
+      target.normal=texture(gl.RGBA8);target.depth=texture(gl.DEPTH_COMPONENT24);target.ao=texture(gl.R8);
+      for(const [color,depth]of [[target.normal,target.depth],[target.ao,null]]) {
+        const fbo=gl.createFramebuffer();if(!fbo)throw new Error('AO framebuffer allocation failed');
+        target.framebuffers.push(fbo);gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,color,0);
+        if(depth)gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.TEXTURE_2D,depth,0);
+        if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw new Error('AO framebuffer unavailable');
+      }
+      this.failure=null;return true;
+    } catch(error) {
+      this.failure=error.message;this.release();return false; // Preserve usable geometry tier.
+    } finally {gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.bindTexture(gl.TEXTURE_2D,null);}
+  }
+
+  /** Bind a sampler without retaining borrowed framebuffer state between renderer passes. */
+  texture(unit,handle) {const gl=this.gl;gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,handle);}
+
+  /** Render normal/depth and AO using the already-synchronized instance batch. */
+  prepare(batch,view) {
+    this.select(batch.world);
+    if(this.settings.mode!=='screen'||this.settings.strength===0||!this.ensure(this.renderer.canvas.width,this.renderer.canvas.height))return false;
+    const gl=this.gl,t=this.targets,r=this.renderer;
+    gl.viewport(0,0,t.width,t.height);gl.bindFramebuffer(gl.FRAMEBUFFER,t.framebuffers[0]);
+    gl.enable(gl.DEPTH_TEST);gl.clearColor(0.5,0.5,1,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+    gl.useProgram(this.normalProgram);gl.uniform4f(this.normalCamera,r.camera.x,r.camera.y,view.halfWidth,view.halfHeight);
+    gl.bindVertexArray(batch.vao);gl.drawArraysInstanced(gl.TRIANGLES,0,36,batch.count);gl.bindVertexArray(null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,t.framebuffers[1]);gl.disable(gl.DEPTH_TEST);
+    gl.useProgram(this.screenProgram);this.texture(0,t.depth);this.texture(1,t.normal);
+    gl.uniform1i(this.screenUniforms.uDepth,0);gl.uniform1i(this.screenUniforms.uNormals,1);
+    gl.uniform4f(this.screenUniforms.uCamera,r.camera.x,r.camera.y,view.halfWidth,view.halfHeight);
+    gl.uniform1f(this.screenUniforms.uRadius,this.settings.radius);gl.drawArrays(gl.TRIANGLES,0,3);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.enable(gl.DEPTH_TEST);
+    gl.viewport(0,0,r.canvas.width,r.canvas.height);
+    // Count both submissions, but only the geometry pass submits world instances.
+    r.stats.draws+=2;r.totals.draws+=2;r.stats.instances+=batch.count;r.totals.instances+=batch.count;
+    return true;
+  }
+
+  /** Supply ambient-only material parameters; direct and emissive terms never sample AO. */
+  bind(uniforms,screenReady) {
+    const gl=this.gl,s=this.settings;
+    gl.uniform1i(uniforms.uAOMode,s.mode==='off'?0:screenReady?2:1);
+    gl.uniform1f(uniforms.uAOStrength,s.strength);gl.uniform1f(uniforms.uAORadius,s.radius);
+    gl.uniform1i(uniforms.uBlockerCount,this.count);gl.uniform4fv(uniforms['uBlockerPose[0]'],this.poses);gl.uniform4fv(uniforms['uBlockerSize[0]'],this.sizes);
+    if(screenReady){
+      this.texture(0,this.targets.ao);this.texture(1,this.targets.depth);this.texture(2,this.targets.normal);
+      gl.uniform1i(uniforms.uAOScreen,0);gl.uniform1i(uniforms.uAODepth,1);gl.uniform1i(uniforms.uAONormals,2);
+      gl.uniform2f(uniforms.uAOSize,this.renderer.canvas.width,this.renderer.canvas.height);
+    }
+  }
+
+  /** Estimated target bytes use a four-byte depth budget; actual driver allocation is unknown. */
+  inspect() {
+    return {requestedMode:this.settings.mode,effectiveMode:this.settings.strength===0||this.settings.mode==='off'?'off':this.targets?'screen':'geometry',
+      strength:this.settings.strength,radius:this.settings.radius,blockers:this.count,candidates:this.candidates,blockerBudget:12,
+      width:this.targets?.width??0,height:this.targets?.height??0,textures:this.targets?.textures.length??0,
+      framebuffers:this.targets?.framebuffers.length??0,targetBytes:(this.targets?.width??0)*(this.targets?.height??0)*9,
+      failure:this.failure,accounting:'Estimated target storage: normal RGBA8 (4), depth24 budgeted at 4, AO R8 (1) bytes per pixel. Actual depth padding and driver overhead are unknown.'};
+  }
+
+  /** Invalidate lost handles without deleting them; the browser owns lost-context reclamation. */
+  invalidate() {this.targets=null;this.normalProgram=this.screenProgram=null;this.failure=null;}
+
+  /** Reallocate only viewport-dependent targets on resize; retain compiled shader programs. */
+  releaseTargets() {
+    const gl=this.gl;
+    if(this.targets){for(const fbo of this.targets.framebuffers)gl.deleteFramebuffer(fbo);for(const texture of this.targets.textures)gl.deleteTexture(texture);}
+    this.targets=null;
+  }
+
+  /** Delete in dependency order. No live target or program remains after disabling screen AO. */
+  release() {
+    const gl=this.gl;
+    this.releaseTargets();
+    for(const program of [this.normalProgram,this.screenProgram])if(program){gl.deleteProgram(program);this.renderer.stats.programs--;}
+    this.normalProgram=this.screenProgram=null;
+  }
+
+  /** Release all owned GPU and CPU storage; caller may keep a harmless disposed handle. */
+  dispose() {if(this.disposed)return;this.disposed=true;this.release();this.poses=this.sizes=this.scores=null;this.count=this.candidates=0;}
+}
+
+return {occlusionSettings,occlusionDimensions,AmbientOcclusion};
+})();
 // Source: engine/basement/renderer.js
 const module6=(()=>{
 /**
@@ -511,19 +867,10 @@ const module6=(()=>{
  */
 const { VERTEX, FRAGMENT } = module7;
 const { Lifetime } = module5;
-const { renderDiagnostics } = module8;
-const { GpuTimer } = module9;
-
-/** Compile one stage; include the driver log and delete failed handles immediately. */
-function compile(gl, type, source) {
-  const shader = gl.createShader(type);
-  gl.shaderSource(shader, source); gl.compileShader(shader);
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    const message = gl.getShaderInfoLog(shader); gl.deleteShader(shader);
-    throw new Error(`WebGL shader compilation: ${message}`);
-  }
-  return shader;
-}
+const { renderDiagnostics } = module9;
+const { GpuTimer } = module10;
+const { createProgram } = module11;
+const { AmbientOcclusion } = module12;
 
 /** Generate one unit cube with flat normals; uploaded once per WebGL context lifetime. */
 function cubeGeometry() {
@@ -546,7 +893,7 @@ function cubeGeometry() {
 
 class Renderer {
   /** Own the supplied surface's WebGL context. pixelRatio caps mobile fill cost. */
-  constructor(canvas, { pixelRatio = 1.5, profiler = null } = {}) {
+  constructor(canvas, { pixelRatio = 1.5, profiler = null, occlusion = {} } = {}) {
     this.profiler=profiler; this.canvas = canvas; this.pixelRatio = pixelRatio; this.life = new Lifetime();
     const gl = canvas.getContext('webgl2', { alpha: false, antialias: true, powerPreference: 'low-power' });
     if (!gl) throw new Error('ETRNLNINE requires WebGL 2 on this device.');
@@ -558,10 +905,12 @@ class Renderer {
     this.totals={draws:0,instances:0,uploads:0,uploadedBytes:0,candidates:0,culled:0};
     try {
       this.initialize();
+      this.occlusion=new AmbientOcclusion(this,occlusion);
+      this.occlusionScope=profiler?.scope('renderer.ambientOcclusion');
       this.gpuTimer=new GpuTimer(gl,(id,ms)=>this.profiler?.recordGpu(id,ms));
       this.life.own(renderDiagnostics(this,profiler));
       this.life.listen(canvas, 'webglcontextlost', event => {
-        event.preventDefault(); this.lost = true; this.gpuTimer.invalidate();
+        event.preventDefault(); this.lost = true; this.gpuTimer.invalidate(); this.occlusion.invalidate();
       });
       this.life.listen(canvas, 'webglcontextrestored', () => {
         // Browser invalidates all old handles on loss. Recreate from retained CPU data,
@@ -574,7 +923,7 @@ class Renderer {
     } catch(error) {
       // Metric-budget/capability failure may occur after GL creation. Constructor
       // failure must release real handles even though no caller received this renderer.
-      this.life.dispose();this.gpuTimer?.dispose();
+      this.life.dispose();this.gpuTimer?.dispose();this.occlusion?.dispose();
       if(this.cube)gl.deleteBuffer(this.cube);if(this.program)gl.deleteProgram(this.program);
       throw error;
     }
@@ -583,21 +932,11 @@ class Renderer {
   /** Allocate renderer-owned program/cube. Shaders are freed after linking. */
   initialize() {
     const gl = this.gl;
-    let vertex, fragment, program;
-    try {
-      vertex = compile(gl, gl.VERTEX_SHADER, VERTEX);
-      fragment = compile(gl, gl.FRAGMENT_SHADER, FRAGMENT);
-      program = gl.createProgram();
-      gl.attachShader(program, vertex); gl.attachShader(program, fragment); gl.linkProgram(program);
-      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
-    } catch (error) {
-      if (program) gl.deleteProgram(program);
-      throw error;
-    } finally {
-      if (vertex) gl.deleteShader(vertex); if (fragment) gl.deleteShader(fragment);
-    }
+    const program=createProgram(gl,VERTEX,FRAGMENT);
     this.program = program; this.stats.programs++;
-    this.uniforms = Object.fromEntries(['uCamera', 'uAmbient', 'uLights[0]', 'uLightColors[0]']
+    this.uniforms = Object.fromEntries(['uCamera', 'uAmbient', 'uLights[0]', 'uLightColors[0]',
+      'uAOMode','uAOStrength','uAORadius','uBlockerCount','uBlockerPose[0]','uBlockerSize[0]',
+      'uAOScreen','uAODepth','uAONormals','uAOSize']
       .map(name => [name, gl.getUniformLocation(program, name)]));
     this.cube = gl.createBuffer(); this.stats.buffers++;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.cube); gl.bufferData(gl.ARRAY_BUFFER, cubeGeometry(), gl.STATIC_DRAW);
@@ -662,25 +1001,30 @@ class Renderer {
     this.stats.draws = this.stats.instances = this.stats.uploads = this.stats.uploadedBytes = 0;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.clearColor(0.018, 0.019, 0.037, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    if (!batch || batch.disposed) return;
+    if (!batch || batch.disposed) {this.occlusion.count=this.occlusion.candidates=0;return;}
     if (batch.renderer !== this) throw new Error('Batch belongs to another renderer');
+    batch.sync(halfWidth, halfHeight);
+    const aoToken=this.profiler?.begin(this.occlusionScope);
+    let screenReady;
+    try {screenReady=this.occlusion.prepare(batch,{halfWidth,halfHeight});}
+    finally {this.profiler?.end(aoToken);}
     gl.useProgram(this.program);
+    this.occlusion.bind(this.uniforms,screenReady);
     gl.uniform4f(this.uniforms.uCamera, this.camera.x, this.camera.y, halfWidth, halfHeight);
     gl.uniform3fv(this.uniforms.uAmbient, this.ambient);
     gl.uniform4fv(this.uniforms['uLights[0]'], this.lights);
     gl.uniform3fv(this.uniforms['uLightColors[0]'], this.lightColors);
-    batch.sync(halfWidth, halfHeight);
     gl.bindVertexArray(batch.vao);
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, batch.count);
     gl.bindVertexArray(null);
-    this.stats.draws = 1; this.stats.instances = batch.count;
+    this.stats.draws++; this.stats.instances += batch.count;
     this.totals.draws++;this.totals.instances+=batch.count;
   }
 
   /** Release renderer and outstanding batches, with listeners removed before late restoration. */
   dispose() {
     if (this.disposed) return;
-    this.disposed = true; this.life.dispose(); this.gpuTimer.dispose();
+    this.disposed = true; this.life.dispose(); this.gpuTimer.dispose(); this.occlusion.dispose();
     for (const batch of [...this.batches]) batch.dispose();
     this.gl.deleteBuffer(this.cube); this.gl.deleteProgram(this.program);
     this.stats.buffers = this.stats.programs = this.stats.vaos = 0;
@@ -776,7 +1120,7 @@ class InstanceBatch {
 return {Renderer};
 })();
 // Source: engine/basement/profile-data.js
-const module11=(()=>{
+const module14=(()=>{
 /**
  * Basement / profile data: bounded copies for diagnostics, never live engine references.
  * Used only for on-demand captures/export, not for each recorded frame.
@@ -840,14 +1184,14 @@ function diagnosticError(error){
 return {boundedCopy,percentile,freezeData,diagnosticError};
 })();
 // Source: engine/basement/profiler.js
-const module10=(()=>{
+const module13=(()=>{
 /**
  * Basement / profiler: bounded CPU scopes, numeric counters, frame history and captures.
  * This mechanism knows no scheduler, renderer, game, DOM element, or GPU API.
  * Milliseconds everywhere. Recording reuses typed storage; summaries/captures allocate
  * only when explicitly requested. Disabled scope calls do not read the clock.
  */
-const { boundedCopy, percentile, freezeData, diagnosticError } = module11;
+const { boundedCopy, percentile, freezeData, diagnosticError } = module14;
 
 class Profiler {
   /** Capacities are hard budgets. Choose them at engine creation, not during a frame. */
@@ -1077,7 +1421,7 @@ const module2=(()=>{
 const { Identities, World } = module3;
 const { Input } = module4;
 const { Renderer } = module6;
-const { Profiler } = module10;
+const { Profiler } = module13;
 
 class Basement {
   /** Renderer first: unsupported WebGL fails before device listeners are installed. */
@@ -1098,7 +1442,7 @@ class Basement {
 return {Basement};
 })();
 // Source: engine/lobby/preparation.js
-const module13=(()=>{
+const module16=(()=>{
 /**
  * Lobby / preparation: cooperatively budgeted generator work in the existing frame loop.
  * Each next() must be a small, synchronous chunk; JavaScript cannot preempt a huge chunk.
@@ -1165,7 +1509,7 @@ class PreparationQueue {
 return {PreparationQueue};
 })();
 // Source: engine/lobby/runtime-diagnostics.js
-const module14=(()=>{
+const module17=(()=>{
 /**
  * Lobby / runtime diagnostics: measurement handles and counters, not scheduling logic.
  * Providers are removed with their runtime. Disabled profiling performs no timer reads.
@@ -1190,14 +1534,14 @@ function runtimeDiagnostics(runtime,profiler){
 return {runtimeDiagnostics};
 })();
 // Source: engine/lobby/runtime.js
-const module12=(()=>{
+const module15=(()=>{
 /**
  * Lobby / runtime: sole animation-frame owner, explicit phases, and pause reasons.
  * All elapsed values are seconds. The engine advances fixed simulation steps and
  * interpolates render poses; long browser suspensions never trigger unlimited work.
  */
-const { PreparationQueue } = module13;
-const { runtimeDiagnostics } = module14;
+const { PreparationQueue } = module16;
+const { runtimeDiagnostics } = module17;
 
 class Runtime {
   /** Inject scheduling for deterministic lifecycle tests; browser defaults allocate no loop yet. */
@@ -1310,7 +1654,7 @@ class Runtime {
 return {Runtime};
 })();
 // Source: engine/directory/residency.js
-const module16=(()=>{
+const module19=(()=>{
 /**
  * Directory / residency: bounded prepared worlds, preparation tickets, and compact state.
  * Factories are game/library supplied. They return {world, ready, capture, dispose, ...}.
@@ -1450,7 +1794,7 @@ class WorldResidency {
 return {WorldResidency};
 })();
 // Source: engine/directory/diagnostics.js
-const module17=(()=>{
+const module20=(()=>{
 /**
  * Directory / diagnostics: report resource ownership through Basement's provider contract.
  * Frame samples are scalar sums. Detailed rows are copied only on capture, capped at 64.
@@ -1497,14 +1841,14 @@ function directoryDiagnostics(directory,profiler){
 return {directoryDiagnostics};
 })();
 // Source: engine/directory/directory.js
-const module15=(()=>{
+const module18=(()=>{
 /**
  * Directory: named libraries, lazy shared resources, and explicit world ownership.
  * Factories come from callers. Nothing here imports a named toy or game asset.
  * A lease pins one resource; releasing the last lease destroys it immediately.
  */
-const { WorldResidency } = module16;
-const { directoryDiagnostics } = module17;
+const { WorldResidency } = module19;
+const { directoryDiagnostics } = module20;
 
 class Directory {
   /** Registration is inert: no world or GPU asset is allocated until requested. */
@@ -1579,16 +1923,17 @@ class Directory {
 return {Directory};
 })();
 // Source: engine/penthouse/toys.js
-const module19=(()=>{
+const module22=(()=>{
 /**
  * Penthouse / toys: reusable procedural box-based architecture and actor assemblies.
  * These are early test toys, not Freelancer art or the final procedural humanoid.
  * Everything is created through World; no toy owns a scheduler or a GPU context.
  */
 
-/** Add a solid box. Colors are linear RGB; emission is an optional dimensionless gain. */
-function box(world, { x = 0, y = 0, z = 0, size = [1,1,1], color = [0.3,0.3,0.4], emission = 0, parent = null, yaw = 0 } = {}) {
-  return world.create({ x, y, z, yaw, parent, shape: { size, color, emission } });
+/** Add a solid box. Colors are linear RGB; emission is a dimensionless gain.
+ * Set ambientBlocker=false for decorative shapes that should not contribute analytic AO. */
+function box(world, { x = 0, y = 0, z = 0, size = [1,1,1], color = [0.3,0.3,0.4], emission = 0, parent = null, yaw = 0, ambientBlocker = true } = {}) {
+  return world.create({ x, y, z, yaw, parent, shape: { size, color, emission, ambientBlocker } });
 }
 
 /**
@@ -1636,7 +1981,7 @@ function actor({ world, color = [0.42,0.34,0.58], bagColor = [0.54,0.30,0.17] })
 return {box,pavilion,actor};
 })();
 // Source: engine/penthouse/controls.js
-const module20=(()=>{
+const module23=(()=>{
 /**
  * Penthouse / controls: parameterized HTML control templates over Basement actions.
  * HTML is intentional for accessible interface text; the world remains pure WebGL.
@@ -1736,7 +2081,7 @@ class ActionButton {
 return {Joystick,ActionButton};
 })();
 // Source: engine/penthouse/profiler-style.js
-const module22=(()=>{
+const module25=(()=>{
 /** Penthouse / profiler presentation: component-scoped styles; removed with the viewer root. */
 const PROFILER_STYLE=`
 .etrnl-profiler{position:absolute;right:30px;top:92px;width:min(390px,calc(100vw - 40px));max-height:calc(100dvh - 190px);overflow:auto;background:#11131eef;border:1px solid #c6ae774d;border-radius:7px;color:#d5cfdf;font:11px/1.55 system-ui,sans-serif;z-index:2;box-shadow:0 12px 50px #0004}
@@ -1761,15 +2106,15 @@ const PROFILER_STYLE=`
 return {PROFILER_STYLE};
 })();
 // Source: engine/penthouse/profiler-view.js
-const module21=(()=>{
+const module24=(()=>{
 /**
  * Penthouse / profiler viewer: accessible HTML/SVG, bounded tables and capture export.
  * Receives a generic subscription function; it never imports Lobby or starts a loop.
  * Closed viewers unsubscribe. Open viewers refresh at most twice a second by default.
  */
 const { Lifetime } = module5;
-const { diagnosticError } = module11;
-const { PROFILER_STYLE } = module22;
+const { diagnosticError } = module14;
+const { PROFILER_STYLE } = module25;
 
 /** Format measured values without turning unavailable measurements into zero. */
 function ms(value){return Number.isFinite(value)?value.toFixed(2):'—';}
@@ -1889,14 +2234,14 @@ class ProfilerView {
 return {ProfilerView};
 })();
 // Source: engine/penthouse/penthouse.js
-const module18=(()=>{
+const module21=(()=>{
 /**
  * Penthouse assembly: expose inert libraries without coupling Directory to toy names.
  * ETRNLNINE installs these factories; games request them through Directory.
  */
-const { pavilion, actor, box } = module19;
-const { Joystick, ActionButton } = module20;
-const { ProfilerView } = module21;
+const { pavilion, actor, box } = module22;
+const { Joystick, ActionButton } = module23;
+const { ProfilerView } = module24;
 
 class Penthouse {
   /** Catalog creation is inert: allocation begins only when a factory is requested. */
@@ -1923,9 +2268,9 @@ const module1=(()=>{
  */
 const { Basement } = module2;
 const { Lifetime } = module5;
-const { Runtime } = module12;
-const { Directory } = module15;
-const { Penthouse } = module18;
+const { Runtime } = module15;
+const { Directory } = module18;
+const { Penthouse } = module21;
 
 class ETRNLNINE {
   /** Build an empty engine, releasing earlier levels if a later constructor fails. */
@@ -1963,7 +2308,7 @@ class ETRNLNINE {
 return {ETRNLNINE};
 })();
 // Source: engine/basement/transfer.js
-const module26=(()=>{
+const module29=(()=>{
 /**
  * Basement / transfer: validated, synchronous movement of one attachment tree.
  * No loading, scheduling, game rules, callbacks during mutation, or resource ownership.
@@ -2013,13 +2358,13 @@ function transferTree({ source, destination, root, landing, validate = () => tru
 return {transferTree};
 })();
 // Source: engine/lobby/travel.js
-const module25=(()=>{
+const module28=(()=>{
 /**
  * Lobby / travel: asynchronous preparation becomes a synchronous boundary commit.
  * It consumes generic residency tickets; it does not import Directory or game content.
  * The active ticket pins the source until a successful transfer replaces it.
  */
-const { transferTree } = module26;
+const { transferTree } = module29;
 
 class WorldTravel {
   /** Adopt an already-ready initial ticket/root. The owner must call advance at a boundary. */
@@ -2112,7 +2457,7 @@ class WorldTravel {
 return {WorldTravel};
 })();
 // Source: engine/basement/geometry.js
-const module28=(()=>{
+const module31=(()=>{
 /** Basement / geometry: pure horizontal collision helpers, with no world or game dependency. */
 
 /** Does a horizontal circle overlap an axis-aligned box? Touching is permitted. */
@@ -2125,7 +2470,7 @@ function circleOverlapsBox(x, y, radius, box) {
 return {circleOverlapsBox};
 })();
 // Source: examples/atrium/layout.js
-const module29=(()=>{
+const module32=(()=>{
 /**
  * Atrium example / authored layout. This is game content, deliberately outside engine/.
  * Change these placements/materials without editing renderer or toy implementations.
@@ -2191,15 +2536,15 @@ function* buildLayout(engine, world, profile) {
 return {buildLayout};
 })();
 // Source: examples/atrium/worlds.js
-const module27=(()=>{
+const module30=(()=>{
 /**
  * Atrium example / world definitions: authored realms, reconstruction and state schema.
  * Directory receives factories, not these names. Lobby budgets actual procedural work.
  * Persisted data is deliberately small: light selection, crystal rotation and prop position.
  */
 const { Lifetime } = module5;
-const { circleOverlapsBox } = module28;
-const { buildLayout } = module29;
+const { circleOverlapsBox } = module31;
+const { buildLayout } = module32;
 
 /** Immutable-by-convention authoring profiles; runtime mutable state is created per world. */
 const PROFILES = [
@@ -2263,15 +2608,15 @@ function worldFactory(engine, profile, id) {
 return {PROFILES,legalLanding,applyLight,worldFactory};
 })();
 // Source: examples/atrium/journey.js
-const module24=(()=>{
+const module27=(()=>{
 /**
  * Atrium example / journey: game-specific realm links, initial actor and prewarming policy.
  * Loading/lifetime algorithms live in Directory; transaction scheduling lives in Lobby.
  * This module chooses the destination and asks for those mechanisms through public contracts.
  */
 const { Lifetime } = module5;
-const { WorldTravel } = module25;
-const { PROFILES, worldFactory, legalLanding, applyLight } = module27;
+const { WorldTravel } = module28;
+const { PROFILES, worldFactory, legalLanding, applyLight } = module30;
 
 /** Own the two realm definitions and their tickets for one example session. */
 function createJourney(engine) {
@@ -2349,12 +2694,12 @@ function createJourney(engine) {
 return {createJourney};
 })();
 // Source: examples/atrium/player.js
-const module30=(()=>{
+const module33=(()=>{
 /**
  * Atrium example / locomotion: game-owned steering/gait profile, independent of realm residency.
  * Actor references and velocity survive transfers. This is not a full physical body solver.
  */
-const { legalLanding } = module27;
+const { legalLanding } = module30;
 
 /** Create one controller whose mutable velocity/load state belongs only to this actor. */
 function playerController(actor, input, renderer) {
@@ -2390,15 +2735,15 @@ function playerController(actor, input, renderer) {
 return {playerController};
 })();
 // Source: examples/atrium/scene.js
-const module23=(()=>{
+const module26=(()=>{
 /**
  * Atrium example / scene: owns controls, phase registrations and the game's journey.
  * Layout/reconstruction, locomotion and world policy have their own focused modules.
  * Nothing here installs an engine patch or creates an independent animation loop.
  */
 const { Lifetime } = module5;
-const { createJourney } = module24;
-const { playerController } = module30;
+const { createJourney } = module27;
+const { playerController } = module33;
 
 /** Start preparing the scene immediately. Rendering remains valid while the first world loads. */
 function createScene(engine,{controlsHost,onStatus=()=>{},onError=()=>{}}){
@@ -2471,13 +2816,14 @@ const module0=(()=>{
  */
 const { ETRNLNINE } = module1;
 const { Lifetime } = module5;
-const { createScene } = module23;
+const { createScene } = module26;
 
 const canvas=document.querySelector('#world'), controlsHost=document.querySelector('#controls');
 const status=document.querySelector('#status'), errorBox=document.querySelector('#error');
 const pauseButton=document.querySelector('#pause'), restartButton=document.querySelector('#restart');
 const directoryStatus=document.querySelector('#directory-status'), travelStatus=document.querySelector('#travel-status');
 const releaseButton=document.querySelector('#release-inactive'), cancelButton=document.querySelector('#cancel-flit');
+const aoSelect=document.querySelector('#ambient-occlusion');
 const heading=document.querySelector('h1');
 const life=new Lifetime();
 let engine, scene;
@@ -2491,8 +2837,10 @@ function report(error) {
 function replaceScene() {
   scene?.dispose(); scene=null;
   scene=createScene(engine,{ controlsHost, onError:report, onStatus: state => {
-    const r=engine.basement.renderer.stats;
-    status.textContent=`${state.loaded?'Weighted':'Light'} pack · ${state.entities} forms · ${r.draws} draw · ${r.uploadedBytes} B updated`;
+    const renderer=engine.basement.renderer,r=renderer.stats,ao=renderer.occlusion.inspect();
+    aoSelect.dataset.effective=ao.effectiveMode;
+    document.querySelector('#ao-status').textContent=ao.failure?'Screen AO unavailable; geometry fallback.':ao.effectiveMode==='screen'?`${ao.width} × ${ao.height} screen contacts · ambient light only`:'Ambient light only · no screen targets';
+    status.textContent=`${state.loaded?'Weighted':'Light'} pack · ${state.entities} forms · ${r.draws} draws · ${r.uploadedBytes} B updated`;
     // Small DOM diagnostics aid accessibility and automated verification; no engine globals.
     status.dataset.world=state.worldId; status.dataset.x=state.x.toFixed(3); status.dataset.y=state.y.toFixed(3);
     status.dataset.buffers=r.buffers; status.dataset.vaos=r.vaos;
@@ -2516,6 +2864,11 @@ function replaceScene() {
 
 try {
   engine=new ETRNLNINE(canvas,{ pixelRatio:1.5,profiling:{enabled:true} });
+  // Example policy only: phone-sized layouts start with the target-free geometry tier.
+  // Resizing never silently changes a user's explicit selection.
+  const aoMode=window.matchMedia('(max-width:650px)').matches?'geometry':'screen';
+  engine.basement.renderer.occlusion.configure({mode:aoMode});aoSelect.value=aoMode;
+  life.listen(aoSelect,'change',()=>engine.basement.renderer.occlusion.configure({mode:aoSelect.value}));
   replaceScene();
   const profilerView=engine.directory.create('tool.profiler',{profiler:engine.basement.profiler,host:document.body,
     subscribe:callback=>engine.lobby.on('render',callback,'profiler.viewer')});

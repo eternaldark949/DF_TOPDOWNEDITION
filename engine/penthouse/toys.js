@@ -4,9 +4,10 @@
  * Everything is created through World; no toy owns a scheduler or a GPU context.
  */
 
-/** Add a solid box. Colors are linear RGB; emission is an optional dimensionless gain. */
-export function box(world, { x = 0, y = 0, z = 0, size = [1,1,1], color = [0.3,0.3,0.4], emission = 0, parent = null, yaw = 0 } = {}) {
-  return world.create({ x, y, z, yaw, parent, shape: { size, color, emission } });
+/** Add a solid box. Colors are linear RGB; emission is a dimensionless gain.
+ * Set ambientBlocker=false for decorative shapes that should not contribute analytic AO. */
+export function box(world, { x = 0, y = 0, z = 0, size = [1,1,1], color = [0.3,0.3,0.4], emission = 0, parent = null, yaw = 0, ambientBlocker = true } = {}) {
+  return world.create({ x, y, z, yaw, parent, shape: { size, color, emission, ambientBlocker } });
 }
 
 /**

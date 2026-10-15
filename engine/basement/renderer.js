@@ -8,17 +8,8 @@ import { VERTEX, FRAGMENT } from './shaders.js';
 import { Lifetime } from './lifetime.js';
 import { renderDiagnostics } from './render-diagnostics.js';
 import { GpuTimer } from './gpu-timer.js';
-
-/** Compile one stage; include the driver log and delete failed handles immediately. */
-function compile(gl, type, source) {
-  const shader = gl.createShader(type);
-  gl.shaderSource(shader, source); gl.compileShader(shader);
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    const message = gl.getShaderInfoLog(shader); gl.deleteShader(shader);
-    throw new Error(`WebGL shader compilation: ${message}`);
-  }
-  return shader;
-}
+import { createProgram } from './gl-program.js';
+import { AmbientOcclusion } from './ambient-occlusion.js';
 
 /** Generate one unit cube with flat normals; uploaded once per WebGL context lifetime. */
 function cubeGeometry() {
@@ -41,7 +32,7 @@ function cubeGeometry() {
 
 export class Renderer {
   /** Own the supplied surface's WebGL context. pixelRatio caps mobile fill cost. */
-  constructor(canvas, { pixelRatio = 1.5, profiler = null } = {}) {
+  constructor(canvas, { pixelRatio = 1.5, profiler = null, occlusion = {} } = {}) {
     this.profiler=profiler; this.canvas = canvas; this.pixelRatio = pixelRatio; this.life = new Lifetime();
     const gl = canvas.getContext('webgl2', { alpha: false, antialias: true, powerPreference: 'low-power' });
     if (!gl) throw new Error('ETRNLNINE requires WebGL 2 on this device.');
@@ -53,10 +44,12 @@ export class Renderer {
     this.totals={draws:0,instances:0,uploads:0,uploadedBytes:0,candidates:0,culled:0};
     try {
       this.initialize();
+      this.occlusion=new AmbientOcclusion(this,occlusion);
+      this.occlusionScope=profiler?.scope('renderer.ambientOcclusion');
       this.gpuTimer=new GpuTimer(gl,(id,ms)=>this.profiler?.recordGpu(id,ms));
       this.life.own(renderDiagnostics(this,profiler));
       this.life.listen(canvas, 'webglcontextlost', event => {
-        event.preventDefault(); this.lost = true; this.gpuTimer.invalidate();
+        event.preventDefault(); this.lost = true; this.gpuTimer.invalidate(); this.occlusion.invalidate();
       });
       this.life.listen(canvas, 'webglcontextrestored', () => {
         // Browser invalidates all old handles on loss. Recreate from retained CPU data,
@@ -69,7 +62,7 @@ export class Renderer {
     } catch(error) {
       // Metric-budget/capability failure may occur after GL creation. Constructor
       // failure must release real handles even though no caller received this renderer.
-      this.life.dispose();this.gpuTimer?.dispose();
+      this.life.dispose();this.gpuTimer?.dispose();this.occlusion?.dispose();
       if(this.cube)gl.deleteBuffer(this.cube);if(this.program)gl.deleteProgram(this.program);
       throw error;
     }
@@ -78,21 +71,11 @@ export class Renderer {
   /** Allocate renderer-owned program/cube. Shaders are freed after linking. */
   initialize() {
     const gl = this.gl;
-    let vertex, fragment, program;
-    try {
-      vertex = compile(gl, gl.VERTEX_SHADER, VERTEX);
-      fragment = compile(gl, gl.FRAGMENT_SHADER, FRAGMENT);
-      program = gl.createProgram();
-      gl.attachShader(program, vertex); gl.attachShader(program, fragment); gl.linkProgram(program);
-      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
-    } catch (error) {
-      if (program) gl.deleteProgram(program);
-      throw error;
-    } finally {
-      if (vertex) gl.deleteShader(vertex); if (fragment) gl.deleteShader(fragment);
-    }
+    const program=createProgram(gl,VERTEX,FRAGMENT);
     this.program = program; this.stats.programs++;
-    this.uniforms = Object.fromEntries(['uCamera', 'uAmbient', 'uLights[0]', 'uLightColors[0]']
+    this.uniforms = Object.fromEntries(['uCamera', 'uAmbient', 'uLights[0]', 'uLightColors[0]',
+      'uAOMode','uAOStrength','uAORadius','uBlockerCount','uBlockerPose[0]','uBlockerSize[0]',
+      'uAOScreen','uAODepth','uAONormals','uAOSize']
       .map(name => [name, gl.getUniformLocation(program, name)]));
     this.cube = gl.createBuffer(); this.stats.buffers++;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.cube); gl.bufferData(gl.ARRAY_BUFFER, cubeGeometry(), gl.STATIC_DRAW);
@@ -157,25 +140,30 @@ export class Renderer {
     this.stats.draws = this.stats.instances = this.stats.uploads = this.stats.uploadedBytes = 0;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.clearColor(0.018, 0.019, 0.037, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    if (!batch || batch.disposed) return;
+    if (!batch || batch.disposed) {this.occlusion.count=this.occlusion.candidates=0;return;}
     if (batch.renderer !== this) throw new Error('Batch belongs to another renderer');
+    batch.sync(halfWidth, halfHeight);
+    const aoToken=this.profiler?.begin(this.occlusionScope);
+    let screenReady;
+    try {screenReady=this.occlusion.prepare(batch,{halfWidth,halfHeight});}
+    finally {this.profiler?.end(aoToken);}
     gl.useProgram(this.program);
+    this.occlusion.bind(this.uniforms,screenReady);
     gl.uniform4f(this.uniforms.uCamera, this.camera.x, this.camera.y, halfWidth, halfHeight);
     gl.uniform3fv(this.uniforms.uAmbient, this.ambient);
     gl.uniform4fv(this.uniforms['uLights[0]'], this.lights);
     gl.uniform3fv(this.uniforms['uLightColors[0]'], this.lightColors);
-    batch.sync(halfWidth, halfHeight);
     gl.bindVertexArray(batch.vao);
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, batch.count);
     gl.bindVertexArray(null);
-    this.stats.draws = 1; this.stats.instances = batch.count;
+    this.stats.draws++; this.stats.instances += batch.count;
     this.totals.draws++;this.totals.instances+=batch.count;
   }
 
   /** Release renderer and outstanding batches, with listeners removed before late restoration. */
   dispose() {
     if (this.disposed) return;
-    this.disposed = true; this.life.dispose(); this.gpuTimer.dispose();
+    this.disposed = true; this.life.dispose(); this.gpuTimer.dispose(); this.occlusion.dispose();
     for (const batch of [...this.batches]) batch.dispose();
     this.gl.deleteBuffer(this.cube); this.gl.deleteProgram(this.program);
     this.stats.buffers = this.stats.programs = this.stats.vaos = 0;

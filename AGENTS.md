@@ -1,6 +1,6 @@
 # Working in ETRNLNINE
 
-Read README.md and the applicable docs/decisions records (First Light, Between Worlds, and Profiler) before changing source. The owner's house architecture and commenting requirements govern this branch.
+Read README.md and the applicable docs/decisions records (First Light, Between Worlds, Profiler, and Ambient Occlusion) before changing source. The owner's house architecture and commenting requirements govern this branch.
 
 - Basement defines reusable mechanisms; Lobby alone owns runtime scheduling; Directory manages registered libraries/worlds/resource ownership; Penthouse supplies reusable toys. ETRNLNINE remains a small composition root.
 - Game/example rules and content stay outside engine/. Engine code never imports them or looks up game DOM IDs.
@@ -15,3 +15,5 @@ Read README.md and the applicable docs/decisions records (First Light, Between W
 For world work, preserve active/preparation ownership and final-boundary validation. Readiness promises resolve without resource values; use the owned ticket.value. Never move actor membership from an asynchronous completion or retain borrowed world resources after releasing their ticket.
 
 For profiling, register static bounded names once and close synchronous scopes in finally. Do not poll or wait for GPU completion in hot paths. Own provider/view subscriptions, distinguish CPU/interval/GPU measurements, and label buffer sizes and capture-time versus historical data accurately.
+
+For AO, read docs/decisions/0004-ambient-occlusion.md. Preserve ambient-only attenuation, bounded candidate/target budgets and the original antialiased forward path. Screen-space AO is SSAO, not GTAO or cast shadows. Keep texture-storage estimates distinct from requested buffer bytes. Free optional targets/programs on quality disable, and preserve context restoration and geometry fallback.

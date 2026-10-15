@@ -25,6 +25,7 @@ footer{position:absolute;bottom:max(25px,env(safe-area-inset-bottom));left:50%;t
 .engine-action{position:absolute;right:max(40px,env(safe-area-inset-right));bottom:max(46px,env(safe-area-inset-bottom));border-radius:50%;font-size:11px;letter-spacing:.1em;padding:0}
 /* These controls expose engine-demo residency deliberately, separate from game touch actions. */
 #world-directory{position:absolute;left:36px;top:205px;max-width:340px;padding:14px 16px;background:#11111dcc;border:1px solid #a6957633;border-radius:6px;font-size:11px;color:#bbb4c9;line-height:1.8}
+#world-directory label{display:flex;align-items:center;gap:8px;margin-top:10px}#world-directory select{font:inherit;color:inherit;background:#171722;border:1px solid #92816a55;padding:5px;border-radius:4px}
 #world-directory summary{cursor:pointer;color:#d1bf9b;letter-spacing:.12em;font-size:10px;text-transform:uppercase}
 #world-directory output{display:block}#world-directory p{margin:7px 0}#world-directory button{padding:6px 9px;font-size:10px;margin-top:8px}
 #world-slots,#transfer-time{font-size:10px;color:#8f8ca6}button:disabled{opacity:.4;cursor:default}
@@ -36,7 +37,7 @@ footer{position:absolute;bottom:max(25px,env(safe-area-inset-bottom));left:50%;t
 <canvas id="world" tabindex="0" aria-label="Interactive WebGL courtyard. Use WASD or arrows to walk, E to change the lantern, B to change the pack response, F to flit between worlds, G to move the prop."></canvas>
 <header><div class="eyebrow">ETRNLNINE / Between worlds</div><h1>The Amber Atrium</h1><div class="subtitle">Two worlds. One continuous journey.<br>Flit between them; leave a little change behind.</div></header>
 <nav aria-label="Demonstration controls"><button id="pause" aria-pressed="false">Pause</button><button id="restart">New scene</button></nav>
-<details id="world-directory"><summary>World directory</summary><p><output id="directory-status">Preparing worlds…</output><output id="world-slots"></output><output id="gpu-status"></output></p><output id="travel-status">Preparing the first world</output><output id="transfer-time"></output><button id="release-inactive">Release inactive</button> <button id="cancel-flit" disabled>Cancel flit</button></details>
+<details id="world-directory"><summary>World directory</summary><p><output id="directory-status">Preparing worlds…</output><output id="world-slots"></output><output id="gpu-status"></output></p><output id="travel-status">Preparing the first world</output><output id="transfer-time"></output><label>Ambient occlusion <select id="ambient-occlusion" aria-label="Ambient occlusion"><option value="off">Off</option><option value="geometry">Geometry</option><option value="screen">Geometry + screen</option></select></label><output id="ao-status"></output><button id="release-inactive">Release inactive</button> <button id="cancel-flit" disabled>Cancel flit</button></details>
 <div id="controls" aria-label="Touch controls"></div>
 <footer><output id="status" aria-label="Engine status">Opening the house…</output><div class="hint"><kbd>WASD / arrows</kbd> walk &nbsp;·&nbsp; <kbd>mouse</kbd> look &nbsp;·&nbsp; <kbd>E / click</kbd> light &nbsp;·&nbsp; <kbd>B</kbd> pack<br><kbd>F</kbd> flit · <kbd>X</kbd> cancel · <kbd>G</kbd> move prop<br>Gamepad: left stick / A light / B flit / X pack / Y cancel</div></footer>
 <div id="error" role="alert" hidden></div>

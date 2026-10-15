@@ -27,7 +27,7 @@ const server=http.createServer((req,res)=>{
     args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   const errors=[];const report={};
   try{
-    const context=await browser.newContext({viewport:{width:1440,height:1000}});
+    const context=await browser.newContext({viewport:{width:1024,height:720}});
     // A runtime guard catches indirect/off-screen preparation as well as visible Canvas usage.
     const installGuard=()=>{
       const original=HTMLCanvasElement.prototype.getContext;
@@ -51,6 +51,7 @@ const server=http.createServer((req,res)=>{
     await page.waitForFunction(()=>document.querySelector('#status').dataset.actor && document.querySelector('#status').dataset.buffers==='3')
       .catch(async error=>{console.error('Startup state:',await page.locator('body').innerText(),errors);throw error;});
     assert.equal(await page.locator('#error').isVisible(),false);
+    console.log('Browser: startup complete');
     const before=Number(await page.locator('#status').getAttribute('data-x'));
     await page.keyboard.down('KeyD');
     await page.waitForFunction(x=>Number(document.querySelector('#status').dataset.x)>x+1,before);
@@ -71,8 +72,13 @@ const server=http.createServer((req,res)=>{
     await page.keyboard.down('KeyW');await page.waitForTimeout(150);await page.keyboard.up('KeyW');
     assert.equal(await page.locator('#status').getAttribute('data-time'),frozen,'Pause freezes simulation');
     await page.locator('#pause').click();
+    console.log('Browser: input/pause complete');
+    // Scene-lifetime stress runs on the target-free tier; the subsequent comparison
+    // and ten world transfers exercise the optional screen tier independently.
+    await page.getByLabel('Ambient occlusion',{exact:true}).selectOption('geometry',{force:true});
     for(let i=0;i<12;i++){
       const previous=await page.locator('#status').getAttribute('data-world');
+      if(i%4===0)console.log(`Browser: scene cycle ${i+1}/12`);
       await page.locator('#restart').click();
       await page.waitForFunction(old=>{const s=document.querySelector('#status').dataset;return s.world!==old && s.world!=='preparing' && s.buffers==='3';},previous);
       assert.equal(await page.locator('.engine-joystick').count(),1);
@@ -80,7 +86,18 @@ const server=http.createServer((req,res)=>{
       assert.equal(await page.locator('#status').getAttribute('data-buffers'),'3');
       assert.equal(await page.locator('#status').getAttribute('data-vaos'),'2');
     }
+    console.log('Browser: scene cycles complete');
     await page.screenshot({path:path.join(artifacts,'worlds-amber-desktop.png')});
+    await page.locator('#pause').click();
+    await page.locator('#world-directory summary').click();
+    for(const mode of ['off','geometry','screen']){
+      await page.getByLabel('Ambient occlusion',{exact:true}).selectOption(mode);
+      await page.locator('#world-directory summary').click();
+      await page.waitForTimeout(100);
+      await page.screenshot({path:path.join(artifacts,`ao-amber-${mode}.png`)});
+      await page.locator('#world-directory summary').click();
+    }
+    await page.locator('#world-directory summary').click();await page.locator('#pause').click();
     const actorId=await page.locator('#status').getAttribute('data-actor');
     const amberId=await page.locator('#status').getAttribute('data-world');
     const amberCount=await page.locator('#status').getAttribute('data-entities');
@@ -173,6 +190,7 @@ const server=http.createServer((req,res)=>{
     const phone=await mobile.newPage();await phone.evaluate(installGuard);phone.on('pageerror',e=>errors.push(e.message));
     await phone.setContent(fs.readFileSync(path.join(root,'dist/ETRNLNINE-Atrium.html'),'utf8'));
     await phone.waitForFunction(()=>document.querySelector('#status').dataset.actor && document.querySelector('#status').dataset.buffers==='3');
+    assert.equal(await phone.getByLabel('Ambient occlusion',{exact:true}).inputValue(),'geometry','Portrait starts with the cheaper target-free tier');
     const stick=await phone.locator('.engine-joystick').boundingBox(),button=await phone.getByRole('button',{name:'Light',exact:true}).boundingBox();
     const cdp=await mobile.newCDPSession(phone);
     const x0=Number(await phone.locator('#status').getAttribute('data-x'));
@@ -231,6 +249,54 @@ const server=http.createServer((req,res)=>{
     assert.equal(report.engine.warm.uploads,0,'Unchanged retained instances do not upload');
     assert.ok(report.engine.moved.uploadedBytes>0 && report.engine.moved.uploadedBytes<=48,'One transform updates a bounded range');
     assert.equal(report.engine.glError,0);assert.ok(report.engine.varied>10,'Actual non-background pixels rendered');
+    // Compare AO on real pixels immediately after submission (before default-buffer discard).
+    console.log('Browser: primitive complete; testing AO pixels/lifecycle');
+    report.ambientOcclusion=await page.evaluate(()=>{
+      const {engine,r}=window.fixture,ao=r.occlusion,gl=r.gl;
+      const world=engine.basement.createWorld(),box=options=>engine.directory.create('toy.box',{world,...options});
+      box({z:-0.25,size:[18,18,0.5],color:[0.5,0.45,0.55]});
+      box({x:-1,y:1,z:1.5,size:[1,5,3],color:[0.4,0.35,0.5]});
+      box({x:1,y:1,z:0.5,size:[2,2,1],color:[0.55,0.4,0.25]});
+      box({x:1,y:1,z:1.3,size:[0.4,0.4,1],color:[0.7,0.5,0.2],emission:3});
+      world.resolve();const batch=r.createBatch(world);r.camera.halfHeight=6;r.ambient.set([0.7,0.6,0.8]);
+      /** Read only in tests. Production never reads pixels or waits for AO/GPU results. */
+      const image=mode=>{ao.configure({mode});r.render(batch);const p=new Uint8Array(r.canvas.width*r.canvas.height*4);gl.readPixels(0,0,r.canvas.width,r.canvas.height,gl.RGBA,gl.UNSIGNED_BYTE,p);return p;};
+      const off=image('off'),geometry=image('geometry'),screen=image('screen');
+      const screenInfo=ao.inspect();
+      /** Count changed RGB pixels and changes that violate ambient-only darkening. */
+      const compare=(a,b)=>{let changed=0,brighter=0,maxDifference=0;for(let i=0;i<a.length;i+=4){let d=0;for(let c=0;c<3;c++){d=Math.max(d,Math.abs(a[i+c]-b[i+c]));if(b[i+c]>a[i+c]+1)brighter++;}if(d>1)changed++;maxDifference=Math.max(d,maxDifference);}return{changed,brighter,maxDifference};};
+      const geometryDifference=compare(off,geometry),screenDifference=compare(geometry,screen);
+      r.ambient.fill(0);const directDifference=compare(image('off'),image('screen'));
+      // Reject an incomplete framebuffer cleanly, then allow explicit retry.
+      ao.configure({mode:'off'});const original=gl.checkFramebufferStatus;gl.checkFramebufferStatus=()=>gl.FRAMEBUFFER_UNSUPPORTED;
+      ao.configure({mode:'screen'});r.render(batch);const fallback=ao.inspect();gl.checkFramebufferStatus=original;
+      const handles={textures:0,framebuffers:0,programs:0},restore=[];
+      for(const[type,key]of [['Texture','textures'],['Framebuffer','framebuffers'],['Program','programs']])for(const[op,delta]of [['create',1],['delete',-1]]){
+        const name=op+type,method=gl[name];gl[name]=function(...args){handles[key]+=delta;return method.apply(this,args);};restore.push(()=>{gl[name]=method;});
+      }
+      let cycles;
+      try{
+        for(let i=0;i<6;i++){
+          ao.configure({mode:'screen',resolutionScale:i%2?0.5:0.75});r.render(batch);
+          ao.configure({mode:'geometry'});
+        }
+        cycles={...handles};
+      }finally{for(const reset of restore)reset();}
+      // Leave screen AO alive to exercise recreation in the existing context-loss check.
+      ao.configure({mode:'screen'});r.ambient.set([0.13,0.13,0.23]);r.render(batch);
+      batch.dispose();world.dispose();
+      return{geometryDifference,screenDifference,directDifference,screenInfo,fallback,cycles,error:gl.getError()};
+    });
+    assert.ok(report.ambientOcclusion.geometryDifference.changed>50,'Analytic AO visibly shades actual neighboring surfaces');
+    assert.ok(report.ambientOcclusion.screenDifference.changed>50,'Screen AO adds finer visible contacts');
+    assert.equal(report.ambientOcclusion.geometryDifference.brighter,0);
+    assert.equal(report.ambientOcclusion.directDifference.changed,0,'Direct lighting and emission survive AO unchanged');
+    assert.equal(report.ambientOcclusion.screenInfo.textures,3);assert.ok(report.ambientOcclusion.screenInfo.width<=768);
+    assert.equal(report.ambientOcclusion.fallback.effectiveMode,'geometry');assert.equal(report.ambientOcclusion.fallback.textures,0);
+    assert.match(report.ambientOcclusion.fallback.failure,/framebuffer/);
+    assert.deepEqual(report.ambientOcclusion.cycles,{textures:0,framebuffers:0,programs:0});
+    assert.equal(report.ambientOcclusion.error,0);
+    console.log('Browser: AO pixels/lifecycle complete');
     report.profilerRenderer=await page.evaluate(async()=>{
       const f=window.fixture,p=f.engine.basement.profiler;
       p.beginFrame(16);f.world.entities.values().next().value.x=4;f.world.resolve();
@@ -295,9 +361,9 @@ const server=http.createServer((req,res)=>{
         let tries=0;const poll=()=>{if(f.r.stats.contextRestores)resolve();else if(++tries>100)reject(new Error('Context restore timed out'));else setTimeout(poll,20);};poll();
       });
       f.r.render(f.lease.value);
-      return {supported:true,paused,restores:f.r.stats.contextRestores,buffers:f.r.stats.buffers,error:f.r.gl.getError()};
+      return {supported:true,paused,restores:f.r.stats.contextRestores,buffers:f.r.stats.buffers,ao:f.r.occlusion.inspect(),error:f.r.gl.getError()};
     });
-    if(restoration.supported){assert.equal(restoration.paused,true);assert.equal(restoration.buffers,2);assert.equal(restoration.error,0);}
+    if(restoration.supported){assert.equal(restoration.paused,true);assert.equal(restoration.buffers,2);assert.equal(restoration.error,0);assert.equal(restoration.ao.effectiveMode,'screen');assert.equal(restoration.ao.textures,3);}
     report.context=restoration;
     report.disposal=await page.evaluate(()=>{
       const f=window.fixture;f.engine.dispose();f.lease.release();f.engine.dispose();
@@ -349,6 +415,29 @@ const server=http.createServer((req,res)=>{
     assert.equal(report.worldLifecycle.stableActor,true);assert.equal(report.worldLifecycle.peakResident,2);
     assert.deepEqual(report.worldLifecycle.afterScene,{worlds:0,resources:0,residency:0,definitions:0,buffers:1,jobs:0});
     assert.equal(report.worldLifecycle.afterEngine.buffers,0);
+    // A closer camera on the actual Atrium makes architectural contacts easier to inspect.
+    await page.setViewportSize({width:1280,height:900});
+    await page.evaluate(async()=>{
+      const {ETRNLNINE}=await import('/engine/etrnlnine.js');
+      const {createJourney}=await import('/examples/atrium/journey.js');
+      document.body.style.cssText='margin:0;background:#10101b;overflow:hidden';
+      const canvas=document.querySelector('canvas');canvas.style.cssText='display:block;width:100vw;height:100vh';
+      const engine=new ETRNLNINE(canvas),r=engine.basement.renderer,journey=createJourney(engine);
+      r.camera.x=-4;r.camera.y=7;r.camera.halfHeight=9;
+      engine.lobby.on('render',()=>{const w=journey.current;if(!w)return;r.ambient.set(w.profile.ambient);r.lights.set(w.lights);r.lightColors.set(w.lightColors);w.world.resolve();r.render(w.batch);});
+      engine.start();await journey.ready;window.detailFixture={engine,journey,r};
+    });
+    await page.waitForFunction(()=>window.detailFixture.engine.directory.residency.inspect().worlds.every(w=>w.status==='ready'));
+    for(const mode of ['off','geometry','screen']){
+      await page.evaluate(mode=>window.detailFixture.r.occlusion.configure({mode}),mode);
+      await page.waitForTimeout(100);
+      await page.screenshot({path:path.join(artifacts,`ao-detail-${mode}.png`)});
+    }
+    report.ambientOcclusion.detail=await page.evaluate(()=>{
+      const f=window.detailFixture,result={...f.r.occlusion.inspect(),error:f.r.gl.getError()};
+      f.journey.dispose();f.engine.dispose();return result;
+    });
+    assert.equal(report.ambientOcclusion.detail.error,0);
     assert.deepEqual(errors,[],'No browser errors');
     fs.writeFileSync(path.join(artifacts,'browser-results.json'),JSON.stringify(report,null,2)+'\n');
     console.log(JSON.stringify(report,null,2));

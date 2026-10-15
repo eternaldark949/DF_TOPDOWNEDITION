@@ -1,0 +1,234 @@
+{
+  "worlds": {
+    "transfers": 10,
+    "stableActor": true,
+    "persistenceAfterEviction": true,
+    "snapshotBytes": 69,
+    "diagnostics": "Last transfer 0.10 ms · preparation/wait 972.1 ms"
+  },
+  "resize": {
+    "width": 1024,
+    "height": 720,
+    "error": 0
+  },
+  "profiler": {
+    "historyCapacity": 120,
+    "retainedCaptures": 2,
+    "freezeKeepsGameRunning": true,
+    "disabledKeepsGameRunning": true,
+    "exportedBytes": 48285,
+    "gpuUnavailable": false,
+    "requestedGpuBufferBytes": 197472,
+    "owners": [
+      [
+        {
+          "owner": "realm:violet/world:2835",
+          "count": 1
+        }
+      ],
+      [
+        {
+          "owner": "realm:amber/world:2834",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "offline": {
+    "networkRequests": 0,
+    "sceneReplacements": 12,
+    "status": "Weighted pack · 120 forms · 3 draws · 4 B updated"
+  },
+  "touch": {
+    "simultaneousPointers": 2,
+    "status": "Weighted pack · 122 forms · 1 draws · 568 B updated"
+  },
+  "engine": {
+    "empty": {
+      "worlds": 0,
+      "resources": 0,
+      "draws": 0
+    },
+    "warm": {
+      "draws": 1,
+      "instances": 1,
+      "uploads": 0,
+      "uploadedBytes": 0,
+      "buffers": 2,
+      "programs": 1,
+      "vaos": 1,
+      "contextRestores": 0
+    },
+    "moved": {
+      "draws": 1,
+      "instances": 1,
+      "uploads": 1,
+      "uploadedBytes": 4,
+      "buffers": 2,
+      "programs": 1,
+      "vaos": 1,
+      "contextRestores": 0
+    },
+    "glError": 0,
+    "varied": 1160
+  },
+  "ambientOcclusion": {
+    "geometryDifference": {
+      "changed": 21238,
+      "brighter": 0,
+      "maxDifference": 18
+    },
+    "screenDifference": {
+      "changed": 6208,
+      "brighter": 0,
+      "maxDifference": 14
+    },
+    "directDifference": {
+      "changed": 0,
+      "brighter": 0,
+      "maxDifference": 0
+    },
+    "screenInfo": {
+      "requestedMode": "screen",
+      "effectiveMode": "screen",
+      "strength": 0.7,
+      "radius": 1.25,
+      "blockers": 3,
+      "candidates": 3,
+      "blockerBudget": 12,
+      "width": 400,
+      "height": 300,
+      "textures": 3,
+      "framebuffers": 2,
+      "targetBytes": 1080000,
+      "failure": null,
+      "accounting": "Estimated target storage: normal RGBA8 (4), depth24 budgeted at 4, AO R8 (1) bytes per pixel. Actual depth padding and driver overhead are unknown."
+    },
+    "fallback": {
+      "requestedMode": "screen",
+      "effectiveMode": "geometry",
+      "strength": 0.7,
+      "radius": 1.25,
+      "blockers": 3,
+      "candidates": 3,
+      "blockerBudget": 12,
+      "width": 0,
+      "height": 0,
+      "textures": 0,
+      "framebuffers": 0,
+      "targetBytes": 0,
+      "failure": "AO framebuffer unavailable",
+      "accounting": "Estimated target storage: normal RGBA8 (4), depth24 budgeted at 4, AO R8 (1) bytes per pixel. Actual depth padding and driver overhead are unknown."
+    },
+    "cycles": {
+      "textures": 0,
+      "framebuffers": 0,
+      "programs": 0
+    },
+    "error": 0,
+    "detail": {
+      "requestedMode": "screen",
+      "effectiveMode": "screen",
+      "strength": 0.7,
+      "radius": 1.25,
+      "blockers": 12,
+      "candidates": 62,
+      "blockerBudget": 12,
+      "width": 640,
+      "height": 450,
+      "textures": 3,
+      "framebuffers": 2,
+      "targetBytes": 2592000,
+      "failure": null,
+      "accounting": "Estimated target storage: normal RGBA8 (4), depth24 budgeted at 4, AO R8 (1) bytes per pixel. Actual depth padding and driver overhead are unknown.",
+      "error": 0
+    }
+  },
+  "profilerRenderer": {
+    "preparationUploadBytes": 4,
+    "lastDrawUploadBytes": 0,
+    "gpu": {
+      "supported": true,
+      "enabled": true,
+      "pending": 0,
+      "capacity": 4,
+      "completed": 1,
+      "skipped": 0,
+      "disjoint": 0,
+      "reportErrors": 0
+    },
+    "queryObjectsAfterDisable": 0,
+    "viewerCycles": 5,
+    "remainingViewers": 0,
+    "error": 0,
+    "badProviderIsolated": true
+  },
+  "profilerStartup": {
+    "rejected": 2,
+    "buffers": 0,
+    "programs": 0,
+    "windowListeners": 0,
+    "error": 0
+  },
+  "context": {
+    "supported": true,
+    "paused": true,
+    "restores": 1,
+    "buffers": 2,
+    "ao": {
+      "requestedMode": "screen",
+      "effectiveMode": "screen",
+      "strength": 0.7,
+      "radius": 1.25,
+      "blockers": 1,
+      "candidates": 1,
+      "blockerBudget": 12,
+      "width": 400,
+      "height": 300,
+      "textures": 3,
+      "framebuffers": 2,
+      "targetBytes": 1080000,
+      "failure": null,
+      "accounting": "Estimated target storage: normal RGBA8 (4), depth24 budgeted at 4, AO R8 (1) bytes per pixel. Actual depth padding and driver overhead are unknown."
+    },
+    "error": 0
+  },
+  "disposal": {
+    "buffers": 0,
+    "programs": 0,
+    "vaos": 0,
+    "worlds": 0,
+    "resources": 0,
+    "running": false
+  },
+  "worldLifecycle": {
+    "blocked": 1,
+    "cancelled": 1,
+    "committed": 1,
+    "stableActor": true,
+    "peakResident": 2,
+    "preparation": {
+      "steps": 21,
+      "peakChunkMs": 0.5,
+      "cancelled": 0
+    },
+    "afterScene": {
+      "worlds": 0,
+      "resources": 0,
+      "residency": 0,
+      "definitions": 0,
+      "buffers": 1,
+      "jobs": 0
+    },
+    "afterEngine": {
+      "draws": 0,
+      "instances": 0,
+      "uploads": 3,
+      "uploadedBytes": 15888,
+      "buffers": 0,
+      "programs": 0,
+      "vaos": 0,
+      "contextRestores": 0
+    }
+  }
+}

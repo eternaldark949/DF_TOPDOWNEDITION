@@ -12,6 +12,7 @@ const status=document.querySelector('#status'), errorBox=document.querySelector(
 const pauseButton=document.querySelector('#pause'), restartButton=document.querySelector('#restart');
 const directoryStatus=document.querySelector('#directory-status'), travelStatus=document.querySelector('#travel-status');
 const releaseButton=document.querySelector('#release-inactive'), cancelButton=document.querySelector('#cancel-flit');
+const aoSelect=document.querySelector('#ambient-occlusion');
 const heading=document.querySelector('h1');
 const life=new Lifetime();
 let engine, scene;
@@ -25,8 +26,10 @@ function report(error) {
 function replaceScene() {
   scene?.dispose(); scene=null;
   scene=createScene(engine,{ controlsHost, onError:report, onStatus: state => {
-    const r=engine.basement.renderer.stats;
-    status.textContent=`${state.loaded?'Weighted':'Light'} pack · ${state.entities} forms · ${r.draws} draw · ${r.uploadedBytes} B updated`;
+    const renderer=engine.basement.renderer,r=renderer.stats,ao=renderer.occlusion.inspect();
+    aoSelect.dataset.effective=ao.effectiveMode;
+    document.querySelector('#ao-status').textContent=ao.failure?'Screen AO unavailable; geometry fallback.':ao.effectiveMode==='screen'?`${ao.width} × ${ao.height} screen contacts · ambient light only`:'Ambient light only · no screen targets';
+    status.textContent=`${state.loaded?'Weighted':'Light'} pack · ${state.entities} forms · ${r.draws} draws · ${r.uploadedBytes} B updated`;
     // Small DOM diagnostics aid accessibility and automated verification; no engine globals.
     status.dataset.world=state.worldId; status.dataset.x=state.x.toFixed(3); status.dataset.y=state.y.toFixed(3);
     status.dataset.buffers=r.buffers; status.dataset.vaos=r.vaos;
@@ -50,6 +53,11 @@ function replaceScene() {
 
 try {
   engine=new ETRNLNINE(canvas,{ pixelRatio:1.5,profiling:{enabled:true} });
+  // Example policy only: phone-sized layouts start with the target-free geometry tier.
+  // Resizing never silently changes a user's explicit selection.
+  const aoMode=window.matchMedia('(max-width:650px)').matches?'geometry':'screen';
+  engine.basement.renderer.occlusion.configure({mode:aoMode});aoSelect.value=aoMode;
+  life.listen(aoSelect,'change',()=>engine.basement.renderer.occlusion.configure({mode:aoSelect.value}));
   replaceScene();
   const profilerView=engine.directory.create('tool.profiler',{profiler:engine.basement.profiler,host:document.body,
     subscribe:callback=>engine.lobby.on('render',callback,'profiler.viewer')});
