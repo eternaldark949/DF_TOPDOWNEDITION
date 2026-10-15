@@ -1,6 +1,6 @@
 # ETRNLNINE — Engine foundation plan
 
-**Status: agreed architectural direction and feature intent; planning only.**
+**Status: agreed architectural direction; first runnable foundation implemented and verified.**
 
 **Owner: ETERNAL / @eternaldark949.**
 
@@ -12,7 +12,11 @@
 
 This document records the owner's requirements and the architectural agreement reached with Codex. It is the starting reference for both Codex and Claude. Do not replace these decisions with a conventional engine template, silently rename the levels, or continue the previous migration strategy.
 
-The branch was intentionally created with only this plan. No engine implementation, game implementation, dependency installation, or automatic import of legacy files is authorized by this planning commit. The owner wants the plan solid before implementation begins.
+The branch was intentionally created with only this plan. On 2026-10-15, after reviewing the plan and first-milestone proposal, the owner invited implementation to begin. The first runnable foundation follows [First Light decisions and source guide](docs/decisions/0001-first-light.md). No wholesale legacy import or expansion into every brainstorm is implied.
+
+**Milestone evidence:** [screenshots, checks, and limitations](docs/milestones/first-light/README.md).
+
+**Try the current milestone:** [self-contained Atrium HTML](dist/ETRNLNINE-Atrium.html). Download the file and open it in a WebGL 2 browser, or serve the repository and open `examples/atrium/`. Run `npm test` and `npm run build` for source checks/building. See the source guide for browser checks, editing examples, and known limitations.
 
 New ideas are welcome. Distinguish agreed requirements from proposed details and unresolved choices. Record subsequent architectural decisions here or in explicitly linked decision documents so the owner does not have to repeat them across conversations.
 
@@ -31,7 +35,7 @@ New ideas are welcome. Distinguish agreed requirements from proposed details and
 11. [Integration and acceptance scenarios](#11-integration-and-acceptance-scenarios)
 12. [Comments and architectural discipline](#12-comments-and-architectural-discipline)
 13. [First runnable engine milestone](#13-proposed-first-runnable-engine-milestone)
-14. [Remaining decisions and implementation sequence](#14-next-planning-decisions--not-implementation-authorization)
+14. [Remaining decisions and implementation sequence](#14-remaining-planning-decisions)
 
 ## Decision status
 
@@ -39,7 +43,7 @@ New ideas are welcome. Distinguish agreed requirements from proposed details and
 - **Proposed implementation direction:** a concrete way to realize that intent. These details guide design review; they are not finalized APIs, algorithms, or numeric budgets.
 - **Open decision:** an unresolved choice that must be recorded before dependent implementation.
 
-Section 10 records the carryovers the owner asked to include. Carrying over a feature means preserving and improving its purpose, not copying unfinished Python methods or committing to every mechanism proposed below. This remains a planning branch; adding detail does not authorize engine implementation.
+Section 10 records the carryovers the owner asked to include. Carrying over a feature means preserving and improving its purpose, not copying unfinished Python methods or committing to every mechanism proposed below. The first runnable milestone is implemented; the broader carryover scope remains a plan. Adding detail does not automatically authorize every proposed extension.
 
 ## 1. Purpose and philosophy
 
@@ -123,7 +127,7 @@ Dependency rules:
 
 The four levels are intentional and must remain recognizable. Do not substitute a new naming scheme without discussing it with the owner.
 
-The following is a responsibility-level layout, not authorization to create implementation files now. Subfolders and filenames inside the levels remain to be designed.
+The following responsibility-level layout governs implementation. The current first-milestone file map and reading order are recorded in the linked First Light source guide; future filenames should follow the same ownership rules.
 
 ```text
 /
@@ -458,7 +462,7 @@ Diagnostics should make the relevant costs observable: recording storage, reside
 
 ## 13. Proposed first runnable engine milestone
 
-**Recommendation, not implementation authorization:** build one small, complete path through the agreed architecture. The result is a working engine with a separately defined interactive demonstration, not a claim that all planned simulation systems are finished.
+**First milestone, implementation begun 2026-10-15:** build one small, complete path through the agreed architecture. The result is a working engine with a separately defined interactive demonstration, not a claim that all planned simulation systems are finished.
 
 ### Immediately practical scope
 
@@ -471,7 +475,7 @@ Diagnostics should make the relevant costs observable: recording storage, reside
 | ETRNLNINE | Construct/connect the levels and expose the agreed lifecycle entry points. Keep detailed rendering, gameplay, and device handling in their responsible modules. |
 | Independent example | Supply its own world, bindings, actor configuration, movement/interaction behavior, and camera settings. Move an actor, show its attached item, and interact with a small scene without importing Freelancer. |
 
-**Proposed initial rendering direction:** direct WebGL 2, modular JavaScript source, no runtime framework, and an offline HTML build containing the required code/assets. This matches the stated direction but remains a choice to record before implementation. No Canvas 2D path, Canvas-prepared textures/text, CDN, or network-required runtime. Rendering text is a separate explicit GPU design decision; do not use a hidden Canvas workaround to make a debug label.
+**Adopted initial rendering direction:** direct WebGL 2, modular JavaScript source, no runtime framework, and an offline HTML build containing the required code/assets. This direction is adopted for the first milestone and recorded in the First Light decision document. No Canvas 2D path, Canvas-prepared textures/text, CDN, or network-required runtime. Rendering text is a separate explicit GPU design decision; do not use a hidden Canvas workaround to make a debug label.
 
 Keyboard, mouse, touch, and gamepad input should all produce real action state in this milestone. Touch controls are instances of documented templates. Cover focus loss, pointer cancellation, device disconnect, and disposal. Distinguish software checks from actual physical-device validation; do not claim a gamepad or phone has been tested when it has not.
 
@@ -488,9 +492,9 @@ Use explicit world identity and shared clock/ownership contracts now so streamin
 
 The immediate follow-on should exercise the existing contracts with two small world contexts and prepared flits between them, including cancelled/unready transfers and resource cleanup. Then build richer locomotion/body response, traversal/perception, and state recording in coherent integrated increments. Exact follow-on order remains a planning decision; the feature scope in section 10 is retained.
 
-## 14. Next planning decisions — not implementation authorization
+## 14. Remaining planning decisions
 
-Before implementation, agree and record:
+The First Light decision document settles the minimum contracts for the first milestone. For subsequent capabilities, agree and record the relevant details before dependent implementation:
 
 1. Precise responsibilities and public interfaces inside each level, including the small ETRNLNINE assembly interface.
 2. Library registration, stable identities, ownership, disposal, and cross-level access contracts.
@@ -503,4 +507,4 @@ Before implementation, agree and record:
 9. The open decisions recorded under each carryover, including traversal elevation, GRecorder capture boundaries/fidelity, and realtime world-switch readiness, transfer, and residency policies.
 10. A staged implementation sequence that proves an empty engine and independent example game before restoring Freelancer content. Start with shared contracts and a representative integrated slice; do not build disconnected feature demos that bypass the house architecture.
 
-After implementation is authorized, prefer coherent, verifiable portions of the agreed engine over parallel experimental renderers or speculative abstraction layers. Update this plan when a decision changes. Never silently redefine the owner's architecture to fit a convenient implementation.
+Continue with coherent, verifiable portions of the agreed engine over parallel experimental renderers or speculative abstraction layers. Update this plan when a decision changes. Never silently redefine the owner's architecture to fit a convenient implementation.

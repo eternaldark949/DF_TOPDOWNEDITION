@@ -1,0 +1,1273 @@
+<!doctype html>
+<!-- Atrium page: accessible HTML interface around a pure WebGL world. No external assets. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#10101b">
+<title>ETRNLNINE · The First Atrium</title>
+<style>
+/* Page presentation belongs to the example. Control classes style reusable template instances. */
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#10101b;color:#e5ded4;font-family:system-ui,sans-serif}
+#world{display:block;width:100%;height:100%;touch-action:none;outline:none}
+header{position:absolute;top:max(30px,env(safe-area-inset-top));left:36px;pointer-events:none}
+.eyebrow{font-size:10px;letter-spacing:.3em;color:#baa78a;text-transform:uppercase}
+h1{font-family:Georgia,serif;font-size:clamp(30px,4vw,58px);font-weight:400;margin:12px 0 8px;letter-spacing:-.03em}
+.subtitle{font-size:12px;color:#a7a4b9;max-width:270px;line-height:1.7}
+nav{position:absolute;top:max(30px,env(safe-area-inset-top));right:30px;display:flex;gap:8px}
+button{font:inherit;color:inherit;cursor:pointer;border:1px solid #92816a55;background:#161622cf;border-radius:5px;padding:10px 16px;touch-action:none}
+button:focus-visible{outline:2px solid #d7b97b;outline-offset:4px}button:hover{background:#33303d}button.held{background:#786145}
+footer{position:absolute;bottom:max(25px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);text-align:center;width:min(65%,600px);pointer-events:none}
+#status{display:block;font-size:10px;color:#c0af94;letter-spacing:.08em;margin-bottom:10px}
+.hint{font-size:11px;line-height:1.7;color:#9693a9}kbd{font:inherit;color:#d2c6b2}
+.engine-joystick{position:absolute;left:max(28px,env(safe-area-inset-left));bottom:max(30px,env(safe-area-inset-bottom));border:1px solid #b8a17c4d;border-radius:50%;background:#17172488;touch-action:none;display:grid;place-items:center}
+.engine-joystick span{width:38px;height:38px;border-radius:50%;border:1px solid #cbb58a80;background:#7d6c4e50;pointer-events:none}
+.engine-action{position:absolute;right:max(40px,env(safe-area-inset-right));bottom:max(46px,env(safe-area-inset-bottom));border-radius:50%;font-size:11px;letter-spacing:.1em;padding:0}
+#error{position:absolute;top:40%;left:10%;width:80%;padding:24px;border:1px solid #bf8a6e;background:#241b24;z-index:3}
+@media(max-width:650px){header{left:20px;top:22px}.subtitle{max-width:180px;font-size:10px}nav{right:15px;top:24px}nav button{padding:9px;font-size:11px}h1{font-size:30px}.eyebrow{font-size:8px}footer{bottom:150px;width:90%}.hint{font-size:10px}.engine-joystick{left:22px}.engine-action{right:25px}}
+</style>
+</head>
+<body>
+<canvas id="world" tabindex="0" aria-label="Interactive WebGL courtyard. Use WASD or arrows to walk, E to change the lantern, B to change the pack response."></canvas>
+<header><div class="eyebrow">ETRNLNINE / First light</div><h1>The First Atrium</h1><div class="subtitle">A house begins with its foundation.<br>A world begins with a little movement.</div></header>
+<nav aria-label="Demonstration controls"><button id="pause" aria-pressed="false">Pause</button><button id="restart">New scene</button></nav>
+<div id="controls" aria-label="Touch controls"></div>
+<footer><output id="status" aria-label="Engine status">Opening the house…</output><div class="hint"><kbd>WASD / arrows</kbd> walk &nbsp;·&nbsp; <kbd>mouse</kbd> look &nbsp;·&nbsp; <kbd>E / click</kbd> light &nbsp;·&nbsp; <kbd>B</kbd> pack<br>Touch controls available · Gamepad: left stick / A / X</div></footer>
+<div id="error" role="alert" hidden></div>
+<script type="module">
+// Source: engine/basement/world.js
+const module3=(()=>{
+/**
+ * Basement / world: identity, transforms, attachments, and spatial membership.
+ * Coordinates: x/y are horizontal world units; z is elevation; yaw is radians.
+ * A world owns its entities. Identity is immutable and independent of array position.
+ * This first representation supports yaw/local translation, not a skeletal solver.
+ */
+class Identities {
+  /** Engine-local monotonically increasing IDs; caller chooses the namespace. */
+  constructor() { this.next = 1; }
+  /** IDs are never reused during this engine's lifetime, even after scene disposal. */
+  create(namespace) { return `${namespace}:${this.next++}`; }
+}
+
+class World {
+  /** Construct an empty world with an explicitly shared identity allocator. */
+  constructor(id, identities) {
+    this.id = id;
+    this.identities = identities;
+    this.entities = new Map();
+    this.revision = 0;
+    this.disposed = false;
+  }
+
+  /**
+   * Add one entity. Shape is optional; invisible anchors allocate no GPU geometry.
+   * Parent must already exist in this world: this prevents cycles and foreign links.
+   * Shape size is full width/depth/height; its origin is its center.
+   */
+  create({ x = 0, y = 0, z = 0, yaw = 0, parent = null, shape = null } = {}) {
+    if (this.disposed) throw new Error('Cannot create in a disposed world');
+    if (parent && this.entities.get(parent.id) !== parent) throw new Error('Parent belongs to another world');
+    const entity = {
+      id: this.identities.create('entity'), worldId: this.id, parent,
+      x, y, z, yaw, previous: { x, y, z, yaw },
+      pose: { x, y, z, yaw }, shape,
+    };
+    this.entities.set(entity.id, entity);
+    this.revision++;
+    return entity;
+  }
+
+  /** Capture local transforms before a fixed update, for smooth render interpolation. */
+  snapshot() {
+    for (const e of this.entities.values()) {
+      e.previous.x = e.x; e.previous.y = e.y;
+      e.previous.z = e.z; e.previous.yaw = e.yaw;
+    }
+  }
+
+  /**
+   * Resolve interpolated world transforms in insertion order, without per-frame objects.
+   * Parent-before-child is guaranteed by create(); shortest-arc yaw avoids full spins.
+   */
+  resolve(alpha = 1) {
+    for (const e of this.entities.values()) {
+      const a = e.previous, p = e.pose;
+      const x = a.x + (e.x - a.x) * alpha;
+      const y = a.y + (e.y - a.y) * alpha;
+      const z = a.z + (e.z - a.z) * alpha;
+      const turn = Math.atan2(Math.sin(e.yaw - a.yaw), Math.cos(e.yaw - a.yaw));
+      const yaw = a.yaw + turn * alpha;
+      if (e.parent) {
+        const b = e.parent.pose, c = Math.cos(b.yaw), s = Math.sin(b.yaw);
+        p.x = b.x + x * c - y * s; p.y = b.y + x * s + y * c;
+        p.z = b.z + z; p.yaw = b.yaw + yaw;
+      } else { p.x = x; p.y = y; p.z = z; p.yaw = yaw; }
+    }
+  }
+
+  /** Remove an entity and descendants; snapshot the map so recursive removal is safe. */
+  remove(entity) {
+    if (this.entities.get(entity.id) !== entity) return;
+    for (const child of [...this.entities.values()]) if (child.parent === entity) this.remove(child);
+    this.entities.delete(entity.id);
+    this.revision++;
+  }
+
+  /** Release CPU membership; Directory separately owns GPU/resource leases. */
+  dispose() {
+    if (this.disposed) return;
+    this.entities.clear(); this.revision++; this.disposed = true;
+  }
+}
+
+return {Identities,World};
+})();
+// Source: engine/basement/lifetime.js
+const module5=(()=>{
+/**
+ * Basement / lifetime: an explicit owner for cleanup callbacks.
+ * It knows no game, scheduler, or DOM IDs. Owners release children in reverse order,
+ * so a control can release its listeners before the resources it references vanish.
+ */
+class Lifetime {
+  /** Start an empty owner; resources are only allocated by the caller. */
+  constructor() { this.cleanups = []; this.disposed = false; }
+
+  /** Register cleanup, returning it for optional manual use. Late additions clean immediately. */
+  own(cleanup) {
+    if (this.disposed) cleanup();
+    else this.cleanups.push(cleanup);
+    return cleanup;
+  }
+
+  /** Add a browser listener whose exact function/options are remembered for removal. */
+  listen(target, type, callback, options) {
+    target.addEventListener(type, callback, options);
+    this.own(() => target.removeEventListener(type, callback, options));
+  }
+
+  /** Release everything once; attempt later cleanups even if one child throws. */
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    const errors = [];
+    for (const cleanup of this.cleanups.reverse()) {
+      try { cleanup(); } catch (error) { errors.push(error); }
+    }
+    this.cleanups.length = 0;
+    if (errors.length) throw new AggregateError(errors, 'Lifetime cleanup failed');
+  }
+}
+
+return {Lifetime};
+})();
+// Source: engine/basement/input.js
+const module4=(()=>{
+/**
+ * Basement / input: keyboard, pointer, touch-control sources, and gamepad actions.
+ * Games supply maps; this module never interprets "move" or "interact" as game rules.
+ * Vector sources combine by strongest magnitude (no diagonal/duplicate speed boost).
+ * Button sources OR together; press edges are consumed once, even during catch-up.
+ */
+const { Lifetime } = module5;
+
+class Input {
+  /** Bind to the supplied surface/window, and an injectable gamepad reader for tests. */
+  constructor(surface, { host = window, gamepads = () => navigator.getGamepads?.() ?? [] } = {}) {
+    this.surface = surface; this.host = host; this.gamepads = gamepads;
+    this.life = new Lifetime(); this.keys = new Set(); this.pointers = new Set();
+    this.map = {}; this.sources = new Map(); this.actions = new Map(); this.pendingPresses = new Set();
+    this.pointer = { x: 0, y: 0, active: false }; this.disposed = false;
+    this.suspended = false;
+    // Ignore keyboard input intended for editable HTML fields, including on key repeat.
+    this.life.listen(host, 'keydown', event => {
+      if (event.target?.closest?.('input,textarea,select,[contenteditable=true]')) return;
+      if (this.usesKey(event.code)) event.preventDefault();
+      if (!this.keys.has(event.code)) {
+        this.latch(map => map.keys?.includes(event.code));
+      }
+      this.keys.add(event.code);
+    });
+    this.life.listen(host, 'keyup', event => this.keys.delete(event.code));
+    this.life.listen(host, 'blur', () => this.clear());
+    this.life.listen(surface, 'pointermove', event => {
+      const r = surface.getBoundingClientRect();
+      this.pointer.x = event.clientX - r.left; this.pointer.y = event.clientY - r.top;
+      this.pointer.active = true;
+    });
+    this.life.listen(surface, 'pointerleave', () => { this.pointer.active = false; });
+    this.life.listen(surface, 'pointerdown', event => {
+      if (!this.pointers.has(event.button)) this.latch(map => map.pointerButtons?.includes(event.button));
+      this.pointers.add(event.button); surface.setPointerCapture?.(event.pointerId);
+    });
+    this.life.listen(surface, 'pointerup', event => this.pointers.delete(event.button));
+    this.life.listen(surface, 'pointercancel', () => this.pointers.clear());
+    this.life.listen(surface, 'lostpointercapture', () => this.pointers.clear());
+    this.life.listen(surface, 'contextmenu', event => event.preventDefault());
+    this.life.listen(host, 'gamepaddisconnected', () => this.sample());
+  }
+
+  /** Does this map own a key? Used to avoid scrolling while playing, not globally. */
+  usesKey(code) {
+    return Object.values(this.map).some(m => m.keys?.includes(code)
+      || m.negativeX?.includes(code) || m.positiveX?.includes(code)
+      || m.negativeY?.includes(code) || m.positiveY?.includes(code));
+  }
+
+  /** Replace bindings between scenes; clear held actions so old rules cannot leak. */
+  bind(map) { this.clear(); this.map = map; this.actions.clear(); }
+
+  /**
+   * Check current physical contributions rather than the last frame's cached action.
+   * This distinguishes a genuine new tap after release from a second binding pressed
+   * while another source is still held, even if both events fall between frames.
+   */
+  buttonHeld(name) {
+    const map = this.map[name];
+    if (!map || map.kind === 'vector') return false;
+    if (map.keys?.some(key => this.keys.has(key)) || map.pointerButtons?.some(button => this.pointers.has(button))) return true;
+    for (const source of this.sources.values()) if (source.action === name && source.x > 0) return true;
+    return [...this.gamepads()].some(pad => pad?.connected && map.buttons?.some(button => pad.buttons[button]?.pressed));
+  }
+
+  /** Preserve brief presses between frames; held/overlapping bindings cannot create extra edges. */
+  latch(matches) {
+    if (this.suspended || this.disposed) return;
+    for (const [name, map] of Object.entries(this.map)) {
+      if (map.kind !== 'vector' && matches(map) && !this.buttonHeld(name)) this.pendingPresses.add(name);
+    }
+  }
+
+  /** Set one template's action contribution. Each control must use a unique source ID. */
+  setSource(sourceId, action, x, y = 0) {
+    if (this.disposed || this.suspended) return;
+    const previous = this.sources.get(sourceId);
+    if (x > 0 && !(previous?.x > 0) && this.map[action]?.kind !== 'vector' && !this.buttonHeld(action)) {
+      this.pendingPresses.add(action);
+    }
+    this.sources.set(sourceId, { action, x, y });
+  }
+
+  /** Remove only this control's contribution; other fingers/devices remain independent. */
+  removeSource(sourceId) { this.sources.delete(sourceId); }
+
+  /** Build action state once per presentation frame, preserving edges until consumed. */
+  sample() {
+    if (this.disposed || this.suspended) return;
+    const pads = [...this.gamepads()].filter(p => p?.connected);
+    for (const [name, map] of Object.entries(this.map)) {
+      let state = this.actions.get(name);
+      if (!state) { state = { x: 0, y: 0, down: false, pressed: false }; this.actions.set(name, state); }
+      let x = 0, y = 0;
+      if (map.kind === 'vector') {
+        x = Number(map.positiveX?.some(k => this.keys.has(k)) ?? false)
+          - Number(map.negativeX?.some(k => this.keys.has(k)) ?? false);
+        y = Number(map.positiveY?.some(k => this.keys.has(k)) ?? false)
+          - Number(map.negativeY?.some(k => this.keys.has(k)) ?? false);
+      } else {
+        x = Number((map.keys?.some(k => this.keys.has(k)) ?? false)
+          || (map.pointerButtons?.some(b => this.pointers.has(b)) ?? false));
+      }
+      // Standard gamepad layout is the initial policy. Exotic mapping/calibration is open.
+      for (const pad of pads) {
+        if (map.kind === 'vector' && map.axes) {
+          let px = pad.axes[map.axes[0]] ?? 0, py = pad.axes[map.axes[1]] ?? 0;
+          const length = Math.hypot(px, py), dead = map.deadZone ?? 0.18;
+          if (length <= dead) { px = 0; py = 0; }
+          else { const scale = Math.min(1, (length - dead) / (1 - dead)) / length; px *= scale; py *= scale; }
+          if (Math.hypot(px, py) > Math.hypot(x, y)) { x = px; y = py; }
+        } else if (map.buttons?.some(b => pad.buttons[b]?.pressed)) x = 1;
+      }
+      for (const source of this.sources.values()) {
+        if (source.action !== name) continue;
+        if (map.kind === 'vector') {
+          if (Math.hypot(source.x, source.y) > Math.hypot(x, y)) { x = source.x; y = source.y; }
+        } else x = Math.max(x, source.x);
+      }
+      const length = Math.hypot(x, y);
+      if (length > 1) { x /= length; y /= length; }
+      const down = length > 0.001;
+      if ((down && !state.down) || this.pendingPresses.has(name)) state.pressed = true;
+      state.x = x; state.y = y; state.down = down;
+    }
+    this.pendingPresses.clear();
+  }
+
+  /** Read without allocating; unknown actions share an immutable zero state. */
+  read(name) { return this.actions.get(name) ?? ZERO_ACTION; }
+
+  /** Consume a press once. Use this for toggles, not continuously held movement. */
+  consume(name) {
+    const state = this.actions.get(name), pressed = state?.pressed ?? false;
+    if (state) state.pressed = false;
+    return pressed;
+  }
+
+  /** Clear physical and logical states on focus loss, pause, or action-map replacement. */
+  clear() {
+    this.keys.clear(); this.pointers.clear(); this.sources.clear(); this.pendingPresses.clear(); this.pointer.active = false;
+    for (const state of this.actions.values()) { state.x = state.y = 0; state.down = state.pressed = false; }
+  }
+
+  /** Pausing blocks new control contributions until resumed; UI pause buttons remain DOM-driven. */
+  suspend(value) { this.suspended = value; this.clear(); }
+
+  /** Remove exactly this instance's browser listeners; safe to call more than once. */
+  dispose() { if (this.disposed) return; this.clear(); this.life.dispose(); this.disposed = true; }
+}
+
+/** Shared read-only fallback; callers must not mutate action state directly. */
+const ZERO_ACTION = Object.freeze({ x: 0, y: 0, down: false, pressed: false });
+
+return {Input};
+})();
+// Source: engine/basement/shaders.js
+const module7=(()=>{
+/**
+ * Basement / shaders: GPU-native instanced boxes and inexpensive surface lighting.
+ * No textures, font atlas, Canvas preparation, post-processing, or external assets.
+ * This is the first renderer material, not the final luxe/bloom renderer.
+ */
+const VERTEX = `#version 300 es
+precision highp float;
+layout(location=0) in vec3 aPosition;
+layout(location=1) in vec3 aNormal;
+// Per-instance layout, documented in renderer.js: pose, dimensions/emission, color.
+layout(location=2) in vec4 aPose;
+layout(location=3) in vec4 aSize;
+layout(location=4) in vec4 aColor;
+uniform vec4 uCamera; // center x/y, visible half-width/half-height in world units
+out vec3 vWorld;
+out vec3 vNormal;
+out vec3 vColor;
+out float vEmission;
+void main() {
+  float c = cos(aPose.w), s = sin(aPose.w);
+  mat2 rotation = mat2(c, s, -s, c);
+  vec3 p = aPosition * aSize.xyz;
+  p.xy = rotation * p.xy;
+  p += aPose.xyz;
+  vWorld = p;
+  vNormal = vec3(rotation * aNormal.xy, aNormal.z);
+  vColor = aColor.rgb;
+  vEmission = aSize.w;
+  // Orthographic oblique camera. z is height; y is ground depth, never screen pixels.
+  vec2 screen = vec2(p.x - uCamera.x, (p.y - uCamera.y) * 0.65 + p.z * 0.76);
+  float depth = (p.y - uCamera.y) * 0.76 - p.z * 0.65;
+  gl_Position = vec4(screen / uCamera.zw, depth / 200.0, 1.0);
+}`;
+
+const FRAGMENT = `#version 300 es
+precision highp float;
+in vec3 vWorld;
+in vec3 vNormal;
+in vec3 vColor;
+in float vEmission;
+uniform vec3 uAmbient;
+uniform vec4 uLights[8]; // x/y/z, radius; radius 0 disables a slot
+uniform vec3 uLightColors[8]; // linear RGB irradiance
+out vec4 outColor;
+void main() {
+  vec3 n = normalize(vNormal);
+  vec3 light = uAmbient * (0.65 + 0.35 * max(n.z, 0.0));
+  light += vec3(0.20,0.22,0.29) * max(dot(n, normalize(vec3(-0.4,-0.5,1.0))), 0.0);
+  for (int i=0; i<8; i++) {
+    vec3 delta = uLights[i].xyz - vWorld;
+    float distanceToLight = length(delta);
+    float radius = uLights[i].w;
+    if (radius > 0.0) {
+      float falloff = max(0.0, 1.0 - distanceToLight / radius);
+      light += uLightColors[i] * falloff * falloff * (0.25 + 0.75 * max(dot(n, normalize(delta + 0.0001)), 0.0));
+    }
+  }
+  vec3 surface = vColor;
+  // A procedural stone-joint pattern on horizontal low surfaces. It is evaluated
+  // in world coordinates, so resizing never rebuilds or rasterizes floor textures.
+  if (vWorld.z < 0.01 && n.z > 0.9) {
+    vec2 tile = abs(fract(vWorld.xy / 2.0 + 0.5) - 0.5);
+    float joint = smoothstep(0.475, 0.495, max(tile.x, tile.y));
+    surface *= 1.0 - joint * 0.30;
+  }
+  vec3 linear = surface * light + vColor * vEmission;
+  // Soft exposure rolloff then display gamma. No claim of physical spectral accuracy.
+  vec3 mapped = vec3(1.0) - exp(-linear * 1.25);
+  outColor = vec4(pow(mapped, vec3(1.0 / 2.2)), 1.0);
+}`;
+
+return {VERTEX,FRAGMENT};
+})();
+// Source: engine/basement/renderer.js
+const module6=(()=>{
+/**
+ * Basement / renderer: WebGL 2 instancing with owned GPU batches and retained storage.
+ * Cube geometry/program belong to the renderer; each world batch belongs to a lease.
+ * 12 float instance record: [x,y,z,yaw, sizeX,sizeY,sizeZ,emission, red,green,blue,0].
+ * Only changed contiguous instance ranges are uploaded after the initial allocation.
+ */
+const { VERTEX, FRAGMENT } = module7;
+const { Lifetime } = module5;
+
+/** Compile one stage; include the driver log and delete failed handles immediately. */
+function compile(gl, type, source) {
+  const shader = gl.createShader(type);
+  gl.shaderSource(shader, source); gl.compileShader(shader);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    const message = gl.getShaderInfoLog(shader); gl.deleteShader(shader);
+    throw new Error(`WebGL shader compilation: ${message}`);
+  }
+  return shader;
+}
+
+/** Generate one unit cube with flat normals; uploaded once per WebGL context lifetime. */
+function cubeGeometry() {
+  const result = [];
+  // Each face is a normal plus four counter-clockwise corners. Culling is disabled
+  // initially, so normal/light correctness does not depend on the camera hemisphere.
+  const faces = [
+    [[0,0,1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]],
+    [[0,0,-1],[-1,1,-1],[1,1,-1],[1,-1,-1],[-1,-1,-1]],
+    [[0,-1,0],[-1,-1,-1],[1,-1,-1],[1,-1,1],[-1,-1,1]],
+    [[0,1,0],[1,1,-1],[-1,1,-1],[-1,1,1],[1,1,1]],
+    [[-1,0,0],[-1,1,-1],[-1,-1,-1],[-1,-1,1],[-1,1,1]],
+    [[1,0,0],[1,-1,-1],[1,1,-1],[1,1,1],[1,-1,1]],
+  ];
+  for (const [normal, ...corners] of faces) {
+    for (const index of [0,1,2,0,2,3]) result.push(...corners[index].map(n => n * 0.5), ...normal);
+  }
+  return new Float32Array(result);
+}
+
+class Renderer {
+  /** Own the supplied surface's WebGL context. pixelRatio caps mobile fill cost. */
+  constructor(canvas, { pixelRatio = 1.5 } = {}) {
+    this.canvas = canvas; this.pixelRatio = pixelRatio; this.life = new Lifetime();
+    const gl = canvas.getContext('webgl2', { alpha: false, antialias: true, powerPreference: 'low-power' });
+    if (!gl) throw new Error('ETRNLNINE requires WebGL 2 on this device.');
+    this.gl = gl; this.batches = new Set(); this.disposed = false; this.lost = false;
+    this.camera = { x: 0, y: 0, halfHeight: 21 };
+    this.ambient = new Float32Array([0.13, 0.13, 0.23]);
+    this.lights = new Float32Array(8 * 4); this.lightColors = new Float32Array(8 * 3);
+    this.stats = { draws: 0, instances: 0, uploads: 0, uploadedBytes: 0, buffers: 0, programs: 0, vaos: 0, contextRestores: 0 };
+    this.initialize();
+    this.life.listen(canvas, 'webglcontextlost', event => {
+      event.preventDefault(); this.lost = true;
+    });
+    this.life.listen(canvas, 'webglcontextrestored', () => {
+      // Browser invalidates all old handles on loss. Recreate from retained CPU data,
+      // not by restarting the game or adding a second scheduler.
+      this.stats.buffers = this.stats.programs = this.stats.vaos = 0;
+      this.initialize();
+      for (const batch of this.batches) batch.initialize();
+      this.stats.contextRestores++; this.lost = false;
+    });
+  }
+
+  /** Allocate renderer-owned program/cube. Shaders are freed after linking. */
+  initialize() {
+    const gl = this.gl;
+    let vertex, fragment, program;
+    try {
+      vertex = compile(gl, gl.VERTEX_SHADER, VERTEX);
+      fragment = compile(gl, gl.FRAGMENT_SHADER, FRAGMENT);
+      program = gl.createProgram();
+      gl.attachShader(program, vertex); gl.attachShader(program, fragment); gl.linkProgram(program);
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
+    } catch (error) {
+      if (program) gl.deleteProgram(program);
+      throw error;
+    } finally {
+      if (vertex) gl.deleteShader(vertex); if (fragment) gl.deleteShader(fragment);
+    }
+    this.program = program; this.stats.programs++;
+    this.uniforms = Object.fromEntries(['uCamera', 'uAmbient', 'uLights[0]', 'uLightColors[0]']
+      .map(name => [name, gl.getUniformLocation(program, name)]));
+    this.cube = gl.createBuffer(); this.stats.buffers++;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.cube); gl.bufferData(gl.ARRAY_BUFFER, cubeGeometry(), gl.STATIC_DRAW);
+    gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
+  }
+
+  /** Allocate a batch with an explicit maximum. Capacity is a budget, not silent growth. */
+  createBatch(world, capacity = 2048) {
+    if (this.disposed) throw new Error('Renderer is disposed');
+    const batch = new InstanceBatch(this, world, capacity); this.batches.add(batch); return batch;
+  }
+
+  /** Resize backing pixels only when necessary. CSS layout belongs to the application. */
+  resize() {
+    const ratio = Math.min(globalThis.devicePixelRatio || 1, this.pixelRatio);
+    const width = Math.max(1, Math.round(this.canvas.clientWidth * ratio));
+    const height = Math.max(1, Math.round(this.canvas.clientHeight * ratio));
+    if (this.canvas.width !== width || this.canvas.height !== height) {
+      this.canvas.width = width; this.canvas.height = height;
+    }
+  }
+
+  /** Compute view dimensions in world units; the same projection is exposed to mouse aiming. */
+  view() {
+    const halfHeight = this.camera.halfHeight;
+    return { halfWidth: halfHeight * this.canvas.width / this.canvas.height, halfHeight };
+  }
+
+  /** Convert surface CSS coordinates to the ground plane (z=0), without hidden game state. */
+  groundPoint(x, y, target = {}) {
+    const { halfWidth, halfHeight } = this.view();
+    target.x = this.camera.x + (x / this.canvas.clientWidth * 2 - 1) * halfWidth;
+    target.y = this.camera.y + (1 - y / this.canvas.clientHeight * 2) * halfHeight / 0.65;
+    return target;
+  }
+
+  /** Clear even an empty engine; present a batch only if supplied and its context is valid. */
+  render(batch = null) {
+    if (this.disposed || this.lost) return;
+    this.resize();
+    const gl = this.gl, { halfWidth, halfHeight } = this.view();
+    this.stats.draws = this.stats.instances = this.stats.uploads = this.stats.uploadedBytes = 0;
+    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    gl.clearColor(0.018, 0.019, 0.037, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    if (!batch || batch.disposed) return;
+    if (batch.renderer !== this) throw new Error('Batch belongs to another renderer');
+    gl.useProgram(this.program);
+    gl.uniform4f(this.uniforms.uCamera, this.camera.x, this.camera.y, halfWidth, halfHeight);
+    gl.uniform3fv(this.uniforms.uAmbient, this.ambient);
+    gl.uniform4fv(this.uniforms['uLights[0]'], this.lights);
+    gl.uniform3fv(this.uniforms['uLightColors[0]'], this.lightColors);
+    batch.sync(halfWidth, halfHeight);
+    gl.bindVertexArray(batch.vao);
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, batch.count);
+    gl.bindVertexArray(null);
+    this.stats.draws = 1; this.stats.instances = batch.count;
+  }
+
+  /** Release renderer and outstanding batches, with listeners removed before late restoration. */
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true; this.life.dispose();
+    for (const batch of [...this.batches]) batch.dispose();
+    this.gl.deleteBuffer(this.cube); this.gl.deleteProgram(this.program);
+    this.stats.buffers = this.stats.programs = this.stats.vaos = 0;
+  }
+}
+
+/**
+ * One world batch, independently owned/disposable through Directory.acquire().
+ * This first renderer performs conservative view culling, not a full spatial grid.
+ * Future spatial query output can replace this small-world scan through the same contract.
+ */
+class InstanceBatch {
+  /** Retain bounded CPU records so context restoration never depends on Canvas assets. */
+  constructor(renderer, world, capacity) {
+    this.renderer = renderer; this.world = world; this.capacity = capacity;
+    this.data = new Float32Array(capacity * 12); this.count = 0; this.disposed = false;
+    this.initialize();
+  }
+
+  /** Configure one VAO and dynamic instance buffer; allocate storage once per context. */
+  initialize() {
+    const { gl, stats, cube } = this.renderer;
+    this.vao = gl.createVertexArray(); stats.vaos++;
+    this.buffer = gl.createBuffer(); stats.buffers++;
+    gl.bindVertexArray(this.vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, cube);
+    for (let i = 0; i < 2; i++) {
+      gl.enableVertexAttribArray(i); gl.vertexAttribPointer(i, 3, gl.FLOAT, false, 24, i * 12);
+    }
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, this.data.byteLength, gl.DYNAMIC_DRAW);
+    for (let i = 0; i < 3; i++) {
+      const location = i + 2;
+      gl.enableVertexAttribArray(location); gl.vertexAttribPointer(location, 4, gl.FLOAT, false, 48, i * 16);
+      gl.vertexAttribDivisor(location, 1);
+    }
+    gl.bindVertexArray(null); this.forceUpload = true;
+  }
+
+  /** Append one float to the retained record, tracking dirty bounds without allocating a closure. */
+  write(value) {
+    const f = Math.fround(value), index = this.cursor++;
+    if (this.data[index] !== f || this.forceUpload) {
+      this.data[index] = f;
+      this.firstDirty = Math.min(this.firstDirty, index); this.lastDirty = index;
+    }
+  }
+
+  /**
+   * Pack visible transforms/materials into retained records; compare Float32 values to
+   * avoid treating harmless double-to-float rounding as a perpetual dirty upload.
+   */
+  sync(halfWidth, halfHeight) {
+    const r = this.renderer, gl = r.gl;
+    this.cursor = 0; this.firstDirty = Infinity; this.lastDirty = -1;
+    for (const entity of this.world.entities.values()) {
+      const s = entity.shape, p = entity.pose;
+      if (!s) continue;
+      const radius = Math.hypot(s.size[0], s.size[1], s.size[2]);
+      const screenY = (p.y - r.camera.y) * 0.65 + p.z * 0.76;
+      if (Math.abs(p.x - r.camera.x) > halfWidth + radius || Math.abs(screenY) > halfHeight + radius) continue;
+      if (this.cursor / 12 >= this.capacity) throw new Error(`World ${this.world.id} exceeds ${this.capacity} visible instances`);
+      this.write(p.x); this.write(p.y); this.write(p.z); this.write(p.yaw);
+      this.write(s.size[0]); this.write(s.size[1]); this.write(s.size[2]); this.write(s.emission ?? 0);
+      this.write(s.color[0]); this.write(s.color[1]); this.write(s.color[2]); this.write(0);
+    }
+    this.count = this.cursor / 12;
+    if (this.lastDirty >= this.firstDirty) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+      // WebGL 2 source-offset/length overload uploads a range without a new typed-array view.
+      gl.bufferSubData(gl.ARRAY_BUFFER, this.firstDirty * 4, this.data, this.firstDirty, this.lastDirty - this.firstDirty + 1);
+      r.stats.uploads++; r.stats.uploadedBytes += (this.lastDirty - this.firstDirty + 1) * 4;
+    }
+    this.forceUpload = false;
+  }
+
+  /** Remove the batch from its renderer and release actual GL handles exactly once. */
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    const { gl, stats } = this.renderer;
+    gl.deleteBuffer(this.buffer); gl.deleteVertexArray(this.vao);
+    stats.buffers--; stats.vaos--; this.renderer.batches.delete(this);
+  }
+}
+
+return {Renderer};
+})();
+// Source: engine/basement/basement.js
+const module2=(()=>{
+/**
+ * Basement assembly: owns only foundational capabilities, never a particular game.
+ * Read world/input/renderer for implementation; this small owner connects their lifetimes.
+ */
+const { Identities, World } = module3;
+const { Input } = module4;
+const { Renderer } = module6;
+
+class Basement {
+  /** Renderer first: unsupported WebGL fails before device listeners are installed. */
+  constructor(canvas, options) {
+    this.identities = new Identities();
+    this.renderer = new Renderer(canvas, options);
+    try { this.input = new Input(canvas); }
+    catch (error) { this.renderer.dispose(); throw error; }
+  }
+  /** Empty worlds have no game content and allocate no GPU batch until requested. */
+  createWorld() { return new World(this.identities.create('world'), this.identities); }
+  /** Release devices before the surface resources they target. */
+  dispose() { this.input.dispose(); this.renderer.dispose(); }
+}
+
+return {Basement};
+})();
+// Source: engine/lobby/runtime.js
+const module8=(()=>{
+/**
+ * Lobby / runtime: sole animation-frame owner, explicit phases, and pause reasons.
+ * All elapsed values are seconds. The engine advances fixed simulation steps and
+ * interpolates render poses; long browser suspensions never trigger unlimited work.
+ */
+class Runtime {
+  /** Inject scheduling for deterministic lifecycle tests; browser defaults allocate no loop yet. */
+  constructor({ request = cb => requestAnimationFrame(cb), cancel = id => cancelAnimationFrame(id), step = 1 / 60, maxSteps = 5 } = {}) {
+    this.request = request; this.cancel = cancel; this.step = step; this.maxSteps = maxSteps;
+    this.phases = { input: new Set(), update: new Set(), render: new Set(), pause: new Set() };
+    this.reasons = new Set(); this.running = false; this.disposed = false;
+    this.frameId = null; this.last = null; this.accumulator = 0; this.time = 0;
+    this.stats = { frames: 0, steps: 0, droppedSeconds: 0 };
+    this.tick = this.tick.bind(this);
+  }
+
+  /** Register a phase callback. Return an idempotent remover owned by the caller's lifetime. */
+  on(phase, callback) {
+    if (this.disposed) throw new Error('Runtime is disposed');
+    const list = this.phases[phase];
+    if (!list) throw new Error(`Unknown runtime phase: ${phase}`);
+    list.add(callback);
+    return () => list.delete(callback);
+  }
+
+  /** Emit in registration order. Callback owners must remove registrations on scene disposal. */
+  emit(phase, ...args) { for (const callback of this.phases[phase]) callback(...args); }
+
+  /** Repeated start calls are harmless; stopped runtime preserves simulation time. */
+  start() {
+    if (this.disposed) throw new Error('Runtime is disposed');
+    if (this.running) return;
+    this.running = true; this.last = null; this.frameId = this.request(this.tick);
+  }
+
+  /** Cancel the only outstanding frame; reset interpolation debt on the next start. */
+  stop() {
+    if (!this.running) return;
+    this.running = false; this.cancel(this.frameId); this.frameId = null;
+    this.last = null; this.accumulator = 0;
+  }
+
+  /**
+   * Add/remove an owned pause reason. Removing a menu pause cannot remove focus pause.
+   * Reset wall-clock debt at transitions, keeping the paused pose fully resolved.
+   */
+  pause(reason, active = true) {
+    const wasPaused = this.reasons.size > 0;
+    if (active) this.reasons.add(reason); else this.reasons.delete(reason);
+    if (wasPaused !== (this.reasons.size > 0)) {
+      this.last = null; this.accumulator = 0; this.emit('pause', this.reasons.size > 0);
+    }
+  }
+
+  /** Execute input -> bounded fixed updates -> interpolated render -> schedule next frame. */
+  tick(milliseconds) {
+    if (!this.running) return;
+    this.frameId = null;
+    try {
+      const elapsed = this.last === null ? 0 : Math.max(0, (milliseconds - this.last) / 1000);
+      this.last = milliseconds;
+      this.emit('input');
+      if (!this.reasons.size) {
+        const admitted = Math.min(elapsed, this.step * this.maxSteps);
+        this.stats.droppedSeconds += elapsed - admitted;
+        this.accumulator += admitted;
+        let count = 0;
+        while (this.accumulator + 1e-10 >= this.step && count < this.maxSteps) {
+          this.emit('update', this.step, this.time);
+          this.accumulator = Math.max(0, this.accumulator - this.step);
+          this.time += this.step; this.stats.steps++; count++;
+        }
+      }
+      this.emit('render', this.reasons.size ? 1 : this.accumulator / this.step, this.time);
+      this.stats.frames++;
+    } catch (error) {
+      this.running = false; this.last = null; throw error;
+    }
+    if (this.running) this.frameId = this.request(this.tick);
+  }
+
+  /** Stop scheduling and remove registrations, allowing the composed engine to release resources. */
+  dispose() {
+    if (this.disposed) return;
+    this.stop(); this.disposed = true;
+    for (const phase of Object.values(this.phases)) phase.clear();
+    this.reasons.clear();
+  }
+}
+
+return {Runtime};
+})();
+// Source: engine/directory/directory.js
+const module9=(()=>{
+/**
+ * Directory: named libraries, lazy shared resources, and explicit world ownership.
+ * Factories come from callers. Nothing here imports a named toy or game asset.
+ * A lease pins one resource; releasing the last lease destroys it immediately.
+ */
+class Directory {
+  /** Registration is inert: no world or GPU asset is allocated until requested. */
+  constructor() { this.libraries = new Map(); this.resources = new Map(); this.worlds = new Map(); this.disposed = false; }
+
+  /** Register a unique library factory; duplicate names are an error, not a silent override. */
+  register(name, factory) {
+    if (this.disposed) throw new Error('Directory is disposed');
+    if (this.libraries.has(name)) throw new Error(`Duplicate library: ${name}`);
+    this.libraries.set(name, factory);
+  }
+
+  /** Instantiate registered content with explicit arguments; caller owns its instance. */
+  create(name, options) {
+    if (this.disposed) throw new Error('Directory is disposed');
+    const factory = this.libraries.get(name);
+    if (!factory) throw new Error(`Unknown library: ${name}`);
+    return factory(options);
+  }
+
+  /** Acquire a shared disposable resource. The factory runs only for the first owner. */
+  acquire(key, factory) {
+    if (this.disposed) throw new Error('Directory is disposed');
+    let record = this.resources.get(key);
+    if (!record) { record = { value: factory(), owners: 0 }; this.resources.set(key, record); }
+    record.owners++;
+    let released = false;
+    return {
+      value: record.value,
+      // Every lease may release once; delayed scene cleanup cannot underflow ownership.
+      release: () => {
+        if (released) return;
+        released = true;
+        if (--record.owners === 0 && this.resources.get(key) === record) {
+          this.resources.delete(key); record.value.dispose();
+        }
+      },
+    };
+  }
+
+  /** Adopt a world using its immutable ID. Its caller must release it on scene replacement. */
+  adopt(world) {
+    if (this.disposed) throw new Error('Directory is disposed');
+    if (this.worlds.has(world.id)) throw new Error(`Duplicate world: ${world.id}`);
+    this.worlds.set(world.id, world);
+    return world;
+  }
+
+  /** Release one adopted world. Safe when scene cleanup and engine cleanup overlap. */
+  releaseWorld(id) {
+    const world = this.worlds.get(id);
+    if (!world) return;
+    this.worlds.delete(id); world.dispose();
+  }
+
+  /** Final owner cleanup also invalidates outstanding leases; release closures remain harmless. */
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    for (const world of this.worlds.values()) world.dispose();
+    for (const resource of this.resources.values()) resource.value.dispose();
+    this.worlds.clear(); this.resources.clear(); this.libraries.clear();
+  }
+}
+
+return {Directory};
+})();
+// Source: engine/penthouse/toys.js
+const module11=(()=>{
+/**
+ * Penthouse / toys: reusable procedural box-based architecture and actor assemblies.
+ * These are early test toys, not Freelancer art or the final procedural humanoid.
+ * Everything is created through World; no toy owns a scheduler or a GPU context.
+ */
+
+/** Add a solid box. Colors are linear RGB; emission is an optional dimensionless gain. */
+function box(world, { x = 0, y = 0, z = 0, size = [1,1,1], color = [0.3,0.3,0.4], emission = 0, parent = null, yaw = 0 } = {}) {
+  return world.create({ x, y, z, yaw, parent, shape: { size, color, emission } });
+}
+
+/**
+ * Generate a small colonnade with configurable dimensions/materials. Its returned root
+ * owns all descendant geometry, so deleting the root removes the full instance.
+ */
+function pavilion({ world, x = 0, y = 10, width = 18, depth = 8, height = 6,
+  stone = [0.22,0.21,0.29], trim = [0.68,0.48,0.27], glow = [1,0.46,0.16] }) {
+  const root = world.create({ x, y });
+  /** Use local positions so the entire toy can move/rotate through one transform. */
+  const part = (px, py, pz, size, color, emission = 0) => box(world, { parent: root, x: px, y: py, z: pz, size, color, emission });
+  part(0,0,0.2,[width+2,depth+2,0.4],stone);
+  part(0,depth/2-0.3,height/2,[width,0.6,height],stone);
+  part(0,0,height,[width+1,depth+1,0.6],stone);
+  part(0,-depth/2,height-0.6,[width,0.12,0.09],glow,2.5);
+  part(0,-depth/2,height-0.9,[width,0.16,0.10],trim);
+  for (const px of [-width/2, -width/4, width/4, width/2]) {
+    part(px,-depth/2,height/2,[0.5,0.5,height],stone);
+    part(px,-depth/2,0.45,[0.9,0.9,0.4],trim);
+    part(px,-depth/2,height-0.35,[0.8,0.8,0.25],trim);
+  }
+  for (let i=0;i<7;i++) {
+    const px = (i-3) * width / 8;
+    part(px,depth/2-0.65,height*0.52,[width/10,0.08,height*0.65],[0.35,0.19,0.16],0.3);
+    part(px,depth/2-0.72,height*0.52,[0.055,0.05,height*0.65],trim);
+  }
+  return root;
+}
+
+/** Build a stylized figure and backpack around a transform anchor; sizes in world units. */
+function actor({ world, color = [0.42,0.34,0.58], bagColor = [0.54,0.30,0.17] }) {
+  const root = world.create({ z: 0.1 });
+  const body = box(world, { parent: root, z: 1, size: [0.62,0.36,0.85], color });
+  box(world, { parent: body, z: 0.68, size: [0.38,0.38,0.43], color: [0.65,0.45,0.34] });
+  box(world, { parent: body, z: 0.91, size: [0.42,0.4,0.13], color: [0.08,0.055,0.09] });
+  const legs = [-1,1].map(side => box(world, { parent: root, x: side*0.18, z: 0.35,
+    size: [0.23,0.25,0.6], color: [0.09,0.085,0.14] }));
+  const arms = [-1,1].map(side => box(world, { parent: body, x: side*0.44,
+    size: [0.18,0.25,0.8], color }));
+  const bag = box(world, { parent: body, y: 0.3, z: 0.02, size: [0.5,0.26,0.62], color: bagColor });
+  box(world, { parent: bag, y: 0.15, z: -0.1, size: [0.34,0.08,0.23], color: [0.7,0.5,0.23] });
+  return { root, body, legs, arms, bag };
+}
+
+return {box,pavilion,actor};
+})();
+// Source: engine/penthouse/controls.js
+const module12=(()=>{
+/**
+ * Penthouse / controls: parameterized HTML control templates over Basement actions.
+ * HTML is intentional for accessible interface text; the world remains pure WebGL.
+ * Each instance has its own pointer capture, source ID, mutable state, and Lifetime.
+ */
+const { Lifetime } = module5;
+
+/** Track a single pointer per control, independently of other control instances. */
+function capture(element, life, begin, move, end) {
+  let pointerId = null;
+  /** Cancel only this owner's interaction, without affecting another active finger. */
+  const release = () => {
+    if (pointerId === null) return;
+    const old = pointerId; pointerId = null;
+    if (element.hasPointerCapture?.(old)) element.releasePointerCapture(old);
+    end();
+  };
+  life.listen(element, 'pointerdown', event => {
+    if (pointerId !== null || (event.pointerType === 'mouse' && event.button !== 0)) return;
+    event.preventDefault(); pointerId = event.pointerId;
+    element.setPointerCapture(pointerId); begin(event);
+  });
+  life.listen(element, 'pointermove', event => { if (event.pointerId === pointerId) move(event); });
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+    life.listen(element, type, event => { if (event.pointerId === pointerId) release(); });
+  }
+  life.listen(window, 'blur', release);
+  life.own(release);
+  return release;
+}
+
+class Joystick {
+  /** radius is CSS pixels; deadZone is normalized; curve >1 softens small movements. */
+  constructor({ input, sourceId, action, host, radius = 54, deadZone = 0.13, curve = 1.4, label = 'Move' }) {
+    this.life = new Lifetime(); this.input = input; this.sourceId = sourceId;
+    this.element = document.createElement('div'); this.element.className = 'engine-joystick';
+    this.element.setAttribute('aria-label', label); this.element.setAttribute('role', 'group');
+    this.element.style.width = this.element.style.height = `${radius * 2}px`;
+    const knob = document.createElement('span'); this.element.append(knob); host.append(this.element);
+    /** Fixed-origin stick: clamp displacement, remap dead zone, then apply response curve. */
+    const update = event => {
+      const r = this.element.getBoundingClientRect();
+      let x = (event.clientX - r.left - r.width / 2) / radius;
+      let y = (event.clientY - r.top - r.height / 2) / radius;
+      const length = Math.hypot(x, y), clamp = Math.min(1, length);
+      if (length) { x /= length; y /= length; }
+      knob.style.transform = `translate(${x * clamp * radius * 0.6}px,${y * clamp * radius * 0.6}px)`;
+      const response = Math.pow(Math.max(0, (clamp - deadZone) / (1 - deadZone)), curve);
+      input.setSource(sourceId, action, x * response, y * response);
+    };
+    /** Releasing a stick removes only its contribution and centers its visual knob. */
+    const reset = () => { input.removeSource(sourceId); knob.style.transform = ''; };
+    this.cancel = capture(this.element, this.life, update, update, reset);
+    this.life.own(() => { reset(); this.element.remove(); });
+  }
+  /** Templates expose cancellation so a pause cannot leave capture alive after resuming. */
+  dispose() { this.life.dispose(); }
+}
+
+class ActionButton {
+  /** A held button template; press edges are generated once by Basement input aggregation. */
+  constructor({ input, sourceId, action, host, label = 'Action', diameter = 72 }) {
+    this.life = new Lifetime(); this.element = document.createElement('button');
+    this.element.className = 'engine-action'; this.element.type = 'button'; this.element.textContent = label;
+    this.element.style.width = this.element.style.height = `${diameter}px`; host.append(this.element);
+    /** State and appearance are instance-local, with no shared pressed flags. */
+    const release = () => {
+      input.removeSource(sourceId); this.element.classList.remove('held');
+    };
+    const cancelPointer = capture(this.element, this.life,
+      () => { input.setSource(sourceId, action, 1); this.element.classList.add('held'); },
+      () => {}, release);
+    // Native button focus remains useful to keyboard users. A separate contribution
+    // prevents releasing a key from cancelling a concurrently held pointer.
+    const keyboardSource = `${sourceId}:keyboard`;
+    const releaseKeyboard = () => input.removeSource(keyboardSource);
+    this.life.listen(this.element, 'keydown', event => {
+      if (event.code !== 'Space' && event.code !== 'Enter') return;
+      event.preventDefault(); input.setSource(keyboardSource, action, 1);
+    });
+    this.life.listen(this.element, 'keyup', event => {
+      if (event.code === 'Space' || event.code === 'Enter') releaseKeyboard();
+    });
+    this.life.listen(this.element, 'blur', releaseKeyboard);
+    this.cancel = () => { cancelPointer(); releaseKeyboard(); };
+    this.life.own(() => { release(); releaseKeyboard(); this.element.remove(); });
+  }
+  /** Remove listeners, active pointer contribution, and owned DOM. */
+  dispose() { this.life.dispose(); }
+}
+
+return {Joystick,ActionButton};
+})();
+// Source: engine/penthouse/penthouse.js
+const module10=(()=>{
+/**
+ * Penthouse assembly: expose inert libraries without coupling Directory to toy names.
+ * ETRNLNINE installs these factories; games request them through Directory.
+ */
+const { pavilion, actor, box } = module11;
+const { Joystick, ActionButton } = module12;
+
+class Penthouse {
+  /** Catalog creation is inert: allocation begins only when a factory is requested. */
+  constructor() {
+    this.libraries = Object.freeze({
+      'toy.box': options => box(options.world, options),
+      'toy.pavilion': pavilion,
+      'toy.actor': actor,
+      'control.joystick': options => new Joystick(options),
+      'control.button': options => new ActionButton(options),
+    });
+  }
+}
+
+return {Penthouse};
+})();
+// Source: engine/etrnlnine.js
+const module1=(()=>{
+/**
+ * ETRNLNINE: the small composition root. This is the source-reading entry point.
+ * It assembles the house, connects shared contracts, and exposes lifecycle methods.
+ * Scene content, controls, movement, HUD, and game rules belong to the caller.
+ */
+const { Basement } = module2;
+const { Lifetime } = module5;
+const { Runtime } = module8;
+const { Directory } = module9;
+const { Penthouse } = module10;
+
+class ETRNLNINE {
+  /** Build an empty engine. No implicit game start or scene-specific allocations. */
+  constructor(canvas, options = {}) {
+    this.basement = new Basement(canvas, options);
+    this.lobby = new Runtime(); this.directory = new Directory(); this.penthouse = new Penthouse();
+    this.life = new Lifetime(); this.disposed = false;
+    for (const [name, factory] of Object.entries(this.penthouse.libraries)) this.directory.register(name, factory);
+    this.life.own(this.lobby.on('input', () => this.basement.input.sample()));
+    this.life.own(this.lobby.on('pause', paused => this.basement.input.suspend(paused)));
+    this.life.listen(document, 'visibilitychange', () => this.lobby.pause('document-hidden', document.hidden));
+    this.life.listen(window, 'blur', () => this.lobby.pause('window-unfocused', true));
+    this.life.listen(window, 'focus', () => this.lobby.pause('window-unfocused', false));
+    // Context loss stops simulation as well as drawing. Restoration rebuilds renderer
+    // resources before this listener removes its independent pause reason.
+    this.life.listen(canvas, 'webglcontextlost', () => this.lobby.pause('gpu-context', true));
+    this.life.listen(canvas, 'webglcontextrestored', () => this.lobby.pause('gpu-context', false));
+    this.lobby.pause('document-hidden', document.hidden);
+  }
+  /** Start/resume the scheduler; no new loop is created by repeated calls. */
+  start() { this.lobby.start(); }
+  /** Stop scheduling without discarding world or device state. */
+  stop() { this.lobby.stop(); this.basement.input.clear(); }
+  /** Release registrations first, then loop, worlds/resources, and foundational capabilities. */
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true; this.life.dispose(); this.lobby.dispose();
+    this.directory.dispose(); this.basement.dispose();
+  }
+}
+
+return {ETRNLNINE};
+})();
+// Source: engine/basement/geometry.js
+const module14=(()=>{
+/** Basement / geometry: pure horizontal collision helpers, with no world or game dependency. */
+
+/** Does a horizontal circle overlap an axis-aligned box? Touching is permitted. */
+function circleOverlapsBox(x, y, radius, box) {
+  const nearX = Math.max(box.x - box.width / 2, Math.min(x, box.x + box.width / 2));
+  const nearY = Math.max(box.y - box.depth / 2, Math.min(y, box.y + box.depth / 2));
+  return (x - nearX) ** 2 + (y - nearY) ** 2 < radius ** 2;
+}
+
+return {circleOverlapsBox};
+})();
+// Source: examples/atrium/layout.js
+const module15=(()=>{
+/**
+ * Atrium example / authored layout. This is game content, deliberately outside engine/.
+ * Change these placements/materials without editing renderer or toy implementations.
+ * This little courtyard is an engine exercise, not a replacement Enni Cole asset.
+ */
+function buildLayout(engine, world) {
+  const directory = engine.directory;
+  /** Every visible object is requested through registered Penthouse library factories. */
+  const box = options => directory.create('toy.box', { world, ...options });
+  const stone = [0.19,0.18,0.24], gold = [0.62,0.42,0.19];
+  box({ z: -0.25, size: [58,68,0.5], color: [0.12,0.115,0.18] });
+  // Inlaid paths define a readable floor, all retained geometry rather than painted textures.
+  box({ y: -5, z: 0.015, size: [7,38,0.025], color: [0.22,0.20,0.25] });
+  for (const x of [-3.6,3.6]) box({ x, y:-5, z:0.035, size:[0.05,38,0.035], color:gold });
+  directory.create('toy.pavilion', { world, y: 11, width: 24, depth: 9, height: 7 });
+  const colliders = [{ x:0, y:15.2, width:24, depth:0.7 }];
+  for (const x of [-12,-6,6,12]) colliders.push({ x, y:6.5, width:0.6, depth:0.6 });
+  // Side galleries frame the courtyard without teaching the engine what an atrium is.
+  for (const side of [-1,1]) {
+    const x = side * 20;
+    box({ x, y:3, z:2.1, size:[2,29,4.2], color:stone });
+    box({ x, y:3, z:4.3, size:[2.4,29.5,0.3], color:gold });
+    colliders.push({ x, y:3, width:2, depth:29 });
+    for (let y=-9; y<=15; y+=4) {
+      box({ x:x-side*1.05, y, z:2.3, size:[0.06,1.8,2.7], color:[0.34,0.15,0.23], emission:0.55 });
+      box({ x:x-side*1.13, y, z:3.7, size:[0.08,2,0.07], color:[1,0.42,0.19], emission:2 });
+    }
+    for (const y of [-12,1]) {
+      const px = side * 10;
+      box({ x:px, y, z:0.55, size:[2.4,2.4,1.1], color:gold });
+      for (let level=0;level<4;level++) box({ x:px, y, z:1.4+level*0.65,
+        size:[2.2-level*0.4,2.2-level*0.4,0.9], color:[0.045,0.12+level*0.01,0.10] });
+      colliders.push({ x:px, y, width:2.4, depth:2.4 });
+    }
+    for (const y of [-18,-4,9]) {
+      box({ x:side*15, y, z:1.8, size:[0.18,0.18,3.6], color:gold });
+      box({ x:side*15, y, z:3.7, size:[0.6,0.6,0.8], color:[1,0.55,0.24], emission:3 });
+      box({ x:side*15, y, z:4.15, size:[0.9,0.9,0.12], color:gold });
+    }
+  }
+  const lantern = box({ x:0,y:2,z:0.65,size:[1.9,1.9,1.3],color:stone });
+  box({ parent:lantern,z:0.85,size:[2.1,2.1,0.22],color:gold });
+  const crystal = box({ parent:lantern,z:1.75,yaw:Math.PI/4,size:[0.7,0.7,1.4],color:[0.25,0.62,1],emission:2 });
+  colliders.push({x:0,y:2,width:2.1,depth:2.1});
+  return { colliders, crystal };
+}
+
+return {buildLayout};
+})();
+// Source: examples/atrium/scene.js
+const module13=(()=>{
+/**
+ * Atrium example / game behavior. Owns one world, one GPU lease, controls and phase hooks.
+ * This is intentionally outside engine/: movement rules, obstacles, palette changes,
+ * and the player identity can all change without editing ETRNLNINE or its levels.
+ */
+const { Lifetime } = module5;
+const { circleOverlapsBox } = module14;
+const { buildLayout } = module15;
+
+/** Create a self-contained scene. dispose() releases every registration and owned resource. */
+function createScene(engine, { controlsHost, onStatus = () => {} }) {
+  const life = new Lifetime(), { basement, lobby, directory } = engine;
+  const world = directory.adopt(basement.createWorld());
+  life.own(() => directory.releaseWorld(world.id));
+  try {
+    const layout = buildLayout(engine, world);
+    const actor = directory.create('toy.actor', { world }); actor.root.y = -8;
+    // Resolve the edited start pose without interpolating from the toy's origin.
+    for (const entity of world.entities.values()) Object.assign(entity.previous,
+      { x:entity.x, y:entity.y, z:entity.z, yaw:entity.yaw });
+    const lease = directory.acquire(`batch:${world.id}`, () => basement.renderer.createBatch(world));
+    life.own(lease.release);
+    const input = basement.input, renderer = basement.renderer;
+    input.bind({
+      move: { kind:'vector', negativeX:['KeyA','ArrowLeft'], positiveX:['KeyD','ArrowRight'],
+        negativeY:['KeyW','ArrowUp'], positiveY:['KeyS','ArrowDown'], axes:[0,1], deadZone:0.18 },
+      interact: { kind:'button', keys:['KeyE'], pointerButtons:[0], buttons:[0] },
+      load: { kind:'button', keys:['KeyB'], buttons:[2] },
+    });
+    life.own(() => input.bind({}));
+    const stick = directory.create('control.joystick', { input, host:controlsHost,
+      sourceId:`${world.id}:stick`, action:'move', radius:52 });
+    life.own(() => stick.dispose());
+    const button = directory.create('control.button', { input, host:controlsHost,
+      sourceId:`${world.id}:button`, action:'interact', label:'Light', diameter:70 });
+    life.own(() => button.dispose());
+    life.own(lobby.on('pause', () => { stick.cancel(); button.cancel(); }));
+
+    // Renderer inputs are generic numeric light slots; the game authors their arrangement.
+    renderer.camera.x = 0; renderer.camera.y = 0; renderer.camera.halfHeight = 22;
+    renderer.lights.fill(0); renderer.lightColors.fill(0);
+    const lightPositions = [[0,7,5,16],[-15,-4,4,12],[15,-4,4,12],[-15,9,4,12],[15,9,4,12],[0,2,3,10],[-15,-18,4,12],[15,-18,4,12]];
+    for (let i=0;i<lightPositions.length;i++) {
+      renderer.lights.set(lightPositions[i],i*4);
+      renderer.lightColors.set(i===5 ? [0.3,1.1,2.7] : [2.4,0.85,0.3],i*3);
+    }
+    let vx=0, vy=0, distance=0, loaded=true, cool=true, statusAt=-1;
+    const pointerGround = {};
+    /** Keep movement legal against the example's horizontal geometry and world boundary. */
+    const legal = (x,y) => Math.abs(x)<18.3 && y>-23 && y<17
+      && !layout.colliders.some(box => circleOverlapsBox(x,y,0.5,box));
+
+    life.own(lobby.on('update', (dt,time) => {
+      world.snapshot();
+      if (input.consume('load')) loaded = !loaded;
+      if (input.consume('interact')) {
+        cool = !cool;
+        const color = cool ? [0.25,0.62,1] : [1,0.34,0.19];
+        layout.crystal.shape.color = color;
+        renderer.lightColors.set(cool ? [0.3,1.1,2.7] : [3,0.5,0.2],15);
+      }
+      const move = input.read('move');
+      // Illustrative steering profile: load slows directional response, widening turns.
+      // This is not the planned mass-distribution/body simulation from section 10.4.
+      const response = 1-Math.exp(-(loaded?4:10)*dt), speed = loaded?6:7;
+      vx += (move.x*speed-vx)*response;
+      vy += (-move.y*speed-vy)*response;
+      const root=actor.root;
+      if (legal(root.x+vx*dt,root.y)) root.x+=vx*dt; else vx=0;
+      if (legal(root.x,root.y+vy*dt)) root.y+=vy*dt; else vy=0;
+      const moving=Math.hypot(vx,vy);
+      let heading = root.yaw;
+      if (moving>0.1) heading=Math.atan2(vy,vx)+Math.PI/2;
+      else if (input.pointer.active) {
+        renderer.groundPoint(input.pointer.x,input.pointer.y,pointerGround);
+        heading=Math.atan2(pointerGround.y-root.y,pointerGround.x-root.x)+Math.PI/2;
+      }
+      const turn=Math.atan2(Math.sin(heading-root.yaw),Math.cos(heading-root.yaw));
+      root.yaw+=turn*(1-Math.exp(-9*dt)); distance+=moving*dt;
+      // Procedural gait derives from actual distance, so blocked movement doesn't moonwalk.
+      actor.body.z=1+Math.sin(distance*5)*Math.min(moving,1)*0.035;
+      actor.legs[0].y=Math.sin(distance*5)*Math.min(moving,1)*0.18;
+      actor.legs[1].y=-actor.legs[0].y;
+      actor.arms[0].y=-actor.legs[0].y*0.6; actor.arms[1].y=-actor.arms[0].y;
+      actor.bag.shape.emission=loaded?0:0.12;
+      layout.crystal.yaw+=dt*0.3;
+      if (time-statusAt>0.2) {
+        statusAt=time;
+        onStatus({ worldId:world.id, x:root.x, y:root.y, loaded, cool, time, entities:world.entities.size });
+      }
+    }));
+    life.own(lobby.on('render', alpha => {
+      world.resolve(alpha); renderer.render(lease.value);
+    }));
+    return { world, actor, dispose: () => life.dispose() };
+  } catch (error) { life.dispose(); throw error; }
+}
+
+return {createScene};
+})();
+// Source: examples/atrium/main.js
+const module0=(()=>{
+/**
+ * Atrium example / browser entry point. Owns page UI, engine startup and scene replacement.
+ * Follow createScene -> layout -> Penthouse toys to understand or change the example.
+ * The engine receives elements as parameters; it never looks up these page IDs.
+ */
+const { ETRNLNINE } = module1;
+const { Lifetime } = module5;
+const { createScene } = module13;
+
+const canvas=document.querySelector('#world'), controlsHost=document.querySelector('#controls');
+const status=document.querySelector('#status'), errorBox=document.querySelector('#error');
+const pauseButton=document.querySelector('#pause'), restartButton=document.querySelector('#restart');
+const life=new Lifetime();
+let engine, scene;
+
+/** Report readable failures while preserving the error for developer tools. */
+function report(error) {
+  errorBox.hidden=false; errorBox.textContent=error.message; console.error(error);
+}
+
+/** Replace the scene through its public lifetime; no game state is stored inside engine/. */
+function replaceScene() {
+  scene?.dispose(); scene=null;
+  scene=createScene(engine,{ controlsHost, onStatus: state => {
+    const r=engine.basement.renderer.stats;
+    status.textContent=`${state.loaded?'Weighted':'Light'} pack · ${state.entities} forms · ${r.draws} draw · ${r.uploadedBytes} B updated`;
+    // Small DOM diagnostics aid accessibility and automated verification; no engine globals.
+    status.dataset.world=state.worldId; status.dataset.x=state.x.toFixed(3); status.dataset.y=state.y.toFixed(3);
+    status.dataset.buffers=r.buffers; status.dataset.vaos=r.vaos;
+    status.dataset.time=state.time.toFixed(2); status.dataset.cool=String(state.cool);
+  }});
+}
+
+try {
+  engine=new ETRNLNINE(canvas,{ pixelRatio:1.5 });
+  replaceScene(); engine.start();
+  life.listen(pauseButton,'click',() => {
+    const paused=!engine.lobby.reasons.has('example-menu');
+    engine.lobby.pause('example-menu',paused);
+    pauseButton.textContent=paused?'Resume':'Pause'; pauseButton.setAttribute('aria-pressed',String(paused));
+  });
+  life.listen(restartButton,'click',() => {
+    try { replaceScene(); } catch(error) { report(error); }
+  });
+  life.listen(window,'pagehide',event => {
+    // bfcache retains a page intact; unload it only when it will not be restored.
+    if (!event.persisted) dispose();
+  });
+} catch(error) { scene?.dispose(); engine?.dispose(); report(error); }
+
+/** Tear down the game before its engine. The listener owner is itself idempotent. */
+function dispose() { life.dispose(); scene?.dispose(); engine?.dispose(); }
+
+return {};
+})();
+</script>
+</body>
+</html>

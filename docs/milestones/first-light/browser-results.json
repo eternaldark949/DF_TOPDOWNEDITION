@@ -1,0 +1,60 @@
+{
+  "resize": {
+    "width": 1024,
+    "height": 720,
+    "error": 0
+  },
+  "offline": {
+    "networkRequests": 0,
+    "sceneReplacements": 12,
+    "status": "Weighted pack · 119 forms · 1 draw · 4 B updated"
+  },
+  "touch": {
+    "simultaneousPointers": 2,
+    "status": "Weighted pack · 119 forms · 1 draw · 436 B updated"
+  },
+  "engine": {
+    "empty": {
+      "worlds": 0,
+      "resources": 0,
+      "draws": 0
+    },
+    "warm": {
+      "draws": 1,
+      "instances": 1,
+      "uploads": 0,
+      "uploadedBytes": 0,
+      "buffers": 2,
+      "programs": 1,
+      "vaos": 1,
+      "contextRestores": 0
+    },
+    "moved": {
+      "draws": 1,
+      "instances": 1,
+      "uploads": 1,
+      "uploadedBytes": 4,
+      "buffers": 2,
+      "programs": 1,
+      "vaos": 1,
+      "contextRestores": 0
+    },
+    "glError": 0,
+    "varied": 1160
+  },
+  "context": {
+    "supported": true,
+    "paused": true,
+    "restores": 1,
+    "buffers": 2,
+    "error": 0
+  },
+  "disposal": {
+    "buffers": 0,
+    "programs": 0,
+    "vaos": 0,
+    "worlds": 0,
+    "resources": 0,
+    "running": false
+  }
+}
