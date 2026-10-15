@@ -34,20 +34,24 @@
     P.destroy=function(){if(this.geo){for(const rec of this.geo.values())rec.builder.destroy();this.geo.clear();}destroy.call(this);};
 
     // Path recording keeps authored (local) points beside the transformed ones.
-    P.moveTo=function(x,y){const p=this.point(x,y);this.part={points:p,local:[x,y],closed:false,mrev:this.mrev,mixed:false};this.path.push(this.part);};
-    P.lineTo=function(x,y){if(!this.part)return this.moveTo(x,y);const part=this.part;part.points.push(...this.point(x,y));part.local.push(x,y);if(part.mrev!==this.mrev)part.mixed=true;};
+    // Authored points are only needed by the retained cache and projection captures; batched
+    // drawing (native-webgl-batch.js) needs world points alone, so local recording is skipped there.
+    P.moveTo=function(x,y){const m=this.matrix,local=this.retainedOff||this.owner.layers?.shapeBatches===false;
+        this.part={points:[m.a*x+m.c*y+m.tx,m.b*x+m.d*y+m.ty],local:local?[x,y]:null,closed:false,mrev:this.mrev,mixed:false};this.path.push(this.part);};
+    P.lineTo=function(x,y){const part=this.part;if(!part)return this.moveTo(x,y);const m=this.matrix;part.points.push(m.a*x+m.c*y+m.tx,m.b*x+m.d*y+m.ty);
+        if(part.local)part.local.push(x,y);if(part.mrev!==this.mrev)part.mixed=true;};
     P.curve=function(points,quadratic){
         const part=this.part;if(!part)return;if(part.mrev!==this.mrev)part.mixed=true;
-        const a=part.points,l=part.local,last=a.slice(-2),ll=l.slice(-2),q=points.map(p=>this.point(...p));
+        const a=part.points,l=part.local,last=a.slice(-2),ll=l?l.slice(-2):null,q=points.map(p=>this.point(...p));
         const length=q.reduce((s,p,i)=>s+Math.hypot(p[0]-(i?q[i-1][0]:last[0]),p[1]-(i?q[i-1][1]:last[1])),0);
         const n=this.segments(Math.min(24,Math.max(4,Math.ceil(length*(this._flatScale||1)/2))));
         for(let i=1;i<=n;i++){const t=i/n,u=1-t;
             if(quadratic){const [p0,p1]=points;
                 a.push(u*u*last[0]+2*u*t*q[0][0]+t*t*q[1][0],u*u*last[1]+2*u*t*q[0][1]+t*t*q[1][1]);
-                l.push(u*u*ll[0]+2*u*t*p0[0]+t*t*p1[0],u*u*ll[1]+2*u*t*p0[1]+t*t*p1[1]);}
+                if(l)l.push(u*u*ll[0]+2*u*t*p0[0]+t*t*p1[0],u*u*ll[1]+2*u*t*p0[1]+t*t*p1[1]);}
             else {const [p0,p1,p2]=points;
                 a.push(u*u*u*last[0]+3*u*u*t*q[0][0]+3*u*t*t*q[1][0]+t*t*t*q[2][0],u*u*u*last[1]+3*u*u*t*q[0][1]+3*u*t*t*q[1][1]+t*t*t*q[2][1]);
-                l.push(u*u*u*ll[0]+3*u*u*t*p0[0]+3*u*t*t*p1[0]+t*t*t*p2[0],u*u*u*ll[1]+3*u*u*t*p0[1]+3*u*t*t*p1[1]+t*t*t*p2[1]);}
+                if(l)l.push(u*u*u*ll[0]+3*u*u*t*p0[0]+3*u*t*t*p1[0]+t*t*t*p2[0],u*u*u*ll[1]+3*u*u*t*p0[1]+3*u*t*t*p1[1]+t*t*t*p2[1]);}
         }
     };
 
@@ -60,7 +64,7 @@
         if(!anticlockwise){if(raw>=tau)span=tau;else span=((raw%tau)+tau)%tau;}
         else {if(raw<=-tau)span=-tau;else span=-(((-raw%tau)+tau)%tau);}
         const n=this.segments(Math.max(2,Math.ceil(Math.abs(span)*Math.max(4,Math.sqrt(Math.max(rx,ry))*2)))),c=Math.cos(rotation),s=Math.sin(rotation);
-        for(let i=0;i<=n;i++){const a=start+span*i/n,px=x+Math.cos(a)*rx*c-Math.sin(a)*ry*s,py=y+Math.cos(a)*rx*s+Math.sin(a)*ry*c;
+        for(let i=0;i<=n;i++){const a=start+span*i/n,ca=Math.cos(a),sa=Math.sin(a),px=x+ca*rx*c-sa*ry*s,py=y+ca*rx*s+sa*ry*c;
             if(!this.part)this.moveTo(px,py);else this.lineTo(px,py);}
     };
     // Shape key: authored points, closure, rule and stroke shape. Two independent 32-bit hashes
