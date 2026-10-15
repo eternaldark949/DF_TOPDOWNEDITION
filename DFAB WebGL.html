@@ -58643,6 +58643,151 @@ class NativeWebGLRenderer {
             limitations:['GPU sound mirage and scope veil approximate Canvas; at most 8 rings and 24 refracting glass panels','Procedural character paths use GPU tessellation; tiny Canvas shadowBlur accents remain approximate','Furniture shadows use the original geometric footprints','Glass rain is a continuous shader interpretation; reflection detail captures and buildings have visible work budgets','Canvas shadowBlur and dashed strokes remain approximate; tactical radar uses its wedge fallback']};
     }
 }
+// Retained shape geometry: the engine's universal path for vector art.
+// Every solid fill and stroke a Canvas-style routine issues is keyed by its shape in the
+// coordinates it was authored in (before the current transform). A shape seen again in a
+// later frame is triangulated once into a GPU geometry and from then on only moved: its
+// transform, colour and alpha change per frame, its triangles never do. Characters' rigid
+// parts, props, signs and building details all qualify without per-entity code; shapes that
+// genuinely change every frame (a swinging hem, a flame) fall through to the live tessellator.
+(() => {
+    const P=NativeVectorContext.prototype;
+    const SEEN_TTL=90,REC_TTL=240,SWEEP=60,MAX_RECS=4096;
+    // Matrix revision: any transform change bumps it so a path knows whether its parts share one frame.
+    for(const name of ['transform','setTransform','resetTransform','restore']){
+        const base=P[name];P[name]=function(...a){const r=base.apply(this,a);this.mrev=(this.mrev||0)+1;return r;};
+    }
+    const begin=P.begin;
+    P.begin=function(){
+        begin.call(this);this.mrev=(this.mrev||0)+1;
+        const frame=this.owner.frameId|0;this.geoFrame=frame;
+        if(!this.geo){this.geo=new Map();this.geoSeen=new Map();this.geoStats={hits:0,builds:0,live:0,recs:0};}
+        else if(frame-(this.geoSwept||0)>=SWEEP){this.geoSwept=frame;this.sweepGeometry(frame);}
+        this.geoStats.hits=this.geoStats.builds=this.geoStats.live=0;this.geoStats.recs=this.geo.size;
+        if(this.geo)for(const rec of this.geo.values())rec.used=0;
+    };
+    P.sweepGeometry=function(frame){
+        for(const [k,f]of this.geoSeen)if(frame-f>SEEN_TTL)this.geoSeen.delete(k);
+        const over=this.geo.size>MAX_RECS;
+        for(const [k,rec]of this.geo)if(frame-rec.frame>REC_TTL||(over&&frame-rec.frame>2))this.dropGeometry(k,rec);
+    };
+    P.dropGeometry=function(key,rec){
+        for(const n of rec.nodes){const i=this.pool.indexOf(n);if(i>=0)this.pool.splice(i,1);if(n.parent)n.parent.removeChild(n);n.destroy();}
+        rec.builder.destroy();this.geo.delete(key);
+    };
+    const destroy=P.destroy;
+    P.destroy=function(){if(this.geo){for(const rec of this.geo.values())rec.builder.destroy();this.geo.clear();}destroy.call(this);};
+
+    // Path recording keeps authored (local) points beside the transformed ones.
+    P.moveTo=function(x,y){const p=this.point(x,y);this.part={points:p,local:[x,y],closed:false,mrev:this.mrev,mixed:false};this.path.push(this.part);};
+    P.lineTo=function(x,y){if(!this.part)return this.moveTo(x,y);const part=this.part;part.points.push(...this.point(x,y));part.local.push(x,y);if(part.mrev!==this.mrev)part.mixed=true;};
+    P.curve=function(points,quadratic){
+        const part=this.part;if(!part)return;if(part.mrev!==this.mrev)part.mixed=true;
+        const a=part.points,l=part.local,last=a.slice(-2),ll=l.slice(-2),q=points.map(p=>this.point(...p));
+        const length=q.reduce((s,p,i)=>s+Math.hypot(p[0]-(i?q[i-1][0]:last[0]),p[1]-(i?q[i-1][1]:last[1])),0);
+        const n=Math.min(24,Math.max(4,Math.ceil(length*(this._flatScale||1)/2)));
+        for(let i=1;i<=n;i++){const t=i/n,u=1-t;
+            if(quadratic){const [p0,p1]=points;
+                a.push(u*u*last[0]+2*u*t*q[0][0]+t*t*q[1][0],u*u*last[1]+2*u*t*q[0][1]+t*t*q[1][1]);
+                l.push(u*u*ll[0]+2*u*t*p0[0]+t*t*p1[0],u*u*ll[1]+2*u*t*p0[1]+t*t*p1[1]);}
+            else {const [p0,p1,p2]=points;
+                a.push(u*u*u*last[0]+3*u*u*t*q[0][0]+3*u*t*t*q[1][0]+t*t*t*q[2][0],u*u*u*last[1]+3*u*u*t*q[0][1]+3*u*t*t*q[1][1]+t*t*t*q[2][1]);
+                l.push(u*u*u*ll[0]+3*u*u*t*p0[0]+3*u*t*t*p1[0]+t*t*t*p2[0],u*u*u*ll[1]+3*u*u*t*p0[1]+3*u*t*t*p1[1]+t*t*t*p2[1]);}
+        }
+    };
+
+    // Shape key: authored points (1/256 px), closure, rule and stroke shape. Two independent
+    // 32-bit hashes keep accidental collisions out of reach for a few thousand live shapes.
+    // Translation-invariant: points are taken relative to the first one, so the same shape drawn
+    // somewhere else (a bouncing curl, a stepping foot) reuses its geometry.
+    function shapeKey(paths,extra,ox,oy){
+        let h1=2166136261,h2=5381;const mix=v=>{h1=Math.imul(h1^v,16777619);h2=(Math.imul(h2,33)^v)|0;};
+        for(let i=0;i<extra.length;i++)mix(extra.charCodeAt(i));
+        for(const p of paths){mix(p.closed?1:2);const l=p.local;mix(l.length);for(let i=0;i<l.length;i+=2){mix(((l[i]-ox)*256)|0);mix(((l[i+1]-oy)*256)|0);}}
+        return (h1>>>0).toString(36)+':'+(h2>>>0).toString(36);
+    }
+    // Paths built entirely under one transform qualify; returns that transform (the current one).
+    function sharedFrame(ctx,paths){
+        if(!paths.length)return null;const r=paths[0].mrev;
+        for(const p of paths)if(p.mixed||p.mrev!==r||!p.local)return null;
+        return r===ctx.mrev?ctx.matrix:null;
+    }
+    const BLEND={lighter:'ADD','destination-out':'ERASE',screen:'SCREEN',multiply:'MULTIPLY'};
+    // Draw resident geometry `key` (built from `local` on first use) under transform m.
+    P.retained=function(kind,style,build,local,key,m){
+        if(this.retainedOff||this.owner.layers?.retainedGeometry===false)return false;
+        if(typeof style!=='string'||this.dash?.length||!m)return false;
+        const frame=this.geoFrame;let rec=this.geo.get(key);
+        if(!rec){
+            // One-off shapes stay live; a shape seen in an earlier frame earns resident geometry.
+            const seen=this.geoSeen.get(key);if(seen===undefined||seen===frame){this.geoSeen.set(key,frame);this.geoStats.live++;return false;}
+            const builder=new PIXI.Graphics();build(builder,typeof local==='function'?local():local);
+            rec={builder,nodes:[],used:0,frame};this.geo.set(key,rec);this.geoSeen.delete(key);this.geoStats.builds++;
+        }else this.geoStats.hits++;
+        rec.frame=frame;
+        let n=rec.nodes[rec.used];
+        if(!n){n=new PIXI.Graphics(rec.builder.geometry);rec.nodes.push(n);this.pool.push(n);}
+        rec.used++;n.visible=true;n.mask=null;this.container.addChild(n);
+        const c=this.color(style);n.tint=c.color;n.alpha=c.alpha*this.globalAlpha;n.blendMode=PIXI.BLEND_MODES[BLEND[this.globalCompositeOperation]||'NORMAL'];
+        n.transform.setFromMatrix(m);this.current=null;
+        this.hashValue(key);this.hashValue(style);this.hashValue(this.globalAlpha);this.hashValue(this.globalCompositeOperation);
+        this.hashValue(m.a);this.hashValue(m.b);this.hashValue(m.c);this.hashValue(m.d);this.hashValue(m.tx);this.hashValue(m.ty);
+        this.pathsPainted++;return true;
+    };
+    // Authored Path2D objects are flattened once per scale band in their own space, then reused:
+    // no replay, no curve subdivision and no point hashing on later frames.
+    const flatCache=new WeakMap();let pathUid=0;
+    P.flatPath=function(path){
+        if(!path?.nativeCommands)return null;
+        const m=this.matrix,s=Math.sqrt(Math.abs(m.a*m.d-m.b*m.c))||1,band=Math.round(Math.log2(s)*2);
+        let bands=flatCache.get(path);if(!bands){bands=new Map();bands.uid=++pathUid;flatCache.set(path,bands);}
+        let f=bands.get(band);
+        if(!f){
+            const matrix=this.matrix,saved=this.path,part=this.part,stack=this.stack.length;
+            this.matrix=new PIXI.Matrix();this._flatScale=Math.pow(2,band/2);this.beginPath();
+            try{this.replay(path);f={parts:this.path.map(p=>({points:p.points,closed:p.closed})),key:'p'+bands.uid+':'+band};}
+            finally{this._flatScale=0;this.stack.length=stack;this.matrix=matrix;this.path=saved;this.part=part;this.mrev++;}
+            bands.set(band,f);
+        }
+        return f;
+    };
+    P.worldParts=function(parts,m){
+        return parts.map(p=>{const a=p.points,o=new Array(a.length);for(let i=0;i<a.length;i+=2){const x=a[i],y=a[i+1];o[i]=m.a*x+m.c*y+m.tx;o[i+1]=m.b*x+m.d*y+m.ty;}return {points:o,local:a,closed:p.closed,mrev:this.mrev,mixed:false};});
+    };
+    // Shared front end for fill and stroke: resident geometry when it qualifies, otherwise the
+    // live tessellator, fed already-flattened points for Path2D input.
+    P.drawShape=function(path,kind,style,build,live){
+        const flat=path&&typeof path==='object'?this.flatPath(path):null;
+        if(flat){
+            if(this.retained(kind,style,build,flat.parts,flat.key+kind,this.matrix))return;
+            const prev=this.path,part=this.part;this.path=this.worldParts(flat.parts,this.matrix);
+            try{return live(true);}finally{this.path=prev;this.part=part;}
+        }
+        if(!path||typeof path==='string'){
+            const paths=this.path,m=sharedFrame(this,paths);
+            if(m&&typeof style==='string'&&!this.retainedOff){
+                const ox=paths[0].local[0],oy=paths[0].local[1];
+                const local=()=>paths.map(p=>({points:p.local.map((v,i)=>v-(i&1?oy:ox)),closed:p.closed}));
+                if(this.retained(kind,style,build,local,shapeKey(paths,kind,ox,oy),new PIXI.Matrix(m.a,m.b,m.c,m.d,m.a*ox+m.c*oy+m.tx,m.b*ox+m.d*oy+m.ty)))return;
+            }
+        }
+        return live(false);
+    };
+    const fill=P.fill,stroke=P.stroke;
+    P.fill=function(path,rule){
+        if(this.globalAlpha<=0)return;
+        const evenodd=(typeof path==='string'?path:rule)==='evenodd';
+        return this.drawShape(path,evenodd?'fe':'fn',this.fillStyle,(g,local)=>{g.beginFill(0xffffff,1);this.polygons(g,local,evenodd);g.endFill();},
+            flat=>fill.call(this,flat?rule:path,rule));
+    };
+    P.stroke=function(path){
+        const w=this.lineWidth,cap=this.lineCap,join=this.lineJoin;
+        return this.drawShape(path,'s'+w+cap+join,this.strokeStyle,(g,local)=>{g.lineStyle({width:w,color:0xffffff,alpha:1,cap,join});
+                for(const p of local){if(p.points.length<4)continue;g.moveTo(p.points[0],p.points[1]);for(let i=2;i<p.points.length;i+=2)g.lineTo(p.points[i],p.points[i+1]);if(p.closed)g.closePath();}
+                g.lineStyle(0);},
+            flat=>stroke.call(this,flat?undefined:path));
+    };
+})();
 // Independently testable apartment passes. Light masks are GPU render textures;
 // CPU work updates small geometry buffers, never a per-frame Canvas light image.
 const NATIVE_LAYER_LABELS={floor:'Floor art',backdrop:'City backdrop',windows:'Window glass',walls:'Walls',doors:'Doors',fixtures:'Lamp fixtures',furniture:'Furniture',player:'Player',
@@ -58826,14 +58971,24 @@ Object.assign(NativeWebGLRenderer.prototype,{
             out.push({owner:p,x,y,w:18,h:18,elevation:24,key:x+','+y,points:Array.from({length:12},(_,i)=>[x+Math.cos(i*Math.PI/6)*9,y+Math.sin(i*Math.PI/6)*9])});}
         return out;
     },
+    // Shadow texels follow the light's size on screen: about one texel per 1.5 device pixels,
+    // in power-of-two steps so camera zoom easing doesn't reallocate every frame. High-resolution
+    // shadows allow up to 768 texels across a light (was 256), standard 512 (was 128).
+    retireShadow(r){(this.retiredShadows||(this.retiredShadows=[])).push({r,frame:this.frameId});},
+    releaseShadows(){const keep=[];for(const x of this.retiredShadows||[]){if(this.frameId-x.frame<2){keep.push(x);continue;}const r=x.r;r.stage.destroy({children:true});r.texture.destroy(true);if(r.dynamicStage){r.dynamicStage.destroy({children:true});r.dynamicTexture.destroy(true);}}this.retiredShadows=keep;},
+    shadowDensity(radius){
+        const px=(game.canvas.width/Math.max(1,game.canvas.clientWidth||game.canvas.width))*(game.view?.zoom||1),cap=this.layers.shadowDetail?768:512;
+        const want=Math.min(cap,Math.max(64,radius*2*px/1.5));let density=Math.pow(2,Math.round(Math.log2(want/(radius*2))));
+        while(radius*2*density>cap*1.42)density/=2;return density*(this.shadowScale||1);
+    },
     shadowTexture(source,casters,walls,wallKey){
-        const start=performance.now(),radius=source.radius,density=Math.min(this.layers.shadowDetail ? .5 : .25,(this.layers.shadowDetail?256:128)/(radius*2));
+        const start=performance.now(),radius=source.radius,density=this.shadowDensity(radius);
         const nearby=casters.filter(c=>c.owner!==source.owner&&Math.hypot(c.x-source.x,c.y-source.y)<radius+Math.max(c.w,c.h));
         const key=[source.x,source.y,radius,source.elevation??84,density,source.w||0,source.h||0,source.cookie?.baseTexture.uid||0,this.layers.wallOcclusion?wallKey:'open',...nearby.map(c=>c.key)].join('|');
         let r=this.shadowCache.get(source.owner);
         if(r&&r.key===key){this.shadowStats.hits++;return r.texture;}
         if(!r||r.radius!==radius||r.density!==density){
-            if(r){r.stage.destroy({children:true});r.texture.destroy(true);if(r.dynamicStage){r.dynamicStage.destroy({children:true});r.dynamicTexture.destroy(true);}}
+            if(r)this.retireShadow(r);   // a sprite may still hold it this frame
             const stage=new PIXI.Container(),sprite=new PIXI.Sprite(this.lightGradient),mask=new PIXI.Graphics(),shadow=new PIXI.Graphics();
             sprite.position.set(radius,radius);sprite.anchor.set(.5);sprite.width=sprite.height=radius*2;
             shadow.blendMode=PIXI.BLEND_MODES.ERASE;stage.addChild(sprite,mask,shadow);
@@ -58996,6 +59151,8 @@ Object.assign(NativeWebGLRenderer.prototype,{
         sources.sort((a,b)=>Math.hypot(a.x-view.x,a.y-view.y)-Math.hypot(b.x-view.x,b.y-view.y));sources.length=Math.min(sources.length,L.decorLights?40:24);
         const occlusion=L.wallOcclusion||L.propShadows||L.playerShadows||L.npcShadows||L.vehicleShadows,casters=occlusion?this.casters(game):[],walls=getOccluders(game.activeMap);
         const wallKey=walls.map(w=>[w.x,w.y,w.w,w.h].join(',')).join(';');
+        // Fit this frame's shadow textures (static + animated) into ~40 MB: halve every light's density until they fit.
+        this.shadowScale=1;if(occlusion){const bytes=()=>sources.reduce((n,q)=>n+(q.radius*2*this.shadowDensity(q.radius))**2*4*2,0);while(this.shadowScale>1/8&&bytes()>40*1048576)this.shadowScale/=2;}
         for(let i=0;i<this.lightSprites.children.length;i++){
             const s=this.lightSprites.children[i],source=sources[i];s.visible=!!source;if(!source)continue;
             s.texture=occlusion?this.shadowTexture(source,casters,walls,wallKey):source.cookie||((source.wash??.08)===.08?this.holeGradient:this.decorGradient);
@@ -59007,7 +59164,8 @@ Object.assign(NativeWebGLRenderer.prototype,{
         // Visible lights touch the LRU; travelling across the city must not
         // retain every street lamp's targets for the rest of the session.
         for(const source of sources){const r=this.shadowCache.get(source.owner);if(r){this.shadowCache.delete(source.owner);this.shadowCache.set(source.owner,r);}}
-        while(this.shadowCache.size>64||this.shadowBytes()>24*1048576){const owner=this.shadowCache.keys().next().value,r=this.shadowCache.get(owner);r.stage.destroy({children:true});r.texture.destroy(true);if(r.dynamicStage){r.dynamicStage.destroy({children:true});r.dynamicTexture.destroy(true);}this.shadowCache.delete(owner);}
+        const live=new Set(sources.map(q=>q.owner));this.releaseShadows();
+        for(const [owner,r]of this.shadowCache){if(this.shadowCache.size<=64&&this.shadowBytes()<=48*1048576)break;if(live.has(owner))continue;this.shadowCache.delete(owner);this.retireShadow(r);}
         this.shadowStats.sources=sources.length;this.worldStats.casters=this.nativeCasters.report();
         this.lightStage.filters=L.softShadows?[this.softFilter]:null;
         this.lighting.uniforms.mapSize.set([game.activeMap.width,game.activeMap.height]);
@@ -59423,6 +59581,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
                 game.drawCorpses(actors,bounds);game.scenes?.drawActors(actors);
             }finally{GameSettings.crowdQuality=crowd;}
         }
+        this.nativeCasters.flush();   // all captured bodies, one atlas pass
         this.syncSceneDepth(game);
         timings.peopleMs=performance.now()-lap;lap=performance.now();
         this.syncDrivenCar(game);timings.drivenCarMs=performance.now()-lap;lap=performance.now();
@@ -59793,17 +59952,18 @@ class NativeCasterBodies {
         let r=this.entries.get(e);
         if(!r){
             if(this.entries.size>=32){const old=[...this.entries].find(([,v])=>v.used<this.owner.frameId-2);if(!old){if(heat)this.owner.nightHeat.stats.dropped++;return false;}this.dispose(old[1]);this.entries.delete(old[0]);}
-            r={ctx:new NativeVectorContext(this.owner),target:this.owner.target(PIXI.RenderTexture.create({width:192,height:192,resolution:1,scaleMode:PIXI.SCALE_MODES.LINEAR}),'body-silhouette-target'),hash:null,revision:0};this.entries.set(e,r);
+            const slot=this.slotFor();if(slot===undefined){if(heat)this.owner.nightHeat.stats.dropped++;return false;}
+            r={ctx:new NativeVectorContext(this.owner),...slot,hash:null,revision:0};r.ctx.label='body-'+slot.slot;r.ctx.root.position.set(slot.x,slot.y);this.atlasStage.addChild(r.ctx.root);this.entries.set(e,r);
         }
         this.captures++;if(heat&&!shadow)this.owner.nightHeat.stats.forcedCaptures++;r.used=this.owner.frameId;r.ctx.begin();r.ctx.canvas=ctx.canvas;r.ctx.translate(96,96);
         const m=ctx.matrix;r.ctx.worldFrame=_worldMatrix.multiply(new DOMMatrix([m.a,m.b,m.c,m.d,m.tx,m.ty]));
         if(this.owner.layers.contactShadows&&!c.noShadow&&_zoomLOD<2){const t=ctx.getTransform();_bodyRot=Math.atan2(t.b,t.a);drawHumanContactShadow(ctx,e);}
         draw(r.ctx,e,{...c,noShadow:true,_crowdBake:true});
-        if(r.hash!==r.ctx.hash){this.owner.renderer.render(r.ctx.root,{renderTexture:r.target,clear:true});r.hash=r.ctx.hash;r.revision++;this.stats.refreshes++;}
-        ctx.current=null;const sprite=ctx.node(PIXI.Sprite);sprite.texture=r.target;sprite.alpha=ctx.globalAlpha;sprite.blendMode=ctx.globalCompositeOperation==='lighter'?PIXI.BLEND_MODES.ADD:PIXI.BLEND_MODES.NORMAL;
+        if(r.hash!==r.ctx.hash){this.atlasDirty=true;r.hash=r.ctx.hash;r.revision++;r.bounds=r.ctx.root.getLocalBounds();this.stats.refreshes++;}
+        ctx.current=null;const sprite=ctx.node(PIXI.Sprite);sprite.texture=r.view;sprite.alpha=ctx.globalAlpha;sprite.blendMode=ctx.globalCompositeOperation==='lighter'?PIXI.BLEND_MODES.ADD:PIXI.BLEND_MODES.NORMAL;
         sprite.transform.setFromMatrix(ctx.matrix.clone().append(new PIXI.Matrix(1,0,0,1,-96,-96)));ctx.current=null;
-        this.owner.nightHeat.paint(ctx,e,{texture:r.target,size:192});
-        const sharedBefore=this.stats.shared;this.note(ctx,e,{texture:r.target,size:192,bounds:r.ctx.root.getLocalBounds(),key:r.target.baseTexture.uid+':'+r.revision});this.stats.shared=sharedBefore;this.stats.captures++;
+        this.owner.nightHeat.paint(ctx,e,{texture:r.view,rect:r.rect,size:192});
+        const sharedBefore=this.stats.shared;this.note(ctx,e,{texture:r.view,rect:r.rect,size:192,bounds:r.bounds,key:'body:'+r.slot+':'+r.revision});this.stats.shared=sharedBefore;this.stats.captures++;
         return true;
     }
     circle(e,opacity=1){
@@ -59819,9 +59979,20 @@ class NativeCasterBodies {
     }
     invalidate(){for(const r of this.entries.values()){r.hash=null;for(const g of r.ctx.gradients)g.key=null;}}
     trim(){for(const [e,r]of this.entries)if(r.used<this.owner.frameId-120){this.dispose(r);this.entries.delete(e);}}
-    dispose(r){r.ctx.destroy();r.target.destroy(true);}
+    // Every captured body lives in one atlas (8x4 slots of 192px) and the whole atlas is drawn in a
+    // single pass per frame (flush), instead of one render-target switch per body: on tiled mobile
+    // GPUs each switch is a full tile flush.
+    slotFor(){
+        if(!this.atlas){const W=192*8,H=192*4;this.atlas=this.owner.target(PIXI.RenderTexture.create({width:W,height:H,resolution:1,scaleMode:PIXI.SCALE_MODES.LINEAR}),'body-atlas');
+            this.atlasStage=new PIXI.Container();this.freeSlots=Array.from({length:32},(_,i)=>31-i);}
+        const slot=this.freeSlots.pop();if(slot===undefined)return undefined;
+        const W=this.atlas.width,H=this.atlas.height,x=(slot%8)*192,y=Math.floor(slot/8)*192;
+        return {slot,x,y,view:new PIXI.Texture(this.atlas.baseTexture,new PIXI.Rectangle(x,y,192,192)),rect:[x/W,y/H,192/W,192/H]};
+    }
+    flush(){if(!this.atlasDirty)return;this.atlasDirty=false;this.owner.renderer.render(this.atlasStage,{renderTexture:this.atlas,clear:true});this.stats.atlasPasses=(this.stats.atlasPasses||0)+1;}
+    dispose(r){r.ctx.destroy();r.view.destroy(false);this.freeSlots.push(r.slot);}
     clear(){for(const r of this.entries.values())this.dispose(r);this.entries.clear();this.begin();}
-    report(){return {...this.stats,casters:this.bodies.size,liveTargets:this.entries.size,bodyBytes:this.entries.size*192*192*4,gradientBytes:[...this.entries.values()].reduce((n,r)=>n+r.ctx.gradients.length*128*128*4,0)};}
+    report(){return {...this.stats,casters:this.bodies.size,liveTargets:this.entries.size,bodyBytes:this.atlas?192*8*192*4*4:0,gradientBytes:[...this.entries.values()].reduce((n,r)=>n+r.ctx.gradients.length*128*128*4,0)};}
 }
 
 Object.assign(NativeWebGLRenderer.prototype,{
@@ -59871,7 +60042,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         const start=performance.now();
         if(!r.dynamicStage){
             const needed=r.texture.baseTexture.realWidth*r.texture.baseTexture.realHeight*4;
-            if(this.shadowBytes()+needed>24*1048576){stats.dropped+=nearby.length;return base;}
+            if(this.shadowBytes()+needed>48*1048576){stats.dropped+=nearby.length;return base;}
             r.dynamicStage=new PIXI.Container();r.dynamicBase=new PIXI.Sprite(base);r.dynamicStage.addChild(r.dynamicBase);
             r.dynamicTexture=PIXI.RenderTexture.create({width:source.radius*2,height:source.radius*2,resolution:r.density,scaleMode:PIXI.SCALE_MODES.LINEAR});
         }
@@ -59891,7 +60062,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             let mesh=r.dynamicMeshes[index++];if(!mesh){mesh=new NativeActorShadowMesh();r.dynamicMeshes.push(mesh);r.dynamicStage.addChild(mesh);}mesh.visible=true;
             const u=mesh.shader.uniforms;u.body=a.texture;u.bodySize=a.size*(a.scale||1);u.direction.set([dx/d,dy/d]);u.rotation.set([Math.cos(a.angle||0),Math.sin(a.angle||0)]);
             u.stretch=1+len/CONFIG.HUMAN_SHADE.LAMP_SHADOW_DEPTH;u.offset=len/2;u.opacity=.85*(a.opacity??1);
-            u.frameA.set(a.frames?[a.frames[0]/17,0,1/17,1]:[0,0,1,1]);u.frameB.set(a.frames?[a.frames[1]/17,0,1/17,1]:[0,0,1,1]);u.blend=a.blend||0;
+            u.frameA.set(a.rect||(a.frames?[a.frames[0]/17,0,1/17,1]:[0,0,1,1]));u.frameB.set(a.rect||(a.frames?[a.frames[1]/17,0,1/17,1]:[0,0,1,1]));u.blend=a.blend||0;
             const b=a.bounds||{x:0,y:0,width:a.size,height:a.size},coords=[];
             for(const x of [b.x-a.size/2,b.x+b.width-a.size/2])for(const y of [b.y-a.size/2,b.y+b.height-a.size/2]){
                 const wx=(x*u.rotation[0]-y*u.rotation[1])*(a.scale||1),wy=(x*u.rotation[1]+y*u.rotation[0])*(a.scale||1),shift=(wx*u.direction[0]+wy*u.direction[1])*(u.stretch-1)+u.offset;coords.push([wx+u.direction[0]*shift,wy+u.direction[1]*shift]);}
@@ -60284,7 +60455,7 @@ class NativeWetReflections{
             if(m.kind==='car'){const c=this.detail,car=m.e;c.save();c.globalAlpha=.58*(car.fade??1);c.translate(0,car.y+(car.width||20)*.55);c.scale(1,-.8);c.translate(car.x,-(car.width||20)*.55);c.rotate(-(car.angle||0));c.scale(1,-1);
                 const art=carSprite(car),P=CAR_ART.PAD;c.drawImage(art.cv,-art.L/2-P,-art.W/2-P,art.L+P*2,art.W+P*2);c.restore();this.stats.detail++;continue;}
             const group=groups.get(m.e),body=r.nativeCasters.bodies.get(m.e),crowd=group?.children.find(n=>n instanceof NativeCrowdPoseMesh&&n.visible);
-            const captured=r.nativeCasters.entries.get(m.e),fresh=captured?.used===r.frameId?captured.target:null;
+            const captured=r.nativeCasters.entries.get(m.e),fresh=captured?.used===r.frameId?captured.view:null;
             let texture=m.e===game.player?r.actorTexture:body?.texture||fresh,frames=body?.frames,blend=body?.blend||0,size=body?.size||192,angle=body?.angle??m.e.angle??0;
             if(crowd){texture=crowd.shader.uniforms.atlas;frames=[...crowd.shader.uniforms.frames];blend=crowd.shader.uniforms.blend;size=112;crowd.transform.updateLocalTransform();angle=Math.atan2(crowd.transform.localTransform.b,crowd.transform.localTransform.a);}
             if(!texture&&group){let rec=this.captures.get(m.e);if(!rec&&this.captures.size<16){rec={target:PIXI.RenderTexture.create({width:192,height:192,resolution:1}),last:-Infinity};this.captures.set(m.e,rec);}
@@ -60332,11 +60503,11 @@ class NativeHeatMesh extends PIXI.Mesh {
         super(geometry,PIXI.Shader.from(`precision highp float;
             attribute vec2 aVertexPosition;attribute vec2 aUV;uniform mat3 projectionMatrix;uniform mat3 translationMatrix;uniform float size;varying vec2 uv;
             void main(){uv=aUV;gl_Position=vec4((projectionMatrix*translationMatrix*vec3(aVertexPosition*(size/192.),1.)).xy,0.,1.);}`,
-            `precision highp float;varying vec2 uv;uniform sampler2D body;uniform vec2 frames;uniform float columns;uniform float blend;uniform float strength;uniform float opacity;uniform float blur;
-            float alphaAt(vec2 p){if(p.x<0.||p.y<0.||p.x>1.||p.y>1.)return 0.;return mix(texture2D(body,vec2((p.x+frames.x)/columns,p.y)).a,texture2D(body,vec2((p.x+frames.y)/columns,p.y)).a,blend);}
+            `precision highp float;varying vec2 uv;uniform sampler2D body;uniform vec4 rectA;uniform vec4 rectB;uniform float blend;uniform float strength;uniform float opacity;uniform float blur;
+            float alphaAt(vec2 p){if(p.x<0.||p.y<0.||p.x>1.||p.y>1.)return 0.;return mix(texture2D(body,rectA.xy+p*rectA.zw).a,texture2D(body,rectB.xy+p*rectB.zw).a,blend);}
             void main(){float core=alphaAt(uv),halo=0.;for(int i=0;i<8;i++){float a=float(i)*2.39996323,r=sqrt((float(i)+.5)/8.)*blur;halo+=alphaAt(uv+vec2(cos(a),sin(a))*r)/8.;}
                 float k=.9*strength,a=(core+halo*.85*(1.-core*k))*k*opacity;gl_FragColor=vec4(vec3(1.,252./255.,244./255.)*a,a);}`,
-            {body:PIXI.Texture.EMPTY,frames:new Float32Array(2),columns:1,blend:0,size:192,strength:0,opacity:1,blur:0}));
+            {body:PIXI.Texture.EMPTY,rectA:new Float32Array([0,0,1,1]),rectB:new Float32Array([0,0,1,1]),blend:0,size:192,strength:0,opacity:1,blur:0}));
     }
 }
 class NativeNightHeat {
@@ -60351,7 +60522,7 @@ class NativeNightHeat {
         if(ctx!==this.owner.peopleContext||!this.wants(e))return;
         if(this.stats.bodies>=24){this.stats.dropped++;return;}
         ctx.current=null;const n=ctx.node(NativeHeatMesh),u=n.shader.uniforms;
-        u.body=body.texture;u.frames.set(body.frames||[0,0]);u.columns=body.frames?17:1;u.blend=body.blend||0;u.size=body.size||192;
+        const f=body.frames;u.body=body.texture;u.rectA.set(body.rect||(f?[f[0]/17,0,1/17,1]:[0,0,1,1]));u.rectB.set(body.rect||(f?[f[1]/17,0,1/17,1]:[0,0,1,1]));u.blend=body.blend||0;u.size=body.size||192;
         u.strength=this.strength;u.opacity=ctx.globalAlpha;u.blur=10*(game._renderScale||1)*this.strength/(game.view.zoom*u.size);
         n.transform.setFromMatrix(ctx.matrix);ctx.current=null;this.stats.bodies++;
     }

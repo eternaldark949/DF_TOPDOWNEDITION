@@ -101,6 +101,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
                 game.drawCorpses(actors,bounds);game.scenes?.drawActors(actors);
             }finally{GameSettings.crowdQuality=crowd;}
         }
+        this.nativeCasters.flush();   // all captured bodies, one atlas pass
         this.syncSceneDepth(game);
         timings.peopleMs=performance.now()-lap;lap=performance.now();
         this.syncDrivenCar(game);timings.drivenCarMs=performance.now()-lap;lap=performance.now();
