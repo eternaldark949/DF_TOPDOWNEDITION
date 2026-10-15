@@ -49,8 +49,11 @@ function replaceScene() {
 }
 
 try {
-  engine=new ETRNLNINE(canvas,{ pixelRatio:1.5 });
-  replaceScene(); engine.start();
+  engine=new ETRNLNINE(canvas,{ pixelRatio:1.5,profiling:{enabled:true} });
+  replaceScene();
+  const profilerView=engine.directory.create('tool.profiler',{profiler:engine.basement.profiler,host:document.body,
+    subscribe:callback=>engine.lobby.on('render',callback,'profiler.viewer')});
+  life.own(()=>profilerView.dispose());engine.start();
   life.listen(pauseButton,'click',() => {
     const paused=!engine.lobby.reasons.has('example-menu');
     engine.lobby.pause('example-menu',paused);

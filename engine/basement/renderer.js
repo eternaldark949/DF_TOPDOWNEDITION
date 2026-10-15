@@ -6,6 +6,8 @@
  */
 import { VERTEX, FRAGMENT } from './shaders.js';
 import { Lifetime } from './lifetime.js';
+import { renderDiagnostics } from './render-diagnostics.js';
+import { GpuTimer } from './gpu-timer.js';
 
 /** Compile one stage; include the driver log and delete failed handles immediately. */
 function compile(gl, type, source) {
@@ -39,8 +41,8 @@ function cubeGeometry() {
 
 export class Renderer {
   /** Own the supplied surface's WebGL context. pixelRatio caps mobile fill cost. */
-  constructor(canvas, { pixelRatio = 1.5 } = {}) {
-    this.canvas = canvas; this.pixelRatio = pixelRatio; this.life = new Lifetime();
+  constructor(canvas, { pixelRatio = 1.5, profiler = null } = {}) {
+    this.profiler=profiler; this.canvas = canvas; this.pixelRatio = pixelRatio; this.life = new Lifetime();
     const gl = canvas.getContext('webgl2', { alpha: false, antialias: true, powerPreference: 'low-power' });
     if (!gl) throw new Error('ETRNLNINE requires WebGL 2 on this device.');
     this.gl = gl; this.batches = new Set(); this.disposed = false; this.lost = false;
@@ -48,18 +50,29 @@ export class Renderer {
     this.ambient = new Float32Array([0.13, 0.13, 0.23]);
     this.lights = new Float32Array(8 * 4); this.lightColors = new Float32Array(8 * 3);
     this.stats = { draws: 0, instances: 0, uploads: 0, uploadedBytes: 0, buffers: 0, programs: 0, vaos: 0, contextRestores: 0 };
-    this.initialize();
-    this.life.listen(canvas, 'webglcontextlost', event => {
-      event.preventDefault(); this.lost = true;
-    });
-    this.life.listen(canvas, 'webglcontextrestored', () => {
-      // Browser invalidates all old handles on loss. Recreate from retained CPU data,
-      // not by restarting the game or adding a second scheduler.
-      this.stats.buffers = this.stats.programs = this.stats.vaos = 0;
+    this.totals={draws:0,instances:0,uploads:0,uploadedBytes:0,candidates:0,culled:0};
+    try {
       this.initialize();
-      for (const batch of this.batches) batch.initialize();
-      this.stats.contextRestores++; this.lost = false;
-    });
+      this.gpuTimer=new GpuTimer(gl,(id,ms)=>this.profiler?.recordGpu(id,ms));
+      this.life.own(renderDiagnostics(this,profiler));
+      this.life.listen(canvas, 'webglcontextlost', event => {
+        event.preventDefault(); this.lost = true; this.gpuTimer.invalidate();
+      });
+      this.life.listen(canvas, 'webglcontextrestored', () => {
+        // Browser invalidates all old handles on loss. Recreate from retained CPU data,
+        // not by restarting the game or adding a second scheduler.
+        this.stats.buffers = this.stats.programs = this.stats.vaos = 0;
+        this.initialize();
+        for (const batch of this.batches) batch.initialize();
+        this.gpuTimer.restore(); this.stats.contextRestores++; this.lost = false;
+      });
+    } catch(error) {
+      // Metric-budget/capability failure may occur after GL creation. Constructor
+      // failure must release real handles even though no caller received this renderer.
+      this.life.dispose();this.gpuTimer?.dispose();
+      if(this.cube)gl.deleteBuffer(this.cube);if(this.program)gl.deleteProgram(this.program);
+      throw error;
+    }
   }
 
   /** Allocate renderer-owned program/cube. Shaders are freed after linking. */
@@ -130,6 +143,14 @@ export class Renderer {
 
   /** Clear even an empty engine; present a batch only if supplied and its context is valid. */
   render(batch = null) {
+    if(this.disposed||this.lost)return;
+    this.gpuTimer.configure(this.profiler?.recording&&this.profiler.gpuEnabled);
+    this.gpuTimer.poll();this.gpuTimer.begin(this.profiler?.current?.id??0);
+    try { this.draw(batch); } finally { this.gpuTimer.end(); }
+  }
+
+  /** Submit a frame; all worlds use the same retained renderer and accounting path. */
+  draw(batch = null) {
     if (this.disposed || this.lost) return;
     this.resize();
     const gl = this.gl, { halfWidth, halfHeight } = this.view();
@@ -148,12 +169,13 @@ export class Renderer {
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, batch.count);
     gl.bindVertexArray(null);
     this.stats.draws = 1; this.stats.instances = batch.count;
+    this.totals.draws++;this.totals.instances+=batch.count;
   }
 
   /** Release renderer and outstanding batches, with listeners removed before late restoration. */
   dispose() {
     if (this.disposed) return;
-    this.disposed = true; this.life.dispose();
+    this.disposed = true; this.life.dispose(); this.gpuTimer.dispose();
     for (const batch of [...this.batches]) batch.dispose();
     this.gl.deleteBuffer(this.cube); this.gl.deleteProgram(this.program);
     this.stats.buffers = this.stats.programs = this.stats.vaos = 0;
@@ -169,7 +191,9 @@ class InstanceBatch {
   /** Retain bounded CPU records so context restoration never depends on Canvas assets. */
   constructor(renderer, world, capacity) {
     this.renderer = renderer; this.world = world; this.capacity = capacity;
-    this.data = new Float32Array(capacity * 12); this.count = 0; this.disposed = false;
+    this.data = new Float32Array(capacity * 12);
+    this.kind='instance-buffer';this.cpuBytes=this.data.byteLength;this.gpuBufferBytes=this.data.byteLength;
+    this.count = 0; this.disposed = false;
     this.initialize();
   }
 
@@ -212,9 +236,10 @@ class InstanceBatch {
     for (const entity of this.world.entities.values()) {
       const s = entity.shape, p = entity.pose;
       if (!s) continue;
+      r.totals.candidates++;
       const radius = Math.hypot(s.size[0], s.size[1], s.size[2]);
       const screenY = (p.y - r.camera.y) * 0.65 + p.z * 0.76;
-      if (Math.abs(p.x - r.camera.x) > halfWidth + radius || Math.abs(screenY) > halfHeight + radius) continue;
+      if (Math.abs(p.x - r.camera.x) > halfWidth + radius || Math.abs(screenY) > halfHeight + radius) {r.totals.culled++;continue;}
       if (this.cursor / 12 >= this.capacity) throw new Error(`World ${this.world.id} exceeds ${this.capacity} visible instances`);
       this.write(p.x); this.write(p.y); this.write(p.z); this.write(p.yaw);
       this.write(s.size[0]); this.write(s.size[1]); this.write(s.size[2]); this.write(s.emission ?? 0);
@@ -226,6 +251,7 @@ class InstanceBatch {
       // WebGL 2 source-offset/length overload uploads a range without a new typed-array view.
       gl.bufferSubData(gl.ARRAY_BUFFER, this.firstDirty * 4, this.data, this.firstDirty, this.lastDirty - this.firstDirty + 1);
       r.stats.uploads++; r.stats.uploadedBytes += (this.lastDirty - this.firstDirty + 1) * 4;
+      r.totals.uploads++;r.totals.uploadedBytes+=(this.lastDirty-this.firstDirty+1)*4;
     }
     this.forceUpload = false;
   }
@@ -238,6 +264,6 @@ class InstanceBatch {
     gl.deleteBuffer(this.buffer); gl.deleteVertexArray(this.vao);
     stats.buffers--; stats.vaos--; this.renderer.batches.delete(this);
     // Disposal releases CPU storage too, even if a caller retains the old handle.
-    this.data = null; this.world = null;
+    this.data = null; this.world = null; this.cpuBytes=this.gpuBufferBytes=0;
   }
 }

@@ -4,10 +4,11 @@
  * A lease pins one resource; releasing the last lease destroys it immediately.
  */
 import { WorldResidency } from './residency.js';
+import { directoryDiagnostics } from './diagnostics.js';
 
 export class Directory {
   /** Registration is inert: no world or GPU asset is allocated until requested. */
-  constructor() { this.residency = new WorldResidency(); this.libraries = new Map(); this.resources = new Map(); this.worlds = new Map(); this.disposed = false; }
+  constructor({profiler=null}={}) { this.residency = new WorldResidency(); this.libraries = new Map(); this.resources = new Map(); this.worlds = new Map(); this.disposed = false; this.removeDiagnostics=directoryDiagnostics(this,profiler); }
 
   /** Register a unique library factory; duplicate names are an error, not a silent override. */
   register(name, factory) {
@@ -25,18 +26,21 @@ export class Directory {
   }
 
   /** Acquire a shared disposable resource. The factory runs only for the first owner. */
-  acquire(key, factory) {
+  acquire(key, factory, {owner='anonymous'}={}) {
     if (this.disposed) throw new Error('Directory is disposed');
+    if(typeof owner!=='string'||!owner.length||owner.length>80)throw new RangeError('Resource owner must contain 1–80 characters');
     let record = this.resources.get(key);
-    if (!record) { record = { value: factory(), owners: 0 }; this.resources.set(key, record); }
-    record.owners++;
+    if (!record) { record = { value: factory(), owners: 0, ownerNames: new Map() }; this.resources.set(key, record); }
+    record.owners++;record.ownerNames.set(owner,(record.ownerNames.get(owner)??0)+1);
     let released = false;
     return {
-      value: record.value,
+      value: record.value, owner,
       // Every lease may release once; delayed scene cleanup cannot underflow ownership.
       release: () => {
         if (released) return;
         released = true;
+        const left=(record.ownerNames.get(owner)??0)-1;
+        if(left>0)record.ownerNames.set(owner,left);else record.ownerNames.delete(owner);
         if (--record.owners === 0 && this.resources.get(key) === record) {
           this.resources.delete(key); record.value.dispose();
         }
@@ -65,7 +69,7 @@ export class Directory {
   /** Final owner cleanup also invalidates outstanding leases; release closures remain harmless. */
   dispose() {
     if (this.disposed) return;
-    this.disposed = true; this.residency.dispose();
+    this.disposed = true; this.removeDiagnostics(); this.residency.dispose();
     for (const world of this.worlds.values()) world.dispose();
     for (const resource of this.resources.values()) resource.value.dispose();
     this.worlds.clear(); this.resources.clear(); this.libraries.clear();

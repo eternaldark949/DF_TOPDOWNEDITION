@@ -30,6 +30,7 @@ export function createScene(engine,{controlsHost,onStatus=()=>{},onError=()=>{}}
   controls.forEach(control=>life.own(()=>control.dispose()));
   life.own(lobby.on('pause',()=>controls.forEach(control=>control.cancel())));
   renderer.camera.x=0;renderer.camera.y=0;renderer.camera.halfHeight=22;
+  const movementScope=basement.profiler.scope('atrium.locomotion'),statusScope=basement.profiler.scope('atrium.status');
   let player=null,statusAt=-1;
   journey.ready.then(()=>{if(!life.disposed)player=playerController(journey.actor,input,renderer);})
     .catch(error=>{if(!life.disposed&&error.name!=='AbortError')onError(error);});
@@ -42,22 +43,26 @@ export function createScene(engine,{controlsHost,onStatus=()=>{},onError=()=>{}}
       else if(input.consume('flit'))journey.flit();
       if(input.consume('interact'))journey.toggleLight();
       if(input.consume('prop'))journey.moveProp();
-      player.update(dt,resource);resource.layout.crystal.yaw+=dt*0.3;
+      const token=basement.profiler.begin(movementScope);
+      try { player.update(dt,resource); } finally { basement.profiler.end(token); }
+      resource.layout.crystal.yaw+=dt*0.3;
     }
     if(time-statusAt>0.12){
       statusAt=time;
       const root=journey.actor?.root;
-      onStatus({worldId:resource?.world.id??'preparing',name:resource?.profile.name??'Opening the worlds',
+      const token=basement.profiler.begin(statusScope);
+      try { onStatus({worldId:resource?.world.id??'preparing',name:resource?.profile.name??'Opening the worlds',
         actorId:root?.id??'',x:root?.x??0,y:root?.y??0,loaded:player?.loaded??true,
         cool:resource?.state.cool??true,propX:resource?.layout.prop.x??6,time,
-        entities:resource?.world.entities.size??0,...journey.inspect()});
+        entities:resource?.world.entities.size??0,...journey.inspect()}); }
+      finally { basement.profiler.end(token); }
     }
-  }));
+  },'atrium.simulation'));
   life.own(lobby.on('render',alpha=>{
     const resource=journey.current;
     if(!resource){renderer.render();return;}
     renderer.ambient.set(resource.profile.ambient);renderer.lights.set(resource.lights);renderer.lightColors.set(resource.lightColors);
     resource.world.resolve(alpha);renderer.render(resource.batch);
-  }));
+  },'atrium.presentation'));
   return {journey,dispose:()=>life.dispose()};
 }

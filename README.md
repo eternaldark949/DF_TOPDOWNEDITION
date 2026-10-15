@@ -1,6 +1,6 @@
 # ETRNLNINE — Engine foundation plan
 
-**Status: first foundation and two-world flitting milestone implemented; broader engine work remains planned.**
+**Status: foundation, two-world flitting, and integrated profiler implemented; broader engine work remains planned.**
 
 **Owner: ETERNAL / @eternaldark949.**
 
@@ -14,7 +14,9 @@ This document records the owner's requirements and the architectural agreement r
 
 The branch was intentionally created with only this plan. On 2026-10-15, after reviewing the plan and first-milestone proposal, the owner invited implementation to begin. The first runnable foundation follows [First Light decisions and source guide](docs/decisions/0001-first-light.md). No wholesale legacy import or expansion into every brainstorm is implied.
 
-**Current milestone:** [Between Worlds decisions and editing guide](docs/decisions/0002-between-worlds.md) · [screenshots and verification](docs/milestones/between-worlds/README.md).
+**Current milestone:** [Engine profiler decisions and API](docs/decisions/0003-profiler.md) · [screenshots and verification](docs/milestones/profiler/README.md).
+
+**Between Worlds:** [world preparation/transfer decisions](docs/decisions/0002-between-worlds.md) · [screenshots and verification](docs/milestones/between-worlds/README.md).
 
 **First Light evidence:** [original foundation screenshots and checks](docs/milestones/first-light/README.md).
 
@@ -38,6 +40,7 @@ New ideas are welcome. Distinguish agreed requirements from proposed details and
 12. [Comments and architectural discipline](#12-comments-and-architectural-discipline)
 13. [First runnable engine milestone](#13-proposed-first-runnable-engine-milestone)
 14. [Remaining decisions and implementation sequence](#14-remaining-planning-decisions)
+15. [Integrated engine profiler](#15-integrated-engine-profiler)
 
 ## Decision status
 
@@ -45,7 +48,7 @@ New ideas are welcome. Distinguish agreed requirements from proposed details and
 - **Proposed implementation direction:** a concrete way to realize that intent. These details guide design review; they are not finalized APIs, algorithms, or numeric budgets.
 - **Open decision:** an unresolved choice that must be recorded before dependent implementation.
 
-Section 10 records the carryovers the owner asked to include. Carrying over a feature means preserving and improving its purpose, not copying unfinished Python methods or committing to every mechanism proposed below. The first foundation and two-world preparation/transfer milestone are implemented; the broader carryover scope remains a plan. Adding detail does not automatically authorize every proposed extension.
+Section 10 records the carryovers the owner asked to include. Carrying over a feature means preserving and improving its purpose, not copying unfinished Python methods or committing to every mechanism proposed below. The foundation, two-world preparation/transfer, and integrated profiler milestones are implemented; the broader carryover scope remains a plan. Adding detail does not automatically authorize every proposed extension.
 
 ## 1. Purpose and philosophy
 
@@ -512,3 +515,16 @@ The First Light and Between Worlds decision documents settle the contracts for t
 10. A staged implementation sequence that proves an empty engine and independent example game before restoring Freelancer content. Start with shared contracts and a representative integrated slice; do not build disconnected feature demos that bypass the house architecture.
 
 Continue with coherent, verifiable portions of the agreed engine over parallel experimental renderers or speculative abstraction layers. Update this plan when a decision changes. Never silently redefine the owner's architecture to fit a convenient implementation.
+
+
+## 15. Integrated engine profiler
+
+**Implemented requirement:** profiling is an engine capability with a reusable viewer, not a game-specific overlay or another runtime loop. See [the profiler decision record](docs/decisions/0003-profiler.md) for contracts, budgets, source ownership, editing examples and measurement limits.
+
+Basement owns bounded CPU recording, scope/counter handles, summaries, diagnostic captures and optional asynchronous GPU timing. Lobby instruments its phases and named callbacks. Directory supplies resource owners, residency and allocation accounting. Penthouse supplies the registered viewer. Games contribute static labels/counters through public interfaces.
+
+The current implementation distinguishes raw frame intervals, measured CPU frame work and delayed GPU render samples. It records nested inclusive/self times, fixed-step catch-up/drop counts, preparation chunks, renderer work, culling and upload counts, world/entity/lease counts and selected resource sizes. History/captures/providers/metric names have explicit limits. The viewer supports freeze/disable independently of simulation, percentile/history views, bounded spike captures and local JSON export.
+
+Profiling is off by default in the engine; this example opts in. Closing the viewer removes its scheduled work. Requested buffer sizes are labeled accounting data, not total browser/driver memory. Captures contain copied bounded data and never pin live worlds. Historical frame data and current capture-time owner details are distinguished. Diagnostic captures are separate from GRecorder replay.
+
+Future spatial/motion/audio systems should register measurements with this same facility. Full spatial-query systems, actual heap accounting, full GPU frame debugging and GRecorder remain separate work; instrumentation does not mean those features are implemented.

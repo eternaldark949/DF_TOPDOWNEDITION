@@ -129,6 +129,41 @@ const server=http.createServer((req,res)=>{
       const c=document.querySelector('canvas');return {width:c.width,height:c.height,error:c.getContext('webgl2').getError()};
     });
     assert.deepEqual(report.resize,{width:1024,height:720,error:0});
+    // Exercise the reusable profiler without exposing the production engine as a global.
+    const inspector=page.locator('.etrnl-profiler');
+    await inspector.locator(':scope > summary').click();
+    await page.waitForFunction(()=>Number(document.querySelector('.etrnl-profiler').dataset.frame)>0);
+    assert.match(await inspector.locator('.profile-scopes').innerText(),/lobby\.render/);
+    await inspector.getByLabel('Freeze history',{exact:true}).check();
+    const frozenProfile=await inspector.getAttribute('data-frame');
+    const runningTime=await page.locator('#status').getAttribute('data-time');
+    await page.waitForFunction(time=>document.querySelector('#status').dataset.time!==time,runningTime);
+    assert.equal(await inspector.getAttribute('data-frame'),frozenProfile,'Freezing history does not advance the recorder or stop the game');
+    for(let i=0;i<4;i++)await inspector.getByRole('button',{name:'Capture latest',exact:true}).click();
+    assert.equal(await inspector.getAttribute('data-captures'),'2','Capture retention is bounded');
+    const [download]=await Promise.all([page.waitForEvent('download'),inspector.getByRole('button',{name:'Export JSON',exact:true}).click()]);
+    const exported=JSON.parse(fs.readFileSync(await download.path(),'utf8'));
+    assert.equal(exported.units,'milliseconds');assert.equal(exported.captures.length,2);
+    const capture=exported.captures.at(-1),values=Object.fromEntries(capture.frame.counters.map(item=>[item.name,item.value]));
+    assert.equal(values['renderer.gpuBuffers'],864+2*98304);
+    assert.equal(values['directory.ownedGpuBuffers'],2*98304);
+    assert.ok(capture.frame.scopes.some(scope=>scope.name==='atrium.presentation'));
+    assert.match(capture.providerDetails.data.directory.resources[0].owners[0].owner,/realm:/);
+    const gpuUnavailable=await inspector.getByLabel('GPU timing',{exact:true}).isDisabled();
+    await inspector.evaluate(element=>{element.scrollTop=0;});
+    await page.screenshot({path:path.join(artifacts,'profiler-desktop.png')});
+    await inspector.getByLabel('Freeze history',{exact:true}).uncheck();
+    await inspector.getByLabel('Record',{exact:true}).uncheck();
+    const offFrame=await inspector.getAttribute('data-frame'),offTime=await page.locator('#status').getAttribute('data-time');
+    await page.waitForFunction(time=>document.querySelector('#status').dataset.time!==time,offTime);
+    assert.equal(await inspector.getAttribute('data-frame'),offFrame,'Disabled recording leaves history untouched');
+    await inspector.getByLabel('Record',{exact:true}).check();
+    await page.waitForFunction(id=>Number(document.querySelector('.etrnl-profiler').dataset.frame)>Number(id),offFrame);
+    report.profiler={historyCapacity:exported.summary.capacity,retainedCaptures:2,freezeKeepsGameRunning:true,
+      disabledKeepsGameRunning:true,exportedBytes:fs.statSync(await download.path()).size,gpuUnavailable,
+      requestedGpuBufferBytes:values['renderer.gpuBuffers'],owners: capture.providerDetails.data.directory.resources.map(resource=>resource.owners)};
+    fs.copyFileSync(await download.path(),path.join(artifacts,'profiler-capture.json'));
+    await inspector.locator(':scope > summary').click();
     report.offline={networkRequests:remote.length,sceneReplacements:12,status:await page.locator('#status').innerText()};
     assert.equal(remote.length,0,'Offline artifact makes zero network requests');
     await page.close(); // Do not keep an unrelated software-rendered world consuming GPU/CPU during touch checks.
@@ -161,6 +196,11 @@ const server=http.createServer((req,res)=>{
     await phone.getByRole('button',{name:'Flit',exact:true}).tap();
     await phone.waitForFunction(()=>document.querySelector('#status').dataset.committed==='1');
     await phone.screenshot({path:path.join(artifacts,'worlds-violet-mobile.png')});
+    await phone.locator('.etrnl-profiler > summary').tap();
+    await phone.waitForFunction(()=>Number(document.querySelector('.etrnl-profiler').dataset.frame)>0);
+    await phone.screenshot({path:path.join(artifacts,'profiler-mobile.png')});
+    const bounds=await phone.locator('.etrnl-profiler').boundingBox();
+    assert.ok(bounds.x>=0&&bounds.x+bounds.width<=412,'Profiler fits the portrait viewport');
     report.touch={simultaneousPointers:2,status:await phone.locator('#status').innerText()};
     await mobile.close();
 
@@ -171,7 +211,7 @@ const server=http.createServer((req,res)=>{
     await page.goto(`http://127.0.0.1:${server.address().port}/fixture`);
     report.engine=await page.evaluate(async()=>{
       const {ETRNLNINE}=await import('/engine/etrnlnine.js');
-      const canvas=document.querySelector('canvas'),engine=new ETRNLNINE(canvas),r=engine.basement.renderer;
+      const canvas=document.querySelector('canvas'),engine=new ETRNLNINE(canvas,{profiling:{enabled:true}}),r=engine.basement.renderer;
       engine.start();engine.start();engine.stop();r.render();
       const empty={worlds:engine.directory.worlds.size,resources:engine.directory.resources.size,draws:r.stats.draws};
       const world=engine.directory.adopt(engine.basement.createWorld());
@@ -191,6 +231,60 @@ const server=http.createServer((req,res)=>{
     assert.equal(report.engine.warm.uploads,0,'Unchanged retained instances do not upload');
     assert.ok(report.engine.moved.uploadedBytes>0 && report.engine.moved.uploadedBytes<=48,'One transform updates a bounded range');
     assert.equal(report.engine.glError,0);assert.ok(report.engine.varied>10,'Actual non-background pixels rendered');
+    report.profilerRenderer=await page.evaluate(async()=>{
+      const f=window.fixture,p=f.engine.basement.profiler;
+      p.beginFrame(16);f.world.entities.values().next().value.x=4;f.world.resolve();
+      f.r.prepare(f.lease.value);f.r.render(f.lease.value);p.endFrame();
+      const capture=p.capture(),values=Object.fromEntries(capture.frame.counters.map(item=>[item.name,item.value]));
+      const baseline=f.engine.lobby.phases.render.size;
+      for(let i=0;i<5;i++){
+        const view=f.engine.directory.create('tool.profiler',{profiler:p,host:document.body,
+          subscribe:callback=>f.engine.lobby.on('render',callback,'test.viewer')});
+        view.element.open=true;view.element.dispatchEvent(new Event('toggle'));
+        if(f.engine.lobby.phases.render.size!==baseline+1)throw new Error('Profiler viewer failed to subscribe');
+        view.dispose();if(f.engine.lobby.phases.render.size!==baseline)throw new Error('Profiler viewer leaked callback');
+      }
+      p.configure({gpu:true});p.beginFrame(16);f.r.render(f.lease.value);p.endFrame();
+      await new Promise(resolve=>setTimeout(resolve,80));f.r.render(f.lease.value);
+      const gpu=f.r.gpuTimer.inspect();p.configure({gpu:false});
+      return{preparationUploadBytes:values['renderer.uploadedBytes'],lastDrawUploadBytes:f.r.stats.uploadedBytes,
+        gpu,queryObjectsAfterDisable:f.r.gpuTimer.slots.length,viewerCycles:5,
+        remainingViewers:document.querySelectorAll('.etrnl-profiler').length,error:f.r.gl.getError()};
+    });
+    assert.ok(report.profilerRenderer.preparationUploadBytes>0,'Preparation uploads survive presentation stats reset');
+    assert.equal(report.profilerRenderer.lastDrawUploadBytes,0);
+    assert.equal(report.profilerRenderer.queryObjectsAfterDisable,0);assert.equal(report.profilerRenderer.remainingViewers,0);
+    assert.equal(report.profilerRenderer.error,0);
+    const isolatedProvider=await page.evaluate(()=>{
+      const p=window.fixture.engine.basement.profiler;
+      const remove=p.provider('bad-report',{sample(){throw null;},details(){throw{get message(){throw new Error('hostile');}};}});
+      p.beginFrame(16);p.endFrame();const capture=p.capture();remove();
+      return{errors:p.stats.providerErrors,message:capture.providerDetails.data['bad-report'].error};
+    });
+    assert.equal(isolatedProvider.errors,1);assert.equal(isolatedProvider.message,'[unreadable diagnostic error]');
+    report.profilerRenderer.badProviderIsolated=true;
+    report.profilerStartup=await page.evaluate(async()=>{
+      const {ETRNLNINE}=await import('/engine/etrnlnine.js');
+      const canvas=document.querySelector('canvas'),gl=canvas.getContext('webgl2');
+      const counts={buffers:0,programs:0,windowListeners:0},restores=[];
+      for(const[name,key,delta]of [['createBuffer','buffers',1],['deleteBuffer','buffers',-1],['createProgram','programs',1],['deleteProgram','programs',-1]]){
+        const original=gl[name];gl[name]=function(...args){counts[key]+=delta;return original.apply(this,args);};
+        restores.push(()=>{gl[name]=original;});
+      }
+      for(const[name,delta]of [['addEventListener',1],['removeEventListener',-1]]){
+        const original=window[name];window[name]=function(...args){counts.windowListeners+=delta;return original.apply(this,args);};
+        restores.push(()=>{window[name]=original;});
+      }
+      let rejected=0;
+      try{
+        for(const config of [{maxCounters:2},{maxScopes:2}]){
+          try{new ETRNLNINE(canvas,{profiling:config});}
+          catch(error){if(!/budget/.test(error.message))throw error;rejected++;}
+        }
+      }finally{for(const restore of restores)restore();}
+      return{rejected,...counts,error:gl.getError()};
+    });
+    assert.deepEqual(report.profilerStartup,{rejected:2,buffers:0,programs:0,windowListeners:0,error:0});
     const restoration=await page.evaluate(async()=>{
       const f=window.fixture,extension=f.r.gl.getExtension('WEBGL_lose_context');
       if(!extension)return{supported:false};
@@ -210,6 +304,8 @@ const server=http.createServer((req,res)=>{
       return {buffers:f.r.stats.buffers,programs:f.r.stats.programs,vaos:f.r.stats.vaos,
         worlds:f.engine.directory.worlds.size,resources:f.engine.directory.resources.size,running:f.engine.lobby.running};
     });
+    const profilerDisposed=await page.evaluate(()=>({providers:window.fixture.engine.basement.profiler.providers.size,history:window.fixture.engine.basement.profiler.frames.length,queries:window.fixture.r.gpuTimer.slots.length}));
+    assert.deepEqual(profilerDisposed,{providers:0,history:0,queries:0});
     assert.deepEqual(report.disposal,{buffers:0,programs:0,vaos:0,worlds:0,resources:0,running:false});
     // Exercise actual chunked world preparation and collision queries using public modules.
     await page.evaluate(async()=>{

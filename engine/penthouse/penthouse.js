@@ -4,6 +4,7 @@
  */
 import { pavilion, actor, box } from './toys.js';
 import { Joystick, ActionButton } from './controls.js';
+import { ProfilerView } from './profiler-view.js';
 
 export class Penthouse {
   /** Catalog creation is inert: allocation begins only when a factory is requested. */
@@ -14,6 +15,7 @@ export class Penthouse {
       'toy.actor': actor,
       'control.joystick': options => new Joystick(options),
       'control.button': options => new ActionButton(options),
+      'tool.profiler':options=>new ProfilerView(options),
     });
   }
 }

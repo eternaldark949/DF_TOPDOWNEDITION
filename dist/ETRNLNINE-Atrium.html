@@ -403,6 +403,104 @@ void main() {
 
 return {VERTEX,FRAGMENT};
 })();
+// Source: engine/basement/render-diagnostics.js
+const module8=(()=>{
+/**
+ * Basement / rendering diagnostics: per-frame work deltas and requested buffer bytes.
+ * Preparation uploads are included even when the later presentation resets legacy stats.
+ */
+function renderDiagnostics(renderer,profiler){
+  if(!profiler)return()=>{};
+  const ids={},baseline={};
+  for(const name of ['draws','instances','uploads','uploadedBytes','candidates','culled']){
+    ids[name]=profiler.counter(`renderer.${name}`,name==='uploadedBytes'?'bytes':'count');baseline[name]=0;
+  }
+  for(const[name,unit]of [['buffers','count'],['programs','count'],['vaos','count'],['cpuBuffers','bytes'],['gpuBuffers','bytes'],['gpuPending','count']])ids[name]=profiler.counter(`renderer.${name}`,unit);
+  return profiler.provider('renderer',{
+    begin(){for(const name in baseline)baseline[name]=renderer.totals[name];},
+    sample(p){
+      for(const name in baseline)p.set(ids[name],renderer.totals[name]-baseline[name]);
+      let cpu=0,gpu=renderer.stats.buffers?864:0;
+      for(const batch of renderer.batches){cpu+=batch.cpuBytes;gpu+=batch.gpuBufferBytes;}
+      p.set(ids.buffers,renderer.stats.buffers);p.set(ids.programs,renderer.stats.programs);p.set(ids.vaos,renderer.stats.vaos);
+      p.set(ids.cpuBuffers,cpu);p.set(ids.gpuBuffers,gpu);p.set(ids.gpuPending,renderer.gpuTimer.pending);
+    },
+    status:()=>renderer.gpuTimer.inspect(),
+    configure:p=>renderer.gpuTimer.configure(p.recording&&p.gpuEnabled),
+    details:()=>({gpuTimer:renderer.gpuTimer.inspect(),buffers:renderer.stats.buffers,programs:renderer.stats.programs,
+      vertexArrays:renderer.stats.vaos,viewport:{width:renderer.canvas.width,height:renderer.canvas.height},
+      accounting:'Requested GL buffer bytes only. Default framebuffer, shader/driver storage and browser heap are excluded.'}),
+  });
+}
+
+return {renderDiagnostics};
+})();
+// Source: engine/basement/gpu-timer.js
+const module9=(()=>{
+/**
+ * Basement / GPU timer: optional EXT_disjoint_timer_query_webgl2 measurements.
+ * At most four reusable queries. Results are polled for availability, never forced
+ * with finish/readback or a blocking result fetch. Measurements retain original frame IDs.
+ */
+class GpuTimer {
+  /** report(frameId,ms) is a data callback, never a renderer/game dependency. */
+  constructor(gl,report,{capacity=4}={}){
+    if(!Number.isInteger(capacity)||capacity<1)throw new RangeError('GPU query capacity must be positive');
+    this.gl=gl;this.report=report;this.capacity=capacity;this.slots=[];this.active=null;
+    this.enabled=false;this.lost=false;this.disposed=false;
+    this.stats={completed:0,skipped:0,disjoint:0,reportErrors:0};this.restore();
+  }
+  /** Reacquire capability after restoration; old context handles must not be reused. */
+  restore(){if(!this.lost)this.clear();this.slots.length=0;this.active=null;this.lost=false;this.extension=this.gl.getExtension('EXT_disjoint_timer_query_webgl2');}
+  /** Context loss invalidates handles without issuing GL operations against the lost context. */
+  invalidate(){this.slots.length=0;this.active=null;this.lost=true;}
+  /** Disabling discards pending timings and deletes query handles, without waiting for completion. */
+  configure(enabled){
+    const next=Boolean(enabled&&!this.disposed&&!this.lost&&this.extension);
+    if(this.enabled&&!next)this.clear();this.enabled=next;
+  }
+  /** Count queued results; no GPU call or allocation. */
+  get pending(){let count=0;for(const slot of this.slots)if(slot.pending)count++;return count;}
+  /** Poll only previously ended queries. A disjoint event invalidates all pending results. */
+  poll(){
+    if(!this.enabled||!this.pending)return;
+    const gl=this.gl,ext=this.extension;
+    if(gl.getParameter(ext.GPU_DISJOINT_EXT)){
+      this.stats.disjoint++;for(const slot of this.slots)slot.pending=false;return;
+    }
+    for(const slot of this.slots){
+      if(!slot.pending||!gl.getQueryParameter(slot.query,gl.QUERY_RESULT_AVAILABLE))continue;
+      const nanoseconds=gl.getQueryParameter(slot.query,gl.QUERY_RESULT);
+      slot.pending=false;this.stats.completed++;
+      try{this.report(slot.frameId,nanoseconds/1e6);}catch{this.stats.reportErrors++;}
+    }
+  }
+  /** Begin one render query if a free slot exists. Saturation skips timing, never stalls drawing. */
+  begin(frameId){
+    if(!this.enabled||!frameId||this.active)return;
+    let slot=null;for(const candidate of this.slots)if(!candidate.pending){slot=candidate;break;}
+    if(!slot&&this.slots.length<this.capacity){
+      const query=this.gl.createQuery();if(!query){this.stats.skipped++;return;}
+      slot={query,pending:false,frameId:0};this.slots.push(slot);
+    }
+    if(!slot){this.stats.skipped++;return;}
+    slot.frameId=frameId;this.active=slot;this.gl.beginQuery(this.extension.TIME_ELAPSED_EXT,slot.query);
+  }
+  /** End in finally, preserving the measured frame association until its result becomes available. */
+  end(){if(!this.active)return;this.gl.endQuery(this.extension.TIME_ELAPSED_EXT);this.active.pending=true;this.active=null;}
+  /** Release query objects once; a lost context already invalidated those handles. */
+  clear(){
+    if(!this.lost){if(this.active)this.end();for(const slot of this.slots)this.gl.deleteQuery(slot.query);}
+    this.slots.length=0;this.active=null;
+  }
+  /** Bounded capability/status data for provider captures. */
+  inspect(){return{supported:Boolean(this.extension),enabled:this.enabled,pending:this.pending,capacity:this.capacity,...this.stats};}
+  /** Dispose cannot outlive the renderer's context owner. */
+  dispose(){if(this.disposed)return;this.clear();this.enabled=false;this.disposed=true;}
+}
+
+return {GpuTimer};
+})();
 // Source: engine/basement/renderer.js
 const module6=(()=>{
 /**
@@ -413,6 +511,8 @@ const module6=(()=>{
  */
 const { VERTEX, FRAGMENT } = module7;
 const { Lifetime } = module5;
+const { renderDiagnostics } = module8;
+const { GpuTimer } = module9;
 
 /** Compile one stage; include the driver log and delete failed handles immediately. */
 function compile(gl, type, source) {
@@ -446,8 +546,8 @@ function cubeGeometry() {
 
 class Renderer {
   /** Own the supplied surface's WebGL context. pixelRatio caps mobile fill cost. */
-  constructor(canvas, { pixelRatio = 1.5 } = {}) {
-    this.canvas = canvas; this.pixelRatio = pixelRatio; this.life = new Lifetime();
+  constructor(canvas, { pixelRatio = 1.5, profiler = null } = {}) {
+    this.profiler=profiler; this.canvas = canvas; this.pixelRatio = pixelRatio; this.life = new Lifetime();
     const gl = canvas.getContext('webgl2', { alpha: false, antialias: true, powerPreference: 'low-power' });
     if (!gl) throw new Error('ETRNLNINE requires WebGL 2 on this device.');
     this.gl = gl; this.batches = new Set(); this.disposed = false; this.lost = false;
@@ -455,18 +555,29 @@ class Renderer {
     this.ambient = new Float32Array([0.13, 0.13, 0.23]);
     this.lights = new Float32Array(8 * 4); this.lightColors = new Float32Array(8 * 3);
     this.stats = { draws: 0, instances: 0, uploads: 0, uploadedBytes: 0, buffers: 0, programs: 0, vaos: 0, contextRestores: 0 };
-    this.initialize();
-    this.life.listen(canvas, 'webglcontextlost', event => {
-      event.preventDefault(); this.lost = true;
-    });
-    this.life.listen(canvas, 'webglcontextrestored', () => {
-      // Browser invalidates all old handles on loss. Recreate from retained CPU data,
-      // not by restarting the game or adding a second scheduler.
-      this.stats.buffers = this.stats.programs = this.stats.vaos = 0;
+    this.totals={draws:0,instances:0,uploads:0,uploadedBytes:0,candidates:0,culled:0};
+    try {
       this.initialize();
-      for (const batch of this.batches) batch.initialize();
-      this.stats.contextRestores++; this.lost = false;
-    });
+      this.gpuTimer=new GpuTimer(gl,(id,ms)=>this.profiler?.recordGpu(id,ms));
+      this.life.own(renderDiagnostics(this,profiler));
+      this.life.listen(canvas, 'webglcontextlost', event => {
+        event.preventDefault(); this.lost = true; this.gpuTimer.invalidate();
+      });
+      this.life.listen(canvas, 'webglcontextrestored', () => {
+        // Browser invalidates all old handles on loss. Recreate from retained CPU data,
+        // not by restarting the game or adding a second scheduler.
+        this.stats.buffers = this.stats.programs = this.stats.vaos = 0;
+        this.initialize();
+        for (const batch of this.batches) batch.initialize();
+        this.gpuTimer.restore(); this.stats.contextRestores++; this.lost = false;
+      });
+    } catch(error) {
+      // Metric-budget/capability failure may occur after GL creation. Constructor
+      // failure must release real handles even though no caller received this renderer.
+      this.life.dispose();this.gpuTimer?.dispose();
+      if(this.cube)gl.deleteBuffer(this.cube);if(this.program)gl.deleteProgram(this.program);
+      throw error;
+    }
   }
 
   /** Allocate renderer-owned program/cube. Shaders are freed after linking. */
@@ -537,6 +648,14 @@ class Renderer {
 
   /** Clear even an empty engine; present a batch only if supplied and its context is valid. */
   render(batch = null) {
+    if(this.disposed||this.lost)return;
+    this.gpuTimer.configure(this.profiler?.recording&&this.profiler.gpuEnabled);
+    this.gpuTimer.poll();this.gpuTimer.begin(this.profiler?.current?.id??0);
+    try { this.draw(batch); } finally { this.gpuTimer.end(); }
+  }
+
+  /** Submit a frame; all worlds use the same retained renderer and accounting path. */
+  draw(batch = null) {
     if (this.disposed || this.lost) return;
     this.resize();
     const gl = this.gl, { halfWidth, halfHeight } = this.view();
@@ -555,12 +674,13 @@ class Renderer {
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, batch.count);
     gl.bindVertexArray(null);
     this.stats.draws = 1; this.stats.instances = batch.count;
+    this.totals.draws++;this.totals.instances+=batch.count;
   }
 
   /** Release renderer and outstanding batches, with listeners removed before late restoration. */
   dispose() {
     if (this.disposed) return;
-    this.disposed = true; this.life.dispose();
+    this.disposed = true; this.life.dispose(); this.gpuTimer.dispose();
     for (const batch of [...this.batches]) batch.dispose();
     this.gl.deleteBuffer(this.cube); this.gl.deleteProgram(this.program);
     this.stats.buffers = this.stats.programs = this.stats.vaos = 0;
@@ -576,7 +696,9 @@ class InstanceBatch {
   /** Retain bounded CPU records so context restoration never depends on Canvas assets. */
   constructor(renderer, world, capacity) {
     this.renderer = renderer; this.world = world; this.capacity = capacity;
-    this.data = new Float32Array(capacity * 12); this.count = 0; this.disposed = false;
+    this.data = new Float32Array(capacity * 12);
+    this.kind='instance-buffer';this.cpuBytes=this.data.byteLength;this.gpuBufferBytes=this.data.byteLength;
+    this.count = 0; this.disposed = false;
     this.initialize();
   }
 
@@ -619,9 +741,10 @@ class InstanceBatch {
     for (const entity of this.world.entities.values()) {
       const s = entity.shape, p = entity.pose;
       if (!s) continue;
+      r.totals.candidates++;
       const radius = Math.hypot(s.size[0], s.size[1], s.size[2]);
       const screenY = (p.y - r.camera.y) * 0.65 + p.z * 0.76;
-      if (Math.abs(p.x - r.camera.x) > halfWidth + radius || Math.abs(screenY) > halfHeight + radius) continue;
+      if (Math.abs(p.x - r.camera.x) > halfWidth + radius || Math.abs(screenY) > halfHeight + radius) {r.totals.culled++;continue;}
       if (this.cursor / 12 >= this.capacity) throw new Error(`World ${this.world.id} exceeds ${this.capacity} visible instances`);
       this.write(p.x); this.write(p.y); this.write(p.z); this.write(p.yaw);
       this.write(s.size[0]); this.write(s.size[1]); this.write(s.size[2]); this.write(s.emission ?? 0);
@@ -633,6 +756,7 @@ class InstanceBatch {
       // WebGL 2 source-offset/length overload uploads a range without a new typed-array view.
       gl.bufferSubData(gl.ARRAY_BUFFER, this.firstDirty * 4, this.data, this.firstDirty, this.lastDirty - this.firstDirty + 1);
       r.stats.uploads++; r.stats.uploadedBytes += (this.lastDirty - this.firstDirty + 1) * 4;
+      r.totals.uploads++;r.totals.uploadedBytes+=(this.lastDirty-this.firstDirty+1)*4;
     }
     this.forceUpload = false;
   }
@@ -645,11 +769,304 @@ class InstanceBatch {
     gl.deleteBuffer(this.buffer); gl.deleteVertexArray(this.vao);
     stats.buffers--; stats.vaos--; this.renderer.batches.delete(this);
     // Disposal releases CPU storage too, even if a caller retains the old handle.
-    this.data = null; this.world = null;
+    this.data = null; this.world = null; this.cpuBytes=this.gpuBufferBytes=0;
   }
 }
 
 return {Renderer};
+})();
+// Source: engine/basement/profile-data.js
+const module11=(()=>{
+/**
+ * Basement / profile data: bounded copies for diagnostics, never live engine references.
+ * Used only for on-demand captures/export, not for each recorded frame.
+ */
+
+/**
+ * Copy JSON-like data within one shared node budget. Truncate strings/collections,
+ * omit accessors, detect cycles, and never traverse a world/DOM/class instance.
+ */
+function boundedCopy(value, budget = { remaining: 1024 }, depth = 0, seen = new WeakSet()) {
+  if (--budget.remaining < 0) return '[node budget]';
+  if (typeof value === 'string') return value.slice(0, 256);
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (value === null || typeof value === 'boolean') return value;
+  if (typeof value !== 'object') return '[not JSON data]';
+  if (depth >= 6) return '[depth limit]';
+  if (seen.has(value)) return '[circular]';
+  const prototype = Object.getPrototypeOf(value);
+  if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) return '[instance omitted]';
+  seen.add(value);
+  const result = Array.isArray(value) ? [] : {};
+  let count = 0;
+  for (const key in value) {
+    if (!Object.hasOwn(value, key)) continue;
+    if (count++ >= 64 || budget.remaining <= 0) {
+      if (Array.isArray(result)) result.push('[truncated]'); else result.$truncated = true;
+      break;
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    const copy = descriptor && 'value' in descriptor
+      ? boundedCopy(descriptor.value, budget, depth + 1, seen) : '[accessor omitted]';
+    // defineProperty avoids treating an author's __proto__ diagnostic key as a setter.
+    Object.defineProperty(result, key.slice(0, 80), { value: copy, enumerable: true, configurable: true });
+  }
+  seen.delete(value);
+  return result;
+}
+
+/** Percentile by nearest rank; callers pass a sorted bounded scratch array. */
+function percentile(sorted, fraction) {
+  return sorted.length ? sorted[Math.max(0, Math.ceil(sorted.length * fraction) - 1)] : null;
+}
+
+
+/** Freeze a bounded owned capture recursively; readers cannot add live resource references later. */
+function freezeData(value){
+  if(value&&typeof value==='object'){
+    for(const key of Object.keys(value))freezeData(value[key]);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+
+/** Reporting must remain isolated even when a provider throws null or a hostile object. */
+function diagnosticError(error){
+  try{return String(error?.message??error).slice(0,160);}
+  catch{return '[unreadable diagnostic error]';}
+}
+
+return {boundedCopy,percentile,freezeData,diagnosticError};
+})();
+// Source: engine/basement/profiler.js
+const module10=(()=>{
+/**
+ * Basement / profiler: bounded CPU scopes, numeric counters, frame history and captures.
+ * This mechanism knows no scheduler, renderer, game, DOM element, or GPU API.
+ * Milliseconds everywhere. Recording reuses typed storage; summaries/captures allocate
+ * only when explicitly requested. Disabled scope calls do not read the clock.
+ */
+const { boundedCopy, percentile, freezeData, diagnosticError } = module11;
+
+class Profiler {
+  /** Capacities are hard budgets. Choose them at engine creation, not during a frame. */
+  constructor({ enabled = false, gpu = false, capacity = 120, maxScopes = 32, maxCounters = 48,
+    maxSpans = 96, maxDepth = 16, maxCaptures = 2, now = () => performance.now() } = {}) {
+    for (const value of [capacity,maxScopes,maxCounters,maxSpans,maxDepth,maxCaptures]) {
+      if (!Number.isInteger(value) || value < 1) throw new RangeError('Profiler capacities must be positive integers');
+    }
+    this.enabled = enabled; this.frozen = false; this.gpuEnabled = Boolean(gpu); this.disposed = false;
+    this.capacity=capacity;this.maxScopes=maxScopes;this.maxCounters=maxCounters;
+    this.maxSpans=maxSpans;this.maxDepth=maxDepth;this.maxCaptures=maxCaptures;this.now=now;
+    this.scopes=[];this.counters=[];this.scopeNames=new Map();this.counterNames=new Map();
+    this.providers=new Map();this.captures=[];this.frames=[];this.sequence=0;this.captureSequence=0;this.count=0;this.current=null;
+    this.depth=0;this.nextToken=0;this.arm=null;
+    this.stackIds=new Int32Array(maxDepth);this.stackStarts=new Float64Array(maxDepth);
+    this.stackChildren=new Float64Array(maxDepth);this.stackTokens=new Float64Array(maxDepth);
+    this.stackSpans=new Int32Array(maxDepth);
+    this.stats={droppedSpans:0,depthOverflows:0,providerErrors:0,unbalancedFrames:0,expiredGpuSamples:0,lastCaptureMs:0,lastExportMs:0,lastProviderError:''};
+    for(let i=0;i<capacity;i++)this.frames.push({id:0,intervalMs:null,cpuMs:0,collectionMs:0,gpuMs:null,
+      paused:false,failed:false,simulationTime:0,started:0,spanCount:0,droppedSpans:0,coveredMs:0,
+      inclusive:new Float64Array(maxScopes),self:new Float64Array(maxScopes),calls:new Uint32Array(maxScopes),
+      values:new Float64Array(maxCounters),spans:new Float64Array(maxSpans*4)});
+    this.collectionScope=this.scope('diagnostics.collect');
+  }
+
+  /** True only when scope/counter/frame mutation is allowed. Freeze preserves existing history. */
+  get recording(){return this.enabled&&!this.frozen&&!this.disposed;}
+
+  /** Return an existing numeric handle or register a bounded static name once. */
+  register(list,names,name,limit,unit){
+    if(this.disposed)throw new Error('Profiler is disposed');
+    if(typeof name!=='string'||!name.length||name.length>80)throw new RangeError('Profiler names must contain 1–80 characters');
+    if(unit!==undefined&&(typeof unit!=='string'||!unit.length||unit.length>24))throw new RangeError('Counter units must contain 1–24 characters');
+    if(names.has(name)){
+      const id=names.get(name);
+      if(unit!==undefined&&list[id].unit!==unit)throw new Error(`Counter unit changed: ${name}`);
+      return id;
+    }
+    if(list.length>=limit)throw new Error('Profiler metric registry budget exceeded');
+    const id=list.length;list.push({name,...(unit===undefined?{}:{unit})});names.set(name,id);return id;
+  }
+
+  /** Register static subsystem names, not per-entity names; handles remain stable across scenes. */
+  scope(name){return this.register(this.scopes,this.scopeNames,name,this.maxScopes);}
+  /** Register a scalar counter/gauge. Units are display metadata, not conversion rules. */
+  counter(name,unit='count'){return this.register(this.counters,this.counterNames,name,this.maxCounters,unit);}
+
+  /** Register at most eight providers; removal is owned by the reporting subsystem. */
+  provider(name,{begin,sample,details,status,configure}={}){
+    if(this.disposed)throw new Error('Profiler is disposed');
+    if(typeof name!=='string'||name.length>80||!name.length)throw new RangeError('Invalid provider name');
+    if(this.providers.has(name))throw new Error(`Duplicate profiler provider: ${name}`);
+    if(this.providers.size>=8)throw new Error('Profiler provider budget exceeded');
+    const record={name,begin,sample,details,status,configure};this.providers.set(name,record);
+    return()=>{if(this.providers.get(name)===record)this.providers.delete(name);};
+  }
+
+  /** Request a bounded lightweight provider status, only when a viewer asks for it. */
+  status(name){
+    try{return boundedCopy(this.providers.get(name)?.status?.()??null,{remaining:64});}
+    catch(error){return{error:diagnosticError(error)};}
+  }
+
+  /** Isolate reporting failures: a broken diagnostic provider cannot stop the game. */
+  collect(method){
+    for(const provider of this.providers.values()){
+      try{provider[method]?.(this);}catch(error){
+        this.stats.providerErrors++;this.stats.lastProviderError=`${provider.name}.${method}: ${diagnosticError(error)}`;
+      }
+    }
+  }
+
+  /** Begin one frame. intervalMs is the raw rAF gap, or null after start/pause/resume. */
+  beginFrame(intervalMs,paused=false){
+    if(!this.recording)return 0;
+    if(this.current)throw new Error('Profiler frame already active');
+    const id=++this.sequence,frame=this.frames[(id-1)%this.capacity];
+    frame.id=id;frame.intervalMs=Number.isFinite(intervalMs)?Math.max(0,intervalMs):null;
+    frame.cpuMs=frame.collectionMs=0;frame.gpuMs=null;frame.paused=paused;frame.failed=false;
+    frame.spanCount=frame.droppedSpans=frame.coveredMs=0;frame.inclusive.fill(0);frame.self.fill(0);frame.calls.fill(0);frame.values.fill(0);
+    frame.started=this.now();this.current=frame;this.depth=0;
+    // Providers baseline cumulative counters before preparation/uploads begin.
+    this.collect('begin');return id;
+  }
+
+  /** Enter a nested synchronous scope. Tokens are frame-specific and consumed LIFO. */
+  begin(id){
+    if(!this.recording||!this.current)return -1;
+    if(!Number.isInteger(id)||id<0||id>=this.scopes.length)throw new Error('Unknown profiler scope');
+    if(this.depth===this.maxDepth){this.stats.depthOverflows++;return -1;}
+    const frame=this.current,d=this.depth++,start=this.now(),token=++this.nextToken;
+    this.stackIds[d]=id;this.stackStarts[d]=start;this.stackChildren[d]=0;this.stackTokens[d]=token;
+    const span=frame.spanCount<this.maxSpans?frame.spanCount++:-1;this.stackSpans[d]=span;
+    if(span>=0){const i=span*4;frame.spans[i]=id;frame.spans[i+1]=start-frame.started;frame.spans[i+3]=d;}
+    else{frame.droppedSpans++;this.stats.droppedSpans++;}
+    return token;
+  }
+
+  /** Close a scope in finally. Inclusive time includes children; self time subtracts them. */
+  end(token){
+    if(token<0||!this.current)return;
+    const d=this.depth-1;
+    if(d<0||this.stackTokens[d]!==token)throw new Error('Profiler scopes must close in LIFO order');
+    const duration=Math.max(0,this.now()-this.stackStarts[d]),id=this.stackIds[d],frame=this.current;
+    frame.inclusive[id]+=duration;frame.self[id]+=Math.max(0,duration-this.stackChildren[d]);frame.calls[id]++;
+    const span=this.stackSpans[d];if(span>=0)frame.spans[span*4+2]=duration;
+    this.depth--;if(this.depth)this.stackChildren[this.depth-1]+=duration;else frame.coveredMs+=duration;
+  }
+
+  /** Set one registered numeric frame value. Disabled mode avoids validation and storage work. */
+  set(id,value){
+    if(!this.recording||!this.current)return;
+    if(!Number.isInteger(id)||id<0||id>=this.counters.length||!Number.isFinite(value))throw new Error('Invalid profiler counter');
+    this.current.values[id]=value;
+  }
+
+  /** Finalize even a failed runtime frame. Diagnostic collection time is explicitly identified. */
+  endFrame(simulationTime=0,failed=false){
+    const frame=this.current;if(!frame)return;
+    if(this.depth){this.stats.unbalancedFrames++;while(this.depth)this.end(this.stackTokens[this.depth-1]);}
+    const collection=this.begin(this.collectionScope),before=this.now();
+    this.collect('sample');frame.collectionMs=Math.max(0,this.now()-before);this.end(collection);
+    frame.cpuMs=Math.max(0,this.now()-frame.started);frame.simulationTime=simulationTime;frame.failed=failed;
+    this.current=null;this.count=Math.min(this.capacity,this.count+1);
+    if(this.arm&&((frame.intervalMs??0)>=this.arm.intervalMs||frame.cpuMs>=this.arm.cpuMs)){
+      this.arm=null;this.capture(frame.id,'armed spike');
+    }
+  }
+
+  /** GPU results can arrive later. Attach only to their original still-retained frame. */
+  recordGpu(id,milliseconds){
+    if(!this.recording||!Number.isFinite(milliseconds)||milliseconds<0)return;
+    const frame=this.frames[(id-1)%this.capacity];
+    if(!frame||frame.id!==id){this.stats.expiredGpuSamples++;return;}
+    frame.gpuMs=milliseconds;
+  }
+
+  /** Internal slot lookup; public summary/capture methods return owned data instead. */
+  #retainedFrame(id=this.sequence){
+    const frame=this.frames[(id-1)%this.capacity];
+    if(!frame||frame.id!==id||frame===this.current)throw new Error('Profiler frame expired or incomplete');
+    return frame;
+  }
+
+  /** On-demand bounded summary for a viewer/export; never called by the hot recorder itself. */
+  summary(){
+    const frames=this.frames.filter(frame=>frame.id&&frame!==this.current).sort((a,b)=>a.id-b.id);
+    const intervals=frames.map(f=>f.intervalMs).filter(Number.isFinite).sort((a,b)=>a-b);
+    const cpu=frames.map(f=>f.cpuMs).sort((a,b)=>a-b);
+    const gpu=frames.map(f=>f.gpuMs).filter(Number.isFinite).sort((a,b)=>a-b);
+    const latest=frames.at(-1),worst=frames.reduce((a,b)=>!a||Math.max(b.intervalMs??0,b.cpuMs)>Math.max(a.intervalMs??0,a.cpuMs)?b:a,null);
+    return {enabled:this.enabled,frozen:this.frozen,capacity:this.capacity,count:frames.length,
+      latestId:latest?.id??null,worstId:worst?.id??null,
+      interval:{p50:percentile(intervals,0.5),p95:percentile(intervals,0.95),worst:intervals.at(-1)??null},
+      cpu:{p50:percentile(cpu,0.5),p95:percentile(cpu,0.95),worst:cpu.at(-1)??null},
+      gpu:{p50:percentile(gpu,0.5),p95:percentile(gpu,0.95),worst:gpu.at(-1)??null,samples:gpu.length},
+      latest:latest?{id:latest.id,cpuMs:latest.cpuMs,intervalMs:latest.intervalMs,gpuMs:latest.gpuMs,
+        collectionMs:latest.collectionMs,unscopedMs:Math.max(0,latest.cpuMs-latest.coveredMs),paused:latest.paused,failed:latest.failed}:null,
+      scopes:latest?this.scopes.map((scope,id)=>({...scope,inclusiveMs:latest.inclusive[id],selfMs:latest.self[id],calls:latest.calls[id]})).filter(s=>s.calls).sort((a,b)=>b.inclusiveMs-a.inclusiveMs):[],
+      counters:latest?this.counters.map((counter,id)=>({...counter,value:latest.values[id]})):[],
+      chart:frames.map(frame=>({id:frame.id,intervalMs:frame.intervalMs,cpuMs:frame.cpuMs,gpuMs:frame.gpuMs})),
+      captures:this.captures.map(c=>({id:c.frame.id,label:c.label})),stats:{...this.stats}};
+  }
+
+  /** Capture copied frame facts and CURRENT provider details, labeled separately for historical frames. */
+  capture(id=this.sequence,label='manual'){
+    const before=this.now(),frame=this.#retainedFrame(id),budget={remaining:1024},details=Object.create(null);
+    for(const[name,provider]of this.providers){
+      if(budget.remaining<=0)break;
+      try{details[name]=boundedCopy(provider.details?.()??null,budget);}catch(error){details[name]={error:diagnosticError(error)};}
+    }
+    const capture={version:1,id:++this.captureSequence,label:String(label).slice(0,80),frame:{id:frame.id,intervalMs:frame.intervalMs,cpuMs:frame.cpuMs,
+      gpuMs:frame.gpuMs,collectionMs:frame.collectionMs,unscopedMs:Math.max(0,frame.cpuMs-frame.coveredMs),simulationTime:frame.simulationTime,paused:frame.paused,failed:frame.failed,
+      droppedSpans:frame.droppedSpans,
+      scopes:this.scopes.map((scope,i)=>({...scope,inclusiveMs:frame.inclusive[i],selfMs:frame.self[i],calls:frame.calls[i]})).filter(s=>s.calls),
+      counters:this.counters.map((counter,i)=>({...counter,value:frame.values[i]})),
+      spans:Array.from({length:frame.spanCount},(_,i)=>({scope:this.scopes[frame.spans[i*4]].name,startMs:frame.spans[i*4+1],durationMs:frame.spans[i*4+2],depth:frame.spans[i*4+3]}))},
+      providerDetails:{timing:'current state at capture time; frame counters belong to the recorded frame',data:details}};
+    if(this.captures.length===this.maxCaptures)this.captures.shift();this.captures.push(freezeData(capture));this.stats.lastCaptureMs=Math.max(0,this.now()-before);return capture;
+  }
+
+  /** Arm one automatic spike capture; disarm immediately after it fires to bound capture overhead. */
+  armSpike({intervalMs=50,cpuMs=16.67}={}){
+    if(this.disposed)throw new Error('Profiler is disposed');
+    if(!(intervalMs>0)||!(cpuMs>0)||!Number.isFinite(intervalMs)||!Number.isFinite(cpuMs))throw new RangeError('Spike thresholds must be positive finite milliseconds');
+    this.arm={intervalMs,cpuMs};
+  }
+
+  /** Export owned copies/metadata as JSON; no callbacks, world instances or device input are serialized. */
+  exportJSON(){
+    const before=this.now(),json=JSON.stringify({version:1,units:'milliseconds',summary:this.summary(),captures:this.captures},null,2);
+    this.stats.lastExportMs=Math.max(0,this.now()-before);return json;
+  }
+
+  /** Stop/freeze between frames. Recording state never pauses or changes the game simulation. */
+  configure({enabled=this.enabled,frozen=this.frozen,gpu=this.gpuEnabled}={}){
+    if(this.disposed)throw new Error('Profiler is disposed');
+    if(this.current)throw new Error('Change profiler recording between frames');
+    this.enabled=Boolean(enabled);this.frozen=Boolean(frozen);this.gpuEnabled=Boolean(gpu);this.collect('configure');
+  }
+
+  /** Total owned typed storage, excluding JS/driver overhead; useful for profiler's own budget. */
+  get storageBytes(){
+    let bytes=this.stackIds.byteLength+this.stackStarts.byteLength+this.stackChildren.byteLength+this.stackTokens.byteLength+this.stackSpans.byteLength;
+    for(const frame of this.frames)bytes+=frame.inclusive.byteLength+frame.self.byteLength+frame.calls.byteLength+frame.values.byteLength+frame.spans.byteLength;
+    return bytes;
+  }
+
+  /** Drop history/captures and reporting callbacks so no disposed subsystem is retained. */
+  dispose(){
+    if(this.disposed)return;
+    this.enabled=false;this.current=null;this.arm=null;this.collect('configure');this.providers.clear();this.captures.length=0;this.frames.length=0;
+    this.stackIds=new Int32Array(0);this.stackStarts=new Float64Array(0);this.stackChildren=new Float64Array(0);
+    this.stackTokens=new Float64Array(0);this.stackSpans=new Int32Array(0);
+    this.scopes.length=this.counters.length=0;this.scopeNames.clear();this.counterNames.clear();this.count=0;this.disposed=true;
+  }
+}
+
+return {Profiler};
 })();
 // Source: engine/basement/basement.js
 const module2=(()=>{
@@ -660,25 +1077,28 @@ const module2=(()=>{
 const { Identities, World } = module3;
 const { Input } = module4;
 const { Renderer } = module6;
+const { Profiler } = module10;
 
 class Basement {
   /** Renderer first: unsupported WebGL fails before device listeners are installed. */
-  constructor(canvas, options) {
+  constructor(canvas, options = {}) {
     this.identities = new Identities();
-    this.renderer = new Renderer(canvas, options);
+    this.profiler=new Profiler(options.profiling);
+    try { this.renderer = new Renderer(canvas, {...options,profiler:this.profiler}); }
+    catch(error){this.profiler.dispose();throw error;}
     try { this.input = new Input(canvas); }
-    catch (error) { this.renderer.dispose(); throw error; }
+    catch (error) { this.renderer.dispose(); this.profiler.dispose(); throw error; }
   }
   /** Empty worlds have no game content and allocate no GPU batch until requested. */
   createWorld(id = this.identities.create('world')) { return new World(id, this.identities); }
   /** Release devices before the surface resources they target. */
-  dispose() { this.input.dispose(); this.renderer.dispose(); }
+  dispose() { this.input.dispose(); this.renderer.dispose(); this.profiler.dispose(); }
 }
 
 return {Basement};
 })();
 // Source: engine/lobby/preparation.js
-const module9=(()=>{
+const module13=(()=>{
 /**
  * Lobby / preparation: cooperatively budgeted generator work in the existing frame loop.
  * Each next() must be a small, synchronous chunk; JavaScript cannot preempt a huge chunk.
@@ -686,20 +1106,20 @@ const module9=(()=>{
  */
 class PreparationQueue {
   /** Budget is milliseconds per frame; next() count is also bounded for reliable tests. */
-  constructor({ budgetMs = 2, maxSteps = 2, now = () => performance.now() } = {}) {
+  constructor({ budgetMs = 2, maxSteps = 2, now = () => performance.now(), profiler = null } = {}) {
     if (!(budgetMs > 0) || !Number.isFinite(budgetMs) || !Number.isInteger(maxSteps) || maxSteps < 1) {
       throw new RangeError('Preparation requires a positive time budget and integer step limit');
     }
-    this.budgetMs = budgetMs; this.maxSteps = maxSteps; this.now = now;
+    this.profiler=profiler; this.budgetMs = budgetMs; this.maxSteps = maxSteps; this.now = now;
     this.jobs = new Set(); this.disposed = false;
     this.stats = { steps: 0, peakChunkMs: 0, cancelled: 0 };
   }
 
   /** Queue an iterator; its finally block must release partially prepared resources. */
-  enqueue(iterator, { signal } = {}) {
+  enqueue(iterator, { signal, label = 'preparation.chunk' } = {}) {
     if (this.disposed) return Promise.reject(new Error('Preparation queue is disposed'));
     return new Promise((resolve, reject) => {
-      const job = { iterator, resolve, reject, signal, abort: null };
+      const job = { iterator, resolve, reject, signal, abort: null, scope:this.profiler?.scope(label)??-1 };
       job.abort = () => {
         if (!this.jobs.delete(job)) return;
         signal?.removeEventListener('abort', job.abort);
@@ -719,6 +1139,7 @@ class PreparationQueue {
       const job = this.jobs.values().next().value;
       this.jobs.delete(job); this.jobs.add(job);
       const before = this.now();
+      const token=job.scope>=0?this.profiler.begin(job.scope):-1;
       try {
         const result = job.iterator.next();
         if (result.done) {
@@ -727,6 +1148,7 @@ class PreparationQueue {
       } catch (error) {
         this.jobs.delete(job); job.signal?.removeEventListener('abort', job.abort); job.reject(error);
       }
+      finally { if(token>=0)this.profiler.end(token); }
       steps++; this.stats.steps++;
       this.stats.peakChunkMs = Math.max(this.stats.peakChunkMs, this.now() - before);
     }
@@ -742,38 +1164,76 @@ class PreparationQueue {
 
 return {PreparationQueue};
 })();
+// Source: engine/lobby/runtime-diagnostics.js
+const module14=(()=>{
+/**
+ * Lobby / runtime diagnostics: measurement handles and counters, not scheduling logic.
+ * Providers are removed with their runtime. Disabled profiling performs no timer reads.
+ */
+function runtimeDiagnostics(runtime,profiler){
+  if(!profiler)return null;
+  const scopes={};for(const name of ['preparation','input','boundary','update','render'])scopes[name]=profiler.scope(`lobby.${name}`);
+  const counters={steps:profiler.counter('runtime.steps'),dropped:profiler.counter('runtime.dropped','ms'),
+    paused:profiler.counter('runtime.paused','flag'),chunks:profiler.counter('preparation.chunks'),pending:profiler.counter('preparation.pending')};
+  let steps=0,dropped=0,chunks=0;
+  const remove=profiler.provider('runtime',{
+    begin(){steps=runtime.stats.steps;dropped=runtime.stats.droppedSeconds;chunks=runtime.preparation.stats.steps;},
+    sample(p){p.set(counters.steps,runtime.stats.steps-steps);p.set(counters.dropped,(runtime.stats.droppedSeconds-dropped)*1000);
+      p.set(counters.paused,Number(runtime.reasons.size>0));p.set(counters.chunks,runtime.preparation.stats.steps-chunks);p.set(counters.pending,runtime.preparation.jobs.size);},
+    details:()=>({stepSeconds:runtime.step,maxSteps:runtime.maxSteps,simulationTime:runtime.time,
+      pausedReasons:[...runtime.reasons].slice(0,64),preparation:{pending:runtime.preparation.jobs.size,
+        budgetMs:runtime.preparation.budgetMs,maxSteps:runtime.preparation.maxSteps,...runtime.preparation.stats}}),
+  });
+  return{scopes,remove};
+}
+
+return {runtimeDiagnostics};
+})();
 // Source: engine/lobby/runtime.js
-const module8=(()=>{
+const module12=(()=>{
 /**
  * Lobby / runtime: sole animation-frame owner, explicit phases, and pause reasons.
  * All elapsed values are seconds. The engine advances fixed simulation steps and
  * interpolates render poses; long browser suspensions never trigger unlimited work.
  */
-const { PreparationQueue } = module9;
+const { PreparationQueue } = module13;
+const { runtimeDiagnostics } = module14;
 
 class Runtime {
   /** Inject scheduling for deterministic lifecycle tests; browser defaults allocate no loop yet. */
-  constructor({ request = cb => requestAnimationFrame(cb), cancel = id => cancelAnimationFrame(id), step = 1 / 60, maxSteps = 5 } = {}) {
+  constructor({ request = cb => requestAnimationFrame(cb), cancel = id => cancelAnimationFrame(id), step = 1 / 60, maxSteps = 5, profiler = null } = {}) {
     this.request = request; this.cancel = cancel; this.step = step; this.maxSteps = maxSteps;
-    this.preparation = new PreparationQueue();
+    this.profiler = profiler; this.preparation = new PreparationQueue({profiler});
     this.phases = { boundary: new Set(), input: new Set(), update: new Set(), render: new Set(), pause: new Set() };
     this.reasons = new Set(); this.running = false; this.disposed = false;
     this.frameId = null; this.last = null; this.accumulator = 0; this.time = 0;
     this.stats = { frames: 0, steps: 0, droppedSeconds: 0 };
+    this.diagnostics=runtimeDiagnostics(this,profiler);
     this.tick = this.tick.bind(this);
   }
 
   /** Register a phase callback. Return an idempotent remover owned by the caller's lifetime. */
-  on(phase, callback) {
+  on(phase, callback, name = null) {
     if (this.disposed) throw new Error('Runtime is disposed');
     const list = this.phases[phase];
     if (!list) throw new Error(`Unknown runtime phase: ${phase}`);
-    list.add(callback);
-    return () => list.delete(callback);
+    const record={callback,scope:name&&this.profiler?this.profiler.scope(name):-1};
+    list.add(record);
+    return () => list.delete(record);
   }
 
   /** Emit in registration order. Callback owners must remove registrations on scene disposal. */
-  emit(phase, ...args) { for (const callback of this.phases[phase]) callback(...args); }
+  emit(phase, ...args) {
+    for (const record of this.phases[phase]) {
+      const token=record.scope>=0?this.profiler.begin(record.scope):-1;
+      try { record.callback(...args); } finally { if(token>=0)this.profiler.end(token); }
+    }
+  }
+
+  /** Measure a named phase without allocating wrapper callbacks in the frame loop. */
+  beginPhase(name){return this.profiler?.begin(this.diagnostics.scopes[name])??-1;}
+  /** Close only valid recording tokens; disabled profiling does not read a clock. */
+  endPhase(token){if(token>=0)this.profiler.end(token);}
 
   /** Repeated start calls are harmless; stopped runtime preserves simulation time. */
   start() {
@@ -805,35 +1265,43 @@ class Runtime {
   tick(milliseconds) {
     if (!this.running) return;
     this.frameId = null;
+    let failed=true;
     try {
       const elapsed = this.last === null ? 0 : Math.max(0, (milliseconds - this.last) / 1000);
+      this.profiler?.beginFrame(this.last===null?null:elapsed*1000,this.reasons.size>0);
       this.last = milliseconds;
-      if (!this.reasons.size) this.preparation.advance();
-      this.emit('input');
+      let token=this.beginPhase('preparation');
+      try { if (!this.reasons.size) this.preparation.advance(); } finally { this.endPhase(token); }
+      token=this.beginPhase('input');
+      try { this.emit('input'); } finally { this.endPhase(token); }
       if (!this.reasons.size) {
         const admitted = Math.min(elapsed, this.step * this.maxSteps);
         this.stats.droppedSeconds += elapsed - admitted;
         this.accumulator += admitted;
         let count = 0;
         while (this.accumulator + 1e-10 >= this.step && count < this.maxSteps) {
-          this.emit('boundary', this.time);
-          this.emit('update', this.step, this.time);
+          token=this.beginPhase('boundary');
+          try { this.emit('boundary', this.time); } finally { this.endPhase(token); }
+          token=this.beginPhase('update');
+          try { this.emit('update', this.step, this.time); } finally { this.endPhase(token); }
           this.accumulator = Math.max(0, this.accumulator - this.step);
           this.time += this.step; this.stats.steps++; count++;
         }
       }
-      this.emit('render', this.reasons.size ? 1 : this.accumulator / this.step, this.time);
-      this.stats.frames++;
+      token=this.beginPhase('render');
+      try { this.emit('render', this.reasons.size ? 1 : this.accumulator / this.step, this.time, milliseconds); }
+      finally { this.endPhase(token); }
+      this.stats.frames++;failed=false;
     } catch (error) {
       this.running = false; this.last = null; throw error;
-    }
+    } finally { this.profiler?.endFrame(this.time,failed); }
     if (this.running) this.frameId = this.request(this.tick);
   }
 
   /** Stop scheduling and remove registrations, allowing the composed engine to release resources. */
   dispose() {
     if (this.disposed) return;
-    this.stop(); this.preparation.dispose(); this.disposed = true;
+    this.stop(); this.preparation.dispose(); this.diagnostics?.remove(); this.disposed = true;
     for (const phase of Object.values(this.phases)) phase.clear();
     this.reasons.clear();
   }
@@ -842,7 +1310,7 @@ class Runtime {
 return {Runtime};
 })();
 // Source: engine/directory/residency.js
-const module11=(()=>{
+const module16=(()=>{
 /**
  * Directory / residency: bounded prepared worlds, preparation tickets, and compact state.
  * Factories are game/library supplied. They return {world, ready, capture, dispose, ...}.
@@ -981,18 +1449,66 @@ class WorldResidency {
 
 return {WorldResidency};
 })();
+// Source: engine/directory/diagnostics.js
+const module17=(()=>{
+/**
+ * Directory / diagnostics: report resource ownership through Basement's provider contract.
+ * Frame samples are scalar sums. Detailed rows are copied only on capture, capped at 64.
+ * Requested buffer sizes are accounting data, not total JS heap or driver memory.
+ */
+function directoryDiagnostics(directory,profiler){
+  if(!profiler)return()=>{};
+  const ids={};
+  for(const[name,unit]of [['worlds','count'],['entities','count'],['resources','count'],['leases','count'],
+    ['ownedCpuBuffers','bytes'],['ownedGpuBuffers','bytes'],['savedState','bytes'],['resident','count']]){
+    ids[name]=profiler.counter(`directory.${name}`,unit);
+  }
+  return profiler.provider('directory',{
+    sample(p){
+      let entities=0,leases=0,cpu=0,gpu=0;
+      for(const world of directory.worlds.values())entities+=world.entities.size;
+      for(const record of directory.resources.values()){
+        leases+=record.owners;cpu+=record.value.cpuBytes??0;gpu+=record.value.gpuBufferBytes??0;
+      }
+      p.set(ids.worlds,directory.worlds.size);p.set(ids.entities,entities);p.set(ids.resources,directory.resources.size);
+      p.set(ids.leases,leases);p.set(ids.ownedCpuBuffers,cpu);p.set(ids.ownedGpuBuffers,gpu);
+      p.set(ids.savedState,directory.residency.stats.snapshotBytes);p.set(ids.resident,directory.residency.records.size);
+    },
+    details(){
+      const worlds=[],resources=[],residency=[];
+      for(const world of directory.worlds.values()){
+        if(worlds.length===64)break;worlds.push({id:world.id,entities:world.entities.size});
+      }
+      for(const[key,record]of directory.resources){
+        if(resources.length===64)break;
+        const owners=[];for(const[owner,count]of record.ownerNames){if(owners.length===64)break;owners.push({owner,count});}
+        resources.push({key,leases:record.owners,owners,
+          kind:record.value.kind??'unclassified',cpuBufferBytes:record.value.cpuBytes??0,gpuBufferBytes:record.value.gpuBufferBytes??0});
+      }
+      for(const record of directory.residency.records.values()){
+        if(residency.length===64)break;residency.push({key:record.key,worldId:record.value?.world.id??null,status:record.status,owners:record.owners.size});
+      }
+      return{worlds,resources,residency,limits:{rows:64,worldCapacity:directory.residency.capacity,snapshotBytes:directory.residency.maxStateBytes},
+        snapshotBytes:directory.residency.stats.snapshotBytes,note:'Owned buffer accounting overlaps renderer totals; do not add them twice. Driver/JS heap excluded.'};
+    },
+  });
+}
+
+return {directoryDiagnostics};
+})();
 // Source: engine/directory/directory.js
-const module10=(()=>{
+const module15=(()=>{
 /**
  * Directory: named libraries, lazy shared resources, and explicit world ownership.
  * Factories come from callers. Nothing here imports a named toy or game asset.
  * A lease pins one resource; releasing the last lease destroys it immediately.
  */
-const { WorldResidency } = module11;
+const { WorldResidency } = module16;
+const { directoryDiagnostics } = module17;
 
 class Directory {
   /** Registration is inert: no world or GPU asset is allocated until requested. */
-  constructor() { this.residency = new WorldResidency(); this.libraries = new Map(); this.resources = new Map(); this.worlds = new Map(); this.disposed = false; }
+  constructor({profiler=null}={}) { this.residency = new WorldResidency(); this.libraries = new Map(); this.resources = new Map(); this.worlds = new Map(); this.disposed = false; this.removeDiagnostics=directoryDiagnostics(this,profiler); }
 
   /** Register a unique library factory; duplicate names are an error, not a silent override. */
   register(name, factory) {
@@ -1010,18 +1526,21 @@ class Directory {
   }
 
   /** Acquire a shared disposable resource. The factory runs only for the first owner. */
-  acquire(key, factory) {
+  acquire(key, factory, {owner='anonymous'}={}) {
     if (this.disposed) throw new Error('Directory is disposed');
+    if(typeof owner!=='string'||!owner.length||owner.length>80)throw new RangeError('Resource owner must contain 1–80 characters');
     let record = this.resources.get(key);
-    if (!record) { record = { value: factory(), owners: 0 }; this.resources.set(key, record); }
-    record.owners++;
+    if (!record) { record = { value: factory(), owners: 0, ownerNames: new Map() }; this.resources.set(key, record); }
+    record.owners++;record.ownerNames.set(owner,(record.ownerNames.get(owner)??0)+1);
     let released = false;
     return {
-      value: record.value,
+      value: record.value, owner,
       // Every lease may release once; delayed scene cleanup cannot underflow ownership.
       release: () => {
         if (released) return;
         released = true;
+        const left=(record.ownerNames.get(owner)??0)-1;
+        if(left>0)record.ownerNames.set(owner,left);else record.ownerNames.delete(owner);
         if (--record.owners === 0 && this.resources.get(key) === record) {
           this.resources.delete(key); record.value.dispose();
         }
@@ -1050,7 +1569,7 @@ class Directory {
   /** Final owner cleanup also invalidates outstanding leases; release closures remain harmless. */
   dispose() {
     if (this.disposed) return;
-    this.disposed = true; this.residency.dispose();
+    this.disposed = true; this.removeDiagnostics(); this.residency.dispose();
     for (const world of this.worlds.values()) world.dispose();
     for (const resource of this.resources.values()) resource.value.dispose();
     this.worlds.clear(); this.resources.clear(); this.libraries.clear();
@@ -1060,7 +1579,7 @@ class Directory {
 return {Directory};
 })();
 // Source: engine/penthouse/toys.js
-const module13=(()=>{
+const module19=(()=>{
 /**
  * Penthouse / toys: reusable procedural box-based architecture and actor assemblies.
  * These are early test toys, not Freelancer art or the final procedural humanoid.
@@ -1117,7 +1636,7 @@ function actor({ world, color = [0.42,0.34,0.58], bagColor = [0.54,0.30,0.17] })
 return {box,pavilion,actor};
 })();
 // Source: engine/penthouse/controls.js
-const module14=(()=>{
+const module20=(()=>{
 /**
  * Penthouse / controls: parameterized HTML control templates over Basement actions.
  * HTML is intentional for accessible interface text; the world remains pure WebGL.
@@ -1216,14 +1735,168 @@ class ActionButton {
 
 return {Joystick,ActionButton};
 })();
+// Source: engine/penthouse/profiler-style.js
+const module22=(()=>{
+/** Penthouse / profiler presentation: component-scoped styles; removed with the viewer root. */
+const PROFILER_STYLE=`
+.etrnl-profiler{position:absolute;right:30px;top:92px;width:min(390px,calc(100vw - 40px));max-height:calc(100dvh - 190px);overflow:auto;background:#11131eef;border:1px solid #c6ae774d;border-radius:7px;color:#d5cfdf;font:11px/1.55 system-ui,sans-serif;z-index:2;box-shadow:0 12px 50px #0004}
+.etrnl-profiler>summary{position:sticky;top:0;background:#191a28;z-index:1;-webkit-tap-highlight-color:transparent}
+.etrnl-profiler summary{padding:12px 16px;cursor:pointer;color:#d5bb85;text-transform:uppercase;letter-spacing:.14em;font-size:10px}
+.etrnl-profiler .profile-body{padding:0 16px 15px}.etrnl-profiler .profile-controls{display:flex;flex-wrap:wrap;gap:7px 12px;margin:8px 0}
+.etrnl-profiler label{display:flex;align-items:center;gap:4px}.etrnl-profiler input{accent-color:#cfb274}
+.etrnl-profiler button{font:inherit;padding:5px 8px;border:1px solid #a7957255;background:#242335;color:inherit;border-radius:4px;cursor:pointer}
+.etrnl-profiler button:disabled{opacity:.4;cursor:default}.etrnl-profiler .profile-actions{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.etrnl-profiler .profile-state{color:#b7a9d5}.etrnl-profiler .profile-hint{color:#9690aa;font-size:10px;margin:7px 0}
+.etrnl-profiler svg{display:block;width:100%;height:88px;background:#0a0d17;border-radius:4px;margin:8px 0}
+.etrnl-profiler .profile-grid{width:100%;border-collapse:collapse;font-size:10px;font-variant-numeric:tabular-nums}
+.etrnl-profiler th{text-align:right;color:#a99cb5;font-weight:400}.etrnl-profiler th:first-child,.etrnl-profiler td:first-child{text-align:left}
+.etrnl-profiler td{text-align:right;border-top:1px solid #91809c22;padding:3px 0}.etrnl-profiler td:first-child{max-width:185px;overflow:hidden;text-overflow:ellipsis}
+.etrnl-profiler h3{font:10px system-ui,sans-serif;text-transform:uppercase;letter-spacing:.12em;color:#c2ab80;margin:12px 0 5px}
+.etrnl-profiler pre{max-height:160px;overflow:auto;white-space:pre-wrap;word-break:break-word;background:#0b0e17;padding:8px;font-size:9px}
+.etrnl-profiler .profile-error{color:#f1b59a}.etrnl-profiler .profile-legend{font-size:9px;color:#b1a4c1}
+@media(max-width:650px){.etrnl-profiler{right:20px;top:145px;width:calc(100vw - 40px);max-height:calc(100dvh - 185px)}.etrnl-profiler:not([open]){width:auto}.etrnl-profiler>summary{position:sticky;top:0;background:#191a28;z-index:1;-webkit-tap-highlight-color:transparent}
+.etrnl-profiler summary{padding:9px 12px}.etrnl-profiler .profile-body{padding:0 12px 12px}}
+`;
+
+return {PROFILER_STYLE};
+})();
+// Source: engine/penthouse/profiler-view.js
+const module21=(()=>{
+/**
+ * Penthouse / profiler viewer: accessible HTML/SVG, bounded tables and capture export.
+ * Receives a generic subscription function; it never imports Lobby or starts a loop.
+ * Closed viewers unsubscribe. Open viewers refresh at most twice a second by default.
+ */
+const { Lifetime } = module5;
+const { diagnosticError } = module11;
+const { PROFILER_STYLE } = module22;
+
+/** Format measured values without turning unavailable measurements into zero. */
+function ms(value){return Number.isFinite(value)?value.toFixed(2):'—';}
+
+/** Populate bounded text-only rows. Authored scope/owner names never enter HTML markup. */
+function rows(table,values){
+  table.replaceChildren();
+  for(const cells of values){
+    const row=document.createElement('tr');
+    for(const text of cells){const cell=document.createElement('td');cell.textContent=text;row.append(cell);}
+    table.append(row);
+  }
+}
+
+class ProfilerView {
+  /** subscribe(callback) must return a remover; supply it from the caller's existing scheduler. */
+  constructor({profiler,host,subscribe,intervalMs=500}){
+    if(!(intervalMs>0)||!Number.isFinite(intervalMs))throw new RangeError('Profiler view interval must be positive');
+    this.profiler=profiler;this.subscribe=subscribe;this.intervalMs=intervalMs;this.lastRefresh=-Infinity;
+    this.life=new Lifetime();this.removeSubscription=null;this.downloadURL=null;this.lastCaptureId=0;
+    this.element=document.createElement('details');this.element.className='etrnl-profiler';
+    // Static component markup only. Dynamic names, values and JSON use textContent below.
+    this.element.innerHTML=`<style>${PROFILER_STYLE}</style><summary>Engine profiler</summary><div class="profile-body">
+      <div class="profile-state" aria-live="polite">Waiting for frames</div>
+      <div class="profile-controls"><label><input type="checkbox" name="record">Record</label><label><input type="checkbox" name="freeze">Freeze history</label><label><input type="checkbox" name="gpu">GPU timing</label></div>
+      <div class="profile-hint profile-gpu"></div>
+      <svg viewBox="0 0 300 80" role="img" aria-label="Recent CPU and frame interval history"><line x1="0" y1="64" x2="300" y2="64" stroke="#6b5d4555"/><polyline class="profile-interval" fill="none" stroke="#ab8edb" stroke-width="1.4"/><polyline class="profile-cpu" fill="none" stroke="#e3bc78" stroke-width="1.5"/><polyline class="profile-gpu-line" fill="none" stroke="#6ec7d7" stroke-width="1.2"/></svg>
+      <div class="profile-legend">Gold: CPU · Violet: frame interval · Cyan: GPU · <span class="profile-scale"></span></div>
+      <table class="profile-grid"><thead><tr><th>Milliseconds</th><th>p50</th><th>p95</th><th>Worst</th></tr></thead><tbody class="profile-summary"></tbody></table>
+      <h3>Latest CPU scopes · inclusive / self</h3><table class="profile-grid"><tbody class="profile-scopes"></tbody></table>
+      <details class="profile-counter-details"><summary>Frame counters</summary><table class="profile-grid"><tbody class="profile-counters"></tbody></table></details>
+      <div class="profile-hint profile-cost"></div>
+      <div class="profile-actions"><button type="button" data-action="latest">Capture latest</button><button type="button" data-action="worst">Capture worst</button><button type="button" data-action="arm">Arm next spike</button><button type="button" data-action="export">Export JSON</button></div>
+      <div class="profile-hint profile-capture-state"></div><details><summary>Latest capture details</summary><pre class="profile-capture">No capture yet.</pre></details>
+      <div class="profile-hint">CPU is measured frame work, not GPU completion. Counters cover registered systems; buffer bytes exclude driver/browser heaps. Captures label current owner details separately from historical frame data.</div>
+      <div class="profile-error" role="status"></div></div>`;
+    host.append(this.element);
+    this.find=selector=>this.element.querySelector(selector);
+    this.checkboxes={record:this.find('[name=record]'),freeze:this.find('[name=freeze]'),gpu:this.find('[name=gpu]')};
+    this.life.listen(this.element,'toggle',()=>{
+      // Nested capture details also emit toggle events; only the root controls scheduling.
+      if(this.element.open&&!this.removeSubscription)this.removeSubscription=this.subscribe?.((a,t,wallMs)=>this.refresh(wallMs));
+      if(!this.element.open&&this.removeSubscription){this.removeSubscription();this.removeSubscription=null;}
+      if(this.element.open)this.refresh(performance.now(),true);
+    });
+    for(const checkbox of Object.values(this.checkboxes))this.life.listen(checkbox,'change',()=>this.action(()=>{
+      profiler.configure({enabled:this.checkboxes.record.checked,frozen:this.checkboxes.freeze.checked,gpu:this.checkboxes.gpu.checked});
+    }));
+    this.life.listen(this.element,'click',event=>{
+      const button=event.target.closest('button[data-action]');if(!button||!this.element.contains(button))return;
+      this.action(()=>{
+        if(button.dataset.action==='latest')profiler.capture(profiler.summary().latestId,'manual latest');
+        if(button.dataset.action==='worst')profiler.capture(profiler.summary().worstId,'manual worst retained');
+        if(button.dataset.action==='arm')profiler.armSpike();
+        if(button.dataset.action==='export')this.download();
+      });
+    });
+    this.life.own(()=>{this.removeSubscription?.();if(this.downloadURL)URL.revokeObjectURL(this.downloadURL);this.element.remove();});
+  }
+
+  /** UI failures are visible inside the inspector and never thrown into simulation. */
+  action(callback){
+    try{callback();this.find('.profile-error').textContent='';}
+    catch(error){this.find('.profile-error').textContent=diagnosticError(error);}
+    this.refresh(performance.now(),true);
+  }
+
+  /** Refresh only while open, using wall time so inspecting a paused world remains useful. */
+  refresh(wallMs,force=false){
+    if(this.life.disposed||(!this.element.open&&!force)||(!force&&wallMs-this.lastRefresh<this.intervalMs))return;
+    this.lastRefresh=wallMs;
+    const p=this.profiler,s=p.summary(),gpu=p.status('renderer');
+    this.checkboxes.record.checked=p.enabled;this.checkboxes.freeze.checked=p.frozen;
+    this.checkboxes.gpu.checked=p.gpuEnabled;this.checkboxes.gpu.disabled=!gpu?.supported;
+    this.find('.profile-state').textContent=`${p.enabled?(p.frozen?'History frozen; game continues':'Recording'):'Recording off'} · ${s.count}/${s.capacity} frames`;
+    this.element.dataset.frame=s.latestId??0;this.element.dataset.count=s.count;this.element.dataset.captures=s.captures.length;
+    this.find('.profile-gpu').textContent=gpu?.supported?`Asynchronous GPU timer · ${gpu.pending} pending · ${gpu.skipped} skipped · ${gpu.disjoint} disjoint resets`:'GPU timing unavailable on this context; CPU profiling remains available.';
+    rows(this.find('.profile-summary'),[['CPU',ms(s.cpu.p50),ms(s.cpu.p95),ms(s.cpu.worst)],['Interval',ms(s.interval.p50),ms(s.interval.p95),ms(s.interval.worst)],[`GPU (${s.gpu.samples})`,ms(s.gpu.p50),ms(s.gpu.p95),ms(s.gpu.worst)]]);
+    rows(this.find('.profile-scopes'),s.scopes.slice(0,8).map(scope=>[`${scope.name} ×${scope.calls}`,ms(scope.inclusiveMs),ms(scope.selfMs)]));
+    if(force||this.find('.profile-counter-details').open){
+      rows(this.find('.profile-counters'),s.counters.map(counter=>[counter.name,`${Number(counter.value.toFixed(2))} ${counter.unit}`]));
+    }
+    const scale=Math.max(33.34,...s.chart.map(frame=>Math.max(frame.cpuMs,frame.intervalMs??0,frame.gpuMs??0)));
+    for(const[property,selector]of [['intervalMs','.profile-interval'],['cpuMs','.profile-cpu'],['gpuMs','.profile-gpu-line']]){
+      const points=[];
+      for(let index=0;index<s.chart.length;index++){
+        const value=s.chart[index][property];if(!Number.isFinite(value))continue;
+        const x=s.chart.length>1?index/(s.chart.length-1)*300:0;
+        points.push(`${x.toFixed(1)},${(78-Math.min(1,value/scale)*76).toFixed(1)}`);
+      }
+      this.find(selector).setAttribute('points',points.join(' '));
+    }
+    this.find('.profile-scale').textContent=`0–${scale.toFixed(0)} ms`;
+    this.find('.profile-cost').textContent=`Collection ${ms(s.latest?.collectionMs)} ms · unscoped ${ms(s.latest?.unscopedMs)} ms · typed history ${(p.storageBytes/1024).toFixed(1)} KiB · last capture ${ms(s.stats.lastCaptureMs)} ms`;
+    this.find('.profile-capture-state').textContent=`${s.captures.length}/${p.maxCaptures} captures retained${p.arm?' · next spike armed':''} · ${s.stats.providerErrors} provider errors`;
+    const capture=p.captures.at(-1);
+    // Formatting a large capture is an explicit capture cost, not recurring viewer work.
+    if((capture?.id??0)!==this.lastCaptureId){
+      this.lastCaptureId=capture?.id??0;
+      this.find('.profile-capture').textContent=capture?JSON.stringify(capture,null,2):'No capture yet.';
+    }
+    for(const name of ['latest','worst'])this.find(`[data-action=${name}]`).disabled=!s.count;
+  }
+
+  /** Keep at most one download URL alive. The browser owns the downloaded file, not engine memory. */
+  download(){
+    if(this.downloadURL)URL.revokeObjectURL(this.downloadURL);
+    this.downloadURL=URL.createObjectURL(new Blob([this.profiler.exportJSON()],{type:'application/json'}));
+    const anchor=document.createElement('a');anchor.href=this.downloadURL;anchor.download='ETRNLNINE-profile.json';
+    this.element.append(anchor);anchor.click();anchor.remove();
+  }
+
+  /** Remove subscriptions, listeners, DOM and the last download URL through the same lifetime. */
+  dispose(){this.life.dispose();}
+}
+
+return {ProfilerView};
+})();
 // Source: engine/penthouse/penthouse.js
-const module12=(()=>{
+const module18=(()=>{
 /**
  * Penthouse assembly: expose inert libraries without coupling Directory to toy names.
  * ETRNLNINE installs these factories; games request them through Directory.
  */
-const { pavilion, actor, box } = module13;
-const { Joystick, ActionButton } = module14;
+const { pavilion, actor, box } = module19;
+const { Joystick, ActionButton } = module20;
+const { ProfilerView } = module21;
 
 class Penthouse {
   /** Catalog creation is inert: allocation begins only when a factory is requested. */
@@ -1234,6 +1907,7 @@ class Penthouse {
       'toy.actor': actor,
       'control.joystick': options => new Joystick(options),
       'control.button': options => new ActionButton(options),
+      'tool.profiler':options=>new ProfilerView(options),
     });
   }
 }
@@ -1249,44 +1923,47 @@ const module1=(()=>{
  */
 const { Basement } = module2;
 const { Lifetime } = module5;
-const { Runtime } = module8;
-const { Directory } = module10;
-const { Penthouse } = module12;
+const { Runtime } = module12;
+const { Directory } = module15;
+const { Penthouse } = module18;
 
 class ETRNLNINE {
-  /** Build an empty engine. No implicit game start or scene-specific allocations. */
+  /** Build an empty engine, releasing earlier levels if a later constructor fails. */
   constructor(canvas, options = {}) {
-    this.basement = new Basement(canvas, options);
-    this.lobby = new Runtime(); this.directory = new Directory(); this.penthouse = new Penthouse();
-    this.life = new Lifetime(); this.disposed = false;
-    for (const [name, factory] of Object.entries(this.penthouse.libraries)) this.directory.register(name, factory);
-    this.life.own(this.lobby.on('input', () => this.basement.input.sample()));
-    this.life.own(this.lobby.on('pause', paused => this.basement.input.suspend(paused)));
-    this.life.listen(document, 'visibilitychange', () => this.lobby.pause('document-hidden', document.hidden));
-    this.life.listen(window, 'blur', () => this.lobby.pause('window-unfocused', true));
-    this.life.listen(window, 'focus', () => this.lobby.pause('window-unfocused', false));
-    // Context loss stops simulation as well as drawing. Restoration rebuilds renderer
-    // resources before this listener removes its independent pause reason.
-    this.life.listen(canvas, 'webglcontextlost', () => this.lobby.pause('gpu-context', true));
-    this.life.listen(canvas, 'webglcontextrestored', () => this.lobby.pause('gpu-context', false));
-    this.lobby.pause('document-hidden', document.hidden);
+    this.life=new Lifetime();this.disposed=false;
+    try {
+      this.basement = new Basement(canvas, options);
+      this.life.own(()=>this.basement.dispose());
+      this.directory = new Directory({profiler:this.basement.profiler});
+      this.life.own(()=>this.directory.dispose());
+      this.lobby = new Runtime({profiler:this.basement.profiler});
+      this.life.own(()=>this.lobby.dispose());
+      this.penthouse = new Penthouse();
+      for (const [name, factory] of Object.entries(this.penthouse.libraries)) this.directory.register(name, factory);
+      this.life.own(this.lobby.on('input', () => this.basement.input.sample(),'input.devices'));
+      this.life.own(this.lobby.on('pause', paused => this.basement.input.suspend(paused)));
+      this.life.listen(document, 'visibilitychange', () => this.lobby.pause('document-hidden', document.hidden));
+      this.life.listen(window, 'blur', () => this.lobby.pause('window-unfocused', true));
+      this.life.listen(window, 'focus', () => this.lobby.pause('window-unfocused', false));
+      // Context loss stops simulation; restoration rebuilds renderer resources before
+      // this listener removes its independent pause reason. No game restart is needed.
+      this.life.listen(canvas, 'webglcontextlost', () => this.lobby.pause('gpu-context', true));
+      this.life.listen(canvas, 'webglcontextrestored', () => this.lobby.pause('gpu-context', false));
+      this.lobby.pause('document-hidden', document.hidden);
+    } catch(error) { this.disposed=true;this.life.dispose();throw error; }
   }
-  /** Start/resume the scheduler; no new loop is created by repeated calls. */
+  /** Start/resume the scheduler; repeated calls do not create another loop. */
   start() { this.lobby.start(); }
   /** Stop scheduling without discarding world or device state. */
   stop() { this.lobby.stop(); this.basement.input.clear(); }
-  /** Release registrations first, then loop, worlds/resources, and foundational capabilities. */
-  dispose() {
-    if (this.disposed) return;
-    this.disposed = true; this.life.dispose(); this.lobby.dispose();
-    this.directory.dispose(); this.basement.dispose();
-  }
+  /** Release registrations, Lobby, Directory, then Basement in reverse acquisition order. */
+  dispose() { if(this.disposed)return;this.disposed=true;this.life.dispose(); }
 }
 
 return {ETRNLNINE};
 })();
 // Source: engine/basement/transfer.js
-const module18=(()=>{
+const module26=(()=>{
 /**
  * Basement / transfer: validated, synchronous movement of one attachment tree.
  * No loading, scheduling, game rules, callbacks during mutation, or resource ownership.
@@ -1336,13 +2013,13 @@ function transferTree({ source, destination, root, landing, validate = () => tru
 return {transferTree};
 })();
 // Source: engine/lobby/travel.js
-const module17=(()=>{
+const module25=(()=>{
 /**
  * Lobby / travel: asynchronous preparation becomes a synchronous boundary commit.
  * It consumes generic residency tickets; it does not import Directory or game content.
  * The active ticket pins the source until a successful transfer replaces it.
  */
-const { transferTree } = module18;
+const { transferTree } = module26;
 
 class WorldTravel {
   /** Adopt an already-ready initial ticket/root. The owner must call advance at a boundary. */
@@ -1435,7 +2112,7 @@ class WorldTravel {
 return {WorldTravel};
 })();
 // Source: engine/basement/geometry.js
-const module20=(()=>{
+const module28=(()=>{
 /** Basement / geometry: pure horizontal collision helpers, with no world or game dependency. */
 
 /** Does a horizontal circle overlap an axis-aligned box? Touching is permitted. */
@@ -1448,7 +2125,7 @@ function circleOverlapsBox(x, y, radius, box) {
 return {circleOverlapsBox};
 })();
 // Source: examples/atrium/layout.js
-const module21=(()=>{
+const module29=(()=>{
 /**
  * Atrium example / authored layout. This is game content, deliberately outside engine/.
  * Change these placements/materials without editing renderer or toy implementations.
@@ -1514,15 +2191,15 @@ function* buildLayout(engine, world, profile) {
 return {buildLayout};
 })();
 // Source: examples/atrium/worlds.js
-const module19=(()=>{
+const module27=(()=>{
 /**
  * Atrium example / world definitions: authored realms, reconstruction and state schema.
  * Directory receives factories, not these names. Lobby budgets actual procedural work.
  * Persisted data is deliberately small: light selection, crystal rotation and prop position.
  */
 const { Lifetime } = module5;
-const { circleOverlapsBox } = module20;
-const { buildLayout } = module21;
+const { circleOverlapsBox } = module28;
+const { buildLayout } = module29;
 
 /** Immutable-by-convention authoring profiles; runtime mutable state is created per world. */
 const PROFILES = [
@@ -1565,7 +2242,7 @@ function worldFactory(engine, profile, id) {
       const layout=yield* buildLayout(engine,world,profile);
       layout.crystal.yaw=saved.crystalYaw; layout.prop.x=saved.propX; layout.propCollider.x=saved.propX;
       world.snapshot(); world.resolve();
-      const lease=engine.directory.acquire(`batch:${world.id}`,()=>engine.basement.renderer.createBatch(world));
+      const lease=engine.directory.acquire(`batch:${world.id}`,()=>engine.basement.renderer.createBatch(world),{owner:`realm:${profile.key}/${world.id}`});
       life.own(lease.release);
       // Upload before readiness, so committing cannot expose collisionless placeholder art.
       engine.basement.renderer.prepare(lease.value);
@@ -1580,21 +2257,21 @@ function worldFactory(engine, profile, id) {
       positions.forEach((position,i)=>resource.lights.set(position,i*4)); applyLight(resource);
       complete=true; return resource;
     } finally { if(!complete)life.dispose(); }
-  })(),{signal});
+  })(),{signal,label:`world.build.${profile.key}`});
 }
 
 return {PROFILES,legalLanding,applyLight,worldFactory};
 })();
 // Source: examples/atrium/journey.js
-const module16=(()=>{
+const module24=(()=>{
 /**
  * Atrium example / journey: game-specific realm links, initial actor and prewarming policy.
  * Loading/lifetime algorithms live in Directory; transaction scheduling lives in Lobby.
  * This module chooses the destination and asks for those mechanisms through public contracts.
  */
 const { Lifetime } = module5;
-const { WorldTravel } = module17;
-const { PROFILES, worldFactory, legalLanding, applyLight } = module19;
+const { WorldTravel } = module25;
+const { PROFILES, worldFactory, legalLanding, applyLight } = module27;
 
 /** Own the two realm definitions and their tickets for one example session. */
 function createJourney(engine) {
@@ -1624,7 +2301,7 @@ function createJourney(engine) {
     resource.world.snapshot();
     travel=new WorldTravel({residency,initial,root:actor.root});
     life.own(()=>travel.dispose());
-    life.own(lobby.on('boundary',time=>travel.advance(time)));
+    life.own(lobby.on('boundary',time=>travel.advance(time),'world.transfer'));
     life.own(travel.onCommit(()=>{
       // Destination's active ticket replaces its warm pin. The departed world becomes
       // an unpinned cache entry, allowing explicit trimming or future LRU eviction.
@@ -1672,12 +2349,12 @@ function createJourney(engine) {
 return {createJourney};
 })();
 // Source: examples/atrium/player.js
-const module22=(()=>{
+const module30=(()=>{
 /**
  * Atrium example / locomotion: game-owned steering/gait profile, independent of realm residency.
  * Actor references and velocity survive transfers. This is not a full physical body solver.
  */
-const { legalLanding } = module19;
+const { legalLanding } = module27;
 
 /** Create one controller whose mutable velocity/load state belongs only to this actor. */
 function playerController(actor, input, renderer) {
@@ -1713,15 +2390,15 @@ function playerController(actor, input, renderer) {
 return {playerController};
 })();
 // Source: examples/atrium/scene.js
-const module15=(()=>{
+const module23=(()=>{
 /**
  * Atrium example / scene: owns controls, phase registrations and the game's journey.
  * Layout/reconstruction, locomotion and world policy have their own focused modules.
  * Nothing here installs an engine patch or creates an independent animation loop.
  */
 const { Lifetime } = module5;
-const { createJourney } = module16;
-const { playerController } = module22;
+const { createJourney } = module24;
+const { playerController } = module30;
 
 /** Start preparing the scene immediately. Rendering remains valid while the first world loads. */
 function createScene(engine,{controlsHost,onStatus=()=>{},onError=()=>{}}){
@@ -1746,6 +2423,7 @@ function createScene(engine,{controlsHost,onStatus=()=>{},onError=()=>{}}){
   controls.forEach(control=>life.own(()=>control.dispose()));
   life.own(lobby.on('pause',()=>controls.forEach(control=>control.cancel())));
   renderer.camera.x=0;renderer.camera.y=0;renderer.camera.halfHeight=22;
+  const movementScope=basement.profiler.scope('atrium.locomotion'),statusScope=basement.profiler.scope('atrium.status');
   let player=null,statusAt=-1;
   journey.ready.then(()=>{if(!life.disposed)player=playerController(journey.actor,input,renderer);})
     .catch(error=>{if(!life.disposed&&error.name!=='AbortError')onError(error);});
@@ -1758,23 +2436,27 @@ function createScene(engine,{controlsHost,onStatus=()=>{},onError=()=>{}}){
       else if(input.consume('flit'))journey.flit();
       if(input.consume('interact'))journey.toggleLight();
       if(input.consume('prop'))journey.moveProp();
-      player.update(dt,resource);resource.layout.crystal.yaw+=dt*0.3;
+      const token=basement.profiler.begin(movementScope);
+      try { player.update(dt,resource); } finally { basement.profiler.end(token); }
+      resource.layout.crystal.yaw+=dt*0.3;
     }
     if(time-statusAt>0.12){
       statusAt=time;
       const root=journey.actor?.root;
-      onStatus({worldId:resource?.world.id??'preparing',name:resource?.profile.name??'Opening the worlds',
+      const token=basement.profiler.begin(statusScope);
+      try { onStatus({worldId:resource?.world.id??'preparing',name:resource?.profile.name??'Opening the worlds',
         actorId:root?.id??'',x:root?.x??0,y:root?.y??0,loaded:player?.loaded??true,
         cool:resource?.state.cool??true,propX:resource?.layout.prop.x??6,time,
-        entities:resource?.world.entities.size??0,...journey.inspect()});
+        entities:resource?.world.entities.size??0,...journey.inspect()}); }
+      finally { basement.profiler.end(token); }
     }
-  }));
+  },'atrium.simulation'));
   life.own(lobby.on('render',alpha=>{
     const resource=journey.current;
     if(!resource){renderer.render();return;}
     renderer.ambient.set(resource.profile.ambient);renderer.lights.set(resource.lights);renderer.lightColors.set(resource.lightColors);
     resource.world.resolve(alpha);renderer.render(resource.batch);
-  }));
+  },'atrium.presentation'));
   return {journey,dispose:()=>life.dispose()};
 }
 
@@ -1789,7 +2471,7 @@ const module0=(()=>{
  */
 const { ETRNLNINE } = module1;
 const { Lifetime } = module5;
-const { createScene } = module15;
+const { createScene } = module23;
 
 const canvas=document.querySelector('#world'), controlsHost=document.querySelector('#controls');
 const status=document.querySelector('#status'), errorBox=document.querySelector('#error');
@@ -1833,8 +2515,11 @@ function replaceScene() {
 }
 
 try {
-  engine=new ETRNLNINE(canvas,{ pixelRatio:1.5 });
-  replaceScene(); engine.start();
+  engine=new ETRNLNINE(canvas,{ pixelRatio:1.5,profiling:{enabled:true} });
+  replaceScene();
+  const profilerView=engine.directory.create('tool.profiler',{profiler:engine.basement.profiler,host:document.body,
+    subscribe:callback=>engine.lobby.on('render',callback,'profiler.viewer')});
+  life.own(()=>profilerView.dispose());engine.start();
   life.listen(pauseButton,'click',() => {
     const paused=!engine.lobby.reasons.has('example-menu');
     engine.lobby.pause('example-menu',paused);

@@ -48,7 +48,7 @@ export function worldFactory(engine, profile, id) {
       const layout=yield* buildLayout(engine,world,profile);
       layout.crystal.yaw=saved.crystalYaw; layout.prop.x=saved.propX; layout.propCollider.x=saved.propX;
       world.snapshot(); world.resolve();
-      const lease=engine.directory.acquire(`batch:${world.id}`,()=>engine.basement.renderer.createBatch(world));
+      const lease=engine.directory.acquire(`batch:${world.id}`,()=>engine.basement.renderer.createBatch(world),{owner:`realm:${profile.key}/${world.id}`});
       life.own(lease.release);
       // Upload before readiness, so committing cannot expose collisionless placeholder art.
       engine.basement.renderer.prepare(lease.value);
@@ -63,5 +63,5 @@ export function worldFactory(engine, profile, id) {
       positions.forEach((position,i)=>resource.lights.set(position,i*4)); applyLight(resource);
       complete=true; return resource;
     } finally { if(!complete)life.dispose(); }
-  })(),{signal});
+  })(),{signal,label:`world.build.${profile.key}`});
 }

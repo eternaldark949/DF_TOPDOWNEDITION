@@ -5,17 +5,20 @@
 import { Identities, World } from './world.js';
 import { Input } from './input.js';
 import { Renderer } from './renderer.js';
+import { Profiler } from './profiler.js';
 
 export class Basement {
   /** Renderer first: unsupported WebGL fails before device listeners are installed. */
-  constructor(canvas, options) {
+  constructor(canvas, options = {}) {
     this.identities = new Identities();
-    this.renderer = new Renderer(canvas, options);
+    this.profiler=new Profiler(options.profiling);
+    try { this.renderer = new Renderer(canvas, {...options,profiler:this.profiler}); }
+    catch(error){this.profiler.dispose();throw error;}
     try { this.input = new Input(canvas); }
-    catch (error) { this.renderer.dispose(); throw error; }
+    catch (error) { this.renderer.dispose(); this.profiler.dispose(); throw error; }
   }
   /** Empty worlds have no game content and allocate no GPU batch until requested. */
   createWorld(id = this.identities.create('world')) { return new World(id, this.identities); }
   /** Release devices before the surface resources they target. */
-  dispose() { this.input.dispose(); this.renderer.dispose(); }
+  dispose() { this.input.dispose(); this.renderer.dispose(); this.profiler.dispose(); }
 }

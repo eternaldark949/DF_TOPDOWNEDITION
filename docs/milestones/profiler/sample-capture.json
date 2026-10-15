@@ -1,0 +1,2037 @@
+{
+  "version": 1,
+  "units": "milliseconds",
+  "summary": {
+    "enabled": true,
+    "frozen": true,
+    "capacity": 120,
+    "count": 120,
+    "latestId": 200,
+    "worstId": 186,
+    "interval": {
+      "p50": 433.20000000000437,
+      "p95": 983.2999999999956,
+      "worst": 1083.199999999997
+    },
+    "cpu": {
+      "p50": 0.6999999992549419,
+      "p95": 2.300000000745058,
+      "worst": 944.1999999992549
+    },
+    "gpu": {
+      "p50": null,
+      "p95": null,
+      "worst": null,
+      "samples": 0
+    },
+    "latest": {
+      "id": 200,
+      "cpuMs": 1.3999999985098839,
+      "intervalMs": 266.6999999999971,
+      "gpuMs": null,
+      "collectionMs": 0,
+      "unscopedMs": 0,
+      "paused": false,
+      "failed": false
+    },
+    "scopes": [
+      {
+        "name": "lobby.render",
+        "inclusiveMs": 1.0999999977648258,
+        "selfMs": 0,
+        "calls": 1
+      },
+      {
+        "name": "profiler.viewer",
+        "inclusiveMs": 0.6999999992549419,
+        "selfMs": 0.6999999992549419,
+        "calls": 1
+      },
+      {
+        "name": "atrium.presentation",
+        "inclusiveMs": 0.3999999985098839,
+        "selfMs": 0.3999999985098839,
+        "calls": 1
+      },
+      {
+        "name": "lobby.update",
+        "inclusiveMs": 0.19999999925494194,
+        "selfMs": 0,
+        "calls": 5
+      },
+      {
+        "name": "atrium.status",
+        "inclusiveMs": 0.19999999925494194,
+        "selfMs": 0.19999999925494194,
+        "calls": 1
+      },
+      {
+        "name": "atrium.simulation",
+        "inclusiveMs": 0.19999999925494194,
+        "selfMs": 0,
+        "calls": 5
+      },
+      {
+        "name": "lobby.input",
+        "inclusiveMs": 0.10000000149011612,
+        "selfMs": 0,
+        "calls": 1
+      },
+      {
+        "name": "input.devices",
+        "inclusiveMs": 0.10000000149011612,
+        "selfMs": 0.10000000149011612,
+        "calls": 1
+      },
+      {
+        "name": "diagnostics.collect",
+        "inclusiveMs": 0,
+        "selfMs": 0,
+        "calls": 1
+      },
+      {
+        "name": "lobby.preparation",
+        "inclusiveMs": 0,
+        "selfMs": 0,
+        "calls": 1
+      },
+      {
+        "name": "lobby.boundary",
+        "inclusiveMs": 0,
+        "selfMs": 0,
+        "calls": 5
+      },
+      {
+        "name": "atrium.locomotion",
+        "inclusiveMs": 0,
+        "selfMs": 0,
+        "calls": 5
+      },
+      {
+        "name": "world.transfer",
+        "inclusiveMs": 0,
+        "selfMs": 0,
+        "calls": 5
+      }
+    ],
+    "counters": [
+      {
+        "name": "renderer.draws",
+        "unit": "count",
+        "value": 1
+      },
+      {
+        "name": "renderer.instances",
+        "unit": "count",
+        "value": 118
+      },
+      {
+        "name": "renderer.uploads",
+        "unit": "count",
+        "value": 1
+      },
+      {
+        "name": "renderer.uploadedBytes",
+        "unit": "bytes",
+        "value": 4
+      },
+      {
+        "name": "renderer.candidates",
+        "unit": "count",
+        "value": 118
+      },
+      {
+        "name": "renderer.culled",
+        "unit": "count",
+        "value": 0
+      },
+      {
+        "name": "renderer.buffers",
+        "unit": "count",
+        "value": 3
+      },
+      {
+        "name": "renderer.programs",
+        "unit": "count",
+        "value": 1
+      },
+      {
+        "name": "renderer.vaos",
+        "unit": "count",
+        "value": 2
+      },
+      {
+        "name": "renderer.cpuBuffers",
+        "unit": "bytes",
+        "value": 196608
+      },
+      {
+        "name": "renderer.gpuBuffers",
+        "unit": "bytes",
+        "value": 197472
+      },
+      {
+        "name": "renderer.gpuPending",
+        "unit": "count",
+        "value": 0
+      },
+      {
+        "name": "directory.worlds",
+        "unit": "count",
+        "value": 2
+      },
+      {
+        "name": "directory.entities",
+        "unit": "count",
+        "value": 232
+      },
+      {
+        "name": "directory.resources",
+        "unit": "count",
+        "value": 2
+      },
+      {
+        "name": "directory.leases",
+        "unit": "count",
+        "value": 2
+      },
+      {
+        "name": "directory.ownedCpuBuffers",
+        "unit": "bytes",
+        "value": 196608
+      },
+      {
+        "name": "directory.ownedGpuBuffers",
+        "unit": "bytes",
+        "value": 196608
+      },
+      {
+        "name": "directory.savedState",
+        "unit": "bytes",
+        "value": 69
+      },
+      {
+        "name": "directory.resident",
+        "unit": "count",
+        "value": 2
+      },
+      {
+        "name": "runtime.steps",
+        "unit": "count",
+        "value": 5
+      },
+      {
+        "name": "runtime.dropped",
+        "unit": "ms",
+        "value": 183.36666666666446
+      },
+      {
+        "name": "runtime.paused",
+        "unit": "flag",
+        "value": 0
+      },
+      {
+        "name": "preparation.chunks",
+        "unit": "count",
+        "value": 0
+      },
+      {
+        "name": "preparation.pending",
+        "unit": "count",
+        "value": 0
+      }
+    ],
+    "chart": [
+      {
+        "id": 81,
+        "intervalMs": 450,
+        "cpuMs": 0.4000000022351742,
+        "gpuMs": null
+      },
+      {
+        "id": 82,
+        "intervalMs": 416.7000000000007,
+        "cpuMs": 0.9000000022351742,
+        "gpuMs": null
+      },
+      {
+        "id": 83,
+        "intervalMs": 449.8999999999978,
+        "cpuMs": 0.8000000007450581,
+        "gpuMs": null
+      },
+      {
+        "id": 84,
+        "intervalMs": 450,
+        "cpuMs": 0.30000000074505806,
+        "gpuMs": null
+      },
+      {
+        "id": 85,
+        "intervalMs": 433.40000000000146,
+        "cpuMs": 0.5999999977648258,
+        "gpuMs": null
+      },
+      {
+        "id": 86,
+        "intervalMs": 16.599999999998545,
+        "cpuMs": 0.29999999701976776,
+        "gpuMs": null
+      },
+      {
+        "id": 87,
+        "intervalMs": 450,
+        "cpuMs": 0.8999999985098839,
+        "gpuMs": null
+      },
+      {
+        "id": 88,
+        "intervalMs": 16.700000000000728,
+        "cpuMs": 0.19999999925494194,
+        "gpuMs": null
+      },
+      {
+        "id": 89,
+        "intervalMs": 16.600000000002183,
+        "cpuMs": 0.4000000022351742,
+        "gpuMs": null
+      },
+      {
+        "id": 90,
+        "intervalMs": 16.69999999999709,
+        "cpuMs": 0.3999999985098839,
+        "gpuMs": null
+      },
+      {
+        "id": 91,
+        "intervalMs": 500,
+        "cpuMs": 0.8999999985098839,
+        "gpuMs": null
+      },
+      {
+        "id": 92,
+        "intervalMs": 433.3000000000029,
+        "cpuMs": 1.199999999254942,
+        "gpuMs": null
+      },
+      {
+        "id": 93,
+        "intervalMs": 449.8999999999978,
+        "cpuMs": 0.6999999992549419,
+        "gpuMs": null
+      },
+      {
+        "id": 94,
+        "intervalMs": 450.1000000000022,
+        "cpuMs": 0.6999999992549419,
+        "gpuMs": null
+      },
+      {
+        "id": 95,
+        "intervalMs": 449.8999999999978,
+        "cpuMs": 0.5999999977648258,
+        "gpuMs": null
+      },
+      {
+        "id": 96,
+        "intervalMs": 16.700000000000728,
+        "cpuMs": 0.5,
+        "gpuMs": null
+      },
+      {
+        "id": 97,
+        "intervalMs": 50,
+        "cpuMs": 0.30000000074505806,
+        "gpuMs": null
+      },
+      {
+        "id": 98,
+        "intervalMs": 16.599999999998545,
+        "cpuMs": 0.30000000074505806,
+        "gpuMs": null
+      },
+      {
+        "id": 99,
+        "intervalMs": 16.700000000000728,
+        "cpuMs": 3.5,
+        "gpuMs": null
+      },
+      {
+        "id": 100,
+        "intervalMs": 500,
+        "cpuMs": 4.300000000745058,
+        "gpuMs": null
+      },
+      {
+        "id": 101,
+        "intervalMs": 466.7000000000007,
+        "cpuMs": 0.6999999992549419,
+        "gpuMs": null
+      },
+      {
+        "id": 102,
+        "intervalMs": 16.599999999998545,
+        "cpuMs": 0.30000000074505806,
+        "gpuMs": null
+      },
+      {
+        "id": 103,
+        "intervalMs": 933.3000000000029,
+        "cpuMs": 0.8000000007450581,
+        "gpuMs": null
+      },
+      {
+        "id": 104,
+        "intervalMs": 450,
+        "cpuMs": 0.8000000007450581,
+        "gpuMs": null
+      },
+      {
+        "id": 105,
+        "intervalMs": 16.69999999999709,
+        "cpuMs": 0.6999999992549419,
+        "gpuMs": null
+      },
+      {
+        "id": 106,
+        "intervalMs": 16.700000000000728,
+        "cpuMs": 0.10000000149011612,
+        "gpuMs": null
+      },
+      {
+        "id": 107,
+        "intervalMs": 16.600000000002183,
+        "cpuMs": 0.6999999992549419,
+        "gpuMs": null
+      },
+      {
+        "id": 108,
+        "intervalMs": 50,
+        "cpuMs": 0.5999999977648258,
+        "gpuMs": null
+      },
+      {
+        "id": 109,
+        "intervalMs": 416.59999999999854,
+        "cpuMs": 1.300000000745058,
+        "gpuMs": null
+      },
+      {
+        "id": 110,
+        "intervalMs": 466.6999999999971,
+        "cpuMs": 0.6999999992549419,
+        "gpuMs": null
+      },
+      {
+        "id": 111,
+        "intervalMs": 16.700000000004366,
+        "cpuMs": 0.30000000074505806,
+        "gpuMs": null
+      },
+      {
+        "id": 112,
+        "intervalMs": 433.29999999999563,
+        "cpuMs": 0.7999999970197678,
+        "gpuMs": null
+      },
+      {
+        "id": 113,
+        "intervalMs": 399.90000000000146,
+        "cpuMs": 0.8000000007450581,
+        "gpuMs": null
+      },
+      {
+        "id": 114,
+        "intervalMs": 466.70000000000437,
+        "cpuMs": 0.6000000014901161,
+        "gpuMs": null
+      },
+      {
+        "id": 115,
+        "intervalMs": 16.69999999999709,
+        "cpuMs": 0.10000000149011612,
+        "gpuMs": null
+      },
+      {
+        "id": 116,
+        "intervalMs": 16.69999999999709,
+        "cpuMs": 1.0999999977648258,
+        "gpuMs": null
+      },
+      {
+        "id": 117,
+        "intervalMs": 16.60000000000582,
+        "cpuMs": 0.6000000014901161,
+        "gpuMs": null
+      },
+      {
+        "id": 118,
+        "intervalMs": 450,
+        "cpuMs": 0.6000000014901161,
+        "gpuMs": null
+      },
+      {
+        "id": 119,
+        "intervalMs": 16.69999999999709,
+        "cpuMs": 0.5,
+        "gpuMs": null
+      },
+      {
+        "id": 120,
+        "intervalMs": 400,
+        "cpuMs": 0.8000000007450581,
+        "gpuMs": null
+      },
+      {
+        "id": 121,
+        "intervalMs": 816.5999999999985,
+        "cpuMs": 0.7999999970197678,
+        "gpuMs": null
+      },
+      {
+        "id": 122,
+        "intervalMs": 483.3000000000029,
+        "cpuMs": 0.19999999925494194,
+        "gpuMs": null
+      },
+      {
+        "id": 123,
+        "intervalMs": 16.69999999999709,
+        "cpuMs": 0.3999999985098839,
+        "gpuMs": null
+      },
+      {
+        "id": 124,
+        "intervalMs": 399.90000000000146,
+        "cpuMs": 0.29999999701976776,
+        "gpuMs": null
+      },
+      {
+        "id": 125,
+        "intervalMs": 483.3000000000029,
+        "cpuMs": 0.8999999985098839,
+        "gpuMs": null
+      },
+      {
+        "id": 126,
+        "intervalMs": 16.69999999999709,
+        "cpuMs": 0.30000000074505806,
+        "gpuMs": null
+      },
+      {
+        "id": 127,
+        "intervalMs": 16.69999999999709,
+        "cpuMs": 0.30000000074505806,
+        "gpuMs": null
+      },
+      {
+        "id": 128,
+        "intervalMs": 33.30000000000291,
+        "cpuMs": 0.5,
+        "gpuMs": null
+      },
+      {
+        "id": 129,
+        "intervalMs": 416.59999999999854,
+        "cpuMs": 0.8999999985098839,
+        "gpuMs": null
+      },
+      {
+        "id": 130,
+        "intervalMs": 433.40000000000146,
+        "cpuMs": 1,
+        "gpuMs": null
+      },
+      {
+        "id": 131,
+        "intervalMs": 416.59999999999854,
+        "cpuMs": 0.30000000074505806,
+        "gpuMs": null
+      },
+      {
+        "id": 132,
+        "intervalMs": 466.70000000000437,
+        "cpuMs": 0.6999999992549419,
+        "gpuMs": null
+      },
+      {
+        "id": 133,
+        "intervalMs": 583.2999999999956,
+        "cpuMs": 0.5999999977648258,
+        "gpuMs": null
+      },
+      {
+        "id": 134,
+        "intervalMs": 16.700000000004366,
+        "cpuMs": 0.19999999925494194,
+        "gpuMs": null
+      },
+      {
+        "id": 135,
+        "intervalMs": 16.69999999999709,
+        "cpuMs": 0.10000000149011612,
+        "gpuMs": null
+      },
+      {
+        "id": 136,
+        "intervalMs": 16.599999999998545,
+        "cpuMs": 0.3999999985098839,
+        "gpuMs": null
+      },
+      {
+        "id": 137,
+        "intervalMs": 16.700000000004366,
+        "cpuMs": 2.5,
+        "gpuMs": null
+      },
+      {
+        "id": 138,
+        "intervalMs": 16.69999999999709,
+        "cpuMs": 0.30000000074505806,
+        "gpuMs": null
+      },
+      {
+        "id": 139,
+        "intervalMs": 449.90000000000146,
+        "cpuMs": 2.300000000745058,
+        "gpuMs": null
+      },
+      {
+        "id": 140,
+        "intervalMs": 983.2999999999956,
+        "cpuMs": 0.8000000007450581,
+        "gpuMs": null
+      },
+      {
+        "id": 141,
+        "intervalMs": 16.60000000000582,
+        "cpuMs": 0.30000000074505806,
+        "gpuMs": null
+      },
+      {
+        "id": 142,
+        "intervalMs": 400,
+        "cpuMs": 0.5,
+        "gpuMs": null
+      },
+      {
+        "id": 143,
+        "intervalMs": 916.6999999999971,
+        "cpuMs": 0.8000000007450581,
+        "gpuMs": null
+      },
+      {
+        "id": 144,
+        "intervalMs": 50,
+        "cpuMs": 0.30000000074505806,
+        "gpuMs": null
+      },
+      {
+        "id": 145,
+        "intervalMs": 999.9000000000015,
+        "cpuMs": 0.8999999985098839,
+        "gpuMs": null
+      },
+      {
+        "id": 146,
+        "intervalMs": 16.69999999999709,
+        "cpuMs": 0.29999999701976776,
+        "gpuMs": null
+      },
+      {
+        "id": 147,
+        "intervalMs": 416.70000000000437,
+        "cpuMs": 0.7999999970197678,
+        "gpuMs": null
+      },
+      {
+        "id": 148,
+        "intervalMs": 483.29999999999563,
+        "cpuMs": 0.6000000014901161,
+        "gpuMs": null
+      },
+      {
+        "id": 149,
+        "intervalMs": 933.3000000000029,
+        "cpuMs": 1.699999999254942,
+        "gpuMs": null
+      },
+      {
+        "id": 150,
+        "intervalMs": 50,
+        "cpuMs": 0.30000000074505806,
+        "gpuMs": null
+      },
+      {
+        "id": 151,
+        "intervalMs": 899.9000000000015,
+        "cpuMs": 1.5,
+        "gpuMs": null
+      },
+      {
+        "id": 152,
+        "intervalMs": 16.69999999999709,
+        "cpuMs": 0.09999999776482582,
+        "gpuMs": null
+      },
+      {
+        "id": 153,
+        "intervalMs": 483.3000000000029,
+        "cpuMs": 0.8000000007450581,
+        "gpuMs": null
+      },
+      {
+        "id": 154,
+        "intervalMs": 433.29999999999563,
+        "cpuMs": 0.5,
+        "gpuMs": null
+      },
+      {
+        "id": 155,
+        "intervalMs": 500,
+        "cpuMs": 0.6999999992549419,
+        "gpuMs": null
+      },
+      {
+        "id": 156,
+        "intervalMs": 483.40000000000146,
+        "cpuMs": 1,
+        "gpuMs": null
+      },
+      {
+        "id": 157,
+        "intervalMs": 1016.5,
+        "cpuMs": 0.19999999925494194,
+        "gpuMs": null
+      },
+      {
+        "id": 158,
+        "intervalMs": 16.80000000000291,
+        "cpuMs": 0.30000000074505806,
+        "gpuMs": null
+      },
+      {
+        "id": 159,
+        "intervalMs": 899.7999999999956,
+        "cpuMs": 1,
+        "gpuMs": null
+      },
+      {
+        "id": 160,
+        "intervalMs": 66.80000000000291,
+        "cpuMs": 0.8000000007450581,
+        "gpuMs": null
+      },
+      {
+        "id": 161,
+        "intervalMs": 16.599999999998545,
+        "cpuMs": 0.30000000074505806,
+        "gpuMs": null
+      },
+      {
+        "id": 162,
+        "intervalMs": 799.9000000000015,
+        "cpuMs": 0.19999999925494194,
+        "gpuMs": null
+      },
+      {
+        "id": 163,
+        "intervalMs": 983.4000000000015,
+        "cpuMs": 0.8999999985098839,
+        "gpuMs": null
+      },
+      {
+        "id": 164,
+        "intervalMs": 466.59999999999854,
+        "cpuMs": 0.8000000007450581,
+        "gpuMs": null
+      },
+      {
+        "id": 165,
+        "intervalMs": 433.40000000000146,
+        "cpuMs": 0.09999999776482582,
+        "gpuMs": null
+      },
+      {
+        "id": 166,
+        "intervalMs": 416.59999999999854,
+        "cpuMs": 0.8999999985098839,
+        "gpuMs": null
+      },
+      {
+        "id": 167,
+        "intervalMs": 16.599999999998545,
+        "cpuMs": 0.30000000074505806,
+        "gpuMs": null
+      },
+      {
+        "id": 168,
+        "intervalMs": 850,
+        "cpuMs": 1,
+        "gpuMs": null
+      },
+      {
+        "id": 169,
+        "intervalMs": 16.69999999999709,
+        "cpuMs": 0.30000000074505806,
+        "gpuMs": null
+      },
+      {
+        "id": 170,
+        "intervalMs": 500,
+        "cpuMs": 0.5,
+        "gpuMs": null
+      },
+      {
+        "id": 171,
+        "intervalMs": 483.3000000000029,
+        "cpuMs": 1.3999999985098839,
+        "gpuMs": null
+      },
+      {
+        "id": 172,
+        "intervalMs": 916.5999999999985,
+        "cpuMs": 1.4000000022351742,
+        "gpuMs": null
+      },
+      {
+        "id": 173,
+        "intervalMs": 416.59999999999854,
+        "cpuMs": 0.20000000298023224,
+        "gpuMs": null
+      },
+      {
+        "id": 174,
+        "intervalMs": 416.70000000000437,
+        "cpuMs": 1,
+        "gpuMs": null
+      },
+      {
+        "id": 175,
+        "intervalMs": 50,
+        "cpuMs": 2.899999998509884,
+        "gpuMs": null
+      },
+      {
+        "id": 176,
+        "intervalMs": 1033.199999999997,
+        "cpuMs": 0.9000000022351742,
+        "gpuMs": null
+      },
+      {
+        "id": 177,
+        "intervalMs": 516.8000000000029,
+        "cpuMs": 0.5,
+        "gpuMs": null
+      },
+      {
+        "id": 178,
+        "intervalMs": 499.90000000000146,
+        "cpuMs": 0.9000000022351742,
+        "gpuMs": null
+      },
+      {
+        "id": 179,
+        "intervalMs": 50,
+        "cpuMs": 0.20000000298023224,
+        "gpuMs": null
+      },
+      {
+        "id": 180,
+        "intervalMs": 433.3999999999942,
+        "cpuMs": 1.300000000745058,
+        "gpuMs": null
+      },
+      {
+        "id": 181,
+        "intervalMs": 516.6000000000058,
+        "cpuMs": 3,
+        "gpuMs": null
+      },
+      {
+        "id": 182,
+        "intervalMs": 450,
+        "cpuMs": 0.4000000022351742,
+        "gpuMs": null
+      },
+      {
+        "id": 183,
+        "intervalMs": 433.1999999999971,
+        "cpuMs": 0.9000000022351742,
+        "gpuMs": null
+      },
+      {
+        "id": 184,
+        "intervalMs": 500,
+        "cpuMs": 1,
+        "gpuMs": null
+      },
+      {
+        "id": 185,
+        "intervalMs": 483.40000000000146,
+        "cpuMs": 0.6000000014901161,
+        "gpuMs": null
+      },
+      {
+        "id": 186,
+        "intervalMs": 1083.199999999997,
+        "cpuMs": 1,
+        "gpuMs": null
+      },
+      {
+        "id": 187,
+        "intervalMs": 16.700000000004366,
+        "cpuMs": 0.3999999985098839,
+        "gpuMs": null
+      },
+      {
+        "id": 188,
+        "intervalMs": 433.3999999999942,
+        "cpuMs": 0.8000000007450581,
+        "gpuMs": null
+      },
+      {
+        "id": 189,
+        "intervalMs": 550,
+        "cpuMs": 0.30000000074505806,
+        "gpuMs": null
+      },
+      {
+        "id": 190,
+        "intervalMs": 433.20000000000437,
+        "cpuMs": 1.5,
+        "gpuMs": null
+      },
+      {
+        "id": 191,
+        "intervalMs": 516.5999999999985,
+        "cpuMs": 0.5999999977648258,
+        "gpuMs": null
+      },
+      {
+        "id": 192,
+        "intervalMs": 1050,
+        "cpuMs": 0.8000000007450581,
+        "gpuMs": null
+      },
+      {
+        "id": 193,
+        "intervalMs": 16.69999999999709,
+        "cpuMs": 944.1999999992549,
+        "gpuMs": null
+      },
+      {
+        "id": 194,
+        "intervalMs": 950,
+        "cpuMs": 0.5999999977648258,
+        "gpuMs": null
+      },
+      {
+        "id": 195,
+        "intervalMs": 33.30000000000291,
+        "cpuMs": 0.29999999701976776,
+        "gpuMs": null
+      },
+      {
+        "id": 196,
+        "intervalMs": 516.6000000000058,
+        "cpuMs": 1,
+        "gpuMs": null
+      },
+      {
+        "id": 197,
+        "intervalMs": 16.69999999999709,
+        "cpuMs": 1.199999999254942,
+        "gpuMs": null
+      },
+      {
+        "id": 198,
+        "intervalMs": 266.6999999999971,
+        "cpuMs": 0.30000000074505806,
+        "gpuMs": null
+      },
+      {
+        "id": 199,
+        "intervalMs": 233.3000000000029,
+        "cpuMs": 1,
+        "gpuMs": null
+      },
+      {
+        "id": 200,
+        "intervalMs": 266.6999999999971,
+        "cpuMs": 1.3999999985098839,
+        "gpuMs": null
+      }
+    ],
+    "captures": [
+      {
+        "id": 200,
+        "label": "manual latest"
+      },
+      {
+        "id": 200,
+        "label": "manual latest"
+      }
+    ],
+    "stats": {
+      "droppedSpans": 0,
+      "depthOverflows": 0,
+      "providerErrors": 0,
+      "unbalancedFrames": 0,
+      "expiredGpuSamples": 0,
+      "lastCaptureMs": 0.10000000149011612,
+      "lastExportMs": 0,
+      "lastProviderError": ""
+    }
+  },
+  "captures": [
+    {
+      "version": 1,
+      "id": 3,
+      "label": "manual latest",
+      "frame": {
+        "id": 200,
+        "intervalMs": 266.6999999999971,
+        "cpuMs": 1.3999999985098839,
+        "gpuMs": null,
+        "collectionMs": 0,
+        "unscopedMs": 0,
+        "simulationTime": 11.633333333333491,
+        "paused": false,
+        "failed": false,
+        "droppedSpans": 0,
+        "scopes": [
+          {
+            "name": "diagnostics.collect",
+            "inclusiveMs": 0,
+            "selfMs": 0,
+            "calls": 1
+          },
+          {
+            "name": "lobby.preparation",
+            "inclusiveMs": 0,
+            "selfMs": 0,
+            "calls": 1
+          },
+          {
+            "name": "lobby.input",
+            "inclusiveMs": 0.10000000149011612,
+            "selfMs": 0,
+            "calls": 1
+          },
+          {
+            "name": "lobby.boundary",
+            "inclusiveMs": 0,
+            "selfMs": 0,
+            "calls": 5
+          },
+          {
+            "name": "lobby.update",
+            "inclusiveMs": 0.19999999925494194,
+            "selfMs": 0,
+            "calls": 5
+          },
+          {
+            "name": "lobby.render",
+            "inclusiveMs": 1.0999999977648258,
+            "selfMs": 0,
+            "calls": 1
+          },
+          {
+            "name": "input.devices",
+            "inclusiveMs": 0.10000000149011612,
+            "selfMs": 0.10000000149011612,
+            "calls": 1
+          },
+          {
+            "name": "atrium.locomotion",
+            "inclusiveMs": 0,
+            "selfMs": 0,
+            "calls": 5
+          },
+          {
+            "name": "atrium.status",
+            "inclusiveMs": 0.19999999925494194,
+            "selfMs": 0.19999999925494194,
+            "calls": 1
+          },
+          {
+            "name": "atrium.simulation",
+            "inclusiveMs": 0.19999999925494194,
+            "selfMs": 0,
+            "calls": 5
+          },
+          {
+            "name": "atrium.presentation",
+            "inclusiveMs": 0.3999999985098839,
+            "selfMs": 0.3999999985098839,
+            "calls": 1
+          },
+          {
+            "name": "world.transfer",
+            "inclusiveMs": 0,
+            "selfMs": 0,
+            "calls": 5
+          },
+          {
+            "name": "profiler.viewer",
+            "inclusiveMs": 0.6999999992549419,
+            "selfMs": 0.6999999992549419,
+            "calls": 1
+          }
+        ],
+        "counters": [
+          {
+            "name": "renderer.draws",
+            "unit": "count",
+            "value": 1
+          },
+          {
+            "name": "renderer.instances",
+            "unit": "count",
+            "value": 118
+          },
+          {
+            "name": "renderer.uploads",
+            "unit": "count",
+            "value": 1
+          },
+          {
+            "name": "renderer.uploadedBytes",
+            "unit": "bytes",
+            "value": 4
+          },
+          {
+            "name": "renderer.candidates",
+            "unit": "count",
+            "value": 118
+          },
+          {
+            "name": "renderer.culled",
+            "unit": "count",
+            "value": 0
+          },
+          {
+            "name": "renderer.buffers",
+            "unit": "count",
+            "value": 3
+          },
+          {
+            "name": "renderer.programs",
+            "unit": "count",
+            "value": 1
+          },
+          {
+            "name": "renderer.vaos",
+            "unit": "count",
+            "value": 2
+          },
+          {
+            "name": "renderer.cpuBuffers",
+            "unit": "bytes",
+            "value": 196608
+          },
+          {
+            "name": "renderer.gpuBuffers",
+            "unit": "bytes",
+            "value": 197472
+          },
+          {
+            "name": "renderer.gpuPending",
+            "unit": "count",
+            "value": 0
+          },
+          {
+            "name": "directory.worlds",
+            "unit": "count",
+            "value": 2
+          },
+          {
+            "name": "directory.entities",
+            "unit": "count",
+            "value": 232
+          },
+          {
+            "name": "directory.resources",
+            "unit": "count",
+            "value": 2
+          },
+          {
+            "name": "directory.leases",
+            "unit": "count",
+            "value": 2
+          },
+          {
+            "name": "directory.ownedCpuBuffers",
+            "unit": "bytes",
+            "value": 196608
+          },
+          {
+            "name": "directory.ownedGpuBuffers",
+            "unit": "bytes",
+            "value": 196608
+          },
+          {
+            "name": "directory.savedState",
+            "unit": "bytes",
+            "value": 69
+          },
+          {
+            "name": "directory.resident",
+            "unit": "count",
+            "value": 2
+          },
+          {
+            "name": "runtime.steps",
+            "unit": "count",
+            "value": 5
+          },
+          {
+            "name": "runtime.dropped",
+            "unit": "ms",
+            "value": 183.36666666666446
+          },
+          {
+            "name": "runtime.paused",
+            "unit": "flag",
+            "value": 0
+          },
+          {
+            "name": "preparation.chunks",
+            "unit": "count",
+            "value": 0
+          },
+          {
+            "name": "preparation.pending",
+            "unit": "count",
+            "value": 0
+          }
+        ],
+        "spans": [
+          {
+            "scope": "lobby.preparation",
+            "startMs": 0,
+            "durationMs": 0,
+            "depth": 0
+          },
+          {
+            "scope": "lobby.input",
+            "startMs": 0,
+            "durationMs": 0.10000000149011612,
+            "depth": 0
+          },
+          {
+            "scope": "input.devices",
+            "startMs": 0,
+            "durationMs": 0.10000000149011612,
+            "depth": 1
+          },
+          {
+            "scope": "lobby.boundary",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 0
+          },
+          {
+            "scope": "world.transfer",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 1
+          },
+          {
+            "scope": "lobby.update",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 0
+          },
+          {
+            "scope": "atrium.simulation",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 1
+          },
+          {
+            "scope": "atrium.locomotion",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 2
+          },
+          {
+            "scope": "lobby.boundary",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 0
+          },
+          {
+            "scope": "world.transfer",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 1
+          },
+          {
+            "scope": "lobby.update",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 0
+          },
+          {
+            "scope": "atrium.simulation",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 1
+          },
+          {
+            "scope": "atrium.locomotion",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 2
+          },
+          {
+            "scope": "lobby.boundary",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 0
+          },
+          {
+            "scope": "world.transfer",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 1
+          },
+          {
+            "scope": "lobby.update",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 0
+          },
+          {
+            "scope": "atrium.simulation",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 1
+          },
+          {
+            "scope": "atrium.locomotion",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 2
+          },
+          {
+            "scope": "lobby.boundary",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 0
+          },
+          {
+            "scope": "world.transfer",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 1
+          },
+          {
+            "scope": "lobby.update",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0.19999999925494194,
+            "depth": 0
+          },
+          {
+            "scope": "atrium.simulation",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0.19999999925494194,
+            "depth": 1
+          },
+          {
+            "scope": "atrium.locomotion",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 2
+          },
+          {
+            "scope": "atrium.status",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0.19999999925494194,
+            "depth": 2
+          },
+          {
+            "scope": "lobby.boundary",
+            "startMs": 0.30000000074505806,
+            "durationMs": 0,
+            "depth": 0
+          },
+          {
+            "scope": "world.transfer",
+            "startMs": 0.30000000074505806,
+            "durationMs": 0,
+            "depth": 1
+          },
+          {
+            "scope": "lobby.update",
+            "startMs": 0.30000000074505806,
+            "durationMs": 0,
+            "depth": 0
+          },
+          {
+            "scope": "atrium.simulation",
+            "startMs": 0.30000000074505806,
+            "durationMs": 0,
+            "depth": 1
+          },
+          {
+            "scope": "atrium.locomotion",
+            "startMs": 0.30000000074505806,
+            "durationMs": 0,
+            "depth": 2
+          },
+          {
+            "scope": "lobby.render",
+            "startMs": 0.30000000074505806,
+            "durationMs": 1.0999999977648258,
+            "depth": 0
+          },
+          {
+            "scope": "atrium.presentation",
+            "startMs": 0.30000000074505806,
+            "durationMs": 0.3999999985098839,
+            "depth": 1
+          },
+          {
+            "scope": "profiler.viewer",
+            "startMs": 0.6999999992549419,
+            "durationMs": 0.6999999992549419,
+            "depth": 1
+          },
+          {
+            "scope": "diagnostics.collect",
+            "startMs": 1.3999999985098839,
+            "durationMs": 0,
+            "depth": 0
+          }
+        ]
+      },
+      "providerDetails": {
+        "timing": "current state at capture time; frame counters belong to the recorded frame",
+        "data": {
+          "renderer": {
+            "gpuTimer": {
+              "supported": true,
+              "enabled": false,
+              "pending": 0,
+              "capacity": 4,
+              "completed": 0,
+              "skipped": 0,
+              "disjoint": 0,
+              "reportErrors": 0
+            },
+            "buffers": 3,
+            "programs": 1,
+            "vertexArrays": 2,
+            "viewport": {
+              "width": 1024,
+              "height": 720
+            },
+            "accounting": "Requested GL buffer bytes only. Default framebuffer, shader/driver storage and browser heap are excluded."
+          },
+          "directory": {
+            "worlds": [
+              {
+                "id": "world:2835",
+                "entities": 112
+              },
+              {
+                "id": "world:2834",
+                "entities": 120
+              }
+            ],
+            "resources": [
+              {
+                "key": "batch:world:2835",
+                "leases": 1,
+                "owners": [
+                  {
+                    "owner": "realm:violet/world:2835",
+                    "count": 1
+                  }
+                ],
+                "kind": "instance-buffer",
+                "cpuBufferBytes": 98304,
+                "gpuBufferBytes": 98304
+              },
+              {
+                "key": "batch:world:2834",
+                "leases": 1,
+                "owners": [
+                  {
+                    "owner": "realm:amber/world:2834",
+                    "count": 1
+                  }
+                ],
+                "kind": "instance-buffer",
+                "cpuBufferBytes": 98304,
+                "gpuBufferBytes": 98304
+              }
+            ],
+            "residency": [
+              {
+                "key": "journey:2833:violet",
+                "worldId": "world:2835",
+                "status": "ready",
+                "owners": 0
+              },
+              {
+                "key": "journey:2833:amber",
+                "worldId": "world:2834",
+                "status": "ready",
+                "owners": 1
+              }
+            ],
+            "limits": {
+              "rows": 64,
+              "worldCapacity": 2,
+              "snapshotBytes": 65536
+            },
+            "snapshotBytes": 69,
+            "note": "Owned buffer accounting overlaps renderer totals; do not add them twice. Driver/JS heap excluded."
+          },
+          "runtime": {
+            "stepSeconds": 0.016666666666666666,
+            "maxSteps": 5,
+            "simulationTime": 12.30000000000019,
+            "pausedReasons": [],
+            "preparation": {
+              "pending": 0,
+              "budgetMs": 2,
+              "maxSteps": 2,
+              "steps": 189,
+              "peakChunkMs": 3.899999998509884,
+              "cancelled": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "version": 1,
+      "id": 4,
+      "label": "manual latest",
+      "frame": {
+        "id": 200,
+        "intervalMs": 266.6999999999971,
+        "cpuMs": 1.3999999985098839,
+        "gpuMs": null,
+        "collectionMs": 0,
+        "unscopedMs": 0,
+        "simulationTime": 11.633333333333491,
+        "paused": false,
+        "failed": false,
+        "droppedSpans": 0,
+        "scopes": [
+          {
+            "name": "diagnostics.collect",
+            "inclusiveMs": 0,
+            "selfMs": 0,
+            "calls": 1
+          },
+          {
+            "name": "lobby.preparation",
+            "inclusiveMs": 0,
+            "selfMs": 0,
+            "calls": 1
+          },
+          {
+            "name": "lobby.input",
+            "inclusiveMs": 0.10000000149011612,
+            "selfMs": 0,
+            "calls": 1
+          },
+          {
+            "name": "lobby.boundary",
+            "inclusiveMs": 0,
+            "selfMs": 0,
+            "calls": 5
+          },
+          {
+            "name": "lobby.update",
+            "inclusiveMs": 0.19999999925494194,
+            "selfMs": 0,
+            "calls": 5
+          },
+          {
+            "name": "lobby.render",
+            "inclusiveMs": 1.0999999977648258,
+            "selfMs": 0,
+            "calls": 1
+          },
+          {
+            "name": "input.devices",
+            "inclusiveMs": 0.10000000149011612,
+            "selfMs": 0.10000000149011612,
+            "calls": 1
+          },
+          {
+            "name": "atrium.locomotion",
+            "inclusiveMs": 0,
+            "selfMs": 0,
+            "calls": 5
+          },
+          {
+            "name": "atrium.status",
+            "inclusiveMs": 0.19999999925494194,
+            "selfMs": 0.19999999925494194,
+            "calls": 1
+          },
+          {
+            "name": "atrium.simulation",
+            "inclusiveMs": 0.19999999925494194,
+            "selfMs": 0,
+            "calls": 5
+          },
+          {
+            "name": "atrium.presentation",
+            "inclusiveMs": 0.3999999985098839,
+            "selfMs": 0.3999999985098839,
+            "calls": 1
+          },
+          {
+            "name": "world.transfer",
+            "inclusiveMs": 0,
+            "selfMs": 0,
+            "calls": 5
+          },
+          {
+            "name": "profiler.viewer",
+            "inclusiveMs": 0.6999999992549419,
+            "selfMs": 0.6999999992549419,
+            "calls": 1
+          }
+        ],
+        "counters": [
+          {
+            "name": "renderer.draws",
+            "unit": "count",
+            "value": 1
+          },
+          {
+            "name": "renderer.instances",
+            "unit": "count",
+            "value": 118
+          },
+          {
+            "name": "renderer.uploads",
+            "unit": "count",
+            "value": 1
+          },
+          {
+            "name": "renderer.uploadedBytes",
+            "unit": "bytes",
+            "value": 4
+          },
+          {
+            "name": "renderer.candidates",
+            "unit": "count",
+            "value": 118
+          },
+          {
+            "name": "renderer.culled",
+            "unit": "count",
+            "value": 0
+          },
+          {
+            "name": "renderer.buffers",
+            "unit": "count",
+            "value": 3
+          },
+          {
+            "name": "renderer.programs",
+            "unit": "count",
+            "value": 1
+          },
+          {
+            "name": "renderer.vaos",
+            "unit": "count",
+            "value": 2
+          },
+          {
+            "name": "renderer.cpuBuffers",
+            "unit": "bytes",
+            "value": 196608
+          },
+          {
+            "name": "renderer.gpuBuffers",
+            "unit": "bytes",
+            "value": 197472
+          },
+          {
+            "name": "renderer.gpuPending",
+            "unit": "count",
+            "value": 0
+          },
+          {
+            "name": "directory.worlds",
+            "unit": "count",
+            "value": 2
+          },
+          {
+            "name": "directory.entities",
+            "unit": "count",
+            "value": 232
+          },
+          {
+            "name": "directory.resources",
+            "unit": "count",
+            "value": 2
+          },
+          {
+            "name": "directory.leases",
+            "unit": "count",
+            "value": 2
+          },
+          {
+            "name": "directory.ownedCpuBuffers",
+            "unit": "bytes",
+            "value": 196608
+          },
+          {
+            "name": "directory.ownedGpuBuffers",
+            "unit": "bytes",
+            "value": 196608
+          },
+          {
+            "name": "directory.savedState",
+            "unit": "bytes",
+            "value": 69
+          },
+          {
+            "name": "directory.resident",
+            "unit": "count",
+            "value": 2
+          },
+          {
+            "name": "runtime.steps",
+            "unit": "count",
+            "value": 5
+          },
+          {
+            "name": "runtime.dropped",
+            "unit": "ms",
+            "value": 183.36666666666446
+          },
+          {
+            "name": "runtime.paused",
+            "unit": "flag",
+            "value": 0
+          },
+          {
+            "name": "preparation.chunks",
+            "unit": "count",
+            "value": 0
+          },
+          {
+            "name": "preparation.pending",
+            "unit": "count",
+            "value": 0
+          }
+        ],
+        "spans": [
+          {
+            "scope": "lobby.preparation",
+            "startMs": 0,
+            "durationMs": 0,
+            "depth": 0
+          },
+          {
+            "scope": "lobby.input",
+            "startMs": 0,
+            "durationMs": 0.10000000149011612,
+            "depth": 0
+          },
+          {
+            "scope": "input.devices",
+            "startMs": 0,
+            "durationMs": 0.10000000149011612,
+            "depth": 1
+          },
+          {
+            "scope": "lobby.boundary",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 0
+          },
+          {
+            "scope": "world.transfer",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 1
+          },
+          {
+            "scope": "lobby.update",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 0
+          },
+          {
+            "scope": "atrium.simulation",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 1
+          },
+          {
+            "scope": "atrium.locomotion",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 2
+          },
+          {
+            "scope": "lobby.boundary",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 0
+          },
+          {
+            "scope": "world.transfer",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 1
+          },
+          {
+            "scope": "lobby.update",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 0
+          },
+          {
+            "scope": "atrium.simulation",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 1
+          },
+          {
+            "scope": "atrium.locomotion",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 2
+          },
+          {
+            "scope": "lobby.boundary",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 0
+          },
+          {
+            "scope": "world.transfer",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 1
+          },
+          {
+            "scope": "lobby.update",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 0
+          },
+          {
+            "scope": "atrium.simulation",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 1
+          },
+          {
+            "scope": "atrium.locomotion",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 2
+          },
+          {
+            "scope": "lobby.boundary",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 0
+          },
+          {
+            "scope": "world.transfer",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 1
+          },
+          {
+            "scope": "lobby.update",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0.19999999925494194,
+            "depth": 0
+          },
+          {
+            "scope": "atrium.simulation",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0.19999999925494194,
+            "depth": 1
+          },
+          {
+            "scope": "atrium.locomotion",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0,
+            "depth": 2
+          },
+          {
+            "scope": "atrium.status",
+            "startMs": 0.10000000149011612,
+            "durationMs": 0.19999999925494194,
+            "depth": 2
+          },
+          {
+            "scope": "lobby.boundary",
+            "startMs": 0.30000000074505806,
+            "durationMs": 0,
+            "depth": 0
+          },
+          {
+            "scope": "world.transfer",
+            "startMs": 0.30000000074505806,
+            "durationMs": 0,
+            "depth": 1
+          },
+          {
+            "scope": "lobby.update",
+            "startMs": 0.30000000074505806,
+            "durationMs": 0,
+            "depth": 0
+          },
+          {
+            "scope": "atrium.simulation",
+            "startMs": 0.30000000074505806,
+            "durationMs": 0,
+            "depth": 1
+          },
+          {
+            "scope": "atrium.locomotion",
+            "startMs": 0.30000000074505806,
+            "durationMs": 0,
+            "depth": 2
+          },
+          {
+            "scope": "lobby.render",
+            "startMs": 0.30000000074505806,
+            "durationMs": 1.0999999977648258,
+            "depth": 0
+          },
+          {
+            "scope": "atrium.presentation",
+            "startMs": 0.30000000074505806,
+            "durationMs": 0.3999999985098839,
+            "depth": 1
+          },
+          {
+            "scope": "profiler.viewer",
+            "startMs": 0.6999999992549419,
+            "durationMs": 0.6999999992549419,
+            "depth": 1
+          },
+          {
+            "scope": "diagnostics.collect",
+            "startMs": 1.3999999985098839,
+            "durationMs": 0,
+            "depth": 0
+          }
+        ]
+      },
+      "providerDetails": {
+        "timing": "current state at capture time; frame counters belong to the recorded frame",
+        "data": {
+          "renderer": {
+            "gpuTimer": {
+              "supported": true,
+              "enabled": false,
+              "pending": 0,
+              "capacity": 4,
+              "completed": 0,
+              "skipped": 0,
+              "disjoint": 0,
+              "reportErrors": 0
+            },
+            "buffers": 3,
+            "programs": 1,
+            "vertexArrays": 2,
+            "viewport": {
+              "width": 1024,
+              "height": 720
+            },
+            "accounting": "Requested GL buffer bytes only. Default framebuffer, shader/driver storage and browser heap are excluded."
+          },
+          "directory": {
+            "worlds": [
+              {
+                "id": "world:2835",
+                "entities": 112
+              },
+              {
+                "id": "world:2834",
+                "entities": 120
+              }
+            ],
+            "resources": [
+              {
+                "key": "batch:world:2835",
+                "leases": 1,
+                "owners": [
+                  {
+                    "owner": "realm:violet/world:2835",
+                    "count": 1
+                  }
+                ],
+                "kind": "instance-buffer",
+                "cpuBufferBytes": 98304,
+                "gpuBufferBytes": 98304
+              },
+              {
+                "key": "batch:world:2834",
+                "leases": 1,
+                "owners": [
+                  {
+                    "owner": "realm:amber/world:2834",
+                    "count": 1
+                  }
+                ],
+                "kind": "instance-buffer",
+                "cpuBufferBytes": 98304,
+                "gpuBufferBytes": 98304
+              }
+            ],
+            "residency": [
+              {
+                "key": "journey:2833:violet",
+                "worldId": "world:2835",
+                "status": "ready",
+                "owners": 0
+              },
+              {
+                "key": "journey:2833:amber",
+                "worldId": "world:2834",
+                "status": "ready",
+                "owners": 1
+              }
+            ],
+            "limits": {
+              "rows": 64,
+              "worldCapacity": 2,
+              "snapshotBytes": 65536
+            },
+            "snapshotBytes": 69,
+            "note": "Owned buffer accounting overlaps renderer totals; do not add them twice. Driver/JS heap excluded."
+          },
+          "runtime": {
+            "stepSeconds": 0.016666666666666666,
+            "maxSteps": 5,
+            "simulationTime": 12.466666666666866,
+            "pausedReasons": [],
+            "preparation": {
+              "pending": 0,
+              "budgetMs": 2,
+              "maxSteps": 2,
+              "steps": 189,
+              "peakChunkMs": 3.899999998509884,
+              "cancelled": 0
+            }
+          }
+        }
+      }
+    }
+  ]
+}

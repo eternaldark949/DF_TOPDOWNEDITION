@@ -35,7 +35,7 @@ export function createJourney(engine) {
     resource.world.snapshot();
     travel=new WorldTravel({residency,initial,root:actor.root});
     life.own(()=>travel.dispose());
-    life.own(lobby.on('boundary',time=>travel.advance(time)));
+    life.own(lobby.on('boundary',time=>travel.advance(time),'world.transfer'));
     life.own(travel.onCommit(()=>{
       // Destination's active ticket replaces its warm pin. The departed world becomes
       // an unpinned cache entry, allowing explicit trimming or future LRU eviction.
