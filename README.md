@@ -29,7 +29,9 @@ New ideas are welcome. Distinguish agreed requirements from proposed details and
 9. [Simulation ambition and shared contracts](#9-simulation-ambition-and-shared-contracts)
 10. [Python-engine carryovers](#10-python-engine-carryovers)
 11. [Integration and acceptance scenarios](#11-integration-and-acceptance-scenarios)
-12. [Remaining decisions and implementation sequence](#12-next-planning-decisions--not-implementation-authorization)
+12. [Comments and architectural discipline](#12-comments-and-architectural-discipline)
+13. [First runnable engine milestone](#13-proposed-first-runnable-engine-milestone)
+14. [Remaining decisions and implementation sequence](#14-next-planning-decisions--not-implementation-authorization)
 
 ## Decision status
 
@@ -430,7 +432,63 @@ These are planning targets for meaningful demonstrations after implementation is
 
 Diagnostics should make the relevant costs observable: recording storage, residency, active voices, perception candidates, traversal queries, entity/attachment counts, and GPU ownership. Establish numeric budgets against representative devices instead of inventing unlimited capacity.
 
-## 12. Next planning decisions — not implementation authorization
+## 12. Comments and architectural discipline
+
+**Agreed owner requirement:** comment everything generously so the owner can return with a PC, understand the implementation, and edit it confidently. Accessibility to the owner is a design requirement, not optional documentation work at the end.
+
+### Comments as part of implementation
+
+- Every source file explains its purpose, house placement, responsibilities, dependencies, and how it fits into the runtime. Include a useful reading path where several files cooperate.
+- Every class, function, method, configuration structure, and shader has an explanation of its purpose and behavior. Document parameters, units, coordinate spaces, defaults, return values, mutations, ownership, and lifecycle obligations where applicable. Explain internal helpers as well as public entry points.
+- Comment meaningful blocks and non-obvious statements, including math, buffer layouts, shader stages, state transitions, ordering, event handling, cancellation, pooling, and resource release. Explain both what happens and why the choice fits the engine.
+- Explain how to adjust intended customization points, with small examples where useful. Distinguish safe tuning parameters from structural invariants. A newcomer to JavaScript should not have to infer an undocumented convention before making an ordinary edit.
+- Record limitations, assumptions, failure behavior, and relevant plan/contract links near the implementation. Clearly identify unfinished behavior; do not describe a stub as an implemented feature.
+- Keep comments synchronized with code in the same change. Generous comments must remain accurate, specific, and readable. Comment volume is welcome; a comment must not conceal a confusing design or substitute for giving a responsibility its proper home.
+- A change is incomplete when its implementation is understandable only through the assistant's chat explanation. Preserve the necessary explanation in source and maintained documentation.
+
+### No bolted-on architecture
+
+- Place every responsibility in its agreed level and separate engine mechanisms from game policy. Use sections 2–5 and 10 as the placement reference.
+- If work reveals a misplaced responsibility, move it to the appropriate place and update imports, registrations, documentation, and affected checks as part of the same coherent change. Do not leave cleanup as an indefinite follow-up.
+- Do not introduce god objects, bandaid classes, duplicate sources of truth, prototype overrides, hidden globals, parallel update loops, or feature-specific bypasses to avoid correcting ownership.
+- A legitimate new class or module needs a clear responsibility, owner, lifecycle, and dependency direction. Wrapping misplaced code in another class does not repair the boundary.
+- Extend an existing contract when the new capability belongs there; design a focused contract when responsibilities truly differ. Do not force unrelated systems into a universal manager or create speculative abstraction layers.
+- When the agreed structure does not yet express a required responsibility, record the design decision and establish its proper home before dependent work. Do not silently rename the house or turn ETRNLNINE into a catch-all.
+- Review placement, dependencies, disposal, comments, and independent-engine operation with each implementation change. Functional output alone does not satisfy the architecture requirement.
+
+## 13. Proposed first runnable engine milestone
+
+**Recommendation, not implementation authorization:** build one small, complete path through the agreed architecture. The result is a working engine with a separately defined interactive demonstration, not a claim that all planned simulation systems are finished.
+
+### Immediately practical scope
+
+| Home | First working responsibilities |
+| --- | --- |
+| Basement | Stable entity identities; local/world transforms and lightweight attachments; explicit resource/disposal contracts; device/action input; a minimal native WebGL renderer with retained geometry/material resources and resize handling. |
+| Lobby | One animation-frame owner; a fixed simulation step with bounded catch-up; render interpolation; explicit input/update/render phases; pause reasons; clean start, stop, and disposal. Document handling of browser suspension and large elapsed times. |
+| Directory | Registration and lookup of a small set of presets/resources; explicit acquisition/release; ownership of the demonstration's active world and its resources through Basement contracts. No bulk loading of every toy. |
+| Penthouse | A simple configurable actor/building toy, a lightweight attachment, and parameterized touch button/joystick instances built on the engine's input interfaces. These are reusable toys, not hard-coded Freelancer entities. |
+| ETRNLNINE | Construct/connect the levels and expose the agreed lifecycle entry points. Keep detailed rendering, gameplay, and device handling in their responsible modules. |
+| Independent example | Supply its own world, bindings, actor configuration, movement/interaction behavior, and camera settings. Move an actor, show its attached item, and interact with a small scene without importing Freelancer. |
+
+**Proposed initial rendering direction:** direct WebGL 2, modular JavaScript source, no runtime framework, and an offline HTML build containing the required code/assets. This matches the stated direction but remains a choice to record before implementation. No Canvas 2D path, Canvas-prepared textures/text, CDN, or network-required runtime. Rendering text is a separate explicit GPU design decision; do not use a hidden Canvas workaround to make a debug label.
+
+Keyboard, mouse, touch, and gamepad input should all produce real action state in this milestone. Touch controls are instances of documented templates. Cover focus loss, pointer cancellation, device disconnect, and disposal. Distinguish software checks from actual physical-device validation; do not claim a gamepad or phone has been tested when it has not.
+
+Use explicit world identity and shared clock/ownership contracts now so streaming, dimensional transfers, GRecorder, and body-aware traversal have a sound place later. The first milestone need not implement their full behavior or pre-create empty managers for every future feature.
+
+### Order and completion evidence
+
+1. Record the minimal interfaces, rendering/build choice, and phase/time rules needed for this milestone; keep unrelated feature decisions open.
+2. Boot and dispose an empty engine through ETRNLNINE, with clear source comments and no Freelancer dependency.
+3. Register a toy/resource through Directory, instantiate it in the independent example, and render it through the native GPU path.
+4. Drive the example through the common action system and configurable controls. Exercise attachment updates, pause/resume, resizing, and cleanup through the same runtime.
+5. Verify repeated start/stop and scene replacement without accumulating loops, event listeners, entities, or GPU resources. Check meaningful input/lifecycle boundaries, browser errors, and representative frame/resource costs.
+6. Produce a self-contained offline HTML artifact and actual runtime screenshots. Provide a short source-reading guide and parameter-editing examples so the owner can navigate and customize the implementation.
+
+The immediate follow-on should exercise the existing contracts with two small world contexts and prepared flits between them, including cancelled/unready transfers and resource cleanup. Then build richer locomotion/body response, traversal/perception, and state recording in coherent integrated increments. Exact follow-on order remains a planning decision; the feature scope in section 10 is retained.
+
+## 14. Next planning decisions — not implementation authorization
 
 Before implementation, agree and record:
 
