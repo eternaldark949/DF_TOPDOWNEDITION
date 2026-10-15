@@ -17,7 +17,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
     },
     clearWorld(){
         if(!this.glBuildings)return;
-        this.glBuildings?.clear();
+        this.glBuildings?.clear();this.glGround?.clear();
         this.surfaces.clear();
         if(this.playerSprite)this.objects.addChild(this.playerSprite);for(const r of this.fixtureNodes.values())this.fixtures.addChild(r.node);
         this.presentation.clear();this.nightHeat.clear();this.nativeCasters.clear();
@@ -60,11 +60,9 @@ Object.assign(NativeWebGLRenderer.prototype,{
         const visible=(o,pad=60)=>o.visible!==false&&o.x>=bounds.left-pad&&o.x<=bounds.right+pad&&o.y>=bounds.top-pad&&o.y<=bounds.bottom+pad;
         let people=0,vehicles=0,buildings=0;
         const ground=this.groundContext;ground.begin();
-        if(map.id==='hub_949'&&L.floor){game.groundBaker.draw(ground,bounds);
-            // GroundBaker's CPU LRU owns tile lifetime. Retire matching GPU
-            // textures when those tiles leave it, including views at other LODs.
-            const keep=new Set(game.groundBaker.cache.values());for(const [image,t]of ground.images)if(!keep.has(image)){ground.images.delete(image);this.releaseImage(t);}
-        }
+        // The city's ground is native GPU geometry (gl/ground.js), built once for the map
+        if(!this.glGround)this.glGround=new GLGround(this,this.floorArt,this.floorArt.getChildIndex(ground.root));
+        if(game.groundBaker?.activeFor(map)&&L.floor)this.glGround.sync(game,bounds);else this.glGround.hide();
         timings.groundMs=performance.now()-lap;lap=performance.now();
         const foliage=this.foliageContext;foliage.begin();
         const street=this.streetContext;street.begin();if(L.streetDetails){

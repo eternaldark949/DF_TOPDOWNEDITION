@@ -16,7 +16,8 @@
 const GLB_STRIDE = 3 + 3 + 3 + 4 + 4 + 4 + 4 + 4 + 4;
 // anim types (vertex shader)
 const GLB_ANIM = { NONE: 0, SPIN: 1, CAUSTIC: 2, SWAY: 3, SHIMMER: 4, BLINK_ON: 5, BLINK_OFF: 6, WINDOW: 7, SKY: 8, SHEEN: 9, RIM: 10, RADIAL: 11, FLICKER: 12, GLOW: 13, TV: 14, WINDOW_TV: 15, BEAM: 16, BREATHE: 17, FADE: 18, SIGN: 19, RIPPLE: 20,
-                   SQ_LIGHT: 21, SQ_MOVE: 22, SQ_WINDOW: 23, SQ_SIGN: 24 };   // 21-24: the Silver Queen (gl/silver-queen.js)
+                   SQ_LIGHT: 21, SQ_MOVE: 22, SQ_WINDOW: 23, SQ_SIGN: 24,   // 21-24: the Silver Queen (gl/silver-queen.js)
+                   GROUND: 34 };   // the city ground's per-pixel texture (gl/ground.js): (kind, a, b)
 // line flags
 const GLB_LINE = { SCALE_K: 1, SQUARE: 2 };
 
@@ -212,7 +213,7 @@ class GLBuildingMesh extends PIXI.Mesh {
             uniform mat3 projectionMatrix; uniform mat3 translationMatrix;
             uniform vec2 uCam; uniform float uC; uniform float uH; uniform float uLod; uniform float uTime; uniform float uPx;
             uniform vec4 uSun; uniform vec3 uSunRGB; uniform vec4 uRim; uniform vec4 uNight; uniform float uFade;
-            varying vec4 vColor; varying vec3 vLine; varying vec4 vText; varying vec2 vWorld; varying vec4 vRadial; varying vec4 vClip;
+            varying vec4 vColor; varying vec3 vLine; varying vec4 vText; varying vec2 vWorld; varying vec4 vRadial; varying vec4 vClip; varying vec4 vGround;
             float kOf(vec3 p, float mode){ return mode < .5 ? 1. + p.z / (uC - uH) : uC / (uC - min(p.z, uC * .86)); }
             vec2 lean(vec3 p, float mode){ return uCam + (p.xy - uCam) * kOf(p, mode); }
             float hash(float s, float i){ return fract(sin(s * 12.9898 + i * 78.233) * 43758.5453); }
@@ -266,7 +267,7 @@ class GLBuildingMesh extends PIXI.Mesh {
             }
             void main(){
                 vec3 P = aPos; float mode = aLine.w; vec4 col = aColor; float hide = 0.;
-                vRadial = vec4(0.); vClip = vec4(0.);
+                vRadial = vec4(0.); vClip = vec4(0.); vGround = vec4(0.);
                 // the face this belongs to: hidden when it turns away; detail gated by how much of the wall shows
                 if (aMeta.x > .5) {
                     if (dot(aFace.xy, uCam - aFace.zw) <= 0.) hide = 1.;
@@ -417,6 +418,7 @@ class GLBuildingMesh extends PIXI.Mesh {
                         col.a *= .22 * (1. - ph);
                     }
                 }
+                if (ty > 33.5 && ty < 34.5) vGround = vec4(aAnim.yzw, 1.);
                 vec2 S = lean(P, mode);
                 if (ty > 15.5 && ty < 16.5) {                              // a searchlight: from its lamp (leaned), sweeping; aAnim (phase, heading, side)
                     float ang = -1.5708 + sin(t * .22 + aAnim.y) * .85 + aAnim.z;
@@ -453,10 +455,23 @@ class GLBuildingMesh extends PIXI.Mesh {
                 gl_Position = hide > .5 ? vec4(2., 2., 2., 1.) : vec4((projectionMatrix * translationMatrix * vec3(S, 1.)).xy, 0., 1.);
             }`;
         const fs = `precision mediump float;
-            varying vec4 vColor; varying vec3 vLine; varying vec4 vText; varying vec2 vWorld; varying vec4 vRadial; varying vec4 vClip;
+            varying vec4 vColor; varying vec3 vLine; varying vec4 vText; varying highp vec2 vWorld; varying vec4 vRadial; varying vec4 vClip; varying vec4 vGround;
             uniform sampler2D uFont; uniform float uAlpha;
             void main(){
                 float a = 1.;
+                if (vGround.w > .5) {                                     // the city ground (gl/ground.js)
+                    if (vGround.x < 1.5) {                                // 1 grain: a speck in this 2 x 1.5 px cell, with chance a (b: seed)
+                        highp vec2 c = mod(floor(vWorld / vec2(2., 1.5)), 4096.);
+                        if (fract(sin(dot(c, vec2(12.9898, 78.233)) + vGround.z) * 43758.5453) >= vGround.y) discard;
+                    } else {                                              // 2 pavement: 25 px tiles, a third darker, the odd one lighter, dark seams
+                        highp vec2 g = floor(vWorld / 25.), f = vWorld - g * 25.; g = mod(g, 4096.);
+                        float h = fract(sin(dot(g, vec2(1.6877, 9.2285)) + 234.7) * 43758.5453);
+                        vec3 col = vColor.rgb / max(vColor.a, .001);
+                        if (h < .35) col = vec3(39., 35., 45.) / 255.; else if (h > .93) col = mix(col, vec3(1., .925, .98), .035);
+                        if (f.x < 1. || f.y < 1.) col = mix(col, vec3(8., 6., 12.) / 255., .55);
+                        gl_FragColor = vec4(col, 1.) * (vColor.a * uAlpha); return;
+                    }
+                }
                 if (vClip.x != vClip.z) {                                 // Silver Queen: cut by a roof rect (x0 > x1: kept inside it)
                     vec2 lo = min(vClip.xy, vClip.zw), hi = max(vClip.xy, vClip.zw);
                     bool inR = vWorld.x > lo.x && vWorld.x < hi.x && vWorld.y > lo.y && vWorld.y < hi.y;
