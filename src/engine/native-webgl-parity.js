@@ -82,7 +82,8 @@ Object.assign(NativeWebGLRenderer.prototype,{
     syncSceneDepth(game){
         const root=this.peopleContext.root,L=this.layers;root.sortableChildren=!!L.depthSort;
         for(const [p,r]of this.props){r.group.zIndex=p.y+(p.height||p.h||0)/2;const parent=L.depthSort&&p.hasCollision&&!p.noNav?root:this.objects;parent.addChild(r.group);}
-        for(const r of this.fixtureNodes.values())(L.depthSort&&L.fixtures?root:this.fixtures).addChild(r.node);
+        // Interior lamp bodies stay over furniture, as Canvas paints them last (engine/draw.js); city lamps depth-sort.
+        const sortLamps=L.depthSort&&L.fixtures&&game.activeMap.id==='hub_949';for(const r of this.fixtureNodes.values())(sortLamps?root:this.fixtures).addChild(r.node);
         for(const [d,r]of this.doorNodes){r.node.zIndex=d.y+(d.h||0)/2;(L.depthSort&&L.doors?root:this.doors).addChild(r.node);}
         for(const group of this.trafficContext.root.children.slice())if(group._nativeEntity&&L.depthSort)root.addChild(group);
         if(L.depthSort){this.playerSprite.zIndex=game.player.y;root.addChild(this.playerSprite);root.sortChildren();}
