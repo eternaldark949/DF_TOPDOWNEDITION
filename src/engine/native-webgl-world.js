@@ -87,6 +87,9 @@ Object.assign(NativeWebGLRenderer.prototype,{
             for(const car of cars)if(visible(car,180)){traffic.save();traffic.globalAlpha=car.fade??1;car._lod=_zoomLOD>0?1:0;if(L.depthSort)traffic.withDepth(car,()=>car.draw(traffic));else car.draw(traffic);this.nativeCasters.vehicle(car);traffic.restore();vehicles++;}
         }
         timings.vehiclesMs=performance.now()-lap;lap=performance.now();
+        // Frame pacing for actor re-posing (NativeCasterBodies.capture): every frame at 30+ fps, every 2nd/3rd when slower.
+        const tNow=performance.now(),dt=this.lastWorldAt?Math.min(250,tNow-this.lastWorldAt):16;this.lastWorldAt=tNow;this.frameMsAvg=(this.frameMsAvg||16)*.9+dt*.1;
+        this.bodyInterval=L.characterAnimation?(this.frameMsAvg>66?3:this.frameMsAvg>36?2:1):1;
         const actors=this.peopleContext;actors.begin();this.objects.addChild(actors.root);this.objects.addChild(this.playerSprite);
         if(L.people){
             // Native actors use live geometry even when the Canvas setting chooses

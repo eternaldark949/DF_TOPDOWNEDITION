@@ -59409,6 +59409,9 @@ Object.assign(NativeWebGLRenderer.prototype,{
             for(const car of cars)if(visible(car,180)){traffic.save();traffic.globalAlpha=car.fade??1;car._lod=_zoomLOD>0?1:0;if(L.depthSort)traffic.withDepth(car,()=>car.draw(traffic));else car.draw(traffic);this.nativeCasters.vehicle(car);traffic.restore();vehicles++;}
         }
         timings.vehiclesMs=performance.now()-lap;lap=performance.now();
+        // Frame pacing for actor re-posing (NativeCasterBodies.capture): every frame at 30+ fps, every 2nd/3rd when slower.
+        const tNow=performance.now(),dt=this.lastWorldAt?Math.min(250,tNow-this.lastWorldAt):16;this.lastWorldAt=tNow;this.frameMsAvg=(this.frameMsAvg||16)*.9+dt*.1;
+        this.bodyInterval=L.characterAnimation?(this.frameMsAvg>66?3:this.frameMsAvg>36?2:1):1;
         const actors=this.peopleContext;actors.begin();this.objects.addChild(actors.root);this.objects.addChild(this.playerSprite);
         if(L.people){
             // Native actors use live geometry even when the Canvas setting chooses
@@ -59776,7 +59779,7 @@ class NativeCasterBodies {
             this.lights.push(...(this.owner.transientSources||[]));
         }
         this.bodies=new Map();this.captures=0;
-        this.stats={shared:0,captures:0,refreshes:0,fallbacks:0,blocked:0,dropped:0,pairs:0,lights:0};
+        this.stats={shared:0,captures:0,refreshes:0,reused:0,fallbacks:0,blocked:0,dropped:0,pairs:0,lights:0};
     }
     note(ctx,e,body){
         if(ctx!==this.owner.peopleContext||!this.owner.layers.npcShadows||_zoomLOD>=2||e._reflectionProxy||e.inCar||e.dead||e.visible===false)return;
@@ -59787,23 +59790,30 @@ class NativeCasterBodies {
     }
     nearLight(e){return this.lights.some(l=>Math.hypot(l.x-e.x,l.y-e.y)<(l.lightRadius||l.radius||Math.hypot(l.w||0,l.h||0)/2||200));}
     capture(ctx,e,c,draw){
-        const heat=this.owner.nightHeat.wants(e),shadow=this.owner.layers.lighting&&_zoomLOD<2&&this.owner.layers.npcShadows&&this.owner.layers.shapeShadows&&this.nearLight(e);
-        if((!heat&&!shadow)||e._reflectionProxy||e.inCar||e.dead)return false;
+        const heat=this.owner.nightHeat.wants(e),shadow=this.owner.layers.lighting&&_zoomLOD<2&&this.owner.layers.npcShadows&&this.owner.layers.shapeShadows&&this.nearLight(e),interval=this.owner.bodyInterval||1;
+        if((!heat&&!shadow&&interval<2)||e._reflectionProxy||e.inCar||e.dead)return false;
         if(this.captures>=(heat||!this.owner.nightHeat.stats.active?16:12)){if(heat)this.owner.nightHeat.stats.dropped++;return false;}
         let r=this.entries.get(e);
         if(!r){
             if(this.entries.size>=32){const old=[...this.entries].find(([,v])=>v.used<this.owner.frameId-2);if(!old){if(heat)this.owner.nightHeat.stats.dropped++;return false;}this.dispose(old[1]);this.entries.delete(old[0]);}
-            r={ctx:new NativeVectorContext(this.owner),target:this.owner.target(PIXI.RenderTexture.create({width:192,height:192,resolution:1,scaleMode:PIXI.SCALE_MODES.LINEAR}),'body-silhouette-target'),hash:null,revision:0};this.entries.set(e,r);
+            r={stagger:this.entries.size,ctx:new NativeVectorContext(this.owner),target:this.owner.target(PIXI.RenderTexture.create({width:192,height:192,resolution:1,scaleMode:PIXI.SCALE_MODES.LINEAR}),'body-silhouette-target'),hash:null,revision:0};this.entries.set(e,r);
         }
-        this.captures++;if(heat&&!shadow)this.owner.nightHeat.stats.forcedCaptures++;r.used=this.owner.frameId;r.ctx.begin();r.ctx.canvas=ctx.canvas;r.ctx.translate(96,96);
-        const m=ctx.matrix;r.ctx.worldFrame=_worldMatrix.multiply(new DOMMatrix([m.a,m.b,m.c,m.d,m.tx,m.ty]));
+        this.captures++;if(heat&&!shadow)this.owner.nightHeat.stats.forcedCaptures++;r.used=this.owner.frameId;
         if(this.owner.layers.contactShadows&&!c.noShadow&&_zoomLOD<2){const t=ctx.getTransform();_bodyRot=Math.atan2(t.b,t.a);drawHumanContactShadow(ctx,e);}
-        draw(r.ctx,e,{...c,noShadow:true,_crowdBake:true});
-        if(r.hash!==r.ctx.hash){this.owner.renderer.render(r.ctx.root,{renderTexture:r.target,clear:true});r.hash=r.ctx.hash;r.revision++;this.stats.refreshes++;}
+        // Slow frames (bodyInterval>1): each body re-poses on its own staggered frame, and in between
+        // its last pose rides along at its live position. A turn re-poses at once.
+        const angle=e.angle||0,turned=r.angle===undefined||Math.abs(Math.atan2(Math.sin(angle-r.angle),Math.cos(angle-r.angle)))>.15;
+        if(r.hash!==null&&interval>1&&!turned&&(this.owner.frameId+r.stagger)%interval!==0)this.stats.reused++;
+        else {
+            r.ctx.begin();r.ctx.canvas=ctx.canvas;r.ctx.translate(96,96);
+            const m=ctx.matrix;r.ctx.worldFrame=_worldMatrix.multiply(new DOMMatrix([m.a,m.b,m.c,m.d,m.tx,m.ty]));
+            draw(r.ctx,e,{...c,noShadow:true,_crowdBake:true});r.angle=angle;
+            if(r.hash!==r.ctx.hash){this.owner.renderer.render(r.ctx.root,{renderTexture:r.target,clear:true});r.hash=r.ctx.hash;r.revision++;r.bounds=r.ctx.root.getLocalBounds();this.stats.refreshes++;}
+        }
         ctx.current=null;const sprite=ctx.node(PIXI.Sprite);sprite.texture=r.target;sprite.alpha=ctx.globalAlpha;sprite.blendMode=ctx.globalCompositeOperation==='lighter'?PIXI.BLEND_MODES.ADD:PIXI.BLEND_MODES.NORMAL;
         sprite.transform.setFromMatrix(ctx.matrix.clone().append(new PIXI.Matrix(1,0,0,1,-96,-96)));ctx.current=null;
         this.owner.nightHeat.paint(ctx,e,{texture:r.target,size:192});
-        const sharedBefore=this.stats.shared;this.note(ctx,e,{texture:r.target,size:192,bounds:r.ctx.root.getLocalBounds(),key:r.target.baseTexture.uid+':'+r.revision});this.stats.shared=sharedBefore;this.stats.captures++;
+        const sharedBefore=this.stats.shared;this.note(ctx,e,{texture:r.target,size:192,bounds:r.bounds,key:r.target.baseTexture.uid+':'+r.revision});this.stats.shared=sharedBefore;this.stats.captures++;
         return true;
     }
     circle(e,opacity=1){
