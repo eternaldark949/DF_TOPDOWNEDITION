@@ -4828,7 +4828,7 @@ class NativeVectorContext {
     }
     measureText(text){const size=Number(/([0-9.]+)px/.exec(this.font)?.[1]||11);return {width:String(text).length*size*.62};}
     fillText(text,x,y){
-        if((/[^\x20-\x7e]/.test(String(text))||/Great Vibes|Chancery|Z003|cursive/.test(this.font))&&this.owner.presentation&&this.owner.presentation.text(this,text,x,y)!==false)return;
+        if((/[^\x20-\x7e]/.test(String(text))||/Great Vibes|Chancery|Z003|cursive|Georgia|(?<!sans-)serif|italic/.test(this.font))&&this.owner.presentation&&this.owner.presentation.text(this,text,x,y)!==false)return;
         this.hashValue(text);this.hashValue(this.font);this.hashValue(this.fillStyle);this.hashValue(this.globalAlpha);this.hashValue(x);this.hashValue(y);
         this.current=null;const n=this.node(PIXI.BitmapText),match=/([0-9.]+)px/.exec(this.font),size=match?Number(match[1]):11;
         n.text=String(text);n.fontSize=size;const color=this.color(this.fillStyle);n.tint=color.color;n.alpha=this.globalAlpha*color.alpha;
@@ -58722,6 +58722,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         const capture=this.qualityRebuildPending?this.capture:null;this.clearMap();this.capture=capture;this.qualityRebuildPending=false;this.map=game.activeMap;const map=this.map,top=map.cameraBounds?.top||0;
         if(map.id!=='hub_949')this.floor.addChild(new PIXI.Sprite(this.bake(map.width,map.height,c=>{
             c.fillStyle=map.floorColor;c.fillRect(0,0,map.width,map.height);
+            for(const z of map.floorZones||[]){c.fillStyle=z.color;c.fillRect(z.x,z.y,z.w,z.h);}   // under everything, as in Canvas
             for(const z of map.zones||[]){c.fillStyle=z.color;c.fillRect(z.x,z.y,z.w,z.h);
                 if(z.texture==='wood'){c.fillStyle='rgba(0,0,0,.15)';for(let py=z.y;py<z.y+z.h;py+=24)c.fillRect(z.x,py,z.w,1);c.fillStyle='rgba(255,255,255,.03)';c.fillRect(z.x,z.y,z.w,z.h);}
                 else if(z.texture==='carpet'){c.fillStyle='rgba(0,0,0,.06)';c.fillRect(z.x,z.y,z.w,4);c.fillRect(z.x,z.y+z.h-4,z.w,4);c.fillRect(z.x,z.y,4,z.h);c.fillRect(z.x+z.w-4,z.y,4,z.h);}}
@@ -58732,19 +58733,25 @@ Object.assign(NativeWebGLRenderer.prototype,{
             const backdrop=new PIXI.Sprite(this.bake(city.w,city.h,c=>{c.translate(-city.x,-city.y);city._stampLayer(c,city.base,city.res);}));
             backdrop.position.set(city.x,city.y);this.backdrop.addChild(backdrop);
         }
-        if(map.id!=='hub_949')this.floorArt.addChild(new PIXI.Sprite(this.bake(map.width,map.height,c=>{if(map.id==='apt_949')game.drawApartmentInterior(c);else INTERIOR_ART[map.id]?.floor?.(game,c);game.roomSystem.drawFloors(c);})));
+        if(map.id!=='hub_949')this.floorArt.addChild(new PIXI.Sprite(this.bake(map.width,map.height,c=>{if(map.id==='apt_949')game.drawApartmentInterior(c);else if(map.id==='moon_city_nightclub')game.drawClubInterior(c);else if(map.id==='keepers_hill'){if(!game._keeperHill)game.preloadKeeper();c.drawImage(game._keeperHill,0,0,KEEPER.HILL.w,KEEPER.HILL.h);}else INTERIOR_ART[map.id]?.floor?.(game,c);game.roomSystem.drawFloors(c);
+            // The faint grid Canvas lays over every floor but the city's baked ground (engine/draw.js).
+            c.strokeStyle='rgba(164, 105, 255, 0.1)';c.lineWidth=1;c.beginPath();
+            for(let x=0;x<=map.width;x+=100){c.moveTo(x,0);c.lineTo(x,map.height);}for(let y=0;y<=map.height;y+=100){c.moveTo(0,y);c.lineTo(map.width,y);}c.stroke();})));
         this.initWorld();
         this.windows.addChild(this.glassContext.root);
         this.walls.beginFill(0x222222).lineStyle(1,0x00f3ff,.3);
         for(const w of map.walls||[])this.walls.drawRect(w.x,w.y,w.w,w.h);this.walls.endFill();
         this.playerSprite=new PIXI.Sprite();this.playerSprite.anchor.set(.5);this.objects.addChild(this.playerSprite);
-        this.emissive.addChild(this.glowContext.root);this.fixtures.addChild(this.fixtureContext.root);const roofIndex=this.world.getChildIndex(this.roofStage),effectIndex=this.world.getChildIndex(this.projectileContext.root);this.world.setChildIndex(this.projectileContext.root,roofIndex-(effectIndex<roofIndex?1:0));this.message('');
+        this.emissive.addChild(this.glowContext.root);this.fixtures.addChild(this.fixtureContext.root);
+        // Canvas paints interior lamp bodies in its top layer, over furniture (engine/draw.js); the city keeps its depth-sorted fixtures.
+        this.world.removeChild(this.fixtures);this.world.addChildAt(this.fixtures,this.world.getChildIndex(this.objects)+(map.id==='hub_949'?0:1));const roofIndex=this.world.getChildIndex(this.roofStage),effectIndex=this.world.getChildIndex(this.projectileContext.root);this.world.setChildIndex(this.projectileContext.root,roofIndex-(effectIndex<roofIndex?1:0));this.message('');
     },
     syncLayers(game,view){
         const start=performance.now(),L=this.layers;
         this.postWorld.position.copyFrom(this.world.position);this.postWorld.scale.copyFrom(this.world.scale);
         this.syncBackdrop(game);
         this.floor.visible=this.floorArt.visible=L.floor;this.backdrop.visible=L.backdrop;this.walls.visible=L.walls;
+        if(L.floor)this.syncLiveFloor(game);   // floors with moving parts (native-webgl-light-sources.js)
         this.windows.visible=L.windows;this.doors.visible=L.doors;
         if(L.windows){const ctx=this.glassContext;ctx.begin();for(const win of game.roomSystem.windows||[])win.draw(ctx,game.dayCycle().daylight);}
         this.linenStage.visible=L.linens;
@@ -58973,7 +58980,8 @@ Object.assign(NativeWebGLRenderer.prototype,{
             this.skyLight.beginFill(0xffffff,a);for(const room of Object.values(game.roomSystem.rooms))if(room.type==='outdoor')for(const q of room.rects)this.skyLight.drawRect(q.x,q.y,q.w,q.h);this.skyLight.endFill();this.skyKey=skyKey;}
         this.skyLight.visible=true;this.skyLight.scale.set(view.zoom);this.skyLight.position.copyFrom(this.world.position);
         this.lightSprites.scale.set(view.zoom);this.lightSprites.position.copyFrom(this.world.position);
-        const sources=(game.lamps||[]).filter(l=>l.visible!==false).map(l=>({owner:l,x:l.x,y:l.y,radius:l.lightRadius||l.radius||200,
+        // Canvas lights every lamp, including the hidden light-only ones rooms place (map-entities.js hiddenLamp).
+        const sources=(game.lamps||[]).map(l=>({owner:l,x:l.x,y:l.y,radius:l.lightRadius||l.radius||200,
             color:l.color||'#ffeebb',elevation:l.elevation??84,wash:.08,lamp:true,colorWash:game.activeMap.type==='outdoor'?.22:.08,alpha:(game.activeMap.type==='outdoor'&&!game.dayCycle().lampsOn?0:1)*game.roomSystem.lampLight(l)*lampFlicker(l)*lampWake(l)*(l.intensity??1)}));
         if(L.decorLights){
             for(const p of game.props||[])if(p.visible!==false&&p.light){const c=p.getCenter(),q=p.light;
@@ -59005,14 +59013,14 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.lighting.uniforms.mapSize.set([game.activeMap.width,game.activeMap.height]);
         this.lighting.uniforms.nightTint=L.nightTint?1:0;
         this.lighting.uniforms.viewport.set([this.lightTarget.width,this.lightTarget.height]);
-        this.renderer.render(this.lightStage,{renderTexture:this.lightTarget,clear:true});
+        this.paintLightSources(game,view);this.renderer.render(this.lightStage,{renderTexture:this.lightTarget,clear:true});
         this.lighting.uniforms.colorGain=L.colorWash ? game.getAmbientDarkness() : 0;
         if(L.colorWash){
             this.lightBase.visible=false;this.skyLight.visible=false;this.surfaces.windowHole.root.visible=false;this.surfaces.windowColor.root.visible=true;
             if(!this.colorSprites){this.colorSprites=new PIXI.Container();this.lightStage.addChild(this.colorSprites);}this.colorSprites.visible=true;this.colorSprites.position.copyFrom(this.lightSprites.position);this.colorSprites.scale.copyFrom(this.lightSprites.scale);this.lightSprites.visible=false;
             for(let i=0;i<Math.max(sources.length,this.colorSprites.children.length);i++){let m=this.colorSprites.children[i];if(!m){m=new NativeLightColorMesh();this.colorSprites.addChild(m);}const source=sources[i];m.visible=!!source;if(!source)continue;const s=this.lightSprites.children[i],u=m.shader.uniforms;m.position.set(s.x-s.width/2,s.y-s.height/2);m.scale.set(s.width,s.height);u.hole=s.texture;if(m.color!==source.color){m.color=source.color;u.tint.set(new PIXI.Color(source.color).toArray().slice(0,3));}u.strength=s.alpha*(source.colorWash??source.wash);u.lamp=source.lamp?1:0;}
 
-            this.renderer.render(this.lightStage,{renderTexture:this.colorTarget,clear:true});this.colorSprites.visible=false;this.lightSprites.visible=true;this.lightBase.visible=true;this.skyLight.visible=true;this.surfaces.windowHole.root.visible=true;this.surfaces.windowColor.root.visible=false;
+            this.showLightSourceColor(true);this.renderer.render(this.lightStage,{renderTexture:this.colorTarget,clear:true});this.showLightSourceColor(false);this.colorSprites.visible=false;this.lightSprites.visible=true;this.lightBase.visible=true;this.skyLight.visible=true;this.surfaces.windowHole.root.visible=true;this.surfaces.windowColor.root.visible=false;
         }
         this.layerStages.lightingMs=performance.now()-start;
     }
@@ -59103,6 +59111,63 @@ class NativeLightColorMesh extends PIXI.Mesh{
             a=clamp(a*strength,0.,1.);gl_FragColor=vec4(rgb*a,a);
         }`,{hole:PIXI.Texture.EMPTY,tint:new Float32Array(3),strength:0,lamp:0}));this.blendMode=PIXI.BLEND_MODES.ADD;}
 }
+// Canvas light-layer sources that the native lamp list doesn't model (engine/lighting.js
+// steps 5-6): vending machines and medbays, and the nightclub's dance floor. Their own
+// paint routines replay into two GPU vector layers inside the light stage: 'hole' into
+// the illumination target (screen-blended white lifts the darkness, as destination-out
+// does in Canvas) and 'color' into the colour wash (additive, as 'lighter').
+// Floors that move (the club's tiles, Keepers Hill's life) are drawn live over the baked floor.
+// The live half of each map's floor; the static half is baked once (native-webgl-layers.js).
+const LIVE_FLOORS={
+    moon_city_nightclub:(g,c)=>g.drawClubFloorLights(c),
+    keepers_hill:(g,c)=>{g._drawHillLife(c);c.drawImage(g._keeperHouse,540,320);g._drawFloatingGable(c);}
+};
+Object.assign(NativeWebGLRenderer.prototype,{
+    initLightSources(){
+        this.sourceHole=new NativeVectorContext(this);this.sourceHole.label='source-holes';
+        this.sourceColor=new NativeVectorContext(this);this.sourceColor.label='source-color';
+        this.lightStage.addChild(this.sourceHole.root,this.sourceColor.root);this.sourceColor.root.visible=false;
+    },
+    paintLightSources(game,view){
+        // Map changes release the textures these layers cached; start each map with fresh ones.
+        if(this.sourceHole&&this.sourceMap!==game.activeMap){for(const c of [this.sourceHole,this.sourceColor])c.destroy();this.sourceHole=null;}
+        if(!this.sourceHole){this.initLightSources();this.sourceMap=game.activeMap;}
+        const hole=this.sourceHole,color=this.sourceColor,L=this.layers;
+        for(const c of [hole,color]){c.begin();c.canvas=game.canvas;c.setTransform(view.zoom,0,0,view.zoom,this.world.x,this.world.y);}
+        hole.root.visible=true;color.root.visible=false;
+        if(!L.decorLights)return;
+        const hw=game.canvas.width/(2*view.zoom),hh=game.canvas.height/(2*view.zoom);
+        const inView=(x,y,r)=>Math.abs(x-view.x)<hw+r&&Math.abs(y-view.y)<hh+r;
+        // Fallback paint path: the authored falloff without Canvas's per-source occlusion masks.
+        const drawLight=DynamicShadows.drawLight;DynamicShadows.drawLight=()=>false;
+        try{
+            hole.globalCompositeOperation='screen';color.globalCompositeOperation='lighter';
+            const time=_frameTime;
+            for(const p of game.props||[]){
+                if(p.visible===false||(p.interactionType!=='medbay_refill'&&p.interactionType!=='vending_machine'))continue;
+                const c=p.getCenter();if(!inView(c.x,c.y,180))continue;
+                const g={p,x:c.x,y:c.y,medbay:p.interactionType==='medbay_refill'},offset=(p.id||0)*1337;
+                const r=170*(g.medbay?1+Math.sin((time+offset)/400)*.05:1+Math.sin((time+offset)/50)*.02);
+                const mod=g.medbay?.9+Math.sin((time+offset)/400)*.2:1+Math.sin((time+offset)/50)*.05;
+                hole.globalAlpha=1;game._drawPropGlow(hole,g,'hole',r);
+                color.globalAlpha=Math.min(1,.2*mod);game._drawPropGlow(color,g,'color',r);
+            }
+            if(game.activeMap.id==='moon_city_nightclub'){game.clubLightLayer(hole,'hole');game.clubLightLayer(color,'color');}
+        }finally{DynamicShadows.drawLight=drawLight;}
+    },
+    // The colour pass renders the same light stage with the hole layers swapped for colour ones.
+    showLightSourceColor(on){if(!this.sourceHole)return;this.sourceHole.root.visible=!on;this.sourceColor.root.visible=on;},
+    // Floors with moving parts: the club's beat-driven tiles, and Keepers Hill's drifting clouds,
+    // nodding flowers and floating gable (the house sits between them, so it is drawn live too).
+    syncLiveFloor(game){
+        const id=game.activeMap?.id,draw=LIVE_FLOORS[id];
+        if(!draw){if(this.liveFloor)this.liveFloor.root.visible=false;return;}
+        if(this.liveFloor&&(this.liveFloor.root.destroyed||this.liveFloorMap!==game.activeMap)){if(!this.liveFloor.root.destroyed)this.liveFloor.destroy();this.liveFloor=null;}   // fresh per map
+        if(!this.liveFloor){this.liveFloor=new NativeVectorContext(this);this.liveFloor.label='live-floor';this.liveFloorMap=game.activeMap;}
+        const ctx=this.liveFloor;if(ctx.root.parent!==this.floorArt)this.floorArt.addChild(ctx.root);
+        ctx.root.visible=true;ctx.begin();ctx.canvas=game.canvas;draw(game,ctx);
+    }
+});
 // Apartment detail migration. Static art stays in resident textures; authored
 // live segments retain their original order and continuous clock on the GPU.
 const NATIVE_LIVE_DECOR=new Set(['apt_craft','apt_fireplace','apt_tub','apt_console','apt_plant','apt_telescope']);
@@ -59326,7 +59391,14 @@ Object.assign(NativeWebGLRenderer.prototype,{
         timings.groundMs=performance.now()-lap;lap=performance.now();
         const foliage=this.foliageContext;foliage.begin();
         const street=this.streetContext;street.begin();if(L.streetDetails){
-            for(const f of game.foliage||[])if(visible(f,140))f.draw(foliage,game.weather.wind,game.weather.windDirection,_gameTimeSec);
+            if(map.foliage){
+                // Same spatial query and density stride as Canvas's foliage pass (engine/draw.js).
+                const scale=GameSettings.getFoliageScale(),stride=scale<1?Math.round(1/scale):1,wind=game.weather?game.weather.wind:.3,dir=game.weather?game.weather.windDirection:1;
+                for(const {item:f,index}of game._queryRenderFoliage({left:bounds.left-140,right:bounds.right+140,top:bounds.top-140,bottom:bounds.bottom+140},this.foliageCandidates||(this.foliageCandidates=[]))){
+                    if(stride>1&&index%stride!==0)continue;if(visible(f,140))f.draw(foliage,wind,dir,_gameTimeSec);
+                }
+            }
+            if(game.leafParticles)game.leafParticles.draw(foliage);   // drifting leaves and petals, with or without trees
             for(const s of game.neonSigns||[])if(visible(s,150))s.draw(street,_frameTime);
             if(map.type==='outdoor')game.traffic?.drawSignals(street,bounds,map.crosswalks);
             game.drawDeliveryPackage(street,bounds);game.drawDropZone(street,bounds);
@@ -59770,7 +59842,8 @@ Object.assign(NativeWebGLRenderer.prototype,{
     syncSceneDepth(game){
         const root=this.peopleContext.root,L=this.layers;root.sortableChildren=!!L.depthSort;
         for(const [p,r]of this.props){r.group.zIndex=p.y+(p.height||p.h||0)/2;const parent=L.depthSort&&p.hasCollision&&!p.noNav?root:this.objects;parent.addChild(r.group);}
-        for(const r of this.fixtureNodes.values())(L.depthSort&&L.fixtures?root:this.fixtures).addChild(r.node);
+        // Interior lamp bodies stay over furniture, as Canvas paints them last (engine/draw.js); city lamps depth-sort.
+        const sortLamps=L.depthSort&&L.fixtures&&game.activeMap.id==='hub_949';for(const r of this.fixtureNodes.values())(sortLamps?root:this.fixtures).addChild(r.node);
         for(const [d,r]of this.doorNodes){r.node.zIndex=d.y+(d.h||0)/2;(L.depthSort&&L.doors?root:this.doors).addChild(r.node);}
         for(const group of this.trafficContext.root.children.slice())if(group._nativeEntity&&L.depthSort)root.addChild(group);
         if(L.depthSort){this.playerSprite.zIndex=game.player.y;root.addChild(this.playerSprite);root.sortChildren();}

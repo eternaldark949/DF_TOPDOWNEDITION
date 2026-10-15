@@ -77,6 +77,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         const capture=this.qualityRebuildPending?this.capture:null;this.clearMap();this.capture=capture;this.qualityRebuildPending=false;this.map=game.activeMap;const map=this.map,top=map.cameraBounds?.top||0;
         if(map.id!=='hub_949')this.floor.addChild(new PIXI.Sprite(this.bake(map.width,map.height,c=>{
             c.fillStyle=map.floorColor;c.fillRect(0,0,map.width,map.height);
+            for(const z of map.floorZones||[]){c.fillStyle=z.color;c.fillRect(z.x,z.y,z.w,z.h);}   // under everything, as in Canvas
             for(const z of map.zones||[]){c.fillStyle=z.color;c.fillRect(z.x,z.y,z.w,z.h);
                 if(z.texture==='wood'){c.fillStyle='rgba(0,0,0,.15)';for(let py=z.y;py<z.y+z.h;py+=24)c.fillRect(z.x,py,z.w,1);c.fillStyle='rgba(255,255,255,.03)';c.fillRect(z.x,z.y,z.w,z.h);}
                 else if(z.texture==='carpet'){c.fillStyle='rgba(0,0,0,.06)';c.fillRect(z.x,z.y,z.w,4);c.fillRect(z.x,z.y+z.h-4,z.w,4);c.fillRect(z.x,z.y,4,z.h);c.fillRect(z.x+z.w-4,z.y,4,z.h);}}
@@ -87,19 +88,25 @@ Object.assign(NativeWebGLRenderer.prototype,{
             const backdrop=new PIXI.Sprite(this.bake(city.w,city.h,c=>{c.translate(-city.x,-city.y);city._stampLayer(c,city.base,city.res);}));
             backdrop.position.set(city.x,city.y);this.backdrop.addChild(backdrop);
         }
-        if(map.id!=='hub_949')this.floorArt.addChild(new PIXI.Sprite(this.bake(map.width,map.height,c=>{if(map.id==='apt_949')game.drawApartmentInterior(c);else INTERIOR_ART[map.id]?.floor?.(game,c);game.roomSystem.drawFloors(c);})));
+        if(map.id!=='hub_949')this.floorArt.addChild(new PIXI.Sprite(this.bake(map.width,map.height,c=>{if(map.id==='apt_949')game.drawApartmentInterior(c);else if(map.id==='moon_city_nightclub')game.drawClubInterior(c);else if(map.id==='keepers_hill'){if(!game._keeperHill)game.preloadKeeper();c.drawImage(game._keeperHill,0,0,KEEPER.HILL.w,KEEPER.HILL.h);}else INTERIOR_ART[map.id]?.floor?.(game,c);game.roomSystem.drawFloors(c);
+            // The faint grid Canvas lays over every floor but the city's baked ground (engine/draw.js).
+            c.strokeStyle='rgba(164, 105, 255, 0.1)';c.lineWidth=1;c.beginPath();
+            for(let x=0;x<=map.width;x+=100){c.moveTo(x,0);c.lineTo(x,map.height);}for(let y=0;y<=map.height;y+=100){c.moveTo(0,y);c.lineTo(map.width,y);}c.stroke();})));
         this.initWorld();
         this.windows.addChild(this.glassContext.root);
         this.walls.beginFill(0x222222).lineStyle(1,0x00f3ff,.3);
         for(const w of map.walls||[])this.walls.drawRect(w.x,w.y,w.w,w.h);this.walls.endFill();
         this.playerSprite=new PIXI.Sprite();this.playerSprite.anchor.set(.5);this.objects.addChild(this.playerSprite);
-        this.emissive.addChild(this.glowContext.root);this.fixtures.addChild(this.fixtureContext.root);const roofIndex=this.world.getChildIndex(this.roofStage),effectIndex=this.world.getChildIndex(this.projectileContext.root);this.world.setChildIndex(this.projectileContext.root,roofIndex-(effectIndex<roofIndex?1:0));this.message('');
+        this.emissive.addChild(this.glowContext.root);this.fixtures.addChild(this.fixtureContext.root);
+        // Canvas paints interior lamp bodies in its top layer, over furniture (engine/draw.js); the city keeps its depth-sorted fixtures.
+        this.world.removeChild(this.fixtures);this.world.addChildAt(this.fixtures,this.world.getChildIndex(this.objects)+(map.id==='hub_949'?0:1));const roofIndex=this.world.getChildIndex(this.roofStage),effectIndex=this.world.getChildIndex(this.projectileContext.root);this.world.setChildIndex(this.projectileContext.root,roofIndex-(effectIndex<roofIndex?1:0));this.message('');
     },
     syncLayers(game,view){
         const start=performance.now(),L=this.layers;
         this.postWorld.position.copyFrom(this.world.position);this.postWorld.scale.copyFrom(this.world.scale);
         this.syncBackdrop(game);
         this.floor.visible=this.floorArt.visible=L.floor;this.backdrop.visible=L.backdrop;this.walls.visible=L.walls;
+        if(L.floor)this.syncLiveFloor(game);   // floors with moving parts (native-webgl-light-sources.js)
         this.windows.visible=L.windows;this.doors.visible=L.doors;
         if(L.windows){const ctx=this.glassContext;ctx.begin();for(const win of game.roomSystem.windows||[])win.draw(ctx,game.dayCycle().daylight);}
         this.linenStage.visible=L.linens;
@@ -328,7 +335,8 @@ Object.assign(NativeWebGLRenderer.prototype,{
             this.skyLight.beginFill(0xffffff,a);for(const room of Object.values(game.roomSystem.rooms))if(room.type==='outdoor')for(const q of room.rects)this.skyLight.drawRect(q.x,q.y,q.w,q.h);this.skyLight.endFill();this.skyKey=skyKey;}
         this.skyLight.visible=true;this.skyLight.scale.set(view.zoom);this.skyLight.position.copyFrom(this.world.position);
         this.lightSprites.scale.set(view.zoom);this.lightSprites.position.copyFrom(this.world.position);
-        const sources=(game.lamps||[]).filter(l=>l.visible!==false).map(l=>({owner:l,x:l.x,y:l.y,radius:l.lightRadius||l.radius||200,
+        // Canvas lights every lamp, including the hidden light-only ones rooms place (map-entities.js hiddenLamp).
+        const sources=(game.lamps||[]).map(l=>({owner:l,x:l.x,y:l.y,radius:l.lightRadius||l.radius||200,
             color:l.color||'#ffeebb',elevation:l.elevation??84,wash:.08,lamp:true,colorWash:game.activeMap.type==='outdoor'?.22:.08,alpha:(game.activeMap.type==='outdoor'&&!game.dayCycle().lampsOn?0:1)*game.roomSystem.lampLight(l)*lampFlicker(l)*lampWake(l)*(l.intensity??1)}));
         if(L.decorLights){
             for(const p of game.props||[])if(p.visible!==false&&p.light){const c=p.getCenter(),q=p.light;
@@ -360,14 +368,14 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.lighting.uniforms.mapSize.set([game.activeMap.width,game.activeMap.height]);
         this.lighting.uniforms.nightTint=L.nightTint?1:0;
         this.lighting.uniforms.viewport.set([this.lightTarget.width,this.lightTarget.height]);
-        this.renderer.render(this.lightStage,{renderTexture:this.lightTarget,clear:true});
+        this.paintLightSources(game,view);this.renderer.render(this.lightStage,{renderTexture:this.lightTarget,clear:true});
         this.lighting.uniforms.colorGain=L.colorWash ? game.getAmbientDarkness() : 0;
         if(L.colorWash){
             this.lightBase.visible=false;this.skyLight.visible=false;this.surfaces.windowHole.root.visible=false;this.surfaces.windowColor.root.visible=true;
             if(!this.colorSprites){this.colorSprites=new PIXI.Container();this.lightStage.addChild(this.colorSprites);}this.colorSprites.visible=true;this.colorSprites.position.copyFrom(this.lightSprites.position);this.colorSprites.scale.copyFrom(this.lightSprites.scale);this.lightSprites.visible=false;
             for(let i=0;i<Math.max(sources.length,this.colorSprites.children.length);i++){let m=this.colorSprites.children[i];if(!m){m=new NativeLightColorMesh();this.colorSprites.addChild(m);}const source=sources[i];m.visible=!!source;if(!source)continue;const s=this.lightSprites.children[i],u=m.shader.uniforms;m.position.set(s.x-s.width/2,s.y-s.height/2);m.scale.set(s.width,s.height);u.hole=s.texture;if(m.color!==source.color){m.color=source.color;u.tint.set(new PIXI.Color(source.color).toArray().slice(0,3));}u.strength=s.alpha*(source.colorWash??source.wash);u.lamp=source.lamp?1:0;}
 
-            this.renderer.render(this.lightStage,{renderTexture:this.colorTarget,clear:true});this.colorSprites.visible=false;this.lightSprites.visible=true;this.lightBase.visible=true;this.skyLight.visible=true;this.surfaces.windowHole.root.visible=true;this.surfaces.windowColor.root.visible=false;
+            this.showLightSourceColor(true);this.renderer.render(this.lightStage,{renderTexture:this.colorTarget,clear:true});this.showLightSourceColor(false);this.colorSprites.visible=false;this.lightSprites.visible=true;this.lightBase.visible=true;this.skyLight.visible=true;this.surfaces.windowHole.root.visible=true;this.surfaces.windowColor.root.visible=false;
         }
         this.layerStages.lightingMs=performance.now()-start;
     }

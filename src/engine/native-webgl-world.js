@@ -69,7 +69,14 @@ Object.assign(NativeWebGLRenderer.prototype,{
         timings.groundMs=performance.now()-lap;lap=performance.now();
         const foliage=this.foliageContext;foliage.begin();
         const street=this.streetContext;street.begin();if(L.streetDetails){
-            for(const f of game.foliage||[])if(visible(f,140))f.draw(foliage,game.weather.wind,game.weather.windDirection,_gameTimeSec);
+            if(map.foliage){
+                // Same spatial query and density stride as Canvas's foliage pass (engine/draw.js).
+                const scale=GameSettings.getFoliageScale(),stride=scale<1?Math.round(1/scale):1,wind=game.weather?game.weather.wind:.3,dir=game.weather?game.weather.windDirection:1;
+                for(const {item:f,index}of game._queryRenderFoliage({left:bounds.left-140,right:bounds.right+140,top:bounds.top-140,bottom:bounds.bottom+140},this.foliageCandidates||(this.foliageCandidates=[]))){
+                    if(stride>1&&index%stride!==0)continue;if(visible(f,140))f.draw(foliage,wind,dir,_gameTimeSec);
+                }
+            }
+            if(game.leafParticles)game.leafParticles.draw(foliage);   // drifting leaves and petals, with or without trees
             for(const s of game.neonSigns||[])if(visible(s,150))s.draw(street,_frameTime);
             if(map.type==='outdoor')game.traffic?.drawSignals(street,bounds,map.crosswalks);
             game.drawDeliveryPackage(street,bounds);game.drawDropZone(street,bounds);
