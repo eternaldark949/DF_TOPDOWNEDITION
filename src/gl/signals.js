@@ -54,8 +54,8 @@ const GLSignals = (() => {
     const glow = (B, x, y, r, k, a, core = 0) => {
         const col = t => rgba(k, a * (core ? (t < core ? 1 - (1 - .45) * t / core : .45 * (1 - (t - core) / (1 - core))) : 1 - t));
         const rings = core ? 2 : 1, ts = core ? [0, core, 1] : [0, 1], segs = 24, base = B.n;
-        B.vertex(P(x, y), undefined, undefined, 0, 0, 0, col(0));
-        for (let i = 1; i <= rings; i++) for (let j = 0; j < segs; j++) { const an = j / segs * Math.PI * 2; B.vertex(P(x + Math.cos(an) * r * ts[i], y + Math.sin(an) * r * ts[i]), undefined, undefined, 0, 0, 0, col(ts[i])); }
+        const c0 = col(0); B.flat(x, y, c0[0], c0[1], c0[2], c0[3]);
+        for (let i = 1; i <= rings; i++) { const c = col(ts[i]); for (let j = 0; j < segs; j++) { const an = j / segs * Math.PI * 2; B.flat(x + Math.cos(an) * r * ts[i], y + Math.sin(an) * r * ts[i], c[0], c[1], c[2], c[3]); } }
         for (let j = 0; j < segs; j++) B.index.push(base, base + 1 + j, base + 1 + (j + 1) % segs);
         for (let i = 1; i < rings; i++) for (let j = 0; j < segs; j++) { const a0 = base + 1 + (i - 1) * segs + j, b0 = base + 1 + (i - 1) * segs + (j + 1) % segs; B.index.push(a0, a0 + segs, b0 + segs, a0, b0 + segs, b0); }
     };
@@ -122,7 +122,7 @@ const GLSignals = (() => {
         }
         /** This frame's lights in view (null: none), and the dark (0..1) */
         sync(traffic, view, crosswalks, dark, time) {
-            const G = new GLBuildingBuilder(0), L = new GLBuildingBuilder(0); let n = 0;
+            const G = (this._G || (this._G = new GLBuildingBuilder(0))).clear(), L = (this._L || (this._L = new GLBuildingBuilder(0))).clear(); let n = 0;
             if (traffic) for (const ix of traffic.network.intersections) {
                 if (!ix.signal || !ix.signal.inView(view)) continue;
                 ground(G, ix.signal, crosswalks, time); lit(L, ix.signal, dark, crosswalks, time); n++;

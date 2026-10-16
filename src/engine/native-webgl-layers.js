@@ -354,8 +354,10 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.skyLight.visible=true;this.skyLight.scale.set(view.zoom);this.skyLight.position.copyFrom(this.world.position);
         this.lightSprites.scale.set(view.zoom);this.lightSprites.position.copyFrom(this.world.position);
         // Canvas lights every lamp, including the hidden light-only ones rooms place (map-entities.js hiddenLamp).
-        const sources=(game.lamps||[]).map(l=>({owner:l,x:l.x,y:l.y,radius:l.lightRadius||l.radius||200,
-            color:l.color||'#ffeebb',elevation:l.elevation??84,wash:.08,lamp:true,colorWash:game.activeMap.type==='outdoor'?.22:.08,alpha:(game.activeMap.type==='outdoor'&&!game.dayCycle().lampsOn?0:1)*game.roomSystem.lampLight(l)*lampFlicker(l)*lampWake(l)*(l.intensity??1)}));
+        // Only lamps whose light reaches the view are weighed (a city has thousands; flicker, wake and room light cost per lamp)
+        const outdoor=game.activeMap.type==='outdoor',lampsOff=outdoor&&!game.dayCycle().lampsOn,hw=w/(2*view.zoom),hh=h/(2*view.zoom),sources=[];
+        if(!lampsOff)for(const l of game.lamps||[]){const radius=l.lightRadius||l.radius||200;if(Math.abs(l.x-view.x)>hw+radius||Math.abs(l.y-view.y)>hh+radius)continue;
+            sources.push({owner:l,x:l.x,y:l.y,radius,color:l.color||'#ffeebb',elevation:l.elevation??84,wash:.08,lamp:true,colorWash:outdoor?.22:.08,alpha:game.roomSystem.lampLight(l)*lampFlicker(l)*lampWake(l)*(l.intensity??1)});}
         if(L.decorLights){
             for(const p of game.props||[])if(p.visible!==false&&p.light){const c=p.getCenter(),q=p.light;
                 sources.push({owner:p,x:c.x+(q.dx||0),y:c.y+(q.dy||0),radius:q.radius||Math.max(q.w||0,q.h||0)/2||180,

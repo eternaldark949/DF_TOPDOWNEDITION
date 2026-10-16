@@ -306,14 +306,14 @@ const GLCars = (() => {
             const lx = farLOD ? 0 : Math.max(-1, Math.min(1, v.load || 0)) * CAR_ART.PITCH_PX, ly = farLOD ? 0 : -(v.bodyRoll || 0) * CAR_ART.ROLL_PX;
             r.lean.position.set(Math.abs(lx) > 0.05 || Math.abs(ly) > 0.05 ? lx : 0, Math.abs(lx) > 0.05 || Math.abs(ly) > 0.05 ? ly : 0);
             r.body.geometry = k.body;
-            const S = new GLBuildingBuilder(0); if (!farLOD) sheen(S, v, g); r.sheen.set(S);
-            const M = new GLBuildingBuilder(0); lamps(M, v, g, farLOD); r.lamps.set(M);
+            const S = (r._S || (r._S = new GLBuildingBuilder(0))).clear(); if (!farLOD) sheen(S, v, g); r.sheen.set(S);
+            const M = (r._M || (r._M = new GLBuildingBuilder(0))).clear(); lamps(M, v, g, farLOD); r.lamps.set(M);
             return r.root;
         }
         /** Every car's glow after dark, into one added geometry in world space */
         glow(cars, dark) {
             if (!this.night) { this.night = new GLDynamic(); this.night.state = ADD; }
-            const B = new GLBuildingBuilder(0);
+            const B = (this._NB || (this._NB = new GLBuildingBuilder(0))).clear();
             for (const v of cars) { const g = carGeo(v), c = Math.cos(v.angle), s = Math.sin(v.angle); B.inFrame([c, s, -s, c, v.x, v.y], () => nightGlow(B, v, g, dark)); }
             this.night.set(B);
             return this.night;

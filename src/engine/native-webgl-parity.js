@@ -5,7 +5,10 @@ class NativeCasterBodies {
     begin(game=null){
         this.lights=[];
         if(game){
-            for(const l of game.lamps||[])if(l.visible!==false&&game.roomSystem.lampLight(l)>.01&&(game.activeMap.type!=='outdoor'||game.dayCycle().lampsOn))this.lights.push(l);
+            // Only lamps that can reach what is near the view (a city has thousands, and each body asks nearLight)
+            const cam=game.view||{},z=cam.zoom||1,cx=cam.x??game.player.x,cy=cam.y??game.player.y,hw=(game.canvas?.width||1920)/(2*z)+400,hh=(game.canvas?.height||1080)/(2*z)+400;
+            if(game.activeMap.type!=='outdoor'||game.dayCycle().lampsOn)for(const l of game.lamps||[]){const R=l.lightRadius||l.radius||200;
+                if(l.visible!==false&&Math.abs(l.x-cx)<hw+R&&Math.abs(l.y-cy)<hh+R&&game.roomSystem.lampLight(l)>.01)this.lights.push(l);}
             if(this.owner.layers.decorLights){
                 for(const p of game.props||[])if(p.light&&p.visible!==false){
                     const c=p.getCenter();if(game.roomSystem.lightAt(c.x,c.y)<.005)continue;
@@ -125,7 +128,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             const needed=r.texture.baseTexture.realWidth*r.texture.baseTexture.realHeight*4;
             if(this.shadowBytes()+needed>48*1048576){stats.dropped+=nearby.length;return base;}
             r.dynamicStage=new PIXI.Container();r.dynamicBase=new PIXI.Sprite(base);r.dynamicStage.addChild(r.dynamicBase);
-            r.dynamicTexture=PIXI.RenderTexture.create({width:source.radius*2,height:source.radius*2,resolution:r.density,scaleMode:PIXI.SCALE_MODES.LINEAR});
+            r.dynamicTexture=this.shadowTarget(source.radius*2,source.radius*2,r.density,'animated-shadow-target');
         }
         r.dynamicBase.texture=base;r.dynamicBase.width=r.dynamicBase.height=source.radius*2;
         r.dynamicMeshes||=[];for(const mesh of r.dynamicMeshes)mesh.visible=false;if(r.actorShadow)r.actorShadow.visible=false;
