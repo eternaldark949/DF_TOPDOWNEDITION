@@ -1,0 +1,6169 @@
+{
+  "schemaVersion": 1,
+  "id": "project:atrium",
+  "name": "Between Worlds",
+  "scenes": [
+    {
+      "key": "amber",
+      "name": "The Amber Atrium",
+      "sun": {
+        "direction": [
+          -0.5,
+          0.8,
+          1.2
+        ],
+        "color": [
+          0.58,
+          0.49,
+          0.62
+        ]
+      },
+      "ethereal": false,
+      "ambient": [
+        0.15,
+        0.11,
+        0.15
+      ],
+      "id": "scene:amber",
+      "entities": [
+        {
+          "id": "amber:courtyard-foundation",
+          "name": "Courtyard foundation",
+          "asset": "asset:amber:courtyard-foundation",
+          "tag": null,
+          "locked": true,
+          "position": [
+            0,
+            0,
+            -0.25
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "amber:central-inlay",
+          "name": "Central inlay",
+          "asset": "asset:amber:central-inlay",
+          "tag": null,
+          "locked": true,
+          "position": [
+            0,
+            -5,
+            0.015
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "amber:west-brass-inlay",
+          "name": "West brass inlay",
+          "asset": "asset:amber:brass-inlay",
+          "tag": null,
+          "locked": true,
+          "position": [
+            -3.6,
+            -5,
+            0.035
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "amber:east-brass-inlay",
+          "name": "East brass inlay",
+          "asset": "asset:amber:brass-inlay",
+          "tag": null,
+          "locked": true,
+          "position": [
+            3.6,
+            -5,
+            0.035
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "amber:colonnade",
+          "name": "Colonnade",
+          "asset": "asset:amber:colonnade",
+          "tag": null,
+          "locked": false,
+          "position": [
+            0,
+            11,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "amber:west-gallery",
+          "name": "West gallery",
+          "asset": "asset:amber:west-gallery",
+          "tag": null,
+          "locked": false,
+          "position": [
+            -20,
+            3,
+            2.1
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "amber:west-entry-planter",
+          "name": "West entry planter",
+          "asset": "asset:amber:planter",
+          "tag": "planter",
+          "locked": false,
+          "position": [
+            -10,
+            -12,
+            0.55
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "amber:west-court-planter",
+          "name": "West court planter",
+          "asset": "asset:amber:planter",
+          "tag": "planter",
+          "locked": false,
+          "position": [
+            -10,
+            1,
+            0.55
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "amber:west-entry-lantern",
+          "name": "West entry lantern",
+          "asset": "asset:amber:lantern",
+          "tag": null,
+          "locked": false,
+          "position": [
+            -15,
+            -18,
+            1.8
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "amber:west-promenade-lantern",
+          "name": "West promenade lantern",
+          "asset": "asset:amber:lantern",
+          "tag": null,
+          "locked": false,
+          "position": [
+            -15,
+            -4,
+            1.8
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "amber:west-gallery-lantern",
+          "name": "West gallery lantern",
+          "asset": "asset:amber:lantern",
+          "tag": null,
+          "locked": false,
+          "position": [
+            -15,
+            9,
+            1.8
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "amber:east-gallery",
+          "name": "East gallery",
+          "asset": "asset:amber:east-gallery",
+          "tag": null,
+          "locked": false,
+          "position": [
+            20,
+            3,
+            2.1
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "amber:east-entry-planter",
+          "name": "East entry planter",
+          "asset": "asset:amber:planter",
+          "tag": "planter",
+          "locked": false,
+          "position": [
+            10,
+            -12,
+            0.55
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "amber:east-court-planter",
+          "name": "East court planter",
+          "asset": "asset:amber:planter",
+          "tag": "planter",
+          "locked": false,
+          "position": [
+            10,
+            1,
+            0.55
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "amber:east-entry-lantern",
+          "name": "East entry lantern",
+          "asset": "asset:amber:lantern",
+          "tag": null,
+          "locked": false,
+          "position": [
+            15,
+            -18,
+            1.8
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "amber:east-promenade-lantern",
+          "name": "East promenade lantern",
+          "asset": "asset:amber:lantern",
+          "tag": null,
+          "locked": false,
+          "position": [
+            15,
+            -4,
+            1.8
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "amber:east-gallery-lantern",
+          "name": "East gallery lantern",
+          "asset": "asset:amber:lantern",
+          "tag": null,
+          "locked": false,
+          "position": [
+            15,
+            9,
+            1.8
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "amber:crystal-lantern",
+          "name": "Crystal lantern",
+          "asset": "asset:amber:crystal-lantern",
+          "tag": "lantern",
+          "locked": false,
+          "position": [
+            0,
+            2,
+            0.65
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "amber:movable-plinth",
+          "name": "Movable plinth",
+          "asset": "asset:amber:movable-plinth",
+          "tag": "prop",
+          "locked": false,
+          "position": [
+            6,
+            -12,
+            0.65
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        }
+      ],
+      "lights": [
+        {
+          "id": "light:0",
+          "position": [
+            0,
+            7,
+            5
+          ],
+          "radius": 16,
+          "color": [
+            2.4,
+            0.85,
+            0.3
+          ]
+        },
+        {
+          "id": "light:1",
+          "position": [
+            -15,
+            -4,
+            4
+          ],
+          "radius": 12,
+          "color": [
+            2.4,
+            0.85,
+            0.3
+          ]
+        },
+        {
+          "id": "light:2",
+          "position": [
+            15,
+            -4,
+            4
+          ],
+          "radius": 12,
+          "color": [
+            2.4,
+            0.85,
+            0.3
+          ]
+        },
+        {
+          "id": "light:3",
+          "position": [
+            -15,
+            9,
+            4
+          ],
+          "radius": 12,
+          "color": [
+            2.4,
+            0.85,
+            0.3
+          ]
+        },
+        {
+          "id": "light:4",
+          "position": [
+            15,
+            9,
+            4
+          ],
+          "radius": 12,
+          "color": [
+            2.4,
+            0.85,
+            0.3
+          ]
+        },
+        {
+          "id": "light:5",
+          "position": [
+            0,
+            2,
+            3
+          ],
+          "radius": 10,
+          "color": [
+            0.3,
+            1.1,
+            2.7
+          ]
+        },
+        {
+          "id": "light:6",
+          "position": [
+            -15,
+            -18,
+            4
+          ],
+          "radius": 12,
+          "color": [
+            2.4,
+            0.85,
+            0.3
+          ]
+        },
+        {
+          "id": "light:7",
+          "position": [
+            15,
+            -18,
+            4
+          ],
+          "radius": 12,
+          "color": [
+            2.4,
+            0.85,
+            0.3
+          ]
+        }
+      ],
+      "lightVariants": {
+        "cool": {
+          "crystal": [
+            0.25,
+            0.62,
+            1
+          ],
+          "irradiance": [
+            0.3,
+            1.1,
+            2.7
+          ]
+        },
+        "warm": {
+          "crystal": [
+            1,
+            0.34,
+            0.19
+          ],
+          "irradiance": [
+            3,
+            0.5,
+            0.2
+          ]
+        }
+      }
+    },
+    {
+      "key": "violet",
+      "name": "The Violet Court",
+      "sun": {
+        "direction": [
+          0.5,
+          0.7,
+          1.1
+        ],
+        "color": [
+          0.36,
+          0.46,
+          0.75
+        ]
+      },
+      "ethereal": true,
+      "ambient": [
+        0.09,
+        0.11,
+        0.26
+      ],
+      "id": "scene:violet",
+      "entities": [
+        {
+          "id": "violet:courtyard-foundation",
+          "name": "Courtyard foundation",
+          "asset": "asset:violet:courtyard-foundation",
+          "tag": null,
+          "locked": true,
+          "position": [
+            0,
+            0,
+            -0.25
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "violet:central-inlay",
+          "name": "Central inlay",
+          "asset": "asset:violet:central-inlay",
+          "tag": null,
+          "locked": true,
+          "position": [
+            0,
+            -5,
+            0.015
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "violet:west-brass-inlay",
+          "name": "West brass inlay",
+          "asset": "asset:violet:brass-inlay",
+          "tag": null,
+          "locked": true,
+          "position": [
+            -3.6,
+            -5,
+            0.035
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "violet:east-brass-inlay",
+          "name": "East brass inlay",
+          "asset": "asset:violet:brass-inlay",
+          "tag": null,
+          "locked": true,
+          "position": [
+            3.6,
+            -5,
+            0.035
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "violet:colonnade",
+          "name": "Colonnade",
+          "asset": "asset:violet:colonnade",
+          "tag": null,
+          "locked": false,
+          "position": [
+            0,
+            11,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "violet:west-gallery",
+          "name": "West gallery",
+          "asset": "asset:violet:west-gallery",
+          "tag": null,
+          "locked": false,
+          "position": [
+            -20,
+            3,
+            2.1
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "violet:west-entry-planter",
+          "name": "West entry planter",
+          "asset": "asset:violet:planter",
+          "tag": "planter",
+          "locked": false,
+          "position": [
+            -10,
+            -12,
+            0.55
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "violet:west-court-planter",
+          "name": "West court planter",
+          "asset": "asset:violet:planter",
+          "tag": "planter",
+          "locked": false,
+          "position": [
+            -10,
+            1,
+            0.55
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "violet:west-entry-lantern",
+          "name": "West entry lantern",
+          "asset": "asset:violet:lantern",
+          "tag": null,
+          "locked": false,
+          "position": [
+            -15,
+            -18,
+            1.8
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "violet:west-promenade-lantern",
+          "name": "West promenade lantern",
+          "asset": "asset:violet:lantern",
+          "tag": null,
+          "locked": false,
+          "position": [
+            -15,
+            -4,
+            1.8
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "violet:west-gallery-lantern",
+          "name": "West gallery lantern",
+          "asset": "asset:violet:lantern",
+          "tag": null,
+          "locked": false,
+          "position": [
+            -15,
+            9,
+            1.8
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "violet:east-gallery",
+          "name": "East gallery",
+          "asset": "asset:violet:east-gallery",
+          "tag": null,
+          "locked": false,
+          "position": [
+            20,
+            3,
+            2.1
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "violet:east-entry-planter",
+          "name": "East entry planter",
+          "asset": "asset:violet:planter",
+          "tag": "planter",
+          "locked": false,
+          "position": [
+            10,
+            -12,
+            0.55
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "violet:east-court-planter",
+          "name": "East court planter",
+          "asset": "asset:violet:planter",
+          "tag": "planter",
+          "locked": false,
+          "position": [
+            10,
+            1,
+            0.55
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "violet:east-entry-lantern",
+          "name": "East entry lantern",
+          "asset": "asset:violet:lantern",
+          "tag": null,
+          "locked": false,
+          "position": [
+            15,
+            -18,
+            1.8
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "violet:east-promenade-lantern",
+          "name": "East promenade lantern",
+          "asset": "asset:violet:lantern",
+          "tag": null,
+          "locked": false,
+          "position": [
+            15,
+            -4,
+            1.8
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "violet:east-gallery-lantern",
+          "name": "East gallery lantern",
+          "asset": "asset:violet:lantern",
+          "tag": null,
+          "locked": false,
+          "position": [
+            15,
+            9,
+            1.8
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "violet:crystal-lantern",
+          "name": "Crystal lantern",
+          "asset": "asset:violet:crystal-lantern",
+          "tag": "lantern",
+          "locked": false,
+          "position": [
+            0,
+            2,
+            0.65
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "violet:movable-plinth",
+          "name": "Movable plinth",
+          "asset": "asset:violet:movable-plinth",
+          "tag": "prop",
+          "locked": false,
+          "position": [
+            6,
+            -12,
+            0.65
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "violet:west-prism",
+          "name": "West prism",
+          "asset": "asset:violet:prism",
+          "tag": null,
+          "locked": false,
+          "position": [
+            -7,
+            -3,
+            2.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        },
+        {
+          "id": "violet:east-prism",
+          "name": "East prism",
+          "asset": "asset:violet:prism",
+          "tag": null,
+          "locked": false,
+          "position": [
+            7,
+            -3,
+            2.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1
+        }
+      ],
+      "lights": [
+        {
+          "id": "light:0",
+          "position": [
+            0,
+            7,
+            5
+          ],
+          "radius": 16,
+          "color": [
+            0.35,
+            0.9,
+            2.5
+          ]
+        },
+        {
+          "id": "light:1",
+          "position": [
+            -15,
+            -4,
+            4
+          ],
+          "radius": 12,
+          "color": [
+            0.35,
+            0.9,
+            2.5
+          ]
+        },
+        {
+          "id": "light:2",
+          "position": [
+            15,
+            -4,
+            4
+          ],
+          "radius": 12,
+          "color": [
+            0.35,
+            0.9,
+            2.5
+          ]
+        },
+        {
+          "id": "light:3",
+          "position": [
+            -15,
+            9,
+            4
+          ],
+          "radius": 12,
+          "color": [
+            0.35,
+            0.9,
+            2.5
+          ]
+        },
+        {
+          "id": "light:4",
+          "position": [
+            15,
+            9,
+            4
+          ],
+          "radius": 12,
+          "color": [
+            0.35,
+            0.9,
+            2.5
+          ]
+        },
+        {
+          "id": "light:5",
+          "position": [
+            0,
+            2,
+            3
+          ],
+          "radius": 10,
+          "color": [
+            0.3,
+            1.1,
+            2.7
+          ]
+        },
+        {
+          "id": "light:6",
+          "position": [
+            -15,
+            -18,
+            4
+          ],
+          "radius": 12,
+          "color": [
+            0.35,
+            0.9,
+            2.5
+          ]
+        },
+        {
+          "id": "light:7",
+          "position": [
+            15,
+            -18,
+            4
+          ],
+          "radius": 12,
+          "color": [
+            0.35,
+            0.9,
+            2.5
+          ]
+        }
+      ],
+      "lightVariants": {
+        "cool": {
+          "crystal": [
+            0.25,
+            0.62,
+            1
+          ],
+          "irradiance": [
+            0.3,
+            1.1,
+            2.7
+          ]
+        },
+        "warm": {
+          "crystal": [
+            1,
+            0.34,
+            0.19
+          ],
+          "irradiance": [
+            3,
+            0.5,
+            0.2
+          ]
+        }
+      }
+    }
+  ],
+  "assets": [
+    {
+      "id": "asset:amber:courtyard-foundation",
+      "name": "Courtyard foundation",
+      "generator": "toy.assembly",
+      "generatorVersion": 1,
+      "parts": [
+        {
+          "id": "part:0",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              58,
+              68,
+              0.5
+            ],
+            "color": [
+              0.14,
+              0.115,
+              0.14
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        }
+      ],
+      "colliders": []
+    },
+    {
+      "id": "asset:amber:central-inlay",
+      "name": "Central inlay",
+      "generator": "toy.assembly",
+      "generatorVersion": 1,
+      "parts": [
+        {
+          "id": "part:0",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              7,
+              38,
+              0.025
+            ],
+            "color": [
+              0.22,
+              0.2,
+              0.25
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        }
+      ],
+      "colliders": []
+    },
+    {
+      "id": "asset:amber:brass-inlay",
+      "name": "Brass inlay",
+      "generator": "toy.assembly",
+      "generatorVersion": 1,
+      "parts": [
+        {
+          "id": "part:0",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.05,
+              38,
+              0.035
+            ],
+            "color": [
+              0.68,
+              0.43,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        }
+      ],
+      "colliders": []
+    },
+    {
+      "id": "asset:amber:colonnade",
+      "name": "Colonnade",
+      "generator": "toy.assembly",
+      "generatorVersion": 1,
+      "parts": [
+        {
+          "id": "part:0",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": null
+        },
+        {
+          "id": "part:1",
+          "parent": 0,
+          "position": [
+            0,
+            0,
+            0.2
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              26,
+              11,
+              0.4
+            ],
+            "color": [
+              0.24,
+              0.18,
+              0.2
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:2",
+          "parent": 0,
+          "position": [
+            0,
+            4.2,
+            3.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              24,
+              0.6,
+              7
+            ],
+            "color": [
+              0.24,
+              0.18,
+              0.2
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:3",
+          "parent": 0,
+          "position": [
+            0,
+            0,
+            7
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              25,
+              10,
+              0.6
+            ],
+            "color": [
+              0.24,
+              0.18,
+              0.2
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:4",
+          "parent": 0,
+          "position": [
+            0,
+            -4.5,
+            6.4
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              24,
+              0.12,
+              0.09
+            ],
+            "color": [
+              1,
+              0.47,
+              0.17
+            ],
+            "emission": 2.5,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:5",
+          "parent": 0,
+          "position": [
+            0,
+            -4.5,
+            6.1
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              24,
+              0.16,
+              0.1
+            ],
+            "color": [
+              0.68,
+              0.43,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:6",
+          "parent": 0,
+          "position": [
+            -12,
+            -4.5,
+            3.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.5,
+              0.5,
+              7
+            ],
+            "color": [
+              0.24,
+              0.18,
+              0.2
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:7",
+          "parent": 0,
+          "position": [
+            -12,
+            -4.5,
+            0.45
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.9,
+              0.9,
+              0.4
+            ],
+            "color": [
+              0.68,
+              0.43,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:8",
+          "parent": 0,
+          "position": [
+            -12,
+            -4.5,
+            6.65
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.8,
+              0.8,
+              0.25
+            ],
+            "color": [
+              0.68,
+              0.43,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:9",
+          "parent": 0,
+          "position": [
+            -6,
+            -4.5,
+            3.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.5,
+              0.5,
+              7
+            ],
+            "color": [
+              0.24,
+              0.18,
+              0.2
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:10",
+          "parent": 0,
+          "position": [
+            -6,
+            -4.5,
+            0.45
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.9,
+              0.9,
+              0.4
+            ],
+            "color": [
+              0.68,
+              0.43,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:11",
+          "parent": 0,
+          "position": [
+            -6,
+            -4.5,
+            6.65
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.8,
+              0.8,
+              0.25
+            ],
+            "color": [
+              0.68,
+              0.43,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:12",
+          "parent": 0,
+          "position": [
+            6,
+            -4.5,
+            3.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.5,
+              0.5,
+              7
+            ],
+            "color": [
+              0.24,
+              0.18,
+              0.2
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:13",
+          "parent": 0,
+          "position": [
+            6,
+            -4.5,
+            0.45
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.9,
+              0.9,
+              0.4
+            ],
+            "color": [
+              0.68,
+              0.43,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:14",
+          "parent": 0,
+          "position": [
+            6,
+            -4.5,
+            6.65
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.8,
+              0.8,
+              0.25
+            ],
+            "color": [
+              0.68,
+              0.43,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:15",
+          "parent": 0,
+          "position": [
+            12,
+            -4.5,
+            3.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.5,
+              0.5,
+              7
+            ],
+            "color": [
+              0.24,
+              0.18,
+              0.2
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:16",
+          "parent": 0,
+          "position": [
+            12,
+            -4.5,
+            0.45
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.9,
+              0.9,
+              0.4
+            ],
+            "color": [
+              0.68,
+              0.43,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:17",
+          "parent": 0,
+          "position": [
+            12,
+            -4.5,
+            6.65
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.8,
+              0.8,
+              0.25
+            ],
+            "color": [
+              0.68,
+              0.43,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:18",
+          "parent": 0,
+          "position": [
+            -9,
+            3.85,
+            3.64
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2.4,
+              0.08,
+              4.55
+            ],
+            "color": [
+              0.35,
+              0.19,
+              0.16
+            ],
+            "emission": 0.3,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:19",
+          "parent": 0,
+          "position": [
+            -9,
+            3.7800000000000002,
+            3.64
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.055,
+              0.05,
+              4.55
+            ],
+            "color": [
+              0.68,
+              0.43,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:20",
+          "parent": 0,
+          "position": [
+            -6,
+            3.85,
+            3.64
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2.4,
+              0.08,
+              4.55
+            ],
+            "color": [
+              0.35,
+              0.19,
+              0.16
+            ],
+            "emission": 0.3,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:21",
+          "parent": 0,
+          "position": [
+            -6,
+            3.7800000000000002,
+            3.64
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.055,
+              0.05,
+              4.55
+            ],
+            "color": [
+              0.68,
+              0.43,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:22",
+          "parent": 0,
+          "position": [
+            -3,
+            3.85,
+            3.64
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2.4,
+              0.08,
+              4.55
+            ],
+            "color": [
+              0.35,
+              0.19,
+              0.16
+            ],
+            "emission": 0.3,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:23",
+          "parent": 0,
+          "position": [
+            -3,
+            3.7800000000000002,
+            3.64
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.055,
+              0.05,
+              4.55
+            ],
+            "color": [
+              0.68,
+              0.43,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:24",
+          "parent": 0,
+          "position": [
+            0,
+            3.85,
+            3.64
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2.4,
+              0.08,
+              4.55
+            ],
+            "color": [
+              0.35,
+              0.19,
+              0.16
+            ],
+            "emission": 0.3,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:25",
+          "parent": 0,
+          "position": [
+            0,
+            3.7800000000000002,
+            3.64
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.055,
+              0.05,
+              4.55
+            ],
+            "color": [
+              0.68,
+              0.43,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:26",
+          "parent": 0,
+          "position": [
+            3,
+            3.85,
+            3.64
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2.4,
+              0.08,
+              4.55
+            ],
+            "color": [
+              0.35,
+              0.19,
+              0.16
+            ],
+            "emission": 0.3,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:27",
+          "parent": 0,
+          "position": [
+            3,
+            3.7800000000000002,
+            3.64
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.055,
+              0.05,
+              4.55
+            ],
+            "color": [
+              0.68,
+              0.43,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:28",
+          "parent": 0,
+          "position": [
+            6,
+            3.85,
+            3.64
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2.4,
+              0.08,
+              4.55
+            ],
+            "color": [
+              0.35,
+              0.19,
+              0.16
+            ],
+            "emission": 0.3,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:29",
+          "parent": 0,
+          "position": [
+            6,
+            3.7800000000000002,
+            3.64
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.055,
+              0.05,
+              4.55
+            ],
+            "color": [
+              0.68,
+              0.43,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:30",
+          "parent": 0,
+          "position": [
+            9,
+            3.85,
+            3.64
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2.4,
+              0.08,
+              4.55
+            ],
+            "color": [
+              0.35,
+              0.19,
+              0.16
+            ],
+            "emission": 0.3,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:31",
+          "parent": 0,
+          "position": [
+            9,
+            3.7800000000000002,
+            3.64
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.055,
+              0.05,
+              4.55
+            ],
+            "color": [
+              0.68,
+              0.43,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        }
+      ],
+      "colliders": [
+        {
+          "x": 0,
+          "y": 4.199999999999999,
+          "width": 24,
+          "depth": 0.7
+        },
+        {
+          "x": -12,
+          "y": -4.5,
+          "width": 0.6,
+          "depth": 0.6
+        },
+        {
+          "x": -6,
+          "y": -4.5,
+          "width": 0.6,
+          "depth": 0.6
+        },
+        {
+          "x": 6,
+          "y": -4.5,
+          "width": 0.6,
+          "depth": 0.6
+        },
+        {
+          "x": 12,
+          "y": -4.5,
+          "width": 0.6,
+          "depth": 0.6
+        }
+      ]
+    },
+    {
+      "id": "asset:amber:west-gallery",
+      "name": "West gallery",
+      "generator": "toy.assembly",
+      "generatorVersion": 1,
+      "parts": [
+        {
+          "id": "part:0",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2,
+              29,
+              4.2
+            ],
+            "color": [
+              0.24,
+              0.18,
+              0.2
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:1",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            2.1999999999999997
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2.4,
+              29.5,
+              0.3
+            ],
+            "color": [
+              0.68,
+              0.43,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:2",
+          "parent": null,
+          "position": [
+            1.0500000000000007,
+            -12,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.38,
+              0.15,
+              0.16
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:3",
+          "parent": null,
+          "position": [
+            1.129999999999999,
+            -12,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              1,
+              0.47,
+              0.17
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:4",
+          "parent": null,
+          "position": [
+            1.0500000000000007,
+            -8,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.38,
+              0.15,
+              0.16
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:5",
+          "parent": null,
+          "position": [
+            1.129999999999999,
+            -8,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              1,
+              0.47,
+              0.17
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:6",
+          "parent": null,
+          "position": [
+            1.0500000000000007,
+            -4,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.38,
+              0.15,
+              0.16
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:7",
+          "parent": null,
+          "position": [
+            1.129999999999999,
+            -4,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              1,
+              0.47,
+              0.17
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:8",
+          "parent": null,
+          "position": [
+            1.0500000000000007,
+            0,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.38,
+              0.15,
+              0.16
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:9",
+          "parent": null,
+          "position": [
+            1.129999999999999,
+            0,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              1,
+              0.47,
+              0.17
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:10",
+          "parent": null,
+          "position": [
+            1.0500000000000007,
+            4,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.38,
+              0.15,
+              0.16
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:11",
+          "parent": null,
+          "position": [
+            1.129999999999999,
+            4,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              1,
+              0.47,
+              0.17
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:12",
+          "parent": null,
+          "position": [
+            1.0500000000000007,
+            8,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.38,
+              0.15,
+              0.16
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:13",
+          "parent": null,
+          "position": [
+            1.129999999999999,
+            8,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              1,
+              0.47,
+              0.17
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:14",
+          "parent": null,
+          "position": [
+            1.0500000000000007,
+            12,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.38,
+              0.15,
+              0.16
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:15",
+          "parent": null,
+          "position": [
+            1.129999999999999,
+            12,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              1,
+              0.47,
+              0.17
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        }
+      ],
+      "colliders": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 2,
+          "depth": 29
+        }
+      ]
+    },
+    {
+      "id": "asset:amber:planter",
+      "name": "Planter",
+      "generator": "toy.assembly",
+      "generatorVersion": 1,
+      "parts": [
+        {
+          "id": "part:0",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2.4,
+              2.4,
+              1.1
+            ],
+            "color": [
+              0.68,
+              0.43,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:1",
+          "parent": 0,
+          "position": [
+            0,
+            0,
+            0.8499999999999999
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2.2,
+              2.2,
+              0.9
+            ],
+            "color": [
+              0.045,
+              0.14,
+              0.1
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:2",
+          "parent": 0,
+          "position": [
+            0,
+            0,
+            1.4999999999999998
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              1.8000000000000003,
+              1.8000000000000003,
+              0.9
+            ],
+            "color": [
+              0.045,
+              0.14,
+              0.1
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:3",
+          "parent": 0,
+          "position": [
+            0,
+            0,
+            2.1500000000000004
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              1.4000000000000001,
+              1.4000000000000001,
+              0.9
+            ],
+            "color": [
+              0.045,
+              0.14,
+              0.1
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:4",
+          "parent": 0,
+          "position": [
+            0,
+            0,
+            2.8
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              1,
+              1,
+              0.9
+            ],
+            "color": [
+              0.045,
+              0.14,
+              0.1
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        }
+      ],
+      "colliders": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 2.4,
+          "depth": 2.4
+        }
+      ]
+    },
+    {
+      "id": "asset:amber:lantern",
+      "name": "Lantern",
+      "generator": "toy.assembly",
+      "generatorVersion": 1,
+      "parts": [
+        {
+          "id": "part:0",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.18,
+              0.18,
+              3.6
+            ],
+            "color": [
+              0.68,
+              0.43,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:1",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            1.9000000000000001
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.6,
+              0.6,
+              0.8
+            ],
+            "color": [
+              1,
+              0.47,
+              0.17
+            ],
+            "emission": 3,
+            "ambientBlocker": true,
+            "castShadow": false
+          }
+        },
+        {
+          "id": "part:2",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            2.3500000000000005
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.9,
+              0.9,
+              0.12
+            ],
+            "color": [
+              0.68,
+              0.43,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        }
+      ],
+      "colliders": []
+    },
+    {
+      "id": "asset:amber:east-gallery",
+      "name": "East gallery",
+      "generator": "toy.assembly",
+      "generatorVersion": 1,
+      "parts": [
+        {
+          "id": "part:0",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2,
+              29,
+              4.2
+            ],
+            "color": [
+              0.24,
+              0.18,
+              0.2
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:1",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            2.1999999999999997
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2.4,
+              29.5,
+              0.3
+            ],
+            "color": [
+              0.68,
+              0.43,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:2",
+          "parent": null,
+          "position": [
+            -1.0500000000000007,
+            -12,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.38,
+              0.15,
+              0.16
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:3",
+          "parent": null,
+          "position": [
+            -1.129999999999999,
+            -12,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              1,
+              0.47,
+              0.17
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:4",
+          "parent": null,
+          "position": [
+            -1.0500000000000007,
+            -8,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.38,
+              0.15,
+              0.16
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:5",
+          "parent": null,
+          "position": [
+            -1.129999999999999,
+            -8,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              1,
+              0.47,
+              0.17
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:6",
+          "parent": null,
+          "position": [
+            -1.0500000000000007,
+            -4,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.38,
+              0.15,
+              0.16
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:7",
+          "parent": null,
+          "position": [
+            -1.129999999999999,
+            -4,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              1,
+              0.47,
+              0.17
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:8",
+          "parent": null,
+          "position": [
+            -1.0500000000000007,
+            0,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.38,
+              0.15,
+              0.16
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:9",
+          "parent": null,
+          "position": [
+            -1.129999999999999,
+            0,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              1,
+              0.47,
+              0.17
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:10",
+          "parent": null,
+          "position": [
+            -1.0500000000000007,
+            4,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.38,
+              0.15,
+              0.16
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:11",
+          "parent": null,
+          "position": [
+            -1.129999999999999,
+            4,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              1,
+              0.47,
+              0.17
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:12",
+          "parent": null,
+          "position": [
+            -1.0500000000000007,
+            8,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.38,
+              0.15,
+              0.16
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:13",
+          "parent": null,
+          "position": [
+            -1.129999999999999,
+            8,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              1,
+              0.47,
+              0.17
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:14",
+          "parent": null,
+          "position": [
+            -1.0500000000000007,
+            12,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.38,
+              0.15,
+              0.16
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:15",
+          "parent": null,
+          "position": [
+            -1.129999999999999,
+            12,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              1,
+              0.47,
+              0.17
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        }
+      ],
+      "colliders": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 2,
+          "depth": 29
+        }
+      ]
+    },
+    {
+      "id": "asset:amber:crystal-lantern",
+      "name": "Crystal lantern",
+      "generator": "toy.assembly",
+      "generatorVersion": 1,
+      "parts": [
+        {
+          "id": "part:0",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              1.9,
+              1.9,
+              1.3
+            ],
+            "color": [
+              0.24,
+              0.18,
+              0.2
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:1",
+          "parent": 0,
+          "position": [
+            0,
+            0,
+            0.85
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2.1,
+              2.1,
+              0.22
+            ],
+            "color": [
+              0.68,
+              0.43,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "crystal",
+          "parent": 0,
+          "position": [
+            0,
+            0,
+            1.75
+          ],
+          "rotation": [
+            0,
+            0,
+            0.3826834323650898,
+            0.9238795325112867
+          ],
+          "shape": {
+            "size": [
+              0.7,
+              0.7,
+              1.4
+            ],
+            "color": [
+              0.25,
+              0.62,
+              1
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": false
+          }
+        }
+      ],
+      "colliders": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 2.1,
+          "depth": 2.1
+        }
+      ]
+    },
+    {
+      "id": "asset:amber:movable-plinth",
+      "name": "Movable plinth",
+      "generator": "toy.assembly",
+      "generatorVersion": 1,
+      "parts": [
+        {
+          "id": "part:0",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2,
+              2,
+              1.3
+            ],
+            "color": [
+              0.68,
+              0.43,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        }
+      ],
+      "colliders": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 2,
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "id": "asset:violet:courtyard-foundation",
+      "name": "Courtyard foundation",
+      "generator": "toy.assembly",
+      "generatorVersion": 1,
+      "parts": [
+        {
+          "id": "part:0",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              58,
+              68,
+              0.5
+            ],
+            "color": [
+              0.075,
+              0.09,
+              0.18
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        }
+      ],
+      "colliders": []
+    },
+    {
+      "id": "asset:violet:central-inlay",
+      "name": "Central inlay",
+      "generator": "toy.assembly",
+      "generatorVersion": 1,
+      "parts": [
+        {
+          "id": "part:0",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              7,
+              38,
+              0.025
+            ],
+            "color": [
+              0.22,
+              0.2,
+              0.25
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        }
+      ],
+      "colliders": []
+    },
+    {
+      "id": "asset:violet:brass-inlay",
+      "name": "Brass inlay",
+      "generator": "toy.assembly",
+      "generatorVersion": 1,
+      "parts": [
+        {
+          "id": "part:0",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.05,
+              38,
+              0.035
+            ],
+            "color": [
+              0.35,
+              0.56,
+              0.7
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        }
+      ],
+      "colliders": []
+    },
+    {
+      "id": "asset:violet:colonnade",
+      "name": "Colonnade",
+      "generator": "toy.assembly",
+      "generatorVersion": 1,
+      "parts": [
+        {
+          "id": "part:0",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": null
+        },
+        {
+          "id": "part:1",
+          "parent": 0,
+          "position": [
+            0,
+            0,
+            0.2
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              26,
+              11,
+              0.4
+            ],
+            "color": [
+              0.14,
+              0.16,
+              0.31
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:2",
+          "parent": 0,
+          "position": [
+            0,
+            4.2,
+            4.25
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              24,
+              0.6,
+              8.5
+            ],
+            "color": [
+              0.14,
+              0.16,
+              0.31
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:3",
+          "parent": 0,
+          "position": [
+            0,
+            0,
+            8.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              25,
+              10,
+              0.6
+            ],
+            "color": [
+              0.14,
+              0.16,
+              0.31
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:4",
+          "parent": 0,
+          "position": [
+            0,
+            -4.5,
+            7.9
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              24,
+              0.12,
+              0.09
+            ],
+            "color": [
+              0.24,
+              0.58,
+              1
+            ],
+            "emission": 2.5,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:5",
+          "parent": 0,
+          "position": [
+            0,
+            -4.5,
+            7.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              24,
+              0.16,
+              0.1
+            ],
+            "color": [
+              0.35,
+              0.56,
+              0.7
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:6",
+          "parent": 0,
+          "position": [
+            -12,
+            -4.5,
+            4.25
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.5,
+              0.5,
+              8.5
+            ],
+            "color": [
+              0.14,
+              0.16,
+              0.31
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:7",
+          "parent": 0,
+          "position": [
+            -12,
+            -4.5,
+            0.45
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.9,
+              0.9,
+              0.4
+            ],
+            "color": [
+              0.35,
+              0.56,
+              0.7
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:8",
+          "parent": 0,
+          "position": [
+            -12,
+            -4.5,
+            8.15
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.8,
+              0.8,
+              0.25
+            ],
+            "color": [
+              0.35,
+              0.56,
+              0.7
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:9",
+          "parent": 0,
+          "position": [
+            -6,
+            -4.5,
+            4.25
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.5,
+              0.5,
+              8.5
+            ],
+            "color": [
+              0.14,
+              0.16,
+              0.31
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:10",
+          "parent": 0,
+          "position": [
+            -6,
+            -4.5,
+            0.45
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.9,
+              0.9,
+              0.4
+            ],
+            "color": [
+              0.35,
+              0.56,
+              0.7
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:11",
+          "parent": 0,
+          "position": [
+            -6,
+            -4.5,
+            8.15
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.8,
+              0.8,
+              0.25
+            ],
+            "color": [
+              0.35,
+              0.56,
+              0.7
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:12",
+          "parent": 0,
+          "position": [
+            6,
+            -4.5,
+            4.25
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.5,
+              0.5,
+              8.5
+            ],
+            "color": [
+              0.14,
+              0.16,
+              0.31
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:13",
+          "parent": 0,
+          "position": [
+            6,
+            -4.5,
+            0.45
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.9,
+              0.9,
+              0.4
+            ],
+            "color": [
+              0.35,
+              0.56,
+              0.7
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:14",
+          "parent": 0,
+          "position": [
+            6,
+            -4.5,
+            8.15
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.8,
+              0.8,
+              0.25
+            ],
+            "color": [
+              0.35,
+              0.56,
+              0.7
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:15",
+          "parent": 0,
+          "position": [
+            12,
+            -4.5,
+            4.25
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.5,
+              0.5,
+              8.5
+            ],
+            "color": [
+              0.14,
+              0.16,
+              0.31
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:16",
+          "parent": 0,
+          "position": [
+            12,
+            -4.5,
+            0.45
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.9,
+              0.9,
+              0.4
+            ],
+            "color": [
+              0.35,
+              0.56,
+              0.7
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:17",
+          "parent": 0,
+          "position": [
+            12,
+            -4.5,
+            8.15
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.8,
+              0.8,
+              0.25
+            ],
+            "color": [
+              0.35,
+              0.56,
+              0.7
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:18",
+          "parent": 0,
+          "position": [
+            -9,
+            3.85,
+            4.42
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2.4,
+              0.08,
+              5.525
+            ],
+            "color": [
+              0.35,
+              0.19,
+              0.16
+            ],
+            "emission": 0.3,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:19",
+          "parent": 0,
+          "position": [
+            -9,
+            3.7800000000000002,
+            4.42
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.055,
+              0.05,
+              5.525
+            ],
+            "color": [
+              0.35,
+              0.56,
+              0.7
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:20",
+          "parent": 0,
+          "position": [
+            -6,
+            3.85,
+            4.42
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2.4,
+              0.08,
+              5.525
+            ],
+            "color": [
+              0.35,
+              0.19,
+              0.16
+            ],
+            "emission": 0.3,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:21",
+          "parent": 0,
+          "position": [
+            -6,
+            3.7800000000000002,
+            4.42
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.055,
+              0.05,
+              5.525
+            ],
+            "color": [
+              0.35,
+              0.56,
+              0.7
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:22",
+          "parent": 0,
+          "position": [
+            -3,
+            3.85,
+            4.42
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2.4,
+              0.08,
+              5.525
+            ],
+            "color": [
+              0.35,
+              0.19,
+              0.16
+            ],
+            "emission": 0.3,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:23",
+          "parent": 0,
+          "position": [
+            -3,
+            3.7800000000000002,
+            4.42
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.055,
+              0.05,
+              5.525
+            ],
+            "color": [
+              0.35,
+              0.56,
+              0.7
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:24",
+          "parent": 0,
+          "position": [
+            0,
+            3.85,
+            4.42
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2.4,
+              0.08,
+              5.525
+            ],
+            "color": [
+              0.35,
+              0.19,
+              0.16
+            ],
+            "emission": 0.3,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:25",
+          "parent": 0,
+          "position": [
+            0,
+            3.7800000000000002,
+            4.42
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.055,
+              0.05,
+              5.525
+            ],
+            "color": [
+              0.35,
+              0.56,
+              0.7
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:26",
+          "parent": 0,
+          "position": [
+            3,
+            3.85,
+            4.42
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2.4,
+              0.08,
+              5.525
+            ],
+            "color": [
+              0.35,
+              0.19,
+              0.16
+            ],
+            "emission": 0.3,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:27",
+          "parent": 0,
+          "position": [
+            3,
+            3.7800000000000002,
+            4.42
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.055,
+              0.05,
+              5.525
+            ],
+            "color": [
+              0.35,
+              0.56,
+              0.7
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:28",
+          "parent": 0,
+          "position": [
+            6,
+            3.85,
+            4.42
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2.4,
+              0.08,
+              5.525
+            ],
+            "color": [
+              0.35,
+              0.19,
+              0.16
+            ],
+            "emission": 0.3,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:29",
+          "parent": 0,
+          "position": [
+            6,
+            3.7800000000000002,
+            4.42
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.055,
+              0.05,
+              5.525
+            ],
+            "color": [
+              0.35,
+              0.56,
+              0.7
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:30",
+          "parent": 0,
+          "position": [
+            9,
+            3.85,
+            4.42
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2.4,
+              0.08,
+              5.525
+            ],
+            "color": [
+              0.35,
+              0.19,
+              0.16
+            ],
+            "emission": 0.3,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:31",
+          "parent": 0,
+          "position": [
+            9,
+            3.7800000000000002,
+            4.42
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.055,
+              0.05,
+              5.525
+            ],
+            "color": [
+              0.35,
+              0.56,
+              0.7
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        }
+      ],
+      "colliders": [
+        {
+          "x": 0,
+          "y": 4.199999999999999,
+          "width": 24,
+          "depth": 0.7
+        },
+        {
+          "x": -12,
+          "y": -4.5,
+          "width": 0.6,
+          "depth": 0.6
+        },
+        {
+          "x": -6,
+          "y": -4.5,
+          "width": 0.6,
+          "depth": 0.6
+        },
+        {
+          "x": 6,
+          "y": -4.5,
+          "width": 0.6,
+          "depth": 0.6
+        },
+        {
+          "x": 12,
+          "y": -4.5,
+          "width": 0.6,
+          "depth": 0.6
+        }
+      ]
+    },
+    {
+      "id": "asset:violet:west-gallery",
+      "name": "West gallery",
+      "generator": "toy.assembly",
+      "generatorVersion": 1,
+      "parts": [
+        {
+          "id": "part:0",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2,
+              29,
+              4.2
+            ],
+            "color": [
+              0.14,
+              0.16,
+              0.31
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:1",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            2.1999999999999997
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2.4,
+              29.5,
+              0.3
+            ],
+            "color": [
+              0.35,
+              0.56,
+              0.7
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:2",
+          "parent": null,
+          "position": [
+            1.0500000000000007,
+            -12,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.15,
+              0.19,
+              0.46
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:3",
+          "parent": null,
+          "position": [
+            1.129999999999999,
+            -12,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              0.24,
+              0.58,
+              1
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:4",
+          "parent": null,
+          "position": [
+            1.0500000000000007,
+            -8,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.15,
+              0.19,
+              0.46
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:5",
+          "parent": null,
+          "position": [
+            1.129999999999999,
+            -8,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              0.24,
+              0.58,
+              1
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:6",
+          "parent": null,
+          "position": [
+            1.0500000000000007,
+            -4,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.15,
+              0.19,
+              0.46
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:7",
+          "parent": null,
+          "position": [
+            1.129999999999999,
+            -4,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              0.24,
+              0.58,
+              1
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:8",
+          "parent": null,
+          "position": [
+            1.0500000000000007,
+            0,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.15,
+              0.19,
+              0.46
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:9",
+          "parent": null,
+          "position": [
+            1.129999999999999,
+            0,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              0.24,
+              0.58,
+              1
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:10",
+          "parent": null,
+          "position": [
+            1.0500000000000007,
+            4,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.15,
+              0.19,
+              0.46
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:11",
+          "parent": null,
+          "position": [
+            1.129999999999999,
+            4,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              0.24,
+              0.58,
+              1
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:12",
+          "parent": null,
+          "position": [
+            1.0500000000000007,
+            8,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.15,
+              0.19,
+              0.46
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:13",
+          "parent": null,
+          "position": [
+            1.129999999999999,
+            8,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              0.24,
+              0.58,
+              1
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:14",
+          "parent": null,
+          "position": [
+            1.0500000000000007,
+            12,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.15,
+              0.19,
+              0.46
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:15",
+          "parent": null,
+          "position": [
+            1.129999999999999,
+            12,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              0.24,
+              0.58,
+              1
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        }
+      ],
+      "colliders": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 2,
+          "depth": 29
+        }
+      ]
+    },
+    {
+      "id": "asset:violet:planter",
+      "name": "Planter",
+      "generator": "toy.assembly",
+      "generatorVersion": 1,
+      "parts": [
+        {
+          "id": "part:0",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2.4,
+              2.4,
+              1.1
+            ],
+            "color": [
+              0.35,
+              0.56,
+              0.7
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:1",
+          "parent": 0,
+          "position": [
+            0,
+            0,
+            0.8499999999999999
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2.2,
+              2.2,
+              0.9
+            ],
+            "color": [
+              0.1,
+              0.2,
+              0.27
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:2",
+          "parent": 0,
+          "position": [
+            0,
+            0,
+            1.4999999999999998
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              1.8000000000000003,
+              1.8000000000000003,
+              0.9
+            ],
+            "color": [
+              0.1,
+              0.2,
+              0.27
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:3",
+          "parent": 0,
+          "position": [
+            0,
+            0,
+            2.1500000000000004
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              1.4000000000000001,
+              1.4000000000000001,
+              0.9
+            ],
+            "color": [
+              0.1,
+              0.2,
+              0.27
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:4",
+          "parent": 0,
+          "position": [
+            0,
+            0,
+            2.8
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              1,
+              1,
+              0.9
+            ],
+            "color": [
+              0.1,
+              0.2,
+              0.27
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        }
+      ],
+      "colliders": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 2.4,
+          "depth": 2.4
+        }
+      ]
+    },
+    {
+      "id": "asset:violet:lantern",
+      "name": "Lantern",
+      "generator": "toy.assembly",
+      "generatorVersion": 1,
+      "parts": [
+        {
+          "id": "part:0",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.18,
+              0.18,
+              3.6
+            ],
+            "color": [
+              0.35,
+              0.56,
+              0.7
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:1",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            1.9000000000000001
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.6,
+              0.6,
+              0.8
+            ],
+            "color": [
+              0.24,
+              0.58,
+              1
+            ],
+            "emission": 3,
+            "ambientBlocker": true,
+            "castShadow": false
+          }
+        },
+        {
+          "id": "part:2",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            2.3500000000000005
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.9,
+              0.9,
+              0.12
+            ],
+            "color": [
+              0.35,
+              0.56,
+              0.7
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        }
+      ],
+      "colliders": []
+    },
+    {
+      "id": "asset:violet:east-gallery",
+      "name": "East gallery",
+      "generator": "toy.assembly",
+      "generatorVersion": 1,
+      "parts": [
+        {
+          "id": "part:0",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2,
+              29,
+              4.2
+            ],
+            "color": [
+              0.14,
+              0.16,
+              0.31
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:1",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            2.1999999999999997
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2.4,
+              29.5,
+              0.3
+            ],
+            "color": [
+              0.35,
+              0.56,
+              0.7
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:2",
+          "parent": null,
+          "position": [
+            -1.0500000000000007,
+            -12,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.15,
+              0.19,
+              0.46
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:3",
+          "parent": null,
+          "position": [
+            -1.129999999999999,
+            -12,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              0.24,
+              0.58,
+              1
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:4",
+          "parent": null,
+          "position": [
+            -1.0500000000000007,
+            -8,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.15,
+              0.19,
+              0.46
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:5",
+          "parent": null,
+          "position": [
+            -1.129999999999999,
+            -8,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              0.24,
+              0.58,
+              1
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:6",
+          "parent": null,
+          "position": [
+            -1.0500000000000007,
+            -4,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.15,
+              0.19,
+              0.46
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:7",
+          "parent": null,
+          "position": [
+            -1.129999999999999,
+            -4,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              0.24,
+              0.58,
+              1
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:8",
+          "parent": null,
+          "position": [
+            -1.0500000000000007,
+            0,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.15,
+              0.19,
+              0.46
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:9",
+          "parent": null,
+          "position": [
+            -1.129999999999999,
+            0,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              0.24,
+              0.58,
+              1
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:10",
+          "parent": null,
+          "position": [
+            -1.0500000000000007,
+            4,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.15,
+              0.19,
+              0.46
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:11",
+          "parent": null,
+          "position": [
+            -1.129999999999999,
+            4,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              0.24,
+              0.58,
+              1
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:12",
+          "parent": null,
+          "position": [
+            -1.0500000000000007,
+            8,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.15,
+              0.19,
+              0.46
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:13",
+          "parent": null,
+          "position": [
+            -1.129999999999999,
+            8,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              0.24,
+              0.58,
+              1
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:14",
+          "parent": null,
+          "position": [
+            -1.0500000000000007,
+            12,
+            0.19999999999999973
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.06,
+              1.8,
+              2.7
+            ],
+            "color": [
+              0.15,
+              0.19,
+              0.46
+            ],
+            "emission": 0.55,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:15",
+          "parent": null,
+          "position": [
+            -1.129999999999999,
+            12,
+            1.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              0.08,
+              2,
+              0.07
+            ],
+            "color": [
+              0.24,
+              0.58,
+              1
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        }
+      ],
+      "colliders": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 2,
+          "depth": 29
+        }
+      ]
+    },
+    {
+      "id": "asset:violet:crystal-lantern",
+      "name": "Crystal lantern",
+      "generator": "toy.assembly",
+      "generatorVersion": 1,
+      "parts": [
+        {
+          "id": "part:0",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              1.9,
+              1.9,
+              1.3
+            ],
+            "color": [
+              0.14,
+              0.16,
+              0.31
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "part:1",
+          "parent": 0,
+          "position": [
+            0,
+            0,
+            0.85
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2.1,
+              2.1,
+              0.22
+            ],
+            "color": [
+              0.35,
+              0.56,
+              0.7
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        },
+        {
+          "id": "crystal",
+          "parent": 0,
+          "position": [
+            0,
+            0,
+            1.75
+          ],
+          "rotation": [
+            0,
+            0,
+            0.3826834323650898,
+            0.9238795325112867
+          ],
+          "shape": {
+            "size": [
+              0.7,
+              0.7,
+              1.4
+            ],
+            "color": [
+              0.25,
+              0.62,
+              1
+            ],
+            "emission": 2,
+            "ambientBlocker": true,
+            "castShadow": false
+          }
+        }
+      ],
+      "colliders": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 2.1,
+          "depth": 2.1
+        }
+      ]
+    },
+    {
+      "id": "asset:violet:movable-plinth",
+      "name": "Movable plinth",
+      "generator": "toy.assembly",
+      "generatorVersion": 1,
+      "parts": [
+        {
+          "id": "part:0",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "shape": {
+            "size": [
+              2,
+              2,
+              1.3
+            ],
+            "color": [
+              0.35,
+              0.56,
+              0.7
+            ],
+            "emission": 0,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        }
+      ],
+      "colliders": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 2,
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "id": "asset:violet:prism",
+      "name": "Prism",
+      "generator": "toy.assembly",
+      "generatorVersion": 1,
+      "parts": [
+        {
+          "id": "part:0",
+          "parent": null,
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0.3826834323650898,
+            0.9238795325112867
+          ],
+          "shape": {
+            "size": [
+              0.7,
+              0.7,
+              3.8
+            ],
+            "color": [
+              0.22,
+              0.5,
+              0.67
+            ],
+            "emission": 0.5,
+            "ambientBlocker": true,
+            "castShadow": true
+          }
+        }
+      ],
+      "colliders": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 1,
+          "depth": 1
+        }
+      ]
+    }
+  ]
+}

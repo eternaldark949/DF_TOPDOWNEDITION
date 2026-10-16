@@ -6,6 +6,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { embedJSON } from './json-module.js';
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const modules=new Map(), visiting=new Set();
@@ -20,6 +21,8 @@ async function bundle(path) {
   const id=`module${modules.size}`;
   // Reserve identity before visiting dependencies; final insertion order is topological below.
   modules.set(path,{id,code:null});
+  const jsonImports=[...source.matchAll(/^import (\w+) from ['"]([^'"]+\.json)['"] with \{\s*type:\s*['"]json['"]\s*\};?$/gm)];
+  for(const match of jsonImports){const data=JSON.parse(await readFile(resolve(dirname(path),match[2]),'utf8'));source=source.replace(match[0],()=>`const ${match[1]}=${embedJSON(data)};`);}
   const imports=[...source.matchAll(/^import \{([^}]+)\} from ['"]([^'"]+)['"];?$/gm)];
   for (const match of imports) {
     if (!match[2].startsWith('.')) throw new Error(`External runtime dependency: ${match[2]}`);
@@ -38,11 +41,16 @@ async function bundle(path) {
   visiting.delete(path); return id;
 }
 
-await bundle(resolve(root,'examples/atrium/main.js'));
-const code=[...modules.values()].map(m=>m.code).join('\n');
-let html=await readFile(resolve(root,'examples/atrium/index.html'),'utf8');
-// Escape closing-script syntax in embedded source without changing JavaScript semantics.
-html=html.replace('<script type="module" src="./main.js"></script>',()=>`<script type="module">\n${code.replace(/<\/script/gi,'<\\/script')}\n</script>`);
+// Validate the authored source before emitting either delivery target.
+const { ATRIUM_PROJECT }=await import('../examples/atrium/project.js');
+if(!ATRIUM_PROJECT)throw new Error('No validated project');
 await mkdir(resolve(root,'dist'),{recursive:true});
-await writeFile(resolve(root,'dist/ETRNLNINE-Atrium.html'),html);
-console.log(`Built ${modules.size} modules into dist/ETRNLNINE-Atrium.html (${Buffer.byteLength(html)} bytes).`);
+for(const [folder,name] of [['examples/atrium','Atrium'],['editor','Studio']]){
+ modules.clear();visiting.clear();
+ await bundle(resolve(root,folder,'main.js'));
+ const code=[...modules.values()].map(m=>m.code).join('\n');
+ let html=await readFile(resolve(root,folder,'index.html'),'utf8');
+ html=html.replace('<script type="module" src="./main.js"></script>',()=>`<script type="module">\n${code.replace(/<\/script/gi,'<\\/script')}\n</script>`);
+ await writeFile(resolve(root,`dist/ETRNLNINE-${name}.html`),html);
+ console.log(`Built ${modules.size} modules into dist/ETRNLNINE-${name}.html (${Buffer.byteLength(html)} bytes).`);
+}

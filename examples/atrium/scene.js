@@ -8,9 +8,9 @@ import { createJourney } from './journey.js';
 import { playerController } from './player.js';
 
 /** Start preparing the scene immediately. Rendering remains valid while the first world loads. */
-export function createScene(engine,{controlsHost,onStatus=()=>{},onError=()=>{}}){
+export function createScene(engine,{controlsHost,project,onStatus=()=>{},onError=()=>{}}){
   const life=new Lifetime(),{basement,lobby,directory}=engine;
-  const journey=createJourney(engine);life.own(()=>journey.dispose());
+  const journey=createJourney(engine,project);life.own(()=>journey.dispose());
   const {input,renderer}=basement;
   input.bind({
     move:{kind:'vector',negativeX:['KeyA','ArrowLeft'],positiveX:['KeyD','ArrowRight'],negativeY:['KeyW','ArrowUp'],positiveY:['KeyS','ArrowDown'],axes:[0,1],deadZone:0.18},

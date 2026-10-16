@@ -29,7 +29,7 @@ export class AmbientOcclusion {
   constructor(renderer,settings={}) {
     this.renderer=renderer;this.gl=renderer.gl;
     this.settings=occlusionSettings({mode:'geometry',strength:0.7,radius:1.25,resolutionScale:0.5,maxDimension:768},settings);
-    this.poses=new Float32Array(12*4);this.sizes=new Float32Array(12*4);this.scores=new Float64Array(12);
+    this.rotations=new Float32Array(48);this.poses=new Float32Array(12*4);this.sizes=new Float32Array(12*4);this.scores=new Float64Array(12);
     this.count=0;this.candidates=0;this.targets=null;this.normalProgram=null;this.screenProgram=null;
     this.failure=null;this.disposed=false;
   }
@@ -55,7 +55,7 @@ export class AmbientOcclusion {
     for(const entity of world.entities.values()) {
       const shape=entity.shape,p=entity.pose;
       if(!shape||shape.ambientBlocker===false||Math.min(...shape.size)<0.15)continue;
-      const [sx,sy,sz]=shape.size;
+      const [sx,sy,sz]=shape.size.map(n=>n*p.scale);
       if(p.z+sz/2<=0.05)continue; // The ground slab must not consume the blocker budget.
       this.candidates++;
       const distance=Math.hypot(Math.max(0,Math.abs(p.x-camera.x)-sx/2),Math.max(0,Math.abs(p.y-camera.y)-sy/2));
@@ -65,12 +65,12 @@ export class AmbientOcclusion {
       if(slot>=12)continue;
       const end=Math.min(this.count,11);
       for(let i=end;i>slot;i--){
-        this.scores[i]=this.scores[i-1];
+        this.scores[i]=this.scores[i-1];this.rotations.copyWithin(i*4,(i-1)*4,i*4);
         this.poses.copyWithin(i*4,(i-1)*4,i*4);this.sizes.copyWithin(i*4,(i-1)*4,i*4);
       }
-      this.scores[slot]=score;
-      this.poses[slot*4]=p.x;this.poses[slot*4+1]=p.y;this.poses[slot*4+2]=p.z;this.poses[slot*4+3]=Math.cos(p.yaw);
-      this.sizes[slot*4]=sx/2;this.sizes[slot*4+1]=sy/2;this.sizes[slot*4+2]=sz/2;this.sizes[slot*4+3]=Math.sin(p.yaw);
+      this.scores[slot]=score;this.rotations.set(p.rotation,slot*4);
+      this.poses[slot*4]=p.x;this.poses[slot*4+1]=p.y;this.poses[slot*4+2]=p.z;this.poses[slot*4+3]=0;
+      this.sizes[slot*4]=sx/2;this.sizes[slot*4+1]=sy/2;this.sizes[slot*4+2]=sz/2;this.sizes[slot*4+3]=0;
       this.count=Math.min(12,this.count+1);
     }
   }
@@ -85,8 +85,8 @@ export class AmbientOcclusion {
     try {
       if(!this.normalProgram){this.normalProgram=createProgram(gl,VERTEX,NORMAL_FRAGMENT);this.renderer.stats.programs++;}
       if(!this.screenProgram){this.screenProgram=createProgram(gl,FULLSCREEN_VERTEX,SSAO_FRAGMENT);this.renderer.stats.programs++;}
-      this.normalCamera=gl.getUniformLocation(this.normalProgram,'uCamera');
-      this.screenUniforms=Object.fromEntries(['uCamera','uRadius','uDepth','uNormals'].map(n=>[n,gl.getUniformLocation(this.screenProgram,n)]));
+      this.normalCamera=gl.getUniformLocation(this.normalProgram,'uViewProjection');
+      this.screenUniforms=Object.fromEntries(['uCamera','uRadius','uDepth','uNormals','uInverseViewProjection'].map(n=>[n,gl.getUniformLocation(this.screenProgram,n)]));
       /** Create immutable single-level storage; nearest sampling avoids depth interpolation. */
       const texture=(format)=>{
         const handle=gl.createTexture();if(!handle)throw new Error('AO texture allocation failed');
@@ -120,12 +120,13 @@ export class AmbientOcclusion {
     const gl=this.gl,t=this.targets,r=this.renderer;
     gl.viewport(0,0,t.width,t.height);gl.bindFramebuffer(gl.FRAMEBUFFER,t.framebuffers[0]);
     gl.enable(gl.DEPTH_TEST);gl.clearColor(0.5,0.5,1,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-    gl.useProgram(this.normalProgram);gl.uniform4f(this.normalCamera,r.camera.x,r.camera.y,view.halfWidth,view.halfHeight);
+    gl.useProgram(this.normalProgram);gl.uniformMatrix4fv(this.normalCamera,false,r.camera.matrix);
     gl.bindVertexArray(batch.vao);gl.drawArraysInstanced(gl.TRIANGLES,0,36,batch.count);gl.bindVertexArray(null);
     gl.bindFramebuffer(gl.FRAMEBUFFER,t.framebuffers[1]);gl.disable(gl.DEPTH_TEST);
     gl.useProgram(this.screenProgram);this.texture(0,t.depth);this.texture(1,t.normal);
     gl.uniform1i(this.screenUniforms.uDepth,0);gl.uniform1i(this.screenUniforms.uNormals,1);
     gl.uniform4f(this.screenUniforms.uCamera,r.camera.x,r.camera.y,view.halfWidth,view.halfHeight);
+    gl.uniformMatrix4fv(this.screenUniforms.uInverseViewProjection,false,r.camera.inverse);
     gl.uniform1f(this.screenUniforms.uRadius,this.settings.radius);gl.drawArrays(gl.TRIANGLES,0,3);
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.enable(gl.DEPTH_TEST);
     gl.viewport(0,0,r.canvas.width,r.canvas.height);
@@ -139,6 +140,8 @@ export class AmbientOcclusion {
     const gl=this.gl,s=this.settings;
     gl.uniform1i(uniforms.uAOMode,s.mode==='off'?0:screenReady?2:1);
     gl.uniform1f(uniforms.uAOStrength,s.strength);gl.uniform1f(uniforms.uAORadius,s.radius);
+    gl.uniformMatrix4fv(uniforms.uInverseViewProjection,false,this.renderer.camera.inverse);
+    gl.uniform4fv(uniforms['uBlockerRotation[0]'],this.rotations);
     gl.uniform1i(uniforms.uBlockerCount,this.count);gl.uniform4fv(uniforms['uBlockerPose[0]'],this.poses);gl.uniform4fv(uniforms['uBlockerSize[0]'],this.sizes);
     if(screenReady){
       this.texture(0,this.targets.ao);this.texture(1,this.targets.depth);this.texture(2,this.targets.normal);
@@ -175,5 +178,5 @@ export class AmbientOcclusion {
   }
 
   /** Release all owned GPU and CPU storage; caller may keep a harmless disposed handle. */
-  dispose() {if(this.disposed)return;this.disposed=true;this.release();this.poses=this.sizes=this.scores=null;this.count=this.candidates=0;}
+  dispose() {if(this.disposed)return;this.disposed=true;this.release();this.poses=this.sizes=this.scores=this.rotations=null;this.count=this.candidates=0;}
 }

@@ -1,0 +1,50 @@
+# Editing the Atrium project
+
+`project.json` is the authoritative version-one portable project. Edit it by hand, import it into Studio, or export a modified copy from Studio. JavaScript implements behavior; the JSON describes the world. Run `npm test` and `npm run build` after source edits. GitHub Actions also builds downloadable game and Studio HTML artifacts from this branch. After editing JSON directly on GitHub, download the Actions artifact for that commit: checked-in `dist/` files remain at their last committed build until explicitly rebuilt. CI does not rewrite repository files.
+
+Strict JSON cannot contain comments. This guide and the property metadata in `engine/basement/properties.js` supply the explanations; do not add JavaScript expressions to the JSON.
+
+## Package and identity
+
+The package has `schemaVersion: 1`, a stable `id`, a display `name`, `assets`, and `scenes`. This first milestone keeps dependencies together in **one portable package**, making phone import/export practical. Separate source documents and general dependency-graph loading remain future work. Both realms are embedded in the delivery HTML, but live worlds and GPU batches are constructed only when needed.
+
+Authored entity, asset and scene IDs are persistent strings. Runtime `World` IDs are separate monotonic session identities. Undo, reload and Play must never write runtime identities back into the package. IDs must be unique within their table; asset references must resolve. Renaming an asset ID requires updating its placed references.
+
+## Assets and placed instances
+
+An asset declares `id`, `name`, `generator: "toy.assembly"`, `generatorVersion: 1`, `parts`, and `colliders`. The explicitly registered generator version is checked during packaging and opening. Unsupported versions fail; no implicit migration changes existing geometry.
+
+Each part has a stable local `id`, `parent` (an earlier part index, or `null` for the instance anchor), local `position: [x,y,z]`, a unit `rotation: [x,y,z,w]`, and optional `shape`. A shape contains full `size: [width,depth,height]`, linear RGB `color`, `emission`, and optional Boolean `castShadow`/`ambientBlocker`. Parts form a parent-before-child tree; forward references and cycles are rejected. Planters, galleries, colonnades and lanterns are grouped assemblies. Identical planters and lamps share one source asset per realm while retaining independent placed transforms and runtime shapes.
+
+A scene entity places an asset using `id`, `name`, `asset`, `position`, `rotation`, positive uniform `scale`, and `locked`. `tag` identifies this example's `prop` and `lantern` interactions; the lantern asset contains a part named `crystal`. The `planter` tag selects the example’s initial inspector target. These are game/application conventions, not engine-wide names. Keep both tagged instances when using the Atrium Play behavior. Removing those conventions requires corresponding game behavior changes.
+
+Instance transforms affect only that placement. Editing an asset's parts deliberately affects its instances when the project is reopened. The initial asset browser is an inventory, not an asset geometry editor. Per-instance material overrides, duplicate/reparent commands, seeds and migration tooling are future schema/editor work.
+
+## Coordinates and properties
+
+World units are metres by convention: X/Y horizontal, Z elevation. Quaternions store full orientation; numeric XYZ rotation controls display degrees and compose Z × Y × X. Uniform instance scale prevents hidden hierarchy shear. Box dimensions can differ by axis, but there is no arbitrary nonuniform hierarchy scale.
+
+The inspector shares metadata, validation and controls between transforms and point lights. Arrow keys use each descriptor's increment; directly entered values may use any valid precision. A focus session or pointer drag is one undo command. Escape and cancelled touches restore the starting snapshot. The Move tool uses a horizontal construction plane; use Top or Oblique view, with optional 0.5 m / 1 m snapping. Vertical movement, full rotation and scale have numeric controls. Camera presets, horizontal orbit buttons, wheel and zoom buttons are available; perspective, free-flight navigation and axis gizmos are future work.
+
+## Environment and collision
+
+A scene supplies its stable `key`/`id`, display name, `ambient`, `sun.direction` (toward the light), `sun.color`, eight `lights`, and the example's `ethereal` flag. Each point light supplies its own stable `id`, world-space `position`, `radius`, and linear RGB irradiance `color`. RGB numbers can exceed 1 for light intensity; they are not hexadecimal display colors. The `lightVariants` object supplies the game lantern's `cool`/`warm` crystal colors and irradiance.
+
+Local asset `colliders` describe horizontal boxes using `x`, `y`, `width`, `depth`. Moving, rotating or scaling an instance updates its conservative XY collision bounds together with the render transform. These remain **planar movement bounds**, not full 3D contact physics, stairs or a rigid-body solver. The current game still uses its courtyard landing limits and planar backpack controller.
+
+## Saving, recovery and Play
+
+Export JSON downloads a portable project, not an HTML build. Import validates size, schema, references, versions and preview construction before replacing the current document. Invalid files leave the open project intact. Successful edits also update one best-effort browser recovery slot. Recover is explicit; browser storage may be unavailable/evicted, so keep exported backups.
+
+Play releases the editing preview and creates isolated runtime worlds from a detached snapshot. Stop disposes game controls, subscriptions and residency, then reconstructs the authored preview and restores the editor camera. Game mutations never silently become project edits. Input bindings are cleared at the context switch; editor tools and shortcuts are disabled during Play. The first fixture starts the game in its first realm, regardless of the currently inspected realm.
+
+## Explicit budgets and delivery
+
+- Portable compact JSON: 512 KiB maximum, checked before parsing imports.
+- Up to 8 scenes, 256 assets, 256 placed entities per scene, 128 parts per asset, and 4,096 source parts overall.
+- At most 1,800 placed parts per scene, reserving the 2,048-instance runtime batch capacity for the actor and diagnostics. Collider lists are limited to 128 per asset.
+- History: at most 64 commands and 2 MiB of UTF-16 snapshot strings; larger projects consequently retain fewer commands. A current document, active gesture snapshot, save checkpoint and one recovery slot are additional bounded data.
+- Editing owns one preview world; Play owns the existing two-slot residency. A validated import may briefly construct one additional candidate preview before atomically releasing the old one.
+- Move previews coalesce pointer updates through the existing Lobby input phase. Asset construction is bounded but currently synchronous per scene; general large-scene streaming/authoring rebuild scheduling remains future work.
+
+`dist/ETRNLNINE-Atrium.html` contains the game without Studio imports. `dist/ETRNLNINE-Studio.html` contains the workspace and its selected project. Both embed the required JSON, need no sibling files/CDNs, and use WebGL2 with HTML interface controls. The bundler intentionally supports a small explicit module syntax, not arbitrary JavaScript transformations.

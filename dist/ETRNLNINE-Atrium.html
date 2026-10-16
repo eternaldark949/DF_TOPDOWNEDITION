@@ -42,14 +42,54 @@ footer{position:absolute;bottom:max(25px,env(safe-area-inset-bottom));left:50%;t
 <footer><output id="status" aria-label="Engine status">Opening the house…</output><div class="hint"><kbd>WASD / arrows</kbd> walk &nbsp;·&nbsp; <kbd>mouse</kbd> look &nbsp;·&nbsp; <kbd>E / click</kbd> light &nbsp;·&nbsp; <kbd>B</kbd> pack<br><kbd>F</kbd> flit · <kbd>X</kbd> cancel · <kbd>G</kbd> move prop<br>Gamepad: left stick / A light / B flit / X pack / Y cancel</div></footer>
 <div id="error" role="alert" hidden></div>
 <script type="module">
+// Source: engine/basement/rotation.js
+const module4=(()=>{
+/** Basement / rotations: z-up unit quaternions, radians, and allocation-free vector transforms. */
+
+/** Compose orientations a × b, allowing the output to alias either operand. */
+function multiplyRotation(a,b,out) {
+  const [x,y,z,w]=a,[i,j,k,l]=b;
+  out[0]=w*i+x*l+y*k-z*j;out[1]=w*j-x*k+y*l+z*i;
+  out[2]=w*k+x*j-y*i+z*l;out[3]=w*l-x*i-y*j-z*k;return out;
+}
+
+/** Rotate a vector by a unit quaternion, optionally with its conjugate for inverse queries. */
+function rotateVector(q,x,y,z,out,inverse=false) {
+  const sign=inverse?-1:1,a=q[0]*sign,b=q[1]*sign,c=q[2]*sign,w=q[3];
+  const tx=2*(b*z-c*y),ty=2*(c*x-a*z),tz=2*(a*y-b*x);
+  out[0]=x+w*tx+b*tz-c*ty;out[1]=y+w*ty+c*tx-a*tz;out[2]=z+w*tz+a*ty-b*tx;return out;
+}
+
+/** XYZ Euler controls compose qz × qy × qx. Stored documents always retain quaternions. */
+function eulerRotation(x,y,z) {
+  const a=Math.sin(x/2),b=Math.sin(y/2),c=Math.sin(z/2),d=Math.cos(x/2),e=Math.cos(y/2),f=Math.cos(z/2);
+  return [a*e*f-d*b*c,d*b*f+a*e*c,d*e*c-a*b*f,d*e*f+a*b*c];
+}
+
+/** Convert a unit quaternion to XYZ Euler controls; clamp the pitch at numerical poles. */
+function rotationEuler(q) {
+  const [x,y,z,w]=q;
+  return [Math.atan2(2*(w*x+y*z),1-2*(x*x+y*y)),Math.asin(Math.max(-1,Math.min(1,2*(w*y-z*x)))),Math.atan2(2*(w*z+x*y),1-2*(y*y+z*z))];
+}
+
+/** Shared GLSL helper for visible geometry, depth geometry and analytic box occlusion. */
+const ROTATION_GLSL=`
+vec3 rotateByQuaternion(vec4 q,vec3 p){return p+2.0*cross(q.xyz,cross(q.xyz,p)+q.w*p);}
+`;
+
+return {multiplyRotation,rotateVector,eulerRotation,rotationEuler,ROTATION_GLSL};
+})();
 // Source: engine/basement/world.js
 const module3=(()=>{
 /**
  * Basement / world: identity, transforms, attachments, and spatial membership.
  * Coordinates: x/y are horizontal world units; z is elevation; yaw is radians.
  * A world owns its entities. Identity is immutable and independent of array position.
- * This first representation supports yaw/local translation, not a skeletal solver.
+ * Base orientations are unit quaternions; yaw adds procedural z rotation. Scale is uniform.
+ * Uniform hierarchy scale avoids hidden shear. This is not a skeletal/physics solver.
  */
+const { multiplyRotation, rotateVector } = module4;
+
 class Identities {
   /** Engine-local monotonically increasing IDs; caller chooses the namespace. */
   constructor() { this.next = 1; }
@@ -72,13 +112,16 @@ class World {
    * Parent must already exist in this world: this prevents cycles and foreign links.
    * Shape size is full width/depth/height; its origin is its center.
    */
-  create({ x = 0, y = 0, z = 0, yaw = 0, parent = null, shape = null } = {}) {
+  create({ x = 0, y = 0, z = 0, yaw = 0, parent = null, shape = null, rotation = [0,0,0,1], scale = 1 } = {}) {
     if (this.disposed) throw new Error('Cannot create in a disposed world');
     if (parent && this.entities.get(parent.id) !== parent) throw new Error('Parent belongs to another world');
+    if(!Number.isFinite(scale)||scale<=0||rotation.length!==4||!rotation.every(Number.isFinite)||Math.abs(Math.hypot(...rotation)-1)>0.001)throw new RangeError('World requires a unit quaternion and positive uniform scale');
     const entity = {
       id: this.identities.create('entity'), worldId: this.id, parent,
-      x, y, z, yaw, previous: { x, y, z, yaw },
-      pose: { x, y, z, yaw }, shape,
+      x, y, z, yaw, rotation:[...rotation], scale, previous: { x, y, z, yaw,rotation:[...rotation],scale },
+      pose: { x, y, z, yaw,rotation:[...rotation],scale }, shape,
+      // Transient presentation amount; never authored/saved or packed into shadow depth.
+      highlight: 0,
     };
     this.entities.set(entity.id, entity);
     this.revision++;
@@ -89,7 +132,8 @@ class World {
   snapshot() {
     for (const e of this.entities.values()) {
       e.previous.x = e.x; e.previous.y = e.y;
-      e.previous.z = e.z; e.previous.yaw = e.yaw;
+      e.previous.z = e.z; e.previous.yaw = e.yaw;e.previous.scale=e.scale;
+      for(let i=0;i<4;i++)e.previous.rotation[i]=e.rotation[i];
     }
   }
 
@@ -98,6 +142,7 @@ class World {
    * Parent-before-child is guaranteed by create(); shortest-arc yaw avoids full spins.
    */
   resolve(alpha = 1) {
+    const local=this.localRotation??=new Float64Array(4),offset=this.offset??=new Float64Array(3),yawRotation=this.yawRotation??=new Float64Array(4);
     for (const e of this.entities.values()) {
       const a = e.previous, p = e.pose;
       const x = a.x + (e.x - a.x) * alpha;
@@ -105,11 +150,16 @@ class World {
       const z = a.z + (e.z - a.z) * alpha;
       const turn = Math.atan2(Math.sin(e.yaw - a.yaw), Math.cos(e.yaw - a.yaw));
       const yaw = a.yaw + turn * alpha;
-      if (e.parent) {
-        const b = e.parent.pose, c = Math.cos(b.yaw), s = Math.sin(b.yaw);
-        p.x = b.x + x * c - y * s; p.y = b.y + x * s + y * c;
-        p.z = b.z + z; p.yaw = b.yaw + yaw;
-      } else { p.x = x; p.y = y; p.z = z; p.yaw = yaw; }
+      let dot=0;for(let i=0;i<4;i++)dot+=a.rotation[i]*e.rotation[i];
+      for(let i=0;i<4;i++)local[i]=a.rotation[i]+((dot<0?-1:1)*e.rotation[i]-a.rotation[i])*alpha;
+      const length=Math.hypot(...local);for(let i=0;i<4;i++)local[i]/=length;
+      yawRotation[0]=yawRotation[1]=0;yawRotation[2]=Math.sin(yaw/2);yawRotation[3]=Math.cos(yaw/2);
+      multiplyRotation(yawRotation,local,local);p.scale=a.scale+(e.scale-a.scale)*alpha;
+      if(e.parent){
+        const b=e.parent.pose;rotateVector(b.rotation,x*b.scale,y*b.scale,z*b.scale,offset);
+        p.x=b.x+offset[0];p.y=b.y+offset[1];p.z=b.z+offset[2];p.yaw=b.yaw+yaw;p.scale*=b.scale;
+        multiplyRotation(b.rotation,local,p.rotation);
+      }else{p.x=x;p.y=y;p.z=z;p.yaw=yaw;for(let i=0;i<4;i++)p.rotation[i]=local[i];}
     }
   }
 
@@ -131,7 +181,7 @@ class World {
 return {Identities,World};
 })();
 // Source: engine/basement/lifetime.js
-const module5=(()=>{
+const module6=(()=>{
 /**
  * Basement / lifetime: an explicit owner for cleanup callbacks.
  * It knows no game, scheduler, or DOM IDs. Owners release children in reverse order,
@@ -170,14 +220,14 @@ class Lifetime {
 return {Lifetime};
 })();
 // Source: engine/basement/input.js
-const module4=(()=>{
+const module5=(()=>{
 /**
  * Basement / input: keyboard, pointer, touch-control sources, and gamepad actions.
  * Games supply maps; this module never interprets "move" or "interact" as game rules.
  * Vector sources combine by strongest magnitude (no diagonal/duplicate speed boost).
  * Button sources OR together; press edges are consumed once, even during catch-up.
  */
-const { Lifetime } = module5;
+const { Lifetime } = module6;
 
 class Input {
   /** Bind to the supplied surface/window, and an injectable gamepad reader for tests. */
@@ -330,22 +380,19 @@ const ZERO_ACTION = Object.freeze({ x: 0, y: 0, down: false, pressed: false });
 return {Input};
 })();
 // Source: engine/basement/occlusion-shaders.js
-const module8=(()=>{
+const module9=(()=>{
 /**
  * Basement / occlusion shaders: local analytic box approximation and bounded SSAO.
- * Camera reconstruction matches the orthographic oblique projection in shaders.js.
+ * Camera reconstruction uses the same inverse view/projection as visible geometry.
  * These are ambient visibility estimates, never a replacement for cast shadows.
  */
 
 /** Shared world-position reconstruction. Depth texture values span [0,1], not world units. */
+const { ROTATION_GLSL } = module4;
+
 const RECONSTRUCT = `
-vec3 reconstruct(vec2 uv, float depth) {
-  vec2 screen = (uv * 2.0 - 1.0) * uCamera.zw;
-  float d = (depth * 2.0 - 1.0) * 200.0;
-  return vec3(screen.x + uCamera.x,
-    (0.65 * screen.y + 0.76 * d) / 1.0001 + uCamera.y,
-    (0.76 * screen.y - 0.65 * d) / 1.0001);
-}`;
+uniform mat4 uInverseViewProjection;
+vec3 reconstruct(vec2 uv,float depth){return (uInverseViewProjection*vec4(uv*2.0-1.0,depth*2.0-1.0,1.0)).xyz;}`;
 
 /** No lit color target is needed: retain normals plus hardware depth at bounded resolution. */
 const NORMAL_FRAGMENT = `#version 300 es
@@ -414,29 +461,30 @@ uniform int uAOMode; // 0 off, 1 analytic geometry, 2 analytic + screen contacts
 uniform float uAOStrength;
 uniform float uAORadius;
 uniform int uBlockerCount;
-uniform vec4 uBlockerPose[12]; // xyz center, cos(yaw)
-uniform vec4 uBlockerSize[12]; // half extents xyz, sin(yaw)
+uniform vec4 uBlockerPose[12]; // xyz center, padding
+uniform vec4 uBlockerSize[12]; // half extents xyz, padding
 uniform sampler2D uAOScreen;
 uniform sampler2D uAODepth;
 uniform sampler2D uAONormals;
 uniform vec2 uAOSize;
 uniform vec4 uCamera;
 ${RECONSTRUCT}
+${ROTATION_GLSL}
+uniform vec4 uBlockerRotation[12];
 float ambientVisibility(vec3 p,vec3 n){
   if(uAOMode==0||uAOStrength==0.0)return 1.0;
   float visibility=1.0;
   for(int i=0;i<12;i++){
     if(i>=uBlockerCount)break;
     vec4 pose=uBlockerPose[i];vec3 h=uBlockerSize[i].xyz;
-    float c=pose.w,s=uBlockerSize[i].w;
-    mat2 localRotation=mat2(c,-s,s,c);
-    vec3 q=vec3(localRotation*(p.xy-pose.xy),p.z-pose.z);
+    vec4 rotation=uBlockerRotation[i];
+    vec3 q=rotateByQuaternion(vec4(-rotation.xyz,rotation.w),p-pose.xyz);
     vec3 outside=max(abs(q)-h,0.0);
     float gap=length(outside);
     if(gap<0.015||gap>=uAORadius)continue;
     // Aim slightly into the box rather than at a coplanar nearest point on its base.
     vec3 target=clamp(q,-h*0.75,h*0.75)-q;
-    vec3 direction=vec3(transpose(localRotation)*target.xy,target.z);
+    vec3 direction=rotateByQuaternion(rotation,target);
     float facing=max(0.0,dot(n,normalize(direction)));
     float coverage=1.0-smoothstep(0.0,uAORadius,gap);
     visibility*=1.0-0.48*coverage*facing;
@@ -467,22 +515,24 @@ float ambientVisibility(vec3 p,vec3 n){
 return {RECONSTRUCT,NORMAL_FRAGMENT,FULLSCREEN_VERTEX,SSAO_FRAGMENT,AMBIENT_VISIBILITY};
 })();
 // Source: engine/basement/shadow-shaders.js
-const module9=(()=>{
+const module10=(()=>{
 /**
  * Basement / shadow shaders: retained instanced depth geometry and filtered visibility.
  * Shadow visibility affects its corresponding direct light only. Ambient AO and emission
  * remain separate. PCF has a fixed kernel; it is not area-light penumbra simulation.
  */
+const { ROTATION_GLSL } = module4;
+
 const SHADOW_VERTEX=`#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPosition;
 layout(location=2) in vec4 aPose;
 layout(location=3) in vec4 aSize;
+layout(location=5) in vec4 aRotation;
 uniform mat4 uLightMatrix;
+${ROTATION_GLSL}
 void main(){
-  float c=cos(aPose.w),s=sin(aPose.w);
-  vec3 p=aPosition*aSize.xyz;
-  p.xy=mat2(c,s,-s,c)*p.xy;
+  vec3 p=rotateByQuaternion(aRotation,aPosition*aSize.xyz);
   gl_Position=uLightMatrix*vec4(p+aPose.xyz,1.0);
 }`;
 
@@ -583,15 +633,16 @@ float pointVisibility(vec3 p,vec3 n){
 return {SHADOW_VERTEX,SHADOW_FRAGMENT,SHADOW_VISIBILITY};
 })();
 // Source: engine/basement/shaders.js
-const module7=(()=>{
+const module8=(()=>{
 /**
  * Basement / shaders: GPU-native instanced boxes and inexpensive surface lighting.
  * Optional ambient visibility is supplied by the Basement occlusion capability.
  * No Canvas preparation, font atlas or external assets.
  * This is the first renderer material, not the final luxe/bloom renderer.
  */
-const { AMBIENT_VISIBILITY } = module8;
-const { SHADOW_VISIBILITY } = module9;
+const { AMBIENT_VISIBILITY } = module9;
+const { SHADOW_VISIBILITY } = module10;
+const { ROTATION_GLSL } = module4;
 
 const VERTEX = `#version 300 es
 precision highp float;
@@ -601,25 +652,20 @@ layout(location=1) in vec3 aNormal;
 layout(location=2) in vec4 aPose;
 layout(location=3) in vec4 aSize;
 layout(location=4) in vec4 aColor;
-uniform vec4 uCamera; // center x/y, visible half-width/half-height in world units
+layout(location=5) in vec4 aRotation;
+uniform mat4 uViewProjection;
+${ROTATION_GLSL}
 out vec3 vWorld;
 out vec3 vNormal;
 out vec3 vColor;
 out float vEmission;
+out float vHighlight;
 void main() {
-  float c = cos(aPose.w), s = sin(aPose.w);
-  mat2 rotation = mat2(c, s, -s, c);
-  vec3 p = aPosition * aSize.xyz;
-  p.xy = rotation * p.xy;
-  p += aPose.xyz;
-  vWorld = p;
-  vNormal = vec3(rotation * aNormal.xy, aNormal.z);
+  vec3 p=rotateByQuaternion(aRotation,aPosition*aSize.xyz)+aPose.xyz;
+  vWorld=p;vNormal=rotateByQuaternion(aRotation,aNormal);
   vColor = aColor.rgb;
-  vEmission = aSize.w;
-  // Orthographic oblique camera. z is height; y is ground depth, never screen pixels.
-  vec2 screen = vec2(p.x - uCamera.x, (p.y - uCamera.y) * 0.65 + p.z * 0.76);
-  float depth = (p.y - uCamera.y) * 0.76 - p.z * 0.65;
-  gl_Position = vec4(screen / uCamera.zw, depth / 200.0, 1.0);
+  vEmission = aSize.w;vHighlight=aColor.w;
+  gl_Position=uViewProjection*vec4(p,1.0);
 }`;
 
 const FRAGMENT = `#version 300 es
@@ -628,6 +674,7 @@ in vec3 vWorld;
 in vec3 vNormal;
 in vec3 vColor;
 in float vEmission;
+in float vHighlight;
 uniform vec3 uAmbient;
 uniform vec4 uLights[8]; // x/y/z, radius; radius 0 disables a slot
 uniform vec3 uLightColors[8]; // linear RGB irradiance
@@ -657,7 +704,7 @@ void main() {
     float joint = smoothstep(0.475, 0.495, max(tile.x, tile.y));
     surface *= 1.0 - joint * 0.30;
   }
-  vec3 linear = surface * light + vColor * vEmission;
+  vec3 linear = surface * light + vColor * vEmission + vec3(0.18,0.12,0.04)*vHighlight;
   // Soft exposure rolloff then display gamma. No claim of physical spectral accuracy.
   vec3 mapped = vec3(1.0) - exp(-linear * 1.25);
   outColor = vec4(pow(mapped, vec3(1.0 / 2.2)), 1.0);
@@ -666,7 +713,7 @@ void main() {
 return {VERTEX,FRAGMENT};
 })();
 // Source: engine/basement/render-diagnostics.js
-const module10=(()=>{
+const module11=(()=>{
 /**
  * Basement / rendering diagnostics: per-frame work deltas and requested buffer bytes.
  * Preparation uploads are included even when the later presentation resets legacy stats.
@@ -701,7 +748,7 @@ function renderDiagnostics(renderer,profiler){
 return {renderDiagnostics};
 })();
 // Source: engine/basement/gpu-timer.js
-const module11=(()=>{
+const module12=(()=>{
 /**
  * Basement / GPU timer: optional EXT_disjoint_timer_query_webgl2 measurements.
  * At most four reusable queries. Results are polled for availability, never forced
@@ -767,7 +814,7 @@ class GpuTimer {
 return {GpuTimer};
 })();
 // Source: engine/basement/gl-program.js
-const module12=(()=>{
+const module13=(()=>{
 /** Basement / GL programs: shared compilation with complete failure-path ownership. */
 
 /** Link two GLSL stages; delete temporary shaders on success and every failure path. */
@@ -794,15 +841,15 @@ function createProgram(gl, vertexSource, fragmentSource) {
 return {createProgram};
 })();
 // Source: engine/basement/ambient-occlusion.js
-const module13=(()=>{
+const module14=(()=>{
 /**
  * Basement / ambient occlusion: owns bounded proxies, optional GPU targets and settings.
  * No scheduling, world ownership or game policy lives here. Renderer invokes the passes
  * with its existing retained batch. Screen targets are lazy and freed when leaving screen.
  */
-const { createProgram } = module12;
-const { VERTEX } = module7;
-const { NORMAL_FRAGMENT, FULLSCREEN_VERTEX, SSAO_FRAGMENT } = module8;
+const { createProgram } = module13;
+const { VERTEX } = module8;
+const { NORMAL_FRAGMENT, FULLSCREEN_VERTEX, SSAO_FRAGMENT } = module9;
 
 /** Validate atomically; world lengths and strengths must never become NaN shader uniforms. */
 function occlusionSettings(previous, patch = {}) {
@@ -826,7 +873,7 @@ class AmbientOcclusion {
   constructor(renderer,settings={}) {
     this.renderer=renderer;this.gl=renderer.gl;
     this.settings=occlusionSettings({mode:'geometry',strength:0.7,radius:1.25,resolutionScale:0.5,maxDimension:768},settings);
-    this.poses=new Float32Array(12*4);this.sizes=new Float32Array(12*4);this.scores=new Float64Array(12);
+    this.rotations=new Float32Array(48);this.poses=new Float32Array(12*4);this.sizes=new Float32Array(12*4);this.scores=new Float64Array(12);
     this.count=0;this.candidates=0;this.targets=null;this.normalProgram=null;this.screenProgram=null;
     this.failure=null;this.disposed=false;
   }
@@ -852,7 +899,7 @@ class AmbientOcclusion {
     for(const entity of world.entities.values()) {
       const shape=entity.shape,p=entity.pose;
       if(!shape||shape.ambientBlocker===false||Math.min(...shape.size)<0.15)continue;
-      const [sx,sy,sz]=shape.size;
+      const [sx,sy,sz]=shape.size.map(n=>n*p.scale);
       if(p.z+sz/2<=0.05)continue; // The ground slab must not consume the blocker budget.
       this.candidates++;
       const distance=Math.hypot(Math.max(0,Math.abs(p.x-camera.x)-sx/2),Math.max(0,Math.abs(p.y-camera.y)-sy/2));
@@ -862,12 +909,12 @@ class AmbientOcclusion {
       if(slot>=12)continue;
       const end=Math.min(this.count,11);
       for(let i=end;i>slot;i--){
-        this.scores[i]=this.scores[i-1];
+        this.scores[i]=this.scores[i-1];this.rotations.copyWithin(i*4,(i-1)*4,i*4);
         this.poses.copyWithin(i*4,(i-1)*4,i*4);this.sizes.copyWithin(i*4,(i-1)*4,i*4);
       }
-      this.scores[slot]=score;
-      this.poses[slot*4]=p.x;this.poses[slot*4+1]=p.y;this.poses[slot*4+2]=p.z;this.poses[slot*4+3]=Math.cos(p.yaw);
-      this.sizes[slot*4]=sx/2;this.sizes[slot*4+1]=sy/2;this.sizes[slot*4+2]=sz/2;this.sizes[slot*4+3]=Math.sin(p.yaw);
+      this.scores[slot]=score;this.rotations.set(p.rotation,slot*4);
+      this.poses[slot*4]=p.x;this.poses[slot*4+1]=p.y;this.poses[slot*4+2]=p.z;this.poses[slot*4+3]=0;
+      this.sizes[slot*4]=sx/2;this.sizes[slot*4+1]=sy/2;this.sizes[slot*4+2]=sz/2;this.sizes[slot*4+3]=0;
       this.count=Math.min(12,this.count+1);
     }
   }
@@ -882,8 +929,8 @@ class AmbientOcclusion {
     try {
       if(!this.normalProgram){this.normalProgram=createProgram(gl,VERTEX,NORMAL_FRAGMENT);this.renderer.stats.programs++;}
       if(!this.screenProgram){this.screenProgram=createProgram(gl,FULLSCREEN_VERTEX,SSAO_FRAGMENT);this.renderer.stats.programs++;}
-      this.normalCamera=gl.getUniformLocation(this.normalProgram,'uCamera');
-      this.screenUniforms=Object.fromEntries(['uCamera','uRadius','uDepth','uNormals'].map(n=>[n,gl.getUniformLocation(this.screenProgram,n)]));
+      this.normalCamera=gl.getUniformLocation(this.normalProgram,'uViewProjection');
+      this.screenUniforms=Object.fromEntries(['uCamera','uRadius','uDepth','uNormals','uInverseViewProjection'].map(n=>[n,gl.getUniformLocation(this.screenProgram,n)]));
       /** Create immutable single-level storage; nearest sampling avoids depth interpolation. */
       const texture=(format)=>{
         const handle=gl.createTexture();if(!handle)throw new Error('AO texture allocation failed');
@@ -917,12 +964,13 @@ class AmbientOcclusion {
     const gl=this.gl,t=this.targets,r=this.renderer;
     gl.viewport(0,0,t.width,t.height);gl.bindFramebuffer(gl.FRAMEBUFFER,t.framebuffers[0]);
     gl.enable(gl.DEPTH_TEST);gl.clearColor(0.5,0.5,1,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-    gl.useProgram(this.normalProgram);gl.uniform4f(this.normalCamera,r.camera.x,r.camera.y,view.halfWidth,view.halfHeight);
+    gl.useProgram(this.normalProgram);gl.uniformMatrix4fv(this.normalCamera,false,r.camera.matrix);
     gl.bindVertexArray(batch.vao);gl.drawArraysInstanced(gl.TRIANGLES,0,36,batch.count);gl.bindVertexArray(null);
     gl.bindFramebuffer(gl.FRAMEBUFFER,t.framebuffers[1]);gl.disable(gl.DEPTH_TEST);
     gl.useProgram(this.screenProgram);this.texture(0,t.depth);this.texture(1,t.normal);
     gl.uniform1i(this.screenUniforms.uDepth,0);gl.uniform1i(this.screenUniforms.uNormals,1);
     gl.uniform4f(this.screenUniforms.uCamera,r.camera.x,r.camera.y,view.halfWidth,view.halfHeight);
+    gl.uniformMatrix4fv(this.screenUniforms.uInverseViewProjection,false,r.camera.inverse);
     gl.uniform1f(this.screenUniforms.uRadius,this.settings.radius);gl.drawArrays(gl.TRIANGLES,0,3);
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.enable(gl.DEPTH_TEST);
     gl.viewport(0,0,r.canvas.width,r.canvas.height);
@@ -936,6 +984,8 @@ class AmbientOcclusion {
     const gl=this.gl,s=this.settings;
     gl.uniform1i(uniforms.uAOMode,s.mode==='off'?0:screenReady?2:1);
     gl.uniform1f(uniforms.uAOStrength,s.strength);gl.uniform1f(uniforms.uAORadius,s.radius);
+    gl.uniformMatrix4fv(uniforms.uInverseViewProjection,false,this.renderer.camera.inverse);
+    gl.uniform4fv(uniforms['uBlockerRotation[0]'],this.rotations);
     gl.uniform1i(uniforms.uBlockerCount,this.count);gl.uniform4fv(uniforms['uBlockerPose[0]'],this.poses);gl.uniform4fv(uniforms['uBlockerSize[0]'],this.sizes);
     if(screenReady){
       this.texture(0,this.targets.ao);this.texture(1,this.targets.depth);this.texture(2,this.targets.normal);
@@ -972,13 +1022,13 @@ class AmbientOcclusion {
   }
 
   /** Release all owned GPU and CPU storage; caller may keep a harmless disposed handle. */
-  dispose() {if(this.disposed)return;this.disposed=true;this.release();this.poses=this.sizes=this.scores=null;this.count=this.candidates=0;}
+  dispose() {if(this.disposed)return;this.disposed=true;this.release();this.poses=this.sizes=this.scores=this.rotations=null;this.count=this.candidates=0;}
 }
 
 return {occlusionSettings,occlusionDimensions,AmbientOcclusion};
 })();
 // Source: engine/basement/shadow-math.js
-const module15=(()=>{
+const module16=(()=>{
 /**
  * Basement / shadow math: light-space transforms, independent of GL and game content.
  * Matrices are column-major Float32 values. Coordinates use x/y ground and z height.
@@ -1004,10 +1054,10 @@ function directionalShadowMatrix(direction,camera,extent,resolution,out=new Floa
   const rlen=Math.hypot(rx,ry,rz);rx/=rlen;ry/=rlen;rz/=rlen;
   const ux=ly*rz-lz*ry,uy=lz*rx-lx*rz,uz=lx*ry-ly*rx;
   const texel=2*extent/resolution,depth=extent*2;
-  const cx=Math.round((rx*camera.x+ry*camera.y)/texel)*texel;
-  const cy=Math.round((ux*camera.x+uy*camera.y)/texel)*texel;
+  const cx=Math.round((rx*camera.x+ry*camera.y+rz*(camera.z??0))/texel)*texel;
+  const cy=Math.round((ux*camera.x+uy*camera.y+uz*(camera.z??0))/texel)*texel;
   out.set([rx/extent,ux/extent,-lx/depth,0, ry/extent,uy/extent,-ly/depth,0,
-    rz/extent,uz/extent,-lz/depth,0, -cx/extent,-cy/extent,(lx*camera.x+ly*camera.y)/depth,1]);
+    rz/extent,uz/extent,-lz/depth,0, -cx/extent,-cy/extent,(lx*camera.x+ly*camera.y+lz*(camera.z??0))/depth,1]);
   return out;
 }
 
@@ -1031,7 +1081,7 @@ function pointShadowMatrix(position,face,near,far,out=new Float32Array(16)) {
 return {lightDirection,directionalShadowMatrix,pointShadowMatrix};
 })();
 // Source: engine/basement/shadow-target.js
-const module17=(()=>{
+const module18=(()=>{
 /**
  * Basement / shadow target: owns one depth-only 2D or cube texture and framebuffer.
  * Requested depth24 storage is budgeted at four bytes/texel; driver padding is unknown.
@@ -1073,17 +1123,17 @@ class ShadowTarget {
 return {ShadowTarget};
 })();
 // Source: engine/basement/shadow-maps.js
-const module16=(()=>{
+const module17=(()=>{
 /**
  * Basement / shadow maps: bounded renderer-owned targets, caster storage and update caches.
  * One directional map updates on change; at most one selected point cube refreshes as
  * an atomic six-face group. Point geometry changes are rate-limited; travel/light moves
  * invalidate immediately. No queue, second loop or partial six-face image is exposed.
  */
-const { createProgram } = module12;
-const { directionalShadowMatrix, pointShadowMatrix } = module15;
-const { SHADOW_VERTEX, SHADOW_FRAGMENT } = module9;
-const { ShadowTarget } = module17;
+const { createProgram } = module13;
+const { directionalShadowMatrix, pointShadowMatrix } = module16;
+const { SHADOW_VERTEX, SHADOW_FRAGMENT } = module10;
+const { ShadowTarget } = module18;
 
 class ShadowMaps {
   /** Retain matrices/keys; GPU allocations remain lazy until an enabled world is drawn. */
@@ -1243,14 +1293,14 @@ class ShadowMaps {
 return {ShadowMaps};
 })();
 // Source: engine/basement/lighting.js
-const module14=(()=>{
+const module15=(()=>{
 /**
  * Basement / lighting: reusable irradiance data, validated configuration and shadow ownership.
  * Games author light placement/palettes; no world names, scheduling or game rules live here.
  * Fixed eight-point storage is explicit. Shadows budget one sun plus one selected point.
  */
-const { lightDirection } = module15;
-const { ShadowMaps } = module16;
+const { lightDirection } = module16;
+const { ShadowMaps } = module17;
 
 /** Validate copied RGB values; runtime data cannot silently retain a caller's mutable array. */
 function colorValues(color) {
@@ -1332,21 +1382,61 @@ class Lighting {
 
 return {shadowSettings,Lighting};
 })();
+// Source: engine/basement/camera.js
+const module19=(()=>{
+/**
+ * Basement / camera: arbitrary z-up orthographic views and their exact inverse rays.
+ * Geometry, culling, picking, aiming and screen-space AO share the same projection.
+ * Near/far depth spans +/-200 world units around the focus. Perspective is future work.
+ */
+class Camera {
+  /** The default reproduces the Atrium's former oblique view; all angles are radians. */
+  constructor(){this.x=0;this.y=0;this.z=0;this.halfHeight=21;this.azimuth=0;this.elevation=Math.atan2(0.65,0.76);this.matrix=new Float32Array(16);this.inverse=new Float32Array(16);this.right=[1,0,0];this.up=[0,0.65,0.76];this.back=[0,-0.76,0.65];}
+
+  /** Recompute orthonormal basis and matrices without per-frame matrix allocation. */
+  update(aspect) {
+    const c=Math.cos(this.azimuth),s=Math.sin(this.azimuth),e=Math.sin(this.elevation),f=Math.cos(this.elevation);
+    this.right[0]=c;this.right[1]=s;this.right[2]=0;this.up[0]=-s*e;this.up[1]=c*e;this.up[2]=f;
+    this.back[0]=s*f;this.back[1]=-c*f;this.back[2]=e;
+    const r=this.right,u=this.up,b=this.back,w=this.halfHeight*aspect,h=this.halfHeight;
+    for(let i=0;i<3;i++){this.matrix[i*4]=r[i]/w;this.matrix[i*4+1]=u[i]/h;this.matrix[i*4+2]=-b[i]/200;this.matrix[i*4+3]=0;
+      this.inverse[i]=r[i]*w;this.inverse[4+i]=u[i]*h;this.inverse[8+i]=-b[i]*200;}
+    this.matrix[12]=-(r[0]*this.x+r[1]*this.y+r[2]*this.z)/w;this.matrix[13]=-(u[0]*this.x+u[1]*this.y+u[2]*this.z)/h;
+    this.matrix[14]=(b[0]*this.x+b[1]*this.y+b[2]*this.z)/200;this.matrix[15]=1;
+    this.inverse[3]=this.inverse[7]=this.inverse[11]=0;this.inverse[12]=this.x;this.inverse[13]=this.y;this.inverse[14]=this.z;this.inverse[15]=1;
+  }
+
+  /** Named views change orientation only, preserving focus and zoom. */
+  preset(name){const views={oblique:[0,Math.atan2(0.65,0.76)],top:[0,Math.PI/2],front:[0,0],side:[Math.PI/2,0]};if(!views[name])throw new Error('Unknown camera view');[this.azimuth,this.elevation]=views[name];}
+
+  /** Ray starts on the near plane; CSS coordinates are relative to the drawing surface. */
+  ray(x,y,width,height){this.update(width/height);const sx=(x/width*2-1)*this.halfHeight*width/height,sy=(1-y/height*2)*this.halfHeight;return{origin:[this.x+this.right[0]*sx+this.up[0]*sy+this.back[0]*200,this.y+this.right[1]*sx+this.up[1]*sy+this.back[1]*200,this.z+this.up[2]*sy+this.back[2]*200],direction:this.back.map(n=>-n)};}
+
+  /** Intersect a horizontal construction plane; side/front parallel rays have no intersection. */
+  ground(x,y,width,height,z=0){const ray=this.ray(x,y,width,height);if(Math.abs(ray.direction[2])<1e-6)return null;const t=(z-ray.origin[2])/ray.direction[2];return{x:ray.origin[0]+t*ray.direction[0],y:ray.origin[1]+t*ray.direction[1],z};}
+
+  /** Project one world point for engine overlays; return surface-relative CSS pixels. */
+  project(p,width,height){this.update(width/height);const x=p.x-this.x,y=p.y-this.y,z=p.z-this.z;return{x:(1+(x*this.right[0]+y*this.right[1])/(this.halfHeight*width/height))*width/2,y:(1-(x*this.up[0]+y*this.up[1]+z*this.up[2])/this.halfHeight)*height/2};}
+}
+
+return {Camera};
+})();
 // Source: engine/basement/renderer.js
-const module6=(()=>{
+const module7=(()=>{
 /**
  * Basement / renderer: WebGL 2 instancing with owned GPU batches and retained storage.
  * Cube geometry/program belong to the renderer; each world batch belongs to a lease.
- * 12 float instance record: [x,y,z,yaw, sizeX,sizeY,sizeZ,emission, red,green,blue,0].
+ * 16 float instance record: position/pad, dimensions/emission, color/highlight, quaternion.
  * Only changed contiguous instance ranges are uploaded after the initial allocation.
  */
-const { VERTEX, FRAGMENT } = module7;
-const { Lifetime } = module5;
-const { renderDiagnostics } = module10;
-const { GpuTimer } = module11;
-const { createProgram } = module12;
-const { AmbientOcclusion } = module13;
-const { Lighting } = module14;
+const { VERTEX, FRAGMENT } = module8;
+const { Lifetime } = module6;
+const { renderDiagnostics } = module11;
+const { GpuTimer } = module12;
+const { createProgram } = module13;
+const { AmbientOcclusion } = module14;
+const { Lighting } = module15;
+const { Camera } = module19;
 
 /** Generate one unit cube with flat normals; uploaded once per WebGL context lifetime. */
 function cubeGeometry() {
@@ -1374,7 +1464,7 @@ class Renderer {
     const gl = canvas.getContext('webgl2', { alpha: false, antialias: true, powerPreference: 'low-power' });
     if (!gl) throw new Error('ETRNLNINE requires WebGL 2 on this device.');
     this.gl = gl; this.batches = new Set(); this.disposed = false; this.lost = false;
-    this.camera = { x: 0, y: 0, halfHeight: 21 };
+    this.camera = new Camera();
     this.stats = { draws: 0, instances: 0, uploads: 0, uploadedBytes: 0, buffers: 0, programs: 0, vaos: 0, contextRestores: 0 };
     this.totals={draws:0,instances:0,uploads:0,uploadedBytes:0,candidates:0,culled:0,shadowDraws:0,shadowHits:0};
     try {
@@ -1410,7 +1500,7 @@ class Renderer {
     const gl = this.gl;
     const program=createProgram(gl,VERTEX,FRAGMENT);
     this.program = program; this.stats.programs++;
-    this.uniforms = Object.fromEntries(['uCamera', 'uAmbient', 'uLights[0]', 'uLightColors[0]',
+    this.uniforms = Object.fromEntries(['uCamera','uViewProjection','uInverseViewProjection','uBlockerRotation[0]', 'uAmbient', 'uLights[0]', 'uLightColors[0]',
       'uAOMode','uAOStrength','uAORadius','uBlockerCount','uBlockerPose[0]','uBlockerSize[0]',
       'uAOScreen','uAODepth','uAONormals','uAOSize','uSunDirection','uSunColor','uSunShadowEnabled','uSunMatrix',
       'uSunShadow','uShadowParameters','uPointShadowIndex','uPointShadow','uPointShadowParameters','uPointShadowPosition','uPointShadowResolution']
@@ -1450,15 +1540,15 @@ class Renderer {
 
   /** Compute view dimensions in world units; the same projection is exposed to mouse aiming. */
   view() {
+    this.camera.update(this.canvas.width/this.canvas.height);
     const halfHeight = this.camera.halfHeight;
     return { halfWidth: halfHeight * this.canvas.width / this.canvas.height, halfHeight };
   }
 
   /** Convert surface CSS coordinates to the ground plane (z=0), without hidden game state. */
   groundPoint(x, y, target = {}) {
-    const { halfWidth, halfHeight } = this.view();
-    target.x = this.camera.x + (x / this.canvas.clientWidth * 2 - 1) * halfWidth;
-    target.y = this.camera.y + (1 - y / this.canvas.clientHeight * 2) * halfHeight / 0.65;
+    const point=this.camera.ground(x,y,this.canvas.clientWidth,this.canvas.clientHeight);
+    if(point)Object.assign(target,point);
     return target;
   }
 
@@ -1490,6 +1580,7 @@ class Renderer {
     gl.useProgram(this.program);
     this.occlusion.bind(this.uniforms,screenReady);
     gl.uniform4f(this.uniforms.uCamera, this.camera.x, this.camera.y, halfWidth, halfHeight);
+    gl.uniformMatrix4fv(this.uniforms.uViewProjection,false,this.camera.matrix);
     this.lighting.bind(this.uniforms);
     gl.bindVertexArray(batch.vao);
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, batch.count);
@@ -1519,7 +1610,7 @@ class InstanceBatch {
     if(!['camera','shadow'].includes(visibility))throw new RangeError('Invalid instance visibility policy');
     this.visibility=visibility;this.version=0;
     this.renderer = renderer; this.world = world; this.capacity = capacity;
-    this.data = new Float32Array(capacity * 12);
+    this.data = new Float32Array(capacity * 16);
     this.kind=visibility==='shadow'?'shadow-instance-buffer':'instance-buffer';this.cpuBytes=this.data.byteLength;this.gpuBufferBytes=this.data.byteLength;
     this.count = 0; this.disposed = false;
     this.initialize();
@@ -1537,9 +1628,9 @@ class InstanceBatch {
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
     gl.bufferData(gl.ARRAY_BUFFER, this.data.byteLength, gl.DYNAMIC_DRAW);
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       const location = i + 2;
-      gl.enableVertexAttribArray(location); gl.vertexAttribPointer(location, 4, gl.FLOAT, false, 48, i * 16);
+      gl.enableVertexAttribArray(location); gl.vertexAttribPointer(location, 4, gl.FLOAT, false, 64, i * 16);
       gl.vertexAttribDivisor(location, 1);
     }
     gl.bindVertexArray(null); this.forceUpload = true;
@@ -1565,19 +1656,20 @@ class InstanceBatch {
       const s = entity.shape, p = entity.pose;
       if (!s || (this.visibility==='shadow'&&s.castShadow===false)) continue;
       r.totals.candidates++;
-      const radius = Math.hypot(s.size[0], s.size[1], s.size[2]);
-      const screenY = (p.y - r.camera.y) * 0.65 + p.z * 0.76;
-      if (this.visibility==='camera'&&(Math.abs(p.x - r.camera.x) > halfWidth + radius || Math.abs(screenY) > halfHeight + radius)) {r.totals.culled++;continue;}
-      if (this.cursor / 12 >= this.capacity) throw new Error(`World ${this.world.id} exceeds ${this.capacity} ${this.visibility} instances`);
-      this.write(p.x); this.write(p.y); this.write(p.z); this.write(p.yaw);
-      this.write(s.size[0]); this.write(s.size[1]); this.write(s.size[2]);
+      const radius = Math.hypot(...s.size)*p.scale;
+      const dx=p.x-r.camera.x,dy=p.y-r.camera.y,dz=p.z-r.camera.z;
+      const screenY=dx*r.camera.up[0]+dy*r.camera.up[1]+dz*r.camera.up[2],screenX=dx*r.camera.right[0]+dy*r.camera.right[1];
+      if (this.visibility==='camera'&&(Math.abs(screenX) > halfWidth + radius || Math.abs(screenY) > halfHeight + radius)) {r.totals.culled++;continue;}
+      if (this.cursor / 16 >= this.capacity) throw new Error(`World ${this.world.id} exceeds ${this.capacity} ${this.visibility} instances`);
+      this.write(p.x); this.write(p.y); this.write(p.z); this.write(0);
+      this.write(s.size[0]*p.scale); this.write(s.size[1]*p.scale); this.write(s.size[2]*p.scale);
       // Depth-only records ignore material changes, so recoloring does not invalidate maps.
       this.write(this.visibility==='camera'?(s.emission??0):0);
       for(let i=0;i<3;i++)this.write(this.visibility==='camera'?s.color[i]:0);
-      this.write(0);
+      this.write(this.visibility==='camera'?(entity.highlight??0):0);for(let i=0;i<4;i++)this.write(p.rotation[i]);
     }
-    if(this.count!==this.cursor/12||this.lastDirty>=this.firstDirty)this.version++;
-    this.count = this.cursor / 12;
+    if(this.count!==this.cursor/16||this.lastDirty>=this.firstDirty)this.version++;
+    this.count = this.cursor / 16;
     if (this.lastDirty >= this.firstDirty) {
       gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
       // WebGL 2 source-offset/length overload uploads a range without a new typed-array view.
@@ -1604,7 +1696,7 @@ class InstanceBatch {
 return {Renderer};
 })();
 // Source: engine/basement/profile-data.js
-const module19=(()=>{
+const module21=(()=>{
 /**
  * Basement / profile data: bounded copies for diagnostics, never live engine references.
  * Used only for on-demand captures/export, not for each recorded frame.
@@ -1668,14 +1760,14 @@ function diagnosticError(error){
 return {boundedCopy,percentile,freezeData,diagnosticError};
 })();
 // Source: engine/basement/profiler.js
-const module18=(()=>{
+const module20=(()=>{
 /**
  * Basement / profiler: bounded CPU scopes, numeric counters, frame history and captures.
  * This mechanism knows no scheduler, renderer, game, DOM element, or GPU API.
  * Milliseconds everywhere. Recording reuses typed storage; summaries/captures allocate
  * only when explicitly requested. Disabled scope calls do not read the clock.
  */
-const { boundedCopy, percentile, freezeData, diagnosticError } = module19;
+const { boundedCopy, percentile, freezeData, diagnosticError } = module21;
 
 class Profiler {
   /** Capacities are hard budgets. Choose them at engine creation, not during a frame. */
@@ -1903,9 +1995,9 @@ const module2=(()=>{
  * Read world/input/renderer for implementation; this small owner connects their lifetimes.
  */
 const { Identities, World } = module3;
-const { Input } = module4;
-const { Renderer } = module6;
-const { Profiler } = module18;
+const { Input } = module5;
+const { Renderer } = module7;
+const { Profiler } = module20;
 
 class Basement {
   /** Renderer first: unsupported WebGL fails before device listeners are installed. */
@@ -1926,7 +2018,7 @@ class Basement {
 return {Basement};
 })();
 // Source: engine/lobby/preparation.js
-const module21=(()=>{
+const module23=(()=>{
 /**
  * Lobby / preparation: cooperatively budgeted generator work in the existing frame loop.
  * Each next() must be a small, synchronous chunk; JavaScript cannot preempt a huge chunk.
@@ -1993,7 +2085,7 @@ class PreparationQueue {
 return {PreparationQueue};
 })();
 // Source: engine/lobby/runtime-diagnostics.js
-const module22=(()=>{
+const module24=(()=>{
 /**
  * Lobby / runtime diagnostics: measurement handles and counters, not scheduling logic.
  * Providers are removed with their runtime. Disabled profiling performs no timer reads.
@@ -2018,14 +2110,14 @@ function runtimeDiagnostics(runtime,profiler){
 return {runtimeDiagnostics};
 })();
 // Source: engine/lobby/runtime.js
-const module20=(()=>{
+const module22=(()=>{
 /**
  * Lobby / runtime: sole animation-frame owner, explicit phases, and pause reasons.
  * All elapsed values are seconds. The engine advances fixed simulation steps and
  * interpolates render poses; long browser suspensions never trigger unlimited work.
  */
-const { PreparationQueue } = module21;
-const { runtimeDiagnostics } = module22;
+const { PreparationQueue } = module23;
+const { runtimeDiagnostics } = module24;
 
 class Runtime {
   /** Inject scheduling for deterministic lifecycle tests; browser defaults allocate no loop yet. */
@@ -2138,7 +2230,7 @@ class Runtime {
 return {Runtime};
 })();
 // Source: engine/directory/residency.js
-const module24=(()=>{
+const module26=(()=>{
 /**
  * Directory / residency: bounded prepared worlds, preparation tickets, and compact state.
  * Factories are game/library supplied. They return {world, ready, capture, dispose, ...}.
@@ -2278,7 +2370,7 @@ class WorldResidency {
 return {WorldResidency};
 })();
 // Source: engine/directory/diagnostics.js
-const module25=(()=>{
+const module27=(()=>{
 /**
  * Directory / diagnostics: report resource ownership through Basement's provider contract.
  * Frame samples are scalar sums. Detailed rows are copied only on capture, capped at 64.
@@ -2325,14 +2417,14 @@ function directoryDiagnostics(directory,profiler){
 return {directoryDiagnostics};
 })();
 // Source: engine/directory/directory.js
-const module23=(()=>{
+const module25=(()=>{
 /**
  * Directory: named libraries, lazy shared resources, and explicit world ownership.
  * Factories come from callers. Nothing here imports a named toy or game asset.
  * A lease pins one resource; releasing the last lease destroys it immediately.
  */
-const { WorldResidency } = module24;
-const { directoryDiagnostics } = module25;
+const { WorldResidency } = module26;
+const { directoryDiagnostics } = module27;
 
 class Directory {
   /** Registration is inert: no world or GPU asset is allocated until requested. */
@@ -2406,8 +2498,22 @@ class Directory {
 
 return {Directory};
 })();
+// Source: engine/penthouse/assembly.js
+const module29=(()=>{
+/** Penthouse / version-one data-driven box assembly. No editor or game knowledge. */
+/** Explicit generator versions available to project/build validation; no allocation here. */
+const ASSEMBLY_GENERATORS=Object.freeze({'toy.assembly':1});
+
+function assembly({world,asset}){
+ const root=world.create(),parts=[];
+ for(const part of asset.parts){const [x,y,z]=part.position;parts.push(world.create({parent:part.parent===null?root:parts[part.parent],x,y,z,rotation:part.rotation,shape:part.shape?JSON.parse(JSON.stringify(part.shape)):null}));}
+ return {root,parts};
+}
+
+return {ASSEMBLY_GENERATORS,assembly};
+})();
 // Source: engine/penthouse/toys.js
-const module27=(()=>{
+const module30=(()=>{
 /**
  * Penthouse / toys: reusable procedural box-based architecture and actor assemblies.
  * These are early test toys, not Freelancer art or the final procedural humanoid.
@@ -2466,13 +2572,13 @@ function actor({ world, color = [0.42,0.34,0.58], bagColor = [0.54,0.30,0.17] })
 return {box,pavilion,actor};
 })();
 // Source: engine/penthouse/controls.js
-const module28=(()=>{
+const module31=(()=>{
 /**
  * Penthouse / controls: parameterized HTML control templates over Basement actions.
  * HTML is intentional for accessible interface text; the world remains pure WebGL.
  * Each instance has its own pointer capture, source ID, mutable state, and Lifetime.
  */
-const { Lifetime } = module5;
+const { Lifetime } = module6;
 
 /** Track a single pointer per control, independently of other control instances. */
 function capture(element, life, begin, move, end) {
@@ -2566,7 +2672,7 @@ class ActionButton {
 return {Joystick,ActionButton};
 })();
 // Source: engine/penthouse/profiler-style.js
-const module30=(()=>{
+const module33=(()=>{
 /** Penthouse / profiler presentation: component-scoped styles; removed with the viewer root. */
 const PROFILER_STYLE=`
 .etrnl-profiler{position:absolute;right:30px;top:92px;width:min(390px,calc(100vw - 40px));max-height:calc(100dvh - 190px);overflow:auto;background:#11131eef;border:1px solid #c6ae774d;border-radius:7px;color:#d5cfdf;font:11px/1.55 system-ui,sans-serif;z-index:2;box-shadow:0 12px 50px #0004}
@@ -2591,15 +2697,15 @@ const PROFILER_STYLE=`
 return {PROFILER_STYLE};
 })();
 // Source: engine/penthouse/profiler-view.js
-const module29=(()=>{
+const module32=(()=>{
 /**
  * Penthouse / profiler viewer: accessible HTML/SVG, bounded tables and capture export.
  * Receives a generic subscription function; it never imports Lobby or starts a loop.
  * Closed viewers unsubscribe. Open viewers refresh at most twice a second by default.
  */
-const { Lifetime } = module5;
-const { diagnosticError } = module19;
-const { PROFILER_STYLE } = module30;
+const { Lifetime } = module6;
+const { diagnosticError } = module21;
+const { PROFILER_STYLE } = module33;
 
 /** Format measured values without turning unavailable measurements into zero. */
 function ms(value){return Number.isFinite(value)?value.toFixed(2):'—';}
@@ -2719,19 +2825,21 @@ class ProfilerView {
 return {ProfilerView};
 })();
 // Source: engine/penthouse/penthouse.js
-const module26=(()=>{
+const module28=(()=>{
 /**
  * Penthouse assembly: expose inert libraries without coupling Directory to toy names.
  * ETRNLNINE installs these factories; games request them through Directory.
  */
-const { pavilion, actor, box } = module27;
-const { Joystick, ActionButton } = module28;
-const { ProfilerView } = module29;
+const { assembly } = module29;
+const { pavilion, actor, box } = module30;
+const { Joystick, ActionButton } = module31;
+const { ProfilerView } = module32;
 
 class Penthouse {
   /** Catalog creation is inert: allocation begins only when a factory is requested. */
   constructor() {
     this.libraries = Object.freeze({
+      'toy.assembly':assembly,
       'toy.box': options => box(options.world, options),
       'toy.pavilion': pavilion,
       'toy.actor': actor,
@@ -2752,10 +2860,10 @@ const module1=(()=>{
  * Scene content, controls, movement, HUD, and game rules belong to the caller.
  */
 const { Basement } = module2;
-const { Lifetime } = module5;
-const { Runtime } = module20;
-const { Directory } = module23;
-const { Penthouse } = module26;
+const { Lifetime } = module6;
+const { Runtime } = module22;
+const { Directory } = module25;
+const { Penthouse } = module28;
 
 class ETRNLNINE {
   /** Build an empty engine, releasing earlier levels if a later constructor fails. */
@@ -2792,8 +2900,86 @@ class ETRNLNINE {
 
 return {ETRNLNINE};
 })();
+// Source: engine/basement/project.js
+const module37=(()=>{
+/**
+ * Basement / authored project contract. JSON is data, never executable behavior.
+ * This first portable package contains scenes and assembly assets together. Validation
+ * happens before adoption and packaging; IDs survive serialization independently of World IDs.
+ * Limits bound synchronous parsing, history and procedural construction on mobile devices.
+ */
+const PROJECT_LIMITS=Object.freeze({bytes:524288,scenes:8,assets:256,entities:256,parts:128,totalParts:4096});
+
+/** Return an independent plain-data value; never share authoring storage with simulation. */
+function copyData(value){return JSON.parse(JSON.stringify(value));}
+
+/** Validate version, graph, numeric domains and the explicitly supported generator catalog. */
+function validateProject(project,{generators=null}={}){
+ const fail=(path,message)=>{throw new Error(`${path}: ${message}`);};
+ const check=(ok,path,message)=>{if(!ok)fail(path,message);};
+ const number=(v,path,min=-10000,max=10000)=>check(Number.isFinite(v)&&v>=min&&v<=max,path,`expected finite ${min}…${max}`);
+ const vector=(v,n,path,min=-10000,max=10000)=>{check(Array.isArray(v)&&v.length===n,path,`expected ${n} components`);v.forEach((x,i)=>number(x,`${path}[${i}]`,min,max));};
+ const text=(v,path)=>check(typeof v==='string'&&v.length>0&&v.length<=120,path,'expected 1–120 characters');
+ const list=(v,max,path)=>check(Array.isArray(v)&&v.length>0&&v.length<=max,path,`expected 1–${max} entries`);
+ const ids=(items,path)=>{const seen=new Set();for(const item of items){text(item?.id,`${path}.id`);check(!seen.has(item.id),path,`duplicate ID ${item.id}`);seen.add(item.id);}return seen;};
+ const rotation=(q,path)=>{vector(q,4,path,-1,1);check(Math.abs(Math.hypot(...q)-1)<.001,path,'expected unit quaternion');};
+ const json=JSON.stringify(project,(_k,v)=>{if(typeof v==='number'&&!Number.isFinite(v))fail('project','non-finite number');return v;});
+ check(typeof json==='string'&&new TextEncoder().encode(json).length<=PROJECT_LIMITS.bytes,'project','package exceeds 512 KiB');
+ check(project?.schemaVersion===1,'schemaVersion','only version 1 is supported');text(project.id,'id');text(project.name,'name');
+ list(project.assets,PROJECT_LIMITS.assets,'assets');list(project.scenes,PROJECT_LIMITS.scenes,'scenes');
+ const assets=ids(project.assets,'assets');ids(project.scenes,'scenes');let total=0;
+ for(const [ai,a] of project.assets.entries()){
+  const p=`assets[${ai}]`;text(a.name,p+'.name');text(a.generator,p+'.generator');check(Number.isInteger(a.generatorVersion)&&a.generatorVersion>0,p+'.generatorVersion','expected positive version');if(generators)check(Object.hasOwn(generators,a.generator)&&generators[a.generator]===a.generatorVersion,p,'unsupported generator/version');
+  list(a.parts,PROJECT_LIMITS.parts,p+'.parts');ids(a.parts,p+'.parts');total+=a.parts.length;check(total<=PROJECT_LIMITS.totalParts,p,'part budget exceeded');
+  a.parts.forEach((part,i)=>{const q=`${p}.parts[${i}]`;check(part.parent===null||(Number.isInteger(part.parent)&&part.parent>=0&&part.parent<i),q+'.parent','parent must precede child');vector(part.position,3,q+'.position');rotation(part.rotation,q+'.rotation');
+   if(part.shape){const s=part.shape;vector(s.size,3,q+'.shape.size',.001,1000);vector(s.color,3,q+'.shape.color',0,16);number(s.emission,q+'.shape.emission',0,32);for(const key of ['castShadow','ambientBlocker'])if(s[key]!==undefined)check(typeof s[key]==='boolean',q+'.shape.'+key,'expected boolean');}
+  });
+  check(Array.isArray(a.colliders)&&a.colliders.length<=128,p+'.colliders','expected bounded collider list');
+  for(const c of a.colliders){number(c.x,p+'.collider.x');number(c.y,p+'.collider.y');number(c.width,p+'.collider.width',.001,1000);number(c.depth,p+'.collider.depth',.001,1000);}
+ }
+ for(const [si,s] of project.scenes.entries()){
+  const p=`scenes[${si}]`;text(s.name,p+'.name');text(s.key,p+'.key');check(!project.scenes.slice(0,si).some(o=>o.key===s.key),p+'.key','duplicate realm key');
+  check(typeof s.ethereal==='boolean',p+'.ethereal','expected boolean');vector(s.ambient,3,p+'.ambient',0,16);vector(s.sun?.direction,3,p+'.sun.direction');check(Math.hypot(...s.sun.direction)>.001,p+'.sun.direction','zero direction');vector(s.sun.color,3,p+'.sun.color',0,16);
+  list(s.entities,PROJECT_LIMITS.entities,p+'.entities');
+  check(s.entities.reduce((n,e)=>n+(project.assets.find(a=>a.id===e.asset)?.parts.length??0),0)<=1800,p+'.entities','placed geometry exceeds 1800 parts');
+  ids(s.entities,p+'.entities');
+  s.entities.forEach((e,i)=>{const q=`${p}.entities[${i}]`;text(e.name,q+'.name');check(assets.has(e.asset),q+'.asset','unresolved asset');vector(e.position,3,q+'.position');rotation(e.rotation,q+'.rotation');number(e.scale,q+'.scale',.05,20);check(typeof e.locked==='boolean',q+'.locked','expected boolean');});
+  if(s.lightVariants)for(const [name,v] of Object.entries(s.lightVariants)){check(['cool','warm'].includes(name),p+'.lightVariants','unknown variant');vector(v.crystal,3,p+'.lightVariants.'+name+'.crystal',0,16);vector(v.irradiance,3,p+'.lightVariants.'+name+'.irradiance',0,16);}
+  check(Array.isArray(s.lights)&&s.lights.length===8,p+'.lights','expected eight light slots');ids(s.lights,p+'.lights');
+  s.lights.forEach((l,i)=>{vector(l.position,3,`${p}.lights[${i}].position`);vector(l.color,3,`${p}.lights[${i}].color`,0,16);number(l.radius,`${p}.lights[${i}].radius`,.1,100);});
+ }
+ return project;
+}
+
+/** Parse only after checking source bytes, so oversized files never enter JSON.parse. */
+function parseProject(text,validate=validateProject){if(new TextEncoder().encode(text).length>PROJECT_LIMITS.bytes)throw new Error('Project exceeds 512 KiB');return validate(JSON.parse(text));}
+
+return {PROJECT_LIMITS,copyData,validateProject,parseProject};
+})();
+// Source: examples/atrium/project.js
+const module36=(()=>{
+/** Atrium source of truth: portable JSON; behavior stays in the example's JavaScript. */
+const data=JSON.parse("{\"schemaVersion\":1,\"id\":\"project:atrium\",\"name\":\"Between Worlds\",\"scenes\":[{\"key\":\"amber\",\"name\":\"The Amber Atrium\",\"sun\":{\"direction\":[-0.5,0.8,1.2],\"color\":[0.58,0.49,0.62]},\"ethereal\":false,\"ambient\":[0.15,0.11,0.15],\"id\":\"scene:amber\",\"entities\":[{\"id\":\"amber:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"asset\":\"asset:amber:courtyard-foundation\",\"tag\":null,\"locked\":true,\"position\":[0,0,-0.25],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:central-inlay\",\"name\":\"Central inlay\",\"asset\":\"asset:amber:central-inlay\",\"tag\":null,\"locked\":true,\"position\":[0,-5,0.015],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-brass-inlay\",\"name\":\"West brass inlay\",\"asset\":\"asset:amber:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[-3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-brass-inlay\",\"name\":\"East brass inlay\",\"asset\":\"asset:amber:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:colonnade\",\"name\":\"Colonnade\",\"asset\":\"asset:amber:colonnade\",\"tag\":null,\"locked\":false,\"position\":[0,11,0],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-gallery\",\"name\":\"West gallery\",\"asset\":\"asset:amber:west-gallery\",\"tag\":null,\"locked\":false,\"position\":[-20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-entry-planter\",\"name\":\"West entry planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-court-planter\",\"name\":\"West court planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-entry-lantern\",\"name\":\"West entry lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-promenade-lantern\",\"name\":\"West promenade lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-gallery-lantern\",\"name\":\"West gallery lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-gallery\",\"name\":\"East gallery\",\"asset\":\"asset:amber:east-gallery\",\"tag\":null,\"locked\":false,\"position\":[20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-entry-planter\",\"name\":\"East entry planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-court-planter\",\"name\":\"East court planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-entry-lantern\",\"name\":\"East entry lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-promenade-lantern\",\"name\":\"East promenade lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-gallery-lantern\",\"name\":\"East gallery lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:crystal-lantern\",\"name\":\"Crystal lantern\",\"asset\":\"asset:amber:crystal-lantern\",\"tag\":\"lantern\",\"locked\":false,\"position\":[0,2,0.65],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:movable-plinth\",\"name\":\"Movable plinth\",\"asset\":\"asset:amber:movable-plinth\",\"tag\":\"prop\",\"locked\":false,\"position\":[6,-12,0.65],\"rotation\":[0,0,0,1],\"scale\":1}],\"lights\":[{\"id\":\"light:0\",\"position\":[0,7,5],\"radius\":16,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:1\",\"position\":[-15,-4,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:2\",\"position\":[15,-4,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:3\",\"position\":[-15,9,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:4\",\"position\":[15,9,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:5\",\"position\":[0,2,3],\"radius\":10,\"color\":[0.3,1.1,2.7]},{\"id\":\"light:6\",\"position\":[-15,-18,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:7\",\"position\":[15,-18,4],\"radius\":12,\"color\":[2.4,0.85,0.3]}],\"lightVariants\":{\"cool\":{\"crystal\":[0.25,0.62,1],\"irradiance\":[0.3,1.1,2.7]},\"warm\":{\"crystal\":[1,0.34,0.19],\"irradiance\":[3,0.5,0.2]}}},{\"key\":\"violet\",\"name\":\"The Violet Court\",\"sun\":{\"direction\":[0.5,0.7,1.1],\"color\":[0.36,0.46,0.75]},\"ethereal\":true,\"ambient\":[0.09,0.11,0.26],\"id\":\"scene:violet\",\"entities\":[{\"id\":\"violet:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"asset\":\"asset:violet:courtyard-foundation\",\"tag\":null,\"locked\":true,\"position\":[0,0,-0.25],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:central-inlay\",\"name\":\"Central inlay\",\"asset\":\"asset:violet:central-inlay\",\"tag\":null,\"locked\":true,\"position\":[0,-5,0.015],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-brass-inlay\",\"name\":\"West brass inlay\",\"asset\":\"asset:violet:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[-3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-brass-inlay\",\"name\":\"East brass inlay\",\"asset\":\"asset:violet:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:colonnade\",\"name\":\"Colonnade\",\"asset\":\"asset:violet:colonnade\",\"tag\":null,\"locked\":false,\"position\":[0,11,0],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-gallery\",\"name\":\"West gallery\",\"asset\":\"asset:violet:west-gallery\",\"tag\":null,\"locked\":false,\"position\":[-20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-entry-planter\",\"name\":\"West entry planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-court-planter\",\"name\":\"West court planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-entry-lantern\",\"name\":\"West entry lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-promenade-lantern\",\"name\":\"West promenade lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-gallery-lantern\",\"name\":\"West gallery lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-gallery\",\"name\":\"East gallery\",\"asset\":\"asset:violet:east-gallery\",\"tag\":null,\"locked\":false,\"position\":[20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-entry-planter\",\"name\":\"East entry planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-court-planter\",\"name\":\"East court planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-entry-lantern\",\"name\":\"East entry lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-promenade-lantern\",\"name\":\"East promenade lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-gallery-lantern\",\"name\":\"East gallery lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:crystal-lantern\",\"name\":\"Crystal lantern\",\"asset\":\"asset:violet:crystal-lantern\",\"tag\":\"lantern\",\"locked\":false,\"position\":[0,2,0.65],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:movable-plinth\",\"name\":\"Movable plinth\",\"asset\":\"asset:violet:movable-plinth\",\"tag\":\"prop\",\"locked\":false,\"position\":[6,-12,0.65],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-prism\",\"name\":\"West prism\",\"asset\":\"asset:violet:prism\",\"tag\":null,\"locked\":false,\"position\":[-7,-3,2.5],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-prism\",\"name\":\"East prism\",\"asset\":\"asset:violet:prism\",\"tag\":null,\"locked\":false,\"position\":[7,-3,2.5],\"rotation\":[0,0,0,1],\"scale\":1}],\"lights\":[{\"id\":\"light:0\",\"position\":[0,7,5],\"radius\":16,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:1\",\"position\":[-15,-4,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:2\",\"position\":[15,-4,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:3\",\"position\":[-15,9,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:4\",\"position\":[15,9,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:5\",\"position\":[0,2,3],\"radius\":10,\"color\":[0.3,1.1,2.7]},{\"id\":\"light:6\",\"position\":[-15,-18,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:7\",\"position\":[15,-18,4],\"radius\":12,\"color\":[0.35,0.9,2.5]}],\"lightVariants\":{\"cool\":{\"crystal\":[0.25,0.62,1],\"irradiance\":[0.3,1.1,2.7]},\"warm\":{\"crystal\":[1,0.34,0.19],\"irradiance\":[3,0.5,0.2]}}}],\"assets\":[{\"id\":\"asset:amber:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[58,68,0.5],\"color\":[0.14,0.115,0.14],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:amber:central-inlay\",\"name\":\"Central inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[7,38,0.025],\"color\":[0.22,0.2,0.25],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:amber:brass-inlay\",\"name\":\"Brass inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.05,38,0.035],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:amber:colonnade\",\"name\":\"Colonnade\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":null},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.2],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[26,11,0.4],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,4.2,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.6,7],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,7],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[25,10,0.6],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,-4.5,6.4],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.12,0.09],\"color\":[1,0.47,0.17],\"emission\":2.5,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:5\",\"parent\":0,\"position\":[0,-4.5,6.1],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.16,0.1],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:6\",\"parent\":0,\"position\":[-12,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:7\",\"parent\":0,\"position\":[-12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:8\",\"parent\":0,\"position\":[-12,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:9\",\"parent\":0,\"position\":[-6,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:10\",\"parent\":0,\"position\":[-6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:11\",\"parent\":0,\"position\":[-6,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:12\",\"parent\":0,\"position\":[6,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:13\",\"parent\":0,\"position\":[6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:14\",\"parent\":0,\"position\":[6,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:15\",\"parent\":0,\"position\":[12,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:16\",\"parent\":0,\"position\":[12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:17\",\"parent\":0,\"position\":[12,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:18\",\"parent\":0,\"position\":[-9,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:19\",\"parent\":0,\"position\":[-9,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:20\",\"parent\":0,\"position\":[-6,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:21\",\"parent\":0,\"position\":[-6,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:22\",\"parent\":0,\"position\":[-3,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:23\",\"parent\":0,\"position\":[-3,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:24\",\"parent\":0,\"position\":[0,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:25\",\"parent\":0,\"position\":[0,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:26\",\"parent\":0,\"position\":[3,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:27\",\"parent\":0,\"position\":[3,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:28\",\"parent\":0,\"position\":[6,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:29\",\"parent\":0,\"position\":[6,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:30\",\"parent\":0,\"position\":[9,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:31\",\"parent\":0,\"position\":[9,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":4.199999999999999,\"width\":24,\"depth\":0.7},{\"x\":-12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":-6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6}]},{\"id\":\"asset:amber:west-gallery\",\"name\":\"West gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":null,\"position\":[1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":null,\"position\":[1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":null,\"position\":[1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:5\",\"parent\":null,\"position\":[1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:6\",\"parent\":null,\"position\":[1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:7\",\"parent\":null,\"position\":[1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:8\",\"parent\":null,\"position\":[1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:9\",\"parent\":null,\"position\":[1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:10\",\"parent\":null,\"position\":[1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:11\",\"parent\":null,\"position\":[1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:12\",\"parent\":null,\"position\":[1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:13\",\"parent\":null,\"position\":[1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:14\",\"parent\":null,\"position\":[1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:15\",\"parent\":null,\"position\":[1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:amber:planter\",\"name\":\"Planter\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,2.4,1.1],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.8499999999999999],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.2,2.2,0.9],\"color\":[0.045,0.14,0.1],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,0,1.4999999999999998],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.8000000000000003,1.8000000000000003,0.9],\"color\":[0.045,0.14,0.1],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,2.1500000000000004],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.4000000000000001,1.4000000000000001,0.9],\"color\":[0.045,0.14,0.1],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,0,2.8],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1,1,0.9],\"color\":[0.045,0.14,0.1],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.4,\"depth\":2.4}]},{\"id\":\"asset:amber:lantern\",\"name\":\"Lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.18,0.18,3.6],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,1.9000000000000001],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.6,0.6,0.8],\"color\":[1,0.47,0.17],\"emission\":3,\"ambientBlocker\":true,\"castShadow\":false}},{\"id\":\"part:2\",\"parent\":null,\"position\":[0,0,2.3500000000000005],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.12],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:amber:east-gallery\",\"name\":\"East gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":null,\"position\":[-1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":null,\"position\":[-1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":null,\"position\":[-1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:5\",\"parent\":null,\"position\":[-1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:6\",\"parent\":null,\"position\":[-1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:7\",\"parent\":null,\"position\":[-1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:8\",\"parent\":null,\"position\":[-1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:9\",\"parent\":null,\"position\":[-1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:10\",\"parent\":null,\"position\":[-1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:11\",\"parent\":null,\"position\":[-1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:12\",\"parent\":null,\"position\":[-1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:13\",\"parent\":null,\"position\":[-1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:14\",\"parent\":null,\"position\":[-1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:15\",\"parent\":null,\"position\":[-1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:amber:crystal-lantern\",\"name\":\"Crystal lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.9,1.9,1.3],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.85],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.1,2.1,0.22],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"crystal\",\"parent\":0,\"position\":[0,0,1.75],\"rotation\":[0,0,0.3826834323650898,0.9238795325112867],\"shape\":{\"size\":[0.7,0.7,1.4],\"color\":[0.25,0.62,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":false}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.1,\"depth\":2.1}]},{\"id\":\"asset:amber:movable-plinth\",\"name\":\"Movable plinth\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,2,1.3],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":2}]},{\"id\":\"asset:violet:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[58,68,0.5],\"color\":[0.075,0.09,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:violet:central-inlay\",\"name\":\"Central inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[7,38,0.025],\"color\":[0.22,0.2,0.25],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:violet:brass-inlay\",\"name\":\"Brass inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.05,38,0.035],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:violet:colonnade\",\"name\":\"Colonnade\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":null},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.2],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[26,11,0.4],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,4.2,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.6,8.5],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,8.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[25,10,0.6],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,-4.5,7.9],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.12,0.09],\"color\":[0.24,0.58,1],\"emission\":2.5,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:5\",\"parent\":0,\"position\":[0,-4.5,7.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.16,0.1],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:6\",\"parent\":0,\"position\":[-12,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:7\",\"parent\":0,\"position\":[-12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:8\",\"parent\":0,\"position\":[-12,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:9\",\"parent\":0,\"position\":[-6,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:10\",\"parent\":0,\"position\":[-6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:11\",\"parent\":0,\"position\":[-6,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:12\",\"parent\":0,\"position\":[6,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:13\",\"parent\":0,\"position\":[6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:14\",\"parent\":0,\"position\":[6,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:15\",\"parent\":0,\"position\":[12,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:16\",\"parent\":0,\"position\":[12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:17\",\"parent\":0,\"position\":[12,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:18\",\"parent\":0,\"position\":[-9,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:19\",\"parent\":0,\"position\":[-9,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:20\",\"parent\":0,\"position\":[-6,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:21\",\"parent\":0,\"position\":[-6,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:22\",\"parent\":0,\"position\":[-3,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:23\",\"parent\":0,\"position\":[-3,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:24\",\"parent\":0,\"position\":[0,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:25\",\"parent\":0,\"position\":[0,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:26\",\"parent\":0,\"position\":[3,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:27\",\"parent\":0,\"position\":[3,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:28\",\"parent\":0,\"position\":[6,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:29\",\"parent\":0,\"position\":[6,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:30\",\"parent\":0,\"position\":[9,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:31\",\"parent\":0,\"position\":[9,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":4.199999999999999,\"width\":24,\"depth\":0.7},{\"x\":-12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":-6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6}]},{\"id\":\"asset:violet:west-gallery\",\"name\":\"West gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":null,\"position\":[1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":null,\"position\":[1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":null,\"position\":[1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:5\",\"parent\":null,\"position\":[1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:6\",\"parent\":null,\"position\":[1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:7\",\"parent\":null,\"position\":[1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:8\",\"parent\":null,\"position\":[1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:9\",\"parent\":null,\"position\":[1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:10\",\"parent\":null,\"position\":[1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:11\",\"parent\":null,\"position\":[1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:12\",\"parent\":null,\"position\":[1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:13\",\"parent\":null,\"position\":[1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:14\",\"parent\":null,\"position\":[1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:15\",\"parent\":null,\"position\":[1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:violet:planter\",\"name\":\"Planter\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,2.4,1.1],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.8499999999999999],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.2,2.2,0.9],\"color\":[0.1,0.2,0.27],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,0,1.4999999999999998],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.8000000000000003,1.8000000000000003,0.9],\"color\":[0.1,0.2,0.27],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,2.1500000000000004],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.4000000000000001,1.4000000000000001,0.9],\"color\":[0.1,0.2,0.27],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,0,2.8],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1,1,0.9],\"color\":[0.1,0.2,0.27],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.4,\"depth\":2.4}]},{\"id\":\"asset:violet:lantern\",\"name\":\"Lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.18,0.18,3.6],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,1.9000000000000001],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.6,0.6,0.8],\"color\":[0.24,0.58,1],\"emission\":3,\"ambientBlocker\":true,\"castShadow\":false}},{\"id\":\"part:2\",\"parent\":null,\"position\":[0,0,2.3500000000000005],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.12],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:violet:east-gallery\",\"name\":\"East gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":null,\"position\":[-1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":null,\"position\":[-1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":null,\"position\":[-1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:5\",\"parent\":null,\"position\":[-1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:6\",\"parent\":null,\"position\":[-1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:7\",\"parent\":null,\"position\":[-1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:8\",\"parent\":null,\"position\":[-1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:9\",\"parent\":null,\"position\":[-1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:10\",\"parent\":null,\"position\":[-1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:11\",\"parent\":null,\"position\":[-1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:12\",\"parent\":null,\"position\":[-1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:13\",\"parent\":null,\"position\":[-1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:14\",\"parent\":null,\"position\":[-1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:15\",\"parent\":null,\"position\":[-1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:violet:crystal-lantern\",\"name\":\"Crystal lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.9,1.9,1.3],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.85],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.1,2.1,0.22],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"crystal\",\"parent\":0,\"position\":[0,0,1.75],\"rotation\":[0,0,0.3826834323650898,0.9238795325112867],\"shape\":{\"size\":[0.7,0.7,1.4],\"color\":[0.25,0.62,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":false}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.1,\"depth\":2.1}]},{\"id\":\"asset:violet:movable-plinth\",\"name\":\"Movable plinth\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,2,1.3],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":2}]},{\"id\":\"asset:violet:prism\",\"name\":\"Prism\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0.3826834323650898,0.9238795325112867],\"shape\":{\"size\":[0.7,0.7,3.8],\"color\":[0.22,0.5,0.67],\"emission\":0.5,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":1,\"depth\":1}]}]}");
+const { validateProject } = module37;
+const { ASSEMBLY_GENERATORS } = module29;
+/** Resolve authored generator identities against the libraries this example actually installs. */
+function validateAtriumProject(project){validateProject(project,{generators:ASSEMBLY_GENERATORS});
+ // This application's injected Play behavior requires these explicit content conventions.
+ // Generic schema and scene-instantiation mechanisms do not know the Atrium's names.
+ for(const scene of project.scenes){
+  const prop=scene.entities.filter(e=>e.tag==='prop'),lantern=scene.entities.filter(e=>e.tag==='lantern');
+  if(prop.length!==1||lantern.length!==1)throw new Error(`${scene.id}: Atrium Play needs one prop and one lantern tag`);
+  const propAsset=project.assets.find(a=>a.id===prop[0].asset),lampAsset=project.assets.find(a=>a.id===lantern[0].asset);
+  if(!propAsset.colliders.length||!lampAsset.parts.some(p=>p.id==='crystal'&&p.shape))throw new Error(`${scene.id}: missing prop collision or crystal part`);
+  if(!scene.lightVariants?.cool||!scene.lightVariants?.warm)throw new Error(`${scene.id}: missing cool/warm light variants`);
+ }
+ return project;}
+const ATRIUM_PROJECT=validateAtriumProject(data);
+
+return {validateAtriumProject,ATRIUM_PROJECT};
+})();
 // Source: engine/basement/transfer.js
-const module34=(()=>{
+const module39=(()=>{
 /**
  * Basement / transfer: validated, synchronous movement of one attachment tree.
  * No loading, scheduling, game rules, callbacks during mutation, or resource ownership.
@@ -2833,7 +3019,8 @@ function transferTree({ source, destination, root, landing, validate = () => tru
   for (const entity of members) {
     entity.worldId = destination.id; destination.entities.set(entity.id, entity);
     // Reset interpolation history: never draw a streak through the old world/anchor.
-    Object.assign(entity.previous, { x: entity.x, y: entity.y, z: entity.z, yaw: entity.yaw });
+    Object.assign(entity.previous, { x: entity.x, y: entity.y, z: entity.z, yaw: entity.yaw, scale:entity.scale });
+    entity.previous.rotation.splice(0,4,...entity.rotation);
   }
   source.revision++; destination.revision++;
   return Object.freeze({ sourceId: source.id, destinationId: destination.id,
@@ -2843,13 +3030,13 @@ function transferTree({ source, destination, root, landing, validate = () => tru
 return {transferTree};
 })();
 // Source: engine/lobby/travel.js
-const module33=(()=>{
+const module38=(()=>{
 /**
  * Lobby / travel: asynchronous preparation becomes a synchronous boundary commit.
  * It consumes generic residency tickets; it does not import Directory or game content.
  * The active ticket pins the source until a successful transfer replaces it.
  */
-const { transferTree } = module34;
+const { transferTree } = module39;
 
 class WorldTravel {
   /** Adopt an already-ready initial ticket/root. The owner must call advance at a boundary. */
@@ -2942,7 +3129,7 @@ class WorldTravel {
 return {WorldTravel};
 })();
 // Source: engine/basement/geometry.js
-const module36=(()=>{
+const module41=(()=>{
 /** Basement / geometry: pure horizontal collision helpers, with no world or game dependency. */
 
 /** Does a horizontal circle overlap an axis-aligned box? Touching is permitted. */
@@ -2954,90 +3141,76 @@ function circleOverlapsBox(x, y, radius, box) {
 
 return {circleOverlapsBox};
 })();
-// Source: examples/atrium/layout.js
-const module37=(()=>{
+// Source: engine/directory/scene-instance.js
+const module43=(()=>{
 /**
- * Atrium example / authored layout. This is game content, deliberately outside engine/.
- * Change these placements/materials without editing renderer or toy implementations.
- * This generator yields actual construction chunks to Lobby preparation. It is not a timer.
- * This little courtyard is an engine exercise, not a replacement Enni Cole asset.
+ * Directory / live authored scene instance. Maps stable document IDs to temporary World
+ * membership, and updates transforms/collision together. Owns no scheduler or game rules.
+ * Collider queries remain planar conservative bounds; full 3D physics is future work.
  */
-function* buildLayout(engine, world, profile) {
-  const directory = engine.directory;
-  /** Every visible object is requested through registered Penthouse library factories. */
-  const box = options => directory.create('toy.box', { world, ...options });
-  const stone = profile.stone, gold = profile.trim;
-  box({ z: -0.25, size: [58,68,0.5], color: profile.floor });
-  // Inlaid paths define a readable floor, all retained geometry rather than painted textures.
-  box({ y: -5, z: 0.015, size: [7,38,0.025], color: [0.22,0.20,0.25] });
-  for (const x of [-3.6,3.6]) box({ x, y:-5, z:0.035, size:[0.05,38,0.035], color:gold });
-  yield; // Floor and paths are one bounded preparation chunk.
-  directory.create('toy.pavilion', { world, y: 11, width: 24, depth: 9, height: profile.height,
-    stone, trim:gold, glow:profile.glow });
-  yield; // Architecture is prepared separately from side galleries and collision data.
-  const colliders = [{ x:0, y:15.2, width:24, depth:0.7 }];
-  for (const x of [-12,-6,6,12]) colliders.push({ x, y:6.5, width:0.6, depth:0.6 });
-  // Side galleries frame the courtyard without teaching the engine what an atrium is.
-  for (const side of [-1,1]) {
-    const x = side * 20;
-    box({ x, y:3, z:2.1, size:[2,29,4.2], color:stone });
-    box({ x, y:3, z:4.3, size:[2.4,29.5,0.3], color:gold });
-    colliders.push({ x, y:3, width:2, depth:29 });
-    for (let y=-9; y<=15; y+=4) {
-      box({ x:x-side*1.05, y, z:2.3, size:[0.06,1.8,2.7], color:profile.window, emission:0.55 });
-      box({ x:x-side*1.13, y, z:3.7, size:[0.08,2,0.07], color:profile.glow, emission:2 });
-    }
-    for (const y of [-12,1]) {
-      const px = side * 10;
-      box({ x:px, y, z:0.55, size:[2.4,2.4,1.1], color:gold });
-      for (let level=0;level<4;level++) box({ x:px, y, z:1.4+level*0.65,
-        size:[2.2-level*0.4,2.2-level*0.4,0.9], color:profile.foliage });
-      colliders.push({ x:px, y, width:2.4, depth:2.4 });
-    }
-    for (const y of [-18,-4,9]) {
-      box({ x:side*15, y, z:1.8, size:[0.18,0.18,3.6], color:gold });
-      box({ x:side*15, y, z:3.7, size:[0.6,0.6,0.8], color:profile.glow, emission:3,castShadow:false });
-      box({ x:side*15, y, z:4.15, size:[0.9,0.9,0.12], color:gold });
-    }
-    yield; // One gallery/planting side per chunk; no per-frame full-world rebuild.
-  }
-  const lantern = box({ x:0,y:2,z:0.65,size:[1.9,1.9,1.3],color:stone });
-  box({ parent:lantern,z:0.85,size:[2.1,2.1,0.22],color:gold });
-  const crystal = box({ parent:lantern,z:1.75,yaw:Math.PI/4,size:[0.7,0.7,1.4],color:[0.25,0.62,1],emission:2,castShadow:false });
-  colliders.push({x:0,y:2,width:2.1,depth:2.1});
-  const prop = box({x:6,y:-12,z:0.65,size:[2,2,1.3],color:gold});
-  const propCollider = {x:6,y:-12,width:2,depth:2}; colliders.push(propCollider);
-  if (profile.ethereal) {
-    // Alternate geometry makes this a distinct world, not just a palette uniform swap.
-    for (const x of [-7,7]) {
-      box({x,y:-3,z:2.5,yaw:Math.PI/4,size:[0.7,0.7,3.8],color:[0.22,0.50,0.67],emission:0.5});
-      colliders.push({x,y:-3,width:1,depth:1});
-    }
-  }
-  yield; // All geometry and horizontal collision information now exist.
-  return { colliders, crystal, prop, propCollider };
+const { rotateVector } = module4;
+class SceneInstance {
+ /** Synchronous construction is available for the explicitly bounded editor preview. */
+ constructor(directory,world,project,scene,{defer=false}={}){
+  this.world=world;this.instances=new Map();this.authored=new Map();this.colliders=[];
+  if(!defer){for(const entity of scene.entities)this.add(directory,project,entity);this.apply(scene);}
+ }
+ /** Runtime loading yields once per bounded assembly, preserving Lobby's preparation budget. */
+ static *prepare(directory,world,project,scene){
+  const instance=new SceneInstance(directory,world,project,scene,{defer:true});
+  for(const entity of scene.entities){instance.add(directory,project,entity);yield;}
+  instance.apply(scene);return instance;
+ }
+ /** Add one registered asset. The surrounding world owner cleans partial jobs on cancellation. */
+ add(directory,project,entity){
+  const asset=project.assets.find(a=>a.id===entity.asset);
+  const built=directory.create(asset.generator,{world:this.world,asset});
+  const colliders=asset.colliders.map(c=>{const box={...c};this.colliders.push(box);return box;});
+  this.instances.set(entity.id,{...built,asset,colliders});
+  for(const part of built.parts)this.authored.set(part.id,entity.id);
+ }
+ /** Update existing retained geometry; positions never require asset reconstruction. */
+ apply(scene){const v=[0,0,0];for(const e of scene.entities){const item=this.instances.get(e.id);if(!item)throw new Error('Scene topology changed: reopen preview');const r=item.root;[r.x,r.y,r.z]=e.position;r.rotation.splice(0,4,...e.rotation);r.scale=e.scale;
+   item.asset.colliders.forEach((c,i)=>{rotateVector(r.rotation,c.x*r.scale,c.y*r.scale,0,v);const b=item.colliders[i];b.x=r.x+v[0];b.y=r.y+v[1];let w=0,d=0;for(const x of [-1,1])for(const y of [-1,1]){rotateVector(r.rotation,x*c.width*r.scale/2,y*c.depth*r.scale/2,0,v);w=Math.max(w,Math.abs(v[0])*2);d=Math.max(d,Math.abs(v[1])*2);}b.width=w;b.depth=d;});
+  }this.world.snapshot();this.world.resolve();}
+ /** Resolve a stable placed ID, or a named assembly part, without exposing runtime IDs in JSON. */
+ root(id){return this.instances.get(id)?.root;}
+ part(id,name){const i=this.instances.get(id);return i?.parts[i.asset.parts.findIndex(p=>p.id===name)];}
+ /** Ray hits on assembly children map to their owning authored instance. */
+ idFor(entity){return this.authored.get(entity.id);}
+ /** Release membership; the caller separately releases its world and GPU lease. */
+ dispose(){for(const i of this.instances.values())this.world.remove(i.root);this.instances.clear();this.authored.clear();this.colliders.length=0;}
+}
+
+return {SceneInstance};
+})();
+// Source: examples/atrium/layout.js
+const module42=(()=>{
+/** Atrium / map generic document instances to this game's named interaction targets. */
+const { SceneInstance } = module43;
+const { ATRIUM_PROJECT } = module36;
+function* buildLayout(engine,world,profile,project=ATRIUM_PROJECT){
+ const instance=yield* SceneInstance.prepare(engine.directory,world,project,profile);
+ const lantern=profile.entities.find(e=>e.tag==='lantern'),prop=profile.entities.find(e=>e.tag==='prop');
+ return {instance,colliders:instance.colliders,crystal:instance.part(lantern.id,'crystal'),prop:instance.root(prop.id),propCollider:instance.instances.get(prop.id).colliders[0]};
 }
 
 return {buildLayout};
 })();
 // Source: examples/atrium/worlds.js
-const module35=(()=>{
+const module40=(()=>{
 /**
  * Atrium example / world definitions: authored realms, reconstruction and state schema.
  * Directory receives factories, not these names. Lobby budgets actual procedural work.
  * Persisted data is deliberately small: light selection, crystal rotation and prop position.
  */
-const { Lifetime } = module5;
-const { circleOverlapsBox } = module36;
-const { buildLayout } = module37;
+const { ATRIUM_PROJECT } = module36;
+const { Lifetime } = module6;
+const { circleOverlapsBox } = module41;
+const { buildLayout } = module42;
 
 /** Immutable-by-convention authoring profiles; runtime mutable state is created per world. */
-const PROFILES = [
-  { key:'amber',name:'The Amber Atrium',stone:[0.24,0.18,0.20],trim:[0.68,0.43,0.18],floor:[0.14,0.115,0.14],
-    glow:[1,0.47,0.17],window:[0.38,0.15,0.16],foliage:[0.045,0.14,0.10],sun:{direction:[-0.5,0.8,1.2],color:[0.58,0.49,0.62]},height:7,ethereal:false,ambient:[0.15,0.11,0.15] },
-  { key:'violet',name:'The Violet Court',stone:[0.14,0.16,0.31],trim:[0.35,0.56,0.70],floor:[0.075,0.09,0.18],
-    glow:[0.24,0.58,1],window:[0.15,0.19,0.46],foliage:[0.10,0.20,0.27],sun:{direction:[0.5,0.7,1.1],color:[0.36,0.46,0.75]},height:8.5,ethereal:true,ambient:[0.09,0.11,0.26] },
-];
+const PROFILES = ATRIUM_PROJECT.scenes;
 
 /** Horizontal destination query shared by movement and final flit validation. */
 function legalLanding(resource, pose) {
@@ -3050,26 +3223,25 @@ function legalLanding(resource, pose) {
 function applyLight(resource) {
   const {state,profile,layout}=resource;
   const cool=state.cool;
-  layout.crystal.shape.color=cool ? [0.25,0.62,1] : [1,0.34,0.19];
-  resource.lightColors.set(cool ? [0.3,1.1,2.7] : [3,0.5,0.2],15);
-  // Other light slots differ between the worlds; actor transfer never mutates their profiles.
-  for(let i=0;i<8;i++)if(i!==5)resource.lightColors.set(profile.ethereal?[0.35,0.9,2.5]:[2.4,0.85,0.3],i*3);
+  const variant=profile.lightVariants[cool?'cool':'warm'];
+  layout.crystal.shape.color=[...variant.crystal];
+  resource.lightColors.set(variant.irradiance,15);
 }
 
 /**
  * Make a factory with stable world identity across eviction/reconstruction.
  * The generator's finally cleans partial geometry and GPU leases on abort or failure.
  */
-function worldFactory(engine, profile, id) {
+function worldFactory(engine, profile, id, project=ATRIUM_PROJECT) {
   return ({signal,state}) => engine.lobby.preparation.enqueue((function* () {
     const life=new Lifetime(); let complete=false;
     const world=engine.directory.adopt(engine.basement.createWorld(id));
     life.own(()=>engine.directory.releaseWorld(world.id,world));
     try {
-      const saved=state ?? {version:1,cool:true,crystalYaw:0,propX:6};
+      const saved=state ?? {version:1,cool:true,crystalYaw:0,propX:profile.entities.find(e=>e.tag==='prop').position[0]};
       if(saved.version!==1 || typeof saved.cool!=='boolean' || !Number.isFinite(saved.crystalYaw)
-        || ![-6,6].includes(saved.propX))throw new Error('Unsupported world snapshot');
-      const layout=yield* buildLayout(engine,world,profile);
+        || !Number.isFinite(saved.propX))throw new Error('Unsupported world snapshot');
+      const layout=yield* buildLayout(engine,world,profile,project);
       layout.crystal.yaw=saved.crystalYaw; layout.prop.x=saved.propX; layout.propCollider.x=saved.propX;
       world.snapshot(); world.resolve();
       const lease=engine.directory.acquire(`batch:${world.id}`,()=>engine.basement.renderer.createBatch(world),{owner:`realm:${profile.key}/${world.id}`});
@@ -3083,8 +3255,7 @@ function worldFactory(engine, profile, id) {
         // Capture selected game facts, not transient actors, GPU buffers, or scene objects.
         capture:()=>({...saved,crystalYaw:layout.crystal.yaw,propX:layout.prop.x}),
         dispose:()=>life.dispose() };
-      const positions=[[0,7,5,16],[-15,-4,4,12],[15,-4,4,12],[-15,9,4,12],[15,9,4,12],[0,2,3,10],[-15,-18,4,12],[15,-18,4,12]];
-      positions.forEach((position,i)=>resource.lights.set(position,i*4)); applyLight(resource);
+      profile.lights.forEach((light,i)=>{resource.lights.set([...light.position,light.radius],i*4);resource.lightColors.set(light.color,i*3);});
       complete=true; return resource;
     } finally { if(!complete)life.dispose(); }
   })(),{signal,label:`world.build.${profile.key}`});
@@ -3093,24 +3264,26 @@ function worldFactory(engine, profile, id) {
 return {PROFILES,legalLanding,applyLight,worldFactory};
 })();
 // Source: examples/atrium/journey.js
-const module32=(()=>{
+const module35=(()=>{
 /**
  * Atrium example / journey: game-specific realm links, initial actor and prewarming policy.
  * Loading/lifetime algorithms live in Directory; transaction scheduling lives in Lobby.
  * This module chooses the destination and asks for those mechanisms through public contracts.
  */
-const { Lifetime } = module5;
-const { WorldTravel } = module33;
-const { PROFILES, worldFactory, legalLanding, applyLight } = module35;
+const { ATRIUM_PROJECT } = module36;
+const { Lifetime } = module6;
+const { WorldTravel } = module38;
+const { worldFactory, legalLanding, applyLight } = module40;
 
 /** Own the two realm definitions and their tickets for one example session. */
-function createJourney(engine) {
+function createJourney(engine,project=ATRIUM_PROJECT) {
   const life=new Lifetime(),{directory,basement,lobby}=engine,residency=directory.residency;
+  const profiles=project.scenes;
   const session=basement.identities.create('journey');
-  const keys=PROFILES.map(profile=>`${session}:${profile.key}`);
+  const keys=profiles.map(profile=>`${session}:${profile.key}`);
   // Register cleanup before acquisitions: release tickets before removing definitions.
   for(let i=0;i<keys.length;i++){
-    residency.register(keys[i],worldFactory(engine,PROFILES[i],basement.identities.create('world')));
+    residency.register(keys[i],worldFactory(engine,profiles[i],basement.identities.create('world'),project));
     life.own(()=>residency.unregister(keys[i]));
   }
   let travel=null,actor=null,warm=null,disposed=false;
@@ -3179,12 +3352,12 @@ function createJourney(engine) {
 return {createJourney};
 })();
 // Source: examples/atrium/player.js
-const module38=(()=>{
+const module44=(()=>{
 /**
  * Atrium example / locomotion: game-owned steering/gait profile, independent of realm residency.
  * Actor references and velocity survive transfers. This is not a full physical body solver.
  */
-const { legalLanding } = module35;
+const { legalLanding } = module40;
 
 /** Create one controller whose mutable velocity/load state belongs only to this actor. */
 function playerController(actor, input, renderer) {
@@ -3220,20 +3393,20 @@ function playerController(actor, input, renderer) {
 return {playerController};
 })();
 // Source: examples/atrium/scene.js
-const module31=(()=>{
+const module34=(()=>{
 /**
  * Atrium example / scene: owns controls, phase registrations and the game's journey.
  * Layout/reconstruction, locomotion and world policy have their own focused modules.
  * Nothing here installs an engine patch or creates an independent animation loop.
  */
-const { Lifetime } = module5;
-const { createJourney } = module32;
-const { playerController } = module38;
+const { Lifetime } = module6;
+const { createJourney } = module35;
+const { playerController } = module44;
 
 /** Start preparing the scene immediately. Rendering remains valid while the first world loads. */
-function createScene(engine,{controlsHost,onStatus=()=>{},onError=()=>{}}){
+function createScene(engine,{controlsHost,project,onStatus=()=>{},onError=()=>{}}){
   const life=new Lifetime(),{basement,lobby,directory}=engine;
-  const journey=createJourney(engine);life.own(()=>journey.dispose());
+  const journey=createJourney(engine,project);life.own(()=>journey.dispose());
   const {input,renderer}=basement;
   input.bind({
     move:{kind:'vector',negativeX:['KeyA','ArrowLeft'],positiveX:['KeyD','ArrowRight'],negativeY:['KeyW','ArrowUp'],positiveY:['KeyS','ArrowDown'],axes:[0,1],deadZone:0.18},
@@ -3301,8 +3474,8 @@ const module0=(()=>{
  * The engine receives elements as parameters; it never looks up these page IDs.
  */
 const { ETRNLNINE } = module1;
-const { Lifetime } = module5;
-const { createScene } = module31;
+const { Lifetime } = module6;
+const { createScene } = module34;
 
 const canvas=document.querySelector('#world'), controlsHost=document.querySelector('#controls');
 const status=document.querySelector('#status'), errorBox=document.querySelector('#error');

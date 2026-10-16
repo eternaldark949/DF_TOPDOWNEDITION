@@ -1,6 +1,6 @@
 # ETRNLNINE — Engine foundation plan
 
-**Status: foundation, two-world flitting, integrated profiler, ambient occlusion, and lighting/shadows implemented; broader engine work remains planned.**
+**Status: foundation, two-world flitting, integrated profiler, ambient occlusion, and lighting/shadows and the first Studio workspace implemented; broader engine work remains planned.**
 
 **Owner: ETERNAL / @eternaldark949.**
 
@@ -14,9 +14,11 @@ This document records the owner's requirements and the architectural agreement r
 
 The branch was intentionally created with only this plan. On 2026-10-15, after reviewing the plan and first-milestone proposal, the owner invited implementation to begin. The first runnable foundation follows [First Light decisions and source guide](docs/decisions/0001-first-light.md). No wholesale legacy import or expansion into every brainstorm is implied.
 
-**Next agreed milestone (planned):** [3D engine, universal Studio, authored JSON and offline packaging](docs/decisions/0006-studio-3d-and-authored-data.md). The first goal is to edit/save/play the Atrium from a phone, then author the first recreated street block.
+**Studio direction and roadmap:** [3D engine, universal Studio, authored JSON and offline packaging](docs/decisions/0006-studio-3d-and-authored-data.md). The first edit/save/play workspace is now implemented; the next content milestone is the recreated street block.
 
-**Current implemented milestone:** [Lighting/shadow decisions and API](docs/decisions/0005-lighting-and-shadows.md) · [screenshots and verification](docs/milestones/lighting/README.md).
+**Current implemented milestone:** [Studio implementation and limits](docs/decisions/0007-studio-first-workspace.md) · [screenshots and verification](docs/milestones/studio/README.md) · [editable JSON guide](examples/atrium/DOCUMENTS.md).
+
+**Lighting/shadows:** [Lighting/shadow decisions and API](docs/decisions/0005-lighting-and-shadows.md) · [screenshots and verification](docs/milestones/lighting/README.md).
 
 **Ambient occlusion:** [decisions and API](docs/decisions/0004-ambient-occlusion.md) · [screenshots and verification](docs/milestones/ambient-occlusion/README.md).
 
@@ -26,7 +28,7 @@ The branch was intentionally created with only this plan. On 2026-10-15, after r
 
 **First Light evidence:** [original foundation screenshots and checks](docs/milestones/first-light/README.md).
 
-**Try the current milestone:** [self-contained two-world HTML](dist/ETRNLNINE-Atrium.html). Download the file and open it in a WebGL 2 browser, or serve the repository and open `examples/atrium/`. Run `npm test` and `npm run build` for source checks/building. See the source guide for browser checks, editing examples, and known limitations.
+**Try the current milestone:** [offline Studio](dist/ETRNLNINE-Studio.html) or [game-only two-world HTML](dist/ETRNLNINE-Atrium.html). Download the file and open it in a WebGL 2 browser, or serve the repository and open `examples/atrium/`. Run `npm test` and `npm run build` for source checks/building. See the source guide for browser checks, editing examples, and known limitations.
 
 New ideas are welcome. Distinguish agreed requirements from proposed details and unresolved choices. Record subsequent architectural decisions here or in explicitly linked decision documents so the owner does not have to repeat them across conversations.
 
@@ -154,7 +156,7 @@ The following responsibility-level layout governs implementation. The current fi
 │   └── etrnlnine.js          # Small composition/assembly entry point
 ├── games/
 │   └── freelancer/           # Game content, worlds, rules, bindings, interface
-├── editor/                   # Planned universal Studio application
+├── editor/                   # Universal Studio application (first workspace implemented)
 ├── examples/                 # Independent demonstrations and their authored documents
 ├── tests/                    # Meaningful boundary, lifecycle, and behavior checks
 ├── tools/                    # Build and development tools
@@ -555,10 +557,12 @@ The example enables the lower-cost sun tier and exposes Off / Soft / Fine plus a
 
 ## 18. 3D engine, Studio and authored JSON
 
-**Agreed direction; planned implementation:** ETRNLNINE is a 3D engine whose games choose their cameras/presentation. Current rendering is 3D, while camera, transform and collision capabilities still need expansion beyond their early 2.5D constraints.
+The first Studio slice is implemented: one contextual workspace, editable Atrium JSON, selection/move, shared transform/light properties, bounded undo/redo, import/export, local recovery and isolated Play/Stop. The engine now supports full quaternion orientation, uniform hierarchy scale, arbitrary orthographic camera orientation and oriented-box ray picking. Movement/collision remain primarily planar.
 
-[The Studio decision record](docs/decisions/0006-studio-3d-and-authored-data.md) defines the universal contextual workspace, house ownership, shared properties/commands, edit/play isolation, phone file workflow and acceptance sequence. Specialized tools contribute to one workspace and reuse controls, history, input routing and document/resource lifecycles. Studio remains a separate application using the engine's public capabilities.
+[The Studio direction record](docs/decisions/0006-studio-3d-and-authored-data.md) preserves the agreed roadmap. [The implementation record](docs/decisions/0007-studio-first-workspace.md) distinguishes delivered capabilities from future specialist tools, free-flight/perspective cameras, general dependency streaming and 3D contact physics. Editor application code stays in `editor/`; reusable mechanisms remain in their house levels, and the game-only build imports no Studio application code.
 
-Associated versioned JSON files will hold authored project/scene/asset/preset data in the modular source tree. Studio and manual editing use the same authoritative format; JavaScript supplies behavior and generators. The build will validate declared dependencies and embed the required data in the final offline HTML, preserving one-file delivery and bounded runtime residency. JSON embedding, authored-document schemas and a GitHub Actions artifact build are planned; the current JavaScript bundler does not implement them yet.
+`examples/atrium/project.json` is now authoritative for scene placements, grouped assembly assets and light data. JavaScript implements behavior/generators. The build validates schema/references/registered generator versions and embeds explicitly imported JSON into separate offline game and Studio HTML files. The first format is one portable package containing scene/asset tables; arbitrary multi-file dependency manifests remain future work. [The editing guide](examples/atrium/DOCUMENTS.md) documents units, fields and budgets. GitHub Actions runs the same source tests/build and uploads both HTML artifacts; it does not deploy or write repository files.
 
-Start with editing the Atrium: select/move a planter, adjust a light, undo/redo, save/reload and play from the same document. Then author the representative main-branch street block, followed by the articulated humanoid workshop through the same contracts. The decision record preserves the owner's historical editor as a reference and records open details to settle before dependent code.
+Run `npm test`, `npm run build`, `npm run test:browser` and `npm run test:studio` for the relevant checks. Browser checks require development Playwright and Chromium; neither is a runtime dependency. [Studio evidence](docs/milestones/studio/README.md) records actual verification and screenshots. Physical-phone performance is still unmeasured.
+
+Next: author the representative main-branch street block through this workflow, then extend the articulated humanoid workshop through the shared document/property/transaction contracts. Broader goals in the direction record remain planned.

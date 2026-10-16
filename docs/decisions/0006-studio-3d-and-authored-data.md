@@ -2,7 +2,7 @@
 
 Recorded 2026-10-16 from the owner's agreement on the engine's 3D direction, a universal contextual editor, the first authoring milestone, and editable JSON source files packaged into self-contained HTML.
 
-**Status: agreed direction and implementation plan.** Studio, authored-document loading, shared property metadata, editor commands and JSON embedding are not implemented by this record. Existing rendering, input, worlds, profiling, AO and lighting remain implemented as described in the earlier decisions.
+**Historical status when recorded: agreed direction and implementation plan.** See [decision 0007](0007-studio-first-workspace.md) for the subsequently implemented first workspace, schema, camera and packaging contracts. The implementation-status statements below describe the planning baseline. Studio, authored-document loading, shared property metadata, editor commands and JSON embedding are not implemented by this record. Existing rendering, input, worlds, profiling, AO and lighting remain implemented as described in the earlier decisions.
 
 ## 1. The engine understands 3D; the game chooses its presentation
 

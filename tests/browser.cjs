@@ -17,7 +17,7 @@ const server=http.createServer((req,res)=>{
   if(req.url==='/favicon.ico'){res.writeHead(204);res.end();return;}
   const target=path.resolve(root,'.'+decodeURIComponent(req.url.split('?')[0]));
   if(!target.startsWith(root+path.sep)){res.writeHead(403);res.end();return;}
-  try{res.setHeader('Content-Type',target.endsWith('.js')?'text/javascript':'text/html');res.end(fs.readFileSync(target));}
+  try{res.setHeader('Content-Type',target.endsWith('.js')?'text/javascript':target.endsWith('.json')?'application/json':'text/html');res.end(fs.readFileSync(target));}
   catch{res.writeHead(404);res.end();}
 });
 
@@ -87,14 +87,14 @@ const server=http.createServer((req,res)=>{
       assert.equal(await page.locator('#status').getAttribute('data-vaos'),'3');
     }
     console.log('Browser: scene cycles complete');
-    await page.screenshot({path:path.join(artifacts,'worlds-amber-desktop.png')});
+    await page.screenshot({timeout:120000,path:path.join(artifacts,'worlds-amber-desktop.png')});
     await page.locator('#pause').click();
     await page.locator('#world-directory summary').click();
     for(const mode of ['off','geometry','screen']){
       await page.getByLabel('Ambient occlusion',{exact:true}).selectOption(mode);
       await page.locator('#world-directory summary').click();
       await page.waitForTimeout(100);
-      await page.screenshot({path:path.join(artifacts,`ao-amber-${mode}.png`)});
+      await page.screenshot({timeout:120000,path:path.join(artifacts,`ao-amber-${mode}.png`)});
       await page.locator('#world-directory summary').click();
     }
     await page.locator('#world-directory summary').click();await page.locator('#pause').click();
@@ -111,13 +111,13 @@ const server=http.createServer((req,res)=>{
     assert.equal(await page.locator('#status').getAttribute('data-actor'),actorId);
     assert.equal(await page.locator('#status').getAttribute('data-cool'),'true','Other world has independent light state');
     assert.equal(await page.locator('#status').getAttribute('data-prop'),'6','Other world has independent prop position');
-    await page.screenshot({path:path.join(artifacts,'worlds-violet-desktop.png')});
+    await page.screenshot({timeout:120000,path:path.join(artifacts,'worlds-violet-desktop.png')});
     await page.locator('#world-directory summary').click();
     await page.locator('#release-inactive').click();
     await page.waitForFunction(()=>document.querySelector('#status').dataset.resident==='1');
     assert.equal(await page.locator('#status').getAttribute('data-buffers'),'3');
     assert.ok(Number(await page.locator('#status').getAttribute('data-snapshot-bytes'))>0);
-    await page.screenshot({path:path.join(artifacts,'worlds-directory.png')});
+    await page.screenshot({timeout:120000,path:path.join(artifacts,'worlds-directory.png')});
     await page.keyboard.press('KeyE');
     await page.waitForFunction(()=>document.querySelector('#status').dataset.cool==='false');
     await page.keyboard.press('KeyG');
@@ -162,13 +162,13 @@ const server=http.createServer((req,res)=>{
     const exported=JSON.parse(fs.readFileSync(await download.path(),'utf8'));
     assert.equal(exported.units,'milliseconds');assert.equal(exported.captures.length,2);
     const capture=exported.captures.at(-1),values=Object.fromEntries(capture.frame.counters.map(item=>[item.name,item.value]));
-    assert.equal(values['renderer.gpuBuffers'],864+3*98304);
-    assert.equal(values['directory.ownedGpuBuffers'],2*98304);
+    assert.equal(values['renderer.gpuBuffers'],864+3*131072);
+    assert.equal(values['directory.ownedGpuBuffers'],2*131072);
     assert.ok(capture.frame.scopes.some(scope=>scope.name==='atrium.presentation'));
     assert.match(capture.providerDetails.data.directory.resources[0].owners[0].owner,/realm:/);
     const gpuUnavailable=await inspector.getByLabel('GPU timing',{exact:true}).isDisabled();
     await inspector.evaluate(element=>{element.scrollTop=0;});
-    await page.screenshot({path:path.join(artifacts,'profiler-desktop.png')});
+    await page.screenshot({timeout:120000,path:path.join(artifacts,'profiler-desktop.png')});
     await inspector.getByLabel('Freeze history',{exact:true}).uncheck();
     await inspector.getByLabel('Record',{exact:true}).uncheck();
     const offFrame=await inspector.getAttribute('data-frame'),offTime=await page.locator('#status').getAttribute('data-time');
@@ -213,10 +213,10 @@ const server=http.createServer((req,res)=>{
     assert.ok(Math.abs(Number(await phone.locator('#status').getAttribute('data-x'))-x1)<0.3,'Touch release stops movement');
     await phone.getByRole('button',{name:'Flit',exact:true}).tap();
     await phone.waitForFunction(()=>document.querySelector('#status').dataset.committed==='1');
-    await phone.screenshot({path:path.join(artifacts,'worlds-violet-mobile.png')});
+    await phone.screenshot({timeout:120000,path:path.join(artifacts,'worlds-violet-mobile.png')});
     await phone.locator('.etrnl-profiler > summary').tap();
     await phone.waitForFunction(()=>Number(document.querySelector('.etrnl-profiler').dataset.frame)>0);
-    await phone.screenshot({path:path.join(artifacts,'profiler-mobile.png')});
+    await phone.screenshot({timeout:120000,path:path.join(artifacts,'profiler-mobile.png')});
     const bounds=await phone.locator('.etrnl-profiler').boundingBox();
     assert.ok(bounds.x>=0&&bounds.x+bounds.width<=412,'Profiler fits the portrait viewport');
     report.touch={simultaneousPointers:2,status:await phone.locator('#status').innerText()};
@@ -247,7 +247,7 @@ const server=http.createServer((req,res)=>{
     });
     assert.deepEqual(report.engine.empty,{worlds:0,resources:0,draws:0});
     assert.equal(report.engine.warm.uploads,0,'Unchanged retained instances do not upload');
-    assert.ok(report.engine.moved.uploadedBytes>0 && report.engine.moved.uploadedBytes<=48,'One transform updates a bounded range');
+    assert.ok(report.engine.moved.uploadedBytes>0 && report.engine.moved.uploadedBytes<=64,'One transform updates a bounded range');
     assert.equal(report.engine.glError,0);assert.ok(report.engine.varied>10,'Actual non-background pixels rendered');
     // Real shadow pixels and cache/ownership behavior, separate from the example's artwork.
     report.lighting=await page.evaluate(()=>{
@@ -270,8 +270,8 @@ const server=http.createServer((req,res)=>{
       for(const[entity,shape]of elevated)entity.shape=shape;
       const unshadowed=image('off'),shadowed=image('low'),sunDifference=compare(unshadowed,shadowed);
       const first=l.maps.inspect();wall.shape.color=[0.1,0.2,0.3];r.render(batch);const cached=l.maps.inspect();
-      const offscreenCaster=Array.from({length:l.maps.casters.count},(_,i)=>l.maps.casters.data[i*12]).includes(11);
-      const offscreenVisible=Array.from({length:batch.count},(_,i)=>batch.data[i*12]).includes(11);
+      const offscreenCaster=Array.from({length:l.maps.casters.count},(_,i)=>l.maps.casters.data[i*16]).includes(11);
+      const offscreenVisible=Array.from({length:batch.count},(_,i)=>batch.data[i*16]).includes(11);
       wall.x+=1;world.resolve();r.render(batch);const moved=l.maps.inspect();
       // Changing map resolution replaces its target, preserving the shared depth program.
       const program=l.maps.program;image('high');const high=l.maps.inspect(),sameProgram=l.maps.program===program;
@@ -485,23 +485,28 @@ const server=http.createServer((req,res)=>{
       const canvas=document.querySelector('canvas');canvas.style.cssText='display:block;width:100vw;height:100vh';
       const engine=new ETRNLNINE(canvas),r=engine.basement.renderer,journey=createJourney(engine);
       r.camera.x=-4;r.camera.y=7;r.camera.halfHeight=9;
-      engine.lobby.on('render',()=>{const w=journey.current;if(!w)return;r.lighting.ambient.set(w.profile.ambient);r.lighting.positions.set(w.lights);r.lighting.colors.set(w.lightColors);w.world.resolve();r.render(w.batch);});
-      engine.start();await journey.ready;window.detailFixture={engine,journey,r};
+      // This fixture captures a static scene. Prepare without rendering every frame,
+      // then stop; an unused neighbor must not gate close-up comparison screenshots.
+      engine.start();await journey.ready;engine.stop();
+      const world=journey.current;
+      r.lighting.ambient.set(world.profile.ambient);r.lighting.positions.set(world.lights);r.lighting.colors.set(world.lightColors);
+      world.world.resolve();window.detailFixture={engine,journey,r};
     });
-    await page.waitForFunction(()=>window.detailFixture.engine.directory.residency.inspect().worlds.every(w=>w.status==='ready'));
+    // Static comparisons submit one frame each. Runtime scheduling and both-world
+    // readiness were exercised above; no continuous software-GPU queue is needed here.
     for(const mode of ['off','geometry','screen']){
-      await page.evaluate(mode=>window.detailFixture.r.occlusion.configure({mode}),mode);
+      await page.evaluate(mode=>{const f=window.detailFixture;f.r.occlusion.configure({mode});f.journey.current.world.resolve();f.r.render(f.journey.current.batch);},mode);
       await page.waitForTimeout(100);
-      await page.screenshot({path:path.join(artifacts,`ao-detail-${mode}.png`)});
+      await page.screenshot({timeout:120000,path:path.join(artifacts,`ao-detail-${mode}.png`)});
     }
     await page.evaluate(()=>{
       const f=window.detailFixture;f.r.lighting.configureDirectional(f.journey.current.profile.sun);
       f.r.occlusion.configure({mode:'geometry'});
     });
     for(const mode of ['off','low','high']){
-      await page.evaluate(mode=>window.detailFixture.r.lighting.configureShadows({mode,pointIndex:5,extent:24}),mode);
+      await page.evaluate(mode=>{const f=window.detailFixture;f.r.lighting.configureShadows({mode,pointIndex:5,extent:24});f.r.render(f.journey.current.batch);},mode);
       await page.waitForTimeout(100);
-      await page.screenshot({path:path.join(artifacts,`lighting-detail-${mode}.png`)});
+      await page.screenshot({timeout:120000,path:path.join(artifacts,`lighting-detail-${mode}.png`)});
     }
     report.lighting.detail=await page.evaluate(()=>window.detailFixture.r.lighting.inspect());
     report.ambientOcclusion.detail=await page.evaluate(()=>{

@@ -23,7 +23,7 @@ test('analytic proxy selection is bounded, deterministic, rotated and isolated t
   world.create({z:-0.5,shape:{size:[100,100,1]}}); // Ground slab is not an ambient blocker.
   world.create({shape:{size:[100,100,100],emission:3,ambientBlocker:false}}); // Explicitly excluded decoration does not dominate.
   world.resolve();ao.select(world);assert.equal(ao.count,12);assert.equal(ao.candidates,50);
-  assert.equal(ao.poses[0],0);assert.ok(Math.abs(ao.poses[3])<1e-6);assert.equal(ao.sizes[3],1);
+  assert.equal(ao.poses[0],0);assert.ok(Math.abs(ao.rotations[2]-Math.SQRT1_2)<1e-6);assert.ok(Math.abs(ao.rotations[3]-Math.SQRT1_2)<1e-6);
   const retained=ao.poses;ao.select(world);assert.equal(ao.poses,retained,'Storage is reused');
   other.create({x:100,z:1,shape:{size:[2,2,2]}});other.resolve();ao.select(other);
   assert.equal(ao.count,1);assert.equal(ao.poses[0],100,'Offscreen blockers remain eligible');

@@ -23,10 +23,10 @@ export function directionalShadowMatrix(direction,camera,extent,resolution,out=n
   const rlen=Math.hypot(rx,ry,rz);rx/=rlen;ry/=rlen;rz/=rlen;
   const ux=ly*rz-lz*ry,uy=lz*rx-lx*rz,uz=lx*ry-ly*rx;
   const texel=2*extent/resolution,depth=extent*2;
-  const cx=Math.round((rx*camera.x+ry*camera.y)/texel)*texel;
-  const cy=Math.round((ux*camera.x+uy*camera.y)/texel)*texel;
+  const cx=Math.round((rx*camera.x+ry*camera.y+rz*(camera.z??0))/texel)*texel;
+  const cy=Math.round((ux*camera.x+uy*camera.y+uz*(camera.z??0))/texel)*texel;
   out.set([rx/extent,ux/extent,-lx/depth,0, ry/extent,uy/extent,-ly/depth,0,
-    rz/extent,uz/extent,-lz/depth,0, -cx/extent,-cy/extent,(lx*camera.x+ly*camera.y)/depth,1]);
+    rz/extent,uz/extent,-lz/depth,0, -cx/extent,-cy/extent,(lx*camera.x+ly*camera.y+lz*(camera.z??0))/depth,1]);
   return out;
 }
 

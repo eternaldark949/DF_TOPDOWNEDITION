@@ -1,0 +1,28 @@
+# Build-only automation: JSON edits use the same validated offline pipeline as local work.
+# No deployment, repository writeback, credentials or runtime dependencies are involved.
+name: ETRNLNINE offline builds
+on:
+  push:
+    branches: [engine/etrnlnine]
+  pull_request:
+    branches: [engine/etrnlnine]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test engine and document contracts
+        run: npm test
+      - name: Validate JSON and package game and Studio
+        run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ETRNLNINE-offline-${{ github.sha }}
+          path: dist/ETRNLNINE-*.html
+          if-no-files-found: error

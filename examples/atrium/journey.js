@@ -3,18 +3,20 @@
  * Loading/lifetime algorithms live in Directory; transaction scheduling lives in Lobby.
  * This module chooses the destination and asks for those mechanisms through public contracts.
  */
+import { ATRIUM_PROJECT } from './project.js';
 import { Lifetime } from '../../engine/basement/lifetime.js';
 import { WorldTravel } from '../../engine/lobby/travel.js';
-import { PROFILES, worldFactory, legalLanding, applyLight } from './worlds.js';
+import { worldFactory, legalLanding, applyLight } from './worlds.js';
 
 /** Own the two realm definitions and their tickets for one example session. */
-export function createJourney(engine) {
+export function createJourney(engine,project=ATRIUM_PROJECT) {
   const life=new Lifetime(),{directory,basement,lobby}=engine,residency=directory.residency;
+  const profiles=project.scenes;
   const session=basement.identities.create('journey');
-  const keys=PROFILES.map(profile=>`${session}:${profile.key}`);
+  const keys=profiles.map(profile=>`${session}:${profile.key}`);
   // Register cleanup before acquisitions: release tickets before removing definitions.
   for(let i=0;i<keys.length;i++){
-    residency.register(keys[i],worldFactory(engine,PROFILES[i],basement.identities.create('world')));
+    residency.register(keys[i],worldFactory(engine,profiles[i],basement.identities.create('world'),project));
     life.own(()=>residency.unregister(keys[i]));
   }
   let travel=null,actor=null,warm=null,disposed=false;

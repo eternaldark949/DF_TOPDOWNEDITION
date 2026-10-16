@@ -37,7 +37,8 @@ export function transferTree({ source, destination, root, landing, validate = ()
   for (const entity of members) {
     entity.worldId = destination.id; destination.entities.set(entity.id, entity);
     // Reset interpolation history: never draw a streak through the old world/anchor.
-    Object.assign(entity.previous, { x: entity.x, y: entity.y, z: entity.z, yaw: entity.yaw });
+    Object.assign(entity.previous, { x: entity.x, y: entity.y, z: entity.z, yaw: entity.yaw, scale:entity.scale });
+    entity.previous.rotation.splice(0,4,...entity.rotation);
   }
   source.revision++; destination.revision++;
   return Object.freeze({ sourceId: source.id, destinationId: destination.id,

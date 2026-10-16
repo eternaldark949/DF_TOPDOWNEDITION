@@ -1,18 +1,15 @@
 /**
  * Basement / occlusion shaders: local analytic box approximation and bounded SSAO.
- * Camera reconstruction matches the orthographic oblique projection in shaders.js.
+ * Camera reconstruction uses the same inverse view/projection as visible geometry.
  * These are ambient visibility estimates, never a replacement for cast shadows.
  */
 
 /** Shared world-position reconstruction. Depth texture values span [0,1], not world units. */
+import { ROTATION_GLSL } from './rotation.js';
+
 export const RECONSTRUCT = `
-vec3 reconstruct(vec2 uv, float depth) {
-  vec2 screen = (uv * 2.0 - 1.0) * uCamera.zw;
-  float d = (depth * 2.0 - 1.0) * 200.0;
-  return vec3(screen.x + uCamera.x,
-    (0.65 * screen.y + 0.76 * d) / 1.0001 + uCamera.y,
-    (0.76 * screen.y - 0.65 * d) / 1.0001);
-}`;
+uniform mat4 uInverseViewProjection;
+vec3 reconstruct(vec2 uv,float depth){return (uInverseViewProjection*vec4(uv*2.0-1.0,depth*2.0-1.0,1.0)).xyz;}`;
 
 /** No lit color target is needed: retain normals plus hardware depth at bounded resolution. */
 export const NORMAL_FRAGMENT = `#version 300 es
@@ -81,29 +78,30 @@ uniform int uAOMode; // 0 off, 1 analytic geometry, 2 analytic + screen contacts
 uniform float uAOStrength;
 uniform float uAORadius;
 uniform int uBlockerCount;
-uniform vec4 uBlockerPose[12]; // xyz center, cos(yaw)
-uniform vec4 uBlockerSize[12]; // half extents xyz, sin(yaw)
+uniform vec4 uBlockerPose[12]; // xyz center, padding
+uniform vec4 uBlockerSize[12]; // half extents xyz, padding
 uniform sampler2D uAOScreen;
 uniform sampler2D uAODepth;
 uniform sampler2D uAONormals;
 uniform vec2 uAOSize;
 uniform vec4 uCamera;
 ${RECONSTRUCT}
+${ROTATION_GLSL}
+uniform vec4 uBlockerRotation[12];
 float ambientVisibility(vec3 p,vec3 n){
   if(uAOMode==0||uAOStrength==0.0)return 1.0;
   float visibility=1.0;
   for(int i=0;i<12;i++){
     if(i>=uBlockerCount)break;
     vec4 pose=uBlockerPose[i];vec3 h=uBlockerSize[i].xyz;
-    float c=pose.w,s=uBlockerSize[i].w;
-    mat2 localRotation=mat2(c,-s,s,c);
-    vec3 q=vec3(localRotation*(p.xy-pose.xy),p.z-pose.z);
+    vec4 rotation=uBlockerRotation[i];
+    vec3 q=rotateByQuaternion(vec4(-rotation.xyz,rotation.w),p-pose.xyz);
     vec3 outside=max(abs(q)-h,0.0);
     float gap=length(outside);
     if(gap<0.015||gap>=uAORadius)continue;
     // Aim slightly into the box rather than at a coplanar nearest point on its base.
     vec3 target=clamp(q,-h*0.75,h*0.75)-q;
-    vec3 direction=vec3(transpose(localRotation)*target.xy,target.z);
+    vec3 direction=rotateByQuaternion(rotation,target);
     float facing=max(0.0,dot(n,normalize(direction)));
     float coverage=1.0-smoothstep(0.0,uAORadius,gap);
     visibility*=1.0-0.48*coverage*facing;

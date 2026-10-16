@@ -1,0 +1,28 @@
+{
+  "node": "v24.19.0",
+  "browser": "Chromium 154.0.8037.57 / SwiftShader",
+  "reproducible": true,
+  "project": {
+    "id": "project:atrium",
+    "schemaVersion": 1,
+    "assets": 21,
+    "scenes": 2
+  },
+  "files": [
+    {
+      "file": "dist/ETRNLNINE-Atrium.html",
+      "bytes": 249427,
+      "sha256": "7af57a5f34c1ed79d0e9abc7be4db27f49ca9f188ea4385cb3b9f0caf9572963"
+    },
+    {
+      "file": "dist/ETRNLNINE-Studio.html",
+      "bytes": 273518,
+      "sha256": "128eabe6614624c9781f4330536257bd38f4b98a03ba025e363f30a047dd45e7"
+    },
+    {
+      "file": "examples/atrium/project.json",
+      "bytes": 120170,
+      "sha256": "3db8ebdd29fa321dd68bbb86f4495efcfb7b82e13264ab98981c487226116de2"
+    }
+  ]
+}

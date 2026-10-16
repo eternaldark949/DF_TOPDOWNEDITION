@@ -1,7 +1,7 @@
 /**
  * Basement / renderer: WebGL 2 instancing with owned GPU batches and retained storage.
  * Cube geometry/program belong to the renderer; each world batch belongs to a lease.
- * 12 float instance record: [x,y,z,yaw, sizeX,sizeY,sizeZ,emission, red,green,blue,0].
+ * 16 float instance record: position/pad, dimensions/emission, color/highlight, quaternion.
  * Only changed contiguous instance ranges are uploaded after the initial allocation.
  */
 import { VERTEX, FRAGMENT } from './shaders.js';
@@ -11,6 +11,7 @@ import { GpuTimer } from './gpu-timer.js';
 import { createProgram } from './gl-program.js';
 import { AmbientOcclusion } from './ambient-occlusion.js';
 import { Lighting } from './lighting.js';
+import { Camera } from './camera.js';
 
 /** Generate one unit cube with flat normals; uploaded once per WebGL context lifetime. */
 function cubeGeometry() {
@@ -38,7 +39,7 @@ export class Renderer {
     const gl = canvas.getContext('webgl2', { alpha: false, antialias: true, powerPreference: 'low-power' });
     if (!gl) throw new Error('ETRNLNINE requires WebGL 2 on this device.');
     this.gl = gl; this.batches = new Set(); this.disposed = false; this.lost = false;
-    this.camera = { x: 0, y: 0, halfHeight: 21 };
+    this.camera = new Camera();
     this.stats = { draws: 0, instances: 0, uploads: 0, uploadedBytes: 0, buffers: 0, programs: 0, vaos: 0, contextRestores: 0 };
     this.totals={draws:0,instances:0,uploads:0,uploadedBytes:0,candidates:0,culled:0,shadowDraws:0,shadowHits:0};
     try {
@@ -74,7 +75,7 @@ export class Renderer {
     const gl = this.gl;
     const program=createProgram(gl,VERTEX,FRAGMENT);
     this.program = program; this.stats.programs++;
-    this.uniforms = Object.fromEntries(['uCamera', 'uAmbient', 'uLights[0]', 'uLightColors[0]',
+    this.uniforms = Object.fromEntries(['uCamera','uViewProjection','uInverseViewProjection','uBlockerRotation[0]', 'uAmbient', 'uLights[0]', 'uLightColors[0]',
       'uAOMode','uAOStrength','uAORadius','uBlockerCount','uBlockerPose[0]','uBlockerSize[0]',
       'uAOScreen','uAODepth','uAONormals','uAOSize','uSunDirection','uSunColor','uSunShadowEnabled','uSunMatrix',
       'uSunShadow','uShadowParameters','uPointShadowIndex','uPointShadow','uPointShadowParameters','uPointShadowPosition','uPointShadowResolution']
@@ -114,15 +115,15 @@ export class Renderer {
 
   /** Compute view dimensions in world units; the same projection is exposed to mouse aiming. */
   view() {
+    this.camera.update(this.canvas.width/this.canvas.height);
     const halfHeight = this.camera.halfHeight;
     return { halfWidth: halfHeight * this.canvas.width / this.canvas.height, halfHeight };
   }
 
   /** Convert surface CSS coordinates to the ground plane (z=0), without hidden game state. */
   groundPoint(x, y, target = {}) {
-    const { halfWidth, halfHeight } = this.view();
-    target.x = this.camera.x + (x / this.canvas.clientWidth * 2 - 1) * halfWidth;
-    target.y = this.camera.y + (1 - y / this.canvas.clientHeight * 2) * halfHeight / 0.65;
+    const point=this.camera.ground(x,y,this.canvas.clientWidth,this.canvas.clientHeight);
+    if(point)Object.assign(target,point);
     return target;
   }
 
@@ -154,6 +155,7 @@ export class Renderer {
     gl.useProgram(this.program);
     this.occlusion.bind(this.uniforms,screenReady);
     gl.uniform4f(this.uniforms.uCamera, this.camera.x, this.camera.y, halfWidth, halfHeight);
+    gl.uniformMatrix4fv(this.uniforms.uViewProjection,false,this.camera.matrix);
     this.lighting.bind(this.uniforms);
     gl.bindVertexArray(batch.vao);
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, batch.count);
@@ -183,7 +185,7 @@ class InstanceBatch {
     if(!['camera','shadow'].includes(visibility))throw new RangeError('Invalid instance visibility policy');
     this.visibility=visibility;this.version=0;
     this.renderer = renderer; this.world = world; this.capacity = capacity;
-    this.data = new Float32Array(capacity * 12);
+    this.data = new Float32Array(capacity * 16);
     this.kind=visibility==='shadow'?'shadow-instance-buffer':'instance-buffer';this.cpuBytes=this.data.byteLength;this.gpuBufferBytes=this.data.byteLength;
     this.count = 0; this.disposed = false;
     this.initialize();
@@ -201,9 +203,9 @@ class InstanceBatch {
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
     gl.bufferData(gl.ARRAY_BUFFER, this.data.byteLength, gl.DYNAMIC_DRAW);
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       const location = i + 2;
-      gl.enableVertexAttribArray(location); gl.vertexAttribPointer(location, 4, gl.FLOAT, false, 48, i * 16);
+      gl.enableVertexAttribArray(location); gl.vertexAttribPointer(location, 4, gl.FLOAT, false, 64, i * 16);
       gl.vertexAttribDivisor(location, 1);
     }
     gl.bindVertexArray(null); this.forceUpload = true;
@@ -229,19 +231,20 @@ class InstanceBatch {
       const s = entity.shape, p = entity.pose;
       if (!s || (this.visibility==='shadow'&&s.castShadow===false)) continue;
       r.totals.candidates++;
-      const radius = Math.hypot(s.size[0], s.size[1], s.size[2]);
-      const screenY = (p.y - r.camera.y) * 0.65 + p.z * 0.76;
-      if (this.visibility==='camera'&&(Math.abs(p.x - r.camera.x) > halfWidth + radius || Math.abs(screenY) > halfHeight + radius)) {r.totals.culled++;continue;}
-      if (this.cursor / 12 >= this.capacity) throw new Error(`World ${this.world.id} exceeds ${this.capacity} ${this.visibility} instances`);
-      this.write(p.x); this.write(p.y); this.write(p.z); this.write(p.yaw);
-      this.write(s.size[0]); this.write(s.size[1]); this.write(s.size[2]);
+      const radius = Math.hypot(...s.size)*p.scale;
+      const dx=p.x-r.camera.x,dy=p.y-r.camera.y,dz=p.z-r.camera.z;
+      const screenY=dx*r.camera.up[0]+dy*r.camera.up[1]+dz*r.camera.up[2],screenX=dx*r.camera.right[0]+dy*r.camera.right[1];
+      if (this.visibility==='camera'&&(Math.abs(screenX) > halfWidth + radius || Math.abs(screenY) > halfHeight + radius)) {r.totals.culled++;continue;}
+      if (this.cursor / 16 >= this.capacity) throw new Error(`World ${this.world.id} exceeds ${this.capacity} ${this.visibility} instances`);
+      this.write(p.x); this.write(p.y); this.write(p.z); this.write(0);
+      this.write(s.size[0]*p.scale); this.write(s.size[1]*p.scale); this.write(s.size[2]*p.scale);
       // Depth-only records ignore material changes, so recoloring does not invalidate maps.
       this.write(this.visibility==='camera'?(s.emission??0):0);
       for(let i=0;i<3;i++)this.write(this.visibility==='camera'?s.color[i]:0);
-      this.write(0);
+      this.write(this.visibility==='camera'?(entity.highlight??0):0);for(let i=0;i<4;i++)this.write(p.rotation[i]);
     }
-    if(this.count!==this.cursor/12||this.lastDirty>=this.firstDirty)this.version++;
-    this.count = this.cursor / 12;
+    if(this.count!==this.cursor/16||this.lastDirty>=this.firstDirty)this.version++;
+    this.count = this.cursor / 16;
     if (this.lastDirty >= this.firstDirty) {
       gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
       // WebGL 2 source-offset/length overload uploads a range without a new typed-array view.
