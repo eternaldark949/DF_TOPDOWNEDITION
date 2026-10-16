@@ -204,9 +204,15 @@ class NativeVectorContext {
 // unsupported phones still report CPU submission and actual frame cadence.
 class NativeGpuTimer {
     constructor(gl){this.gl=gl;this.extension=gl.getExtension('EXT_disjoint_timer_query_webgl2');this.pending=[];this.samples=[];this.status=this.extension?'awaiting GPU samples':'GPU timer unavailable';}
-    begin(label,frame){if(!this.extension||this.active||this.pending.length>=12)return;
+    // Without timer queries (most phones), one frame in 8 is probed by draining the GPU around each stage (gl.finish):
+    // that stage's GPU time, at the cost of serialising the probed frame
+    begin(label,frame){if(this.active)return;
+        if(!this.extension){if(!this.probing||frame%8)return;this.gl.finish();this.active={label,frame,t:performance.now()};this.status='GPU stage time by gl.finish probes (1 frame in 8)';return;}
+        if(this.pending.length>=12)return;
         const q=this.gl.createQuery();this.gl.beginQuery(this.extension.TIME_ELAPSED_EXT,q);this.active={q,label,frame};}
-    end(){if(!this.active)return;this.gl.endQuery(this.extension.TIME_ELAPSED_EXT);this.pending.push(this.active);this.active=null;}
+    end(){if(!this.active)return;
+        if(!this.extension){this.gl.finish();const e=this.active;this.samples.push({label:e.label,frame:e.frame,ms:performance.now()-e.t,probe:true});if(this.samples.length>18000)this.samples.shift();this.active=null;return;}
+        this.gl.endQuery(this.extension.TIME_ELAPSED_EXT);this.pending.push(this.active);this.active=null;}
     clear(){for(const e of this.pending)this.gl.deleteQuery(e.q);this.pending=[];this.samples=[];this.active=null;}
     poll(){if(!this.extension||!this.pending.length)return;
         if(this.gl.getParameter(this.extension.GPU_DISJOINT_EXT)){this.clear();this.status='disjoint samples discarded';return;}

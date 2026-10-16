@@ -175,7 +175,7 @@ class NativeWebGLRenderer {
         if(this.renderer.screen.width!==w||this.renderer.screen.height!==h)this.renderer.resize(w,h);
         this.world.filterArea.width=w;this.world.filterArea.height=h;
         game._renderDrawId=(game._renderDrawId||0)+1;
-        const view=game.view=nativeCameraView(game,this),zoom=view.zoom;
+        const view=game.view=nativeCameraView(game,this),zoom=view.zoom;this.gpuTimer.probing=!!(this.capture&&!this.capture.finished);
         const halfW=w/(2*zoom),halfH=h/(2*zoom),rect={left:view.x-halfW,right:view.x+halfW,top:view.y-halfH,bottom:view.y+halfH};
         const padded={left:rect.left-100,right:rect.right+100,top:rect.top-100,bottom:rect.bottom+100};
         game._cullBounds={view:rect,world:padded,bodies:padded,cars:padded,buildings:padded,buildingTops:padded,foliage:padded,lamps:padded,lampGlow:padded,props:padded,neonSigns:padded,headlights:padded,vehicles:padded,entities:padded};
@@ -192,7 +192,7 @@ class NativeWebGLRenderer {
         this.playerSprite.alpha=(game.player.isHidden||game.flitState.active) ? .5 : 1;
         this.playerSprite.visible&&=this.layers.player;
         this.syncLayers(game,view);
-        this.syncDetails(game,view);this.syncWorld(game,view);this.gpuTimer.begin('surfaces',this.frameId);this.surfaces.sync(game,view);this.gpuTimer.end();
+        this.syncDetails(game,view);this.gpuTimer.begin('world',this.frameId);this.syncWorld(game,view);this.gpuTimer.end();this.gpuTimer.begin('surfaces',this.frameId);this.surfaces.sync(game,view);this.gpuTimer.end();
         this.gpuTimer.begin('lighting',this.frameId);this.syncLighting(game,view);this.gpuTimer.end();
         this.gpuTimer.begin('presentation',this.frameId);this.presentation.sync(game,view);this.gpuTimer.end();
         this.syncColorGrade(game);

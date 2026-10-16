@@ -4876,9 +4876,15 @@ class NativeVectorContext {
 // unsupported phones still report CPU submission and actual frame cadence.
 class NativeGpuTimer {
     constructor(gl){this.gl=gl;this.extension=gl.getExtension('EXT_disjoint_timer_query_webgl2');this.pending=[];this.samples=[];this.status=this.extension?'awaiting GPU samples':'GPU timer unavailable';}
-    begin(label,frame){if(!this.extension||this.active||this.pending.length>=12)return;
+    // Without timer queries (most phones), one frame in 8 is probed by draining the GPU around each stage (gl.finish):
+    // that stage's GPU time, at the cost of serialising the probed frame
+    begin(label,frame){if(this.active)return;
+        if(!this.extension){if(!this.probing||frame%8)return;this.gl.finish();this.active={label,frame,t:performance.now()};this.status='GPU stage time by gl.finish probes (1 frame in 8)';return;}
+        if(this.pending.length>=12)return;
         const q=this.gl.createQuery();this.gl.beginQuery(this.extension.TIME_ELAPSED_EXT,q);this.active={q,label,frame};}
-    end(){if(!this.active)return;this.gl.endQuery(this.extension.TIME_ELAPSED_EXT);this.pending.push(this.active);this.active=null;}
+    end(){if(!this.active)return;
+        if(!this.extension){this.gl.finish();const e=this.active;this.samples.push({label:e.label,frame:e.frame,ms:performance.now()-e.t,probe:true});if(this.samples.length>18000)this.samples.shift();this.active=null;return;}
+        this.gl.endQuery(this.extension.TIME_ELAPSED_EXT);this.pending.push(this.active);this.active=null;}
     clear(){for(const e of this.pending)this.gl.deleteQuery(e.q);this.pending=[];this.samples=[];this.active=null;}
     poll(){if(!this.extension||!this.pending.length)return;
         if(this.gl.getParameter(this.extension.GPU_DISJOINT_EXT)){this.clear();this.status='disjoint samples discarded';return;}
@@ -58579,7 +58585,7 @@ class NativeWebGLRenderer {
         if(this.renderer.screen.width!==w||this.renderer.screen.height!==h)this.renderer.resize(w,h);
         this.world.filterArea.width=w;this.world.filterArea.height=h;
         game._renderDrawId=(game._renderDrawId||0)+1;
-        const view=game.view=nativeCameraView(game,this),zoom=view.zoom;
+        const view=game.view=nativeCameraView(game,this),zoom=view.zoom;this.gpuTimer.probing=!!(this.capture&&!this.capture.finished);
         const halfW=w/(2*zoom),halfH=h/(2*zoom),rect={left:view.x-halfW,right:view.x+halfW,top:view.y-halfH,bottom:view.y+halfH};
         const padded={left:rect.left-100,right:rect.right+100,top:rect.top-100,bottom:rect.bottom+100};
         game._cullBounds={view:rect,world:padded,bodies:padded,cars:padded,buildings:padded,buildingTops:padded,foliage:padded,lamps:padded,lampGlow:padded,props:padded,neonSigns:padded,headlights:padded,vehicles:padded,entities:padded};
@@ -58596,7 +58602,7 @@ class NativeWebGLRenderer {
         this.playerSprite.alpha=(game.player.isHidden||game.flitState.active) ? .5 : 1;
         this.playerSprite.visible&&=this.layers.player;
         this.syncLayers(game,view);
-        this.syncDetails(game,view);this.syncWorld(game,view);this.gpuTimer.begin('surfaces',this.frameId);this.surfaces.sync(game,view);this.gpuTimer.end();
+        this.syncDetails(game,view);this.gpuTimer.begin('world',this.frameId);this.syncWorld(game,view);this.gpuTimer.end();this.gpuTimer.begin('surfaces',this.frameId);this.surfaces.sync(game,view);this.gpuTimer.end();
         this.gpuTimer.begin('lighting',this.frameId);this.syncLighting(game,view);this.gpuTimer.end();
         this.gpuTimer.begin('presentation',this.frameId);this.presentation.sync(game,view);this.gpuTimer.end();
         this.syncColorGrade(game);
