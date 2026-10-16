@@ -8,6 +8,7 @@
     "test:browser": "node tests/browser.cjs",
     "test:studio": "node tests/studio-browser.cjs",
     "test:studio-tools": "node tests/studio-tools-browser.cjs",
-    "test:freelancer": "node tests/freelancer-browser.cjs"
+    "test:freelancer": "node tests/freelancer-browser.cjs",
+    "test:camera": "node tests/camera-browser.cjs"
   }
 }

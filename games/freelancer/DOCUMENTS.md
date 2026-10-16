@@ -54,3 +54,7 @@ Only two worlds may be resident. There is no unconditional prewarming in this fi
 7. `engine/basement/spatial-grid.js`, `planar-motor.js`: reusable collision/movement mechanisms.
 
 Run `npm test`, `npm run build`, and `npm run test:freelancer`; use the Studio regression suites after shared workspace edits. Browser checks need development Chromium/Playwright, not runtime packages.
+
+## Studio camera navigation
+
+Use the shared [viewport controls](../../docs/decisions/0010-viewport-navigation.md) to orbit, pan, pinch/zoom and frame the selected asset or all authored geometry. These are editor view changes; they do not overwrite this game's camera metadata or enter document history.

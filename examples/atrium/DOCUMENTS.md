@@ -62,3 +62,7 @@ The current implementation and resource budgets are recorded in [decision 0008](
 ## Other installed projects
 
 Studio now also includes the [Freelancer street/vestibule slice](../../games/freelancer/DOCUMENTS.md). Choose a starter through the project selector; export or undo unsaved edits first. Each installed package supplies validation, Play and application policies through the editor catalog; Atrium remains an independent diagnostic. Import/recovery recognizes installed package IDs. The existing recovery slot is shared, so export backups when moving between projects.
+
+## Viewport navigation and lights
+
+Studio now provides [shared camera controls](../../docs/decisions/0010-viewport-navigation.md): mouse/touch orbit, view-plane pan, pointer-anchored zoom, F/Home framing and Reset view. Camera view state is separate from authored JSON/history. The same record lists the currently editable light-object fields (XYZ, linear RGB 0–16, radius 0.1–100 m) and distinguishes engine-level shadow settings.

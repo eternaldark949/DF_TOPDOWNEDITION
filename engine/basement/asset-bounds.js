@@ -14,3 +14,19 @@ export function assetBounds(asset){
  }
  return Number.isFinite(min[0])?{min,max}:{min:[0,0,0],max:[0,0,0]};
 }
+
+/** Bound resolved world shapes, optionally restricted to a supplied set of runtime IDs.
+ * Editor guides are not World entities and cannot inflate this result. No temporary World. */
+export function worldBounds(world,ids=null){
+ const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity],v=[0,0,0];
+ world.resolve();
+ for(const entity of world.entities.values()){
+  if(!entity.shape||(ids&&!ids.has(entity.id)))continue;
+  const p=entity.pose,s=entity.shape.size;
+  for(const x of [-1,1])for(const y of [-1,1])for(const z of [-1,1]){
+   rotateVector(p.rotation,x*s[0]*p.scale/2,y*s[1]*p.scale/2,z*s[2]*p.scale/2,v);
+   for(const [i,key]of ['x','y','z'].entries()){min[i]=Math.min(min[i],p[key]+v[i]);max[i]=Math.max(max[i],p[key]+v[i]);}
+  }
+ }
+ return Number.isFinite(min[0])?{min,max}:null;
+}

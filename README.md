@@ -16,7 +16,9 @@ The branch was intentionally created with only this plan. On 2026-10-15, after r
 
 **Studio direction and roadmap:** [3D engine, universal Studio, authored JSON and offline packaging](docs/decisions/0006-studio-3d-and-authored-data.md). The first edit/save/play workspace is now implemented; the first recreated street/vestibule slice is now implemented.
 
-**Current implemented milestone:** [Freelancer street/doorway slice](docs/decisions/0009-freelancer-street-slice.md) · [screenshots and verification](docs/milestones/enni-street/README.md) · [Freelancer editing guide](games/freelancer/DOCUMENTS.md).
+**Viewport update:** [camera navigation and current light parameters](docs/decisions/0010-viewport-navigation.md) · [screenshots and checks](docs/milestones/viewport-navigation/README.md).
+
+**Current playable milestone:** [Freelancer street/doorway slice](docs/decisions/0009-freelancer-street-slice.md) · [screenshots and verification](docs/milestones/enni-street/README.md) · [Freelancer editing guide](games/freelancer/DOCUMENTS.md).
 
 **Studio tools:** [authoring contracts](docs/decisions/0008-studio-authoring-tools.md) · [tools evidence](docs/milestones/studio-tools/README.md) · [base JSON guide](examples/atrium/DOCUMENTS.md).
 
@@ -565,7 +567,7 @@ The first Studio slice is implemented: one contextual workspace, editable Atrium
 
 `examples/atrium/project.json` is now authoritative for scene placements, grouped assembly assets and light data. JavaScript implements behavior/generators. The build validates schema/references/registered generator versions and embeds explicitly imported JSON into separate offline game and Studio HTML files. The first format is one portable package containing scene/asset tables; arbitrary multi-file dependency manifests remain future work. [The editing guide](examples/atrium/DOCUMENTS.md) documents units, fields and budgets. GitHub Actions runs the same source tests/build and uploads the offline HTML artifacts; it does not deploy or write repository files.
 
-Run `npm test`, `npm run build`, `npm run test:browser`, `npm run test:studio`, `npm run test:studio-tools` and `npm run test:freelancer` for the relevant checks. Browser checks require development Playwright and Chromium; neither is a runtime dependency. [Studio evidence](docs/milestones/studio/README.md) records actual verification and screenshots. Physical-phone performance is still unmeasured.
+Run `npm test`, `npm run build`, `npm run test:browser`, `npm run test:studio`, `npm run test:studio-tools`, `npm run test:freelancer` and `npm run test:camera` for the relevant checks. Browser checks require development Playwright and Chromium; neither is a runtime dependency. [Studio evidence](docs/milestones/studio/README.md) records actual verification and screenshots. Physical-phone performance is still unmeasured.
 
 The [Freelancer slice](docs/decisions/0009-freelancer-street-slice.md) now exercises this workflow with the Enni Cole street, a cutaway vestibule and explicit enter/return actions. Next: extend the articulated humanoid workshop through the shared document/property/transaction contracts, preserving the agreed silhouette review. Broader goals in the direction record remain planned.
 

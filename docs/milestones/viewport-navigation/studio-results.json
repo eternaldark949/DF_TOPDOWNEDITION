@@ -1,0 +1,17 @@
+{
+  "walked": true,
+  "walkInput": "touch joystick",
+  "mobile": {
+    "width": 412,
+    "height": 892
+  },
+  "playCycles": 4,
+  "requests": [],
+  "errors": [],
+  "authoredID": "amber:west-entry-planter",
+  "recovery": true,
+  "cancelledTouch": true,
+  "committedTouch": true,
+  "blankInputRejected": true,
+  "fullRotation": true
+}

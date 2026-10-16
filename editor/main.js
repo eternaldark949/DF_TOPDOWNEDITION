@@ -10,6 +10,7 @@ import { WorkspacePanels } from './workspace/panels.js';
 import { StudioPreferences } from './workspace/preferences.js';
 import { STUDIO_PROJECTS, studioProject, validateStudioProject } from './projects.js';
 import { StudioSession } from './workspace/session.js';
+import { selectedBounds, sceneBounds } from './workspace/framing.js';
 import { StudioViewport } from './workspace/viewport.js';
 import { ProjectFiles } from './documents/files.js';
 
@@ -60,22 +61,25 @@ try{
  action('recover',()=>{const data=files.recover();if(!data)throw new Error('No valid local recovery is available');session.replace(data);setTool('select');frameScene();});
  life.listen($('scene'),'change',()=>{viewport.cancel();session.setScene(Number($('scene').value));frameScene();});
  /** The active tool is shared by the viewport, its overlay and this one toolbar. */
- function setTool(mode){viewport.cancel();viewport.mode=mode;document.body.classList.toggle('rotate-mode',mode==='rotate');for(const id of ['select','move','rotate'])$(id).setAttribute('aria-pressed',String(id===mode));$('tool-readout').textContent=mode==='place'?'PLACE · '+session.document.data.assets.find(a=>a.id===viewport.placementAsset)?.name:mode.toUpperCase();}
- for(const mode of ['select','move','rotate'])action(mode,()=>setTool(mode));
+ function setTool(mode){viewport.cancel();viewport.mode=mode;document.body.dataset.navigation=mode;document.body.classList.toggle('rotate-mode',mode==='rotate');for(const id of ['select','move','rotate','orbit','pan'])$(id).setAttribute('aria-pressed',String(id===mode));$('tool-readout').textContent=mode==='place'?'PLACE · '+session.document.data.assets.find(a=>a.id===viewport.placementAsset)?.name:mode.toUpperCase();}
+ for(const mode of ['select','move','rotate','orbit','pan'])action(mode,()=>setTool(mode));
  action('duplicate',()=>session.duplicate());action('delete',()=>session.remove());
  for(const key of ['grid','lights']){const button=$(key);button.setAttribute('aria-pressed',String(preferences.value[key]));action(key,()=>{preferences.set(key,!preferences.value[key]);viewport.showLights=preferences.value.lights;button.setAttribute('aria-pressed',String(preferences.value[key]));});}
  for(const [id,key]of [['rotation-axis','axis'],['rotation-space','space'],['angle-snap','angleSnap']]){$(id).value=preferences.value[key];life.listen($(id),'change',()=>{viewport.cancel();const value=key==='angleSnap'?Number($(id).value):$(id).value;preferences.set(key,value);viewport[key]=value;});}
  life.listen($('asset-search'),'input',()=>{panels.filter=$('asset-search').value;panels.renderAssets(session);});
  life.listen($('snap'),'change',()=>{viewport.cancel();viewport.snap=Number($('snap').value);});
  life.listen($('view'),'change',()=>{viewport.cancel();renderer.camera.preset($('view').value);});
- action('orbit-left',()=>renderer.camera.azimuth-=Math.PI/12);action('orbit-right',()=>renderer.camera.azimuth+=Math.PI/12);
- action('zoom-in',()=>renderer.camera.halfHeight=Math.max(5,renderer.camera.halfHeight/1.2));action('zoom-out',()=>renderer.camera.halfHeight=Math.min(50,renderer.camera.halfHeight*1.2));
+ action('orbit-left',()=>viewport.navigation.motion.orbit(15,0));action('orbit-right',()=>viewport.navigation.motion.orbit(-15,0));
+ function zoom(factor){viewport.navigation.motion.zoom(factor,$('world').clientWidth/2,$('world').clientHeight/2,$('world').clientWidth,$('world').clientHeight);}
+ action('zoom-in',()=>zoom(1/1.2));action('zoom-out',()=>zoom(1.2));
+ function frame(selected){viewport.cancel();viewport.navigation.motion.frame(selected?selectedBounds(session):sceneBounds(session),$('world').clientWidth,$('world').clientHeight);}
+ action('frame-selected',()=>frame(true));action('frame-all',()=>frame(false));action('reset-view',frameScene);
  action('mobile-library',()=>{document.body.classList.toggle('library-open');document.body.classList.remove('properties-open');});action('mobile-properties',()=>{document.body.classList.toggle('properties-open');document.body.classList.remove('library-open');});
  profiler=engine.directory.create('tool.profiler',{profiler:engine.basement.profiler,host:document.body,subscribe:callback=>engine.lobby.on('render',callback,'studio.profiler')});life.own(()=>profiler.dispose());action('profiler',()=>profiler.element.open=!profiler.element.open);
- life.listen(window,'keydown',e=>{if(session.play||e.target.isContentEditable||['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName))return;if(e.key==='Escape'){viewport.cancel();session.document.cancel();if(viewport.mode==='place')setTool('select');}if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();viewport.cancel();try{session.remove();}catch(error){report(error);}}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='d'){e.preventDefault();viewport.cancel();try{session.duplicate();}catch(error){report(error);}}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();viewport.cancel();if(e.shiftKey)session.document.redo();else session.document.undo();}});
+ life.listen(window,'keydown',e=>{if(session.play||e.target.isContentEditable||['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName))return;if(e.key.toLowerCase()==='f'&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();frame(true);}if(e.key==='Home'){e.preventDefault();frame(false);}if(e.key==='Escape'){viewport.cancel();session.document.cancel();if(viewport.mode==='place')setTool('select');}if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();viewport.cancel();try{session.remove();}catch(error){report(error);}}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='d'){e.preventDefault();viewport.cancel();try{session.duplicate();}catch(error){report(error);}}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();viewport.cancel();if(e.shiftKey)session.document.redo();else session.document.undo();}});
  life.listen($('error'),'click',()=>$('error').hidden=true);
  let metricsAt=-Infinity;
  // DOM diagnostics update at 4 Hz; the viewport retains the host's normal frame rate.
- life.own(engine.lobby.on('render',(_alpha,_time,wallMs)=>{if(wallMs-metricsAt<250)return;metricsAt=wallMs;const stats=renderer.stats;$('metrics').textContent=`${stats.draws} draws · ${stats.buffers} buffers`;$('status').dataset.worlds=engine.directory.worlds.size;$('status').dataset.buffers=stats.buffers;$('status').dataset.guides=renderer.lines.layers.size;},'studio.status'));
+ life.own(engine.lobby.on('render',(_alpha,_time,wallMs)=>{if(wallMs-metricsAt<250)return;metricsAt=wallMs;const stats=renderer.stats;$('metrics').textContent=`${stats.draws} draws · ${stats.buffers} buffers`;$('status').dataset.worlds=engine.directory.worlds.size;$('status').dataset.buffers=stats.buffers;$('status').dataset.guides=renderer.lines.layers.size;$('status').dataset.camera=JSON.stringify(viewport.navigation.motion.snapshot());},'studio.status'));
  life.listen(window,'pagehide',()=>life.dispose());engine.start();
 }catch(error){report(error);life.dispose();}
