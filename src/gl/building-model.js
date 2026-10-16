@@ -131,7 +131,7 @@ const GLBuildingModel = (() => {
     // ---------------- the building ----------------
     function build(b) {
         const H = Math.min(b.floors, CONFIG.BUILDINGS.MAX_FLOORS) * FH();
-        const out = { H, base: new GLBuildingBuilder(H), top: new GLBuildingBuilder(H), glow: new GLBuildingBuilder(H) };
+        const out = { H, base: GLBuildingBuilder.scratch(H, 0), top: GLBuildingBuilder.scratch(H, 1), glow: GLBuildingBuilder.scratch(H, 2) };
         const faces = b._leanFaces();
         // the three layers share one face table, in the Canvas face order
         out.faceIds = faces.map(f => { const i = out.top.addFace(f); out.base.addFace(f); out.glow.addFace(f); return i; });

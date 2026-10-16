@@ -17,7 +17,7 @@ const GLCozyCafe = (() => {
 
     function build(b) {
         const H = b._ccH();
-        const o = { H, base: new GLBuildingBuilder(H), top: new GLBuildingBuilder(H), glow: new GLBuildingBuilder(H) };
+        const o = { H, base: GLBuildingBuilder.scratch(H, 0), top: GLBuildingBuilder.scratch(H, 1), glow: GLBuildingBuilder.scratch(H, 2) };
         const add = f => { const i = o.top.addFace(f); o.base.addFace(f); o.glow.addFace(f); return i; };
         o.faces = b._leanFaces();
         o.faceIds = o.faces.map(add);

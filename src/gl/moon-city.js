@@ -116,7 +116,7 @@ const GLMoonCity = (() => {
     // ---------------- the building ----------------
     function build(b) {
         const G = b._mcGeo(), H = Math.min(b.floors, CONFIG.BUILDINGS.MAX_FLOORS) * FH();
-        const o = { H, base: new GLBuildingBuilder(H), top: new GLBuildingBuilder(H), glow: new GLBuildingBuilder(H) };
+        const o = { H, base: GLBuildingBuilder.scratch(H, 0), top: GLBuildingBuilder.scratch(H, 1), glow: GLBuildingBuilder.scratch(H, 2) };
         const faces = b._leanFaces();
         const ids = faces.map(f => { const i = o.top.addFace(f); o.base.addFace(f); o.glow.addFace(f); return i; });
         drawBase(b, o.base, G);

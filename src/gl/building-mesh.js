@@ -103,16 +103,22 @@ class GLBuildingBuilder {
         d[o + 29] = d[o + 30] = d[o + 31] = d[o + 32] = 0;
         return this.n++;
     }
+    /** A cleared builder kept for one-off builds (buildings, landmarks), so each build doesn't regrow its buffers from
+        nothing: slot is the layer (0 base, 1 top, 2 glow). Its finish() copies out, so the next build can reuse it */
+    static scratch(H, slot) { const S = GLBuildingBuilder._scratch || (GLBuildingBuilder._scratch = []); const B = (S[slot] || (S[slot] = new GLBuildingBuilder(H))).clear(); B.H = H; B._pooled = true; return B; }
     /** Start over, keeping the buffers (a builder reused frame after frame) */
     clear() { this.n = 0; this.index.length = 0; this.faces.length = 0; this.groups = null; this.m = null; this._add = 0; this._c = [1, 1, 1, 1]; return this.reset(); }
     /** One vertex; returns its index */
     vertex(p, prev = p, next = p, side = 0, hw = 0, flags = 0, color = this._c, uvText = null) {
-        this._grow(1);
-        if (this.m) { p = this._map(p); prev = this._map(prev); next = this._map(next); }
-        const d = this.data, o = this.n * GLB_STRIDE, t = uvText || this._text, a = this._anim;
-        d[o] = p[0]; d[o + 1] = p[1]; d[o + 2] = p[2] || 0;
-        d[o + 3] = prev[0]; d[o + 4] = prev[1]; d[o + 5] = prev[2] || 0;
-        d[o + 6] = next[0]; d[o + 7] = next[1]; d[o + 8] = next[2] || 0;
+        if ((this.n + 1) * GLB_STRIDE > this.data.length) this._grow(1);
+        const d = this.data, o = this.n * GLB_STRIDE, t = uvText || this._text, a = this._anim, m = this.m;
+        if (m) {                                                         // mapped in place: no arrays per vertex
+            const A = m[0], B = m[1], C = m[2], D = m[3], E = m[4], F = m[5];
+            d[o] = A * p[0] + C * p[1] + E; d[o + 1] = B * p[0] + D * p[1] + F;
+            if (prev === p) { d[o + 3] = d[o]; d[o + 4] = d[o + 1]; } else { d[o + 3] = A * prev[0] + C * prev[1] + E; d[o + 4] = B * prev[0] + D * prev[1] + F; }
+            if (next === p) { d[o + 6] = d[o]; d[o + 7] = d[o + 1]; } else { d[o + 6] = A * next[0] + C * next[1] + E; d[o + 7] = B * next[0] + D * next[1] + F; }
+        } else { d[o] = p[0]; d[o + 1] = p[1]; d[o + 3] = prev[0]; d[o + 4] = prev[1]; d[o + 6] = next[0]; d[o + 7] = next[1]; }
+        d[o + 2] = p[2] || 0; d[o + 5] = prev[2] || 0; d[o + 8] = next[2] || 0;
         d[o + 9] = side; d[o + 10] = hw; d[o + 11] = flags; d[o + 12] = p[3] || 0;
         d[o + 13] = color[0]; d[o + 14] = color[1]; d[o + 15] = color[2]; d[o + 16] = color[3];
         const fc = this._face >= 0 ? this.faces[this._face] : null;
@@ -203,7 +209,8 @@ class GLBuildingBuilder {
     }
     /** The finished geometry: interleaved vertices and indices */
     finish() {
-        return { data: this.data.slice(0, this.n * GLB_STRIDE), index: this.n > 65535 ? new Uint32Array(this.index) : new Uint16Array(this.index),
+        const used = this.n * GLB_STRIDE;                                   // mostly full: hand the buffer over rather than copy a megabyte
+        return { data: !this._pooled && used >= this.data.length * .7 ? this.data.subarray(0, used) : this.data.slice(0, used), index: this.n > 65535 ? new Uint32Array(this.index) : new Uint16Array(this.index),
                  vertices: this.n, groups: this.groups || null };
     }
 }

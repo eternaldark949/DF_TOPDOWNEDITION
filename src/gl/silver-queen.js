@@ -140,7 +140,7 @@ const GLSilverQueen = (() => {
     // ---------------- the building ----------------
     function build(b) {
         H = b._sqH(); C0 = leanCamHeight(); Q = (x, y, z) => [x, y, z, z <= H + 1e-6 ? 0 : 1];
-        const o = { H, base: new GLBuildingBuilder(H), top: new GLBuildingBuilder(H), glow: new GLBuildingBuilder(H) };
+        const o = { H, base: GLBuildingBuilder.scratch(H, 0), top: GLBuildingBuilder.scratch(H, 1), glow: GLBuildingBuilder.scratch(H, 2) };
         const addFace = f => { const i = o.top.addFace(f); o.base.addFace(f); o.glow.addFace(f); return i; };
         const faces = b._leanFaces();
         o.faces = faces; o.faceIds = faces.map(addFace);

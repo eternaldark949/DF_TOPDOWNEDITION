@@ -44,18 +44,28 @@ class GLBuildingsSystem {
         this.stats.builds++; this.stats.buildMs += performance.now() - start;
         return r;
     }
-    /** Build the buildings just outside the view ahead of time, a few milliseconds a frame */
+    /** Build the buildings just outside the view ahead of time, one a frame, nearest first and further ahead
+        the faster the camera moves (a car crossing the city must not build its next block on the frame it arrives) */
     prefetch(map, bounds, budgetMs = 3) {
-        const start = performance.now(), pad = 700, F = this.renderer.frames, last = F && F[F.length - 1];
-        if (last && last.renderMs > 28) return;                        // a slow frame already: building ahead can wait
-        for (const b of map.buildings || []) {
-            if (performance.now() - start > budgetMs) break;
-            if (!this.supports(b) || this.records.has(b)) continue;
-            if (b.x > bounds.right + pad || b.x + (b.w || 0) < bounds.left - pad || b.y > bounds.bottom + pad || b.y + (b.h || 0) < bounds.top - pad) continue;
-            this.record(b).seen = this.frame - 1;
-            this.stats.prefetched = (this.stats.prefetched || 0) + 1;
-            break;                                                     // one a frame: a first sign's text can take a while
+        const F = this.renderer.frames, n = F ? F.length : 0;
+        if (n > 1) {                                                   // a spike already: building ahead can wait
+            let sum = 0, k = 0; for (let i = Math.max(0, n - 31); i < n - 1; i++, k++) sum += F[i].renderMs;
+            if (k && F[n - 1].renderMs > Math.max(28, 1.6 * sum / k)) return;
         }
+        const cx = (bounds.left + bounds.right) / 2, cy = (bounds.top + bounds.bottom) / 2, p = this._cam || [cx, cy];
+        const vx = cx - p[0], vy = cy - p[1]; this._cam = [cx, cy];
+        const ahead = Math.min(1600, Math.hypot(vx, vy) * 20), pad = 700 + ahead;   // ~20 frames of travel
+        let best = null, bestD = Infinity;
+        for (const b of map.buildings || []) {
+            if (b.x > bounds.right + pad || b.x + (b.w || 0) < bounds.left - pad || b.y > bounds.bottom + pad || b.y + (b.h || 0) < bounds.top - pad) continue;
+            if (this.records.has(b) || !this.supports(b)) continue;
+            const dx = b.x + (b.w || 0) / 2 - cx, dy = b.y + (b.h || 0) / 2 - cy;
+            const d = Math.hypot(dx, dy) - (dx * vx + dy * vy) / (Math.hypot(vx, vy) || 1) * (ahead ? 1 : 0);   // ahead counts as nearer
+            if (d < bestD) { bestD = d; best = b; }
+        }
+        if (!best) return;
+        this.record(best).seen = this.frame - 1;
+        this.stats.prefetched = (this.stats.prefetched || 0) + 1;
     }
     /** Show b this frame */
     show(b, game) {

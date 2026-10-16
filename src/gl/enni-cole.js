@@ -62,7 +62,7 @@ const GLEnniCole = (() => {
 
     function build(b) {
         const H = Math.min(b.floors, CONFIG.BUILDINGS.MAX_FLOORS) * CONFIG.BUILDINGS.FLOOR_HEIGHT;
-        const o = { H, base: new GLBuildingBuilder(H), top: new GLBuildingBuilder(H), glow: new GLBuildingBuilder(H) };
+        const o = { H, base: GLBuildingBuilder.scratch(H, 0), top: GLBuildingBuilder.scratch(H, 1), glow: GLBuildingBuilder.scratch(H, 2) };
         const faces = b._leanFaces().map(f => {
             const g = { nx: f.nx, ny: f.ny, x1: f.x1, y1: f.y1 };
             return { f, id: o.top.addFace(g), b: o.base.addFace(g), g: o.glow.addFace(g) };

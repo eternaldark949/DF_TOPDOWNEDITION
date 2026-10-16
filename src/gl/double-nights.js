@@ -44,7 +44,7 @@ const GLDoubleNights = (() => {
 
     function build(b) {
         const G = b._dnGeo(), C = DN.C, H = DN.FLOORS * FH();
-        const o = { H, base: new GLBuildingBuilder(H), top: new GLBuildingBuilder(H), glow: new GLBuildingBuilder(H) };
+        const o = { H, base: GLBuildingBuilder.scratch(H, 0), top: GLBuildingBuilder.scratch(H, 1), glow: GLBuildingBuilder.scratch(H, 2) };
         for (const sh of [G.west, G.east, G.lens]) faces(o, sh);
         drawBase(b, o.base, G);
         drawTop(b, o.top, G, H, C);
