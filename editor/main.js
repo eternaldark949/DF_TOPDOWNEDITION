@@ -5,6 +5,7 @@
  */
 import { ETRNLNINE } from '../engine/etrnlnine.js';
 import { Lifetime } from '../engine/basement/lifetime.js';
+import { PanelDock } from '../engine/penthouse/panel-dock.js';
 import { AppearanceControls } from '../engine/penthouse/appearance-controls.js';
 import { AuthoringGuides } from '../engine/penthouse/authoring-guides.js';
 import { WorkspacePanels } from './workspace/panels.js';
@@ -20,12 +21,12 @@ const preferences=new StudioPreferences();
 // Query chooses an installed starter only; opening data always revalidates its own identity.
 const starter=STUDIO_PROJECTS.find(e=>e.label.toLowerCase()===new URLSearchParams(location.search).get('project'))??STUDIO_PROJECTS[0];
 let activeProject=starter;
-let session,panels,viewport,engine,profiler,guides;
+let session,panels,viewport,engine,profiler,guides,dock;
 /** Keep errors readable and dismissible, while the current document remains available. */
 function report(error){$('error').hidden=false;$('error').textContent=error.message;}
 /** Refresh command availability and status without replacing focused controls during previews. */
 function state(kind){if(!session||life.disposed)return;const doc=session.document;
- if(kind==='play')guides?.clear();
+ if(kind==='play')guides?.clear();dock?.suspend(!!session.play);
  activeProject=studioProject(doc.data);$('project').value=doc.data.id;$('project').disabled=!!session.play||doc.dirty;$('project').title=doc.dirty?'Export your changes or undo them before changing starter projects':'Choose a starter project';
  const selected=session.selectionKind==='material'?null:session.scene.entities.find(e=>e.id===session.selected);
  if(viewport){const dial=viewport.mode==='rotate'&&selected&&!selected.locked;$('rotate').disabled=!!session.play||!selected||selected.locked;document.body.classList.toggle('rotate-mode',!!dial);$('rotate').setAttribute('aria-pressed',String(!!dial));if(viewport.mode==='rotate')$('tool-readout').textContent=dial?'ROTATE':session.selectionKind==='material'?'MATERIAL':'SELECT LIGHT';}
@@ -47,7 +48,8 @@ try{
  guides=new AuthoringGuides(engine.basement.renderer);life.own(()=>guides.dispose());
  session=new StudioSession(engine,{guideLayers:()=>guides.layersFor({scene:session.scene,selected:session.selectionKind==='material'?null:session.selected,revision:session.document.revision,mode:viewport.mode,axis:viewport.axis,space:viewport.space,grid:preferences.value.grid,lights:preferences.value.lights}),canRemove:entity=>activeProject.canRemove(entity,session.document.data),cloneEntity:entity=>activeProject.clone(entity),project:starter.project,validate:validateStudioProject,selectInitial:scene=>activeProject.select(scene)??scene.entities.find(e=>!e.locked)?.id,playFactory:(engine,options)=>studioProject(options.project).play(engine,options),controlsHost:$('controls'),onChange:state,onStatus:s=>{$('status').textContent=`Play · ${s.name} · ${s.prompt??activeProject.help}`;$('status').dataset.x=s.x??0;$('status').dataset.y=s.y??0;}});life.own(()=>session.dispose());
  viewport=new StudioViewport($('world'),session,report,guides);Object.assign(viewport,{axis:preferences.value.axis,space:preferences.value.space,angleSnap:preferences.value.angleSnap,showLights:preferences.value.lights});life.own(()=>viewport.dispose());
- panels=new WorkspacePanels({fields:$('fields'),hierarchy:$('hierarchy'),assets:$('asset-list'),materials:$('material-list'),scene:$('scene'),name:$('selection-name'),id:$('selection-id')},{onError:report,onSelect:id=>{viewport.cancel();session.select(id);document.body.classList.remove('library-open');document.body.classList.add('properties-open');},onSelectMaterial:id=>{viewport.cancel();session.selectMaterial(id);document.body.classList.remove('library-open');document.body.classList.add('properties-open');},onPlace:id=>{viewport.cancel();viewport.placementAsset=id;setTool('place');document.body.classList.remove('library-open','properties-open');}});life.own(()=>panels.dispose());life.own(()=>files.dispose());
+ dock=new PanelDock({root:$('workspace'),entries:[{key:'directory',panel:$('library'),label:'Directory',side:'left'},{key:'properties',panel:$('properties'),label:'Properties',side:'right'}],compact:matchMedia('(max-width:760px)'),defaults:{wide:['directory','properties'],compact:[]},onBeforeChange:()=>{const active=document.activeElement;if(active?.closest('#library,#properties'))active.blur();viewport.cancel();}});life.own(()=>dock.dispose());
+ panels=new WorkspacePanels({fields:$('fields'),hierarchy:$('hierarchy'),assets:$('asset-list'),materials:$('material-list'),scene:$('scene'),name:$('selection-name'),id:$('selection-id')},{onError:report,onSelect:id=>{viewport.cancel();session.select(id);dock.setOpen('properties',true);},onSelectMaterial:id=>{viewport.cancel();session.selectMaterial(id);dock.setOpen('properties',true);},onPlace:id=>{viewport.cancel();viewport.placementAsset=id;setTool('place');dock.closeAll();}});life.own(()=>panels.dispose());life.own(()=>files.dispose());
  const renderer=engine.basement.renderer;
  const appearanceControls=new AppearanceControls({renderer,host:document.querySelector('.view-options'),subscribe:fn=>engine.lobby.on('render',fn,'studio.appearance-controls'),onError:report});life.own(()=>appearanceControls.dispose());
  for(const entry of STUDIO_PROJECTS){const option=document.createElement('option');option.value=entry.project.id;option.textContent=entry.label;$('project').append(option);}
@@ -81,7 +83,7 @@ try{
  action('zoom-in',()=>zoom(1/1.2));action('zoom-out',()=>zoom(1.2));
  function frame(selected){viewport.cancel();viewport.navigation.motion.frame(selected?selectedBounds(session):sceneBounds(session),$('world').clientWidth,$('world').clientHeight);}
  action('frame-selected',()=>frame(true));action('frame-all',()=>frame(false));action('reset-view',frameScene);
- action('mobile-library',()=>{document.body.classList.toggle('library-open');document.body.classList.remove('properties-open');});action('mobile-properties',()=>{document.body.classList.toggle('properties-open');document.body.classList.remove('library-open');});
+
  profiler=engine.directory.create('tool.profiler',{profiler:engine.basement.profiler,host:document.body,subscribe:callback=>engine.lobby.on('render',callback,'studio.profiler')});life.own(()=>profiler.dispose());action('profiler',()=>profiler.element.open=!profiler.element.open);
  life.listen(window,'keydown',e=>{if(session.play||e.target.isContentEditable||['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName))return;if(e.key.toLowerCase()==='f'&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();frame(true);}if(e.key==='Home'){e.preventDefault();frame(false);}if(e.key==='Escape'){viewport.cancel();session.document.cancel();if(viewport.mode==='place')setTool('select');}if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();viewport.cancel();try{session.remove();}catch(error){report(error);}}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='d'){e.preventDefault();viewport.cancel();try{session.duplicate();}catch(error){report(error);}}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();viewport.cancel();if(e.shiftKey)session.document.redo();else session.document.undo();}});
  life.listen($('error'),'click',()=>$('error').hidden=true);

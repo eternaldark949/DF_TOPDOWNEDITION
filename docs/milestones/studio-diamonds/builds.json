@@ -1,0 +1,8 @@
+{
+  "reproducible": true,
+  "sha256": {
+    "dist/ETRNLNINE-Atrium.html": "ad00b30e2289ff408990fdf9cb46a8670ef5f7694b5a14a9c894c795470078d8",
+    "dist/ETRNLNINE-Freelancer.html": "99d630823ced0978d5c7a5f504aff9561b9a7433660bc704df2fc08b3a21043f",
+    "dist/ETRNLNINE-Studio.html": "4ecedcb60f7e539b678d53bc09c4423f8c8b32cf0f2a9edcd27b7e424ec9b90a"
+  }
+}

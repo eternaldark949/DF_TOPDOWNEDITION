@@ -1,0 +1,77 @@
+/* Penthouse / shared DFAB workspace palette. Hosts opt in with workspace-theme.
+   Violet communicates interaction/focus; gold communicates selection and active tools. */
+.workspace-theme {
+  --ui-bg: #0a0a0f;
+  --ui-panel: #121019;
+  --ui-raised: #1b1526;
+  --ui-text: #eee8df;
+  --ui-muted: #c2b6cf;
+  --ui-border: #3d304e;
+  --ui-violet: #a469ff;
+  --ui-violet-bright: #ceadff;
+  --ui-gold: #d4a84b;
+  color: var(--ui-text);
+  background: var(--ui-bg);
+  font:
+    13px system-ui,
+    sans-serif;
+  color-scheme: dark;
+}
+.workspace-theme button,
+.workspace-theme input,
+.workspace-theme select {
+  font: inherit;
+  color: var(--ui-text);
+  background: var(--ui-panel);
+  border: 1px solid var(--ui-border);
+  border-radius: 5px;
+  min-height: 44px;
+  padding: 8px 10px;
+}
+.workspace-theme button {
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.workspace-theme button:hover {
+  background: #281c39;
+  border-color: var(--ui-violet);
+}
+.workspace-theme button[aria-pressed="true"] {
+  color: #ffe2a0;
+  border-color: var(--ui-gold);
+  background: #d4a84b18;
+}
+.workspace-theme button:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+.workspace-theme :is(button, input, select, summary):focus-visible {
+  outline: 2px solid var(--ui-violet-bright);
+  outline-offset: 3px;
+}
+.workspace-theme input,
+.workspace-theme select {
+  min-width: 0;
+}
+.workspace-theme input:invalid {
+  border-color: #e99aa9;
+}
+.workspace-theme :is(small, .eyebrow) {
+  color: var(--ui-gold);
+  font: 10px monospace;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.workspace-theme h2 {
+  font:
+    22px Georgia,
+    serif;
+  color: #f0dfbf;
+  font-weight: 400;
+}
+.workspace-theme h3 {
+  font: 11px system-ui;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ui-gold);
+}

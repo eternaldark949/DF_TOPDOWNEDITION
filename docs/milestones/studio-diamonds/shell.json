@@ -1,0 +1,21 @@
+{
+  "lifetime": {
+    "remount": true,
+    "callerUnchanged": true,
+    "oldListenerRemoved": true,
+    "suspendRestored": true
+  },
+  "panels": {
+    "desktopIndependent": true,
+    "compactExclusive": true,
+    "labels": true,
+    "keyboard": true,
+    "largeTargets": true,
+    "stablePhoneViewport": true,
+    "playRestoration": true,
+    "documentUnchanged": true,
+    "reducedMotion": true
+  },
+  "errors": [],
+  "requests": []
+}

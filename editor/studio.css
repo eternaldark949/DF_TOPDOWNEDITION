@@ -1,0 +1,602 @@
+/* Studio / layout and contextual editor surfaces. Shared palette and diamond controls
+   live in Penthouse; game rendering, documents and panel state never live in CSS. */
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+body {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) 34px;
+}
+header {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--ui-border);
+  background: linear-gradient(110deg, #101016, #1d122b);
+}
+header > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+h1 {
+  font:
+    23px Georgia,
+    serif;
+  letter-spacing: 0.07em;
+  margin: 0 auto 0 0;
+  white-space: nowrap;
+}
+header small {
+  font-size: 9px;
+}
+header button {
+  font-size: 12px;
+}
+#play {
+  border-color: var(--ui-gold);
+  color: #ffe2a0;
+}
+.projectbar {
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+#project-name {
+  margin-right: auto;
+  max-width: 260px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ui-muted);
+}
+#project {
+  max-width: 170px;
+}
+#scene {
+  max-width: 240px;
+}
+main {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  --directory-width: 224px;
+  --properties-width: 300px;
+  grid-template-columns: var(--directory-width) minmax(0, 1fr) var(
+      --properties-width
+    );
+  transition: grid-template-columns 0.22s ease;
+}
+main[data-directory-open="false"] {
+  --directory-width: 0px;
+}
+main[data-properties-open="false"] {
+  --properties-width: 0px;
+}
+aside {
+  min-width: 0;
+  padding: 20px 14px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: #79569b #15101c;
+  background: linear-gradient(120deg, #111017f7, #191122f7);
+  z-index: 4;
+}
+#library {
+  grid-column: 1;
+  border-right: 1px solid var(--ui-border);
+}
+#stage {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  container-type: size;
+  background: #0b0911;
+}
+#properties {
+  grid-column: 3;
+  grid-row: 1;
+  border-left: 1px solid var(--ui-border);
+}
+.dock-panel[data-panel-open="false"] {
+  visibility: hidden;
+  opacity: 0;
+  padding: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+aside > .eyebrow {
+  padding-right: 40px;
+  min-height: 24px;
+}
+h2 {
+  margin: 8px 0 18px;
+  overflow-wrap: anywhere;
+}
+h3 {
+  margin: 18px 0 10px;
+}
+main > .panel-control[data-side="left"] {
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+main > .panel-control[data-side="right"] {
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+main > .panel-control[data-side="left"][aria-expanded="true"] {
+  left: calc(var(--directory-width) - 54px);
+  top: 10px;
+  transform: none;
+}
+main > .panel-control[data-side="right"][aria-expanded="true"] {
+  top: 10px;
+  transform: none;
+}
+canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  outline: none;
+}
+#world {
+  cursor: crosshair;
+}
+body[data-navigation="orbit"] #world {
+  cursor: grab;
+}
+body[data-navigation="pan"] #world {
+  cursor: move;
+}
+.tools {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+}
+.tools > * {
+  pointer-events: auto;
+}
+.tool-strip,
+.navigation-strip,
+.rotation-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  background: #100d18ef;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+}
+.tools button,
+.tools select {
+  font-size: 11px;
+  padding: 7px 9px;
+}
+.tools #orbit,
+.tools #pan {
+  color: var(--ui-violet-bright);
+}
+.rotation-settings {
+  display: none;
+}
+.rotate-mode .rotation-settings {
+  display: flex;
+}
+#viewport-options {
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  background: #100d18ef;
+}
+#viewport-options > summary {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  min-height: 52px;
+  padding: 8px 12px;
+  color: var(--ui-violet-bright);
+  font-size: 11px;
+  list-style: none;
+}
+.view-options {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  width: min(290px, 100%);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  padding: 12px;
+  background: #15101ff5;
+  border: 1px solid #9165bb;
+  border-radius: 6px;
+  box-shadow: 0 12px 32px #0009;
+  max-height: max(70px, calc(100cqh - 170px));
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.view-options :is(button, select) {
+  font-size: 11px;
+}
+.view-options label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--ui-muted);
+}
+.view-options input {
+  width: 100%;
+  min-width: 0;
+}
+.view-label {
+  position: absolute;
+  bottom: 16px;
+  left: 18px;
+  display: flex;
+  gap: 16px;
+  pointer-events: none;
+  color: var(--ui-muted);
+  font: 10px monospace;
+  letter-spacing: 0.06em;
+}
+#tool-readout {
+  color: var(--ui-gold);
+}
+.directory-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+.directory-tabs button {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 4px;
+  font: 11px system-ui;
+}
+#hierarchy button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border-color: transparent;
+  border-left: 2px solid transparent;
+  border-radius: 0;
+  font: 12px monospace;
+}
+#hierarchy button[aria-pressed="true"] {
+  background: #d4a84b16;
+  border-left-color: var(--ui-gold);
+  color: #ffe2a0;
+}
+#hierarchy button[data-light="true"] {
+  color: #e1bb73;
+}
+body:not(.assets-open) #assets {
+  display: none;
+}
+body.assets-open #hierarchy {
+  display: none;
+}
+body:not(.materials-open) #materials {
+  display: none;
+}
+body.materials-open #hierarchy,
+body.materials-open #assets {
+  display: none;
+}
+#asset-search {
+  width: 100%;
+}
+.asset-hint,
+.note {
+  font-size: 12px;
+  color: var(--ui-muted);
+  line-height: 1.7;
+}
+.asset-card {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  margin: 6px 0;
+  padding: 10px;
+  min-height: 58px;
+}
+.asset-card > span:last-child {
+  min-width: 0;
+}
+.asset-card strong {
+  display: block;
+  font: 12px system-ui;
+}
+.asset-card small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 10px monospace;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ui-muted);
+  margin-top: 5px;
+}
+.asset-swatch {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  border: 1px solid #ffffff50;
+  transform: rotate(45deg);
+  border-radius: 2px;
+}
+.asset-card:hover .asset-swatch {
+  box-shadow: 0 0 12px #a469ff60;
+}
+#material-list {
+  display: grid;
+  gap: 6px;
+}
+#selection-id {
+  font: 11px monospace;
+  color: var(--ui-violet-bright);
+  overflow-wrap: anywhere;
+}
+fieldset {
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+  margin: 16px 0 0;
+  padding: 12px 0;
+  display: flex;
+  gap: 7px;
+  min-width: 0;
+}
+legend {
+  font-size: 12px;
+  color: #e4c995;
+  padding: 0 6px 0 0;
+}
+fieldset label {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--ui-muted);
+  font-size: 11px;
+  min-width: 0;
+}
+fieldset input {
+  width: 100%;
+  padding: 7px;
+  font: 12px monospace;
+}
+.material-field {
+  display: grid;
+  gap: 7px;
+  margin: 12px 0;
+  color: var(--ui-muted);
+  font-size: 12px;
+}
+.material-field :is(input, select) {
+  width: 100%;
+  min-width: 0;
+}
+#fields [data-material] {
+  border-top: 1px solid var(--ui-border);
+}
+#fields [data-material-action] {
+  width: 100%;
+  margin: 12px 0;
+}
+footer {
+  min-width: 0;
+  padding: 8px 14px;
+  background: #100d16;
+  border-top: 1px solid var(--ui-border);
+  font: 11px system-ui;
+  color: var(--ui-muted);
+  display: flex;
+  gap: 12px;
+}
+#status {
+  margin-right: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#error {
+  position: absolute;
+  bottom: 40px;
+  left: 20px;
+  right: 20px;
+  padding: 16px;
+  background: #482532;
+  border: 1px solid #efa3b8;
+  z-index: 10;
+  cursor: pointer;
+}
+#controls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+#controls > * {
+  pointer-events: auto;
+}
+.engine-joystick {
+  position: absolute;
+  left: 25px;
+  bottom: 30px;
+  border: 1px solid #d4a84b88;
+  border-radius: 50%;
+  background: #171021b0;
+  touch-action: none;
+  display: grid;
+  place-items: center;
+}
+.engine-joystick span {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid #d4a84b88;
+  background: #d4a84b44;
+  pointer-events: none;
+}
+.engine-action {
+  position: absolute;
+  right: 25px;
+  bottom: 40px;
+  border-radius: 50%;
+  padding: 0;
+  font-size: 12px;
+}
+.etrnl-profiler:not([open]) {
+  display: none;
+}
+body.playing .tools,
+body.playing .view-label {
+  display: none;
+}
+@media (max-width: 760px) {
+  header {
+    padding: 10px;
+  }
+  header > div {
+    gap: 5px;
+  }
+  h1 {
+    font-size: 18px;
+    letter-spacing: 0.03em;
+  }
+  header small {
+    font-size: 8px;
+  }
+  header button {
+    font-size: 11px;
+    padding: 7px;
+  }
+  .projectbar {
+    gap: 5px;
+    margin-top: 8px;
+  }
+  #project-name {
+    display: none;
+  }
+  #project {
+    width: 92px;
+  }
+  #scene {
+    width: 130px;
+  }
+  .projectbar :is(button, select) {
+    font-size: 11px;
+    padding: 6px;
+  }
+  main {
+    display: block;
+    --drawer-width: min(340px, calc(100% - 120px));
+  }
+  #stage {
+    width: 100%;
+    height: 100%;
+  }
+  #library,
+  #properties {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: var(--drawer-width);
+    padding: 18px 14px;
+    transition:
+      transform 0.22s ease,
+      opacity 0.22s ease,
+      visibility 0.22s;
+    box-shadow: 0 0 35px #000b;
+  }
+  #library {
+    left: 0;
+  }
+  #properties {
+    right: 0;
+  }
+  #library[data-panel-open="false"] {
+    transform: translateX(-100%);
+  }
+  #properties[data-panel-open="false"] {
+    transform: translateX(100%);
+  }
+  main > .panel-control[data-side="left"][aria-expanded="true"] {
+    left: calc(var(--drawer-width) - 54px);
+  }
+  .tools {
+    left: 8px;
+    right: 8px;
+    top: 8px;
+    gap: 4px;
+  }
+  .tool-strip,
+  .navigation-strip {
+    gap: 3px;
+    padding: 3px;
+  }
+  .tools button {
+    font-size: 11px;
+    padding: 6px 8px;
+  }
+  .tools > #viewport-options {
+    margin-left: auto;
+  }
+  #viewport-options > summary {
+    min-height: 50px;
+    padding: 7px 10px;
+  }
+  .tool-strip #duplicate,
+  .tool-strip #delete {
+    font-size: 0;
+    width: 44px;
+    padding: 5px;
+  }
+  .tool-strip #duplicate::before {
+    content: "⧉";
+    font-size: 18px;
+  }
+  .tool-strip #delete::before {
+    content: "⌫";
+    font-size: 18px;
+  }
+  .view-label {
+    bottom: 12px;
+    left: 14px;
+    gap: 10px;
+    font-size: 9px;
+  }
+  #metrics {
+    display: none;
+  }
+  footer {
+    padding: 8px 10px;
+    font-size: 10px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  main,
+  #library,
+  #properties {
+    transition: none !important;
+  }
+}

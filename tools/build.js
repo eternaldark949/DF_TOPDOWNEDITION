@@ -6,6 +6,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { embedStyles } from './styles-module.js';
 import { embedJSON } from './json-module.js';
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
@@ -51,7 +52,8 @@ for(const [folder,name] of [['examples/atrium','Atrium'],['editor','Studio'],['g
  modules.clear();visiting.clear();
  await bundle(resolve(root,folder,'main.js'));
  const code=[...modules.values()].map(m=>m.code).join('\n');
- let html=await readFile(resolve(root,folder,'index.html'),'utf8');
+ const entry=resolve(root,folder,'index.html');
+ let html=await embedStyles(await readFile(entry,'utf8'),entry,root);
  html=html.replace('<script type="module" src="./main.js"></script>',()=>`<script type="module">\n${code.replace(/<\/script/gi,'<\\/script')}\n</script>`);
  await writeFile(resolve(root,`dist/ETRNLNINE-${name}.html`),html);
  console.log(`Built ${modules.size} modules into dist/ETRNLNINE-${name}.html (${Buffer.byteLength(html)} bytes).`);

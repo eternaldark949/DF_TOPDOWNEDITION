@@ -1,0 +1,9 @@
+
+> test:studio-shell
+> node tests/studio-shell-browser.cjs
+
+Shell: startup / offline styles / ownership
+Shell: desktop collapse / expand
+Shell: compact panels / stable viewport
+Shell: Play restoration
+Studio diamond shell acceptance passed

@@ -140,7 +140,7 @@ const server = http.createServer((req, res) => {
     );
     // Real touch streams: pinch/pan while a placement tool is armed must create no placement.
     await p.setViewportSize({ width: 412, height: 892 });
-    await p.locator("#mobile-library").click();
+    await p.locator("[data-panel-toggle=directory]").click();
     await p.locator("#show-assets").click();
     await p.locator(".asset-card").first().click();
     r = await p.locator("#world").boundingBox();
@@ -169,9 +169,10 @@ const server = http.createServer((req, res) => {
     );
     assert.deepEqual(await data(), authored);
     // A second finger rolls back a real, already-previewed object Move gesture.
-    await p.locator("#mobile-library").click();
+    await p.locator("[data-panel-toggle=directory]").click();
     await p.locator("#show-hierarchy").click();
     await p.locator(`#hierarchy [data-id="${selected}"]`).click();
+    await p.locator("[data-panel-toggle=properties]").click();
     await p.locator("#viewport-options").evaluate((e) => (e.open = true));
     await p.locator("#view").selectOption("top");
     await p.locator("#frame-selected").click();

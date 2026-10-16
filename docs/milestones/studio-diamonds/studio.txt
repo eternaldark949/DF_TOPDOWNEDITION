@@ -1,0 +1,8 @@
+
+> test:studio
+> node tests/studio-browser.cjs
+
+Studio: numeric edit / undo / redo
+Studio: export / valid reload / invalid import isolation
+Studio: recovery / walk / four clean Play-Stop cycles
+Studio browser acceptance passed

@@ -16,6 +16,7 @@ const server=http.createServer((_req,res)=>{res.setHeader('Content-Type','text/h
  const guard=()=>{const original=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(kind,...args){if(kind==='2d')throw new Error('Canvas2D forbidden');return original.call(this,kind,...args);};if(typeof OffscreenCanvas!=='undefined'){const get=OffscreenCanvas.prototype.getContext;OffscreenCanvas.prototype.getContext=function(kind,...args){if(kind==='2d')throw new Error('Offscreen Canvas2D forbidden');return get.call(this,kind,...args);};}};
  await page.evaluate(guard);const requests=[],network=r=>requests.push(r.url());page.on('request',network);
  await page.setContent(html);await page.waitForFunction(()=>document.querySelector('#status').dataset.buffers==='4');assert.equal(await page.locator('#error').isVisible(),false);
+ await page.locator('[data-panel-toggle=properties]').click();
  const initialID=await page.locator('#selection-id').textContent();const input=()=>page.getByLabel('Position X',{exact:true});const original=Number(await input().inputValue());
  await input().fill('');await input().press('Enter');await page.waitForFunction(()=>!document.querySelector('#error').hidden);await page.locator('#error').click();assert.equal(Number(await input().inputValue()),original);
  await input().fill(String(original+2));await input().press('Enter');await page.waitForFunction(()=>!document.querySelector('#undo').disabled);
@@ -23,7 +24,7 @@ const server=http.createServer((_req,res)=>{res.setHeader('Content-Type','text/h
  await page.locator('#redo').click();assert.equal(Number(await input().inputValue()),original+2);
  console.log('Studio: numeric edit / undo / redo');
  // Mobile hierarchy opens independently; selecting a light changes the shared inspector context.
- await page.locator('#mobile-library').click();await page.locator('#hierarchy [data-id="light:5"]').click();const radius=page.getByLabel('Radius',{exact:true});await radius.fill('14');await radius.press('Enter');await page.locator('#undo').click();assert.equal(await radius.inputValue(),'10');await page.locator('#redo').click();assert.equal(await radius.inputValue(),'14');
+ await page.locator('[data-panel-toggle=directory]').click();await page.locator('#hierarchy [data-id="light:5"]').click();const radius=page.getByLabel('Radius',{exact:true});await radius.fill('14');await radius.press('Enter');await page.locator('#undo').click();assert.equal(await radius.inputValue(),'10');await page.locator('#redo').click();assert.equal(await radius.inputValue(),'14');
  const exportProject=async()=>{const event=page.waitForEvent('download');await page.locator('#save').click();const download=await event;return JSON.parse(fs.readFileSync(await download.path(),'utf8'));};
  const saved=await exportProject();assert.equal(saved.scenes[0].entities.find(e=>e.id===initialID).position[0],original+2);assert.equal(saved.scenes[0].lights[5].radius,14);
  const importProject=async data=>{await page.locator('#file').setInputFiles({name:'project.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(data))});};
@@ -31,8 +32,9 @@ const server=http.createServer((_req,res)=>{res.setHeader('Content-Type','text/h
  await importProject(saved);await page.waitForFunction(id=>document.querySelector('#selection-id').textContent===id,initialID);assert.equal(Number(await input().inputValue()),original+2);
  console.log('Studio: export / valid reload / invalid import isolation');
  // A cancelled captured move must restore data and leave no undo command.
- await page.locator('#mobile-properties').click();await page.locator('#viewport-options').evaluate(e=>e.open=true);await page.locator('#view').selectOption('top');await page.locator('#viewport-options').evaluate(e=>e.open=false);await page.locator('#move').click();const rect=await page.locator('#world').boundingBox(),e=saved.scenes[0].entities.find(e=>e.id===initialID);
- const x=rect.x+rect.width/2+e.position[0]*rect.height/48,y=rect.y+rect.height/2-e.position[1]*rect.height/48;
+ await page.locator('[data-panel-toggle=properties]').click();await page.locator('#viewport-options').evaluate(e=>e.open=true);await page.locator('#view').selectOption('top');await page.locator('#viewport-options').evaluate(e=>e.open=false);await page.locator('#move').click();const rect=await page.locator('#world').boundingBox(),e=saved.scenes[0].entities.find(e=>e.id===initialID);
+ const camera=JSON.parse(await page.locator('#status').getAttribute('data-camera'));
+ const x=rect.x+rect.width/2+(e.position[0]-camera.x)*rect.height/(2*camera.halfHeight),y=rect.y+rect.height/2-(e.position[1]-camera.y)*rect.height/(2*camera.halfHeight);
  const revision=Number(await page.locator('#status').getAttribute('data-revision'));
  const touch=await context.newCDPSession(page);
  await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
@@ -51,10 +53,10 @@ const server=http.createServer((_req,res)=>{res.setHeader('Content-Type','text/h
  assert.equal((await exportProject()).scenes[0].entities.find(e=>e.id===initialID).position[0],original+2);
  await page.locator('#viewport-options').evaluate(e=>e.open=true);await page.locator('#view').selectOption('oblique');await page.locator('#viewport-options').evaluate(e=>e.open=false);
  // Real touch selection, then a numeric edit persisted in the same-origin recovery slot.
- await page.locator('#mobile-library').click();await page.locator(`#hierarchy [data-id="${initialID}"]`).tap();await input().fill(String(original+3));await input().press('Enter');
+ await page.locator('[data-panel-toggle=directory]').click();await page.locator(`#hierarchy [data-id="${initialID}"]`).tap();await input().fill(String(original+3));await input().press('Enter');
  await page.waitForFunction(()=>document.querySelector('#status').dataset.recovery==='stored');
  page.off('request',network);await page.goto(`http://127.0.0.1:${server.address().port}`);await page.evaluate(guard);page.on('request',network);
- await page.setContent(html);await page.waitForFunction(()=>document.querySelector('#status').dataset.buffers==='4');await page.locator('#recover').click();assert.equal(Number(await input().inputValue()),original+3);
+ await page.setContent(html);await page.waitForFunction(()=>document.querySelector('#status').dataset.buffers==='4');await page.locator('#recover').click();await page.locator('[data-panel-toggle=properties]').click();assert.equal(Number(await input().inputValue()),original+3);
  const rotation=page.getByLabel('Rotation Y',{exact:true});await rotation.fill('20');await rotation.press('Enter');
  const authored=await exportProject();assert.ok(Math.abs(authored.scenes[0].entities.find(e=>e.id===initialID).rotation[1])>.1);
  for(let i=0;i<4;i++){

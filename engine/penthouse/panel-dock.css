@@ -1,0 +1,64 @@
+/* Penthouse / diamond visuals and accessible hit areas. The application positions controls;
+   a small decorative diamond sits inside a full 44px native button. */
+.panel-control {
+  position: absolute;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 6px !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: 6px !important;
+  color: var(--ui-violet-bright, #ceadff) !important;
+  box-shadow: none;
+  touch-action: manipulation;
+}
+.panel-control[hidden] {
+  display: none;
+}
+.panel-control[data-side="right"] {
+  flex-direction: row-reverse;
+}
+.panel-diamond {
+  display: block;
+  flex: 0 0 13px;
+  width: 13px;
+  height: 13px;
+  transform: rotate(45deg);
+  background: var(--ui-violet, #a469ff);
+  border: 1px solid #dac2ff;
+  box-shadow:
+    0 0 12px #a469ff80,
+    0 0 24px #a469ff30;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+.panel-control:hover .panel-diamond,
+.panel-control:focus-visible .panel-diamond {
+  transform: rotate(45deg) scale(1.15);
+  box-shadow: 0 0 16px #a469ffb0;
+}
+.panel-control-label {
+  font: 12px system-ui;
+  white-space: nowrap;
+  padding: 4px 6px;
+  background: #16101fe8;
+  border: 1px solid #664480;
+  border-radius: 3px;
+}
+.panel-control[aria-expanded="true"] .panel-control-label {
+  display: none;
+}
+.panel-control[aria-expanded="true"] .panel-diamond {
+  background: transparent;
+  box-shadow: 0 0 9px #a469ff55;
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel-diamond {
+    transition: none;
+  }
+}

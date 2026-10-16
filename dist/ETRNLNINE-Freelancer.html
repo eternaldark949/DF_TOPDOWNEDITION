@@ -4144,7 +4144,7 @@ class AppearanceControls {
     try {
       const summary = document.createElement("summary");
       summary.textContent = title;
-      summary.style.cssText = "cursor:pointer;padding:10px 3px;color:#d9bb83";
+      summary.style.cssText = "cursor:pointer;padding:10px 3px;color:var(--ui-gold,#d9bb83)";
       this.element.append(summary);
       const body = document.createElement("div");
       body.style.cssText =
@@ -4156,9 +4156,9 @@ class AppearanceControls {
       const field = (key, label, input, owner = renderer.bloom) => {
         const wrap = document.createElement("label");
         wrap.style.cssText =
-          "display:grid;gap:5px;min-width:0;font:10px system-ui;color:#bca9c8";
+          "display:grid;gap:5px;min-width:0;font:11px system-ui;color:var(--ui-muted,#bca9c8)";
         wrap.append(document.createTextNode(label));
-        input.style.cssText = "width:100%;min-width:0;min-height:38px";
+        input.style.cssText = "width:100%;min-width:0;min-height:44px";
         input.setAttribute("aria-label", label);
         input.dataset[owner === renderer.bloom ? "bloom" : "presentation"] =
           key;
@@ -4198,7 +4198,7 @@ class AppearanceControls {
       const presetLabel = document.createElement("label");
       presetLabel.textContent = "Bloom look";
       presetLabel.style.cssText =
-        "grid-column:1/-1;display:grid;gap:5px;font:10px system-ui;color:#bca9c8";
+        "grid-column:1/-1;display:grid;gap:5px;font:11px system-ui;color:var(--ui-muted,#bca9c8)";
       this.preset = document.createElement("select");
       this.preset.setAttribute("aria-label", "Bloom look");
       this.preset.dataset.bloomPreset = "";
@@ -4256,7 +4256,7 @@ class AppearanceControls {
       }
       this.status = document.createElement("output");
       this.status.style.cssText =
-        "grid-column:1/-1;font:10px/1.6 system-ui;color:#a99bb6";
+        "grid-column:1/-1;font:11px/1.6 system-ui;color:var(--ui-muted,#a99bb6)";
       this.status.setAttribute("aria-live", "polite");
       body.append(this.status);
       host.append(this.element);
