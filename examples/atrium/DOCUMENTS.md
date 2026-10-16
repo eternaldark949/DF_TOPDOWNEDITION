@@ -1,12 +1,12 @@
 # Editing the Atrium project
 
-`project.json` is the authoritative version-one portable project. Edit it by hand, import it into Studio, or export a modified copy from Studio. JavaScript implements behavior; the JSON describes the world. Run `npm test` and `npm run build` after source edits. GitHub Actions also builds downloadable game and Studio HTML artifacts from this branch. After editing JSON directly on GitHub, download the Actions artifact for that commit: checked-in `dist/` files remain at their last committed build until explicitly rebuilt. CI does not rewrite repository files.
+`project.json` is the authoritative version-two portable project. Edit it by hand, import it into Studio, or export a modified copy from Studio. JavaScript implements behavior; the JSON describes the world. Run `npm test` and `npm run build` after source edits. GitHub Actions also builds downloadable game and Studio HTML artifacts from this branch. After editing JSON directly on GitHub, download the Actions artifact for that commit: checked-in `dist/` files remain at their last committed build until explicitly rebuilt. CI does not rewrite repository files.
 
 Strict JSON cannot contain comments. This guide and the property metadata in `engine/basement/properties.js` supply the explanations; do not add JavaScript expressions to the JSON.
 
 ## Package and identity
 
-The package has `schemaVersion: 1`, a stable `id`, a display `name`, `assets`, and `scenes`. This first milestone keeps dependencies together in **one portable package**, making phone import/export practical. Separate source documents and general dependency-graph loading remain future work. Both realms are embedded in the delivery HTML, but live worlds and GPU batches are constructed only when needed.
+The package has `schemaVersion: 2`, a stable `id`, a display `name`, `materials`, `assets`, and `scenes`. This first milestone keeps dependencies together in **one portable package**, making phone import/export practical. Separate source documents and general dependency-graph loading remain future work. Both realms are embedded in the delivery HTML, but live worlds and GPU batches are constructed only when needed.
 
 Authored entity, asset and scene IDs are persistent strings. Runtime `World` IDs are separate monotonic session identities. Undo, reload and Play must never write runtime identities back into the package. IDs must be unique within their table; asset references must resolve. Renaming an asset ID requires updating its placed references.
 
@@ -14,17 +14,17 @@ Authored entity, asset and scene IDs are persistent strings. Runtime `World` IDs
 
 An asset declares `id`, `name`, `generator: "toy.assembly"`, `generatorVersion: 1`, `parts`, and `colliders`. The explicitly registered generator version is checked during packaging and opening. Unsupported versions fail; no implicit migration changes existing geometry.
 
-Each part has a stable local `id`, `parent` (an earlier part index, or `null` for the instance anchor), local `position: [x,y,z]`, a unit `rotation: [x,y,z,w]`, and optional `shape`. A shape contains full `size: [width,depth,height]`, linear RGB `color`, `emission`, and optional Boolean `castShadow`/`ambientBlocker`. Parts form a parent-before-child tree; forward references and cycles are rejected. Planters, galleries, colonnades and lanterns are grouped assemblies. Identical planters and lamps share one source asset per realm while retaining independent placed transforms and runtime shapes.
+Each part has a stable local `id`, `parent` (an earlier part index, or `null` for the instance anchor), local `position: [x,y,z]`, a unit `rotation: [x,y,z,w]`, and optional `shape`. A shape contains full `size: [width,depth,height]`, a linked `material` ID, and optional Boolean `castShadow`/`ambientBlocker`. Parts form a parent-before-child tree; forward references and cycles are rejected. Planters, galleries, colonnades and lanterns are grouped assemblies. Identical planters and lamps share one source asset per realm while retaining independent placed transforms and runtime shapes.
 
 A scene entity places an asset using `id`, `name`, `asset`, `position`, `rotation`, positive uniform `scale`, and `locked`. `tag` identifies this example's `prop` and `lantern` interactions; the lantern asset contains a part named `crystal`. The `planter` tag selects the example’s initial inspector target. These are game/application conventions, not engine-wide names. Keep both tagged instances when using the Atrium Play behavior. Removing those conventions requires corresponding game behavior changes.
 
-Instance transforms affect only that placement. Editing an asset's parts deliberately affects its instances when the project is reopened. The initial asset browser is an inventory, not an asset geometry editor. Per-instance material overrides, reparent commands, seeds and migration tooling are future schema/editor work.
+Instance transforms affect only that placement. Editing an asset's parts deliberately affects its instances when the project is reopened. The initial asset browser is an inventory, not an asset geometry editor. Per-instance material overrides are editable now; reparent commands, seeds and general migration tooling remain future work. Version-one inline appearance has a specific validated ingress migration.
 
 ## Coordinates and properties
 
 World units are metres by convention: X/Y horizontal, Z elevation. Quaternions store full orientation; numeric XYZ rotation controls display degrees and compose Z × Y × X. Uniform instance scale prevents hidden hierarchy shear. Box dimensions can differ by axis, but there is no arbitrary nonuniform hierarchy scale.
 
-The inspector shares metadata, validation and controls between transforms and point lights. Arrow keys use each descriptor's increment; directly entered values may use any valid precision. A focus session or pointer drag is one undo command. Escape and cancelled touches restore the starting snapshot. The Move tool uses a horizontal construction plane; use Top or Oblique view, with optional 0.5 m / 1 m snapping. Vertical movement, full rotation and scale have numeric controls; rotation also has an interactive axis ring. Camera presets, horizontal orbit buttons, wheel and zoom buttons are available; perspective, free-flight navigation and translation-axis gizmos are future work.
+The inspector shares metadata, validation and controls between transforms, point lights and materials. Arrow keys use each descriptor's increment; directly entered values may use any valid precision. A focus session or pointer drag is one undo command. Escape and cancelled touches restore the starting snapshot. The Move tool uses a horizontal construction plane; use Top or Oblique view, with optional 0.5 m / 1 m snapping. Vertical movement, full rotation and scale have numeric controls; rotation also has an interactive axis ring. Camera presets, horizontal orbit buttons, wheel and zoom buttons are available; both orthographic and perspective lenses are available. Free-flight navigation and translation-axis gizmos remain future work.
 
 ## Environment and collision
 
@@ -66,3 +66,7 @@ Studio now also includes the [Freelancer street/vestibule slice](../../games/fre
 ## Viewport navigation and lights
 
 Studio now provides [shared camera controls](../../docs/decisions/0010-viewport-navigation.md): mouse/touch orbit, view-plane pan, pointer-anchored zoom, F/Home framing and Reset view. Camera view state is separate from authored JSON/history. The same record lists the currently editable light-object fields (XYZ, linear RGB 0–16, radius 0.1–100 m) and distinguishes engine-level shadow settings.
+
+## Linked materials
+
+The project-level `materials` table defines base colour and independent emission colour/strength. Each shaped part references a material ID. Placement `materialOverrides` can redirect individual parts without copying source geometry. Old version-one files migrate once on import/recovery; exports use version two. Use Studio’s Materials tab or the object inspector’s Surface part/Assigned material controls. [Current contract](../../docs/decisions/0013-presentation-and-materials.md).

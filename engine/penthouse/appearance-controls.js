@@ -1,20 +1,20 @@
-/** Penthouse / one reusable bloom control panel for any engine host.
+/** Penthouse / shared image/effect controls for any engine host.
  * App supplies the renderer, host and Lobby subscription. No game/editor IDs or scheduler.
  * Settings are viewport policy; this widget never mutates authored project data/history. */
 import { Lifetime } from "../basement/lifetime.js";
-export class BloomControls {
-  /** Labels and bounds correspond to the public Bloom API; caller owns this instance. */
+export class AppearanceControls {
+  /** Labels and bounds correspond to the public Presentation/Bloom APIs; caller owns this instance. */
   constructor({
     renderer,
     host,
     subscribe,
     onError = () => {},
-    title = "✧ Bloom & exposure",
+    title = "✧ Image & effects",
   }) {
     this.renderer = renderer;
     this.life = new Lifetime();
     this.element = document.createElement("details");
-    this.element.className = "engine-bloom";
+    this.element.className = "engine-appearance";
     this.element.style.cssText = "grid-column:1/-1;min-width:0";
     try {
       const summary = document.createElement("summary");
@@ -26,34 +26,39 @@ export class BloomControls {
         "display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px 2px";
       this.element.append(body);
       this.fields = {};
+      this.owners = {};
       /** One field factory: touch target, validation, app error policy and setting adoption are shared. */
-      const field = (key, label, input) => {
+      const field = (key, label, input, owner = renderer.bloom) => {
         const wrap = document.createElement("label");
         wrap.style.cssText =
           "display:grid;gap:5px;min-width:0;font:10px system-ui;color:#bca9c8";
         wrap.append(document.createTextNode(label));
         input.style.cssText = "width:100%;min-width:0;min-height:38px";
         input.setAttribute("aria-label", label);
-        input.dataset.bloom = key;
+        input.dataset[owner === renderer.bloom ? "bloom" : "presentation"] =
+          key;
         wrap.append(input);
         body.append(wrap);
         this.fields[key] = input;
-        input.value = renderer.bloom.settings[key];
+        this.owners[key] = owner;
+        input.value = owner.settings[key];
         this.life.listen(input, "change", () => {
           try {
-            renderer.bloom.configure({
+            if (key === "mode" && input.value !== "off")
+              renderer.presentation.configure({});
+            owner.configure({
               [key]: key === "mode" ? input.value : Number(input.value),
             });
             this.refreshStatus();
           } catch (error) {
-            input.value = renderer.bloom.settings[key];
+            input.value = owner.settings[key];
             onError(error);
           }
         });
       };
       const mode = document.createElement("select");
       for (const [value, label] of [
-        ["off", "Off · direct"],
+        ["off", "Off"],
         ["low", "Soft · 512 px"],
         ["high", "Fine · 1024 px"],
       ]) {
@@ -72,7 +77,12 @@ export class BloomControls {
         const input = document.createElement("input");
         input.type = "number";
         Object.assign(input, { min, max, step });
-        field(key, label, input);
+        field(
+          key,
+          label,
+          input,
+          key === "exposure" ? renderer.presentation : renderer.bloom,
+        );
       }
       this.status = document.createElement("output");
       this.status.style.cssText =
@@ -96,20 +106,28 @@ export class BloomControls {
   }
   /** Report actual quality/failure, never imply HDR is active merely because it was requested. */
   refreshStatus() {
-    const b = this.renderer.bloom.inspect();
+    const b = this.renderer.bloom.inspect(),
+      p = this.renderer.presentation.inspect();
     // Engine/application policies may configure bloom too; do not replace in-progress typing.
     for (const [key, input] of Object.entries(this.fields))
-      if (document.activeElement !== input && input.value !== String(b[key]))
-        input.value = b[key];
-    this.status.dataset.effective = b.effectiveMode;
-    this.status.dataset.bytes = b.targetBytes;
-    this.status.textContent = b.failure
-      ? `Direct rendering · ${b.failure}`
-      : b.mode === "off"
-        ? "Direct rendering · bloom off"
-        : b.effectiveMode === "off"
-          ? "Preparing HDR…"
-          : `HDR · ${b.samples}× MSAA · ${b.levels} scales · ${b.passes} passes · ${(b.targetBytes / 1048576).toFixed(1)} MiB estimated`;
+      if (
+        document.activeElement !== input &&
+        input.value !== String(this.owners[key].settings[key])
+      )
+        input.value = this.owners[key].settings[key];
+    this.status.dataset.effective =
+      p.effectiveMode === "hdr" && !b.failure ? b.mode : "off";
+    this.status.dataset.bytes = b.targetBytes + p.targetBytes;
+    this.status.textContent =
+      (p.failure ?? b.failure)
+        ? `${p.effectiveMode === "hdr" ? "HDR · bloom unavailable" : "Direct rendering"} · ${p.failure ?? b.failure}`
+        : b.mode === "off"
+          ? `${p.effectiveMode === "hdr" ? "HDR" : "Direct rendering"} · bloom off`
+          : p.effectiveMode !== "hdr"
+            ? p.mode === "direct"
+              ? "Direct rendering · effects bypassed"
+              : "Preparing HDR…"
+            : `HDR · ${p.samples}× MSAA · ${b.levels} scales · ${b.passes + p.passes} passes · ${((b.targetBytes + p.targetBytes) / 1048576).toFixed(1)} MiB estimated`;
   }
   /** Unsubscribe before removing DOM; repeated disposal is safe. */
   dispose() {

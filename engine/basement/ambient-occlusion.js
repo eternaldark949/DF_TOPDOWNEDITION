@@ -3,9 +3,10 @@
  * No scheduling, world ownership or game policy lives here. Renderer invokes the passes
  * with its existing retained batch. Screen targets are lazy and freed when leaving screen.
  */
+import { FULLSCREEN_VERTEX } from './fullscreen-shaders.js';
 import { createProgram } from './gl-program.js';
 import { VERTEX } from './shaders.js';
-import { NORMAL_FRAGMENT, FULLSCREEN_VERTEX, SSAO_FRAGMENT } from './occlusion-shaders.js';
+import { NORMAL_FRAGMENT,  SSAO_FRAGMENT } from './occlusion-shaders.js';
 
 /** Validate atomically; world lengths and strengths must never become NaN shader uniforms. */
 export function occlusionSettings(previous, patch = {}) {

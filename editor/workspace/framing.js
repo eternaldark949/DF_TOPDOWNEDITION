@@ -3,6 +3,7 @@
 import { worldBounds } from "../../engine/basement/asset-bounds.js";
 /** Frame the complete placed hierarchy, or the point light's actual influence radius. */
 export function selectedBounds(session) {
+  if(session.selectionKind==='material')return null;
   const item = session.preview?.instance.instances.get(session.selected);
   if (item)
     return worldBounds(

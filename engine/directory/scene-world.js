@@ -30,6 +30,7 @@ export function sceneWorldFactory(
               scene,
             ),
             grid = new SpatialGrid(4);
+          life.own(()=>instance.dispose());
           grid.rebuild(instance.colliders);
           life.own(() => grid.clear());
           world.snapshot();

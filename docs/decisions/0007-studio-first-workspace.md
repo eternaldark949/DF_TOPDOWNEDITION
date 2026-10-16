@@ -1,5 +1,7 @@
 # First Studio workspace and portable Atrium
 
+**Material/presentation update:** [decision 0013](0013-presentation-and-materials.md) supersedes the inline-appearance/schema and bloom-owned HDR/exposure descriptions below.
+
 **Perspective update:** [decision 0011](0011-perspective-camera.md) adds the shared perspective lens, depth-correct AO/picking/guides and complete pose restoration. Camera limitations below describe the earlier milestone.
 
 Implemented 2026-10-16 following the owner's green light. This record supersedes the implementation-status statements in decision 0006; its broader universal-tool and 3D-engine ambitions remain the roadmap.

@@ -2,6 +2,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { Bloom } from "../engine/basement/bloom.js";
+import { HdrTargets } from "../engine/basement/hdr-targets.js";
+import { Presentation } from "../engine/basement/presentation.js";
 import { BloomTargets } from "../engine/basement/bloom-targets.js";
 import {
   bloomDimensions,
@@ -28,9 +30,7 @@ test("Bloom settings validate atomically, mode off is allocation-free, disposal 
     assert.equal(b.settings, before);
   }
   assert.equal(b.ensure(), false);
-  const dark = b.background.slice();
-  b.configure({ exposure: 2 });
-  b.background.forEach((v, i) => assert.ok(v > dark[i]));
+  assert.throws(() => b.configure({ exposure: 2 }), RangeError);
   assert.equal(b.inspect().targetBytes, 0);
   b.dispose();
   b.dispose();
@@ -45,7 +45,7 @@ test("Bloom pyramid has bounded quality/aspect/storage, including 1-pixel target
   assert.deepEqual(high[0], { width: 1024, height: 576 });
   assert.deepEqual(bloomDimensions(1, 1, "high"), [{ width: 1, height: 1 }]);
   assert.deepEqual(bloomDimensions(800, 600, "off"), []);
-  assert.equal(bloomStorage(1, 1, [{ width: 1, height: 1 }], 4), 68);
+  assert.equal(bloomStorage([{ width: 1, height: 1 }]), 8);
   for (const d of bloomDimensions(100, 900, "low"))
     assert.ok(d.width >= 1 && d.height >= 1);
 });
@@ -86,9 +86,9 @@ function targetGL(refuseAt = Infinity) {
   return { gl, counts };
 }
 test("HDR target refusal releases every partial texture/FBO/renderbuffer and successful disposal is idempotent", () => {
-  for (const stage of [1, 2, 5, 12]) {
+  for (const stage of [1, 2]) {
     const { gl, counts } = targetGL(stage);
-    assert.throws(() => new BloomTargets(gl, 512, 384, "low"), /incomplete/);
+    assert.throws(() => new HdrTargets(gl, 512, 384), /incomplete/);
     assert.deepEqual(counts, {
       textures: 0,
       framebuffers: 0,
@@ -96,9 +96,11 @@ test("HDR target refusal releases every partial texture/FBO/renderbuffer and suc
     });
   }
   const { gl, counts } = targetGL();
-  const t = new BloomTargets(gl, 512, 384, "low");
+  const t = new HdrTargets(gl, 512, 384);
   assert.equal(t.samples, 4);
-  assert.ok(counts.textures > 2);
+  assert.equal(counts.textures, 2);
+  const pyramid = new BloomTargets(gl, 512, 384, "low");
+  pyramid.dispose();
   t.dispose();
   t.dispose();
   assert.deepEqual(counts, { textures: 0, framebuffers: 0, renderbuffers: 0 });
@@ -110,17 +112,17 @@ test("Unsupported HDR latches fallback without repeated allocation until explici
     calls++;
     return null;
   };
-  const b = new Bloom(
+  const b = new Presentation(
     { gl, stats: { programs: 0 }, canvas: { width: 320, height: 240 } },
-    { mode: "low" },
+    { mode: "hdr" },
   );
-  assert.equal(b.ensure(), false);
-  assert.equal(b.ensure(), false);
+  assert.equal(b.prepare(false), false);
+  assert.equal(b.prepare(false), false);
   assert.equal(calls, 1);
   assert.match(b.inspect().failure, /HDR/);
   assert.deepEqual(counts, { textures: 0, framebuffers: 0, renderbuffers: 0 });
-  b.configure({ strength: 0.7 });
-  assert.equal(b.ensure(), false);
+  b.configure({ exposure: 2 });
+  assert.equal(b.prepare(false), false);
   assert.equal(calls, 2);
   b.dispose();
 });

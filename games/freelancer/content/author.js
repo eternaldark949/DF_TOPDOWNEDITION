@@ -6,7 +6,7 @@ import { writeFile } from "node:fs/promises";
 import { ArchitecturalParts } from "../../../engine/penthouse/architectural-parts.js";
 import { strokeLettering } from "../../../engine/penthouse/stroke-lettering.js";
 import { multiplyRotation } from "../../../engine/basement/rotation.js";
-import { validateProject } from "../../../engine/basement/project.js";
+import { validateProject, upgradeProject } from "../../../engine/basement/project.js";
 import { ASSEMBLY_GENERATORS } from "../../../engine/penthouse/assembly.js";
 
 // Linear RGB: rose masonry, champagne metal, midnight framing and honey-lit displays.
@@ -702,13 +702,14 @@ const interior = {
     },
   ],
 };
-const project = {
+const legacyProject = {
   schemaVersion: 1,
   id: "freelancer.enni-slice.v1",
   name: "Freelancer · Enni Cole",
   assets,
   scenes: [street, interior],
 };
+const project=upgradeProject(legacyProject);
 validateProject(project, { generators: ASSEMBLY_GENERATORS });
 await writeFile(
   new URL("./project.json", import.meta.url),

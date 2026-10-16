@@ -23,7 +23,7 @@ export function applyLight(resource) {
   const {state,profile,layout}=resource;
   const cool=state.cool;
   const variant=profile.lightVariants[cool?'cool':'warm'];
-  layout.crystal.shape.color=[...variant.crystal];
+  layout.crystal.shape.material.baseColor=[...variant.crystal];layout.crystal.shape.material.emissionColor=[...variant.crystal];
   resource.lightColors.set(variant.irradiance,15);
 }
 
@@ -41,6 +41,7 @@ export function worldFactory(engine, profile, id, project=ATRIUM_PROJECT) {
       if(saved.version!==1 || typeof saved.cool!=='boolean' || !Number.isFinite(saved.crystalYaw)
         || !Number.isFinite(saved.propX))throw new Error('Unsupported world snapshot');
       const layout=yield* buildLayout(engine,world,profile,project);
+      life.own(()=>layout.instance.dispose());
       layout.crystal.yaw=saved.crystalYaw; layout.prop.x=saved.propX; layout.propCollider.x=saved.propX;
       world.snapshot(); world.resolve();
       const lease=engine.directory.acquire(`batch:${world.id}`,()=>engine.basement.renderer.createBatch(world),{owner:`realm:${profile.key}/${world.id}`});

@@ -1,7 +1,7 @@
 /**
  * Basement / renderer: WebGL 2 instancing with owned GPU batches and retained storage.
  * Cube geometry/program belong to the renderer; each world batch belongs to a lease.
- * 16 float instance record: position/pad, dimensions/emission, color/highlight, quaternion.
+ * Lit record: 20 floats (80 bytes): pose, dimensions, base colour/highlight, quaternion, emission RGB. Shadow records remain 16 floats (64 bytes), independent of materials.
  * Only changed contiguous instance ranges are uploaded after the initial allocation.
  */
 import { VERTEX, FRAGMENT } from './shaders.js';
@@ -12,6 +12,7 @@ import { createProgram } from './gl-program.js';
 import { AmbientOcclusion } from './ambient-occlusion.js';
 import { Lighting } from './lighting.js';
 import { LineRendering } from './lines.js';
+import { Presentation } from './presentation.js';
 import { Bloom } from './bloom.js';
 import { Camera } from './camera.js';
 
@@ -36,7 +37,7 @@ function cubeGeometry() {
 
 export class Renderer {
   /** Own the supplied surface's WebGL context. pixelRatio caps mobile fill cost. */
-  constructor(canvas, { pixelRatio = 1.5, profiler = null, occlusion = {}, lighting = {}, bloom = {} } = {}) {
+  constructor(canvas, { pixelRatio = 1.5, profiler = null, occlusion = {}, lighting = {}, bloom = {}, presentation = {} } = {}) {
     this.profiler=profiler; this.canvas = canvas; this.pixelRatio = pixelRatio; this.life = new Lifetime();
     const gl = canvas.getContext('webgl2', { alpha: false, antialias: true, powerPreference: 'low-power' });
     if (!gl) throw new Error('ETRNLNINE requires WebGL 2 on this device.');
@@ -52,11 +53,12 @@ export class Renderer {
       this.lineScope=profiler?.scope('renderer.lines');
       this.occlusion=new AmbientOcclusion(this,occlusion);
       this.occlusionScope=profiler?.scope('renderer.ambientOcclusion');
+      this.presentation=new Presentation(this,presentation);this.presentationScope=profiler?.scope('renderer.presentation');
       this.bloom=new Bloom(this,bloom);this.bloomScope=profiler?.scope('renderer.bloom');
       this.gpuTimer=new GpuTimer(gl,(id,ms)=>this.profiler?.recordGpu(id,ms));
       this.life.own(renderDiagnostics(this,profiler));
       this.life.listen(canvas, 'webglcontextlost', event => {
-        event.preventDefault(); this.lost = true; this.gpuTimer.invalidate(); this.lines.invalidate(); this.occlusion.invalidate(); this.lighting.invalidate();this.bloom.invalidate();
+        event.preventDefault(); this.lost = true; this.gpuTimer.invalidate(); this.lines.invalidate(); this.occlusion.invalidate(); this.lighting.invalidate();this.bloom.invalidate();this.presentation.invalidate();
       });
       this.life.listen(canvas, 'webglcontextrestored', () => {
         // Browser invalidates all old handles on loss. Recreate from retained CPU data,
@@ -70,7 +72,7 @@ export class Renderer {
     } catch(error) {
       // Metric-budget/capability failure may occur after GL creation. Constructor
       // failure must release real handles even though no caller received this renderer.
-      this.life.dispose();this.lines?.dispose();this.gpuTimer?.dispose();this.occlusion?.dispose();this.lighting?.dispose();this.bloom?.dispose();
+      this.life.dispose();this.lines?.dispose();this.gpuTimer?.dispose();this.occlusion?.dispose();this.lighting?.dispose();this.bloom?.dispose();this.presentation?.dispose();
       if(this.cube)gl.deleteBuffer(this.cube);if(this.program)gl.deleteProgram(this.program);
       throw error;
     }
@@ -143,7 +145,7 @@ export class Renderer {
       const token=layers.length?this.profiler?.begin(this.lineScope):null;
       try{for(const layer of layers){if(layer.renderer!==this)throw new Error('Guide belongs to another renderer');layer.draw();}}
       finally{if(layers.length)this.profiler?.end(token);}
-    } finally { if(this.bloom.ready)this.bloom.reset();this.gpuTimer.end(); }
+    } finally { if(this.presentation.ready)this.presentation.reset();this.gpuTimer.end(); }
   }
 
   /** Submit a frame; all worlds use the same retained renderer and accounting path. */
@@ -153,8 +155,8 @@ export class Renderer {
     const gl = this.gl; this.view();
     this.stats.draws = this.stats.instances = this.stats.uploads = this.stats.uploadedBytes = 0;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    gl.clearColor(this.bloom.background[0],this.bloom.background[1],this.bloom.background[2],1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    if (!batch || batch.disposed) {this.bloom.ready=false;this.bloom.passes=0;this.occlusion.count=this.occlusion.candidates=0;this.lighting.clearWorld();return;}
+    gl.clearColor(this.presentation.background[0],this.presentation.background[1],this.presentation.background[2],1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    if (!batch || batch.disposed) {this.bloom.ready=false;this.bloom.passes=0;this.presentation.ready=false;this.presentation.passes=0;this.occlusion.count=this.occlusion.candidates=0;this.lighting.clearWorld();return;}
     if (batch.renderer !== this) throw new Error('Batch belongs to another renderer');
     batch.sync();
     const shadowToken=this.profiler?.begin(this.shadowScope);
@@ -163,11 +165,11 @@ export class Renderer {
     let screenReady;
     try {screenReady=this.occlusion.prepare(batch);}
     finally {this.profiler?.end(aoToken);}
-    const bloomToken=this.profiler?.begin(this.bloomScope);
+    const presentationToken=this.profiler?.begin(this.presentationScope);
     let hdr;
-    try{hdr=this.bloom.ensure();this.bloom.begin();}finally{this.profiler?.end(bloomToken);}
+    try{hdr=this.presentation.prepare(this.bloom.settings.mode!=='off');this.presentation.begin();if(!hdr)this.bloom.deactivate();}finally{this.profiler?.end(presentationToken);}
     gl.useProgram(this.program);
-    gl.uniform1i(this.uniforms.uLinearOutput,hdr?1:0);gl.uniform1f(this.uniforms.uExposure,this.bloom.settings.exposure);
+    gl.uniform1i(this.uniforms.uLinearOutput,hdr?1:0);gl.uniform1f(this.uniforms.uExposure,this.presentation.settings.exposure);
     this.occlusion.bind(this.uniforms,screenReady);
     gl.uniformMatrix4fv(this.uniforms.uViewProjection,false,this.camera.matrix);
     this.lighting.bind(this.uniforms);
@@ -176,14 +178,17 @@ export class Renderer {
     gl.bindVertexArray(null);
     this.stats.draws++; this.stats.instances += batch.count;
     this.totals.draws++;this.totals.instances+=batch.count;
-    const finishToken=this.profiler?.begin(this.bloomScope);
-    try{this.bloom.finish();}finally{this.profiler?.end(finishToken);}
+    if(hdr){
+      const resolveToken=this.profiler?.begin(this.presentationScope);try{this.presentation.resolve();}finally{this.profiler?.end(resolveToken);}
+      const filterToken=this.profiler?.begin(this.bloomScope);let additive;try{additive=this.bloom.render(this.presentation.targets.scene.texture);}finally{this.profiler?.end(filterToken);}
+      const composeToken=this.profiler?.begin(this.presentationScope);try{this.presentation.compose(additive,this.bloom.settings.strength);}finally{this.profiler?.end(composeToken);}
+    }
   }
 
   /** Release renderer and outstanding batches, with listeners removed before late restoration. */
   dispose() {
     if (this.disposed) return;
-    this.disposed = true; this.life.dispose(); this.lines.dispose(); this.gpuTimer.dispose(); this.occlusion.dispose(); this.lighting.dispose();this.bloom.dispose();
+    this.disposed = true; this.life.dispose(); this.lines.dispose(); this.gpuTimer.dispose(); this.occlusion.dispose(); this.lighting.dispose();this.bloom.dispose();this.presentation.dispose();
     for (const batch of [...this.batches]) batch.dispose();
     this.gl.deleteBuffer(this.cube); this.gl.deleteProgram(this.program);
     this.stats.buffers = this.stats.programs = this.stats.vaos = 0;
@@ -201,8 +206,9 @@ class InstanceBatch {
     if(!['camera','shadow'].includes(visibility))throw new RangeError('Invalid instance visibility policy');
     this.visibility=visibility;this.version=0;
     this.renderer = renderer; this.world = world; this.capacity = capacity;
-    this.data = new Float32Array(capacity * 16);
+    this.data = new Float32Array(capacity * (visibility==='camera'?20:16));
     this.kind=visibility==='shadow'?'shadow-instance-buffer':'instance-buffer';this.cpuBytes=this.data.byteLength;this.gpuBufferBytes=this.data.byteLength;
+    this.recordFloats=visibility==='camera'?20:16;
     this.count = 0; this.disposed = false;
     this.initialize();
   }
@@ -219,9 +225,9 @@ class InstanceBatch {
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
     gl.bufferData(gl.ARRAY_BUFFER, this.data.byteLength, gl.DYNAMIC_DRAW);
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < (this.visibility==='camera'?5:4); i++) {
       const location = i + 2;
-      gl.enableVertexAttribArray(location); gl.vertexAttribPointer(location, 4, gl.FLOAT, false, 64, i * 16);
+      gl.enableVertexAttribArray(location); gl.vertexAttribPointer(location, 4, gl.FLOAT, false, this.recordFloats*4, i * 16);
       gl.vertexAttribDivisor(location, 1);
     }
     gl.bindVertexArray(null); this.forceUpload = true;
@@ -250,16 +256,17 @@ class InstanceBatch {
       // Sphere is conservative under any orientation. Shadow membership ignores the lens.
       const radius = Math.hypot(...s.size)*p.scale;
       if (this.visibility==='camera'&&!r.camera.sphereVisible(p.x,p.y,p.z,radius)) {r.totals.culled++;continue;}
-      if (this.cursor / 16 >= this.capacity) throw new Error(`World ${this.world.id} exceeds ${this.capacity} ${this.visibility} instances`);
+      if (this.cursor / this.recordFloats >= this.capacity) throw new Error(`World ${this.world.id} exceeds ${this.capacity} ${this.visibility} instances`);
       this.write(p.x); this.write(p.y); this.write(p.z); this.write(0);
       this.write(s.size[0]*p.scale); this.write(s.size[1]*p.scale); this.write(s.size[2]*p.scale);
       // Depth-only records ignore material changes, so recoloring does not invalidate maps.
-      this.write(this.visibility==='camera'?(s.emission??0):0);
-      for(let i=0;i<3;i++)this.write(this.visibility==='camera'?s.color[i]:0);
+      this.write(0);
+      for(let i=0;i<3;i++)this.write(this.visibility==='camera'?s.material.baseColor[i]:0);
       this.write(this.visibility==='camera'?(entity.highlight??0):0);for(let i=0;i<4;i++)this.write(p.rotation[i]);
+      if(this.visibility==='camera'){for(let i=0;i<3;i++)this.write(s.material.emissionColor[i]*s.material.emissionStrength);this.write(0);}
     }
-    if(this.count!==this.cursor/16||this.lastDirty>=this.firstDirty)this.version++;
-    this.count = this.cursor / 16;
+    if(this.count!==this.cursor/this.recordFloats||this.lastDirty>=this.firstDirty)this.version++;
+    this.count = this.cursor / this.recordFloats;
     if (this.lastDirty >= this.firstDirty) {
       gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
       // WebGL 2 source-offset/length overload uploads a range without a new typed-array view.

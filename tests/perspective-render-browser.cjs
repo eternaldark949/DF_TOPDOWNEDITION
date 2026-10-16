@@ -127,7 +127,7 @@ const server = http.createServer((req, res) => {
         ).includes(11),
         offscreenVisible = Array.from(
           { length: batch.count },
-          (_, i) => batch.data[i * 16],
+          (_, i) => batch.data[i * batch.recordFloats],
         ).includes(11);
       l.configureDirectional({ color: [0, 0, 0] });
       l.setPoint(0, { position: [0, -3, 3], color: [3, 2, 1], radius: 12 });

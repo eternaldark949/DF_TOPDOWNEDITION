@@ -27,7 +27,7 @@ export class StudioSession {
   this.preview=null;
   this.document=null;
   this.sceneIndex=0;
-  this.selected=null;
+  this.selected=null;this.selectionKind='instance';
   this.lightingDirty=true;
 
   // The editor submits through the same renderer and host frame as the game.
@@ -60,10 +60,12 @@ export class StudioSession {
    batch=lease.value;
    return {world,instance,batch,dispose(){
     lease.release();
+    instance.dispose();
     directory.releaseWorld(world.id,world);
    }};
   }catch(error){
    lease?.release();
+   instance?.dispose();
    directory.releaseWorld(world.id,world);
    throw error;
   }
@@ -79,6 +81,7 @@ export class StudioSession {
   this.preview=candidate;
   this.document=doc;
   this.sceneIndex=0;
+  this.selectionKind='instance';
   this.selected=this.selectInitial(doc.data.scenes[0]);
   this.lightingDirty=true;
   this.releaseDocument=doc.onChange(kind=>{
@@ -98,6 +101,7 @@ export class StudioSession {
   this.preview=candidate;
   this.sceneIndex=index;
   this.lightingDirty=true;
+  this.selectionKind='instance';
   this.selected=this.selectInitial(this.scene);
   this.onChange('scene');
  }
@@ -106,9 +110,12 @@ export class StudioSession {
  select(id){
   if(this.play)return;
   this.document.cancel();
-  this.selected=id;
+  this.selectionKind='instance';this.selected=id;
   this.onChange('selection');
  }
+
+ /** A material data-block selection changes inspector context, never document content. */
+ selectMaterial(id){if(this.play)return;if(!this.document.data.materials.some(m=>m.id===id))throw new Error('Unknown material');this.document.cancel();this.selectionKind='material';this.selected=id;this.onChange('selection');}
 
  /** Place one source asset with its true bottom on the construction plane. */
  place(assetId,point){
@@ -119,14 +126,14 @@ export class StudioSession {
  }
  /** Clone placement while sharing its source asset; application policy handles unique game roles. */
  duplicate(){
-  if(this.play)return;const original=this.scene.entities.find(e=>e.id===this.selected);
+  if(this.play)return;if(this.selectionKind==='material')throw new Error('Select an unlocked instance');const original=this.scene.entities.find(e=>e.id===this.selected);
   if(!original||original.locked)throw new Error('Select an unlocked instance');
   const entity=this.cloneEntity(copyData(original));entity.id=this.document.allocateId();entity.name+=' copy';entity.position[0]+=1;
   this.document.edit('Duplicate instance',data=>data.scenes[this.sceneIndex].entities.push(entity));this.select(entity.id);return entity.id;
  }
  /** Delete through history, preserving protected application roles and every unaffected instance. */
  remove(){
-  if(this.play)return;const entity=this.scene.entities.find(e=>e.id===this.selected);
+  if(this.play)return;if(this.selectionKind==='material')throw new Error('Select an instance to delete');const entity=this.scene.entities.find(e=>e.id===this.selected);
   if(!entity||!this.canRemove(entity))throw new Error('This instance is protected');
   this.document.edit('Delete instance',data=>{const list=data.scenes[this.sceneIndex].entities;list.splice(list.findIndex(e=>e.id===entity.id),1);});
   this.select(this.selectInitial(this.scene));

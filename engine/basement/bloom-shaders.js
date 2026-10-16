@@ -1,9 +1,5 @@
 /** Basement / linear-light bloom pyramid. Bright energy is extracted before tone mapping.
  * Stable spatial filters only: no history, noise textures, Canvas assets or frame jitter. */
-export const BLOOM_VERTEX = `#version 300 es
-precision highp float;
-out vec2 vUV;
-void main(){vUV=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));gl_Position=vec4(vUV*2.0-1.0,0.0,1.0);}`;
 /** Thirteen overlapping taps reduce aliasing of narrow signs before the first reduction.
  * Soft-knee extraction occurs per source sample so tiny bright geometry survives averaging. */
 export const BLOOM_DOWN = `#version 300 es
@@ -43,21 +39,4 @@ void main(){
  c+=(texture(uCoarse,vUV+t*vec2(-1,0)).rgb+texture(uCoarse,vUV+t*vec2(1,0)).rgb+texture(uCoarse,vUV+t*vec2(0,-1)).rgb+texture(uCoarse,vUV+t*vec2(0,1)).rgb)*2.0;
  c+=texture(uCoarse,vUV+t*vec2(-1,-1)).rgb+texture(uCoarse,vUV+t*vec2(1,-1)).rgb+texture(uCoarse,vUV+t*vec2(-1,1)).rgb+texture(uCoarse,vUV+t*vec2(1,1)).rgb;
  outColor=vec4(mix(texture(uFine,vUV).rgb,c/16.0,uSpread.y),1.0);
-}`;
-/** Bloom combines with unclipped scene radiance, followed by one exposure/rolloff/encoding.
- * Restore resolved geometry depth into the default framebuffer in the same submission.
- * Studio lines then use ordinary depth testing and display colours, outside bloom entirely. */
-export const BLOOM_COMPOSITE = `#version 300 es
-precision highp float;
-in vec2 vUV;
-uniform sampler2D uScene;
-uniform sampler2D uBloom;
-uniform sampler2D uDepth;
-uniform vec2 uFinish; // bloom strength and exposure
-out vec4 outColor;
-void main(){
- vec3 linear=max(texture(uScene,vUV).rgb+texture(uBloom,vUV).rgb*uFinish.x,vec3(0.0));
- vec3 mapped=vec3(1.0)-exp(-linear*uFinish.y);
- outColor=vec4(pow(mapped,vec3(1.0/2.2)),1.0);
- gl_FragDepth=texture(uDepth,vUV).r;
 }`;

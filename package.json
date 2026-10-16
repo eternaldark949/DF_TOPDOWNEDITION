@@ -5,6 +5,7 @@
   "scripts": {
     "build": "node tools/build.js",
     "test": "node --test tests/*.test.js",
+    "test:materials": "node tests/materials-browser.cjs",
     "test:bloom": "node tests/bloom-browser.cjs && node tests/bloom-ui-browser.cjs",
     "test:browser": "node tests/browser.cjs",
     "test:studio": "node tests/studio-browser.cjs",

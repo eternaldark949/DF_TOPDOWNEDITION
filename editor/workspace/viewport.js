@@ -137,7 +137,7 @@ export class StudioViewport {
       event.preventDefault();
       return;
     }
-    const selected = session.scene.entities.find(
+    const selected = session.selectionKind==='material'?null:session.scene.entities.find(
       (e) => e.id === session.selected,
     );
     if (this.mode === "rotate" && selected && !selected.locked) {

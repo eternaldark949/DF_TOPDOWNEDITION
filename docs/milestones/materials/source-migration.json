@@ -1,0 +1,14 @@
+{
+  "examples/atrium/project.json": {
+    "exactLegacyRoundTrip": true,
+    "shapedParts": 157,
+    "materials": 47,
+    "sceneCount": 2
+  },
+  "games/freelancer/content/project.json": {
+    "exactLegacyRoundTrip": true,
+    "shapedParts": 438,
+    "materials": 72,
+    "sceneCount": 2
+  }
+}

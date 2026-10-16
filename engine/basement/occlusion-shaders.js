@@ -18,15 +18,6 @@ in vec3 vNormal;
 out vec4 outColor;
 void main(){outColor=vec4(normalize(vNormal)*0.5+0.5,1.0);}`;
 
-/** Vertex-ID triangle needs no mesh allocation or per-frame uploads. */
-export const FULLSCREEN_VERTEX = `#version 300 es
-precision highp float;
-out vec2 vUV;
-void main(){
-  vUV=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));
-  gl_Position=vec4(vUV*2.0-1.0,0.0,1.0);
-}`;
-
 /**
  * Deterministic eight-direction/two-distance neighborhood estimator. World-unit
  * radius prevents a fixed-pixel halo as zoom changes. No temporal noise/history.

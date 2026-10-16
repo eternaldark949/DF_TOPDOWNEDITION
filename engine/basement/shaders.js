@@ -17,18 +17,19 @@ layout(location=2) in vec4 aPose;
 layout(location=3) in vec4 aSize;
 layout(location=4) in vec4 aColor;
 layout(location=5) in vec4 aRotation;
+layout(location=6) in vec4 aEmission; // independent linear emissive radiance
 uniform mat4 uViewProjection;
 ${ROTATION_GLSL}
 out vec3 vWorld;
 out vec3 vNormal;
 out vec3 vColor;
-out float vEmission;
+out vec3 vEmission;
 out float vHighlight;
 void main() {
   vec3 p=rotateByQuaternion(aRotation,aPosition*aSize.xyz)+aPose.xyz;
   vWorld=p;vNormal=rotateByQuaternion(aRotation,aNormal);
   vColor = aColor.rgb;
-  vEmission = aSize.w;vHighlight=aColor.w;
+  vEmission = aEmission.rgb;vHighlight=aColor.w;
   gl_Position=uViewProjection*vec4(p,1.0);
 }`;
 
@@ -37,7 +38,7 @@ precision highp float;
 in vec3 vWorld;
 in vec3 vNormal;
 in vec3 vColor;
-in float vEmission;
+in vec3 vEmission;
 in float vHighlight;
 uniform bool uLinearOutput; // HDR scene target defers exposure/encoding to the compositor
 uniform float uExposure;
@@ -70,7 +71,7 @@ void main() {
     float joint = smoothstep(0.475, 0.495, max(tile.x, tile.y));
     surface *= 1.0 - joint * 0.30;
   }
-  vec3 linear = surface * light + vColor * vEmission + vec3(0.18,0.12,0.04)*vHighlight;
+  vec3 linear = surface * light + vEmission + vec3(0.18,0.12,0.04)*vHighlight;
   // Soft exposure rolloff then display gamma. No claim of physical spectral accuracy.
   if(uLinearOutput){outColor=vec4(clamp(linear,vec3(0.0),vec3(65000.0)),1.0);return;}
   vec3 mapped = vec3(1.0) - exp(-linear * uExposure);

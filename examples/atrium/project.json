@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "project:atrium",
   "name": "Between Worlds",
   "scenes": [
@@ -1121,14 +1121,9 @@
               68,
               0.5
             ],
-            "color": [
-              0.14,
-              0.115,
-              0.14
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:1"
           }
         }
       ],
@@ -1160,14 +1155,9 @@
               38,
               0.025
             ],
-            "color": [
-              0.22,
-              0.2,
-              0.25
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:2"
           }
         }
       ],
@@ -1199,14 +1189,9 @@
               38,
               0.035
             ],
-            "color": [
-              0.68,
-              0.43,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:3"
           }
         }
       ],
@@ -1254,14 +1239,9 @@
               11,
               0.4
             ],
-            "color": [
-              0.24,
-              0.18,
-              0.2
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:4"
           }
         },
         {
@@ -1284,14 +1264,9 @@
               0.6,
               7
             ],
-            "color": [
-              0.24,
-              0.18,
-              0.2
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:4"
           }
         },
         {
@@ -1314,14 +1289,9 @@
               10,
               0.6
             ],
-            "color": [
-              0.24,
-              0.18,
-              0.2
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:4"
           }
         },
         {
@@ -1344,14 +1314,9 @@
               0.12,
               0.09
             ],
-            "color": [
-              1,
-              0.47,
-              0.17
-            ],
-            "emission": 2.5,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:5"
           }
         },
         {
@@ -1374,14 +1339,9 @@
               0.16,
               0.1
             ],
-            "color": [
-              0.68,
-              0.43,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:6"
           }
         },
         {
@@ -1404,14 +1364,9 @@
               0.5,
               7
             ],
-            "color": [
-              0.24,
-              0.18,
-              0.2
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:4"
           }
         },
         {
@@ -1434,14 +1389,9 @@
               0.9,
               0.4
             ],
-            "color": [
-              0.68,
-              0.43,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:6"
           }
         },
         {
@@ -1464,14 +1414,9 @@
               0.8,
               0.25
             ],
-            "color": [
-              0.68,
-              0.43,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:6"
           }
         },
         {
@@ -1494,14 +1439,9 @@
               0.5,
               7
             ],
-            "color": [
-              0.24,
-              0.18,
-              0.2
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:4"
           }
         },
         {
@@ -1524,14 +1464,9 @@
               0.9,
               0.4
             ],
-            "color": [
-              0.68,
-              0.43,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:6"
           }
         },
         {
@@ -1554,14 +1489,9 @@
               0.8,
               0.25
             ],
-            "color": [
-              0.68,
-              0.43,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:6"
           }
         },
         {
@@ -1584,14 +1514,9 @@
               0.5,
               7
             ],
-            "color": [
-              0.24,
-              0.18,
-              0.2
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:4"
           }
         },
         {
@@ -1614,14 +1539,9 @@
               0.9,
               0.4
             ],
-            "color": [
-              0.68,
-              0.43,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:6"
           }
         },
         {
@@ -1644,14 +1564,9 @@
               0.8,
               0.25
             ],
-            "color": [
-              0.68,
-              0.43,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:6"
           }
         },
         {
@@ -1674,14 +1589,9 @@
               0.5,
               7
             ],
-            "color": [
-              0.24,
-              0.18,
-              0.2
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:4"
           }
         },
         {
@@ -1704,14 +1614,9 @@
               0.9,
               0.4
             ],
-            "color": [
-              0.68,
-              0.43,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:6"
           }
         },
         {
@@ -1734,14 +1639,9 @@
               0.8,
               0.25
             ],
-            "color": [
-              0.68,
-              0.43,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:6"
           }
         },
         {
@@ -1764,14 +1664,9 @@
               0.08,
               4.55
             ],
-            "color": [
-              0.35,
-              0.19,
-              0.16
-            ],
-            "emission": 0.3,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:7"
           }
         },
         {
@@ -1794,14 +1689,9 @@
               0.05,
               4.55
             ],
-            "color": [
-              0.68,
-              0.43,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:6"
           }
         },
         {
@@ -1824,14 +1714,9 @@
               0.08,
               4.55
             ],
-            "color": [
-              0.35,
-              0.19,
-              0.16
-            ],
-            "emission": 0.3,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:7"
           }
         },
         {
@@ -1854,14 +1739,9 @@
               0.05,
               4.55
             ],
-            "color": [
-              0.68,
-              0.43,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:6"
           }
         },
         {
@@ -1884,14 +1764,9 @@
               0.08,
               4.55
             ],
-            "color": [
-              0.35,
-              0.19,
-              0.16
-            ],
-            "emission": 0.3,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:7"
           }
         },
         {
@@ -1914,14 +1789,9 @@
               0.05,
               4.55
             ],
-            "color": [
-              0.68,
-              0.43,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:6"
           }
         },
         {
@@ -1944,14 +1814,9 @@
               0.08,
               4.55
             ],
-            "color": [
-              0.35,
-              0.19,
-              0.16
-            ],
-            "emission": 0.3,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:7"
           }
         },
         {
@@ -1974,14 +1839,9 @@
               0.05,
               4.55
             ],
-            "color": [
-              0.68,
-              0.43,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:6"
           }
         },
         {
@@ -2004,14 +1864,9 @@
               0.08,
               4.55
             ],
-            "color": [
-              0.35,
-              0.19,
-              0.16
-            ],
-            "emission": 0.3,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:7"
           }
         },
         {
@@ -2034,14 +1889,9 @@
               0.05,
               4.55
             ],
-            "color": [
-              0.68,
-              0.43,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:6"
           }
         },
         {
@@ -2064,14 +1914,9 @@
               0.08,
               4.55
             ],
-            "color": [
-              0.35,
-              0.19,
-              0.16
-            ],
-            "emission": 0.3,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:7"
           }
         },
         {
@@ -2094,14 +1939,9 @@
               0.05,
               4.55
             ],
-            "color": [
-              0.68,
-              0.43,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:6"
           }
         },
         {
@@ -2124,14 +1964,9 @@
               0.08,
               4.55
             ],
-            "color": [
-              0.35,
-              0.19,
-              0.16
-            ],
-            "emission": 0.3,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:7"
           }
         },
         {
@@ -2154,14 +1989,9 @@
               0.05,
               4.55
             ],
-            "color": [
-              0.68,
-              0.43,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:6"
           }
         }
       ],
@@ -2224,14 +2054,9 @@
               29,
               4.2
             ],
-            "color": [
-              0.24,
-              0.18,
-              0.2
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:8"
           }
         },
         {
@@ -2254,14 +2079,9 @@
               29.5,
               0.3
             ],
-            "color": [
-              0.68,
-              0.43,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:9"
           }
         },
         {
@@ -2284,14 +2104,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.38,
-              0.15,
-              0.16
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:10"
           }
         },
         {
@@ -2314,14 +2129,9 @@
               2,
               0.07
             ],
-            "color": [
-              1,
-              0.47,
-              0.17
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:11"
           }
         },
         {
@@ -2344,14 +2154,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.38,
-              0.15,
-              0.16
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:10"
           }
         },
         {
@@ -2374,14 +2179,9 @@
               2,
               0.07
             ],
-            "color": [
-              1,
-              0.47,
-              0.17
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:11"
           }
         },
         {
@@ -2404,14 +2204,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.38,
-              0.15,
-              0.16
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:10"
           }
         },
         {
@@ -2434,14 +2229,9 @@
               2,
               0.07
             ],
-            "color": [
-              1,
-              0.47,
-              0.17
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:11"
           }
         },
         {
@@ -2464,14 +2254,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.38,
-              0.15,
-              0.16
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:10"
           }
         },
         {
@@ -2494,14 +2279,9 @@
               2,
               0.07
             ],
-            "color": [
-              1,
-              0.47,
-              0.17
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:11"
           }
         },
         {
@@ -2524,14 +2304,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.38,
-              0.15,
-              0.16
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:10"
           }
         },
         {
@@ -2554,14 +2329,9 @@
               2,
               0.07
             ],
-            "color": [
-              1,
-              0.47,
-              0.17
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:11"
           }
         },
         {
@@ -2584,14 +2354,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.38,
-              0.15,
-              0.16
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:10"
           }
         },
         {
@@ -2614,14 +2379,9 @@
               2,
               0.07
             ],
-            "color": [
-              1,
-              0.47,
-              0.17
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:11"
           }
         },
         {
@@ -2644,14 +2404,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.38,
-              0.15,
-              0.16
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:10"
           }
         },
         {
@@ -2674,14 +2429,9 @@
               2,
               0.07
             ],
-            "color": [
-              1,
-              0.47,
-              0.17
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:11"
           }
         }
       ],
@@ -2720,14 +2470,9 @@
               2.4,
               1.1
             ],
-            "color": [
-              0.68,
-              0.43,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:12"
           }
         },
         {
@@ -2750,14 +2495,9 @@
               2.2,
               0.9
             ],
-            "color": [
-              0.045,
-              0.14,
-              0.1
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:13"
           }
         },
         {
@@ -2780,14 +2520,9 @@
               1.8000000000000003,
               0.9
             ],
-            "color": [
-              0.045,
-              0.14,
-              0.1
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:13"
           }
         },
         {
@@ -2810,14 +2545,9 @@
               1.4000000000000001,
               0.9
             ],
-            "color": [
-              0.045,
-              0.14,
-              0.1
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:13"
           }
         },
         {
@@ -2840,14 +2570,9 @@
               1,
               0.9
             ],
-            "color": [
-              0.045,
-              0.14,
-              0.1
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:13"
           }
         }
       ],
@@ -2886,14 +2611,9 @@
               0.18,
               3.6
             ],
-            "color": [
-              0.68,
-              0.43,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:14"
           }
         },
         {
@@ -2916,14 +2636,9 @@
               0.6,
               0.8
             ],
-            "color": [
-              1,
-              0.47,
-              0.17
-            ],
-            "emission": 3,
             "ambientBlocker": true,
-            "castShadow": false
+            "castShadow": false,
+            "material": "material:15"
           }
         },
         {
@@ -2946,14 +2661,9 @@
               0.9,
               0.12
             ],
-            "color": [
-              0.68,
-              0.43,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:14"
           }
         }
       ],
@@ -2985,14 +2695,9 @@
               29,
               4.2
             ],
-            "color": [
-              0.24,
-              0.18,
-              0.2
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:16"
           }
         },
         {
@@ -3015,14 +2720,9 @@
               29.5,
               0.3
             ],
-            "color": [
-              0.68,
-              0.43,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:17"
           }
         },
         {
@@ -3045,14 +2745,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.38,
-              0.15,
-              0.16
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:18"
           }
         },
         {
@@ -3075,14 +2770,9 @@
               2,
               0.07
             ],
-            "color": [
-              1,
-              0.47,
-              0.17
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:19"
           }
         },
         {
@@ -3105,14 +2795,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.38,
-              0.15,
-              0.16
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:18"
           }
         },
         {
@@ -3135,14 +2820,9 @@
               2,
               0.07
             ],
-            "color": [
-              1,
-              0.47,
-              0.17
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:19"
           }
         },
         {
@@ -3165,14 +2845,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.38,
-              0.15,
-              0.16
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:18"
           }
         },
         {
@@ -3195,14 +2870,9 @@
               2,
               0.07
             ],
-            "color": [
-              1,
-              0.47,
-              0.17
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:19"
           }
         },
         {
@@ -3225,14 +2895,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.38,
-              0.15,
-              0.16
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:18"
           }
         },
         {
@@ -3255,14 +2920,9 @@
               2,
               0.07
             ],
-            "color": [
-              1,
-              0.47,
-              0.17
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:19"
           }
         },
         {
@@ -3285,14 +2945,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.38,
-              0.15,
-              0.16
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:18"
           }
         },
         {
@@ -3315,14 +2970,9 @@
               2,
               0.07
             ],
-            "color": [
-              1,
-              0.47,
-              0.17
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:19"
           }
         },
         {
@@ -3345,14 +2995,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.38,
-              0.15,
-              0.16
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:18"
           }
         },
         {
@@ -3375,14 +3020,9 @@
               2,
               0.07
             ],
-            "color": [
-              1,
-              0.47,
-              0.17
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:19"
           }
         },
         {
@@ -3405,14 +3045,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.38,
-              0.15,
-              0.16
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:18"
           }
         },
         {
@@ -3435,14 +3070,9 @@
               2,
               0.07
             ],
-            "color": [
-              1,
-              0.47,
-              0.17
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:19"
           }
         }
       ],
@@ -3481,14 +3111,9 @@
               1.9,
               1.3
             ],
-            "color": [
-              0.24,
-              0.18,
-              0.2
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:20"
           }
         },
         {
@@ -3511,14 +3136,9 @@
               2.1,
               0.22
             ],
-            "color": [
-              0.68,
-              0.43,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:21"
           }
         },
         {
@@ -3541,14 +3161,9 @@
               0.7,
               1.4
             ],
-            "color": [
-              0.25,
-              0.62,
-              1
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": false
+            "castShadow": false,
+            "material": "material:22"
           }
         }
       ],
@@ -3587,14 +3202,9 @@
               2,
               1.3
             ],
-            "color": [
-              0.68,
-              0.43,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:23"
           }
         }
       ],
@@ -3633,14 +3243,9 @@
               68,
               0.5
             ],
-            "color": [
-              0.075,
-              0.09,
-              0.18
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:24"
           }
         }
       ],
@@ -3672,14 +3277,9 @@
               38,
               0.025
             ],
-            "color": [
-              0.22,
-              0.2,
-              0.25
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:25"
           }
         }
       ],
@@ -3711,14 +3311,9 @@
               38,
               0.035
             ],
-            "color": [
-              0.35,
-              0.56,
-              0.7
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:26"
           }
         }
       ],
@@ -3766,14 +3361,9 @@
               11,
               0.4
             ],
-            "color": [
-              0.14,
-              0.16,
-              0.31
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:27"
           }
         },
         {
@@ -3796,14 +3386,9 @@
               0.6,
               8.5
             ],
-            "color": [
-              0.14,
-              0.16,
-              0.31
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:27"
           }
         },
         {
@@ -3826,14 +3411,9 @@
               10,
               0.6
             ],
-            "color": [
-              0.14,
-              0.16,
-              0.31
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:27"
           }
         },
         {
@@ -3856,14 +3436,9 @@
               0.12,
               0.09
             ],
-            "color": [
-              0.24,
-              0.58,
-              1
-            ],
-            "emission": 2.5,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:28"
           }
         },
         {
@@ -3886,14 +3461,9 @@
               0.16,
               0.1
             ],
-            "color": [
-              0.35,
-              0.56,
-              0.7
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:29"
           }
         },
         {
@@ -3916,14 +3486,9 @@
               0.5,
               8.5
             ],
-            "color": [
-              0.14,
-              0.16,
-              0.31
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:27"
           }
         },
         {
@@ -3946,14 +3511,9 @@
               0.9,
               0.4
             ],
-            "color": [
-              0.35,
-              0.56,
-              0.7
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:29"
           }
         },
         {
@@ -3976,14 +3536,9 @@
               0.8,
               0.25
             ],
-            "color": [
-              0.35,
-              0.56,
-              0.7
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:29"
           }
         },
         {
@@ -4006,14 +3561,9 @@
               0.5,
               8.5
             ],
-            "color": [
-              0.14,
-              0.16,
-              0.31
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:27"
           }
         },
         {
@@ -4036,14 +3586,9 @@
               0.9,
               0.4
             ],
-            "color": [
-              0.35,
-              0.56,
-              0.7
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:29"
           }
         },
         {
@@ -4066,14 +3611,9 @@
               0.8,
               0.25
             ],
-            "color": [
-              0.35,
-              0.56,
-              0.7
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:29"
           }
         },
         {
@@ -4096,14 +3636,9 @@
               0.5,
               8.5
             ],
-            "color": [
-              0.14,
-              0.16,
-              0.31
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:27"
           }
         },
         {
@@ -4126,14 +3661,9 @@
               0.9,
               0.4
             ],
-            "color": [
-              0.35,
-              0.56,
-              0.7
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:29"
           }
         },
         {
@@ -4156,14 +3686,9 @@
               0.8,
               0.25
             ],
-            "color": [
-              0.35,
-              0.56,
-              0.7
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:29"
           }
         },
         {
@@ -4186,14 +3711,9 @@
               0.5,
               8.5
             ],
-            "color": [
-              0.14,
-              0.16,
-              0.31
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:27"
           }
         },
         {
@@ -4216,14 +3736,9 @@
               0.9,
               0.4
             ],
-            "color": [
-              0.35,
-              0.56,
-              0.7
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:29"
           }
         },
         {
@@ -4246,14 +3761,9 @@
               0.8,
               0.25
             ],
-            "color": [
-              0.35,
-              0.56,
-              0.7
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:29"
           }
         },
         {
@@ -4276,14 +3786,9 @@
               0.08,
               5.525
             ],
-            "color": [
-              0.35,
-              0.19,
-              0.16
-            ],
-            "emission": 0.3,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:30"
           }
         },
         {
@@ -4306,14 +3811,9 @@
               0.05,
               5.525
             ],
-            "color": [
-              0.35,
-              0.56,
-              0.7
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:29"
           }
         },
         {
@@ -4336,14 +3836,9 @@
               0.08,
               5.525
             ],
-            "color": [
-              0.35,
-              0.19,
-              0.16
-            ],
-            "emission": 0.3,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:30"
           }
         },
         {
@@ -4366,14 +3861,9 @@
               0.05,
               5.525
             ],
-            "color": [
-              0.35,
-              0.56,
-              0.7
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:29"
           }
         },
         {
@@ -4396,14 +3886,9 @@
               0.08,
               5.525
             ],
-            "color": [
-              0.35,
-              0.19,
-              0.16
-            ],
-            "emission": 0.3,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:30"
           }
         },
         {
@@ -4426,14 +3911,9 @@
               0.05,
               5.525
             ],
-            "color": [
-              0.35,
-              0.56,
-              0.7
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:29"
           }
         },
         {
@@ -4456,14 +3936,9 @@
               0.08,
               5.525
             ],
-            "color": [
-              0.35,
-              0.19,
-              0.16
-            ],
-            "emission": 0.3,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:30"
           }
         },
         {
@@ -4486,14 +3961,9 @@
               0.05,
               5.525
             ],
-            "color": [
-              0.35,
-              0.56,
-              0.7
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:29"
           }
         },
         {
@@ -4516,14 +3986,9 @@
               0.08,
               5.525
             ],
-            "color": [
-              0.35,
-              0.19,
-              0.16
-            ],
-            "emission": 0.3,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:30"
           }
         },
         {
@@ -4546,14 +4011,9 @@
               0.05,
               5.525
             ],
-            "color": [
-              0.35,
-              0.56,
-              0.7
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:29"
           }
         },
         {
@@ -4576,14 +4036,9 @@
               0.08,
               5.525
             ],
-            "color": [
-              0.35,
-              0.19,
-              0.16
-            ],
-            "emission": 0.3,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:30"
           }
         },
         {
@@ -4606,14 +4061,9 @@
               0.05,
               5.525
             ],
-            "color": [
-              0.35,
-              0.56,
-              0.7
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:29"
           }
         },
         {
@@ -4636,14 +4086,9 @@
               0.08,
               5.525
             ],
-            "color": [
-              0.35,
-              0.19,
-              0.16
-            ],
-            "emission": 0.3,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:30"
           }
         },
         {
@@ -4666,14 +4111,9 @@
               0.05,
               5.525
             ],
-            "color": [
-              0.35,
-              0.56,
-              0.7
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:29"
           }
         }
       ],
@@ -4736,14 +4176,9 @@
               29,
               4.2
             ],
-            "color": [
-              0.14,
-              0.16,
-              0.31
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:31"
           }
         },
         {
@@ -4766,14 +4201,9 @@
               29.5,
               0.3
             ],
-            "color": [
-              0.35,
-              0.56,
-              0.7
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:32"
           }
         },
         {
@@ -4796,14 +4226,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.15,
-              0.19,
-              0.46
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:33"
           }
         },
         {
@@ -4826,14 +4251,9 @@
               2,
               0.07
             ],
-            "color": [
-              0.24,
-              0.58,
-              1
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:34"
           }
         },
         {
@@ -4856,14 +4276,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.15,
-              0.19,
-              0.46
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:33"
           }
         },
         {
@@ -4886,14 +4301,9 @@
               2,
               0.07
             ],
-            "color": [
-              0.24,
-              0.58,
-              1
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:34"
           }
         },
         {
@@ -4916,14 +4326,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.15,
-              0.19,
-              0.46
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:33"
           }
         },
         {
@@ -4946,14 +4351,9 @@
               2,
               0.07
             ],
-            "color": [
-              0.24,
-              0.58,
-              1
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:34"
           }
         },
         {
@@ -4976,14 +4376,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.15,
-              0.19,
-              0.46
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:33"
           }
         },
         {
@@ -5006,14 +4401,9 @@
               2,
               0.07
             ],
-            "color": [
-              0.24,
-              0.58,
-              1
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:34"
           }
         },
         {
@@ -5036,14 +4426,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.15,
-              0.19,
-              0.46
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:33"
           }
         },
         {
@@ -5066,14 +4451,9 @@
               2,
               0.07
             ],
-            "color": [
-              0.24,
-              0.58,
-              1
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:34"
           }
         },
         {
@@ -5096,14 +4476,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.15,
-              0.19,
-              0.46
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:33"
           }
         },
         {
@@ -5126,14 +4501,9 @@
               2,
               0.07
             ],
-            "color": [
-              0.24,
-              0.58,
-              1
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:34"
           }
         },
         {
@@ -5156,14 +4526,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.15,
-              0.19,
-              0.46
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:33"
           }
         },
         {
@@ -5186,14 +4551,9 @@
               2,
               0.07
             ],
-            "color": [
-              0.24,
-              0.58,
-              1
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:34"
           }
         }
       ],
@@ -5232,14 +4592,9 @@
               2.4,
               1.1
             ],
-            "color": [
-              0.35,
-              0.56,
-              0.7
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:35"
           }
         },
         {
@@ -5262,14 +4617,9 @@
               2.2,
               0.9
             ],
-            "color": [
-              0.1,
-              0.2,
-              0.27
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:36"
           }
         },
         {
@@ -5292,14 +4642,9 @@
               1.8000000000000003,
               0.9
             ],
-            "color": [
-              0.1,
-              0.2,
-              0.27
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:36"
           }
         },
         {
@@ -5322,14 +4667,9 @@
               1.4000000000000001,
               0.9
             ],
-            "color": [
-              0.1,
-              0.2,
-              0.27
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:36"
           }
         },
         {
@@ -5352,14 +4692,9 @@
               1,
               0.9
             ],
-            "color": [
-              0.1,
-              0.2,
-              0.27
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:36"
           }
         }
       ],
@@ -5398,14 +4733,9 @@
               0.18,
               3.6
             ],
-            "color": [
-              0.35,
-              0.56,
-              0.7
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:37"
           }
         },
         {
@@ -5428,14 +4758,9 @@
               0.6,
               0.8
             ],
-            "color": [
-              0.24,
-              0.58,
-              1
-            ],
-            "emission": 3,
             "ambientBlocker": true,
-            "castShadow": false
+            "castShadow": false,
+            "material": "material:38"
           }
         },
         {
@@ -5458,14 +4783,9 @@
               0.9,
               0.12
             ],
-            "color": [
-              0.35,
-              0.56,
-              0.7
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:37"
           }
         }
       ],
@@ -5497,14 +4817,9 @@
               29,
               4.2
             ],
-            "color": [
-              0.14,
-              0.16,
-              0.31
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:39"
           }
         },
         {
@@ -5527,14 +4842,9 @@
               29.5,
               0.3
             ],
-            "color": [
-              0.35,
-              0.56,
-              0.7
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:40"
           }
         },
         {
@@ -5557,14 +4867,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.15,
-              0.19,
-              0.46
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:41"
           }
         },
         {
@@ -5587,14 +4892,9 @@
               2,
               0.07
             ],
-            "color": [
-              0.24,
-              0.58,
-              1
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:42"
           }
         },
         {
@@ -5617,14 +4917,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.15,
-              0.19,
-              0.46
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:41"
           }
         },
         {
@@ -5647,14 +4942,9 @@
               2,
               0.07
             ],
-            "color": [
-              0.24,
-              0.58,
-              1
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:42"
           }
         },
         {
@@ -5677,14 +4967,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.15,
-              0.19,
-              0.46
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:41"
           }
         },
         {
@@ -5707,14 +4992,9 @@
               2,
               0.07
             ],
-            "color": [
-              0.24,
-              0.58,
-              1
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:42"
           }
         },
         {
@@ -5737,14 +5017,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.15,
-              0.19,
-              0.46
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:41"
           }
         },
         {
@@ -5767,14 +5042,9 @@
               2,
               0.07
             ],
-            "color": [
-              0.24,
-              0.58,
-              1
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:42"
           }
         },
         {
@@ -5797,14 +5067,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.15,
-              0.19,
-              0.46
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:41"
           }
         },
         {
@@ -5827,14 +5092,9 @@
               2,
               0.07
             ],
-            "color": [
-              0.24,
-              0.58,
-              1
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:42"
           }
         },
         {
@@ -5857,14 +5117,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.15,
-              0.19,
-              0.46
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:41"
           }
         },
         {
@@ -5887,14 +5142,9 @@
               2,
               0.07
             ],
-            "color": [
-              0.24,
-              0.58,
-              1
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:42"
           }
         },
         {
@@ -5917,14 +5167,9 @@
               1.8,
               2.7
             ],
-            "color": [
-              0.15,
-              0.19,
-              0.46
-            ],
-            "emission": 0.55,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:41"
           }
         },
         {
@@ -5947,14 +5192,9 @@
               2,
               0.07
             ],
-            "color": [
-              0.24,
-              0.58,
-              1
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:42"
           }
         }
       ],
@@ -5993,14 +5233,9 @@
               1.9,
               1.3
             ],
-            "color": [
-              0.14,
-              0.16,
-              0.31
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:43"
           }
         },
         {
@@ -6023,14 +5258,9 @@
               2.1,
               0.22
             ],
-            "color": [
-              0.35,
-              0.56,
-              0.7
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:44"
           }
         },
         {
@@ -6053,14 +5283,9 @@
               0.7,
               1.4
             ],
-            "color": [
-              0.25,
-              0.62,
-              1
-            ],
-            "emission": 2,
             "ambientBlocker": true,
-            "castShadow": false
+            "castShadow": false,
+            "material": "material:45"
           }
         }
       ],
@@ -6099,14 +5324,9 @@
               2,
               1.3
             ],
-            "color": [
-              0.35,
-              0.56,
-              0.7
-            ],
-            "emission": 0,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:46"
           }
         }
       ],
@@ -6145,14 +5365,9 @@
               0.7,
               3.8
             ],
-            "color": [
-              0.22,
-              0.5,
-              0.67
-            ],
-            "emission": 0.5,
             "ambientBlocker": true,
-            "castShadow": true
+            "castShadow": true,
+            "material": "material:47"
           }
         }
       ],
@@ -6164,6 +5379,713 @@
           "depth": 1
         }
       ]
+    }
+  ],
+  "materials": [
+    {
+      "id": "material:1",
+      "name": "Courtyard foundation · 1",
+      "baseColor": [
+        0.14,
+        0.115,
+        0.14
+      ],
+      "emissionColor": [
+        0.14,
+        0.115,
+        0.14
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:2",
+      "name": "Central inlay · 1",
+      "baseColor": [
+        0.22,
+        0.2,
+        0.25
+      ],
+      "emissionColor": [
+        0.22,
+        0.2,
+        0.25
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:3",
+      "name": "Brass inlay · 1",
+      "baseColor": [
+        0.68,
+        0.43,
+        0.18
+      ],
+      "emissionColor": [
+        0.68,
+        0.43,
+        0.18
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:4",
+      "name": "Colonnade · 1",
+      "baseColor": [
+        0.24,
+        0.18,
+        0.2
+      ],
+      "emissionColor": [
+        0.24,
+        0.18,
+        0.2
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:5",
+      "name": "Colonnade · 2",
+      "baseColor": [
+        1,
+        0.47,
+        0.17
+      ],
+      "emissionColor": [
+        1,
+        0.47,
+        0.17
+      ],
+      "emissionStrength": 2.5
+    },
+    {
+      "id": "material:6",
+      "name": "Colonnade · 3",
+      "baseColor": [
+        0.68,
+        0.43,
+        0.18
+      ],
+      "emissionColor": [
+        0.68,
+        0.43,
+        0.18
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:7",
+      "name": "Colonnade · 4",
+      "baseColor": [
+        0.35,
+        0.19,
+        0.16
+      ],
+      "emissionColor": [
+        0.35,
+        0.19,
+        0.16
+      ],
+      "emissionStrength": 0.3
+    },
+    {
+      "id": "material:8",
+      "name": "West gallery · 1",
+      "baseColor": [
+        0.24,
+        0.18,
+        0.2
+      ],
+      "emissionColor": [
+        0.24,
+        0.18,
+        0.2
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:9",
+      "name": "West gallery · 2",
+      "baseColor": [
+        0.68,
+        0.43,
+        0.18
+      ],
+      "emissionColor": [
+        0.68,
+        0.43,
+        0.18
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:10",
+      "name": "West gallery · 3",
+      "baseColor": [
+        0.38,
+        0.15,
+        0.16
+      ],
+      "emissionColor": [
+        0.38,
+        0.15,
+        0.16
+      ],
+      "emissionStrength": 0.55
+    },
+    {
+      "id": "material:11",
+      "name": "West gallery · 4",
+      "baseColor": [
+        1,
+        0.47,
+        0.17
+      ],
+      "emissionColor": [
+        1,
+        0.47,
+        0.17
+      ],
+      "emissionStrength": 2
+    },
+    {
+      "id": "material:12",
+      "name": "Planter · 1",
+      "baseColor": [
+        0.68,
+        0.43,
+        0.18
+      ],
+      "emissionColor": [
+        0.68,
+        0.43,
+        0.18
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:13",
+      "name": "Planter · 2",
+      "baseColor": [
+        0.045,
+        0.14,
+        0.1
+      ],
+      "emissionColor": [
+        0.045,
+        0.14,
+        0.1
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:14",
+      "name": "Lantern · 1",
+      "baseColor": [
+        0.68,
+        0.43,
+        0.18
+      ],
+      "emissionColor": [
+        0.68,
+        0.43,
+        0.18
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:15",
+      "name": "Lantern · 2",
+      "baseColor": [
+        1,
+        0.47,
+        0.17
+      ],
+      "emissionColor": [
+        1,
+        0.47,
+        0.17
+      ],
+      "emissionStrength": 3
+    },
+    {
+      "id": "material:16",
+      "name": "East gallery · 1",
+      "baseColor": [
+        0.24,
+        0.18,
+        0.2
+      ],
+      "emissionColor": [
+        0.24,
+        0.18,
+        0.2
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:17",
+      "name": "East gallery · 2",
+      "baseColor": [
+        0.68,
+        0.43,
+        0.18
+      ],
+      "emissionColor": [
+        0.68,
+        0.43,
+        0.18
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:18",
+      "name": "East gallery · 3",
+      "baseColor": [
+        0.38,
+        0.15,
+        0.16
+      ],
+      "emissionColor": [
+        0.38,
+        0.15,
+        0.16
+      ],
+      "emissionStrength": 0.55
+    },
+    {
+      "id": "material:19",
+      "name": "East gallery · 4",
+      "baseColor": [
+        1,
+        0.47,
+        0.17
+      ],
+      "emissionColor": [
+        1,
+        0.47,
+        0.17
+      ],
+      "emissionStrength": 2
+    },
+    {
+      "id": "material:20",
+      "name": "Crystal lantern · 1",
+      "baseColor": [
+        0.24,
+        0.18,
+        0.2
+      ],
+      "emissionColor": [
+        0.24,
+        0.18,
+        0.2
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:21",
+      "name": "Crystal lantern · 2",
+      "baseColor": [
+        0.68,
+        0.43,
+        0.18
+      ],
+      "emissionColor": [
+        0.68,
+        0.43,
+        0.18
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:22",
+      "name": "Crystal lantern · 3",
+      "baseColor": [
+        0.25,
+        0.62,
+        1
+      ],
+      "emissionColor": [
+        0.25,
+        0.62,
+        1
+      ],
+      "emissionStrength": 2
+    },
+    {
+      "id": "material:23",
+      "name": "Movable plinth · 1",
+      "baseColor": [
+        0.68,
+        0.43,
+        0.18
+      ],
+      "emissionColor": [
+        0.68,
+        0.43,
+        0.18
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:24",
+      "name": "Courtyard foundation · 1",
+      "baseColor": [
+        0.075,
+        0.09,
+        0.18
+      ],
+      "emissionColor": [
+        0.075,
+        0.09,
+        0.18
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:25",
+      "name": "Central inlay · 1",
+      "baseColor": [
+        0.22,
+        0.2,
+        0.25
+      ],
+      "emissionColor": [
+        0.22,
+        0.2,
+        0.25
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:26",
+      "name": "Brass inlay · 1",
+      "baseColor": [
+        0.35,
+        0.56,
+        0.7
+      ],
+      "emissionColor": [
+        0.35,
+        0.56,
+        0.7
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:27",
+      "name": "Colonnade · 1",
+      "baseColor": [
+        0.14,
+        0.16,
+        0.31
+      ],
+      "emissionColor": [
+        0.14,
+        0.16,
+        0.31
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:28",
+      "name": "Colonnade · 2",
+      "baseColor": [
+        0.24,
+        0.58,
+        1
+      ],
+      "emissionColor": [
+        0.24,
+        0.58,
+        1
+      ],
+      "emissionStrength": 2.5
+    },
+    {
+      "id": "material:29",
+      "name": "Colonnade · 3",
+      "baseColor": [
+        0.35,
+        0.56,
+        0.7
+      ],
+      "emissionColor": [
+        0.35,
+        0.56,
+        0.7
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:30",
+      "name": "Colonnade · 4",
+      "baseColor": [
+        0.35,
+        0.19,
+        0.16
+      ],
+      "emissionColor": [
+        0.35,
+        0.19,
+        0.16
+      ],
+      "emissionStrength": 0.3
+    },
+    {
+      "id": "material:31",
+      "name": "West gallery · 1",
+      "baseColor": [
+        0.14,
+        0.16,
+        0.31
+      ],
+      "emissionColor": [
+        0.14,
+        0.16,
+        0.31
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:32",
+      "name": "West gallery · 2",
+      "baseColor": [
+        0.35,
+        0.56,
+        0.7
+      ],
+      "emissionColor": [
+        0.35,
+        0.56,
+        0.7
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:33",
+      "name": "West gallery · 3",
+      "baseColor": [
+        0.15,
+        0.19,
+        0.46
+      ],
+      "emissionColor": [
+        0.15,
+        0.19,
+        0.46
+      ],
+      "emissionStrength": 0.55
+    },
+    {
+      "id": "material:34",
+      "name": "West gallery · 4",
+      "baseColor": [
+        0.24,
+        0.58,
+        1
+      ],
+      "emissionColor": [
+        0.24,
+        0.58,
+        1
+      ],
+      "emissionStrength": 2
+    },
+    {
+      "id": "material:35",
+      "name": "Planter · 1",
+      "baseColor": [
+        0.35,
+        0.56,
+        0.7
+      ],
+      "emissionColor": [
+        0.35,
+        0.56,
+        0.7
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:36",
+      "name": "Planter · 2",
+      "baseColor": [
+        0.1,
+        0.2,
+        0.27
+      ],
+      "emissionColor": [
+        0.1,
+        0.2,
+        0.27
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:37",
+      "name": "Lantern · 1",
+      "baseColor": [
+        0.35,
+        0.56,
+        0.7
+      ],
+      "emissionColor": [
+        0.35,
+        0.56,
+        0.7
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:38",
+      "name": "Lantern · 2",
+      "baseColor": [
+        0.24,
+        0.58,
+        1
+      ],
+      "emissionColor": [
+        0.24,
+        0.58,
+        1
+      ],
+      "emissionStrength": 3
+    },
+    {
+      "id": "material:39",
+      "name": "East gallery · 1",
+      "baseColor": [
+        0.14,
+        0.16,
+        0.31
+      ],
+      "emissionColor": [
+        0.14,
+        0.16,
+        0.31
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:40",
+      "name": "East gallery · 2",
+      "baseColor": [
+        0.35,
+        0.56,
+        0.7
+      ],
+      "emissionColor": [
+        0.35,
+        0.56,
+        0.7
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:41",
+      "name": "East gallery · 3",
+      "baseColor": [
+        0.15,
+        0.19,
+        0.46
+      ],
+      "emissionColor": [
+        0.15,
+        0.19,
+        0.46
+      ],
+      "emissionStrength": 0.55
+    },
+    {
+      "id": "material:42",
+      "name": "East gallery · 4",
+      "baseColor": [
+        0.24,
+        0.58,
+        1
+      ],
+      "emissionColor": [
+        0.24,
+        0.58,
+        1
+      ],
+      "emissionStrength": 2
+    },
+    {
+      "id": "material:43",
+      "name": "Crystal lantern · 1",
+      "baseColor": [
+        0.14,
+        0.16,
+        0.31
+      ],
+      "emissionColor": [
+        0.14,
+        0.16,
+        0.31
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:44",
+      "name": "Crystal lantern · 2",
+      "baseColor": [
+        0.35,
+        0.56,
+        0.7
+      ],
+      "emissionColor": [
+        0.35,
+        0.56,
+        0.7
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:45",
+      "name": "Crystal lantern · 3",
+      "baseColor": [
+        0.25,
+        0.62,
+        1
+      ],
+      "emissionColor": [
+        0.25,
+        0.62,
+        1
+      ],
+      "emissionStrength": 2
+    },
+    {
+      "id": "material:46",
+      "name": "Movable plinth · 1",
+      "baseColor": [
+        0.35,
+        0.56,
+        0.7
+      ],
+      "emissionColor": [
+        0.35,
+        0.56,
+        0.7
+      ],
+      "emissionStrength": 0
+    },
+    {
+      "id": "material:47",
+      "name": "Prism · 1",
+      "baseColor": [
+        0.22,
+        0.5,
+        0.67
+      ],
+      "emissionColor": [
+        0.22,
+        0.5,
+        0.67
+      ],
+      "emissionStrength": 0.5
     }
   ]
 }

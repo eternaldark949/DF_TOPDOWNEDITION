@@ -30,7 +30,7 @@ export function playerController(actor, input, renderer) {
       actor.body.z=1+Math.sin(distance*5)*Math.min(moving,1)*0.035;
       actor.legs[0].y=Math.sin(distance*5)*Math.min(moving,1)*0.18;actor.legs[1].y=-actor.legs[0].y;
       actor.arms[0].y=-actor.legs[0].y*0.6;actor.arms[1].y=-actor.arms[0].y;
-      actor.bag.shape.emission=loaded?0:0.12;
+      actor.bag.shape.material.emissionStrength=loaded?0:0.12;
     },
   };
 }

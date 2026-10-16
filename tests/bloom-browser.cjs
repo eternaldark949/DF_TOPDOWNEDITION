@@ -124,23 +124,26 @@ const server = http.createServer((req, res) => {
       r.bloom.configure({ mode: "low", strength: 0 });
       const hdr = image(),
         zero = r.bloom.inspect(),
-        reference = r.bloom.targets;
+        reference = r.presentation.targets;
       r.bloom.configure({ strength: 0.9 });
       const bloom = image(),
         on = r.bloom.inspect(),
-        reused = reference === r.bloom.targets;
+        reused = reference === r.presentation.targets;
+      const filterReference = r.bloom.targets;
       image();
-      const cached = reference === r.bloom.targets;
-      r.bloom.configure({ strength: 0, exposure: 2 });
+      const cached = filterReference === r.bloom.targets;
+      r.presentation.configure({ exposure: 2 });
+      r.bloom.configure({ strength: 0 });
       const exposureDifference = difference(hdr, image());
-      r.bloom.configure({ strength: 0.9, exposure: 1.25 });
+      r.presentation.configure({ exposure: 1.25 });
+      r.bloom.configure({ strength: 0.9 });
       // A high threshold and a dark emitter prove extraction does not blur the whole scene.
-      emitter.shape.emission = 0;
+      emitter.shape.material.emissionStrength = 0;
       r.bloom.configure({ threshold: 16, strength: 0 });
       const darkOff = image();
       r.bloom.configure({ strength: 1 });
       const darkOn = image();
-      emitter.shape.emission = 12;
+      emitter.shape.material.emissionStrength = 12;
       r.bloom.configure({ threshold: 1, mode: "high" });
       image();
       const high = r.bloom.inspect();
@@ -171,7 +174,7 @@ const server = http.createServer((req, res) => {
     });
     console.log(JSON.stringify(report.pixels, null, 2));
     assert.ok(report.pixels.exposureDifference.brighter > 100);
-    assert.equal(report.pixels.zero.passes, 1);
+    assert.equal(report.pixels.zero.passes, 0);
     assert.equal(report.pixels.on.effectiveMode, "low");
     assert.equal(report.pixels.error, 0);
     assert.ok(report.pixels.bloomDifference.brighter > 100);
@@ -245,14 +248,14 @@ const server = http.createServer((req, res) => {
       const f = window.fixture,
         r = f.r,
         gl = r.gl;
-      const program = r.bloom.programs[0].program,
-        old = r.bloom.targets;
+      const program = r.presentation.program,
+        old = r.presentation.targets;
       r.canvas.style.cssText = "width:256px;height:192px";
       f.image();
       const resize = {
-        replaced: r.bloom.targets !== old,
-        programReused: r.bloom.programs[0].program === program,
-        width: r.bloom.targets.width,
+        replaced: r.presentation.targets !== old,
+        programReused: r.presentation.program === program,
+        width: r.presentation.targets.width,
       };
       const ext = gl.getExtension("WEBGL_lose_context");
       let restored = false;
@@ -271,10 +274,13 @@ const server = http.createServer((req, res) => {
           poll();
         });
         f.image();
-        restored = r.bloom.inspect().effectiveMode === "high";
+        restored =
+          r.presentation.inspect().effectiveMode === "hdr" &&
+          r.bloom.inspect().effectiveMode === "high";
       }
       // No capability retry loop, and a working antialiased direct render on refusal.
       r.bloom.configure({ mode: "off" });
+      r.presentation.configure({ mode: "direct" });
       const original = gl.getExtension.bind(gl);
       let attempts = 0;
       gl.getExtension = (name) => {
@@ -285,11 +291,13 @@ const server = http.createServer((req, res) => {
         return original(name);
       };
       r.bloom.configure({ mode: "low" });
+      r.presentation.configure({ mode: "hdr" });
       f.image();
       f.image();
-      const refusal = { attempts, ...r.bloom.inspect() };
+      const refusal = { attempts, ...r.presentation.inspect() };
       gl.getExtension = original;
       r.bloom.configure({ mode: "low" });
+      r.presentation.configure({ mode: "auto" });
       f.image();
       const recovered = r.bloom.inspect().effectiveMode === "low";
       for (let i = 0; i < 3; i++) {
@@ -400,6 +408,7 @@ const server = http.createServer((req, res) => {
     report.enni = await page.evaluate(() => ({
       camera: window.enniFixture.r.camera.snapshot(),
       bloom: window.enniFixture.r.bloom.inspect(),
+      presentation: window.enniFixture.r.presentation.inspect(),
       error: window.enniFixture.r.gl.getError(),
     }));
     // A closer architectural view isolates the sign/window halo without changing source materials.
@@ -431,6 +440,7 @@ const server = http.createServer((req, res) => {
     report.detail = await page.evaluate(() => ({
       camera: window.enniFixture.r.camera.snapshot(),
       bloom: window.enniFixture.r.bloom.inspect(),
+      presentation: window.enniFixture.r.presentation.inspect(),
     }));
     await page.setViewportSize({ width: 412, height: 892 });
     await page.evaluate(() => {

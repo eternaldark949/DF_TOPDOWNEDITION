@@ -49,7 +49,7 @@ const root = path.resolve(__dirname, ".."),
         ),
       );
       const mode = p.locator("[data-bloom=mode]"),
-        status = p.locator(".engine-bloom output");
+        status = p.locator(".engine-appearance output");
       let before;
       const exported = async () => {
         const pending = p.waitForEvent("download");
@@ -70,12 +70,12 @@ const root = path.resolve(__dirname, ".."),
         await p.waitForFunction(
           () => document.querySelector("#status").dataset.actor,
         );
-      await p.locator(".engine-bloom").evaluate((e) => (e.open = true));
+      await p.locator(".engine-appearance").evaluate((e) => (e.open = true));
       await mode.selectOption("low");
       await p.waitForFunction(
         () =>
-          document.querySelector(".engine-bloom output").dataset.effective ===
-          "low",
+          document.querySelector(".engine-appearance output").dataset
+            .effective === "low",
       );
       for (const [key, value] of [
         ["strength", ".85"],
@@ -83,7 +83,9 @@ const root = path.resolve(__dirname, ".."),
         ["threshold", "1"],
         ["exposure", "1.25"],
       ]) {
-        const input = p.locator(`[data-bloom=${key}]`);
+        const input = p.locator(
+          `[data-${key === "exposure" ? "presentation" : "bloom"}=${key}]`,
+        );
         await input.fill(value);
         await input.dispatchEvent("change");
       }
@@ -127,13 +129,20 @@ const root = path.resolve(__dirname, ".."),
         await p.waitForFunction(
           () => document.querySelector("[data-bloom=mode]").value === "off",
         );
+        // The coordinator releases Auto HDR on its next frame, independently of the filter.
+        // Wait for the resource report rather than treating the requested mode as completion.
+        await p.waitForFunction(
+          () =>
+            document.querySelector(".engine-appearance output").dataset
+              .bytes === "0",
+        );
         assert.equal(await status.getAttribute("data-bytes"), "0");
         await p.locator("#quality").selectOption("mobile");
         await mode.selectOption("low");
         await p.waitForFunction(
           () =>
-            document.querySelector(".engine-bloom output").dataset.effective ===
-            "low",
+            document.querySelector(".engine-appearance output").dataset
+              .effective === "low",
         );
         const oldActor = await p.locator("#status").getAttribute("data-actor");
         await p.locator("#restart").click();
@@ -149,20 +158,21 @@ const root = path.resolve(__dirname, ".."),
         await mode.selectOption("off");
         await p.waitForFunction(
           () =>
-            document.querySelector(".engine-bloom output").dataset.bytes ===
-            "0",
+            document.querySelector(".engine-appearance output").dataset
+              .bytes === "0",
         );
         await mode.selectOption("low");
         await p.waitForFunction(
           () =>
-            document.querySelector(".engine-bloom output").dataset.effective ===
-            "low",
+            document.querySelector(".engine-appearance output").dataset
+              .effective === "low",
         );
       }
       await mode.selectOption("off");
       await p.waitForFunction(
         () =>
-          document.querySelector(".engine-bloom output").dataset.bytes === "0",
+          document.querySelector(".engine-appearance output").dataset.bytes ===
+          "0",
       );
       assert.deepEqual(errors, []);
       assert.deepEqual(requests, []);
