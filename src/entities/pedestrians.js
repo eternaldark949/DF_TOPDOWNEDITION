@@ -111,7 +111,7 @@
                 let nearestDist = Infinity;
                 
                 for (let node of this.network.nodes) {
-                    const dist = Math.hypot(node.x - this.x, node.y - this.y);
+                    const dx = node.x - this.x, dy = node.y - this.y, dist = dx * dx + dy * dy;   // squared: same nearest
                     if (dist < nearestDist) {
                         nearestDist = dist;
                         nearest = node;

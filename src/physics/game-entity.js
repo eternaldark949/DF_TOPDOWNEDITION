@@ -262,9 +262,14 @@
             // =====================
             
             isOnScreen(camera, canvas, margin = 100) {
-                const center = this.getCenter();
-                const screenX = (center.x - camera.x) * camera.zoom + canvas.width / 2;
-                const screenY = (center.y - camera.y) * camera.zoom + canvas.height / 2;
+                // The base centre inline (no object per call: the collision pass asks every collidable each tick)
+                let cx, cy;
+                if (this.getCenter === GameEntity.prototype.getCenter) {
+                    const mid = this.collisionShape === GameEntity.SHAPE.OBB || this.collisionShape === GameEntity.SHAPE.CIRCLE;
+                    cx = mid ? this.x : this.x + this.width / 2; cy = mid ? this.y : this.y + this.height / 2;
+                } else { const center = this.getCenter(); cx = center.x; cy = center.y; }
+                const screenX = (cx - camera.x) * camera.zoom + canvas.width / 2;
+                const screenY = (cy - camera.y) * camera.zoom + canvas.height / 2;
                 const size = Math.max(this.width, this.height, this.radius * 2);
                 const screenSize = (size / 2 + margin) * camera.zoom;
                 

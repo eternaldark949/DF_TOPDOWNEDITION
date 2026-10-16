@@ -5,7 +5,10 @@ class NativeCasterBodies {
     begin(game=null){
         this.lights=[];
         if(game){
-            for(const l of game.lamps||[])if(l.visible!==false&&game.roomSystem.lampLight(l)>.01&&(game.activeMap.type!=='outdoor'||game.dayCycle().lampsOn))this.lights.push(l);
+            // Only lamps that can reach what is near the view (a city has thousands, and each body asks nearLight)
+            const cam=game.view||{},z=cam.zoom||1,cx=cam.x??game.player.x,cy=cam.y??game.player.y,hw=(game.canvas?.width||1920)/(2*z)+400,hh=(game.canvas?.height||1080)/(2*z)+400;
+            if(game.activeMap.type!=='outdoor'||game.dayCycle().lampsOn)for(const l of game.lamps||[]){const R=l.lightRadius||l.radius||200;
+                if(l.visible!==false&&Math.abs(l.x-cx)<hw+R&&Math.abs(l.y-cy)<hh+R&&game.roomSystem.lampLight(l)>.01)this.lights.push(l);}
             if(this.owner.layers.decorLights){
                 for(const p of game.props||[])if(p.light&&p.visible!==false){
                     const c=p.getCenter();if(game.roomSystem.lightAt(c.x,c.y)<.005)continue;
@@ -100,7 +103,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         for(const group of this.trafficContext.root.children.slice())if(group._nativeEntity&&L.depthSort)root.addChild(group);
         if(L.depthSort){this.playerSprite.zIndex=game.player.y;root.addChild(this.playerSprite);root.sortChildren();}
         this.buildingBaseStage.sortableChildren=this.roofStage.sortableChildren=!!L.depthSort;
-        for(const [b,r]of this.nativeBuildings){r.base.root.zIndex=r.top.root.zIndex=b.y+(b.h||b.height||0);}
+        
         this.roofDetailContext.root.zIndex=Infinity;
         if(L.depthSort){this.buildingBaseStage.sortChildren();this.roofStage.sortChildren();}
     },
@@ -125,7 +128,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             const needed=r.texture.baseTexture.realWidth*r.texture.baseTexture.realHeight*4;
             if(this.shadowBytes()+needed>48*1048576){stats.dropped+=nearby.length;return base;}
             r.dynamicStage=new PIXI.Container();r.dynamicBase=new PIXI.Sprite(base);r.dynamicStage.addChild(r.dynamicBase);
-            r.dynamicTexture=PIXI.RenderTexture.create({width:source.radius*2,height:source.radius*2,resolution:r.density,scaleMode:PIXI.SCALE_MODES.LINEAR});
+            r.dynamicTexture=this.shadowTarget(source.radius*2,source.radius*2,r.density,'animated-shadow-target');
         }
         r.dynamicBase.texture=base;r.dynamicBase.width=r.dynamicBase.height=source.radius*2;
         r.dynamicMeshes||=[];for(const mesh of r.dynamicMeshes)mesh.visible=false;if(r.actorShadow)r.actorShadow.visible=false;
@@ -206,11 +209,35 @@ function nativeCanvasColorGrade() {
     if (memK > 0.001) filterChain += ` saturate(${(1 - 0.5 * memK).toFixed(3)}) sepia(${(0.14 * memK).toFixed(3)}) hue-rotate(${(-22 * memK).toFixed(1)}deg) contrast(${(1 - 0.08 * memK).toFixed(3)})`;
     return filterChain;
 }
+/** A CSS filter chain as colour-matrix steps [[rows (9), offset (3)], ...] (Filter Effects 1, sRGB); at most 12 */
+function nativeGradeSteps(chain){
+    const steps=[],amt=v=>v.endsWith('%')?parseFloat(v)/100:parseFloat(v);
+    for(const [,fn,arg]of String(chain).matchAll(/([a-z-]+)\(([^)]*)\)/g)){
+        let a=amt(arg.trim()),m=null,o=[0,0,0];
+        if(fn==='grayscale'||fn==='sepia'){a=Math.min(1,Math.max(0,a));const s=1-a;
+            m=fn==='grayscale'?[.2126+.7874*s,.7152-.7152*s,.0722-.0722*s,.2126-.2126*s,.7152+.2848*s,.0722-.0722*s,.2126-.2126*s,.7152-.7152*s,.0722+.9278*s]
+                             :[.393+.607*s,.769-.769*s,.189-.189*s,.349-.349*s,.686+.314*s,.168-.168*s,.272-.272*s,.534-.534*s,.131+.869*s];
+            if(a===0)continue;}
+        else if(fn==='saturate'){const s=a;if(s===1)continue;m=[.213+.787*s,.715-.715*s,.072-.072*s,.213-.213*s,.715+.285*s,.072-.072*s,.213-.213*s,.715-.715*s,.072+.928*s];}
+        else if(fn==='brightness'){if(a===1)continue;m=[a,0,0,0,a,0,0,0,a];}
+        else if(fn==='contrast'){if(a===1)continue;m=[a,0,0,0,a,0,0,0,a];o=[.5-.5*a,.5-.5*a,.5-.5*a];}
+        else if(fn==='hue-rotate'){const d=(arg.includes('rad')?parseFloat(arg)*180/Math.PI:arg.includes('turn')?parseFloat(arg)*360:parseFloat(arg))||0;if(d%360===0)continue;
+            const t=d*Math.PI/180,c=Math.cos(t),s=Math.sin(t);
+            m=[.213+c*.787-s*.213,.715-c*.715-s*.715,.072-c*.072+s*.928,.213-c*.213+s*.143,.715+c*.285+s*.140,.072-c*.072-s*.283,.213-c*.213-s*.787,.715-c*.715+s*.715,.072+c*.928+s*.072];}
+        else if(fn==='invert'){a=Math.min(1,Math.max(0,a));if(a===0)continue;const k=1-2*a;m=[k,0,0,0,k,0,0,0,k];o=[a,a,a];}
+        if(m&&steps.length<12)steps.push([m,o]);
+    }
+    return steps;
+}
 Object.assign(NativeWebGLRenderer.prototype,{
+    // Canvas grades the picture with a CSS filter on its canvas. Here the same chain runs in the scene's last pass
+    // (the atmosphere filter): each filter function is its colour matrix, applied in order and clamped as CSS does,
+    // instead of the browser compositing extra full-screen passes over the GL canvas every frame.
     syncColorGrade(game){
-        const filter=nativeCanvasColorGrade.call(game);
-        const applied=this.layers.colorGrade?filter:'none';
-        if(game.canvas.style.filter!==applied)game.canvas.style.filter=applied;
-        this.colorGrade={enabled:this.layers.colorGrade,filter:game.canvas.style.filter};
+        const filter=this.layers.colorGrade?nativeCanvasColorGrade.call(game):'';
+        if(game.canvas.style.filter&&game.canvas.style.filter!=='none')game.canvas.style.filter='none';
+        if(filter!==this.gradeKey){this.gradeKey=filter;const steps=nativeGradeSteps(filter),U=this.atmosphereFilter.uniforms;
+            U.gradeRows.fill(0);U.gradeOff.fill(0);steps.forEach(([m,o],i)=>{U.gradeRows.set(m,i*9);U.gradeOff.set(o,i*3);});U.gradeCount=steps.length;this.gradeSteps=steps.length;}
+        this.colorGrade={enabled:this.layers.colorGrade,filter,gpu:true,steps:this.gradeSteps||0};
     }
 });

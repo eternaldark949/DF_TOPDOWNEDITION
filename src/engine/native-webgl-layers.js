@@ -3,19 +3,21 @@
 const NATIVE_LAYER_LABELS={floor:'Floor art',backdrop:'City backdrop',windows:'Window glass',walls:'Walls',doors:'Doors',fixtures:'Lamp fixtures',furniture:'Furniture',player:'Player',
     lighting:'Lighting',colorWash:'Colored light wash',decorLights:'Decor light sources',wallOcclusion:'Wall occlusion',propShadows:'Furniture shadows',
     playerShadows:'Player shadows',indicators:'Player marker',furnitureHints:'Grab hints',contactShadows:'Contact shadows',roomVeil:'Room veil',nightTint:'Night tint',
-    glows:'Emissive glows',softShadows:'Soft edges',bloom:'Bloom',atmosphere:'Atmosphere',decorAnimation:'Decor animation',characterAnimation:'Character animation',shapeShadows:'Shape-accurate shadows',linens:'Curtains',shadowDetail:'High-resolution shadows',projectiles:'Bullet / fireball FX',weaponFx:'Muzzle / weapon FX',casings:'Spent casings',impactParticles:'Impact particles',decals:'Ground decals',overlays:'Combat cues',transientLights:'Shot lighting',fxGlow:'FX glow',buildings:'City buildings / roofs',people:'People / enemies',vehicles:'Vehicles',streetDetails:'Street details',worldMarkers:'World markers',rainDrops:'Rain drops',rainSplashes:'Rain splashes',crowdSprites:'GPU crowd animation cache',buildingCache:'GPU building glow cache',rainQuads:'GPU rain quads',depthSort:'Scene depth sorting',npcShadows:'NPC shape shadows',vehicleShadows:'Vehicle shadows',liveBackdrop:'Live veranda city',colorGrade:'Final color grade / vision',entrancePads:'Entrance pads',entranceLabels:'Entrance labels',daylight:'Daylight color / haze',sunShadows:'Sun cast shadows',cloudShadows:'Cloud shadows',windowDaylight:'Window daylight',glassRain:'Rain on glass',wetRoofs:'Wet roof highlights',wetSurfaces:'Wet ground / puddles',puddleRipples:'Puddle ripples',reflectionLights:'Reflected lights',reflectionDetail:'Reflected characters / vehicles',cameraEffects:'Camera effects',scopeView:'Sniper scope',radar:'Tactical radar',bokeh:'Bokeh',mirage:'Sound mirage',noiseRings:'Simple sound rings',speech:'Speech bubbles',playerEmotes:'Player emotes',executionCues:'Execution cues',flitEffects:'Flit effects',ghosts:'Graveyard ghosts',enemyEffects:'Special enemy effects',fireGlow:'Fire light glow',mapEdges:'Map edge veil',glassRefraction:'Glass refraction',reflectionProps:'Reflected furniture',reflectionFoliage:'Reflected foliage',reflectionLive:'Reflected landmark effects',debugOverlay:'Debug overlay',missionHud:'Objective / vehicle HUD',nightHeat:'Night vision hostile heat'};
+    glows:'Emissive glows',softShadows:'Soft edges',bloom:'Bloom',atmosphere:'Atmosphere',decorAnimation:'Decor animation',characterAnimation:'Character animation',shapeShadows:'Shape-accurate shadows',linens:'Curtains',shadowDetail:'High-resolution shadows',projectiles:'Bullet / fireball FX',weaponFx:'Muzzle / weapon FX',casings:'Spent casings',impactParticles:'Impact particles',decals:'Ground decals',overlays:'Combat cues',transientLights:'Shot lighting',fxGlow:'FX glow',buildings:'City buildings / roofs',people:'People / enemies',vehicles:'Vehicles',streetDetails:'Street details',worldMarkers:'World markers',rainDrops:'Rain drops',rainSplashes:'Rain splashes',crowdSprites:'GPU crowd animation cache',rainQuads:'GPU rain quads',depthSort:'Scene depth sorting',npcShadows:'NPC shape shadows',vehicleShadows:'Vehicle shadows',liveBackdrop:'Live veranda city',colorGrade:'Final color grade / vision',entrancePads:'Entrance pads',entranceLabels:'Entrance labels',daylight:'Daylight color / haze',sunShadows:'Sun cast shadows',cloudShadows:'Cloud shadows',windowDaylight:'Window daylight',glassRain:'Rain on glass',wetRoofs:'Wet roof highlights',wetSurfaces:'Wet ground / puddles',puddleRipples:'Puddle ripples',reflectionLights:'Reflected lights',reflectionDetail:'Reflected characters / vehicles',cameraEffects:'Camera effects',scopeView:'Sniper scope',radar:'Tactical radar',bokeh:'Bokeh',mirage:'Sound mirage',noiseRings:'Simple sound rings',speech:'Speech bubbles',playerEmotes:'Player emotes',executionCues:'Execution cues',flitEffects:'Flit effects',ghosts:'Graveyard ghosts',enemyEffects:'Special enemy effects',fireGlow:'Fire light glow',mapEdges:'Map edge veil',glassRefraction:'Glass refraction',reflectionProps:'Reflected furniture',reflectionFoliage:'Reflected foliage',reflectionLive:'Reflected landmark effects',debugOverlay:'Debug overlay',missionHud:'Objective / vehicle HUD',nightHeat:'Night vision hostile heat'};
 const NATIVE_LAYER_BASELINE={floor:true,backdrop:true,walls:true,furniture:true,player:true,lighting:true,characterAnimation:true};
 const NATIVE_LAYER_DEFAULTS=Object.fromEntries(Object.keys(NATIVE_LAYER_LABELS).map(k=>[k,true]));
 Object.assign(NativeWebGLRenderer.prototype,{
     setLayers(values){
         let changed=false;for(const [k,v] of Object.entries(values))if(k in this.layers&&this.layers[k]!==!!v){this.layers[k]=!!v;changed=true;}
+        // Bloom is the game's own setting (Settings → Bloom): the toggle here and that one are the same switch
+        if('bloom' in values&&typeof GameSettings!=='undefined')GameSettings.bloom=this.layers.bloom;
         if(!changed)return;
         this.resetSample();
         if(this.onLayersChanged)this.onLayersChanged();
     },
     preset(name){
         const shadows=new Set(['colorWash','decorLights','wallOcclusion','propShadows','playerShadows','contactShadows','indicators','furnitureHints','roomVeil','nightTint','glows','doors','windows','fixtures','shapeShadows','linens','shadowDetail','npcShadows','vehicleShadows']);
-        this.setLayers(Object.fromEntries(Object.keys(this.layers).map(k=>[k,name==='canvas'||!!NATIVE_LAYER_BASELINE[k]||(name==='shadows'&&shadows.has(k))])));
+        this.setLayers(Object.fromEntries(Object.keys(this.layers).filter(k=>k!=='bloom').map(k=>[k,name==='canvas'||!!NATIVE_LAYER_BASELINE[k]||(name==='shadows'&&shadows.has(k))])));   // (bloom stays the player's setting)
     },
     initLayers(){
         this.shadowCache=new Map();this.shadowStats={};this.layerStages={};
@@ -47,8 +49,14 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.atmosphereFilter=new PIXI.Filter(undefined,`
             precision highp float;varying vec2 vTextureCoord;uniform sampler2D uSampler;
             uniform vec4 inputSize;uniform vec4 outputFrame;uniform vec2 viewport;uniform float clock;uniform vec4 tint;
+            uniform vec3 gradeRows[36];uniform vec3 gradeOff[12];uniform float gradeCount;
             void main(){vec4 c=texture2D(uSampler,vTextureCoord);vec2 p=(outputFrame.xy+vTextureCoord*inputSize.xy)/viewport;
-                gl_FragColor=vec4(mix(c.rgb,tint.rgb*c.a,tint.a),c.a);}`,{viewport:new Float32Array(2),clock:0,tint:new Float32Array([1,.627,.196,.04])});
+                vec3 rgb=mix(c.rgb,tint.rgb*c.a,tint.a);
+                // The colour grade (Canvas's CSS filter chain), one clamped step per filter function, on straight colour
+                if(gradeCount>0.){vec3 s=c.a>0.?rgb/c.a:rgb;
+                    for(int i=0;i<12;i++){if(float(i)>=gradeCount)break;s=clamp(vec3(dot(gradeRows[i*3],s),dot(gradeRows[i*3+1],s),dot(gradeRows[i*3+2],s))+gradeOff[i],0.,1.);}
+                    rgb=s*c.a;}
+                gl_FragColor=vec4(rgb,c.a);}`,{viewport:new Float32Array(2),clock:0,tint:new Float32Array([1,.627,.196,.04]),gradeRows:new Float32Array(108),gradeOff:new Float32Array(36),gradeCount:0});
         this.atmosphereFilter.padding=0;
     },
     clearLayers(){
@@ -155,10 +163,12 @@ Object.assign(NativeWebGLRenderer.prototype,{
                 g.position.set(h.x,h.y);g.rotation=(p.angle||0)+i*Math.PI/2+Math.PI;g.alpha=i===F.side?1:.75;g.scale.set(i===F.side?1.35:1);}
         }
         const t=_frameTime/1000;
-        const filters=[];if(L.bloom)filters.push(this.sceneBloom);if(L.atmosphere)filters.push(this.atmosphereFilter);
+        if(typeof GameSettings!=='undefined'&&L.bloom!==!!GameSettings.bloom)this.setLayers({bloom:!!GameSettings.bloom});   // follow Settings → Bloom
+        const filters=[];if(L.bloom&&game.getAmbientDarkness()>.2)filters.push(this.sceneBloom);   // Canvas blooms only once it is dark (lighting.js drawBloomPass)
+        if(L.atmosphere||this.gradeSteps)filters.push(this.atmosphereFilter);
         this.stage.filters=filters.length?filters:null;
         this.stage.filterArea=this.world.filterArea;this.atmosphereFilter.uniforms.viewport.set([game.canvas.width,game.canvas.height]);
-        const tint={amber:[1,.627,.196,.04],violet:[.471,.235,.784,.04],crimson:[.784,.196,.275,.03],teal:[.196,.706,.784,.03]}[GameSettings.atmosphereTint]||[0,0,0,0];
+        const tint={amber:[1,.627,.196,.04],violet:[.471,.235,.784,.04],crimson:[.784,.196,.275,.03],teal:[.196,.706,.784,.03]}[GameSettings.atmosphereTint]||[0,0,0,0];if(!L.atmosphere)tint[3]=0;
         this.atmosphereFilter.uniforms.tint.set(tint);
         this.atmosphereFilter.uniforms.clock=Math.floor(t*30)/30;
         this.layerStages={sceneLayersMs:performance.now()-start};
@@ -185,7 +195,12 @@ Object.assign(NativeWebGLRenderer.prototype,{
     // in power-of-two steps so camera zoom easing doesn't reallocate every frame. High-resolution
     // shadows allow up to 768 texels across a light (was 256), standard 512 (was 128).
     retireShadow(r){(this.retiredShadows||(this.retiredShadows=[])).push({r,frame:this.frameId});},
-    releaseShadows(){const keep=[];for(const x of this.retiredShadows||[]){if(this.frameId-x.frame<2){keep.push(x);continue;}const r=x.r;r.stage.destroy({children:true});r.texture.destroy(true);if(r.dynamicStage){r.dynamicStage.destroy({children:true});r.dynamicTexture.destroy(true);}}this.retiredShadows=keep;},
+    releaseShadows(){const keep=[];for(const x of this.retiredShadows||[]){if(this.frameId-x.frame<2){keep.push(x);continue;}const r=x.r;r.stage.destroy({children:true});this.poolShadowTarget(r.texture);if(r.dynamicStage){r.dynamicStage.destroy({children:true});this.poolShadowTarget(r.dynamicTexture);}}this.retiredShadows=keep;},
+    // Light-shadow targets are reused by size: lights coming and going (or the zoom stepping their density) take a
+    // free one of the same size instead of allocating GPU memory each time
+    poolShadowTarget(t){const P=this.shadowTargetPool||(this.shadowTargetPool=[]);if(!t||t.destroyed)return;P.push(t);while(P.length>24)P.shift().destroy(true);},
+    shadowTarget(w,h,resolution,origin){const P=this.shadowTargetPool||(this.shadowTargetPool=[]),i=P.findIndex(t=>t.width===w&&t.height===h&&t.baseTexture.resolution===resolution);
+        if(i>=0)return P.splice(i,1)[0];return this.target(PIXI.RenderTexture.create({width:w,height:h,resolution,scaleMode:PIXI.SCALE_MODES.LINEAR}),origin);},
     shadowDensity(radius){
         const px=(game.canvas.width/Math.max(1,game.canvas.clientWidth||game.canvas.width))*(game.view?.zoom||1),cap=this.layers.shadowDetail?768:512;
         const want=Math.min(cap,Math.max(64,radius*2*px/1.5));let density=Math.pow(2,Math.round(Math.log2(want/(radius*2))));
@@ -202,7 +217,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             const stage=new PIXI.Container(),sprite=new PIXI.Sprite(this.lightGradient),mask=new PIXI.Graphics(),shadow=new PIXI.Graphics();
             sprite.position.set(radius,radius);sprite.anchor.set(.5);sprite.width=sprite.height=radius*2;
             shadow.blendMode=PIXI.BLEND_MODES.ERASE;stage.addChild(sprite,mask,shadow);
-            const texture=this.target(PIXI.RenderTexture.create({width:radius*2,height:radius*2,resolution:density,scaleMode:PIXI.SCALE_MODES.LINEAR}),'static-shadow-target');
+            const texture=this.shadowTarget(radius*2,radius*2,density,'static-shadow-target');
             r={stage,sprite,mask,shadow,texture,radius,density};this.shadowCache.set(source.owner,r);
         }
         r.sprite.texture=source.cookie||((source.wash??.08)===.08?this.holeGradient:this.decorGradient);
@@ -245,7 +260,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         if(!r.dynamicStage){
             r.dynamicStage=new PIXI.Container();r.dynamicBase=new PIXI.Sprite(base);r.dynamicStage.addChild(r.dynamicBase);
             r.actorShadow=new NativeActorShadowMesh();r.dynamicStage.addChild(r.actorShadow);
-            r.dynamicTexture=this.target(PIXI.RenderTexture.create({width:source.radius*2,height:source.radius*2,resolution:r.density,scaleMode:PIXI.SCALE_MODES.LINEAR}),'animated-shadow-target');
+            r.dynamicTexture=this.shadowTarget(source.radius*2,source.radius*2,r.density,'animated-shadow-target');
         }
         r.dynamicBase.texture=base;r.dynamicBase.width=r.dynamicBase.height=source.radius*2;
         const len=Math.min(120,source.radius-d,d*24/Math.max(1,(source.elevation??84)-24)),u=r.actorShadow.shader.uniforms;
@@ -298,19 +313,18 @@ Object.assign(NativeWebGLRenderer.prototype,{
         for(const lamp of live){
             const inView=lamp.visible!==false&&Math.abs(lamp.x-v.x)<=game.canvas.width/(2*v.zoom)+160&&Math.abs(lamp.y-v.y)<=game.canvas.height/(2*v.zoom)+160;
             let r=this.fixtureNodes.get(lamp);if(!inView){if(r)r.node.visible=false;continue;}
-            const key=lamp.lampType+':'+lamp.color;let assets=this.fixtureAssets.get(key);
-            if(!assets){assets=[];
-                for(const on of [false,true])assets.push(this.bake(192,192,c=>{
-                    const saved={angle:lamp.angle,k:lamp._lightK,forced:lamp._forcedOff,visible:lamp.visible,lod:_zoomLOD};
-                    try{lamp.angle=0;lamp._lightK=1;lamp._forcedOff=false;lamp.visible=true;_zoomLOD=1;c.translate(96-lamp.x,96-lamp.y);lamp.draw(c,on?0:1);}
-                    finally{lamp.angle=saved.angle;lamp._lightK=saved.k;lamp._forcedOff=saved.forced;lamp.visible=saved.visible;_zoomLOD=saved.lod;}
-                },'fixture'));this.fixtureAssets.set(key,assets);}
-            if(!r){r={node:new PIXI.Container(),off:new PIXI.Sprite(),on:new PIXI.Sprite(),particles:new PIXI.Graphics()};for(const s of [r.off,r.on]){s.anchor.set(.5);r.node.addChild(s);}r.node.addChild(r.particles);this.fixtures.addChild(r.node);this.fixtureNodes.set(lamp,r);}
+            if(!this.glLamps)this.glLamps=new GLLamps();
+            if(!r){r={node:new PIXI.Container(),body:new PIXI.Container(),parts:[],particles:new PIXI.Graphics()};r.node.addChild(r.body,r.particles);this.fixtures.addChild(r.node);this.fixtureNodes.set(lamp,r);}
             r.node.visible=true;r.node.zIndex=lamp.y;r.particles.clear();const dots=r.particles;
             lamp._lightK=game.roomSystem.lampLight(lamp)*lampFlicker(lamp);lamp._forcedOff=lamp._lightK<.02;
-            const room=game.roomSystem.rooms[lamp._roomId],on=!lamp._forcedOff&&(room?.type!=='outdoor'||day.lampsOn),k=on?Math.min(1,lamp._lightK):0;
-            r.off.texture=assets[0];r.on.texture=assets[1];r.off.visible=k<1;r.on.visible=k>0;r.on.alpha=k;
-            for(const s of [r.off,r.on]){s.position.set(lamp.x,lamp.y);s.rotation=lamp.angle||0;}
+            const room=game.roomSystem.rooms[lamp._roomId],sky=room?room.type==='outdoor':game.activeMap.type==='outdoor',on=!lamp._forcedOff&&(!sky||day.lampsOn),k=on?Math.min(1,lamp._lightK):0;
+            // the lamp's body: GPU geometry pieces (gl/lamps.js), each faded as Canvas fades its sprites
+            const pieces=this.glLamps.body(lamp,on,k),postScale=LAMP_TYPE_STYLE[lamp.lampType]?LAMP_POST_SCALE:1;
+            r.body.position.set(lamp.x,lamp.y);r.body.rotation=lamp.angle||0;r.body.scale.set(postScale);
+            for(let i=0;i<Math.max(pieces.length,r.parts.length);i++){
+                let part=r.parts[i];if(!part&&pieces[i]){part=r.parts[i]=new GLInstance();r.body.addChild(part);}
+                if(pieces[i]){part.geometry=pieces[i][0];part.alpha=pieces[i][1];part.visible=true;}else part.visible=false;
+            }
             if(on&&_zoomLOD<1){
                 const style=LAMP_TYPE_STYLE[lamp.lampType],bulbs=style?LAMP_STYLES[style].bulbs:[{x:0,y:0}];
                 const time=((this.layers.decorAnimation?_frameTime:0)+lamp.animOffset)/1000;
@@ -346,8 +360,10 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.skyLight.visible=true;this.skyLight.scale.set(view.zoom);this.skyLight.position.copyFrom(this.world.position);
         this.lightSprites.scale.set(view.zoom);this.lightSprites.position.copyFrom(this.world.position);
         // Canvas lights every lamp, including the hidden light-only ones rooms place (map-entities.js hiddenLamp).
-        const sources=(game.lamps||[]).map(l=>({owner:l,x:l.x,y:l.y,radius:l.lightRadius||l.radius||200,
-            color:l.color||'#ffeebb',elevation:l.elevation??84,wash:.08,lamp:true,colorWash:game.activeMap.type==='outdoor'?.22:.08,alpha:(game.activeMap.type==='outdoor'&&!game.dayCycle().lampsOn?0:1)*game.roomSystem.lampLight(l)*lampFlicker(l)*lampWake(l)*(l.intensity??1)}));
+        // Only lamps whose light reaches the view are weighed (a city has thousands; flicker, wake and room light cost per lamp)
+        const outdoor=game.activeMap.type==='outdoor',lampsOff=outdoor&&!game.dayCycle().lampsOn,hw=w/(2*view.zoom),hh=h/(2*view.zoom),sources=[];
+        if(!lampsOff)for(const l of game.lamps||[]){const radius=l.lightRadius||l.radius||200;if(Math.abs(l.x-view.x)>hw+radius||Math.abs(l.y-view.y)>hh+radius)continue;
+            sources.push({owner:l,x:l.x,y:l.y,radius,color:l.color||'#ffeebb',elevation:l.elevation??84,wash:.08,lamp:true,colorWash:outdoor?.22:.08,alpha:game.roomSystem.lampLight(l)*lampFlicker(l)*lampWake(l)*(l.intensity??1)});}
         if(L.decorLights){
             for(const p of game.props||[])if(p.visible!==false&&p.light){const c=p.getCenter(),q=p.light;
                 sources.push({owner:p,x:c.x+(q.dx||0),y:c.y+(q.dy||0),radius:q.radius||Math.max(q.w||0,q.h||0)/2||180,
@@ -358,7 +374,10 @@ Object.assign(NativeWebGLRenderer.prototype,{
         }
         if(L.transientLights)sources.push(...this.transientSources);
         for(let i=sources.length-1;i>=0;i--){const q=sources[i];if(q.alpha<.005||Math.abs(q.x-view.x)>w/(2*view.zoom)+q.radius||Math.abs(q.y-view.y)>h/(2*view.zoom)+q.radius)sources.splice(i,1);}
-        sources.sort((a,b)=>Math.hypot(a.x-view.x,a.y-view.y)-Math.hypot(b.x-view.x,b.y-view.y));sources.length=Math.min(sources.length,L.decorLights?40:24);
+        sources.sort((a,b)=>Math.hypot(a.x-view.x,a.y-view.y)-Math.hypot(b.x-view.x,b.y-view.y));
+        // Canvas lights only the nearest lamps for the zoom (draw.js _maxLitLamps): zoomed out, the far ones stay dark
+        {const budget=_zoomLOD===2?10:_zoomLOD===1?18:40;let lamps=0;for(let i=0;i<sources.length;i++)if(sources[i].lamp&&++lamps>budget)sources.splice(i--,1);}
+        sources.length=Math.min(sources.length,L.decorLights?40:24);
         const occlusion=L.wallOcclusion||L.propShadows||L.playerShadows||L.npcShadows||L.vehicleShadows,casters=occlusion?this.casters(game):[],walls=getOccluders(game.activeMap);
         const wallKey=walls.map(w=>[w.x,w.y,w.w,w.h].join(',')).join(';');
         // Fit this frame's shadow textures (static + animated) into ~40 MB: halve every light's density until they fit.
@@ -380,15 +399,20 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.lightStage.filters=L.softShadows?[this.softFilter]:null;
         this.lighting.uniforms.mapSize.set([game.activeMap.width,game.activeMap.height]);
         this.lighting.uniforms.nightTint=L.nightTint?1:0;
+        // The colour of the dark: the hour's outdoors (violet-indigo at night, gold at dusk, rose at dawn), night's violet indoors (lighting.js step 3)
+        {const t=(game.activeMap.type==='indoor'?'22, 10, 48':game.dayCycle().tintRGB).split(',');for(let i=0;i<3;i++)this.lighting.uniforms.darkTint[i]=+t[i]/255;}
         this.lighting.uniforms.viewport.set([this.lightTarget.width,this.lightTarget.height]);
-        this.paintLightSources(game,view);this.renderer.render(this.lightStage,{renderTexture:this.lightTarget,clear:true});
+        this.paintLightSources(game,view);
+        // Neon pools, headlights, underglow (gl/light-pools.js)
+        if(!this.lightPools)this.lightPools=new GLLightPools(this.lightStage);this.lightPools.sync(game,view,this.lightSprites);this.lightPools.show(false);
+        this.renderer.render(this.lightStage,{renderTexture:this.lightTarget,clear:true});
         this.lighting.uniforms.colorGain=L.colorWash ? game.getAmbientDarkness() : 0;
         if(L.colorWash){
             this.lightBase.visible=false;this.skyLight.visible=false;this.surfaces.windowHole.root.visible=false;this.surfaces.windowColor.root.visible=true;
             if(!this.colorSprites){this.colorSprites=new PIXI.Container();this.lightStage.addChild(this.colorSprites);}this.colorSprites.visible=true;this.colorSprites.position.copyFrom(this.lightSprites.position);this.colorSprites.scale.copyFrom(this.lightSprites.scale);this.lightSprites.visible=false;
             for(let i=0;i<Math.max(sources.length,this.colorSprites.children.length);i++){let m=this.colorSprites.children[i];if(!m){m=new NativeLightColorMesh();this.colorSprites.addChild(m);}const source=sources[i];m.visible=!!source;if(!source)continue;const s=this.lightSprites.children[i],u=m.shader.uniforms;m.position.set(s.x-s.width/2,s.y-s.height/2);m.scale.set(s.width,s.height);u.hole=s.texture;if(m.color!==source.color){m.color=source.color;u.tint.set(new PIXI.Color(source.color).toArray().slice(0,3));}u.strength=s.alpha*(source.colorWash??source.wash);u.lamp=source.lamp?1:0;}
 
-            this.showLightSourceColor(true);this.renderer.render(this.lightStage,{renderTexture:this.colorTarget,clear:true});this.showLightSourceColor(false);this.colorSprites.visible=false;this.lightSprites.visible=true;this.lightBase.visible=true;this.skyLight.visible=true;this.surfaces.windowHole.root.visible=true;this.surfaces.windowColor.root.visible=false;
+            this.showLightSourceColor(true);this.lightPools.show(true);this.renderer.render(this.lightStage,{renderTexture:this.colorTarget,clear:true});this.showLightSourceColor(false);this.lightPools.show(false);this.colorSprites.visible=false;this.lightSprites.visible=true;this.lightBase.visible=true;this.skyLight.visible=true;this.surfaces.windowHole.root.visible=true;this.surfaces.windowColor.root.visible=false;
         }
         this.layerStages.lightingMs=performance.now()-start;
     }

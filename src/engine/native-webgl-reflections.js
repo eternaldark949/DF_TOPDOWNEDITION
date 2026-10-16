@@ -75,12 +75,6 @@ class NativeWetReflections{
                     if(car.dead||car.visible===false||!near(car.x,car.y,60))continue;const ca=Math.cos(car.angle||0),sa=Math.sin(car.angle||0),h=(car.length||40)/2,wd=(car.width||20)/3,f=(car.fade??1)*night;
                     for(const sign of [-1,1]){const px=-sa*wd*sign,py=ca*wd*sign;glow(car.x+ca*h+px,car.y+sa*h+py+14,car.headlightColor||'#fff2d6',12,44,.9*f);glow(car.x-ca*h+px,car.y-sa*h+py+12,'#ff3048',10,34,.75*f);}
                 }
-                if(q!=='medium'&&L.buildings)for(const [b,record]of r.nativeBuildings){
-                    const gy=b.y+b.h;if(!record.glowTarget||!record.glowMesh?.visible||!near(b.x+b.w/2,gy,Math.max(200,b.w/2))||!onWet(b.x+b.w/2,gy+100,b.w))continue;
-                    if(this.stats.buildings>=8){this.stats.dropped++;continue;}
-                    const c=this.light;c.save();c.translate(0,gy);c.scale(1,-.75);c.translate(0,-gy);const node=c.node(NativeReflectionImage);node.shader.uniforms.image=record.glowTarget;node.shader.uniforms.opacity=.45;node.blendMode=PIXI.BLEND_MODES.ADD;
-                    record.glowMesh.transform.updateLocalTransform();node.transform.setFromMatrix(c.matrix.clone().append(record.glowMesh.transform.localTransform));c.restore();this.stats.buildings++;
-                }
             }
             if(surf?.glowShift&&L.glows){const c=this.light;c.current=null;const node=c.node(NativeReflectionImage);
                 // One resident GPU snapshot of the already prepared room glow,
@@ -93,10 +87,10 @@ class NativeWetReflections{
             for(const p of game.projectiles||[])if(p.active!==false)glow(p.x,p.y+12,p.color||'#ffffff',12,26,.6);
         }
         if(L.reflectionLights&&L.reflectionLive&&L.glows&&night>.01&&q!=='medium'){
-            const records=[...r.nativeBuildings].filter(([b,record])=>record.glowLive?.root.visible&&record.glowLive.root.children.length&&near(b.x+b.w/2,b.y+b.h,Math.max(200,b.w/2))&&onWet(b.x+b.w/2,b.y+b.h+100,b.w)).slice(0,4);
+            const records=(r.glBuildings?.visible()||[]).filter(([b,record])=>record.glow.visible&&near(b.x+b.w/2,b.y+b.h,Math.max(200,b.w/2))&&onWet(b.x+b.w/2,b.y+b.h+100,b.w)).slice(0,4);
             if(records.length){const res=Math.min(.5,512/Math.max(W,H)),needed=Math.ceil(W*res)*Math.ceil(H*res)*4,old=this.liveTarget?this.liveTarget.baseTexture.realWidth*this.liveTarget.baseTexture.realHeight*4:0;
                 if(this.bytes()-old+needed<=24*1048576){if(!this.liveTarget||this.liveSize!==[W,H,res].join(':')){this.liveTarget?.destroy(true);this.liveTarget=PIXI.RenderTexture.create({width:W,height:H,resolution:res});this.liveSize=[W,H,res].join(':');}
-                    for(let i=0;i<records.length;i++){const [b,record]=records[i],gy=b.y+b.h,transform=new PIXI.Matrix(view.zoom,0,0,view.zoom,r.world.x,r.world.y).append(new PIXI.Matrix(1,0,0,-.75,0,gy*1.75));r.renderer.render(record.glowLive.root,{renderTexture:this.liveTarget,clear:i===0,transform});this.stats.liveBuildings++;}
+                    for(let i=0;i<records.length;i++){const [b,record]=records[i],gy=b.y+b.h,transform=new PIXI.Matrix(view.zoom,0,0,view.zoom,r.world.x,r.world.y).append(new PIXI.Matrix(1,0,0,-.75,0,gy*1.75));r.renderer.render(record.glow,{renderTexture:this.liveTarget,clear:i===0,transform});this.stats.liveBuildings++;}
                     const node=this.light.node(NativeReflectionImage);node.shader.uniforms.image=this.liveTarget;node.shader.uniforms.opacity=.45;node.blendMode=PIXI.BLEND_MODES.ADD;node.position.set(0,0);node.scale.set(W,H);
                 }else this.stats.dropped+=records.length;
             }
@@ -145,7 +139,7 @@ class NativeWetReflections{
                 }
             }else{this.light.globalCompositeOperation='destination-out';this.light.fillStyle='#000';for(const m of movers)game._reflShape(this.light,m,.85);}
         }
-        if(L.puddleRipples&&game._ripples?.length){const ripple=this.ripple;ripple.root.visible=true;game._drawRipples(ripple,night>.5);
+        if(L.puddleRipples&&game._ripples?.length){const ripple=this.ripple;ripple.root.visible=true;if(!this.rings||this.rings.destroyed)this.rings=new GLRipples();ripple.root.addChild(this.rings);this.rings.sync(game._ripples,night>.5,(game.camera?.zoom||1)*(game._renderScale||1));
             if(!this.rippleFilter){this.rippleFilter=new PIXI.Filter(undefined,`precision highp float;varying vec2 vTextureCoord;uniform sampler2D uSampler;uniform vec4 inputSize;uniform vec4 outputFrame;uniform sampler2D wetMask;uniform vec2 viewport;
                 void main(){vec2 p=(outputFrame.xy+vTextureCoord*inputSize.xy)/viewport;gl_FragColor=texture2D(uSampler,vTextureCoord)*texture2D(wetMask,p).a;}`,{wetMask:this.maskTarget,viewport:new Float32Array([W,H])});this.rippleFilter.resolution=.5;}
             this.rippleFilter.uniforms.wetMask=this.maskTarget;this.rippleFilter.uniforms.viewport.set([W,H]);ripple.root.filters=[this.rippleFilter];ripple.root.filterArea=new PIXI.Rectangle(0,0,W,H);
