@@ -5,9 +5,10 @@
  */
 
 /** Add a solid box. Colors are linear RGB; emission is a dimensionless gain.
+ * Set castShadow=false to exclude geometry from shadow depth passes.
  * Set ambientBlocker=false for decorative shapes that should not contribute analytic AO. */
-export function box(world, { x = 0, y = 0, z = 0, size = [1,1,1], color = [0.3,0.3,0.4], emission = 0, parent = null, yaw = 0, ambientBlocker = true } = {}) {
-  return world.create({ x, y, z, yaw, parent, shape: { size, color, emission, ambientBlocker } });
+export function box(world, { x = 0, y = 0, z = 0, size = [1,1,1], color = [0.3,0.3,0.4], emission = 0, parent = null, yaw = 0, ambientBlocker = true, castShadow = true } = {}) {
+  return world.create({ x, y, z, yaw, parent, shape: { size, color, emission, ambientBlocker, castShadow } });
 }
 
 /**

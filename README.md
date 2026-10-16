@@ -1,10 +1,10 @@
 # ETRNLNINE — Engine foundation plan
 
-**Status: foundation, two-world flitting, integrated profiler, and ambient occlusion implemented; broader engine work remains planned.**
+**Status: foundation, two-world flitting, integrated profiler, ambient occlusion, and lighting/shadows implemented; broader engine work remains planned.**
 
 **Owner: ETERNAL / @eternaldark949.**
 
-**Recorded and updated: 2026-10-15.**
+**Recorded 2026-10-15; updated 2026-10-16.**
 
 **Branch: `engine/etrnlnine`, an independent root history in `DF_TOPDOWNEDITION`.**
 
@@ -14,7 +14,9 @@ This document records the owner's requirements and the architectural agreement r
 
 The branch was intentionally created with only this plan. On 2026-10-15, after reviewing the plan and first-milestone proposal, the owner invited implementation to begin. The first runnable foundation follows [First Light decisions and source guide](docs/decisions/0001-first-light.md). No wholesale legacy import or expansion into every brainstorm is implied.
 
-**Current milestone:** [Ambient occlusion decisions and API](docs/decisions/0004-ambient-occlusion.md) · [screenshots and verification](docs/milestones/ambient-occlusion/README.md).
+**Current milestone:** [Lighting/shadow decisions and API](docs/decisions/0005-lighting-and-shadows.md) · [screenshots and verification](docs/milestones/lighting/README.md).
+
+**Ambient occlusion:** [decisions and API](docs/decisions/0004-ambient-occlusion.md) · [screenshots and verification](docs/milestones/ambient-occlusion/README.md).
 
 **Engine profiler:** [decisions and API](docs/decisions/0003-profiler.md) · [screenshots and verification](docs/milestones/profiler/README.md).
 
@@ -44,6 +46,7 @@ New ideas are welcome. Distinguish agreed requirements from proposed details and
 14. [Remaining decisions and implementation sequence](#14-remaining-planning-decisions)
 15. [Integrated engine profiler](#15-integrated-engine-profiler)
 16. [Ambient occlusion](#16-ambient-occlusion-and-rendering-direction)
+17. [Lighting and shadows](#17-lighting-and-shadows)
 
 ## Decision status
 
@@ -51,7 +54,7 @@ New ideas are welcome. Distinguish agreed requirements from proposed details and
 - **Proposed implementation direction:** a concrete way to realize that intent. These details guide design review; they are not finalized APIs, algorithms, or numeric budgets.
 - **Open decision:** an unresolved choice that must be recorded before dependent implementation.
 
-Section 10 records the carryovers the owner asked to include. Carrying over a feature means preserving and improving its purpose, not copying unfinished Python methods or committing to every mechanism proposed below. The foundation, two-world preparation/transfer, integrated profiler, and ambient occlusion milestones are implemented; the broader carryover scope remains a plan. Adding detail does not automatically authorize every proposed extension.
+Section 10 records the carryovers the owner asked to include. Carrying over a feature means preserving and improving its purpose, not copying unfinished Python methods or committing to every mechanism proposed below. The foundation, two-world preparation/transfer, integrated profiler, ambient occlusion, and lighting/shadow milestones are implemented; the broader carryover scope remains a plan. Adding detail does not automatically authorize every proposed extension.
 
 ## 1. Purpose and philosophy
 
@@ -536,4 +539,12 @@ Future spatial/motion/audio systems should register measurements with this same 
 
 The forward renderer now supports analytic geometry AO and an optional depth/normal SSAO tier. Only ambient illumination is attenuated; direct lights and emission retain their brightness. The example exposes Off / Geometry / Geometry + screen in World directory and defaults portrait layouts to the cheaper target-free tier.
 
-[Ambient occlusion decisions](docs/decisions/0004-ambient-occlusion.md) record ownership, quality settings, target budgets, profiling, tests and visual/algorithmic limits. Screen AO is SSAO, not GTAO. Cast shadows and direct-light occlusion remain unimplemented, and this milestone does not introduce deferred rendering, fog or bloom. Shared spatial indexing is still planned; the bounded proxy selection currently scans the small active world.
+[Ambient occlusion decisions](docs/decisions/0004-ambient-occlusion.md) record ownership, quality settings, target budgets, profiling, tests and visual/algorithmic limits. Screen AO is SSAO, not GTAO. The AO milestone did not include cast shadows; section 17 records their subsequent implementation. Deferred rendering, fog and bloom remain unimplemented. Shared spatial indexing is still planned; the bounded proxy selection currently scans the small active world.
+
+## 17. Lighting and shadows
+
+Lighting is now a dedicated Basement capability owning ambient/directional data, eight point-light slots, a filtered directional shadow map and one optional cached point-light cube. The existing forward renderer submits the passes. The game supplies its palettes/directions and selects quality; the ETRNLNINE composition root remains unchanged.
+
+[Lighting decisions and API](docs/decisions/0005-lighting-and-shadows.md) record units, budgets, source ownership, caching, offscreen casters, failure/context/disposal behavior and remaining limits. Cast shadows affect direct light; AO affects ambient light; emission is preserved. Contact grounding uses actual cast shadows plus AO, without claiming a separate screen-space contact-shadow implementation.
+
+The example enables the lower-cost sun tier and exposes Off / Soft / Fine plus an opt-in shadowed crystal light in World directory. The engine itself defaults shadows off. Shared spatial acceleration, cascades, multiple shadowed local lights and real-phone performance validation remain future work. [Screenshots and verification](docs/milestones/lighting/README.md) provide current evidence.

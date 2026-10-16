@@ -48,7 +48,7 @@ const server=http.createServer((req,res)=>{
     page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
     const remote=[];page.on('request',request=>{if(/^https?:/.test(request.url()))remote.push(request.url());});
     await page.setContent(fs.readFileSync(path.join(root,'dist/ETRNLNINE-Atrium.html'),'utf8'));
-    await page.waitForFunction(()=>document.querySelector('#status').dataset.actor && document.querySelector('#status').dataset.buffers==='3')
+    await page.waitForFunction(()=>document.querySelector('#status').dataset.actor && document.querySelector('#status').dataset.buffers==='4')
       .catch(async error=>{console.error('Startup state:',await page.locator('body').innerText(),errors);throw error;});
     assert.equal(await page.locator('#error').isVisible(),false);
     console.log('Browser: startup complete');
@@ -80,11 +80,11 @@ const server=http.createServer((req,res)=>{
       const previous=await page.locator('#status').getAttribute('data-world');
       if(i%4===0)console.log(`Browser: scene cycle ${i+1}/12`);
       await page.locator('#restart').click();
-      await page.waitForFunction(old=>{const s=document.querySelector('#status').dataset;return s.world!==old && s.world!=='preparing' && s.buffers==='3';},previous);
+      await page.waitForFunction(old=>{const s=document.querySelector('#status').dataset;return s.world!==old && s.world!=='preparing' && s.buffers==='4';},previous);
       assert.equal(await page.locator('.engine-joystick').count(),1);
       assert.equal(await page.locator('.engine-action').count(),2);
-      assert.equal(await page.locator('#status').getAttribute('data-buffers'),'3');
-      assert.equal(await page.locator('#status').getAttribute('data-vaos'),'2');
+      assert.equal(await page.locator('#status').getAttribute('data-buffers'),'4');
+      assert.equal(await page.locator('#status').getAttribute('data-vaos'),'3');
     }
     console.log('Browser: scene cycles complete');
     await page.screenshot({path:path.join(artifacts,'worlds-amber-desktop.png')});
@@ -115,7 +115,7 @@ const server=http.createServer((req,res)=>{
     await page.locator('#world-directory summary').click();
     await page.locator('#release-inactive').click();
     await page.waitForFunction(()=>document.querySelector('#status').dataset.resident==='1');
-    assert.equal(await page.locator('#status').getAttribute('data-buffers'),'2');
+    assert.equal(await page.locator('#status').getAttribute('data-buffers'),'3');
     assert.ok(Number(await page.locator('#status').getAttribute('data-snapshot-bytes'))>0);
     await page.screenshot({path:path.join(artifacts,'worlds-directory.png')});
     await page.keyboard.press('KeyE');
@@ -133,7 +133,7 @@ const server=http.createServer((req,res)=>{
       await page.keyboard.press('KeyF');
       await page.waitForFunction(count=>document.querySelector('#status').dataset.committed===String(count),i);
       assert.equal(await page.locator('#status').getAttribute('data-actor'),actorId);
-      assert.equal(await page.locator('#status').getAttribute('data-buffers'),'3');
+      assert.equal(await page.locator('#status').getAttribute('data-buffers'),'4');
       assert.equal(await page.locator('#status').getAttribute('data-resident'),'2');
     }
     report.worlds={transfers:10,stableActor:true,persistenceAfterEviction:true,
@@ -162,7 +162,7 @@ const server=http.createServer((req,res)=>{
     const exported=JSON.parse(fs.readFileSync(await download.path(),'utf8'));
     assert.equal(exported.units,'milliseconds');assert.equal(exported.captures.length,2);
     const capture=exported.captures.at(-1),values=Object.fromEntries(capture.frame.counters.map(item=>[item.name,item.value]));
-    assert.equal(values['renderer.gpuBuffers'],864+2*98304);
+    assert.equal(values['renderer.gpuBuffers'],864+3*98304);
     assert.equal(values['directory.ownedGpuBuffers'],2*98304);
     assert.ok(capture.frame.scopes.some(scope=>scope.name==='atrium.presentation'));
     assert.match(capture.providerDetails.data.directory.resources[0].owners[0].owner,/realm:/);
@@ -189,7 +189,7 @@ const server=http.createServer((req,res)=>{
     const mobile=await browser.newContext({viewport:{width:412,height:892},isMobile:true,hasTouch:true,deviceScaleFactor:1});
     const phone=await mobile.newPage();await phone.evaluate(installGuard);phone.on('pageerror',e=>errors.push(e.message));
     await phone.setContent(fs.readFileSync(path.join(root,'dist/ETRNLNINE-Atrium.html'),'utf8'));
-    await phone.waitForFunction(()=>document.querySelector('#status').dataset.actor && document.querySelector('#status').dataset.buffers==='3');
+    await phone.waitForFunction(()=>document.querySelector('#status').dataset.actor && document.querySelector('#status').dataset.buffers==='4');
     assert.equal(await phone.getByLabel('Ambient occlusion',{exact:true}).inputValue(),'geometry','Portrait starts with the cheaper target-free tier');
     const stick=await phone.locator('.engine-joystick').boundingBox(),button=await phone.getByRole('button',{name:'Light',exact:true}).boundingBox();
     const cdp=await mobile.newCDPSession(phone);
@@ -249,6 +249,66 @@ const server=http.createServer((req,res)=>{
     assert.equal(report.engine.warm.uploads,0,'Unchanged retained instances do not upload');
     assert.ok(report.engine.moved.uploadedBytes>0 && report.engine.moved.uploadedBytes<=48,'One transform updates a bounded range');
     assert.equal(report.engine.glError,0);assert.ok(report.engine.varied>10,'Actual non-background pixels rendered');
+    // Real shadow pixels and cache/ownership behavior, separate from the example's artwork.
+    report.lighting=await page.evaluate(()=>{
+      const {engine,r}=window.fixture,l=r.lighting,gl=r.gl;
+      const world=engine.basement.createWorld(),box=options=>engine.directory.create('toy.box',{world,...options});
+      box({z:-0.25,size:[20,20,0.5],color:[0.6,0.6,0.6]});
+      const wall=box({y:2,z:1.5,size:[5,0.6,3],color:[0.4,0.35,0.5]});
+      box({x:-2,y:-1,z:1,size:[0.8,0.8,2],color:[0.55,0.4,0.2]});
+      box({x:3,y:-1,z:1,size:[0.6,0.6,1],color:[0.8,0.4,0.2],emission:2,castShadow:false});
+      box({x:11,z:6,size:[1,1,1],color:[0.4,0.4,0.5]}); // Truly outside the camera, but its shadow lands inside.
+      world.resolve();const batch=r.createBatch(world,64);r.camera.halfHeight=6;
+      r.occlusion.configure({mode:'off'});l.ambient.fill(0);l.colors.fill(0);
+      l.configureDirectional({direction:[1,0,1],color:[1,1,1]});
+      /** Production never reads shadow pixels; these immediate readbacks are test evidence only. */
+      const image=mode=>{l.configureShadows({mode,extent:16});r.render(batch);const p=new Uint8Array(r.canvas.width*r.canvas.height*4);gl.readPixels(0,0,r.canvas.width,r.canvas.height,gl.RGBA,gl.UNSIGNED_BYTE,p);return p;};
+      const compare=(a,b)=>{let changed=0,brighter=0;for(let i=0;i<a.length;i+=4){let d=0;for(let c=0;c<3;c++){d=Math.max(d,Math.abs(a[i+c]-b[i+c]));if(b[i+c]>a[i+c]+1)brighter++;}if(d>1)changed++;}return{changed,brighter};};
+      // Temporarily disable all elevated casters: a flat floor must never shadow itself.
+      const elevated=[];for(const entity of world.entities.values())if(entity.z>0){elevated.push([entity,entity.shape]);entity.shape=null;}
+      const flatOff=image('off'),flatOn=image('low'),flatDifference=compare(flatOff,flatOn);
+      for(const[entity,shape]of elevated)entity.shape=shape;
+      const unshadowed=image('off'),shadowed=image('low'),sunDifference=compare(unshadowed,shadowed);
+      const first=l.maps.inspect();wall.shape.color=[0.1,0.2,0.3];r.render(batch);const cached=l.maps.inspect();
+      const offscreenCaster=Array.from({length:l.maps.casters.count},(_,i)=>l.maps.casters.data[i*12]).includes(11);
+      const offscreenVisible=Array.from({length:batch.count},(_,i)=>batch.data[i*12]).includes(11);
+      wall.x+=1;world.resolve();r.render(batch);const moved=l.maps.inspect();
+      // Changing map resolution replaces its target, preserving the shared depth program.
+      const program=l.maps.program;image('high');const high=l.maps.inspect(),sameProgram=l.maps.program===program;
+      l.configureDirectional({color:[0,0,0]});l.setPoint(0,{position:[0,-3,3],color:[3,2,1],radius:12});
+      const originalNow=performance.now;let now=10000;performance.now=()=>now;
+      let pointDifference,pointFirst,pointCached,throttled,refreshed,lightMoved,colorChanged;
+      try{
+        const off=image('off');l.configureShadows({pointIndex:0,pointResolution:128,pointRefreshHz:1});const on=image('low');
+        pointDifference=compare(off,on);pointFirst=l.maps.inspect();r.render(batch);pointCached=l.maps.inspect();
+        wall.x+=0.5;world.resolve();r.render(batch);throttled=l.maps.inspect();
+        now+=1001;r.render(batch);refreshed=l.maps.inspect();
+        l.positions[0]+=1;r.render(batch);lightMoved=l.maps.inspect();
+        l.colors[0]=2;r.render(batch);colorChanged=l.maps.inspect();
+      }finally{performance.now=originalNow;}
+      // A different world must never inherit the old cube or retain its world reference.
+      const other=engine.basement.createWorld();engine.directory.create('toy.box',{world:other,size:[1,1,1]});other.resolve();
+      const otherBatch=r.createBatch(other,64);r.render(otherBatch);const travel=l.maps.inspect();
+      otherBatch.dispose();const afterSourceRelease=l.maps.inspect();
+      l.configureShadows({mode:'off',pointIndex:-1});other.dispose();batch.dispose();world.dispose();
+      l.configureDirectional({direction:[-0.4,-0.5,1],color:[0.20,0.22,0.29]});l.positions.fill(0);l.colors.fill(0);l.ambient.set([0.13,0.13,0.23]);
+      const released=l.maps.inspect();
+      return{flatDifference,sunDifference,pointDifference,first,cached,moved,high,sameProgram,offscreenCaster,offscreenVisible,
+        pointFirst,pointCached,throttled,refreshed,lightMoved,colorChanged,travel,afterSourceRelease,released,error:gl.getError()};
+    });
+    assert.equal(report.lighting.flatDifference.changed,0,'Flat receiver has no self-shadow speckling');
+    assert.ok(report.lighting.sunDifference.changed>100,'Sun map casts onto neighboring surfaces');
+    assert.equal(report.lighting.sunDifference.brighter,0);assert.equal(report.lighting.first.frameDraws,1);
+    assert.equal(report.lighting.cached.frameDraws,0,'Unchanged sun geometry reuses its map');
+    assert.equal(report.lighting.moved.sunUpdates,report.lighting.cached.sunUpdates+1);
+    assert.equal(report.lighting.high.sunResolution,1024);assert.equal(report.lighting.sameProgram,true);
+    assert.equal(report.lighting.offscreenCaster,true);assert.equal(report.lighting.offscreenVisible,false);
+    assert.ok(report.lighting.pointDifference.changed>100,'Selected local light is occluded by scene geometry');
+    assert.equal(report.lighting.pointFirst.frameDraws,6);assert.equal(report.lighting.pointCached.frameDraws,0);
+    assert.equal(report.lighting.throttled.frameDraws,0);assert.equal(report.lighting.refreshed.frameDraws,6);
+    assert.equal(report.lighting.lightMoved.frameDraws,6);assert.equal(report.lighting.colorChanged.frameDraws,0);
+    assert.equal(report.lighting.travel.frameDraws,6);assert.equal(report.lighting.released.casters,0);
+    assert.equal(report.lighting.released.textures,0);assert.equal(report.lighting.afterSourceRelease.casters,0);assert.equal(report.lighting.afterSourceRelease.casterGpuBytes,0);assert.equal(report.lighting.error,0);
     // Compare AO on real pixels immediately after submission (before default-buffer discard).
     console.log('Browser: primitive complete; testing AO pixels/lifecycle');
     report.ambientOcclusion=await page.evaluate(()=>{
@@ -258,7 +318,7 @@ const server=http.createServer((req,res)=>{
       box({x:-1,y:1,z:1.5,size:[1,5,3],color:[0.4,0.35,0.5]});
       box({x:1,y:1,z:0.5,size:[2,2,1],color:[0.55,0.4,0.25]});
       box({x:1,y:1,z:1.3,size:[0.4,0.4,1],color:[0.7,0.5,0.2],emission:3});
-      world.resolve();const batch=r.createBatch(world);r.camera.halfHeight=6;r.ambient.set([0.7,0.6,0.8]);
+      world.resolve();const batch=r.createBatch(world);r.camera.halfHeight=6;r.lighting.ambient.set([0.7,0.6,0.8]);
       /** Read only in tests. Production never reads pixels or waits for AO/GPU results. */
       const image=mode=>{ao.configure({mode});r.render(batch);const p=new Uint8Array(r.canvas.width*r.canvas.height*4);gl.readPixels(0,0,r.canvas.width,r.canvas.height,gl.RGBA,gl.UNSIGNED_BYTE,p);return p;};
       const off=image('off'),geometry=image('geometry'),screen=image('screen');
@@ -266,7 +326,7 @@ const server=http.createServer((req,res)=>{
       /** Count changed RGB pixels and changes that violate ambient-only darkening. */
       const compare=(a,b)=>{let changed=0,brighter=0,maxDifference=0;for(let i=0;i<a.length;i+=4){let d=0;for(let c=0;c<3;c++){d=Math.max(d,Math.abs(a[i+c]-b[i+c]));if(b[i+c]>a[i+c]+1)brighter++;}if(d>1)changed++;maxDifference=Math.max(d,maxDifference);}return{changed,brighter,maxDifference};};
       const geometryDifference=compare(off,geometry),screenDifference=compare(geometry,screen);
-      r.ambient.fill(0);const directDifference=compare(image('off'),image('screen'));
+      r.lighting.ambient.fill(0);const directDifference=compare(image('off'),image('screen'));
       // Reject an incomplete framebuffer cleanly, then allow explicit retry.
       ao.configure({mode:'off'});const original=gl.checkFramebufferStatus;gl.checkFramebufferStatus=()=>gl.FRAMEBUFFER_UNSUPPORTED;
       ao.configure({mode:'screen'});r.render(batch);const fallback=ao.inspect();gl.checkFramebufferStatus=original;
@@ -283,7 +343,7 @@ const server=http.createServer((req,res)=>{
         cycles={...handles};
       }finally{for(const reset of restore)reset();}
       // Leave screen AO alive to exercise recreation in the existing context-loss check.
-      ao.configure({mode:'screen'});r.ambient.set([0.13,0.13,0.23]);r.render(batch);
+      ao.configure({mode:'screen'});r.lighting.ambient.set([0.13,0.13,0.23]);r.render(batch);
       batch.dispose();world.dispose();
       return{geometryDifference,screenDifference,directDifference,screenInfo,fallback,cycles,error:gl.getError()};
     });
@@ -352,7 +412,8 @@ const server=http.createServer((req,res)=>{
     });
     assert.deepEqual(report.profilerStartup,{rejected:2,buffers:0,programs:0,windowListeners:0,error:0});
     const restoration=await page.evaluate(async()=>{
-      const f=window.fixture,extension=f.r.gl.getExtension('WEBGL_lose_context');
+      const f=window.fixture;f.r.lighting.configureShadows({mode:'low',pointIndex:0});f.r.lighting.setPoint(0,{position:[0,0,4],color:[1,1,1],radius:12});f.r.render(f.lease.value);
+      const extension=f.r.gl.getExtension('WEBGL_lose_context');
       if(!extension)return{supported:false};
       extension.loseContext();await new Promise(resolve=>setTimeout(resolve,80));
       const paused=f.engine.lobby.reasons.has('gpu-context');
@@ -361,9 +422,9 @@ const server=http.createServer((req,res)=>{
         let tries=0;const poll=()=>{if(f.r.stats.contextRestores)resolve();else if(++tries>100)reject(new Error('Context restore timed out'));else setTimeout(poll,20);};poll();
       });
       f.r.render(f.lease.value);
-      return {supported:true,paused,restores:f.r.stats.contextRestores,buffers:f.r.stats.buffers,ao:f.r.occlusion.inspect(),error:f.r.gl.getError()};
+      return {supported:true,paused,restores:f.r.stats.contextRestores,buffers:f.r.stats.buffers,shadows:f.r.lighting.maps.inspect(),ao:f.r.occlusion.inspect(),error:f.r.gl.getError()};
     });
-    if(restoration.supported){assert.equal(restoration.paused,true);assert.equal(restoration.buffers,2);assert.equal(restoration.error,0);assert.equal(restoration.ao.effectiveMode,'screen');assert.equal(restoration.ao.textures,3);}
+    if(restoration.supported){assert.equal(restoration.paused,true);assert.equal(restoration.buffers,3);assert.equal(restoration.error,0);assert.equal(restoration.ao.effectiveMode,'screen');assert.equal(restoration.ao.textures,3);assert.equal(restoration.shadows.sunReady,true);assert.equal(restoration.shadows.pointReady,true);}
     report.context=restoration;
     report.disposal=await page.evaluate(()=>{
       const f=window.fixture;f.engine.dispose();f.lease.release();f.engine.dispose();
@@ -424,7 +485,7 @@ const server=http.createServer((req,res)=>{
       const canvas=document.querySelector('canvas');canvas.style.cssText='display:block;width:100vw;height:100vh';
       const engine=new ETRNLNINE(canvas),r=engine.basement.renderer,journey=createJourney(engine);
       r.camera.x=-4;r.camera.y=7;r.camera.halfHeight=9;
-      engine.lobby.on('render',()=>{const w=journey.current;if(!w)return;r.ambient.set(w.profile.ambient);r.lights.set(w.lights);r.lightColors.set(w.lightColors);w.world.resolve();r.render(w.batch);});
+      engine.lobby.on('render',()=>{const w=journey.current;if(!w)return;r.lighting.ambient.set(w.profile.ambient);r.lighting.positions.set(w.lights);r.lighting.colors.set(w.lightColors);w.world.resolve();r.render(w.batch);});
       engine.start();await journey.ready;window.detailFixture={engine,journey,r};
     });
     await page.waitForFunction(()=>window.detailFixture.engine.directory.residency.inspect().worlds.every(w=>w.status==='ready'));
@@ -433,6 +494,16 @@ const server=http.createServer((req,res)=>{
       await page.waitForTimeout(100);
       await page.screenshot({path:path.join(artifacts,`ao-detail-${mode}.png`)});
     }
+    await page.evaluate(()=>{
+      const f=window.detailFixture;f.r.lighting.configureDirectional(f.journey.current.profile.sun);
+      f.r.occlusion.configure({mode:'geometry'});
+    });
+    for(const mode of ['off','low','high']){
+      await page.evaluate(mode=>window.detailFixture.r.lighting.configureShadows({mode,pointIndex:5,extent:24}),mode);
+      await page.waitForTimeout(100);
+      await page.screenshot({path:path.join(artifacts,`lighting-detail-${mode}.png`)});
+    }
+    report.lighting.detail=await page.evaluate(()=>window.detailFixture.r.lighting.inspect());
     report.ambientOcclusion.detail=await page.evaluate(()=>{
       const f=window.detailFixture,result={...f.r.occlusion.inspect(),error:f.r.gl.getError()};
       f.journey.dispose();f.engine.dispose();return result;

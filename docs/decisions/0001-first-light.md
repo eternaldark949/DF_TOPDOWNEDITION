@@ -1,5 +1,7 @@
 # First Light — runnable foundation decisions
 
+**Subsequent lighting milestone:** [Lighting and shadow decisions](0005-lighting-and-shadows.md) supersede the original light-data ownership and shadow limitations below; those describe this earlier milestone.
+
 Recorded 2026-10-15 after the owner invited implementation to begin. This scopes the first runnable milestone; the broader engine plan remains in the root README.
 
 > Historical milestone record. The current example and runtime are extended by [Between Worlds](0002-between-worlds.md), including changes to the phases, file map, and implemented world capabilities below.

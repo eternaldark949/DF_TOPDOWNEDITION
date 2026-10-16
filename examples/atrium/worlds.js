@@ -10,9 +10,9 @@ import { buildLayout } from './layout.js';
 /** Immutable-by-convention authoring profiles; runtime mutable state is created per world. */
 export const PROFILES = [
   { key:'amber',name:'The Amber Atrium',stone:[0.24,0.18,0.20],trim:[0.68,0.43,0.18],floor:[0.14,0.115,0.14],
-    glow:[1,0.47,0.17],window:[0.38,0.15,0.16],foliage:[0.045,0.14,0.10],height:7,ethereal:false,ambient:[0.15,0.11,0.15] },
+    glow:[1,0.47,0.17],window:[0.38,0.15,0.16],foliage:[0.045,0.14,0.10],sun:{direction:[-0.5,0.8,1.2],color:[0.58,0.49,0.62]},height:7,ethereal:false,ambient:[0.15,0.11,0.15] },
   { key:'violet',name:'The Violet Court',stone:[0.14,0.16,0.31],trim:[0.35,0.56,0.70],floor:[0.075,0.09,0.18],
-    glow:[0.24,0.58,1],window:[0.15,0.19,0.46],foliage:[0.10,0.20,0.27],height:8.5,ethereal:true,ambient:[0.09,0.11,0.26] },
+    glow:[0.24,0.58,1],window:[0.15,0.19,0.46],foliage:[0.10,0.20,0.27],sun:{direction:[0.5,0.7,1.1],color:[0.36,0.46,0.75]},height:8.5,ethereal:true,ambient:[0.09,0.11,0.26] },
 ];
 
 /** Horizontal destination query shared by movement and final flit validation. */

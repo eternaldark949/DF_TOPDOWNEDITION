@@ -38,14 +38,14 @@ export function* buildLayout(engine, world, profile) {
     }
     for (const y of [-18,-4,9]) {
       box({ x:side*15, y, z:1.8, size:[0.18,0.18,3.6], color:gold });
-      box({ x:side*15, y, z:3.7, size:[0.6,0.6,0.8], color:profile.glow, emission:3 });
+      box({ x:side*15, y, z:3.7, size:[0.6,0.6,0.8], color:profile.glow, emission:3,castShadow:false });
       box({ x:side*15, y, z:4.15, size:[0.9,0.9,0.12], color:gold });
     }
     yield; // One gallery/planting side per chunk; no per-frame full-world rebuild.
   }
   const lantern = box({ x:0,y:2,z:0.65,size:[1.9,1.9,1.3],color:stone });
   box({ parent:lantern,z:0.85,size:[2.1,2.1,0.22],color:gold });
-  const crystal = box({ parent:lantern,z:1.75,yaw:Math.PI/4,size:[0.7,0.7,1.4],color:[0.25,0.62,1],emission:2 });
+  const crystal = box({ parent:lantern,z:1.75,yaw:Math.PI/4,size:[0.7,0.7,1.4],color:[0.25,0.62,1],emission:2,castShadow:false });
   colliders.push({x:0,y:2,width:2.1,depth:2.1});
   const prop = box({x:6,y:-12,z:0.65,size:[2,2,1.3],color:gold});
   const propCollider = {x:6,y:-12,width:2,depth:2}; colliders.push(propCollider);

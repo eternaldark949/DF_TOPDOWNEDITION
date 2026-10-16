@@ -5,6 +5,7 @@
  * This is the first renderer material, not the final luxe/bloom renderer.
  */
 import { AMBIENT_VISIBILITY } from './occlusion-shaders.js';
+import { SHADOW_VISIBILITY } from './shadow-shaders.js';
 
 export const VERTEX = `#version 300 es
 precision highp float;
@@ -46,18 +47,20 @@ uniform vec4 uLights[8]; // x/y/z, radius; radius 0 disables a slot
 uniform vec3 uLightColors[8]; // linear RGB irradiance
 out vec4 outColor;
 ${AMBIENT_VISIBILITY}
+${SHADOW_VISIBILITY}
 void main() {
   vec3 n = normalize(vNormal);
   // Occlusion attenuates ambient irradiance only, before exposure and display gamma.
   vec3 light = uAmbient * (0.65 + 0.35 * max(n.z, 0.0)) * ambientVisibility(vWorld,n);
-  light += vec3(0.20,0.22,0.29) * max(dot(n, normalize(vec3(-0.4,-0.5,1.0))), 0.0);
+  light += uSunColor * max(dot(n,uSunDirection),0.0) * sunVisibility(vWorld,n);
   for (int i=0; i<8; i++) {
     vec3 delta = uLights[i].xyz - vWorld;
     float distanceToLight = length(delta);
     float radius = uLights[i].w;
     if (radius > 0.0) {
       float falloff = max(0.0, 1.0 - distanceToLight / radius);
-      light += uLightColors[i] * falloff * falloff * (0.25 + 0.75 * max(dot(n, normalize(delta + 0.0001)), 0.0));
+      float visibility=i==uPointShadowIndex?pointVisibility(vWorld,n):1.0;
+      light += uLightColors[i] * visibility * falloff * falloff * (0.25 + 0.75 * max(dot(n, normalize(delta + 0.0001)), 0.0));
     }
   }
   vec3 surface = vColor;

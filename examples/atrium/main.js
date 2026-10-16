@@ -12,6 +12,7 @@ const status=document.querySelector('#status'), errorBox=document.querySelector(
 const pauseButton=document.querySelector('#pause'), restartButton=document.querySelector('#restart');
 const directoryStatus=document.querySelector('#directory-status'), travelStatus=document.querySelector('#travel-status');
 const releaseButton=document.querySelector('#release-inactive'), cancelButton=document.querySelector('#cancel-flit');
+const shadowSelect=document.querySelector('#cast-shadows'),pointShadows=document.querySelector('#point-shadows');
 const aoSelect=document.querySelector('#ambient-occlusion');
 const heading=document.querySelector('h1');
 const life=new Lifetime();
@@ -29,6 +30,8 @@ function replaceScene() {
     const renderer=engine.basement.renderer,r=renderer.stats,ao=renderer.occlusion.inspect();
     aoSelect.dataset.effective=ao.effectiveMode;
     document.querySelector('#ao-status').textContent=ao.failure?'Screen AO unavailable; geometry fallback.':ao.effectiveMode==='screen'?`${ao.width} × ${ao.height} screen contacts · ambient light only`:'Ambient light only · no screen targets';
+    const shadow=renderer.lighting.maps.inspect();
+    document.querySelector('#shadow-status').textContent=shadow.sunFailure||shadow.pointFailure?'A shadow target is unavailable; inspect the profiler for details.':shadow.mode==='off'?'Cast shadows off':`${shadow.sunResolution} sun map · ${shadow.pointReady?'1 cached point cube':'local shadows off'}`;
     status.textContent=`${state.loaded?'Weighted':'Light'} pack · ${state.entities} forms · ${r.draws} draws · ${r.uploadedBytes} B updated`;
     // Small DOM diagnostics aid accessibility and automated verification; no engine globals.
     status.dataset.world=state.worldId; status.dataset.x=state.x.toFixed(3); status.dataset.y=state.y.toFixed(3);
@@ -46,7 +49,7 @@ function replaceScene() {
       ? `Last transfer ${state.travel.transferMs.toFixed(2)} ms · preparation/wait ${state.travel.waitMs.toFixed(1)} ms` : 'Destination preparation runs in bounded chunks';
     const slots=state.residency.worlds.map(world=>`${world.key.endsWith('amber')?'Amber':'Violet'}: ${world.status} / ${world.owners} owner${world.owners===1?'':'s'}${world.key===scene?.journey.travel?.current.key?' / active':''}`);
     document.querySelector('#world-slots').textContent=slots.join(' · ');
-    document.querySelector('#gpu-status').textContent=`${r.buffers} GPU buffers · ${r.vaos} world batches`;
+    document.querySelector('#gpu-status').textContent=`${r.buffers} GPU buffers · ${r.vaos} instance batches`;
     cancelButton.disabled=!scene?.journey.travel?.pending;
   }});
 }
@@ -58,6 +61,10 @@ try {
   const aoMode=window.matchMedia('(max-width:650px)').matches?'geometry':'screen';
   engine.basement.renderer.occlusion.configure({mode:aoMode});aoSelect.value=aoMode;
   life.listen(aoSelect,'change',()=>engine.basement.renderer.occlusion.configure({mode:aoSelect.value}));
+  // Example policy: one low-resolution sun map. Local cube shadows remain opt-in.
+  engine.basement.renderer.lighting.configureShadows({mode:'low'});shadowSelect.value='low';
+  life.listen(shadowSelect,'change',()=>engine.basement.renderer.lighting.configureShadows({mode:shadowSelect.value}));
+  life.listen(pointShadows,'change',()=>engine.basement.renderer.lighting.configureShadows({pointIndex:pointShadows.checked?5:-1}));
   replaceScene();
   const profilerView=engine.directory.create('tool.profiler',{profiler:engine.basement.profiler,host:document.body,
     subscribe:callback=>engine.lobby.on('render',callback,'profiler.viewer')});

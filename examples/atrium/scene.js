@@ -31,7 +31,7 @@ export function createScene(engine,{controlsHost,onStatus=()=>{},onError=()=>{}}
   life.own(lobby.on('pause',()=>controls.forEach(control=>control.cancel())));
   renderer.camera.x=0;renderer.camera.y=0;renderer.camera.halfHeight=22;
   const movementScope=basement.profiler.scope('atrium.locomotion'),statusScope=basement.profiler.scope('atrium.status');
-  let player=null,statusAt=-1;
+  let player=null,statusAt=-1,litWorld=null;
   journey.ready.then(()=>{if(!life.disposed)player=playerController(journey.actor,input,renderer);})
     .catch(error=>{if(!life.disposed&&error.name!=='AbortError')onError(error);});
 
@@ -61,7 +61,8 @@ export function createScene(engine,{controlsHost,onStatus=()=>{},onError=()=>{}}
   life.own(lobby.on('render',alpha=>{
     const resource=journey.current;
     if(!resource){renderer.render();return;}
-    renderer.ambient.set(resource.profile.ambient);renderer.lights.set(resource.lights);renderer.lightColors.set(resource.lightColors);
+    if(litWorld!==resource.world){renderer.lighting.configureDirectional(resource.profile.sun);litWorld=resource.world;}
+    renderer.lighting.ambient.set(resource.profile.ambient);renderer.lighting.positions.set(resource.lights);renderer.lighting.colors.set(resource.lightColors);
     resource.world.resolve(alpha);renderer.render(resource.batch);
   },'atrium.presentation'));
   return {journey,dispose:()=>life.dispose()};

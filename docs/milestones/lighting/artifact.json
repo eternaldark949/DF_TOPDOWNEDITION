@@ -1,0 +1,8 @@
+{
+  "html": "dist/ETRNLNINE-Atrium.html",
+  "bytes": 186796,
+  "sha256": "99ab93e698d5a14e01309cdf8afe667f389cd550d699167ad45e459d1e14a5cb",
+  "nodeTests": 45,
+  "browser": "Chromium software WebGL / SwiftShader",
+  "phonePerformanceMeasured": false
+}

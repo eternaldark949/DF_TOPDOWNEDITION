@@ -10,6 +10,7 @@ import { renderDiagnostics } from './render-diagnostics.js';
 import { GpuTimer } from './gpu-timer.js';
 import { createProgram } from './gl-program.js';
 import { AmbientOcclusion } from './ambient-occlusion.js';
+import { Lighting } from './lighting.js';
 
 /** Generate one unit cube with flat normals; uploaded once per WebGL context lifetime. */
 function cubeGeometry() {
@@ -32,24 +33,24 @@ function cubeGeometry() {
 
 export class Renderer {
   /** Own the supplied surface's WebGL context. pixelRatio caps mobile fill cost. */
-  constructor(canvas, { pixelRatio = 1.5, profiler = null, occlusion = {} } = {}) {
+  constructor(canvas, { pixelRatio = 1.5, profiler = null, occlusion = {}, lighting = {} } = {}) {
     this.profiler=profiler; this.canvas = canvas; this.pixelRatio = pixelRatio; this.life = new Lifetime();
     const gl = canvas.getContext('webgl2', { alpha: false, antialias: true, powerPreference: 'low-power' });
     if (!gl) throw new Error('ETRNLNINE requires WebGL 2 on this device.');
     this.gl = gl; this.batches = new Set(); this.disposed = false; this.lost = false;
     this.camera = { x: 0, y: 0, halfHeight: 21 };
-    this.ambient = new Float32Array([0.13, 0.13, 0.23]);
-    this.lights = new Float32Array(8 * 4); this.lightColors = new Float32Array(8 * 3);
     this.stats = { draws: 0, instances: 0, uploads: 0, uploadedBytes: 0, buffers: 0, programs: 0, vaos: 0, contextRestores: 0 };
-    this.totals={draws:0,instances:0,uploads:0,uploadedBytes:0,candidates:0,culled:0};
+    this.totals={draws:0,instances:0,uploads:0,uploadedBytes:0,candidates:0,culled:0,shadowDraws:0,shadowHits:0};
     try {
       this.initialize();
+      this.lighting=new Lighting(this,lighting);
+      this.shadowScope=profiler?.scope('renderer.shadows');
       this.occlusion=new AmbientOcclusion(this,occlusion);
       this.occlusionScope=profiler?.scope('renderer.ambientOcclusion');
       this.gpuTimer=new GpuTimer(gl,(id,ms)=>this.profiler?.recordGpu(id,ms));
       this.life.own(renderDiagnostics(this,profiler));
       this.life.listen(canvas, 'webglcontextlost', event => {
-        event.preventDefault(); this.lost = true; this.gpuTimer.invalidate(); this.occlusion.invalidate();
+        event.preventDefault(); this.lost = true; this.gpuTimer.invalidate(); this.occlusion.invalidate(); this.lighting.invalidate();
       });
       this.life.listen(canvas, 'webglcontextrestored', () => {
         // Browser invalidates all old handles on loss. Recreate from retained CPU data,
@@ -62,7 +63,7 @@ export class Renderer {
     } catch(error) {
       // Metric-budget/capability failure may occur after GL creation. Constructor
       // failure must release real handles even though no caller received this renderer.
-      this.life.dispose();this.gpuTimer?.dispose();this.occlusion?.dispose();
+      this.life.dispose();this.gpuTimer?.dispose();this.occlusion?.dispose();this.lighting?.dispose();
       if(this.cube)gl.deleteBuffer(this.cube);if(this.program)gl.deleteProgram(this.program);
       throw error;
     }
@@ -75,7 +76,8 @@ export class Renderer {
     this.program = program; this.stats.programs++;
     this.uniforms = Object.fromEntries(['uCamera', 'uAmbient', 'uLights[0]', 'uLightColors[0]',
       'uAOMode','uAOStrength','uAORadius','uBlockerCount','uBlockerPose[0]','uBlockerSize[0]',
-      'uAOScreen','uAODepth','uAONormals','uAOSize']
+      'uAOScreen','uAODepth','uAONormals','uAOSize','uSunDirection','uSunColor','uSunShadowEnabled','uSunMatrix',
+      'uSunShadow','uShadowParameters','uPointShadowIndex','uPointShadow','uPointShadowParameters','uPointShadowPosition','uPointShadowResolution']
       .map(name => [name, gl.getUniformLocation(program, name)]));
     this.cube = gl.createBuffer(); this.stats.buffers++;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.cube); gl.bufferData(gl.ARRAY_BUFFER, cubeGeometry(), gl.STATIC_DRAW);
@@ -83,9 +85,9 @@ export class Renderer {
   }
 
   /** Allocate a batch with an explicit maximum. Capacity is a budget, not silent growth. */
-  createBatch(world, capacity = 2048) {
+  createBatch(world, capacity = 2048, {visibility='camera'} = {}) {
     if (this.disposed) throw new Error('Renderer is disposed');
-    const batch = new InstanceBatch(this, world, capacity); this.batches.add(batch); return batch;
+    const batch = new InstanceBatch(this, world, capacity, visibility); this.batches.add(batch); return batch;
   }
 
   /**
@@ -140,9 +142,11 @@ export class Renderer {
     this.stats.draws = this.stats.instances = this.stats.uploads = this.stats.uploadedBytes = 0;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.clearColor(0.018, 0.019, 0.037, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    if (!batch || batch.disposed) {this.occlusion.count=this.occlusion.candidates=0;return;}
+    if (!batch || batch.disposed) {this.occlusion.count=this.occlusion.candidates=0;this.lighting.clearWorld();return;}
     if (batch.renderer !== this) throw new Error('Batch belongs to another renderer');
     batch.sync(halfWidth, halfHeight);
+    const shadowToken=this.profiler?.begin(this.shadowScope);
+    try {this.lighting.prepare(batch);}finally {this.profiler?.end(shadowToken);}
     const aoToken=this.profiler?.begin(this.occlusionScope);
     let screenReady;
     try {screenReady=this.occlusion.prepare(batch,{halfWidth,halfHeight});}
@@ -150,9 +154,7 @@ export class Renderer {
     gl.useProgram(this.program);
     this.occlusion.bind(this.uniforms,screenReady);
     gl.uniform4f(this.uniforms.uCamera, this.camera.x, this.camera.y, halfWidth, halfHeight);
-    gl.uniform3fv(this.uniforms.uAmbient, this.ambient);
-    gl.uniform4fv(this.uniforms['uLights[0]'], this.lights);
-    gl.uniform3fv(this.uniforms['uLightColors[0]'], this.lightColors);
+    this.lighting.bind(this.uniforms);
     gl.bindVertexArray(batch.vao);
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, batch.count);
     gl.bindVertexArray(null);
@@ -163,7 +165,7 @@ export class Renderer {
   /** Release renderer and outstanding batches, with listeners removed before late restoration. */
   dispose() {
     if (this.disposed) return;
-    this.disposed = true; this.life.dispose(); this.gpuTimer.dispose(); this.occlusion.dispose();
+    this.disposed = true; this.life.dispose(); this.gpuTimer.dispose(); this.occlusion.dispose(); this.lighting.dispose();
     for (const batch of [...this.batches]) batch.dispose();
     this.gl.deleteBuffer(this.cube); this.gl.deleteProgram(this.program);
     this.stats.buffers = this.stats.programs = this.stats.vaos = 0;
@@ -177,10 +179,12 @@ export class Renderer {
  */
 class InstanceBatch {
   /** Retain bounded CPU records so context restoration never depends on Canvas assets. */
-  constructor(renderer, world, capacity) {
+  constructor(renderer, world, capacity, visibility) {
+    if(!['camera','shadow'].includes(visibility))throw new RangeError('Invalid instance visibility policy');
+    this.visibility=visibility;this.version=0;
     this.renderer = renderer; this.world = world; this.capacity = capacity;
     this.data = new Float32Array(capacity * 12);
-    this.kind='instance-buffer';this.cpuBytes=this.data.byteLength;this.gpuBufferBytes=this.data.byteLength;
+    this.kind=visibility==='shadow'?'shadow-instance-buffer':'instance-buffer';this.cpuBytes=this.data.byteLength;this.gpuBufferBytes=this.data.byteLength;
     this.count = 0; this.disposed = false;
     this.initialize();
   }
@@ -223,16 +227,20 @@ class InstanceBatch {
     this.cursor = 0; this.firstDirty = Infinity; this.lastDirty = -1;
     for (const entity of this.world.entities.values()) {
       const s = entity.shape, p = entity.pose;
-      if (!s) continue;
+      if (!s || (this.visibility==='shadow'&&s.castShadow===false)) continue;
       r.totals.candidates++;
       const radius = Math.hypot(s.size[0], s.size[1], s.size[2]);
       const screenY = (p.y - r.camera.y) * 0.65 + p.z * 0.76;
-      if (Math.abs(p.x - r.camera.x) > halfWidth + radius || Math.abs(screenY) > halfHeight + radius) {r.totals.culled++;continue;}
-      if (this.cursor / 12 >= this.capacity) throw new Error(`World ${this.world.id} exceeds ${this.capacity} visible instances`);
+      if (this.visibility==='camera'&&(Math.abs(p.x - r.camera.x) > halfWidth + radius || Math.abs(screenY) > halfHeight + radius)) {r.totals.culled++;continue;}
+      if (this.cursor / 12 >= this.capacity) throw new Error(`World ${this.world.id} exceeds ${this.capacity} ${this.visibility} instances`);
       this.write(p.x); this.write(p.y); this.write(p.z); this.write(p.yaw);
-      this.write(s.size[0]); this.write(s.size[1]); this.write(s.size[2]); this.write(s.emission ?? 0);
-      this.write(s.color[0]); this.write(s.color[1]); this.write(s.color[2]); this.write(0);
+      this.write(s.size[0]); this.write(s.size[1]); this.write(s.size[2]);
+      // Depth-only records ignore material changes, so recoloring does not invalidate maps.
+      this.write(this.visibility==='camera'?(s.emission??0):0);
+      for(let i=0;i<3;i++)this.write(this.visibility==='camera'?s.color[i]:0);
+      this.write(0);
     }
+    if(this.count!==this.cursor/12||this.lastDirty>=this.firstDirty)this.version++;
     this.count = this.cursor / 12;
     if (this.lastDirty >= this.firstDirty) {
       gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
@@ -251,6 +259,7 @@ class InstanceBatch {
     const { gl, stats } = this.renderer;
     gl.deleteBuffer(this.buffer); gl.deleteVertexArray(this.vao);
     stats.buffers--; stats.vaos--; this.renderer.batches.delete(this);
+    this.renderer.lighting?.releaseBatch(this);
     // Disposal releases CPU storage too, even if a caller retains the old handle.
     this.data = null; this.world = null; this.cpuBytes=this.gpuBufferBytes=0;
   }

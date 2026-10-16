@@ -37,7 +37,7 @@ footer{position:absolute;bottom:max(25px,env(safe-area-inset-bottom));left:50%;t
 <canvas id="world" tabindex="0" aria-label="Interactive WebGL courtyard. Use WASD or arrows to walk, E to change the lantern, B to change the pack response, F to flit between worlds, G to move the prop."></canvas>
 <header><div class="eyebrow">ETRNLNINE / Between worlds</div><h1>The Amber Atrium</h1><div class="subtitle">Two worlds. One continuous journey.<br>Flit between them; leave a little change behind.</div></header>
 <nav aria-label="Demonstration controls"><button id="pause" aria-pressed="false">Pause</button><button id="restart">New scene</button></nav>
-<details id="world-directory"><summary>World directory</summary><p><output id="directory-status">Preparing worlds…</output><output id="world-slots"></output><output id="gpu-status"></output></p><output id="travel-status">Preparing the first world</output><output id="transfer-time"></output><label>Ambient occlusion <select id="ambient-occlusion" aria-label="Ambient occlusion"><option value="off">Off</option><option value="geometry">Geometry</option><option value="screen">Geometry + screen</option></select></label><output id="ao-status"></output><button id="release-inactive">Release inactive</button> <button id="cancel-flit" disabled>Cancel flit</button></details>
+<details id="world-directory"><summary>World directory</summary><p><output id="directory-status">Preparing worlds…</output><output id="world-slots"></output><output id="gpu-status"></output></p><output id="travel-status">Preparing the first world</output><output id="transfer-time"></output><label>Ambient occlusion <select id="ambient-occlusion" aria-label="Ambient occlusion"><option value="off">Off</option><option value="geometry">Geometry</option><option value="screen">Geometry + screen</option></select></label><output id="ao-status"></output><label>Cast shadows <select id="cast-shadows" aria-label="Cast shadows"><option value="off">Off</option><option value="low">Soft · 512</option><option value="high">Fine · 1024</option></select></label><label><input id="point-shadows" type="checkbox"> Shadow the crystal light</label><output id="shadow-status"></output><button id="release-inactive">Release inactive</button> <button id="cancel-flit" disabled>Cancel flit</button></details>
 <div id="controls" aria-label="Touch controls"></div>
 <footer><output id="status" aria-label="Engine status">Opening the house…</output><div class="hint"><kbd>WASD / arrows</kbd> walk &nbsp;·&nbsp; <kbd>mouse</kbd> look &nbsp;·&nbsp; <kbd>E / click</kbd> light &nbsp;·&nbsp; <kbd>B</kbd> pack<br><kbd>F</kbd> flit · <kbd>X</kbd> cancel · <kbd>G</kbd> move prop<br>Gamepad: left stick / A light / B flit / X pack / Y cancel</div></footer>
 <div id="error" role="alert" hidden></div>
@@ -466,6 +466,122 @@ float ambientVisibility(vec3 p,vec3 n){
 
 return {RECONSTRUCT,NORMAL_FRAGMENT,FULLSCREEN_VERTEX,SSAO_FRAGMENT,AMBIENT_VISIBILITY};
 })();
+// Source: engine/basement/shadow-shaders.js
+const module9=(()=>{
+/**
+ * Basement / shadow shaders: retained instanced depth geometry and filtered visibility.
+ * Shadow visibility affects its corresponding direct light only. Ambient AO and emission
+ * remain separate. PCF has a fixed kernel; it is not area-light penumbra simulation.
+ */
+const SHADOW_VERTEX=`#version 300 es
+precision highp float;
+layout(location=0) in vec3 aPosition;
+layout(location=2) in vec4 aPose;
+layout(location=3) in vec4 aSize;
+uniform mat4 uLightMatrix;
+void main(){
+  float c=cos(aPose.w),s=sin(aPose.w);
+  vec3 p=aPosition*aSize.xyz;
+  p.xy=mat2(c,s,-s,c)*p.xy;
+  gl_Position=uLightMatrix*vec4(p+aPose.xyz,1.0);
+}`;
+
+/** Depth-only framebuffers have no color attachment or fragment color work. */
+const SHADOW_FRAGMENT=`#version 300 es
+precision highp float;
+void main(){}`;
+
+/**
+ * Raw depth samplers permit portable explicit PCF with standard WebGL2 formats.
+ * Sun and cube use independent texture units, including when their branches are off.
+ * Biases and filter radii are expressed in world units, not arbitrary depth fractions.
+ */
+const SHADOW_VISIBILITY=`
+uniform vec3 uSunDirection;
+uniform vec3 uSunColor;
+uniform int uSunShadowEnabled;
+uniform mat4 uSunMatrix;
+uniform sampler2D uSunShadow;
+uniform vec4 uShadowParameters; // receiver bias, normal bias, world filter radius, sun half-extent
+uniform int uPointShadowIndex;
+uniform samplerCube uPointShadow;
+uniform vec4 uPointShadowParameters; // near, far, bias, filter radius in world units
+uniform float uPointShadowResolution;
+uniform vec3 uPointShadowPosition; // position actually captured in the cached cube
+// Bilinear interpolation of depth COMPARISONS, not depth values. Four offset taps
+// provide continuous soft edges (16 comparisons) without blending occluder depths.
+float sunTap(vec2 uv,float reference,vec2 gradient,vec2 origin){
+  vec2 dimensions=vec2(textureSize(uSunShadow,0));
+  vec2 pixel=uv*dimensions-0.5,base=floor(pixel),fraction=fract(pixel);
+  float visibility=0.0;
+  for(int y=0;y<2;y++)for(int x=0;x<2;x++){
+    vec2 center=(base+vec2(x,y)+0.5)/dimensions;
+    float planeReference=reference+dot(gradient,center-origin);
+    float visible=any(lessThan(center,vec2(0.0)))||any(greaterThan(center,vec2(1.0)))?1.0:step(planeReference,texture(uSunShadow,center).r);
+    visibility+=visible*(x==0?1.0-fraction.x:fraction.x)*(y==0?1.0-fraction.y:fraction.y);
+  }
+  return visibility;
+}
+float sunVisibility(vec3 p,vec3 n){
+  if(uSunShadowEnabled==0)return 1.0;
+  vec3 coord=(uSunMatrix*vec4(p+n*uShadowParameters.y,1.0)).xyz*0.5+0.5;
+  // Receiver-plane depth correction compares each texel at its actual world-plane
+  // intersection, removing nearest-texel slope acne without a large detached bias.
+  vec3 dx=dFdx(coord),dy=dFdy(coord);
+  float determinant=dx.x*dy.y-dx.y*dy.x;
+  vec2 gradient=abs(determinant)>1e-10?vec2(dy.y*dx.z-dx.y*dy.z,dx.x*dy.z-dy.x*dx.z)/determinant:vec2(0.0);
+  if(any(lessThan(coord,vec3(0.0)))||any(greaterThan(coord,vec3(1.0))))return 1.0;
+  float bias=uShadowParameters.x*(1.0+2.0*(1.0-max(dot(n,uSunDirection),0.0)))/(uShadowParameters.w*4.0);
+  float reference=coord.z-bias;
+  float radius=uShadowParameters.z/(uShadowParameters.w*2.0);
+  float visibility=0.0;
+  for(int i=0;i<4;i++){
+    vec2 offset=vec2((i&1)==0?-0.5:0.5,(i&2)==0?-0.5:0.5);
+    visibility+=sunTap(coord.xy+offset*radius,reference,gradient,coord.xy);
+  }
+  return visibility*0.25;
+}
+// Snap a direction to the selected cube face's texel center. Explicit face orientation
+// matches shadow-math.js and GL cube sampling, including seams and negative faces.
+vec3 cubeTexelRay(vec3 d){
+  vec3 a=abs(d);vec2 uv;int face;
+  if(a.x>=a.y&&a.x>=a.z){face=d.x>0.0?0:1;uv=vec2(d.x>0.0?-d.z:d.z,-d.y)/a.x;}
+  else if(a.y>=a.z){face=d.y>0.0?2:3;uv=vec2(d.x,d.y>0.0?d.z:-d.z)/a.y;}
+  else{face=d.z>0.0?4:5;uv=vec2(d.z>0.0?d.x:-d.x,-d.y)/a.z;}
+  vec2 pixel=clamp(floor((uv*0.5+0.5)*uPointShadowResolution),vec2(0.0),vec2(uPointShadowResolution-1.0));
+  uv=(pixel+0.5)/uPointShadowResolution*2.0-1.0;
+  if(face==0)return vec3(1.0,-uv.y,-uv.x);
+  if(face==1)return vec3(-1.0,-uv.y,uv.x);
+  if(face==2)return vec3(uv.x,1.0,uv.y);
+  if(face==3)return vec3(uv.x,-1.0,-uv.y);
+  if(face==4)return vec3(uv.x,-uv.y,1.0);
+  return vec3(-uv.x,-uv.y,-1.0);
+}
+float pointVisibility(vec3 p,vec3 n){
+  vec3 delta=p+n*uShadowParameters.y-uPointShadowPosition;
+  float major=max(max(abs(delta.x),abs(delta.y)),abs(delta.z));
+  float near=uPointShadowParameters.x,far=uPointShadowParameters.y;
+  if(major<=near||major>=far)return 1.0;
+  vec3 direction=normalize(delta),axis=abs(direction.z)<0.9?vec3(0,0,1):vec3(0,1,0);
+  vec3 tangent=normalize(cross(direction,axis)),bitangent=cross(direction,tangent);
+  float visibility=0.0,radius=uPointShadowParameters.w;
+  for(int i=0;i<4;i++){
+    vec2 offset=vec2((i&1)==0?-0.5:0.5,(i&2)==0?-0.5:0.5);
+    vec3 ray=cubeTexelRay(delta+radius*(tangent*offset.x+bitangent*offset.y));
+    // Intersect the sample ray with the receiver's local plane. Comparing its own
+    // perspective depth prevents the receiver from shadowing itself across a PCF tap.
+    float denominator=dot(n,ray);
+    float distanceAlongRay=abs(denominator)>0.0001?dot(n,delta)/denominator:-1.0;
+    if(distanceAlongRay<=near||distanceAlongRay>=far){visibility+=1.0;continue;}
+    float adjusted=max(near,distanceAlongRay-uPointShadowParameters.z);
+    float reference=far/(far-near)-far*near/((far-near)*adjusted);
+    visibility+=step(reference,texture(uPointShadow,ray).r);
+  }
+  return visibility*0.25;
+}`;
+
+return {SHADOW_VERTEX,SHADOW_FRAGMENT,SHADOW_VISIBILITY};
+})();
 // Source: engine/basement/shaders.js
 const module7=(()=>{
 /**
@@ -475,6 +591,7 @@ const module7=(()=>{
  * This is the first renderer material, not the final luxe/bloom renderer.
  */
 const { AMBIENT_VISIBILITY } = module8;
+const { SHADOW_VISIBILITY } = module9;
 
 const VERTEX = `#version 300 es
 precision highp float;
@@ -516,18 +633,20 @@ uniform vec4 uLights[8]; // x/y/z, radius; radius 0 disables a slot
 uniform vec3 uLightColors[8]; // linear RGB irradiance
 out vec4 outColor;
 ${AMBIENT_VISIBILITY}
+${SHADOW_VISIBILITY}
 void main() {
   vec3 n = normalize(vNormal);
   // Occlusion attenuates ambient irradiance only, before exposure and display gamma.
   vec3 light = uAmbient * (0.65 + 0.35 * max(n.z, 0.0)) * ambientVisibility(vWorld,n);
-  light += vec3(0.20,0.22,0.29) * max(dot(n, normalize(vec3(-0.4,-0.5,1.0))), 0.0);
+  light += uSunColor * max(dot(n,uSunDirection),0.0) * sunVisibility(vWorld,n);
   for (int i=0; i<8; i++) {
     vec3 delta = uLights[i].xyz - vWorld;
     float distanceToLight = length(delta);
     float radius = uLights[i].w;
     if (radius > 0.0) {
       float falloff = max(0.0, 1.0 - distanceToLight / radius);
-      light += uLightColors[i] * falloff * falloff * (0.25 + 0.75 * max(dot(n, normalize(delta + 0.0001)), 0.0));
+      float visibility=i==uPointShadowIndex?pointVisibility(vWorld,n):1.0;
+      light += uLightColors[i] * visibility * falloff * falloff * (0.25 + 0.75 * max(dot(n, normalize(delta + 0.0001)), 0.0));
     }
   }
   vec3 surface = vColor;
@@ -547,7 +666,7 @@ void main() {
 return {VERTEX,FRAGMENT};
 })();
 // Source: engine/basement/render-diagnostics.js
-const module9=(()=>{
+const module10=(()=>{
 /**
  * Basement / rendering diagnostics: per-frame work deltas and requested buffer bytes.
  * Preparation uploads are included even when the later presentation resets legacy stats.
@@ -555,10 +674,10 @@ const module9=(()=>{
 function renderDiagnostics(renderer,profiler){
   if(!profiler)return()=>{};
   const ids={},baseline={};
-  for(const name of ['draws','instances','uploads','uploadedBytes','candidates','culled']){
+  for(const name of ['draws','instances','uploads','uploadedBytes','candidates','culled','shadowDraws','shadowHits']){
     ids[name]=profiler.counter(`renderer.${name}`,name==='uploadedBytes'?'bytes':'count');baseline[name]=0;
   }
-  for(const[name,unit]of [['buffers','count'],['programs','count'],['vaos','count'],['cpuBuffers','bytes'],['gpuBuffers','bytes'],['gpuPending','count'],['aoTargets','bytes'],['aoBlockers','count']])ids[name]=profiler.counter(`renderer.${name}`,unit);
+  for(const[name,unit]of [['buffers','count'],['programs','count'],['vaos','count'],['cpuBuffers','bytes'],['gpuBuffers','bytes'],['gpuPending','count'],['aoTargets','bytes'],['aoBlockers','count'],['shadowTargets','bytes']])ids[name]=profiler.counter(`renderer.${name}`,unit);
   return profiler.provider('renderer',{
     begin(){for(const name in baseline)baseline[name]=renderer.totals[name];},
     sample(p){
@@ -569,19 +688,20 @@ function renderDiagnostics(renderer,profiler){
       p.set(ids.cpuBuffers,cpu);p.set(ids.gpuBuffers,gpu);p.set(ids.gpuPending,renderer.gpuTimer.pending);
       const ao=renderer.occlusion,t=ao.targets;
       p.set(ids.aoTargets,t?t.width*t.height*9:0);p.set(ids.aoBlockers,ao.count);
+      const maps=renderer.lighting.maps;p.set(ids.shadowTargets,(maps.sun?.bytes??0)+(maps.point?.bytes??0));
     },
     status:()=>renderer.gpuTimer.inspect(),
     configure:p=>renderer.gpuTimer.configure(p.recording&&p.gpuEnabled),
     details:()=>({gpuTimer:renderer.gpuTimer.inspect(),buffers:renderer.stats.buffers,programs:renderer.stats.programs,
-      vertexArrays:renderer.stats.vaos,ambientOcclusion:renderer.occlusion.inspect(),viewport:{width:renderer.canvas.width,height:renderer.canvas.height},
-      accounting:'Requested GL buffer bytes only. Estimated AO render-target bytes are reported separately in ambientOcclusion/aoTargets. Default framebuffer, shader/driver storage and browser heap are excluded.'}),
+      vertexArrays:renderer.stats.vaos,ambientOcclusion:renderer.occlusion.inspect(),lighting:renderer.lighting.inspect(),viewport:{width:renderer.canvas.width,height:renderer.canvas.height},
+      accounting:'Requested GL buffer bytes only. Estimated AO and shadow texture bytes are reported separately in ambientOcclusion/aoTargets. Default framebuffer, shader/driver storage and browser heap are excluded.'}),
   });
 }
 
 return {renderDiagnostics};
 })();
 // Source: engine/basement/gpu-timer.js
-const module10=(()=>{
+const module11=(()=>{
 /**
  * Basement / GPU timer: optional EXT_disjoint_timer_query_webgl2 measurements.
  * At most four reusable queries. Results are polled for availability, never forced
@@ -647,7 +767,7 @@ class GpuTimer {
 return {GpuTimer};
 })();
 // Source: engine/basement/gl-program.js
-const module11=(()=>{
+const module12=(()=>{
 /** Basement / GL programs: shared compilation with complete failure-path ownership. */
 
 /** Link two GLSL stages; delete temporary shaders on success and every failure path. */
@@ -674,13 +794,13 @@ function createProgram(gl, vertexSource, fragmentSource) {
 return {createProgram};
 })();
 // Source: engine/basement/ambient-occlusion.js
-const module12=(()=>{
+const module13=(()=>{
 /**
  * Basement / ambient occlusion: owns bounded proxies, optional GPU targets and settings.
  * No scheduling, world ownership or game policy lives here. Renderer invokes the passes
  * with its existing retained batch. Screen targets are lazy and freed when leaving screen.
  */
-const { createProgram } = module11;
+const { createProgram } = module12;
 const { VERTEX } = module7;
 const { NORMAL_FRAGMENT, FULLSCREEN_VERTEX, SSAO_FRAGMENT } = module8;
 
@@ -857,6 +977,361 @@ class AmbientOcclusion {
 
 return {occlusionSettings,occlusionDimensions,AmbientOcclusion};
 })();
+// Source: engine/basement/shadow-math.js
+const module15=(()=>{
+/**
+ * Basement / shadow math: light-space transforms, independent of GL and game content.
+ * Matrices are column-major Float32 values. Coordinates use x/y ground and z height.
+ */
+
+/** Normalize finite directions once on configuration; zero vectors have no light frame. */
+function lightDirection(direction) {
+  if(!direction||direction.length!==3||!Array.from(direction).every(Number.isFinite))throw new RangeError('Light direction requires three finite numbers');
+  const length=Math.hypot(...direction);if(length<1e-6)throw new RangeError('Light direction must be nonzero');
+  return Array.from(direction,n=>n/length);
+}
+
+/**
+ * Orthographic sun matrix. Snap light-space x/y to whole texels to reduce swimming
+ * when a camera pans. The depth half-range is twice the horizontal half-extent.
+ * The incoming direction points FROM a receiver TO the sun, matching Lambert lighting.
+ */
+function directionalShadowMatrix(direction,camera,extent,resolution,out=new Float32Array(16)) {
+  const length=Math.hypot(...direction),lx=direction[0]/length,ly=direction[1]/length,lz=direction[2]/length;
+  // Cross a stable up axis with the light; vertical suns need a different reference up.
+  let rx,ry,rz;
+  if(Math.abs(lz)<0.99){rx=-ly;ry=lx;rz=0;}else{rx=lz;ry=0;rz=-lx;}
+  const rlen=Math.hypot(rx,ry,rz);rx/=rlen;ry/=rlen;rz/=rlen;
+  const ux=ly*rz-lz*ry,uy=lz*rx-lx*rz,uz=lx*ry-ly*rx;
+  const texel=2*extent/resolution,depth=extent*2;
+  const cx=Math.round((rx*camera.x+ry*camera.y)/texel)*texel;
+  const cy=Math.round((ux*camera.x+uy*camera.y)/texel)*texel;
+  out.set([rx/extent,ux/extent,-lx/depth,0, ry/extent,uy/extent,-ly/depth,0,
+    rz/extent,uz/extent,-lz/depth,0, -cx/extent,-cy/extent,(lx*camera.x+ly*camera.y)/depth,1]);
+  return out;
+}
+
+/** Standard GL cube face axes: +X,-X,+Y,-Y,+Z,-Z; each view has a 90° field of view. */
+const CUBE_FRAMES=[
+  [0,0,-1, 0,-1,0, 1,0,0], [0,0,1, 0,-1,0, -1,0,0],
+  [1,0,0, 0,0,1, 0,1,0], [1,0,0, 0,0,-1, 0,-1,0],
+  [1,0,0, 0,-1,0, 0,0,1], [-1,0,0, 0,-1,0, 0,0,-1],
+];
+
+/** Write projection × cube-face view, with finite near/far distances in world units. */
+function pointShadowMatrix(position,face,near,far,out=new Float32Array(16)) {
+  if(!Number.isInteger(face)||face<0||face>5||!(far>near&&near>0))throw new RangeError('Invalid cube shadow projection');
+  const [rx,ry,rz,ux,uy,uz,fx,fy,fz]=CUBE_FRAMES[face],a=-(far+near)/(far-near),b=-2*far*near/(far-near);
+  const r=rx*position[0]+ry*position[1]+rz*position[2],u=ux*position[0]+uy*position[1]+uz*position[2];
+  const f=fx*position[0]+fy*position[1]+fz*position[2];
+  out.set([rx,ux,-a*fx,fx, ry,uy,-a*fy,fy, rz,uz,-a*fz,fz, -r,-u,a*f+b,-f]);
+  return out;
+}
+
+return {lightDirection,directionalShadowMatrix,pointShadowMatrix};
+})();
+// Source: engine/basement/shadow-target.js
+const module17=(()=>{
+/**
+ * Basement / shadow target: owns one depth-only 2D or cube texture and framebuffer.
+ * Requested depth24 storage is budgeted at four bytes/texel; driver padding is unknown.
+ */
+class ShadowTarget {
+  /** Allocate immutable single-level depth; clean partial creation on every refusal. */
+  constructor(gl,resolution,cube=false) {
+    this.gl=gl;this.resolution=resolution;this.cube=cube;this.texture=null;this.framebuffer=null;
+    this.bytes=resolution*resolution*(cube?6:1)*4;
+    try {
+      this.texture=gl.createTexture();this.framebuffer=gl.createFramebuffer();
+      if(!this.texture||!this.framebuffer)throw new Error('Shadow target allocation failed');
+      const type=cube?gl.TEXTURE_CUBE_MAP:gl.TEXTURE_2D;
+      gl.activeTexture(gl.TEXTURE0+(cube?4:3));gl.bindTexture(type,this.texture);
+      gl.texStorage2D(type,1,gl.DEPTH_COMPONENT24,resolution,resolution);
+      for(const parameter of [gl.TEXTURE_MIN_FILTER,gl.TEXTURE_MAG_FILTER])gl.texParameteri(type,parameter,gl.NEAREST);
+      for(const parameter of [gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T])gl.texParameteri(type,parameter,gl.CLAMP_TO_EDGE);
+      if(cube)gl.texParameteri(type,gl.TEXTURE_WRAP_R,gl.CLAMP_TO_EDGE);
+      gl.bindFramebuffer(gl.FRAMEBUFFER,this.framebuffer);gl.drawBuffers([gl.NONE]);gl.readBuffer(gl.NONE);
+      this.face(0);
+      if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw new Error('Shadow framebuffer unavailable');
+    } catch(error) {this.dispose();throw error;}
+    finally {gl.bindFramebuffer(gl.FRAMEBUFFER,null);}
+  }
+
+  /** Attach the sun image or one cube face before clearing and drawing depth. */
+  face(index) {
+    const gl=this.gl;gl.bindFramebuffer(gl.FRAMEBUFFER,this.framebuffer);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,this.cube?gl.TEXTURE_CUBE_MAP_POSITIVE_X+index:gl.TEXTURE_2D,this.texture,0);
+  }
+
+  /** Delete actual handles once; lost-context owners discard handles without calling this. */
+  dispose() {
+    if(this.framebuffer)this.gl.deleteFramebuffer(this.framebuffer);if(this.texture)this.gl.deleteTexture(this.texture);
+    this.framebuffer=this.texture=null;this.bytes=0;
+  }
+}
+
+return {ShadowTarget};
+})();
+// Source: engine/basement/shadow-maps.js
+const module16=(()=>{
+/**
+ * Basement / shadow maps: bounded renderer-owned targets, caster storage and update caches.
+ * One directional map updates on change; at most one selected point cube refreshes as
+ * an atomic six-face group. Point geometry changes are rate-limited; travel/light moves
+ * invalidate immediately. No queue, second loop or partial six-face image is exposed.
+ */
+const { createProgram } = module12;
+const { directionalShadowMatrix, pointShadowMatrix } = module15;
+const { SHADOW_VERTEX, SHADOW_FRAGMENT } = module9;
+const { ShadowTarget } = module17;
+
+class ShadowMaps {
+  /** Retain matrices/keys; GPU allocations remain lazy until an enabled world is drawn. */
+  constructor(renderer,lighting) {
+    this.renderer=renderer;this.lighting=lighting;this.gl=renderer.gl;
+    this.sun=null;this.point=null;this.program=null;this.casters=null;this.sourceBatch=null;
+    this.sunMatrix=new Float32Array(16);this.previousSunMatrix=new Float32Array(16);this.faceMatrix=new Float32Array(16);
+    this.pointPosition=new Float32Array(3);this.pointKey=new Float32Array(4);
+    this.sunVersion=this.pointVersion=-1;this.pointAt=-Infinity;this.pointIndex=-1;
+    this.sunReady=this.pointReady=false;this.sunFailure=this.pointFailure=null;
+    this.frameDraws=0;this.sunUpdates=this.pointUpdates=0;this.disposed=false;
+  }
+
+  /** Release resources that are no longer allowed; retry failures only after explicit change. */
+  reconfigure(previous,next) {
+    this.sunFailure=this.pointFailure=null;
+    if(next.mode==='off'){this.release();return;}
+    if(previous.mode!==next.mode){this.sun?.dispose();this.sun=null;this.sunReady=false;}
+    if(previous.pointIndex!==next.pointIndex||previous.pointResolution!==next.pointResolution){this.point?.dispose();this.point=null;this.pointReady=false;}
+  }
+
+  /** Create the shared depth program once; failed allocation leaves usable unshadowed lights. */
+  ensureProgram() {
+    if(!this.program){this.program=createProgram(this.gl,SHADOW_VERTEX,SHADOW_FRAGMENT);this.renderer.stats.programs++;this.matrixUniform=this.gl.getUniformLocation(this.program,'uLightMatrix');}
+  }
+
+  /**
+   * Borrow only the active world. Camera-visible instances cannot serve as shadow casters:
+   * an offscreen building can cast onto visible ground. The separate bounded batch packs
+   * all eligible resident-world shapes, with unchanged records retained between frames.
+   */
+  prepare(batch) {
+    const r=this.renderer,l=this.lighting,s=l.settings,gl=this.gl;
+    this.frameDraws=0;
+    if(s.mode==='off'){this.clearWorld();return;}
+    if(this.sunFailure&&(s.pointIndex<0||this.pointFailure)){this.clearWorld();return;}
+    if(!this.casters||this.casters.world!==batch.world||this.casters.disposed){
+      this.clearWorld();this.casters=r.createBatch(batch.world,batch.capacity,{visibility:'shadow'});
+    }
+    this.sourceBatch=batch;
+    this.casters.sync(0,0);
+    try {
+      this.ensureProgram();gl.enable(gl.DEPTH_TEST);gl.useProgram(this.program);gl.bindVertexArray(this.casters.vao);
+      this.prepareSun();this.preparePoint();
+    } catch(error) {
+      // Program errors disable both paths until reconfiguration/restoration. Target
+      // errors are handled independently below so the other light can still work.
+      this.sunFailure=this.pointFailure=error.message;this.sunReady=this.pointReady=false;
+    } finally {
+      gl.bindVertexArray(null);gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+      gl.viewport(0,0,r.canvas.width,r.canvas.height);gl.enable(gl.DEPTH_TEST);
+    }
+  }
+
+  /** Depth draw contributes actual submissions/instances to the renderer's existing totals. */
+  submit(target,matrix,face=0) {
+    const gl=this.gl,r=this.renderer;target.face(face);gl.viewport(0,0,target.resolution,target.resolution);
+    gl.clear(gl.DEPTH_BUFFER_BIT);gl.uniformMatrix4fv(this.matrixUniform,false,matrix);
+    gl.drawArraysInstanced(gl.TRIANGLES,0,36,this.casters.count);
+    this.frameDraws++;r.stats.draws++;r.stats.instances+=this.casters.count;
+    r.totals.draws++;r.totals.shadowDraws++;r.totals.instances+=this.casters.count;
+  }
+
+  /** Sun cache includes the packed caster version and the complete snapped light transform. */
+  prepareSun() {
+    if(!this.lighting.directionColor.some(n=>n>0)){this.sun?.dispose();this.sun=null;this.sunReady=false;return;}
+    if(this.sunFailure)return;
+    const s=this.lighting.settings,resolution=s.mode==='high'?1024:512;
+    try {
+      if(!this.sun)this.sun=new ShadowTarget(this.gl,resolution);
+      directionalShadowMatrix(this.lighting.direction,this.renderer.camera,s.extent,resolution,this.sunMatrix);
+      let changed=this.sunVersion!==this.casters.version||!this.sunReady;
+      for(let i=0;i<16;i++)if(this.sunMatrix[i]!==this.previousSunMatrix[i])changed=true;
+      if(!changed){this.renderer.totals.shadowHits++;return;}
+      this.submit(this.sun,this.sunMatrix);this.previousSunMatrix.set(this.sunMatrix);
+      this.sunVersion=this.casters.version;this.sunReady=true;this.sunUpdates++;
+    } catch(error) {this.sunFailure=error.message;this.sun?.dispose();this.sun=null;this.sunReady=false;}
+  }
+
+  /**
+   * At most one point slot can own a cube. Light moves/radius changes and a new world
+   * refresh immediately; moving casters refresh at most pointRefreshHz times/second.
+   * All six faces use the same retained pose snapshot and complete in one submission group.
+   */
+  preparePoint() {
+    const l=this.lighting,s=l.settings,index=s.pointIndex,offset=index*4,far=l.positions[offset+3],near=0.05;
+    if(index<0||!Number.isFinite(far)||far<=near){this.point?.dispose();this.point=null;this.pointReady=false;this.pointIndex=-1;return;}
+    if(this.pointFailure)return;
+    const now=performance.now();
+    let lightChanged=this.pointIndex!==index||!this.pointReady;
+    for(let i=0;i<4;i++)if(this.pointKey[i]!==l.positions[offset+i])lightChanged=true;
+    const dirty=this.pointVersion!==this.casters.version;
+    if(!lightChanged&&(!dirty||now-this.pointAt<1000/s.pointRefreshHz)){this.renderer.totals.shadowHits++;return;}
+    try {
+      if(!this.point)this.point=new ShadowTarget(this.gl,s.pointResolution,true);
+      for(let i=0;i<3;i++)this.pointPosition[i]=l.positions[offset+i];
+      for(let face=0;face<6;face++){
+        pointShadowMatrix(this.pointPosition,face,near,far,this.faceMatrix);this.submit(this.point,this.faceMatrix,face);
+      }
+      for(let i=0;i<4;i++)this.pointKey[i]=l.positions[offset+i];
+      this.pointIndex=index;this.pointVersion=this.casters.version;this.pointAt=now;this.pointReady=true;this.pointUpdates++;
+    } catch(error) {this.pointFailure=error.message;this.point?.dispose();this.point=null;this.pointReady=false;}
+  }
+
+  /** Bind raw depth samplers on reserved units 3/4; AO owns units 0..2. */
+  bind(uniforms) {
+    const gl=this.gl,s=this.lighting.settings,enabled=s.mode!=='off';
+    gl.uniform1i(uniforms.uSunShadowEnabled,enabled&&this.sunReady?1:0);
+    gl.uniformMatrix4fv(uniforms.uSunMatrix,false,this.sunMatrix);
+    gl.uniform4f(uniforms.uShadowParameters,s.bias,s.normalBias,s.softness,s.extent);
+    gl.uniform1i(uniforms.uSunShadow,3);gl.uniform1i(uniforms.uPointShadow,4);
+    gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,this.sunReady?this.sun.texture:null);
+    gl.activeTexture(gl.TEXTURE4);gl.bindTexture(gl.TEXTURE_CUBE_MAP,this.pointReady?this.point.texture:null);
+    gl.uniform1i(uniforms.uPointShadowIndex,enabled&&this.pointReady?this.pointIndex:-1);
+    gl.uniform3fv(uniforms.uPointShadowPosition,this.pointPosition);
+    gl.uniform1f(uniforms.uPointShadowResolution,this.point?.resolution??128);
+    gl.uniform4f(uniforms.uPointShadowParameters,0.05,this.pointKey[3]||1,s.bias,s.softness*0.5);
+  }
+
+  /** Scalar/copyable ownership and freshness data, never borrowed World/GL references. */
+  inspect() {
+    const s=this.lighting.settings;
+    return {mode:s.mode,sunReady:this.sunReady,pointReady:this.pointReady,pointIndex:this.pointReady?this.pointIndex:-1,
+      sunResolution:this.sun?.resolution??0,pointResolution:this.point?.resolution??0,
+      targetBytes:(this.sun?.bytes??0)+(this.point?.bytes??0),textures:Number(!!this.sun)+Number(!!this.point),
+      framebuffers:Number(!!this.sun)+Number(!!this.point),casterOwner:this.casters?`lighting.shadowCasters/${this.casters.world.id}`:null,
+      casters:this.casters?.count??0,casterCapacity:this.casters?.capacity??0,casterCpuBytes:this.casters?.cpuBytes??0,casterGpuBytes:this.casters?.gpuBufferBytes??0,frameDraws:this.frameDraws,
+      sunUpdates:this.sunUpdates,pointUpdates:this.pointUpdates,pointRefreshHz:s.pointRefreshHz,
+      pointAgeMs:this.pointReady?Math.max(0,performance.now()-this.pointAt):null,
+      sunFailure:this.sunFailure,pointFailure:this.pointFailure,
+      accounting:'Estimated depth24 storage budgeted at four bytes/texel; default framebuffer and driver overhead excluded. Caster buffers are included in renderer buffer totals.'};
+  }
+
+  /** No borrowed world survives a clear, travel, disposal or last active scene removal. */
+  clearWorld() {
+    this.sourceBatch=null;const casters=this.casters;this.casters=null;casters?.dispose();
+    this.sunVersion=this.pointVersion=-1;this.sunReady=this.pointReady=false;
+  }
+
+  /** Source disposal must remove its borrowed caster copy even if no further frame runs. */
+  releaseSource(batch) {if(this.sourceBatch===batch)this.clearWorld();}
+
+  /** Lost handles are browser-owned; retained caster CPU data is restored with other batches. */
+  invalidate() {this.sun=this.point=this.program=this.matrixUniform=null;this.sunFailure=this.pointFailure=null;this.sunReady=this.pointReady=false;}
+
+  /** Release all optional resources, including the bounded caster batch. */
+  release() {
+    this.clearWorld();this.sun?.dispose();this.point?.dispose();this.sun=this.point=null;
+    if(this.program){this.gl.deleteProgram(this.program);this.renderer.stats.programs--;}
+    this.program=this.matrixUniform=null;
+  }
+
+  /** Idempotent renderer-owned cleanup; no game world or resource lease is disposed here. */
+  dispose() {if(this.disposed)return;this.disposed=true;this.release();}
+}
+
+return {ShadowMaps};
+})();
+// Source: engine/basement/lighting.js
+const module14=(()=>{
+/**
+ * Basement / lighting: reusable irradiance data, validated configuration and shadow ownership.
+ * Games author light placement/palettes; no world names, scheduling or game rules live here.
+ * Fixed eight-point storage is explicit. Shadows budget one sun plus one selected point.
+ */
+const { lightDirection } = module15;
+const { ShadowMaps } = module16;
+
+/** Validate copied RGB values; runtime data cannot silently retain a caller's mutable array. */
+function colorValues(color) {
+  if(!color||color.length!==3||!Array.from(color).every(n=>Number.isFinite(n)&&n>=0&&n<=32))throw new RangeError('Light color requires three values in [0,32]');
+  return Array.from(color);
+}
+
+/** Atomically validate all settings, including the hard one-point-shadow budget. */
+function shadowSettings(previous,patch={}) {
+  const next={...previous,...patch};
+  if(!['off','low','high'].includes(next.mode))throw new RangeError('Shadow mode must be off, low or high');
+  for(const[key,min,max]of [['extent',4,128],['bias',0.001,0.2],['normalBias',0,0.2],['softness',0,2],['pointRefreshHz',1,60]]) {
+    if(!Number.isFinite(next[key])||next[key]<min||next[key]>max)throw new RangeError(`Shadow ${key} must be between ${min} and ${max}`);
+  }
+  if(!Number.isInteger(next.pointIndex)||next.pointIndex < -1||next.pointIndex>7)throw new RangeError('Shadow pointIndex must be -1 or one slot from 0 to 7');
+  if(![128,256,512].includes(next.pointResolution))throw new RangeError('Point shadow resolution must be 128, 256 or 512');
+  return Object.freeze(next);
+}
+
+class Lighting {
+  /** Default light appearance matches First Light; shadow targets are opt-in and lazy. */
+  constructor(renderer,{directional={},shadows={}}={}) {
+    this.renderer=renderer;this.disposed=false;
+    this.ambient=new Float32Array([0.13,0.13,0.23]);
+    this.positions=new Float32Array(8*4);this.colors=new Float32Array(8*3);
+    this.direction=new Float32Array(lightDirection([-0.4,-0.5,1]));this.directionColor=new Float32Array([0.20,0.22,0.29]);
+    this.configureDirectional(directional);
+    this.settings=shadowSettings({mode:'off',extent:48,bias:0.02,normalBias:0.025,softness:0.22,pointIndex:-1,pointResolution:256,pointRefreshHz:10},shadows);
+    this.maps=new ShadowMaps(renderer,this);
+  }
+
+  /** Direction points toward the source; colors are linear RGB irradiance, not sRGB UI colors. */
+  configureDirectional(patch={}) {
+    if(this.disposed)throw new Error('Lighting is disposed');
+    const normalized=lightDirection(patch.direction??this.direction),rgb=colorValues(patch.color??this.directionColor);
+    this.direction.set(normalized);this.directionColor.set(rgb);
+  }
+
+  /** Change budgets between submissions. Disable immediately releases optional GPU resources. */
+  configureShadows(patch) {
+    if(this.disposed)throw new Error('Lighting is disposed');
+    const next=shadowSettings(this.settings,patch);this.maps.reconfigure(this.settings,next);this.settings=next;
+  }
+
+  /** Configure one point slot; radius zero disables it. No ninth slot or automatic growth. */
+  setPoint(index,{position,color,radius}) {
+    if(this.disposed)throw new Error('Lighting is disposed');
+    if(!Number.isInteger(index)||index<0||index>7)throw new RangeError('Point light slot must be 0..7');
+    if(!position||position.length!==3||!Array.from(position).every(Number.isFinite)||!Number.isFinite(radius)||radius<0||radius>256)throw new RangeError('Invalid point position or radius');
+    const rgb=colorValues(color);this.positions.set([...position,radius],index*4);this.colors.set(rgb,index*3);
+  }
+
+  /** Submit shadow work through the renderer's existing frame and retained geometry path. */
+  prepare(batch) {this.maps.prepare(batch);}
+
+  /** Supply direct light and corresponding visibility; AO samples only ambient irradiance. */
+  bind(uniforms) {
+    const gl=this.renderer.gl;
+    gl.uniform3fv(uniforms.uAmbient,this.ambient);gl.uniform4fv(uniforms['uLights[0]'],this.positions);gl.uniform3fv(uniforms['uLightColors[0]'],this.colors);
+    gl.uniform3fv(uniforms.uSunDirection,this.direction);gl.uniform3fv(uniforms.uSunColor,this.directionColor);
+    this.maps.bind(uniforms);
+  }
+
+  /** Capture scalar/copyable state only; provider snapshots never retain a live world or GL object. */
+  inspect() {return {pointBudget:8,direction:Array.from(this.direction),directionColor:Array.from(this.directionColor),shadows:this.maps.inspect()};}
+
+  /** Invalidate lost handles; world state remains owned by Directory, not the light cache. */
+  invalidate() {this.maps.invalidate();}
+
+  /** Drop the active world's borrowed shadow geometry without retaining disposed scenery. */
+  clearWorld() {this.maps.clearWorld();}
+
+  /** A world batch's owner can unload it while the runtime is stopped. */
+  releaseBatch(batch) {this.maps.releaseSource(batch);}
+
+  /** Release maps/batches once; no listeners, timers or animation callbacks were installed here. */
+  dispose() {if(this.disposed)return;this.disposed=true;this.maps.dispose();}
+}
+
+return {shadowSettings,Lighting};
+})();
 // Source: engine/basement/renderer.js
 const module6=(()=>{
 /**
@@ -867,10 +1342,11 @@ const module6=(()=>{
  */
 const { VERTEX, FRAGMENT } = module7;
 const { Lifetime } = module5;
-const { renderDiagnostics } = module9;
-const { GpuTimer } = module10;
-const { createProgram } = module11;
-const { AmbientOcclusion } = module12;
+const { renderDiagnostics } = module10;
+const { GpuTimer } = module11;
+const { createProgram } = module12;
+const { AmbientOcclusion } = module13;
+const { Lighting } = module14;
 
 /** Generate one unit cube with flat normals; uploaded once per WebGL context lifetime. */
 function cubeGeometry() {
@@ -893,24 +1369,24 @@ function cubeGeometry() {
 
 class Renderer {
   /** Own the supplied surface's WebGL context. pixelRatio caps mobile fill cost. */
-  constructor(canvas, { pixelRatio = 1.5, profiler = null, occlusion = {} } = {}) {
+  constructor(canvas, { pixelRatio = 1.5, profiler = null, occlusion = {}, lighting = {} } = {}) {
     this.profiler=profiler; this.canvas = canvas; this.pixelRatio = pixelRatio; this.life = new Lifetime();
     const gl = canvas.getContext('webgl2', { alpha: false, antialias: true, powerPreference: 'low-power' });
     if (!gl) throw new Error('ETRNLNINE requires WebGL 2 on this device.');
     this.gl = gl; this.batches = new Set(); this.disposed = false; this.lost = false;
     this.camera = { x: 0, y: 0, halfHeight: 21 };
-    this.ambient = new Float32Array([0.13, 0.13, 0.23]);
-    this.lights = new Float32Array(8 * 4); this.lightColors = new Float32Array(8 * 3);
     this.stats = { draws: 0, instances: 0, uploads: 0, uploadedBytes: 0, buffers: 0, programs: 0, vaos: 0, contextRestores: 0 };
-    this.totals={draws:0,instances:0,uploads:0,uploadedBytes:0,candidates:0,culled:0};
+    this.totals={draws:0,instances:0,uploads:0,uploadedBytes:0,candidates:0,culled:0,shadowDraws:0,shadowHits:0};
     try {
       this.initialize();
+      this.lighting=new Lighting(this,lighting);
+      this.shadowScope=profiler?.scope('renderer.shadows');
       this.occlusion=new AmbientOcclusion(this,occlusion);
       this.occlusionScope=profiler?.scope('renderer.ambientOcclusion');
       this.gpuTimer=new GpuTimer(gl,(id,ms)=>this.profiler?.recordGpu(id,ms));
       this.life.own(renderDiagnostics(this,profiler));
       this.life.listen(canvas, 'webglcontextlost', event => {
-        event.preventDefault(); this.lost = true; this.gpuTimer.invalidate(); this.occlusion.invalidate();
+        event.preventDefault(); this.lost = true; this.gpuTimer.invalidate(); this.occlusion.invalidate(); this.lighting.invalidate();
       });
       this.life.listen(canvas, 'webglcontextrestored', () => {
         // Browser invalidates all old handles on loss. Recreate from retained CPU data,
@@ -923,7 +1399,7 @@ class Renderer {
     } catch(error) {
       // Metric-budget/capability failure may occur after GL creation. Constructor
       // failure must release real handles even though no caller received this renderer.
-      this.life.dispose();this.gpuTimer?.dispose();this.occlusion?.dispose();
+      this.life.dispose();this.gpuTimer?.dispose();this.occlusion?.dispose();this.lighting?.dispose();
       if(this.cube)gl.deleteBuffer(this.cube);if(this.program)gl.deleteProgram(this.program);
       throw error;
     }
@@ -936,7 +1412,8 @@ class Renderer {
     this.program = program; this.stats.programs++;
     this.uniforms = Object.fromEntries(['uCamera', 'uAmbient', 'uLights[0]', 'uLightColors[0]',
       'uAOMode','uAOStrength','uAORadius','uBlockerCount','uBlockerPose[0]','uBlockerSize[0]',
-      'uAOScreen','uAODepth','uAONormals','uAOSize']
+      'uAOScreen','uAODepth','uAONormals','uAOSize','uSunDirection','uSunColor','uSunShadowEnabled','uSunMatrix',
+      'uSunShadow','uShadowParameters','uPointShadowIndex','uPointShadow','uPointShadowParameters','uPointShadowPosition','uPointShadowResolution']
       .map(name => [name, gl.getUniformLocation(program, name)]));
     this.cube = gl.createBuffer(); this.stats.buffers++;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.cube); gl.bufferData(gl.ARRAY_BUFFER, cubeGeometry(), gl.STATIC_DRAW);
@@ -944,9 +1421,9 @@ class Renderer {
   }
 
   /** Allocate a batch with an explicit maximum. Capacity is a budget, not silent growth. */
-  createBatch(world, capacity = 2048) {
+  createBatch(world, capacity = 2048, {visibility='camera'} = {}) {
     if (this.disposed) throw new Error('Renderer is disposed');
-    const batch = new InstanceBatch(this, world, capacity); this.batches.add(batch); return batch;
+    const batch = new InstanceBatch(this, world, capacity, visibility); this.batches.add(batch); return batch;
   }
 
   /**
@@ -1001,9 +1478,11 @@ class Renderer {
     this.stats.draws = this.stats.instances = this.stats.uploads = this.stats.uploadedBytes = 0;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.clearColor(0.018, 0.019, 0.037, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    if (!batch || batch.disposed) {this.occlusion.count=this.occlusion.candidates=0;return;}
+    if (!batch || batch.disposed) {this.occlusion.count=this.occlusion.candidates=0;this.lighting.clearWorld();return;}
     if (batch.renderer !== this) throw new Error('Batch belongs to another renderer');
     batch.sync(halfWidth, halfHeight);
+    const shadowToken=this.profiler?.begin(this.shadowScope);
+    try {this.lighting.prepare(batch);}finally {this.profiler?.end(shadowToken);}
     const aoToken=this.profiler?.begin(this.occlusionScope);
     let screenReady;
     try {screenReady=this.occlusion.prepare(batch,{halfWidth,halfHeight});}
@@ -1011,9 +1490,7 @@ class Renderer {
     gl.useProgram(this.program);
     this.occlusion.bind(this.uniforms,screenReady);
     gl.uniform4f(this.uniforms.uCamera, this.camera.x, this.camera.y, halfWidth, halfHeight);
-    gl.uniform3fv(this.uniforms.uAmbient, this.ambient);
-    gl.uniform4fv(this.uniforms['uLights[0]'], this.lights);
-    gl.uniform3fv(this.uniforms['uLightColors[0]'], this.lightColors);
+    this.lighting.bind(this.uniforms);
     gl.bindVertexArray(batch.vao);
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, batch.count);
     gl.bindVertexArray(null);
@@ -1024,7 +1501,7 @@ class Renderer {
   /** Release renderer and outstanding batches, with listeners removed before late restoration. */
   dispose() {
     if (this.disposed) return;
-    this.disposed = true; this.life.dispose(); this.gpuTimer.dispose(); this.occlusion.dispose();
+    this.disposed = true; this.life.dispose(); this.gpuTimer.dispose(); this.occlusion.dispose(); this.lighting.dispose();
     for (const batch of [...this.batches]) batch.dispose();
     this.gl.deleteBuffer(this.cube); this.gl.deleteProgram(this.program);
     this.stats.buffers = this.stats.programs = this.stats.vaos = 0;
@@ -1038,10 +1515,12 @@ class Renderer {
  */
 class InstanceBatch {
   /** Retain bounded CPU records so context restoration never depends on Canvas assets. */
-  constructor(renderer, world, capacity) {
+  constructor(renderer, world, capacity, visibility) {
+    if(!['camera','shadow'].includes(visibility))throw new RangeError('Invalid instance visibility policy');
+    this.visibility=visibility;this.version=0;
     this.renderer = renderer; this.world = world; this.capacity = capacity;
     this.data = new Float32Array(capacity * 12);
-    this.kind='instance-buffer';this.cpuBytes=this.data.byteLength;this.gpuBufferBytes=this.data.byteLength;
+    this.kind=visibility==='shadow'?'shadow-instance-buffer':'instance-buffer';this.cpuBytes=this.data.byteLength;this.gpuBufferBytes=this.data.byteLength;
     this.count = 0; this.disposed = false;
     this.initialize();
   }
@@ -1084,16 +1563,20 @@ class InstanceBatch {
     this.cursor = 0; this.firstDirty = Infinity; this.lastDirty = -1;
     for (const entity of this.world.entities.values()) {
       const s = entity.shape, p = entity.pose;
-      if (!s) continue;
+      if (!s || (this.visibility==='shadow'&&s.castShadow===false)) continue;
       r.totals.candidates++;
       const radius = Math.hypot(s.size[0], s.size[1], s.size[2]);
       const screenY = (p.y - r.camera.y) * 0.65 + p.z * 0.76;
-      if (Math.abs(p.x - r.camera.x) > halfWidth + radius || Math.abs(screenY) > halfHeight + radius) {r.totals.culled++;continue;}
-      if (this.cursor / 12 >= this.capacity) throw new Error(`World ${this.world.id} exceeds ${this.capacity} visible instances`);
+      if (this.visibility==='camera'&&(Math.abs(p.x - r.camera.x) > halfWidth + radius || Math.abs(screenY) > halfHeight + radius)) {r.totals.culled++;continue;}
+      if (this.cursor / 12 >= this.capacity) throw new Error(`World ${this.world.id} exceeds ${this.capacity} ${this.visibility} instances`);
       this.write(p.x); this.write(p.y); this.write(p.z); this.write(p.yaw);
-      this.write(s.size[0]); this.write(s.size[1]); this.write(s.size[2]); this.write(s.emission ?? 0);
-      this.write(s.color[0]); this.write(s.color[1]); this.write(s.color[2]); this.write(0);
+      this.write(s.size[0]); this.write(s.size[1]); this.write(s.size[2]);
+      // Depth-only records ignore material changes, so recoloring does not invalidate maps.
+      this.write(this.visibility==='camera'?(s.emission??0):0);
+      for(let i=0;i<3;i++)this.write(this.visibility==='camera'?s.color[i]:0);
+      this.write(0);
     }
+    if(this.count!==this.cursor/12||this.lastDirty>=this.firstDirty)this.version++;
     this.count = this.cursor / 12;
     if (this.lastDirty >= this.firstDirty) {
       gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
@@ -1112,6 +1595,7 @@ class InstanceBatch {
     const { gl, stats } = this.renderer;
     gl.deleteBuffer(this.buffer); gl.deleteVertexArray(this.vao);
     stats.buffers--; stats.vaos--; this.renderer.batches.delete(this);
+    this.renderer.lighting?.releaseBatch(this);
     // Disposal releases CPU storage too, even if a caller retains the old handle.
     this.data = null; this.world = null; this.cpuBytes=this.gpuBufferBytes=0;
   }
@@ -1120,7 +1604,7 @@ class InstanceBatch {
 return {Renderer};
 })();
 // Source: engine/basement/profile-data.js
-const module14=(()=>{
+const module19=(()=>{
 /**
  * Basement / profile data: bounded copies for diagnostics, never live engine references.
  * Used only for on-demand captures/export, not for each recorded frame.
@@ -1184,14 +1668,14 @@ function diagnosticError(error){
 return {boundedCopy,percentile,freezeData,diagnosticError};
 })();
 // Source: engine/basement/profiler.js
-const module13=(()=>{
+const module18=(()=>{
 /**
  * Basement / profiler: bounded CPU scopes, numeric counters, frame history and captures.
  * This mechanism knows no scheduler, renderer, game, DOM element, or GPU API.
  * Milliseconds everywhere. Recording reuses typed storage; summaries/captures allocate
  * only when explicitly requested. Disabled scope calls do not read the clock.
  */
-const { boundedCopy, percentile, freezeData, diagnosticError } = module14;
+const { boundedCopy, percentile, freezeData, diagnosticError } = module19;
 
 class Profiler {
   /** Capacities are hard budgets. Choose them at engine creation, not during a frame. */
@@ -1421,7 +1905,7 @@ const module2=(()=>{
 const { Identities, World } = module3;
 const { Input } = module4;
 const { Renderer } = module6;
-const { Profiler } = module13;
+const { Profiler } = module18;
 
 class Basement {
   /** Renderer first: unsupported WebGL fails before device listeners are installed. */
@@ -1442,7 +1926,7 @@ class Basement {
 return {Basement};
 })();
 // Source: engine/lobby/preparation.js
-const module16=(()=>{
+const module21=(()=>{
 /**
  * Lobby / preparation: cooperatively budgeted generator work in the existing frame loop.
  * Each next() must be a small, synchronous chunk; JavaScript cannot preempt a huge chunk.
@@ -1509,7 +1993,7 @@ class PreparationQueue {
 return {PreparationQueue};
 })();
 // Source: engine/lobby/runtime-diagnostics.js
-const module17=(()=>{
+const module22=(()=>{
 /**
  * Lobby / runtime diagnostics: measurement handles and counters, not scheduling logic.
  * Providers are removed with their runtime. Disabled profiling performs no timer reads.
@@ -1534,14 +2018,14 @@ function runtimeDiagnostics(runtime,profiler){
 return {runtimeDiagnostics};
 })();
 // Source: engine/lobby/runtime.js
-const module15=(()=>{
+const module20=(()=>{
 /**
  * Lobby / runtime: sole animation-frame owner, explicit phases, and pause reasons.
  * All elapsed values are seconds. The engine advances fixed simulation steps and
  * interpolates render poses; long browser suspensions never trigger unlimited work.
  */
-const { PreparationQueue } = module16;
-const { runtimeDiagnostics } = module17;
+const { PreparationQueue } = module21;
+const { runtimeDiagnostics } = module22;
 
 class Runtime {
   /** Inject scheduling for deterministic lifecycle tests; browser defaults allocate no loop yet. */
@@ -1654,7 +2138,7 @@ class Runtime {
 return {Runtime};
 })();
 // Source: engine/directory/residency.js
-const module19=(()=>{
+const module24=(()=>{
 /**
  * Directory / residency: bounded prepared worlds, preparation tickets, and compact state.
  * Factories are game/library supplied. They return {world, ready, capture, dispose, ...}.
@@ -1794,7 +2278,7 @@ class WorldResidency {
 return {WorldResidency};
 })();
 // Source: engine/directory/diagnostics.js
-const module20=(()=>{
+const module25=(()=>{
 /**
  * Directory / diagnostics: report resource ownership through Basement's provider contract.
  * Frame samples are scalar sums. Detailed rows are copied only on capture, capped at 64.
@@ -1841,14 +2325,14 @@ function directoryDiagnostics(directory,profiler){
 return {directoryDiagnostics};
 })();
 // Source: engine/directory/directory.js
-const module18=(()=>{
+const module23=(()=>{
 /**
  * Directory: named libraries, lazy shared resources, and explicit world ownership.
  * Factories come from callers. Nothing here imports a named toy or game asset.
  * A lease pins one resource; releasing the last lease destroys it immediately.
  */
-const { WorldResidency } = module19;
-const { directoryDiagnostics } = module20;
+const { WorldResidency } = module24;
+const { directoryDiagnostics } = module25;
 
 class Directory {
   /** Registration is inert: no world or GPU asset is allocated until requested. */
@@ -1923,7 +2407,7 @@ class Directory {
 return {Directory};
 })();
 // Source: engine/penthouse/toys.js
-const module22=(()=>{
+const module27=(()=>{
 /**
  * Penthouse / toys: reusable procedural box-based architecture and actor assemblies.
  * These are early test toys, not Freelancer art or the final procedural humanoid.
@@ -1931,9 +2415,10 @@ const module22=(()=>{
  */
 
 /** Add a solid box. Colors are linear RGB; emission is a dimensionless gain.
+ * Set castShadow=false to exclude geometry from shadow depth passes.
  * Set ambientBlocker=false for decorative shapes that should not contribute analytic AO. */
-function box(world, { x = 0, y = 0, z = 0, size = [1,1,1], color = [0.3,0.3,0.4], emission = 0, parent = null, yaw = 0, ambientBlocker = true } = {}) {
-  return world.create({ x, y, z, yaw, parent, shape: { size, color, emission, ambientBlocker } });
+function box(world, { x = 0, y = 0, z = 0, size = [1,1,1], color = [0.3,0.3,0.4], emission = 0, parent = null, yaw = 0, ambientBlocker = true, castShadow = true } = {}) {
+  return world.create({ x, y, z, yaw, parent, shape: { size, color, emission, ambientBlocker, castShadow } });
 }
 
 /**
@@ -1981,7 +2466,7 @@ function actor({ world, color = [0.42,0.34,0.58], bagColor = [0.54,0.30,0.17] })
 return {box,pavilion,actor};
 })();
 // Source: engine/penthouse/controls.js
-const module23=(()=>{
+const module28=(()=>{
 /**
  * Penthouse / controls: parameterized HTML control templates over Basement actions.
  * HTML is intentional for accessible interface text; the world remains pure WebGL.
@@ -2081,7 +2566,7 @@ class ActionButton {
 return {Joystick,ActionButton};
 })();
 // Source: engine/penthouse/profiler-style.js
-const module25=(()=>{
+const module30=(()=>{
 /** Penthouse / profiler presentation: component-scoped styles; removed with the viewer root. */
 const PROFILER_STYLE=`
 .etrnl-profiler{position:absolute;right:30px;top:92px;width:min(390px,calc(100vw - 40px));max-height:calc(100dvh - 190px);overflow:auto;background:#11131eef;border:1px solid #c6ae774d;border-radius:7px;color:#d5cfdf;font:11px/1.55 system-ui,sans-serif;z-index:2;box-shadow:0 12px 50px #0004}
@@ -2106,15 +2591,15 @@ const PROFILER_STYLE=`
 return {PROFILER_STYLE};
 })();
 // Source: engine/penthouse/profiler-view.js
-const module24=(()=>{
+const module29=(()=>{
 /**
  * Penthouse / profiler viewer: accessible HTML/SVG, bounded tables and capture export.
  * Receives a generic subscription function; it never imports Lobby or starts a loop.
  * Closed viewers unsubscribe. Open viewers refresh at most twice a second by default.
  */
 const { Lifetime } = module5;
-const { diagnosticError } = module14;
-const { PROFILER_STYLE } = module25;
+const { diagnosticError } = module19;
+const { PROFILER_STYLE } = module30;
 
 /** Format measured values without turning unavailable measurements into zero. */
 function ms(value){return Number.isFinite(value)?value.toFixed(2):'—';}
@@ -2234,14 +2719,14 @@ class ProfilerView {
 return {ProfilerView};
 })();
 // Source: engine/penthouse/penthouse.js
-const module21=(()=>{
+const module26=(()=>{
 /**
  * Penthouse assembly: expose inert libraries without coupling Directory to toy names.
  * ETRNLNINE installs these factories; games request them through Directory.
  */
-const { pavilion, actor, box } = module22;
-const { Joystick, ActionButton } = module23;
-const { ProfilerView } = module24;
+const { pavilion, actor, box } = module27;
+const { Joystick, ActionButton } = module28;
+const { ProfilerView } = module29;
 
 class Penthouse {
   /** Catalog creation is inert: allocation begins only when a factory is requested. */
@@ -2268,9 +2753,9 @@ const module1=(()=>{
  */
 const { Basement } = module2;
 const { Lifetime } = module5;
-const { Runtime } = module15;
-const { Directory } = module18;
-const { Penthouse } = module21;
+const { Runtime } = module20;
+const { Directory } = module23;
+const { Penthouse } = module26;
 
 class ETRNLNINE {
   /** Build an empty engine, releasing earlier levels if a later constructor fails. */
@@ -2308,7 +2793,7 @@ class ETRNLNINE {
 return {ETRNLNINE};
 })();
 // Source: engine/basement/transfer.js
-const module29=(()=>{
+const module34=(()=>{
 /**
  * Basement / transfer: validated, synchronous movement of one attachment tree.
  * No loading, scheduling, game rules, callbacks during mutation, or resource ownership.
@@ -2358,13 +2843,13 @@ function transferTree({ source, destination, root, landing, validate = () => tru
 return {transferTree};
 })();
 // Source: engine/lobby/travel.js
-const module28=(()=>{
+const module33=(()=>{
 /**
  * Lobby / travel: asynchronous preparation becomes a synchronous boundary commit.
  * It consumes generic residency tickets; it does not import Directory or game content.
  * The active ticket pins the source until a successful transfer replaces it.
  */
-const { transferTree } = module29;
+const { transferTree } = module34;
 
 class WorldTravel {
   /** Adopt an already-ready initial ticket/root. The owner must call advance at a boundary. */
@@ -2457,7 +2942,7 @@ class WorldTravel {
 return {WorldTravel};
 })();
 // Source: engine/basement/geometry.js
-const module31=(()=>{
+const module36=(()=>{
 /** Basement / geometry: pure horizontal collision helpers, with no world or game dependency. */
 
 /** Does a horizontal circle overlap an axis-aligned box? Touching is permitted. */
@@ -2470,7 +2955,7 @@ function circleOverlapsBox(x, y, radius, box) {
 return {circleOverlapsBox};
 })();
 // Source: examples/atrium/layout.js
-const module32=(()=>{
+const module37=(()=>{
 /**
  * Atrium example / authored layout. This is game content, deliberately outside engine/.
  * Change these placements/materials without editing renderer or toy implementations.
@@ -2511,14 +2996,14 @@ function* buildLayout(engine, world, profile) {
     }
     for (const y of [-18,-4,9]) {
       box({ x:side*15, y, z:1.8, size:[0.18,0.18,3.6], color:gold });
-      box({ x:side*15, y, z:3.7, size:[0.6,0.6,0.8], color:profile.glow, emission:3 });
+      box({ x:side*15, y, z:3.7, size:[0.6,0.6,0.8], color:profile.glow, emission:3,castShadow:false });
       box({ x:side*15, y, z:4.15, size:[0.9,0.9,0.12], color:gold });
     }
     yield; // One gallery/planting side per chunk; no per-frame full-world rebuild.
   }
   const lantern = box({ x:0,y:2,z:0.65,size:[1.9,1.9,1.3],color:stone });
   box({ parent:lantern,z:0.85,size:[2.1,2.1,0.22],color:gold });
-  const crystal = box({ parent:lantern,z:1.75,yaw:Math.PI/4,size:[0.7,0.7,1.4],color:[0.25,0.62,1],emission:2 });
+  const crystal = box({ parent:lantern,z:1.75,yaw:Math.PI/4,size:[0.7,0.7,1.4],color:[0.25,0.62,1],emission:2,castShadow:false });
   colliders.push({x:0,y:2,width:2.1,depth:2.1});
   const prop = box({x:6,y:-12,z:0.65,size:[2,2,1.3],color:gold});
   const propCollider = {x:6,y:-12,width:2,depth:2}; colliders.push(propCollider);
@@ -2536,22 +3021,22 @@ function* buildLayout(engine, world, profile) {
 return {buildLayout};
 })();
 // Source: examples/atrium/worlds.js
-const module30=(()=>{
+const module35=(()=>{
 /**
  * Atrium example / world definitions: authored realms, reconstruction and state schema.
  * Directory receives factories, not these names. Lobby budgets actual procedural work.
  * Persisted data is deliberately small: light selection, crystal rotation and prop position.
  */
 const { Lifetime } = module5;
-const { circleOverlapsBox } = module31;
-const { buildLayout } = module32;
+const { circleOverlapsBox } = module36;
+const { buildLayout } = module37;
 
 /** Immutable-by-convention authoring profiles; runtime mutable state is created per world. */
 const PROFILES = [
   { key:'amber',name:'The Amber Atrium',stone:[0.24,0.18,0.20],trim:[0.68,0.43,0.18],floor:[0.14,0.115,0.14],
-    glow:[1,0.47,0.17],window:[0.38,0.15,0.16],foliage:[0.045,0.14,0.10],height:7,ethereal:false,ambient:[0.15,0.11,0.15] },
+    glow:[1,0.47,0.17],window:[0.38,0.15,0.16],foliage:[0.045,0.14,0.10],sun:{direction:[-0.5,0.8,1.2],color:[0.58,0.49,0.62]},height:7,ethereal:false,ambient:[0.15,0.11,0.15] },
   { key:'violet',name:'The Violet Court',stone:[0.14,0.16,0.31],trim:[0.35,0.56,0.70],floor:[0.075,0.09,0.18],
-    glow:[0.24,0.58,1],window:[0.15,0.19,0.46],foliage:[0.10,0.20,0.27],height:8.5,ethereal:true,ambient:[0.09,0.11,0.26] },
+    glow:[0.24,0.58,1],window:[0.15,0.19,0.46],foliage:[0.10,0.20,0.27],sun:{direction:[0.5,0.7,1.1],color:[0.36,0.46,0.75]},height:8.5,ethereal:true,ambient:[0.09,0.11,0.26] },
 ];
 
 /** Horizontal destination query shared by movement and final flit validation. */
@@ -2608,15 +3093,15 @@ function worldFactory(engine, profile, id) {
 return {PROFILES,legalLanding,applyLight,worldFactory};
 })();
 // Source: examples/atrium/journey.js
-const module27=(()=>{
+const module32=(()=>{
 /**
  * Atrium example / journey: game-specific realm links, initial actor and prewarming policy.
  * Loading/lifetime algorithms live in Directory; transaction scheduling lives in Lobby.
  * This module chooses the destination and asks for those mechanisms through public contracts.
  */
 const { Lifetime } = module5;
-const { WorldTravel } = module28;
-const { PROFILES, worldFactory, legalLanding, applyLight } = module30;
+const { WorldTravel } = module33;
+const { PROFILES, worldFactory, legalLanding, applyLight } = module35;
 
 /** Own the two realm definitions and their tickets for one example session. */
 function createJourney(engine) {
@@ -2694,12 +3179,12 @@ function createJourney(engine) {
 return {createJourney};
 })();
 // Source: examples/atrium/player.js
-const module33=(()=>{
+const module38=(()=>{
 /**
  * Atrium example / locomotion: game-owned steering/gait profile, independent of realm residency.
  * Actor references and velocity survive transfers. This is not a full physical body solver.
  */
-const { legalLanding } = module30;
+const { legalLanding } = module35;
 
 /** Create one controller whose mutable velocity/load state belongs only to this actor. */
 function playerController(actor, input, renderer) {
@@ -2735,15 +3220,15 @@ function playerController(actor, input, renderer) {
 return {playerController};
 })();
 // Source: examples/atrium/scene.js
-const module26=(()=>{
+const module31=(()=>{
 /**
  * Atrium example / scene: owns controls, phase registrations and the game's journey.
  * Layout/reconstruction, locomotion and world policy have their own focused modules.
  * Nothing here installs an engine patch or creates an independent animation loop.
  */
 const { Lifetime } = module5;
-const { createJourney } = module27;
-const { playerController } = module33;
+const { createJourney } = module32;
+const { playerController } = module38;
 
 /** Start preparing the scene immediately. Rendering remains valid while the first world loads. */
 function createScene(engine,{controlsHost,onStatus=()=>{},onError=()=>{}}){
@@ -2769,7 +3254,7 @@ function createScene(engine,{controlsHost,onStatus=()=>{},onError=()=>{}}){
   life.own(lobby.on('pause',()=>controls.forEach(control=>control.cancel())));
   renderer.camera.x=0;renderer.camera.y=0;renderer.camera.halfHeight=22;
   const movementScope=basement.profiler.scope('atrium.locomotion'),statusScope=basement.profiler.scope('atrium.status');
-  let player=null,statusAt=-1;
+  let player=null,statusAt=-1,litWorld=null;
   journey.ready.then(()=>{if(!life.disposed)player=playerController(journey.actor,input,renderer);})
     .catch(error=>{if(!life.disposed&&error.name!=='AbortError')onError(error);});
 
@@ -2799,7 +3284,8 @@ function createScene(engine,{controlsHost,onStatus=()=>{},onError=()=>{}}){
   life.own(lobby.on('render',alpha=>{
     const resource=journey.current;
     if(!resource){renderer.render();return;}
-    renderer.ambient.set(resource.profile.ambient);renderer.lights.set(resource.lights);renderer.lightColors.set(resource.lightColors);
+    if(litWorld!==resource.world){renderer.lighting.configureDirectional(resource.profile.sun);litWorld=resource.world;}
+    renderer.lighting.ambient.set(resource.profile.ambient);renderer.lighting.positions.set(resource.lights);renderer.lighting.colors.set(resource.lightColors);
     resource.world.resolve(alpha);renderer.render(resource.batch);
   },'atrium.presentation'));
   return {journey,dispose:()=>life.dispose()};
@@ -2816,13 +3302,14 @@ const module0=(()=>{
  */
 const { ETRNLNINE } = module1;
 const { Lifetime } = module5;
-const { createScene } = module26;
+const { createScene } = module31;
 
 const canvas=document.querySelector('#world'), controlsHost=document.querySelector('#controls');
 const status=document.querySelector('#status'), errorBox=document.querySelector('#error');
 const pauseButton=document.querySelector('#pause'), restartButton=document.querySelector('#restart');
 const directoryStatus=document.querySelector('#directory-status'), travelStatus=document.querySelector('#travel-status');
 const releaseButton=document.querySelector('#release-inactive'), cancelButton=document.querySelector('#cancel-flit');
+const shadowSelect=document.querySelector('#cast-shadows'),pointShadows=document.querySelector('#point-shadows');
 const aoSelect=document.querySelector('#ambient-occlusion');
 const heading=document.querySelector('h1');
 const life=new Lifetime();
@@ -2840,6 +3327,8 @@ function replaceScene() {
     const renderer=engine.basement.renderer,r=renderer.stats,ao=renderer.occlusion.inspect();
     aoSelect.dataset.effective=ao.effectiveMode;
     document.querySelector('#ao-status').textContent=ao.failure?'Screen AO unavailable; geometry fallback.':ao.effectiveMode==='screen'?`${ao.width} × ${ao.height} screen contacts · ambient light only`:'Ambient light only · no screen targets';
+    const shadow=renderer.lighting.maps.inspect();
+    document.querySelector('#shadow-status').textContent=shadow.sunFailure||shadow.pointFailure?'A shadow target is unavailable; inspect the profiler for details.':shadow.mode==='off'?'Cast shadows off':`${shadow.sunResolution} sun map · ${shadow.pointReady?'1 cached point cube':'local shadows off'}`;
     status.textContent=`${state.loaded?'Weighted':'Light'} pack · ${state.entities} forms · ${r.draws} draws · ${r.uploadedBytes} B updated`;
     // Small DOM diagnostics aid accessibility and automated verification; no engine globals.
     status.dataset.world=state.worldId; status.dataset.x=state.x.toFixed(3); status.dataset.y=state.y.toFixed(3);
@@ -2857,7 +3346,7 @@ function replaceScene() {
       ? `Last transfer ${state.travel.transferMs.toFixed(2)} ms · preparation/wait ${state.travel.waitMs.toFixed(1)} ms` : 'Destination preparation runs in bounded chunks';
     const slots=state.residency.worlds.map(world=>`${world.key.endsWith('amber')?'Amber':'Violet'}: ${world.status} / ${world.owners} owner${world.owners===1?'':'s'}${world.key===scene?.journey.travel?.current.key?' / active':''}`);
     document.querySelector('#world-slots').textContent=slots.join(' · ');
-    document.querySelector('#gpu-status').textContent=`${r.buffers} GPU buffers · ${r.vaos} world batches`;
+    document.querySelector('#gpu-status').textContent=`${r.buffers} GPU buffers · ${r.vaos} instance batches`;
     cancelButton.disabled=!scene?.journey.travel?.pending;
   }});
 }
@@ -2869,6 +3358,10 @@ try {
   const aoMode=window.matchMedia('(max-width:650px)').matches?'geometry':'screen';
   engine.basement.renderer.occlusion.configure({mode:aoMode});aoSelect.value=aoMode;
   life.listen(aoSelect,'change',()=>engine.basement.renderer.occlusion.configure({mode:aoSelect.value}));
+  // Example policy: one low-resolution sun map. Local cube shadows remain opt-in.
+  engine.basement.renderer.lighting.configureShadows({mode:'low'});shadowSelect.value='low';
+  life.listen(shadowSelect,'change',()=>engine.basement.renderer.lighting.configureShadows({mode:shadowSelect.value}));
+  life.listen(pointShadows,'change',()=>engine.basement.renderer.lighting.configureShadows({pointIndex:pointShadows.checked?5:-1}));
   replaceScene();
   const profilerView=engine.directory.create('tool.profiler',{profiler:engine.basement.profiler,host:document.body,
     subscribe:callback=>engine.lobby.on('render',callback,'profiler.viewer')});

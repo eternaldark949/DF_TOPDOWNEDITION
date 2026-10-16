@@ -1,6 +1,6 @@
 # Working in ETRNLNINE
 
-Read README.md and the applicable docs/decisions records (First Light, Between Worlds, Profiler, and Ambient Occlusion) before changing source. The owner's house architecture and commenting requirements govern this branch.
+Read README.md and the applicable docs/decisions records (First Light, Between Worlds, Profiler, Ambient Occlusion, and Lighting/Shadows) before changing source. The owner's house architecture and commenting requirements govern this branch.
 
 - Basement defines reusable mechanisms; Lobby alone owns runtime scheduling; Directory manages registered libraries/worlds/resource ownership; Penthouse supplies reusable toys. ETRNLNINE remains a small composition root.
 - Game/example rules and content stay outside engine/. Engine code never imports them or looks up game DOM IDs.
@@ -17,3 +17,5 @@ For world work, preserve active/preparation ownership and final-boundary validat
 For profiling, register static bounded names once and close synchronous scopes in finally. Do not poll or wait for GPU completion in hot paths. Own provider/view subscriptions, distinguish CPU/interval/GPU measurements, and label buffer sizes and capture-time versus historical data accurately.
 
 For AO, read docs/decisions/0004-ambient-occlusion.md. Preserve ambient-only attenuation, bounded candidate/target budgets and the original antialiased forward path. Screen-space AO is SSAO, not GTAO or cast shadows. Keep texture-storage estimates distinct from requested buffer bytes. Free optional targets/programs on quality disable, and preserve context restoration and geometry fallback.
+
+For lighting, read docs/decisions/0005-lighting-and-shadows.md. Light data belongs to renderer.lighting; do not reintroduce renderer-field aliases. Camera-visible geometry is not the shadow caster list. Preserve the one-sun/one-point budget, material-independent depth cache, plane-correct comparisons, immediate source-batch cleanup and complete six-face cube updates. Keep estimated texture bytes separate from requested buffers.
