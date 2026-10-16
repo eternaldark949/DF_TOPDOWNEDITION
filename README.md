@@ -1,6 +1,6 @@
 # ETRNLNINE — Engine foundation plan
 
-**Status: foundation, two-world flitting, integrated profiler, ambient occlusion, and lighting/shadows and the first Studio workspace implemented; broader engine work remains planned.**
+**Status: foundation, two-world flitting, integrated profiler, ambient occlusion, and lighting/shadows and Studio authoring tools implemented; broader engine work remains planned.**
 
 **Owner: ETERNAL / @eternaldark949.**
 
@@ -16,7 +16,7 @@ The branch was intentionally created with only this plan. On 2026-10-15, after r
 
 **Studio direction and roadmap:** [3D engine, universal Studio, authored JSON and offline packaging](docs/decisions/0006-studio-3d-and-authored-data.md). The first edit/save/play workspace is now implemented; the next content milestone is the recreated street block.
 
-**Current implemented milestone:** [Studio implementation and limits](docs/decisions/0007-studio-first-workspace.md) · [screenshots and verification](docs/milestones/studio/README.md) · [editable JSON guide](examples/atrium/DOCUMENTS.md).
+**Current implemented milestone:** [Studio authoring tools and limits](docs/decisions/0008-studio-authoring-tools.md) · [screenshots and verification](docs/milestones/studio-tools/README.md) · [editable JSON guide](examples/atrium/DOCUMENTS.md).
 
 **Lighting/shadows:** [Lighting/shadow decisions and API](docs/decisions/0005-lighting-and-shadows.md) · [screenshots and verification](docs/milestones/lighting/README.md).
 
@@ -563,8 +563,8 @@ The first Studio slice is implemented: one contextual workspace, editable Atrium
 
 `examples/atrium/project.json` is now authoritative for scene placements, grouped assembly assets and light data. JavaScript implements behavior/generators. The build validates schema/references/registered generator versions and embeds explicitly imported JSON into separate offline game and Studio HTML files. The first format is one portable package containing scene/asset tables; arbitrary multi-file dependency manifests remain future work. [The editing guide](examples/atrium/DOCUMENTS.md) documents units, fields and budgets. GitHub Actions runs the same source tests/build and uploads both HTML artifacts; it does not deploy or write repository files.
 
-Run `npm test`, `npm run build`, `npm run test:browser` and `npm run test:studio` for the relevant checks. Browser checks require development Playwright and Chromium; neither is a runtime dependency. [Studio evidence](docs/milestones/studio/README.md) records actual verification and screenshots. Physical-phone performance is still unmeasured.
+Run `npm test`, `npm run build`, `npm run test:browser`, `npm run test:studio` and `npm run test:studio-tools` for the relevant checks. Browser checks require development Playwright and Chromium; neither is a runtime dependency. [Studio evidence](docs/milestones/studio/README.md) records actual verification and screenshots. Physical-phone performance is still unmeasured.
 
 Next: author the representative main-branch street block through this workflow, then extend the articulated humanoid workshop through the shared document/property/transaction contracts. Broader goals in the direction record remain planned.
 
-The agreed follow-on [Studio presentation and gizmo requirements](docs/decisions/0007-studio-first-workspace.md#agreed-next-work-street-block-studio-presentation-and-humanoid-review) include DFAB-inspired styling, a grid toggle, a shared rotation dial and selectable light markers in edit mode. The same record preserves the street-block scope and the requested humanoid silhouette previews. These additions remain planned.
+The agreed follow-on [Studio presentation and gizmo requirements](docs/decisions/0007-studio-first-workspace.md#agreed-next-work-street-block-studio-presentation-and-humanoid-review) include DFAB-inspired styling, a grid toggle, a shared rotation dial and selectable light markers in edit mode. The same record preserves the street-block scope and the requested humanoid silhouette previews. The [authoring-tools milestone](docs/decisions/0008-studio-authoring-tools.md) implements the styling, grid, rotation dial, light markers and placement/duplicate/delete commands. The street block and humanoid remain upcoming.

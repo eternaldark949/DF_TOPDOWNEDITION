@@ -731,6 +731,7 @@ function renderDiagnostics(renderer,profiler){
       for(const name in baseline)p.set(ids[name],renderer.totals[name]-baseline[name]);
       let cpu=0,gpu=renderer.stats.buffers?864:0;
       for(const batch of renderer.batches){cpu+=batch.cpuBytes;gpu+=batch.gpuBufferBytes;}
+      for(const layer of renderer.lines.layers){cpu+=layer.cpuBytes;gpu+=layer.gpuBufferBytes;}
       p.set(ids.buffers,renderer.stats.buffers);p.set(ids.programs,renderer.stats.programs);p.set(ids.vaos,renderer.stats.vaos);
       p.set(ids.cpuBuffers,cpu);p.set(ids.gpuBuffers,gpu);p.set(ids.gpuPending,renderer.gpuTimer.pending);
       const ao=renderer.occlusion,t=ao.targets;
@@ -740,7 +741,7 @@ function renderDiagnostics(renderer,profiler){
     status:()=>renderer.gpuTimer.inspect(),
     configure:p=>renderer.gpuTimer.configure(p.recording&&p.gpuEnabled),
     details:()=>({gpuTimer:renderer.gpuTimer.inspect(),buffers:renderer.stats.buffers,programs:renderer.stats.programs,
-      vertexArrays:renderer.stats.vaos,ambientOcclusion:renderer.occlusion.inspect(),lighting:renderer.lighting.inspect(),viewport:{width:renderer.canvas.width,height:renderer.canvas.height},
+      vertexArrays:renderer.stats.vaos,lines:renderer.lines.inspect(),ambientOcclusion:renderer.occlusion.inspect(),lighting:renderer.lighting.inspect(),viewport:{width:renderer.canvas.width,height:renderer.canvas.height},
       accounting:'Requested GL buffer bytes only. Estimated AO and shadow texture bytes are reported separately in ambientOcclusion/aoTargets. Default framebuffer, shader/driver storage and browser heap are excluded.'}),
   });
 }
@@ -1382,8 +1383,88 @@ class Lighting {
 
 return {shadowSettings,Lighting};
 })();
-// Source: engine/basement/camera.js
+// Source: engine/basement/lines.js
 const module19=(()=>{
+/**
+ * Basement / retained colored lines. A small general rendering capability for debug
+ * bounds, construction grids and authoring guides; it knows no editor or game types.
+ * One shared program per renderer; each layer owns a bounded CPU/GPU vertex buffer.
+ * Renderer submits these passes inside its normal GPU timer and restores all handles.
+ */
+const { createProgram } = module13;
+const VERTEX=`#version 300 es
+precision highp float;
+layout(location=0) in vec3 aPosition;
+layout(location=1) in vec4 aColor;
+uniform mat4 uViewProjection;
+out vec4 vColor;
+void main(){vColor=aColor;gl_Position=uViewProjection*vec4(aPosition,1.0);}`;
+const FRAGMENT=`#version 300 es
+precision highp float;
+in vec4 vColor;
+out vec4 outColor;
+void main(){outColor=vColor;}`;
+
+class LineRendering {
+ /** Inert until a caller acquires its first layer. No programs/buffers in game-only use. */
+ constructor(renderer){this.renderer=renderer;this.layers=new Set();this.program=null;}
+ /** Create an explicitly owned bounded layer; caller disposes it when hidden/closed. */
+ create(capacity=4096,{depthTest=true}={}){
+  if(this.renderer.disposed||this.renderer.lost)throw new Error('Renderer is unavailable');
+  if(!Number.isInteger(capacity)||capacity<2||capacity>16384)throw new Error('Line vertex budget must be 2–16384');
+  const layer=new LineLayer(this,capacity,depthTest);
+  try{this.ensure();layer.initialize();this.layers.add(layer);return layer;}
+  catch(error){layer.dispose();if(!this.layers.size)this.releaseProgram();throw error;}
+ }
+ /** Program is shared only by layers belonging to this renderer and released with the last. */
+ ensure(){if(this.program)return;const r=this.renderer;this.program=createProgram(r.gl,VERTEX,FRAGMENT);this.matrix=r.gl.getUniformLocation(this.program,'uViewProjection');r.stats.programs++;}
+ releaseProgram(){if(!this.program)return;this.renderer.gl.deleteProgram(this.program);this.program=null;this.renderer.stats.programs--;}
+ /** Context loss invalidates handles; retained numeric data remains available for restoration. */
+ invalidate(){this.program=null;for(const layer of this.layers){layer.buffer=null;layer.vao=null;}}
+ restore(){if(!this.layers.size)return;this.ensure();for(const layer of this.layers)layer.initialize();}
+ /** Diagnostics return copied scalars, never borrowed layer objects or GL handles. */
+ inspect(){let vertices=0,cpuBytes=0,gpuBufferBytes=0;for(const layer of this.layers){vertices+=layer.count;cpuBytes+=layer.cpuBytes;gpuBufferBytes+=layer.gpuBufferBytes;}return{layers:this.layers.size,vertices,cpuBytes,gpuBufferBytes};}
+ dispose(){for(const layer of [...this.layers])layer.dispose();this.releaseProgram();}
+}
+
+class LineLayer {
+ constructor(owner,capacity,depthTest){this.owner=owner;this.renderer=owner.renderer;this.capacity=capacity;this.depthTest=depthTest;this.data=new Float32Array(capacity*7);this.count=0;this.cursor=0;this.disposed=false;this.dirty=false;this.cpuBytes=this.gpuBufferBytes=this.data.byteLength;}
+ /** Seven floats per vertex: world XYZ plus display RGBA. No texture/font preparation. */
+ initialize(){
+  const r=this.renderer,gl=r.gl;
+  this.buffer=gl.createBuffer();this.vao=gl.createVertexArray();
+  if(!this.buffer||!this.vao){if(this.buffer)gl.deleteBuffer(this.buffer);if(this.vao)gl.deleteVertexArray(this.vao);this.buffer=this.vao=null;throw new Error('Line layer allocation failed');}
+  r.stats.buffers++;r.stats.vaos++;gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,this.data.byteLength,gl.DYNAMIC_DRAW);
+  gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,28,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,4,gl.FLOAT,false,28,12);gl.bindVertexArray(null);this.dirty=true;
+ }
+ /** Rewrite only on invalidation, never for every static frame. */
+ begin(){this.cursor=0;}
+ segment(a,b,color){if(this.cursor+14>this.data.length)throw new Error('Line layer vertex budget exceeded');for(const p of [a,b]){this.data.set(p,this.cursor);this.data.set(color,this.cursor+3);this.cursor+=7;}}
+ end(){this.count=this.cursor/7;this.dirty=true;}
+ /** Called only by Renderer.render; restore depth/blend state before the next submission. */
+ draw(){
+  if(this.disposed)throw new Error('Line layer is disposed');if(!this.count)return;
+  const r=this.renderer,gl=r.gl;this.owner.ensure();
+  gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
+  if(this.dirty){const bytes=this.count*28;gl.bufferSubData(gl.ARRAY_BUFFER,0,this.data.subarray(0,this.count*7));r.stats.uploads++;r.stats.uploadedBytes+=bytes;r.totals.uploads++;r.totals.uploadedBytes+=bytes;this.dirty=false;}
+  gl.useProgram(this.owner.program);gl.uniformMatrix4fv(this.owner.matrix,false,r.camera.matrix);
+  if(!this.depthTest)gl.disable(gl.DEPTH_TEST);gl.depthMask(false);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+  gl.drawArrays(gl.LINES,0,this.count);gl.bindVertexArray(null);gl.disable(gl.BLEND);gl.depthMask(true);gl.enable(gl.DEPTH_TEST);r.stats.draws++;r.totals.draws++;
+ }
+ /** Removal is immediate; disposed guide layers cannot survive into Play or context restore. */
+ dispose(){
+  if(this.disposed)return;this.disposed=true;const r=this.renderer,gl=r.gl;
+  if(this.buffer){gl.deleteBuffer(this.buffer);r.stats.buffers--;}
+  if(this.vao){gl.deleteVertexArray(this.vao);r.stats.vaos--;}
+  this.buffer=this.vao=null;this.owner.layers.delete(this);this.data=null;
+  if(!this.owner.layers.size)this.owner.releaseProgram();
+ }
+}
+
+return {LineRendering};
+})();
+// Source: engine/basement/camera.js
+const module20=(()=>{
 /**
  * Basement / camera: arbitrary z-up orthographic views and their exact inverse rays.
  * Geometry, culling, picking, aiming and screen-space AO share the same projection.
@@ -1436,7 +1517,8 @@ const { GpuTimer } = module12;
 const { createProgram } = module13;
 const { AmbientOcclusion } = module14;
 const { Lighting } = module15;
-const { Camera } = module19;
+const { LineRendering } = module19;
+const { Camera } = module20;
 
 /** Generate one unit cube with flat normals; uploaded once per WebGL context lifetime. */
 function cubeGeometry() {
@@ -1469,14 +1551,16 @@ class Renderer {
     this.totals={draws:0,instances:0,uploads:0,uploadedBytes:0,candidates:0,culled:0,shadowDraws:0,shadowHits:0};
     try {
       this.initialize();
+      this.lines=new LineRendering(this);
       this.lighting=new Lighting(this,lighting);
       this.shadowScope=profiler?.scope('renderer.shadows');
+      this.lineScope=profiler?.scope('renderer.lines');
       this.occlusion=new AmbientOcclusion(this,occlusion);
       this.occlusionScope=profiler?.scope('renderer.ambientOcclusion');
       this.gpuTimer=new GpuTimer(gl,(id,ms)=>this.profiler?.recordGpu(id,ms));
       this.life.own(renderDiagnostics(this,profiler));
       this.life.listen(canvas, 'webglcontextlost', event => {
-        event.preventDefault(); this.lost = true; this.gpuTimer.invalidate(); this.occlusion.invalidate(); this.lighting.invalidate();
+        event.preventDefault(); this.lost = true; this.gpuTimer.invalidate(); this.lines.invalidate(); this.occlusion.invalidate(); this.lighting.invalidate();
       });
       this.life.listen(canvas, 'webglcontextrestored', () => {
         // Browser invalidates all old handles on loss. Recreate from retained CPU data,
@@ -1484,12 +1568,13 @@ class Renderer {
         this.stats.buffers = this.stats.programs = this.stats.vaos = 0;
         this.initialize();
         for (const batch of this.batches) batch.initialize();
+        this.lines.restore();
         this.gpuTimer.restore(); this.stats.contextRestores++; this.lost = false;
       });
     } catch(error) {
       // Metric-budget/capability failure may occur after GL creation. Constructor
       // failure must release real handles even though no caller received this renderer.
-      this.life.dispose();this.gpuTimer?.dispose();this.occlusion?.dispose();this.lighting?.dispose();
+      this.life.dispose();this.lines?.dispose();this.gpuTimer?.dispose();this.occlusion?.dispose();this.lighting?.dispose();
       if(this.cube)gl.deleteBuffer(this.cube);if(this.program)gl.deleteProgram(this.program);
       throw error;
     }
@@ -1553,11 +1638,16 @@ class Renderer {
   }
 
   /** Clear even an empty engine; present a batch only if supplied and its context is valid. */
-  render(batch = null) {
+  render(batch = null, layers = []) {
     if(this.disposed||this.lost)return;
     this.gpuTimer.configure(this.profiler?.recording&&this.profiler.gpuEnabled);
     this.gpuTimer.poll();this.gpuTimer.begin(this.profiler?.current?.id??0);
-    try { this.draw(batch); } finally { this.gpuTimer.end(); }
+    try {
+      this.draw(batch);
+      const token=layers.length?this.profiler?.begin(this.lineScope):null;
+      try{for(const layer of layers){if(layer.renderer!==this)throw new Error('Guide belongs to another renderer');layer.draw();}}
+      finally{if(layers.length)this.profiler?.end(token);}
+    } finally { this.gpuTimer.end(); }
   }
 
   /** Submit a frame; all worlds use the same retained renderer and accounting path. */
@@ -1592,7 +1682,7 @@ class Renderer {
   /** Release renderer and outstanding batches, with listeners removed before late restoration. */
   dispose() {
     if (this.disposed) return;
-    this.disposed = true; this.life.dispose(); this.gpuTimer.dispose(); this.occlusion.dispose(); this.lighting.dispose();
+    this.disposed = true; this.life.dispose(); this.lines.dispose(); this.gpuTimer.dispose(); this.occlusion.dispose(); this.lighting.dispose();
     for (const batch of [...this.batches]) batch.dispose();
     this.gl.deleteBuffer(this.cube); this.gl.deleteProgram(this.program);
     this.stats.buffers = this.stats.programs = this.stats.vaos = 0;
@@ -1696,7 +1786,7 @@ class InstanceBatch {
 return {Renderer};
 })();
 // Source: engine/basement/profile-data.js
-const module21=(()=>{
+const module22=(()=>{
 /**
  * Basement / profile data: bounded copies for diagnostics, never live engine references.
  * Used only for on-demand captures/export, not for each recorded frame.
@@ -1760,14 +1850,14 @@ function diagnosticError(error){
 return {boundedCopy,percentile,freezeData,diagnosticError};
 })();
 // Source: engine/basement/profiler.js
-const module20=(()=>{
+const module21=(()=>{
 /**
  * Basement / profiler: bounded CPU scopes, numeric counters, frame history and captures.
  * This mechanism knows no scheduler, renderer, game, DOM element, or GPU API.
  * Milliseconds everywhere. Recording reuses typed storage; summaries/captures allocate
  * only when explicitly requested. Disabled scope calls do not read the clock.
  */
-const { boundedCopy, percentile, freezeData, diagnosticError } = module21;
+const { boundedCopy, percentile, freezeData, diagnosticError } = module22;
 
 class Profiler {
   /** Capacities are hard budgets. Choose them at engine creation, not during a frame. */
@@ -1997,7 +2087,7 @@ const module2=(()=>{
 const { Identities, World } = module3;
 const { Input } = module5;
 const { Renderer } = module7;
-const { Profiler } = module20;
+const { Profiler } = module21;
 
 class Basement {
   /** Renderer first: unsupported WebGL fails before device listeners are installed. */
@@ -2018,7 +2108,7 @@ class Basement {
 return {Basement};
 })();
 // Source: engine/lobby/preparation.js
-const module23=(()=>{
+const module24=(()=>{
 /**
  * Lobby / preparation: cooperatively budgeted generator work in the existing frame loop.
  * Each next() must be a small, synchronous chunk; JavaScript cannot preempt a huge chunk.
@@ -2085,7 +2175,7 @@ class PreparationQueue {
 return {PreparationQueue};
 })();
 // Source: engine/lobby/runtime-diagnostics.js
-const module24=(()=>{
+const module25=(()=>{
 /**
  * Lobby / runtime diagnostics: measurement handles and counters, not scheduling logic.
  * Providers are removed with their runtime. Disabled profiling performs no timer reads.
@@ -2110,14 +2200,14 @@ function runtimeDiagnostics(runtime,profiler){
 return {runtimeDiagnostics};
 })();
 // Source: engine/lobby/runtime.js
-const module22=(()=>{
+const module23=(()=>{
 /**
  * Lobby / runtime: sole animation-frame owner, explicit phases, and pause reasons.
  * All elapsed values are seconds. The engine advances fixed simulation steps and
  * interpolates render poses; long browser suspensions never trigger unlimited work.
  */
-const { PreparationQueue } = module23;
-const { runtimeDiagnostics } = module24;
+const { PreparationQueue } = module24;
+const { runtimeDiagnostics } = module25;
 
 class Runtime {
   /** Inject scheduling for deterministic lifecycle tests; browser defaults allocate no loop yet. */
@@ -2230,7 +2320,7 @@ class Runtime {
 return {Runtime};
 })();
 // Source: engine/directory/residency.js
-const module26=(()=>{
+const module27=(()=>{
 /**
  * Directory / residency: bounded prepared worlds, preparation tickets, and compact state.
  * Factories are game/library supplied. They return {world, ready, capture, dispose, ...}.
@@ -2370,7 +2460,7 @@ class WorldResidency {
 return {WorldResidency};
 })();
 // Source: engine/directory/diagnostics.js
-const module27=(()=>{
+const module28=(()=>{
 /**
  * Directory / diagnostics: report resource ownership through Basement's provider contract.
  * Frame samples are scalar sums. Detailed rows are copied only on capture, capped at 64.
@@ -2417,14 +2507,14 @@ function directoryDiagnostics(directory,profiler){
 return {directoryDiagnostics};
 })();
 // Source: engine/directory/directory.js
-const module25=(()=>{
+const module26=(()=>{
 /**
  * Directory: named libraries, lazy shared resources, and explicit world ownership.
  * Factories come from callers. Nothing here imports a named toy or game asset.
  * A lease pins one resource; releasing the last lease destroys it immediately.
  */
-const { WorldResidency } = module26;
-const { directoryDiagnostics } = module27;
+const { WorldResidency } = module27;
+const { directoryDiagnostics } = module28;
 
 class Directory {
   /** Registration is inert: no world or GPU asset is allocated until requested. */
@@ -2499,7 +2589,7 @@ class Directory {
 return {Directory};
 })();
 // Source: engine/penthouse/assembly.js
-const module29=(()=>{
+const module30=(()=>{
 /** Penthouse / version-one data-driven box assembly. No editor or game knowledge. */
 /** Explicit generator versions available to project/build validation; no allocation here. */
 const ASSEMBLY_GENERATORS=Object.freeze({'toy.assembly':1});
@@ -2513,7 +2603,7 @@ function assembly({world,asset}){
 return {ASSEMBLY_GENERATORS,assembly};
 })();
 // Source: engine/penthouse/toys.js
-const module30=(()=>{
+const module31=(()=>{
 /**
  * Penthouse / toys: reusable procedural box-based architecture and actor assemblies.
  * These are early test toys, not Freelancer art or the final procedural humanoid.
@@ -2572,7 +2662,7 @@ function actor({ world, color = [0.42,0.34,0.58], bagColor = [0.54,0.30,0.17] })
 return {box,pavilion,actor};
 })();
 // Source: engine/penthouse/controls.js
-const module31=(()=>{
+const module32=(()=>{
 /**
  * Penthouse / controls: parameterized HTML control templates over Basement actions.
  * HTML is intentional for accessible interface text; the world remains pure WebGL.
@@ -2672,7 +2762,7 @@ class ActionButton {
 return {Joystick,ActionButton};
 })();
 // Source: engine/penthouse/profiler-style.js
-const module33=(()=>{
+const module34=(()=>{
 /** Penthouse / profiler presentation: component-scoped styles; removed with the viewer root. */
 const PROFILER_STYLE=`
 .etrnl-profiler{position:absolute;right:30px;top:92px;width:min(390px,calc(100vw - 40px));max-height:calc(100dvh - 190px);overflow:auto;background:#11131eef;border:1px solid #c6ae774d;border-radius:7px;color:#d5cfdf;font:11px/1.55 system-ui,sans-serif;z-index:2;box-shadow:0 12px 50px #0004}
@@ -2697,15 +2787,15 @@ const PROFILER_STYLE=`
 return {PROFILER_STYLE};
 })();
 // Source: engine/penthouse/profiler-view.js
-const module32=(()=>{
+const module33=(()=>{
 /**
  * Penthouse / profiler viewer: accessible HTML/SVG, bounded tables and capture export.
  * Receives a generic subscription function; it never imports Lobby or starts a loop.
  * Closed viewers unsubscribe. Open viewers refresh at most twice a second by default.
  */
 const { Lifetime } = module6;
-const { diagnosticError } = module21;
-const { PROFILER_STYLE } = module33;
+const { diagnosticError } = module22;
+const { PROFILER_STYLE } = module34;
 
 /** Format measured values without turning unavailable measurements into zero. */
 function ms(value){return Number.isFinite(value)?value.toFixed(2):'—';}
@@ -2825,15 +2915,15 @@ class ProfilerView {
 return {ProfilerView};
 })();
 // Source: engine/penthouse/penthouse.js
-const module28=(()=>{
+const module29=(()=>{
 /**
  * Penthouse assembly: expose inert libraries without coupling Directory to toy names.
  * ETRNLNINE installs these factories; games request them through Directory.
  */
-const { assembly } = module29;
-const { pavilion, actor, box } = module30;
-const { Joystick, ActionButton } = module31;
-const { ProfilerView } = module32;
+const { assembly } = module30;
+const { pavilion, actor, box } = module31;
+const { Joystick, ActionButton } = module32;
+const { ProfilerView } = module33;
 
 class Penthouse {
   /** Catalog creation is inert: allocation begins only when a factory is requested. */
@@ -2861,9 +2951,9 @@ const module1=(()=>{
  */
 const { Basement } = module2;
 const { Lifetime } = module6;
-const { Runtime } = module22;
-const { Directory } = module25;
-const { Penthouse } = module28;
+const { Runtime } = module23;
+const { Directory } = module26;
+const { Penthouse } = module29;
 
 class ETRNLNINE {
   /** Build an empty engine, releasing earlier levels if a later constructor fails. */
@@ -2901,7 +2991,7 @@ class ETRNLNINE {
 return {ETRNLNINE};
 })();
 // Source: engine/basement/project.js
-const module37=(()=>{
+const module38=(()=>{
 /**
  * Basement / authored project contract. JSON is data, never executable behavior.
  * This first portable package contains scenes and assembly assets together. Validation
@@ -2957,11 +3047,11 @@ function parseProject(text,validate=validateProject){if(new TextEncoder().encode
 return {PROJECT_LIMITS,copyData,validateProject,parseProject};
 })();
 // Source: examples/atrium/project.js
-const module36=(()=>{
+const module37=(()=>{
 /** Atrium source of truth: portable JSON; behavior stays in the example's JavaScript. */
 const data=JSON.parse("{\"schemaVersion\":1,\"id\":\"project:atrium\",\"name\":\"Between Worlds\",\"scenes\":[{\"key\":\"amber\",\"name\":\"The Amber Atrium\",\"sun\":{\"direction\":[-0.5,0.8,1.2],\"color\":[0.58,0.49,0.62]},\"ethereal\":false,\"ambient\":[0.15,0.11,0.15],\"id\":\"scene:amber\",\"entities\":[{\"id\":\"amber:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"asset\":\"asset:amber:courtyard-foundation\",\"tag\":null,\"locked\":true,\"position\":[0,0,-0.25],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:central-inlay\",\"name\":\"Central inlay\",\"asset\":\"asset:amber:central-inlay\",\"tag\":null,\"locked\":true,\"position\":[0,-5,0.015],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-brass-inlay\",\"name\":\"West brass inlay\",\"asset\":\"asset:amber:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[-3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-brass-inlay\",\"name\":\"East brass inlay\",\"asset\":\"asset:amber:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:colonnade\",\"name\":\"Colonnade\",\"asset\":\"asset:amber:colonnade\",\"tag\":null,\"locked\":false,\"position\":[0,11,0],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-gallery\",\"name\":\"West gallery\",\"asset\":\"asset:amber:west-gallery\",\"tag\":null,\"locked\":false,\"position\":[-20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-entry-planter\",\"name\":\"West entry planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-court-planter\",\"name\":\"West court planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-entry-lantern\",\"name\":\"West entry lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-promenade-lantern\",\"name\":\"West promenade lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-gallery-lantern\",\"name\":\"West gallery lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-gallery\",\"name\":\"East gallery\",\"asset\":\"asset:amber:east-gallery\",\"tag\":null,\"locked\":false,\"position\":[20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-entry-planter\",\"name\":\"East entry planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-court-planter\",\"name\":\"East court planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-entry-lantern\",\"name\":\"East entry lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-promenade-lantern\",\"name\":\"East promenade lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-gallery-lantern\",\"name\":\"East gallery lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:crystal-lantern\",\"name\":\"Crystal lantern\",\"asset\":\"asset:amber:crystal-lantern\",\"tag\":\"lantern\",\"locked\":false,\"position\":[0,2,0.65],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:movable-plinth\",\"name\":\"Movable plinth\",\"asset\":\"asset:amber:movable-plinth\",\"tag\":\"prop\",\"locked\":false,\"position\":[6,-12,0.65],\"rotation\":[0,0,0,1],\"scale\":1}],\"lights\":[{\"id\":\"light:0\",\"position\":[0,7,5],\"radius\":16,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:1\",\"position\":[-15,-4,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:2\",\"position\":[15,-4,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:3\",\"position\":[-15,9,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:4\",\"position\":[15,9,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:5\",\"position\":[0,2,3],\"radius\":10,\"color\":[0.3,1.1,2.7]},{\"id\":\"light:6\",\"position\":[-15,-18,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:7\",\"position\":[15,-18,4],\"radius\":12,\"color\":[2.4,0.85,0.3]}],\"lightVariants\":{\"cool\":{\"crystal\":[0.25,0.62,1],\"irradiance\":[0.3,1.1,2.7]},\"warm\":{\"crystal\":[1,0.34,0.19],\"irradiance\":[3,0.5,0.2]}}},{\"key\":\"violet\",\"name\":\"The Violet Court\",\"sun\":{\"direction\":[0.5,0.7,1.1],\"color\":[0.36,0.46,0.75]},\"ethereal\":true,\"ambient\":[0.09,0.11,0.26],\"id\":\"scene:violet\",\"entities\":[{\"id\":\"violet:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"asset\":\"asset:violet:courtyard-foundation\",\"tag\":null,\"locked\":true,\"position\":[0,0,-0.25],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:central-inlay\",\"name\":\"Central inlay\",\"asset\":\"asset:violet:central-inlay\",\"tag\":null,\"locked\":true,\"position\":[0,-5,0.015],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-brass-inlay\",\"name\":\"West brass inlay\",\"asset\":\"asset:violet:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[-3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-brass-inlay\",\"name\":\"East brass inlay\",\"asset\":\"asset:violet:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:colonnade\",\"name\":\"Colonnade\",\"asset\":\"asset:violet:colonnade\",\"tag\":null,\"locked\":false,\"position\":[0,11,0],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-gallery\",\"name\":\"West gallery\",\"asset\":\"asset:violet:west-gallery\",\"tag\":null,\"locked\":false,\"position\":[-20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-entry-planter\",\"name\":\"West entry planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-court-planter\",\"name\":\"West court planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-entry-lantern\",\"name\":\"West entry lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-promenade-lantern\",\"name\":\"West promenade lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-gallery-lantern\",\"name\":\"West gallery lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-gallery\",\"name\":\"East gallery\",\"asset\":\"asset:violet:east-gallery\",\"tag\":null,\"locked\":false,\"position\":[20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-entry-planter\",\"name\":\"East entry planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-court-planter\",\"name\":\"East court planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-entry-lantern\",\"name\":\"East entry lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-promenade-lantern\",\"name\":\"East promenade lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-gallery-lantern\",\"name\":\"East gallery lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:crystal-lantern\",\"name\":\"Crystal lantern\",\"asset\":\"asset:violet:crystal-lantern\",\"tag\":\"lantern\",\"locked\":false,\"position\":[0,2,0.65],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:movable-plinth\",\"name\":\"Movable plinth\",\"asset\":\"asset:violet:movable-plinth\",\"tag\":\"prop\",\"locked\":false,\"position\":[6,-12,0.65],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-prism\",\"name\":\"West prism\",\"asset\":\"asset:violet:prism\",\"tag\":null,\"locked\":false,\"position\":[-7,-3,2.5],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-prism\",\"name\":\"East prism\",\"asset\":\"asset:violet:prism\",\"tag\":null,\"locked\":false,\"position\":[7,-3,2.5],\"rotation\":[0,0,0,1],\"scale\":1}],\"lights\":[{\"id\":\"light:0\",\"position\":[0,7,5],\"radius\":16,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:1\",\"position\":[-15,-4,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:2\",\"position\":[15,-4,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:3\",\"position\":[-15,9,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:4\",\"position\":[15,9,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:5\",\"position\":[0,2,3],\"radius\":10,\"color\":[0.3,1.1,2.7]},{\"id\":\"light:6\",\"position\":[-15,-18,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:7\",\"position\":[15,-18,4],\"radius\":12,\"color\":[0.35,0.9,2.5]}],\"lightVariants\":{\"cool\":{\"crystal\":[0.25,0.62,1],\"irradiance\":[0.3,1.1,2.7]},\"warm\":{\"crystal\":[1,0.34,0.19],\"irradiance\":[3,0.5,0.2]}}}],\"assets\":[{\"id\":\"asset:amber:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[58,68,0.5],\"color\":[0.14,0.115,0.14],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:amber:central-inlay\",\"name\":\"Central inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[7,38,0.025],\"color\":[0.22,0.2,0.25],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:amber:brass-inlay\",\"name\":\"Brass inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.05,38,0.035],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:amber:colonnade\",\"name\":\"Colonnade\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":null},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.2],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[26,11,0.4],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,4.2,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.6,7],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,7],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[25,10,0.6],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,-4.5,6.4],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.12,0.09],\"color\":[1,0.47,0.17],\"emission\":2.5,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:5\",\"parent\":0,\"position\":[0,-4.5,6.1],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.16,0.1],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:6\",\"parent\":0,\"position\":[-12,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:7\",\"parent\":0,\"position\":[-12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:8\",\"parent\":0,\"position\":[-12,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:9\",\"parent\":0,\"position\":[-6,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:10\",\"parent\":0,\"position\":[-6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:11\",\"parent\":0,\"position\":[-6,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:12\",\"parent\":0,\"position\":[6,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:13\",\"parent\":0,\"position\":[6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:14\",\"parent\":0,\"position\":[6,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:15\",\"parent\":0,\"position\":[12,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:16\",\"parent\":0,\"position\":[12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:17\",\"parent\":0,\"position\":[12,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:18\",\"parent\":0,\"position\":[-9,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:19\",\"parent\":0,\"position\":[-9,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:20\",\"parent\":0,\"position\":[-6,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:21\",\"parent\":0,\"position\":[-6,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:22\",\"parent\":0,\"position\":[-3,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:23\",\"parent\":0,\"position\":[-3,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:24\",\"parent\":0,\"position\":[0,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:25\",\"parent\":0,\"position\":[0,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:26\",\"parent\":0,\"position\":[3,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:27\",\"parent\":0,\"position\":[3,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:28\",\"parent\":0,\"position\":[6,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:29\",\"parent\":0,\"position\":[6,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:30\",\"parent\":0,\"position\":[9,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:31\",\"parent\":0,\"position\":[9,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":4.199999999999999,\"width\":24,\"depth\":0.7},{\"x\":-12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":-6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6}]},{\"id\":\"asset:amber:west-gallery\",\"name\":\"West gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":null,\"position\":[1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":null,\"position\":[1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":null,\"position\":[1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:5\",\"parent\":null,\"position\":[1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:6\",\"parent\":null,\"position\":[1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:7\",\"parent\":null,\"position\":[1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:8\",\"parent\":null,\"position\":[1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:9\",\"parent\":null,\"position\":[1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:10\",\"parent\":null,\"position\":[1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:11\",\"parent\":null,\"position\":[1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:12\",\"parent\":null,\"position\":[1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:13\",\"parent\":null,\"position\":[1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:14\",\"parent\":null,\"position\":[1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:15\",\"parent\":null,\"position\":[1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:amber:planter\",\"name\":\"Planter\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,2.4,1.1],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.8499999999999999],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.2,2.2,0.9],\"color\":[0.045,0.14,0.1],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,0,1.4999999999999998],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.8000000000000003,1.8000000000000003,0.9],\"color\":[0.045,0.14,0.1],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,2.1500000000000004],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.4000000000000001,1.4000000000000001,0.9],\"color\":[0.045,0.14,0.1],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,0,2.8],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1,1,0.9],\"color\":[0.045,0.14,0.1],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.4,\"depth\":2.4}]},{\"id\":\"asset:amber:lantern\",\"name\":\"Lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.18,0.18,3.6],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,1.9000000000000001],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.6,0.6,0.8],\"color\":[1,0.47,0.17],\"emission\":3,\"ambientBlocker\":true,\"castShadow\":false}},{\"id\":\"part:2\",\"parent\":null,\"position\":[0,0,2.3500000000000005],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.12],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:amber:east-gallery\",\"name\":\"East gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":null,\"position\":[-1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":null,\"position\":[-1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":null,\"position\":[-1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:5\",\"parent\":null,\"position\":[-1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:6\",\"parent\":null,\"position\":[-1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:7\",\"parent\":null,\"position\":[-1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:8\",\"parent\":null,\"position\":[-1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:9\",\"parent\":null,\"position\":[-1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:10\",\"parent\":null,\"position\":[-1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:11\",\"parent\":null,\"position\":[-1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:12\",\"parent\":null,\"position\":[-1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:13\",\"parent\":null,\"position\":[-1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:14\",\"parent\":null,\"position\":[-1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:15\",\"parent\":null,\"position\":[-1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:amber:crystal-lantern\",\"name\":\"Crystal lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.9,1.9,1.3],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.85],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.1,2.1,0.22],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"crystal\",\"parent\":0,\"position\":[0,0,1.75],\"rotation\":[0,0,0.3826834323650898,0.9238795325112867],\"shape\":{\"size\":[0.7,0.7,1.4],\"color\":[0.25,0.62,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":false}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.1,\"depth\":2.1}]},{\"id\":\"asset:amber:movable-plinth\",\"name\":\"Movable plinth\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,2,1.3],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":2}]},{\"id\":\"asset:violet:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[58,68,0.5],\"color\":[0.075,0.09,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:violet:central-inlay\",\"name\":\"Central inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[7,38,0.025],\"color\":[0.22,0.2,0.25],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:violet:brass-inlay\",\"name\":\"Brass inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.05,38,0.035],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:violet:colonnade\",\"name\":\"Colonnade\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":null},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.2],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[26,11,0.4],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,4.2,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.6,8.5],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,8.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[25,10,0.6],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,-4.5,7.9],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.12,0.09],\"color\":[0.24,0.58,1],\"emission\":2.5,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:5\",\"parent\":0,\"position\":[0,-4.5,7.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.16,0.1],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:6\",\"parent\":0,\"position\":[-12,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:7\",\"parent\":0,\"position\":[-12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:8\",\"parent\":0,\"position\":[-12,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:9\",\"parent\":0,\"position\":[-6,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:10\",\"parent\":0,\"position\":[-6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:11\",\"parent\":0,\"position\":[-6,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:12\",\"parent\":0,\"position\":[6,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:13\",\"parent\":0,\"position\":[6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:14\",\"parent\":0,\"position\":[6,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:15\",\"parent\":0,\"position\":[12,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:16\",\"parent\":0,\"position\":[12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:17\",\"parent\":0,\"position\":[12,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:18\",\"parent\":0,\"position\":[-9,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:19\",\"parent\":0,\"position\":[-9,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:20\",\"parent\":0,\"position\":[-6,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:21\",\"parent\":0,\"position\":[-6,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:22\",\"parent\":0,\"position\":[-3,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:23\",\"parent\":0,\"position\":[-3,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:24\",\"parent\":0,\"position\":[0,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:25\",\"parent\":0,\"position\":[0,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:26\",\"parent\":0,\"position\":[3,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:27\",\"parent\":0,\"position\":[3,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:28\",\"parent\":0,\"position\":[6,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:29\",\"parent\":0,\"position\":[6,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:30\",\"parent\":0,\"position\":[9,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:31\",\"parent\":0,\"position\":[9,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":4.199999999999999,\"width\":24,\"depth\":0.7},{\"x\":-12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":-6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6}]},{\"id\":\"asset:violet:west-gallery\",\"name\":\"West gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":null,\"position\":[1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":null,\"position\":[1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":null,\"position\":[1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:5\",\"parent\":null,\"position\":[1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:6\",\"parent\":null,\"position\":[1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:7\",\"parent\":null,\"position\":[1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:8\",\"parent\":null,\"position\":[1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:9\",\"parent\":null,\"position\":[1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:10\",\"parent\":null,\"position\":[1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:11\",\"parent\":null,\"position\":[1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:12\",\"parent\":null,\"position\":[1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:13\",\"parent\":null,\"position\":[1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:14\",\"parent\":null,\"position\":[1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:15\",\"parent\":null,\"position\":[1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:violet:planter\",\"name\":\"Planter\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,2.4,1.1],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.8499999999999999],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.2,2.2,0.9],\"color\":[0.1,0.2,0.27],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,0,1.4999999999999998],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.8000000000000003,1.8000000000000003,0.9],\"color\":[0.1,0.2,0.27],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,2.1500000000000004],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.4000000000000001,1.4000000000000001,0.9],\"color\":[0.1,0.2,0.27],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,0,2.8],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1,1,0.9],\"color\":[0.1,0.2,0.27],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.4,\"depth\":2.4}]},{\"id\":\"asset:violet:lantern\",\"name\":\"Lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.18,0.18,3.6],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,1.9000000000000001],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.6,0.6,0.8],\"color\":[0.24,0.58,1],\"emission\":3,\"ambientBlocker\":true,\"castShadow\":false}},{\"id\":\"part:2\",\"parent\":null,\"position\":[0,0,2.3500000000000005],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.12],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:violet:east-gallery\",\"name\":\"East gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":null,\"position\":[-1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":null,\"position\":[-1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":null,\"position\":[-1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:5\",\"parent\":null,\"position\":[-1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:6\",\"parent\":null,\"position\":[-1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:7\",\"parent\":null,\"position\":[-1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:8\",\"parent\":null,\"position\":[-1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:9\",\"parent\":null,\"position\":[-1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:10\",\"parent\":null,\"position\":[-1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:11\",\"parent\":null,\"position\":[-1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:12\",\"parent\":null,\"position\":[-1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:13\",\"parent\":null,\"position\":[-1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:14\",\"parent\":null,\"position\":[-1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:15\",\"parent\":null,\"position\":[-1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:violet:crystal-lantern\",\"name\":\"Crystal lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.9,1.9,1.3],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.85],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.1,2.1,0.22],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"crystal\",\"parent\":0,\"position\":[0,0,1.75],\"rotation\":[0,0,0.3826834323650898,0.9238795325112867],\"shape\":{\"size\":[0.7,0.7,1.4],\"color\":[0.25,0.62,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":false}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.1,\"depth\":2.1}]},{\"id\":\"asset:violet:movable-plinth\",\"name\":\"Movable plinth\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,2,1.3],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":2}]},{\"id\":\"asset:violet:prism\",\"name\":\"Prism\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0.3826834323650898,0.9238795325112867],\"shape\":{\"size\":[0.7,0.7,3.8],\"color\":[0.22,0.5,0.67],\"emission\":0.5,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":1,\"depth\":1}]}]}");
-const { validateProject } = module37;
-const { ASSEMBLY_GENERATORS } = module29;
+const { validateProject } = module38;
+const { ASSEMBLY_GENERATORS } = module30;
 /** Resolve authored generator identities against the libraries this example actually installs. */
 function validateAtriumProject(project){validateProject(project,{generators:ASSEMBLY_GENERATORS});
  // This application's injected Play behavior requires these explicit content conventions.
@@ -2976,10 +3066,15 @@ function validateAtriumProject(project){validateProject(project,{generators:ASSE
  return project;}
 const ATRIUM_PROJECT=validateAtriumProject(data);
 
-return {validateAtriumProject,ATRIUM_PROJECT};
+/** Unique diagnostic interaction roles stay with their original instance when copied. */
+function cloneAtriumEntity(entity){if(['prop','lantern'].includes(entity.tag))entity.tag=null;return entity;}
+/** Preserve the two interaction anchors required by this example's injected game behavior. */
+function canRemoveAtriumEntity(entity){return !entity.locked&&!['prop','lantern'].includes(entity.tag);}
+
+return {validateAtriumProject,ATRIUM_PROJECT,cloneAtriumEntity,canRemoveAtriumEntity};
 })();
 // Source: engine/basement/transfer.js
-const module39=(()=>{
+const module40=(()=>{
 /**
  * Basement / transfer: validated, synchronous movement of one attachment tree.
  * No loading, scheduling, game rules, callbacks during mutation, or resource ownership.
@@ -3030,13 +3125,13 @@ function transferTree({ source, destination, root, landing, validate = () => tru
 return {transferTree};
 })();
 // Source: engine/lobby/travel.js
-const module38=(()=>{
+const module39=(()=>{
 /**
  * Lobby / travel: asynchronous preparation becomes a synchronous boundary commit.
  * It consumes generic residency tickets; it does not import Directory or game content.
  * The active ticket pins the source until a successful transfer replaces it.
  */
-const { transferTree } = module39;
+const { transferTree } = module40;
 
 class WorldTravel {
   /** Adopt an already-ready initial ticket/root. The owner must call advance at a boundary. */
@@ -3129,7 +3224,7 @@ class WorldTravel {
 return {WorldTravel};
 })();
 // Source: engine/basement/geometry.js
-const module41=(()=>{
+const module42=(()=>{
 /** Basement / geometry: pure horizontal collision helpers, with no world or game dependency. */
 
 /** Does a horizontal circle overlap an axis-aligned box? Touching is permitted. */
@@ -3142,7 +3237,7 @@ function circleOverlapsBox(x, y, radius, box) {
 return {circleOverlapsBox};
 })();
 // Source: engine/directory/scene-instance.js
-const module43=(()=>{
+const module44=(()=>{
 /**
  * Directory / live authored scene instance. Maps stable document IDs to temporary World
  * membership, and updates transforms/collision together. Owns no scheduler or game rules.
@@ -3152,7 +3247,7 @@ const { rotateVector } = module4;
 class SceneInstance {
  /** Synchronous construction is available for the explicitly bounded editor preview. */
  constructor(directory,world,project,scene,{defer=false}={}){
-  this.world=world;this.instances=new Map();this.authored=new Map();this.colliders=[];
+  this.directory=directory;this.world=world;this.instances=new Map();this.authored=new Map();this.colliders=[];
   if(!defer){for(const entity of scene.entities)this.add(directory,project,entity);this.apply(scene);}
  }
  /** Runtime loading yields once per bounded assembly, preserving Lobby's preparation budget. */
@@ -3170,9 +3265,28 @@ class SceneInstance {
   for(const part of built.parts)this.authored.set(part.id,entity.id);
  }
  /** Update existing retained geometry; positions never require asset reconstruction. */
- apply(scene){const v=[0,0,0];for(const e of scene.entities){const item=this.instances.get(e.id);if(!item)throw new Error('Scene topology changed: reopen preview');const r=item.root;[r.x,r.y,r.z]=e.position;r.rotation.splice(0,4,...e.rotation);r.scale=e.scale;
+ apply(scene,project=null){
+  // Reconcile topology by authored ID, retaining every unaffected runtime tree and collider.
+  const ids=new Set(scene.entities.map(e=>e.id));
+  for(const id of this.instances.keys())if(!ids.has(id))this.remove(id);
+  for(const entity of scene.entities){
+   const old=this.instances.get(entity.id);
+   if(old&&old.asset.id!==entity.asset)this.remove(entity.id);
+   if(!this.instances.has(entity.id)){
+    if(!project)throw new Error('Project required when adding an instance');
+    this.add(this.directory,project,entity);
+   }
+  }
+  const v=[0,0,0];for(const e of scene.entities){const item=this.instances.get(e.id);if(!item)throw new Error('Scene topology changed: reopen preview');const r=item.root;[r.x,r.y,r.z]=e.position;const length=Math.hypot(...e.rotation);r.rotation.splice(0,4,...e.rotation.map(n=>n/length));r.scale=e.scale;
    item.asset.colliders.forEach((c,i)=>{rotateVector(r.rotation,c.x*r.scale,c.y*r.scale,0,v);const b=item.colliders[i];b.x=r.x+v[0];b.y=r.y+v[1];let w=0,d=0;for(const x of [-1,1])for(const y of [-1,1]){rotateVector(r.rotation,x*c.width*r.scale/2,y*c.depth*r.scale/2,0,v);w=Math.max(w,Math.abs(v[0])*2);d=Math.max(d,Math.abs(v[1])*2);}b.width=w;b.depth=d;});
   }this.world.snapshot();this.world.resolve();}
+ /** Remove only one tree and its derived mappings; shared asset data remains untouched. */
+ remove(id){
+  const item=this.instances.get(id);if(!item)return;
+  for(const part of item.parts)this.authored.delete(part.id);
+  for(const collider of item.colliders){const index=this.colliders.indexOf(collider);if(index!==-1)this.colliders.splice(index,1);}
+  this.world.remove(item.root);this.instances.delete(id);
+ }
  /** Resolve a stable placed ID, or a named assembly part, without exposing runtime IDs in JSON. */
  root(id){return this.instances.get(id)?.root;}
  part(id,name){const i=this.instances.get(id);return i?.parts[i.asset.parts.findIndex(p=>p.id===name)];}
@@ -3185,10 +3299,10 @@ class SceneInstance {
 return {SceneInstance};
 })();
 // Source: examples/atrium/layout.js
-const module42=(()=>{
+const module43=(()=>{
 /** Atrium / map generic document instances to this game's named interaction targets. */
-const { SceneInstance } = module43;
-const { ATRIUM_PROJECT } = module36;
+const { SceneInstance } = module44;
+const { ATRIUM_PROJECT } = module37;
 function* buildLayout(engine,world,profile,project=ATRIUM_PROJECT){
  const instance=yield* SceneInstance.prepare(engine.directory,world,project,profile);
  const lantern=profile.entities.find(e=>e.tag==='lantern'),prop=profile.entities.find(e=>e.tag==='prop');
@@ -3198,16 +3312,16 @@ function* buildLayout(engine,world,profile,project=ATRIUM_PROJECT){
 return {buildLayout};
 })();
 // Source: examples/atrium/worlds.js
-const module40=(()=>{
+const module41=(()=>{
 /**
  * Atrium example / world definitions: authored realms, reconstruction and state schema.
  * Directory receives factories, not these names. Lobby budgets actual procedural work.
  * Persisted data is deliberately small: light selection, crystal rotation and prop position.
  */
-const { ATRIUM_PROJECT } = module36;
+const { ATRIUM_PROJECT } = module37;
 const { Lifetime } = module6;
-const { circleOverlapsBox } = module41;
-const { buildLayout } = module42;
+const { circleOverlapsBox } = module42;
+const { buildLayout } = module43;
 
 /** Immutable-by-convention authoring profiles; runtime mutable state is created per world. */
 const PROFILES = ATRIUM_PROJECT.scenes;
@@ -3264,16 +3378,16 @@ function worldFactory(engine, profile, id, project=ATRIUM_PROJECT) {
 return {PROFILES,legalLanding,applyLight,worldFactory};
 })();
 // Source: examples/atrium/journey.js
-const module35=(()=>{
+const module36=(()=>{
 /**
  * Atrium example / journey: game-specific realm links, initial actor and prewarming policy.
  * Loading/lifetime algorithms live in Directory; transaction scheduling lives in Lobby.
  * This module chooses the destination and asks for those mechanisms through public contracts.
  */
-const { ATRIUM_PROJECT } = module36;
+const { ATRIUM_PROJECT } = module37;
 const { Lifetime } = module6;
-const { WorldTravel } = module38;
-const { worldFactory, legalLanding, applyLight } = module40;
+const { WorldTravel } = module39;
+const { worldFactory, legalLanding, applyLight } = module41;
 
 /** Own the two realm definitions and their tickets for one example session. */
 function createJourney(engine,project=ATRIUM_PROJECT) {
@@ -3352,12 +3466,12 @@ function createJourney(engine,project=ATRIUM_PROJECT) {
 return {createJourney};
 })();
 // Source: examples/atrium/player.js
-const module44=(()=>{
+const module45=(()=>{
 /**
  * Atrium example / locomotion: game-owned steering/gait profile, independent of realm residency.
  * Actor references and velocity survive transfers. This is not a full physical body solver.
  */
-const { legalLanding } = module40;
+const { legalLanding } = module41;
 
 /** Create one controller whose mutable velocity/load state belongs only to this actor. */
 function playerController(actor, input, renderer) {
@@ -3393,15 +3507,15 @@ function playerController(actor, input, renderer) {
 return {playerController};
 })();
 // Source: examples/atrium/scene.js
-const module34=(()=>{
+const module35=(()=>{
 /**
  * Atrium example / scene: owns controls, phase registrations and the game's journey.
  * Layout/reconstruction, locomotion and world policy have their own focused modules.
  * Nothing here installs an engine patch or creates an independent animation loop.
  */
 const { Lifetime } = module6;
-const { createJourney } = module35;
-const { playerController } = module44;
+const { createJourney } = module36;
+const { playerController } = module45;
 
 /** Start preparing the scene immediately. Rendering remains valid while the first world loads. */
 function createScene(engine,{controlsHost,project,onStatus=()=>{},onError=()=>{}}){
@@ -3475,7 +3589,7 @@ const module0=(()=>{
  */
 const { ETRNLNINE } = module1;
 const { Lifetime } = module6;
-const { createScene } = module34;
+const { createScene } = module35;
 
 const canvas=document.querySelector('#world'), controlsHost=document.querySelector('#controls');
 const status=document.querySelector('#status'), errorBox=document.querySelector('#error');

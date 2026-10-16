@@ -15,6 +15,7 @@ export function renderDiagnostics(renderer,profiler){
       for(const name in baseline)p.set(ids[name],renderer.totals[name]-baseline[name]);
       let cpu=0,gpu=renderer.stats.buffers?864:0;
       for(const batch of renderer.batches){cpu+=batch.cpuBytes;gpu+=batch.gpuBufferBytes;}
+      for(const layer of renderer.lines.layers){cpu+=layer.cpuBytes;gpu+=layer.gpuBufferBytes;}
       p.set(ids.buffers,renderer.stats.buffers);p.set(ids.programs,renderer.stats.programs);p.set(ids.vaos,renderer.stats.vaos);
       p.set(ids.cpuBuffers,cpu);p.set(ids.gpuBuffers,gpu);p.set(ids.gpuPending,renderer.gpuTimer.pending);
       const ao=renderer.occlusion,t=ao.targets;
@@ -24,7 +25,7 @@ export function renderDiagnostics(renderer,profiler){
     status:()=>renderer.gpuTimer.inspect(),
     configure:p=>renderer.gpuTimer.configure(p.recording&&p.gpuEnabled),
     details:()=>({gpuTimer:renderer.gpuTimer.inspect(),buffers:renderer.stats.buffers,programs:renderer.stats.programs,
-      vertexArrays:renderer.stats.vaos,ambientOcclusion:renderer.occlusion.inspect(),lighting:renderer.lighting.inspect(),viewport:{width:renderer.canvas.width,height:renderer.canvas.height},
+      vertexArrays:renderer.stats.vaos,lines:renderer.lines.inspect(),ambientOcclusion:renderer.occlusion.inspect(),lighting:renderer.lighting.inspect(),viewport:{width:renderer.canvas.width,height:renderer.canvas.height},
       accounting:'Requested GL buffer bytes only. Estimated AO and shadow texture bytes are reported separately in ambientOcclusion/aoTargets. Default framebuffer, shader/driver storage and browser heap are excluded.'}),
   });
 }

@@ -5,15 +5,17 @@
  */
 import { SceneInstance } from '../../engine/directory/scene-instance.js';
 import { ProjectDocument } from '../../engine/basement/document.js';
+import { assetBounds } from '../../engine/basement/asset-bounds.js';
+import { copyData } from '../../engine/basement/project.js';
 import { Lifetime } from '../../engine/basement/lifetime.js';
 
 export class StudioSession {
  /** Inject game behavior, schema resolution and initial selection at the application boundary. */
  constructor(engine,{
   project,validate,selectInitial=scene=>scene.entities.find(e=>!e.locked)?.id,
-  playFactory,controlsHost,onChange,onStatus,
+  playFactory,controlsHost,onChange,onStatus,canRemove=entity=>!entity.locked,cloneEntity=entity=>entity,guideLayers=()=>[],
  }){
-  this.engine=engine;
+  this.engine=engine;this.canRemove=canRemove;this.cloneEntity=cloneEntity;this.guideLayers=guideLayers;
   this.validate=validate;
   this.selectInitial=selectInitial;
   this.playFactory=playFactory;
@@ -39,7 +41,7 @@ export class StudioSession {
     scene.lights.forEach((light,i)=>renderer.lighting.setPoint(i,light));
     this.lightingDirty=false;
    }
-   renderer.render(this.preview.batch);
+   renderer.render(this.preview.batch,this.guideLayers());
   },'studio.viewport'));
   this.replace(project);
  }
@@ -81,7 +83,7 @@ export class StudioSession {
   this.lightingDirty=true;
   this.releaseDocument=doc.onChange(kind=>{
    this.lightingDirty=true;
-   if(!this.play)this.preview.instance.apply(this.scene);
+   if(!this.play)this.preview.instance.apply(this.scene,doc.data);
    this.onChange(kind);
   });
   this.onChange('open');
@@ -108,6 +110,27 @@ export class StudioSession {
   this.onChange('selection');
  }
 
+ /** Place one source asset with its true bottom on the construction plane. */
+ place(assetId,point){
+  if(this.play)return;const asset=this.document.data.assets.find(a=>a.id===assetId);
+  if(!asset)throw new Error('Unknown source asset');const id=this.document.allocateId(),bounds=assetBounds(asset);
+  this.document.edit('Place asset',data=>data.scenes[this.sceneIndex].entities.push({id,name:asset.name,asset:assetId,tag:null,locked:false,position:[point.x,point.y,(point.z??0)-bounds.min[2]],rotation:[0,0,0,1],scale:1}));
+  this.select(id);return id;
+ }
+ /** Clone placement while sharing its source asset; application policy handles unique game roles. */
+ duplicate(){
+  if(this.play)return;const original=this.scene.entities.find(e=>e.id===this.selected);
+  if(!original||original.locked)throw new Error('Select an unlocked instance');
+  const entity=this.cloneEntity(copyData(original));entity.id=this.document.allocateId();entity.name+=' copy';entity.position[0]+=1;
+  this.document.edit('Duplicate instance',data=>data.scenes[this.sceneIndex].entities.push(entity));this.select(entity.id);return entity.id;
+ }
+ /** Delete through history, preserving protected application roles and every unaffected instance. */
+ remove(){
+  if(this.play)return;const entity=this.scene.entities.find(e=>e.id===this.selected);
+  if(!entity||!this.canRemove(entity))throw new Error('This instance is protected');
+  this.document.edit('Delete instance',data=>{const list=data.scenes[this.sceneIndex].entities;list.splice(list.findIndex(e=>e.id===entity.id),1);});
+  this.select(this.selectInitial(this.scene));
+ }
  /** Release the preview before Play; pass only detached authored data to the game factory. */
  startPlay(){
   if(this.play)return;

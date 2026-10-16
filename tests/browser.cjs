@@ -28,6 +28,8 @@ const server=http.createServer((req,res)=>{
   const errors=[];const report={};
   try{
     const context=await browser.newContext({viewport:{width:1024,height:720}});
+    // Cooperative loading follows real frames; software GL can make those frames slow.
+    context.setDefaultTimeout(120000);
     // A runtime guard catches indirect/off-screen preparation as well as visible Canvas usage.
     const installGuard=()=>{
       const original=HTMLCanvasElement.prototype.getContext;
@@ -187,6 +189,7 @@ const server=http.createServer((req,res)=>{
 
     // Exercise the actual DOM control templates with simultaneous touch pointers.
     const mobile=await browser.newContext({viewport:{width:412,height:892},isMobile:true,hasTouch:true,deviceScaleFactor:1});
+    mobile.setDefaultTimeout(120000);
     const phone=await mobile.newPage();await phone.evaluate(installGuard);phone.on('pageerror',e=>errors.push(e.message));
     await phone.setContent(fs.readFileSync(path.join(root,'dist/ETRNLNINE-Atrium.html'),'utf8'));
     await phone.waitForFunction(()=>document.querySelector('#status').dataset.actor && document.querySelector('#status').dataset.buffers==='4');

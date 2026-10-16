@@ -5,9 +5,22 @@
 *{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:#16151c;color:#e8e0d4;font:13px system-ui,sans-serif}button,input,select{font:inherit;color:inherit;background:#24222c;border:1px solid #59505b;border-radius:5px;min-height:40px;padding:7px 10px}button{cursor:pointer}button:hover,button[aria-pressed=true]{background:#534536;border-color:#c6a56c}button:disabled{opacity:.4;cursor:default}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #ddba7b;outline-offset:2px}header{height:112px;padding:13px 20px;border-bottom:1px solid #48404b;background:#1c1a22}header>div{display:flex;align-items:center;gap:10px}h1{font:24px Georgia,serif;margin:0 auto 0 0;letter-spacing:.03em}small,.eyebrow{color:#b7a584;font-size:10px;letter-spacing:.16em;text-transform:uppercase}.projectbar{margin-top:12px}#project-name{margin-right:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#b9b1c5}main{height:calc(100% - 146px);display:grid;grid-template-columns:216px minmax(0,1fr) 260px}aside{padding:17px 12px;overflow:auto;background:#1d1b24}#library{border-right:1px solid #48404b}#properties{border-left:1px solid #48404b}h2{font:20px Georgia,serif;font-weight:400;margin:8px 0 18px}h3{font-size:10px;font-weight:500;letter-spacing:.16em;color:#b7a584;text-transform:uppercase;margin:18px 0 9px}#hierarchy button{display:block;width:100%;text-align:left;background:transparent;border-color:transparent;min-height:36px;font-size:11px}#hierarchy button[aria-pressed=true]{background:#433a30;border-color:#8a7149}#hierarchy button[data-light=true]{color:#d3b17b}#assets p{font-size:11px;color:#aaa1b5;margin:12px 0}#stage{position:relative;min-width:0;overflow:hidden;background:#11121b}canvas{width:100%;height:100%;display:block;touch-action:none;outline:none}.tools{position:absolute;top:14px;left:14px;right:14px;display:flex;flex-wrap:wrap;gap:5px;pointer-events:none}.tools>*{pointer-events:auto;background:#1d1a25dc;font-size:11px;min-height:38px}.view-label{position:absolute;bottom:16px;left:20px;pointer-events:none;color:#aea2bc;font-size:11px;letter-spacing:.06em}fieldset{border:0;border-top:1px solid #49414d;margin:14px 0 0;padding:12px 0;display:flex;gap:6px;min-width:0}legend{color:#baad98;font-size:11px;padding:0 6px 0 0}fieldset label{display:flex;flex:1;flex-direction:column;gap:6px;color:#a99cb4;font-size:10px;min-width:0}fieldset input{width:100%;padding:7px;font-size:12px}#selection-id{font-size:10px;color:#998fa5;overflow-wrap:anywhere}.note{color:#a99fb1;font-size:11px;line-height:1.8}footer{height:34px;padding:9px 17px;background:#211e28;border-top:1px solid #48404b;font-size:10px;color:#b8adbf;display:flex;gap:15px}#status{margin-right:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#error{position:absolute;bottom:40px;left:20px;right:20px;padding:16px;background:#522c35;border:1px solid #c58b91;z-index:9;cursor:pointer}#controls{position:absolute;inset:0;pointer-events:none}#controls>*{pointer-events:auto}.engine-joystick{position:absolute;left:25px;bottom:30px;border:1px solid #b8a17c88;border-radius:50%;background:#171724aa;touch-action:none;display:grid;place-items:center}.engine-joystick span{width:38px;height:38px;border-radius:50%;border:1px solid #cbb58a80;background:#7d6c4e80;pointer-events:none}.engine-action{position:absolute;right:25px;bottom:40px;border-radius:50%;padding:0;font-size:11px}#mobile-library,#mobile-properties{display:none}body.playing #library,body.playing #properties{opacity:.45;pointer-events:none}body.playing .tools{display:none}
 .etrnl-profiler:not([open]){display:none}
 @media(max-width:760px){header{height:115px;padding:10px}h1{font-size:20px}header button{padding:7px;font-size:11px}.projectbar{gap:4px;margin-top:9px}#scene{width:125px;min-width:0}header>div{gap:6px}header small{font-size:8px}.projectbar button{font-size:10px;padding:6px}#project-name{display:none}main{height:calc(100% - 149px);display:block}#stage{height:100%}#library,#properties{display:none;position:absolute;z-index:3;bottom:34px;left:0;right:0;border:1px solid #5d5262;max-height:44%;padding:12px 18px;background:#211e2bf5}body.library-open #library,body.properties-open:not(.playing) #properties{display:block}body.properties-open:not(.playing) #stage{height:56%}#properties{height:calc(44vh - 65.56px);max-height:none}#mobile-library,#mobile-properties{display:inline-block}.tools{left:9px;top:9px;right:9px;gap:4px}.tools>*{min-height:38px;padding:6px;font-size:10px}#properties h2{margin:3px 0 6px;font-size:20px}fieldset{margin-top:8px;padding:7px 0}.view-label{bottom:12px;left:15px;font-size:10px}footer{padding:9px;font-size:9px}#metrics{display:none}#assets{display:none}#hierarchy{display:grid;grid-template-columns:1fr 1fr}body.playing #library{display:none}}
+
+/* Studio's shared visual language: charcoal, gold and violet; compact visual controls
+   retain generous hit targets. These styles apply to every contextual workspace. */
+:root{--studio-bg:#0a0a0f;--studio-panel:#111118;--studio-border:#292431;--studio-gold:#d4a84b;--studio-violet:#a879ec}
+html,body{background:var(--studio-bg);color:#e0ddd4}header{background:linear-gradient(110deg,#111018,#191420);border-color:var(--studio-border)}header h1{color:#ede1ca;letter-spacing:.07em}header small{color:var(--studio-gold);font-family:monospace}button,input,select{background:#15131d;border-color:#403548;border-radius:4px}button:hover{background:#292032;border-color:#8e6d42}button[aria-pressed=true]{color:#f2d899;background:#d4a84b17;border-color:#a78240}button:focus-visible,input:focus-visible,select:focus-visible{outline-color:var(--studio-violet)}#play{border-color:#886a38;color:#f0cd82}aside{background:linear-gradient(110deg,#111118,#17121e)}#library,#properties,footer{border-color:var(--studio-border)}h2{color:#e6d9c5}#hierarchy button{border-radius:0;border-left:2px solid transparent;font-family:monospace;font-size:11px}#hierarchy button[aria-pressed=true]{background:#d4a84b12;border-color:transparent;border-left-color:var(--studio-gold)}#hierarchy button[data-light=true]{color:#d2ad62}#selection-id{font-family:monospace;color:#9b83ac}legend{color:#c4a97a}fieldset{border-color:#342a3e}fieldset input{font-family:monospace}footer{background:#111018}#status{color:#b3a0bf}.tools{align-items:flex-start;gap:6px}.tool-strip{display:flex;flex-wrap:wrap;gap:4px;background:#100e17ed!important;border:1px solid #514133;border-radius:5px;padding:4px}.tool-strip button{font-size:11px;padding:6px 9px;min-height:38px}.rotation-settings{display:none;gap:4px;padding:4px;border:1px solid #694578;background:#100e17ed;border-radius:5px}.rotate-mode .rotation-settings{display:flex}.rotation-settings select{min-height:38px;font-size:11px;padding:5px}#viewport-options{position:relative;border:1px solid #514133;padding:0;background:#100e17ed;border-radius:5px}#viewport-options summary{min-height:46px;cursor:pointer;display:flex;align-items:center;padding:8px 12px;color:#c5ad88;font-size:11px;list-style:none}.view-options{position:absolute;right:0;top:51px;width:250px;display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px;background:#16111ff5;border:1px solid #795d86;box-shadow:0 12px 32px #0008;border-radius:5px}.view-options button,.view-options select{font-size:11px;padding:6px}.view-label{display:flex;gap:18px;font:9px monospace;letter-spacing:.1em;color:#b29b76}#tool-readout{color:#d5b77c}#asset-search{width:100%;min-height:36px;font-size:11px}.asset-hint{font-size:10px;color:#9d8ba9;line-height:1.6}.asset-card{display:flex;width:100%;align-items:center;gap:9px;text-align:left;margin:6px 0;padding:8px;min-height:51px}.asset-card>span:last-child{min-width:0}.asset-card strong{display:block;font-size:11px;font-weight:500}.asset-card small{display:block;overflow:hidden;text-overflow:ellipsis;font:8px monospace;letter-spacing:0;text-transform:none;color:#98829f;margin-top:4px}.asset-swatch{width:16px;height:16px;flex-shrink:0;border:1px solid #ffffff40;transform:rotate(45deg);border-radius:3px}.asset-card:hover .asset-swatch{box-shadow:0 0 10px #a879ec55}
+@media(max-width:760px){.tools{left:8px;right:8px;top:8px;gap:4px}.tool-strip{gap:2px;padding:3px;max-width:100%}.tool-strip button{font-size:10px;padding:5px 7px;min-height:38px}.tools>#viewport-options{margin-left:auto}.tools>#viewport-options summary{min-height:38px;padding:6px 10px}.view-options{top:43px;width:250px}.rotation-settings{padding:2px}.rotation-settings select{font-size:10px;min-height:36px}#assets{display:block!important}#library{max-height:65%;background:#14101ef8}#hierarchy{margin-bottom:15px}#asset-list{display:grid;grid-template-columns:1fr 1fr;gap:5px}.asset-card{margin:0}.view-label{gap:9px;font-size:8px}#properties{background:linear-gradient(110deg,#17131f,#1e1629)}.tool-strip #mobile-library,.tool-strip #mobile-properties{color:#b99bd6;border-color:#684578}}
+.tools{z-index:2}#viewport-options{position:static}.view-options{left:auto;right:0;top:calc(100% + 6px)}
+.directory-tabs{display:flex;gap:5px;margin-bottom:14px}.directory-tabs button{flex:1;font:11px monospace;min-height:36px}body:not(.assets-open) #assets{display:none!important}body.assets-open #assets{display:block!important}body.assets-open #hierarchy{display:none}
+@media(max-width:760px){.tool-strip #duplicate,.tool-strip #delete{font-size:0;width:38px;padding:5px}.tool-strip #duplicate::before{content:'⧉';font-size:16px}.tool-strip #delete::before{content:'⌫';font-size:16px}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
 </style></head><body class="properties-open">
 <header><div><h1>ETRNLNINE <small>Studio</small></h1><button id="undo" title="Undo (Ctrl Z)">↶ Undo</button><button id="redo" title="Redo (Ctrl Shift Z)">↷ Redo</button><button id="play">▶ Play</button></div><div class="projectbar"><span id="project-name"></span><select id="scene" aria-label="Scene"></select><button id="save">Export JSON</button><button id="open">Import</button><button id="recover">Recover</button><button id="profiler">Profiler</button><input id="file" type="file" accept=".json,application/json" hidden></div></header>
-<main><aside id="library"><div class="eyebrow">Directory</div><h2>Scene & assets</h2><div id="hierarchy"></div><section id="assets"><h3>Packaged assets</h3><div id="asset-list"></div></section></aside><section id="stage"><canvas id="world" tabindex="0" aria-label="Studio WebGL viewport. Tap to select; choose Move to drag on the ground plane."></canvas><nav class="tools" aria-label="Viewport tools"><button id="mobile-library">Directory</button><button id="mobile-properties">Properties</button><button id="select" aria-pressed="true">Select</button><button id="move" aria-pressed="false">Move</button><select id="view" aria-label="Camera view"><option value="oblique">Oblique</option><option value="top">Top</option><option value="front">Front</option><option value="side">Side</option></select><button id="orbit-left" aria-label="Orbit left">↶ View</button><button id="orbit-right" aria-label="Orbit right">View ↷</button><button id="zoom-in" aria-label="Zoom in">＋</button><button id="zoom-out" aria-label="Zoom out">−</button><select id="snap" aria-label="Move snapping"><option value="0.5">Snap 0.5 m</option><option value="1">Snap 1 m</option><option value="0">No snap</option></select></nav><div class="view-label">AUTHORED WORLD / Z UP / METRES</div><div id="controls"></div></section><aside id="properties"><div class="eyebrow">Inspector</div><h2 id="selection-name"></h2><div id="selection-id"></div><div id="fields"></div><p class="note">Tap to select. Move drags on a horizontal plane. Numeric controls edit all three axes. Escape cancels an edit. Play uses a separate copy.</p></aside></main><footer><output id="status">Opening Studio…</output><output id="metrics"></output></footer><div id="error" role="alert" hidden title="Tap to dismiss"></div>
+<main><aside id="library"><div class="eyebrow">Directory</div><h2>Scene & assets</h2><div class="directory-tabs"><button id="show-hierarchy" aria-pressed="true">Scene</button><button id="show-assets" aria-pressed="false">Assets</button></div><div id="hierarchy"></div><section id="assets"><h3>Asset library</h3><input id="asset-search" type="search" aria-label="Search assets" placeholder="Find an asset…"><p class="asset-hint">Choose a template, then tap the viewport to place it.</p><div id="asset-list"></div></section></aside><section id="stage"><canvas id="world" tabindex="0" aria-label="Studio WebGL viewport. Tap to select; choose Move to drag on the ground plane."></canvas><nav class="tools" aria-label="Viewport tools">
+<div class="tool-strip"><button id="mobile-library">Directory</button><button id="mobile-properties">Properties</button><button id="select" title="Select objects" aria-pressed="true">↖ Select</button><button id="move" title="Move on the construction plane" aria-pressed="false">✥ Move</button><button id="rotate" title="Drag the selected object's rotation ring" aria-pressed="false">⟳ Rotate</button><button id="duplicate" aria-label="Duplicate instance" title="Duplicate (Ctrl D)">⧉ Copy</button><button id="delete" aria-label="Delete instance" title="Delete selected instance">⌫ Delete</button></div>
+<div class="rotation-settings"><select id="rotation-axis" aria-label="Rotation axis"><option value="x">X axis</option><option value="y">Y axis</option><option value="z" selected>Z axis</option></select><select id="rotation-space" aria-label="Rotation space"><option value="world">World</option><option value="local">Local</option></select><select id="angle-snap" aria-label="Angle snapping"><option value="0">Free angle</option><option value="5">Snap 5°</option><option value="15" selected>Snap 15°</option><option value="45">Snap 45°</option></select></div>
+<details id="viewport-options"><summary>◈ View & guides</summary><div class="view-options"><button id="grid" aria-pressed="false">⌗ Grid</button><button id="lights" aria-pressed="true">☼ Light icons</button><select id="view" aria-label="Camera view"><option value="oblique">Oblique</option><option value="top">Top</option><option value="front">Front</option><option value="side">Side</option></select><button id="orbit-left" aria-label="Orbit left">↶ Orbit</button><button id="orbit-right" aria-label="Orbit right">Orbit ↷</button><button id="zoom-in" aria-label="Zoom in">＋</button><button id="zoom-out" aria-label="Zoom out">−</button><select id="snap" aria-label="Move snapping"><option value="0.5">Snap 0.5 m</option><option value="1">Snap 1 m</option><option value="0">No snap</option></select></div></details></nav><div class="view-label"><span id="tool-readout">SELECT</span><span>Z UP · METRES · WEBGL</span></div><div id="controls"></div></section><aside id="properties"><div class="eyebrow">Inspector</div><h2 id="selection-name"></h2><div id="selection-id"></div><div id="fields"></div><p class="note">Select an object or light marker. Move on the ground plane, or drag the rotation ring. Use Top for Z rotation, Front for Y, Side for X. Escape cancels. Play uses a separate copy.</p></aside></main><footer><output id="status">Opening Studio…</output><output id="metrics"></output></footer><div id="error" role="alert" hidden title="Tap to dismiss"></div>
 <script type="module">
 // Source: engine/basement/rotation.js
 const module4=(()=>{
@@ -698,6 +711,7 @@ function renderDiagnostics(renderer,profiler){
       for(const name in baseline)p.set(ids[name],renderer.totals[name]-baseline[name]);
       let cpu=0,gpu=renderer.stats.buffers?864:0;
       for(const batch of renderer.batches){cpu+=batch.cpuBytes;gpu+=batch.gpuBufferBytes;}
+      for(const layer of renderer.lines.layers){cpu+=layer.cpuBytes;gpu+=layer.gpuBufferBytes;}
       p.set(ids.buffers,renderer.stats.buffers);p.set(ids.programs,renderer.stats.programs);p.set(ids.vaos,renderer.stats.vaos);
       p.set(ids.cpuBuffers,cpu);p.set(ids.gpuBuffers,gpu);p.set(ids.gpuPending,renderer.gpuTimer.pending);
       const ao=renderer.occlusion,t=ao.targets;
@@ -707,7 +721,7 @@ function renderDiagnostics(renderer,profiler){
     status:()=>renderer.gpuTimer.inspect(),
     configure:p=>renderer.gpuTimer.configure(p.recording&&p.gpuEnabled),
     details:()=>({gpuTimer:renderer.gpuTimer.inspect(),buffers:renderer.stats.buffers,programs:renderer.stats.programs,
-      vertexArrays:renderer.stats.vaos,ambientOcclusion:renderer.occlusion.inspect(),lighting:renderer.lighting.inspect(),viewport:{width:renderer.canvas.width,height:renderer.canvas.height},
+      vertexArrays:renderer.stats.vaos,lines:renderer.lines.inspect(),ambientOcclusion:renderer.occlusion.inspect(),lighting:renderer.lighting.inspect(),viewport:{width:renderer.canvas.width,height:renderer.canvas.height},
       accounting:'Requested GL buffer bytes only. Estimated AO and shadow texture bytes are reported separately in ambientOcclusion/aoTargets. Default framebuffer, shader/driver storage and browser heap are excluded.'}),
   });
 }
@@ -1349,8 +1363,88 @@ class Lighting {
 
 return {shadowSettings,Lighting};
 })();
-// Source: engine/basement/camera.js
+// Source: engine/basement/lines.js
 const module19=(()=>{
+/**
+ * Basement / retained colored lines. A small general rendering capability for debug
+ * bounds, construction grids and authoring guides; it knows no editor or game types.
+ * One shared program per renderer; each layer owns a bounded CPU/GPU vertex buffer.
+ * Renderer submits these passes inside its normal GPU timer and restores all handles.
+ */
+const { createProgram } = module13;
+const VERTEX=`#version 300 es
+precision highp float;
+layout(location=0) in vec3 aPosition;
+layout(location=1) in vec4 aColor;
+uniform mat4 uViewProjection;
+out vec4 vColor;
+void main(){vColor=aColor;gl_Position=uViewProjection*vec4(aPosition,1.0);}`;
+const FRAGMENT=`#version 300 es
+precision highp float;
+in vec4 vColor;
+out vec4 outColor;
+void main(){outColor=vColor;}`;
+
+class LineRendering {
+ /** Inert until a caller acquires its first layer. No programs/buffers in game-only use. */
+ constructor(renderer){this.renderer=renderer;this.layers=new Set();this.program=null;}
+ /** Create an explicitly owned bounded layer; caller disposes it when hidden/closed. */
+ create(capacity=4096,{depthTest=true}={}){
+  if(this.renderer.disposed||this.renderer.lost)throw new Error('Renderer is unavailable');
+  if(!Number.isInteger(capacity)||capacity<2||capacity>16384)throw new Error('Line vertex budget must be 2–16384');
+  const layer=new LineLayer(this,capacity,depthTest);
+  try{this.ensure();layer.initialize();this.layers.add(layer);return layer;}
+  catch(error){layer.dispose();if(!this.layers.size)this.releaseProgram();throw error;}
+ }
+ /** Program is shared only by layers belonging to this renderer and released with the last. */
+ ensure(){if(this.program)return;const r=this.renderer;this.program=createProgram(r.gl,VERTEX,FRAGMENT);this.matrix=r.gl.getUniformLocation(this.program,'uViewProjection');r.stats.programs++;}
+ releaseProgram(){if(!this.program)return;this.renderer.gl.deleteProgram(this.program);this.program=null;this.renderer.stats.programs--;}
+ /** Context loss invalidates handles; retained numeric data remains available for restoration. */
+ invalidate(){this.program=null;for(const layer of this.layers){layer.buffer=null;layer.vao=null;}}
+ restore(){if(!this.layers.size)return;this.ensure();for(const layer of this.layers)layer.initialize();}
+ /** Diagnostics return copied scalars, never borrowed layer objects or GL handles. */
+ inspect(){let vertices=0,cpuBytes=0,gpuBufferBytes=0;for(const layer of this.layers){vertices+=layer.count;cpuBytes+=layer.cpuBytes;gpuBufferBytes+=layer.gpuBufferBytes;}return{layers:this.layers.size,vertices,cpuBytes,gpuBufferBytes};}
+ dispose(){for(const layer of [...this.layers])layer.dispose();this.releaseProgram();}
+}
+
+class LineLayer {
+ constructor(owner,capacity,depthTest){this.owner=owner;this.renderer=owner.renderer;this.capacity=capacity;this.depthTest=depthTest;this.data=new Float32Array(capacity*7);this.count=0;this.cursor=0;this.disposed=false;this.dirty=false;this.cpuBytes=this.gpuBufferBytes=this.data.byteLength;}
+ /** Seven floats per vertex: world XYZ plus display RGBA. No texture/font preparation. */
+ initialize(){
+  const r=this.renderer,gl=r.gl;
+  this.buffer=gl.createBuffer();this.vao=gl.createVertexArray();
+  if(!this.buffer||!this.vao){if(this.buffer)gl.deleteBuffer(this.buffer);if(this.vao)gl.deleteVertexArray(this.vao);this.buffer=this.vao=null;throw new Error('Line layer allocation failed');}
+  r.stats.buffers++;r.stats.vaos++;gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,this.data.byteLength,gl.DYNAMIC_DRAW);
+  gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,28,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,4,gl.FLOAT,false,28,12);gl.bindVertexArray(null);this.dirty=true;
+ }
+ /** Rewrite only on invalidation, never for every static frame. */
+ begin(){this.cursor=0;}
+ segment(a,b,color){if(this.cursor+14>this.data.length)throw new Error('Line layer vertex budget exceeded');for(const p of [a,b]){this.data.set(p,this.cursor);this.data.set(color,this.cursor+3);this.cursor+=7;}}
+ end(){this.count=this.cursor/7;this.dirty=true;}
+ /** Called only by Renderer.render; restore depth/blend state before the next submission. */
+ draw(){
+  if(this.disposed)throw new Error('Line layer is disposed');if(!this.count)return;
+  const r=this.renderer,gl=r.gl;this.owner.ensure();
+  gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
+  if(this.dirty){const bytes=this.count*28;gl.bufferSubData(gl.ARRAY_BUFFER,0,this.data.subarray(0,this.count*7));r.stats.uploads++;r.stats.uploadedBytes+=bytes;r.totals.uploads++;r.totals.uploadedBytes+=bytes;this.dirty=false;}
+  gl.useProgram(this.owner.program);gl.uniformMatrix4fv(this.owner.matrix,false,r.camera.matrix);
+  if(!this.depthTest)gl.disable(gl.DEPTH_TEST);gl.depthMask(false);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+  gl.drawArrays(gl.LINES,0,this.count);gl.bindVertexArray(null);gl.disable(gl.BLEND);gl.depthMask(true);gl.enable(gl.DEPTH_TEST);r.stats.draws++;r.totals.draws++;
+ }
+ /** Removal is immediate; disposed guide layers cannot survive into Play or context restore. */
+ dispose(){
+  if(this.disposed)return;this.disposed=true;const r=this.renderer,gl=r.gl;
+  if(this.buffer){gl.deleteBuffer(this.buffer);r.stats.buffers--;}
+  if(this.vao){gl.deleteVertexArray(this.vao);r.stats.vaos--;}
+  this.buffer=this.vao=null;this.owner.layers.delete(this);this.data=null;
+  if(!this.owner.layers.size)this.owner.releaseProgram();
+ }
+}
+
+return {LineRendering};
+})();
+// Source: engine/basement/camera.js
+const module20=(()=>{
 /**
  * Basement / camera: arbitrary z-up orthographic views and their exact inverse rays.
  * Geometry, culling, picking, aiming and screen-space AO share the same projection.
@@ -1403,7 +1497,8 @@ const { GpuTimer } = module12;
 const { createProgram } = module13;
 const { AmbientOcclusion } = module14;
 const { Lighting } = module15;
-const { Camera } = module19;
+const { LineRendering } = module19;
+const { Camera } = module20;
 
 /** Generate one unit cube with flat normals; uploaded once per WebGL context lifetime. */
 function cubeGeometry() {
@@ -1436,14 +1531,16 @@ class Renderer {
     this.totals={draws:0,instances:0,uploads:0,uploadedBytes:0,candidates:0,culled:0,shadowDraws:0,shadowHits:0};
     try {
       this.initialize();
+      this.lines=new LineRendering(this);
       this.lighting=new Lighting(this,lighting);
       this.shadowScope=profiler?.scope('renderer.shadows');
+      this.lineScope=profiler?.scope('renderer.lines');
       this.occlusion=new AmbientOcclusion(this,occlusion);
       this.occlusionScope=profiler?.scope('renderer.ambientOcclusion');
       this.gpuTimer=new GpuTimer(gl,(id,ms)=>this.profiler?.recordGpu(id,ms));
       this.life.own(renderDiagnostics(this,profiler));
       this.life.listen(canvas, 'webglcontextlost', event => {
-        event.preventDefault(); this.lost = true; this.gpuTimer.invalidate(); this.occlusion.invalidate(); this.lighting.invalidate();
+        event.preventDefault(); this.lost = true; this.gpuTimer.invalidate(); this.lines.invalidate(); this.occlusion.invalidate(); this.lighting.invalidate();
       });
       this.life.listen(canvas, 'webglcontextrestored', () => {
         // Browser invalidates all old handles on loss. Recreate from retained CPU data,
@@ -1451,12 +1548,13 @@ class Renderer {
         this.stats.buffers = this.stats.programs = this.stats.vaos = 0;
         this.initialize();
         for (const batch of this.batches) batch.initialize();
+        this.lines.restore();
         this.gpuTimer.restore(); this.stats.contextRestores++; this.lost = false;
       });
     } catch(error) {
       // Metric-budget/capability failure may occur after GL creation. Constructor
       // failure must release real handles even though no caller received this renderer.
-      this.life.dispose();this.gpuTimer?.dispose();this.occlusion?.dispose();this.lighting?.dispose();
+      this.life.dispose();this.lines?.dispose();this.gpuTimer?.dispose();this.occlusion?.dispose();this.lighting?.dispose();
       if(this.cube)gl.deleteBuffer(this.cube);if(this.program)gl.deleteProgram(this.program);
       throw error;
     }
@@ -1520,11 +1618,16 @@ class Renderer {
   }
 
   /** Clear even an empty engine; present a batch only if supplied and its context is valid. */
-  render(batch = null) {
+  render(batch = null, layers = []) {
     if(this.disposed||this.lost)return;
     this.gpuTimer.configure(this.profiler?.recording&&this.profiler.gpuEnabled);
     this.gpuTimer.poll();this.gpuTimer.begin(this.profiler?.current?.id??0);
-    try { this.draw(batch); } finally { this.gpuTimer.end(); }
+    try {
+      this.draw(batch);
+      const token=layers.length?this.profiler?.begin(this.lineScope):null;
+      try{for(const layer of layers){if(layer.renderer!==this)throw new Error('Guide belongs to another renderer');layer.draw();}}
+      finally{if(layers.length)this.profiler?.end(token);}
+    } finally { this.gpuTimer.end(); }
   }
 
   /** Submit a frame; all worlds use the same retained renderer and accounting path. */
@@ -1559,7 +1662,7 @@ class Renderer {
   /** Release renderer and outstanding batches, with listeners removed before late restoration. */
   dispose() {
     if (this.disposed) return;
-    this.disposed = true; this.life.dispose(); this.gpuTimer.dispose(); this.occlusion.dispose(); this.lighting.dispose();
+    this.disposed = true; this.life.dispose(); this.lines.dispose(); this.gpuTimer.dispose(); this.occlusion.dispose(); this.lighting.dispose();
     for (const batch of [...this.batches]) batch.dispose();
     this.gl.deleteBuffer(this.cube); this.gl.deleteProgram(this.program);
     this.stats.buffers = this.stats.programs = this.stats.vaos = 0;
@@ -1663,7 +1766,7 @@ class InstanceBatch {
 return {Renderer};
 })();
 // Source: engine/basement/profile-data.js
-const module21=(()=>{
+const module22=(()=>{
 /**
  * Basement / profile data: bounded copies for diagnostics, never live engine references.
  * Used only for on-demand captures/export, not for each recorded frame.
@@ -1727,14 +1830,14 @@ function diagnosticError(error){
 return {boundedCopy,percentile,freezeData,diagnosticError};
 })();
 // Source: engine/basement/profiler.js
-const module20=(()=>{
+const module21=(()=>{
 /**
  * Basement / profiler: bounded CPU scopes, numeric counters, frame history and captures.
  * This mechanism knows no scheduler, renderer, game, DOM element, or GPU API.
  * Milliseconds everywhere. Recording reuses typed storage; summaries/captures allocate
  * only when explicitly requested. Disabled scope calls do not read the clock.
  */
-const { boundedCopy, percentile, freezeData, diagnosticError } = module21;
+const { boundedCopy, percentile, freezeData, diagnosticError } = module22;
 
 class Profiler {
   /** Capacities are hard budgets. Choose them at engine creation, not during a frame. */
@@ -1964,7 +2067,7 @@ const module2=(()=>{
 const { Identities, World } = module3;
 const { Input } = module5;
 const { Renderer } = module7;
-const { Profiler } = module20;
+const { Profiler } = module21;
 
 class Basement {
   /** Renderer first: unsupported WebGL fails before device listeners are installed. */
@@ -1985,7 +2088,7 @@ class Basement {
 return {Basement};
 })();
 // Source: engine/lobby/preparation.js
-const module23=(()=>{
+const module24=(()=>{
 /**
  * Lobby / preparation: cooperatively budgeted generator work in the existing frame loop.
  * Each next() must be a small, synchronous chunk; JavaScript cannot preempt a huge chunk.
@@ -2052,7 +2155,7 @@ class PreparationQueue {
 return {PreparationQueue};
 })();
 // Source: engine/lobby/runtime-diagnostics.js
-const module24=(()=>{
+const module25=(()=>{
 /**
  * Lobby / runtime diagnostics: measurement handles and counters, not scheduling logic.
  * Providers are removed with their runtime. Disabled profiling performs no timer reads.
@@ -2077,14 +2180,14 @@ function runtimeDiagnostics(runtime,profiler){
 return {runtimeDiagnostics};
 })();
 // Source: engine/lobby/runtime.js
-const module22=(()=>{
+const module23=(()=>{
 /**
  * Lobby / runtime: sole animation-frame owner, explicit phases, and pause reasons.
  * All elapsed values are seconds. The engine advances fixed simulation steps and
  * interpolates render poses; long browser suspensions never trigger unlimited work.
  */
-const { PreparationQueue } = module23;
-const { runtimeDiagnostics } = module24;
+const { PreparationQueue } = module24;
+const { runtimeDiagnostics } = module25;
 
 class Runtime {
   /** Inject scheduling for deterministic lifecycle tests; browser defaults allocate no loop yet. */
@@ -2197,7 +2300,7 @@ class Runtime {
 return {Runtime};
 })();
 // Source: engine/directory/residency.js
-const module26=(()=>{
+const module27=(()=>{
 /**
  * Directory / residency: bounded prepared worlds, preparation tickets, and compact state.
  * Factories are game/library supplied. They return {world, ready, capture, dispose, ...}.
@@ -2337,7 +2440,7 @@ class WorldResidency {
 return {WorldResidency};
 })();
 // Source: engine/directory/diagnostics.js
-const module27=(()=>{
+const module28=(()=>{
 /**
  * Directory / diagnostics: report resource ownership through Basement's provider contract.
  * Frame samples are scalar sums. Detailed rows are copied only on capture, capped at 64.
@@ -2384,14 +2487,14 @@ function directoryDiagnostics(directory,profiler){
 return {directoryDiagnostics};
 })();
 // Source: engine/directory/directory.js
-const module25=(()=>{
+const module26=(()=>{
 /**
  * Directory: named libraries, lazy shared resources, and explicit world ownership.
  * Factories come from callers. Nothing here imports a named toy or game asset.
  * A lease pins one resource; releasing the last lease destroys it immediately.
  */
-const { WorldResidency } = module26;
-const { directoryDiagnostics } = module27;
+const { WorldResidency } = module27;
+const { directoryDiagnostics } = module28;
 
 class Directory {
   /** Registration is inert: no world or GPU asset is allocated until requested. */
@@ -2466,7 +2569,7 @@ class Directory {
 return {Directory};
 })();
 // Source: engine/penthouse/assembly.js
-const module29=(()=>{
+const module30=(()=>{
 /** Penthouse / version-one data-driven box assembly. No editor or game knowledge. */
 /** Explicit generator versions available to project/build validation; no allocation here. */
 const ASSEMBLY_GENERATORS=Object.freeze({'toy.assembly':1});
@@ -2480,7 +2583,7 @@ function assembly({world,asset}){
 return {ASSEMBLY_GENERATORS,assembly};
 })();
 // Source: engine/penthouse/toys.js
-const module30=(()=>{
+const module31=(()=>{
 /**
  * Penthouse / toys: reusable procedural box-based architecture and actor assemblies.
  * These are early test toys, not Freelancer art or the final procedural humanoid.
@@ -2539,7 +2642,7 @@ function actor({ world, color = [0.42,0.34,0.58], bagColor = [0.54,0.30,0.17] })
 return {box,pavilion,actor};
 })();
 // Source: engine/penthouse/controls.js
-const module31=(()=>{
+const module32=(()=>{
 /**
  * Penthouse / controls: parameterized HTML control templates over Basement actions.
  * HTML is intentional for accessible interface text; the world remains pure WebGL.
@@ -2639,7 +2742,7 @@ class ActionButton {
 return {Joystick,ActionButton};
 })();
 // Source: engine/penthouse/profiler-style.js
-const module33=(()=>{
+const module34=(()=>{
 /** Penthouse / profiler presentation: component-scoped styles; removed with the viewer root. */
 const PROFILER_STYLE=`
 .etrnl-profiler{position:absolute;right:30px;top:92px;width:min(390px,calc(100vw - 40px));max-height:calc(100dvh - 190px);overflow:auto;background:#11131eef;border:1px solid #c6ae774d;border-radius:7px;color:#d5cfdf;font:11px/1.55 system-ui,sans-serif;z-index:2;box-shadow:0 12px 50px #0004}
@@ -2664,15 +2767,15 @@ const PROFILER_STYLE=`
 return {PROFILER_STYLE};
 })();
 // Source: engine/penthouse/profiler-view.js
-const module32=(()=>{
+const module33=(()=>{
 /**
  * Penthouse / profiler viewer: accessible HTML/SVG, bounded tables and capture export.
  * Receives a generic subscription function; it never imports Lobby or starts a loop.
  * Closed viewers unsubscribe. Open viewers refresh at most twice a second by default.
  */
 const { Lifetime } = module6;
-const { diagnosticError } = module21;
-const { PROFILER_STYLE } = module33;
+const { diagnosticError } = module22;
+const { PROFILER_STYLE } = module34;
 
 /** Format measured values without turning unavailable measurements into zero. */
 function ms(value){return Number.isFinite(value)?value.toFixed(2):'—';}
@@ -2792,15 +2895,15 @@ class ProfilerView {
 return {ProfilerView};
 })();
 // Source: engine/penthouse/penthouse.js
-const module28=(()=>{
+const module29=(()=>{
 /**
  * Penthouse assembly: expose inert libraries without coupling Directory to toy names.
  * ETRNLNINE installs these factories; games request them through Directory.
  */
-const { assembly } = module29;
-const { pavilion, actor, box } = module30;
-const { Joystick, ActionButton } = module31;
-const { ProfilerView } = module32;
+const { assembly } = module30;
+const { pavilion, actor, box } = module31;
+const { Joystick, ActionButton } = module32;
+const { ProfilerView } = module33;
 
 class Penthouse {
   /** Catalog creation is inert: allocation begins only when a factory is requested. */
@@ -2828,9 +2931,9 @@ const module1=(()=>{
  */
 const { Basement } = module2;
 const { Lifetime } = module6;
-const { Runtime } = module22;
-const { Directory } = module25;
-const { Penthouse } = module28;
+const { Runtime } = module23;
+const { Directory } = module26;
+const { Penthouse } = module29;
 
 class ETRNLNINE {
   /** Build an empty engine, releasing earlier levels if a later constructor fails. */
@@ -2867,8 +2970,116 @@ class ETRNLNINE {
 
 return {ETRNLNINE};
 })();
+// Source: engine/basement/rotation-gesture.js
+const module36=(()=>{
+/** Basement / axis-constrained quaternion gestures and ray/plane mathematics. Radians, Z up. */
+const { rotateVector, multiplyRotation } = module4;
+
+/** Resolve an axis in world coordinates; a local axis follows the starting orientation. */
+function rotationAxis(rotation,axis,space){
+ if(!['x','y','z'].includes(axis)||!['world','local'].includes(space))throw new Error('Invalid rotation axis/space');
+ const v=[0,0,0];v['xyz'.indexOf(axis)]=1;
+ if(space==='local'){const length=Math.hypot(...rotation),q=rotation.map(n=>n/length);rotateVector(q,...v,v);}return v;
+}
+/** Ray intersection with a plane, refusing nearly edge-on gestures and intersections behind us. */
+function rayPlane(ray,center,normal){
+ const denominator=ray.direction.reduce((n,v,i)=>n+v*normal[i],0);
+ if(Math.abs(denominator)<.04)return null;
+ const t=normal.reduce((n,v,i)=>n+(center[i]-ray.origin[i])*v,0)/denominator;
+ return t<0?null:ray.origin.map((v,i)=>v+ray.direction[i]*t);
+}
+/** Stable in-plane basis, shared by visible rings and their angular picking. */
+function planeBasis(normal){
+ const ref=Math.abs(normal[2])<.9?[0,0,1]:[0,1,0];
+ const u=[normal[1]*ref[2]-normal[2]*ref[1],normal[2]*ref[0]-normal[0]*ref[2],normal[0]*ref[1]-normal[1]*ref[0]],length=Math.hypot(...u);
+ for(let i=0;i<3;i++)u[i]/=length;
+ return [u,[normal[1]*u[2]-normal[2]*u[1],normal[2]*u[0]-normal[0]*u[2],normal[0]*u[1]-normal[1]*u[0]]];
+}
+class RotationGesture {
+ /** Store starting orientation and angle; previews always derive from that starting state. */
+ constructor(rotation,axis,space,angle){const length=Math.hypot(...rotation);this.rotation=rotation.map(n=>n/length);this.normal=rotationAxis(this.rotation,axis,space);this.last=angle;this.total=0;}
+ /** Unwrap across ±π; snap accumulated angle rather than rounding quaternion components. */
+ update(angle,snapDegrees=0){
+  this.total+=Math.atan2(Math.sin(angle-this.last),Math.cos(angle-this.last));this.last=angle;
+  const step=snapDegrees*Math.PI/180,turn=step?Math.round(this.total/step)*step:this.total;
+  const s=Math.sin(turn/2),delta=[...this.normal.map(n=>n*s),Math.cos(turn/2)],out=[0,0,0,1];multiplyRotation(delta,this.rotation,out);return out;
+ }
+}
+
+return {rotationAxis,rayPlane,planeBasis,RotationGesture};
+})();
+// Source: engine/penthouse/authoring-guides.js
+const module35=(()=>{
+/**
+ * Penthouse / reusable native WebGL authoring guides. No DOM IDs, scheduler or game
+ * names. The application supplies scene/selection/preferences and owns this lifetime.
+ * Grid is depth-tested; markers and the dial are foreground guides, never world entities.
+ */
+const { rotationAxis, planeBasis, rayPlane } = module36;
+
+/** World-space rotation ring: fixed CSS size, actual axis plane, shared hit/draw geometry. */
+function rotationRing(camera,entity,axis,space,height){
+ const normal=rotationAxis(entity.rotation,axis,space),basis=planeBasis(normal);
+ return {center:entity.position,normal,basis,radius:camera.halfHeight*2/height*48};
+}
+/** Angular coordinate in the ring's plane; null when the view is nearly edge-on. */
+function ringAngle(ring,ray){
+ const hit=rayPlane(ray,ring.center,ring.normal);if(!hit)return null;
+ const delta=hit.map((n,i)=>n-ring.center[i]);
+ return {angle:Math.atan2(delta.reduce((n,v,i)=>n+v*ring.basis[1][i],0),delta.reduce((n,v,i)=>n+v*ring.basis[0][i],0)),radius:Math.hypot(...delta)};
+}
+class AuthoringGuides {
+ /** Preference data stays with Studio; these resources only represent the current view. */
+ constructor(renderer){this.renderer=renderer;this.grid=null;this.widgets=null;this.key='';}
+ /** Return explicit passes for Renderer.render; no work or resource allocation in Play. */
+ layersFor({scene,selected,revision,mode,axis,space,grid,lights}){
+  const r=this.renderer;if(r.lost)return[];
+  if(!grid&&this.grid){this.grid.dispose();this.grid=null;}
+  if(grid&&!this.grid){
+   this.grid=r.lines.create(1024);this.grid.begin();
+   for(let n=-30;n<=30;n++){
+    const color=n===0?[.72,.5,.25,.75]:n%5===0?[.72,.56,.34,.3]:[.72,.56,.34,.12];
+    this.grid.segment([n,-30,.065],[n,30,.065],color);this.grid.segment([-30,n,.065],[30,n,.065],color);
+   }
+   this.grid.end();
+  }
+  const target=scene.entities.find(e=>e.id===selected),dial=mode==='rotate'&&target&&!target.locked;
+  if(!lights&&!dial){if(this.widgets)this.widgets.dispose();this.widgets=null;this.key='';return this.grid?[this.grid]:[];}
+  const camera=r.camera,h=r.canvas.clientHeight;
+  const key=[scene.id,revision,selected,mode,axis,space,lights,camera.x,camera.y,camera.z,camera.azimuth,camera.elevation,camera.halfHeight,r.canvas.clientWidth,h].join('/');
+  if(!this.widgets){this.widgets=r.lines.create(1024,{depthTest:false});this.key='';}
+  if(key!==this.key){
+   camera.update(r.canvas.clientWidth/h);this.widgets.begin();const pixel=camera.halfHeight*2/h;
+   if(lights)for(const light of scene.lights){
+    const color=light.id===selected?[1,.92,.63,1]:[.91,.68,.32,.95],center=light.position;
+    const p=(x,y)=>center.map((v,i)=>v+pixel*(camera.right[i]*x+camera.up[i]*y));
+    for(const [a,b]of [[[0,8],[7,0]],[[7,0],[0,-8]],[[0,-8],[-7,0]],[[-7,0],[0,8]],[[-3,0],[3,0]],[[0,-3],[0,3]]])this.widgets.segment(p(...a),p(...b),color);
+   }
+   if(dial){
+    const ring=rotationRing(camera,target,axis,space,h),color=axis==='x'?[1,.42,.36,1]:axis==='y'?[.45,.9,.67,1]:[.87,.7,1,1];
+    const p=angle=>ring.center.map((v,i)=>v+ring.radius*(Math.cos(angle)*ring.basis[0][i]+Math.sin(angle)*ring.basis[1][i]));
+    for(let i=0;i<72;i++)this.widgets.segment(p(i*Math.PI/36),p((i+1)*Math.PI/36),color);
+    for(let i=0;i<12;i++){const angle=i*Math.PI/6,a=p(angle),b=a.map((v,j)=>v+(a[j]-ring.center[j])*.12);this.widgets.segment(a,b,color);}
+   }
+   this.widgets.end();this.key=key;
+  }
+  return [this.grid,this.widgets].filter(Boolean);
+ }
+ /** Pick readable light icons in CSS pixels, independently of physical geometry/collision. */
+ pickLight(scene,x,y,width,height){
+  const camera=this.renderer.camera;let closest=null,distance=22*22;
+  for(const light of scene.lights){const [px,py,pz]=light.position,p=camera.project({x:px,y:py,z:pz},width,height),d=(p.x-x)**2+(p.y-y)**2;if(d<distance){distance=d;closest=light;}}
+  return closest;
+ }
+ /** Hidden guides release all buffers/VAOs and their shared program ownership immediately. */
+ clear(){this.grid?.dispose();this.widgets?.dispose();this.grid=this.widgets=null;this.key='';}
+ dispose(){this.clear();}
+}
+
+return {rotationRing,ringAngle,AuthoringGuides};
+})();
 // Source: engine/basement/properties.js
-const module34=(()=>{
+const module38=(()=>{
 /**
  * Basement / shared editable-property metadata. These descriptors define validation,
  * labels and units for every inspector instance; controls do not invent field rules.
@@ -2893,14 +3104,14 @@ function writeProperty(target,descriptor,value){const values=Array.isArray(value
 return {TRANSFORM_PROPERTIES,LIGHT_PROPERTIES,readProperty,writeProperty};
 })();
 // Source: engine/penthouse/property-inspector.js
-const module35=(()=>{
+const module39=(()=>{
 /**
  * Penthouse / common accessible property controls, reused for entities and lights.
  * A focus session groups previews into one command. Escape cancels; blur commits.
  * All listeners belong to this panel and disappear when selection/context changes.
  */
 const { Lifetime } = module6;
-const { readProperty, writeProperty } = module34;
+const { readProperty, writeProperty } = module38;
 class PropertyInspector {
  /** Resolve the target afresh after undo/import, rather than holding a stale data object. */
  constructor({host,document:doc,resolve,properties,onError}){this.life=new Lifetime();this.doc=doc;this.active=null;
@@ -2921,8 +3132,64 @@ class PropertyInspector {
 
 return {PropertyInspector};
 })();
-// Source: engine/basement/project.js
+// Source: editor/workspace/panels.js
 const module37=(()=>{
+/** Studio / contextual panels. One inspector and asset browser serve every placed asset. */
+const { TRANSFORM_PROPERTIES, LIGHT_PROPERTIES } = module38;
+const { PropertyInspector } = module39;
+class WorkspacePanels {
+ /** Element references and callbacks are supplied by the application shell. */
+ constructor(elements,{onSelect,onPlace,onError}){this.elements=elements;this.onSelect=onSelect;this.onPlace=onPlace;this.onError=onError;this.inspector=null;this.refreshing=false;this.filter='';}
+ /** Commit/cancel/context changes rebuild controls, never a high-rate pointer preview. */
+ refresh(session){
+  if(this.refreshing)return;this.refreshing=true;
+  try{
+   this.inspector?.dispose();this.inspector=null;
+   const e=this.elements,scene=session.scene,doc=session.document;
+   e.fields.replaceChildren();e.hierarchy.replaceChildren();
+   e.scene.replaceChildren(...doc.data.scenes.map((scene,i)=>{const option=document.createElement('option');option.value=i;option.textContent=scene.name;return option;}));e.scene.value=session.sceneIndex;
+   const light=scene.lights.find(l=>l.id===session.selected),entity=scene.entities.find(e=>e.id===session.selected),target=light??entity;
+   e.name.textContent=light?'Point light '+(scene.lights.indexOf(light)+1):entity?.name??'Select an instance';e.id.textContent=target?.id??'';
+   for(const item of [...scene.entities.filter(e=>!e.locked),...scene.lights]){
+    const button=document.createElement('button');button.textContent=item.name??'◈ Point light '+(scene.lights.indexOf(item)+1);button.dataset.id=item.id;button.dataset.light=String(!item.name);button.setAttribute('aria-pressed',String(item.id===session.selected));button.addEventListener('click',()=>this.onSelect(item.id));e.hierarchy.append(button);
+   }
+   if(target&&!entity?.locked&&!session.play){
+    const id=target.id,index=session.sceneIndex,resolve=data=>(light?data.scenes[index].lights:data.scenes[index].entities).find(e=>e.id===id);
+    this.inspector=new PropertyInspector({host:e.fields,document:doc,resolve,properties:light?LIGHT_PROPERTIES:TRANSFORM_PROPERTIES,onError:this.onError});
+   }
+   if(session.preview)for(const [id,item]of session.preview.instance.instances)for(const part of item.parts)part.highlight=id===session.selected?1:0;
+   this.renderAssets(session);
+  }finally{this.refreshing=false;}
+ }
+ /** All packaged assets can be placed; source identity disambiguates similar palettes. */
+ renderAssets(session){
+  const host=this.elements.assets;host.replaceChildren();
+  const query=this.filter.trim().toLowerCase();
+  for(const asset of session.document.data.assets.filter(a=>(a.name+' '+a.id).toLowerCase().includes(query))){
+   const button=document.createElement('button');button.className='asset-card';button.dataset.asset=asset.id;button.setAttribute('aria-label','Place '+asset.name);button.disabled=!!session.play;
+   const swatch=document.createElement('span');swatch.className='asset-swatch';const color=asset.parts.find(p=>p.shape)?.shape.color??[.6,.4,.2];swatch.style.background=`rgb(${color.map(n=>Math.round(255*Math.min(1,n**(1/2.2)))).join(',')})`;
+   const label=document.createElement('span'),name=document.createElement('strong'),detail=document.createElement('small');name.textContent=asset.name;detail.textContent=asset.id;label.append(name,detail);button.append(swatch,label);button.addEventListener('click',()=>this.onPlace(asset.id));host.append(button);
+  }
+ }
+ /** Cancelled properties cannot spawn replacement controls during application disposal. */
+ dispose(){this.inspector?.dispose();this.inspector=null;}
+}
+
+return {WorkspacePanels};
+})();
+// Source: editor/workspace/preferences.js
+const module40=(()=>{
+/** Studio / view preferences. Never serialized into authored game projects or history. */
+class StudioPreferences {
+ constructor(){this.key='ETRNLNINE.Studio.view.v1';this.value={grid:false,lights:true,axis:'z',space:'world',angleSnap:15};try{const v=JSON.parse(localStorage.getItem(this.key));if(v){for(const key of ['grid','lights'])if(typeof v[key]==='boolean')this.value[key]=v[key];if(['x','y','z'].includes(v.axis))this.value.axis=v.axis;if(['world','local'].includes(v.space))this.value.space=v.space;if([0,5,15,45].includes(v.angleSnap))this.value.angleSnap=v.angleSnap;}}catch{/* Storage is optional; defaults remain useful offline. */}}
+ /** Only fixed known settings are accepted; unavailable storage never blocks tool use. */
+ set(key,value){this.value[key]=value;try{localStorage.setItem(this.key,JSON.stringify(this.value));}catch{/* Best effort, like other browser preferences. */}}
+}
+
+return {StudioPreferences};
+})();
+// Source: engine/basement/project.js
+const module42=(()=>{
 /**
  * Basement / authored project contract. JSON is data, never executable behavior.
  * This first portable package contains scenes and assembly assets together. Validation
@@ -2978,11 +3245,11 @@ function parseProject(text,validate=validateProject){if(new TextEncoder().encode
 return {PROJECT_LIMITS,copyData,validateProject,parseProject};
 })();
 // Source: examples/atrium/project.js
-const module36=(()=>{
+const module41=(()=>{
 /** Atrium source of truth: portable JSON; behavior stays in the example's JavaScript. */
 const data=JSON.parse("{\"schemaVersion\":1,\"id\":\"project:atrium\",\"name\":\"Between Worlds\",\"scenes\":[{\"key\":\"amber\",\"name\":\"The Amber Atrium\",\"sun\":{\"direction\":[-0.5,0.8,1.2],\"color\":[0.58,0.49,0.62]},\"ethereal\":false,\"ambient\":[0.15,0.11,0.15],\"id\":\"scene:amber\",\"entities\":[{\"id\":\"amber:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"asset\":\"asset:amber:courtyard-foundation\",\"tag\":null,\"locked\":true,\"position\":[0,0,-0.25],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:central-inlay\",\"name\":\"Central inlay\",\"asset\":\"asset:amber:central-inlay\",\"tag\":null,\"locked\":true,\"position\":[0,-5,0.015],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-brass-inlay\",\"name\":\"West brass inlay\",\"asset\":\"asset:amber:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[-3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-brass-inlay\",\"name\":\"East brass inlay\",\"asset\":\"asset:amber:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:colonnade\",\"name\":\"Colonnade\",\"asset\":\"asset:amber:colonnade\",\"tag\":null,\"locked\":false,\"position\":[0,11,0],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-gallery\",\"name\":\"West gallery\",\"asset\":\"asset:amber:west-gallery\",\"tag\":null,\"locked\":false,\"position\":[-20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-entry-planter\",\"name\":\"West entry planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-court-planter\",\"name\":\"West court planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-entry-lantern\",\"name\":\"West entry lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-promenade-lantern\",\"name\":\"West promenade lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-gallery-lantern\",\"name\":\"West gallery lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-gallery\",\"name\":\"East gallery\",\"asset\":\"asset:amber:east-gallery\",\"tag\":null,\"locked\":false,\"position\":[20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-entry-planter\",\"name\":\"East entry planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-court-planter\",\"name\":\"East court planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-entry-lantern\",\"name\":\"East entry lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-promenade-lantern\",\"name\":\"East promenade lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-gallery-lantern\",\"name\":\"East gallery lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:crystal-lantern\",\"name\":\"Crystal lantern\",\"asset\":\"asset:amber:crystal-lantern\",\"tag\":\"lantern\",\"locked\":false,\"position\":[0,2,0.65],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:movable-plinth\",\"name\":\"Movable plinth\",\"asset\":\"asset:amber:movable-plinth\",\"tag\":\"prop\",\"locked\":false,\"position\":[6,-12,0.65],\"rotation\":[0,0,0,1],\"scale\":1}],\"lights\":[{\"id\":\"light:0\",\"position\":[0,7,5],\"radius\":16,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:1\",\"position\":[-15,-4,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:2\",\"position\":[15,-4,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:3\",\"position\":[-15,9,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:4\",\"position\":[15,9,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:5\",\"position\":[0,2,3],\"radius\":10,\"color\":[0.3,1.1,2.7]},{\"id\":\"light:6\",\"position\":[-15,-18,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:7\",\"position\":[15,-18,4],\"radius\":12,\"color\":[2.4,0.85,0.3]}],\"lightVariants\":{\"cool\":{\"crystal\":[0.25,0.62,1],\"irradiance\":[0.3,1.1,2.7]},\"warm\":{\"crystal\":[1,0.34,0.19],\"irradiance\":[3,0.5,0.2]}}},{\"key\":\"violet\",\"name\":\"The Violet Court\",\"sun\":{\"direction\":[0.5,0.7,1.1],\"color\":[0.36,0.46,0.75]},\"ethereal\":true,\"ambient\":[0.09,0.11,0.26],\"id\":\"scene:violet\",\"entities\":[{\"id\":\"violet:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"asset\":\"asset:violet:courtyard-foundation\",\"tag\":null,\"locked\":true,\"position\":[0,0,-0.25],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:central-inlay\",\"name\":\"Central inlay\",\"asset\":\"asset:violet:central-inlay\",\"tag\":null,\"locked\":true,\"position\":[0,-5,0.015],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-brass-inlay\",\"name\":\"West brass inlay\",\"asset\":\"asset:violet:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[-3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-brass-inlay\",\"name\":\"East brass inlay\",\"asset\":\"asset:violet:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:colonnade\",\"name\":\"Colonnade\",\"asset\":\"asset:violet:colonnade\",\"tag\":null,\"locked\":false,\"position\":[0,11,0],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-gallery\",\"name\":\"West gallery\",\"asset\":\"asset:violet:west-gallery\",\"tag\":null,\"locked\":false,\"position\":[-20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-entry-planter\",\"name\":\"West entry planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-court-planter\",\"name\":\"West court planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-entry-lantern\",\"name\":\"West entry lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-promenade-lantern\",\"name\":\"West promenade lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-gallery-lantern\",\"name\":\"West gallery lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-gallery\",\"name\":\"East gallery\",\"asset\":\"asset:violet:east-gallery\",\"tag\":null,\"locked\":false,\"position\":[20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-entry-planter\",\"name\":\"East entry planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-court-planter\",\"name\":\"East court planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-entry-lantern\",\"name\":\"East entry lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-promenade-lantern\",\"name\":\"East promenade lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-gallery-lantern\",\"name\":\"East gallery lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:crystal-lantern\",\"name\":\"Crystal lantern\",\"asset\":\"asset:violet:crystal-lantern\",\"tag\":\"lantern\",\"locked\":false,\"position\":[0,2,0.65],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:movable-plinth\",\"name\":\"Movable plinth\",\"asset\":\"asset:violet:movable-plinth\",\"tag\":\"prop\",\"locked\":false,\"position\":[6,-12,0.65],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-prism\",\"name\":\"West prism\",\"asset\":\"asset:violet:prism\",\"tag\":null,\"locked\":false,\"position\":[-7,-3,2.5],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-prism\",\"name\":\"East prism\",\"asset\":\"asset:violet:prism\",\"tag\":null,\"locked\":false,\"position\":[7,-3,2.5],\"rotation\":[0,0,0,1],\"scale\":1}],\"lights\":[{\"id\":\"light:0\",\"position\":[0,7,5],\"radius\":16,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:1\",\"position\":[-15,-4,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:2\",\"position\":[15,-4,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:3\",\"position\":[-15,9,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:4\",\"position\":[15,9,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:5\",\"position\":[0,2,3],\"radius\":10,\"color\":[0.3,1.1,2.7]},{\"id\":\"light:6\",\"position\":[-15,-18,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:7\",\"position\":[15,-18,4],\"radius\":12,\"color\":[0.35,0.9,2.5]}],\"lightVariants\":{\"cool\":{\"crystal\":[0.25,0.62,1],\"irradiance\":[0.3,1.1,2.7]},\"warm\":{\"crystal\":[1,0.34,0.19],\"irradiance\":[3,0.5,0.2]}}}],\"assets\":[{\"id\":\"asset:amber:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[58,68,0.5],\"color\":[0.14,0.115,0.14],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:amber:central-inlay\",\"name\":\"Central inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[7,38,0.025],\"color\":[0.22,0.2,0.25],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:amber:brass-inlay\",\"name\":\"Brass inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.05,38,0.035],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:amber:colonnade\",\"name\":\"Colonnade\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":null},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.2],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[26,11,0.4],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,4.2,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.6,7],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,7],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[25,10,0.6],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,-4.5,6.4],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.12,0.09],\"color\":[1,0.47,0.17],\"emission\":2.5,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:5\",\"parent\":0,\"position\":[0,-4.5,6.1],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.16,0.1],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:6\",\"parent\":0,\"position\":[-12,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:7\",\"parent\":0,\"position\":[-12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:8\",\"parent\":0,\"position\":[-12,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:9\",\"parent\":0,\"position\":[-6,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:10\",\"parent\":0,\"position\":[-6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:11\",\"parent\":0,\"position\":[-6,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:12\",\"parent\":0,\"position\":[6,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:13\",\"parent\":0,\"position\":[6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:14\",\"parent\":0,\"position\":[6,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:15\",\"parent\":0,\"position\":[12,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:16\",\"parent\":0,\"position\":[12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:17\",\"parent\":0,\"position\":[12,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:18\",\"parent\":0,\"position\":[-9,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:19\",\"parent\":0,\"position\":[-9,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:20\",\"parent\":0,\"position\":[-6,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:21\",\"parent\":0,\"position\":[-6,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:22\",\"parent\":0,\"position\":[-3,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:23\",\"parent\":0,\"position\":[-3,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:24\",\"parent\":0,\"position\":[0,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:25\",\"parent\":0,\"position\":[0,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:26\",\"parent\":0,\"position\":[3,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:27\",\"parent\":0,\"position\":[3,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:28\",\"parent\":0,\"position\":[6,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:29\",\"parent\":0,\"position\":[6,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:30\",\"parent\":0,\"position\":[9,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:31\",\"parent\":0,\"position\":[9,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":4.199999999999999,\"width\":24,\"depth\":0.7},{\"x\":-12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":-6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6}]},{\"id\":\"asset:amber:west-gallery\",\"name\":\"West gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":null,\"position\":[1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":null,\"position\":[1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":null,\"position\":[1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:5\",\"parent\":null,\"position\":[1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:6\",\"parent\":null,\"position\":[1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:7\",\"parent\":null,\"position\":[1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:8\",\"parent\":null,\"position\":[1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:9\",\"parent\":null,\"position\":[1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:10\",\"parent\":null,\"position\":[1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:11\",\"parent\":null,\"position\":[1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:12\",\"parent\":null,\"position\":[1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:13\",\"parent\":null,\"position\":[1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:14\",\"parent\":null,\"position\":[1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:15\",\"parent\":null,\"position\":[1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:amber:planter\",\"name\":\"Planter\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,2.4,1.1],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.8499999999999999],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.2,2.2,0.9],\"color\":[0.045,0.14,0.1],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,0,1.4999999999999998],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.8000000000000003,1.8000000000000003,0.9],\"color\":[0.045,0.14,0.1],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,2.1500000000000004],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.4000000000000001,1.4000000000000001,0.9],\"color\":[0.045,0.14,0.1],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,0,2.8],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1,1,0.9],\"color\":[0.045,0.14,0.1],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.4,\"depth\":2.4}]},{\"id\":\"asset:amber:lantern\",\"name\":\"Lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.18,0.18,3.6],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,1.9000000000000001],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.6,0.6,0.8],\"color\":[1,0.47,0.17],\"emission\":3,\"ambientBlocker\":true,\"castShadow\":false}},{\"id\":\"part:2\",\"parent\":null,\"position\":[0,0,2.3500000000000005],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.12],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:amber:east-gallery\",\"name\":\"East gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":null,\"position\":[-1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":null,\"position\":[-1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":null,\"position\":[-1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:5\",\"parent\":null,\"position\":[-1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:6\",\"parent\":null,\"position\":[-1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:7\",\"parent\":null,\"position\":[-1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:8\",\"parent\":null,\"position\":[-1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:9\",\"parent\":null,\"position\":[-1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:10\",\"parent\":null,\"position\":[-1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:11\",\"parent\":null,\"position\":[-1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:12\",\"parent\":null,\"position\":[-1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:13\",\"parent\":null,\"position\":[-1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:14\",\"parent\":null,\"position\":[-1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:15\",\"parent\":null,\"position\":[-1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:amber:crystal-lantern\",\"name\":\"Crystal lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.9,1.9,1.3],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.85],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.1,2.1,0.22],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"crystal\",\"parent\":0,\"position\":[0,0,1.75],\"rotation\":[0,0,0.3826834323650898,0.9238795325112867],\"shape\":{\"size\":[0.7,0.7,1.4],\"color\":[0.25,0.62,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":false}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.1,\"depth\":2.1}]},{\"id\":\"asset:amber:movable-plinth\",\"name\":\"Movable plinth\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,2,1.3],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":2}]},{\"id\":\"asset:violet:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[58,68,0.5],\"color\":[0.075,0.09,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:violet:central-inlay\",\"name\":\"Central inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[7,38,0.025],\"color\":[0.22,0.2,0.25],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:violet:brass-inlay\",\"name\":\"Brass inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.05,38,0.035],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:violet:colonnade\",\"name\":\"Colonnade\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":null},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.2],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[26,11,0.4],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,4.2,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.6,8.5],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,8.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[25,10,0.6],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,-4.5,7.9],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.12,0.09],\"color\":[0.24,0.58,1],\"emission\":2.5,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:5\",\"parent\":0,\"position\":[0,-4.5,7.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.16,0.1],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:6\",\"parent\":0,\"position\":[-12,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:7\",\"parent\":0,\"position\":[-12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:8\",\"parent\":0,\"position\":[-12,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:9\",\"parent\":0,\"position\":[-6,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:10\",\"parent\":0,\"position\":[-6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:11\",\"parent\":0,\"position\":[-6,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:12\",\"parent\":0,\"position\":[6,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:13\",\"parent\":0,\"position\":[6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:14\",\"parent\":0,\"position\":[6,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:15\",\"parent\":0,\"position\":[12,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:16\",\"parent\":0,\"position\":[12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:17\",\"parent\":0,\"position\":[12,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:18\",\"parent\":0,\"position\":[-9,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:19\",\"parent\":0,\"position\":[-9,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:20\",\"parent\":0,\"position\":[-6,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:21\",\"parent\":0,\"position\":[-6,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:22\",\"parent\":0,\"position\":[-3,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:23\",\"parent\":0,\"position\":[-3,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:24\",\"parent\":0,\"position\":[0,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:25\",\"parent\":0,\"position\":[0,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:26\",\"parent\":0,\"position\":[3,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:27\",\"parent\":0,\"position\":[3,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:28\",\"parent\":0,\"position\":[6,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:29\",\"parent\":0,\"position\":[6,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:30\",\"parent\":0,\"position\":[9,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:31\",\"parent\":0,\"position\":[9,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":4.199999999999999,\"width\":24,\"depth\":0.7},{\"x\":-12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":-6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6}]},{\"id\":\"asset:violet:west-gallery\",\"name\":\"West gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":null,\"position\":[1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":null,\"position\":[1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":null,\"position\":[1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:5\",\"parent\":null,\"position\":[1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:6\",\"parent\":null,\"position\":[1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:7\",\"parent\":null,\"position\":[1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:8\",\"parent\":null,\"position\":[1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:9\",\"parent\":null,\"position\":[1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:10\",\"parent\":null,\"position\":[1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:11\",\"parent\":null,\"position\":[1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:12\",\"parent\":null,\"position\":[1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:13\",\"parent\":null,\"position\":[1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:14\",\"parent\":null,\"position\":[1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:15\",\"parent\":null,\"position\":[1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:violet:planter\",\"name\":\"Planter\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,2.4,1.1],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.8499999999999999],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.2,2.2,0.9],\"color\":[0.1,0.2,0.27],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,0,1.4999999999999998],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.8000000000000003,1.8000000000000003,0.9],\"color\":[0.1,0.2,0.27],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,2.1500000000000004],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.4000000000000001,1.4000000000000001,0.9],\"color\":[0.1,0.2,0.27],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,0,2.8],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1,1,0.9],\"color\":[0.1,0.2,0.27],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.4,\"depth\":2.4}]},{\"id\":\"asset:violet:lantern\",\"name\":\"Lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.18,0.18,3.6],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,1.9000000000000001],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.6,0.6,0.8],\"color\":[0.24,0.58,1],\"emission\":3,\"ambientBlocker\":true,\"castShadow\":false}},{\"id\":\"part:2\",\"parent\":null,\"position\":[0,0,2.3500000000000005],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.12],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:violet:east-gallery\",\"name\":\"East gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":null,\"position\":[-1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":null,\"position\":[-1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":null,\"position\":[-1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:5\",\"parent\":null,\"position\":[-1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:6\",\"parent\":null,\"position\":[-1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:7\",\"parent\":null,\"position\":[-1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:8\",\"parent\":null,\"position\":[-1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:9\",\"parent\":null,\"position\":[-1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:10\",\"parent\":null,\"position\":[-1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:11\",\"parent\":null,\"position\":[-1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:12\",\"parent\":null,\"position\":[-1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:13\",\"parent\":null,\"position\":[-1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:14\",\"parent\":null,\"position\":[-1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:15\",\"parent\":null,\"position\":[-1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:violet:crystal-lantern\",\"name\":\"Crystal lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.9,1.9,1.3],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.85],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.1,2.1,0.22],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"crystal\",\"parent\":0,\"position\":[0,0,1.75],\"rotation\":[0,0,0.3826834323650898,0.9238795325112867],\"shape\":{\"size\":[0.7,0.7,1.4],\"color\":[0.25,0.62,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":false}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.1,\"depth\":2.1}]},{\"id\":\"asset:violet:movable-plinth\",\"name\":\"Movable plinth\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,2,1.3],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":2}]},{\"id\":\"asset:violet:prism\",\"name\":\"Prism\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0.3826834323650898,0.9238795325112867],\"shape\":{\"size\":[0.7,0.7,3.8],\"color\":[0.22,0.5,0.67],\"emission\":0.5,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":1,\"depth\":1}]}]}");
-const { validateProject } = module37;
-const { ASSEMBLY_GENERATORS } = module29;
+const { validateProject } = module42;
+const { ASSEMBLY_GENERATORS } = module30;
 /** Resolve authored generator identities against the libraries this example actually installs. */
 function validateAtriumProject(project){validateProject(project,{generators:ASSEMBLY_GENERATORS});
  // This application's injected Play behavior requires these explicit content conventions.
@@ -2997,10 +3264,15 @@ function validateAtriumProject(project){validateProject(project,{generators:ASSE
  return project;}
 const ATRIUM_PROJECT=validateAtriumProject(data);
 
-return {validateAtriumProject,ATRIUM_PROJECT};
+/** Unique diagnostic interaction roles stay with their original instance when copied. */
+function cloneAtriumEntity(entity){if(['prop','lantern'].includes(entity.tag))entity.tag=null;return entity;}
+/** Preserve the two interaction anchors required by this example's injected game behavior. */
+function canRemoveAtriumEntity(entity){return !entity.locked&&!['prop','lantern'].includes(entity.tag);}
+
+return {validateAtriumProject,ATRIUM_PROJECT,cloneAtriumEntity,canRemoveAtriumEntity};
 })();
 // Source: engine/basement/transfer.js
-const module41=(()=>{
+const module46=(()=>{
 /**
  * Basement / transfer: validated, synchronous movement of one attachment tree.
  * No loading, scheduling, game rules, callbacks during mutation, or resource ownership.
@@ -3051,13 +3323,13 @@ function transferTree({ source, destination, root, landing, validate = () => tru
 return {transferTree};
 })();
 // Source: engine/lobby/travel.js
-const module40=(()=>{
+const module45=(()=>{
 /**
  * Lobby / travel: asynchronous preparation becomes a synchronous boundary commit.
  * It consumes generic residency tickets; it does not import Directory or game content.
  * The active ticket pins the source until a successful transfer replaces it.
  */
-const { transferTree } = module41;
+const { transferTree } = module46;
 
 class WorldTravel {
   /** Adopt an already-ready initial ticket/root. The owner must call advance at a boundary. */
@@ -3150,7 +3422,7 @@ class WorldTravel {
 return {WorldTravel};
 })();
 // Source: engine/basement/geometry.js
-const module43=(()=>{
+const module48=(()=>{
 /** Basement / geometry: pure horizontal collision helpers, with no world or game dependency. */
 
 /** Does a horizontal circle overlap an axis-aligned box? Touching is permitted. */
@@ -3163,7 +3435,7 @@ function circleOverlapsBox(x, y, radius, box) {
 return {circleOverlapsBox};
 })();
 // Source: engine/directory/scene-instance.js
-const module45=(()=>{
+const module50=(()=>{
 /**
  * Directory / live authored scene instance. Maps stable document IDs to temporary World
  * membership, and updates transforms/collision together. Owns no scheduler or game rules.
@@ -3173,7 +3445,7 @@ const { rotateVector } = module4;
 class SceneInstance {
  /** Synchronous construction is available for the explicitly bounded editor preview. */
  constructor(directory,world,project,scene,{defer=false}={}){
-  this.world=world;this.instances=new Map();this.authored=new Map();this.colliders=[];
+  this.directory=directory;this.world=world;this.instances=new Map();this.authored=new Map();this.colliders=[];
   if(!defer){for(const entity of scene.entities)this.add(directory,project,entity);this.apply(scene);}
  }
  /** Runtime loading yields once per bounded assembly, preserving Lobby's preparation budget. */
@@ -3191,9 +3463,28 @@ class SceneInstance {
   for(const part of built.parts)this.authored.set(part.id,entity.id);
  }
  /** Update existing retained geometry; positions never require asset reconstruction. */
- apply(scene){const v=[0,0,0];for(const e of scene.entities){const item=this.instances.get(e.id);if(!item)throw new Error('Scene topology changed: reopen preview');const r=item.root;[r.x,r.y,r.z]=e.position;r.rotation.splice(0,4,...e.rotation);r.scale=e.scale;
+ apply(scene,project=null){
+  // Reconcile topology by authored ID, retaining every unaffected runtime tree and collider.
+  const ids=new Set(scene.entities.map(e=>e.id));
+  for(const id of this.instances.keys())if(!ids.has(id))this.remove(id);
+  for(const entity of scene.entities){
+   const old=this.instances.get(entity.id);
+   if(old&&old.asset.id!==entity.asset)this.remove(entity.id);
+   if(!this.instances.has(entity.id)){
+    if(!project)throw new Error('Project required when adding an instance');
+    this.add(this.directory,project,entity);
+   }
+  }
+  const v=[0,0,0];for(const e of scene.entities){const item=this.instances.get(e.id);if(!item)throw new Error('Scene topology changed: reopen preview');const r=item.root;[r.x,r.y,r.z]=e.position;const length=Math.hypot(...e.rotation);r.rotation.splice(0,4,...e.rotation.map(n=>n/length));r.scale=e.scale;
    item.asset.colliders.forEach((c,i)=>{rotateVector(r.rotation,c.x*r.scale,c.y*r.scale,0,v);const b=item.colliders[i];b.x=r.x+v[0];b.y=r.y+v[1];let w=0,d=0;for(const x of [-1,1])for(const y of [-1,1]){rotateVector(r.rotation,x*c.width*r.scale/2,y*c.depth*r.scale/2,0,v);w=Math.max(w,Math.abs(v[0])*2);d=Math.max(d,Math.abs(v[1])*2);}b.width=w;b.depth=d;});
   }this.world.snapshot();this.world.resolve();}
+ /** Remove only one tree and its derived mappings; shared asset data remains untouched. */
+ remove(id){
+  const item=this.instances.get(id);if(!item)return;
+  for(const part of item.parts)this.authored.delete(part.id);
+  for(const collider of item.colliders){const index=this.colliders.indexOf(collider);if(index!==-1)this.colliders.splice(index,1);}
+  this.world.remove(item.root);this.instances.delete(id);
+ }
  /** Resolve a stable placed ID, or a named assembly part, without exposing runtime IDs in JSON. */
  root(id){return this.instances.get(id)?.root;}
  part(id,name){const i=this.instances.get(id);return i?.parts[i.asset.parts.findIndex(p=>p.id===name)];}
@@ -3206,10 +3497,10 @@ class SceneInstance {
 return {SceneInstance};
 })();
 // Source: examples/atrium/layout.js
-const module44=(()=>{
+const module49=(()=>{
 /** Atrium / map generic document instances to this game's named interaction targets. */
-const { SceneInstance } = module45;
-const { ATRIUM_PROJECT } = module36;
+const { SceneInstance } = module50;
+const { ATRIUM_PROJECT } = module41;
 function* buildLayout(engine,world,profile,project=ATRIUM_PROJECT){
  const instance=yield* SceneInstance.prepare(engine.directory,world,project,profile);
  const lantern=profile.entities.find(e=>e.tag==='lantern'),prop=profile.entities.find(e=>e.tag==='prop');
@@ -3219,16 +3510,16 @@ function* buildLayout(engine,world,profile,project=ATRIUM_PROJECT){
 return {buildLayout};
 })();
 // Source: examples/atrium/worlds.js
-const module42=(()=>{
+const module47=(()=>{
 /**
  * Atrium example / world definitions: authored realms, reconstruction and state schema.
  * Directory receives factories, not these names. Lobby budgets actual procedural work.
  * Persisted data is deliberately small: light selection, crystal rotation and prop position.
  */
-const { ATRIUM_PROJECT } = module36;
+const { ATRIUM_PROJECT } = module41;
 const { Lifetime } = module6;
-const { circleOverlapsBox } = module43;
-const { buildLayout } = module44;
+const { circleOverlapsBox } = module48;
+const { buildLayout } = module49;
 
 /** Immutable-by-convention authoring profiles; runtime mutable state is created per world. */
 const PROFILES = ATRIUM_PROJECT.scenes;
@@ -3285,16 +3576,16 @@ function worldFactory(engine, profile, id, project=ATRIUM_PROJECT) {
 return {PROFILES,legalLanding,applyLight,worldFactory};
 })();
 // Source: examples/atrium/journey.js
-const module39=(()=>{
+const module44=(()=>{
 /**
  * Atrium example / journey: game-specific realm links, initial actor and prewarming policy.
  * Loading/lifetime algorithms live in Directory; transaction scheduling lives in Lobby.
  * This module chooses the destination and asks for those mechanisms through public contracts.
  */
-const { ATRIUM_PROJECT } = module36;
+const { ATRIUM_PROJECT } = module41;
 const { Lifetime } = module6;
-const { WorldTravel } = module40;
-const { worldFactory, legalLanding, applyLight } = module42;
+const { WorldTravel } = module45;
+const { worldFactory, legalLanding, applyLight } = module47;
 
 /** Own the two realm definitions and their tickets for one example session. */
 function createJourney(engine,project=ATRIUM_PROJECT) {
@@ -3373,12 +3664,12 @@ function createJourney(engine,project=ATRIUM_PROJECT) {
 return {createJourney};
 })();
 // Source: examples/atrium/player.js
-const module46=(()=>{
+const module51=(()=>{
 /**
  * Atrium example / locomotion: game-owned steering/gait profile, independent of realm residency.
  * Actor references and velocity survive transfers. This is not a full physical body solver.
  */
-const { legalLanding } = module42;
+const { legalLanding } = module47;
 
 /** Create one controller whose mutable velocity/load state belongs only to this actor. */
 function playerController(actor, input, renderer) {
@@ -3414,15 +3705,15 @@ function playerController(actor, input, renderer) {
 return {playerController};
 })();
 // Source: examples/atrium/scene.js
-const module38=(()=>{
+const module43=(()=>{
 /**
  * Atrium example / scene: owns controls, phase registrations and the game's journey.
  * Layout/reconstruction, locomotion and world policy have their own focused modules.
  * Nothing here installs an engine patch or creates an independent animation loop.
  */
 const { Lifetime } = module6;
-const { createJourney } = module39;
-const { playerController } = module46;
+const { createJourney } = module44;
+const { playerController } = module51;
 
 /** Start preparing the scene immediately. Rendering remains valid while the first world loads. */
 function createScene(engine,{controlsHost,project,onStatus=()=>{},onError=()=>{}}){
@@ -3488,13 +3779,13 @@ function createScene(engine,{controlsHost,project,onStatus=()=>{},onError=()=>{}
 return {createScene};
 })();
 // Source: engine/basement/document.js
-const module48=(()=>{
+const module53=(()=>{
 /**
  * Basement / bounded document transactions. One gesture is one command; cancel restores
  * its starting snapshot. Validation precedes adoption. Runtime resources never enter history.
  * Snapshot history is deliberately small (64 commands / 2 MiB), independent of scene size.
  */
-const { copyData, validateProject } = module37;
+const { copyData, validateProject } = module42;
 
 class ProjectDocument {
  /** Own a validated data copy. Registry-specific validation is injected by the application. */
@@ -3507,6 +3798,15 @@ class ProjectDocument {
   this.active=null;
   this.saved=JSON.stringify(this.data);
   this.revision=0;
+  this.nextAuthoredId=1;
+ }
+
+ /** Allocate authoring IDs in this document, independently of runtime World identities.
+  * The counter is not undone: delete/undo/new-command cannot silently reuse an old ID. */
+ allocateId(namespace='instance'){
+  if(!/^[a-z][a-z0-9-]{0,31}$/.test(namespace))throw new Error('Invalid authored namespace');
+  const used=new Set(this.data.scenes.flatMap(scene=>scene.entities.map(entity=>entity.id)));
+  let id;do{id=`${namespace}:${this.nextAuthoredId++}`;}while(used.has(id));return id;
  }
 
  /** Subscribe once; the owning inspector/workspace must release its subscription. */
@@ -3591,24 +3891,47 @@ class ProjectDocument {
 
 return {ProjectDocument};
 })();
+// Source: engine/basement/asset-bounds.js
+const module54=(()=>{
+/** Basement / assembly bounds: placement and framing share the actual local part transforms. */
+const { rotateVector, multiplyRotation } = module4;
+/** Return full local AABB, including nested quaternion attachments. No temporary World/IDs. */
+function assetBounds(asset){
+ const poses=[],min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
+ for(const part of asset.parts){
+  const parent=part.parent===null?null:poses[part.parent],position=[...part.position],rotation=part.rotation.map(n=>n/Math.hypot(...part.rotation));
+  if(parent){rotateVector(parent.rotation,...position,position);for(let i=0;i<3;i++)position[i]+=parent.position[i];multiplyRotation(parent.rotation,rotation,rotation);}
+  poses.push({position,rotation});if(!part.shape)continue;
+  for(const x of [-1,1])for(const y of [-1,1])for(const z of [-1,1]){
+   const p=[0,0,0];rotateVector(rotation,x*part.shape.size[0]/2,y*part.shape.size[1]/2,z*part.shape.size[2]/2,p);
+   for(let i=0;i<3;i++){min[i]=Math.min(min[i],position[i]+p[i]);max[i]=Math.max(max[i],position[i]+p[i]);}
+  }
+ }
+ return Number.isFinite(min[0])?{min,max}:{min:[0,0,0],max:[0,0,0]};
+}
+
+return {assetBounds};
+})();
 // Source: editor/workspace/session.js
-const module47=(()=>{
+const module52=(()=>{
 /**
  * Studio / edit and Play lifetimes. The application selects context; the existing Lobby
  * remains the sole frame owner. Editing has one preview; Play releases it and owns the
  * game's bounded residency. Stop reconstructs only the selected authored scene.
  */
-const { SceneInstance } = module45;
-const { ProjectDocument } = module48;
+const { SceneInstance } = module50;
+const { ProjectDocument } = module53;
+const { assetBounds } = module54;
+const { copyData } = module42;
 const { Lifetime } = module6;
 
 class StudioSession {
  /** Inject game behavior, schema resolution and initial selection at the application boundary. */
  constructor(engine,{
   project,validate,selectInitial=scene=>scene.entities.find(e=>!e.locked)?.id,
-  playFactory,controlsHost,onChange,onStatus,
+  playFactory,controlsHost,onChange,onStatus,canRemove=entity=>!entity.locked,cloneEntity=entity=>entity,guideLayers=()=>[],
  }){
-  this.engine=engine;
+  this.engine=engine;this.canRemove=canRemove;this.cloneEntity=cloneEntity;this.guideLayers=guideLayers;
   this.validate=validate;
   this.selectInitial=selectInitial;
   this.playFactory=playFactory;
@@ -3634,7 +3957,7 @@ class StudioSession {
     scene.lights.forEach((light,i)=>renderer.lighting.setPoint(i,light));
     this.lightingDirty=false;
    }
-   renderer.render(this.preview.batch);
+   renderer.render(this.preview.batch,this.guideLayers());
   },'studio.viewport'));
   this.replace(project);
  }
@@ -3676,7 +3999,7 @@ class StudioSession {
   this.lightingDirty=true;
   this.releaseDocument=doc.onChange(kind=>{
    this.lightingDirty=true;
-   if(!this.play)this.preview.instance.apply(this.scene);
+   if(!this.play)this.preview.instance.apply(this.scene,doc.data);
    this.onChange(kind);
   });
   this.onChange('open');
@@ -3703,6 +4026,27 @@ class StudioSession {
   this.onChange('selection');
  }
 
+ /** Place one source asset with its true bottom on the construction plane. */
+ place(assetId,point){
+  if(this.play)return;const asset=this.document.data.assets.find(a=>a.id===assetId);
+  if(!asset)throw new Error('Unknown source asset');const id=this.document.allocateId(),bounds=assetBounds(asset);
+  this.document.edit('Place asset',data=>data.scenes[this.sceneIndex].entities.push({id,name:asset.name,asset:assetId,tag:null,locked:false,position:[point.x,point.y,(point.z??0)-bounds.min[2]],rotation:[0,0,0,1],scale:1}));
+  this.select(id);return id;
+ }
+ /** Clone placement while sharing its source asset; application policy handles unique game roles. */
+ duplicate(){
+  if(this.play)return;const original=this.scene.entities.find(e=>e.id===this.selected);
+  if(!original||original.locked)throw new Error('Select an unlocked instance');
+  const entity=this.cloneEntity(copyData(original));entity.id=this.document.allocateId();entity.name+=' copy';entity.position[0]+=1;
+  this.document.edit('Duplicate instance',data=>data.scenes[this.sceneIndex].entities.push(entity));this.select(entity.id);return entity.id;
+ }
+ /** Delete through history, preserving protected application roles and every unaffected instance. */
+ remove(){
+  if(this.play)return;const entity=this.scene.entities.find(e=>e.id===this.selected);
+  if(!entity||!this.canRemove(entity))throw new Error('This instance is protected');
+  this.document.edit('Delete instance',data=>{const list=data.scenes[this.sceneIndex].entities;list.splice(list.findIndex(e=>e.id===entity.id),1);});
+  this.select(this.selectInitial(this.scene));
+ }
  /** Release the preview before Play; pass only detached authored data to the game factory. */
  startPlay(){
   if(this.play)return;
@@ -3753,7 +4097,7 @@ class StudioSession {
 return {StudioSession};
 })();
 // Source: engine/basement/picking.js
-const module50=(()=>{
+const module56=(()=>{
 /** Basement / picking: nearest ray intersection with actual oriented, uniformly scaled boxes. */
 const { rotateVector } = module4;
 
@@ -3772,77 +4116,102 @@ function pickWorld(world,ray,eligible=()=>true){let hit=null,distance=Infinity;f
 return {rayBox,pickWorld};
 })();
 // Source: editor/workspace/viewport.js
-const module49=(()=>{
+const module55=(()=>{
 /**
- * Studio / select and move tools. Shared rays and oriented-box queries live in Basement.
- * One captured pointer owns a drag. Pause/cancel restores the complete transaction.
- * Pointer traffic is coalesced through Lobby, never a second animation-frame loop.
+ * Studio / shared selection, placement, translation and rotation tools. One captured
+ * pointer owns a transaction. High-rate movement coalesces through Lobby's input phase.
+ * Guides and gestures share their actual ring geometry; scene policy stays in Session.
  */
 const { Lifetime } = module6;
-const { pickWorld } = module50;
+const { pickWorld } = module56;
+const { RotationGesture } = module36;
+const { rotationRing, ringAngle } = module35;
+
 class StudioViewport {
- /** Own listeners, gesture state and the one existing-scheduler preview subscription. */
- constructor(canvas,session,onError){
-  this.life=new Lifetime();this.canvas=canvas;this.session=session;this.onError=onError;
-  this.mode='select';this.snap=.5;this.drag=null;this.pending=null;
-  const point=e=>{const rect=canvas.getBoundingClientRect();return{x:e.clientX-rect.left,y:e.clientY-rect.top,width:rect.width,height:rect.height};};
-  this.life.listen(canvas,'pointerdown',e=>{
-   if(session.play||e.button!==0||this.drag)return;
-   const p=point(e),preview=session.preview,camera=session.engine.basement.renderer.camera;
-   const hit=pickWorld(preview.world,camera.ray(p.x,p.y,p.width,p.height),entity=>{
-    const id=preview.instance.idFor(entity);return session.scene.entities.some(e=>e.id===id&&!e.locked);
-   });
-   if(!hit)return;
-   const id=preview.instance.idFor(hit);session.select(id);
-   if(this.mode!=='move')return;
-   const entity=session.scene.entities.find(e=>e.id===id),origin=camera.ground(p.x,p.y,p.width,p.height,entity.position[2]);
-   if(!origin){onError(new Error('Use Top or Oblique view for ground-plane movement'));return;}
-   // Capture first: a failed capture must not leave a document transaction open.
-   canvas.setPointerCapture(e.pointerId);session.document.begin('Move instance');
-   this.drag={pointer:e.pointerId,id,origin,position:[...entity.position]};e.preventDefault();
-  });
-  this.life.listen(canvas,'pointermove',e=>{if(this.drag?.pointer===e.pointerId)this.pending=point(e);});
+ /** All mutable gesture/tool state belongs to this viewport and releases with it. */
+ constructor(canvas,session,onError,guides){
+  this.life=new Lifetime();this.canvas=canvas;this.session=session;this.onError=onError;this.guides=guides;
+  this.mode='select';this.snap=.5;this.angleSnap=15;this.axis='z';this.space='world';this.showLights=true;this.placementAsset=null;
+  this.drag=null;this.pending=null;
+  this.life.listen(canvas,'pointerdown',event=>{try{this.begin(event);}catch(error){this.cancel();onError(error);}});
+  this.life.listen(canvas,'pointermove',event=>{if(this.drag?.pointer===event.pointerId)this.pending=this.point(event);});
   this.life.own(session.engine.lobby.on('input',()=>this.flush(),'studio.move-preview'));
-  this.life.listen(canvas,'pointerup',e=>{
-   if(this.drag?.pointer!==e.pointerId)return;
-   this.pending=point(e);this.flush();if(!this.drag)return;
-   this.drag=null;session.document.commit();if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId);
+  this.life.listen(canvas,'pointerup',event=>{
+   if(this.drag?.pointer!==event.pointerId)return;
+   this.pending=this.point(event);this.flush();if(!this.drag)return;
+   this.drag=null;session.document.commit();if(canvas.hasPointerCapture(event.pointerId))canvas.releasePointerCapture(event.pointerId);
   });
   for(const event of ['pointercancel','lostpointercapture'])this.life.listen(canvas,event,()=>this.cancel());
   this.life.listen(window,'blur',()=>this.cancel());
   this.life.own(session.engine.lobby.on('pause',paused=>{if(paused)this.cancel();}));
-  this.life.listen(canvas,'wheel',e=>{
-   if(session.play)return;e.preventDefault();const c=session.engine.basement.renderer.camera;
-   c.halfHeight=Math.max(5,Math.min(50,c.halfHeight*Math.exp(e.deltaY*.001)));
+  this.life.listen(canvas,'wheel',event=>{
+   if(session.play)return;this.cancel();event.preventDefault();const camera=session.engine.basement.renderer.camera;
+   camera.halfHeight=Math.max(5,Math.min(50,camera.halfHeight*Math.exp(event.deltaY*.001)));
   },{passive:false});
  }
- /** At most one validated document preview per host frame; the final pointerup flushes too. */
+ /** CSS-space picking stays independent of backing pixel ratio and responsive panel resizing. */
+ point(event){const r=this.canvas.getBoundingClientRect();return{x:event.clientX-r.left,y:event.clientY-r.top,width:r.width,height:r.height};}
+ /** Capture and begin only after a usable target/plane has been found. */
+ begin(event){
+  const session=this.session;if(session.play||event.button!==0||this.drag)return;
+  const p=this.point(event),camera=session.engine.basement.renderer.camera,ray=camera.ray(p.x,p.y,p.width,p.height);
+  session.document.cancel();
+  if(this.mode==='place'&&this.placementAsset){
+   const hit=camera.ground(p.x,p.y,p.width,p.height);if(!hit)throw new Error('Use Top or Oblique view for placement');
+   const quantize=n=>this.snap?Math.round(n/this.snap)*this.snap:n;
+   session.place(this.placementAsset,{x:quantize(hit.x),y:quantize(hit.y),z:0});event.preventDefault();return;
+  }
+  const selected=session.scene.entities.find(e=>e.id===session.selected);
+  if(this.mode==='rotate'&&selected&&!selected.locked){
+   const ring=rotationRing(camera,selected,this.axis,this.space,p.height),hit=ringAngle(ring,ray);
+   if(hit&&Math.abs(hit.radius-ring.radius)<camera.halfHeight*2/p.height*12){
+    this.canvas.setPointerCapture(event.pointerId);session.document.begin('Rotate instance');
+    this.drag={pointer:event.pointerId,id:selected.id,kind:'rotation',ring,gesture:new RotationGesture(selected.rotation,this.axis,this.space,hit.angle)};
+    event.preventDefault();return;
+   }
+  }
+  const light=this.showLights?this.guides?.pickLight(session.scene,p.x,p.y,p.width,p.height):null;
+  const hit=light?null:pickWorld(session.preview.world,ray,entity=>{
+   const id=session.preview.instance.idFor(entity);return session.scene.entities.some(e=>e.id===id&&!e.locked);
+  });
+  if(!light&&!hit)return;
+  const id=light?.id??session.preview.instance.idFor(hit);session.select(id);
+  if(this.mode!=='move')return;
+  const entity=light??session.scene.entities.find(e=>e.id===id),origin=camera.ground(p.x,p.y,p.width,p.height,entity.position[2]);
+  if(!origin)throw new Error('Use Top or Oblique view for ground-plane movement');
+  this.canvas.setPointerCapture(event.pointerId);session.document.begin(light?'Move light':'Move instance');
+  this.drag={pointer:event.pointerId,id,kind:light?'light':'entity',origin,position:[...entity.position]};event.preventDefault();
+ }
+ /** At most one preview per frame; final pointerup flushes the exact endpoint as well. */
  flush(){
   const d=this.drag,p=this.pending;this.pending=null;if(!d||!p)return;
   const session=this.session,camera=session.engine.basement.renderer.camera;
-  const hit=camera.ground(p.x,p.y,p.width,p.height,d.position[2]);if(!hit)return;
-  try{session.document.preview(data=>{
-   const entity=data.scenes[session.sceneIndex].entities.find(e=>e.id===d.id);
-   const quantize=v=>this.snap?Math.round(v/this.snap)*this.snap:v;
-   entity.position=[quantize(d.position[0]+hit.x-d.origin.x),quantize(d.position[1]+hit.y-d.origin.y),d.position[2]];
-  });}catch(error){this.cancel();this.onError(error);}
+  try{
+   if(d.kind==='rotation'){
+    const hit=ringAngle(d.ring,camera.ray(p.x,p.y,p.width,p.height));if(!hit)return;
+    const rotation=d.gesture.update(hit.angle,this.angleSnap);
+    session.document.preview(data=>{data.scenes[session.sceneIndex].entities.find(e=>e.id===d.id).rotation=rotation;});
+   }else{
+    const hit=camera.ground(p.x,p.y,p.width,p.height,d.position[2]);if(!hit)return;
+    session.document.preview(data=>{
+     const list=d.kind==='light'?data.scenes[session.sceneIndex].lights:data.scenes[session.sceneIndex].entities;
+     const target=list.find(e=>e.id===d.id),quantize=n=>this.snap?Math.round(n/this.snap)*this.snap:n;
+     target.position=[quantize(d.position[0]+hit.x-d.origin.x),quantize(d.position[1]+hit.y-d.origin.y),d.position[2]];
+    });
+   }
+  }catch(error){this.cancel();this.onError(error);}
  }
- /** Modes and context switches cancel before replacing document/selection or input bindings. */
- cancel(){
-  this.pending=null;if(!this.drag)return;
-  const pointer=this.drag.pointer;this.drag=null;this.session.document.cancel();
-  if(this.canvas.hasPointerCapture(pointer))this.canvas.releasePointerCapture(pointer);
- }
- /** No captured pointers, pending transactions or Lobby subscribers survive this tool. */
+ /** Context/mode/view changes must restore the starting data and release pointer ownership. */
+ cancel(){this.pending=null;if(!this.drag)return;const id=this.drag.pointer;this.drag=null;this.session.document.cancel();if(this.canvas.hasPointerCapture(id))this.canvas.releasePointerCapture(id);}
  dispose(){this.cancel();this.life.dispose();}
 }
 
 return {StudioViewport};
 })();
 // Source: editor/documents/files.js
-const module51=(()=>{
+const module57=(()=>{
 /** Studio / portable files and best-effort local recovery. No repository credentials or sync. */
-const { parseProject, PROJECT_LIMITS } = module37;
+const { parseProject, PROJECT_LIMITS } = module42;
 class ProjectFiles {
  /** One recovery slot and at most one download URL belong to this workspace. */
  constructor(validate){this.validate=validate;this.key='ETRNLNINE.Studio.project.v1';this.url=null;}
@@ -3867,20 +4236,26 @@ const module0=(()=>{
  */
 const { ETRNLNINE } = module1;
 const { Lifetime } = module6;
-const { TRANSFORM_PROPERTIES, LIGHT_PROPERTIES } = module34;
-const { PropertyInspector } = module35;
-const { ATRIUM_PROJECT, validateAtriumProject } = module36;
-const { createScene } = module38;
-const { StudioSession } = module47;
-const { StudioViewport } = module49;
-const { ProjectFiles } = module51;
+const { AuthoringGuides } = module35;
+const { WorkspacePanels } = module37;
+const { StudioPreferences } = module40;
+const { ATRIUM_PROJECT, validateAtriumProject, cloneAtriumEntity, canRemoveAtriumEntity } = module41;
+const { createScene } = module43;
+const { StudioSession } = module52;
+const { StudioViewport } = module55;
+const { ProjectFiles } = module57;
 
 const $=id=>document.getElementById(id),life=new Lifetime(),files=new ProjectFiles(validateAtriumProject);
-let session,inspector,viewport,engine,profiler;
+const preferences=new StudioPreferences();
+let session,panels,viewport,engine,profiler,guides;
 /** Keep errors readable and dismissible, while the current document remains available. */
 function report(error){$('error').hidden=false;$('error').textContent=error.message;}
 /** Refresh command availability and status without replacing focused controls during previews. */
 function state(kind){if(!session||life.disposed)return;const doc=session.document;
+ if(kind==='play')guides?.clear();
+ const selected=session.scene.entities.find(e=>e.id===session.selected);
+ if(viewport){const dial=viewport.mode==='rotate'&&selected&&!selected.locked;$('rotate').disabled=!!session.play||!selected||selected.locked;document.body.classList.toggle('rotate-mode',!!dial);$('rotate').setAttribute('aria-pressed',String(!!dial));if(viewport.mode==='rotate')$('tool-readout').textContent=dial?'ROTATE':'SELECT LIGHT';}
+ $('duplicate').disabled=!!session.play||!selected||selected.locked;$('delete').disabled=!!session.play||!selected||!session.canRemove(selected);
  $('undo').disabled=!!session.play||!doc.undoStack.length;$('redo').disabled=!!session.play||!doc.redoStack.length;
  $('play').textContent=session.play?'■ Stop':'▶ Play';document.body.classList.toggle('playing',!!session.play);
  $('project-name').textContent=doc.data.name+(doc.dirty?' •':'');$('status').textContent=session.play?'Play · WASD / stick walk · F flit · E light':`${doc.dirty?'Unsaved changes':'Project ready'} · ${session.scene.name}`;
@@ -3889,43 +4264,42 @@ function state(kind){if(!session||life.disposed)return;const doc=session.documen
  if(['commit','undo','redo'].includes(kind)){const stored=files.store(doc.data);$('status').dataset.recovery=stored?'stored':'unavailable';}
  if(kind==='preview')return;
  // Commit may run from blur; rebuild only after the owning event handler returns.
- if(kind==='commit'||kind==='saved'){queueMicrotask(()=>{if(!doc.active)panels();});return;}panels();
-}
-/** One hierarchy and inspector renderer handles both entity and light selection contexts. */
-function panels(){if(!session||life.disposed)return;inspector?.dispose();inspector=null;const scene=session.scene,doc=session.document;$('fields').replaceChildren();$('hierarchy').replaceChildren();$('asset-list').replaceChildren();
- $('scene').replaceChildren(...doc.data.scenes.map((s,i)=>{const o=document.createElement('option');o.value=i;o.textContent=s.name;return o;}));$('scene').value=session.sceneIndex;
- const light=scene.lights.find(l=>l.id===session.selected),entity=scene.entities.find(e=>e.id===session.selected),target=light??entity;
- $('selection-name').textContent=light?'Point light '+(scene.lights.indexOf(light)+1):entity?.name??'Select an instance';$('selection-id').textContent=target?.id??'';
- for(const item of [...scene.entities.filter(e=>!e.locked),...scene.lights]){const button=document.createElement('button');button.textContent=item.name??'◈ Point light '+(scene.lights.indexOf(item)+1);button.dataset.id=item.id;button.dataset.light=String(!item.name);button.setAttribute('aria-pressed',String(item.id===session.selected));button.addEventListener('click',()=>{viewport.cancel();session.select(item.id);document.body.classList.remove('library-open');document.body.classList.add('properties-open');});$('hierarchy').append(button);}
- if(target&&!entity?.locked&&!session.play){const id=target.id,index=session.sceneIndex;const resolve=data=>(light?data.scenes[index].lights:data.scenes[index].entities).find(e=>e.id===id);inspector=new PropertyInspector({host:$('fields'),document:doc,resolve,properties:light?LIGHT_PROPERTIES:TRANSFORM_PROPERTIES,onError:report});}
- const used=new Set(scene.entities.map(e=>e.asset));for(const asset of doc.data.assets.filter(a=>used.has(a.id))){const p=document.createElement('p');p.textContent=`${asset.name} · ${asset.parts.length} parts · v${asset.generatorVersion}`;$('asset-list').append(p);}
- if(session.preview)for(const [id,item]of session.preview.instance.instances)for(const part of item.parts)part.highlight=id===session.selected?1:0;
+ if(kind==='commit'||kind==='saved'){queueMicrotask(()=>{if(!doc.active)panels?.refresh(session);});return;}panels?.refresh(session);
 }
 /** Safe UI action boundary; failed validation reports without destroying the open project. */
 function action(id,fn){life.listen($(id),'click',()=>{try{viewport?.cancel();fn();}catch(error){report(error);}});}
 try{
  engine=new ETRNLNINE($('world'),{pixelRatio:1.25,occlusion:{mode:'geometry'},lighting:{shadows:{mode:'low'}}});life.own(()=>engine.dispose());
- session=new StudioSession(engine,{project:ATRIUM_PROJECT,validate:validateAtriumProject,selectInitial:scene=>scene.entities.find(e=>e.tag==='planter')?.id,playFactory:createScene,controlsHost:$('controls'),onChange:state,onStatus:s=>{$('status').textContent=`Play · ${s.name} · WASD / stick walk · F flit`;$('status').dataset.x=s.x??0;$('status').dataset.y=s.y??0;}});life.own(()=>session.dispose());
- viewport=new StudioViewport($('world'),session,report);life.own(()=>viewport.dispose());life.own(()=>inspector?.dispose());life.own(()=>files.dispose());
+ guides=new AuthoringGuides(engine.basement.renderer);life.own(()=>guides.dispose());
+ session=new StudioSession(engine,{guideLayers:()=>guides.layersFor({scene:session.scene,selected:session.selected,revision:session.document.revision,mode:viewport.mode,axis:viewport.axis,space:viewport.space,grid:preferences.value.grid,lights:preferences.value.lights}),canRemove:canRemoveAtriumEntity,cloneEntity:cloneAtriumEntity,project:ATRIUM_PROJECT,validate:validateAtriumProject,selectInitial:scene=>scene.entities.find(e=>e.tag==='planter')?.id,playFactory:createScene,controlsHost:$('controls'),onChange:state,onStatus:s=>{$('status').textContent=`Play · ${s.name} · WASD / stick walk · F flit`;$('status').dataset.x=s.x??0;$('status').dataset.y=s.y??0;}});life.own(()=>session.dispose());
+ viewport=new StudioViewport($('world'),session,report,guides);Object.assign(viewport,{axis:preferences.value.axis,space:preferences.value.space,angleSnap:preferences.value.angleSnap,showLights:preferences.value.lights});life.own(()=>viewport.dispose());
+ panels=new WorkspacePanels({fields:$('fields'),hierarchy:$('hierarchy'),assets:$('asset-list'),scene:$('scene'),name:$('selection-name'),id:$('selection-id')},{onError:report,onSelect:id=>{viewport.cancel();session.select(id);document.body.classList.remove('library-open');document.body.classList.add('properties-open');},onPlace:id=>{viewport.cancel();viewport.placementAsset=id;setTool('place');document.body.classList.remove('library-open','properties-open');}});life.own(()=>panels.dispose());life.own(()=>files.dispose());
  const renderer=engine.basement.renderer;renderer.camera.halfHeight=24;state('open');
+ for(const [id,assets]of [['show-hierarchy',false],['show-assets',true]])action(id,()=>{document.body.classList.toggle('assets-open',assets);$('show-assets').setAttribute('aria-pressed',String(assets));$('show-hierarchy').setAttribute('aria-pressed',String(!assets));});
  action('undo',()=>session.document.undo());action('redo',()=>session.document.redo());
  action('play',()=>{document.activeElement?.blur();if(session.play)session.stopPlay();else session.startPlay();});
  action('save',()=>{document.activeElement?.blur();files.download(session.document.snapshot());session.document.markSaved();});
  action('open',()=>$('file').click());life.listen($('file'),'change',async()=>{try{const file=$('file').files[0];if(file)session.replace(await files.read(file));}catch(error){report(error);}finally{$('file').value='';}});
  action('recover',()=>{const data=files.recover();if(!data)throw new Error('No valid local recovery is available');session.replace(data);});
  life.listen($('scene'),'change',()=>{viewport.cancel();session.setScene(Number($('scene').value));});
- for(const mode of ['select','move'])action(mode,()=>{viewport.mode=mode;for(const id of ['select','move'])$(id).setAttribute('aria-pressed',String(id===mode));});
+ /** The active tool is shared by the viewport, its overlay and this one toolbar. */
+ function setTool(mode){viewport.cancel();viewport.mode=mode;document.body.classList.toggle('rotate-mode',mode==='rotate');for(const id of ['select','move','rotate'])$(id).setAttribute('aria-pressed',String(id===mode));$('tool-readout').textContent=mode==='place'?'PLACE · '+session.document.data.assets.find(a=>a.id===viewport.placementAsset)?.name:mode.toUpperCase();}
+ for(const mode of ['select','move','rotate'])action(mode,()=>setTool(mode));
+ action('duplicate',()=>session.duplicate());action('delete',()=>session.remove());
+ for(const key of ['grid','lights']){const button=$(key);button.setAttribute('aria-pressed',String(preferences.value[key]));action(key,()=>{preferences.set(key,!preferences.value[key]);viewport.showLights=preferences.value.lights;button.setAttribute('aria-pressed',String(preferences.value[key]));});}
+ for(const [id,key]of [['rotation-axis','axis'],['rotation-space','space'],['angle-snap','angleSnap']]){$(id).value=preferences.value[key];life.listen($(id),'change',()=>{viewport.cancel();const value=key==='angleSnap'?Number($(id).value):$(id).value;preferences.set(key,value);viewport[key]=value;});}
+ life.listen($('asset-search'),'input',()=>{panels.filter=$('asset-search').value;panels.renderAssets(session);});
  life.listen($('snap'),'change',()=>{viewport.cancel();viewport.snap=Number($('snap').value);});
  life.listen($('view'),'change',()=>{viewport.cancel();renderer.camera.preset($('view').value);});
  action('orbit-left',()=>renderer.camera.azimuth-=Math.PI/12);action('orbit-right',()=>renderer.camera.azimuth+=Math.PI/12);
  action('zoom-in',()=>renderer.camera.halfHeight=Math.max(5,renderer.camera.halfHeight/1.2));action('zoom-out',()=>renderer.camera.halfHeight=Math.min(50,renderer.camera.halfHeight*1.2));
  action('mobile-library',()=>{document.body.classList.toggle('library-open');document.body.classList.remove('properties-open');});action('mobile-properties',()=>{document.body.classList.toggle('properties-open');document.body.classList.remove('library-open');});
  profiler=engine.directory.create('tool.profiler',{profiler:engine.basement.profiler,host:document.body,subscribe:callback=>engine.lobby.on('render',callback,'studio.profiler')});life.own(()=>profiler.dispose());action('profiler',()=>profiler.element.open=!profiler.element.open);
- life.listen(window,'keydown',e=>{if(session.play||e.target.isContentEditable||['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName))return;if(e.key==='Escape'){viewport.cancel();session.document.cancel();}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();viewport.cancel();if(e.shiftKey)session.document.redo();else session.document.undo();}});
+ life.listen(window,'keydown',e=>{if(session.play||e.target.isContentEditable||['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName))return;if(e.key==='Escape'){viewport.cancel();session.document.cancel();if(viewport.mode==='place')setTool('select');}if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();viewport.cancel();try{session.remove();}catch(error){report(error);}}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='d'){e.preventDefault();viewport.cancel();try{session.duplicate();}catch(error){report(error);}}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();viewport.cancel();if(e.shiftKey)session.document.redo();else session.document.undo();}});
  life.listen($('error'),'click',()=>$('error').hidden=true);
  let metricsAt=-Infinity;
  // DOM diagnostics update at 4 Hz; the viewport retains the host's normal frame rate.
- life.own(engine.lobby.on('render',(_alpha,_time,wallMs)=>{if(wallMs-metricsAt<250)return;metricsAt=wallMs;const stats=renderer.stats;$('metrics').textContent=`${stats.draws} draws · ${stats.buffers} buffers`;$('status').dataset.worlds=engine.directory.worlds.size;$('status').dataset.buffers=stats.buffers;},'studio.status'));
+ life.own(engine.lobby.on('render',(_alpha,_time,wallMs)=>{if(wallMs-metricsAt<250)return;metricsAt=wallMs;const stats=renderer.stats;$('metrics').textContent=`${stats.draws} draws · ${stats.buffers} buffers`;$('status').dataset.worlds=engine.directory.worlds.size;$('status').dataset.buffers=stats.buffers;$('status').dataset.guides=renderer.lines.layers.size;},'studio.status'));
  life.listen(window,'pagehide',()=>life.dispose());engine.start();
 }catch(error){report(error);life.dispose();}
 

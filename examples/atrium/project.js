@@ -15,3 +15,8 @@ export function validateAtriumProject(project){validateProject(project,{generato
  }
  return project;}
 export const ATRIUM_PROJECT=validateAtriumProject(data);
+
+/** Unique diagnostic interaction roles stay with their original instance when copied. */
+export function cloneAtriumEntity(entity){if(['prop','lantern'].includes(entity.tag))entity.tag=null;return entity;}
+/** Preserve the two interaction anchors required by this example's injected game behavior. */
+export function canRemoveAtriumEntity(entity){return !entity.locked&&!['prop','lantern'].includes(entity.tag);}

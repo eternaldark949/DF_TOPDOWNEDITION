@@ -16,6 +16,15 @@ export class ProjectDocument {
   this.active=null;
   this.saved=JSON.stringify(this.data);
   this.revision=0;
+  this.nextAuthoredId=1;
+ }
+
+ /** Allocate authoring IDs in this document, independently of runtime World identities.
+  * The counter is not undone: delete/undo/new-command cannot silently reuse an old ID. */
+ allocateId(namespace='instance'){
+  if(!/^[a-z][a-z0-9-]{0,31}$/.test(namespace))throw new Error('Invalid authored namespace');
+  const used=new Set(this.data.scenes.flatMap(scene=>scene.entities.map(entity=>entity.id)));
+  let id;do{id=`${namespace}:${this.nextAuthoredId++}`;}while(used.has(id));return id;
  }
 
  /** Subscribe once; the owning inspector/workspace must release its subscription. */

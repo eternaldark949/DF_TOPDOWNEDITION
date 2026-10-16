@@ -18,13 +18,13 @@ Each part has a stable local `id`, `parent` (an earlier part index, or `null` fo
 
 A scene entity places an asset using `id`, `name`, `asset`, `position`, `rotation`, positive uniform `scale`, and `locked`. `tag` identifies this example's `prop` and `lantern` interactions; the lantern asset contains a part named `crystal`. The `planter` tag selects the example’s initial inspector target. These are game/application conventions, not engine-wide names. Keep both tagged instances when using the Atrium Play behavior. Removing those conventions requires corresponding game behavior changes.
 
-Instance transforms affect only that placement. Editing an asset's parts deliberately affects its instances when the project is reopened. The initial asset browser is an inventory, not an asset geometry editor. Per-instance material overrides, duplicate/reparent commands, seeds and migration tooling are future schema/editor work.
+Instance transforms affect only that placement. Editing an asset's parts deliberately affects its instances when the project is reopened. The initial asset browser is an inventory, not an asset geometry editor. Per-instance material overrides, reparent commands, seeds and migration tooling are future schema/editor work.
 
 ## Coordinates and properties
 
 World units are metres by convention: X/Y horizontal, Z elevation. Quaternions store full orientation; numeric XYZ rotation controls display degrees and compose Z × Y × X. Uniform instance scale prevents hidden hierarchy shear. Box dimensions can differ by axis, but there is no arbitrary nonuniform hierarchy scale.
 
-The inspector shares metadata, validation and controls between transforms and point lights. Arrow keys use each descriptor's increment; directly entered values may use any valid precision. A focus session or pointer drag is one undo command. Escape and cancelled touches restore the starting snapshot. The Move tool uses a horizontal construction plane; use Top or Oblique view, with optional 0.5 m / 1 m snapping. Vertical movement, full rotation and scale have numeric controls. Camera presets, horizontal orbit buttons, wheel and zoom buttons are available; perspective, free-flight navigation and axis gizmos are future work.
+The inspector shares metadata, validation and controls between transforms and point lights. Arrow keys use each descriptor's increment; directly entered values may use any valid precision. A focus session or pointer drag is one undo command. Escape and cancelled touches restore the starting snapshot. The Move tool uses a horizontal construction plane; use Top or Oblique view, with optional 0.5 m / 1 m snapping. Vertical movement, full rotation and scale have numeric controls; rotation also has an interactive axis ring. Camera presets, horizontal orbit buttons, wheel and zoom buttons are available; perspective, free-flight navigation and translation-axis gizmos are future work.
 
 ## Environment and collision
 
@@ -48,3 +48,13 @@ Play releases the editing preview and creates isolated runtime worlds from a det
 - Move previews coalesce pointer updates through the existing Lobby input phase. Asset construction is bounded but currently synchronous per scene; general large-scene streaming/authoring rebuild scheduling remains future work.
 
 `dist/ETRNLNINE-Atrium.html` contains the game without Studio imports. `dist/ETRNLNINE-Studio.html` contains the workspace and its selected project. Both embed the required JSON, need no sibling files/CDNs, and use WebGL2 with HTML interface controls. The bundler intentionally supports a small explicit module syntax, not arbitrary JavaScript transformations.
+
+## Authoring tools and workspace guides
+
+Open **Assets**, search the project library, choose a card and tap the viewport to place it. Placement snaps horizontally and offsets the asset's lowest transformed point onto Z=0. **Copy** (Ctrl/Cmd+D) makes a new placement with a fresh authored ID and the same asset reference; **Delete** removes the selected unlocked placement. Undo restores deletions. Atrium's required prop/lantern interaction anchors are protected from deletion, and copied anchors lose their unique game role. These are example policies, not engine tag rules.
+
+Choose **Rotate**, an X/Y/Z axis, World/Local space and an angle increment. Drag the ring to rotate; cancelling restores the starting orientation and a completed drag occupies one history entry. Use Top for Z, Front for Y or Side for X when a ring is edge-on. Numeric rotation remains available. Point lights do not have rotation properties.
+
+**View & guides** contains independent grid and light-marker toggles. Markers select point lights for the same inspector and Move tool. Hiding markers preserves lighting; hiding the grid preserves snapping. Grid, markers and dial are WebGL guides, separate from authored geometry, collisions, shadows and AO. They are released during Play and restored on Stop. Axis, space, angle snap and guide visibility are best-effort local view preferences, not project edits.
+
+The current implementation and resource budgets are recorded in [decision 0008](../../docs/decisions/0008-studio-authoring-tools.md). These tools prepare the street-block work; they do not add the new building or humanoid themselves.

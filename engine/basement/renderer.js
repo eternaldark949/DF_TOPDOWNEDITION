@@ -11,6 +11,7 @@ import { GpuTimer } from './gpu-timer.js';
 import { createProgram } from './gl-program.js';
 import { AmbientOcclusion } from './ambient-occlusion.js';
 import { Lighting } from './lighting.js';
+import { LineRendering } from './lines.js';
 import { Camera } from './camera.js';
 
 /** Generate one unit cube with flat normals; uploaded once per WebGL context lifetime. */
@@ -44,14 +45,16 @@ export class Renderer {
     this.totals={draws:0,instances:0,uploads:0,uploadedBytes:0,candidates:0,culled:0,shadowDraws:0,shadowHits:0};
     try {
       this.initialize();
+      this.lines=new LineRendering(this);
       this.lighting=new Lighting(this,lighting);
       this.shadowScope=profiler?.scope('renderer.shadows');
+      this.lineScope=profiler?.scope('renderer.lines');
       this.occlusion=new AmbientOcclusion(this,occlusion);
       this.occlusionScope=profiler?.scope('renderer.ambientOcclusion');
       this.gpuTimer=new GpuTimer(gl,(id,ms)=>this.profiler?.recordGpu(id,ms));
       this.life.own(renderDiagnostics(this,profiler));
       this.life.listen(canvas, 'webglcontextlost', event => {
-        event.preventDefault(); this.lost = true; this.gpuTimer.invalidate(); this.occlusion.invalidate(); this.lighting.invalidate();
+        event.preventDefault(); this.lost = true; this.gpuTimer.invalidate(); this.lines.invalidate(); this.occlusion.invalidate(); this.lighting.invalidate();
       });
       this.life.listen(canvas, 'webglcontextrestored', () => {
         // Browser invalidates all old handles on loss. Recreate from retained CPU data,
@@ -59,12 +62,13 @@ export class Renderer {
         this.stats.buffers = this.stats.programs = this.stats.vaos = 0;
         this.initialize();
         for (const batch of this.batches) batch.initialize();
+        this.lines.restore();
         this.gpuTimer.restore(); this.stats.contextRestores++; this.lost = false;
       });
     } catch(error) {
       // Metric-budget/capability failure may occur after GL creation. Constructor
       // failure must release real handles even though no caller received this renderer.
-      this.life.dispose();this.gpuTimer?.dispose();this.occlusion?.dispose();this.lighting?.dispose();
+      this.life.dispose();this.lines?.dispose();this.gpuTimer?.dispose();this.occlusion?.dispose();this.lighting?.dispose();
       if(this.cube)gl.deleteBuffer(this.cube);if(this.program)gl.deleteProgram(this.program);
       throw error;
     }
@@ -128,11 +132,16 @@ export class Renderer {
   }
 
   /** Clear even an empty engine; present a batch only if supplied and its context is valid. */
-  render(batch = null) {
+  render(batch = null, layers = []) {
     if(this.disposed||this.lost)return;
     this.gpuTimer.configure(this.profiler?.recording&&this.profiler.gpuEnabled);
     this.gpuTimer.poll();this.gpuTimer.begin(this.profiler?.current?.id??0);
-    try { this.draw(batch); } finally { this.gpuTimer.end(); }
+    try {
+      this.draw(batch);
+      const token=layers.length?this.profiler?.begin(this.lineScope):null;
+      try{for(const layer of layers){if(layer.renderer!==this)throw new Error('Guide belongs to another renderer');layer.draw();}}
+      finally{if(layers.length)this.profiler?.end(token);}
+    } finally { this.gpuTimer.end(); }
   }
 
   /** Submit a frame; all worlds use the same retained renderer and accounting path. */
@@ -167,7 +176,7 @@ export class Renderer {
   /** Release renderer and outstanding batches, with listeners removed before late restoration. */
   dispose() {
     if (this.disposed) return;
-    this.disposed = true; this.life.dispose(); this.gpuTimer.dispose(); this.occlusion.dispose(); this.lighting.dispose();
+    this.disposed = true; this.life.dispose(); this.lines.dispose(); this.gpuTimer.dispose(); this.occlusion.dispose(); this.lighting.dispose();
     for (const batch of [...this.batches]) batch.dispose();
     this.gl.deleteBuffer(this.cube); this.gl.deleteProgram(this.program);
     this.stats.buffers = this.stats.programs = this.stats.vaos = 0;
