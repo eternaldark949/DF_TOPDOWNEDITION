@@ -460,6 +460,12 @@
             refresh(items, kind, tick, draw, time, revision) {
                 let changed = this.source !== items || this.kind !== kind || this.revision !== revision || this.entries.length !== items.length;
                 if (!changed && this.checkedTick === tick && this.checkedDraw === draw && this.checkedTime === time) return;
+                // Unannounced moves are re-verified a few times a second, not on every tick and draw: a city's
+                // thousands of lamps and puddles were walked item by item several times a frame. Identity, length
+                // and revision changes (invalidateEffectSpatial) still rebuild at once.
+                const now = performance.now();
+                if (!changed && this.checkedAt !== undefined && now - this.checkedAt < 250) return;
+                this.checkedAt = now;
                 if (!changed) {
                     for (let i = 0; i < items.length; i++) {
                         const e = this.entries[i], item = items[i], r = kind === 'puddles' ? item.r : item.radius;

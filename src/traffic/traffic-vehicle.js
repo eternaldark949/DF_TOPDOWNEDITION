@@ -1382,7 +1382,10 @@
                 if (_game && _game.simDue && CONFIG.SIM.DECIMATE && player) {
                     // Squared compare — no sqrt on the hot path.
                     const _dx = this.x - player.x, _dy = this.y - player.y;
-                    const _r = CONFIG.SIM.AI_NEAR_RADIUS;
+                    // Full-rate AI reaches the view's corners plus a margin, up to AI_NEAR_RADIUS: a phone's
+                    // small view would otherwise run every car in a 1400px circle at 60Hz, most of them off screen
+                    const _cv = _game.canvas, _z = (_game.camera && _game.camera.zoom) || 1;
+                    const _r = _cv ? Math.min(CONFIG.SIM.AI_NEAR_RADIUS, Math.hypot(_cv.width, _cv.height) / (2 * _z) + 400) : CONFIG.SIM.AI_NEAR_RADIUS;
                     const _far = (_dx * _dx + _dy * _dy) > (_r * _r);
                     if (_far && !_game.simDue(CONFIG.SIM.TRAFFIC_AI_FAR_INTERVAL, this._aiPhase)) {
                         this.aiDriveStep(weather, walls, buildings, decalSystem);
