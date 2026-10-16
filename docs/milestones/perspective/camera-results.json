@@ -1,0 +1,19 @@
+{
+  "projection": "perspective",
+  "workflow": {
+    "mouseOrbit": true,
+    "pan": true,
+    "cursorZoom": true,
+    "cancel": true,
+    "frameSelected": true,
+    "frameAll": true,
+    "pinchWithoutPlacement": true,
+    "secondFingerCancelsObjectMove": true,
+    "touchOrbit": true,
+    "touchCancel": true,
+    "playRestoresCamera": true,
+    "authoredUnchanged": true
+  },
+  "errors": [],
+  "requests": []
+}

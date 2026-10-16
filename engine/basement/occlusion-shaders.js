@@ -9,7 +9,7 @@ import { ROTATION_GLSL } from './rotation.js';
 
 export const RECONSTRUCT = `
 uniform mat4 uInverseViewProjection;
-vec3 reconstruct(vec2 uv,float depth){return (uInverseViewProjection*vec4(uv*2.0-1.0,depth*2.0-1.0,1.0)).xyz;}`;
+vec3 reconstruct(vec2 uv,float depth){vec4 p=uInverseViewProjection*vec4(uv*2.0-1.0,depth*2.0-1.0,1.0);return p.xyz/p.w;}`;
 
 /** No lit color target is needed: retain normals plus hardware depth at bounded resolution. */
 export const NORMAL_FRAGMENT = `#version 300 es
@@ -37,8 +37,9 @@ precision highp float;
 in vec2 vUV;
 uniform sampler2D uDepth;
 uniform sampler2D uNormals;
-uniform vec4 uCamera;
 uniform float uRadius;
+uniform mat4 uViewProjection;
+uniform vec2 uProjectionScale;
 out vec4 outColor;
 ${RECONSTRUCT}
 void main(){
@@ -46,13 +47,15 @@ void main(){
   if(depth>=0.99999){outColor=vec4(1.0);return;}
   vec3 p=reconstruct(vUV,depth);
   vec3 n=normalize(texture(uNormals,vUV).xyz*2.0-1.0);
+  // clip.w is view depth in perspective, 1 in orthographic: radius stays in metres.
+  vec2 radiusScale=uProjectionScale/(2.0*(uViewProjection*vec4(p,1.0)).w);
   float blocked=0.0;
   for(int i=0;i<8;i++){
     float angle=(float(i)+0.125)*0.7853981634;
     vec2 direction=vec2(cos(angle),sin(angle));
     for(int j=0;j<2;j++){
       float reach=uRadius*(j==0?0.3:0.8);
-      vec2 uv=vUV+direction*reach/(uCamera.zw*2.0);
+      vec2 uv=vUV+direction*reach*radiusScale;
       if(any(lessThan(uv,vec2(0.0)))||any(greaterThan(uv,vec2(1.0))))continue;
       float other=texture(uDepth,uv).r;
       if(other>=0.99999)continue;
@@ -84,7 +87,6 @@ uniform sampler2D uAOScreen;
 uniform sampler2D uAODepth;
 uniform sampler2D uAONormals;
 uniform vec2 uAOSize;
-uniform vec4 uCamera;
 ${RECONSTRUCT}
 ${ROTATION_GLSL}
 uniform vec4 uBlockerRotation[12];

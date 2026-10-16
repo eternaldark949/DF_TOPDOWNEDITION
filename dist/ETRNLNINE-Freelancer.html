@@ -360,7 +360,7 @@ const { ROTATION_GLSL } = module4;
 
 const RECONSTRUCT = `
 uniform mat4 uInverseViewProjection;
-vec3 reconstruct(vec2 uv,float depth){return (uInverseViewProjection*vec4(uv*2.0-1.0,depth*2.0-1.0,1.0)).xyz;}`;
+vec3 reconstruct(vec2 uv,float depth){vec4 p=uInverseViewProjection*vec4(uv*2.0-1.0,depth*2.0-1.0,1.0);return p.xyz/p.w;}`;
 
 /** No lit color target is needed: retain normals plus hardware depth at bounded resolution. */
 const NORMAL_FRAGMENT = `#version 300 es
@@ -388,8 +388,9 @@ precision highp float;
 in vec2 vUV;
 uniform sampler2D uDepth;
 uniform sampler2D uNormals;
-uniform vec4 uCamera;
 uniform float uRadius;
+uniform mat4 uViewProjection;
+uniform vec2 uProjectionScale;
 out vec4 outColor;
 ${RECONSTRUCT}
 void main(){
@@ -397,13 +398,15 @@ void main(){
   if(depth>=0.99999){outColor=vec4(1.0);return;}
   vec3 p=reconstruct(vUV,depth);
   vec3 n=normalize(texture(uNormals,vUV).xyz*2.0-1.0);
+  // clip.w is view depth in perspective, 1 in orthographic: radius stays in metres.
+  vec2 radiusScale=uProjectionScale/(2.0*(uViewProjection*vec4(p,1.0)).w);
   float blocked=0.0;
   for(int i=0;i<8;i++){
     float angle=(float(i)+0.125)*0.7853981634;
     vec2 direction=vec2(cos(angle),sin(angle));
     for(int j=0;j<2;j++){
       float reach=uRadius*(j==0?0.3:0.8);
-      vec2 uv=vUV+direction*reach/(uCamera.zw*2.0);
+      vec2 uv=vUV+direction*reach*radiusScale;
       if(any(lessThan(uv,vec2(0.0)))||any(greaterThan(uv,vec2(1.0))))continue;
       float other=texture(uDepth,uv).r;
       if(other>=0.99999)continue;
@@ -435,7 +438,6 @@ uniform sampler2D uAOScreen;
 uniform sampler2D uAODepth;
 uniform sampler2D uAONormals;
 uniform vec2 uAOSize;
-uniform vec4 uCamera;
 ${RECONSTRUCT}
 ${ROTATION_GLSL}
 uniform vec4 uBlockerRotation[12];
@@ -899,7 +901,7 @@ class AmbientOcclusion {
       if(!this.normalProgram){this.normalProgram=createProgram(gl,VERTEX,NORMAL_FRAGMENT);this.renderer.stats.programs++;}
       if(!this.screenProgram){this.screenProgram=createProgram(gl,FULLSCREEN_VERTEX,SSAO_FRAGMENT);this.renderer.stats.programs++;}
       this.normalCamera=gl.getUniformLocation(this.normalProgram,'uViewProjection');
-      this.screenUniforms=Object.fromEntries(['uCamera','uRadius','uDepth','uNormals','uInverseViewProjection'].map(n=>[n,gl.getUniformLocation(this.screenProgram,n)]));
+      this.screenUniforms=Object.fromEntries(['uRadius','uDepth','uNormals','uInverseViewProjection','uViewProjection','uProjectionScale'].map(n=>[n,gl.getUniformLocation(this.screenProgram,n)]));
       /** Create immutable single-level storage; nearest sampling avoids depth interpolation. */
       const texture=(format)=>{
         const handle=gl.createTexture();if(!handle)throw new Error('AO texture allocation failed');
@@ -927,7 +929,7 @@ class AmbientOcclusion {
   texture(unit,handle) {const gl=this.gl;gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,handle);}
 
   /** Render normal/depth and AO using the already-synchronized instance batch. */
-  prepare(batch,view) {
+  prepare(batch) {
     this.select(batch.world);
     if(this.settings.mode!=='screen'||this.settings.strength===0||!this.ensure(this.renderer.canvas.width,this.renderer.canvas.height))return false;
     const gl=this.gl,t=this.targets,r=this.renderer;
@@ -938,8 +940,9 @@ class AmbientOcclusion {
     gl.bindFramebuffer(gl.FRAMEBUFFER,t.framebuffers[1]);gl.disable(gl.DEPTH_TEST);
     gl.useProgram(this.screenProgram);this.texture(0,t.depth);this.texture(1,t.normal);
     gl.uniform1i(this.screenUniforms.uDepth,0);gl.uniform1i(this.screenUniforms.uNormals,1);
-    gl.uniform4f(this.screenUniforms.uCamera,r.camera.x,r.camera.y,view.halfWidth,view.halfHeight);
     gl.uniformMatrix4fv(this.screenUniforms.uInverseViewProjection,false,r.camera.inverse);
+    gl.uniformMatrix4fv(this.screenUniforms.uViewProjection,false,r.camera.matrix);
+    gl.uniform2fv(this.screenUniforms.uProjectionScale,r.camera.projectionScale);
     gl.uniform1f(this.screenUniforms.uRadius,this.settings.radius);gl.drawArrays(gl.TRIANGLES,0,3);
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.enable(gl.DEPTH_TEST);
     gl.viewport(0,0,r.canvas.width,r.canvas.height);
@@ -1143,7 +1146,7 @@ class ShadowMaps {
       this.clearWorld();this.casters=r.createBatch(batch.world,batch.capacity,{visibility:'shadow'});
     }
     this.sourceBatch=batch;
-    this.casters.sync(0,0);
+    this.casters.sync();
     try {
       this.ensureProgram();gl.enable(gl.DEPTH_TEST);gl.useProgram(this.program);gl.bindVertexArray(this.casters.vao);
       this.prepareSun();this.preparePoint();
@@ -1433,39 +1436,258 @@ return {LineRendering};
 })();
 // Source: engine/basement/camera.js
 const module20=(()=>{
-/**
- * Basement / camera: arbitrary z-up orthographic views and their exact inverse rays.
- * Geometry, culling, picking, aiming and screen-space AO share the same projection.
- * Near/far depth spans +/-200 world units around the focus. Perspective is future work.
+/** Basement / shared z-up camera. Focus is the orbit pivot, never an implicit eye.
+ * Drawing, clipping, picking and screen-space effects use one view/projection pair.
+ * Orthographic remains the default so game presentation does not change in Studio.
  */
+const POSE_KEYS = [
+  "x",
+  "y",
+  "z",
+  "halfHeight",
+  "azimuth",
+  "elevation",
+  "projection",
+  "distance",
+  "fov",
+  "near",
+  "far",
+];
 class Camera {
-  /** The default reproduces the Atrium's former oblique view; all angles are radians. */
-  constructor(){this.x=0;this.y=0;this.z=0;this.halfHeight=21;this.azimuth=0;this.elevation=Math.atan2(0.65,0.76);this.matrix=new Float32Array(16);this.inverse=new Float32Array(16);this.right=[1,0,0];this.up=[0,0.65,0.76];this.back=[0,-0.76,0.65];}
-
-  /** Recompute orthonormal basis and matrices without per-frame matrix allocation. */
+  /** Distances are metres, angles radians; FOV is vertical. Clip settings affect perspective only. */
+  constructor() {
+    this.x = 0;
+    this.y = 0;
+    this.z = 0;
+    this.halfHeight = 21;
+    this.azimuth = 0;
+    this.elevation = Math.atan2(0.65, 0.76);
+    this.projection = "orthographic";
+    this.fov = (50 * Math.PI) / 180;
+    this.distance = this.halfHeight / Math.tan(this.fov / 2);
+    this.near = 0.1;
+    this.far = 1000;
+    this.matrix = new Float32Array(16);
+    this.inverse = new Float32Array(16);
+    this.right = [1, 0, 0];
+    this.up = [0, 0.65, 0.76];
+    this.back = [0, -0.76, 0.65];
+    this.planes = new Float32Array(24);
+    this.eye = [0, 0, 0];
+    this.projectionScale = [1, 1];
+  }
+  /** One complete pose contract for navigation cancellation and edit/Play isolation. */
+  snapshot() {
+    return Object.fromEntries(POSE_KEYS.map((key) => [key, this[key]]));
+  }
+  /** Switch lenses without changing the apparent size on the focus plane. */
+  setProjection(mode) {
+    if (!["orthographic", "perspective"].includes(mode))
+      throw new Error("Unknown camera projection");
+    if (mode === this.projection) return;
+    if (mode === "perspective")
+      this.distance = this.halfHeight / Math.tan(this.fov / 2);
+    else this.halfHeight = this.focusHalfHeight;
+    this.projection = mode;
+  }
+  get focusHalfHeight() {
+    return this.projection === "perspective"
+      ? this.distance * Math.tan(this.fov / 2)
+      : this.halfHeight;
+  }
+  /** Basis and exact analytical inverse: no general matrix inversion. */
   update(aspect) {
-    const c=Math.cos(this.azimuth),s=Math.sin(this.azimuth),e=Math.sin(this.elevation),f=Math.cos(this.elevation);
-    this.right[0]=c;this.right[1]=s;this.right[2]=0;this.up[0]=-s*e;this.up[1]=c*e;this.up[2]=f;
-    this.back[0]=s*f;this.back[1]=-c*f;this.back[2]=e;
-    const r=this.right,u=this.up,b=this.back,w=this.halfHeight*aspect,h=this.halfHeight;
-    for(let i=0;i<3;i++){this.matrix[i*4]=r[i]/w;this.matrix[i*4+1]=u[i]/h;this.matrix[i*4+2]=-b[i]/200;this.matrix[i*4+3]=0;
-      this.inverse[i]=r[i]*w;this.inverse[4+i]=u[i]*h;this.inverse[8+i]=-b[i]*200;}
-    this.matrix[12]=-(r[0]*this.x+r[1]*this.y+r[2]*this.z)/w;this.matrix[13]=-(u[0]*this.x+u[1]*this.y+u[2]*this.z)/h;
-    this.matrix[14]=(b[0]*this.x+b[1]*this.y+b[2]*this.z)/200;this.matrix[15]=1;
-    this.inverse[3]=this.inverse[7]=this.inverse[11]=0;this.inverse[12]=this.x;this.inverse[13]=this.y;this.inverse[14]=this.z;this.inverse[15]=1;
+    const c = Math.cos(this.azimuth),
+      s = Math.sin(this.azimuth),
+      e = Math.sin(this.elevation),
+      f = Math.cos(this.elevation);
+    const r = this.right,
+      u = this.up,
+      b = this.back,
+      m = this.matrix,
+      v = this.inverse;
+    r[0] = c;
+    r[1] = s;
+    r[2] = 0;
+    u[0] = -s * e;
+    u[1] = c * e;
+    u[2] = f;
+    b[0] = s * f;
+    b[1] = -c * f;
+    b[2] = e;
+    const focus = [this.x, this.y, this.z];
+    if (this.projection === "perspective") {
+      const sy = 1 / Math.tan(this.fov / 2),
+        sx = sy / aspect,
+        A = -(this.far + this.near) / (this.far - this.near),
+        B = (-2 * this.far * this.near) / (this.far - this.near);
+      this.projectionScale[0] = sx;
+      this.projectionScale[1] = sy;
+      for (let i = 0; i < 3; i++) this.eye[i] = focus[i] + b[i] * this.distance;
+      for (let i = 0; i < 3; i++) {
+        m[i * 4] = r[i] * sx;
+        m[i * 4 + 1] = u[i] * sy;
+        m[i * 4 + 2] = b[i] * A;
+        m[i * 4 + 3] = -b[i];
+        v[i] = r[i] / sx;
+        v[4 + i] = u[i] / sy;
+        v[8 + i] = this.eye[i] / B;
+        v[12 + i] = (this.eye[i] * A) / B - b[i];
+      }
+      const dot = (a) => a.reduce((n, t, i) => n + t * this.eye[i], 0);
+      m[12] = -dot(r) * sx;
+      m[13] = -dot(u) * sy;
+      m[14] = B - A * dot(b);
+      m[15] = dot(b);
+      v[3] = v[7] = 0;
+      v[11] = 1 / B;
+      v[15] = A / B;
+    } else {
+      const h = this.halfHeight,
+        w = h * aspect;
+      this.projectionScale[0] = 1 / w;
+      this.projectionScale[1] = 1 / h;
+      for (let i = 0; i < 3; i++) {
+        this.eye[i] = focus[i] + b[i] * 200;
+        m[i * 4] = r[i] / w;
+        m[i * 4 + 1] = u[i] / h;
+        m[i * 4 + 2] = -b[i] / 200;
+        m[i * 4 + 3] = 0;
+        v[i] = r[i] * w;
+        v[4 + i] = u[i] * h;
+        v[8 + i] = -b[i] * 200;
+        v[12 + i] = focus[i];
+      }
+      const dot = (a) => a.reduce((n, t, i) => n + t * focus[i], 0);
+      m[12] = -dot(r) / w;
+      m[13] = -dot(u) / h;
+      m[14] = dot(b) / 200;
+      m[15] = 1;
+      v[3] = v[7] = v[11] = 0;
+      v[15] = 1;
+    }
+    // Normalize once per camera update, not once per visible instance.
+    for (let axis = 0; axis < 3; axis++)
+      for (let side = 0; side < 2; side++) {
+        const sign = side === 0 ? -1 : 1,
+          offset = (axis * 2 + side) * 4;
+        const a = m[3] + sign * m[axis],
+          b = m[7] + sign * m[4 + axis],
+          c = m[11] + sign * m[8 + axis],
+          length = Math.hypot(a, b, c);
+        this.planes[offset] = a / length;
+        this.planes[offset + 1] = b / length;
+        this.planes[offset + 2] = c / length;
+        this.planes[offset + 3] = (m[15] + sign * m[12 + axis]) / length;
+      }
+  }
+  /** Named orientations preserve projection, pivot and distance. */
+  preset(name) {
+    const views = {
+      oblique: [0, Math.atan2(0.65, 0.76)],
+      top: [0, Math.PI / 2],
+      front: [0, 0],
+      side: [Math.PI / 2, 0],
+    };
+    if (!views[name]) throw new Error("Unknown camera view");
+    [this.azimuth, this.elevation] = views[name];
+  }
+  /** Homogeneous unprojection is also the reference for depth reconstruction tests. */
+  unproject(x, y, z) {
+    // CPU queries use double precision; GPU uniforms remain Float32. Avoid subtracting
+    // nearly equal inverse-matrix terms at kilometre-scale far planes during picking.
+    if (this.projection === "perspective") {
+      const depth =
+        (2 * this.far * this.near) /
+        (this.far + this.near - z * (this.far - this.near));
+      return [0, 1, 2].map(
+        (i) =>
+          this.eye[i] +
+          depth *
+            ((this.right[i] * x) / this.projectionScale[0] +
+              (this.up[i] * y) / this.projectionScale[1] -
+              this.back[i]),
+      );
+    }
+    const focus = [this.x, this.y, this.z];
+    return focus.map(
+      (n, i) =>
+        n +
+        (this.right[i] * x) / this.projectionScale[0] +
+        (this.up[i] * y) / this.projectionScale[1] -
+        this.back[i] * z * 200,
+    );
   }
 
-  /** Named views change orientation only, preserving focus and zoom. */
-  preset(name){const views={oblique:[0,Math.atan2(0.65,0.76)],top:[0,Math.PI/2],front:[0,0],side:[Math.PI/2,0]};if(!views[name])throw new Error('Unknown camera view');[this.azimuth,this.elevation]=views[name];}
+  /** Clipped ray starts at the near plane. maxDistance excludes invisible far-plane objects. */
+  ray(x, y, width, height) {
+    this.update(width / height);
+    const nx = (x / width) * 2 - 1,
+      ny = 1 - (y / height) * 2;
+    const origin = this.unproject(nx, ny, -1),
+      end = this.unproject(nx, ny, 1),
+      direction = end.map((n, i) => n - origin[i]),
+      maxDistance = Math.hypot(...direction);
+    return {
+      origin,
+      direction: direction.map((n) => n / maxDistance),
+      maxDistance,
+    };
+  }
+  /** Reject parallel, behind-camera and beyond-far construction-plane intersections. */
+  ground(x, y, width, height, z = 0) {
+    const ray = this.ray(x, y, width, height);
+    if (Math.abs(ray.direction[2]) < 1e-6) return null;
+    const t = (z - ray.origin[2]) / ray.direction[2];
+    if (t < 0 || t > ray.maxDistance) return null;
+    return {
+      x: ray.origin[0] + t * ray.direction[0],
+      y: ray.origin[1] + t * ray.direction[1],
+      z,
+    };
+  }
+  /** CSS projection plus clipping information for foreground editor markers. */
+  project(p, width, height) {
+    this.update(width / height);
+    const d = [p.x - this.x, p.y - this.y, p.z - this.z],
+      dot = (a) => a.reduce((n, t, i) => n + t * d[i], 0);
+    const depth =
+      this.projection === "perspective" ? this.distance - dot(this.back) : 1;
+    const x = (dot(this.right) * this.projectionScale[0]) / depth,
+      y = (dot(this.up) * this.projectionScale[1]) / depth;
+    const z =
+      this.projection === "perspective"
+        ? (this.far + this.near) / (this.far - this.near) -
+          (2 * this.far * this.near) / ((this.far - this.near) * depth)
+        : -dot(this.back) / 200;
+    return {
+      x: ((x + 1) * width) / 2,
+      y: ((1 - y) * height) / 2,
+      depth: z,
+      visible:
+        depth > 0 && Math.abs(x) <= 1 && Math.abs(y) <= 1 && Math.abs(z) <= 1,
+    };
+  }
 
-  /** Ray starts on the near plane; CSS coordinates are relative to the drawing surface. */
-  ray(x,y,width,height){this.update(width/height);const sx=(x/width*2-1)*this.halfHeight*width/height,sy=(1-y/height*2)*this.halfHeight;return{origin:[this.x+this.right[0]*sx+this.up[0]*sy+this.back[0]*200,this.y+this.right[1]*sx+this.up[1]*sy+this.back[1]*200,this.z+this.up[2]*sy+this.back[2]*200],direction:this.back.map(n=>-n)};}
-
-  /** Intersect a horizontal construction plane; side/front parallel rays have no intersection. */
-  ground(x,y,width,height,z=0){const ray=this.ray(x,y,width,height);if(Math.abs(ray.direction[2])<1e-6)return null;const t=(z-ray.origin[2])/ray.direction[2];return{x:ray.origin[0]+t*ray.direction[0],y:ray.origin[1]+t*ray.direction[1],z};}
-
-  /** Project one world point for engine overlays; return surface-relative CSS pixels. */
-  project(p,width,height){this.update(width/height);const x=p.x-this.x,y=p.y-this.y,z=p.z-this.z;return{x:(1+(x*this.right[0]+y*this.right[1])/(this.halfHeight*width/height))*width/2,y:(1-(x*this.up[0]+y*this.up[1]+z*this.up[2])/this.halfHeight)*height/2};}
+  /** World length represented by one CSS pixel at this point's view depth. */
+  worldUnitsPerPixel(point, height) {
+    if (this.projection !== "perspective")
+      return (this.halfHeight * 2) / height;
+    const d =
+      this.distance -
+      ((point[0] - this.x) * this.back[0] +
+        (point[1] - this.y) * this.back[1] +
+        (point[2] - this.z) * this.back[2]);
+    return (Math.max(this.near, d) * 2 * Math.tan(this.fov / 2)) / height;
+  }
+  /** Conservative six-plane sphere test. Shadow casters deliberately do not use this. */
+  sphereVisible(x, y, z, radius) {
+    const p = this.planes;
+    for (let i = 0; i < 24; i += 4)
+      if (p[i] * x + p[i + 1] * y + p[i + 2] * z + p[i + 3] < -radius)
+        return false;
+    return true;
+  }
 }
 
 return {Camera};
@@ -1553,7 +1775,7 @@ class Renderer {
     const gl = this.gl;
     const program=createProgram(gl,VERTEX,FRAGMENT);
     this.program = program; this.stats.programs++;
-    this.uniforms = Object.fromEntries(['uCamera','uViewProjection','uInverseViewProjection','uBlockerRotation[0]', 'uAmbient', 'uLights[0]', 'uLightColors[0]',
+    this.uniforms = Object.fromEntries(['uViewProjection','uInverseViewProjection','uBlockerRotation[0]', 'uAmbient', 'uLights[0]', 'uLightColors[0]',
       'uAOMode','uAOStrength','uAORadius','uBlockerCount','uBlockerPose[0]','uBlockerSize[0]',
       'uAOScreen','uAODepth','uAONormals','uAOSize','uSunDirection','uSunColor','uSunShadowEnabled','uSunMatrix',
       'uSunShadow','uShadowParameters','uPointShadowIndex','uPointShadow','uPointShadowParameters','uPointShadowPosition','uPointShadowResolution']
@@ -1578,7 +1800,7 @@ class Renderer {
     if (this.disposed || this.lost) throw new Error('GPU is not ready for world preparation');
     if (batch.renderer !== this || batch.disposed) throw new Error('Invalid preparation batch');
     this.resize(); batch.world.resolve();
-    const view = this.view(); batch.sync(view.halfWidth, view.halfHeight);
+    this.view(); batch.sync();
   }
 
   /** Resize backing pixels only when necessary. CSS layout belongs to the application. */
@@ -1594,7 +1816,7 @@ class Renderer {
   /** Compute view dimensions in world units; the same projection is exposed to mouse aiming. */
   view() {
     this.camera.update(this.canvas.width/this.canvas.height);
-    const halfHeight = this.camera.halfHeight;
+    const halfHeight = this.camera.focusHalfHeight;
     return { halfWidth: halfHeight * this.canvas.width / this.canvas.height, halfHeight };
   }
 
@@ -1622,22 +1844,21 @@ class Renderer {
   draw(batch = null) {
     if (this.disposed || this.lost) return;
     this.resize();
-    const gl = this.gl, { halfWidth, halfHeight } = this.view();
+    const gl = this.gl; this.view();
     this.stats.draws = this.stats.instances = this.stats.uploads = this.stats.uploadedBytes = 0;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.clearColor(0.018, 0.019, 0.037, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     if (!batch || batch.disposed) {this.occlusion.count=this.occlusion.candidates=0;this.lighting.clearWorld();return;}
     if (batch.renderer !== this) throw new Error('Batch belongs to another renderer');
-    batch.sync(halfWidth, halfHeight);
+    batch.sync();
     const shadowToken=this.profiler?.begin(this.shadowScope);
     try {this.lighting.prepare(batch);}finally {this.profiler?.end(shadowToken);}
     const aoToken=this.profiler?.begin(this.occlusionScope);
     let screenReady;
-    try {screenReady=this.occlusion.prepare(batch,{halfWidth,halfHeight});}
+    try {screenReady=this.occlusion.prepare(batch);}
     finally {this.profiler?.end(aoToken);}
     gl.useProgram(this.program);
     this.occlusion.bind(this.uniforms,screenReady);
-    gl.uniform4f(this.uniforms.uCamera, this.camera.x, this.camera.y, halfWidth, halfHeight);
     gl.uniformMatrix4fv(this.uniforms.uViewProjection,false,this.camera.matrix);
     this.lighting.bind(this.uniforms);
     gl.bindVertexArray(batch.vao);
@@ -1707,17 +1928,16 @@ class InstanceBatch {
    * Pack visible transforms/materials into retained records; compare Float32 values to
    * avoid treating harmless double-to-float rounding as a perpetual dirty upload.
    */
-  sync(halfWidth, halfHeight) {
+  sync() {
     const r = this.renderer, gl = r.gl;
     this.cursor = 0; this.firstDirty = Infinity; this.lastDirty = -1;
     for (const entity of this.world.entities.values()) {
       const s = entity.shape, p = entity.pose;
       if (!s || (this.visibility==='shadow'&&s.castShadow===false)) continue;
       r.totals.candidates++;
+      // Sphere is conservative under any orientation. Shadow membership ignores the lens.
       const radius = Math.hypot(...s.size)*p.scale;
-      const dx=p.x-r.camera.x,dy=p.y-r.camera.y,dz=p.z-r.camera.z;
-      const screenY=dx*r.camera.up[0]+dy*r.camera.up[1]+dz*r.camera.up[2],screenX=dx*r.camera.right[0]+dy*r.camera.right[1];
-      if (this.visibility==='camera'&&(Math.abs(screenX) > halfWidth + radius || Math.abs(screenY) > halfHeight + radius)) {r.totals.culled++;continue;}
+      if (this.visibility==='camera'&&!r.camera.sphereVisible(p.x,p.y,p.z,radius)) {r.totals.culled++;continue;}
       if (this.cursor / 16 >= this.capacity) throw new Error(`World ${this.world.id} exceeds ${this.capacity} ${this.visibility} instances`);
       this.write(p.x); this.write(p.y); this.write(p.z); this.write(0);
       this.write(s.size[0]*p.scale); this.write(s.size[1]*p.scale); this.write(s.size[2]*p.scale);

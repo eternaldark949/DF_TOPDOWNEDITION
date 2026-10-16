@@ -8,7 +8,7 @@ import { rotationAxis, planeBasis, rayPlane } from '../basement/rotation-gesture
 /** World-space rotation ring: fixed CSS size, actual axis plane, shared hit/draw geometry. */
 export function rotationRing(camera,entity,axis,space,height){
  const normal=rotationAxis(entity.rotation,axis,space),basis=planeBasis(normal);
- return {center:entity.position,normal,basis,radius:camera.halfHeight*2/height*48};
+ return {center:entity.position,normal,basis,radius:camera.worldUnitsPerPixel(entity.position,height)*48};
 }
 /** Angular coordinate in the ring's plane; null when the view is nearly edge-on. */
 export function ringAngle(ring,ray){
@@ -36,12 +36,14 @@ export class AuthoringGuides {
   const target=scene.entities.find(e=>e.id===selected),dial=mode==='rotate'&&target&&!target.locked;
   if(!lights&&!dial){if(this.widgets)this.widgets.dispose();this.widgets=null;this.key='';return this.grid?[this.grid]:[];}
   const camera=r.camera,h=r.canvas.clientHeight;
-  const key=[scene.id,revision,selected,mode,axis,space,lights,camera.x,camera.y,camera.z,camera.azimuth,camera.elevation,camera.halfHeight,r.canvas.clientWidth,h].join('/');
+  const key=[scene.id,revision,selected,mode,axis,space,lights,camera.x,camera.y,camera.z,camera.azimuth,camera.elevation,camera.halfHeight,camera.projection,camera.distance,camera.fov,camera.near,camera.far,r.canvas.clientWidth,h].join('/');
   if(!this.widgets){this.widgets=r.lines.create(1024,{depthTest:false});this.key='';}
   if(key!==this.key){
-   camera.update(r.canvas.clientWidth/h);this.widgets.begin();const pixel=camera.halfHeight*2/h;
+   camera.update(r.canvas.clientWidth/h);this.widgets.begin();
    if(lights)for(const light of scene.lights){
     const color=light.id===selected?[1,.92,.63,1]:[.91,.68,.32,.95],center=light.position;
+    const pixel=camera.worldUnitsPerPixel(center,h);
+    if(!camera.project({x:center[0],y:center[1],z:center[2]},r.canvas.clientWidth,h).visible)continue;
     const p=(x,y)=>center.map((v,i)=>v+pixel*(camera.right[i]*x+camera.up[i]*y));
     for(const [a,b]of [[[0,8],[7,0]],[[7,0],[0,-8]],[[0,-8],[-7,0]],[[-7,0],[0,8]],[[-3,0],[3,0]],[[0,-3],[0,3]]])this.widgets.segment(p(...a),p(...b),color);
    }
@@ -58,7 +60,7 @@ export class AuthoringGuides {
  /** Pick readable light icons in CSS pixels, independently of physical geometry/collision. */
  pickLight(scene,x,y,width,height){
   const camera=this.renderer.camera;let closest=null,distance=22*22;
-  for(const light of scene.lights){const [px,py,pz]=light.position,p=camera.project({x:px,y:py,z:pz},width,height),d=(p.x-x)**2+(p.y-y)**2;if(d<distance){distance=d;closest=light;}}
+  for(const light of scene.lights){const [px,py,pz]=light.position,p=camera.project({x:px,y:py,z:pz},width,height),d=(p.x-x)**2+(p.y-y)**2;if(p.visible&&d<distance){distance=d;closest=light;}}
   return closest;
  }
  /** Hidden guides release all buffers/VAOs and their shared program ownership immediately. */

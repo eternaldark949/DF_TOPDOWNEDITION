@@ -4,7 +4,8 @@ const root=path.resolve(__dirname,'..'),html=fs.readFileSync(path.join(root,'dis
 const server=http.createServer((req,res)=>{if(req.url==='/'){res.setHeader('Content-Type','text/html');res.end('<!doctype html>');return;}const file=path.resolve(root,'.'+req.url);if(!file.startsWith(root+path.sep)){res.writeHead(403);res.end();return;}try{res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.json')?'application/json':'text/html');res.end(fs.readFileSync(file));}catch{res.writeHead(404);res.end();}});
 (async()=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch({executablePath:process.env.ETRNLNINE_CHROMIUM||'/usr/bin/chromium',args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
- const errors=[],requests=[],report={};
+ const errors=[],requests=[],report={},perspective=process.env.ETRNLNINE_PERSPECTIVE==='1';
+ const {Camera}=await import('../engine/basement/camera.js');const camera=new Camera();camera.halfHeight=24;camera.preset('top');if(perspective)camera.setProjection('perspective');
  try{
   const context=await browser.newContext({viewport:{width:412,height:892},hasTouch:true,isMobile:true,acceptDownloads:true}),page=await context.newPage();page.setDefaultTimeout(120000);page.on('pageerror',e=>errors.push(e.message));
   await page.goto(`http://127.0.0.1:${server.address().port}`);
@@ -13,10 +14,11 @@ const server=http.createServer((req,res)=>{if(req.url==='/'){res.setHeader('Cont
   const exportData=async()=>{const promise=page.waitForEvent('download');await page.locator('#save').click();const file=await promise;return JSON.parse(fs.readFileSync(await file.path(),'utf8'));};
   const options=async fn=>{await page.locator('#viewport-options summary').click();await fn();await page.locator('#viewport-options summary').click();};
   const view=async value=>options(()=>page.locator('#view').selectOption(value));
+  if(perspective)await options(()=>page.locator('#projection').selectOption('perspective'));
   const base=await exportData(),originalID=await page.locator('#selection-id').textContent();
   await options(()=>page.locator('#grid').click());await page.waitForFunction(()=>document.querySelector('#status').dataset.guides==='2');assert.deepEqual(await exportData(),base);
   await view('top');
-  const rect=()=>page.locator('#world').boundingBox(),project=(position,r)=>({x:r.x+r.width/2+position[0]*r.height/48,y:r.y+r.height/2-position[1]*r.height/48});
+  const rect=()=>page.locator('#world').boundingBox(),project=(position,r)=>{const p=camera.project({x:position[0],y:position[1],z:position[2]},r.width,r.height);return {x:r.x+p.x,y:r.y+p.y};};
   let r=await rect(),light=project(base.scenes[0].lights[5].position,r);await page.touchscreen.tap(light.x,light.y);await page.waitForFunction(()=>document.querySelector('#selection-id').textContent==='light:5');assert.equal(await page.locator('#rotate').isDisabled(),true);
   const touch=await context.newCDPSession(page),drag=async(a,b,cancel=false)=>{
    await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[a]});await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[b]});await touch.send('Input.dispatchTouchEvent',{type:cancel?'touchCancel':'touchEnd',touchPoints:[]});
@@ -37,9 +39,9 @@ const server=http.createServer((req,res)=>{if(req.url==='/'){res.setHeader('Cont
    await page.locator('#play').click();await page.waitForFunction(()=>document.querySelector('#status').dataset.mode==='edit'&&document.querySelector('#status').dataset.worlds==='1'&&document.querySelector('#status').dataset.guides==='2'&&document.querySelector('#status').dataset.buffers==='5');
   }
   assert.equal(JSON.stringify(await exportData()),before);await page.locator('#mobile-properties').click();await view('oblique');
-  await page.screenshot({path:path.join(root,'artifacts/studio-tools-phone.png'),timeout:120000});await page.setViewportSize({width:1280,height:900});await page.locator('#show-hierarchy').click();await page.locator('#library').evaluate(e=>e.scrollTop=0);await page.screenshot({path:path.join(root,'artifacts/studio-tools-desktop.png'),timeout:120000});
+  await page.screenshot({path:path.join(root,`artifacts/studio-tools-${perspective?'perspective-':''}phone.png`),timeout:120000});await page.setViewportSize({width:1280,height:900});await page.locator('#show-hierarchy').click();await page.locator('#library').evaluate(e=>e.scrollTop=0);await page.screenshot({path:path.join(root,`artifacts/studio-tools-${perspective?'perspective-':''}desktop.png`),timeout:120000});
   assert.deepEqual(errors,[]);assert.deepEqual(requests,[]);
-  report.workflow={grid:true,lightPicking:true,lightMove:true,placement:true,groundOffset:true,duplicate:true,deleteUndo:true,rotationSnap:true,rotationCancel:true,playCycles:2};report.errors=errors;report.requests=requests;
+  report.projection=perspective?'perspective':'orthographic';report.workflow={grid:true,lightPicking:true,lightMove:true,placement:true,groundOffset:true,duplicate:true,deleteUndo:true,rotationSnap:true,rotationCancel:true,playCycles:2};report.errors=errors;report.requests=requests;
   await context.close();
   // Public source fixture verifies resource accounting and restoration while guides are live.
   const p=await browser.newPage();await p.goto(`http://127.0.0.1:${server.address().port}`);
@@ -51,6 +53,6 @@ const server=http.createServer((req,res)=>{if(req.url==='/'){res.setHeader('Cont
   if(supported){await p.waitForFunction(()=>fixture.renderer.lost);await p.evaluate(()=>fixture.ext.restoreContext());await p.waitForFunction(()=>!fixture.renderer.lost);}
   report.resources=await p.evaluate(()=>{const f=fixture;f.renderer.render(null,[f.layer]);const error=f.renderer.gl.getError();f.layer.dispose();const afterLayer={buffers:f.renderer.stats.buffers,programs:f.renderer.stats.programs,layers:f.renderer.lines.layers.size};f.engine.dispose();return{restored:f.renderer.stats.contextRestores,error,afterLayer,afterEngine:{buffers:f.renderer.stats.buffers,programs:f.renderer.stats.programs,vaos:f.renderer.stats.vaos}};});
   assert.equal(report.resources.error,0);assert.deepEqual(report.resources.afterLayer,{buffers:1,programs:1,layers:0});assert.deepEqual(report.resources.afterEngine,{buffers:0,programs:0,vaos:0});
-  fs.writeFileSync(path.join(root,'artifacts/studio-tools-results.json'),JSON.stringify(report,null,2)+'\n');console.log('Authoring tools acceptance passed');
+  fs.writeFileSync(path.join(root,`artifacts/studio-tools-${perspective?'perspective-':''}results.json`),JSON.stringify(report,null,2)+'\n');console.log('Authoring tools acceptance passed');
  }finally{await browser.close();server.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

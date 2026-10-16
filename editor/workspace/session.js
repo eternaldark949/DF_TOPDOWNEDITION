@@ -136,10 +136,11 @@ export class StudioSession {
   if(this.play)return;
   this.document.cancel();
   const renderer=this.engine.basement.renderer;
-  this.camera=Object.fromEntries(['x','y','z','halfHeight','azimuth','elevation'].map(key=>[key,renderer.camera[key]]));
+  this.camera=renderer.camera.snapshot();
   this.preview.dispose();
   this.preview=null;
   this.engine.basement.input.clear();
+  renderer.camera.setProjection('orthographic');
   renderer.camera.preset('oblique');
   renderer.camera.z=0;
   try{

@@ -48,7 +48,7 @@ export class ShadowMaps {
       this.clearWorld();this.casters=r.createBatch(batch.world,batch.capacity,{visibility:'shadow'});
     }
     this.sourceBatch=batch;
-    this.casters.sync(0,0);
+    this.casters.sync();
     try {
       this.ensureProgram();gl.enable(gl.DEPTH_TEST);gl.useProgram(this.program);gl.bindVertexArray(this.casters.vao);
       this.prepareSun();this.preparePoint();

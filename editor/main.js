@@ -50,7 +50,7 @@ try{
  const renderer=engine.basement.renderer;
  for(const entry of STUDIO_PROJECTS){const option=document.createElement('option');option.value=entry.project.id;option.textContent=entry.label;$('project').append(option);}
  /** Authored per-scene framing is application metadata, not a viewport rule keyed by a game name. */
- function frameScene(){Object.assign(renderer.camera,{x:0,y:0,z:0,halfHeight:24});renderer.camera.preset('oblique');if(session.scene.camera){for(const key of ['x','y','z','azimuth','elevation','halfHeight'])renderer.camera[key]=session.scene.camera[key];renderer.camera.halfHeight=Math.max(renderer.camera.halfHeight,21/($('world').clientWidth/$('world').clientHeight));}}
+ function frameScene(){const mode=renderer.camera.projection;renderer.camera.setProjection('orthographic');Object.assign(renderer.camera,{x:0,y:0,z:0,halfHeight:24});renderer.camera.preset('oblique');if(session.scene.camera){for(const key of ['x','y','z','azimuth','elevation','halfHeight'])renderer.camera[key]=session.scene.camera[key];renderer.camera.halfHeight=Math.max(renderer.camera.halfHeight,21/($('world').clientWidth/$('world').clientHeight));}renderer.camera.setProjection(mode);}
  life.listen($('project'),'change',()=>{try{viewport.cancel();activeProject=STUDIO_PROJECTS.find(e=>e.project.id===$('project').value);session.replace(activeProject.project);setTool('select');guides.clear();frameScene();}catch(error){activeProject=studioProject(session.document.data);$('project').value=session.document.data.id;report(error);}});
  frameScene();state('open');
  for(const [id,assets]of [['show-hierarchy',false],['show-assets',true]])action(id,()=>{document.body.classList.toggle('assets-open',assets);$('show-assets').setAttribute('aria-pressed',String(assets));$('show-hierarchy').setAttribute('aria-pressed',String(!assets));});
@@ -68,6 +68,10 @@ try{
  for(const [id,key]of [['rotation-axis','axis'],['rotation-space','space'],['angle-snap','angleSnap']]){$(id).value=preferences.value[key];life.listen($(id),'change',()=>{viewport.cancel();const value=key==='angleSnap'?Number($(id).value):$(id).value;preferences.set(key,value);viewport[key]=value;});}
  life.listen($('asset-search'),'input',()=>{panels.filter=$('asset-search').value;panels.renderAssets(session);});
  life.listen($('snap'),'change',()=>{viewport.cancel();viewport.snap=Number($('snap').value);});
+ // Lens controls change viewport state only; they never dirty the authored document.
+ $('projection').value=renderer.camera.projection;
+ life.listen($('projection'),'change',()=>{viewport.cancel();renderer.camera.setProjection($('projection').value);});
+ life.listen($('fov'),'change',()=>{viewport.cancel();const value=Number($('fov').value);if(Number.isFinite(value)){renderer.camera.fov=Math.max(15,Math.min(110,value))*Math.PI/180;$('fov').value=renderer.camera.fov*180/Math.PI;}});
  life.listen($('view'),'change',()=>{viewport.cancel();renderer.camera.preset($('view').value);});
  action('orbit-left',()=>viewport.navigation.motion.orbit(15,0));action('orbit-right',()=>viewport.navigation.motion.orbit(-15,0));
  function zoom(factor){viewport.navigation.motion.zoom(factor,$('world').clientWidth/2,$('world').clientHeight/2,$('world').clientWidth,$('world').clientHeight);}
@@ -80,6 +84,6 @@ try{
  life.listen($('error'),'click',()=>$('error').hidden=true);
  let metricsAt=-Infinity;
  // DOM diagnostics update at 4 Hz; the viewport retains the host's normal frame rate.
- life.own(engine.lobby.on('render',(_alpha,_time,wallMs)=>{if(wallMs-metricsAt<250)return;metricsAt=wallMs;const stats=renderer.stats;$('metrics').textContent=`${stats.draws} draws · ${stats.buffers} buffers`;$('status').dataset.worlds=engine.directory.worlds.size;$('status').dataset.buffers=stats.buffers;$('status').dataset.guides=renderer.lines.layers.size;$('status').dataset.camera=JSON.stringify(viewport.navigation.motion.snapshot());},'studio.status'));
+ life.own(engine.lobby.on('render',(_alpha,_time,wallMs)=>{if(wallMs-metricsAt<250)return;metricsAt=wallMs;const stats=renderer.stats;$('projection').value=renderer.camera.projection;$('projection').disabled=!!session.play;$('fov').disabled=!!session.play||renderer.camera.projection!=='perspective';$('metrics').textContent=`${stats.draws} draws · ${stats.buffers} buffers`;$('status').dataset.worlds=engine.directory.worlds.size;$('status').dataset.buffers=stats.buffers;$('status').dataset.guides=renderer.lines.layers.size;$('status').dataset.camera=JSON.stringify(viewport.navigation.motion.snapshot());},'studio.status'));
  life.listen(window,'pagehide',()=>life.dispose());engine.start();
 }catch(error){report(error);life.dispose();}

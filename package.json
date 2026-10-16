@@ -9,6 +9,7 @@
     "test:studio": "node tests/studio-browser.cjs",
     "test:studio-tools": "node tests/studio-tools-browser.cjs",
     "test:freelancer": "node tests/freelancer-browser.cjs",
+    "test:perspective": "ETRNLNINE_PERSPECTIVE=1 node tests/camera-browser.cjs && ETRNLNINE_PERSPECTIVE=1 node tests/studio-tools-browser.cjs && node tests/perspective-render-browser.cjs",
     "test:camera": "node tests/camera-browser.cjs"
   }
 }

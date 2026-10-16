@@ -1,5 +1,7 @@
 # First Studio workspace and portable Atrium
 
+**Perspective update:** [decision 0011](0011-perspective-camera.md) adds the shared perspective lens, depth-correct AO/picking/guides and complete pose restoration. Camera limitations below describe the earlier milestone.
+
 Implemented 2026-10-16 following the owner's green light. This record supersedes the implementation-status statements in decision 0006; its broader universal-tool and 3D-engine ambitions remain the roadmap.
 
 **Implementation update:** [decision 0008](0008-studio-authoring-tools.md) adds project-wide asset placement, duplicate/delete, rotation, grid/light guides and DFAB-inspired styling. Descriptions below record the initial milestone.

@@ -12,7 +12,7 @@ export function rayPlane(ray,center,normal){
  const denominator=ray.direction.reduce((n,v,i)=>n+v*normal[i],0);
  if(Math.abs(denominator)<.04)return null;
  const t=normal.reduce((n,v,i)=>n+(center[i]-ray.origin[i])*v,0)/denominator;
- return t<0?null:ray.origin.map((v,i)=>v+ray.direction[i]*t);
+ return t<0||t>(ray.maxDistance??Infinity)?null:ray.origin.map((v,i)=>v+ray.direction[i]*t);
 }
 /** Stable in-plane basis, shared by visible rings and their angular picking. */
 export function planeBasis(normal){

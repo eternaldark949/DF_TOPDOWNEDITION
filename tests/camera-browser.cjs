@@ -6,6 +6,8 @@ const fs = require("node:fs"),
   { chromium } = require("playwright");
 const root = path.resolve(__dirname, ".."),
   html = fs.readFileSync(path.join(root, "dist/ETRNLNINE-Studio.html"), "utf8"),
+  perspective = process.env.ETRNLNINE_PERSPECTIVE === "1",
+  zoomKey = perspective ? "distance" : "halfHeight",
   errors = [],
   requests = [],
   report = {};
@@ -59,6 +61,18 @@ const server = http.createServer((req, res) => {
         await p.locator("#save").click();
         return JSON.parse(fs.readFileSync(await (await wait).path(), "utf8"));
       };
+    if (perspective) {
+      await p.locator("#viewport-options").evaluate((e) => (e.open = true));
+      await p.locator("#projection").selectOption("perspective");
+      await p.locator("#fov").fill("55");
+      await p.locator("#fov").dispatchEvent("change");
+      await p.locator("#viewport-options").evaluate((e) => (e.open = false));
+      await p.waitForFunction(
+        () =>
+          JSON.parse(document.querySelector("#status").dataset.camera)
+            .projection === "perspective",
+      );
+    }
     const authored = await data(),
       selected = await p.locator("#selection-id").textContent();
     let r = await p.locator("#world").boundingBox(),
@@ -86,7 +100,7 @@ const server = http.createServer((req, res) => {
     before = after;
     await p.mouse.wheel(0, -250);
     await waitChange(before);
-    assert.ok((await camera()).halfHeight < before.halfHeight);
+    assert.ok((await camera())[zoomKey] < before[zoomKey]);
     // Escape rolls back an unfinished camera gesture, independently of document history.
     before = await camera();
     await p.mouse.down({ button: "middle" });
@@ -103,14 +117,22 @@ const server = http.createServer((req, res) => {
     await p.keyboard.press("f");
     await p.waitForFunction(
       () =>
-        JSON.parse(document.querySelector("#status").dataset.camera)
-          .halfHeight < 5,
+        ((c) =>
+          c.projection === "perspective"
+            ? c.distance * Math.tan(c.fov / 2)
+            : c.halfHeight)(
+          JSON.parse(document.querySelector("#status").dataset.camera),
+        ) < 5,
     );
     await p.keyboard.press("Home");
     await p.waitForFunction(
       () =>
-        JSON.parse(document.querySelector("#status").dataset.camera)
-          .halfHeight > 10,
+        ((c) =>
+          c.projection === "perspective"
+            ? c.distance * Math.tan(c.fov / 2)
+            : c.halfHeight)(
+          JSON.parse(document.querySelector("#status").dataset.camera),
+        ) > 10,
     );
     assert.deepEqual(await data(), authored);
     console.log(
@@ -140,7 +162,7 @@ const server = http.createServer((req, res) => {
     await send("touchEnd", []);
     await waitChange(before);
     after = await camera();
-    assert.ok(after.halfHeight < before.halfHeight);
+    assert.ok(after[zoomKey] < before[zoomKey]);
     assert.notDeepEqual(
       [after.x, after.y, after.z],
       [before.x, before.y, before.z],
@@ -213,16 +235,23 @@ const server = http.createServer((req, res) => {
     await p.locator("#project").selectOption("freelancer.enni-slice.v1");
     await p.locator("#select").click();
     await p.screenshot({
-      path: path.join(root, "artifacts/camera-phone.png"),
+      path: path.join(
+        root,
+        `artifacts/camera-${perspective ? "perspective-" : ""}phone.png`,
+      ),
       timeout: 120000,
     });
     await p.setViewportSize({ width: 1440, height: 960 });
     await p.screenshot({
-      path: path.join(root, "artifacts/camera-desktop.png"),
+      path: path.join(
+        root,
+        `artifacts/camera-${perspective ? "perspective-" : ""}desktop.png`,
+      ),
       timeout: 120000,
     });
     assert.deepEqual(errors, []);
     assert.deepEqual(requests, []);
+    report.projection = perspective ? "perspective" : "orthographic";
     report.workflow = {
       mouseOrbit: true,
       pan: true,
@@ -240,7 +269,10 @@ const server = http.createServer((req, res) => {
     report.errors = errors;
     report.requests = requests;
     fs.writeFileSync(
-      path.join(root, "artifacts/camera-results.json"),
+      path.join(
+        root,
+        `artifacts/camera-${perspective ? "perspective-" : ""}results.json`,
+      ),
       JSON.stringify(report, null, 2) + "\n",
     );
     console.log("Camera acceptance passed");

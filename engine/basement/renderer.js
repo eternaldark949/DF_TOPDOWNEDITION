@@ -79,7 +79,7 @@ export class Renderer {
     const gl = this.gl;
     const program=createProgram(gl,VERTEX,FRAGMENT);
     this.program = program; this.stats.programs++;
-    this.uniforms = Object.fromEntries(['uCamera','uViewProjection','uInverseViewProjection','uBlockerRotation[0]', 'uAmbient', 'uLights[0]', 'uLightColors[0]',
+    this.uniforms = Object.fromEntries(['uViewProjection','uInverseViewProjection','uBlockerRotation[0]', 'uAmbient', 'uLights[0]', 'uLightColors[0]',
       'uAOMode','uAOStrength','uAORadius','uBlockerCount','uBlockerPose[0]','uBlockerSize[0]',
       'uAOScreen','uAODepth','uAONormals','uAOSize','uSunDirection','uSunColor','uSunShadowEnabled','uSunMatrix',
       'uSunShadow','uShadowParameters','uPointShadowIndex','uPointShadow','uPointShadowParameters','uPointShadowPosition','uPointShadowResolution']
@@ -104,7 +104,7 @@ export class Renderer {
     if (this.disposed || this.lost) throw new Error('GPU is not ready for world preparation');
     if (batch.renderer !== this || batch.disposed) throw new Error('Invalid preparation batch');
     this.resize(); batch.world.resolve();
-    const view = this.view(); batch.sync(view.halfWidth, view.halfHeight);
+    this.view(); batch.sync();
   }
 
   /** Resize backing pixels only when necessary. CSS layout belongs to the application. */
@@ -120,7 +120,7 @@ export class Renderer {
   /** Compute view dimensions in world units; the same projection is exposed to mouse aiming. */
   view() {
     this.camera.update(this.canvas.width/this.canvas.height);
-    const halfHeight = this.camera.halfHeight;
+    const halfHeight = this.camera.focusHalfHeight;
     return { halfWidth: halfHeight * this.canvas.width / this.canvas.height, halfHeight };
   }
 
@@ -148,22 +148,21 @@ export class Renderer {
   draw(batch = null) {
     if (this.disposed || this.lost) return;
     this.resize();
-    const gl = this.gl, { halfWidth, halfHeight } = this.view();
+    const gl = this.gl; this.view();
     this.stats.draws = this.stats.instances = this.stats.uploads = this.stats.uploadedBytes = 0;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.clearColor(0.018, 0.019, 0.037, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     if (!batch || batch.disposed) {this.occlusion.count=this.occlusion.candidates=0;this.lighting.clearWorld();return;}
     if (batch.renderer !== this) throw new Error('Batch belongs to another renderer');
-    batch.sync(halfWidth, halfHeight);
+    batch.sync();
     const shadowToken=this.profiler?.begin(this.shadowScope);
     try {this.lighting.prepare(batch);}finally {this.profiler?.end(shadowToken);}
     const aoToken=this.profiler?.begin(this.occlusionScope);
     let screenReady;
-    try {screenReady=this.occlusion.prepare(batch,{halfWidth,halfHeight});}
+    try {screenReady=this.occlusion.prepare(batch);}
     finally {this.profiler?.end(aoToken);}
     gl.useProgram(this.program);
     this.occlusion.bind(this.uniforms,screenReady);
-    gl.uniform4f(this.uniforms.uCamera, this.camera.x, this.camera.y, halfWidth, halfHeight);
     gl.uniformMatrix4fv(this.uniforms.uViewProjection,false,this.camera.matrix);
     this.lighting.bind(this.uniforms);
     gl.bindVertexArray(batch.vao);
@@ -233,17 +232,16 @@ class InstanceBatch {
    * Pack visible transforms/materials into retained records; compare Float32 values to
    * avoid treating harmless double-to-float rounding as a perpetual dirty upload.
    */
-  sync(halfWidth, halfHeight) {
+  sync() {
     const r = this.renderer, gl = r.gl;
     this.cursor = 0; this.firstDirty = Infinity; this.lastDirty = -1;
     for (const entity of this.world.entities.values()) {
       const s = entity.shape, p = entity.pose;
       if (!s || (this.visibility==='shadow'&&s.castShadow===false)) continue;
       r.totals.candidates++;
+      // Sphere is conservative under any orientation. Shadow membership ignores the lens.
       const radius = Math.hypot(...s.size)*p.scale;
-      const dx=p.x-r.camera.x,dy=p.y-r.camera.y,dz=p.z-r.camera.z;
-      const screenY=dx*r.camera.up[0]+dy*r.camera.up[1]+dz*r.camera.up[2],screenX=dx*r.camera.right[0]+dy*r.camera.right[1];
-      if (this.visibility==='camera'&&(Math.abs(screenX) > halfWidth + radius || Math.abs(screenY) > halfHeight + radius)) {r.totals.culled++;continue;}
+      if (this.visibility==='camera'&&!r.camera.sphereVisible(p.x,p.y,p.z,radius)) {r.totals.culled++;continue;}
       if (this.cursor / 16 >= this.capacity) throw new Error(`World ${this.world.id} exceeds ${this.capacity} ${this.visibility} instances`);
       this.write(p.x); this.write(p.y); this.write(p.z); this.write(0);
       this.write(s.size[0]*p.scale); this.write(s.size[1]*p.scale); this.write(s.size[2]*p.scale);

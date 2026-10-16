@@ -16,6 +16,7 @@ html,body{background:var(--studio-bg);color:#e0ddd4}header{background:linear-gra
 @media(max-width:760px){.tool-strip #duplicate,.tool-strip #delete{font-size:0;width:38px;padding:5px}.tool-strip #duplicate::before{content:'⧉';font-size:16px}.tool-strip #delete::before{content:'⌫';font-size:16px}}
 @media(max-width:760px){#project{width:91px;min-width:0;font-size:10px}#scene{width:105px}.projectbar{flex-wrap:wrap}header{height:151px}main{height:calc(100% - 185px)}.projectbar button{padding:5px}#properties{height:calc(44vh - 81.4px)}}
 #stage{container-type:size}.view-options{max-height:max(48px,calc(100cqh - 170px));overflow-y:auto}
+.view-options label{display:grid;gap:4px;min-width:0;font-size:10px;color:#b7a584}.view-options label input{width:100%;min-width:0}
 .navigation-strip{display:flex;gap:4px;padding:4px;border:1px solid #514133;border-radius:5px;background:#100e17ed}.navigation-strip button{font-size:11px;min-height:38px}.tools #orbit,.tools #pan{color:#c9b3de}#world{cursor:crosshair}body[data-navigation=orbit] #world{cursor:grab}body[data-navigation=pan] #world{cursor:move}
 @media(max-width:760px){.navigation-strip{padding:3px}.navigation-strip button{min-height:36px;font-size:10px;padding:5px 10px}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
@@ -24,7 +25,7 @@ html,body{background:var(--studio-bg);color:#e0ddd4}header{background:linear-gra
 <main><aside id="library"><div class="eyebrow">Directory</div><h2>Scene & assets</h2><div class="directory-tabs"><button id="show-hierarchy" aria-pressed="true">Scene</button><button id="show-assets" aria-pressed="false">Assets</button></div><div id="hierarchy"></div><section id="assets"><h3>Asset library</h3><input id="asset-search" type="search" aria-label="Search assets" placeholder="Find an asset…"><p class="asset-hint">Choose a template, then tap the viewport to place it.</p><div id="asset-list"></div></section></aside><section id="stage"><canvas id="world" tabindex="0" aria-label="Studio WebGL viewport. Tap to select; choose Move to drag on the ground plane."></canvas><nav class="tools" aria-label="Viewport tools">
 <div class="tool-strip"><button id="mobile-library">Directory</button><button id="mobile-properties">Properties</button><button id="select" title="Select objects" aria-pressed="true">↖ Select</button><button id="move" title="Move on the construction plane" aria-pressed="false">✥ Move</button><button id="rotate" title="Drag the selected object's rotation ring" aria-pressed="false">⟳ Rotate</button><button id="duplicate" aria-label="Duplicate instance" title="Duplicate (Ctrl D)">⧉ Copy</button><button id="delete" aria-label="Delete instance" title="Delete selected instance">⌫ Delete</button></div>
 <div class="rotation-settings"><select id="rotation-axis" aria-label="Rotation axis"><option value="x">X axis</option><option value="y">Y axis</option><option value="z" selected>Z axis</option></select><select id="rotation-space" aria-label="Rotation space"><option value="world">World</option><option value="local">Local</option></select><select id="angle-snap" aria-label="Angle snapping"><option value="0">Free angle</option><option value="5">Snap 5°</option><option value="15" selected>Snap 15°</option><option value="45">Snap 45°</option></select></div>
-<div class="navigation-strip"><button id="orbit" title="Orbit camera · middle drag or Alt + left drag" aria-pressed="false">Orbit</button><button id="pan" title="Pan camera · right drag or Shift + middle drag" aria-pressed="false">Pan</button></div><details id="viewport-options"><summary>◈ View & guides</summary><div class="view-options"><button id="frame-selected" title="Frame selected (F)">Frame selected</button><button id="frame-all" title="Frame all (Home)">Frame all</button><button id="reset-view">Reset view</button><span></span><button id="grid" aria-pressed="false">⌗ Grid</button><button id="lights" aria-pressed="true">☼ Light icons</button><select id="view" aria-label="Camera view"><option value="oblique">Oblique</option><option value="top">Top</option><option value="front">Front</option><option value="side">Side</option></select><button id="orbit-left" aria-label="Orbit left">↶ Orbit</button><button id="orbit-right" aria-label="Orbit right">Orbit ↷</button><button id="zoom-in" aria-label="Zoom in">＋</button><button id="zoom-out" aria-label="Zoom out">−</button><select id="snap" aria-label="Move snapping"><option value="0.5">Snap 0.5 m</option><option value="1">Snap 1 m</option><option value="0">No snap</option></select></div></details></nav><div class="view-label"><span id="tool-readout">SELECT</span><span>Z UP · METRES · WEBGL</span></div><div id="controls"></div></section><aside id="properties"><div class="eyebrow">Inspector</div><h2 id="selection-name"></h2><div id="selection-id"></div><div id="fields"></div><p class="note">Camera: middle drag or Alt + left drag to orbit; right drag or Shift + middle drag to pan. Wheel zooms toward the pointer. On touch, use Orbit/Pan mode or two fingers to pan and pinch. F frames selection; Home frames all. Move on the ground plane or drag the rotation ring. Use Top for Z rotation, Front for Y, Side for X. Escape cancels. Play uses a separate copy.</p></aside></main><footer><output id="status">Opening Studio…</output><output id="metrics"></output></footer><div id="error" role="alert" hidden title="Tap to dismiss"></div>
+<div class="navigation-strip"><button id="orbit" title="Orbit camera · middle drag or Alt + left drag" aria-pressed="false">Orbit</button><button id="pan" title="Pan camera · right drag or Shift + middle drag" aria-pressed="false">Pan</button></div><details id="viewport-options"><summary>◈ View & guides</summary><div class="view-options"><button id="frame-selected" title="Frame selected (F)">Frame selected</button><button id="frame-all" title="Frame all (Home)">Frame all</button><button id="reset-view">Reset view</button><span></span><button id="grid" aria-pressed="false">⌗ Grid</button><button id="lights" aria-pressed="true">☼ Light icons</button><select id="projection" aria-label="Camera projection"><option value="orthographic">Orthographic</option><option value="perspective">Perspective</option></select><label>Vertical FOV ° <input id="fov" aria-label="Vertical field of view" type="number" min="15" max="110" value="50" step="1"></label><select id="view" aria-label="Camera view"><option value="oblique">Oblique</option><option value="top">Top</option><option value="front">Front</option><option value="side">Side</option></select><button id="orbit-left" aria-label="Orbit left">↶ Orbit</button><button id="orbit-right" aria-label="Orbit right">Orbit ↷</button><button id="zoom-in" aria-label="Zoom in">＋</button><button id="zoom-out" aria-label="Zoom out">−</button><select id="snap" aria-label="Move snapping"><option value="0.5">Snap 0.5 m</option><option value="1">Snap 1 m</option><option value="0">No snap</option></select></div></details></nav><div class="view-label"><span id="tool-readout">SELECT</span><span>Z UP · METRES · WEBGL</span></div><div id="controls"></div></section><aside id="properties"><div class="eyebrow">Inspector</div><h2 id="selection-name"></h2><div id="selection-id"></div><div id="fields"></div><p class="note">Camera: middle drag or Alt + left drag to orbit; right drag or Shift + middle drag to pan. Wheel zooms toward the pointer. On touch, use Orbit/Pan mode or two fingers to pan and pinch. F frames selection; Home frames all. Move on the ground plane or drag the rotation ring. Use Top for Z rotation, Front for Y, Side for X. Escape cancels. Play uses a separate copy.</p></aside></main><footer><output id="status">Opening Studio…</output><output id="metrics"></output></footer><div id="error" role="alert" hidden title="Tap to dismiss"></div>
 <script type="module">
 // Source: engine/basement/rotation.js
 const module4=(()=>{
@@ -376,7 +377,7 @@ const { ROTATION_GLSL } = module4;
 
 const RECONSTRUCT = `
 uniform mat4 uInverseViewProjection;
-vec3 reconstruct(vec2 uv,float depth){return (uInverseViewProjection*vec4(uv*2.0-1.0,depth*2.0-1.0,1.0)).xyz;}`;
+vec3 reconstruct(vec2 uv,float depth){vec4 p=uInverseViewProjection*vec4(uv*2.0-1.0,depth*2.0-1.0,1.0);return p.xyz/p.w;}`;
 
 /** No lit color target is needed: retain normals plus hardware depth at bounded resolution. */
 const NORMAL_FRAGMENT = `#version 300 es
@@ -404,8 +405,9 @@ precision highp float;
 in vec2 vUV;
 uniform sampler2D uDepth;
 uniform sampler2D uNormals;
-uniform vec4 uCamera;
 uniform float uRadius;
+uniform mat4 uViewProjection;
+uniform vec2 uProjectionScale;
 out vec4 outColor;
 ${RECONSTRUCT}
 void main(){
@@ -413,13 +415,15 @@ void main(){
   if(depth>=0.99999){outColor=vec4(1.0);return;}
   vec3 p=reconstruct(vUV,depth);
   vec3 n=normalize(texture(uNormals,vUV).xyz*2.0-1.0);
+  // clip.w is view depth in perspective, 1 in orthographic: radius stays in metres.
+  vec2 radiusScale=uProjectionScale/(2.0*(uViewProjection*vec4(p,1.0)).w);
   float blocked=0.0;
   for(int i=0;i<8;i++){
     float angle=(float(i)+0.125)*0.7853981634;
     vec2 direction=vec2(cos(angle),sin(angle));
     for(int j=0;j<2;j++){
       float reach=uRadius*(j==0?0.3:0.8);
-      vec2 uv=vUV+direction*reach/(uCamera.zw*2.0);
+      vec2 uv=vUV+direction*reach*radiusScale;
       if(any(lessThan(uv,vec2(0.0)))||any(greaterThan(uv,vec2(1.0))))continue;
       float other=texture(uDepth,uv).r;
       if(other>=0.99999)continue;
@@ -451,7 +455,6 @@ uniform sampler2D uAOScreen;
 uniform sampler2D uAODepth;
 uniform sampler2D uAONormals;
 uniform vec2 uAOSize;
-uniform vec4 uCamera;
 ${RECONSTRUCT}
 ${ROTATION_GLSL}
 uniform vec4 uBlockerRotation[12];
@@ -915,7 +918,7 @@ class AmbientOcclusion {
       if(!this.normalProgram){this.normalProgram=createProgram(gl,VERTEX,NORMAL_FRAGMENT);this.renderer.stats.programs++;}
       if(!this.screenProgram){this.screenProgram=createProgram(gl,FULLSCREEN_VERTEX,SSAO_FRAGMENT);this.renderer.stats.programs++;}
       this.normalCamera=gl.getUniformLocation(this.normalProgram,'uViewProjection');
-      this.screenUniforms=Object.fromEntries(['uCamera','uRadius','uDepth','uNormals','uInverseViewProjection'].map(n=>[n,gl.getUniformLocation(this.screenProgram,n)]));
+      this.screenUniforms=Object.fromEntries(['uRadius','uDepth','uNormals','uInverseViewProjection','uViewProjection','uProjectionScale'].map(n=>[n,gl.getUniformLocation(this.screenProgram,n)]));
       /** Create immutable single-level storage; nearest sampling avoids depth interpolation. */
       const texture=(format)=>{
         const handle=gl.createTexture();if(!handle)throw new Error('AO texture allocation failed');
@@ -943,7 +946,7 @@ class AmbientOcclusion {
   texture(unit,handle) {const gl=this.gl;gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,handle);}
 
   /** Render normal/depth and AO using the already-synchronized instance batch. */
-  prepare(batch,view) {
+  prepare(batch) {
     this.select(batch.world);
     if(this.settings.mode!=='screen'||this.settings.strength===0||!this.ensure(this.renderer.canvas.width,this.renderer.canvas.height))return false;
     const gl=this.gl,t=this.targets,r=this.renderer;
@@ -954,8 +957,9 @@ class AmbientOcclusion {
     gl.bindFramebuffer(gl.FRAMEBUFFER,t.framebuffers[1]);gl.disable(gl.DEPTH_TEST);
     gl.useProgram(this.screenProgram);this.texture(0,t.depth);this.texture(1,t.normal);
     gl.uniform1i(this.screenUniforms.uDepth,0);gl.uniform1i(this.screenUniforms.uNormals,1);
-    gl.uniform4f(this.screenUniforms.uCamera,r.camera.x,r.camera.y,view.halfWidth,view.halfHeight);
     gl.uniformMatrix4fv(this.screenUniforms.uInverseViewProjection,false,r.camera.inverse);
+    gl.uniformMatrix4fv(this.screenUniforms.uViewProjection,false,r.camera.matrix);
+    gl.uniform2fv(this.screenUniforms.uProjectionScale,r.camera.projectionScale);
     gl.uniform1f(this.screenUniforms.uRadius,this.settings.radius);gl.drawArrays(gl.TRIANGLES,0,3);
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.enable(gl.DEPTH_TEST);
     gl.viewport(0,0,r.canvas.width,r.canvas.height);
@@ -1159,7 +1163,7 @@ class ShadowMaps {
       this.clearWorld();this.casters=r.createBatch(batch.world,batch.capacity,{visibility:'shadow'});
     }
     this.sourceBatch=batch;
-    this.casters.sync(0,0);
+    this.casters.sync();
     try {
       this.ensureProgram();gl.enable(gl.DEPTH_TEST);gl.useProgram(this.program);gl.bindVertexArray(this.casters.vao);
       this.prepareSun();this.preparePoint();
@@ -1449,39 +1453,258 @@ return {LineRendering};
 })();
 // Source: engine/basement/camera.js
 const module20=(()=>{
-/**
- * Basement / camera: arbitrary z-up orthographic views and their exact inverse rays.
- * Geometry, culling, picking, aiming and screen-space AO share the same projection.
- * Near/far depth spans +/-200 world units around the focus. Perspective is future work.
+/** Basement / shared z-up camera. Focus is the orbit pivot, never an implicit eye.
+ * Drawing, clipping, picking and screen-space effects use one view/projection pair.
+ * Orthographic remains the default so game presentation does not change in Studio.
  */
+const POSE_KEYS = [
+  "x",
+  "y",
+  "z",
+  "halfHeight",
+  "azimuth",
+  "elevation",
+  "projection",
+  "distance",
+  "fov",
+  "near",
+  "far",
+];
 class Camera {
-  /** The default reproduces the Atrium's former oblique view; all angles are radians. */
-  constructor(){this.x=0;this.y=0;this.z=0;this.halfHeight=21;this.azimuth=0;this.elevation=Math.atan2(0.65,0.76);this.matrix=new Float32Array(16);this.inverse=new Float32Array(16);this.right=[1,0,0];this.up=[0,0.65,0.76];this.back=[0,-0.76,0.65];}
-
-  /** Recompute orthonormal basis and matrices without per-frame matrix allocation. */
+  /** Distances are metres, angles radians; FOV is vertical. Clip settings affect perspective only. */
+  constructor() {
+    this.x = 0;
+    this.y = 0;
+    this.z = 0;
+    this.halfHeight = 21;
+    this.azimuth = 0;
+    this.elevation = Math.atan2(0.65, 0.76);
+    this.projection = "orthographic";
+    this.fov = (50 * Math.PI) / 180;
+    this.distance = this.halfHeight / Math.tan(this.fov / 2);
+    this.near = 0.1;
+    this.far = 1000;
+    this.matrix = new Float32Array(16);
+    this.inverse = new Float32Array(16);
+    this.right = [1, 0, 0];
+    this.up = [0, 0.65, 0.76];
+    this.back = [0, -0.76, 0.65];
+    this.planes = new Float32Array(24);
+    this.eye = [0, 0, 0];
+    this.projectionScale = [1, 1];
+  }
+  /** One complete pose contract for navigation cancellation and edit/Play isolation. */
+  snapshot() {
+    return Object.fromEntries(POSE_KEYS.map((key) => [key, this[key]]));
+  }
+  /** Switch lenses without changing the apparent size on the focus plane. */
+  setProjection(mode) {
+    if (!["orthographic", "perspective"].includes(mode))
+      throw new Error("Unknown camera projection");
+    if (mode === this.projection) return;
+    if (mode === "perspective")
+      this.distance = this.halfHeight / Math.tan(this.fov / 2);
+    else this.halfHeight = this.focusHalfHeight;
+    this.projection = mode;
+  }
+  get focusHalfHeight() {
+    return this.projection === "perspective"
+      ? this.distance * Math.tan(this.fov / 2)
+      : this.halfHeight;
+  }
+  /** Basis and exact analytical inverse: no general matrix inversion. */
   update(aspect) {
-    const c=Math.cos(this.azimuth),s=Math.sin(this.azimuth),e=Math.sin(this.elevation),f=Math.cos(this.elevation);
-    this.right[0]=c;this.right[1]=s;this.right[2]=0;this.up[0]=-s*e;this.up[1]=c*e;this.up[2]=f;
-    this.back[0]=s*f;this.back[1]=-c*f;this.back[2]=e;
-    const r=this.right,u=this.up,b=this.back,w=this.halfHeight*aspect,h=this.halfHeight;
-    for(let i=0;i<3;i++){this.matrix[i*4]=r[i]/w;this.matrix[i*4+1]=u[i]/h;this.matrix[i*4+2]=-b[i]/200;this.matrix[i*4+3]=0;
-      this.inverse[i]=r[i]*w;this.inverse[4+i]=u[i]*h;this.inverse[8+i]=-b[i]*200;}
-    this.matrix[12]=-(r[0]*this.x+r[1]*this.y+r[2]*this.z)/w;this.matrix[13]=-(u[0]*this.x+u[1]*this.y+u[2]*this.z)/h;
-    this.matrix[14]=(b[0]*this.x+b[1]*this.y+b[2]*this.z)/200;this.matrix[15]=1;
-    this.inverse[3]=this.inverse[7]=this.inverse[11]=0;this.inverse[12]=this.x;this.inverse[13]=this.y;this.inverse[14]=this.z;this.inverse[15]=1;
+    const c = Math.cos(this.azimuth),
+      s = Math.sin(this.azimuth),
+      e = Math.sin(this.elevation),
+      f = Math.cos(this.elevation);
+    const r = this.right,
+      u = this.up,
+      b = this.back,
+      m = this.matrix,
+      v = this.inverse;
+    r[0] = c;
+    r[1] = s;
+    r[2] = 0;
+    u[0] = -s * e;
+    u[1] = c * e;
+    u[2] = f;
+    b[0] = s * f;
+    b[1] = -c * f;
+    b[2] = e;
+    const focus = [this.x, this.y, this.z];
+    if (this.projection === "perspective") {
+      const sy = 1 / Math.tan(this.fov / 2),
+        sx = sy / aspect,
+        A = -(this.far + this.near) / (this.far - this.near),
+        B = (-2 * this.far * this.near) / (this.far - this.near);
+      this.projectionScale[0] = sx;
+      this.projectionScale[1] = sy;
+      for (let i = 0; i < 3; i++) this.eye[i] = focus[i] + b[i] * this.distance;
+      for (let i = 0; i < 3; i++) {
+        m[i * 4] = r[i] * sx;
+        m[i * 4 + 1] = u[i] * sy;
+        m[i * 4 + 2] = b[i] * A;
+        m[i * 4 + 3] = -b[i];
+        v[i] = r[i] / sx;
+        v[4 + i] = u[i] / sy;
+        v[8 + i] = this.eye[i] / B;
+        v[12 + i] = (this.eye[i] * A) / B - b[i];
+      }
+      const dot = (a) => a.reduce((n, t, i) => n + t * this.eye[i], 0);
+      m[12] = -dot(r) * sx;
+      m[13] = -dot(u) * sy;
+      m[14] = B - A * dot(b);
+      m[15] = dot(b);
+      v[3] = v[7] = 0;
+      v[11] = 1 / B;
+      v[15] = A / B;
+    } else {
+      const h = this.halfHeight,
+        w = h * aspect;
+      this.projectionScale[0] = 1 / w;
+      this.projectionScale[1] = 1 / h;
+      for (let i = 0; i < 3; i++) {
+        this.eye[i] = focus[i] + b[i] * 200;
+        m[i * 4] = r[i] / w;
+        m[i * 4 + 1] = u[i] / h;
+        m[i * 4 + 2] = -b[i] / 200;
+        m[i * 4 + 3] = 0;
+        v[i] = r[i] * w;
+        v[4 + i] = u[i] * h;
+        v[8 + i] = -b[i] * 200;
+        v[12 + i] = focus[i];
+      }
+      const dot = (a) => a.reduce((n, t, i) => n + t * focus[i], 0);
+      m[12] = -dot(r) / w;
+      m[13] = -dot(u) / h;
+      m[14] = dot(b) / 200;
+      m[15] = 1;
+      v[3] = v[7] = v[11] = 0;
+      v[15] = 1;
+    }
+    // Normalize once per camera update, not once per visible instance.
+    for (let axis = 0; axis < 3; axis++)
+      for (let side = 0; side < 2; side++) {
+        const sign = side === 0 ? -1 : 1,
+          offset = (axis * 2 + side) * 4;
+        const a = m[3] + sign * m[axis],
+          b = m[7] + sign * m[4 + axis],
+          c = m[11] + sign * m[8 + axis],
+          length = Math.hypot(a, b, c);
+        this.planes[offset] = a / length;
+        this.planes[offset + 1] = b / length;
+        this.planes[offset + 2] = c / length;
+        this.planes[offset + 3] = (m[15] + sign * m[12 + axis]) / length;
+      }
+  }
+  /** Named orientations preserve projection, pivot and distance. */
+  preset(name) {
+    const views = {
+      oblique: [0, Math.atan2(0.65, 0.76)],
+      top: [0, Math.PI / 2],
+      front: [0, 0],
+      side: [Math.PI / 2, 0],
+    };
+    if (!views[name]) throw new Error("Unknown camera view");
+    [this.azimuth, this.elevation] = views[name];
+  }
+  /** Homogeneous unprojection is also the reference for depth reconstruction tests. */
+  unproject(x, y, z) {
+    // CPU queries use double precision; GPU uniforms remain Float32. Avoid subtracting
+    // nearly equal inverse-matrix terms at kilometre-scale far planes during picking.
+    if (this.projection === "perspective") {
+      const depth =
+        (2 * this.far * this.near) /
+        (this.far + this.near - z * (this.far - this.near));
+      return [0, 1, 2].map(
+        (i) =>
+          this.eye[i] +
+          depth *
+            ((this.right[i] * x) / this.projectionScale[0] +
+              (this.up[i] * y) / this.projectionScale[1] -
+              this.back[i]),
+      );
+    }
+    const focus = [this.x, this.y, this.z];
+    return focus.map(
+      (n, i) =>
+        n +
+        (this.right[i] * x) / this.projectionScale[0] +
+        (this.up[i] * y) / this.projectionScale[1] -
+        this.back[i] * z * 200,
+    );
   }
 
-  /** Named views change orientation only, preserving focus and zoom. */
-  preset(name){const views={oblique:[0,Math.atan2(0.65,0.76)],top:[0,Math.PI/2],front:[0,0],side:[Math.PI/2,0]};if(!views[name])throw new Error('Unknown camera view');[this.azimuth,this.elevation]=views[name];}
+  /** Clipped ray starts at the near plane. maxDistance excludes invisible far-plane objects. */
+  ray(x, y, width, height) {
+    this.update(width / height);
+    const nx = (x / width) * 2 - 1,
+      ny = 1 - (y / height) * 2;
+    const origin = this.unproject(nx, ny, -1),
+      end = this.unproject(nx, ny, 1),
+      direction = end.map((n, i) => n - origin[i]),
+      maxDistance = Math.hypot(...direction);
+    return {
+      origin,
+      direction: direction.map((n) => n / maxDistance),
+      maxDistance,
+    };
+  }
+  /** Reject parallel, behind-camera and beyond-far construction-plane intersections. */
+  ground(x, y, width, height, z = 0) {
+    const ray = this.ray(x, y, width, height);
+    if (Math.abs(ray.direction[2]) < 1e-6) return null;
+    const t = (z - ray.origin[2]) / ray.direction[2];
+    if (t < 0 || t > ray.maxDistance) return null;
+    return {
+      x: ray.origin[0] + t * ray.direction[0],
+      y: ray.origin[1] + t * ray.direction[1],
+      z,
+    };
+  }
+  /** CSS projection plus clipping information for foreground editor markers. */
+  project(p, width, height) {
+    this.update(width / height);
+    const d = [p.x - this.x, p.y - this.y, p.z - this.z],
+      dot = (a) => a.reduce((n, t, i) => n + t * d[i], 0);
+    const depth =
+      this.projection === "perspective" ? this.distance - dot(this.back) : 1;
+    const x = (dot(this.right) * this.projectionScale[0]) / depth,
+      y = (dot(this.up) * this.projectionScale[1]) / depth;
+    const z =
+      this.projection === "perspective"
+        ? (this.far + this.near) / (this.far - this.near) -
+          (2 * this.far * this.near) / ((this.far - this.near) * depth)
+        : -dot(this.back) / 200;
+    return {
+      x: ((x + 1) * width) / 2,
+      y: ((1 - y) * height) / 2,
+      depth: z,
+      visible:
+        depth > 0 && Math.abs(x) <= 1 && Math.abs(y) <= 1 && Math.abs(z) <= 1,
+    };
+  }
 
-  /** Ray starts on the near plane; CSS coordinates are relative to the drawing surface. */
-  ray(x,y,width,height){this.update(width/height);const sx=(x/width*2-1)*this.halfHeight*width/height,sy=(1-y/height*2)*this.halfHeight;return{origin:[this.x+this.right[0]*sx+this.up[0]*sy+this.back[0]*200,this.y+this.right[1]*sx+this.up[1]*sy+this.back[1]*200,this.z+this.up[2]*sy+this.back[2]*200],direction:this.back.map(n=>-n)};}
-
-  /** Intersect a horizontal construction plane; side/front parallel rays have no intersection. */
-  ground(x,y,width,height,z=0){const ray=this.ray(x,y,width,height);if(Math.abs(ray.direction[2])<1e-6)return null;const t=(z-ray.origin[2])/ray.direction[2];return{x:ray.origin[0]+t*ray.direction[0],y:ray.origin[1]+t*ray.direction[1],z};}
-
-  /** Project one world point for engine overlays; return surface-relative CSS pixels. */
-  project(p,width,height){this.update(width/height);const x=p.x-this.x,y=p.y-this.y,z=p.z-this.z;return{x:(1+(x*this.right[0]+y*this.right[1])/(this.halfHeight*width/height))*width/2,y:(1-(x*this.up[0]+y*this.up[1]+z*this.up[2])/this.halfHeight)*height/2};}
+  /** World length represented by one CSS pixel at this point's view depth. */
+  worldUnitsPerPixel(point, height) {
+    if (this.projection !== "perspective")
+      return (this.halfHeight * 2) / height;
+    const d =
+      this.distance -
+      ((point[0] - this.x) * this.back[0] +
+        (point[1] - this.y) * this.back[1] +
+        (point[2] - this.z) * this.back[2]);
+    return (Math.max(this.near, d) * 2 * Math.tan(this.fov / 2)) / height;
+  }
+  /** Conservative six-plane sphere test. Shadow casters deliberately do not use this. */
+  sphereVisible(x, y, z, radius) {
+    const p = this.planes;
+    for (let i = 0; i < 24; i += 4)
+      if (p[i] * x + p[i + 1] * y + p[i + 2] * z + p[i + 3] < -radius)
+        return false;
+    return true;
+  }
 }
 
 return {Camera};
@@ -1569,7 +1792,7 @@ class Renderer {
     const gl = this.gl;
     const program=createProgram(gl,VERTEX,FRAGMENT);
     this.program = program; this.stats.programs++;
-    this.uniforms = Object.fromEntries(['uCamera','uViewProjection','uInverseViewProjection','uBlockerRotation[0]', 'uAmbient', 'uLights[0]', 'uLightColors[0]',
+    this.uniforms = Object.fromEntries(['uViewProjection','uInverseViewProjection','uBlockerRotation[0]', 'uAmbient', 'uLights[0]', 'uLightColors[0]',
       'uAOMode','uAOStrength','uAORadius','uBlockerCount','uBlockerPose[0]','uBlockerSize[0]',
       'uAOScreen','uAODepth','uAONormals','uAOSize','uSunDirection','uSunColor','uSunShadowEnabled','uSunMatrix',
       'uSunShadow','uShadowParameters','uPointShadowIndex','uPointShadow','uPointShadowParameters','uPointShadowPosition','uPointShadowResolution']
@@ -1594,7 +1817,7 @@ class Renderer {
     if (this.disposed || this.lost) throw new Error('GPU is not ready for world preparation');
     if (batch.renderer !== this || batch.disposed) throw new Error('Invalid preparation batch');
     this.resize(); batch.world.resolve();
-    const view = this.view(); batch.sync(view.halfWidth, view.halfHeight);
+    this.view(); batch.sync();
   }
 
   /** Resize backing pixels only when necessary. CSS layout belongs to the application. */
@@ -1610,7 +1833,7 @@ class Renderer {
   /** Compute view dimensions in world units; the same projection is exposed to mouse aiming. */
   view() {
     this.camera.update(this.canvas.width/this.canvas.height);
-    const halfHeight = this.camera.halfHeight;
+    const halfHeight = this.camera.focusHalfHeight;
     return { halfWidth: halfHeight * this.canvas.width / this.canvas.height, halfHeight };
   }
 
@@ -1638,22 +1861,21 @@ class Renderer {
   draw(batch = null) {
     if (this.disposed || this.lost) return;
     this.resize();
-    const gl = this.gl, { halfWidth, halfHeight } = this.view();
+    const gl = this.gl; this.view();
     this.stats.draws = this.stats.instances = this.stats.uploads = this.stats.uploadedBytes = 0;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.clearColor(0.018, 0.019, 0.037, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     if (!batch || batch.disposed) {this.occlusion.count=this.occlusion.candidates=0;this.lighting.clearWorld();return;}
     if (batch.renderer !== this) throw new Error('Batch belongs to another renderer');
-    batch.sync(halfWidth, halfHeight);
+    batch.sync();
     const shadowToken=this.profiler?.begin(this.shadowScope);
     try {this.lighting.prepare(batch);}finally {this.profiler?.end(shadowToken);}
     const aoToken=this.profiler?.begin(this.occlusionScope);
     let screenReady;
-    try {screenReady=this.occlusion.prepare(batch,{halfWidth,halfHeight});}
+    try {screenReady=this.occlusion.prepare(batch);}
     finally {this.profiler?.end(aoToken);}
     gl.useProgram(this.program);
     this.occlusion.bind(this.uniforms,screenReady);
-    gl.uniform4f(this.uniforms.uCamera, this.camera.x, this.camera.y, halfWidth, halfHeight);
     gl.uniformMatrix4fv(this.uniforms.uViewProjection,false,this.camera.matrix);
     this.lighting.bind(this.uniforms);
     gl.bindVertexArray(batch.vao);
@@ -1723,17 +1945,16 @@ class InstanceBatch {
    * Pack visible transforms/materials into retained records; compare Float32 values to
    * avoid treating harmless double-to-float rounding as a perpetual dirty upload.
    */
-  sync(halfWidth, halfHeight) {
+  sync() {
     const r = this.renderer, gl = r.gl;
     this.cursor = 0; this.firstDirty = Infinity; this.lastDirty = -1;
     for (const entity of this.world.entities.values()) {
       const s = entity.shape, p = entity.pose;
       if (!s || (this.visibility==='shadow'&&s.castShadow===false)) continue;
       r.totals.candidates++;
+      // Sphere is conservative under any orientation. Shadow membership ignores the lens.
       const radius = Math.hypot(...s.size)*p.scale;
-      const dx=p.x-r.camera.x,dy=p.y-r.camera.y,dz=p.z-r.camera.z;
-      const screenY=dx*r.camera.up[0]+dy*r.camera.up[1]+dz*r.camera.up[2],screenX=dx*r.camera.right[0]+dy*r.camera.right[1];
-      if (this.visibility==='camera'&&(Math.abs(screenX) > halfWidth + radius || Math.abs(screenY) > halfHeight + radius)) {r.totals.culled++;continue;}
+      if (this.visibility==='camera'&&!r.camera.sphereVisible(p.x,p.y,p.z,radius)) {r.totals.culled++;continue;}
       if (this.cursor / 16 >= this.capacity) throw new Error(`World ${this.world.id} exceeds ${this.capacity} ${this.visibility} instances`);
       this.write(p.x); this.write(p.y); this.write(p.z); this.write(0);
       this.write(s.size[0]*p.scale); this.write(s.size[1]*p.scale); this.write(s.size[2]*p.scale);
@@ -2990,7 +3211,7 @@ function rayPlane(ray,center,normal){
  const denominator=ray.direction.reduce((n,v,i)=>n+v*normal[i],0);
  if(Math.abs(denominator)<.04)return null;
  const t=normal.reduce((n,v,i)=>n+(center[i]-ray.origin[i])*v,0)/denominator;
- return t<0?null:ray.origin.map((v,i)=>v+ray.direction[i]*t);
+ return t<0||t>(ray.maxDistance??Infinity)?null:ray.origin.map((v,i)=>v+ray.direction[i]*t);
 }
 /** Stable in-plane basis, shared by visible rings and their angular picking. */
 function planeBasis(normal){
@@ -3024,7 +3245,7 @@ const { rotationAxis, planeBasis, rayPlane } = module36;
 /** World-space rotation ring: fixed CSS size, actual axis plane, shared hit/draw geometry. */
 function rotationRing(camera,entity,axis,space,height){
  const normal=rotationAxis(entity.rotation,axis,space),basis=planeBasis(normal);
- return {center:entity.position,normal,basis,radius:camera.halfHeight*2/height*48};
+ return {center:entity.position,normal,basis,radius:camera.worldUnitsPerPixel(entity.position,height)*48};
 }
 /** Angular coordinate in the ring's plane; null when the view is nearly edge-on. */
 function ringAngle(ring,ray){
@@ -3052,12 +3273,14 @@ class AuthoringGuides {
   const target=scene.entities.find(e=>e.id===selected),dial=mode==='rotate'&&target&&!target.locked;
   if(!lights&&!dial){if(this.widgets)this.widgets.dispose();this.widgets=null;this.key='';return this.grid?[this.grid]:[];}
   const camera=r.camera,h=r.canvas.clientHeight;
-  const key=[scene.id,revision,selected,mode,axis,space,lights,camera.x,camera.y,camera.z,camera.azimuth,camera.elevation,camera.halfHeight,r.canvas.clientWidth,h].join('/');
+  const key=[scene.id,revision,selected,mode,axis,space,lights,camera.x,camera.y,camera.z,camera.azimuth,camera.elevation,camera.halfHeight,camera.projection,camera.distance,camera.fov,camera.near,camera.far,r.canvas.clientWidth,h].join('/');
   if(!this.widgets){this.widgets=r.lines.create(1024,{depthTest:false});this.key='';}
   if(key!==this.key){
-   camera.update(r.canvas.clientWidth/h);this.widgets.begin();const pixel=camera.halfHeight*2/h;
+   camera.update(r.canvas.clientWidth/h);this.widgets.begin();
    if(lights)for(const light of scene.lights){
     const color=light.id===selected?[1,.92,.63,1]:[.91,.68,.32,.95],center=light.position;
+    const pixel=camera.worldUnitsPerPixel(center,h);
+    if(!camera.project({x:center[0],y:center[1],z:center[2]},r.canvas.clientWidth,h).visible)continue;
     const p=(x,y)=>center.map((v,i)=>v+pixel*(camera.right[i]*x+camera.up[i]*y));
     for(const [a,b]of [[[0,8],[7,0]],[[7,0],[0,-8]],[[0,-8],[-7,0]],[[-7,0],[0,8]],[[-3,0],[3,0]],[[0,-3],[0,3]]])this.widgets.segment(p(...a),p(...b),color);
    }
@@ -3074,7 +3297,7 @@ class AuthoringGuides {
  /** Pick readable light icons in CSS pixels, independently of physical geometry/collision. */
  pickLight(scene,x,y,width,height){
   const camera=this.renderer.camera;let closest=null,distance=22*22;
-  for(const light of scene.lights){const [px,py,pz]=light.position,p=camera.project({x:px,y:py,z:pz},width,height),d=(p.x-x)**2+(p.y-y)**2;if(d<distance){distance=d;closest=light;}}
+  for(const light of scene.lights){const [px,py,pz]=light.position,p=camera.project({x:px,y:py,z:pz},width,height),d=(p.x-x)**2+(p.y-y)**2;if(p.visible&&d<distance){distance=d;closest=light;}}
   return closest;
  }
  /** Hidden guides release all buffers/VAOs and their shared program ownership immediately. */
@@ -4852,10 +5075,11 @@ class StudioSession {
   if(this.play)return;
   this.document.cancel();
   const renderer=this.engine.basement.renderer;
-  this.camera=Object.fromEntries(['x','y','z','halfHeight','azimuth','elevation'].map(key=>[key,renderer.camera[key]]));
+  this.camera=renderer.camera.snapshot();
   this.preview.dispose();
   this.preview=null;
   this.engine.basement.input.clear();
+  renderer.camera.setProjection('orthographic');
   renderer.camera.preset('oblique');
   renderer.camera.z=0;
   try{
@@ -4926,7 +5150,7 @@ return {selectedBounds,sceneBounds};
 })();
 // Source: engine/basement/camera-navigation.js
 const module66=(()=>{
-/** Basement / orthographic navigation mathematics. No DOM, input devices or scheduling.
+/** Basement / camera navigation mathematics. No DOM, input devices or scheduling.
  * Focus is the orbit pivot. Pan and zoom use its view plane, so front/side views remain
  * usable without trying to intersect a parallel ground plane. Units are metres/radians. */
 class CameraNavigation {
@@ -4942,15 +5166,7 @@ class CameraNavigation {
   }
   /** Copy only navigation fields; never serialize camera matrices or methods. */
   snapshot() {
-    const c = this.camera;
-    return {
-      x: c.x,
-      y: c.y,
-      z: c.z,
-      azimuth: c.azimuth,
-      elevation: c.elevation,
-      halfHeight: c.halfHeight,
-    };
+    return this.camera.snapshot();
   }
   restore(pose) {
     Object.assign(this.camera, pose);
@@ -4959,8 +5175,8 @@ class CameraNavigation {
   point(x, y, width, height) {
     const c = this.camera;
     c.update(width / height);
-    const sx = ((x - width / 2) * 2 * c.halfHeight) / height,
-      sy = ((height / 2 - y) * 2 * c.halfHeight) / height;
+    const sx = ((x - width / 2) * 2 * c.focusHalfHeight) / height,
+      sy = ((height / 2 - y) * 2 * c.focusHalfHeight) / height;
     return [
       c.x + c.right[0] * sx + c.up[0] * sy,
       c.y + c.right[1] * sx + c.up[1] * sy,
@@ -4971,18 +5187,20 @@ class CameraNavigation {
   pan(dx, dy, width, height) {
     const c = this.camera;
     c.update(width / height);
-    const scale = (2 * c.halfHeight) / height;
+    const scale = (2 * c.focusHalfHeight) / height;
     for (const [i, key] of ["x", "y", "z"].entries())
       c[key] += (-c.right[i] * dx + c.up[i] * dy) * scale;
   }
-  /** Preserve the world point under the cursor while changing orthographic size. */
+  /** Preserve the focus-plane point under the cursor while resizing or dollying. */
   zoom(factor, x, y, width, height) {
     const c = this.camera,
       before = this.point(x, y, width, height);
-    c.halfHeight = Math.max(
+    const size = Math.max(
       this.minZoom,
-      Math.min(this.maxZoom, c.halfHeight * factor),
+      Math.min(this.maxZoom, c.focusHalfHeight * factor),
     );
+    if (c.projection === "perspective") c.distance = size / Math.tan(c.fov / 2);
+    else c.halfHeight = size;
     const after = this.point(x, y, width, height);
     for (const [i, key] of ["x", "y", "z"].entries())
       c[key] += before[i] - after[i];
@@ -5006,11 +5224,26 @@ class CameraNavigation {
     [c.x, c.y, c.z] = bounds.min.map((n, i) => (n + bounds.max[i]) / 2);
     c.update(width / height);
     let sx = 0,
-      sy = 0;
+      sy = 0,
+      distance = 0;
     for (const x of [bounds.min[0], bounds.max[0]])
       for (const y of [bounds.min[1], bounds.max[1]])
         for (const z of [bounds.min[2], bounds.max[2]]) {
           const d = [x - c.x, y - c.y, z - c.z];
+          // Each corner has its own view depth; a flat screen-space fit can clip the near side.
+          const right = Math.abs(d.reduce((n, v, i) => n + v * c.right[i], 0));
+          const up = Math.abs(d.reduce((n, v, i) => n + v * c.up[i], 0));
+          const back = d.reduce((n, v, i) => n + v * c.back[i], 0);
+          distance = Math.max(
+            distance,
+            back +
+              Math.max(
+                c.near,
+                (Math.max(up, (right * height) / width) * padding) /
+                  Math.tan(c.fov / 2),
+              ),
+          );
+
           sx = Math.max(
             sx,
             Math.abs(d.reduce((n, v, i) => n + v * c.right[i], 0)),
@@ -5020,6 +5253,10 @@ class CameraNavigation {
             Math.abs(d.reduce((n, v, i) => n + v * c.up[i], 0)),
           );
         }
+    if (c.projection === "perspective") {
+      c.distance = Math.max(c.near * 2, distance);
+      return;
+    }
     c.halfHeight = Math.max(
       this.minZoom,
       Math.min(this.maxZoom, Math.max(sy, (sx * height) / width) * padding),
@@ -5283,7 +5520,7 @@ const { rotateVector } = module4;
 function rayBox(ray,entity){
   const p=entity.pose,s=entity.shape;if(!s)return null;
   const origin=[0,0,0],direction=[0,0,0];rotateVector(p.rotation,ray.origin[0]-p.x,ray.origin[1]-p.y,ray.origin[2]-p.z,origin,true);rotateVector(p.rotation,...ray.direction,direction,true);
-  let near=0,far=Infinity;
+  let near=0,far=ray.maxDistance??Infinity;
   for(let i=0;i<3;i++){const h=s.size[i]*p.scale/2;if(Math.abs(direction[i])<1e-9){if(Math.abs(origin[i])>h)return null;continue;}let a=(-h-origin[i])/direction[i],b=(h-origin[i])/direction[i];if(a>b)[a,b]=[b,a];near=Math.max(near,a);far=Math.min(far,b);if(near>far)return null;}
   return near;
 }
@@ -5449,7 +5686,7 @@ class StudioViewport {
       if (
         hit &&
         Math.abs(hit.radius - ring.radius) <
-          ((camera.halfHeight * 2) / p.height) * 12
+          camera.worldUnitsPerPixel(selected.position, p.height) * 12
       ) {
         this.canvas.setPointerCapture(event.pointerId);
         session.document.begin("Rotate instance");
@@ -5634,7 +5871,7 @@ try{
  const renderer=engine.basement.renderer;
  for(const entry of STUDIO_PROJECTS){const option=document.createElement('option');option.value=entry.project.id;option.textContent=entry.label;$('project').append(option);}
  /** Authored per-scene framing is application metadata, not a viewport rule keyed by a game name. */
- function frameScene(){Object.assign(renderer.camera,{x:0,y:0,z:0,halfHeight:24});renderer.camera.preset('oblique');if(session.scene.camera){for(const key of ['x','y','z','azimuth','elevation','halfHeight'])renderer.camera[key]=session.scene.camera[key];renderer.camera.halfHeight=Math.max(renderer.camera.halfHeight,21/($('world').clientWidth/$('world').clientHeight));}}
+ function frameScene(){const mode=renderer.camera.projection;renderer.camera.setProjection('orthographic');Object.assign(renderer.camera,{x:0,y:0,z:0,halfHeight:24});renderer.camera.preset('oblique');if(session.scene.camera){for(const key of ['x','y','z','azimuth','elevation','halfHeight'])renderer.camera[key]=session.scene.camera[key];renderer.camera.halfHeight=Math.max(renderer.camera.halfHeight,21/($('world').clientWidth/$('world').clientHeight));}renderer.camera.setProjection(mode);}
  life.listen($('project'),'change',()=>{try{viewport.cancel();activeProject=STUDIO_PROJECTS.find(e=>e.project.id===$('project').value);session.replace(activeProject.project);setTool('select');guides.clear();frameScene();}catch(error){activeProject=studioProject(session.document.data);$('project').value=session.document.data.id;report(error);}});
  frameScene();state('open');
  for(const [id,assets]of [['show-hierarchy',false],['show-assets',true]])action(id,()=>{document.body.classList.toggle('assets-open',assets);$('show-assets').setAttribute('aria-pressed',String(assets));$('show-hierarchy').setAttribute('aria-pressed',String(!assets));});
@@ -5652,6 +5889,10 @@ try{
  for(const [id,key]of [['rotation-axis','axis'],['rotation-space','space'],['angle-snap','angleSnap']]){$(id).value=preferences.value[key];life.listen($(id),'change',()=>{viewport.cancel();const value=key==='angleSnap'?Number($(id).value):$(id).value;preferences.set(key,value);viewport[key]=value;});}
  life.listen($('asset-search'),'input',()=>{panels.filter=$('asset-search').value;panels.renderAssets(session);});
  life.listen($('snap'),'change',()=>{viewport.cancel();viewport.snap=Number($('snap').value);});
+ // Lens controls change viewport state only; they never dirty the authored document.
+ $('projection').value=renderer.camera.projection;
+ life.listen($('projection'),'change',()=>{viewport.cancel();renderer.camera.setProjection($('projection').value);});
+ life.listen($('fov'),'change',()=>{viewport.cancel();const value=Number($('fov').value);if(Number.isFinite(value)){renderer.camera.fov=Math.max(15,Math.min(110,value))*Math.PI/180;$('fov').value=renderer.camera.fov*180/Math.PI;}});
  life.listen($('view'),'change',()=>{viewport.cancel();renderer.camera.preset($('view').value);});
  action('orbit-left',()=>viewport.navigation.motion.orbit(15,0));action('orbit-right',()=>viewport.navigation.motion.orbit(-15,0));
  function zoom(factor){viewport.navigation.motion.zoom(factor,$('world').clientWidth/2,$('world').clientHeight/2,$('world').clientWidth,$('world').clientHeight);}
@@ -5664,7 +5905,7 @@ try{
  life.listen($('error'),'click',()=>$('error').hidden=true);
  let metricsAt=-Infinity;
  // DOM diagnostics update at 4 Hz; the viewport retains the host's normal frame rate.
- life.own(engine.lobby.on('render',(_alpha,_time,wallMs)=>{if(wallMs-metricsAt<250)return;metricsAt=wallMs;const stats=renderer.stats;$('metrics').textContent=`${stats.draws} draws · ${stats.buffers} buffers`;$('status').dataset.worlds=engine.directory.worlds.size;$('status').dataset.buffers=stats.buffers;$('status').dataset.guides=renderer.lines.layers.size;$('status').dataset.camera=JSON.stringify(viewport.navigation.motion.snapshot());},'studio.status'));
+ life.own(engine.lobby.on('render',(_alpha,_time,wallMs)=>{if(wallMs-metricsAt<250)return;metricsAt=wallMs;const stats=renderer.stats;$('projection').value=renderer.camera.projection;$('projection').disabled=!!session.play;$('fov').disabled=!!session.play||renderer.camera.projection!=='perspective';$('metrics').textContent=`${stats.draws} draws · ${stats.buffers} buffers`;$('status').dataset.worlds=engine.directory.worlds.size;$('status').dataset.buffers=stats.buffers;$('status').dataset.guides=renderer.lines.layers.size;$('status').dataset.camera=JSON.stringify(viewport.navigation.motion.snapshot());},'studio.status'));
  life.listen(window,'pagehide',()=>life.dispose());engine.start();
 }catch(error){report(error);life.dispose();}
 

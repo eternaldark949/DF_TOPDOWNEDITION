@@ -16,6 +16,8 @@ The branch was intentionally created with only this plan. On 2026-10-15, after r
 
 **Studio direction and roadmap:** [3D engine, universal Studio, authored JSON and offline packaging](docs/decisions/0006-studio-3d-and-authored-data.md). The first edit/save/play workspace is now implemented; the first recreated street/vestibule slice is now implemented.
 
+**Perspective update:** [shared dual-projection camera and bloom/lighting sequence](docs/decisions/0011-perspective-camera.md) · [screenshots and checks](docs/milestones/perspective/README.md).
+
 **Viewport update:** [camera navigation and current light parameters](docs/decisions/0010-viewport-navigation.md) · [screenshots and checks](docs/milestones/viewport-navigation/README.md).
 
 **Current playable milestone:** [Freelancer street/doorway slice](docs/decisions/0009-freelancer-street-slice.md) · [screenshots and verification](docs/milestones/enni-street/README.md) · [Freelancer editing guide](games/freelancer/DOCUMENTS.md).
@@ -561,9 +563,9 @@ The example enables the lower-cost sun tier and exposes Off / Soft / Fine plus a
 
 ## 18. 3D engine, Studio and authored JSON
 
-The first Studio slice is implemented: one contextual workspace, editable Atrium JSON, selection/move, shared transform/light properties, bounded undo/redo, import/export, local recovery and isolated Play/Stop. The engine now supports full quaternion orientation, uniform hierarchy scale, arbitrary orthographic camera orientation and oriented-box ray picking. Movement/collision remain primarily planar.
+The first Studio slice is implemented: one contextual workspace, editable Atrium JSON, selection/move, shared transform/light properties, bounded undo/redo, import/export, local recovery and isolated Play/Stop. The engine now supports full quaternion orientation, uniform hierarchy scale, shared perspective/orthographic camera orientation and clipped oriented-box ray picking. Movement/collision remain primarily planar.
 
-[The Studio direction record](docs/decisions/0006-studio-3d-and-authored-data.md) preserves the agreed roadmap. [The implementation record](docs/decisions/0007-studio-first-workspace.md) distinguishes delivered capabilities from future specialist tools, free-flight/perspective cameras, general dependency streaming and 3D contact physics. Editor application code stays in `editor/`; reusable mechanisms remain in their house levels, and the game-only build imports no Studio application code.
+[The Studio direction record](docs/decisions/0006-studio-3d-and-authored-data.md) preserves the agreed roadmap. [The implementation record](docs/decisions/0007-studio-first-workspace.md) distinguishes delivered capabilities from future specialist tools, free-flight cameras, general dependency streaming and 3D contact physics. Editor application code stays in `editor/`; reusable mechanisms remain in their house levels, and the game-only build imports no Studio application code.
 
 `examples/atrium/project.json` is now authoritative for scene placements, grouped assembly assets and light data. JavaScript implements behavior/generators. The build validates schema/references/registered generator versions and embeds explicitly imported JSON into separate offline game and Studio HTML files. The first format is one portable package containing scene/asset tables; arbitrary multi-file dependency manifests remain future work. [The editing guide](examples/atrium/DOCUMENTS.md) documents units, fields and budgets. GitHub Actions runs the same source tests/build and uploads the offline HTML artifacts; it does not deploy or write repository files.
 

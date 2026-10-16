@@ -86,7 +86,7 @@ export class AmbientOcclusion {
       if(!this.normalProgram){this.normalProgram=createProgram(gl,VERTEX,NORMAL_FRAGMENT);this.renderer.stats.programs++;}
       if(!this.screenProgram){this.screenProgram=createProgram(gl,FULLSCREEN_VERTEX,SSAO_FRAGMENT);this.renderer.stats.programs++;}
       this.normalCamera=gl.getUniformLocation(this.normalProgram,'uViewProjection');
-      this.screenUniforms=Object.fromEntries(['uCamera','uRadius','uDepth','uNormals','uInverseViewProjection'].map(n=>[n,gl.getUniformLocation(this.screenProgram,n)]));
+      this.screenUniforms=Object.fromEntries(['uRadius','uDepth','uNormals','uInverseViewProjection','uViewProjection','uProjectionScale'].map(n=>[n,gl.getUniformLocation(this.screenProgram,n)]));
       /** Create immutable single-level storage; nearest sampling avoids depth interpolation. */
       const texture=(format)=>{
         const handle=gl.createTexture();if(!handle)throw new Error('AO texture allocation failed');
@@ -114,7 +114,7 @@ export class AmbientOcclusion {
   texture(unit,handle) {const gl=this.gl;gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,handle);}
 
   /** Render normal/depth and AO using the already-synchronized instance batch. */
-  prepare(batch,view) {
+  prepare(batch) {
     this.select(batch.world);
     if(this.settings.mode!=='screen'||this.settings.strength===0||!this.ensure(this.renderer.canvas.width,this.renderer.canvas.height))return false;
     const gl=this.gl,t=this.targets,r=this.renderer;
@@ -125,8 +125,9 @@ export class AmbientOcclusion {
     gl.bindFramebuffer(gl.FRAMEBUFFER,t.framebuffers[1]);gl.disable(gl.DEPTH_TEST);
     gl.useProgram(this.screenProgram);this.texture(0,t.depth);this.texture(1,t.normal);
     gl.uniform1i(this.screenUniforms.uDepth,0);gl.uniform1i(this.screenUniforms.uNormals,1);
-    gl.uniform4f(this.screenUniforms.uCamera,r.camera.x,r.camera.y,view.halfWidth,view.halfHeight);
     gl.uniformMatrix4fv(this.screenUniforms.uInverseViewProjection,false,r.camera.inverse);
+    gl.uniformMatrix4fv(this.screenUniforms.uViewProjection,false,r.camera.matrix);
+    gl.uniform2fv(this.screenUniforms.uProjectionScale,r.camera.projectionScale);
     gl.uniform1f(this.screenUniforms.uRadius,this.settings.radius);gl.drawArrays(gl.TRIANGLES,0,3);
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.enable(gl.DEPTH_TEST);
     gl.viewport(0,0,r.canvas.width,r.canvas.height);

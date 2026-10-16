@@ -1,5 +1,7 @@
 # Studio viewport navigation and current light parameters
 
+**Perspective update:** [decision 0011](0011-perspective-camera.md) adds the shared perspective lens, depth-correct AO/picking/guides and complete pose restoration. Camera limitations below describe the earlier milestone.
+
 Implemented 2026-10-16 following the owner's request for proper viewport camera controls. This extends the universal workspace, keeping authored document edits separate from the editor's camera. It does not change either standalone game's camera or renderer.
 
 ## Navigation

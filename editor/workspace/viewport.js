@@ -152,7 +152,7 @@ export class StudioViewport {
       if (
         hit &&
         Math.abs(hit.radius - ring.radius) <
-          ((camera.halfHeight * 2) / p.height) * 12
+          camera.worldUnitsPerPixel(selected.position, p.height) * 12
       ) {
         this.canvas.setPointerCapture(event.pointerId);
         session.document.begin("Rotate instance");
