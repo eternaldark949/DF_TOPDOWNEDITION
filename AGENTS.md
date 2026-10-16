@@ -1,6 +1,6 @@
 # Working in ETRNLNINE
 
-Read README.md and the applicable docs/decisions records (First Light, Between Worlds, Profiler, Ambient Occlusion, and Lighting/Shadows) before changing source. The owner's house architecture and commenting requirements govern this branch.
+Read README.md and the applicable docs/decisions records (First Light, Between Worlds, Profiler, Ambient Occlusion, Lighting/Shadows, and Studio/3D/Authored Data) before changing source. The owner's house architecture and commenting requirements govern this branch.
 
 - Basement defines reusable mechanisms; Lobby alone owns runtime scheduling; Directory manages registered libraries/worlds/resource ownership; Penthouse supplies reusable toys. ETRNLNINE remains a small composition root.
 - Game/example rules and content stay outside engine/. Engine code never imports them or looks up game DOM IDs.
@@ -19,3 +19,5 @@ For profiling, register static bounded names once and close synchronous scopes i
 For AO, read docs/decisions/0004-ambient-occlusion.md. Preserve ambient-only attenuation, bounded candidate/target budgets and the original antialiased forward path. Screen-space AO is SSAO, not GTAO or cast shadows. Keep texture-storage estimates distinct from requested buffer bytes. Free optional targets/programs on quality disable, and preserve context restoration and geometry fallback.
 
 For lighting, read docs/decisions/0005-lighting-and-shadows.md. Light data belongs to renderer.lighting; do not reintroduce renderer-field aliases. Camera-visible geometry is not the shadow caster list. Preserve the one-sun/one-point budget, material-independent depth cache, plane-correct comparisons, immediate source-batch cleanup and complete six-face cube updates. Keep estimated texture bytes separate from requested buffers.
+
+Before authoring/editor/scene-format/build work, read docs/decisions/0006-studio-3d-and-authored-data.md. The engine targets full 3D with game-chosen presentation. Studio uses one contextual workspace, shared properties/commands and the existing scheduler. Authored JSON is the planned source of truth; JavaScript implements behavior. Validate and embed explicit project dependencies into offline HTML without eager world/GPU construction. Do not claim the editor, JSON embedding or GitHub workflow exists until implemented. Keep editor/ and game data outside engine/; preserve house ownership, stable authored IDs, touch cancellation and edit/play isolation.

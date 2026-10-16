@@ -14,7 +14,9 @@ This document records the owner's requirements and the architectural agreement r
 
 The branch was intentionally created with only this plan. On 2026-10-15, after reviewing the plan and first-milestone proposal, the owner invited implementation to begin. The first runnable foundation follows [First Light decisions and source guide](docs/decisions/0001-first-light.md). No wholesale legacy import or expansion into every brainstorm is implied.
 
-**Current milestone:** [Lighting/shadow decisions and API](docs/decisions/0005-lighting-and-shadows.md) · [screenshots and verification](docs/milestones/lighting/README.md).
+**Next agreed milestone (planned):** [3D engine, universal Studio, authored JSON and offline packaging](docs/decisions/0006-studio-3d-and-authored-data.md). The first goal is to edit/save/play the Atrium from a phone, then author the first recreated street block.
+
+**Current implemented milestone:** [Lighting/shadow decisions and API](docs/decisions/0005-lighting-and-shadows.md) · [screenshots and verification](docs/milestones/lighting/README.md).
 
 **Ambient occlusion:** [decisions and API](docs/decisions/0004-ambient-occlusion.md) · [screenshots and verification](docs/milestones/ambient-occlusion/README.md).
 
@@ -47,6 +49,7 @@ New ideas are welcome. Distinguish agreed requirements from proposed details and
 15. [Integrated engine profiler](#15-integrated-engine-profiler)
 16. [Ambient occlusion](#16-ambient-occlusion-and-rendering-direction)
 17. [Lighting and shadows](#17-lighting-and-shadows)
+18. [3D engine, Studio and authored JSON](#18-3d-engine-studio-and-authored-json)
 
 ## Decision status
 
@@ -151,7 +154,8 @@ The following responsibility-level layout governs implementation. The current fi
 │   └── etrnlnine.js          # Small composition/assembly entry point
 ├── games/
 │   └── freelancer/           # Game content, worlds, rules, bindings, interface
-├── examples/                 # Independent engine demonstrations
+├── editor/                   # Planned universal Studio application
+├── examples/                 # Independent demonstrations and their authored documents
 ├── tests/                    # Meaningful boundary, lifecycle, and behavior checks
 ├── tools/                    # Build and development tools
 └── docs/                     # Contracts and subsequent architectural decisions
@@ -548,3 +552,13 @@ Lighting is now a dedicated Basement capability owning ambient/directional data,
 [Lighting decisions and API](docs/decisions/0005-lighting-and-shadows.md) record units, budgets, source ownership, caching, offscreen casters, failure/context/disposal behavior and remaining limits. Cast shadows affect direct light; AO affects ambient light; emission is preserved. Contact grounding uses actual cast shadows plus AO, without claiming a separate screen-space contact-shadow implementation.
 
 The example enables the lower-cost sun tier and exposes Off / Soft / Fine plus an opt-in shadowed crystal light in World directory. The engine itself defaults shadows off. Shared spatial acceleration, cascades, multiple shadowed local lights and real-phone performance validation remain future work. [Screenshots and verification](docs/milestones/lighting/README.md) provide current evidence.
+
+## 18. 3D engine, Studio and authored JSON
+
+**Agreed direction; planned implementation:** ETRNLNINE is a 3D engine whose games choose their cameras/presentation. Current rendering is 3D, while camera, transform and collision capabilities still need expansion beyond their early 2.5D constraints.
+
+[The Studio decision record](docs/decisions/0006-studio-3d-and-authored-data.md) defines the universal contextual workspace, house ownership, shared properties/commands, edit/play isolation, phone file workflow and acceptance sequence. Specialized tools contribute to one workspace and reuse controls, history, input routing and document/resource lifecycles. Studio remains a separate application using the engine's public capabilities.
+
+Associated versioned JSON files will hold authored project/scene/asset/preset data in the modular source tree. Studio and manual editing use the same authoritative format; JavaScript supplies behavior and generators. The build will validate declared dependencies and embed the required data in the final offline HTML, preserving one-file delivery and bounded runtime residency. JSON embedding, authored-document schemas and a GitHub Actions artifact build are planned; the current JavaScript bundler does not implement them yet.
+
+Start with editing the Atrium: select/move a planter, adjust a light, undo/redo, save/reload and play from the same document. Then author the representative main-branch street block, followed by the articulated humanoid workshop through the same contracts. The decision record preserves the owner's historical editor as a reference and records open details to settle before dependent code.
