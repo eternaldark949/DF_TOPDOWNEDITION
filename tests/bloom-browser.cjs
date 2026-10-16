@@ -132,6 +132,20 @@ const server = http.createServer((req, res) => {
       const filterReference = r.bloom.targets;
       image();
       const cached = filterReference === r.bloom.targets;
+      // Push the real shader beyond the old limits; shaping must reuse all allocations/passes.
+      r.bloom.configure({ haze: 2 });
+      const hazeDifference = difference(bloom, image());
+      const hazeResources = {
+        sameTargets: r.bloom.targets === filterReference,
+        passes: r.bloom.passes,
+        programs: r.bloom.programs.length,
+      };
+      const { BLOOM_PRESETS } = await import(
+        "/engine/basement/bloom-presets.js"
+      );
+      r.bloom.configure(BLOOM_PRESETS.at(-1).settings);
+      const fullDifference = difference(hdr, image());
+      r.bloom.configure(BLOOM_PRESETS[0].settings);
       r.presentation.configure({ exposure: 2 });
       r.bloom.configure({ strength: 0 });
       const exposureDifference = difference(hdr, image());
@@ -159,6 +173,9 @@ const server = http.createServer((req, res) => {
       };
       window.fixture = { engine, r, world, batch, image, reference };
       return {
+        hazeDifference,
+        hazeResources,
+        fullDifference,
         exposureDifference,
         directVsHdr: difference(direct, hdr),
         bloomDifference: difference(hdr, bloom),
@@ -173,6 +190,18 @@ const server = http.createServer((req, res) => {
       };
     });
     console.log(JSON.stringify(report.pixels, null, 2));
+    assert.ok(
+      report.pixels.hazeDifference.brighter > 100,
+      "Haze contributes broad rendered energy",
+    );
+    assert.equal(report.pixels.hazeResources.sameTargets, true);
+    assert.equal(report.pixels.hazeResources.passes, report.pixels.on.passes);
+    assert.equal(report.pixels.hazeResources.programs, 2);
+    assert.ok(
+      report.pixels.fullDifference.changed >
+        report.pixels.bloomDifference.changed,
+      "Full bloom expands visible glow coverage at unchanged exposure",
+    );
     assert.ok(report.pixels.exposureDifference.brighter > 100);
     assert.equal(report.pixels.zero.passes, 0);
     assert.equal(report.pixels.on.effectiveMode, "low");
@@ -442,6 +471,42 @@ const server = http.createServer((req, res) => {
       bloom: window.enniFixture.r.bloom.inspect(),
       presentation: window.enniFixture.r.presentation.inspect(),
     }));
+    // Same authored facade/camera/exposure for every named look; no material or exposure edits.
+    report.looks = {};
+    for (const id of ["subtle", "luxe", "dream", "full"]) {
+      report.looks[id] = await page.evaluate(async (id) => {
+        const { BLOOM_PRESETS } = await import(
+          "/engine/basement/bloom-presets.js"
+        );
+        const f = window.enniFixture,
+          targets = f.r.bloom.targets,
+          scene = f.r.presentation.targets;
+        f.r.bloom.configure(BLOOM_PRESETS.find((p) => p.id === id).settings);
+        f.render();
+        return {
+          settings: f.r.bloom.inspect(),
+          exposure: f.r.presentation.settings.exposure,
+          sameFilter: targets === f.r.bloom.targets,
+          sameScene: scene === f.r.presentation.targets,
+          error: f.r.gl.getError(),
+        };
+      }, id);
+      assert.equal(report.looks[id].sameFilter, true);
+      assert.equal(report.looks[id].sameScene, true);
+      assert.equal(report.looks[id].error, 0);
+      await page.screenshot({
+        path: path.join(root, `artifacts/bloom-look-${id}.png`),
+        timeout: 120000,
+      });
+    }
+    await page.evaluate(async () => {
+      const { BLOOM_PRESETS } = await import(
+        "/engine/basement/bloom-presets.js"
+      );
+      window.enniFixture.r.bloom.configure(
+        BLOOM_PRESETS.find((p) => p.id === "luxe").settings,
+      );
+    });
     await page.setViewportSize({ width: 412, height: 892 });
     await page.evaluate(() => {
       const f = window.enniFixture;

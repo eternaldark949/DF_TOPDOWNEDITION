@@ -1,5 +1,7 @@
 # HDR bloom · light that breathes
 
+**Bloom controls update:** [decision 0014](0014-bloom-art-direction.md) expands shaping ranges, exposes scatter/soft knee, and adds haze/recipes.
+
 **Material/presentation update:** [decision 0013](0013-presentation-and-materials.md) supersedes the inline-appearance/schema and bloom-owned HDR/exposure descriptions below.
 
 Implemented 2026-10-16 following the owner's green light after [perspective](0011-perspective-camera.md). This is native WebGL2 multiscale bloom on the shared forward renderer, not an imported image effect or a second renderer. The architectural aim remains crisp geometry with a soft, expansive luminous halo for Enni Cole. Volumetric fog, wet reflections and PBR materials remain separate work.

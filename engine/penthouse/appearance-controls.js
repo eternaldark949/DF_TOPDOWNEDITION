@@ -1,6 +1,11 @@
 /** Penthouse / shared image/effect controls for any engine host.
  * App supplies the renderer, host and Lobby subscription. No game/editor IDs or scheduler.
  * Settings are viewport policy; this widget never mutates authored project data/history. */
+import { BLOOM_PARAMETERS } from "../basement/bloom-settings.js";
+import {
+  BLOOM_PRESETS,
+  matchingBloomPreset,
+} from "../basement/bloom-presets.js";
 import { Lifetime } from "../basement/lifetime.js";
 export class AppearanceControls {
   /** Labels and bounds correspond to the public Presentation/Bloom APIs; caller owns this instance. */
@@ -68,15 +73,60 @@ export class AppearanceControls {
         mode.append(option);
       }
       field("mode", "Bloom quality", mode);
-      for (const [key, label, min, max, step] of [
-        ["strength", "Bloom strength", 0, 3, 0.05],
-        ["radius", "Bloom spread", 0.5, 3, 0.05],
-        ["threshold", "Bloom threshold", 0, 16, 0.1],
-        ["exposure", "Exposure", 0.05, 8, 0.05],
+      // Recipes edit the same effect fields as manual input. Selecting one explicitly opts
+      // into Soft if bloom was Off, retains an existing quality, and never changes exposure.
+      const presetLabel = document.createElement("label");
+      presetLabel.textContent = "Bloom look";
+      presetLabel.style.cssText =
+        "grid-column:1/-1;display:grid;gap:5px;font:10px system-ui;color:#bca9c8";
+      this.preset = document.createElement("select");
+      this.preset.setAttribute("aria-label", "Bloom look");
+      this.preset.dataset.bloomPreset = "";
+      for (const [value, label] of [
+        ["custom", "Custom"],
+        ...BLOOM_PRESETS.map((p) => [p.id, p.name]),
+      ]) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        if (value === "custom") option.disabled = true;
+        this.preset.append(option);
+      }
+      presetLabel.append(this.preset);
+      body.append(presetLabel);
+      this.life.listen(this.preset, "change", () => {
+        try {
+          const recipe = BLOOM_PRESETS.find((p) => p.id === this.preset.value);
+          if (!recipe) return;
+          renderer.bloom.configure({
+            ...recipe.settings,
+            mode:
+              renderer.bloom.settings.mode === "off"
+                ? "low"
+                : renderer.bloom.settings.mode,
+          });
+          renderer.presentation.configure({});
+          // A recipe explicitly replaces every shaping value, including a focused numeric field.
+          this.refreshStatus(true);
+        } catch (error) {
+          this.refreshStatus();
+          onError(error);
+        }
+      });
+      for (const { key, label, min, max, step, hint } of [
+        ...BLOOM_PARAMETERS,
+        {
+          key: "exposure",
+          label: "Exposure",
+          min: 0.05,
+          max: 8,
+          step: 0.05,
+          hint: "Whole-scene presentation brightness; independent of bloom.",
+        },
       ]) {
         const input = document.createElement("input");
         input.type = "number";
-        Object.assign(input, { min, max, step });
+        Object.assign(input, { min, max, step, title: hint });
         field(
           key,
           label,
@@ -105,16 +155,17 @@ export class AppearanceControls {
     }
   }
   /** Report actual quality/failure, never imply HDR is active merely because it was requested. */
-  refreshStatus() {
+  refreshStatus(force = false) {
     const b = this.renderer.bloom.inspect(),
       p = this.renderer.presentation.inspect();
     // Engine/application policies may configure bloom too; do not replace in-progress typing.
     for (const [key, input] of Object.entries(this.fields))
       if (
-        document.activeElement !== input &&
+        (force || document.activeElement !== input) &&
         input.value !== String(this.owners[key].settings[key])
       )
         input.value = this.owners[key].settings[key];
+    this.preset.value = matchingBloomPreset(this.renderer.bloom.settings);
     this.status.dataset.effective =
       p.effectiveMode === "hdr" && !b.failure ? b.mode : "off";
     this.status.dataset.bytes = b.targetBytes + p.targetBytes;

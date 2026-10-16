@@ -47,8 +47,8 @@ export class Bloom {
       if (!this.targets) this.targets = new BloomTargets(gl, w, h, s.mode);
       if (!this.programs.length)
         for (const [fragment, names] of [
-          [BLOOM_DOWN, ["uSource", "uExtract", "uThreshold"]],
-          [BLOOM_UP, ["uFine", "uCoarse", "uSpread"]],
+          [BLOOM_DOWN, ["uSource", "uExtract", "uThreshold", "uTinyHaze"]],
+          [BLOOM_UP, ["uFine", "uCoarse", "uSpread", "uHazeSource", "uHaze"]],
         ]) {
           const program = createProgram(gl, FULLSCREEN_VERTEX, fragment),
             owned = { program, uniforms: {} };
@@ -98,6 +98,7 @@ export class Bloom {
     let source = { texture: sceneTexture };
     gl.useProgram(down.program);
     gl.uniform1i(down.uniforms.uSource, 0);
+    gl.uniform1f(down.uniforms.uTinyHaze, t.down.length === 1 ? s.haze : 0);
     gl.uniform2f(down.uniforms.uThreshold, s.threshold, s.knee);
     for (let i = 0; i < t.down.length; i++) {
       gl.uniform1i(down.uniforms.uExtract, i === 0 ? 1 : 0);
@@ -108,8 +109,12 @@ export class Bloom {
     gl.useProgram(up.program);
     gl.uniform1i(up.uniforms.uFine, 0);
     gl.uniform1i(up.uniforms.uCoarse, 1);
+    gl.uniform1i(up.uniforms.uHazeSource, 2);
+    // The smallest reduction already belongs to this filter. Haze borrows it directly.
+    this.texture(2, t.down[t.down.length - 1].texture);
     gl.uniform2f(up.uniforms.uSpread, s.radius, s.scatter);
     for (let i = t.down.length - 2; i >= 0; i--) {
+      gl.uniform1f(up.uniforms.uHaze, i === 0 ? s.haze : 0);
       this.texture(0, t.down[i].texture);
       this.texture(1, source.texture);
       this.submit(t.up[i]);

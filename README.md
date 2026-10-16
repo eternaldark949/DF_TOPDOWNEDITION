@@ -18,6 +18,8 @@ The branch was intentionally created with only this plan. On 2026-10-15, after r
 
 **Materials and presentation:** [linked material editing and the shared HDR stage](docs/decisions/0013-presentation-and-materials.md) · [previews and verification](docs/milestones/materials/README.md).
 
+**Bloom tuning:** [full artistic range and shared recipes](docs/decisions/0014-bloom-art-direction.md) · [matched previews](docs/milestones/bloom-tuning/README.md).
+
 **Bloom update:** [HDR multiscale bloom, controls and capability budgets](docs/decisions/0012-hdr-bloom.md) · [matched screenshots and checks](docs/milestones/bloom/README.md).
 
 **Perspective update:** [shared dual-projection camera and bloom/lighting sequence](docs/decisions/0011-perspective-camera.md) · [screenshots and checks](docs/milestones/perspective/README.md).

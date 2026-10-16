@@ -1,12 +1,18 @@
 /** HDR bloom contracts: allocation-free defaults, validated atomic edits and bounded ownership. */
 import test from "node:test";
 import assert from "node:assert/strict";
+import {
+  BLOOM_PRESETS,
+  matchingBloomPreset,
+} from "../engine/basement/bloom-presets.js";
 import { Bloom } from "../engine/basement/bloom.js";
 import { HdrTargets } from "../engine/basement/hdr-targets.js";
 import { Presentation } from "../engine/basement/presentation.js";
 import { BloomTargets } from "../engine/basement/bloom-targets.js";
 import {
   bloomDimensions,
+  bloomSettings,
+  BLOOM_PARAMETERS,
   bloomStorage,
 } from "../engine/basement/bloom-settings.js";
 test("Bloom settings validate atomically, mode off is allocation-free, disposal prevents resurrection", () => {
@@ -25,6 +31,7 @@ test("Bloom settings validate atomically, mode off is allocation-free, disposal 
     { scatter: -1 },
     { threshold: Infinity },
     { typo: 1 },
+    { constructor: 1 },
   ]) {
     assert.throws(() => b.configure(patch), RangeError);
     assert.equal(b.settings, before);
@@ -125,4 +132,27 @@ test("Unsupported HDR latches fallback without repeated allocation until explici
   assert.equal(b.prepare(false), false);
   assert.equal(calls, 2);
   b.dispose();
+});
+
+/** Artistic range and UI bounds share one catalog; recipes remain ordinary immutable settings. */
+test("Bloom recipes span subtle to full glow with independent, validated shaping controls", () => {
+  for (const recipe of BLOOM_PRESETS) {
+    const s = bloomSettings(recipe.settings);
+    assert.equal(matchingBloomPreset(s), recipe.id);
+    assert.ok(Object.isFrozen(recipe.settings));
+  }
+  const full = bloomSettings(BLOOM_PRESETS.at(-1).settings);
+  assert.ok(full.strength > 3 && full.radius > 3 && full.haze > 0);
+  assert.equal(matchingBloomPreset({ ...full, haze: 0.123 }), "custom");
+  for (const { key, min, max } of BLOOM_PARAMETERS) {
+    assert.equal(bloomSettings({ [key]: min })[key], min);
+    assert.equal(bloomSettings({ [key]: max })[key], max);
+    assert.throws(() => bloomSettings({ [key]: max + 1 }), RangeError);
+    assert.throws(() => bloomSettings({ [key]: NaN }), RangeError);
+  }
+  assert.equal(
+    bloomSettings().haze,
+    0,
+    "Default appearance stays conservative",
+  );
 });

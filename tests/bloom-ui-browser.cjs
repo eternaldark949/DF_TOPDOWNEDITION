@@ -71,6 +71,34 @@ const root = path.resolve(__dirname, ".."),
           () => document.querySelector("#status").dataset.actor,
         );
       await p.locator(".engine-appearance").evaluate((e) => (e.open = true));
+      // One shared recipe widget works in both hosts, opts into Soft, and leaves exposure alone.
+      const exposure = p.locator("[data-presentation=exposure]");
+      const originalExposure = await exposure.inputValue();
+      await p.getByLabel("Bloom look", { exact: true }).selectOption("full");
+      assert.equal(await mode.inputValue(), "low");
+      assert.equal(await p.locator("[data-bloom=strength]").inputValue(), "10");
+      assert.equal(await exposure.inputValue(), originalExposure);
+      for (const [key, value] of [
+        ["strength", "12"],
+        ["radius", "7"],
+        ["scatter", ".95"],
+        ["haze", "2"],
+        ["knee", ".9"],
+      ]) {
+        const input = p.locator(`[data-bloom=${key}]`);
+        await input.fill(value);
+        await input.dispatchEvent("change");
+      }
+      assert.equal(
+        await p.getByLabel("Bloom look", { exact: true }).inputValue(),
+        "custom",
+      );
+      await p.getByLabel("Bloom look", { exact: true }).selectOption("subtle");
+      assert.equal(
+        await p.locator("[data-bloom=knee]").inputValue(),
+        "0.6",
+        "Recipe replaces the focused field too",
+      );
       await mode.selectOption("low");
       await p.waitForFunction(
         () =>

@@ -1888,6 +1888,60 @@ return {presentationSettings,Presentation};
 const module26=(()=>{
 /** Basement / bloom settings and predictable target budgets. No GL or application policy.
  * Sizes are backing pixels; radii are pyramid texels, strength dimensionless. */
+/** One parameter catalog supplies both API validation and shared Studio/game controls.
+ * Radius stays explicitly measured in pyramid texels; haze adds broad radiance, not volume fog. */
+const BLOOM_PARAMETERS = Object.freeze(
+  [
+    {
+      key: "strength",
+      label: "Bloom strength",
+      min: 0,
+      max: 16,
+      step: 0.1,
+      hint: "Glow intensity, independent of scene exposure.",
+    },
+    {
+      key: "radius",
+      label: "Bloom spread",
+      min: 0.5,
+      max: 8,
+      step: 0.1,
+      hint: "Halo reach in coarse pyramid texels.",
+    },
+    {
+      key: "scatter",
+      label: "Bloom scatter",
+      min: 0,
+      max: 1,
+      step: 0.05,
+      hint: "More weight on broad scales; 1 uses the broadest reconstruction.",
+    },
+    {
+      key: "haze",
+      label: "Bloom haze",
+      min: 0,
+      max: 4,
+      step: 0.05,
+      hint: "Extra broad glow from the smallest scale; this is screen-space bloom.",
+    },
+    {
+      key: "threshold",
+      label: "Bloom threshold",
+      min: 0,
+      max: 16,
+      step: 0.05,
+      hint: "Lower values let more of the lit scene glow; 0 includes all radiance.",
+    },
+    {
+      key: "knee",
+      label: "Bloom soft knee",
+      min: 0,
+      max: 1,
+      step: 0.05,
+      hint: "Softens the transition around the brightness threshold.",
+    },
+  ].map((p) => Object.freeze(p)),
+);
 const DEFAULTS = Object.freeze({
   mode: "off",
   strength: 0.65,
@@ -1895,22 +1949,17 @@ const DEFAULTS = Object.freeze({
   knee: 0.6,
   radius: 1.25,
   scatter: 0.8,
+  haze: 0,
 });
 /** Validate an entire candidate before adopting it: bad UI/API input cannot half-configure a frame. */
 function bloomSettings(patch = {}, previous = DEFAULTS) {
   const s = { ...previous, ...patch };
   for (const key of Object.keys(patch))
-    if (!(key in DEFAULTS))
+    if (!Object.hasOwn(DEFAULTS, key))
       throw new RangeError(`Unknown bloom setting: ${key}`);
   if (!["off", "low", "high"].includes(s.mode))
     throw new RangeError("Bloom mode must be off, low or high");
-  for (const [key, min, max] of [
-    ["strength", 0, 3],
-    ["threshold", 0, 16],
-    ["knee", 0, 1],
-    ["radius", 0.5, 3],
-    ["scatter", 0, 1],
-  ])
+  for (const { key, min, max } of BLOOM_PARAMETERS)
     if (!Number.isFinite(s[key]) || s[key] < min || s[key] > max)
       throw new RangeError(`Bloom ${key} must be ${min}–${max}`);
   return Object.freeze(s);
@@ -1941,7 +1990,7 @@ function bloomStorage(dimensions) {
   );
 }
 
-return {bloomSettings,bloomDimensions,bloomStorage};
+return {BLOOM_PARAMETERS,bloomSettings,bloomDimensions,bloomStorage};
 })();
 // Source: engine/basement/bloom-targets.js
 const module27=(()=>{
@@ -1984,6 +2033,7 @@ precision highp float;
 in vec2 vUV;
 uniform sampler2D uSource;
 uniform bool uExtract;
+uniform float uTinyHaze; // single-level targets have no reconstruction; apply gain here
 uniform vec2 uThreshold; // threshold and relative knee
 out vec4 outColor;
 vec3 sampleAt(vec2 p){
@@ -1999,7 +2049,7 @@ void main(){
  c+=(sampleAt(vUV+t*vec2(-2,-2))+sampleAt(vUV+t*vec2(2,-2))+sampleAt(vUV+t*vec2(-2,2))+sampleAt(vUV+t*vec2(2,2)))*0.03125;
  c+=(sampleAt(vUV+t*vec2(-2,0))+sampleAt(vUV+t*vec2(2,0))+sampleAt(vUV+t*vec2(0,-2))+sampleAt(vUV+t*vec2(0,2)))*0.0625;
  c+=(sampleAt(vUV+t*vec2(-1,-1))+sampleAt(vUV+t*vec2(1,-1))+sampleAt(vUV+t*vec2(-1,1))+sampleAt(vUV+t*vec2(1,1)))*0.125;
- outColor=vec4(min(c,vec3(65000.0)),1.0);
+ outColor=vec4(min(c*(1.0+uTinyHaze),vec3(65000.0)),1.0);
 }`;
 /** Normalized tent reconstruction mixes scales without amplifying a constant field per level.
  * Distinct upsample targets prevent sampling from the texture currently being written. */
@@ -2008,14 +2058,24 @@ precision highp float;
 in vec2 vUV;
 uniform sampler2D uFine;
 uniform sampler2D uCoarse;
+uniform sampler2D uHazeSource; // borrowed smallest reduction, never the active output
+uniform float uHaze; // broad additive energy, enabled only on the final reconstruction
 uniform vec2 uSpread; // radius in coarse texels, fraction of broad reconstructed energy
 out vec4 outColor;
+// One normalized kernel serves both reconstruction and haze; changing it cannot leave
+// two visually different copies behind. Opaque sampler parameters are native GLSL ES 3.
+vec3 tent(sampler2D source,vec2 spacing){
+ vec3 c=texture(source,vUV).rgb*4.0;
+ c+=(texture(source,vUV+spacing*vec2(-1,0)).rgb+texture(source,vUV+spacing*vec2(1,0)).rgb+texture(source,vUV+spacing*vec2(0,-1)).rgb+texture(source,vUV+spacing*vec2(0,1)).rgb)*2.0;
+ c+=texture(source,vUV+spacing*vec2(-1,-1)).rgb+texture(source,vUV+spacing*vec2(-1,1)).rgb+texture(source,vUV+spacing*vec2(1,-1)).rgb+texture(source,vUV+spacing*vec2(1,1)).rgb;
+ return c/16.0;
+}
 void main(){
- vec2 t=uSpread.x/vec2(textureSize(uCoarse,0));
- vec3 c=texture(uCoarse,vUV).rgb*4.0;
- c+=(texture(uCoarse,vUV+t*vec2(-1,0)).rgb+texture(uCoarse,vUV+t*vec2(1,0)).rgb+texture(uCoarse,vUV+t*vec2(0,-1)).rgb+texture(uCoarse,vUV+t*vec2(0,1)).rgb)*2.0;
- c+=texture(uCoarse,vUV+t*vec2(-1,-1)).rgb+texture(uCoarse,vUV+t*vec2(1,-1)).rgb+texture(uCoarse,vUV+t*vec2(-1,1)).rgb+texture(uCoarse,vUV+t*vec2(1,1)).rgb;
- outColor=vec4(mix(texture(uFine,vUV).rgb,c/16.0,uSpread.y),1.0);
+ vec3 result=mix(texture(uFine,vUV).rgb,tent(uCoarse,uSpread.x/vec2(textureSize(uCoarse,0))),uSpread.y);
+ // Reuse the broadest reduction without another target/submission. Zero haze skips
+ // its additional reads; one tent removes visible coarse-texel boundaries.
+ if(uHaze>0.0)result+=tent(uHazeSource,1.0/vec2(textureSize(uHazeSource,0)))*uHaze;
+ outColor=vec4(min(result,vec3(65000.0)),1.0);
 }`;
 
 return {BLOOM_DOWN,BLOOM_UP};
@@ -2071,8 +2131,8 @@ class Bloom {
       if (!this.targets) this.targets = new BloomTargets(gl, w, h, s.mode);
       if (!this.programs.length)
         for (const [fragment, names] of [
-          [BLOOM_DOWN, ["uSource", "uExtract", "uThreshold"]],
-          [BLOOM_UP, ["uFine", "uCoarse", "uSpread"]],
+          [BLOOM_DOWN, ["uSource", "uExtract", "uThreshold", "uTinyHaze"]],
+          [BLOOM_UP, ["uFine", "uCoarse", "uSpread", "uHazeSource", "uHaze"]],
         ]) {
           const program = createProgram(gl, FULLSCREEN_VERTEX, fragment),
             owned = { program, uniforms: {} };
@@ -2122,6 +2182,7 @@ class Bloom {
     let source = { texture: sceneTexture };
     gl.useProgram(down.program);
     gl.uniform1i(down.uniforms.uSource, 0);
+    gl.uniform1f(down.uniforms.uTinyHaze, t.down.length === 1 ? s.haze : 0);
     gl.uniform2f(down.uniforms.uThreshold, s.threshold, s.knee);
     for (let i = 0; i < t.down.length; i++) {
       gl.uniform1i(down.uniforms.uExtract, i === 0 ? 1 : 0);
@@ -2132,8 +2193,12 @@ class Bloom {
     gl.useProgram(up.program);
     gl.uniform1i(up.uniforms.uFine, 0);
     gl.uniform1i(up.uniforms.uCoarse, 1);
+    gl.uniform1i(up.uniforms.uHazeSource, 2);
+    // The smallest reduction already belongs to this filter. Haze borrows it directly.
+    this.texture(2, t.down[t.down.length - 1].texture);
     gl.uniform2f(up.uniforms.uSpread, s.radius, s.scatter);
     for (let i = t.down.length - 2; i >= 0; i--) {
+      gl.uniform1f(up.uniforms.uHaze, i === 0 ? s.haze : 0);
       this.texture(0, t.down[i].texture);
       this.texture(1, source.texture);
       this.submit(t.up[i]);
