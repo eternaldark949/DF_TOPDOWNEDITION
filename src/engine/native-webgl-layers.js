@@ -189,7 +189,12 @@ Object.assign(NativeWebGLRenderer.prototype,{
     // in power-of-two steps so camera zoom easing doesn't reallocate every frame. High-resolution
     // shadows allow up to 768 texels across a light (was 256), standard 512 (was 128).
     retireShadow(r){(this.retiredShadows||(this.retiredShadows=[])).push({r,frame:this.frameId});},
-    releaseShadows(){const keep=[];for(const x of this.retiredShadows||[]){if(this.frameId-x.frame<2){keep.push(x);continue;}const r=x.r;r.stage.destroy({children:true});r.texture.destroy(true);if(r.dynamicStage){r.dynamicStage.destroy({children:true});r.dynamicTexture.destroy(true);}}this.retiredShadows=keep;},
+    releaseShadows(){const keep=[];for(const x of this.retiredShadows||[]){if(this.frameId-x.frame<2){keep.push(x);continue;}const r=x.r;r.stage.destroy({children:true});this.poolShadowTarget(r.texture);if(r.dynamicStage){r.dynamicStage.destroy({children:true});this.poolShadowTarget(r.dynamicTexture);}}this.retiredShadows=keep;},
+    // Light-shadow targets are reused by size: lights coming and going (or the zoom stepping their density) take a
+    // free one of the same size instead of allocating GPU memory each time
+    poolShadowTarget(t){const P=this.shadowTargetPool||(this.shadowTargetPool=[]);if(!t||t.destroyed)return;P.push(t);while(P.length>24)P.shift().destroy(true);},
+    shadowTarget(w,h,resolution,origin){const P=this.shadowTargetPool||(this.shadowTargetPool=[]),i=P.findIndex(t=>t.width===w&&t.height===h&&t.baseTexture.resolution===resolution);
+        if(i>=0)return P.splice(i,1)[0];return this.target(PIXI.RenderTexture.create({width:w,height:h,resolution,scaleMode:PIXI.SCALE_MODES.LINEAR}),origin);},
     shadowDensity(radius){
         const px=(game.canvas.width/Math.max(1,game.canvas.clientWidth||game.canvas.width))*(game.view?.zoom||1),cap=this.layers.shadowDetail?768:512;
         const want=Math.min(cap,Math.max(64,radius*2*px/1.5));let density=Math.pow(2,Math.round(Math.log2(want/(radius*2))));
@@ -206,7 +211,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             const stage=new PIXI.Container(),sprite=new PIXI.Sprite(this.lightGradient),mask=new PIXI.Graphics(),shadow=new PIXI.Graphics();
             sprite.position.set(radius,radius);sprite.anchor.set(.5);sprite.width=sprite.height=radius*2;
             shadow.blendMode=PIXI.BLEND_MODES.ERASE;stage.addChild(sprite,mask,shadow);
-            const texture=this.target(PIXI.RenderTexture.create({width:radius*2,height:radius*2,resolution:density,scaleMode:PIXI.SCALE_MODES.LINEAR}),'static-shadow-target');
+            const texture=this.shadowTarget(radius*2,radius*2,density,'static-shadow-target');
             r={stage,sprite,mask,shadow,texture,radius,density};this.shadowCache.set(source.owner,r);
         }
         r.sprite.texture=source.cookie||((source.wash??.08)===.08?this.holeGradient:this.decorGradient);
@@ -249,7 +254,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         if(!r.dynamicStage){
             r.dynamicStage=new PIXI.Container();r.dynamicBase=new PIXI.Sprite(base);r.dynamicStage.addChild(r.dynamicBase);
             r.actorShadow=new NativeActorShadowMesh();r.dynamicStage.addChild(r.actorShadow);
-            r.dynamicTexture=this.target(PIXI.RenderTexture.create({width:source.radius*2,height:source.radius*2,resolution:r.density,scaleMode:PIXI.SCALE_MODES.LINEAR}),'animated-shadow-target');
+            r.dynamicTexture=this.shadowTarget(source.radius*2,source.radius*2,r.density,'animated-shadow-target');
         }
         r.dynamicBase.texture=base;r.dynamicBase.width=r.dynamicBase.height=source.radius*2;
         const len=Math.min(120,source.radius-d,d*24/Math.max(1,(source.elevation??84)-24)),u=r.actorShadow.shader.uniforms;

@@ -21,7 +21,7 @@ const GLPeople = (() => {
             if (!r) { r = { node: new GLDynamic() }; this.nodes.set(key, r); }
             r.used = this.frame; r.drawn = ctx.begun;
             const m = ctx.matrix, scale = Math.hypot(m.a, m.b) || 1, zoom = (typeof game !== 'undefined' && game.camera?.zoom) || 1;
-            const B = new GLBuildingBuilder(0), pen = new GLPen(B, zoom * scale * (ctx.worldFrame ? 1 : 1));
+            const B = (r.B || (r.B = new GLBuildingBuilder(0))).clear(), pen = new GLPen(B, zoom * scale * (ctx.worldFrame ? 1 : 1));
             pen.base = ctx.getTransform(); pen.canvas = ctx.canvas;
             const wants = _lampShadowWants; _lampShadowWants = () => false;     // the lamp shadows are the GL engine's (no Canvas captures)
             let result;

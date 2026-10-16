@@ -125,7 +125,7 @@ const GLPen = (() => {
     const area2 = p => { let a = 0; for (let i = 0; i < p.length; i++) { const u = p[i], v = p[(i + 1) % p.length]; a += u[0] * v[1] - v[0] * u[1]; } return a; };
     const inside = (pt, poly) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const a = poly[i], b = poly[j]; if ((a[1] > pt[1]) !== (b[1] > pt[1]) && pt[0] < (b[0] - a[0]) * (pt[1] - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; };
     /** Triangles of the subpaths: each on its own (nonzero, as the bodies are drawn); even-odd cuts a subpath inside another as its hole */
-    function triangulate(subs, evenodd) {
+    function triangulate(subs, evenodd, indexed = false) {
         const polys = subs.map(s => s.pts).filter(p => p.length >= 3 && Math.abs(area2(p)) > 1e-6), tris = [];
         const holeOf = new Map();
         if (evenodd) polys.forEach((p, i) => { for (let j = 0; j < polys.length; j++) if (j !== i && !holeOf.has(j) && Math.abs(area2(polys[j])) > Math.abs(area2(p)) && inside(p[0], polys[j]) && inside(p[(p.length / 2) | 0], polys[j])) { holeOf.set(i, j); break; } });
@@ -135,6 +135,7 @@ const GLPen = (() => {
             for (const q of p) flat.push(q[0], q[1]);
             polys.forEach((h, j) => { if (holeOf.get(j) === i) { holes.push(flat.length / 2); for (const q of h) flat.push(q[0], q[1]); } });
             const idx = PIXI.utils.earcut(flat, holes.length ? holes : null);
+            if (indexed) { if (idx.length) tris.push([flat, idx]); return; }
             for (let k = 0; k < idx.length; k += 3) tris.push([[flat[idx[k] * 2], flat[idx[k] * 2 + 1]], [flat[idx[k + 1] * 2], flat[idx[k + 1] * 2 + 1]], [flat[idx[k + 2] * 2], flat[idx[k + 2] * 2 + 1]]]);
         });
         return tris;
@@ -238,15 +239,27 @@ const GLPen = (() => {
         }
         _poly(p, colorOf, a) {
             const B = this.B, base = B.n;
-            for (const v of p) { const c = colorOf(v); B.vertex([v[0], v[1], 0, 0], undefined, undefined, 0, 0, 0, [c[0], c[1], c[2], c[3] * a]); }
+            for (const v of p) { const c = colorOf(v); B.flat(v[0], v[1], c[0], c[1], c[2], c[3] * a); }
             for (let i = 1; i + 1 < p.length; i++) B.index.push(base, base + i, base + i + 1);
         }
         fill(a, b) {
             const path = a instanceof Path ? a : a && a._gl ? a._gl : null, rule = typeof a === 'string' ? a : b;
             const subs = this._subs(path); this.fillStyle = Pen.style(this.fillStyle);
             this._paint(this.fillStyle, () => {
+                const shadow = this.shadowBlur > 0 && GLColor.parse(this.shadowColor)[3] > 0;
+                if (!this.clipPieces && !(this.fillStyle instanceof Gradient)) {
+                    // a solid fill, unclipped: its outline's points once, indexed by the triangulation
+                    if (shadow) this._shadow(subs, null);
+                    const c = GLColor.parse(this.fillStyle == null ? '#000' : this.fillStyle), a = c[3] * this._alpha();
+                    if (a > 0) for (const [flat, idx] of triangulate(subs, rule === 'evenodd', true)) {
+                        const B = this.B, base = B.n;
+                        for (let k = 0; k < flat.length; k += 2) B.flat(flat[k], flat[k + 1], c[0], c[1], c[2], a);
+                        for (let k = 0; k < idx.length; k++) B.index.push(base + idx[k]);
+                    }
+                    return;
+                }
                 const tris = triangulate(subs, rule === 'evenodd');
-                if (this.shadowBlur > 0 && GLColor.parse(this.shadowColor)[3] > 0) this._shadow(subs, tris);
+                if (shadow) this._shadow(subs, tris);
                 this._emitTris(tris, this.fillStyle);
             });
         }
@@ -312,8 +325,8 @@ const GLPen = (() => {
         }
         _disc(x, y, r, c) {
             const B = this.B, n = Math.max(8, Math.min(24, Math.ceil(r * this.k * 2))), base = B.n;
-            B.vertex([x, y, 0, 0], undefined, undefined, 0, 0, 0, c);
-            for (let i = 0; i < n; i++) B.vertex([x + Math.cos(i / n * TAU) * r, y + Math.sin(i / n * TAU) * r, 0, 0], undefined, undefined, 0, 0, 0, c);
+            B.flat(x, y, c[0], c[1], c[2], c[3]);
+            for (let i = 0; i < n; i++) B.flat(x + Math.cos(i / n * TAU) * r, y + Math.sin(i / n * TAU) * r, c[0], c[1], c[2], c[3]);
             for (let i = 0; i < n; i++) B.index.push(base, base + 1 + i, base + 1 + (i + 1) % n);
         }
         clip(a, b) {

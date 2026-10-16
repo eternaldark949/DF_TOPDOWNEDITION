@@ -89,6 +89,22 @@ class GLBuildingBuilder {
     _map(p) { const m = this.m; return m ? [m[0] * p[0] + m[2] * p[1] + m[4], m[1] * p[0] + m[3] * p[1] + m[5], p[2], p[3]] : p; }
     /** Additive ('lighter') for what follows: premultiplied colour with zero alpha adds */
     additive(on = true) { this._add = on ? 1 : 0; return this; }
+    /** A plain fill vertex at (x, y) in colour (r, g, b, a): the pen's fast path (no line, face, animation or text) */
+    flat(x, y, r, g, b, a) {
+        if ((this.n + 1) * GLB_STRIDE > this.data.length) this._grow(1);
+        const m = this.m; if (m) { const X = m[0] * x + m[2] * y + m[4]; y = m[1] * x + m[3] * y + m[5]; x = X; }
+        const d = this.data, o = this.n * GLB_STRIDE, t = this._text, an = this._anim;
+        d[o] = d[o + 3] = d[o + 6] = x; d[o + 1] = d[o + 4] = d[o + 7] = y; d[o + 2] = d[o + 5] = d[o + 8] = 0;
+        d[o + 9] = d[o + 10] = d[o + 11] = d[o + 12] = 0;
+        d[o + 13] = r; d[o + 14] = g; d[o + 15] = b; d[o + 16] = a;
+        d[o + 17] = 0; d[o + 18] = this._minDepth; d[o + 19] = this._maxLod; d[o + 20] = this._add || 0;
+        d[o + 21] = an[0]; d[o + 22] = an[1]; d[o + 23] = an[2]; d[o + 24] = an[3];
+        d[o + 25] = t[0]; d[o + 26] = t[1]; d[o + 27] = t[2]; d[o + 28] = t[3];
+        d[o + 29] = d[o + 30] = d[o + 31] = d[o + 32] = 0;
+        return this.n++;
+    }
+    /** Start over, keeping the buffers (a builder reused frame after frame) */
+    clear() { this.n = 0; this.index.length = 0; this.faces.length = 0; this.groups = null; this.m = null; this._add = 0; this._c = [1, 1, 1, 1]; return this.reset(); }
     /** One vertex; returns its index */
     vertex(p, prev = p, next = p, side = 0, hw = 0, flags = 0, color = this._c, uvText = null) {
         this._grow(1);

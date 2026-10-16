@@ -46,7 +46,8 @@ class GLBuildingsSystem {
     }
     /** Build the buildings just outside the view ahead of time, a few milliseconds a frame */
     prefetch(map, bounds, budgetMs = 3) {
-        const start = performance.now(), pad = 700;
+        const start = performance.now(), pad = 700, F = this.renderer.frames, last = F && F[F.length - 1];
+        if (last && last.renderMs > 28) return;                        // a slow frame already: building ahead can wait
         for (const b of map.buildings || []) {
             if (performance.now() - start > budgetMs) break;
             if (!this.supports(b) || this.records.has(b)) continue;

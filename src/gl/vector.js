@@ -29,7 +29,7 @@
         if (!r || !r._penRun || r.parent !== this.container || r._op !== op || r._faceTag !== this.faceTag) {
             r = this.current = this.node(GLDynamic);
             r._penRun = true; r._hasText = false; r._op = op; r.state = stateFor(op); r.alpha = 1;
-            r._B = new GLBuildingBuilder(0); r._pen = new GLPen(r._B, detail(this));
+            r._B = (r._B || new GLBuildingBuilder(0)).clear(); r._pen = new GLPen(r._B, detail(this));
         }
         r._dirty = true;
         const P = r._pen, m = this.matrix;

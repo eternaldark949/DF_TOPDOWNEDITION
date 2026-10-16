@@ -6,22 +6,38 @@
 
 /** A GLInstance whose geometry is rewritten from a GLBuildingBuilder each frame (its buffers reused) */
 class GLDynamic extends GLInstance {
+    /** Upload builder B's geometry (its buffers are reused while they are large enough; nothing is copied first) */
     set(B) {
-        const built = B.finish();
-        if (!built.vertices) { this.visible = false; return; }
-        this.visible = true;
-        if (!this.geometry || built.index instanceof Uint32Array !== this.geometry.indexBuffer.data instanceof Uint32Array) {
-            this.geometry?.destroy(); this.geometry = GLInstance.geometry(B);
-        } else { this.geometry.buffers[0].update(built.data); this.geometry.indexBuffer.update(built.index); }
-        // Its extent (lines widen by their half width, joins up to twice that), for bounds queries
-        const d = built.data; let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-        for (let o = 0, n = built.vertices * GLB_STRIDE; o < n; o += GLB_STRIDE) {
+        const n = B.n, ni = B.index.length;
+        if (!n || !ni) { this.visible = false; this.extent = null; return; }
+        this.visible = true; this._B = B; this.extent = undefined;
+        const big = n > 65535, data = B.data.subarray(0, n * GLB_STRIDE);
+        let idx = this._idx;
+        if (!idx || idx.length < ni || (idx instanceof Uint32Array) !== big) idx = this._idx = new (big ? Uint32Array : Uint16Array)(Math.max(ni, 1024) * 1.5 | 0);
+        for (let i = 0; i < ni; i++) idx[i] = B.index[i];
+        const view = idx.subarray(0, ni);
+        if (!this.geometry || (this.geometry.indexBuffer.data instanceof Uint32Array) !== big) {
+            this.geometry?.destroy();
+            const buf = new PIXI.Buffer(data, false, false), S = GLB_STRIDE * 4, g = new PIXI.Geometry();
+            let o = 0; const attr = (name, size) => { g.addAttribute(name, buf, size, false, PIXI.TYPES.FLOAT, S, o * 4); o += size; };
+            attr('aPos', 3); attr('aPrev', 3); attr('aNext', 3); attr('aLine', 4); attr('aColor', 4); attr('aMeta', 4); attr('aAnim', 4); attr('aText', 4); attr('aFace', 4);
+            g.addIndex(new PIXI.Buffer(view, false, true));
+            this.geometry = g;
+        } else { this.geometry.buffers[0].update(data); this.geometry.indexBuffer.update(view); }
+        this.geometry.vertices = n;
+    }
+    /** Its extent (lines widen by their half width, joins up to twice that), measured when bounds are asked for */
+    get box() {
+        if (this.extent !== undefined) return this.extent;
+        const B = this._B, d = B && B.data; if (!d) return (this.extent = null);
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        for (let o = 0, n = B.n * GLB_STRIDE; o < n; o += GLB_STRIDE) {
             const w = Math.abs(d[o + 10]) * 2, x = d[o], y = d[o + 1];
             if (x - w < x0) x0 = x - w; if (x + w > x1) x1 = x + w; if (y - w < y0) y0 = y - w; if (y + w > y1) y1 = y + w;
         }
-        this.extent = [x0, y0, x1, y1];
+        return (this.extent = [x0, y0, x1, y1]);
     }
-    _calculateBounds() { const e = this.extent; if (e && this.visible) this._bounds.addFrameMatrix(this.worldTransform, e[0], e[1], e[2], e[3]); }
+    _calculateBounds() { const e = this.visible && this.box; if (e) this._bounds.addFrameMatrix(this.worldTransform, e[0], e[1], e[2], e[3]); }
 }
 
 const GLSignals = (() => {
