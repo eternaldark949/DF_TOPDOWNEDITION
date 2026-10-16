@@ -59164,8 +59164,10 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.skyLight.visible=true;this.skyLight.scale.set(view.zoom);this.skyLight.position.copyFrom(this.world.position);
         this.lightSprites.scale.set(view.zoom);this.lightSprites.position.copyFrom(this.world.position);
         // Canvas lights every lamp, including the hidden light-only ones rooms place (map-entities.js hiddenLamp).
-        const sources=(game.lamps||[]).map(l=>({owner:l,x:l.x,y:l.y,radius:l.lightRadius||l.radius||200,
-            color:l.color||'#ffeebb',elevation:l.elevation??84,wash:.08,lamp:true,colorWash:game.activeMap.type==='outdoor'?.22:.08,alpha:(game.activeMap.type==='outdoor'&&!game.dayCycle().lampsOn?0:1)*game.roomSystem.lampLight(l)*lampFlicker(l)*lampWake(l)*(l.intensity??1)}));
+        // Only lamps whose light reaches the view are weighed (a city has thousands; flicker, wake and room light cost per lamp)
+        const outdoor=game.activeMap.type==='outdoor',lampsOff=outdoor&&!game.dayCycle().lampsOn,hw=w/(2*view.zoom),hh=h/(2*view.zoom),sources=[];
+        if(!lampsOff)for(const l of game.lamps||[]){const radius=l.lightRadius||l.radius||200;if(Math.abs(l.x-view.x)>hw+radius||Math.abs(l.y-view.y)>hh+radius)continue;
+            sources.push({owner:l,x:l.x,y:l.y,radius,color:l.color||'#ffeebb',elevation:l.elevation??84,wash:.08,lamp:true,colorWash:outdoor?.22:.08,alpha:game.roomSystem.lampLight(l)*lampFlicker(l)*lampWake(l)*(l.intensity??1)});}
         if(L.decorLights){
             for(const p of game.props||[])if(p.visible!==false&&p.light){const c=p.getCenter(),q=p.light;
                 sources.push({owner:p,x:c.x+(q.dx||0),y:c.y+(q.dy||0),radius:q.radius||Math.max(q.w||0,q.h||0)/2||180,
@@ -59860,7 +59862,10 @@ class NativeCasterBodies {
     begin(game=null){
         this.lights=[];
         if(game){
-            for(const l of game.lamps||[])if(l.visible!==false&&game.roomSystem.lampLight(l)>.01&&(game.activeMap.type!=='outdoor'||game.dayCycle().lampsOn))this.lights.push(l);
+            // Only lamps that can reach what is near the view (a city has thousands, and each body asks nearLight)
+            const cam=game.view||{},z=cam.zoom||1,cx=cam.x??game.player.x,cy=cam.y??game.player.y,hw=(game.canvas?.width||1920)/(2*z)+400,hh=(game.canvas?.height||1080)/(2*z)+400;
+            if(game.activeMap.type!=='outdoor'||game.dayCycle().lampsOn)for(const l of game.lamps||[]){const R=l.lightRadius||l.radius||200;
+                if(l.visible!==false&&Math.abs(l.x-cx)<hw+R&&Math.abs(l.y-cy)<hh+R&&game.roomSystem.lampLight(l)>.01)this.lights.push(l);}
             if(this.owner.layers.decorLights){
                 for(const p of game.props||[])if(p.light&&p.visible!==false){
                     const c=p.getCenter();if(game.roomSystem.lightAt(c.x,c.y)<.005)continue;
@@ -59980,7 +59985,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             const needed=r.texture.baseTexture.realWidth*r.texture.baseTexture.realHeight*4;
             if(this.shadowBytes()+needed>48*1048576){stats.dropped+=nearby.length;return base;}
             r.dynamicStage=new PIXI.Container();r.dynamicBase=new PIXI.Sprite(base);r.dynamicStage.addChild(r.dynamicBase);
-            r.dynamicTexture=PIXI.RenderTexture.create({width:source.radius*2,height:source.radius*2,resolution:r.density,scaleMode:PIXI.SCALE_MODES.LINEAR});
+            r.dynamicTexture=this.shadowTarget(source.radius*2,source.radius*2,r.density,'animated-shadow-target');
         }
         r.dynamicBase.texture=base;r.dynamicBase.width=r.dynamicBase.height=source.radius*2;
         r.dynamicMeshes||=[];for(const mesh of r.dynamicMeshes)mesh.visible=false;if(r.actorShadow)r.actorShadow.visible=false;
@@ -65833,8 +65838,8 @@ const GLSignals = (() => {
     const glow = (B, x, y, r, k, a, core = 0) => {
         const col = t => rgba(k, a * (core ? (t < core ? 1 - (1 - .45) * t / core : .45 * (1 - (t - core) / (1 - core))) : 1 - t));
         const rings = core ? 2 : 1, ts = core ? [0, core, 1] : [0, 1], segs = 24, base = B.n;
-        B.vertex(P(x, y), undefined, undefined, 0, 0, 0, col(0));
-        for (let i = 1; i <= rings; i++) for (let j = 0; j < segs; j++) { const an = j / segs * Math.PI * 2; B.vertex(P(x + Math.cos(an) * r * ts[i], y + Math.sin(an) * r * ts[i]), undefined, undefined, 0, 0, 0, col(ts[i])); }
+        const c0 = col(0); B.flat(x, y, c0[0], c0[1], c0[2], c0[3]);
+        for (let i = 1; i <= rings; i++) { const c = col(ts[i]); for (let j = 0; j < segs; j++) { const an = j / segs * Math.PI * 2; B.flat(x + Math.cos(an) * r * ts[i], y + Math.sin(an) * r * ts[i], c[0], c[1], c[2], c[3]); } }
         for (let j = 0; j < segs; j++) B.index.push(base, base + 1 + j, base + 1 + (j + 1) % segs);
         for (let i = 1; i < rings; i++) for (let j = 0; j < segs; j++) { const a0 = base + 1 + (i - 1) * segs + j, b0 = base + 1 + (i - 1) * segs + (j + 1) % segs; B.index.push(a0, a0 + segs, b0 + segs, a0, b0 + segs, b0); }
     };
@@ -65901,7 +65906,7 @@ const GLSignals = (() => {
         }
         /** This frame's lights in view (null: none), and the dark (0..1) */
         sync(traffic, view, crosswalks, dark, time) {
-            const G = new GLBuildingBuilder(0), L = new GLBuildingBuilder(0); let n = 0;
+            const G = (this._G || (this._G = new GLBuildingBuilder(0))).clear(), L = (this._L || (this._L = new GLBuildingBuilder(0))).clear(); let n = 0;
             if (traffic) for (const ix of traffic.network.intersections) {
                 if (!ix.signal || !ix.signal.inView(view)) continue;
                 ground(G, ix.signal, crosswalks, time); lit(L, ix.signal, dark, crosswalks, time); n++;
@@ -66221,14 +66226,14 @@ const GLCars = (() => {
             const lx = farLOD ? 0 : Math.max(-1, Math.min(1, v.load || 0)) * CAR_ART.PITCH_PX, ly = farLOD ? 0 : -(v.bodyRoll || 0) * CAR_ART.ROLL_PX;
             r.lean.position.set(Math.abs(lx) > 0.05 || Math.abs(ly) > 0.05 ? lx : 0, Math.abs(lx) > 0.05 || Math.abs(ly) > 0.05 ? ly : 0);
             r.body.geometry = k.body;
-            const S = new GLBuildingBuilder(0); if (!farLOD) sheen(S, v, g); r.sheen.set(S);
-            const M = new GLBuildingBuilder(0); lamps(M, v, g, farLOD); r.lamps.set(M);
+            const S = (r._S || (r._S = new GLBuildingBuilder(0))).clear(); if (!farLOD) sheen(S, v, g); r.sheen.set(S);
+            const M = (r._M || (r._M = new GLBuildingBuilder(0))).clear(); lamps(M, v, g, farLOD); r.lamps.set(M);
             return r.root;
         }
         /** Every car's glow after dark, into one added geometry in world space */
         glow(cars, dark) {
             if (!this.night) { this.night = new GLDynamic(); this.night.state = ADD; }
-            const B = new GLBuildingBuilder(0);
+            const B = (this._NB || (this._NB = new GLBuildingBuilder(0))).clear();
             for (const v of cars) { const g = carGeo(v), c = Math.cos(v.angle), s = Math.sin(v.angle); B.inFrame([c, s, -s, c, v.x, v.y], () => nightGlow(B, v, g, dark)); }
             this.night.set(B);
             return this.night;
