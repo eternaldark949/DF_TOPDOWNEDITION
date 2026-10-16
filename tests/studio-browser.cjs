@@ -32,7 +32,7 @@ const server=http.createServer((_req,res)=>{res.setHeader('Content-Type','text/h
  await importProject(saved);await page.waitForFunction(id=>document.querySelector('#selection-id').textContent===id,initialID);assert.equal(Number(await input().inputValue()),original+2);
  console.log('Studio: export / valid reload / invalid import isolation');
  // A cancelled captured move must restore data and leave no undo command.
- await page.locator('[data-panel-toggle=properties]').click();await page.locator('#viewport-options').evaluate(e=>e.open=true);await page.locator('#view').selectOption('top');await page.locator('#viewport-options').evaluate(e=>e.open=false);await page.locator('#move').click();const rect=await page.locator('#world').boundingBox(),e=saved.scenes[0].entities.find(e=>e.id===initialID);
+ await page.locator('[data-panel-toggle=properties]').click();await page.locator('[data-panel-toggle=viewport]').click();await page.locator('#view').selectOption('top');await page.locator('[data-panel-toggle=viewport]').click();await page.locator('#move').click();const rect=await page.locator('#world').boundingBox(),e=saved.scenes[0].entities.find(e=>e.id===initialID);
  const camera=JSON.parse(await page.locator('#status').getAttribute('data-camera'));
  const x=rect.x+rect.width/2+(e.position[0]-camera.x)*rect.height/(2*camera.halfHeight),y=rect.y+rect.height/2-(e.position[1]-camera.y)*rect.height/(2*camera.halfHeight);
  const revision=Number(await page.locator('#status').getAttribute('data-revision'));
@@ -51,7 +51,7 @@ const server=http.createServer((_req,res)=>{res.setHeader('Content-Type','text/h
  assert.notEqual(moved,original+2);assert.equal(moved/.5,Math.round(moved/.5));
  await page.locator('#undo').click();
  assert.equal((await exportProject()).scenes[0].entities.find(e=>e.id===initialID).position[0],original+2);
- await page.locator('#viewport-options').evaluate(e=>e.open=true);await page.locator('#view').selectOption('oblique');await page.locator('#viewport-options').evaluate(e=>e.open=false);
+ await page.locator('[data-panel-toggle=viewport]').click();await page.locator('#view').selectOption('oblique');await page.locator('[data-panel-toggle=viewport]').click();
  // Real touch selection, then a numeric edit persisted in the same-origin recovery slot.
  await page.locator('[data-panel-toggle=directory]').click();await page.locator(`#hierarchy [data-id="${initialID}"]`).tap();await input().fill(String(original+3));await input().press('Enter');
  await page.waitForFunction(()=>document.querySelector('#status').dataset.recovery==='stored');

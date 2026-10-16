@@ -165,9 +165,9 @@ const server = http.createServer((req, res) => {
       await button("properties").getAttribute("aria-expanded"),
       "false",
     );
-    await p.locator("#viewport-options").evaluate((e) => (e.open = true));
+    await p.locator('[data-panel-toggle=viewport]').click();
     await p.locator("#reset-view").click();
-    await p.locator("#viewport-options").evaluate((e) => (e.open = false));
+    await p.locator('[data-panel-toggle=viewport]').click();
     const canvas = await p.locator("#world").boundingBox();
     await shot("studio-diamonds-phone-clear.png");
     await button("directory").tap();

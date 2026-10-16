@@ -64,7 +64,7 @@ const root = path.resolve(__dirname, ".."),
         );
         await p.locator("#project").selectOption("freelancer.enni-slice.v1");
         before = await exported();
-        await p.locator("#viewport-options").evaluate((e) => (e.open = true));
+        await p.locator('[data-panel-toggle=viewport]').click();
         await p.locator("#projection").selectOption("perspective");
       } else
         await p.waitForFunction(
@@ -122,7 +122,7 @@ const root = path.resolve(__dirname, ".."),
       if (target === "Studio") {
         assert.deepEqual(await exported(), before);
         assert.equal(await p.locator("#undo").isDisabled(), true);
-        await p.locator("#viewport-options").evaluate((e) => (e.open = false));
+        await p.locator('[data-panel-toggle=viewport]').click();
         await p.locator("#play").click();
         await p.waitForFunction(
           () =>
@@ -135,7 +135,7 @@ const root = path.resolve(__dirname, ".."),
         await p.waitForFunction(
           () => document.querySelector("#status").dataset.mode === "edit",
         );
-        await p.locator("#viewport-options").evaluate((e) => (e.open = true));
+        await p.locator('[data-panel-toggle=viewport]').click();
         assert.equal(await mode.inputValue(), "low");
         assert.equal(
           Number(await p.locator("[data-bloom=strength]").inputValue()),
@@ -146,7 +146,7 @@ const root = path.resolve(__dirname, ".."),
           path: path.join(root, "artifacts/bloom-studio-controls-phone.png"),
           timeout: 120000,
         });
-        await p.locator("#viewport-options").evaluate((e) => (e.open = false));
+        await p.locator('[data-panel-toggle=viewport]').click();
         await p.setViewportSize({ width: 1440, height: 960 });
         await p.screenshot({
           path: path.join(root, "artifacts/bloom-studio-desktop.png"),
@@ -181,7 +181,7 @@ const root = path.resolve(__dirname, ".."),
         assert.equal(await mode.inputValue(), "low");
       }
       if (target === "Studio")
-        await p.locator("#viewport-options").evaluate((e) => (e.open = true));
+        await p.locator('[data-panel-toggle=viewport]').click();
       for (let i = 0; i < 2; i++) {
         await mode.selectOption("off");
         await p.waitForFunction(

@@ -62,11 +62,11 @@ const server = http.createServer((req, res) => {
         return JSON.parse(fs.readFileSync(await (await wait).path(), "utf8"));
       };
     if (perspective) {
-      await p.locator("#viewport-options").evaluate((e) => (e.open = true));
+      await p.locator('[data-panel-toggle=viewport]').click();
       await p.locator("#projection").selectOption("perspective");
       await p.locator("#fov").fill("55");
       await p.locator("#fov").dispatchEvent("change");
-      await p.locator("#viewport-options").evaluate((e) => (e.open = false));
+      await p.locator('[data-panel-toggle=viewport]').click();
       await p.waitForFunction(
         () =>
           JSON.parse(document.querySelector("#status").dataset.camera)
@@ -173,10 +173,10 @@ const server = http.createServer((req, res) => {
     await p.locator("#show-hierarchy").click();
     await p.locator(`#hierarchy [data-id="${selected}"]`).click();
     await p.locator("[data-panel-toggle=properties]").click();
-    await p.locator("#viewport-options").evaluate((e) => (e.open = true));
+    await p.locator('[data-panel-toggle=viewport]').click();
     await p.locator("#view").selectOption("top");
     await p.locator("#frame-selected").click();
-    await p.locator("#viewport-options").evaluate((e) => (e.open = false));
+    await p.locator('[data-panel-toggle=viewport]').click();
     await p.locator("#move").click();
     r = await p.locator("#world").boundingBox();
     const center = { x: r.x + r.width / 2, y: r.y + r.height / 2 },

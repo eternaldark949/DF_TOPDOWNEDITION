@@ -1,5 +1,7 @@
 # Studio · labelled diamonds and the DFAB palette
 
+**Follow-on:** [0016](0016-viewport-panel-and-iconography.md) adds the coordinated Viewport surface, shared SVG family and section navigation.
+
 Implemented after the owner's green light to bring the original editor's diamond panel controls, nearby collapsed labels and nocturnal violet/gold palette into the universal Studio. Extends [0007](0007-studio-first-workspace.md) and [0008](0008-studio-authoring-tools.md); scene, material, rendering and document contracts remain in their existing owners.
 
 ## Interaction and appearance

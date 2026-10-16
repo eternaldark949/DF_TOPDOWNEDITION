@@ -1,12 +1,387 @@
 <!doctype html>
 <!-- Studio shell: HTML properties surround the actual WebGL viewport; nothing paints a 2D canvas. -->
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0a0a0f"><title>ETRNLNINE Studio</title>
-<link rel="stylesheet" href="../engine/penthouse/workspace-theme.css">
-<link rel="stylesheet" href="../engine/penthouse/panel-dock.css">
-<link rel="stylesheet" href="./studio.css"></head><body class="workspace-theme">
-<header><div><h1>ETRNLNINE <small>Studio</small></h1><button id="undo" title="Undo (Ctrl Z)">↶ Undo</button><button id="redo" title="Redo (Ctrl Shift Z)">↷ Redo</button><button id="play">▶ Play</button></div><div class="projectbar"><span id="project-name"></span><select id="project" aria-label="Starter project"></select><select id="scene" aria-label="Scene"></select><button id="save">Export JSON</button><button id="open">Import</button><button id="recover">Recover</button><button id="profiler">Profiler</button><input id="file" type="file" accept=".json,application/json" hidden></div></header>
-<main id="workspace"><aside id="library"><div class="eyebrow">Directory</div><h2>Scene & assets</h2><div class="directory-tabs"><button id="show-hierarchy" aria-pressed="true">Scene</button><button id="show-assets" aria-pressed="false">Assets</button><button id="show-materials" aria-pressed="false">Materials</button></div><div id="hierarchy"></div><section id="assets"><h3>Asset library</h3><input id="asset-search" type="search" aria-label="Search assets" placeholder="Find an asset…"><p class="asset-hint">Choose a template, then tap the viewport to place it.</p><div id="asset-list"></div></section><section id="materials"><h3>Material library</h3><div id="material-list"></div></section></aside><section id="stage"><canvas id="world" tabindex="0" aria-label="Studio WebGL viewport. Tap to select; choose Move to drag on the ground plane."></canvas><nav class="tools" aria-label="Viewport tools">
-<div class="tool-strip"><button id="select" title="Select objects" aria-pressed="true">↖ Select</button><button id="move" title="Move on the construction plane" aria-pressed="false">✥ Move</button><button id="rotate" title="Drag the selected object's rotation ring" aria-pressed="false">⟳ Rotate</button><button id="duplicate" aria-label="Duplicate instance" title="Duplicate (Ctrl D)">⧉ Copy</button><button id="delete" aria-label="Delete instance" title="Delete selected instance">⌫ Delete</button></div>
-<div class="rotation-settings"><select id="rotation-axis" aria-label="Rotation axis"><option value="x">X axis</option><option value="y">Y axis</option><option value="z" selected>Z axis</option></select><select id="rotation-space" aria-label="Rotation space"><option value="world">World</option><option value="local">Local</option></select><select id="angle-snap" aria-label="Angle snapping"><option value="0">Free angle</option><option value="5">Snap 5°</option><option value="15" selected>Snap 15°</option><option value="45">Snap 45°</option></select></div>
-<div class="navigation-strip"><button id="orbit" title="Orbit camera · middle drag or Alt + left drag" aria-pressed="false">Orbit</button><button id="pan" title="Pan camera · right drag or Shift + middle drag" aria-pressed="false">Pan</button></div><details id="viewport-options"><summary>◈ View & guides</summary><div class="view-options"><button id="frame-selected" title="Frame selected (F)">Frame selected</button><button id="frame-all" title="Frame all (Home)">Frame all</button><button id="reset-view">Reset view</button><span></span><button id="grid" aria-pressed="false">⌗ Grid</button><button id="lights" aria-pressed="true">☼ Light icons</button><select id="projection" aria-label="Camera projection"><option value="orthographic">Orthographic</option><option value="perspective">Perspective</option></select><label>Vertical FOV ° <input id="fov" aria-label="Vertical field of view" type="number" min="15" max="110" value="50" step="1"></label><select id="view" aria-label="Camera view"><option value="oblique">Oblique</option><option value="top">Top</option><option value="front">Front</option><option value="side">Side</option></select><button id="orbit-left" aria-label="Orbit left">↶ Orbit</button><button id="orbit-right" aria-label="Orbit right">Orbit ↷</button><button id="zoom-in" aria-label="Zoom in">＋</button><button id="zoom-out" aria-label="Zoom out">−</button><select id="snap" aria-label="Move snapping"><option value="0.5">Snap 0.5 m</option><option value="1">Snap 1 m</option><option value="0">No snap</option></select></div></details></nav><div class="view-label"><span id="tool-readout">SELECT</span><span>Z UP · METRES · WEBGL</span></div><div id="controls"></div></section><aside id="properties"><div class="eyebrow">Inspector</div><h2 id="selection-name"></h2><div id="selection-id"></div><div id="fields"></div><p class="note">Camera: middle drag or Alt + left drag to orbit; right drag or Shift + middle drag to pan. Wheel zooms toward the pointer. On touch, use Orbit/Pan mode or two fingers to pan and pinch. F frames selection; Home frames all. Move on the ground plane or drag the rotation ring. Use Top for Z rotation, Front for Y, Side for X. Escape cancels. Play uses a separate copy.</p></aside></main><footer><output id="status">Opening Studio…</output><output id="metrics"></output></footer><div id="error" role="alert" hidden title="Tap to dismiss"></div>
-<script type="module" src="./main.js"></script></body></html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0a0a0f" />
+    <title>ETRNLNINE Studio</title>
+    <link rel="stylesheet" href="../engine/penthouse/workspace-theme.css" />
+    <link rel="stylesheet" href="../engine/penthouse/panel-dock.css" />
+    <link rel="stylesheet" href="./studio.css" />
+  </head>
+  <body class="workspace-theme">
+    <header>
+      <div>
+        <h1>ETRNLNINE <small>Studio</small></h1>
+        <button id="undo" data-icon="undo" title="Undo (Ctrl Z)">Undo</button
+        ><button id="redo" data-icon="redo" title="Redo (Ctrl Shift Z)">
+          Redo</button
+        ><button id="play" data-icon="play">Play</button>
+      </div>
+      <div class="projectbar">
+        <span id="project-name"></span
+        ><select id="project" aria-label="Starter project"></select
+        ><select id="scene" aria-label="Scene"></select
+        ><button id="save" data-icon="export">Export JSON</button
+        ><button id="open" data-icon="import">Import</button
+        ><button id="recover" data-icon="reset">Recover</button
+        ><button id="profiler" data-icon="profiler">Profiler</button
+        ><input id="file" type="file" accept=".json,application/json" hidden />
+      </div>
+    </header>
+    <main id="workspace">
+      <aside id="library">
+        <div class="eyebrow">Directory</div>
+        <h2>Scene & assets</h2>
+        <div class="directory-tabs">
+          <button id="show-hierarchy" data-icon="scene" aria-pressed="true">
+            Scene</button
+          ><button id="show-assets" data-icon="assets" aria-pressed="false">
+            Assets</button
+          ><button
+            id="show-materials"
+            data-icon="material"
+            aria-pressed="false"
+          >
+            Materials
+          </button>
+        </div>
+        <div id="hierarchy"></div>
+        <section id="assets">
+          <h3>Asset library</h3>
+          <input
+            id="asset-search"
+            type="search"
+            aria-label="Search assets"
+            placeholder="Find an asset…"
+          />
+          <p class="asset-hint">
+            Choose a template, then tap the viewport to place it.
+          </p>
+          <div id="asset-list"></div>
+        </section>
+        <section id="materials">
+          <h3>Material library</h3>
+          <div id="material-list"></div>
+        </section>
+      </aside>
+      <section id="stage">
+        <canvas
+          id="world"
+          tabindex="0"
+          aria-label="Studio WebGL viewport. Tap to select; choose Move to drag on the ground plane."
+        ></canvas>
+        <nav class="tools" aria-label="Viewport tools">
+          <div class="tool-strip">
+            <button
+              id="select"
+              data-icon="select"
+              title="Select objects"
+              aria-pressed="true"
+            >
+              Select</button
+            ><button
+              id="move"
+              data-icon="move"
+              title="Move on the construction plane"
+              aria-pressed="false"
+            >
+              Move</button
+            ><button
+              id="rotate"
+              data-icon="rotate"
+              title="Drag the selected object's rotation ring"
+              aria-pressed="false"
+            >
+              Rotate</button
+            ><button
+              id="duplicate"
+              data-icon="copy"
+              aria-label="Duplicate instance"
+              title="Duplicate (Ctrl D)"
+            >
+              Copy</button
+            ><button
+              id="delete"
+              data-icon="delete"
+              aria-label="Delete instance"
+              title="Delete selected instance"
+            >
+              Delete
+            </button>
+          </div>
+          <div class="rotation-settings">
+            <select id="rotation-axis" aria-label="Rotation axis">
+              <option value="x">X axis</option>
+              <option value="y">Y axis</option>
+              <option value="z" selected>Z axis</option></select
+            ><select id="rotation-space" aria-label="Rotation space">
+              <option value="world">World</option>
+              <option value="local">Local</option></select
+            ><select id="angle-snap" aria-label="Angle snapping">
+              <option value="0">Free angle</option>
+              <option value="5">Snap 5°</option>
+              <option value="15" selected>Snap 15°</option>
+              <option value="45">Snap 45°</option>
+            </select>
+          </div>
+          <div class="navigation-strip">
+            <button
+              id="orbit"
+              data-icon="orbit"
+              title="Orbit camera · middle drag or Alt + left drag"
+              aria-pressed="false"
+            >
+              Orbit</button
+            ><button
+              id="pan"
+              data-icon="pan"
+              title="Pan camera · right drag or Shift + middle drag"
+              aria-pressed="false"
+            >
+              Pan
+            </button>
+          </div>
+          <div class="viewport-shortcuts" aria-label="Viewport shortcuts">
+            <button
+              id="lens"
+              data-view-command="lens"
+              data-icon="orthographic"
+              data-icon-only="true"
+              title="Toggle perspective / orthographic"
+              aria-pressed="false"
+            >
+              Orthographic
+            </button>
+            <button
+              id="grid"
+              data-view-command="grid"
+              data-icon="grid"
+              data-icon-only="true"
+              title="Toggle construction grid"
+              aria-pressed="false"
+            >
+              Grid
+            </button>
+            <button
+              id="lights"
+              data-view-command="lights"
+              data-icon="light"
+              data-icon-only="true"
+              title="Toggle light markers"
+              aria-pressed="true"
+            >
+              Light markers
+            </button>
+            <button
+              id="frame-selection"
+              data-view-command="frame"
+              data-icon="frame"
+              data-icon-only="true"
+              title="Frame selected (F)"
+            >
+              Frame selected
+            </button>
+          </div>
+        </nav>
+        <div class="view-label">
+          <span id="tool-readout">SELECT</span
+          ><span>Z UP · METRES · WEBGL</span>
+        </div>
+        <div id="controls"></div>
+      </section>
+      <aside id="properties">
+        <div class="eyebrow">Inspector</div>
+        <h2 id="selection-name"></h2>
+        <div id="selection-id"></div>
+        <div id="fields"></div>
+        <p class="note">
+          Camera: middle drag or Alt + left drag to orbit; right drag or Shift +
+          middle drag to pan. Wheel zooms toward the pointer. On touch, use
+          Orbit/Pan mode or two fingers to pan and pinch. F frames selection;
+          Home frames all. Move on the ground plane or drag the rotation ring.
+          Use Top for Z rotation, Front for Y, Side for X. Escape cancels. Play
+          uses a separate copy.
+        </p>
+      </aside>
+      <aside id="viewport-options" aria-label="Viewport settings">
+        <div class="eyebrow">Viewport</div>
+        <h2>Compose the view</h2>
+        <p class="panel-intro">
+          Your lens, guides and atmosphere. These settings leave the project
+          untouched.
+        </p>
+        <!-- Section shortcuts make appearance reachable without scrolling through camera fields. -->
+        <nav class="viewport-sections" aria-label="Viewport sections">
+          <button
+            data-viewport-section="camera-section"
+            data-icon="camera"
+            aria-pressed="true"
+          >
+            Camera
+          </button>
+          <button
+            data-viewport-section="guides-section"
+            data-icon="guides"
+            aria-pressed="false"
+          >
+            Guides
+          </button>
+          <button
+            data-viewport-section="appearance-section"
+            data-icon="bloom"
+            aria-pressed="false"
+          >
+            Appearance
+          </button>
+        </nav>
+        <details
+          class="viewport-section"
+          id="camera-section"
+          name="viewport-sections"
+          open
+        >
+          <summary data-icon="camera">Camera</summary>
+          <div class="section-body">
+            <label
+              >Lens<select id="projection" aria-label="Camera projection">
+                <option value="orthographic">Orthographic</option>
+                <option value="perspective">Perspective</option>
+              </select></label
+            >
+            <label
+              >View preset<select id="view" aria-label="Camera view">
+                <option value="oblique">Oblique</option>
+                <option value="top">Top</option>
+                <option value="front">Front</option>
+                <option value="side">Side</option>
+              </select></label
+            >
+            <label
+              >Vertical field of view · °<input
+                id="fov"
+                aria-label="Vertical field of view"
+                type="number"
+                min="15"
+                max="110"
+                value="50"
+                step="1"
+            /></label>
+            <div class="command-grid">
+              <button
+                id="frame-selected"
+                data-view-command="frame"
+                data-icon="frame"
+                title="Frame selected (F)"
+              >
+                Selection</button
+              ><button
+                id="frame-all"
+                data-view-command="frameAll"
+                data-icon="frameAll"
+                title="Frame all (Home)"
+              >
+                Everything</button
+              ><button
+                id="reset-view"
+                data-view-command="reset"
+                data-icon="reset"
+              >
+                Reset view
+              </button>
+            </div>
+            <div class="command-grid">
+              <button
+                id="orbit-left"
+                data-view-command="left"
+                data-icon="orbitLeft"
+                aria-label="Orbit left"
+              >
+                Orbit left</button
+              ><button
+                id="orbit-right"
+                data-view-command="right"
+                data-icon="orbitRight"
+                aria-label="Orbit right"
+              >
+                Orbit right</button
+              ><button
+                id="zoom-in"
+                data-view-command="zoomIn"
+                data-icon="zoomIn"
+                aria-label="Zoom in"
+              >
+                Zoom in</button
+              ><button
+                id="zoom-out"
+                data-view-command="zoomOut"
+                data-icon="zoomOut"
+                aria-label="Zoom out"
+              >
+                Zoom out
+              </button>
+            </div>
+          </div>
+        </details>
+        <details
+          class="viewport-section"
+          id="guides-section"
+          name="viewport-sections"
+        >
+          <summary data-icon="guides">Guides</summary>
+          <div class="section-body">
+            <button
+              data-view-command="grid"
+              data-icon="grid"
+              aria-pressed="false"
+            >
+              Construction grid
+            </button>
+            <button
+              data-view-command="lights"
+              data-icon="light"
+              aria-pressed="true"
+            >
+              Light markers
+            </button>
+            <button
+              data-view-command="axes"
+              data-icon="axes"
+              aria-pressed="false"
+            >
+              World axes · XYZ
+            </button>
+            <button
+              data-view-command="outlines"
+              data-icon="outline"
+              aria-pressed="false"
+            >
+              Selection bounds outline
+            </button>
+            <p class="panel-hint">
+              Guide visibility does not change geometry, snapping or
+              illumination.
+            </p>
+            <label
+              >Move snapping<select id="snap" aria-label="Move snapping">
+                <option value="0.5">Snap 0.5 m</option>
+                <option value="1">Snap 1 m</option>
+                <option value="0">No snap</option>
+              </select></label
+            >
+          </div>
+        </details>
+        <section id="appearance-section" class="viewport-section"></section>
+      </aside>
+    </main>
+    <footer>
+      <output id="status">Opening Studio…</output><output id="metrics"></output>
+    </footer>
+    <div id="error" role="alert" hidden title="Tap to dismiss"></div>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

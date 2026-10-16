@@ -1,0 +1,26 @@
+{
+  "shell": {
+    "exitCode": 0,
+    "seconds": 117.29
+  },
+  "studio": {
+    "exitCode": 0,
+    "seconds": 126.89
+  },
+  "tools": {
+    "exitCode": 0,
+    "seconds": 113.67
+  },
+  "camera": {
+    "exitCode": 0,
+    "seconds": 134.96
+  },
+  "appearance": {
+    "exitCode": 0,
+    "seconds": 88.86
+  },
+  "materials": {
+    "exitCode": 0,
+    "seconds": 278.19
+  }
+}

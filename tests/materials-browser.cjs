@@ -345,7 +345,7 @@ const root = path.resolve(__dirname, ".."),
     console.log("Materials: Play isolation passed; capturing editor");
     await page.locator("#show-materials").click();
     await page.locator(`[data-material-id="${materialId}"]`).click();
-    await page.locator("#viewport-options").evaluate((e) => (e.open = true));
+    await page.locator('[data-panel-toggle=viewport]').click();
     await page.locator("#projection").selectOption("perspective");
     await page.locator(".engine-appearance").evaluate((e) => (e.open = true));
     await page.locator("[data-bloom=mode]").selectOption("low");
@@ -354,12 +354,13 @@ const root = path.resolve(__dirname, ".."),
         document.querySelector(".engine-appearance output").dataset
           .effective === "low",
     );
+    await page.locator('[data-viewport-section=guides-section]').click();
     // A clean presentation view still uses the same native renderer and editable material.
     if ((await page.locator("#grid").getAttribute("aria-pressed")) === "true")
-      await page.locator("#grid").click();
+      await page.locator("#viewport-options [data-view-command=grid]").click();
     if ((await page.locator("#lights").getAttribute("aria-pressed")) === "true")
-      await page.locator("#lights").click();
-    await page.locator("#viewport-options").evaluate((e) => (e.open = false));
+      await page.locator("#viewport-options [data-view-command=lights]").click();
+    await page.locator('[data-panel-toggle=viewport]').click();
     await page.locator("#library").evaluate((e) => {
       e.scrollTop = 0;
     });

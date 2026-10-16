@@ -11,6 +11,7 @@ body {
 }
 body {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) 34px;
 }
 header {
@@ -83,7 +84,7 @@ aside {
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-color: #79569b #15101c;
-  background: linear-gradient(120deg, #111017f7, #191122f7);
+  background: linear-gradient(120deg, #111017, #191122);
   z-index: 4;
 }
 #library {
@@ -199,52 +200,135 @@ body[data-navigation="pan"] #world {
 .rotate-mode .rotation-settings {
   display: flex;
 }
+/* The Viewport surface shares PanelDock ownership with Directory/Properties. It
+   overlays the scene, never resizes it, and carries no second visibility flag. */
 #viewport-options {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: var(--properties-width);
+  width: min(
+    340px,
+    calc(100% - var(--directory-width) - var(--properties-width))
+  );
+  border-left: 1px solid var(--ui-border);
+  border-right: 1px solid var(--ui-border);
+  padding-bottom: 80px;
+  box-shadow: -12px 0 32px #0009;
+  background: linear-gradient(120deg, #111017, #191122);
+}
+main > .panel-control[data-panel-toggle="viewport"] {
+  top: auto;
+  bottom: 12px;
+  right: calc(var(--properties-width) + 8px);
+  transform: none;
+}
+main > .panel-control[data-panel-toggle="viewport"][aria-expanded="true"] {
+  top: 10px;
+  bottom: auto;
+}
+.viewport-shortcuts {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  background: #100d18ef;
   border: 1px solid var(--ui-border);
   border-radius: 6px;
-  background: #100d18ef;
 }
-#viewport-options > summary {
+.panel-intro,
+.panel-hint {
+  font-size: 12px;
+  color: var(--ui-muted);
+  line-height: 1.7;
+}
+.panel-intro {
+  margin-bottom: 20px;
+}
+.viewport-sections {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  position: sticky;
+  top: -1px;
+  z-index: 1;
+  padding: 8px 0;
+  background: var(--ui-panel);
+}
+.viewport-sections button {
+  flex-direction: column;
+  gap: 5px;
+  min-height: 62px;
+  padding: 6px 2px;
+  font-size: 11px;
+}
+.viewport-section {
+  border-top: 1px solid var(--ui-border);
+}
+.viewport-section > summary,
+.viewport-section .engine-appearance > summary {
   display: flex;
   align-items: center;
-  cursor: pointer;
+  justify-content: flex-start;
+  gap: 10px;
   min-height: 52px;
-  padding: 8px 12px;
-  color: var(--ui-violet-bright);
-  font-size: 11px;
   list-style: none;
+  cursor: pointer;
+  color: var(--ui-gold);
+  font-size: 13px;
 }
-.view-options {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  width: min(290px, 100%);
+.viewport-section summary::-webkit-details-marker {
+  display: none;
+}
+.viewport-section summary::after {
+  content: "+";
+  margin-left: auto;
+  font: 18px monospace;
+  color: var(--ui-violet-bright);
+}
+.viewport-section[open] > summary::after,
+.viewport-section .engine-appearance[open] > summary::after {
+  content: "−";
+}
+.section-body {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 4px 0 18px;
+}
+.section-body label {
+  display: grid;
   gap: 7px;
-  padding: 12px;
-  background: #15101ff5;
-  border: 1px solid #9165bb;
-  border-radius: 6px;
-  box-shadow: 0 12px 32px #0009;
-  max-height: max(70px, calc(100cqh - 170px));
-  overflow: auto;
-  overscroll-behavior: contain;
-}
-.view-options :is(button, select) {
-  font-size: 11px;
-}
-.view-options label {
-  display: grid;
-  gap: 5px;
-  min-width: 0;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ui-muted);
 }
-.view-options input {
+.section-body :is(input, select) {
   width: 100%;
-  min-width: 0;
 }
+.section-body > button {
+  justify-content: flex-start;
+}
+.command-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.command-grid button {
+  font-size: 11px;
+  padding: 8px 5px;
+}
+.command-grid button:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+.directory-tabs .workspace-icon {
+  width: 16px;
+  height: 16px;
+  flex-basis: 16px;
+}
+.directory-tabs .icon-control {
+  flex-direction: column;
+  gap: 4px;
+  min-height: 58px;
+}
+
 .view-label {
   position: absolute;
   bottom: 16px;
@@ -490,6 +574,15 @@ body.playing .view-label {
     font-size: 11px;
     padding: 7px;
   }
+  /* History stays available as named icon controls without widening the whole grid. */
+  header :is(#undo, #redo) {
+    width: 44px;
+    min-width: 44px;
+    padding: 8px;
+  }
+  header :is(#undo, #redo) .control-caption {
+    display: none;
+  }
   .projectbar {
     gap: 5px;
     margin-top: 8px;
@@ -558,26 +651,46 @@ body.playing .view-label {
     font-size: 11px;
     padding: 6px 8px;
   }
-  .tools > #viewport-options {
-    margin-left: auto;
+  /* Phone controls retain the same vectors and full native hit areas. */
+  .tool-strip :is(#duplicate, #delete) .control-caption {
+    display: none;
   }
-  #viewport-options > summary {
-    min-height: 50px;
-    padding: 7px 10px;
-  }
-  .tool-strip #duplicate,
-  .tool-strip #delete {
-    font-size: 0;
+  .tool-strip :is(#duplicate, #delete) {
     width: 44px;
-    padding: 5px;
   }
-  .tool-strip #duplicate::before {
-    content: "⧉";
-    font-size: 18px;
+  #viewport-options {
+    right: 0;
+    width: min(340px, calc(100% - 120px));
+    padding: 18px 14px 80px;
+    transition:
+      transform 0.22s ease,
+      opacity 0.22s ease,
+      visibility 0.22s;
   }
-  .tool-strip #delete::before {
-    content: "⌫";
-    font-size: 18px;
+  #viewport-options[data-panel-open="false"] {
+    transform: translateX(100%);
+  }
+  main > .panel-control[data-panel-toggle="viewport"] {
+    right: 8px;
+  }
+  /* Keep all three nodes reachable without placing a collapsed control over fields.
+     A right drawer leaves a left rail; Directory leaves the opposite right rail. */
+  main[data-properties-open="true"]
+    > .panel-control[data-panel-toggle="viewport"] {
+    left: 8px;
+    right: auto;
+  }
+  main[data-viewport-open="true"]
+    > .panel-control[data-panel-toggle="properties"] {
+    left: 8px;
+    right: auto;
+    top: calc(50% + 58px);
+  }
+  main[data-viewport-open="true"]
+    > .panel-control[data-panel-toggle="viewport"] {
+    top: 10px;
+    bottom: auto;
+    right: 8px;
   }
   .view-label {
     bottom: 12px;
@@ -596,7 +709,8 @@ body.playing .view-label {
 @media (prefers-reduced-motion: reduce) {
   main,
   #library,
-  #properties {
+  #properties,
+  #viewport-options {
     transition: none !important;
   }
 }

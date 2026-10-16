@@ -16,6 +16,8 @@ The branch was intentionally created with only this plan. On 2026-10-15, after r
 
 **Studio direction and roadmap:** [3D engine, universal Studio, authored JSON and offline packaging](docs/decisions/0006-studio-3d-and-authored-data.md). The first edit/save/play workspace is now implemented; the first recreated street/vestibule slice is now implemented.
 
+**Viewport and icons:** [coordinated view controls and the original SVG family](docs/decisions/0016-viewport-panel-and-iconography.md) · [previews and verification](docs/milestones/viewport-panel/README.md).
+
 **Studio diamonds:** [labelled panel controls and DFAB redesign](docs/decisions/0015-studio-diamond-shell.md) · [previews and verification](docs/milestones/studio-diamonds/README.md).
 
 **Materials and presentation:** [linked material editing and the shared HDR stage](docs/decisions/0013-presentation-and-materials.md) · [previews and verification](docs/milestones/materials/README.md).

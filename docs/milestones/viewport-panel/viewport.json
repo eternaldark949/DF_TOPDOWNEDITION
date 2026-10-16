@@ -1,0 +1,31 @@
+{
+  "icons": {
+    "count": 33,
+    "allPathsValid": true,
+    "registeredCatalog": true,
+    "dynamicState": true,
+    "disposeRemount": true
+  },
+  "controllerLifetime": {
+    "disposeRemount": true,
+    "singleAction": true
+  },
+  "viewport": {
+    "threeCoordinatedPanels": true,
+    "stableCanvas": true,
+    "sectionShortcuts": true,
+    "sharedGuideState": true,
+    "worldAxes": true,
+    "selectionBoundsOutline": true,
+    "optionalGuideRelease": true,
+    "sharedLensState": true,
+    "validatesFov": true,
+    "documentUnchanged": true,
+    "keyboard": true,
+    "touch": true,
+    "playRestoration": true,
+    "reducedMotion": true
+  },
+  "errors": [],
+  "requests": []
+}
