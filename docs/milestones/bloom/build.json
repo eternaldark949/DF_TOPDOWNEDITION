@@ -1,0 +1,20 @@
+{
+  "reproducible": true,
+  "files": [
+    {
+      "path": "dist/ETRNLNINE-Atrium.html",
+      "bytes": 283385,
+      "sha256": "9ae668869da821d18d15e4046c1143e9416c4d780bb881a1d4f2434fc3f8c70f"
+    },
+    {
+      "path": "dist/ETRNLNINE-Freelancer.html",
+      "bytes": 367133,
+      "sha256": "a1b95603e61d46d84ce681efdb35e9dc2c93b6a737b80b6f4a1af060ce1992e6"
+    },
+    {
+      "path": "dist/ETRNLNINE-Studio.html",
+      "bytes": 510248,
+      "sha256": "3f237d3d8b81c274090e9c7df022ef85b7edc2e8a8c8c9565ab2d7848440a1ca"
+    }
+  ]
+}

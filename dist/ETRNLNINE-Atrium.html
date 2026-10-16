@@ -640,7 +640,7 @@ const module8=(()=>{
  * Basement / shaders: GPU-native instanced boxes and inexpensive surface lighting.
  * Optional ambient visibility is supplied by the Basement occlusion capability.
  * No Canvas preparation, font atlas or external assets.
- * This is the first renderer material, not the final luxe/bloom renderer.
+ * This is the first renderer material, not a full PBR material system.
  */
 const { AMBIENT_VISIBILITY } = module9;
 const { SHADOW_VISIBILITY } = module10;
@@ -677,6 +677,8 @@ in vec3 vNormal;
 in vec3 vColor;
 in float vEmission;
 in float vHighlight;
+uniform bool uLinearOutput; // HDR scene target defers exposure/encoding to the compositor
+uniform float uExposure;
 uniform vec3 uAmbient;
 uniform vec4 uLights[8]; // x/y/z, radius; radius 0 disables a slot
 uniform vec3 uLightColors[8]; // linear RGB irradiance
@@ -708,7 +710,8 @@ void main() {
   }
   vec3 linear = surface * light + vColor * vEmission + vec3(0.18,0.12,0.04)*vHighlight;
   // Soft exposure rolloff then display gamma. No claim of physical spectral accuracy.
-  vec3 mapped = vec3(1.0) - exp(-linear * 1.25);
+  if(uLinearOutput){outColor=vec4(clamp(linear,vec3(0.0),vec3(65000.0)),1.0);return;}
+  vec3 mapped = vec3(1.0) - exp(-linear * uExposure);
   outColor = vec4(pow(mapped, vec3(1.0 / 2.2)), 1.0);
 }`;
 
@@ -726,7 +729,7 @@ function renderDiagnostics(renderer,profiler){
   for(const name of ['draws','instances','uploads','uploadedBytes','candidates','culled','shadowDraws','shadowHits']){
     ids[name]=profiler.counter(`renderer.${name}`,name==='uploadedBytes'?'bytes':'count');baseline[name]=0;
   }
-  for(const[name,unit]of [['buffers','count'],['programs','count'],['vaos','count'],['cpuBuffers','bytes'],['gpuBuffers','bytes'],['gpuPending','count'],['aoTargets','bytes'],['aoBlockers','count'],['shadowTargets','bytes']])ids[name]=profiler.counter(`renderer.${name}`,unit);
+  for(const[name,unit]of [['buffers','count'],['programs','count'],['vaos','count'],['cpuBuffers','bytes'],['gpuBuffers','bytes'],['gpuPending','count'],['aoTargets','bytes'],['aoBlockers','count'],['shadowTargets','bytes'],['bloomTargets','bytes'],['bloomPasses','count']])ids[name]=profiler.counter(`renderer.${name}`,unit);
   return profiler.provider('renderer',{
     begin(){for(const name in baseline)baseline[name]=renderer.totals[name];},
     sample(p){
@@ -738,13 +741,14 @@ function renderDiagnostics(renderer,profiler){
       p.set(ids.cpuBuffers,cpu);p.set(ids.gpuBuffers,gpu);p.set(ids.gpuPending,renderer.gpuTimer.pending);
       const ao=renderer.occlusion,t=ao.targets;
       p.set(ids.aoTargets,t?t.width*t.height*9:0);p.set(ids.aoBlockers,ao.count);
+      const bloom=renderer.bloom;p.set(ids.bloomTargets,bloom.targets?.bytes??0);p.set(ids.bloomPasses,bloom.passes);
       const maps=renderer.lighting.maps;p.set(ids.shadowTargets,(maps.sun?.bytes??0)+(maps.point?.bytes??0));
     },
     status:()=>renderer.gpuTimer.inspect(),
     configure:p=>renderer.gpuTimer.configure(p.recording&&p.gpuEnabled),
     details:()=>({gpuTimer:renderer.gpuTimer.inspect(),buffers:renderer.stats.buffers,programs:renderer.stats.programs,
-      vertexArrays:renderer.stats.vaos,lines:renderer.lines.inspect(),ambientOcclusion:renderer.occlusion.inspect(),lighting:renderer.lighting.inspect(),viewport:{width:renderer.canvas.width,height:renderer.canvas.height},
-      accounting:'Requested GL buffer bytes only. Estimated AO and shadow texture bytes are reported separately in ambientOcclusion/aoTargets. Default framebuffer, shader/driver storage and browser heap are excluded.'}),
+      vertexArrays:renderer.stats.vaos,lines:renderer.lines.inspect(),ambientOcclusion:renderer.occlusion.inspect(),lighting:renderer.lighting.inspect(),bloom:renderer.bloom.inspect(),viewport:{width:renderer.canvas.width,height:renderer.canvas.height},
+      accounting:'Requested GL buffer bytes only. Estimated AO, shadow and bloom target bytes are reported separately in ambientOcclusion/aoTargets. Default framebuffer, shader/driver storage and browser heap are excluded.'}),
   });
 }
 
@@ -1466,8 +1470,550 @@ class LineLayer {
 
 return {LineRendering};
 })();
-// Source: engine/basement/camera.js
+// Source: engine/basement/bloom-settings.js
+const module21=(()=>{
+/** Basement / bloom settings and predictable target budgets. No GL or application policy.
+ * Sizes are backing pixels; radii are pyramid texels, exposure/strength dimensionless. */
+const DEFAULTS = Object.freeze({
+  mode: "off",
+  strength: 0.65,
+  threshold: 1,
+  knee: 0.6,
+  radius: 1.25,
+  scatter: 0.8,
+  exposure: 1.25,
+});
+/** Validate an entire candidate before adopting it: bad UI/API input cannot half-configure a frame. */
+function bloomSettings(patch = {}, previous = DEFAULTS) {
+  const s = { ...previous, ...patch };
+  for (const key of Object.keys(patch))
+    if (!(key in DEFAULTS))
+      throw new RangeError(`Unknown bloom setting: ${key}`);
+  if (!["off", "low", "high"].includes(s.mode))
+    throw new RangeError("Bloom mode must be off, low or high");
+  for (const [key, min, max] of [
+    ["strength", 0, 3],
+    ["threshold", 0, 16],
+    ["knee", 0, 1],
+    ["radius", 0.5, 3],
+    ["scatter", 0, 1],
+    ["exposure", 0.05, 8],
+  ])
+    if (!Number.isFinite(s[key]) || s[key] < min || s[key] > max)
+      throw new RangeError(`Bloom ${key} must be ${min}–${max}`);
+  return Object.freeze(s);
+}
+/** Keep aspect ratio at the first half-size level, then halve to bounded broad-halo scales. */
+function bloomDimensions(width, height, mode) {
+  if (mode === "off") return [];
+  const cap = mode === "high" ? 1024 : 512,
+    levels = mode === "high" ? 7 : 6,
+    scale = Math.min(0.5, cap / Math.max(width, height));
+  let w = Math.max(1, Math.round(width * scale)),
+    h = Math.max(1, Math.round(height * scale));
+  const result = [];
+  for (let i = 0; i < levels; i++) {
+    result.push({ width: w, height: h });
+    if (w === 1 && h === 1) break;
+    w = Math.max(1, Math.floor(w / 2));
+    h = Math.max(1, Math.floor(h / 2));
+  }
+  return result;
+}
+/** Requested storage estimate: RGBA16F=8, depth24 padded=4 bytes. Driver padding is excluded. */
+function bloomStorage(width, height, dimensions, samples) {
+  const pyramid = dimensions.reduce(
+    (n, d, i) =>
+      n + d.width * d.height * 8 * (i === dimensions.length - 1 ? 1 : 2),
+    0,
+  );
+  return width * height * 12 * (samples + 1) + pyramid;
+}
+
+/** Scene-linear clear radiance matching the historical display backdrop at exposure 1.25. */
+const BLOOM_BACKGROUND = Object.freeze([
+  0.00011607027229163823, 0.00013073244809242254, 0.0005666143501070634,
+]);
+
+return {bloomSettings,bloomDimensions,bloomStorage,BLOOM_BACKGROUND};
+})();
+// Source: engine/basement/bloom-targets.js
+const module22=(()=>{
+/** Basement / one HDR scene and bounded bloom pyramid. Owns every GL target handle.
+ * Construction is transactional; even refusal midway through allocation cleans partial work. */
+const { bloomDimensions, bloomStorage } = module21;
+class BloomTargets {
+  /** Require float colour and shared multisample support to preserve architectural AA. */
+  constructor(gl, width, height, mode) {
+    this.gl = gl;
+    this.width = width;
+    this.height = height;
+    this.mode = mode;
+    this.textures = [];
+    this.framebuffers = [];
+    this.renderbuffers = [];
+    this.disposed = false;
+    try {
+      if (!gl.getExtension("EXT_color_buffer_float"))
+        throw new Error("HDR colour targets are unavailable");
+      const colour = Array.from(
+          gl.getInternalformatParameter(
+            gl.RENDERBUFFER,
+            gl.RGBA16F,
+            gl.SAMPLES,
+          ) ?? [],
+        ),
+        depth = Array.from(
+          gl.getInternalformatParameter(
+            gl.RENDERBUFFER,
+            gl.DEPTH_COMPONENT24,
+            gl.SAMPLES,
+          ) ?? [],
+        );
+      this.samples = Math.max(
+        0,
+        ...colour.filter((n) => n >= 2 && n <= 4 && depth.includes(n)),
+      );
+      if (!this.samples)
+        throw new Error("Antialiased HDR targets are unavailable");
+      this.scene = this.target(width, height, true);
+      this.multisample = this.framebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.multisample);
+      for (const [format, attachment] of [
+        [gl.RGBA16F, gl.COLOR_ATTACHMENT0],
+        [gl.DEPTH_COMPONENT24, gl.DEPTH_ATTACHMENT],
+      ]) {
+        const rb = gl.createRenderbuffer();
+        if (!rb) throw new Error("HDR renderbuffer allocation failed");
+        this.renderbuffers.push(rb);
+        gl.bindRenderbuffer(gl.RENDERBUFFER, rb);
+        gl.renderbufferStorageMultisample(
+          gl.RENDERBUFFER,
+          this.samples,
+          format,
+          width,
+          height,
+        );
+        gl.framebufferRenderbuffer(
+          gl.FRAMEBUFFER,
+          attachment,
+          gl.RENDERBUFFER,
+          rb,
+        );
+      }
+      this.check();
+      const dimensions = bloomDimensions(width, height, mode);
+      this.down = dimensions.map((d) => this.target(d.width, d.height));
+      this.up = dimensions
+        .slice(0, -1)
+        .map((d) => this.target(d.width, d.height));
+      this.bytes = bloomStorage(width, height, dimensions, this.samples);
+    } catch (error) {
+      this.dispose();
+      throw error;
+    } finally {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+      gl.bindTexture(gl.TEXTURE_2D, null);
+    }
+  }
+  /** Record immediately after allocation, before storage/attachment calls can fail. */
+  framebuffer() {
+    const f = this.gl.createFramebuffer();
+    if (!f) throw new Error("HDR framebuffer allocation failed");
+    this.framebuffers.push(f);
+    return f;
+  }
+  /** Immutable one-level storage; float colour is linear-filtered and depth is nearest-filtered. */
+  texture(format, width, height, filter) {
+    const gl = this.gl,
+      t = gl.createTexture();
+    if (!t) throw new Error("HDR texture allocation failed");
+    this.textures.push(t);
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texStorage2D(gl.TEXTURE_2D, 1, format, width, height);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    return t;
+  }
+  /** No depth on the reduction pyramid; only the resolved scene supports guide depth. */
+  target(width, height, depth = false) {
+    const gl = this.gl,
+      framebuffer = this.framebuffer(),
+      texture = this.texture(gl.RGBA16F, width, height, gl.LINEAR);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    gl.framebufferTexture2D(
+      gl.FRAMEBUFFER,
+      gl.COLOR_ATTACHMENT0,
+      gl.TEXTURE_2D,
+      texture,
+      0,
+    );
+    const result = { framebuffer, texture, width, height };
+    if (depth) {
+      result.depth = this.texture(
+        gl.DEPTH_COMPONENT24,
+        width,
+        height,
+        gl.NEAREST,
+      );
+      gl.framebufferTexture2D(
+        gl.FRAMEBUFFER,
+        gl.DEPTH_ATTACHMENT,
+        gl.TEXTURE_2D,
+        result.depth,
+        0,
+      );
+    }
+    this.check();
+    return result;
+  }
+  /** Check each complete attachment set before publishing this owned target group. */
+  check() {
+    if (
+      this.gl.checkFramebufferStatus(this.gl.FRAMEBUFFER) !==
+      this.gl.FRAMEBUFFER_COMPLETE
+    )
+      throw new Error("HDR framebuffer is incomplete");
+  }
+  /** Deletion is idempotent, including partially constructed targets. */
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    const gl = this.gl;
+    for (const f of this.framebuffers) gl.deleteFramebuffer(f);
+    for (const t of this.textures) gl.deleteTexture(t);
+    for (const r of this.renderbuffers) gl.deleteRenderbuffer(r);
+    this.framebuffers = [];
+    this.textures = [];
+    this.renderbuffers = [];
+  }
+}
+
+return {BloomTargets};
+})();
+// Source: engine/basement/bloom-shaders.js
+const module23=(()=>{
+/** Basement / linear-light bloom pyramid. Bright energy is extracted before tone mapping.
+ * Stable spatial filters only: no history, noise textures, Canvas assets or frame jitter. */
+const BLOOM_VERTEX = `#version 300 es
+precision highp float;
+out vec2 vUV;
+void main(){vUV=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));gl_Position=vec4(vUV*2.0-1.0,0.0,1.0);}`;
+/** Thirteen overlapping taps reduce aliasing of narrow signs before the first reduction.
+ * Soft-knee extraction occurs per source sample so tiny bright geometry survives averaging. */
+const BLOOM_DOWN = `#version 300 es
+precision highp float;
+in vec2 vUV;
+uniform sampler2D uSource;
+uniform bool uExtract;
+uniform vec2 uThreshold; // threshold and relative knee
+out vec4 outColor;
+vec3 sampleAt(vec2 p){
+ vec3 c=max(texture(uSource,p).rgb,vec3(0.0));
+ if(!uExtract)return c;
+ float brightness=max(c.r,max(c.g,c.b)),k=uThreshold.x*uThreshold.y;
+ float soft=clamp(brightness-uThreshold.x+k,0.0,2.0*k);
+ soft=soft*soft/(4.0*k+0.00001);
+ return c*(max(brightness-uThreshold.x,soft)/max(brightness,0.00001));
+}
+void main(){
+ vec2 t=1.0/vec2(textureSize(uSource,0));vec3 c=sampleAt(vUV)*0.125;
+ c+=(sampleAt(vUV+t*vec2(-2,-2))+sampleAt(vUV+t*vec2(2,-2))+sampleAt(vUV+t*vec2(-2,2))+sampleAt(vUV+t*vec2(2,2)))*0.03125;
+ c+=(sampleAt(vUV+t*vec2(-2,0))+sampleAt(vUV+t*vec2(2,0))+sampleAt(vUV+t*vec2(0,-2))+sampleAt(vUV+t*vec2(0,2)))*0.0625;
+ c+=(sampleAt(vUV+t*vec2(-1,-1))+sampleAt(vUV+t*vec2(1,-1))+sampleAt(vUV+t*vec2(-1,1))+sampleAt(vUV+t*vec2(1,1)))*0.125;
+ outColor=vec4(min(c,vec3(65000.0)),1.0);
+}`;
+/** Normalized tent reconstruction mixes scales without amplifying a constant field per level.
+ * Distinct upsample targets prevent sampling from the texture currently being written. */
+const BLOOM_UP = `#version 300 es
+precision highp float;
+in vec2 vUV;
+uniform sampler2D uFine;
+uniform sampler2D uCoarse;
+uniform vec2 uSpread; // radius in coarse texels, fraction of broad reconstructed energy
+out vec4 outColor;
+void main(){
+ vec2 t=uSpread.x/vec2(textureSize(uCoarse,0));
+ vec3 c=texture(uCoarse,vUV).rgb*4.0;
+ c+=(texture(uCoarse,vUV+t*vec2(-1,0)).rgb+texture(uCoarse,vUV+t*vec2(1,0)).rgb+texture(uCoarse,vUV+t*vec2(0,-1)).rgb+texture(uCoarse,vUV+t*vec2(0,1)).rgb)*2.0;
+ c+=texture(uCoarse,vUV+t*vec2(-1,-1)).rgb+texture(uCoarse,vUV+t*vec2(1,-1)).rgb+texture(uCoarse,vUV+t*vec2(-1,1)).rgb+texture(uCoarse,vUV+t*vec2(1,1)).rgb;
+ outColor=vec4(mix(texture(uFine,vUV).rgb,c/16.0,uSpread.y),1.0);
+}`;
+/** Bloom combines with unclipped scene radiance, followed by one exposure/rolloff/encoding.
+ * Restore resolved geometry depth into the default framebuffer in the same submission.
+ * Studio lines then use ordinary depth testing and display colours, outside bloom entirely. */
+const BLOOM_COMPOSITE = `#version 300 es
+precision highp float;
+in vec2 vUV;
+uniform sampler2D uScene;
+uniform sampler2D uBloom;
+uniform sampler2D uDepth;
+uniform vec2 uFinish; // bloom strength and exposure
+out vec4 outColor;
+void main(){
+ vec3 linear=max(texture(uScene,vUV).rgb+texture(uBloom,vUV).rgb*uFinish.x,vec3(0.0));
+ vec3 mapped=vec3(1.0)-exp(-linear*uFinish.y);
+ outColor=vec4(pow(mapped,vec3(1.0/2.2)),1.0);
+ gl_FragDepth=texture(uDepth,vUV).r;
+}`;
+
+return {BLOOM_VERTEX,BLOOM_DOWN,BLOOM_UP,BLOOM_COMPOSITE};
+})();
+// Source: engine/basement/bloom.js
 const module20=(()=>{
+/** Basement / renderer-owned HDR bloom. The existing renderer submits all passes.
+ * Default is off and allocation-free. Unsupported HDR retains the antialiased direct path.
+ * No scene/world references are retained, no independent frame loop or temporal history. */
+const { bloomSettings, BLOOM_BACKGROUND } = module21;
+const { BloomTargets } = module22;
+const { createProgram } = module13;
+const {
+  BLOOM_VERTEX,
+  BLOOM_DOWN,
+  BLOOM_UP,
+  BLOOM_COMPOSITE,
+} = module23;
+class Bloom {
+  /** Retain settings only at construction; even enabled quality waits for an actual batch draw. */
+  constructor(renderer, options = {}) {
+    this.renderer = renderer;
+    this.disposed = false;
+    this.settings = bloomSettings(options);
+    this.background = new Float32Array(3);
+    this.updateExposure();
+    this.targets = null;
+    this.programs = [];
+    this.failure = null;
+    this.ready = false;
+    this.passes = 0;
+  }
+  /** Artist changes reuse storage; only size/quality changes replace targets. Explicit configure retries failures. */
+  configure(patch) {
+    if (this.disposed) throw new Error("Bloom is disposed");
+    const next = bloomSettings(patch, this.settings);
+    if (next.mode !== this.settings.mode) this.releaseTargets();
+    this.settings = next;
+    this.updateExposure();
+    this.failure = null;
+    if (next.mode === "off") this.release();
+  }
+  /** Recompute direct clear colour only when settings change, keeping exposure consistent with HDR. */
+  updateExposure() {
+    for (let i = 0; i < 3; i++)
+      this.background[i] = Math.pow(
+        1 - Math.exp(-BLOOM_BACKGROUND[i] * this.settings.exposure),
+        1 / 2.2,
+      );
+  }
+  /** Programs and immutable targets are lazy; failure is latched until configure/restore. */
+  ensure() {
+    const r = this.renderer,
+      gl = r.gl,
+      s = this.settings,
+      w = r.canvas.width,
+      h = r.canvas.height;
+    this.ready = false;
+    this.passes = 0;
+    if (this.disposed || s.mode === "off" || this.failure) return false;
+    try {
+      if (
+        this.targets &&
+        (this.targets.width !== w ||
+          this.targets.height !== h ||
+          this.targets.mode !== s.mode)
+      )
+        this.releaseTargets();
+      if (!this.targets) this.targets = new BloomTargets(gl, w, h, s.mode);
+      if (!this.programs.length) {
+        for (const [fragment, names] of [
+          [BLOOM_DOWN, ["uSource", "uExtract", "uThreshold"]],
+          [BLOOM_UP, ["uFine", "uCoarse", "uSpread"]],
+          [BLOOM_COMPOSITE, ["uScene", "uBloom", "uDepth", "uFinish"]],
+        ]) {
+          const program = createProgram(gl, BLOOM_VERTEX, fragment);
+          const owned = { program, uniforms: {} };
+          this.programs.push(owned);
+          r.stats.programs++;
+          owned.uniforms = Object.fromEntries(
+            names.map((n) => [n, gl.getUniformLocation(program, n)]),
+          );
+        }
+      }
+      this.ready = true;
+      return true;
+    } catch (error) {
+      this.failure = error.message;
+      this.release();
+      return false;
+    }
+  }
+  /** Called after AO/shadows restore their temporary bindings and before the forward material pass. */
+  begin() {
+    const gl = this.renderer.gl,
+      t = this.targets;
+    if (!this.ready) return;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, t.multisample);
+    gl.viewport(0, 0, t.width, t.height);
+    // Same background as direct rendering at default exposure, converted once to scene-linear values.
+    gl.clearColor(...BLOOM_BACKGROUND, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  }
+  /** Sampler-unit bindings are local to post passes; Renderer restores the active unit afterward. */
+  texture(unit, handle) {
+    const gl = this.renderer.gl;
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(gl.TEXTURE_2D, handle);
+  }
+  /** Count real fullscreen draws alongside existing renderer submission counters. */
+  submit(target) {
+    const r = this.renderer,
+      gl = r.gl;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target?.framebuffer ?? null);
+    gl.viewport(
+      0,
+      0,
+      target?.width ?? r.canvas.width,
+      target?.height ?? r.canvas.height,
+    );
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    this.passes++;
+    r.stats.draws++;
+    r.totals.draws++;
+  }
+  /** Resolve MSAA colour/depth, reduce bright energy, reconstruct broad scales, then encode once. */
+  finish() {
+    if (!this.ready) return;
+    const r = this.renderer,
+      gl = r.gl,
+      t = this.targets,
+      s = this.settings;
+    gl.bindVertexArray(null);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, t.multisample);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, t.scene.framebuffer);
+    gl.blitFramebuffer(
+      0,
+      0,
+      t.width,
+      t.height,
+      0,
+      0,
+      t.width,
+      t.height,
+      gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT,
+      gl.NEAREST,
+    );
+    gl.disable(gl.DEPTH_TEST);
+    gl.depthMask(false);
+    const down = this.programs[0],
+      up = this.programs[1],
+      composite = this.programs[2];
+    let source = t.scene;
+    // Zero strength retains the HDR reference but skips every pyramid submission.
+    if (s.strength > 0) {
+      gl.useProgram(down.program);
+      gl.uniform1i(down.uniforms.uSource, 0);
+      gl.uniform2f(down.uniforms.uThreshold, s.threshold, s.knee);
+      for (let i = 0; i < t.down.length; i++) {
+        gl.uniform1i(down.uniforms.uExtract, i === 0 ? 1 : 0);
+        this.texture(0, source.texture);
+        this.submit(t.down[i]);
+        source = t.down[i];
+      }
+      gl.useProgram(up.program);
+      gl.uniform1i(up.uniforms.uFine, 0);
+      gl.uniform1i(up.uniforms.uCoarse, 1);
+      gl.uniform2f(up.uniforms.uSpread, s.radius, s.scatter);
+      for (let i = t.down.length - 2; i >= 0; i--) {
+        this.texture(0, t.down[i].texture);
+        this.texture(1, source.texture);
+        this.submit(t.up[i]);
+        source = t.up[i];
+      }
+    }
+    gl.useProgram(composite.program);
+    gl.uniform1i(composite.uniforms.uScene, 0);
+    gl.uniform1i(composite.uniforms.uBloom, 1);
+    gl.uniform1i(composite.uniforms.uDepth, 2);
+    gl.uniform2f(composite.uniforms.uFinish, s.strength, s.exposure);
+    this.texture(0, t.scene.texture);
+    this.texture(1, source.texture);
+    this.texture(2, t.scene.depth);
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthMask(true);
+    gl.depthFunc(gl.ALWAYS);
+    this.submit(null);
+    gl.depthFunc(gl.LEQUAL);
+  }
+  /** Renderer calls this even after exceptions; overlays and subsequent frames see normal state. */
+  reset() {
+    const r = this.renderer,
+      gl = r.gl;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindVertexArray(null);
+    gl.viewport(0, 0, r.canvas.width, r.canvas.height);
+    gl.depthFunc(gl.LEQUAL);
+    gl.depthMask(true);
+    gl.enable(gl.DEPTH_TEST);
+    gl.disable(gl.BLEND);
+    gl.activeTexture(gl.TEXTURE0);
+  }
+  /** Estimates are separate from buffer counts and include MSAA renderbuffers, unlike default-FBO estimates. */
+  inspect() {
+    const t = this.targets;
+    return {
+      ...this.settings,
+      effectiveMode: this.ready ? this.settings.mode : "off",
+      failure: this.failure,
+      passes: this.passes,
+      width: t?.width ?? 0,
+      height: t?.height ?? 0,
+      samples: t?.samples ?? 0,
+      levels: t?.down.length ?? 0,
+      targetBytes: t?.bytes ?? 0,
+      textures: t?.textures.length ?? 0,
+      framebuffers: t?.framebuffers.length ?? 0,
+      renderbuffers: t?.renderbuffers.length ?? 0,
+      programs: this.programs.length,
+      accounting:
+        "Estimated RGBA16F (8) and padded depth24 (4) bytes/pixel, including owned MSAA samples; excludes driver overhead and default framebuffer.",
+    };
+  }
+  releaseTargets() {
+    this.targets?.dispose();
+    this.targets = null;
+    this.ready = false;
+  }
+  release() {
+    this.passes = 0;
+    this.releaseTargets();
+    for (const p of this.programs) {
+      this.renderer.gl.deleteProgram(p.program);
+      this.renderer.stats.programs--;
+    }
+    this.programs = [];
+  }
+  /** Lost-context handles are invalid already; no deletion or counter adjustment against the new context. */
+  invalidate() {
+    this.targets = null;
+    this.programs = [];
+    this.failure = null;
+    this.ready = false;
+    this.passes = 0;
+  }
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.release();
+  }
+}
+
+return {Bloom};
+})();
+// Source: engine/basement/camera.js
+const module24=(()=>{
 /** Basement / shared z-up camera. Focus is the orbit pivot, never an implicit eye.
  * Drawing, clipping, picking and screen-space effects use one view/projection pair.
  * Orthographic remains the default so game presentation does not change in Studio.
@@ -1740,7 +2286,8 @@ const { createProgram } = module13;
 const { AmbientOcclusion } = module14;
 const { Lighting } = module15;
 const { LineRendering } = module19;
-const { Camera } = module20;
+const { Bloom } = module20;
+const { Camera } = module24;
 
 /** Generate one unit cube with flat normals; uploaded once per WebGL context lifetime. */
 function cubeGeometry() {
@@ -1763,7 +2310,7 @@ function cubeGeometry() {
 
 class Renderer {
   /** Own the supplied surface's WebGL context. pixelRatio caps mobile fill cost. */
-  constructor(canvas, { pixelRatio = 1.5, profiler = null, occlusion = {}, lighting = {} } = {}) {
+  constructor(canvas, { pixelRatio = 1.5, profiler = null, occlusion = {}, lighting = {}, bloom = {} } = {}) {
     this.profiler=profiler; this.canvas = canvas; this.pixelRatio = pixelRatio; this.life = new Lifetime();
     const gl = canvas.getContext('webgl2', { alpha: false, antialias: true, powerPreference: 'low-power' });
     if (!gl) throw new Error('ETRNLNINE requires WebGL 2 on this device.');
@@ -1779,10 +2326,11 @@ class Renderer {
       this.lineScope=profiler?.scope('renderer.lines');
       this.occlusion=new AmbientOcclusion(this,occlusion);
       this.occlusionScope=profiler?.scope('renderer.ambientOcclusion');
+      this.bloom=new Bloom(this,bloom);this.bloomScope=profiler?.scope('renderer.bloom');
       this.gpuTimer=new GpuTimer(gl,(id,ms)=>this.profiler?.recordGpu(id,ms));
       this.life.own(renderDiagnostics(this,profiler));
       this.life.listen(canvas, 'webglcontextlost', event => {
-        event.preventDefault(); this.lost = true; this.gpuTimer.invalidate(); this.lines.invalidate(); this.occlusion.invalidate(); this.lighting.invalidate();
+        event.preventDefault(); this.lost = true; this.gpuTimer.invalidate(); this.lines.invalidate(); this.occlusion.invalidate(); this.lighting.invalidate();this.bloom.invalidate();
       });
       this.life.listen(canvas, 'webglcontextrestored', () => {
         // Browser invalidates all old handles on loss. Recreate from retained CPU data,
@@ -1796,7 +2344,7 @@ class Renderer {
     } catch(error) {
       // Metric-budget/capability failure may occur after GL creation. Constructor
       // failure must release real handles even though no caller received this renderer.
-      this.life.dispose();this.lines?.dispose();this.gpuTimer?.dispose();this.occlusion?.dispose();this.lighting?.dispose();
+      this.life.dispose();this.lines?.dispose();this.gpuTimer?.dispose();this.occlusion?.dispose();this.lighting?.dispose();this.bloom?.dispose();
       if(this.cube)gl.deleteBuffer(this.cube);if(this.program)gl.deleteProgram(this.program);
       throw error;
     }
@@ -1807,7 +2355,7 @@ class Renderer {
     const gl = this.gl;
     const program=createProgram(gl,VERTEX,FRAGMENT);
     this.program = program; this.stats.programs++;
-    this.uniforms = Object.fromEntries(['uViewProjection','uInverseViewProjection','uBlockerRotation[0]', 'uAmbient', 'uLights[0]', 'uLightColors[0]',
+    this.uniforms = Object.fromEntries(['uLinearOutput','uExposure','uViewProjection','uInverseViewProjection','uBlockerRotation[0]', 'uAmbient', 'uLights[0]', 'uLightColors[0]',
       'uAOMode','uAOStrength','uAORadius','uBlockerCount','uBlockerPose[0]','uBlockerSize[0]',
       'uAOScreen','uAODepth','uAONormals','uAOSize','uSunDirection','uSunColor','uSunShadowEnabled','uSunMatrix',
       'uSunShadow','uShadowParameters','uPointShadowIndex','uPointShadow','uPointShadowParameters','uPointShadowPosition','uPointShadowResolution']
@@ -1869,7 +2417,7 @@ class Renderer {
       const token=layers.length?this.profiler?.begin(this.lineScope):null;
       try{for(const layer of layers){if(layer.renderer!==this)throw new Error('Guide belongs to another renderer');layer.draw();}}
       finally{if(layers.length)this.profiler?.end(token);}
-    } finally { this.gpuTimer.end(); }
+    } finally { if(this.bloom.ready)this.bloom.reset();this.gpuTimer.end(); }
   }
 
   /** Submit a frame; all worlds use the same retained renderer and accounting path. */
@@ -1879,8 +2427,8 @@ class Renderer {
     const gl = this.gl; this.view();
     this.stats.draws = this.stats.instances = this.stats.uploads = this.stats.uploadedBytes = 0;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    gl.clearColor(0.018, 0.019, 0.037, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    if (!batch || batch.disposed) {this.occlusion.count=this.occlusion.candidates=0;this.lighting.clearWorld();return;}
+    gl.clearColor(this.bloom.background[0],this.bloom.background[1],this.bloom.background[2],1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    if (!batch || batch.disposed) {this.bloom.ready=false;this.bloom.passes=0;this.occlusion.count=this.occlusion.candidates=0;this.lighting.clearWorld();return;}
     if (batch.renderer !== this) throw new Error('Batch belongs to another renderer');
     batch.sync();
     const shadowToken=this.profiler?.begin(this.shadowScope);
@@ -1889,7 +2437,11 @@ class Renderer {
     let screenReady;
     try {screenReady=this.occlusion.prepare(batch);}
     finally {this.profiler?.end(aoToken);}
+    const bloomToken=this.profiler?.begin(this.bloomScope);
+    let hdr;
+    try{hdr=this.bloom.ensure();this.bloom.begin();}finally{this.profiler?.end(bloomToken);}
     gl.useProgram(this.program);
+    gl.uniform1i(this.uniforms.uLinearOutput,hdr?1:0);gl.uniform1f(this.uniforms.uExposure,this.bloom.settings.exposure);
     this.occlusion.bind(this.uniforms,screenReady);
     gl.uniformMatrix4fv(this.uniforms.uViewProjection,false,this.camera.matrix);
     this.lighting.bind(this.uniforms);
@@ -1898,12 +2450,14 @@ class Renderer {
     gl.bindVertexArray(null);
     this.stats.draws++; this.stats.instances += batch.count;
     this.totals.draws++;this.totals.instances+=batch.count;
+    const finishToken=this.profiler?.begin(this.bloomScope);
+    try{this.bloom.finish();}finally{this.profiler?.end(finishToken);}
   }
 
   /** Release renderer and outstanding batches, with listeners removed before late restoration. */
   dispose() {
     if (this.disposed) return;
-    this.disposed = true; this.life.dispose(); this.lines.dispose(); this.gpuTimer.dispose(); this.occlusion.dispose(); this.lighting.dispose();
+    this.disposed = true; this.life.dispose(); this.lines.dispose(); this.gpuTimer.dispose(); this.occlusion.dispose(); this.lighting.dispose();this.bloom.dispose();
     for (const batch of [...this.batches]) batch.dispose();
     this.gl.deleteBuffer(this.cube); this.gl.deleteProgram(this.program);
     this.stats.buffers = this.stats.programs = this.stats.vaos = 0;
@@ -2006,7 +2560,7 @@ class InstanceBatch {
 return {Renderer};
 })();
 // Source: engine/basement/profile-data.js
-const module22=(()=>{
+const module26=(()=>{
 /**
  * Basement / profile data: bounded copies for diagnostics, never live engine references.
  * Used only for on-demand captures/export, not for each recorded frame.
@@ -2070,14 +2624,14 @@ function diagnosticError(error){
 return {boundedCopy,percentile,freezeData,diagnosticError};
 })();
 // Source: engine/basement/profiler.js
-const module21=(()=>{
+const module25=(()=>{
 /**
  * Basement / profiler: bounded CPU scopes, numeric counters, frame history and captures.
  * This mechanism knows no scheduler, renderer, game, DOM element, or GPU API.
  * Milliseconds everywhere. Recording reuses typed storage; summaries/captures allocate
  * only when explicitly requested. Disabled scope calls do not read the clock.
  */
-const { boundedCopy, percentile, freezeData, diagnosticError } = module22;
+const { boundedCopy, percentile, freezeData, diagnosticError } = module26;
 
 class Profiler {
   /** Capacities are hard budgets. Choose them at engine creation, not during a frame. */
@@ -2307,7 +2861,7 @@ const module2=(()=>{
 const { Identities, World } = module3;
 const { Input } = module5;
 const { Renderer } = module7;
-const { Profiler } = module21;
+const { Profiler } = module25;
 
 class Basement {
   /** Renderer first: unsupported WebGL fails before device listeners are installed. */
@@ -2328,7 +2882,7 @@ class Basement {
 return {Basement};
 })();
 // Source: engine/lobby/preparation.js
-const module24=(()=>{
+const module28=(()=>{
 /**
  * Lobby / preparation: cooperatively budgeted generator work in the existing frame loop.
  * Each next() must be a small, synchronous chunk; JavaScript cannot preempt a huge chunk.
@@ -2395,7 +2949,7 @@ class PreparationQueue {
 return {PreparationQueue};
 })();
 // Source: engine/lobby/runtime-diagnostics.js
-const module25=(()=>{
+const module29=(()=>{
 /**
  * Lobby / runtime diagnostics: measurement handles and counters, not scheduling logic.
  * Providers are removed with their runtime. Disabled profiling performs no timer reads.
@@ -2420,14 +2974,14 @@ function runtimeDiagnostics(runtime,profiler){
 return {runtimeDiagnostics};
 })();
 // Source: engine/lobby/runtime.js
-const module23=(()=>{
+const module27=(()=>{
 /**
  * Lobby / runtime: sole animation-frame owner, explicit phases, and pause reasons.
  * All elapsed values are seconds. The engine advances fixed simulation steps and
  * interpolates render poses; long browser suspensions never trigger unlimited work.
  */
-const { PreparationQueue } = module24;
-const { runtimeDiagnostics } = module25;
+const { PreparationQueue } = module28;
+const { runtimeDiagnostics } = module29;
 
 class Runtime {
   /** Inject scheduling for deterministic lifecycle tests; browser defaults allocate no loop yet. */
@@ -2540,7 +3094,7 @@ class Runtime {
 return {Runtime};
 })();
 // Source: engine/directory/residency.js
-const module27=(()=>{
+const module31=(()=>{
 /**
  * Directory / residency: bounded prepared worlds, preparation tickets, and compact state.
  * Factories are game/library supplied. They return {world, ready, capture, dispose, ...}.
@@ -2680,7 +3234,7 @@ class WorldResidency {
 return {WorldResidency};
 })();
 // Source: engine/directory/diagnostics.js
-const module28=(()=>{
+const module32=(()=>{
 /**
  * Directory / diagnostics: report resource ownership through Basement's provider contract.
  * Frame samples are scalar sums. Detailed rows are copied only on capture, capped at 64.
@@ -2727,14 +3281,14 @@ function directoryDiagnostics(directory,profiler){
 return {directoryDiagnostics};
 })();
 // Source: engine/directory/directory.js
-const module26=(()=>{
+const module30=(()=>{
 /**
  * Directory: named libraries, lazy shared resources, and explicit world ownership.
  * Factories come from callers. Nothing here imports a named toy or game asset.
  * A lease pins one resource; releasing the last lease destroys it immediately.
  */
-const { WorldResidency } = module27;
-const { directoryDiagnostics } = module28;
+const { WorldResidency } = module31;
+const { directoryDiagnostics } = module32;
 
 class Directory {
   /** Registration is inert: no world or GPU asset is allocated until requested. */
@@ -2809,7 +3363,7 @@ class Directory {
 return {Directory};
 })();
 // Source: engine/penthouse/assembly.js
-const module30=(()=>{
+const module34=(()=>{
 /** Penthouse / version-one data-driven box assembly. No editor or game knowledge. */
 /** Explicit generator versions available to project/build validation; no allocation here. */
 const ASSEMBLY_GENERATORS=Object.freeze({'toy.assembly':1});
@@ -2823,7 +3377,7 @@ function assembly({world,asset}){
 return {ASSEMBLY_GENERATORS,assembly};
 })();
 // Source: engine/penthouse/toys.js
-const module31=(()=>{
+const module35=(()=>{
 /**
  * Penthouse / toys: reusable procedural box-based architecture and actor assemblies.
  * These are early test toys, not Freelancer art or the final procedural humanoid.
@@ -2882,7 +3436,7 @@ function actor({ world, color = [0.42,0.34,0.58], bagColor = [0.54,0.30,0.17] })
 return {box,pavilion,actor};
 })();
 // Source: engine/penthouse/controls.js
-const module32=(()=>{
+const module36=(()=>{
 /**
  * Penthouse / controls: parameterized HTML control templates over Basement actions.
  * HTML is intentional for accessible interface text; the world remains pure WebGL.
@@ -2982,7 +3536,7 @@ class ActionButton {
 return {Joystick,ActionButton};
 })();
 // Source: engine/penthouse/profiler-style.js
-const module34=(()=>{
+const module38=(()=>{
 /** Penthouse / profiler presentation: component-scoped styles; removed with the viewer root. */
 const PROFILER_STYLE=`
 .etrnl-profiler{position:absolute;right:30px;top:92px;width:min(390px,calc(100vw - 40px));max-height:calc(100dvh - 190px);overflow:auto;background:#11131eef;border:1px solid #c6ae774d;border-radius:7px;color:#d5cfdf;font:11px/1.55 system-ui,sans-serif;z-index:2;box-shadow:0 12px 50px #0004}
@@ -3007,15 +3561,15 @@ const PROFILER_STYLE=`
 return {PROFILER_STYLE};
 })();
 // Source: engine/penthouse/profiler-view.js
-const module33=(()=>{
+const module37=(()=>{
 /**
  * Penthouse / profiler viewer: accessible HTML/SVG, bounded tables and capture export.
  * Receives a generic subscription function; it never imports Lobby or starts a loop.
  * Closed viewers unsubscribe. Open viewers refresh at most twice a second by default.
  */
 const { Lifetime } = module6;
-const { diagnosticError } = module22;
-const { PROFILER_STYLE } = module34;
+const { diagnosticError } = module26;
+const { PROFILER_STYLE } = module38;
 
 /** Format measured values without turning unavailable measurements into zero. */
 function ms(value){return Number.isFinite(value)?value.toFixed(2):'—';}
@@ -3135,15 +3689,15 @@ class ProfilerView {
 return {ProfilerView};
 })();
 // Source: engine/penthouse/penthouse.js
-const module29=(()=>{
+const module33=(()=>{
 /**
  * Penthouse assembly: expose inert libraries without coupling Directory to toy names.
  * ETRNLNINE installs these factories; games request them through Directory.
  */
-const { assembly } = module30;
-const { pavilion, actor, box } = module31;
-const { Joystick, ActionButton } = module32;
-const { ProfilerView } = module33;
+const { assembly } = module34;
+const { pavilion, actor, box } = module35;
+const { Joystick, ActionButton } = module36;
+const { ProfilerView } = module37;
 
 class Penthouse {
   /** Catalog creation is inert: allocation begins only when a factory is requested. */
@@ -3171,9 +3725,9 @@ const module1=(()=>{
  */
 const { Basement } = module2;
 const { Lifetime } = module6;
-const { Runtime } = module23;
-const { Directory } = module26;
-const { Penthouse } = module29;
+const { Runtime } = module27;
+const { Directory } = module30;
+const { Penthouse } = module33;
 
 class ETRNLNINE {
   /** Build an empty engine, releasing earlier levels if a later constructor fails. */
@@ -3211,7 +3765,7 @@ class ETRNLNINE {
 return {ETRNLNINE};
 })();
 // Source: engine/basement/project.js
-const module38=(()=>{
+const module42=(()=>{
 /**
  * Basement / authored project contract. JSON is data, never executable behavior.
  * This first portable package contains scenes and assembly assets together. Validation
@@ -3267,11 +3821,11 @@ function parseProject(text,validate=validateProject){if(new TextEncoder().encode
 return {PROJECT_LIMITS,copyData,validateProject,parseProject};
 })();
 // Source: examples/atrium/project.js
-const module37=(()=>{
+const module41=(()=>{
 /** Atrium source of truth: portable JSON; behavior stays in the example's JavaScript. */
 const data=JSON.parse("{\"schemaVersion\":1,\"id\":\"project:atrium\",\"name\":\"Between Worlds\",\"scenes\":[{\"key\":\"amber\",\"name\":\"The Amber Atrium\",\"sun\":{\"direction\":[-0.5,0.8,1.2],\"color\":[0.58,0.49,0.62]},\"ethereal\":false,\"ambient\":[0.15,0.11,0.15],\"id\":\"scene:amber\",\"entities\":[{\"id\":\"amber:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"asset\":\"asset:amber:courtyard-foundation\",\"tag\":null,\"locked\":true,\"position\":[0,0,-0.25],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:central-inlay\",\"name\":\"Central inlay\",\"asset\":\"asset:amber:central-inlay\",\"tag\":null,\"locked\":true,\"position\":[0,-5,0.015],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-brass-inlay\",\"name\":\"West brass inlay\",\"asset\":\"asset:amber:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[-3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-brass-inlay\",\"name\":\"East brass inlay\",\"asset\":\"asset:amber:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:colonnade\",\"name\":\"Colonnade\",\"asset\":\"asset:amber:colonnade\",\"tag\":null,\"locked\":false,\"position\":[0,11,0],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-gallery\",\"name\":\"West gallery\",\"asset\":\"asset:amber:west-gallery\",\"tag\":null,\"locked\":false,\"position\":[-20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-entry-planter\",\"name\":\"West entry planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-court-planter\",\"name\":\"West court planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-entry-lantern\",\"name\":\"West entry lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-promenade-lantern\",\"name\":\"West promenade lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-gallery-lantern\",\"name\":\"West gallery lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-gallery\",\"name\":\"East gallery\",\"asset\":\"asset:amber:east-gallery\",\"tag\":null,\"locked\":false,\"position\":[20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-entry-planter\",\"name\":\"East entry planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-court-planter\",\"name\":\"East court planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-entry-lantern\",\"name\":\"East entry lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-promenade-lantern\",\"name\":\"East promenade lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-gallery-lantern\",\"name\":\"East gallery lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:crystal-lantern\",\"name\":\"Crystal lantern\",\"asset\":\"asset:amber:crystal-lantern\",\"tag\":\"lantern\",\"locked\":false,\"position\":[0,2,0.65],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:movable-plinth\",\"name\":\"Movable plinth\",\"asset\":\"asset:amber:movable-plinth\",\"tag\":\"prop\",\"locked\":false,\"position\":[6,-12,0.65],\"rotation\":[0,0,0,1],\"scale\":1}],\"lights\":[{\"id\":\"light:0\",\"position\":[0,7,5],\"radius\":16,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:1\",\"position\":[-15,-4,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:2\",\"position\":[15,-4,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:3\",\"position\":[-15,9,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:4\",\"position\":[15,9,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:5\",\"position\":[0,2,3],\"radius\":10,\"color\":[0.3,1.1,2.7]},{\"id\":\"light:6\",\"position\":[-15,-18,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:7\",\"position\":[15,-18,4],\"radius\":12,\"color\":[2.4,0.85,0.3]}],\"lightVariants\":{\"cool\":{\"crystal\":[0.25,0.62,1],\"irradiance\":[0.3,1.1,2.7]},\"warm\":{\"crystal\":[1,0.34,0.19],\"irradiance\":[3,0.5,0.2]}}},{\"key\":\"violet\",\"name\":\"The Violet Court\",\"sun\":{\"direction\":[0.5,0.7,1.1],\"color\":[0.36,0.46,0.75]},\"ethereal\":true,\"ambient\":[0.09,0.11,0.26],\"id\":\"scene:violet\",\"entities\":[{\"id\":\"violet:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"asset\":\"asset:violet:courtyard-foundation\",\"tag\":null,\"locked\":true,\"position\":[0,0,-0.25],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:central-inlay\",\"name\":\"Central inlay\",\"asset\":\"asset:violet:central-inlay\",\"tag\":null,\"locked\":true,\"position\":[0,-5,0.015],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-brass-inlay\",\"name\":\"West brass inlay\",\"asset\":\"asset:violet:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[-3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-brass-inlay\",\"name\":\"East brass inlay\",\"asset\":\"asset:violet:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:colonnade\",\"name\":\"Colonnade\",\"asset\":\"asset:violet:colonnade\",\"tag\":null,\"locked\":false,\"position\":[0,11,0],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-gallery\",\"name\":\"West gallery\",\"asset\":\"asset:violet:west-gallery\",\"tag\":null,\"locked\":false,\"position\":[-20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-entry-planter\",\"name\":\"West entry planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-court-planter\",\"name\":\"West court planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-entry-lantern\",\"name\":\"West entry lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-promenade-lantern\",\"name\":\"West promenade lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-gallery-lantern\",\"name\":\"West gallery lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-gallery\",\"name\":\"East gallery\",\"asset\":\"asset:violet:east-gallery\",\"tag\":null,\"locked\":false,\"position\":[20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-entry-planter\",\"name\":\"East entry planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-court-planter\",\"name\":\"East court planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-entry-lantern\",\"name\":\"East entry lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-promenade-lantern\",\"name\":\"East promenade lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-gallery-lantern\",\"name\":\"East gallery lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:crystal-lantern\",\"name\":\"Crystal lantern\",\"asset\":\"asset:violet:crystal-lantern\",\"tag\":\"lantern\",\"locked\":false,\"position\":[0,2,0.65],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:movable-plinth\",\"name\":\"Movable plinth\",\"asset\":\"asset:violet:movable-plinth\",\"tag\":\"prop\",\"locked\":false,\"position\":[6,-12,0.65],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-prism\",\"name\":\"West prism\",\"asset\":\"asset:violet:prism\",\"tag\":null,\"locked\":false,\"position\":[-7,-3,2.5],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-prism\",\"name\":\"East prism\",\"asset\":\"asset:violet:prism\",\"tag\":null,\"locked\":false,\"position\":[7,-3,2.5],\"rotation\":[0,0,0,1],\"scale\":1}],\"lights\":[{\"id\":\"light:0\",\"position\":[0,7,5],\"radius\":16,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:1\",\"position\":[-15,-4,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:2\",\"position\":[15,-4,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:3\",\"position\":[-15,9,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:4\",\"position\":[15,9,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:5\",\"position\":[0,2,3],\"radius\":10,\"color\":[0.3,1.1,2.7]},{\"id\":\"light:6\",\"position\":[-15,-18,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:7\",\"position\":[15,-18,4],\"radius\":12,\"color\":[0.35,0.9,2.5]}],\"lightVariants\":{\"cool\":{\"crystal\":[0.25,0.62,1],\"irradiance\":[0.3,1.1,2.7]},\"warm\":{\"crystal\":[1,0.34,0.19],\"irradiance\":[3,0.5,0.2]}}}],\"assets\":[{\"id\":\"asset:amber:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[58,68,0.5],\"color\":[0.14,0.115,0.14],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:amber:central-inlay\",\"name\":\"Central inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[7,38,0.025],\"color\":[0.22,0.2,0.25],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:amber:brass-inlay\",\"name\":\"Brass inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.05,38,0.035],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:amber:colonnade\",\"name\":\"Colonnade\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":null},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.2],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[26,11,0.4],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,4.2,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.6,7],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,7],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[25,10,0.6],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,-4.5,6.4],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.12,0.09],\"color\":[1,0.47,0.17],\"emission\":2.5,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:5\",\"parent\":0,\"position\":[0,-4.5,6.1],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.16,0.1],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:6\",\"parent\":0,\"position\":[-12,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:7\",\"parent\":0,\"position\":[-12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:8\",\"parent\":0,\"position\":[-12,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:9\",\"parent\":0,\"position\":[-6,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:10\",\"parent\":0,\"position\":[-6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:11\",\"parent\":0,\"position\":[-6,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:12\",\"parent\":0,\"position\":[6,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:13\",\"parent\":0,\"position\":[6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:14\",\"parent\":0,\"position\":[6,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:15\",\"parent\":0,\"position\":[12,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:16\",\"parent\":0,\"position\":[12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:17\",\"parent\":0,\"position\":[12,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:18\",\"parent\":0,\"position\":[-9,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:19\",\"parent\":0,\"position\":[-9,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:20\",\"parent\":0,\"position\":[-6,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:21\",\"parent\":0,\"position\":[-6,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:22\",\"parent\":0,\"position\":[-3,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:23\",\"parent\":0,\"position\":[-3,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:24\",\"parent\":0,\"position\":[0,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:25\",\"parent\":0,\"position\":[0,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:26\",\"parent\":0,\"position\":[3,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:27\",\"parent\":0,\"position\":[3,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:28\",\"parent\":0,\"position\":[6,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:29\",\"parent\":0,\"position\":[6,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:30\",\"parent\":0,\"position\":[9,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:31\",\"parent\":0,\"position\":[9,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":4.199999999999999,\"width\":24,\"depth\":0.7},{\"x\":-12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":-6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6}]},{\"id\":\"asset:amber:west-gallery\",\"name\":\"West gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":null,\"position\":[1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":null,\"position\":[1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":null,\"position\":[1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:5\",\"parent\":null,\"position\":[1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:6\",\"parent\":null,\"position\":[1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:7\",\"parent\":null,\"position\":[1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:8\",\"parent\":null,\"position\":[1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:9\",\"parent\":null,\"position\":[1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:10\",\"parent\":null,\"position\":[1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:11\",\"parent\":null,\"position\":[1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:12\",\"parent\":null,\"position\":[1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:13\",\"parent\":null,\"position\":[1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:14\",\"parent\":null,\"position\":[1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:15\",\"parent\":null,\"position\":[1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:amber:planter\",\"name\":\"Planter\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,2.4,1.1],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.8499999999999999],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.2,2.2,0.9],\"color\":[0.045,0.14,0.1],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,0,1.4999999999999998],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.8000000000000003,1.8000000000000003,0.9],\"color\":[0.045,0.14,0.1],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,2.1500000000000004],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.4000000000000001,1.4000000000000001,0.9],\"color\":[0.045,0.14,0.1],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,0,2.8],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1,1,0.9],\"color\":[0.045,0.14,0.1],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.4,\"depth\":2.4}]},{\"id\":\"asset:amber:lantern\",\"name\":\"Lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.18,0.18,3.6],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,1.9000000000000001],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.6,0.6,0.8],\"color\":[1,0.47,0.17],\"emission\":3,\"ambientBlocker\":true,\"castShadow\":false}},{\"id\":\"part:2\",\"parent\":null,\"position\":[0,0,2.3500000000000005],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.12],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:amber:east-gallery\",\"name\":\"East gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":null,\"position\":[-1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":null,\"position\":[-1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":null,\"position\":[-1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:5\",\"parent\":null,\"position\":[-1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:6\",\"parent\":null,\"position\":[-1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:7\",\"parent\":null,\"position\":[-1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:8\",\"parent\":null,\"position\":[-1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:9\",\"parent\":null,\"position\":[-1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:10\",\"parent\":null,\"position\":[-1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:11\",\"parent\":null,\"position\":[-1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:12\",\"parent\":null,\"position\":[-1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:13\",\"parent\":null,\"position\":[-1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:14\",\"parent\":null,\"position\":[-1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.38,0.15,0.16],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:15\",\"parent\":null,\"position\":[-1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[1,0.47,0.17],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:amber:crystal-lantern\",\"name\":\"Crystal lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.9,1.9,1.3],\"color\":[0.24,0.18,0.2],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.85],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.1,2.1,0.22],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"crystal\",\"parent\":0,\"position\":[0,0,1.75],\"rotation\":[0,0,0.3826834323650898,0.9238795325112867],\"shape\":{\"size\":[0.7,0.7,1.4],\"color\":[0.25,0.62,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":false}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.1,\"depth\":2.1}]},{\"id\":\"asset:amber:movable-plinth\",\"name\":\"Movable plinth\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,2,1.3],\"color\":[0.68,0.43,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":2}]},{\"id\":\"asset:violet:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[58,68,0.5],\"color\":[0.075,0.09,0.18],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:violet:central-inlay\",\"name\":\"Central inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[7,38,0.025],\"color\":[0.22,0.2,0.25],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:violet:brass-inlay\",\"name\":\"Brass inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.05,38,0.035],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:violet:colonnade\",\"name\":\"Colonnade\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":null},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.2],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[26,11,0.4],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,4.2,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.6,8.5],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,8.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[25,10,0.6],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,-4.5,7.9],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.12,0.09],\"color\":[0.24,0.58,1],\"emission\":2.5,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:5\",\"parent\":0,\"position\":[0,-4.5,7.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.16,0.1],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:6\",\"parent\":0,\"position\":[-12,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:7\",\"parent\":0,\"position\":[-12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:8\",\"parent\":0,\"position\":[-12,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:9\",\"parent\":0,\"position\":[-6,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:10\",\"parent\":0,\"position\":[-6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:11\",\"parent\":0,\"position\":[-6,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:12\",\"parent\":0,\"position\":[6,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:13\",\"parent\":0,\"position\":[6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:14\",\"parent\":0,\"position\":[6,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:15\",\"parent\":0,\"position\":[12,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:16\",\"parent\":0,\"position\":[12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:17\",\"parent\":0,\"position\":[12,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:18\",\"parent\":0,\"position\":[-9,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:19\",\"parent\":0,\"position\":[-9,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:20\",\"parent\":0,\"position\":[-6,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:21\",\"parent\":0,\"position\":[-6,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:22\",\"parent\":0,\"position\":[-3,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:23\",\"parent\":0,\"position\":[-3,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:24\",\"parent\":0,\"position\":[0,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:25\",\"parent\":0,\"position\":[0,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:26\",\"parent\":0,\"position\":[3,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:27\",\"parent\":0,\"position\":[3,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:28\",\"parent\":0,\"position\":[6,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:29\",\"parent\":0,\"position\":[6,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:30\",\"parent\":0,\"position\":[9,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"color\":[0.35,0.19,0.16],\"emission\":0.3,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:31\",\"parent\":0,\"position\":[9,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":4.199999999999999,\"width\":24,\"depth\":0.7},{\"x\":-12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":-6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6}]},{\"id\":\"asset:violet:west-gallery\",\"name\":\"West gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":null,\"position\":[1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":null,\"position\":[1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":null,\"position\":[1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:5\",\"parent\":null,\"position\":[1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:6\",\"parent\":null,\"position\":[1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:7\",\"parent\":null,\"position\":[1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:8\",\"parent\":null,\"position\":[1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:9\",\"parent\":null,\"position\":[1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:10\",\"parent\":null,\"position\":[1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:11\",\"parent\":null,\"position\":[1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:12\",\"parent\":null,\"position\":[1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:13\",\"parent\":null,\"position\":[1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:14\",\"parent\":null,\"position\":[1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:15\",\"parent\":null,\"position\":[1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:violet:planter\",\"name\":\"Planter\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,2.4,1.1],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.8499999999999999],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.2,2.2,0.9],\"color\":[0.1,0.2,0.27],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,0,1.4999999999999998],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.8000000000000003,1.8000000000000003,0.9],\"color\":[0.1,0.2,0.27],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,2.1500000000000004],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.4000000000000001,1.4000000000000001,0.9],\"color\":[0.1,0.2,0.27],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,0,2.8],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1,1,0.9],\"color\":[0.1,0.2,0.27],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.4,\"depth\":2.4}]},{\"id\":\"asset:violet:lantern\",\"name\":\"Lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.18,0.18,3.6],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,1.9000000000000001],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.6,0.6,0.8],\"color\":[0.24,0.58,1],\"emission\":3,\"ambientBlocker\":true,\"castShadow\":false}},{\"id\":\"part:2\",\"parent\":null,\"position\":[0,0,2.3500000000000005],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.12],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[]},{\"id\":\"asset:violet:east-gallery\",\"name\":\"East gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:2\",\"parent\":null,\"position\":[-1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:3\",\"parent\":null,\"position\":[-1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:4\",\"parent\":null,\"position\":[-1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:5\",\"parent\":null,\"position\":[-1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:6\",\"parent\":null,\"position\":[-1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:7\",\"parent\":null,\"position\":[-1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:8\",\"parent\":null,\"position\":[-1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:9\",\"parent\":null,\"position\":[-1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:10\",\"parent\":null,\"position\":[-1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:11\",\"parent\":null,\"position\":[-1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:12\",\"parent\":null,\"position\":[-1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:13\",\"parent\":null,\"position\":[-1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:14\",\"parent\":null,\"position\":[-1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"color\":[0.15,0.19,0.46],\"emission\":0.55,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:15\",\"parent\":null,\"position\":[-1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"color\":[0.24,0.58,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:violet:crystal-lantern\",\"name\":\"Crystal lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.9,1.9,1.3],\"color\":[0.14,0.16,0.31],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.85],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.1,2.1,0.22],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}},{\"id\":\"crystal\",\"parent\":0,\"position\":[0,0,1.75],\"rotation\":[0,0,0.3826834323650898,0.9238795325112867],\"shape\":{\"size\":[0.7,0.7,1.4],\"color\":[0.25,0.62,1],\"emission\":2,\"ambientBlocker\":true,\"castShadow\":false}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.1,\"depth\":2.1}]},{\"id\":\"asset:violet:movable-plinth\",\"name\":\"Movable plinth\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,2,1.3],\"color\":[0.35,0.56,0.7],\"emission\":0,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":2}]},{\"id\":\"asset:violet:prism\",\"name\":\"Prism\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0.3826834323650898,0.9238795325112867],\"shape\":{\"size\":[0.7,0.7,3.8],\"color\":[0.22,0.5,0.67],\"emission\":0.5,\"ambientBlocker\":true,\"castShadow\":true}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":1,\"depth\":1}]}]}");
-const { validateProject } = module38;
-const { ASSEMBLY_GENERATORS } = module30;
+const { validateProject } = module42;
+const { ASSEMBLY_GENERATORS } = module34;
 /** Resolve authored generator identities against the libraries this example actually installs. */
 function validateAtriumProject(project){validateProject(project,{generators:ASSEMBLY_GENERATORS});
  // This application's injected Play behavior requires these explicit content conventions.
@@ -3294,7 +3848,7 @@ function canRemoveAtriumEntity(entity){return !entity.locked&&!['prop','lantern'
 return {validateAtriumProject,ATRIUM_PROJECT,cloneAtriumEntity,canRemoveAtriumEntity};
 })();
 // Source: engine/basement/transfer.js
-const module40=(()=>{
+const module44=(()=>{
 /**
  * Basement / transfer: validated, synchronous movement of one attachment tree.
  * No loading, scheduling, game rules, callbacks during mutation, or resource ownership.
@@ -3345,13 +3899,13 @@ function transferTree({ source, destination, root, landing, validate = () => tru
 return {transferTree};
 })();
 // Source: engine/lobby/travel.js
-const module39=(()=>{
+const module43=(()=>{
 /**
  * Lobby / travel: asynchronous preparation becomes a synchronous boundary commit.
  * It consumes generic residency tickets; it does not import Directory or game content.
  * The active ticket pins the source until a successful transfer replaces it.
  */
-const { transferTree } = module40;
+const { transferTree } = module44;
 
 class WorldTravel {
   /** Adopt an already-ready initial ticket/root. The owner must call advance at a boundary. */
@@ -3444,7 +3998,7 @@ class WorldTravel {
 return {WorldTravel};
 })();
 // Source: engine/basement/geometry.js
-const module42=(()=>{
+const module46=(()=>{
 /** Basement / geometry: pure horizontal collision helpers, with no world or game dependency. */
 
 /** Does a horizontal circle overlap an axis-aligned box? Touching is permitted. */
@@ -3457,7 +4011,7 @@ function circleOverlapsBox(x, y, radius, box) {
 return {circleOverlapsBox};
 })();
 // Source: engine/directory/scene-instance.js
-const module44=(()=>{
+const module48=(()=>{
 /**
  * Directory / live authored scene instance. Maps stable document IDs to temporary World
  * membership, and updates transforms/collision together. Owns no scheduler or game rules.
@@ -3519,10 +4073,10 @@ class SceneInstance {
 return {SceneInstance};
 })();
 // Source: examples/atrium/layout.js
-const module43=(()=>{
+const module47=(()=>{
 /** Atrium / map generic document instances to this game's named interaction targets. */
-const { SceneInstance } = module44;
-const { ATRIUM_PROJECT } = module37;
+const { SceneInstance } = module48;
+const { ATRIUM_PROJECT } = module41;
 function* buildLayout(engine,world,profile,project=ATRIUM_PROJECT){
  const instance=yield* SceneInstance.prepare(engine.directory,world,project,profile);
  const lantern=profile.entities.find(e=>e.tag==='lantern'),prop=profile.entities.find(e=>e.tag==='prop');
@@ -3532,16 +4086,16 @@ function* buildLayout(engine,world,profile,project=ATRIUM_PROJECT){
 return {buildLayout};
 })();
 // Source: examples/atrium/worlds.js
-const module41=(()=>{
+const module45=(()=>{
 /**
  * Atrium example / world definitions: authored realms, reconstruction and state schema.
  * Directory receives factories, not these names. Lobby budgets actual procedural work.
  * Persisted data is deliberately small: light selection, crystal rotation and prop position.
  */
-const { ATRIUM_PROJECT } = module37;
+const { ATRIUM_PROJECT } = module41;
 const { Lifetime } = module6;
-const { circleOverlapsBox } = module42;
-const { buildLayout } = module43;
+const { circleOverlapsBox } = module46;
+const { buildLayout } = module47;
 
 /** Immutable-by-convention authoring profiles; runtime mutable state is created per world. */
 const PROFILES = ATRIUM_PROJECT.scenes;
@@ -3598,16 +4152,16 @@ function worldFactory(engine, profile, id, project=ATRIUM_PROJECT) {
 return {PROFILES,legalLanding,applyLight,worldFactory};
 })();
 // Source: examples/atrium/journey.js
-const module36=(()=>{
+const module40=(()=>{
 /**
  * Atrium example / journey: game-specific realm links, initial actor and prewarming policy.
  * Loading/lifetime algorithms live in Directory; transaction scheduling lives in Lobby.
  * This module chooses the destination and asks for those mechanisms through public contracts.
  */
-const { ATRIUM_PROJECT } = module37;
+const { ATRIUM_PROJECT } = module41;
 const { Lifetime } = module6;
-const { WorldTravel } = module39;
-const { worldFactory, legalLanding, applyLight } = module41;
+const { WorldTravel } = module43;
+const { worldFactory, legalLanding, applyLight } = module45;
 
 /** Own the two realm definitions and their tickets for one example session. */
 function createJourney(engine,project=ATRIUM_PROJECT) {
@@ -3686,12 +4240,12 @@ function createJourney(engine,project=ATRIUM_PROJECT) {
 return {createJourney};
 })();
 // Source: examples/atrium/player.js
-const module45=(()=>{
+const module49=(()=>{
 /**
  * Atrium example / locomotion: game-owned steering/gait profile, independent of realm residency.
  * Actor references and velocity survive transfers. This is not a full physical body solver.
  */
-const { legalLanding } = module41;
+const { legalLanding } = module45;
 
 /** Create one controller whose mutable velocity/load state belongs only to this actor. */
 function playerController(actor, input, renderer) {
@@ -3727,15 +4281,15 @@ function playerController(actor, input, renderer) {
 return {playerController};
 })();
 // Source: examples/atrium/scene.js
-const module35=(()=>{
+const module39=(()=>{
 /**
  * Atrium example / scene: owns controls, phase registrations and the game's journey.
  * Layout/reconstruction, locomotion and world policy have their own focused modules.
  * Nothing here installs an engine patch or creates an independent animation loop.
  */
 const { Lifetime } = module6;
-const { createJourney } = module36;
-const { playerController } = module45;
+const { createJourney } = module40;
+const { playerController } = module49;
 
 /** Start preparing the scene immediately. Rendering remains valid while the first world loads. */
 function createScene(engine,{controlsHost,project,onStatus=()=>{},onError=()=>{}}){
@@ -3809,7 +4363,7 @@ const module0=(()=>{
  */
 const { ETRNLNINE } = module1;
 const { Lifetime } = module6;
-const { createScene } = module35;
+const { createScene } = module39;
 
 const canvas=document.querySelector('#world'), controlsHost=document.querySelector('#controls');
 const status=document.querySelector('#status'), errorBox=document.querySelector('#error');

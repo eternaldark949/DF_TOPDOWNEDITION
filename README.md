@@ -1,6 +1,6 @@
 # ETRNLNINE — Engine foundation plan
 
-**Status: foundation, two-world flitting, integrated profiler, ambient occlusion, lighting/shadows, Studio authoring tools, and the first Freelancer street/doorway slice implemented; broader engine work remains planned.**
+**Status: foundation, two-world flitting, integrated profiler, ambient occlusion, lighting/shadows, HDR bloom, Studio authoring tools, and the first Freelancer street/doorway slice implemented; broader engine work remains planned.**
 
 **Owner: ETERNAL / @eternaldark949.**
 
@@ -15,6 +15,8 @@ This document records the owner's requirements and the architectural agreement r
 The branch was intentionally created with only this plan. On 2026-10-15, after reviewing the plan and first-milestone proposal, the owner invited implementation to begin. The first runnable foundation follows [First Light decisions and source guide](docs/decisions/0001-first-light.md). No wholesale legacy import or expansion into every brainstorm is implied.
 
 **Studio direction and roadmap:** [3D engine, universal Studio, authored JSON and offline packaging](docs/decisions/0006-studio-3d-and-authored-data.md). The first edit/save/play workspace is now implemented; the first recreated street/vestibule slice is now implemented.
+
+**Bloom update:** [HDR multiscale bloom, controls and capability budgets](docs/decisions/0012-hdr-bloom.md) · [matched screenshots and checks](docs/milestones/bloom/README.md).
 
 **Perspective update:** [shared dual-projection camera and bloom/lighting sequence](docs/decisions/0011-perspective-camera.md) · [screenshots and checks](docs/milestones/perspective/README.md).
 
@@ -551,7 +553,7 @@ Future spatial/motion/audio systems should register measurements with this same 
 
 The forward renderer now supports analytic geometry AO and an optional depth/normal SSAO tier. Only ambient illumination is attenuated; direct lights and emission retain their brightness. The example exposes Off / Geometry / Geometry + screen in World directory and defaults portrait layouts to the cheaper target-free tier.
 
-[Ambient occlusion decisions](docs/decisions/0004-ambient-occlusion.md) record ownership, quality settings, target budgets, profiling, tests and visual/algorithmic limits. Screen AO is SSAO, not GTAO. The AO milestone did not include cast shadows; section 17 records their subsequent implementation. Deferred rendering, fog and bloom remain unimplemented. Shared spatial indexing is still planned; the bounded proxy selection currently scans the small active world.
+[Ambient occlusion decisions](docs/decisions/0004-ambient-occlusion.md) record ownership, quality settings, target budgets, profiling, tests and visual/algorithmic limits. Screen AO is SSAO, not GTAO. The AO milestone did not include cast shadows; section 17 records their subsequent implementation. Deferred rendering and fog remain unimplemented. [HDR bloom](docs/decisions/0012-hdr-bloom.md) is now implemented. AO proxy selection still scans the small active world; the existing spatial grid serves collision queries rather than AO.
 
 ## 17. Lighting and shadows
 

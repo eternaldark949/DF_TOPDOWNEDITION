@@ -1,0 +1,32 @@
+{
+  "game": {
+    "roundTrips": 3,
+    "stableActor": true,
+    "keyboardApproach": true,
+    "outOfRangeRefused": true,
+    "resident": 2,
+    "requests": []
+  },
+  "studio": {
+    "projectSelector": true,
+    "duplicateUndo": true,
+    "bothScenes": true,
+    "playIsolated": true
+  },
+  "profile": {
+    "idleUploadedBytes": 0,
+    "frame": 3
+  },
+  "heldGamepadNoBounce": true,
+  "cleanup": {
+    "worlds": 0,
+    "definitions": 0,
+    "records": 0,
+    "controls": 0,
+    "jobs": 0,
+    "buffers": 0,
+    "programs": 0,
+    "vaos": 0
+  },
+  "errors": []
+}

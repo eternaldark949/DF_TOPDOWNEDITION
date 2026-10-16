@@ -5,6 +5,7 @@
  */
 import { ETRNLNINE } from '../engine/etrnlnine.js';
 import { Lifetime } from '../engine/basement/lifetime.js';
+import { BloomControls } from '../engine/penthouse/bloom-controls.js';
 import { AuthoringGuides } from '../engine/penthouse/authoring-guides.js';
 import { WorkspacePanels } from './workspace/panels.js';
 import { StudioPreferences } from './workspace/preferences.js';
@@ -48,6 +49,7 @@ try{
  viewport=new StudioViewport($('world'),session,report,guides);Object.assign(viewport,{axis:preferences.value.axis,space:preferences.value.space,angleSnap:preferences.value.angleSnap,showLights:preferences.value.lights});life.own(()=>viewport.dispose());
  panels=new WorkspacePanels({fields:$('fields'),hierarchy:$('hierarchy'),assets:$('asset-list'),scene:$('scene'),name:$('selection-name'),id:$('selection-id')},{onError:report,onSelect:id=>{viewport.cancel();session.select(id);document.body.classList.remove('library-open');document.body.classList.add('properties-open');},onPlace:id=>{viewport.cancel();viewport.placementAsset=id;setTool('place');document.body.classList.remove('library-open','properties-open');}});life.own(()=>panels.dispose());life.own(()=>files.dispose());
  const renderer=engine.basement.renderer;
+ const bloomControls=new BloomControls({renderer,host:document.querySelector('.view-options'),subscribe:fn=>engine.lobby.on('render',fn,'studio.bloom-controls'),onError:report});life.own(()=>bloomControls.dispose());
  for(const entry of STUDIO_PROJECTS){const option=document.createElement('option');option.value=entry.project.id;option.textContent=entry.label;$('project').append(option);}
  /** Authored per-scene framing is application metadata, not a viewport rule keyed by a game name. */
  function frameScene(){const mode=renderer.camera.projection;renderer.camera.setProjection('orthographic');Object.assign(renderer.camera,{x:0,y:0,z:0,halfHeight:24});renderer.camera.preset('oblique');if(session.scene.camera){for(const key of ['x','y','z','azimuth','elevation','halfHeight'])renderer.camera[key]=session.scene.camera[key];renderer.camera.halfHeight=Math.max(renderer.camera.halfHeight,21/($('world').clientWidth/$('world').clientHeight));}renderer.camera.setProjection(mode);}

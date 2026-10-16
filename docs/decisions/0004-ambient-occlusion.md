@@ -1,5 +1,7 @@
 # Ambient occlusion — grounding the forward renderer
 
+**Bloom update:** [decision 0012](0012-hdr-bloom.md) implements HDR multiscale bloom. Bloom limitations/plans below describe this earlier milestone.
+
 **Perspective update:** [decision 0011](0011-perspective-camera.md) adds the shared perspective lens, depth-correct AO/picking/guides and complete pose restoration. Camera limitations below describe the earlier milestone.
 
 **Subsequent lighting milestone:** [Lighting and shadow decisions](0005-lighting-and-shadows.md) supersede the original light-data ownership and shadow limitations below; those describe this earlier milestone.

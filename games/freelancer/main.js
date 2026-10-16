@@ -1,6 +1,7 @@
 /** Freelancer / standalone browser composition. Game UI stays here, never in the engine.
  * The same scene factory runs under Studio Play, with detached authored JSON. */
 import { ETRNLNINE } from "../../engine/etrnlnine.js";
+import { BloomControls } from "../../engine/penthouse/bloom-controls.js";
 import { Lifetime } from "../../engine/basement/lifetime.js";
 import { createFreelancerScene } from "./scene.js";
 const $ = (id) => document.getElementById(id),
@@ -49,6 +50,7 @@ try {
   });
   life.own(() => engine.dispose());
   life.own(() => scene?.dispose());
+  const bloomControls=new BloomControls({renderer:engine.basement.renderer,host:$("appearance"),subscribe:fn=>engine.lobby.on('render',fn,'freelancer.bloom-controls'),onError:report});life.own(()=>bloomControls.dispose());
   restart();
   life.listen($("restart"), "click", restart);
   life.listen($("pause"), "click", () => {
@@ -60,6 +62,7 @@ try {
   life.listen($("quality"), "change", () => {
     const r = engine.basement.renderer,
       quality = $("quality").value;
+    if(quality==='off')r.bloom.configure({mode:'off'});
     r.occlusion.configure({
       mode:
         quality === "fine" ? "screen" : quality === "off" ? "off" : "geometry",

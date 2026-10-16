@@ -12,7 +12,7 @@ const server=http.createServer((req,res)=>{if(req.url==='/'){res.setHeader('Cont
   await page.evaluate(()=>{const get=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(kind,...args){if(kind==='2d')throw new Error('Canvas2D forbidden');return get.call(this,kind,...args);};});
   page.on('request',r=>requests.push(r.url()));await page.setContent(html);await page.waitForFunction(()=>document.querySelector('#status').dataset.buffers==='4');
   const exportData=async()=>{const promise=page.waitForEvent('download');await page.locator('#save').click();const file=await promise;return JSON.parse(fs.readFileSync(await file.path(),'utf8'));};
-  const options=async fn=>{await page.locator('#viewport-options summary').click();await fn();await page.locator('#viewport-options summary').click();};
+  const options=async fn=>{await page.locator('#viewport-options > summary').click();await fn();await page.locator('#viewport-options > summary').click();};
   const view=async value=>options(()=>page.locator('#view').selectOption(value));
   if(perspective)await options(()=>page.locator('#projection').selectOption('perspective'));
   const base=await exportData(),originalID=await page.locator('#selection-id').textContent();

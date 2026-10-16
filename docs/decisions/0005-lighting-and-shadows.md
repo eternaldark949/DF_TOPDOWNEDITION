@@ -1,5 +1,7 @@
 # Lighting — direct illumination, visibility and ownership
 
+**Bloom update:** [decision 0012](0012-hdr-bloom.md) implements HDR multiscale bloom. Bloom limitations/plans below describe this earlier milestone.
+
 Recorded 2026-10-16 after the owner approved the lighting/shadow work discussed alongside [ambient occlusion](0004-ambient-occlusion.md). This extends the retained **forward WebGL2 renderer**; it does not introduce deferred rendering or an external framework.
 
 ## Implemented capabilities

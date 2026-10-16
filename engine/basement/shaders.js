@@ -2,7 +2,7 @@
  * Basement / shaders: GPU-native instanced boxes and inexpensive surface lighting.
  * Optional ambient visibility is supplied by the Basement occlusion capability.
  * No Canvas preparation, font atlas or external assets.
- * This is the first renderer material, not the final luxe/bloom renderer.
+ * This is the first renderer material, not a full PBR material system.
  */
 import { AMBIENT_VISIBILITY } from './occlusion-shaders.js';
 import { SHADOW_VISIBILITY } from './shadow-shaders.js';
@@ -39,6 +39,8 @@ in vec3 vNormal;
 in vec3 vColor;
 in float vEmission;
 in float vHighlight;
+uniform bool uLinearOutput; // HDR scene target defers exposure/encoding to the compositor
+uniform float uExposure;
 uniform vec3 uAmbient;
 uniform vec4 uLights[8]; // x/y/z, radius; radius 0 disables a slot
 uniform vec3 uLightColors[8]; // linear RGB irradiance
@@ -70,6 +72,7 @@ void main() {
   }
   vec3 linear = surface * light + vColor * vEmission + vec3(0.18,0.12,0.04)*vHighlight;
   // Soft exposure rolloff then display gamma. No claim of physical spectral accuracy.
-  vec3 mapped = vec3(1.0) - exp(-linear * 1.25);
+  if(uLinearOutput){outColor=vec4(clamp(linear,vec3(0.0),vec3(65000.0)),1.0);return;}
+  vec3 mapped = vec3(1.0) - exp(-linear * uExposure);
   outColor = vec4(pow(mapped, vec3(1.0 / 2.2)), 1.0);
 }`;

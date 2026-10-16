@@ -12,6 +12,7 @@ import { createProgram } from './gl-program.js';
 import { AmbientOcclusion } from './ambient-occlusion.js';
 import { Lighting } from './lighting.js';
 import { LineRendering } from './lines.js';
+import { Bloom } from './bloom.js';
 import { Camera } from './camera.js';
 
 /** Generate one unit cube with flat normals; uploaded once per WebGL context lifetime. */
@@ -35,7 +36,7 @@ function cubeGeometry() {
 
 export class Renderer {
   /** Own the supplied surface's WebGL context. pixelRatio caps mobile fill cost. */
-  constructor(canvas, { pixelRatio = 1.5, profiler = null, occlusion = {}, lighting = {} } = {}) {
+  constructor(canvas, { pixelRatio = 1.5, profiler = null, occlusion = {}, lighting = {}, bloom = {} } = {}) {
     this.profiler=profiler; this.canvas = canvas; this.pixelRatio = pixelRatio; this.life = new Lifetime();
     const gl = canvas.getContext('webgl2', { alpha: false, antialias: true, powerPreference: 'low-power' });
     if (!gl) throw new Error('ETRNLNINE requires WebGL 2 on this device.');
@@ -51,10 +52,11 @@ export class Renderer {
       this.lineScope=profiler?.scope('renderer.lines');
       this.occlusion=new AmbientOcclusion(this,occlusion);
       this.occlusionScope=profiler?.scope('renderer.ambientOcclusion');
+      this.bloom=new Bloom(this,bloom);this.bloomScope=profiler?.scope('renderer.bloom');
       this.gpuTimer=new GpuTimer(gl,(id,ms)=>this.profiler?.recordGpu(id,ms));
       this.life.own(renderDiagnostics(this,profiler));
       this.life.listen(canvas, 'webglcontextlost', event => {
-        event.preventDefault(); this.lost = true; this.gpuTimer.invalidate(); this.lines.invalidate(); this.occlusion.invalidate(); this.lighting.invalidate();
+        event.preventDefault(); this.lost = true; this.gpuTimer.invalidate(); this.lines.invalidate(); this.occlusion.invalidate(); this.lighting.invalidate();this.bloom.invalidate();
       });
       this.life.listen(canvas, 'webglcontextrestored', () => {
         // Browser invalidates all old handles on loss. Recreate from retained CPU data,
@@ -68,7 +70,7 @@ export class Renderer {
     } catch(error) {
       // Metric-budget/capability failure may occur after GL creation. Constructor
       // failure must release real handles even though no caller received this renderer.
-      this.life.dispose();this.lines?.dispose();this.gpuTimer?.dispose();this.occlusion?.dispose();this.lighting?.dispose();
+      this.life.dispose();this.lines?.dispose();this.gpuTimer?.dispose();this.occlusion?.dispose();this.lighting?.dispose();this.bloom?.dispose();
       if(this.cube)gl.deleteBuffer(this.cube);if(this.program)gl.deleteProgram(this.program);
       throw error;
     }
@@ -79,7 +81,7 @@ export class Renderer {
     const gl = this.gl;
     const program=createProgram(gl,VERTEX,FRAGMENT);
     this.program = program; this.stats.programs++;
-    this.uniforms = Object.fromEntries(['uViewProjection','uInverseViewProjection','uBlockerRotation[0]', 'uAmbient', 'uLights[0]', 'uLightColors[0]',
+    this.uniforms = Object.fromEntries(['uLinearOutput','uExposure','uViewProjection','uInverseViewProjection','uBlockerRotation[0]', 'uAmbient', 'uLights[0]', 'uLightColors[0]',
       'uAOMode','uAOStrength','uAORadius','uBlockerCount','uBlockerPose[0]','uBlockerSize[0]',
       'uAOScreen','uAODepth','uAONormals','uAOSize','uSunDirection','uSunColor','uSunShadowEnabled','uSunMatrix',
       'uSunShadow','uShadowParameters','uPointShadowIndex','uPointShadow','uPointShadowParameters','uPointShadowPosition','uPointShadowResolution']
@@ -141,7 +143,7 @@ export class Renderer {
       const token=layers.length?this.profiler?.begin(this.lineScope):null;
       try{for(const layer of layers){if(layer.renderer!==this)throw new Error('Guide belongs to another renderer');layer.draw();}}
       finally{if(layers.length)this.profiler?.end(token);}
-    } finally { this.gpuTimer.end(); }
+    } finally { if(this.bloom.ready)this.bloom.reset();this.gpuTimer.end(); }
   }
 
   /** Submit a frame; all worlds use the same retained renderer and accounting path. */
@@ -151,8 +153,8 @@ export class Renderer {
     const gl = this.gl; this.view();
     this.stats.draws = this.stats.instances = this.stats.uploads = this.stats.uploadedBytes = 0;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    gl.clearColor(0.018, 0.019, 0.037, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    if (!batch || batch.disposed) {this.occlusion.count=this.occlusion.candidates=0;this.lighting.clearWorld();return;}
+    gl.clearColor(this.bloom.background[0],this.bloom.background[1],this.bloom.background[2],1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    if (!batch || batch.disposed) {this.bloom.ready=false;this.bloom.passes=0;this.occlusion.count=this.occlusion.candidates=0;this.lighting.clearWorld();return;}
     if (batch.renderer !== this) throw new Error('Batch belongs to another renderer');
     batch.sync();
     const shadowToken=this.profiler?.begin(this.shadowScope);
@@ -161,7 +163,11 @@ export class Renderer {
     let screenReady;
     try {screenReady=this.occlusion.prepare(batch);}
     finally {this.profiler?.end(aoToken);}
+    const bloomToken=this.profiler?.begin(this.bloomScope);
+    let hdr;
+    try{hdr=this.bloom.ensure();this.bloom.begin();}finally{this.profiler?.end(bloomToken);}
     gl.useProgram(this.program);
+    gl.uniform1i(this.uniforms.uLinearOutput,hdr?1:0);gl.uniform1f(this.uniforms.uExposure,this.bloom.settings.exposure);
     this.occlusion.bind(this.uniforms,screenReady);
     gl.uniformMatrix4fv(this.uniforms.uViewProjection,false,this.camera.matrix);
     this.lighting.bind(this.uniforms);
@@ -170,12 +176,14 @@ export class Renderer {
     gl.bindVertexArray(null);
     this.stats.draws++; this.stats.instances += batch.count;
     this.totals.draws++;this.totals.instances+=batch.count;
+    const finishToken=this.profiler?.begin(this.bloomScope);
+    try{this.bloom.finish();}finally{this.profiler?.end(finishToken);}
   }
 
   /** Release renderer and outstanding batches, with listeners removed before late restoration. */
   dispose() {
     if (this.disposed) return;
-    this.disposed = true; this.life.dispose(); this.lines.dispose(); this.gpuTimer.dispose(); this.occlusion.dispose(); this.lighting.dispose();
+    this.disposed = true; this.life.dispose(); this.lines.dispose(); this.gpuTimer.dispose(); this.occlusion.dispose(); this.lighting.dispose();this.bloom.dispose();
     for (const batch of [...this.batches]) batch.dispose();
     this.gl.deleteBuffer(this.cube); this.gl.deleteProgram(this.program);
     this.stats.buffers = this.stats.programs = this.stats.vaos = 0;

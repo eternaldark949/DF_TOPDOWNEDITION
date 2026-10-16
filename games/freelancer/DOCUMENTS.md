@@ -10,7 +10,7 @@ Walk with WASD, arrows, a gamepad's left stick or the touch joystick. Steering f
 
 Movement uses a sliding horizontal circle with a 0.38 m radius. A spatial grid indexes static collider footprints, and the motor limits each collision step to 0.12 m. These are planar kinematic movement rules, not full 3D stairs, parkour or rigid bodies. The existing box-based backpack traveler remains a diagnostic placeholder pending the separate humanoid silhouette review.
 
-Soft lighting uses geometry AO and one low-resolution sun shadow map. Fine contacts enables screen-space AO and a larger sun map. Low power turns AO and cast shadows off. These modes do not establish physical-phone performance; use the integrated profiler and test an actual device. The renderer still uses opaque colored/emissive boxes, without transparent/PBR glass, bloom, volumetric fog or wet-road reflections.
+Soft lighting uses geometry AO and one low-resolution sun shadow map. Fine contacts enables screen-space AO and a larger sun map. Low power turns AO, cast shadows and bloom off. These modes do not establish physical-phone performance; use the integrated profiler and test an actual device. The renderer still uses opaque colored/emissive boxes, without transparent/PBR glass, volumetric fog or wet-road reflections. The shared **Bloom & exposure** panel opts into antialiased HDR Soft/Fine bloom, with strength/spread/threshold/exposure controls. It starts Off; read the [HDR bloom guide](../../docs/decisions/0012-hdr-bloom.md) for costs and fallback. Selecting another lighting tier does not silently re-enable bloom.
 
 ## Art and assemblies
 

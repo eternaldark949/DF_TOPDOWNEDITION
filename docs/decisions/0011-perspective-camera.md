@@ -1,5 +1,7 @@
 # Perspective · the second lens
 
+**Bloom update:** [decision 0012](0012-hdr-bloom.md) implements HDR multiscale bloom. Bloom limitations/plans below describe this earlier milestone.
+
 Adopted and implemented 2026-10-16. Supersedes the orthographic-only camera limitation in [0010](0010-viewport-navigation.md). The engine supports 3D geometry through either lens; games still choose their presentation. This milestone adds perspective to the shared camera and Studio, without introducing a separate renderer or an editor-only projection.
 
 ## Using it
