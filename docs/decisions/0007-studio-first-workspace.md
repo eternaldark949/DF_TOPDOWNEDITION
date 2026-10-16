@@ -25,6 +25,23 @@ A transaction snapshots bounded authored data, validates candidates before previ
 
 The asset browser currently lists used assets; geometry editing and specialist workspaces are not implemented. Selection and horizontal Move are the first tools; numeric controls cover all position/rotation axes and uniform scale. Dedicated axis gizmos, general tool registration, duplicate/reparent operations, free-flight/perspective cameras, animation editing and large-scene authoring jobs remain follow-on work. Editor construction is bounded but synchronous per scene. Runtime reconstruction yields once per bounded assembly through the existing Lobby preparation queue.
 
+## Agreed next work: street block, Studio presentation and humanoid review
+
+**Status: agreed follow-on requirements; not implemented by the first Studio milestone.** These additions preserve the existing universal workspace and shared document/tool lifetimes.
+
+The next content exercise is one representative Freelancer street block: Enni Cole's exterior, pavement, streetlights, planters and player, followed by approach → interact → enter → return. Author reusable assets through Studio and extend placement, duplicate/delete and transform tools as that exercise requires. Missing general capabilities belong in their proper engine level; named building content and game rules remain outside engine/.
+
+The owner also requested the visual character and useful small tools of the [DFAB Editor Suite reference](../references/DFAB-Editor-Suite-15.html):
+
+- **Presentation:** develop the charcoal panels, warm gold and restrained violet accents, clear hierarchy, compact icon tools and contextual property sections into a coherent Studio design. Carry over DFAB's visual identity while keeping the shared layout, generous touch hit areas and offline typography. Phone panels must preserve a useful viewport.
+- **Grid visibility:** add an explicit editor grid toggle. The construction grid is an editor guide, separate from authored paving/materials; hiding it must not alter scene geometry, collision or snapping. Store view preferences separately from authored game content, and stop grid work when hidden.
+- **Rotation dial:** add an interactive rotation control using the same transform properties and quaternion representation as numeric editing. Make the active axis and coordinate space explicit, support configurable angle snapping and numeric alternatives, and group a drag into one undoable transaction. Escape, pointer cancellation and context changes restore the starting rotation. Reuse the control across asset types.
+- **Light-object icons:** show camera-readable markers at light positions in edit mode, linked to stable authored selection and the shared light inspector. Hiding markers must not disable actual lighting. Markers and other editor guides must not become collision geometry, shadow casters, AO blockers or game content; game-only builds and Play views exclude them. Keep viewport guides Canvas-free and release their owned resources/subscriptions when disabled or closed.
+
+Reusable dial/marker/grid tools belong in Penthouse, their shared math, picking and property/transaction mechanisms in Basement, and scheduling in Lobby. Studio owns panel arrangement, preferences, tool composition and selection context. Use the existing renderer and resource contracts; no separate editor render loop or per-asset histories.
+
+When work reaches the new 3D procedural humanoid, show front, side, three-quarter and gameplay-camera previews, including solid silhouette views, before investing in surface detail. Review proportions, posture, limb spacing and the backpack outline first, then readability while walking and turning. This preview commitment is distinct from claiming that the current diagnostic box actor is the finished procedural humanoid.
+
 ## Verification and next step
 
 Current evidence belongs in [the Studio milestone](../milestones/studio/README.md). Node tests cover invalid references/versions, identity-preserving history, cancellation, budget eviction, isolated snapshots, grouped foliage/collider transforms and camera-ray agreement on rotated boxes. Browser checks exercise the actual offline artifact, mobile-sized property workflow, imports/recovery, touch cancellation and repeated Play disposal. The existing rendering/lifecycle suite additionally guards AO, shadows, input, flits and context restoration.

@@ -566,3 +566,5 @@ The first Studio slice is implemented: one contextual workspace, editable Atrium
 Run `npm test`, `npm run build`, `npm run test:browser` and `npm run test:studio` for the relevant checks. Browser checks require development Playwright and Chromium; neither is a runtime dependency. [Studio evidence](docs/milestones/studio/README.md) records actual verification and screenshots. Physical-phone performance is still unmeasured.
 
 Next: author the representative main-branch street block through this workflow, then extend the articulated humanoid workshop through the shared document/property/transaction contracts. Broader goals in the direction record remain planned.
+
+The agreed follow-on [Studio presentation and gizmo requirements](docs/decisions/0007-studio-first-workspace.md#agreed-next-work-street-block-studio-presentation-and-humanoid-review) include DFAB-inspired styling, a grid toggle, a shared rotation dial and selectable light markers in edit mode. The same record preserves the street-block scope and the requested humanoid silhouette previews. These additions remain planned.
