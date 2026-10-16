@@ -59726,15 +59726,16 @@ class NativeCrowdAtlas {
         syncHumanoidGait(e);
         const key=(typeof weatherAt==='function'&&weatherAt(e)?.rain>.05?'wet:':'dry:')+JSON.stringify(c),owner=this.owner;let r=this.entries.get(key);
         if(!r){this.stats.misses++;
-            if(this.built>=1||!this.canPaint()){this.stats.liveBodies++;return false;}
+            if(this.built>=3){this.stats.liveBodies++;return false;}
             if(this.entries.size>=64){const old=[...this.entries].find(([,v])=>v.used<owner.frameId-60);if(!old){this.stats.liveBodies++;return false;}this.dispose(old[1]);this.entries.delete(old[0]);}
             r=this.build(e,c);this.entries.set(key,r);this.built++;this.stats.atlasesBuilt++;
         }else this.stats.hits++;
         r.used=owner.frameId;const tau=Math.PI*2,walking=(e._gait?.speed||0)>CONFIG.GAIT.STOP_SPEED;
         const phase=walking?((e.walkPhase||0)%tau+tau)%tau/tau*16:0;
         let a=walking?1+Math.floor(phase):0,b=walking?1+(Math.floor(phase)+1)%16:0,mix=walking?phase%1:0;
+        // A body with no pose yet gets one now, over budget: drawing it live instead costs as much, and again every frame
         for(const f of new Set([a,b]))if(!r.ready.has(f)){
-            if(this.canPaint())this.paint(r,e,c,f);else this.stats.deferredPoses++;
+            if(this.canPaint()||!r.ready.size)this.paint(r,e,c,f);else this.stats.deferredPoses++;
         }
         if(!r.ready.size){this.stats.liveBodies++;return false;}
         if(!r.ready.has(a)||!r.ready.has(b)){
