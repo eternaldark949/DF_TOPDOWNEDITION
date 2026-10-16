@@ -58859,8 +58859,14 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.atmosphereFilter=new PIXI.Filter(undefined,`
             precision highp float;varying vec2 vTextureCoord;uniform sampler2D uSampler;
             uniform vec4 inputSize;uniform vec4 outputFrame;uniform vec2 viewport;uniform float clock;uniform vec4 tint;
+            uniform vec3 gradeRows[36];uniform vec3 gradeOff[12];uniform float gradeCount;
             void main(){vec4 c=texture2D(uSampler,vTextureCoord);vec2 p=(outputFrame.xy+vTextureCoord*inputSize.xy)/viewport;
-                gl_FragColor=vec4(mix(c.rgb,tint.rgb*c.a,tint.a),c.a);}`,{viewport:new Float32Array(2),clock:0,tint:new Float32Array([1,.627,.196,.04])});
+                vec3 rgb=mix(c.rgb,tint.rgb*c.a,tint.a);
+                // The colour grade (Canvas's CSS filter chain), one clamped step per filter function, on straight colour
+                if(gradeCount>0.){vec3 s=c.a>0.?rgb/c.a:rgb;
+                    for(int i=0;i<12;i++){if(float(i)>=gradeCount)break;s=clamp(vec3(dot(gradeRows[i*3],s),dot(gradeRows[i*3+1],s),dot(gradeRows[i*3+2],s))+gradeOff[i],0.,1.);}
+                    rgb=s*c.a;}
+                gl_FragColor=vec4(rgb,c.a);}`,{viewport:new Float32Array(2),clock:0,tint:new Float32Array([1,.627,.196,.04]),gradeRows:new Float32Array(108),gradeOff:new Float32Array(36),gradeCount:0});
         this.atmosphereFilter.padding=0;
     },
     clearLayers(){
@@ -58969,10 +58975,10 @@ Object.assign(NativeWebGLRenderer.prototype,{
         const t=_frameTime/1000;
         if(typeof GameSettings!=='undefined'&&L.bloom!==!!GameSettings.bloom)this.setLayers({bloom:!!GameSettings.bloom});   // follow Settings → Bloom
         const filters=[];if(L.bloom&&game.getAmbientDarkness()>.2)filters.push(this.sceneBloom);   // Canvas blooms only once it is dark (lighting.js drawBloomPass)
-        if(L.atmosphere)filters.push(this.atmosphereFilter);
+        if(L.atmosphere||this.gradeSteps)filters.push(this.atmosphereFilter);
         this.stage.filters=filters.length?filters:null;
         this.stage.filterArea=this.world.filterArea;this.atmosphereFilter.uniforms.viewport.set([game.canvas.width,game.canvas.height]);
-        const tint={amber:[1,.627,.196,.04],violet:[.471,.235,.784,.04],crimson:[.784,.196,.275,.03],teal:[.196,.706,.784,.03]}[GameSettings.atmosphereTint]||[0,0,0,0];
+        const tint={amber:[1,.627,.196,.04],violet:[.471,.235,.784,.04],crimson:[.784,.196,.275,.03],teal:[.196,.706,.784,.03]}[GameSettings.atmosphereTint]||[0,0,0,0];if(!L.atmosphere)tint[3]=0;
         this.atmosphereFilter.uniforms.tint.set(tint);
         this.atmosphereFilter.uniforms.clock=Math.floor(t*30)/30;
         this.layerStages={sceneLayersMs:performance.now()-start};
@@ -60067,12 +60073,36 @@ function nativeCanvasColorGrade() {
     if (memK > 0.001) filterChain += ` saturate(${(1 - 0.5 * memK).toFixed(3)}) sepia(${(0.14 * memK).toFixed(3)}) hue-rotate(${(-22 * memK).toFixed(1)}deg) contrast(${(1 - 0.08 * memK).toFixed(3)})`;
     return filterChain;
 }
+/** A CSS filter chain as colour-matrix steps [[rows (9), offset (3)], ...] (Filter Effects 1, sRGB); at most 12 */
+function nativeGradeSteps(chain){
+    const steps=[],amt=v=>v.endsWith('%')?parseFloat(v)/100:parseFloat(v);
+    for(const [,fn,arg]of String(chain).matchAll(/([a-z-]+)\(([^)]*)\)/g)){
+        let a=amt(arg.trim()),m=null,o=[0,0,0];
+        if(fn==='grayscale'||fn==='sepia'){a=Math.min(1,Math.max(0,a));const s=1-a;
+            m=fn==='grayscale'?[.2126+.7874*s,.7152-.7152*s,.0722-.0722*s,.2126-.2126*s,.7152+.2848*s,.0722-.0722*s,.2126-.2126*s,.7152-.7152*s,.0722+.9278*s]
+                             :[.393+.607*s,.769-.769*s,.189-.189*s,.349-.349*s,.686+.314*s,.168-.168*s,.272-.272*s,.534-.534*s,.131+.869*s];
+            if(a===0)continue;}
+        else if(fn==='saturate'){const s=a;if(s===1)continue;m=[.213+.787*s,.715-.715*s,.072-.072*s,.213-.213*s,.715+.285*s,.072-.072*s,.213-.213*s,.715-.715*s,.072+.928*s];}
+        else if(fn==='brightness'){if(a===1)continue;m=[a,0,0,0,a,0,0,0,a];}
+        else if(fn==='contrast'){if(a===1)continue;m=[a,0,0,0,a,0,0,0,a];o=[.5-.5*a,.5-.5*a,.5-.5*a];}
+        else if(fn==='hue-rotate'){const d=(arg.includes('rad')?parseFloat(arg)*180/Math.PI:arg.includes('turn')?parseFloat(arg)*360:parseFloat(arg))||0;if(d%360===0)continue;
+            const t=d*Math.PI/180,c=Math.cos(t),s=Math.sin(t);
+            m=[.213+c*.787-s*.213,.715-c*.715-s*.715,.072-c*.072+s*.928,.213-c*.213+s*.143,.715+c*.285+s*.140,.072-c*.072-s*.283,.213-c*.213-s*.787,.715-c*.715+s*.715,.072+c*.928+s*.072];}
+        else if(fn==='invert'){a=Math.min(1,Math.max(0,a));if(a===0)continue;const k=1-2*a;m=[k,0,0,0,k,0,0,0,k];o=[a,a,a];}
+        if(m&&steps.length<12)steps.push([m,o]);
+    }
+    return steps;
+}
 Object.assign(NativeWebGLRenderer.prototype,{
+    // Canvas grades the picture with a CSS filter on its canvas. Here the same chain runs in the scene's last pass
+    // (the atmosphere filter): each filter function is its colour matrix, applied in order and clamped as CSS does,
+    // instead of the browser compositing extra full-screen passes over the GL canvas every frame.
     syncColorGrade(game){
-        const filter=nativeCanvasColorGrade.call(game);
-        const applied=this.layers.colorGrade?filter:'none';
-        if(game.canvas.style.filter!==applied)game.canvas.style.filter=applied;
-        this.colorGrade={enabled:this.layers.colorGrade,filter:game.canvas.style.filter};
+        const filter=this.layers.colorGrade?nativeCanvasColorGrade.call(game):'';
+        if(game.canvas.style.filter&&game.canvas.style.filter!=='none')game.canvas.style.filter='none';
+        if(filter!==this.gradeKey){this.gradeKey=filter;const steps=nativeGradeSteps(filter),U=this.atmosphereFilter.uniforms;
+            U.gradeRows.fill(0);U.gradeOff.fill(0);steps.forEach(([m,o],i)=>{U.gradeRows.set(m,i*9);U.gradeOff.set(o,i*3);});U.gradeCount=steps.length;this.gradeSteps=steps.length;}
+        this.colorGrade={enabled:this.layers.colorGrade,filter,gpu:true,steps:this.gradeSteps||0};
     }
 });
 // Native floor cues, daylight and glass. No live Canvas frame captures.
@@ -60538,7 +60568,7 @@ class NativePresentation{
         if(L.glassRefraction){if(L.windows)for(const w of game.roomSystem.windows||[])if(!w.shattered&&!(game.activeMap.id==='apt_949'&&w.y===0))glass(w.x,w.y,w.w,w.h);
             if(L.doors)for(const d of game.roomSystem.doors||[])if(d.type==='sliding')for(const [ax,ay,bx,by]of d.leaves())d.orientation==='H'?glass(Math.min(ax,bx),d.y,Math.abs(bx-ax),d.h):glass(d.x,Math.min(ay,by),d.w,Math.abs(by-ay));}
         if(typeof GameSettings!=='undefined'&&L.bloom!==!!GameSettings.bloom)r.setLayers({bloom:!!GameSettings.bloom});   // follow Settings → Bloom
-        const filters=[];if(u.ringCount||u.glassCount)filters.push(this.optics);if(L.bloom&&game.getAmbientDarkness()>.2)filters.push(r.sceneBloom);if(L.atmosphere)filters.push(r.atmosphereFilter);r.scene.filters=filters.length?filters:null;r.scene.filterArea=new PIXI.Rectangle(0,0,game.canvas.width,game.canvas.height);r.stage.filters=null;
+        const filters=[];if(u.ringCount||u.glassCount)filters.push(this.optics);if(L.bloom&&game.getAmbientDarkness()>.2)filters.push(r.sceneBloom);if(L.atmosphere||r.gradeSteps)filters.push(r.atmosphereFilter);r.scene.filters=filters.length?filters:null;r.scene.filterArea=new PIXI.Rectangle(0,0,game.canvas.width,game.canvas.height);r.stage.filters=null;
         this.stats.rings=u.ringCount;this.stats.glass=u.glassCount;
     }
     sync(game,view){
