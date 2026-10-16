@@ -41,11 +41,13 @@ async function bundle(path) {
   visiting.delete(path); return id;
 }
 
-// Validate the authored source before emitting either delivery target.
+// Validate authored sources before emitting any delivery target.
 const { ATRIUM_PROJECT }=await import('../examples/atrium/project.js');
+const { FREELANCER_PROJECT }=await import('../games/freelancer/project.js');
+if(!FREELANCER_PROJECT)throw new Error('No validated Freelancer project');
 if(!ATRIUM_PROJECT)throw new Error('No validated project');
 await mkdir(resolve(root,'dist'),{recursive:true});
-for(const [folder,name] of [['examples/atrium','Atrium'],['editor','Studio']]){
+for(const [folder,name] of [['examples/atrium','Atrium'],['editor','Studio'],['games/freelancer','Freelancer']]){
  modules.clear();visiting.clear();
  await bundle(resolve(root,folder,'main.js'));
  const code=[...modules.values()].map(m=>m.code).join('\n');

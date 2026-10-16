@@ -22,6 +22,8 @@ export class AuthoringGuides {
  /** Return explicit passes for Renderer.render; no work or resource allocation in Play. */
  layersFor({scene,selected,revision,mode,axis,space,grid,lights}){
   const r=this.renderer;if(r.lost)return[];
+  // A newly opened document can reuse scene IDs/revision zero; object identity invalidates it.
+  if(this.scene!==scene){this.scene=scene;this.key='';}
   if(!grid&&this.grid){this.grid.dispose();this.grid=null;}
   if(grid&&!this.grid){
    this.grid=r.lines.create(1024);this.grid.begin();
@@ -60,6 +62,6 @@ export class AuthoringGuides {
   return closest;
  }
  /** Hidden guides release all buffers/VAOs and their shared program ownership immediately. */
- clear(){this.grid?.dispose();this.widgets?.dispose();this.grid=this.widgets=null;this.key='';}
+ clear(){this.grid?.dispose();this.widgets?.dispose();this.grid=this.widgets=null;this.key='';this.scene=null;}
  dispose(){this.clear();}
 }

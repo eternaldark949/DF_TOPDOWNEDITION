@@ -2,6 +2,8 @@
 
 Implemented 2026-10-16 under the owner's green light. This extends decision [0007](0007-studio-first-workspace.md); its first-workspace limits are historical where this record explicitly replaces them. The representative Freelancer street block and new articulated humanoid remain the next content stages.
 
+**Follow-on update:** [decision 0009](0009-freelancer-street-slice.md) implements the first street/vestibule and enter/return slice, with Freelancer installed alongside Atrium in Studio. The humanoid workshop remains upcoming.
+
 ## Delivered workspace
 
 Studio now has charcoal panels, warm gold and violet accents, compact tools, Scene/Assets tabs, a searchable project-wide asset library and responsive contextual properties. Typography is offline. HTML supplies interface controls; the viewport, grid, rotation dial and light markers are native WebGL2. No Canvas2D or additional frame scheduler was introduced.

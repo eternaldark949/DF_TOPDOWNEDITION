@@ -1,6 +1,6 @@
 # ETRNLNINE — Engine foundation plan
 
-**Status: foundation, two-world flitting, integrated profiler, ambient occlusion, and lighting/shadows and Studio authoring tools implemented; broader engine work remains planned.**
+**Status: foundation, two-world flitting, integrated profiler, ambient occlusion, lighting/shadows, Studio authoring tools, and the first Freelancer street/doorway slice implemented; broader engine work remains planned.**
 
 **Owner: ETERNAL / @eternaldark949.**
 
@@ -14,9 +14,11 @@ This document records the owner's requirements and the architectural agreement r
 
 The branch was intentionally created with only this plan. On 2026-10-15, after reviewing the plan and first-milestone proposal, the owner invited implementation to begin. The first runnable foundation follows [First Light decisions and source guide](docs/decisions/0001-first-light.md). No wholesale legacy import or expansion into every brainstorm is implied.
 
-**Studio direction and roadmap:** [3D engine, universal Studio, authored JSON and offline packaging](docs/decisions/0006-studio-3d-and-authored-data.md). The first edit/save/play workspace is now implemented; the next content milestone is the recreated street block.
+**Studio direction and roadmap:** [3D engine, universal Studio, authored JSON and offline packaging](docs/decisions/0006-studio-3d-and-authored-data.md). The first edit/save/play workspace is now implemented; the first recreated street/vestibule slice is now implemented.
 
-**Current implemented milestone:** [Studio authoring tools and limits](docs/decisions/0008-studio-authoring-tools.md) · [screenshots and verification](docs/milestones/studio-tools/README.md) · [editable JSON guide](examples/atrium/DOCUMENTS.md).
+**Current implemented milestone:** [Freelancer street/doorway slice](docs/decisions/0009-freelancer-street-slice.md) · [screenshots and verification](docs/milestones/enni-street/README.md) · [Freelancer editing guide](games/freelancer/DOCUMENTS.md).
+
+**Studio tools:** [authoring contracts](docs/decisions/0008-studio-authoring-tools.md) · [tools evidence](docs/milestones/studio-tools/README.md) · [base JSON guide](examples/atrium/DOCUMENTS.md).
 
 **Lighting/shadows:** [Lighting/shadow decisions and API](docs/decisions/0005-lighting-and-shadows.md) · [screenshots and verification](docs/milestones/lighting/README.md).
 
@@ -28,7 +30,7 @@ The branch was intentionally created with only this plan. On 2026-10-15, after r
 
 **First Light evidence:** [original foundation screenshots and checks](docs/milestones/first-light/README.md).
 
-**Try the current milestone:** [offline Studio](dist/ETRNLNINE-Studio.html) or [game-only two-world HTML](dist/ETRNLNINE-Atrium.html). Download the file and open it in a WebGL 2 browser, or serve the repository and open `examples/atrium/`. Run `npm test` and `npm run build` for source checks/building. See the source guide for browser checks, editing examples, and known limitations.
+**Try the current milestone:** [offline Studio](dist/ETRNLNINE-Studio.html), [Freelancer street/store](dist/ETRNLNINE-Freelancer.html), or [Atrium diagnostic HTML](dist/ETRNLNINE-Atrium.html). Download the file and open it in a WebGL 2 browser, or serve the repository and open `games/freelancer/`, `editor/` or `examples/atrium/`. Run `npm test` and `npm run build` for source checks/building. See the source guide for browser checks, editing examples, and known limitations.
 
 New ideas are welcome. Distinguish agreed requirements from proposed details and unresolved choices. Record subsequent architectural decisions here or in explicitly linked decision documents so the owner does not have to repeat them across conversations.
 
@@ -561,10 +563,10 @@ The first Studio slice is implemented: one contextual workspace, editable Atrium
 
 [The Studio direction record](docs/decisions/0006-studio-3d-and-authored-data.md) preserves the agreed roadmap. [The implementation record](docs/decisions/0007-studio-first-workspace.md) distinguishes delivered capabilities from future specialist tools, free-flight/perspective cameras, general dependency streaming and 3D contact physics. Editor application code stays in `editor/`; reusable mechanisms remain in their house levels, and the game-only build imports no Studio application code.
 
-`examples/atrium/project.json` is now authoritative for scene placements, grouped assembly assets and light data. JavaScript implements behavior/generators. The build validates schema/references/registered generator versions and embeds explicitly imported JSON into separate offline game and Studio HTML files. The first format is one portable package containing scene/asset tables; arbitrary multi-file dependency manifests remain future work. [The editing guide](examples/atrium/DOCUMENTS.md) documents units, fields and budgets. GitHub Actions runs the same source tests/build and uploads both HTML artifacts; it does not deploy or write repository files.
+`examples/atrium/project.json` is now authoritative for scene placements, grouped assembly assets and light data. JavaScript implements behavior/generators. The build validates schema/references/registered generator versions and embeds explicitly imported JSON into separate offline game and Studio HTML files. The first format is one portable package containing scene/asset tables; arbitrary multi-file dependency manifests remain future work. [The editing guide](examples/atrium/DOCUMENTS.md) documents units, fields and budgets. GitHub Actions runs the same source tests/build and uploads the offline HTML artifacts; it does not deploy or write repository files.
 
-Run `npm test`, `npm run build`, `npm run test:browser`, `npm run test:studio` and `npm run test:studio-tools` for the relevant checks. Browser checks require development Playwright and Chromium; neither is a runtime dependency. [Studio evidence](docs/milestones/studio/README.md) records actual verification and screenshots. Physical-phone performance is still unmeasured.
+Run `npm test`, `npm run build`, `npm run test:browser`, `npm run test:studio`, `npm run test:studio-tools` and `npm run test:freelancer` for the relevant checks. Browser checks require development Playwright and Chromium; neither is a runtime dependency. [Studio evidence](docs/milestones/studio/README.md) records actual verification and screenshots. Physical-phone performance is still unmeasured.
 
-Next: author the representative main-branch street block through this workflow, then extend the articulated humanoid workshop through the shared document/property/transaction contracts. Broader goals in the direction record remain planned.
+The [Freelancer slice](docs/decisions/0009-freelancer-street-slice.md) now exercises this workflow with the Enni Cole street, a cutaway vestibule and explicit enter/return actions. Next: extend the articulated humanoid workshop through the shared document/property/transaction contracts, preserving the agreed silhouette review. Broader goals in the direction record remain planned.
 
-The agreed follow-on [Studio presentation and gizmo requirements](docs/decisions/0007-studio-first-workspace.md#agreed-next-work-street-block-studio-presentation-and-humanoid-review) include DFAB-inspired styling, a grid toggle, a shared rotation dial and selectable light markers in edit mode. The same record preserves the street-block scope and the requested humanoid silhouette previews. The [authoring-tools milestone](docs/decisions/0008-studio-authoring-tools.md) implements the styling, grid, rotation dial, light markers and placement/duplicate/delete commands. The street block and humanoid remain upcoming.
+The agreed follow-on [Studio presentation and gizmo requirements](docs/decisions/0007-studio-first-workspace.md#agreed-next-work-street-block-studio-presentation-and-humanoid-review) include DFAB-inspired styling, a grid toggle, a shared rotation dial and selectable light markers in edit mode. The same record preserves the street-block scope and the requested humanoid silhouette previews. The [authoring-tools milestone](docs/decisions/0008-studio-authoring-tools.md) implements the styling, grid, rotation dial, light markers and placement/duplicate/delete commands. The first [street/vestibule slice](docs/decisions/0009-freelancer-street-slice.md) is implemented; the new humanoid remains upcoming.

@@ -1,0 +1,381 @@
+{
+  "version": 1,
+  "id": 1,
+  "label": "Freelancer idle submission",
+  "frame": {
+    "id": 3,
+    "intervalMs": null,
+    "cpuMs": 2.9000000059604645,
+    "gpuMs": null,
+    "collectionMs": 0.10000000894069672,
+    "unscopedMs": 0,
+    "simulationTime": 0.03333333333333333,
+    "paused": false,
+    "failed": false,
+    "droppedSpans": 0,
+    "scopes": [
+      {
+        "name": "diagnostics.collect",
+        "inclusiveMs": 0.10000000894069672,
+        "selfMs": 0.10000000894069672,
+        "calls": 1
+      },
+      {
+        "name": "renderer.shadows",
+        "inclusiveMs": 1.7999999970197678,
+        "selfMs": 1.7999999970197678,
+        "calls": 1
+      },
+      {
+        "name": "renderer.ambientOcclusion",
+        "inclusiveMs": 0.10000000894069672,
+        "selfMs": 0.10000000894069672,
+        "calls": 1
+      },
+      {
+        "name": "freelancer.locomotion",
+        "inclusiveMs": 0,
+        "selfMs": 0,
+        "calls": 1
+      },
+      {
+        "name": "freelancer.simulation",
+        "inclusiveMs": 0.09999999403953552,
+        "selfMs": 0.09999999403953552,
+        "calls": 1
+      },
+      {
+        "name": "freelancer.presentation",
+        "inclusiveMs": 2.7000000029802322,
+        "selfMs": 0.7999999970197678,
+        "calls": 1
+      }
+    ],
+    "counters": [
+      {
+        "name": "renderer.draws",
+        "unit": "count",
+        "value": 1
+      },
+      {
+        "name": "renderer.instances",
+        "unit": "count",
+        "value": 604
+      },
+      {
+        "name": "renderer.uploads",
+        "unit": "count",
+        "value": 0
+      },
+      {
+        "name": "renderer.uploadedBytes",
+        "unit": "bytes",
+        "value": 0
+      },
+      {
+        "name": "renderer.candidates",
+        "unit": "count",
+        "value": 985
+      },
+      {
+        "name": "renderer.culled",
+        "unit": "count",
+        "value": 7
+      },
+      {
+        "name": "renderer.shadowDraws",
+        "unit": "count",
+        "value": 0
+      },
+      {
+        "name": "renderer.shadowHits",
+        "unit": "count",
+        "value": 1
+      },
+      {
+        "name": "renderer.buffers",
+        "unit": "count",
+        "value": 3
+      },
+      {
+        "name": "renderer.programs",
+        "unit": "count",
+        "value": 2
+      },
+      {
+        "name": "renderer.vaos",
+        "unit": "count",
+        "value": 2
+      },
+      {
+        "name": "renderer.cpuBuffers",
+        "unit": "bytes",
+        "value": 262144
+      },
+      {
+        "name": "renderer.gpuBuffers",
+        "unit": "bytes",
+        "value": 263008
+      },
+      {
+        "name": "renderer.gpuPending",
+        "unit": "count",
+        "value": 0
+      },
+      {
+        "name": "renderer.aoTargets",
+        "unit": "bytes",
+        "value": 0
+      },
+      {
+        "name": "renderer.aoBlockers",
+        "unit": "count",
+        "value": 12
+      },
+      {
+        "name": "renderer.shadowTargets",
+        "unit": "bytes",
+        "value": 1048576
+      },
+      {
+        "name": "directory.worlds",
+        "unit": "count",
+        "value": 1
+      },
+      {
+        "name": "directory.entities",
+        "unit": "count",
+        "value": 647
+      },
+      {
+        "name": "directory.resources",
+        "unit": "count",
+        "value": 1
+      },
+      {
+        "name": "directory.leases",
+        "unit": "count",
+        "value": 1
+      },
+      {
+        "name": "directory.ownedCpuBuffers",
+        "unit": "bytes",
+        "value": 131072
+      },
+      {
+        "name": "directory.ownedGpuBuffers",
+        "unit": "bytes",
+        "value": 131072
+      },
+      {
+        "name": "directory.savedState",
+        "unit": "bytes",
+        "value": 0
+      },
+      {
+        "name": "directory.resident",
+        "unit": "count",
+        "value": 1
+      },
+      {
+        "name": "runtime.steps",
+        "unit": "count",
+        "value": 0
+      },
+      {
+        "name": "runtime.dropped",
+        "unit": "ms",
+        "value": 0
+      },
+      {
+        "name": "runtime.paused",
+        "unit": "flag",
+        "value": 0
+      },
+      {
+        "name": "preparation.chunks",
+        "unit": "count",
+        "value": 0
+      },
+      {
+        "name": "preparation.pending",
+        "unit": "count",
+        "value": 0
+      }
+    ],
+    "spans": [
+      {
+        "scope": "freelancer.simulation",
+        "startMs": 0,
+        "durationMs": 0.09999999403953552,
+        "depth": 0
+      },
+      {
+        "scope": "freelancer.locomotion",
+        "startMs": 0.09999999403953552,
+        "durationMs": 0,
+        "depth": 1
+      },
+      {
+        "scope": "freelancer.presentation",
+        "startMs": 0.09999999403953552,
+        "durationMs": 2.7000000029802322,
+        "depth": 0
+      },
+      {
+        "scope": "renderer.shadows",
+        "startMs": 0.7999999970197678,
+        "durationMs": 1.7999999970197678,
+        "depth": 1
+      },
+      {
+        "scope": "renderer.ambientOcclusion",
+        "startMs": 2.5999999940395355,
+        "durationMs": 0.10000000894069672,
+        "depth": 1
+      },
+      {
+        "scope": "diagnostics.collect",
+        "startMs": 2.7999999970197678,
+        "durationMs": 0.10000000894069672,
+        "depth": 0
+      }
+    ]
+  },
+  "providerDetails": {
+    "timing": "current state at capture time; frame counters belong to the recorded frame",
+    "data": {
+      "renderer": {
+        "gpuTimer": {
+          "supported": true,
+          "enabled": false,
+          "pending": 0,
+          "capacity": 4,
+          "completed": 0,
+          "skipped": 0,
+          "disjoint": 0,
+          "reportErrors": 0
+        },
+        "buffers": 3,
+        "programs": 2,
+        "vertexArrays": 2,
+        "lines": {
+          "layers": 0,
+          "vertices": 0,
+          "cpuBytes": 0,
+          "gpuBufferBytes": 0
+        },
+        "ambientOcclusion": {
+          "requestedMode": "geometry",
+          "effectiveMode": "geometry",
+          "strength": 0.7,
+          "radius": 1.25,
+          "blockers": 12,
+          "candidates": 212,
+          "blockerBudget": 12,
+          "width": 0,
+          "height": 0,
+          "textures": 0,
+          "framebuffers": 0,
+          "targetBytes": 0,
+          "failure": null,
+          "accounting": "Estimated target storage: normal RGBA8 (4), depth24 budgeted at 4, AO R8 (1) bytes per pixel. Actual depth padding and driver overhead are unknown."
+        },
+        "lighting": {
+          "pointBudget": 8,
+          "direction": [
+            -0.34874290227890015,
+            -0.4649905562400818,
+            0.8137334585189819
+          ],
+          "directionColor": [
+            0.23999999463558197,
+            0.18000000715255737,
+            0.2800000011920929
+          ],
+          "shadows": {
+            "mode": "low",
+            "sunReady": true,
+            "pointReady": false,
+            "pointIndex": -1,
+            "sunResolution": 512,
+            "pointResolution": 0,
+            "targetBytes": 1048576,
+            "textures": 1,
+            "framebuffers": 1,
+            "casterOwner": "lighting.shadowCasters/world:2",
+            "casters": 374,
+            "casterCapacity": 2048,
+            "casterCpuBytes": 131072,
+            "casterGpuBytes": 131072,
+            "frameDraws": 0,
+            "sunUpdates": 1,
+            "pointUpdates": 0,
+            "pointRefreshHz": 10,
+            "pointAgeMs": null,
+            "sunFailure": null,
+            "pointFailure": null,
+            "accounting": "Estimated depth24 storage budgeted at four bytes/texel; default framebuffer and driver overhead excluded. Caster buffers are included in renderer buffer totals."
+          }
+        },
+        "viewport": {
+          "width": 320,
+          "height": 240
+        },
+        "accounting": "Requested GL buffer bytes only. Estimated AO and shadow texture bytes are reported separately in ambientOcclusion/aoTargets. Default framebuffer, shader/driver storage and browser heap are excluded."
+      },
+      "directory": {
+        "worlds": [
+          {
+            "id": "world:2",
+            "entities": 647
+          }
+        ],
+        "resources": [
+          {
+            "key": "scene:world:2",
+            "leases": 1,
+            "owners": [
+              {
+                "owner": "scene:clinic-way",
+                "count": 1
+              }
+            ],
+            "kind": "instance-buffer",
+            "cpuBufferBytes": 131072,
+            "gpuBufferBytes": 131072
+          }
+        ],
+        "residency": [
+          {
+            "key": "freelancer:1:freelancer:clinic-way",
+            "worldId": "world:2",
+            "status": "ready",
+            "owners": 1
+          }
+        ],
+        "limits": {
+          "rows": 64,
+          "worldCapacity": 2,
+          "snapshotBytes": 65536
+        },
+        "snapshotBytes": 0,
+        "note": "Owned buffer accounting overlaps renderer totals; do not add them twice. Driver/JS heap excluded."
+      },
+      "runtime": {
+        "stepSeconds": 0.016666666666666666,
+        "maxSteps": 5,
+        "simulationTime": 0,
+        "pausedReasons": [],
+        "preparation": {
+          "pending": 0,
+          "budgetMs": 2,
+          "maxSteps": 2,
+          "steps": 37,
+          "peakChunkMs": 13.299999997019768,
+          "cancelled": 0
+        }
+      }
+    }
+  }
+}

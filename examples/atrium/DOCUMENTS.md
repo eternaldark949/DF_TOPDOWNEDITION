@@ -58,3 +58,7 @@ Choose **Rotate**, an X/Y/Z axis, World/Local space and an angle increment. Drag
 **View & guides** contains independent grid and light-marker toggles. Markers select point lights for the same inspector and Move tool. Hiding markers preserves lighting; hiding the grid preserves snapping. Grid, markers and dial are WebGL guides, separate from authored geometry, collisions, shadows and AO. They are released during Play and restored on Stop. Axis, space, angle snap and guide visibility are best-effort local view preferences, not project edits.
 
 The current implementation and resource budgets are recorded in [decision 0008](../../docs/decisions/0008-studio-authoring-tools.md). These tools prepare the street-block work; they do not add the new building or humanoid themselves.
+
+## Other installed projects
+
+Studio now also includes the [Freelancer street/vestibule slice](../../games/freelancer/DOCUMENTS.md). Choose a starter through the project selector; export or undo unsaved edits first. Each installed package supplies validation, Play and application policies through the editor catalog; Atrium remains an independent diagnostic. Import/recovery recognizes installed package IDs. The existing recovery slot is shared, so export backups when moving between projects.
