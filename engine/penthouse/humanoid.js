@@ -1,51 +1,91 @@
 /**
- * Penthouse / procedural humanoid: a reusable articulated mannequin for proportion review.
+ * Penthouse / procedural humanoid: a reusable articulated figure with generated clothing.
  *
- * Ownership: this toy builds an invisible joint hierarchy and box body segments through
+ * Ownership: this toy builds an invisible joint hierarchy and rounded body parts through
  * World only. It owns no scheduler, GPU resource or game identity. Games supply the
- * parameter/palette document (for example Freelancer's 949 preset) and decide when to
- * pose it; Lobby phases call poseHumanoid() through the game's registered callbacks.
+ * parameter/palette/outfit document (for example Freelancer's 949 preset) and a wardrobe
+ * catalogue, and decide when to pose it; Lobby phases call poseHumanoid() through the
+ * game's registered callbacks.
  *
  * Units: metres, radians and linear RGB. Axes follow World: x right, y back, z up.
  * A humanoid faces local -Y, matching the planar motor's heading convention.
  *
- * Status: the silhouette-review stage agreed in decision 0007 (recorded in 0020). Segments are
- * oriented boxes with two-part tapers; there is no mesh, skinning, IK, cloth or hair
- * simulation yet. Proportions and posture are the subject, not surface detail.
+ * Look: the body shape is ported from the 2D game's procedural humanoid (src/ui/bodies.js
+ * on main). Its per-gender canon gives tapered limbs [near, belly, belly position, far]
+ * whose touching ends share one radius, a torso with deltoid caps, a wide pelvis and a big
+ * stylised head; its builds scale breadth, depth, head, hips and shoulders. Each part is
+ * one rounded instance (Basement rounded-shapes.js): segments meet in continuous joints
+ * exactly as the 2D outlines do. Clothes are those same shapes grown outward over the
+ * spans a garment covers (garments.js), so every outfit fits every body.
+ *
+ * Status (decision 0020): rigid rounded segments. There is no skinning, IK, cloth or hair
+ * simulation, faces or ground contact on slopes yet; skirts and hair are static volumes.
  */
 import { createMaterial } from "../basement/material.js";
 import { eulerRotation } from "../basement/rotation.js";
+import { roundedProfile } from "../basement/rounded-shapes.js";
+import { GARMENT_FINISHES, GARMENT_SLOTS, garmentCoverage, resolveOutfit, validateOutfit } from "./garments.js";
 
 /** Bump when the generated skeleton or the meaning of a parameter changes. */
-export const HUMANOID_GENERATOR_VERSION = 1;
+export const HUMANOID_GENERATOR_VERSION = 2;
+
+/**
+ * The 2D game's body canon, in its own drawing unit (1 unit = height ÷ 131 here, which
+ * puts the classic female shoulders at 0.37 m across the deltoids for 1.68 m). Fields keep
+ * the 2D names: sh shoulder joints at ±sh, del deltoid radius, tf/tb chest front and back,
+ * chest/back half-breadths there, bust {x forward, y apart, r}, hf/hb pelvis front/back,
+ * hw half-breadth at the hip bones, leg thigh spacing (±leg), and limb tapers
+ * [near radius, belly radius, belly position 0..1, far radius]. `waist` (half-breadth at
+ * the waist) is new: a top-down drawing never needed it.
+ */
+export const BODY_CANON = Object.freeze({
+  female: { sh: 10.5, del: 4.0, tf: 6.0, tb: -7.2, chest: 7.8, back: 8.8, waist: 7.0, bust: { x: 5.4, y: 4.9, r: 3.3 },
+    hf: 3.0, hb: -9.0, hw: 12.0, leg: 5.4,
+    thigh: [4.7, 4.5, 0.28, 3.3], calf: [3.3, 3.6, 0.3, 2.05], upper: [3.5, 3.35, 0.35, 2.55], fore: [2.55, 2.7, 0.22, 1.8], hand: 1.0, foot: 1.0 },
+  androgynous: { sh: 11.0, del: 4.3, tf: 6.3, tb: -7.8, chest: 8.8, back: 9.4, waist: 8.1, bust: null,
+    hf: 2.6, hb: -8.0, hw: 11.2, leg: 5.0,
+    thigh: [4.75, 4.55, 0.28, 3.45], calf: [3.45, 3.75, 0.3, 2.2], upper: [3.8, 3.6, 0.35, 2.75], fore: [2.75, 2.9, 0.22, 1.95], hand: 1.04, foot: 1.02 },
+  male: { sh: 12.5, del: 4.8, tf: 6.6, tb: -8.0, chest: 10.0, back: 10.8, waist: 9.4, bust: null,
+    hf: 2.5, hb: -7.5, hw: 10.8, leg: 4.9,
+    thigh: [4.85, 4.65, 0.28, 3.6], calf: [3.6, 3.95, 0.3, 2.35], upper: [4.2, 4.0, 0.35, 3.0], fore: [3.0, 3.2, 0.22, 2.1], hand: 1.1, foot: 1.05 },
+});
+
+/** The 2D builds: breadth (w), depth (d), head, and extra hip/shoulder emphasis. */
+export const BODY_BUILDS = Object.freeze({
+  classic: { w: 1, d: 1, head: 1 },
+  slim: { w: 0.88, d: 0.92, head: 0.98 },
+  athletic: { w: 1.05, d: 1.02, head: 1.0, shoulder: 1.08 },
+  curvy: { w: 1.04, d: 1.04, head: 1.0, hip: 1.25 },
+  broad: { w: 1.15, d: 1.08, head: 1.02, shoulder: 1.1 },
+  heavy: { w: 1.2, d: 1.22, head: 1.05, hip: 1.1 },
+});
+
+/** Canon units per metre of height, and the 2D head (16 across) in those units. */
+const UNITS_PER_HEIGHT = 131,
+  HEAD = Object.freeze({ width: 16, depth: 17.2, height: 19.5 });
 
 /**
  * One table drives validation, review sliders and documentation, so a new parameter
  * cannot be accepted by one surface and ignored by another. `slider` is the useful
- * interactive span; min/max are hard limits. Fractions are of total standing height.
+ * interactive span; min/max are hard limits. Shape values multiply the canon (1 = as the
+ * 2D game draws that gender and build).
  */
 export const HUMANOID_PARAMETERS = Object.freeze(
   [
     // Overall scale and the vertical division of the body.
     ["height", "Height", "m", 1.2, 2.2, 1.45, 2.0, "Body"],
-    ["headHeight", "Head height", "× height", 0.1, 0.2, 0.115, 0.16, "Body"],
+    ["headSize", "Head size", "× canon", 0.7, 1.3, 0.8, 1.2, "Body"],
     ["legLength", "Leg length", "× height", 0.4, 0.6, 0.44, 0.56, "Body"],
     ["armLength", "Arm length", "× height", 0.35, 0.5, 0.38, 0.47, "Body"],
     ["neckLength", "Neck length", "× height", 0.02, 0.08, 0.025, 0.065, "Body"],
-    // Horizontal masses. Widths are full extents, not half-widths.
-    ["shoulderWidth", "Shoulder width", "m", 0.25, 0.55, 0.3, 0.48, "Torso"],
-    ["chestDepth", "Chest depth", "m", 0.14, 0.34, 0.16, 0.3, "Torso"],
-    ["waistWidth", "Waist width", "m", 0.18, 0.45, 0.2, 0.4, "Torso"],
-    ["hipWidth", "Hip width", "m", 0.24, 0.5, 0.26, 0.44, "Torso"],
-    ["headWidth", "Head width", "× head height", 0.6, 0.95, 0.66, 0.88, "Torso"],
-    // Limb thickness at the root of each segment; the far half tapers by `limbTaper`.
-    ["upperArm", "Upper arm", "m", 0.06, 0.16, 0.065, 0.13, "Limbs"],
-    ["forearm", "Forearm", "m", 0.05, 0.13, 0.055, 0.11, "Limbs"],
-    ["thigh", "Thigh", "m", 0.1, 0.24, 0.11, 0.21, "Limbs"],
-    ["calf", "Calf", "m", 0.07, 0.17, 0.08, 0.15, "Limbs"],
-    ["limbTaper", "Limb taper", "far / near", 0.55, 1, 0.6, 0.95, "Limbs"],
-    ["footLength", "Foot length", "× height", 0.12, 0.18, 0.13, 0.17, "Limbs"],
-    ["stance", "Stance width", "m", 0, 0.2, 0, 0.16, "Limbs"],
+    ["footLength", "Foot length", "× height", 0.12, 0.18, 0.13, 0.17, "Body"],
+    // Horizontal masses relative to the canon for the chosen gender and build.
+    ["shoulders", "Shoulders", "× canon", 0.8, 1.25, 0.85, 1.2, "Shape"],
+    ["waist", "Waist", "× canon", 0.8, 1.3, 0.85, 1.25, "Shape"],
+    ["hips", "Hips", "× canon", 0.8, 1.35, 0.85, 1.3, "Shape"],
+    ["bust", "Bust", "× canon", 0, 1.6, 0, 1.4, "Shape"],
+    ["limbs", "Limb thickness", "× canon", 0.75, 1.35, 0.8, 1.25, "Shape"],
+    ["stance", "Stance width", "m", 0, 0.2, 0, 0.16, "Shape"],
     // Posture is a resting attitude; gait adds bounded motion on top of it.
     ["spineLean", "Spine lean", "rad", -0.2, 0.3, -0.1, 0.2, "Posture"],
     ["headTilt", "Head tilt", "rad", -0.3, 0.3, -0.2, 0.2, "Posture"],
@@ -61,73 +101,54 @@ export const HUMANOID_PARAMETERS = Object.freeze(
   ),
 );
 
-/** Discrete outline choices. Hair styles are silhouette volumes, not strand simulation. */
+/** Discrete choices. Hair styles are static volumes, not strand or chain simulation. */
 export const HUMANOID_CHOICES = Object.freeze({
-  hair: Object.freeze(["none", "short", "bun", "ponytail"]),
+  gender: Object.freeze(Object.keys(BODY_CANON)),
+  build: Object.freeze(Object.keys(BODY_BUILDS)),
+  hair: Object.freeze(["none", "short", "bun", "ponytail", "curls"]),
   backpack: Object.freeze([true, false]),
 });
 
-/** Material slots a game palette must fill. Thigh-high legwear has its own slot. */
-export const HUMANOID_PALETTE_SLOTS = Object.freeze([
-  "skin",
-  "hair",
-  "top",
-  "bottoms",
-  "legwear",
-  "shoes",
-  "bag",
-  "strap",
-]);
+/** Body material slots a palette must fill; garments carry their own colours. */
+export const HUMANOID_PALETTE_SLOTS = Object.freeze(["skin", "hair", "bag", "strap"]);
 
 /**
  * Validate a complete humanoid document without filling defaults or mutating input.
  * The returned object is a frozen deep copy, so later UI edits cannot alter a
- * validated preset in place; edits validate a new candidate instead.
+ * validated preset in place; edits validate a new candidate instead. Outfit garments
+ * are checked against a wardrobe when the figure is generated.
  */
 export function validateHumanoid(document) {
-  if (!document || typeof document !== "object")
-    throw new TypeError("Humanoid document must be an object");
-  if (document.schemaVersion !== 1 || document.kind !== "humanoid")
-    throw new Error("Expected a schema-1 humanoid document");
+  if (!document || typeof document !== "object") throw new TypeError("Humanoid document must be an object");
+  if (document.schemaVersion !== 2 || document.kind !== "humanoid") throw new Error("Expected a schema-2 humanoid document");
   if (document.generatorVersion !== HUMANOID_GENERATOR_VERSION)
-    throw new Error(
-      `Humanoid generator ${document.generatorVersion} is not installed`,
-    );
+    throw new Error(`Humanoid generator ${document.generatorVersion} is not installed`);
   for (const key of ["id", "name"])
     if (typeof document[key] !== "string" || !document[key].length || document[key].length > 80)
       throw new Error(`Humanoid ${key} must contain 1–80 characters`);
+  const known = new Set(["schemaVersion", "kind", "id", "name", "generatorVersion", "parameters", "palette", "outfit"]);
+  for (const key of Object.keys(document)) if (!known.has(key)) throw new Error(`Unknown humanoid field: ${key}`);
   const p = document.parameters,
     palette = document.palette;
   if (!p || typeof p !== "object") throw new Error("Missing humanoid parameters");
-  const known = new Set([
-    ...HUMANOID_PARAMETERS.map((d) => d.key),
-    ...Object.keys(HUMANOID_CHOICES),
-  ]);
-  for (const key of Object.keys(p))
-    if (!known.has(key)) throw new Error(`Unknown humanoid parameter: ${key}`);
+  const keys = new Set([...HUMANOID_PARAMETERS.map((d) => d.key), ...Object.keys(HUMANOID_CHOICES)]);
+  for (const key of Object.keys(p)) if (!keys.has(key)) throw new Error(`Unknown humanoid parameter: ${key}`);
   for (const d of HUMANOID_PARAMETERS)
     if (!Number.isFinite(p[d.key]) || p[d.key] < d.min || p[d.key] > d.max)
       throw new RangeError(`${d.label} must be ${d.min}–${d.max} ${d.unit}`);
   for (const [key, options] of Object.entries(HUMANOID_CHOICES))
-    if (!options.includes(p[key]))
-      throw new RangeError(`${key} must be one of ${options.join(", ")}`);
+    if (!options.includes(p[key])) throw new RangeError(`${key} must be one of ${options.join(", ")}`);
   if (!palette || typeof palette !== "object") throw new Error("Missing palette");
-  for (const key of Object.keys(palette))
-    if (!HUMANOID_PALETTE_SLOTS.includes(key))
-      throw new Error(`Unknown palette slot: ${key}`);
+  for (const key of Object.keys(palette)) if (!HUMANOID_PALETTE_SLOTS.includes(key)) throw new Error(`Unknown palette slot: ${key}`);
   for (const slot of HUMANOID_PALETTE_SLOTS) {
     const c = palette[slot];
     if (!Array.isArray(c) || c.length !== 3 || !c.every((n) => Number.isFinite(n) && n >= 0 && n <= 1))
       throw new RangeError(`Palette ${slot} needs three linear RGB values in 0–1`);
   }
-  // Cross-parameter limits keep the body physically assemblable: arms must not
-  // collapse into the torso and the hips must hold both thighs without overlap.
-  if (p.thigh * 2 > p.hipWidth + 0.04)
-    throw new RangeError("Thighs are wider than the hips can hold");
-  if (p.waistWidth > Math.max(p.shoulderWidth, p.hipWidth))
-    throw new RangeError("Waist must not exceed both shoulders and hips");
-  if (p.headHeight + p.neckLength + p.legLength > 0.8)
-    throw new RangeError("Head, neck and legs leave no room for a torso");
+  validateOutfit(document.outfit);
+  // The stylised head is large; the legs and neck must still leave room for a torso.
+  const headFraction = (HEAD.height * p.headSize * BODY_BUILDS[p.build].head) / UNITS_PER_HEIGHT;
+  if (headFraction + p.neckLength + p.legLength > 0.8) throw new RangeError("Head, neck and legs leave no room for a torso");
   return deepFreeze(structuredClone(document));
 }
 
@@ -141,46 +162,84 @@ function deepFreeze(value) {
 }
 
 /**
+ * The canon for a gender and build with the document's shape multipliers applied, as in
+ * the 2D bodyCanon(): shoulder emphasis widens deltoids and chest, hip emphasis widens
+ * hips, seat and thigh spacing. Breadth values scale by the build's w, depth by d.
+ */
+function shapedCanon(p) {
+  const base = BODY_CANON[p.gender],
+    b = BODY_BUILDS[p.build],
+    C = structuredClone(base);
+  if (b.shoulder) {
+    const k = b.shoulder;
+    C.sh *= k; C.del *= 1 + (k - 1) * 0.8; C.chest *= 1 + (k - 1) * 0.6; C.back *= 1 + (k - 1) * 0.7;
+  }
+  if (b.hip) {
+    const k = b.hip;
+    C.hw *= k; C.hb *= 1 + (k - 1) * 0.6; C.leg *= 1 + (k - 1) * 0.5;
+  }
+  C.sh *= p.shoulders; C.del *= 0.5 + p.shoulders * 0.5; C.chest *= p.shoulders; C.back *= p.shoulders;
+  C.waist *= p.waist;
+  C.hw *= p.hips; C.hb *= 0.4 + p.hips * 0.6; C.leg *= 0.5 + p.hips * 0.5;
+  // Builds stretch the 2D frame: breadth across the shoulders, depth front to back.
+  for (const key of ["sh", "chest", "back", "waist", "hw", "leg"]) C[key] *= b.w;
+  for (const key of ["tf", "tb", "hf", "hb"]) C[key] *= b.d;
+  const limb = ((b.w + b.d) / 2) * p.limbs;
+  for (const key of ["thigh", "calf", "upper", "fore"]) C[key] = [C[key][0] * limb, C[key][1] * limb, C[key][2], C[key][3] * limb];
+  C.del *= limb / p.limbs;
+  C.bust = C.bust && p.bust > 0 ? { x: C.bust.x * b.d, y: C.bust.y * b.w, r: C.bust.r * p.bust } : null;
+  C.head = b.head * p.headSize;
+  return C;
+}
+
+/**
  * Derive joint positions and segment sizes from validated parameters. Pure data: the
  * same function serves construction, tests and any future rig/IK consumer.
- * All z values are measured from the ground in the rest pose.
+ * All z values are measured from the ground in the rest pose; `u` is the canon unit.
  */
 export function humanoidMeasurements(p) {
   const H = p.height,
-    head = p.headHeight * H,
+    u = H / UNITS_PER_HEIGHT,
+    C = shapedCanon(p),
+    head = { width: HEAD.width * u * C.head, depth: HEAD.depth * u * C.head, height: HEAD.height * u * C.head },
     neck = p.neckLength * H,
-    foot = { length: p.footLength * H, height: 0.035 * H },
+    foot = { length: p.footLength * H, height: 0.032 * H, width: 6.6 * u * C.foot },
     hipZ = p.legLength * H,
     // Knee sits slightly above the leg's midpoint, as on a real skeleton.
     thighLength = (hipZ - foot.height) * 0.52,
     shinLength = hipZ - foot.height - thighLength,
-    chinZ = H - head,
+    chinZ = H - head.height,
+    // Top of the shoulders (the chest dome); the neck rises from just below it.
     shoulderZ = chinZ - neck,
-    // The waist joint divides the trunk; the chest above it carries shoulders and pack.
-    waistZ = hipZ + (shoulderZ - hipZ) * 0.42,
+    // The waist joint divides the trunk; the chest above it carries arms, bust and pack.
+    waistZ = hipZ + (shoulderZ - hipZ) * 0.4,
     arm = p.armLength * H,
-    hand = arm * 0.22,
-    upperArmLength = (arm - hand) * 0.53,
-    forearmLength = arm - hand - upperArmLength;
+    hand = arm * 0.2,
+    upperArmLength = (arm - hand) * 0.54,
+    forearmLength = arm - hand - upperArmLength,
+    chestDepth = (C.tf - C.tb) * u;
   return {
+    u,
+    canon: C,
     height: H,
-    head: { height: head, width: head * p.headWidth, depth: head * 0.92 },
-    neck: { length: neck, width: Math.max(0.07, head * 0.42) },
+    head,
+    neck: { length: neck, radius: head.width * 0.22 },
     hipZ,
     waistZ,
     shoulderZ,
     chinZ,
-    hipSpacing: p.hipWidth / 2 - p.thigh / 2 + p.stance / 2,
-    // Arm centres sit just inside the deltoid width, outside the narrower upper chest.
-    shoulderSpacing: p.shoulderWidth / 2 - p.upperArm * 0.42,
+    hipSpacing: C.leg * u + p.stance / 2,
+    shoulderSpacing: C.sh * u,
+    // Shoulder joints sit under the deltoid caps, a little below the top of the shoulders.
+    shoulderJointZ: shoulderZ - C.del * u * 0.9,
     thighLength,
     shinLength,
     upperArmLength,
     forearmLength,
-    hand: { length: hand, width: p.forearm * 0.95, depth: p.forearm * 0.45 },
+    hand: { length: hand, width: 5.8 * u * C.hand, thickness: C.fore[3] * u * 2.5 },
     foot,
-    pelvis: { width: p.hipWidth, depth: p.chestDepth * 0.95, height: (waistZ - hipZ) * 1.25 },
-    chest: { width: p.shoulderWidth, depth: p.chestDepth, height: shoulderZ - waistZ },
+    chest: { width: (C.chest + C.back) * u, depth: chestDepth, waistWidth: C.waist * 2 * u, height: shoulderZ - waistZ },
+    pelvis: { waistWidth: C.waist * 2 * u, hipWidth: C.hw * 2 * u, depth: (C.hf - C.hb) * u, height: waistZ - hipZ },
     backpack: {
       width: p.backpackWidth,
       height: p.backpackHeight,
@@ -191,112 +250,312 @@ export function humanoidMeasurements(p) {
   };
 }
 
+/** The 2D profile's hump, matching the shader exactly (rounded-shapes.js). */
+function hump(t, peak) {
+  return t < peak ? 0.5 - 0.5 * Math.cos((Math.PI * t) / peak) : 0.5 + 0.5 * Math.cos((Math.PI * (t - peak)) / (1 - peak));
+}
+
+/**
+ * A body region: a rounded shape running from a near dome centre (`origin`, in its joint's
+ * frame) along `axis` for `length`, with near radii ax/ay and a profile. Built from a 2D
+ * limb taper [near, belly, belly position, far] when one is given.
+ */
+function region(joint, { origin, axis = "down", ax, ay, length, taper = 1, depthTaper = taper, bulge = 0, peak = 0.5, widthOnly = false }) {
+  return { joint, origin, axis, ax, ay, length, taper, depthTaper, bulge: Math.max(-0.95, Math.min(0.95, bulge)), peak, widthOnly };
+}
+function limbRegion(joint, origin, taper2d, length, u, depthRatio = 1) {
+  const [near, belly, at, far] = taper2d,
+    t = far / near;
+  return region(joint, { origin, ax: near * u, ay: near * u * depthRatio, length, taper: t, peak: at, bulge: belly / near - (1 + (t - 1) * at) });
+}
+/** Profile scale along a region: width (x) when `width`, else depth (y), as the shader does. */
+const regionScale = (R, t, width = false) =>
+  Math.max(0.02, 1 + ((width ? R.taper : R.depthTaper) - 1) * t + (!R.widthOnly || width ? R.bulge * hump(t, R.peak) : 0));
+
+/** Shape axes: hanging regions need no rotation; forward (feet) turns +z to +y. */
+const AXES = {
+  down: { vector: [0, 0, -1], rotation: [0, 0, 0, 1] },
+  forward: { vector: [0, -1, 0], rotation: eulerRotation(-Math.PI / 2, 0, 0) },
+};
+
 /**
  * Build one humanoid in `world`. Returns a rig whose `root` owns every descendant,
  * so `world.remove(rig.root)` (or rig.dispose()) removes the whole figure.
- * Options: x/y/yaw place the root; `materials` may share live per-slot materials;
- * otherwise private materials are created from the document palette.
+ * Options: x/y/yaw place the root; `wardrobe` (validateWardrobe) resolves the outfit;
+ * `materials` may share live per-slot body materials; otherwise private materials are
+ * created from the palette. Garment materials are always private to this figure.
  */
-export function createHumanoid({ world, document, x = 0, y = 0, yaw = 0, materials = null }) {
+export function createHumanoid({ world, document, wardrobe = null, x = 0, y = 0, yaw = 0, materials = null }) {
   // Always validate: frozen data is not proof that it passed this generator's rules.
   const doc = validateHumanoid(document),
     p = doc.parameters,
     m = humanoidMeasurements(p),
+    C = m.canon,
+    u = m.u,
+    outfit = resolveOutfit(doc.outfit, wardrobe),
     slots =
       materials ??
       Object.fromEntries(
-        HUMANOID_PALETTE_SLOTS.map((slot) => [slot, createMaterial({ baseColor: doc.palette[slot] })]),
+        HUMANOID_PALETTE_SLOTS.map((slot) => [
+          slot,
+          // Soft skin sheen and satin hair; bags and straps stay matte.
+          createMaterial({ baseColor: doc.palette[slot], ...(slot === "skin" ? { specularSharpness: 0.42, reflectivity: 0.035 } : slot === "hair" ? { specularSharpness: 0.62, reflectivity: 0.05 } : {}) }),
+        ]),
       );
+  // One material per worn garment, keyed by its outfit position, so the review's
+  // silhouette override can restore each garment's own colour and finish.
+  const garmentMaterials = outfit.map((g) => createMaterial({ baseColor: g.color, ...GARMENT_FINISHES[g.finish] }));
   const parts = [],
     root = world.create({ x, y, yaw });
   /** Invisible pivot: shape-less entities cost no GPU instance. */
   const joint = (parent, px, py, pz) => world.create({ parent, x: px, y: py, z: pz });
-  /** One visible box, recorded with its slot so materials can be overridden together. */
-  const part = (parent, slot, px, py, pz, size) => {
+  /** Record a visible part with its material key, so overrides can restore it. */
+  const add = (parent, key, position, size, rounded, rotation = [0, 0, 0, 1]) => {
+    const material = typeof key === "number" ? garmentMaterials[key] : slots[key];
     const entity = world.create({
       parent,
-      x: px,
-      y: py,
-      z: pz,
-      shape: { size, material: slots[slot], ambientBlocker: false, castShadow: true },
+      x: position[0],
+      y: position[1],
+      z: position[2],
+      rotation,
+      shape: { size, material, rounded, ambientBlocker: false, castShadow: true },
     });
-    parts.push({ entity, slot });
+    parts.push({ entity, slot: key });
     return entity;
   };
+  /** A sphere (or ellipsoid with `stretch`): a rounded shape shorter than its two domes. */
+  const sphere = (parent, key, position, r, stretch = [1, 1, 1]) =>
+    add(parent, key, position, [2 * r * stretch[0], 2 * r * stretch[1], 2 * r * stretch[2]], ROUND);
+
   /**
-   * A limb segment hanging down -Z from its joint, as two stacked halves so the far
-   * half can taper. Overlap hides the seam when the joint below rotates.
+   * Draw the span [a, b] of a region, grown outward by `grow` metres. The body itself is
+   * the span [0, 1] with no growth: one instance whose profile the shader evaluates
+   * exactly. A garment span is split at the region's bulge peak and into pieces no longer
+   * than a third of the region, each refitted to the grown profile at its ends and middle,
+   * so thin layers (3 mm stockings) never let the skin show through. Ends that stop inside
+   * the region are flat hems; ends at the region's own ends keep its domes, so a stocking
+   * that reaches the knee wraps the joint as the skin does.
    */
-  const segment = (parent, length, width, depth, nearSlot, farSlot = nearSlot) => {
-    const far = p.limbTaper;
-    part(parent, nearSlot, 0, 0, -length * 0.27, [width, depth, length * 0.56]);
-    part(parent, farSlot, 0, 0, -length * 0.74, [width * far, depth * far, length * 0.54]);
+  const span = (R, a, b, grow, key) => {
+    if (grow === 0 && a === 0 && b === 1) return piece(R, 0, 1, 0, key, true, true);
+    const cuts = [a];
+    if (R.peak > a + 0.02 && R.peak < b - 0.02) cuts.push(R.peak);
+    cuts.push(b);
+    for (let i = 0; i + 1 < cuts.length; i++) {
+      const n = Math.ceil((cuts[i + 1] - cuts[i]) / 0.34 - 1e-9);
+      for (let k = 0; k < n; k++) {
+        const t0 = cuts[i] + ((cuts[i + 1] - cuts[i]) * k) / n,
+          t1 = cuts[i] + ((cuts[i + 1] - cuts[i]) * (k + 1)) / n,
+          first = i === 0 && k === 0,
+          last = i + 2 === cuts.length && k + 1 === n;
+        // Inner joins overlap slightly; their flat discs are hidden inside the neighbour.
+        piece(R, first ? t0 : t0 - 0.01, last ? t1 : t1 + 0.01, grow, key, first && a === 0, last && b === 1);
+      }
+    }
+  };
+  /** One rounded instance covering [a, b] of R; `roundNear`/`roundFar` keep the domes. */
+  const piece = (R, a, b, grow, key, roundNear, roundFar) => {
+    a = Math.max(0, a);
+    b = Math.min(1, b);
+    // True grown radii at both ends, per axis: width and depth taper independently.
+    const wa = R.ax * regionScale(R, a, true) + grow,
+      wb = R.ax * regionScale(R, b, true) + grow,
+      da = R.ay * regionScale(R, a) + grow,
+      db = R.ay * regionScale(R, b) + grow,
+      taper = wb / wa,
+      depthTaper = db / da;
+    // The body itself keeps the region's exact profile. A garment piece refits the
+    // bulge (measured on the width) at the region's peak if inside, else its middle.
+    const local = grow === 0 ? R.peak : R.peak > a && R.peak < b ? (R.peak - a) / (b - a) : 0.5,
+      tm = a + local * (b - a),
+      bulge = grow === 0 ? R.bulge : Math.max(-0.95, Math.min(0.95, (R.ax * regionScale(R, tm, true) + grow) / wa - (1 + (taper - 1) * local)));
+    const flatNear = !roundNear,
+      flatFar = !roundFar,
+      r0 = Math.min(wa, da),
+      r1 = Math.min(wb, db),
+      c0 = flatNear ? r0 * 0.002 : r0,
+      c1 = flatFar ? r1 * 0.002 : r1,
+      body = (b - a) * R.length,
+      size = [2 * wa, 2 * da, body + c0 + c1],
+      along = a * R.length + size[2] / 2 - c0,
+      { vector, rotation } = AXES[R.axis];
+    return add(
+      R.joint,
+      key,
+      [R.origin[0] + vector[0] * along, R.origin[1] + vector[1] * along, R.origin[2] + vector[2] * along],
+      size,
+      roundedProfile({ taper, depthTaper, bulge, peak: Math.max(0.01, Math.min(0.99, local)), flatNear, flatFar, widthOnly: R.widthOnly }),
+      rotation,
+    );
   };
 
-  // Pelvis: the root of the trunk. Its height is set again by gait (bob).
-  const pelvis = joint(root, 0, 0, m.hipZ);
-  // Two-box pelvis: full hip width at the hip joints, narrowing toward the waist, so the
-  // front outline shows the waist-to-hip transition instead of one rectangular block.
-  const ph = m.pelvis.height;
-  part(pelvis, "bottoms", 0, 0, ph * 0.08, [m.pelvis.width * 0.96, m.pelvis.depth, ph * 0.62]);
-  part(pelvis, "bottoms", 0, 0, ph * 0.5, [(p.waistWidth + p.hipWidth) / 2, m.pelvis.depth * 0.92, ph * 0.5]);
+  // ── Trunk ──────────────────────────────────────────────────────────────────────
+  // Pelvis: the root of the trunk; gait sets its height again (bob). Its region runs from
+  // the waist down past the hip joints, widest at the hip bones (width-only bulge), with
+  // the seat behind the hip joints as in the 2D outline (hf … hb).
+  // Footwear and legwear thicken the sole; the whole body stands on them, so the grown
+  // sole (not the bare foot) meets the ground.
+  const lift = outfit.reduce((sum, g) => sum + (garmentCoverage(g).foot ? (g.thickness ?? GARMENT_SLOTS[g.slot].thickness) : 0), 0);
+  const pelvis = joint(root, 0, 0, m.hipZ + lift);
+  const ph = m.pelvis.height,
+    pelvisDepth = m.pelvis.depth / 2,
+    pelvisLength = ph,
+    hipAt = 0.5,
+    waistHalf = m.pelvis.waistWidth / 2,
+    // A small far dome tucks under between the thighs instead of hanging below them.
+    pelvisTaper = 0.68,
+    pelvisDepthTaper = 0.62;
+  const pelvisRegion = region(pelvis, {
+    origin: [0, -((C.hf + C.hb) / 2) * u, ph],
+    ax: waistHalf,
+    ay: pelvisDepth,
+    length: pelvisLength,
+    taper: pelvisTaper,
+    depthTaper: pelvisDepthTaper,
+    peak: hipAt,
+    bulge: m.pelvis.hipWidth / 2 / waistHalf - (1 + (pelvisTaper - 1) * hipAt),
+    widthOnly: true,
+  });
   // Waist joint: spine lean and counter-twist bend here, above the hips.
   const waist = joint(pelvis, 0, 0, m.waistZ - m.hipZ);
-  const chestH = m.chest.height;
-  part(waist, "top", 0, 0, chestH * 0.22, [p.waistWidth, p.chestDepth * 0.82, chestH * 0.5]);
-  // Two-box chest: full width at the shoulders, a deeper narrower ribcage below,
-  // which reads as a rounded torso in side view instead of one rectangle.
-  // Shoulder width is measured across the deltoids, so the chest stops inside the arms
-  // and the upper arms remain readable outside the ribcage from the front.
-  part(waist, "top", 0, 0, chestH * 0.78, [p.shoulderWidth - p.upperArm * 1.2, p.chestDepth * 0.78, chestH * 0.42]);
-  part(waist, "top", 0, -p.chestDepth * 0.04, chestH * 0.6, [Math.max(p.waistWidth * 1.05, p.shoulderWidth * 0.7), p.chestDepth, chestH * 0.46]);
-  // Neck and head pivot from the top of the chest.
-  const neck = joint(waist, 0, 0, chestH);
-  part(neck, "skin", 0, 0, m.neck.length * 0.5, [m.neck.width, m.neck.width * 0.95, m.neck.length + 0.02]);
-  const head = joint(neck, 0, 0, m.neck.length);
-  const hh = m.head.height,
-    hw = m.head.width,
-    hd = m.head.depth;
-  // Cranium reaches exactly the authored head height; the narrower jaw tucks under it.
-  part(head, "skin", 0, -hd * 0.04, hh * 0.6, [hw, hd, hh * 0.8]);
-  part(head, "skin", 0, -hd * 0.12, hh * 0.2, [hw * 0.74, hd * 0.72, hh * 0.36]);
-  addHair(part, head, p.hair, hh, hw, hd);
+  // Chest: shoulders down to the waist, narrowing (taper) with a slight ribcage swell.
+  // Its top dome is the shoulder line; deltoid caps sit over its outer corners.
+  const chestDepth = m.chest.depth / 2,
+    chestHalf = m.chest.width / 2,
+    chestTaper = waistHalf / chestHalf,
+    chestRegion = region(waist, {
+      origin: [0, -((C.tf + C.tb) / 2) * u, m.chest.height - Math.min(chestHalf, chestDepth)],
+      ax: chestHalf,
+      ay: chestDepth,
+      length: m.chest.height - Math.min(chestHalf, chestDepth) + 0.01,
+      taper: chestTaper,
+      peak: 0.32,
+      bulge: 0.05,
+      widthOnly: true,
+    });
+  // Neck: a cylinder from inside the head down into the shoulders.
+  const neck = joint(waist, 0, 0, m.chest.height - 0.02);
+  const neckLength = m.chinZ - (m.shoulderZ - 0.02),
+    neckRegion = region(neck, { origin: [0, m.neck.radius * 0.15, neckLength + 0.01], ax: m.neck.radius, ay: m.neck.radius, length: neckLength + 0.02, taper: 1.08 });
+  const head = joint(neck, 0, 0, neckLength);
+  const hw = m.head.width,
+    hd = m.head.depth,
+    hh = m.head.height;
 
-  // Arms hang from shoulder pivots at the top outside corners of the chest.
+  // ── Limbs ──────────────────────────────────────────────────────────────────────
+  // Arms hang from shoulder pivots under the deltoids, legs from hip pivots in the pelvis.
+  // Each 2D taper becomes one region; its far radius equals the next segment's near
+  // radius, so elbows and knees stay joined at any bend.
   const arms = [-1, 1].map((side) => {
-    const shoulder = joint(waist, side * m.shoulderSpacing, 0, chestH - p.upperArm * 0.45);
-    segment(shoulder, m.upperArmLength, p.upperArm, p.upperArm * 0.95, "top", "skin");
+    const shoulder = joint(waist, side * m.shoulderSpacing, 0, m.shoulderJointZ - m.waistZ);
+    const upper = limbRegion(shoulder, [0, 0, 0], C.upper, m.upperArmLength, u);
     const elbow = joint(shoulder, 0, 0, -m.upperArmLength);
-    segment(elbow, m.forearmLength, p.forearm, p.forearm * 0.9, "skin");
+    const fore = limbRegion(elbow, [0, 0, 0], C.fore, m.forearmLength, u);
     const wrist = joint(elbow, 0, 0, -m.forearmLength);
-    part(wrist, "skin", 0, 0, -m.hand.length / 2, [m.hand.depth, m.hand.width, m.hand.length]);
-    return { side, shoulder, elbow, wrist };
+    // Hands: thin across the arm (x), as wide as the palm front to back (y).
+    const hr = m.hand.thickness / 2,
+      hand = region(wrist, { origin: [0, 0, -hr * 0.4], ax: hr, ay: m.hand.width / 2, length: m.hand.length - hr * 1.8, taper: 0.82, bulge: 0.12, peak: 0.35 });
+    return { side, shoulder, elbow, wrist, regions: { upperArm: upper, forearm: fore, hand } };
   });
-
-  // Legs: thigh-high legwear covers the lower thigh, shin and ankle.
   const legs = [-1, 1].map((side) => {
     const hip = joint(pelvis, side * m.hipSpacing, 0, 0);
-    segment(hip, m.thighLength, p.thigh, p.thigh * 1.02, "bottoms", "legwear");
+    const thigh = limbRegion(hip, [0, 0, 0], C.thigh, m.thighLength, u, 1.04);
     const knee = joint(hip, 0, 0, -m.thighLength);
-    segment(knee, m.shinLength, p.calf, p.calf * 1.05, "legwear");
+    const calf = limbRegion(knee, [0, 0, 0], C.calf, m.shinLength, u, 1.06);
     const ankle = joint(knee, 0, 0, -m.shinLength);
-    const f = m.foot;
-    // Foot extends forward (-Y) from the ankle; its sole rests on the ground at rest.
-    part(ankle, "shoes", 0, -f.length * 0.28, -f.height * 0.5, [p.calf * 0.85, f.length, f.height]);
-    return { side, hip, knee, ankle };
+    // Foot: heel to toes along -Y, sole at the ground in the rest pose. Local y of the
+    // rotated shape is vertical, so ay is half the foot's height.
+    const f = m.foot,
+      fy = f.height / 2,
+      heel = Math.min(f.width * 0.4, fy),
+      foot = region(ankle, {
+        origin: [0, f.length * 0.24 - heel, -f.height + fy],
+        axis: "forward",
+        ax: f.width * 0.4,
+        ay: fy,
+        length: f.length - heel * 2.15,
+        taper: 1.12,
+        bulge: 0.14,
+        peak: 0.62,
+        widthOnly: true,
+      });
+    return { side, hip, knee, ankle, regions: { thigh, calf, foot } };
+  });
+
+  // ── Skin ───────────────────────────────────────────────────────────────────────
+  const regions = { neck: [neckRegion], chest: [chestRegion], pelvis: [pelvisRegion] };
+  for (const key of ["upperArm", "forearm", "hand"]) regions[key] = arms.map((a) => a.regions[key]);
+  for (const key of ["thigh", "calf", "foot"]) regions[key] = legs.map((l) => l.regions[key]);
+  for (const list of Object.values(regions)) for (const R of list) span(R, 0, 1, 0, "skin");
+  // Deltoid caps ride on the arms, so they lift and swing with the shoulder joint.
+  const deltoid = C.del * u,
+    // Shifted toward the chest and down, so the cap merges into the shoulder dome and arm.
+    deltoids = arms.map((a) => ({ joint: a.shoulder, position: [-a.side * deltoid * 0.18, 0, -deltoid * 0.12], r: deltoid * 0.95 }));
+  for (const d of deltoids) sphere(d.joint, "skin", d.position, d.r, [1, 1, 1.2]);
+  // Bust (female canon): two spheres on the chest front, as in the 2D canon.
+  const bust = C.bust
+    ? [-1, 1].map((side) => ({
+        // Pushed back into the chest by a third of its radius so it reads as one form.
+        position: [side * C.bust.y * u * 0.85, -C.bust.x * u - (C.tf + C.tb) * u * 0.5 + C.bust.r * u * 0.62, chestRegion.origin[2] - chestRegion.length * 0.24],
+        r: C.bust.r * u * 1.15,
+      }))
+    : [];
+  for (const b of bust) sphere(waist, "skin", b.position, b.r, BUST_STRETCH);
+  // Head: an egg, wider at the crown than the jaw, plus ears. Its top is exactly `height`.
+  // Taper only: a bulge on a body this short would read as a belt around the face.
+  add(head, "skin", [0, -hd * 0.04, hh / 2], [hw, hd, hh], roundedProfile({ taper: 0.8 }));
+  for (const side of [-1, 1]) sphere(head, "skin", [side * hw * 0.48, hd * 0.04, hh * 0.46], hw * 0.09, [0.6, 1, 1.35]);
+  addHair(add, sphere, head, p.hair, hh, hw, hd);
+
+  // ── Clothes ────────────────────────────────────────────────────────────────────
+  // Each garment grows the regions it covers by its thickness over the layer below.
+  // Thickness accumulates in wear order, so a jacket sits over a top over legwear.
+  const worn = {};
+  outfit.forEach((g, index) => {
+    const coverage = garmentCoverage(g),
+      thickness = g.thickness ?? GARMENT_SLOTS[g.slot].thickness,
+      grow = (name) => (worn[name] = (worn[name] ?? 0) + thickness);
+    for (const [name, [a, b]] of Object.entries(coverage)) {
+      const g0 = grow(name);
+      for (const R of regions[name]) span(R, a, b, g0, index);
+    }
+    if (coverage.chest) {
+      const [a, b] = coverage.chest,
+        g0 = worn.chest;
+      // A top over the bust covers it too; sleeves carry the deltoid caps.
+      for (const s of bust) if (a <= 0.38 && b >= 0.2) sphere(waist, index, s.position, s.r + g0, BUST_STRETCH);
+      if (coverage.upperArm?.[0] === 0) for (const d of deltoids) sphere(d.joint, index, d.position, d.r + g0, [1, 1, 1.2]);
+    }
+    if (g.skirt) {
+      // Fitted from the waist over the hips, then a static flared cone to the hem.
+      // Cloth simulation (the 2D game's chains) is future work: legs can pass through it.
+      const g0 = grow("pelvis"),
+        R = pelvisRegion;
+      span(R, 0, R.peak, g0, index);
+      // The cone is centred between the hip joints (not on the seat) and starts wide and
+      // deep enough to contain the thighs' upper domes at rest.
+      const thighR = C.thigh[0] * u,
+        top = R.origin[2] - R.peak * R.length,
+        hem = -g.skirt.length * m.thighLength,
+        nearX = Math.max(R.ax * regionScale(R, R.peak, true), m.hipSpacing + thighR) + g0,
+        nearY = Math.max(R.ay * regionScale(R, R.peak) + Math.abs(R.origin[1]), thighR * 1.15) + g0,
+        length = top - hem,
+        flare = g.skirt.flare;
+      add(pelvis, index, [0, 0, top - length / 2], [nearX * 2, nearY * 2, length], roundedProfile({ taper: flare, flatNear: true, flatFar: true, bulge: 0.04, peak: 0.3 }));
+    }
   });
 
   // Backpack: attached to the chest so it follows lean/twist; its own pivot carries
-  // bounded secondary swing. Straps make the shoulder outline readable from the front.
+  // bounded secondary swing. Packs and straps stay boxes: they are boxy objects.
   let pack = null;
   if (p.backpack) {
-    const b = m.backpack;
-    pack = joint(waist, 0, p.chestDepth / 2, b.top);
-    part(pack, "bag", 0, b.depth / 2 + 0.005, -b.height / 2, [b.width, b.depth, b.height]);
-    part(pack, "bag", 0, b.depth * 0.62, -b.height * 0.64, [b.width * 0.72, b.depth * 0.5, b.height * 0.42]);
-    part(pack, "strap", 0, b.depth / 2, -0.02, [b.width * 0.86, b.depth * 0.9, 0.05]);
-    for (const side of [-1, 1])
-      part(waist, "strap", side * p.shoulderWidth * 0.24, -p.chestDepth * 0.5, chestH * 0.62, [0.04, 0.02, chestH * 0.62]);
+    const b = m.backpack,
+      back = chestRegion.origin[1] + chestDepth;
+    pack = joint(waist, 0, back, b.top);
+    add(pack, "bag", [0, b.depth / 2 + 0.005, -b.height / 2], [b.width, b.depth, b.height]);
+    add(pack, "bag", [0, b.depth * 0.62, -b.height * 0.64], [b.width * 0.72, b.depth * 0.5, b.height * 0.42]);
+    add(pack, "strap", [0, b.depth / 2, -0.02], [b.width * 0.86, b.depth * 0.9, 0.05]);
+    for (const side of [-1, 1]) add(waist, "strap", [side * chestHalf * 0.5, chestRegion.origin[1] - chestDepth * 1.02, m.chest.height * 0.62], [0.04, 0.02, m.chest.height * 0.62]);
   }
 
   return {
@@ -311,12 +570,15 @@ export function createHumanoid({ world, document, x = 0, y = 0, yaw = 0, materia
     legs,
     pack,
     parts,
+    outfit,
+    lift,
     materials: slots,
+    garmentMaterials,
     // Secondary-motion state belongs to this instance only.
     motion: { packPitch: 0, packRoll: 0, packPitchRate: 0, packRollRate: 0, lean: 0, lastSpeed: 0 },
-    /** Show every part with one material (silhouette review) or restore the palette slots. */
+    /** Show every part with one material (silhouette review) or restore palette and garments. */
     override(material = null) {
-      for (const { entity, slot } of parts) entity.shape.material = material ?? slots[slot];
+      for (const { entity, slot } of parts) entity.shape.material = material ?? (typeof slot === "number" ? garmentMaterials[slot] : slots[slot]);
     },
     /** Remove the figure and all descendants from its world. */
     dispose() {
@@ -325,15 +587,40 @@ export function createHumanoid({ world, document, x = 0, y = 0, yaw = 0, materia
   };
 }
 
-/** Hair volumes enlarge the head outline the way real hair does; no strands. */
-function addHair(part, head, style, hh, hw, hd) {
+/** Shared profile for spheres and ellipsoids. */
+const ROUND = roundedProfile();
+/** Bust volumes are wider than deep and slightly tall, so they read as soft forms. */
+const BUST_STRETCH = Object.freeze([1.12, 0.78, 1.05]);
+
+/**
+ * Hair volumes enlarge the head outline the way real hair does; no strands. Curls are a
+ * deterministic cluster of spheres over the crown, back and sides (949's look in the 2D
+ * game), leaving the face clear.
+ */
+function addHair(add, sphere, head, style, hh, hw, hd) {
   if (style === "none") return;
   // A cap over the crown and back of the head is shared by every style.
-  part(head, "hair", 0, hd * 0.06, hh * 0.82, [hw * 1.08, hd * 1.06, hh * 0.4]);
-  if (style === "bun") part(head, "hair", 0, hd * 0.5, hh * 0.86, [hw * 0.46, hd * 0.42, hh * 0.36]);
+  add(head, "hair", [0, hd * 0.1, hh * 0.68], [hw * 1.08, hd * 1.06, hh * 0.7], ROUND);
+  if (style === "bun") sphere(head, "hair", [0, hd * 0.5, hh * 0.84], hw * 0.24);
   if (style === "ponytail") {
-    part(head, "hair", 0, hd * 0.58, hh * 0.62, [hw * 0.34, hd * 0.3, hh * 0.3]);
-    part(head, "hair", 0, hd * 0.66, hh * 0.18, [hw * 0.26, hd * 0.24, hh * 0.62]);
+    sphere(head, "hair", [0, hd * 0.52, hh * 0.66], hw * 0.14);
+    add(head, "hair", [0, hd * 0.62, hh * 0.3], [hw * 0.26, hd * 0.24, hh * 0.8], roundedProfile({ taper: 0.45, bulge: 0.2, peak: 0.3 }), eulerRotation(0.18, 0, 0));
+  }
+  if (style === "curls") {
+    // Rings of curls on an ellipsoid shell; small deterministic size variation keeps the
+    // outline lumpy rather than a smooth helmet. Points facing the face are skipped.
+    const rings = [[-0.1, 11], [0.25, 11], [0.6, 9], [0.95, 6], [1.3, 3], [1.57, 1]];
+    let n = 0;
+    for (const [elevation, count] of rings)
+      for (let i = 0; i < count; i++) {
+        const azimuth = (i / count) * Math.PI * 2 + elevation * 1.7,
+          dx = Math.cos(elevation) * Math.sin(azimuth),
+          dy = Math.cos(elevation) * Math.cos(azimuth),
+          dz = Math.sin(elevation);
+        if (dy < -0.25 && elevation < 0.85) continue;
+        const size = hw * (0.17 + 0.04 * Math.sin(n++ * 2.39));
+        sphere(head, "hair", [dx * hw * 0.56, hd * 0.08 + dy * hd * 0.56, hh * 0.62 + dz * hh * 0.4], size);
+      }
   }
 }
 
@@ -359,7 +646,7 @@ export function poseHumanoid(rig, { phase = 0, amount = 0, turn = 0, accel = 0, 
     s = Math.sin(phase),
     c = Math.cos(phase);
   // Pelvis bob: lowest at double support (twice per stride), with a slight twist.
-  rig.pelvis.z = m.hipZ - 0.022 * a * (0.5 + 0.5 * Math.cos(2 * phase)) * (m.height / 1.7);
+  rig.pelvis.z = m.hipZ + rig.lift - 0.022 * a * (0.5 + 0.5 * Math.cos(2 * phase)) * (m.height / 1.7);
   setRotation(rig.pelvis, 0, 0, 0.07 * a * s);
   // Lean: resting posture, a little forward while walking, and toward the turn centre.
   const motion = rig.motion,

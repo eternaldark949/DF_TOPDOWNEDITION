@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "kind": "wardrobe",
+  "id": "freelancer.wardrobe",
+  "garments": [
+    { "id": "sports-bra", "name": "Sports bra", "slot": "top", "color": [0.05, 0.04, 0.07], "finish": "matte", "chest": [0.12, 0.42], "sleeve": "none" },
+    { "id": "crop-top", "name": "Crop top", "slot": "top", "color": [0.18, 0.1, 0.3], "finish": "satin", "chest": [0, 0.58], "sleeve": "none" },
+    { "id": "sleeved-crop", "name": "Sleeved crop top", "slot": "top", "color": [0.18, 0.1, 0.3], "finish": "satin", "chest": [0, 0.58], "sleeve": "long" },
+    { "id": "tank", "name": "Tank top", "slot": "top", "color": [0.6, 0.58, 0.55], "finish": "matte", "chest": [0, 1], "pelvis": [0, 0.3], "sleeve": "none" },
+    { "id": "tshirt", "name": "T-shirt", "slot": "top", "color": [0.08, 0.08, 0.1], "finish": "matte", "chest": [0, 1], "pelvis": [0, 0.3], "sleeve": "short" },
+    { "id": "turtleneck", "name": "Turtleneck", "slot": "top", "color": [0.03, 0.025, 0.04], "finish": "matte", "neck": [0.25, 1], "chest": [0, 1], "pelvis": [0, 0.3], "sleeve": "long" },
+    { "id": "hoodie", "name": "Hoodie", "slot": "outer", "color": [0.1, 0.08, 0.14], "finish": "matte", "thickness": 0.018, "chest": [0, 1], "pelvis": [0, 0.45], "sleeve": "long" },
+    { "id": "jacket", "name": "Jacket", "slot": "outer", "color": [0.04, 0.03, 0.05], "finish": "satin", "thickness": 0.016, "chest": [0, 1], "pelvis": [0, 0.5], "sleeve": "long" },
+    { "id": "pants", "name": "Pants", "slot": "bottom", "color": [0.04, 0.035, 0.06], "finish": "matte", "pelvis": [0, 1], "legs": "full" },
+    { "id": "leggings", "name": "Leggings", "slot": "bottom", "color": [0.02, 0.018, 0.03], "finish": "gloss", "thickness": 0.004, "pelvis": [0, 1], "legs": "full" },
+    { "id": "shorts", "name": "Shorts", "slot": "bottom", "color": [0.04, 0.035, 0.06], "finish": "matte", "pelvis": [0, 1], "legs": "shorts" },
+    { "id": "hot-pants", "name": "Hot pants", "slot": "bottom", "color": [0.04, 0.035, 0.06], "finish": "satin", "pelvis": [0.2, 1], "legs": "brief" },
+    { "id": "skirt", "name": "Skirt", "slot": "bottom", "color": [0.025, 0.018, 0.04], "finish": "satin", "skirt": { "length": 0.5, "flare": 1.5 } },
+    { "id": "pencil-skirt", "name": "Pencil skirt", "slot": "bottom", "color": [0.03, 0.025, 0.04], "finish": "satin", "skirt": { "length": 0.85, "flare": 1.02 } },
+    { "id": "long-skirt", "name": "Long skirt", "slot": "bottom", "color": [0.2, 0.03, 0.05], "finish": "satin", "skirt": { "length": 2.0, "flare": 1.5 } },
+    { "id": "thigh-highs", "name": "Thigh-highs", "slot": "legwear", "color": [0.02, 0.018, 0.03], "finish": "gloss", "thigh": [0.42, 1], "calf": [0, 1], "foot": [0, 1] },
+    { "id": "stockings", "name": "Stockings", "slot": "legwear", "color": [0.03, 0.02, 0.025], "finish": "satin", "thickness": 0.002, "pelvis": [0.25, 1], "thigh": [0, 1], "calf": [0, 1], "foot": [0, 1] },
+    { "id": "socks", "name": "Socks", "slot": "legwear", "color": [0.7, 0.68, 0.64], "finish": "matte", "calf": [0.6, 1], "foot": [0, 1] },
+    { "id": "boots", "name": "Boots", "slot": "shoes", "color": [0.05, 0.03, 0.03], "finish": "satin", "calf": [0.4, 1], "foot": [0, 1] },
+    { "id": "sneakers", "name": "Sneakers", "slot": "shoes", "color": [0.62, 0.6, 0.58], "finish": "matte", "thickness": 0.012, "calf": [0.88, 1], "foot": [0, 1] },
+    { "id": "thigh-heels", "name": "Thigh-high heels", "slot": "shoes", "color": [0.02, 0.015, 0.02], "finish": "gloss", "thigh": [0.4, 1], "calf": [0, 1], "foot": [0, 1] },
+    { "id": "gloves", "name": "Gloves", "slot": "outer", "color": [0.02, 0.018, 0.025], "finish": "satin", "thickness": 0.004, "hand": [0, 1], "forearm": [0.7, 1] }
+  ]
+}

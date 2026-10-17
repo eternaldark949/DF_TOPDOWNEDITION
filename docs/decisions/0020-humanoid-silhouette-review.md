@@ -2,7 +2,7 @@
 
 Implemented 2026-10-17 under the owner's go-ahead to begin the humanoid work. This is the review stage that [decision 0007](0007-studio-first-workspace.md#agreed-next-work-street-block-studio-presentation-and-humanoid-review) requires before surface detail: front, side, three-quarter and gameplay-camera previews with solid silhouettes, so proportions, posture, limb spacing and the backpack outline can be judged first, then readability while walking and turning.
 
-**Status:** the generator, 949's starting preset and the review page are implemented. The proportions are a proposal awaiting the owner's review. The Freelancer street slice still uses the diagnostic box traveler; swapping in the humanoid waits for approved proportions.
+**Status:** implemented, then superseded in part by [decision 0021](0021-rounded-bodies-and-garments.md). The review page, cameras, silhouette look, parameter-table pattern and `poseHumanoid` described here remain. The box body segments, the schema-1 document and the field table below are historical: generator v2 builds rounded bodies from the 2D game's canon and generates clothing. The Freelancer street slice still uses the diagnostic box traveler until the owner approves 949's look.
 
 ## Delivered boundary
 

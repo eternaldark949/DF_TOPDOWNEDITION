@@ -122,7 +122,7 @@ export class AmbientOcclusion {
     gl.viewport(0,0,t.width,t.height);gl.bindFramebuffer(gl.FRAMEBUFFER,t.framebuffers[0]);
     gl.enable(gl.DEPTH_TEST);gl.clearColor(0.5,0.5,1,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
     gl.useProgram(this.normalProgram);gl.uniformMatrix4fv(this.normalCamera,false,r.camera.matrix);
-    gl.bindVertexArray(batch.vao);gl.drawArraysInstanced(gl.TRIANGLES,0,36,batch.count);gl.bindVertexArray(null);
+    const geometryDraws=batch.draw();
     gl.bindFramebuffer(gl.FRAMEBUFFER,t.framebuffers[1]);gl.disable(gl.DEPTH_TEST);
     gl.useProgram(this.screenProgram);this.texture(0,t.depth);this.texture(1,t.normal);
     gl.uniform1i(this.screenUniforms.uDepth,0);gl.uniform1i(this.screenUniforms.uNormals,1);
@@ -132,8 +132,8 @@ export class AmbientOcclusion {
     gl.uniform1f(this.screenUniforms.uRadius,this.settings.radius);gl.drawArrays(gl.TRIANGLES,0,3);
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.enable(gl.DEPTH_TEST);
     gl.viewport(0,0,r.canvas.width,r.canvas.height);
-    // Count both submissions, but only the geometry pass submits world instances.
-    r.stats.draws+=2;r.totals.draws+=2;r.stats.instances+=batch.count;r.totals.instances+=batch.count;
+    // Count every submission, but only the geometry pass submits world instances.
+    r.stats.draws+=geometryDraws+1;r.totals.draws+=geometryDraws+1;r.stats.instances+=batch.count;r.totals.instances+=batch.count;
     return true;
   }
 

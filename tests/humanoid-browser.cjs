@@ -80,14 +80,33 @@ const server = http.createServer((req, res) => {
     assert.equal(exported.kind, "humanoid");
     await page.getByRole("button", { name: "Undo" }).click();
     await page.waitForFunction(() => document.querySelector("#status").dataset.height === "1.68");
-    // An impossible combination is reported and leaves the figures unchanged.
-    const hips = page.getByLabel("Hip width (m)", { exact: true });
-    await hips.fill("0.24");
-    await hips.press("Enter");
-    await page.waitForFunction(() => /Thighs|Waist/.test(document.querySelector("#problem").textContent));
+    // An impossible combination is reported and leaves the figures unchanged: long legs
+    // are valid alone, but with a long neck the big head leaves no room for a torso.
+    const legs = page.getByLabel("Leg length (× height)", { exact: true });
+    await legs.fill("0.6");
+    await legs.press("Enter");
+    await page.waitForFunction(() => document.querySelector("#problem").textContent === "");
+    const neck = page.getByLabel("Neck length (× height)", { exact: true });
+    await neck.fill("0.08");
+    await neck.press("Enter");
+    await page.waitForFunction(() => /no room for a torso/.test(document.querySelector("#problem").textContent));
     assert.equal((await status()).height, "1.68");
+    await page.getByRole("button", { name: "Undo" }).click();
+    // Outfit: choosing a garment rebuilds with more parts; generating draws a full outfit.
+    const before = Number((await status()).parts);
+    await page.getByLabel("Outfit outer", { exact: true }).selectOption("jacket");
+    await page.waitForFunction((n) => Number(document.querySelector("#status").dataset.parts) > n, before);
+    await page.getByRole("button", { name: "Generate outfit" }).click();
+    await page.waitForFunction(() => document.querySelector("#problem").textContent === "");
+    for (const slot of ["top", "bottom", "shoes"]) assert.notEqual(await page.getByLabel(`Outfit ${slot}`, { exact: true }).inputValue(), "");
+    await page.getByLabel("Body canon", { exact: true }).selectOption("male");
+    await page.getByLabel("Build", { exact: true }).selectOption("heavy");
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: path.join(root, "artifacts/humanoid-generated-outfit.png") });
+    await page.getByRole("button", { name: "Reset" }).click();
+    await page.waitForFunction(() => document.querySelector("#status").dataset.height === "1.68");
     await page.locator("#toggle-panel").click();
-    console.log("Humanoid: proportion edit / export / undo / invalid refusal");
+    console.log("Humanoid: proportion edit / export / undo / invalid refusal / outfit edits");
 
     // Gameplay camera at true scale and close-up, both looks; repeated switching is bounded.
     await page.locator("nav [data-mode=gameplay]").click();
@@ -120,12 +139,12 @@ const server = http.createServer((req, res) => {
     report.pixels = await p.evaluate(async () => {
       const { ETRNLNINE } = await import("/engine/etrnlnine.js"),
         { createHumanoidReview } = await import("/games/freelancer/humanoid/review.js"),
-        { STELLA_949 } = await import("/games/freelancer/humanoid/preset.js");
+        { STELLA_949, FREELANCER_WARDROBE } = await import("/games/freelancer/humanoid/preset.js");
       const canvas = document.createElement("canvas");
       canvas.style.cssText = "width:640px;height:360px;display:block";
       document.body.append(canvas);
       const engine = new ETRNLNINE(canvas, { pixelRatio: 1 }),
-        review = createHumanoidReview(engine, { document: STELLA_949 }),
+        review = createHumanoidReview(engine, { document: STELLA_949, wardrobe: FREELANCER_WARDROBE }),
         gl = engine.basement.renderer.gl;
       /** Count dark (figure) pixels in each quarter of the turnaround. */
       const frame = () => {
@@ -150,33 +169,52 @@ const server = http.createServer((req, res) => {
       taller.parameters.height = 1.95;
       review.setDocument(taller);
       const tall = frame();
-      const unpacked = structuredClone(STELLA_949);
-      unpacked.parameters.backpack = false;
-      review.setDocument(unpacked);
+      // 949's preset carries no pack (as in the 2D game); add one to measure its outline.
+      const packed = structuredClone(STELLA_949);
+      packed.parameters.backpack = true;
+      review.setDocument(packed);
+      const withPack = frame();
+      review.setDocument(STELLA_949);
       const noPack = frame();
+      // Context loss and restoration rebuild both instance streams and the rounded mesh
+      // from retained data: the restored frame must match the one before the loss.
+      const lose = gl.getExtension("WEBGL_lose_context");
+      let restored = null;
+      if (lose) {
+        const back = new Promise((r) => canvas.addEventListener("webglcontextrestored", r, { once: true }));
+        lose.loseContext();
+        await new Promise((r) => setTimeout(r, 50));
+        lose.restoreContext();
+        await back;
+        restored = frame();
+      }
       review.dispose();
       const r = engine.basement.renderer.stats;
       const after = { buffers: r.buffers, worlds: engine.directory.worlds.size };
       engine.dispose();
-      return { preset, tall, noPack, after, final: { buffers: r.buffers, programs: r.programs, vaos: r.vaos } };
+      return { preset, tall, noPack, withPack, restored, after, final: { buffers: r.buffers, programs: r.programs, vaos: r.vaos } };
     });
-    const { preset, tall, noPack, after, final } = report.pixels,
+    const { preset, tall, noPack, withPack, restored, after, final } = report.pixels,
       sum = (c) => c.reduce((a, b) => a + b, 0);
     // A solid silhouette: every view has figure pixels on a mostly pale card.
     for (const count of preset.columns) assert.ok(count > 400, `each view is drawn (${preset.columns})`);
     assert.ok(preset.pale > preset.total * 0.6, "silhouette card dominates the frame");
     // At this wide aspect the lineup width sets the frame, so scale is fixed and a
     // taller figure must cover more pixels; removing the pack must cover fewer.
-    assert.ok(sum(noPack.columns) < sum(preset.columns), "removing the pack shrinks the outline");
+    assert.deepEqual(noPack.columns, preset.columns, "rebuilding the same document is deterministic");
+    assert.ok(restored, "WEBGL_lose_context is available in this browser");
+    assert.deepEqual(restored.columns, preset.columns, "context restoration rebuilds rounded shapes exactly");
+    assert.ok(sum(noPack.columns) < sum(withPack.columns), "removing the pack shrinks the outline");
     // The side view (third column) loses the most when the pack is removed.
-    const loss = preset.columns.map((n, i) => n - noPack.columns[i]);
+    const loss = withPack.columns.map((n, i) => n - noPack.columns[i]);
     assert.ok(loss[2] >= Math.max(loss[0], loss[3]) * 0.5, `pack reads in profile (${loss})`);
     assert.ok(sum(tall.columns) > sum(preset.columns) * 1.1, "height edits reach the outline");
-    // Only the renderer's own unit cube remains once the review releases its lease/guides.
-    assert.deepEqual(after, { buffers: 1, worlds: 0 });
+    // Only the renderer's own meshes remain once the review releases its lease/guides:
+    // the unit cube plus the rounded mesh's vertex and index buffers.
+    assert.deepEqual(after, { buffers: 3, worlds: 0 });
     assert.deepEqual(final, { buffers: 0, programs: 0, vaos: 0 });
     assert.deepEqual(errors, []);
-    console.log("Humanoid pixel metrics", JSON.stringify({ preset: preset.columns, noPack: noPack.columns, tall: tall.columns }));
+    console.log("Humanoid pixel metrics", JSON.stringify({ preset: preset.columns, withPack: withPack.columns, tall: tall.columns }));
     fs.writeFileSync(path.join(root, "artifacts/humanoid-results.json"), JSON.stringify(report, null, 2) + "\n");
     console.log("Humanoid review acceptance passed");
   } finally {

@@ -1,6 +1,6 @@
 # ETRNLNINE — Engine foundation plan
 
-**Status: foundation, two-world flitting, integrated profiler, ambient occlusion, lighting/shadows, HDR bloom, linked material editing, Studio authoring tools, the first Freelancer street/doorway slice, and the procedural humanoid's silhouette review stage implemented; broader engine work remains planned.**
+**Status: foundation, two-world flitting, integrated profiler, ambient occlusion, lighting/shadows, HDR bloom, linked material editing, Studio authoring tools, the first Freelancer street/doorway slice, and the procedural humanoid with rounded bodies and generated clothing implemented; broader engine work remains planned.**
 
 **Owner: ETERNAL / @eternaldark949.**
 
@@ -16,7 +16,7 @@ The branch was intentionally created with only this plan. On 2026-10-15, after r
 
 **Studio direction and roadmap:** [3D engine, universal Studio, authored JSON and offline packaging](docs/decisions/0006-studio-3d-and-authored-data.md). The first edit/save/play workspace is now implemented; the first recreated street/vestibule slice is now implemented.
 
-**Humanoid review:** [procedural humanoid and silhouette review stage](docs/decisions/0020-humanoid-silhouette-review.md) · [previews and verification](docs/milestones/humanoid/README.md). 949's proportions await the owner's review.
+**Humanoid review:** [silhouette review stage](docs/decisions/0020-humanoid-silhouette-review.md) · [rounded bodies and generated clothing](docs/decisions/0021-rounded-bodies-and-garments.md) · [previews and verification](docs/milestones/humanoid/README.md). 949's look and outfit await the owner's review.
 
 **Origins, locks and number surfaces:** [origin-first components, selectable locks and precise sliders](docs/decisions/0019-origins-locks-and-number-surfaces.md) · [previews and verification](docs/milestones/origins-and-controls/README.md).
 

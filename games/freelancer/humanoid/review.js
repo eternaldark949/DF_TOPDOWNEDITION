@@ -1,6 +1,6 @@
-/** Freelancer / humanoid silhouette review. Composes the generic Penthouse humanoid with
- * 949's preset, review cameras and solid-silhouette presentation, as agreed in decision
- * 0007: front, side, three-quarter and gameplay-camera views before surface detail.
+/** Freelancer / humanoid review. Composes the generic Penthouse humanoid with 949's
+ * preset, the Freelancer wardrobe, review cameras and solid-silhouette presentation, as
+ * agreed in decision 0007: front, side, three-quarter and gameplay-camera views.
  *
  * Ownership: one adopted world, one renderer batch lease, one guide line layer and the
  * Lobby callbacks below all belong to this session's Lifetime. Rebuilding proportions
@@ -9,6 +9,7 @@
 import { Lifetime } from "../../../engine/basement/lifetime.js";
 import { createMaterial, updateMaterial } from "../../../engine/basement/material.js";
 import { poseHumanoid, validateHumanoid } from "../../../engine/penthouse/humanoid.js";
+import { resolveOutfit } from "../../../engine/penthouse/garments.js";
 import { box } from "../../../engine/penthouse/toys.js";
 import { FREELANCER_PROJECT } from "../project.js";
 
@@ -39,7 +40,7 @@ function isWithin(entity, root) {
  * Create the review. `document` is a validated humanoid document; options.onStatus
  * receives copied scalars for UI/tests. Returns a controller for mode/pose/document edits.
  */
-export function createHumanoidReview(engine, { document, onStatus = () => {} }) {
+export function createHumanoidReview(engine, { document, wardrobe, onStatus = () => {} }) {
   const life = new Lifetime(),
     { basement, lobby, directory } = engine,
     renderer = basement.renderer,
@@ -92,9 +93,9 @@ export function createHumanoidReview(engine, { document, onStatus = () => {} }) 
     for (const rig of state.rigs) rig.dispose();
     state.walker?.dispose();
     state.rigs = REVIEW_VIEWS.map((view) =>
-      directory.create("toy.humanoid", { world, document: state.document, yaw: view.yaw }),
+      directory.create("toy.humanoid", { world, document: state.document, wardrobe, yaw: view.yaw }),
     );
-    state.walker = directory.create("toy.humanoid", { world, document: state.document });
+    state.walker = directory.create("toy.humanoid", { world, document: state.document, wardrobe });
     applyLook();
     layout();
   }
@@ -276,9 +277,15 @@ export function createHumanoidReview(engine, { document, onStatus = () => {} }) 
       return state.document;
     },
     inspect,
+    get wardrobe() {
+      return wardrobe;
+    },
     /** Validate before replacing; an invalid candidate leaves the current figures intact. */
     setDocument(candidate) {
       const next = validateHumanoid(candidate);
+      // Resolve the outfit first too, so a garment missing from the wardrobe is refused
+      // before any figure is removed.
+      resolveOutfit(next.outfit, wardrobe);
       state.document = next;
       rebuild();
       return next;

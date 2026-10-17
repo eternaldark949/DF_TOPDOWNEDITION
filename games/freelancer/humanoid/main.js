@@ -1,11 +1,14 @@
 /** Freelancer / standalone humanoid review page. Review UI stays here, never in the engine.
+ * The outfit section edits the document's outfit list against the Freelancer wardrobe;
+ * "Generate outfit" draws one at random from it with a small colour palette.
  * Proportion edits validate a candidate document before replacing the figures; the
  * authored JSON in content/humanoid-949.json changes only when the owner saves an export. */
 import { ETRNLNINE } from "../../../engine/etrnlnine.js";
 import { Lifetime } from "../../../engine/basement/lifetime.js";
 import { NumberControl } from "../../../engine/penthouse/number-control.js";
 import { HUMANOID_PARAMETERS, HUMANOID_CHOICES } from "../../../engine/penthouse/humanoid.js";
-import { STELLA_949 } from "./preset.js";
+import { GARMENT_SLOTS, generateOutfit } from "../../../engine/penthouse/garments.js";
+import { STELLA_949, FREELANCER_WARDROBE } from "./preset.js";
 import { createHumanoidReview } from "./review.js";
 
 const $ = (id) => document.getElementById(id),
@@ -41,9 +44,10 @@ function buildPanel(host) {
   problem.id = "problem";
   problem.setAttribute("role", "status");
   /** Apply one candidate; an invalid combination is reported and leaves the figures. */
-  const apply = (patch) => {
+  const apply = (patch, outfit = null) => {
     const candidate = structuredClone(review.document);
     Object.assign(candidate.parameters, patch);
+    if (outfit) candidate.outfit = outfit;
     try {
       review.setDocument(candidate);
       problem.textContent = "";
@@ -61,7 +65,10 @@ function buildPanel(host) {
       else if (control.type === "checkbox") control.checked = p[key];
       else control.value = p[key];
     }
+    for (const [slot, select] of outfitControls)
+      select.value = review.document.outfit.find((e) => FREELANCER_WARDROBE.garments.get(e.garment)?.slot === slot)?.garment ?? "";
   };
+  const outfitControls = new Map();
   const remember = (document) => {
     history.push(document);
     if (history.length > HISTORY_LIMIT) history.shift();
@@ -102,33 +109,69 @@ function buildPanel(host) {
     controls.set(d.key, control);
     panel.own(() => control.dispose());
   }
-  // Discrete outline choices.
+  // Discrete choices: string options become selects, booleans become checkboxes.
   const heading = document.createElement("h2");
-  heading.textContent = "Outline";
+  heading.textContent = "Body and outline";
   host.append(heading);
-  const hairLabel = document.createElement("label");
-  hairLabel.textContent = "Hair volume";
-  const hair = document.createElement("select");
-  hair.setAttribute("aria-label", "Hair volume");
-  for (const option of HUMANOID_CHOICES.hair) hair.append(new Option(option, option));
-  hair.value = review.document.parameters.hair;
-  host.append(hairLabel, hair);
-  controls.set("hair", hair);
-  panel.listen(hair, "change", () => {
+  const choiceLabels = { gender: "Body canon", build: "Build", hair: "Hair", backpack: "Wear backpack" };
+  for (const [key, options] of Object.entries(HUMANOID_CHOICES)) {
+    const label = document.createElement("label");
+    let control;
+    if (options.every((o) => typeof o === "boolean")) {
+      control = document.createElement("input");
+      control.type = "checkbox";
+      control.checked = review.document.parameters[key];
+      label.append(control, choiceLabels[key] ?? key);
+      host.append(label);
+    } else {
+      label.textContent = choiceLabels[key] ?? key;
+      control = document.createElement("select");
+      control.setAttribute("aria-label", choiceLabels[key] ?? key);
+      for (const option of options) control.append(new Option(option, option));
+      control.value = review.document.parameters[key];
+      host.append(label, control);
+    }
+    controls.set(key, control);
+    panel.listen(control, "change", () => {
+      const previous = review.document;
+      if (apply({ [key]: control.type === "checkbox" ? control.checked : control.value })) remember(previous);
+      refresh();
+    });
+  }
+  // Outfit: one garment per slot from the wardrobe. Garments carry their own colour.
+  const outfitHeading = document.createElement("h2");
+  outfitHeading.textContent = "Outfit";
+  host.append(outfitHeading);
+  const slots = Object.keys(GARMENT_SLOTS),
+    /** Current outfit with `slot` replaced by `garment` (or removed when empty). */
+    withSlot = (slot, garment) => {
+      const kept = review.document.outfit.filter((e) => FREELANCER_WARDROBE.garments.get(e.garment)?.slot !== slot);
+      return garment ? [...kept, { garment }] : kept;
+    };
+  for (const slot of slots) {
+    const label = document.createElement("label"),
+      select = document.createElement("select");
+    label.textContent = slot[0].toUpperCase() + slot.slice(1);
+    select.setAttribute("aria-label", `Outfit ${slot}`);
+    select.append(new Option("None", ""));
+    for (const g of FREELANCER_WARDROBE.garments.values()) if (g.slot === slot) select.append(new Option(g.name, g.id));
+    host.append(label, select);
+    outfitControls.set(slot, select);
+    panel.listen(select, "change", () => {
+      const previous = review.document;
+      if (apply({}, withSlot(slot, select.value))) remember(previous);
+      refresh();
+    });
+  }
+  const generate = document.createElement("button");
+  generate.textContent = "Generate outfit";
+  const generateRow = document.createElement("div");
+  generateRow.className = "row";
+  generateRow.append(generate);
+  host.append(generateRow);
+  panel.listen(generate, "click", () => {
     const previous = review.document;
-    if (apply({ hair: hair.value })) remember(previous);
-    refresh();
-  });
-  const packLabel = document.createElement("label"),
-    pack = document.createElement("input");
-  pack.type = "checkbox";
-  pack.checked = review.document.parameters.backpack;
-  packLabel.append(pack, "Wear backpack");
-  host.append(packLabel);
-  controls.set("backpack", pack);
-  panel.listen(pack, "change", () => {
-    const previous = review.document;
-    if (apply({ backpack: pack.checked })) remember(previous);
+    if (apply({}, generateOutfit(FREELANCER_WARDROBE, { colors: OUTFIT_COLOURS }))) remember(previous);
     refresh();
   });
   // Document actions.
@@ -162,8 +205,15 @@ function buildPanel(host) {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
   panel.own(() => host.replaceChildren());
+  refresh();
   return () => panel.dispose();
 }
+
+/** Linear-RGB colours "Generate outfit" draws from: Freelancer's night palette. */
+const OUTFIT_COLOURS = Object.freeze([
+  [0.02, 0.018, 0.03], [0.18, 0.1, 0.3], [0.32, 0.05, 0.08], [0.05, 0.12, 0.2], [0.6, 0.58, 0.55],
+  [0.45, 0.3, 0.12], [0.08, 0.2, 0.12], [0.5, 0.18, 0.32], [0.04, 0.035, 0.06], [0.72, 0.5, 0.1],
+]);
 
 try {
   engine = new ETRNLNINE($("world"), {
@@ -174,6 +224,7 @@ try {
   life.own(() => engine.dispose());
   review = createHumanoidReview(engine, {
     document: STELLA_949,
+    wardrobe: FREELANCER_WARDROBE,
     onStatus: (s) => {
       $("status").textContent = `${s.figures} figures · ${s.parts} parts each · ${s.instances} visible forms · ${s.draws} draws · WebGL2`;
       Object.assign($("status").dataset, s);

@@ -4,17 +4,22 @@
  * remain separate. PCF has a fixed kernel; it is not area-light penumbra simulation.
  */
 import { ROTATION_GLSL } from './rotation.js';
+import { SHAPE_GLSL } from './rounded-shapes.js';
 
 export const SHADOW_VERTEX=`#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPosition;
+layout(location=1) in vec3 aNormal; // rounded-mesh parameters; unused by boxes here
 layout(location=2) in vec4 aPose;
 layout(location=3) in vec4 aSize;
 layout(location=5) in vec4 aRotation;
 uniform mat4 uLightMatrix;
 ${ROTATION_GLSL}
+${SHAPE_GLSL}
 void main(){
-  vec3 p=rotateByQuaternion(aRotation,aPosition*aSize.xyz);
+  // Same placement as the lit pass, so rounded casters shadow with their real outline.
+  vec3 local,normal;shapeVertex(aPosition,aNormal,aPose,aSize,local,normal);
+  vec3 p=rotateByQuaternion(aRotation,local);
   gl_Position=uLightMatrix*vec4(p+aPose.xyz,1.0);
 }`;
 

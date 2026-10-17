@@ -1,5 +1,6 @@
 /**
- * Basement / shaders: GPU-native instanced boxes and inexpensive surface lighting.
+ * Basement / shaders: GPU-native instanced boxes and rounded shapes, with inexpensive
+ * surface lighting. shapeVertex() (rounded-shapes.js) places both primitives.
  * Optional ambient visibility is supplied by the Basement occlusion capability.
  * No Canvas preparation, font atlas or external assets.
  * This is the first renderer material, not a full PBR material system.
@@ -7,12 +8,13 @@
 import { AMBIENT_VISIBILITY } from './occlusion-shaders.js';
 import { SHADOW_VISIBILITY } from './shadow-shaders.js';
 import { ROTATION_GLSL } from './rotation.js';
+import { SHAPE_GLSL } from './rounded-shapes.js';
 
 export const VERTEX = `#version 300 es
 precision highp float;
-layout(location=0) in vec3 aPosition;
+layout(location=0) in vec3 aPosition; // box corner, or rounded-mesh parameters
 layout(location=1) in vec3 aNormal;
-// Per-instance layout, documented in renderer.js: pose, dimensions/emission, color.
+// Per-instance layout, documented in renderer.js: pose/taper, dimensions/profile, color.
 layout(location=2) in vec4 aPose;
 layout(location=3) in vec4 aSize;
 layout(location=4) in vec4 aColor;
@@ -21,6 +23,7 @@ layout(location=6) in vec4 aEmission; // linear emissive radiance / sharpness
 layout(location=7) in vec4 aSpecular; // tint / normal-incidence reflectance
 uniform mat4 uViewProjection;
 ${ROTATION_GLSL}
+${SHAPE_GLSL}
 out vec3 vWorld;
 out vec3 vNormal;
 out vec3 vColor;
@@ -29,8 +32,9 @@ flat out vec4 vSpecular;
 flat out float vSharpness;
 out float vHighlight;
 void main() {
-  vec3 p=rotateByQuaternion(aRotation,aPosition*aSize.xyz)+aPose.xyz;
-  vWorld=p;vNormal=rotateByQuaternion(aRotation,aNormal);
+  vec3 local,normal;shapeVertex(aPosition,aNormal,aPose,aSize,local,normal);
+  vec3 p=rotateByQuaternion(aRotation,local)+aPose.xyz;
+  vWorld=p;vNormal=rotateByQuaternion(aRotation,normal);
   vColor = aColor.rgb;
   vEmission = aEmission.rgb;vHighlight=aColor.w;
   vSpecular=aSpecular;vSharpness=aEmission.w;
