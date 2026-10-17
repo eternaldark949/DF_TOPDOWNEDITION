@@ -81,3 +81,7 @@ need no geometry asset. `locked` affects editing, `selectable` viewport picking,
 `visible` visual rendering; hidden colliders remain independent. Older files upgrade
 at ingress. See [the full contract](../../docs/decisions/0019-origins-locks-and-number-surfaces.md) for linked/unique geometry, inherited locks,
 precise slider/number fields and explicit remaining mesh/light-component limits.
+
+## Humanoid silhouette review
+
+`content/humanoid-949.json` holds Stella / 949's proportions, posture, backpack and palette for the generic Penthouse humanoid. It is a starting proposal for review. Open `dist/ETRNLNINE-Humanoid-Review.html` to see front, three-quarter, side and back figures plus the gameplay camera, in shaded or solid-silhouette looks, standing or walking. The **Proportions** panel edits every parameter with undo; **Export JSON** downloads a replacement for the content file. Lengths are metres, angles radians and fractions are of standing height; [decision 0020](../../docs/decisions/0020-humanoid-silhouette-review.md#document-fields) lists every field and its limits. The street scene still uses the diagnostic traveler until the proportions are approved.

@@ -3996,8 +3996,420 @@ function actor({ world, color = [0.42,0.34,0.58], bagColor = [0.54,0.30,0.17] })
 
 return {box,pavilion,actor};
 })();
-// Source: engine/penthouse/controls.js
+// Source: engine/penthouse/humanoid.js
 const module42=(()=>{
+/**
+ * Penthouse / procedural humanoid: a reusable articulated mannequin for proportion review.
+ *
+ * Ownership: this toy builds an invisible joint hierarchy and box body segments through
+ * World only. It owns no scheduler, GPU resource or game identity. Games supply the
+ * parameter/palette document (for example Freelancer's 949 preset) and decide when to
+ * pose it; Lobby phases call poseHumanoid() through the game's registered callbacks.
+ *
+ * Units: metres, radians and linear RGB. Axes follow World: x right, y back, z up.
+ * A humanoid faces local -Y, matching the planar motor's heading convention.
+ *
+ * Status: the silhouette-review stage agreed in decision 0007 (recorded in 0020). Segments are
+ * oriented boxes with two-part tapers; there is no mesh, skinning, IK, cloth or hair
+ * simulation yet. Proportions and posture are the subject, not surface detail.
+ */
+const { createMaterial } = module41;
+const { eulerRotation } = module4;
+
+/** Bump when the generated skeleton or the meaning of a parameter changes. */
+const HUMANOID_GENERATOR_VERSION = 1;
+
+/**
+ * One table drives validation, review sliders and documentation, so a new parameter
+ * cannot be accepted by one surface and ignored by another. `slider` is the useful
+ * interactive span; min/max are hard limits. Fractions are of total standing height.
+ */
+const HUMANOID_PARAMETERS = Object.freeze(
+  [
+    // Overall scale and the vertical division of the body.
+    ["height", "Height", "m", 1.2, 2.2, 1.45, 2.0, "Body"],
+    ["headHeight", "Head height", "× height", 0.1, 0.2, 0.115, 0.16, "Body"],
+    ["legLength", "Leg length", "× height", 0.4, 0.6, 0.44, 0.56, "Body"],
+    ["armLength", "Arm length", "× height", 0.35, 0.5, 0.38, 0.47, "Body"],
+    ["neckLength", "Neck length", "× height", 0.02, 0.08, 0.025, 0.065, "Body"],
+    // Horizontal masses. Widths are full extents, not half-widths.
+    ["shoulderWidth", "Shoulder width", "m", 0.25, 0.55, 0.3, 0.48, "Torso"],
+    ["chestDepth", "Chest depth", "m", 0.14, 0.34, 0.16, 0.3, "Torso"],
+    ["waistWidth", "Waist width", "m", 0.18, 0.45, 0.2, 0.4, "Torso"],
+    ["hipWidth", "Hip width", "m", 0.24, 0.5, 0.26, 0.44, "Torso"],
+    ["headWidth", "Head width", "× head height", 0.6, 0.95, 0.66, 0.88, "Torso"],
+    // Limb thickness at the root of each segment; the far half tapers by `limbTaper`.
+    ["upperArm", "Upper arm", "m", 0.06, 0.16, 0.065, 0.13, "Limbs"],
+    ["forearm", "Forearm", "m", 0.05, 0.13, 0.055, 0.11, "Limbs"],
+    ["thigh", "Thigh", "m", 0.1, 0.24, 0.11, 0.21, "Limbs"],
+    ["calf", "Calf", "m", 0.07, 0.17, 0.08, 0.15, "Limbs"],
+    ["limbTaper", "Limb taper", "far / near", 0.55, 1, 0.6, 0.95, "Limbs"],
+    ["footLength", "Foot length", "× height", 0.12, 0.18, 0.13, 0.17, "Limbs"],
+    ["stance", "Stance width", "m", 0, 0.2, 0, 0.16, "Limbs"],
+    // Posture is a resting attitude; gait adds bounded motion on top of it.
+    ["spineLean", "Spine lean", "rad", -0.2, 0.3, -0.1, 0.2, "Posture"],
+    ["headTilt", "Head tilt", "rad", -0.3, 0.3, -0.2, 0.2, "Posture"],
+    ["armSpread", "Arm spread", "rad", 0, 0.4, 0.02, 0.3, "Posture"],
+    // Carried load: dimensions describe the outline; mass shapes secondary motion only.
+    ["backpackWidth", "Pack width", "m", 0.2, 0.6, 0.24, 0.52, "Backpack"],
+    ["backpackHeight", "Pack height", "m", 0.25, 0.75, 0.3, 0.66, "Backpack"],
+    ["backpackDepth", "Pack depth", "m", 0.1, 0.4, 0.12, 0.34, "Backpack"],
+    ["backpackDrop", "Pack drop", "m", -0.1, 0.3, -0.05, 0.22, "Backpack"],
+    ["backpackMass", "Pack mass", "kg", 0, 30, 0, 24, "Backpack"],
+  ].map(([key, label, unit, min, max, low, high, group]) =>
+    Object.freeze({ key, label, unit, min, max, slider: [low, high], group }),
+  ),
+);
+
+/** Discrete outline choices. Hair styles are silhouette volumes, not strand simulation. */
+const HUMANOID_CHOICES = Object.freeze({
+  hair: Object.freeze(["none", "short", "bun", "ponytail"]),
+  backpack: Object.freeze([true, false]),
+});
+
+/** Material slots a game palette must fill. Thigh-high legwear has its own slot. */
+const HUMANOID_PALETTE_SLOTS = Object.freeze([
+  "skin",
+  "hair",
+  "top",
+  "bottoms",
+  "legwear",
+  "shoes",
+  "bag",
+  "strap",
+]);
+
+/**
+ * Validate a complete humanoid document without filling defaults or mutating input.
+ * The returned object is a frozen deep copy, so later UI edits cannot alter a
+ * validated preset in place; edits validate a new candidate instead.
+ */
+function validateHumanoid(document) {
+  if (!document || typeof document !== "object")
+    throw new TypeError("Humanoid document must be an object");
+  if (document.schemaVersion !== 1 || document.kind !== "humanoid")
+    throw new Error("Expected a schema-1 humanoid document");
+  if (document.generatorVersion !== HUMANOID_GENERATOR_VERSION)
+    throw new Error(
+      `Humanoid generator ${document.generatorVersion} is not installed`,
+    );
+  for (const key of ["id", "name"])
+    if (typeof document[key] !== "string" || !document[key].length || document[key].length > 80)
+      throw new Error(`Humanoid ${key} must contain 1–80 characters`);
+  const p = document.parameters,
+    palette = document.palette;
+  if (!p || typeof p !== "object") throw new Error("Missing humanoid parameters");
+  const known = new Set([
+    ...HUMANOID_PARAMETERS.map((d) => d.key),
+    ...Object.keys(HUMANOID_CHOICES),
+  ]);
+  for (const key of Object.keys(p))
+    if (!known.has(key)) throw new Error(`Unknown humanoid parameter: ${key}`);
+  for (const d of HUMANOID_PARAMETERS)
+    if (!Number.isFinite(p[d.key]) || p[d.key] < d.min || p[d.key] > d.max)
+      throw new RangeError(`${d.label} must be ${d.min}–${d.max} ${d.unit}`);
+  for (const [key, options] of Object.entries(HUMANOID_CHOICES))
+    if (!options.includes(p[key]))
+      throw new RangeError(`${key} must be one of ${options.join(", ")}`);
+  if (!palette || typeof palette !== "object") throw new Error("Missing palette");
+  for (const key of Object.keys(palette))
+    if (!HUMANOID_PALETTE_SLOTS.includes(key))
+      throw new Error(`Unknown palette slot: ${key}`);
+  for (const slot of HUMANOID_PALETTE_SLOTS) {
+    const c = palette[slot];
+    if (!Array.isArray(c) || c.length !== 3 || !c.every((n) => Number.isFinite(n) && n >= 0 && n <= 1))
+      throw new RangeError(`Palette ${slot} needs three linear RGB values in 0–1`);
+  }
+  // Cross-parameter limits keep the body physically assemblable: arms must not
+  // collapse into the torso and the hips must hold both thighs without overlap.
+  if (p.thigh * 2 > p.hipWidth + 0.04)
+    throw new RangeError("Thighs are wider than the hips can hold");
+  if (p.waistWidth > Math.max(p.shoulderWidth, p.hipWidth))
+    throw new RangeError("Waist must not exceed both shoulders and hips");
+  if (p.headHeight + p.neckLength + p.legLength > 0.8)
+    throw new RangeError("Head, neck and legs leave no room for a torso");
+  return deepFreeze(structuredClone(document));
+}
+
+/** Freeze nested authored data once at validation, rather than at every read. */
+function deepFreeze(value) {
+  if (value && typeof value === "object") {
+    for (const child of Object.values(value)) deepFreeze(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+/**
+ * Derive joint positions and segment sizes from validated parameters. Pure data: the
+ * same function serves construction, tests and any future rig/IK consumer.
+ * All z values are measured from the ground in the rest pose.
+ */
+function humanoidMeasurements(p) {
+  const H = p.height,
+    head = p.headHeight * H,
+    neck = p.neckLength * H,
+    foot = { length: p.footLength * H, height: 0.035 * H },
+    hipZ = p.legLength * H,
+    // Knee sits slightly above the leg's midpoint, as on a real skeleton.
+    thighLength = (hipZ - foot.height) * 0.52,
+    shinLength = hipZ - foot.height - thighLength,
+    chinZ = H - head,
+    shoulderZ = chinZ - neck,
+    // The waist joint divides the trunk; the chest above it carries shoulders and pack.
+    waistZ = hipZ + (shoulderZ - hipZ) * 0.42,
+    arm = p.armLength * H,
+    hand = arm * 0.22,
+    upperArmLength = (arm - hand) * 0.53,
+    forearmLength = arm - hand - upperArmLength;
+  return {
+    height: H,
+    head: { height: head, width: head * p.headWidth, depth: head * 0.92 },
+    neck: { length: neck, width: Math.max(0.07, head * 0.42) },
+    hipZ,
+    waistZ,
+    shoulderZ,
+    chinZ,
+    hipSpacing: p.hipWidth / 2 - p.thigh / 2 + p.stance / 2,
+    // Arm centres sit just inside the deltoid width, outside the narrower upper chest.
+    shoulderSpacing: p.shoulderWidth / 2 - p.upperArm * 0.42,
+    thighLength,
+    shinLength,
+    upperArmLength,
+    forearmLength,
+    hand: { length: hand, width: p.forearm * 0.95, depth: p.forearm * 0.45 },
+    foot,
+    pelvis: { width: p.hipWidth, depth: p.chestDepth * 0.95, height: (waistZ - hipZ) * 1.25 },
+    chest: { width: p.shoulderWidth, depth: p.chestDepth, height: shoulderZ - waistZ },
+    backpack: {
+      width: p.backpackWidth,
+      height: p.backpackHeight,
+      depth: p.backpackDepth,
+      // Top of the pack sits at the shoulder line, lowered by the authored drop.
+      top: shoulderZ - waistZ - p.backpackDrop,
+    },
+  };
+}
+
+/**
+ * Build one humanoid in `world`. Returns a rig whose `root` owns every descendant,
+ * so `world.remove(rig.root)` (or rig.dispose()) removes the whole figure.
+ * Options: x/y/yaw place the root; `materials` may share live per-slot materials;
+ * otherwise private materials are created from the document palette.
+ */
+function createHumanoid({ world, document, x = 0, y = 0, yaw = 0, materials = null }) {
+  // Always validate: frozen data is not proof that it passed this generator's rules.
+  const doc = validateHumanoid(document),
+    p = doc.parameters,
+    m = humanoidMeasurements(p),
+    slots =
+      materials ??
+      Object.fromEntries(
+        HUMANOID_PALETTE_SLOTS.map((slot) => [slot, createMaterial({ baseColor: doc.palette[slot] })]),
+      );
+  const parts = [],
+    root = world.create({ x, y, yaw });
+  /** Invisible pivot: shape-less entities cost no GPU instance. */
+  const joint = (parent, px, py, pz) => world.create({ parent, x: px, y: py, z: pz });
+  /** One visible box, recorded with its slot so materials can be overridden together. */
+  const part = (parent, slot, px, py, pz, size) => {
+    const entity = world.create({
+      parent,
+      x: px,
+      y: py,
+      z: pz,
+      shape: { size, material: slots[slot], ambientBlocker: false, castShadow: true },
+    });
+    parts.push({ entity, slot });
+    return entity;
+  };
+  /**
+   * A limb segment hanging down -Z from its joint, as two stacked halves so the far
+   * half can taper. Overlap hides the seam when the joint below rotates.
+   */
+  const segment = (parent, length, width, depth, nearSlot, farSlot = nearSlot) => {
+    const far = p.limbTaper;
+    part(parent, nearSlot, 0, 0, -length * 0.27, [width, depth, length * 0.56]);
+    part(parent, farSlot, 0, 0, -length * 0.74, [width * far, depth * far, length * 0.54]);
+  };
+
+  // Pelvis: the root of the trunk. Its height is set again by gait (bob).
+  const pelvis = joint(root, 0, 0, m.hipZ);
+  // Two-box pelvis: full hip width at the hip joints, narrowing toward the waist, so the
+  // front outline shows the waist-to-hip transition instead of one rectangular block.
+  const ph = m.pelvis.height;
+  part(pelvis, "bottoms", 0, 0, ph * 0.08, [m.pelvis.width * 0.96, m.pelvis.depth, ph * 0.62]);
+  part(pelvis, "bottoms", 0, 0, ph * 0.5, [(p.waistWidth + p.hipWidth) / 2, m.pelvis.depth * 0.92, ph * 0.5]);
+  // Waist joint: spine lean and counter-twist bend here, above the hips.
+  const waist = joint(pelvis, 0, 0, m.waistZ - m.hipZ);
+  const chestH = m.chest.height;
+  part(waist, "top", 0, 0, chestH * 0.22, [p.waistWidth, p.chestDepth * 0.82, chestH * 0.5]);
+  // Two-box chest: full width at the shoulders, a deeper narrower ribcage below,
+  // which reads as a rounded torso in side view instead of one rectangle.
+  // Shoulder width is measured across the deltoids, so the chest stops inside the arms
+  // and the upper arms remain readable outside the ribcage from the front.
+  part(waist, "top", 0, 0, chestH * 0.78, [p.shoulderWidth - p.upperArm * 1.2, p.chestDepth * 0.78, chestH * 0.42]);
+  part(waist, "top", 0, -p.chestDepth * 0.04, chestH * 0.6, [Math.max(p.waistWidth * 1.05, p.shoulderWidth * 0.7), p.chestDepth, chestH * 0.46]);
+  // Neck and head pivot from the top of the chest.
+  const neck = joint(waist, 0, 0, chestH);
+  part(neck, "skin", 0, 0, m.neck.length * 0.5, [m.neck.width, m.neck.width * 0.95, m.neck.length + 0.02]);
+  const head = joint(neck, 0, 0, m.neck.length);
+  const hh = m.head.height,
+    hw = m.head.width,
+    hd = m.head.depth;
+  // Cranium reaches exactly the authored head height; the narrower jaw tucks under it.
+  part(head, "skin", 0, -hd * 0.04, hh * 0.6, [hw, hd, hh * 0.8]);
+  part(head, "skin", 0, -hd * 0.12, hh * 0.2, [hw * 0.74, hd * 0.72, hh * 0.36]);
+  addHair(part, head, p.hair, hh, hw, hd);
+
+  // Arms hang from shoulder pivots at the top outside corners of the chest.
+  const arms = [-1, 1].map((side) => {
+    const shoulder = joint(waist, side * m.shoulderSpacing, 0, chestH - p.upperArm * 0.45);
+    segment(shoulder, m.upperArmLength, p.upperArm, p.upperArm * 0.95, "top", "skin");
+    const elbow = joint(shoulder, 0, 0, -m.upperArmLength);
+    segment(elbow, m.forearmLength, p.forearm, p.forearm * 0.9, "skin");
+    const wrist = joint(elbow, 0, 0, -m.forearmLength);
+    part(wrist, "skin", 0, 0, -m.hand.length / 2, [m.hand.depth, m.hand.width, m.hand.length]);
+    return { side, shoulder, elbow, wrist };
+  });
+
+  // Legs: thigh-high legwear covers the lower thigh, shin and ankle.
+  const legs = [-1, 1].map((side) => {
+    const hip = joint(pelvis, side * m.hipSpacing, 0, 0);
+    segment(hip, m.thighLength, p.thigh, p.thigh * 1.02, "bottoms", "legwear");
+    const knee = joint(hip, 0, 0, -m.thighLength);
+    segment(knee, m.shinLength, p.calf, p.calf * 1.05, "legwear");
+    const ankle = joint(knee, 0, 0, -m.shinLength);
+    const f = m.foot;
+    // Foot extends forward (-Y) from the ankle; its sole rests on the ground at rest.
+    part(ankle, "shoes", 0, -f.length * 0.28, -f.height * 0.5, [p.calf * 0.85, f.length, f.height]);
+    return { side, hip, knee, ankle };
+  });
+
+  // Backpack: attached to the chest so it follows lean/twist; its own pivot carries
+  // bounded secondary swing. Straps make the shoulder outline readable from the front.
+  let pack = null;
+  if (p.backpack) {
+    const b = m.backpack;
+    pack = joint(waist, 0, p.chestDepth / 2, b.top);
+    part(pack, "bag", 0, b.depth / 2 + 0.005, -b.height / 2, [b.width, b.depth, b.height]);
+    part(pack, "bag", 0, b.depth * 0.62, -b.height * 0.64, [b.width * 0.72, b.depth * 0.5, b.height * 0.42]);
+    part(pack, "strap", 0, b.depth / 2, -0.02, [b.width * 0.86, b.depth * 0.9, 0.05]);
+    for (const side of [-1, 1])
+      part(waist, "strap", side * p.shoulderWidth * 0.24, -p.chestDepth * 0.5, chestH * 0.62, [0.04, 0.02, chestH * 0.62]);
+  }
+
+  return {
+    document: doc,
+    measurements: m,
+    root,
+    pelvis,
+    waist,
+    neck,
+    head,
+    arms,
+    legs,
+    pack,
+    parts,
+    materials: slots,
+    // Secondary-motion state belongs to this instance only.
+    motion: { packPitch: 0, packRoll: 0, packPitchRate: 0, packRollRate: 0, lean: 0, lastSpeed: 0 },
+    /** Show every part with one material (silhouette review) or restore the palette slots. */
+    override(material = null) {
+      for (const { entity, slot } of parts) entity.shape.material = material ?? slots[slot];
+    },
+    /** Remove the figure and all descendants from its world. */
+    dispose() {
+      world.remove(root);
+    },
+  };
+}
+
+/** Hair volumes enlarge the head outline the way real hair does; no strands. */
+function addHair(part, head, style, hh, hw, hd) {
+  if (style === "none") return;
+  // A cap over the crown and back of the head is shared by every style.
+  part(head, "hair", 0, hd * 0.06, hh * 0.82, [hw * 1.08, hd * 1.06, hh * 0.4]);
+  if (style === "bun") part(head, "hair", 0, hd * 0.5, hh * 0.86, [hw * 0.46, hd * 0.42, hh * 0.36]);
+  if (style === "ponytail") {
+    part(head, "hair", 0, hd * 0.58, hh * 0.62, [hw * 0.34, hd * 0.3, hh * 0.3]);
+    part(head, "hair", 0, hd * 0.66, hh * 0.18, [hw * 0.26, hd * 0.24, hh * 0.62]);
+  }
+}
+
+/** Write a quaternion into an entity's existing rotation storage (no allocation per frame). */
+function setRotation(entity, x, y, z) {
+  const q = eulerRotation(x, y, z);
+  for (let i = 0; i < 4; i++) entity.rotation[i] = q[i];
+}
+
+/**
+ * Pose one rig. `state` is the caller's authoritative movement, never read from input:
+ *   phase   gait phase in radians (one stride = 2π)
+ *   amount  0 standing … 1 full walk
+ *   turn    signed yaw rate (rad/s), used for lean into turns
+ *   accel   forward acceleration (m/s²), used for pack inertia
+ *   dt      seconds since the previous pose, for the bounded pack spring
+ * Angle conventions: rotating a hanging limb by +x swings it backward (+Y).
+ */
+function poseHumanoid(rig, { phase = 0, amount = 0, turn = 0, accel = 0, dt = 0 } = {}) {
+  const p = rig.document.parameters,
+    m = rig.measurements,
+    a = Math.max(0, Math.min(1, amount)),
+    s = Math.sin(phase),
+    c = Math.cos(phase);
+  // Pelvis bob: lowest at double support (twice per stride), with a slight twist.
+  rig.pelvis.z = m.hipZ - 0.022 * a * (0.5 + 0.5 * Math.cos(2 * phase)) * (m.height / 1.7);
+  setRotation(rig.pelvis, 0, 0, 0.07 * a * s);
+  // Lean: resting posture, a little forward while walking, and toward the turn centre.
+  const motion = rig.motion,
+    targetLean = Math.max(-0.22, Math.min(0.22, turn * a * 0.09));
+  motion.lean += (targetLean - motion.lean) * Math.min(1, dt * 8);
+  // +x pitches the upper body forward (toward -Y); +y rolls it toward +X.
+  setRotation(rig.waist, p.spineLean + 0.05 * a, motion.lean, -0.1 * a * s);
+  setRotation(rig.head, p.headTilt - 0.03 * a, -motion.lean * 0.5, 0.05 * a * s);
+  for (const leg of rig.legs) {
+    // Right leg is half a stride behind the left.
+    const ls = leg.side < 0 ? s : -s,
+      lc = leg.side < 0 ? c : -c,
+      swing = -0.4 * a * ls,
+      // Knee bends mostly while the leg travels forward (swing phase).
+      knee = a * (0.08 + 0.62 * Math.max(0, lc) * Math.max(0, 0.4 + ls));
+    setRotation(leg.hip, swing, 0, 0);
+    setRotation(leg.knee, knee, 0, 0);
+    // Keep the sole roughly level with the ground instead of pointing with the shin.
+    setRotation(leg.ankle, -(swing + knee) * 0.75, 0, 0);
+  }
+  for (const arm of rig.arms) {
+    // Arms counter-swing their opposite leg; the spread keeps hands clear of the hips.
+    const as = arm.side < 0 ? s : -s;
+    setRotation(arm.shoulder, 0.3 * a * as, -arm.side * p.armSpread, 0);
+    setRotation(arm.elbow, -(0.12 + 0.28 * a * Math.max(0, -as)), 0, 0);
+  }
+  if (rig.pack) {
+    // Bounded damped spring: acceleration tips the pack back, turning swings it out.
+    // Heavier packs respond more slowly and swing further; mass never adds energy.
+    const mass = Math.max(1, p.backpackMass),
+      stiffness = 70 / Math.sqrt(mass),
+      damping = 2 * 0.55 * Math.sqrt(stiffness),
+      step = Math.min(dt, 1 / 30);
+    if (step > 0) {
+      const pitchForce = -stiffness * motion.packPitch - damping * motion.packPitchRate + accel * 0.08 * Math.sqrt(mass);
+      const rollForce = -stiffness * motion.packRoll - damping * motion.packRollRate + turn * a * 0.25 * Math.sqrt(mass);
+      motion.packPitchRate += pitchForce * step;
+      motion.packRollRate += rollForce * step;
+      motion.packPitch = Math.max(-0.3, Math.min(0.3, motion.packPitch + motion.packPitchRate * step));
+      motion.packRoll = Math.max(-0.3, Math.min(0.3, motion.packRoll + motion.packRollRate * step));
+    }
+    // Gait bounce adds a small rhythmic pitch on top of the spring.
+    setRotation(rig.pack, motion.packPitch + 0.03 * a * Math.cos(2 * phase), motion.packRoll, 0);
+  }
+}
+
+return {HUMANOID_GENERATOR_VERSION,HUMANOID_PARAMETERS,HUMANOID_CHOICES,HUMANOID_PALETTE_SLOTS,validateHumanoid,humanoidMeasurements,createHumanoid,poseHumanoid};
+})();
+// Source: engine/penthouse/controls.js
+const module43=(()=>{
 /**
  * Penthouse / controls: parameterized HTML control templates over Basement actions.
  * HTML is intentional for accessible interface text; the world remains pure WebGL.
@@ -4097,7 +4509,7 @@ class ActionButton {
 return {Joystick,ActionButton};
 })();
 // Source: engine/penthouse/profiler-style.js
-const module44=(()=>{
+const module45=(()=>{
 /** Penthouse / profiler presentation: component-scoped styles; removed with the viewer root. */
 const PROFILER_STYLE=`
 .etrnl-profiler{position:absolute;right:30px;top:92px;width:min(390px,calc(100vw - 40px));max-height:calc(100dvh - 190px);overflow:auto;background:#11131eef;border:1px solid #c6ae774d;border-radius:7px;color:#d5cfdf;font:11px/1.55 system-ui,sans-serif;z-index:2;box-shadow:0 12px 50px #0004}
@@ -4122,7 +4534,7 @@ const PROFILER_STYLE=`
 return {PROFILER_STYLE};
 })();
 // Source: engine/penthouse/profiler-view.js
-const module43=(()=>{
+const module44=(()=>{
 /**
  * Penthouse / profiler viewer: accessible HTML/SVG, bounded tables and capture export.
  * Receives a generic subscription function; it never imports Lobby or starts a loop.
@@ -4130,7 +4542,7 @@ const module43=(()=>{
  */
 const { Lifetime } = module6;
 const { diagnosticError } = module31;
-const { PROFILER_STYLE } = module44;
+const { PROFILER_STYLE } = module45;
 
 /** Format measured values without turning unavailable measurements into zero. */
 function ms(value){return Number.isFinite(value)?value.toFixed(2):'—';}
@@ -4250,7 +4662,7 @@ class ProfilerView {
 return {ProfilerView};
 })();
 // Source: engine/penthouse/workspace-icons.js
-const module45=(()=>{
+const module46=(()=>{
 /** Penthouse / the Studio's original 24-unit SVG family. Paths are inert library data,
  * not DOM, textures or renderer assets. Directory exposes this immutable catalog;
  * applications request it explicitly and choose their own command-to-icon mapping.
@@ -4311,9 +4723,10 @@ const module38=(()=>{
  */
 const { assembly } = module39;
 const { pavilion, actor, box } = module40;
-const { Joystick, ActionButton } = module42;
-const { ProfilerView } = module43;
-const { WORKSPACE_ICONS } = module45;
+const { createHumanoid } = module42;
+const { Joystick, ActionButton } = module43;
+const { ProfilerView } = module44;
+const { WORKSPACE_ICONS } = module46;
 
 class Penthouse {
   /** Catalog creation is inert: allocation begins only when a factory is requested. */
@@ -4323,6 +4736,8 @@ class Penthouse {
       'toy.box': options => box(options.world, options),
       'toy.pavilion': pavilion,
       'toy.actor': actor,
+      // Articulated proportion-review mannequin; callers supply a validated document.
+      'toy.humanoid': createHumanoid,
       'control.joystick': options => new Joystick(options),
       'control.button': options => new ActionButton(options),
       'tool.profiler':options=>new ProfilerView(options),
@@ -4383,7 +4798,7 @@ class ETRNLNINE {
 return {ETRNLNINE};
 })();
 // Source: engine/basement/objects.js
-const module50=(()=>{
+const module51=(()=>{
 /** Basement / authored object tree. Origin-only nodes and geometry-bearing components
  * share identity, local transforms and inherited editor restrictions. No game/DOM policy.
  * Parent-before-child storage is validated at the project boundary, not repaired per frame. */
@@ -4501,14 +4916,14 @@ function reparentObject(scene, id, parent) {
 return {ancestors,lockOwner,descendants,objectPoses,objectPose,localPoint,localRotation,reparentObject};
 })();
 // Source: engine/basement/project.js
-const module49=(()=>{
+const module50=(()=>{
 /**
  * Basement / authored project contract. JSON is data, never executable behavior.
  * This first portable package contains scenes and assembly assets together. Validation
  * happens before adoption and packaging; IDs survive serialization independently of World IDs.
  * Limits bound synchronous parsing, history and procedural construction on mobile devices.
  */
-const { objectPoses } = module50;
+const { objectPoses } = module51;
 const { validateMaterial } = module41;
 const PROJECT_LIMITS = Object.freeze({
   bytes: 524288,
@@ -4885,10 +5300,10 @@ function upgradeProject(source) {
 return {PROJECT_LIMITS,copyData,parseProject,validateProject,upgradeProject};
 })();
 // Source: examples/atrium/project.js
-const module48=(()=>{
+const module49=(()=>{
 /** Atrium source of truth: portable JSON; behavior stays in the example's JavaScript. */
 const data=JSON.parse("{\"schemaVersion\":3,\"id\":\"project:atrium\",\"name\":\"Between Worlds\",\"scenes\":[{\"key\":\"amber\",\"name\":\"The Amber Atrium\",\"sun\":{\"direction\":[-0.5,0.8,1.2],\"color\":[0.58,0.49,0.62]},\"ethereal\":false,\"ambient\":[0.15,0.11,0.15],\"id\":\"scene:amber\",\"entities\":[{\"id\":\"amber:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"asset\":\"asset:amber:courtyard-foundation\",\"tag\":null,\"locked\":true,\"position\":[0,0,-0.25],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:central-inlay\",\"name\":\"Central inlay\",\"asset\":\"asset:amber:central-inlay\",\"tag\":null,\"locked\":true,\"position\":[0,-5,0.015],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:west-brass-inlay\",\"name\":\"West brass inlay\",\"asset\":\"asset:amber:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[-3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:east-brass-inlay\",\"name\":\"East brass inlay\",\"asset\":\"asset:amber:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:colonnade\",\"name\":\"Colonnade\",\"asset\":\"asset:amber:colonnade\",\"tag\":null,\"locked\":false,\"position\":[0,11,0],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:west-gallery\",\"name\":\"West gallery\",\"asset\":\"asset:amber:west-gallery\",\"tag\":null,\"locked\":false,\"position\":[-20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:west-entry-planter\",\"name\":\"West entry planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:west-court-planter\",\"name\":\"West court planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:west-entry-lantern\",\"name\":\"West entry lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:west-promenade-lantern\",\"name\":\"West promenade lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:west-gallery-lantern\",\"name\":\"West gallery lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:east-gallery\",\"name\":\"East gallery\",\"asset\":\"asset:amber:east-gallery\",\"tag\":null,\"locked\":false,\"position\":[20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:east-entry-planter\",\"name\":\"East entry planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:east-court-planter\",\"name\":\"East court planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:east-entry-lantern\",\"name\":\"East entry lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:east-promenade-lantern\",\"name\":\"East promenade lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:east-gallery-lantern\",\"name\":\"East gallery lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:crystal-lantern\",\"name\":\"Crystal lantern\",\"asset\":\"asset:amber:crystal-lantern\",\"tag\":\"lantern\",\"locked\":false,\"position\":[0,2,0.65],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:movable-plinth\",\"name\":\"Movable plinth\",\"asset\":\"asset:amber:movable-plinth\",\"tag\":\"prop\",\"locked\":false,\"position\":[6,-12,0.65],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null}],\"lights\":[{\"id\":\"light:0\",\"position\":[0,7,5],\"radius\":16,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:1\",\"position\":[-15,-4,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:2\",\"position\":[15,-4,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:3\",\"position\":[-15,9,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:4\",\"position\":[15,9,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:5\",\"position\":[0,2,3],\"radius\":10,\"color\":[0.3,1.1,2.7]},{\"id\":\"light:6\",\"position\":[-15,-18,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:7\",\"position\":[15,-18,4],\"radius\":12,\"color\":[2.4,0.85,0.3]}],\"lightVariants\":{\"cool\":{\"crystal\":[0.25,0.62,1],\"irradiance\":[0.3,1.1,2.7]},\"warm\":{\"crystal\":[1,0.34,0.19],\"irradiance\":[3,0.5,0.2]}}},{\"key\":\"violet\",\"name\":\"The Violet Court\",\"sun\":{\"direction\":[0.5,0.7,1.1],\"color\":[0.36,0.46,0.75]},\"ethereal\":true,\"ambient\":[0.09,0.11,0.26],\"id\":\"scene:violet\",\"entities\":[{\"id\":\"violet:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"asset\":\"asset:violet:courtyard-foundation\",\"tag\":null,\"locked\":true,\"position\":[0,0,-0.25],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:central-inlay\",\"name\":\"Central inlay\",\"asset\":\"asset:violet:central-inlay\",\"tag\":null,\"locked\":true,\"position\":[0,-5,0.015],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:west-brass-inlay\",\"name\":\"West brass inlay\",\"asset\":\"asset:violet:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[-3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:east-brass-inlay\",\"name\":\"East brass inlay\",\"asset\":\"asset:violet:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:colonnade\",\"name\":\"Colonnade\",\"asset\":\"asset:violet:colonnade\",\"tag\":null,\"locked\":false,\"position\":[0,11,0],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:west-gallery\",\"name\":\"West gallery\",\"asset\":\"asset:violet:west-gallery\",\"tag\":null,\"locked\":false,\"position\":[-20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:west-entry-planter\",\"name\":\"West entry planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:west-court-planter\",\"name\":\"West court planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:west-entry-lantern\",\"name\":\"West entry lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:west-promenade-lantern\",\"name\":\"West promenade lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:west-gallery-lantern\",\"name\":\"West gallery lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:east-gallery\",\"name\":\"East gallery\",\"asset\":\"asset:violet:east-gallery\",\"tag\":null,\"locked\":false,\"position\":[20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:east-entry-planter\",\"name\":\"East entry planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:east-court-planter\",\"name\":\"East court planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:east-entry-lantern\",\"name\":\"East entry lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:east-promenade-lantern\",\"name\":\"East promenade lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:east-gallery-lantern\",\"name\":\"East gallery lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:crystal-lantern\",\"name\":\"Crystal lantern\",\"asset\":\"asset:violet:crystal-lantern\",\"tag\":\"lantern\",\"locked\":false,\"position\":[0,2,0.65],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:movable-plinth\",\"name\":\"Movable plinth\",\"asset\":\"asset:violet:movable-plinth\",\"tag\":\"prop\",\"locked\":false,\"position\":[6,-12,0.65],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:west-prism\",\"name\":\"West prism\",\"asset\":\"asset:violet:prism\",\"tag\":null,\"locked\":false,\"position\":[-7,-3,2.5],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:east-prism\",\"name\":\"East prism\",\"asset\":\"asset:violet:prism\",\"tag\":null,\"locked\":false,\"position\":[7,-3,2.5],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null}],\"lights\":[{\"id\":\"light:0\",\"position\":[0,7,5],\"radius\":16,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:1\",\"position\":[-15,-4,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:2\",\"position\":[15,-4,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:3\",\"position\":[-15,9,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:4\",\"position\":[15,9,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:5\",\"position\":[0,2,3],\"radius\":10,\"color\":[0.3,1.1,2.7]},{\"id\":\"light:6\",\"position\":[-15,-18,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:7\",\"position\":[15,-18,4],\"radius\":12,\"color\":[0.35,0.9,2.5]}],\"lightVariants\":{\"cool\":{\"crystal\":[0.25,0.62,1],\"irradiance\":[0.3,1.1,2.7]},\"warm\":{\"crystal\":[1,0.34,0.19],\"irradiance\":[3,0.5,0.2]}}}],\"assets\":[{\"id\":\"asset:amber:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[58,68,0.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:1\"}}],\"colliders\":[]},{\"id\":\"asset:amber:central-inlay\",\"name\":\"Central inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[7,38,0.025],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:2\"}}],\"colliders\":[]},{\"id\":\"asset:amber:brass-inlay\",\"name\":\"Brass inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.05,38,0.035],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:3\"}}],\"colliders\":[]},{\"id\":\"asset:amber:colonnade\",\"name\":\"Colonnade\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":null},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.2],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[26,11,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,4.2,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.6,7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,7],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[25,10,0.6],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,-4.5,6.4],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.12,0.09],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:5\"}},{\"id\":\"part:5\",\"parent\":0,\"position\":[0,-4.5,6.1],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.16,0.1],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:6\",\"parent\":0,\"position\":[-12,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:7\",\"parent\":0,\"position\":[-12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:8\",\"parent\":0,\"position\":[-12,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:9\",\"parent\":0,\"position\":[-6,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:10\",\"parent\":0,\"position\":[-6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:11\",\"parent\":0,\"position\":[-6,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:12\",\"parent\":0,\"position\":[6,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:13\",\"parent\":0,\"position\":[6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:14\",\"parent\":0,\"position\":[6,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:15\",\"parent\":0,\"position\":[12,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:16\",\"parent\":0,\"position\":[12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:17\",\"parent\":0,\"position\":[12,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:18\",\"parent\":0,\"position\":[-9,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:19\",\"parent\":0,\"position\":[-9,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:20\",\"parent\":0,\"position\":[-6,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:21\",\"parent\":0,\"position\":[-6,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:22\",\"parent\":0,\"position\":[-3,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:23\",\"parent\":0,\"position\":[-3,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:24\",\"parent\":0,\"position\":[0,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:25\",\"parent\":0,\"position\":[0,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:26\",\"parent\":0,\"position\":[3,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:27\",\"parent\":0,\"position\":[3,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:28\",\"parent\":0,\"position\":[6,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:29\",\"parent\":0,\"position\":[6,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:30\",\"parent\":0,\"position\":[9,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:31\",\"parent\":0,\"position\":[9,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}}],\"colliders\":[{\"x\":0,\"y\":4.199999999999999,\"width\":24,\"depth\":0.7},{\"x\":-12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":-6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6}]},{\"id\":\"asset:amber:west-gallery\",\"name\":\"West gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:8\"}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:9\"}},{\"id\":\"part:2\",\"parent\":null,\"position\":[1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:3\",\"parent\":null,\"position\":[1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}},{\"id\":\"part:4\",\"parent\":null,\"position\":[1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:5\",\"parent\":null,\"position\":[1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}},{\"id\":\"part:6\",\"parent\":null,\"position\":[1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:7\",\"parent\":null,\"position\":[1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}},{\"id\":\"part:8\",\"parent\":null,\"position\":[1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:9\",\"parent\":null,\"position\":[1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}},{\"id\":\"part:10\",\"parent\":null,\"position\":[1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:11\",\"parent\":null,\"position\":[1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}},{\"id\":\"part:12\",\"parent\":null,\"position\":[1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:13\",\"parent\":null,\"position\":[1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}},{\"id\":\"part:14\",\"parent\":null,\"position\":[1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:15\",\"parent\":null,\"position\":[1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:amber:planter\",\"name\":\"Planter\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,2.4,1.1],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:12\"}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.8499999999999999],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.2,2.2,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:13\"}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,0,1.4999999999999998],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.8000000000000003,1.8000000000000003,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:13\"}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,2.1500000000000004],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.4000000000000001,1.4000000000000001,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:13\"}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,0,2.8],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1,1,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:13\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.4,\"depth\":2.4}]},{\"id\":\"asset:amber:lantern\",\"name\":\"Lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.18,0.18,3.6],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:14\"}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,1.9000000000000001],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.6,0.6,0.8],\"ambientBlocker\":true,\"castShadow\":false,\"material\":\"material:15\"}},{\"id\":\"part:2\",\"parent\":null,\"position\":[0,0,2.3500000000000005],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.12],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:14\"}}],\"colliders\":[]},{\"id\":\"asset:amber:east-gallery\",\"name\":\"East gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:16\"}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:17\"}},{\"id\":\"part:2\",\"parent\":null,\"position\":[-1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:3\",\"parent\":null,\"position\":[-1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}},{\"id\":\"part:4\",\"parent\":null,\"position\":[-1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:5\",\"parent\":null,\"position\":[-1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}},{\"id\":\"part:6\",\"parent\":null,\"position\":[-1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:7\",\"parent\":null,\"position\":[-1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}},{\"id\":\"part:8\",\"parent\":null,\"position\":[-1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:9\",\"parent\":null,\"position\":[-1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}},{\"id\":\"part:10\",\"parent\":null,\"position\":[-1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:11\",\"parent\":null,\"position\":[-1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}},{\"id\":\"part:12\",\"parent\":null,\"position\":[-1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:13\",\"parent\":null,\"position\":[-1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}},{\"id\":\"part:14\",\"parent\":null,\"position\":[-1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:15\",\"parent\":null,\"position\":[-1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:amber:crystal-lantern\",\"name\":\"Crystal lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.9,1.9,1.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:20\"}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.85],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.1,2.1,0.22],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:21\"}},{\"id\":\"crystal\",\"parent\":0,\"position\":[0,0,1.75],\"rotation\":[0,0,0.3826834323650898,0.9238795325112867],\"shape\":{\"size\":[0.7,0.7,1.4],\"ambientBlocker\":true,\"castShadow\":false,\"material\":\"material:22\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.1,\"depth\":2.1}]},{\"id\":\"asset:amber:movable-plinth\",\"name\":\"Movable plinth\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,2,1.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:23\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":2}]},{\"id\":\"asset:violet:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[58,68,0.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:24\"}}],\"colliders\":[]},{\"id\":\"asset:violet:central-inlay\",\"name\":\"Central inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[7,38,0.025],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:25\"}}],\"colliders\":[]},{\"id\":\"asset:violet:brass-inlay\",\"name\":\"Brass inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.05,38,0.035],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:26\"}}],\"colliders\":[]},{\"id\":\"asset:violet:colonnade\",\"name\":\"Colonnade\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":null},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.2],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[26,11,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,4.2,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.6,8.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,8.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[25,10,0.6],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,-4.5,7.9],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.12,0.09],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:28\"}},{\"id\":\"part:5\",\"parent\":0,\"position\":[0,-4.5,7.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.16,0.1],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:6\",\"parent\":0,\"position\":[-12,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:7\",\"parent\":0,\"position\":[-12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:8\",\"parent\":0,\"position\":[-12,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:9\",\"parent\":0,\"position\":[-6,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:10\",\"parent\":0,\"position\":[-6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:11\",\"parent\":0,\"position\":[-6,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:12\",\"parent\":0,\"position\":[6,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:13\",\"parent\":0,\"position\":[6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:14\",\"parent\":0,\"position\":[6,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:15\",\"parent\":0,\"position\":[12,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:16\",\"parent\":0,\"position\":[12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:17\",\"parent\":0,\"position\":[12,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:18\",\"parent\":0,\"position\":[-9,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:19\",\"parent\":0,\"position\":[-9,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:20\",\"parent\":0,\"position\":[-6,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:21\",\"parent\":0,\"position\":[-6,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:22\",\"parent\":0,\"position\":[-3,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:23\",\"parent\":0,\"position\":[-3,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:24\",\"parent\":0,\"position\":[0,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:25\",\"parent\":0,\"position\":[0,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:26\",\"parent\":0,\"position\":[3,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:27\",\"parent\":0,\"position\":[3,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:28\",\"parent\":0,\"position\":[6,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:29\",\"parent\":0,\"position\":[6,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:30\",\"parent\":0,\"position\":[9,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:31\",\"parent\":0,\"position\":[9,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}}],\"colliders\":[{\"x\":0,\"y\":4.199999999999999,\"width\":24,\"depth\":0.7},{\"x\":-12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":-6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6}]},{\"id\":\"asset:violet:west-gallery\",\"name\":\"West gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:31\"}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:32\"}},{\"id\":\"part:2\",\"parent\":null,\"position\":[1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:3\",\"parent\":null,\"position\":[1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}},{\"id\":\"part:4\",\"parent\":null,\"position\":[1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:5\",\"parent\":null,\"position\":[1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}},{\"id\":\"part:6\",\"parent\":null,\"position\":[1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:7\",\"parent\":null,\"position\":[1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}},{\"id\":\"part:8\",\"parent\":null,\"position\":[1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:9\",\"parent\":null,\"position\":[1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}},{\"id\":\"part:10\",\"parent\":null,\"position\":[1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:11\",\"parent\":null,\"position\":[1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}},{\"id\":\"part:12\",\"parent\":null,\"position\":[1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:13\",\"parent\":null,\"position\":[1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}},{\"id\":\"part:14\",\"parent\":null,\"position\":[1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:15\",\"parent\":null,\"position\":[1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:violet:planter\",\"name\":\"Planter\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,2.4,1.1],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:35\"}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.8499999999999999],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.2,2.2,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:36\"}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,0,1.4999999999999998],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.8000000000000003,1.8000000000000003,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:36\"}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,2.1500000000000004],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.4000000000000001,1.4000000000000001,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:36\"}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,0,2.8],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1,1,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:36\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.4,\"depth\":2.4}]},{\"id\":\"asset:violet:lantern\",\"name\":\"Lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.18,0.18,3.6],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:37\"}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,1.9000000000000001],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.6,0.6,0.8],\"ambientBlocker\":true,\"castShadow\":false,\"material\":\"material:38\"}},{\"id\":\"part:2\",\"parent\":null,\"position\":[0,0,2.3500000000000005],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.12],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:37\"}}],\"colliders\":[]},{\"id\":\"asset:violet:east-gallery\",\"name\":\"East gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:39\"}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:40\"}},{\"id\":\"part:2\",\"parent\":null,\"position\":[-1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:3\",\"parent\":null,\"position\":[-1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}},{\"id\":\"part:4\",\"parent\":null,\"position\":[-1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:5\",\"parent\":null,\"position\":[-1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}},{\"id\":\"part:6\",\"parent\":null,\"position\":[-1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:7\",\"parent\":null,\"position\":[-1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}},{\"id\":\"part:8\",\"parent\":null,\"position\":[-1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:9\",\"parent\":null,\"position\":[-1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}},{\"id\":\"part:10\",\"parent\":null,\"position\":[-1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:11\",\"parent\":null,\"position\":[-1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}},{\"id\":\"part:12\",\"parent\":null,\"position\":[-1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:13\",\"parent\":null,\"position\":[-1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}},{\"id\":\"part:14\",\"parent\":null,\"position\":[-1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:15\",\"parent\":null,\"position\":[-1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:violet:crystal-lantern\",\"name\":\"Crystal lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.9,1.9,1.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:43\"}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.85],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.1,2.1,0.22],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:44\"}},{\"id\":\"crystal\",\"parent\":0,\"position\":[0,0,1.75],\"rotation\":[0,0,0.3826834323650898,0.9238795325112867],\"shape\":{\"size\":[0.7,0.7,1.4],\"ambientBlocker\":true,\"castShadow\":false,\"material\":\"material:45\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.1,\"depth\":2.1}]},{\"id\":\"asset:violet:movable-plinth\",\"name\":\"Movable plinth\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,2,1.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:46\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":2}]},{\"id\":\"asset:violet:prism\",\"name\":\"Prism\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0.3826834323650898,0.9238795325112867],\"shape\":{\"size\":[0.7,0.7,3.8],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:47\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":1,\"depth\":1}]}],\"materials\":[{\"id\":\"material:1\",\"name\":\"Courtyard foundation · 1\",\"baseColor\":[0.14,0.115,0.14],\"emissionColor\":[0.14,0.115,0.14],\"emissionStrength\":0},{\"id\":\"material:2\",\"name\":\"Central inlay · 1\",\"baseColor\":[0.22,0.2,0.25],\"emissionColor\":[0.22,0.2,0.25],\"emissionStrength\":0},{\"id\":\"material:3\",\"name\":\"Brass inlay · 1\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:4\",\"name\":\"Colonnade · 1\",\"baseColor\":[0.24,0.18,0.2],\"emissionColor\":[0.24,0.18,0.2],\"emissionStrength\":0},{\"id\":\"material:5\",\"name\":\"Colonnade · 2\",\"baseColor\":[1,0.47,0.17],\"emissionColor\":[1,0.47,0.17],\"emissionStrength\":2.5},{\"id\":\"material:6\",\"name\":\"Colonnade · 3\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:7\",\"name\":\"Colonnade · 4\",\"baseColor\":[0.35,0.19,0.16],\"emissionColor\":[0.35,0.19,0.16],\"emissionStrength\":0.3},{\"id\":\"material:8\",\"name\":\"West gallery · 1\",\"baseColor\":[0.24,0.18,0.2],\"emissionColor\":[0.24,0.18,0.2],\"emissionStrength\":0},{\"id\":\"material:9\",\"name\":\"West gallery · 2\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:10\",\"name\":\"West gallery · 3\",\"baseColor\":[0.38,0.15,0.16],\"emissionColor\":[0.38,0.15,0.16],\"emissionStrength\":0.55},{\"id\":\"material:11\",\"name\":\"West gallery · 4\",\"baseColor\":[1,0.47,0.17],\"emissionColor\":[1,0.47,0.17],\"emissionStrength\":2},{\"id\":\"material:12\",\"name\":\"Planter · 1\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:13\",\"name\":\"Planter · 2\",\"baseColor\":[0.045,0.14,0.1],\"emissionColor\":[0.045,0.14,0.1],\"emissionStrength\":0},{\"id\":\"material:14\",\"name\":\"Lantern · 1\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:15\",\"name\":\"Lantern · 2\",\"baseColor\":[1,0.47,0.17],\"emissionColor\":[1,0.47,0.17],\"emissionStrength\":3},{\"id\":\"material:16\",\"name\":\"East gallery · 1\",\"baseColor\":[0.24,0.18,0.2],\"emissionColor\":[0.24,0.18,0.2],\"emissionStrength\":0},{\"id\":\"material:17\",\"name\":\"East gallery · 2\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:18\",\"name\":\"East gallery · 3\",\"baseColor\":[0.38,0.15,0.16],\"emissionColor\":[0.38,0.15,0.16],\"emissionStrength\":0.55},{\"id\":\"material:19\",\"name\":\"East gallery · 4\",\"baseColor\":[1,0.47,0.17],\"emissionColor\":[1,0.47,0.17],\"emissionStrength\":2},{\"id\":\"material:20\",\"name\":\"Crystal lantern · 1\",\"baseColor\":[0.24,0.18,0.2],\"emissionColor\":[0.24,0.18,0.2],\"emissionStrength\":0},{\"id\":\"material:21\",\"name\":\"Crystal lantern · 2\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:22\",\"name\":\"Crystal lantern · 3\",\"baseColor\":[0.25,0.62,1],\"emissionColor\":[0.25,0.62,1],\"emissionStrength\":2},{\"id\":\"material:23\",\"name\":\"Movable plinth · 1\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:24\",\"name\":\"Courtyard foundation · 1\",\"baseColor\":[0.075,0.09,0.18],\"emissionColor\":[0.075,0.09,0.18],\"emissionStrength\":0},{\"id\":\"material:25\",\"name\":\"Central inlay · 1\",\"baseColor\":[0.22,0.2,0.25],\"emissionColor\":[0.22,0.2,0.25],\"emissionStrength\":0},{\"id\":\"material:26\",\"name\":\"Brass inlay · 1\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:27\",\"name\":\"Colonnade · 1\",\"baseColor\":[0.14,0.16,0.31],\"emissionColor\":[0.14,0.16,0.31],\"emissionStrength\":0},{\"id\":\"material:28\",\"name\":\"Colonnade · 2\",\"baseColor\":[0.24,0.58,1],\"emissionColor\":[0.24,0.58,1],\"emissionStrength\":2.5},{\"id\":\"material:29\",\"name\":\"Colonnade · 3\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:30\",\"name\":\"Colonnade · 4\",\"baseColor\":[0.35,0.19,0.16],\"emissionColor\":[0.35,0.19,0.16],\"emissionStrength\":0.3},{\"id\":\"material:31\",\"name\":\"West gallery · 1\",\"baseColor\":[0.14,0.16,0.31],\"emissionColor\":[0.14,0.16,0.31],\"emissionStrength\":0},{\"id\":\"material:32\",\"name\":\"West gallery · 2\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:33\",\"name\":\"West gallery · 3\",\"baseColor\":[0.15,0.19,0.46],\"emissionColor\":[0.15,0.19,0.46],\"emissionStrength\":0.55},{\"id\":\"material:34\",\"name\":\"West gallery · 4\",\"baseColor\":[0.24,0.58,1],\"emissionColor\":[0.24,0.58,1],\"emissionStrength\":2},{\"id\":\"material:35\",\"name\":\"Planter · 1\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:36\",\"name\":\"Planter · 2\",\"baseColor\":[0.1,0.2,0.27],\"emissionColor\":[0.1,0.2,0.27],\"emissionStrength\":0},{\"id\":\"material:37\",\"name\":\"Lantern · 1\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:38\",\"name\":\"Lantern · 2\",\"baseColor\":[0.24,0.58,1],\"emissionColor\":[0.24,0.58,1],\"emissionStrength\":3},{\"id\":\"material:39\",\"name\":\"East gallery · 1\",\"baseColor\":[0.14,0.16,0.31],\"emissionColor\":[0.14,0.16,0.31],\"emissionStrength\":0},{\"id\":\"material:40\",\"name\":\"East gallery · 2\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:41\",\"name\":\"East gallery · 3\",\"baseColor\":[0.15,0.19,0.46],\"emissionColor\":[0.15,0.19,0.46],\"emissionStrength\":0.55},{\"id\":\"material:42\",\"name\":\"East gallery · 4\",\"baseColor\":[0.24,0.58,1],\"emissionColor\":[0.24,0.58,1],\"emissionStrength\":2},{\"id\":\"material:43\",\"name\":\"Crystal lantern · 1\",\"baseColor\":[0.14,0.16,0.31],\"emissionColor\":[0.14,0.16,0.31],\"emissionStrength\":0},{\"id\":\"material:44\",\"name\":\"Crystal lantern · 2\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:45\",\"name\":\"Crystal lantern · 3\",\"baseColor\":[0.25,0.62,1],\"emissionColor\":[0.25,0.62,1],\"emissionStrength\":2},{\"id\":\"material:46\",\"name\":\"Movable plinth · 1\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:47\",\"name\":\"Prism · 1\",\"baseColor\":[0.22,0.5,0.67],\"emissionColor\":[0.22,0.5,0.67],\"emissionStrength\":0.5}]}");
-const { validateProject } = module49;
+const { validateProject } = module50;
 const { ASSEMBLY_GENERATORS } = module39;
 /** Resolve authored generator identities against the libraries this example actually installs. */
 function validateAtriumProject(project){validateProject(project,{generators:ASSEMBLY_GENERATORS});
@@ -4912,7 +5327,7 @@ function canRemoveAtriumEntity(entity){return !entity.locked&&!['prop','lantern'
 return {validateAtriumProject,ATRIUM_PROJECT,cloneAtriumEntity,canRemoveAtriumEntity};
 })();
 // Source: engine/basement/transfer.js
-const module52=(()=>{
+const module53=(()=>{
 /**
  * Basement / transfer: validated, synchronous movement of one attachment tree.
  * No loading, scheduling, game rules, callbacks during mutation, or resource ownership.
@@ -4963,13 +5378,13 @@ function transferTree({ source, destination, root, landing, validate = () => tru
 return {transferTree};
 })();
 // Source: engine/lobby/travel.js
-const module51=(()=>{
+const module52=(()=>{
 /**
  * Lobby / travel: asynchronous preparation becomes a synchronous boundary commit.
  * It consumes generic residency tickets; it does not import Directory or game content.
  * The active ticket pins the source until a successful transfer replaces it.
  */
-const { transferTree } = module52;
+const { transferTree } = module53;
 
 class WorldTravel {
   /** Adopt an already-ready initial ticket/root. The owner must call advance at a boundary. */
@@ -5062,7 +5477,7 @@ class WorldTravel {
 return {WorldTravel};
 })();
 // Source: engine/basement/geometry.js
-const module54=(()=>{
+const module55=(()=>{
 /** Basement / geometry: pure horizontal collision helpers, with no world or game dependency. */
 
 /** Does a horizontal circle overlap an axis-aligned box? Touching is permitted. */
@@ -5075,7 +5490,7 @@ function circleOverlapsBox(x, y, radius, box) {
 return {circleOverlapsBox};
 })();
 // Source: engine/directory/material-library.js
-const module57=(()=>{
+const module58=(()=>{
 /** Directory / scene-owned runtime material library. Authored IDs resolve once to shared
  * mutable numeric objects. Play never borrows authoring objects; updates retain link identity. */
 const { createMaterial, updateMaterial } = module41;
@@ -5118,14 +5533,14 @@ class MaterialLibrary {
 return {MaterialLibrary};
 })();
 // Source: engine/directory/scene-instance.js
-const module56=(()=>{
+const module57=(()=>{
 /**
  * Directory / live authored scene instance. Maps stable document IDs to temporary World
  * membership, and updates transforms/collision together. Owns scene runtime materials.
  * Owns no scheduler or game rules.
  * Collider queries remain planar conservative bounds; full 3D physics is future work.
  */
-const { MaterialLibrary } = module57;
+const { MaterialLibrary } = module58;
 const { rotateVector } = module4;
 class SceneInstance {
   /** Synchronous construction is available for the explicitly bounded editor preview. */
@@ -5345,11 +5760,11 @@ class SceneInstance {
 return {SceneInstance};
 })();
 // Source: examples/atrium/layout.js
-const module55=(()=>{
+const module56=(()=>{
 /** Atrium / map generic document instances to this game's named interaction targets. */
 const { createMaterial } = module41;
-const { SceneInstance } = module56;
-const { ATRIUM_PROJECT } = module48;
+const { SceneInstance } = module57;
+const { ATRIUM_PROJECT } = module49;
 function* buildLayout(engine,world,profile,project=ATRIUM_PROJECT){
  const instance=yield* SceneInstance.prepare(engine.directory,world,project,profile);
  const lantern=profile.entities.find(e=>e.tag==='lantern'),prop=profile.entities.find(e=>e.tag==='prop');
@@ -5360,16 +5775,16 @@ function* buildLayout(engine,world,profile,project=ATRIUM_PROJECT){
 return {buildLayout};
 })();
 // Source: examples/atrium/worlds.js
-const module53=(()=>{
+const module54=(()=>{
 /**
  * Atrium example / world definitions: authored realms, reconstruction and state schema.
  * Directory receives factories, not these names. Lobby budgets actual procedural work.
  * Persisted data is deliberately small: light selection, crystal rotation and prop position.
  */
-const { ATRIUM_PROJECT } = module48;
+const { ATRIUM_PROJECT } = module49;
 const { Lifetime } = module6;
-const { circleOverlapsBox } = module54;
-const { buildLayout } = module55;
+const { circleOverlapsBox } = module55;
+const { buildLayout } = module56;
 
 /** Immutable-by-convention authoring profiles; runtime mutable state is created per world. */
 const PROFILES = ATRIUM_PROJECT.scenes;
@@ -5427,16 +5842,16 @@ function worldFactory(engine, profile, id, project=ATRIUM_PROJECT) {
 return {PROFILES,legalLanding,applyLight,worldFactory};
 })();
 // Source: examples/atrium/journey.js
-const module47=(()=>{
+const module48=(()=>{
 /**
  * Atrium example / journey: game-specific realm links, initial actor and prewarming policy.
  * Loading/lifetime algorithms live in Directory; transaction scheduling lives in Lobby.
  * This module chooses the destination and asks for those mechanisms through public contracts.
  */
-const { ATRIUM_PROJECT } = module48;
+const { ATRIUM_PROJECT } = module49;
 const { Lifetime } = module6;
-const { WorldTravel } = module51;
-const { worldFactory, legalLanding, applyLight } = module53;
+const { WorldTravel } = module52;
+const { worldFactory, legalLanding, applyLight } = module54;
 
 /** Own the two realm definitions and their tickets for one example session. */
 function createJourney(engine,project=ATRIUM_PROJECT) {
@@ -5515,12 +5930,12 @@ function createJourney(engine,project=ATRIUM_PROJECT) {
 return {createJourney};
 })();
 // Source: examples/atrium/player.js
-const module58=(()=>{
+const module59=(()=>{
 /**
  * Atrium example / locomotion: game-owned steering/gait profile, independent of realm residency.
  * Actor references and velocity survive transfers. This is not a full physical body solver.
  */
-const { legalLanding } = module53;
+const { legalLanding } = module54;
 
 /** Create one controller whose mutable velocity/load state belongs only to this actor. */
 function playerController(actor, input, renderer) {
@@ -5556,15 +5971,15 @@ function playerController(actor, input, renderer) {
 return {playerController};
 })();
 // Source: examples/atrium/scene.js
-const module46=(()=>{
+const module47=(()=>{
 /**
  * Atrium example / scene: owns controls, phase registrations and the game's journey.
  * Layout/reconstruction, locomotion and world policy have their own focused modules.
  * Nothing here installs an engine patch or creates an independent animation loop.
  */
 const { Lifetime } = module6;
-const { createJourney } = module47;
-const { playerController } = module58;
+const { createJourney } = module48;
+const { playerController } = module59;
 
 /** Start preparing the scene immediately. Rendering remains valid while the first world loads. */
 function createScene(engine,{controlsHost,project,onStatus=()=>{},onError=()=>{}}){
@@ -5638,7 +6053,7 @@ const module0=(()=>{
  */
 const { ETRNLNINE } = module1;
 const { Lifetime } = module6;
-const { createScene } = module46;
+const { createScene } = module47;
 
 const canvas=document.querySelector('#world'), controlsHost=document.querySelector('#controls');
 const status=document.querySelector('#status'), errorBox=document.querySelector('#error');
