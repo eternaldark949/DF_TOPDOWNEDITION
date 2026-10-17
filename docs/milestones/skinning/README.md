@@ -21,7 +21,7 @@ The blue cone beside them is a rigid lofted mesh. Sun shadows and screen-space A
   - Context restoration reproduces the bent frame exactly.
   - The real frame loop alternates animate and render.
   - Cleanup leaves zero buffers, VAOs, programs and palettes.
-- Regression suites: `test:browser`, `test:materials`, `test:surface`, `test:bloom`, `test:perspective`, `test:camera`, `test:objects`, `test:humanoid`, `test:freelancer`, `test:studio`, `test:studio-tools`, `test:studio-shell`, `test:viewport-ui` and `test:tool-fold`. Results are listed in the pull request.
+- Regression suites: `test:browser`, `test:materials`, `test:surface`, `test:bloom`, `test:perspective`, `test:camera`, `test:objects`, `test:humanoid`, `test:freelancer`, `test:studio`, `test:studio-tools`, `test:studio-shell`, `test:viewport-ui` and `test:tool-fold` all pass.
 
 ## Limits
 
