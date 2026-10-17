@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#120f1a"><title>Freelancer · 949 humanoid review</title>
+<style>
+/* Review presentation owns these elements; the engine receives a canvas and parameters. */
+*{box-sizing:border-box}[hidden]{display:none!important}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#100d18;color:#eadfc9;font:13px system-ui,sans-serif}
+canvas{display:block;width:100%;height:100%;touch-action:none;outline:none}
+header{position:absolute;top:0;left:0;padding:20px 26px;pointer-events:none}header small{display:block;color:#bca075;font:10px monospace;letter-spacing:.26em}h1{font:28px Georgia,serif;font-weight:400;letter-spacing:.1em;margin:7px 0 4px}#subtitle{font:11px Georgia,serif;color:#bcb0bf;letter-spacing:.06em;max-width:360px}
+nav{position:absolute;top:22px;right:22px;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;max-width:calc(100% - 44px)}
+.group{display:flex;border:1px solid #5b4552;border-radius:5px;overflow:hidden;background:#17111fe8}
+button,select{color:#d8c6a4;background:transparent;border:0;min-height:40px;padding:8px 11px;font:11px system-ui;cursor:pointer}
+.group button+button{border-left:1px solid #3b2d3a}button[aria-pressed="true"]{background:#5a3f78;color:#fff4dc}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid #cba8ee;outline-offset:-2px}
+.solo{border:1px solid #5b4552;border-radius:5px;background:#17111fe8}
+#labels{position:absolute;inset:0;pointer-events:none}#labels span{position:absolute;transform:translate(-50%,6px);font:10px monospace;letter-spacing:.18em;text-transform:uppercase;color:#cdb68b;background:#120d18cc;padding:3px 7px;border-radius:3px;white-space:nowrap}
+body.silhouette header h1,body.silhouette #subtitle{color:#2a2230}body.silhouette #status{color:#5a5060}body.silhouette #labels span{color:#2a2230;background:#ffffffaa}
+#panel{position:absolute;right:22px;top:76px;width:286px;max-height:calc(100% - 120px);overflow:auto;background:#17111ff2;border:1px solid #5b4552;border-radius:6px;padding:4px 12px 12px}
+#panel[hidden]{display:none}#panel h2{font:10px monospace;letter-spacing:.2em;color:#bca075;margin:14px 0 6px;text-transform:uppercase}
+#panel label{display:block;font-size:11px;color:#bcb0bf;margin:8px 0 3px}#panel label em{font-style:normal;color:#7d6f86;font-size:10px}
+#panel input{color:#d8c6a4}#panel select{width:100%;border:1px solid #5b4552;border-radius:6px;background:#121019;min-height:40px}
+#panel .row{display:flex;gap:6px;margin-top:12px}#panel .row button{flex:1;border:1px solid #5b4552;border-radius:5px;background:#201728}
+#panel input[type=checkbox]{width:20px;height:20px;vertical-align:middle;margin-right:8px}
+#problem{color:#ffb4c0;font-size:11px;min-height:1em;margin-top:8px}
+#status{position:absolute;left:26px;bottom:10px;font:9px monospace;color:#a89bb5;pointer-events:none}
+#error{position:absolute;left:20px;right:20px;top:130px;padding:18px;background:#542433;z-index:9}
+@media(max-width:700px){header{padding:14px 16px}h1{font-size:21px}#subtitle{display:none}nav{top:auto;bottom:30px;right:12px;left:12px;justify-content:center}button{padding:7px 9px;min-height:38px;font-size:10px}#panel{left:12px;right:12px;width:auto;top:auto;bottom:130px;max-height:38%}#status{left:14px;bottom:8px}}
+</style><link rel="stylesheet" href="../../../engine/penthouse/number-control.css" />
+</head><body>
+<canvas id="world" tabindex="0" aria-label="WebGL humanoid review: turnaround or gameplay camera"></canvas>
+<header><small>FREELANCER / ETRNLNINE · HUMANOID REVIEW</small><h1 id="name">949</h1><div id="subtitle">Body shape from the 2D canon, generated clothing, posture and outline.</div></header>
+<div id="labels" aria-hidden="true"></div>
+<nav aria-label="Review views">
+ <div class="group" role="group" aria-label="Camera"><button data-mode="turnaround" aria-pressed="true">Turnaround</button><button data-mode="gameplay" aria-pressed="false">Gameplay camera</button></div>
+ <div class="group" role="group" aria-label="Look"><button data-look="shaded" aria-pressed="true">Shaded</button><button data-look="silhouette" aria-pressed="false">Silhouette</button></div>
+ <div class="group" role="group" aria-label="Pose" id="poses"><button data-pose="stand" aria-pressed="true">Stand</button><button data-pose="walk" aria-pressed="false">Walk</button></div>
+ <div class="group" role="group" aria-label="Gameplay zoom" id="zooms" hidden><button data-zoom="1" aria-pressed="true">Game scale</button><button data-zoom="3" aria-pressed="false">Close 3×</button></div>
+ <button class="solo" id="toggle-panel" aria-expanded="false" aria-controls="panel">Proportions</button>
+</nav>
+<aside id="panel" aria-label="Proportions" hidden></aside>
+<output id="status" aria-live="off"></output><div id="error" role="alert" hidden></div>
+<script type="module" src="./main.js"></script></body></html>

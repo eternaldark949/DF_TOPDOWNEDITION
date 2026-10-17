@@ -681,6 +681,178 @@ float ambientVisibility(vec3 p,vec3 n){
 
 return {RECONSTRUCT,NORMAL_FRAGMENT,SSAO_FRAGMENT,AMBIENT_VISIBILITY};
 })();
+// Source: engine/basement/rounded-shapes.js
+const module11=(()=>{
+/**
+ * Basement / rounded shapes: one shared, smooth "tapered capsule" mesh that every rounded
+ * instance reuses, shaped per instance in the vertex shader. It is the renderer's second
+ * primitive beside the unit box, built for bodies, clothing and other organic forms.
+ *
+ * Shape contract (all in the shape's local frame, before its rotation):
+ *   - `shape.size` is the full extent, as for a box: x width and y depth at the near end,
+ *     z total length including both end caps. Cross-sections are ellipses.
+ *   - The near end sits at +z (t = 0) and the far end at -z (t = 1). A limb that hangs
+ *     from a joint therefore needs no extra rotation: near is the joint, far is below.
+ *   - `shape.rounded` = { taper, depthTaper, bulge, peak, flatNear, flatFar, widthOnly }
+ *     (see roundedProfile):
+ *       taper     far-end width ÷ near-end width (0.05–4)
+ *       depthTaper far-end depth ÷ near-end depth (defaults to taper), so a shape can
+ *                 widen without deepening (a pelvis from waist to hips)
+ *       bulge     extra radius, as a fraction of the near radius, added smoothly between
+ *                 the ends and largest at `peak` (−0.95–0.95; negative pinches)
+ *       peak      where along the body the bulge is largest, 0 near … 1 far (0.01–0.99)
+ *       flatNear  end the near side with a flat disc instead of a dome (a sleeve hem)
+ *       flatFar   the same for the far side
+ *       widthOnly apply the bulge to the x width only (hips, ribcage), keeping the depth
+ *   Each end is a dome whose height is its smaller cross-section radius, so two segments
+ *   whose touching radii match meet in one continuous joint, with no gap at any angle.
+ *   If size.z is shorter than both domes the domes are squashed into an ellipsoid.
+ *
+ * Record packing: lit and shadow records keep their sizes (24 and 16 floats). The two
+ * previously unused lanes carry the profile, so boxes and rounded shapes share every
+ * record, upload and depth-cache path:
+ *   pose.w  0 marks a box (the legacy value, so old records stay boxes); otherwise the
+ *           integer part is the width taper in thousandths and the fraction is depth
+ *           taper ÷ 4 (resolution about 0.002, finer than any visible change)
+ *   size.w  integer part = peak in hundredths + 100 × flags (1 flat near, 2 flat far,
+ *           4 width-only bulge); fraction = (bulge + 1) / 2. Float32 keeps the fraction to
+ *           about 1e-4 at the largest code (799), finer than any visible change.
+ *
+ * CPU queries (picking, asset bounds, analytic AO) still treat a rounded shape as its box.
+ * The box encloses the shape whenever taper ≤ 1 and bulge ≤ 0; otherwise the surface
+ * can extend slightly past it, which the renderer's culling radius accounts for.
+ */
+
+/** Mesh resolution: segments around the axis, rings along each dome and along the body. */
+const AROUND = 18,
+  DOME_RINGS = 5,
+  BODY_RINGS = 7;
+
+/** Validated, frozen profile. Authors call this once; the renderer only packs it. */
+function roundedProfile({ taper = 1, depthTaper = taper, bulge = 0, peak = 0.5, flatNear = false, flatFar = false, widthOnly = false } = {}) {
+  for (const value of [taper, depthTaper])
+    if (!Number.isFinite(value) || value < 0.05 || value > 3.99) throw new RangeError("Rounded tapers must be 0.05–3.99");
+  if (!Number.isFinite(bulge) || bulge < -0.95 || bulge > 0.95) throw new RangeError("Rounded bulge must be −0.95–0.95");
+  if (!Number.isFinite(peak) || peak < 0.01 || peak > 0.99) throw new RangeError("Rounded peak must be 0.01–0.99");
+  if (![flatNear, flatFar, widthOnly].every((flag) => typeof flag === "boolean")) throw new TypeError("Rounded flags must be boolean");
+  return Object.freeze({ taper, depthTaper, bulge, peak, flatNear, flatFar, widthOnly });
+}
+
+/** Encode the pose.w lane: width taper in thousandths, depth taper ÷ 4 as the fraction. */
+function packTaperLane(r) {
+  const width = Math.min(3999, Math.max(50, Math.round((r.taper ?? 1) * 1000))),
+    depth = Math.min(3.99, Math.max(0.05, r.depthTaper ?? r.taper ?? 1));
+  return width + depth / 4.0001;
+}
+
+/** Encode the size.w lane. Values are clamped so a hand-written profile cannot corrupt it. */
+function packRoundedLane(r) {
+  const peak = Math.round(Math.min(0.99, Math.max(0.01, r.peak ?? 0.5)) * 100),
+    flags = (r.flatNear ? 1 : 0) + (r.flatFar ? 2 : 0) + (r.widthOnly ? 4 : 0),
+    // Keep the fraction strictly below 1 so it never carries into the integer part.
+    fraction = Math.min(0.9998, Math.max(0, ((r.bulge ?? 0) + 1) / 2));
+  return peak + 100 * flags + fraction;
+}
+
+/** Largest radial scale relative to the near radius: culling radii must cover the bulge. */
+function roundedReach(r) {
+  return Math.max(1, r.taper ?? 1, r.depthTaper ?? 1) + Math.max(0, r.bulge ?? 0);
+}
+
+/**
+ * Indexed mesh in parameter space, not positions: aPosition = (cos θ, sin θ, t) and
+ * aNormal = (sin φ, cos φ, end), where end is +1 on the near dome, −1 on the far dome
+ * and 0 on the body. Interleaved like the cube (6 floats, 24-byte stride).
+ * The body rings duplicate the dome equators so each keeps its own exact normal.
+ */
+function roundedGeometry() {
+  const rings = [];
+  // Near dome, from the pole (+z) down to its equator.
+  for (let i = 0; i <= DOME_RINGS; i++) {
+    const phi = (Math.PI / 2) * (1 - i / DOME_RINGS);
+    rings.push([0, Math.sin(phi), Math.cos(phi), 1]);
+  }
+  for (let i = 0; i <= BODY_RINGS; i++) rings.push([i / BODY_RINGS, 0, 1, 0]);
+  // Far dome, from its equator down to the pole (−z).
+  for (let i = 0; i <= DOME_RINGS; i++) {
+    const phi = (-Math.PI / 2) * (i / DOME_RINGS);
+    rings.push([1, Math.sin(phi), Math.cos(phi), -1]);
+  }
+  const columns = AROUND + 1,
+    vertices = new Float32Array(rings.length * columns * 6),
+    indices = [];
+  let v = 0;
+  for (const [t, sinPhi, cosPhi, end] of rings)
+    for (let j = 0; j < columns; j++) {
+      const theta = (j / AROUND) * Math.PI * 2;
+      vertices.set([Math.cos(theta), Math.sin(theta), t, sinPhi, cosPhi, end], v);
+      v += 6;
+    }
+  for (let r = 0; r + 1 < rings.length; r++)
+    for (let j = 0; j < AROUND; j++) {
+      const a = r * columns + j,
+        b = a + columns;
+      // Counter-clockwise seen from outside (+x at θ = 0, rings descending in z).
+      indices.push(a, b, a + 1, a + 1, b, b + 1);
+    }
+  return { vertices, indices: new Uint16Array(indices) };
+}
+
+/**
+ * Shared GLSL: place one vertex of either primitive. Boxes pass straight through. Rounded
+ * vertices evaluate the profile s(t) = mix(1, taper, t) + bulge·hump(t), where hump rises
+ * from 0 at the near end to 1 at `peak` and returns to 0 at the far end with zero slope at
+ * all three points, then build an analytic normal (no per-vertex normal data is needed).
+ */
+const SHAPE_GLSL = `
+const float SHAPE_PI=3.14159265;
+void shapeVertex(vec3 a,vec3 b,vec4 pose,vec4 size,out vec3 p,out vec3 n){
+  if(pose.w<=0.0){p=a*size.xyz;n=b;return;}
+  float tx=floor(pose.w)/1000.0, ty=fract(pose.w)*4.0001;
+  float code=floor(size.w);
+  float bulge=fract(size.w)*2.0-1.0;
+  float flags=floor(code/100.0);
+  float peak=clamp((code-flags*100.0)/100.0,0.01,0.99);
+  bool flatNear=mod(flags,2.0)>0.5, flatFar=mod(floor(flags/2.0),2.0)>0.5, widthOnly=flags>3.5;
+  float ax=size.x*0.5, ay=size.y*0.5;
+  // Dome heights follow each end's smaller radius; flat ends keep a sliver for normals.
+  float r0=min(ax,ay), r1=min(ax*tx,ay*ty);
+  float c0=flatNear?r0*0.002:r0, c1=flatFar?r1*0.002:r1;
+  float body=size.z-c0-c1;
+  if(body<0.0){float k=size.z/(c0+c1);c0*=k;c1*=k;body=0.0;}
+  float t=b.z>0.5?0.0:(b.z<-0.5?1.0:a.z);
+  float hump, slope;
+  if(t<peak){float u=SHAPE_PI*t/peak;hump=0.5-0.5*cos(u);slope=0.5*SHAPE_PI/peak*sin(u);}
+  else{float u=SHAPE_PI*(t-peak)/(1.0-peak);hump=0.5+0.5*cos(u);slope=-0.5*SHAPE_PI/(1.0-peak)*sin(u);}
+  // Separate width/depth scales: each axis has its own taper; a width-only bulge widens
+  // hips without deepening them.
+  float by=widthOnly?0.0:bulge;
+  float sx=max(0.02,mix(1.0,tx,t)+bulge*hump), sy=max(0.02,mix(1.0,ty,t)+by*hump);
+  float dsx=(tx-1.0)+bulge*slope, dsy=(ty-1.0)+by*slope;
+  // Axis position of this ring's centre: near dome centre at the top, body runs down.
+  float zc=size.z*0.5-c0-body*t;
+  float k=body>0.0?ax*ay/body:0.0;
+  vec2 ring=a.xy;
+  // dP/dθ × dP/dz, with z decreasing as t grows: radii change by ds per -body of z.
+  vec3 side=normalize(vec3(sy*ay*ring.x,sx*ax*ring.y,k*(sx*dsy*ring.y*ring.y+sy*dsx*ring.x*ring.x)));
+  if(abs(b.z)<0.5){
+    p=vec3(sx*ax*ring.x,sy*ay*ring.y,zc);
+    n=side;
+  } else {
+    // Domes sit where the hump is zero. Their normals bend toward the body's sloped
+    // normal near the equator, so a tapered shape shades without a crease at the seam.
+    float c=b.z>0.5?c0:c1, sinPhi=b.x, cosPhi=b.y;
+    p=vec3(sx*ax*cosPhi*ring.x,sy*ay*cosPhi*ring.y,zc+c*sinPhi);
+    vec3 dome=normalize(vec3(cosPhi*ring.x/(sx*ax),cosPhi*ring.y/(sy*ay),sinPhi/c));
+    vec3 equator=normalize(vec3(ring.x/(sx*ax),ring.y/(sy*ay),0.0));
+    n=dome+(side-equator)*cosPhi*cosPhi;
+  }
+  n=normalize(n);
+}
+`;
+
+return {roundedProfile,packTaperLane,packRoundedLane,roundedReach,roundedGeometry,SHAPE_GLSL};
+})();
 // Source: engine/basement/shadow-shaders.js
 const module10=(()=>{
 /**
@@ -689,17 +861,22 @@ const module10=(()=>{
  * remain separate. PCF has a fixed kernel; it is not area-light penumbra simulation.
  */
 const { ROTATION_GLSL } = module4;
+const { SHAPE_GLSL } = module11;
 
 const SHADOW_VERTEX=`#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPosition;
+layout(location=1) in vec3 aNormal; // rounded-mesh parameters; unused by boxes here
 layout(location=2) in vec4 aPose;
 layout(location=3) in vec4 aSize;
 layout(location=5) in vec4 aRotation;
 uniform mat4 uLightMatrix;
 ${ROTATION_GLSL}
+${SHAPE_GLSL}
 void main(){
-  vec3 p=rotateByQuaternion(aRotation,aPosition*aSize.xyz);
+  // Same placement as the lit pass, so rounded casters shadow with their real outline.
+  vec3 local,normal;shapeVertex(aPosition,aNormal,aPose,aSize,local,normal);
+  vec3 p=rotateByQuaternion(aRotation,local);
   gl_Position=uLightMatrix*vec4(p+aPose.xyz,1.0);
 }`;
 
@@ -802,7 +979,8 @@ return {SHADOW_VERTEX,SHADOW_FRAGMENT,SHADOW_VISIBILITY};
 // Source: engine/basement/shaders.js
 const module8=(()=>{
 /**
- * Basement / shaders: GPU-native instanced boxes and inexpensive surface lighting.
+ * Basement / shaders: GPU-native instanced boxes and rounded shapes, with inexpensive
+ * surface lighting. shapeVertex() (rounded-shapes.js) places both primitives.
  * Optional ambient visibility is supplied by the Basement occlusion capability.
  * No Canvas preparation, font atlas or external assets.
  * This is the first renderer material, not a full PBR material system.
@@ -810,12 +988,13 @@ const module8=(()=>{
 const { AMBIENT_VISIBILITY } = module9;
 const { SHADOW_VISIBILITY } = module10;
 const { ROTATION_GLSL } = module4;
+const { SHAPE_GLSL } = module11;
 
 const VERTEX = `#version 300 es
 precision highp float;
-layout(location=0) in vec3 aPosition;
+layout(location=0) in vec3 aPosition; // box corner, or rounded-mesh parameters
 layout(location=1) in vec3 aNormal;
-// Per-instance layout, documented in renderer.js: pose, dimensions/emission, color.
+// Per-instance layout, documented in renderer.js: pose/taper, dimensions/profile, color.
 layout(location=2) in vec4 aPose;
 layout(location=3) in vec4 aSize;
 layout(location=4) in vec4 aColor;
@@ -824,6 +1003,7 @@ layout(location=6) in vec4 aEmission; // linear emissive radiance / sharpness
 layout(location=7) in vec4 aSpecular; // tint / normal-incidence reflectance
 uniform mat4 uViewProjection;
 ${ROTATION_GLSL}
+${SHAPE_GLSL}
 out vec3 vWorld;
 out vec3 vNormal;
 out vec3 vColor;
@@ -832,8 +1012,9 @@ flat out vec4 vSpecular;
 flat out float vSharpness;
 out float vHighlight;
 void main() {
-  vec3 p=rotateByQuaternion(aRotation,aPosition*aSize.xyz)+aPose.xyz;
-  vWorld=p;vNormal=rotateByQuaternion(aRotation,aNormal);
+  vec3 local,normal;shapeVertex(aPosition,aNormal,aPose,aSize,local,normal);
+  vec3 p=rotateByQuaternion(aRotation,local)+aPose.xyz;
+  vWorld=p;vNormal=rotateByQuaternion(aRotation,normal);
   vColor = aColor.rgb;
   vEmission = aEmission.rgb;vHighlight=aColor.w;
   vSpecular=aSpecular;vSharpness=aEmission.w;
@@ -919,7 +1100,7 @@ void main() {
 return {VERTEX,FRAGMENT};
 })();
 // Source: engine/basement/render-diagnostics.js
-const module11=(()=>{
+const module12=(()=>{
 /**
  * Basement / rendering diagnostics: per-frame work deltas and requested buffer bytes.
  * Preparation uploads are included even when the later presentation resets legacy stats.
@@ -957,7 +1138,7 @@ function renderDiagnostics(renderer,profiler){
 return {renderDiagnostics};
 })();
 // Source: engine/basement/gpu-timer.js
-const module12=(()=>{
+const module13=(()=>{
 /**
  * Basement / GPU timer: optional EXT_disjoint_timer_query_webgl2 measurements.
  * At most four reusable queries. Results are polled for availability, never forced
@@ -1023,7 +1204,7 @@ class GpuTimer {
 return {GpuTimer};
 })();
 // Source: engine/basement/gl-program.js
-const module13=(()=>{
+const module14=(()=>{
 /** Basement / GL programs: shared compilation with complete failure-path ownership. */
 
 /** Link two GLSL stages; delete temporary shaders on success and every failure path. */
@@ -1050,7 +1231,7 @@ function createProgram(gl, vertexSource, fragmentSource) {
 return {createProgram};
 })();
 // Source: engine/basement/fullscreen-shaders.js
-const module15=(()=>{
+const module16=(()=>{
 /** Basement / vertex-ID fullscreen triangle shared by screen-space capabilities. */
 const FULLSCREEN_VERTEX = `#version 300 es
 precision highp float;
@@ -1060,14 +1241,14 @@ void main(){vUV=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));gl_Position
 return {FULLSCREEN_VERTEX};
 })();
 // Source: engine/basement/ambient-occlusion.js
-const module14=(()=>{
+const module15=(()=>{
 /**
  * Basement / ambient occlusion: owns bounded proxies, optional GPU targets and settings.
  * No scheduling, world ownership or game policy lives here. Renderer invokes the passes
  * with its existing retained batch. Screen targets are lazy and freed when leaving screen.
  */
-const { FULLSCREEN_VERTEX } = module15;
-const { createProgram } = module13;
+const { FULLSCREEN_VERTEX } = module16;
+const { createProgram } = module14;
 const { VERTEX } = module8;
 const { NORMAL_FRAGMENT,  SSAO_FRAGMENT } = module9;
 
@@ -1185,7 +1366,7 @@ class AmbientOcclusion {
     gl.viewport(0,0,t.width,t.height);gl.bindFramebuffer(gl.FRAMEBUFFER,t.framebuffers[0]);
     gl.enable(gl.DEPTH_TEST);gl.clearColor(0.5,0.5,1,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
     gl.useProgram(this.normalProgram);gl.uniformMatrix4fv(this.normalCamera,false,r.camera.matrix);
-    gl.bindVertexArray(batch.vao);gl.drawArraysInstanced(gl.TRIANGLES,0,36,batch.count);gl.bindVertexArray(null);
+    const geometryDraws=batch.draw();
     gl.bindFramebuffer(gl.FRAMEBUFFER,t.framebuffers[1]);gl.disable(gl.DEPTH_TEST);
     gl.useProgram(this.screenProgram);this.texture(0,t.depth);this.texture(1,t.normal);
     gl.uniform1i(this.screenUniforms.uDepth,0);gl.uniform1i(this.screenUniforms.uNormals,1);
@@ -1195,8 +1376,8 @@ class AmbientOcclusion {
     gl.uniform1f(this.screenUniforms.uRadius,this.settings.radius);gl.drawArrays(gl.TRIANGLES,0,3);
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.enable(gl.DEPTH_TEST);
     gl.viewport(0,0,r.canvas.width,r.canvas.height);
-    // Count both submissions, but only the geometry pass submits world instances.
-    r.stats.draws+=2;r.totals.draws+=2;r.stats.instances+=batch.count;r.totals.instances+=batch.count;
+    // Count every submission, but only the geometry pass submits world instances.
+    r.stats.draws+=geometryDraws+1;r.totals.draws+=geometryDraws+1;r.stats.instances+=batch.count;r.totals.instances+=batch.count;
     return true;
   }
 
@@ -1249,7 +1430,7 @@ class AmbientOcclusion {
 return {occlusionSettings,occlusionDimensions,AmbientOcclusion};
 })();
 // Source: engine/basement/shadow-math.js
-const module17=(()=>{
+const module18=(()=>{
 /**
  * Basement / shadow math: light-space transforms, independent of GL and game content.
  * Matrices are column-major Float32 values. Coordinates use x/y ground and z height.
@@ -1302,7 +1483,7 @@ function pointShadowMatrix(position,face,near,far,out=new Float32Array(16)) {
 return {lightDirection,directionalShadowMatrix,pointShadowMatrix};
 })();
 // Source: engine/basement/shadow-target.js
-const module19=(()=>{
+const module20=(()=>{
 /**
  * Basement / shadow target: owns one depth-only 2D or cube texture and framebuffer.
  * Requested depth24 storage is budgeted at four bytes/texel; driver padding is unknown.
@@ -1344,17 +1525,17 @@ class ShadowTarget {
 return {ShadowTarget};
 })();
 // Source: engine/basement/shadow-maps.js
-const module18=(()=>{
+const module19=(()=>{
 /**
  * Basement / shadow maps: bounded renderer-owned targets, caster storage and update caches.
  * One directional map updates on change; at most one selected point cube refreshes as
  * an atomic six-face group. Point geometry changes are rate-limited; travel/light moves
  * invalidate immediately. No queue, second loop or partial six-face image is exposed.
  */
-const { createProgram } = module13;
-const { directionalShadowMatrix, pointShadowMatrix } = module17;
+const { createProgram } = module14;
+const { directionalShadowMatrix, pointShadowMatrix } = module18;
 const { SHADOW_VERTEX, SHADOW_FRAGMENT } = module10;
-const { ShadowTarget } = module19;
+const { ShadowTarget } = module20;
 
 class ShadowMaps {
   /** Retain matrices/keys; GPU allocations remain lazy until an enabled world is drawn. */
@@ -1397,7 +1578,7 @@ class ShadowMaps {
     this.sourceBatch=batch;
     this.casters.sync();
     try {
-      this.ensureProgram();gl.enable(gl.DEPTH_TEST);gl.useProgram(this.program);gl.bindVertexArray(this.casters.vao);
+      this.ensureProgram();gl.enable(gl.DEPTH_TEST);gl.useProgram(this.program);
       this.prepareSun();this.preparePoint();
     } catch(error) {
       // Program errors disable both paths until reconfiguration/restoration. Target
@@ -1413,9 +1594,10 @@ class ShadowMaps {
   submit(target,matrix,face=0) {
     const gl=this.gl,r=this.renderer;target.face(face);gl.viewport(0,0,target.resolution,target.resolution);
     gl.clear(gl.DEPTH_BUFFER_BIT);gl.uniformMatrix4fv(this.matrixUniform,false,matrix);
-    gl.drawArraysInstanced(gl.TRIANGLES,0,36,this.casters.count);
-    this.frameDraws++;r.stats.draws++;r.stats.instances+=this.casters.count;
-    r.totals.draws++;r.totals.shadowDraws++;r.totals.instances+=this.casters.count;
+    // One submission per primitive stream (boxes, rounded shapes) present in the casters.
+    const submissions=this.casters.draw();
+    this.frameDraws+=submissions;r.stats.draws+=submissions;r.stats.instances+=this.casters.count;
+    r.totals.draws+=submissions;r.totals.shadowDraws+=submissions;r.totals.instances+=this.casters.count;
   }
 
   /** Sun cache includes the packed caster version and the complete snapped light transform. */
@@ -1514,14 +1696,14 @@ class ShadowMaps {
 return {ShadowMaps};
 })();
 // Source: engine/basement/lighting.js
-const module16=(()=>{
+const module17=(()=>{
 /**
  * Basement / lighting: reusable irradiance data, validated configuration and shadow ownership.
  * Games author light placement/palettes; no world names, scheduling or game rules live here.
  * Fixed eight-point storage is explicit. Shadows budget one sun plus one selected point.
  */
-const { lightDirection } = module17;
-const { ShadowMaps } = module18;
+const { lightDirection } = module18;
+const { ShadowMaps } = module19;
 
 /** Validate copied RGB values; runtime data cannot silently retain a caller's mutable array. */
 function colorValues(color) {
@@ -1604,14 +1786,14 @@ class Lighting {
 return {shadowSettings,Lighting};
 })();
 // Source: engine/basement/lines.js
-const module20=(()=>{
+const module21=(()=>{
 /**
  * Basement / retained colored lines. A small general rendering capability for debug
  * bounds, construction grids and authoring guides; it knows no editor or game types.
  * One shared program per renderer; each layer owns a bounded CPU/GPU vertex buffer.
  * Renderer submits these passes inside its normal GPU timer and restores all handles.
  */
-const { createProgram } = module13;
+const { createProgram } = module14;
 const VERTEX=`#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPosition;
@@ -1684,7 +1866,7 @@ class LineLayer {
 return {LineRendering};
 })();
 // Source: engine/basement/float-targets.js
-const module23=(()=>{
+const module24=(()=>{
 /** Basement / transactional float-colour target allocation. Each owner records handles
  * before storage calls, so partial construction and normal disposal share one cleanup path. */
 class FloatTargets {
@@ -1773,9 +1955,9 @@ class FloatTargets {
 return {FloatTargets};
 })();
 // Source: engine/basement/hdr-targets.js
-const module22=(()=>{
+const module23=(()=>{
 /** Basement / antialiased HDR scene and resolved depth. Independent of every post effect. */
-const { FloatTargets } = module23;
+const { FloatTargets } = module24;
 class HdrTargets extends FloatTargets {
   constructor(gl, width, height) {
     super(gl);
@@ -1845,7 +2027,7 @@ class HdrTargets extends FloatTargets {
 return {HdrTargets};
 })();
 // Source: engine/basement/presentation-shaders.js
-const module24=(()=>{
+const module25=(()=>{
 /** Basement / final linear radiance composition, display encoding and guide depth restoration. */
 /** An optional additive texture combines with unclipped scene radiance, followed by one exposure/rolloff/encoding.
  * Restore resolved geometry depth into the default framebuffer in the same submission.
@@ -1868,13 +2050,13 @@ void main(){
 return {PRESENT_COMPOSITE};
 })();
 // Source: engine/basement/presentation.js
-const module21=(()=>{
+const module22=(()=>{
 /** Basement / shared image presentation: HDR scene ownership, resolve, exposure and final
  * composition. Effects borrow linear scene colour; this stage knows no effect or game type. */
-const { HdrTargets } = module22;
-const { createProgram } = module13;
-const { FULLSCREEN_VERTEX } = module15;
-const { PRESENT_COMPOSITE } = module24;
+const { HdrTargets } = module23;
+const { createProgram } = module14;
+const { FULLSCREEN_VERTEX } = module16;
+const { PRESENT_COMPOSITE } = module25;
 const BACKGROUND = Object.freeze([
   0.00011607027229163823, 0.00013073244809242254, 0.0005666143501070634,
 ]);
@@ -2094,7 +2276,7 @@ class Presentation {
 return {presentationSettings,Presentation};
 })();
 // Source: engine/basement/bloom-settings.js
-const module26=(()=>{
+const module27=(()=>{
 /** Basement / bloom settings and predictable target budgets. No GL or application policy.
  * Sizes are backing pixels; radii are pyramid texels, strength dimensionless. */
 /** One parameter catalog supplies both API validation and shared Studio/game controls.
@@ -2202,10 +2384,10 @@ function bloomStorage(dimensions) {
 return {BLOOM_PARAMETERS,bloomSettings,bloomDimensions,bloomStorage};
 })();
 // Source: engine/basement/bloom-targets.js
-const module27=(()=>{
+const module28=(()=>{
 /** Basement / effect-local bloom pyramid. Scene colour, depth and MSAA belong to Presentation. */
-const { FloatTargets } = module23;
-const { bloomDimensions, bloomStorage } = module26;
+const { FloatTargets } = module24;
+const { bloomDimensions, bloomStorage } = module27;
 class BloomTargets extends FloatTargets {
   constructor(gl, width, height, mode) {
     super(gl);
@@ -2232,7 +2414,7 @@ class BloomTargets extends FloatTargets {
 return {BloomTargets};
 })();
 // Source: engine/basement/bloom-shaders.js
-const module28=(()=>{
+const module29=(()=>{
 /** Basement / linear-light bloom pyramid. Bright energy is extracted before tone mapping.
  * Stable spatial filters only: no history, noise textures, Canvas assets or frame jitter. */
 /** Thirteen overlapping taps reduce aliasing of narrow signs before the first reduction.
@@ -2290,14 +2472,14 @@ void main(){
 return {BLOOM_DOWN,BLOOM_UP};
 })();
 // Source: engine/basement/bloom.js
-const module25=(()=>{
+const module26=(()=>{
 /** Basement / bloom filter. Borrows resolved scene colour during render; owns only its
  * reduction/reconstruction pyramid and programs. No HDR scene, exposure, compositor or scheduler. */
-const { bloomSettings } = module26;
-const { BloomTargets } = module27;
-const { createProgram } = module13;
-const { FULLSCREEN_VERTEX } = module15;
-const { BLOOM_DOWN, BLOOM_UP } = module28;
+const { bloomSettings } = module27;
+const { BloomTargets } = module28;
+const { createProgram } = module14;
+const { FULLSCREEN_VERTEX } = module16;
+const { BLOOM_DOWN, BLOOM_UP } = module29;
 class Bloom {
   /** No targets/programs are allocated until a nonzero enabled filter is submitted. */
   constructor(renderer, options = {}) {
@@ -2478,7 +2660,7 @@ class Bloom {
 return {Bloom};
 })();
 // Source: engine/basement/camera.js
-const module29=(()=>{
+const module30=(()=>{
 /** Basement / shared z-up camera. Focus is the orbit pivot, never an implicit eye.
  * Drawing, clipping, picking and screen-space effects use one view/projection pair.
  * Orthographic remains the default so game presentation does not change in Studio.
@@ -2742,18 +2924,22 @@ const module7=(()=>{
  * Cube geometry/program belong to the renderer; each world batch belongs to a lease.
  * Lit record: 24 floats (96 bytes): pose, dimensions, base colour/highlight, quaternion, emission RGB/sharpness, specular RGB/reflectivity. Shadow records remain 16 floats (64 bytes), independent of materials.
  * Only changed contiguous instance ranges are uploaded after the initial allocation.
+ * Two primitives share those records: unit boxes (pose.w = 0) and rounded tapered capsules
+ * (rounded-shapes.js). Each batch keeps one stream per primitive; the rounded stream and
+ * the renderer's rounded mesh are allocated only when a world first contains one.
  */
 const { VERTEX, FRAGMENT } = module8;
 const { Lifetime } = module6;
-const { renderDiagnostics } = module11;
-const { GpuTimer } = module12;
-const { createProgram } = module13;
-const { AmbientOcclusion } = module14;
-const { Lighting } = module16;
-const { LineRendering } = module20;
-const { Presentation } = module21;
-const { Bloom } = module25;
-const { Camera } = module29;
+const { renderDiagnostics } = module12;
+const { GpuTimer } = module13;
+const { createProgram } = module14;
+const { AmbientOcclusion } = module15;
+const { Lighting } = module17;
+const { LineRendering } = module21;
+const { Presentation } = module22;
+const { Bloom } = module26;
+const { Camera } = module30;
+const { roundedGeometry, packRoundedLane, packTaperLane, roundedReach } = module11;
 
 /** Generate one unit cube with flat normals; uploaded once per WebGL context lifetime. */
 function cubeGeometry() {
@@ -2829,7 +3015,27 @@ class Renderer {
       .map(name => [name, gl.getUniformLocation(program, name)]));
     this.cube = gl.createBuffer(); this.stats.buffers++;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.cube); gl.bufferData(gl.ARRAY_BUFFER, cubeGeometry(), gl.STATIC_DRAW);
+    // Handles from a lost context are already invalid; the mesh is rebuilt on next use.
+    this.rounded = null;
     gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
+  }
+
+  /**
+   * Renderer-owned rounded mesh (vertex + index buffer), created the first time any batch
+   * holds a rounded shape and kept until disposal or context loss. Worlds made only of
+   * boxes never allocate it.
+   */
+  roundedMesh() {
+    if (this.rounded) return this.rounded;
+    const gl = this.gl, { vertices, indices } = roundedGeometry();
+    const vertexBuffer = gl.createBuffer(), indexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer); gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+    // Element bindings are VAO state, so upload with no VAO bound and bind per stream VAO.
+    gl.bindVertexArray(null);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+    this.stats.buffers += 2;
+    return (this.rounded = { vertexBuffer, indexBuffer, count: indices.length });
   }
 
   /** Allocate a batch with an explicit maximum. Capacity is a budget, not silent growth. */
@@ -2916,11 +3122,9 @@ class Renderer {
     gl.uniform3fv(this.uniforms.uCameraBack,this.camera.back);
     gl.uniform1i(this.uniforms.uPerspective,this.camera.projection==='perspective'?1:0);
     this.lighting.bind(this.uniforms);
-    gl.bindVertexArray(batch.vao);
-    gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, batch.count);
-    gl.bindVertexArray(null);
-    this.stats.draws++; this.stats.instances += batch.count;
-    this.totals.draws++;this.totals.instances+=batch.count;
+    const submissions = batch.draw();
+    this.stats.draws += submissions; this.stats.instances += batch.count;
+    this.totals.draws += submissions;this.totals.instances+=batch.count;
     if(hdr){
       const resolveToken=this.profiler?.begin(this.presentationScope);try{this.presentation.resolve();}finally{this.profiler?.end(resolveToken);}
       const filterToken=this.profiler?.begin(this.bloomScope);let additive;try{additive=this.bloom.render(this.presentation.targets.scene.texture);}finally{this.profiler?.end(filterToken);}
@@ -2934,49 +3138,51 @@ class Renderer {
     this.disposed = true; this.life.dispose(); this.lines.dispose(); this.gpuTimer.dispose(); this.occlusion.dispose(); this.lighting.dispose();this.bloom.dispose();this.presentation.dispose();
     for (const batch of [...this.batches]) batch.dispose();
     this.gl.deleteBuffer(this.cube); this.gl.deleteProgram(this.program);
+    if (this.rounded) { this.gl.deleteBuffer(this.rounded.vertexBuffer); this.gl.deleteBuffer(this.rounded.indexBuffer); this.rounded = null; }
     this.stats.buffers = this.stats.programs = this.stats.vaos = 0;
   }
 }
 
 /**
- * One world batch, independently owned/disposable through Directory.acquire().
- * This first renderer performs conservative view culling, not a full spatial grid.
- * Future spatial query output can replace this small-world scan through the same contract.
+ * One primitive's records inside a batch: retained CPU floats, one dynamic GPU buffer and
+ * the VAO that pairs them with the primitive's mesh. Dirty bounds are per stream, so a
+ * walking figure re-uploads only its rounded range while static boxes stay untouched.
  */
-class InstanceBatch {
-  /** Retain bounded CPU records so context restoration never depends on Canvas assets. */
-  constructor(renderer, world, capacity, visibility) {
-    if(!['camera','shadow'].includes(visibility))throw new RangeError('Invalid instance visibility policy');
-    this.visibility=visibility;this.version=0;
-    this.renderer = renderer; this.world = world; this.capacity = capacity;
-    this.data = new Float32Array(capacity * (visibility==='camera'?24:16));
-    this.kind=visibility==='shadow'?'shadow-instance-buffer':'instance-buffer';this.cpuBytes=this.data.byteLength;this.gpuBufferBytes=this.data.byteLength;
-    this.recordFloats=visibility==='camera'?24:16;
-    this.count = 0; this.disposed = false;
+class InstanceStream {
+  constructor(batch, primitive) {
+    this.batch = batch; this.primitive = primitive;
+    this.data = new Float32Array(batch.capacity * batch.recordFloats);
+    this.count = 0; this.cursor = 0; this.firstDirty = Infinity; this.lastDirty = -1;
     this.initialize();
   }
 
-  /** Configure one VAO and dynamic instance buffer; allocate storage once per context. */
+  /** Configure the VAO for this primitive's mesh and allocate instance storage once per context. */
   initialize() {
-    const { gl, stats, cube } = this.renderer;
+    const r = this.batch.renderer, { gl, stats } = r;
+    const mesh = this.primitive === 'rounded' ? r.roundedMesh() : null;
     this.vao = gl.createVertexArray(); stats.vaos++;
     this.buffer = gl.createBuffer(); stats.buffers++;
     gl.bindVertexArray(this.vao);
-    gl.bindBuffer(gl.ARRAY_BUFFER, cube);
+    gl.bindBuffer(gl.ARRAY_BUFFER, mesh ? mesh.vertexBuffer : r.cube);
     for (let i = 0; i < 2; i++) {
       gl.enableVertexAttribArray(i); gl.vertexAttribPointer(i, 3, gl.FLOAT, false, 24, i * 12);
     }
+    if (mesh) gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.indexBuffer);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
     gl.bufferData(gl.ARRAY_BUFFER, this.data.byteLength, gl.DYNAMIC_DRAW);
-    for (let i = 0; i < (this.visibility==='camera'?6:4); i++) {
+    const floats = this.batch.recordFloats;
+    for (let i = 0; i < floats / 4; i++) {
       const location = i + 2;
-      gl.enableVertexAttribArray(location); gl.vertexAttribPointer(location, 4, gl.FLOAT, false, this.recordFloats*4, i * 16);
+      gl.enableVertexAttribArray(location); gl.vertexAttribPointer(location, 4, gl.FLOAT, false, floats*4, i * 16);
       gl.vertexAttribDivisor(location, 1);
     }
     gl.bindVertexArray(null); this.forceUpload = true;
   }
 
-  /** Append one float to the retained record, tracking dirty bounds without allocating a closure. */
+  /** Start a packing pass; previous contents stay for exact-value comparison. */
+  begin() { this.cursor = 0; this.firstDirty = Infinity; this.lastDirty = -1; }
+
+  /** Append one float, tracking dirty bounds without allocating a closure. */
   write(value) {
     const f = Math.fround(value), index = this.cursor++;
     if (this.data[index] !== f || this.forceUpload) {
@@ -2985,58 +3191,132 @@ class InstanceBatch {
     }
   }
 
+  /** Upload the changed range; returns whether the packed contents changed at all. */
+  finish() {
+    const r = this.batch.renderer, gl = r.gl, count = this.cursor / this.batch.recordFloats;
+    const changed = count !== this.count || this.lastDirty >= this.firstDirty;
+    this.count = count;
+    if (this.lastDirty >= this.firstDirty) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+      // WebGL 2 source-offset/length overload uploads a range without a new typed-array view.
+      gl.bufferSubData(gl.ARRAY_BUFFER, this.firstDirty * 4, this.data, this.firstDirty, this.lastDirty - this.firstDirty + 1);
+      const bytes = (this.lastDirty - this.firstDirty + 1) * 4;
+      r.stats.uploads++; r.stats.uploadedBytes += bytes; r.totals.uploads++; r.totals.uploadedBytes += bytes;
+    }
+    this.forceUpload = false;
+    return changed;
+  }
+
+  /** Issue this stream's instanced draw with whatever program the caller bound. */
+  draw() {
+    if (!this.count) return 0;
+    const r = this.batch.renderer, gl = r.gl;
+    gl.bindVertexArray(this.vao);
+    if (this.primitive === 'rounded') gl.drawElementsInstanced(gl.TRIANGLES, r.rounded.count, gl.UNSIGNED_SHORT, 0, this.count);
+    else gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, this.count);
+    return 1;
+  }
+
+  /** Release GL handles and CPU storage exactly once. */
+  dispose() {
+    const { gl, stats } = this.batch.renderer;
+    gl.deleteBuffer(this.buffer); gl.deleteVertexArray(this.vao);
+    stats.buffers--; stats.vaos--; this.data = null;
+  }
+}
+
+/**
+ * One world batch, independently owned/disposable through Directory.acquire().
+ * This first renderer performs conservative view culling, not a full spatial grid.
+ * Future spatial query output can replace this small-world scan through the same contract.
+ * Capacity bounds boxes and rounded shapes together: it is the world's instance budget.
+ */
+class InstanceBatch {
+  /** Retain bounded CPU records so context restoration never depends on Canvas assets. */
+  constructor(renderer, world, capacity, visibility) {
+    if(!['camera','shadow'].includes(visibility))throw new RangeError('Invalid instance visibility policy');
+    this.visibility=visibility;this.version=0;
+    this.renderer = renderer; this.world = world; this.capacity = capacity;
+    this.kind=visibility==='shadow'?'shadow-instance-buffer':'instance-buffer';
+    this.recordFloats=visibility==='camera'?24:16;
+    this.count = 0; this.disposed = false;
+    this.box = null; this.rounded = null;
+    this.initialize();
+  }
+
+  /** Byte budgets: each stream reserves the whole capacity, since the mix can change. */
+  get cpuBytes() { return (this.box?.data.byteLength ?? 0) + (this.rounded?.data.byteLength ?? 0); }
+  get gpuBufferBytes() { return this.cpuBytes; }
+  /** The box stream's VAO and retained records, kept for diagnostics and tests that
+   * predate rounded shapes. Rounded records live in `rounded.data` when present. */
+  get vao() { return this.box?.vao ?? null; }
+  get data() { return this.box?.data ?? null; }
+
+  /** (Re)create GPU state for the streams this batch already uses, e.g. after context restore. */
+  initialize() {
+    if (this.box) this.box.initialize(); else this.box = new InstanceStream(this, 'box');
+    this.rounded?.initialize();
+  }
+
   /**
    * Pack visible transforms/materials into retained records; compare Float32 values to
    * avoid treating harmless double-to-float rounding as a perpetual dirty upload.
    */
   sync() {
-    const r = this.renderer, gl = r.gl;
-    this.cursor = 0; this.firstDirty = Infinity; this.lastDirty = -1;
+    const r = this.renderer, camera = this.visibility === 'camera';
+    this.box.begin(); this.rounded?.begin();
+    let total = 0;
     for (const entity of this.world.entities.values()) {
       const s = entity.shape, p = entity.pose;
       if (!s || p.visible===false || (this.visibility==='shadow'&&s.castShadow===false)) continue;
       r.totals.candidates++;
+      const profile = s.rounded ?? null;
       // Sphere is conservative under any orientation. Shadow membership ignores the lens.
-      const radius = Math.hypot(...s.size)*p.scale;
-      if (this.visibility==='camera'&&!r.camera.sphereVisible(p.x,p.y,p.z,radius)) {r.totals.culled++;continue;}
-      if (this.cursor / this.recordFloats >= this.capacity) throw new Error(`World ${this.world.id} exceeds ${this.capacity} ${this.visibility} instances`);
-      this.write(p.x); this.write(p.y); this.write(p.z); this.write(0);
-      this.write(s.size[0]*p.scale); this.write(s.size[1]*p.scale); this.write(s.size[2]*p.scale);
+      const radius = Math.hypot(...s.size)*p.scale*(profile ? roundedReach(profile) : 1);
+      if (camera&&!r.camera.sphereVisible(p.x,p.y,p.z,radius)) {r.totals.culled++;continue;}
+      if (++total > this.capacity) throw new Error(`World ${this.world.id} exceeds ${this.capacity} ${this.visibility} instances`);
+      const out = profile ? (this.rounded ??= new InstanceStream(this, 'rounded')) : this.box;
+      // pose.w / size.w carry the rounded profile (pose.w 0 = box); see rounded-shapes.js.
+      out.write(p.x); out.write(p.y); out.write(p.z); out.write(profile ? packTaperLane(profile) : 0);
+      out.write(s.size[0]*p.scale); out.write(s.size[1]*p.scale); out.write(s.size[2]*p.scale);
+      out.write(profile ? packRoundedLane(profile) : 0);
       // Depth-only records ignore material changes, so recoloring does not invalidate maps.
-      this.write(0);
-      for(let i=0;i<3;i++)this.write(this.visibility==='camera'?s.material.baseColor[i]:0);
-      this.write(this.visibility==='camera'?(entity.highlight??0):0);for(let i=0;i<4;i++)this.write(p.rotation[i]);
-      if(this.visibility==='camera'){for(let i=0;i<3;i++)this.write(s.material.emissionColor[i]*s.material.emissionStrength);this.write(s.material.specularSharpness);for(let i=0;i<3;i++)this.write(s.material.specularColor[i]);this.write(s.material.reflectivity);}
+      for(let i=0;i<3;i++)out.write(camera?s.material.baseColor[i]:0);
+      out.write(camera?(entity.highlight??0):0);for(let i=0;i<4;i++)out.write(p.rotation[i]);
+      if(camera){for(let i=0;i<3;i++)out.write(s.material.emissionColor[i]*s.material.emissionStrength);out.write(s.material.specularSharpness);for(let i=0;i<3;i++)out.write(s.material.specularColor[i]);out.write(s.material.reflectivity);}
     }
-    if(this.count!==this.cursor/this.recordFloats||this.lastDirty>=this.firstDirty)this.version++;
-    this.count = this.cursor / this.recordFloats;
-    if (this.lastDirty >= this.firstDirty) {
-      gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
-      // WebGL 2 source-offset/length overload uploads a range without a new typed-array view.
-      gl.bufferSubData(gl.ARRAY_BUFFER, this.firstDirty * 4, this.data, this.firstDirty, this.lastDirty - this.firstDirty + 1);
-      r.stats.uploads++; r.stats.uploadedBytes += (this.lastDirty - this.firstDirty + 1) * 4;
-      r.totals.uploads++;r.totals.uploadedBytes+=(this.lastDirty-this.firstDirty+1)*4;
-    }
-    this.forceUpload = false;
+    const changedBox = this.box.finish(), changedRounded = this.rounded ? this.rounded.finish() : false;
+    if (changedBox || changedRounded || this.count !== total) this.version++;
+    this.count = total;
+  }
+
+  /**
+   * Draw every non-empty stream with the program the caller bound (lit, depth or normals).
+   * Returns the number of submissions so passes can account for them honestly.
+   */
+  draw() {
+    const gl = this.renderer.gl;
+    const submissions = this.box.draw() + (this.rounded ? this.rounded.draw() : 0);
+    gl.bindVertexArray(null);
+    return submissions;
   }
 
   /** Remove the batch from its renderer and release actual GL handles exactly once. */
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
-    const { gl, stats } = this.renderer;
-    gl.deleteBuffer(this.buffer); gl.deleteVertexArray(this.vao);
-    stats.buffers--; stats.vaos--; this.renderer.batches.delete(this);
+    this.box.dispose(); this.rounded?.dispose();
+    this.renderer.batches.delete(this);
     this.renderer.lighting?.releaseBatch(this);
     // Disposal releases CPU storage too, even if a caller retains the old handle.
-    this.data = null; this.world = null; this.cpuBytes=this.gpuBufferBytes=0;
+    this.box = this.rounded = null; this.world = null;
   }
 }
 
 return {Renderer};
 })();
 // Source: engine/basement/profile-data.js
-const module31=(()=>{
+const module32=(()=>{
 /**
  * Basement / profile data: bounded copies for diagnostics, never live engine references.
  * Used only for on-demand captures/export, not for each recorded frame.
@@ -3100,14 +3380,14 @@ function diagnosticError(error){
 return {boundedCopy,percentile,freezeData,diagnosticError};
 })();
 // Source: engine/basement/profiler.js
-const module30=(()=>{
+const module31=(()=>{
 /**
  * Basement / profiler: bounded CPU scopes, numeric counters, frame history and captures.
  * This mechanism knows no scheduler, renderer, game, DOM element, or GPU API.
  * Milliseconds everywhere. Recording reuses typed storage; summaries/captures allocate
  * only when explicitly requested. Disabled scope calls do not read the clock.
  */
-const { boundedCopy, percentile, freezeData, diagnosticError } = module31;
+const { boundedCopy, percentile, freezeData, diagnosticError } = module32;
 
 class Profiler {
   /** Capacities are hard budgets. Choose them at engine creation, not during a frame. */
@@ -3337,7 +3617,7 @@ const module2=(()=>{
 const { Identities, World } = module3;
 const { Input } = module5;
 const { Renderer } = module7;
-const { Profiler } = module30;
+const { Profiler } = module31;
 
 class Basement {
   /** Renderer first: unsupported WebGL fails before device listeners are installed. */
@@ -3358,7 +3638,7 @@ class Basement {
 return {Basement};
 })();
 // Source: engine/lobby/preparation.js
-const module33=(()=>{
+const module34=(()=>{
 /**
  * Lobby / preparation: cooperatively budgeted generator work in the existing frame loop.
  * Each next() must be a small, synchronous chunk; JavaScript cannot preempt a huge chunk.
@@ -3425,7 +3705,7 @@ class PreparationQueue {
 return {PreparationQueue};
 })();
 // Source: engine/lobby/runtime-diagnostics.js
-const module34=(()=>{
+const module35=(()=>{
 /**
  * Lobby / runtime diagnostics: measurement handles and counters, not scheduling logic.
  * Providers are removed with their runtime. Disabled profiling performs no timer reads.
@@ -3450,14 +3730,14 @@ function runtimeDiagnostics(runtime,profiler){
 return {runtimeDiagnostics};
 })();
 // Source: engine/lobby/runtime.js
-const module32=(()=>{
+const module33=(()=>{
 /**
  * Lobby / runtime: sole animation-frame owner, explicit phases, and pause reasons.
  * All elapsed values are seconds. The engine advances fixed simulation steps and
  * interpolates render poses; long browser suspensions never trigger unlimited work.
  */
-const { PreparationQueue } = module33;
-const { runtimeDiagnostics } = module34;
+const { PreparationQueue } = module34;
+const { runtimeDiagnostics } = module35;
 
 class Runtime {
   /** Inject scheduling for deterministic lifecycle tests; browser defaults allocate no loop yet. */
@@ -3570,7 +3850,7 @@ class Runtime {
 return {Runtime};
 })();
 // Source: engine/directory/residency.js
-const module36=(()=>{
+const module37=(()=>{
 /**
  * Directory / residency: bounded prepared worlds, preparation tickets, and compact state.
  * Factories are game/library supplied. They return {world, ready, capture, dispose, ...}.
@@ -3710,7 +3990,7 @@ class WorldResidency {
 return {WorldResidency};
 })();
 // Source: engine/directory/diagnostics.js
-const module37=(()=>{
+const module38=(()=>{
 /**
  * Directory / diagnostics: report resource ownership through Basement's provider contract.
  * Frame samples are scalar sums. Detailed rows are copied only on capture, capped at 64.
@@ -3757,14 +4037,14 @@ function directoryDiagnostics(directory,profiler){
 return {directoryDiagnostics};
 })();
 // Source: engine/directory/directory.js
-const module35=(()=>{
+const module36=(()=>{
 /**
  * Directory: named libraries, lazy shared resources, and explicit world ownership.
  * Factories come from callers. Nothing here imports a named toy or game asset.
  * A lease pins one resource; releasing the last lease destroys it immediately.
  */
-const { WorldResidency } = module36;
-const { directoryDiagnostics } = module37;
+const { WorldResidency } = module37;
+const { directoryDiagnostics } = module38;
 
 class Directory {
   /** Registration is inert: no world or GPU asset is allocated until requested. */
@@ -3839,7 +4119,7 @@ class Directory {
 return {Directory};
 })();
 // Source: engine/penthouse/assembly.js
-const module39=(()=>{
+const module40=(()=>{
 /** Penthouse / version-one data-driven box assembly. No editor or game knowledge. */
 /** Explicit generator versions available to project/build validation; no allocation here. */
 const ASSEMBLY_GENERATORS=Object.freeze({'toy.assembly':1});
@@ -3853,7 +4133,7 @@ function assembly({world,asset,materials}){
 return {ASSEMBLY_GENERATORS,assembly};
 })();
 // Source: engine/basement/material.js
-const module41=(()=>{
+const module42=(()=>{
 /** Basement / standard opaque surface material. Base colour and emission are independent
  * linear RGB values; emission strength is dimensionless radiance gain, not a light object.
  * Specular response is direct-light GGX; reflectivity is normal-incidence reflectance,
@@ -3935,14 +4215,14 @@ function updateMaterial(target, source) {
 return {SURFACE_DEFAULTS,createMaterial,validateMaterial,updateMaterial};
 })();
 // Source: engine/penthouse/toys.js
-const module40=(()=>{
+const module41=(()=>{
 /**
  * Penthouse / toys: reusable procedural box-based architecture and actor assemblies.
  * These are early test toys, not Freelancer art or the final procedural humanoid.
  * Everything is created through World; no toy owns a scheduler or a GPU context.
  */
 
-const { createMaterial } = module41;
+const { createMaterial } = module42;
 
 /** Add a solid box. Colors are linear RGB; emission is a dimensionless gain.
  * Pass material to share a live definition; color/emission only initialize a private material.
@@ -3996,8 +4276,894 @@ function actor({ world, color = [0.42,0.34,0.58], bagColor = [0.54,0.30,0.17] })
 
 return {box,pavilion,actor};
 })();
+// Source: engine/penthouse/garments.js
+const module44=(()=>{
+/**
+ * Penthouse / garments: clothing as data, generated from the body it is worn on.
+ *
+ * The idea is ported from the 2D game's wardrobe (src/ui/wardrobe.js on main): a garment
+ * does not carry its own geometry. It names which parts of the body it covers and how
+ * thick it is; the humanoid generator then grows those same body shapes outward by that
+ * thickness over the covered span. Every garment therefore fits every gender, build and
+ * height with no per-body authoring, and a new garment is a few lines of JSON.
+ *
+ * Body regions (paired regions apply to both sides). Spans are [from, to] fractions along
+ * the region, measured from the end nearest the head (0) to the far end (1):
+ *   neck, chest (shoulders → waist), pelvis (waist → crotch), upperArm, forearm, hand,
+ *   thigh, calf, foot. `bust` is implied: a garment over the chest also covers it.
+ * Shorthands, as in the 2D wardrobe (explicit spans win when both are given):
+ *   sleeve  none | cap | short | elbow | long          (tops, outerwear)
+ *   legs    none | brief | shorts | knee | full        (bottoms, legwear)
+ *   skirt   { length: × thigh length, flare: hem width ÷ hip width }
+ * Layering comes from the slot: legwear sits on the skin, then tops, bottoms (tops tuck in),
+ * shoes, outerwear. `thickness` (metres) overrides the slot's default growth.
+ *
+ * Finishes map to existing surface response only (decision 0018): matte, satin, gloss.
+ * The 2D game's velvet and sparkle need new shader terms and are not implemented yet.
+ */
+
+/** Wear order and default growth over the layer beneath (metres). */
+const GARMENT_SLOTS = Object.freeze({
+  legwear: Object.freeze({ order: 1, thickness: 0.003 }),
+  top: Object.freeze({ order: 2, thickness: 0.006 }),
+  bottom: Object.freeze({ order: 3, thickness: 0.008 }),
+  shoes: Object.freeze({ order: 4, thickness: 0.009 }),
+  outer: Object.freeze({ order: 5, thickness: 0.016 }),
+});
+
+/** Surface response per finish, in the material fields of decision 0018. */
+const GARMENT_FINISHES = Object.freeze({
+  matte: Object.freeze({ specularSharpness: 0.25, reflectivity: 0.02 }),
+  satin: Object.freeze({ specularSharpness: 0.55, reflectivity: 0.05 }),
+  gloss: Object.freeze({ specularSharpness: 0.86, reflectivity: 0.1 }),
+});
+
+/** Regions a garment may name, in generation order. */
+const GARMENT_REGIONS = Object.freeze(["neck", "chest", "pelvis", "upperArm", "forearm", "hand", "thigh", "calf", "foot"]);
+
+/** Shorthand expansions. Kept as data so the review UI and docs can list them. */
+const GARMENT_SHORTHANDS = Object.freeze({
+  sleeve: Object.freeze({
+    none: {},
+    cap: { upperArm: [0, 0.18] },
+    short: { upperArm: [0, 0.45] },
+    elbow: { upperArm: [0, 1] },
+    long: { upperArm: [0, 1], forearm: [0, 0.94] },
+  }),
+  legs: Object.freeze({
+    none: {},
+    brief: { thigh: [0, 0.08] },
+    shorts: { thigh: [0, 0.4] },
+    knee: { thigh: [0, 1] },
+    full: { thigh: [0, 1], calf: [0, 0.94] },
+  }),
+});
+
+const span = (value, where) => {
+  if (!Array.isArray(value) || value.length !== 2 || !value.every(Number.isFinite) || value[0] < 0 || value[1] > 1 || value[1] - value[0] < 0.02)
+    throw new RangeError(`${where} must be [from, to] with 0 ≤ from < to ≤ 1`);
+};
+const colour = (value, where) => {
+  if (!Array.isArray(value) || value.length !== 3 || !value.every((n) => Number.isFinite(n) && n >= 0 && n <= 1))
+    throw new RangeError(`${where} needs three linear RGB values in 0–1`);
+};
+
+/** Validate one garment definition. Throws with the garment's id in the message. */
+function validateGarment(g) {
+  if (!g || typeof g !== "object") throw new TypeError("Garment must be an object");
+  const where = `Garment ${g.id ?? "?"}`;
+  const known = new Set(["id", "name", "slot", "color", "finish", "thickness", "sleeve", "legs", "skirt", ...GARMENT_REGIONS]);
+  for (const key of Object.keys(g)) if (!known.has(key)) throw new Error(`${where}: unknown field ${key}`);
+  for (const key of ["id", "name"])
+    if (typeof g[key] !== "string" || !g[key].length || g[key].length > 60) throw new Error(`${where}: ${key} must contain 1–60 characters`);
+  if (!GARMENT_SLOTS[g.slot]) throw new RangeError(`${where}: slot must be one of ${Object.keys(GARMENT_SLOTS).join(", ")}`);
+  colour(g.color, `${where} color`);
+  if (!GARMENT_FINISHES[g.finish]) throw new RangeError(`${where}: finish must be one of ${Object.keys(GARMENT_FINISHES).join(", ")}`);
+  if (g.thickness !== undefined && (!Number.isFinite(g.thickness) || g.thickness < 0.001 || g.thickness > 0.05))
+    throw new RangeError(`${where}: thickness must be 0.001–0.05 m`);
+  for (const key of ["sleeve", "legs"])
+    if (g[key] !== undefined && !GARMENT_SHORTHANDS[key][g[key]])
+      throw new RangeError(`${where}: ${key} must be one of ${Object.keys(GARMENT_SHORTHANDS[key]).join(", ")}`);
+  for (const region of GARMENT_REGIONS) if (g[region] !== undefined) span(g[region], `${where} ${region}`);
+  if (g.skirt !== undefined) {
+    const s = g.skirt;
+    if (!s || !Number.isFinite(s.length) || s.length < 0.1 || s.length > 2.2 || !Number.isFinite(s.flare) || s.flare < 1 || s.flare > 2.5 || Object.keys(s).some((k) => k !== "length" && k !== "flare"))
+      throw new RangeError(`${where}: skirt needs length 0.1–2.2 (× thigh) and flare 1–2.5`);
+  }
+  if (!Object.keys(garmentCoverage(g)).length && !g.skirt) throw new Error(`${where} covers nothing`);
+  return g;
+}
+
+/**
+ * Expand shorthands into explicit region spans: { region: [from, to] }. Pure and cheap,
+ * so the generator calls it per build rather than caching expanded copies.
+ */
+function garmentCoverage(g) {
+  const out = {};
+  for (const key of ["sleeve", "legs"]) if (g[key]) Object.assign(out, GARMENT_SHORTHANDS[key][g[key]]);
+  for (const region of GARMENT_REGIONS) if (g[region]) out[region] = g[region];
+  return out;
+}
+
+/**
+ * Validate a wardrobe document: { schemaVersion: 1, kind: "wardrobe", id, garments: [...] }.
+ * Returns a frozen copy plus a Map from garment id to definition for lookups.
+ */
+function validateWardrobe(doc) {
+  if (!doc || doc.schemaVersion !== 1 || doc.kind !== "wardrobe") throw new Error("Expected a schema-1 wardrobe document");
+  if (typeof doc.id !== "string" || !doc.id.length) throw new Error("Wardrobe id is required");
+  if (!Array.isArray(doc.garments) || !doc.garments.length || doc.garments.length > 256) throw new RangeError("Wardrobe needs 1–256 garments");
+  const ids = new Set();
+  for (const g of doc.garments) {
+    validateGarment(g);
+    if (ids.has(g.id)) throw new Error(`Duplicate garment id ${g.id}`);
+    ids.add(g.id);
+  }
+  const frozen = freeze(structuredClone(doc));
+  return Object.freeze({ document: frozen, garments: new Map(frozen.garments.map((g) => [g.id, g])) });
+}
+
+/**
+ * Resolve an outfit (the humanoid document's list) against a validated wardrobe.
+ * Entries are { garment: id, color?, finish? }; colour/finish override the catalogue so one
+ * garment definition yields many looks. Returns definitions sorted into wear order.
+ */
+function resolveOutfit(outfit, wardrobe) {
+  if (!outfit.length) return [];
+  if (!wardrobe?.garments) throw new Error("This outfit needs a wardrobe");
+  return outfit
+    .map((entry, index) => {
+      const base = wardrobe.garments.get(entry.garment);
+      if (!base) throw new Error(`Outfit garment ${entry.garment} is not in wardrobe ${wardrobe.document.id}`);
+      return { ...base, color: entry.color ?? base.color, finish: entry.finish ?? base.finish, index };
+    })
+    .sort((a, b) => GARMENT_SLOTS[a.slot].order - GARMENT_SLOTS[b.slot].order || a.index - b.index);
+}
+
+/**
+ * Generate an outfit from a wardrobe: always a top, a bottom and shoes, sometimes legwear
+ * and outerwear. `random` returns [0, 1) (inject a seeded one for repeatable crowds);
+ * `colors`, when given, recolours each piece from that list, so one catalogue yields
+ * many looks. Returns outfit entries ready for a humanoid document.
+ */
+function generateOutfit(wardrobe, { random = Math.random, colors = null } = {}) {
+  const bySlot = {};
+  for (const g of wardrobe.garments.values()) (bySlot[g.slot] ??= []).push(g);
+  const pick = (list) => list[Math.min(list.length - 1, Math.floor(random() * list.length))];
+  const chances = { top: 1, bottom: 1, shoes: 1, legwear: 0.5, outer: 0.3 };
+  const outfit = [];
+  for (const [slot, chance] of Object.entries(chances)) {
+    if (!bySlot[slot] || random() >= chance) continue;
+    const g = pick(bySlot[slot]),
+      entry = { garment: g.id };
+    if (colors?.length) entry.color = [...pick(colors)];
+    outfit.push(entry);
+  }
+  return outfit;
+}
+
+/** Validate the shape of outfit entries (wardrobe membership is checked at generation). */
+function validateOutfit(outfit) {
+  if (!Array.isArray(outfit) || outfit.length > 12) throw new RangeError("Outfit must be a list of up to 12 garments");
+  for (const entry of outfit) {
+    if (!entry || typeof entry.garment !== "string" || Object.keys(entry).some((k) => !["garment", "color", "finish"].includes(k)))
+      throw new Error("Outfit entries are { garment, color?, finish? }");
+    if (entry.color !== undefined) colour(entry.color, `Outfit ${entry.garment} color`);
+    if (entry.finish !== undefined && !GARMENT_FINISHES[entry.finish]) throw new RangeError(`Outfit ${entry.garment}: unknown finish`);
+  }
+}
+
+function freeze(value) {
+  if (value && typeof value === "object") {
+    for (const child of Object.values(value)) freeze(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+return {GARMENT_SLOTS,GARMENT_FINISHES,GARMENT_REGIONS,GARMENT_SHORTHANDS,validateGarment,garmentCoverage,validateWardrobe,resolveOutfit,generateOutfit,validateOutfit};
+})();
+// Source: engine/penthouse/humanoid.js
+const module43=(()=>{
+/**
+ * Penthouse / procedural humanoid: a reusable articulated figure with generated clothing.
+ *
+ * Ownership: this toy builds an invisible joint hierarchy and rounded body parts through
+ * World only. It owns no scheduler, GPU resource or game identity. Games supply the
+ * parameter/palette/outfit document (for example Freelancer's 949 preset) and a wardrobe
+ * catalogue, and decide when to pose it; Lobby phases call poseHumanoid() through the
+ * game's registered callbacks.
+ *
+ * Units: metres, radians and linear RGB. Axes follow World: x right, y back, z up.
+ * A humanoid faces local -Y, matching the planar motor's heading convention.
+ *
+ * Look: the body shape is ported from the 2D game's procedural humanoid (src/ui/bodies.js
+ * on main). Its per-gender canon gives tapered limbs [near, belly, belly position, far]
+ * whose touching ends share one radius, a torso with deltoid caps, a wide pelvis and a big
+ * stylised head; its builds scale breadth, depth, head, hips and shoulders. Each part is
+ * one rounded instance (Basement rounded-shapes.js): segments meet in continuous joints
+ * exactly as the 2D outlines do. Clothes are those same shapes grown outward over the
+ * spans a garment covers (garments.js), so every outfit fits every body.
+ *
+ * Status (decision 0020): rigid rounded segments. There is no skinning, IK, cloth or hair
+ * simulation, faces or ground contact on slopes yet; skirts and hair are static volumes.
+ */
+const { createMaterial } = module42;
+const { eulerRotation } = module4;
+const { roundedProfile } = module11;
+const { GARMENT_FINISHES, GARMENT_SLOTS, garmentCoverage, resolveOutfit, validateOutfit } = module44;
+
+/** Bump when the generated skeleton or the meaning of a parameter changes. */
+const HUMANOID_GENERATOR_VERSION = 2;
+
+/**
+ * The 2D game's body canon, in its own drawing unit (1 unit = height ÷ 131 here, which
+ * puts the classic female shoulders at 0.37 m across the deltoids for 1.68 m). Fields keep
+ * the 2D names: sh shoulder joints at ±sh, del deltoid radius, tf/tb chest front and back,
+ * chest/back half-breadths there, bust {x forward, y apart, r}, hf/hb pelvis front/back,
+ * hw half-breadth at the hip bones, leg thigh spacing (±leg), and limb tapers
+ * [near radius, belly radius, belly position 0..1, far radius]. `waist` (half-breadth at
+ * the waist) is new: a top-down drawing never needed it.
+ */
+const BODY_CANON = Object.freeze({
+  female: { sh: 10.5, del: 4.0, tf: 6.0, tb: -7.2, chest: 7.8, back: 8.8, waist: 7.0, bust: { x: 5.4, y: 4.9, r: 3.3 },
+    hf: 3.0, hb: -9.0, hw: 12.0, leg: 5.4,
+    thigh: [4.7, 4.5, 0.28, 3.3], calf: [3.3, 3.6, 0.3, 2.05], upper: [3.5, 3.35, 0.35, 2.55], fore: [2.55, 2.7, 0.22, 1.8], hand: 1.0, foot: 1.0 },
+  androgynous: { sh: 11.0, del: 4.3, tf: 6.3, tb: -7.8, chest: 8.8, back: 9.4, waist: 8.1, bust: null,
+    hf: 2.6, hb: -8.0, hw: 11.2, leg: 5.0,
+    thigh: [4.75, 4.55, 0.28, 3.45], calf: [3.45, 3.75, 0.3, 2.2], upper: [3.8, 3.6, 0.35, 2.75], fore: [2.75, 2.9, 0.22, 1.95], hand: 1.04, foot: 1.02 },
+  male: { sh: 12.5, del: 4.8, tf: 6.6, tb: -8.0, chest: 10.0, back: 10.8, waist: 9.4, bust: null,
+    hf: 2.5, hb: -7.5, hw: 10.8, leg: 4.9,
+    thigh: [4.85, 4.65, 0.28, 3.6], calf: [3.6, 3.95, 0.3, 2.35], upper: [4.2, 4.0, 0.35, 3.0], fore: [3.0, 3.2, 0.22, 2.1], hand: 1.1, foot: 1.05 },
+});
+
+/** The 2D builds: breadth (w), depth (d), head, and extra hip/shoulder emphasis. */
+const BODY_BUILDS = Object.freeze({
+  classic: { w: 1, d: 1, head: 1 },
+  slim: { w: 0.88, d: 0.92, head: 0.98 },
+  athletic: { w: 1.05, d: 1.02, head: 1.0, shoulder: 1.08 },
+  curvy: { w: 1.04, d: 1.04, head: 1.0, hip: 1.25 },
+  broad: { w: 1.15, d: 1.08, head: 1.02, shoulder: 1.1 },
+  heavy: { w: 1.2, d: 1.22, head: 1.05, hip: 1.1 },
+});
+
+/** Canon units per metre of height, and the 2D head (16 across) in those units. */
+const UNITS_PER_HEIGHT = 131,
+  HEAD = Object.freeze({ width: 16, depth: 17.2, height: 19.5 });
+
+/**
+ * One table drives validation, review sliders and documentation, so a new parameter
+ * cannot be accepted by one surface and ignored by another. `slider` is the useful
+ * interactive span; min/max are hard limits. Shape values multiply the canon (1 = as the
+ * 2D game draws that gender and build).
+ */
+const HUMANOID_PARAMETERS = Object.freeze(
+  [
+    // Overall scale and the vertical division of the body.
+    ["height", "Height", "m", 1.2, 2.2, 1.45, 2.0, "Body"],
+    ["headSize", "Head size", "× canon", 0.7, 1.3, 0.8, 1.2, "Body"],
+    ["legLength", "Leg length", "× height", 0.4, 0.6, 0.44, 0.56, "Body"],
+    ["armLength", "Arm length", "× height", 0.35, 0.5, 0.38, 0.47, "Body"],
+    ["neckLength", "Neck length", "× height", 0.02, 0.08, 0.025, 0.065, "Body"],
+    ["footLength", "Foot length", "× height", 0.12, 0.18, 0.13, 0.17, "Body"],
+    // Horizontal masses relative to the canon for the chosen gender and build.
+    ["shoulders", "Shoulders", "× canon", 0.8, 1.25, 0.85, 1.2, "Shape"],
+    ["waist", "Waist", "× canon", 0.8, 1.3, 0.85, 1.25, "Shape"],
+    ["hips", "Hips", "× canon", 0.8, 1.35, 0.85, 1.3, "Shape"],
+    ["bust", "Bust", "× canon", 0, 1.6, 0, 1.4, "Shape"],
+    ["limbs", "Limb thickness", "× canon", 0.75, 1.35, 0.8, 1.25, "Shape"],
+    ["stance", "Stance width", "m", 0, 0.2, 0, 0.16, "Shape"],
+    // Posture is a resting attitude; gait adds bounded motion on top of it.
+    ["spineLean", "Spine lean", "rad", -0.2, 0.3, -0.1, 0.2, "Posture"],
+    ["headTilt", "Head tilt", "rad", -0.3, 0.3, -0.2, 0.2, "Posture"],
+    ["armSpread", "Arm spread", "rad", 0, 0.4, 0.02, 0.3, "Posture"],
+    // Carried load: dimensions describe the outline; mass shapes secondary motion only.
+    ["backpackWidth", "Pack width", "m", 0.2, 0.6, 0.24, 0.52, "Backpack"],
+    ["backpackHeight", "Pack height", "m", 0.25, 0.75, 0.3, 0.66, "Backpack"],
+    ["backpackDepth", "Pack depth", "m", 0.1, 0.4, 0.12, 0.34, "Backpack"],
+    ["backpackDrop", "Pack drop", "m", -0.1, 0.3, -0.05, 0.22, "Backpack"],
+    ["backpackMass", "Pack mass", "kg", 0, 30, 0, 24, "Backpack"],
+  ].map(([key, label, unit, min, max, low, high, group]) =>
+    Object.freeze({ key, label, unit, min, max, slider: [low, high], group }),
+  ),
+);
+
+/** Discrete choices. Hair styles are static volumes, not strand or chain simulation. */
+const HUMANOID_CHOICES = Object.freeze({
+  gender: Object.freeze(Object.keys(BODY_CANON)),
+  build: Object.freeze(Object.keys(BODY_BUILDS)),
+  hair: Object.freeze(["none", "short", "bun", "ponytail", "curls"]),
+  backpack: Object.freeze([true, false]),
+});
+
+/** Body material slots a palette must fill; garments carry their own colours. */
+const HUMANOID_PALETTE_SLOTS = Object.freeze(["skin", "hair", "bag", "strap"]);
+
+/**
+ * Validate a complete humanoid document without filling defaults or mutating input.
+ * The returned object is a frozen deep copy, so later UI edits cannot alter a
+ * validated preset in place; edits validate a new candidate instead. Outfit garments
+ * are checked against a wardrobe when the figure is generated.
+ */
+function validateHumanoid(document) {
+  if (!document || typeof document !== "object") throw new TypeError("Humanoid document must be an object");
+  if (document.schemaVersion !== 2 || document.kind !== "humanoid") throw new Error("Expected a schema-2 humanoid document");
+  if (document.generatorVersion !== HUMANOID_GENERATOR_VERSION)
+    throw new Error(`Humanoid generator ${document.generatorVersion} is not installed`);
+  for (const key of ["id", "name"])
+    if (typeof document[key] !== "string" || !document[key].length || document[key].length > 80)
+      throw new Error(`Humanoid ${key} must contain 1–80 characters`);
+  const known = new Set(["schemaVersion", "kind", "id", "name", "generatorVersion", "parameters", "palette", "outfit"]);
+  for (const key of Object.keys(document)) if (!known.has(key)) throw new Error(`Unknown humanoid field: ${key}`);
+  const p = document.parameters,
+    palette = document.palette;
+  if (!p || typeof p !== "object") throw new Error("Missing humanoid parameters");
+  const keys = new Set([...HUMANOID_PARAMETERS.map((d) => d.key), ...Object.keys(HUMANOID_CHOICES)]);
+  for (const key of Object.keys(p)) if (!keys.has(key)) throw new Error(`Unknown humanoid parameter: ${key}`);
+  for (const d of HUMANOID_PARAMETERS)
+    if (!Number.isFinite(p[d.key]) || p[d.key] < d.min || p[d.key] > d.max)
+      throw new RangeError(`${d.label} must be ${d.min}–${d.max} ${d.unit}`);
+  for (const [key, options] of Object.entries(HUMANOID_CHOICES))
+    if (!options.includes(p[key])) throw new RangeError(`${key} must be one of ${options.join(", ")}`);
+  if (!palette || typeof palette !== "object") throw new Error("Missing palette");
+  for (const key of Object.keys(palette)) if (!HUMANOID_PALETTE_SLOTS.includes(key)) throw new Error(`Unknown palette slot: ${key}`);
+  for (const slot of HUMANOID_PALETTE_SLOTS) {
+    const c = palette[slot];
+    if (!Array.isArray(c) || c.length !== 3 || !c.every((n) => Number.isFinite(n) && n >= 0 && n <= 1))
+      throw new RangeError(`Palette ${slot} needs three linear RGB values in 0–1`);
+  }
+  validateOutfit(document.outfit);
+  // The stylised head is large; the legs and neck must still leave room for a torso.
+  const headFraction = (HEAD.height * p.headSize * BODY_BUILDS[p.build].head) / UNITS_PER_HEIGHT;
+  if (headFraction + p.neckLength + p.legLength > 0.8) throw new RangeError("Head, neck and legs leave no room for a torso");
+  return deepFreeze(structuredClone(document));
+}
+
+/** Freeze nested authored data once at validation, rather than at every read. */
+function deepFreeze(value) {
+  if (value && typeof value === "object") {
+    for (const child of Object.values(value)) deepFreeze(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+/**
+ * The canon for a gender and build with the document's shape multipliers applied, as in
+ * the 2D bodyCanon(): shoulder emphasis widens deltoids and chest, hip emphasis widens
+ * hips, seat and thigh spacing. Breadth values scale by the build's w, depth by d.
+ */
+function shapedCanon(p) {
+  const base = BODY_CANON[p.gender],
+    b = BODY_BUILDS[p.build],
+    C = structuredClone(base);
+  if (b.shoulder) {
+    const k = b.shoulder;
+    C.sh *= k; C.del *= 1 + (k - 1) * 0.8; C.chest *= 1 + (k - 1) * 0.6; C.back *= 1 + (k - 1) * 0.7;
+  }
+  if (b.hip) {
+    const k = b.hip;
+    C.hw *= k; C.hb *= 1 + (k - 1) * 0.6; C.leg *= 1 + (k - 1) * 0.5;
+  }
+  C.sh *= p.shoulders; C.del *= 0.5 + p.shoulders * 0.5; C.chest *= p.shoulders; C.back *= p.shoulders;
+  C.waist *= p.waist;
+  C.hw *= p.hips; C.hb *= 0.4 + p.hips * 0.6; C.leg *= 0.5 + p.hips * 0.5;
+  // Builds stretch the 2D frame: breadth across the shoulders, depth front to back.
+  for (const key of ["sh", "chest", "back", "waist", "hw", "leg"]) C[key] *= b.w;
+  for (const key of ["tf", "tb", "hf", "hb"]) C[key] *= b.d;
+  const limb = ((b.w + b.d) / 2) * p.limbs;
+  for (const key of ["thigh", "calf", "upper", "fore"]) C[key] = [C[key][0] * limb, C[key][1] * limb, C[key][2], C[key][3] * limb];
+  C.del *= limb / p.limbs;
+  C.bust = C.bust && p.bust > 0 ? { x: C.bust.x * b.d, y: C.bust.y * b.w, r: C.bust.r * p.bust } : null;
+  C.head = b.head * p.headSize;
+  return C;
+}
+
+/**
+ * Derive joint positions and segment sizes from validated parameters. Pure data: the
+ * same function serves construction, tests and any future rig/IK consumer.
+ * All z values are measured from the ground in the rest pose; `u` is the canon unit.
+ */
+function humanoidMeasurements(p) {
+  const H = p.height,
+    u = H / UNITS_PER_HEIGHT,
+    C = shapedCanon(p),
+    head = { width: HEAD.width * u * C.head, depth: HEAD.depth * u * C.head, height: HEAD.height * u * C.head },
+    neck = p.neckLength * H,
+    foot = { length: p.footLength * H, height: 0.032 * H, width: 6.6 * u * C.foot },
+    hipZ = p.legLength * H,
+    // Knee sits slightly above the leg's midpoint, as on a real skeleton.
+    thighLength = (hipZ - foot.height) * 0.52,
+    shinLength = hipZ - foot.height - thighLength,
+    chinZ = H - head.height,
+    // Top of the shoulders (the chest dome); the neck rises from just below it.
+    shoulderZ = chinZ - neck,
+    // The waist joint divides the trunk; the chest above it carries arms, bust and pack.
+    waistZ = hipZ + (shoulderZ - hipZ) * 0.4,
+    arm = p.armLength * H,
+    hand = arm * 0.2,
+    upperArmLength = (arm - hand) * 0.54,
+    forearmLength = arm - hand - upperArmLength,
+    chestDepth = (C.tf - C.tb) * u;
+  return {
+    u,
+    canon: C,
+    height: H,
+    head,
+    neck: { length: neck, radius: head.width * 0.22 },
+    hipZ,
+    waistZ,
+    shoulderZ,
+    chinZ,
+    hipSpacing: C.leg * u + p.stance / 2,
+    shoulderSpacing: C.sh * u,
+    // Shoulder joints sit under the deltoid caps, a little below the top of the shoulders.
+    shoulderJointZ: shoulderZ - C.del * u * 0.9,
+    thighLength,
+    shinLength,
+    upperArmLength,
+    forearmLength,
+    hand: { length: hand, width: 5.8 * u * C.hand, thickness: C.fore[3] * u * 2.5 },
+    foot,
+    chest: { width: (C.chest + C.back) * u, depth: chestDepth, waistWidth: C.waist * 2 * u, height: shoulderZ - waistZ },
+    pelvis: { waistWidth: C.waist * 2 * u, hipWidth: C.hw * 2 * u, depth: (C.hf - C.hb) * u, height: waistZ - hipZ },
+    backpack: {
+      width: p.backpackWidth,
+      height: p.backpackHeight,
+      depth: p.backpackDepth,
+      // Top of the pack sits at the shoulder line, lowered by the authored drop.
+      top: shoulderZ - waistZ - p.backpackDrop,
+    },
+  };
+}
+
+/** The 2D profile's hump, matching the shader exactly (rounded-shapes.js). */
+function hump(t, peak) {
+  return t < peak ? 0.5 - 0.5 * Math.cos((Math.PI * t) / peak) : 0.5 + 0.5 * Math.cos((Math.PI * (t - peak)) / (1 - peak));
+}
+
+/**
+ * A body region: a rounded shape running from a near dome centre (`origin`, in its joint's
+ * frame) along `axis` for `length`, with near radii ax/ay and a profile. Built from a 2D
+ * limb taper [near, belly, belly position, far] when one is given.
+ */
+function region(joint, { origin, axis = "down", ax, ay, length, taper = 1, depthTaper = taper, bulge = 0, peak = 0.5, widthOnly = false }) {
+  return { joint, origin, axis, ax, ay, length, taper, depthTaper, bulge: Math.max(-0.95, Math.min(0.95, bulge)), peak, widthOnly };
+}
+function limbRegion(joint, origin, taper2d, length, u, depthRatio = 1) {
+  const [near, belly, at, far] = taper2d,
+    t = far / near;
+  return region(joint, { origin, ax: near * u, ay: near * u * depthRatio, length, taper: t, peak: at, bulge: belly / near - (1 + (t - 1) * at) });
+}
+/** Profile scale along a region: width (x) when `width`, else depth (y), as the shader does. */
+const regionScale = (R, t, width = false) =>
+  Math.max(0.02, 1 + ((width ? R.taper : R.depthTaper) - 1) * t + (!R.widthOnly || width ? R.bulge * hump(t, R.peak) : 0));
+
+/** Shape axes: hanging regions need no rotation; forward (feet) turns +z to +y. */
+const AXES = {
+  down: { vector: [0, 0, -1], rotation: [0, 0, 0, 1] },
+  forward: { vector: [0, -1, 0], rotation: eulerRotation(-Math.PI / 2, 0, 0) },
+};
+
+/**
+ * Build one humanoid in `world`. Returns a rig whose `root` owns every descendant,
+ * so `world.remove(rig.root)` (or rig.dispose()) removes the whole figure.
+ * Options: x/y/yaw place the root; `wardrobe` (validateWardrobe) resolves the outfit;
+ * `materials` may share live per-slot body materials; otherwise private materials are
+ * created from the palette. Garment materials are always private to this figure.
+ */
+function createHumanoid({ world, document, wardrobe = null, x = 0, y = 0, yaw = 0, materials = null }) {
+  // Always validate: frozen data is not proof that it passed this generator's rules.
+  const doc = validateHumanoid(document),
+    p = doc.parameters,
+    m = humanoidMeasurements(p),
+    C = m.canon,
+    u = m.u,
+    outfit = resolveOutfit(doc.outfit, wardrobe),
+    slots =
+      materials ??
+      Object.fromEntries(
+        HUMANOID_PALETTE_SLOTS.map((slot) => [
+          slot,
+          // Soft skin sheen and satin hair; bags and straps stay matte.
+          createMaterial({ baseColor: doc.palette[slot], ...(slot === "skin" ? { specularSharpness: 0.42, reflectivity: 0.035 } : slot === "hair" ? { specularSharpness: 0.62, reflectivity: 0.05 } : {}) }),
+        ]),
+      );
+  // One material per worn garment, keyed by its outfit position, so the review's
+  // silhouette override can restore each garment's own colour and finish.
+  const garmentMaterials = outfit.map((g) => createMaterial({ baseColor: g.color, ...GARMENT_FINISHES[g.finish] }));
+  const parts = [],
+    root = world.create({ x, y, yaw });
+  /** Invisible pivot: shape-less entities cost no GPU instance. */
+  const joint = (parent, px, py, pz) => world.create({ parent, x: px, y: py, z: pz });
+  /** Record a visible part with its material key, so overrides can restore it. */
+  const add = (parent, key, position, size, rounded, rotation = [0, 0, 0, 1]) => {
+    const material = typeof key === "number" ? garmentMaterials[key] : slots[key];
+    const entity = world.create({
+      parent,
+      x: position[0],
+      y: position[1],
+      z: position[2],
+      rotation,
+      shape: { size, material, rounded, ambientBlocker: false, castShadow: true },
+    });
+    parts.push({ entity, slot: key });
+    return entity;
+  };
+  /** A sphere (or ellipsoid with `stretch`): a rounded shape shorter than its two domes. */
+  const sphere = (parent, key, position, r, stretch = [1, 1, 1]) =>
+    add(parent, key, position, [2 * r * stretch[0], 2 * r * stretch[1], 2 * r * stretch[2]], ROUND);
+
+  /**
+   * Draw the span [a, b] of a region, grown outward by `grow` metres. The body itself is
+   * the span [0, 1] with no growth: one instance whose profile the shader evaluates
+   * exactly. A garment span is split at the region's bulge peak and into pieces no longer
+   * than a third of the region, each refitted to the grown profile at its ends and middle,
+   * so thin layers (3 mm stockings) never let the skin show through. Ends that stop inside
+   * the region are flat hems; ends at the region's own ends keep its domes, so a stocking
+   * that reaches the knee wraps the joint as the skin does.
+   */
+  const span = (R, a, b, grow, key) => {
+    if (grow === 0 && a === 0 && b === 1) return piece(R, 0, 1, 0, key, true, true);
+    const cuts = [a];
+    if (R.peak > a + 0.02 && R.peak < b - 0.02) cuts.push(R.peak);
+    cuts.push(b);
+    for (let i = 0; i + 1 < cuts.length; i++) {
+      const n = Math.ceil((cuts[i + 1] - cuts[i]) / 0.34 - 1e-9);
+      for (let k = 0; k < n; k++) {
+        const t0 = cuts[i] + ((cuts[i + 1] - cuts[i]) * k) / n,
+          t1 = cuts[i] + ((cuts[i + 1] - cuts[i]) * (k + 1)) / n,
+          first = i === 0 && k === 0,
+          last = i + 2 === cuts.length && k + 1 === n;
+        // Inner joins overlap slightly; their flat discs are hidden inside the neighbour.
+        piece(R, first ? t0 : t0 - 0.01, last ? t1 : t1 + 0.01, grow, key, first && a === 0, last && b === 1);
+      }
+    }
+  };
+  /** One rounded instance covering [a, b] of R; `roundNear`/`roundFar` keep the domes. */
+  const piece = (R, a, b, grow, key, roundNear, roundFar) => {
+    a = Math.max(0, a);
+    b = Math.min(1, b);
+    // True grown radii at both ends, per axis: width and depth taper independently.
+    const wa = R.ax * regionScale(R, a, true) + grow,
+      wb = R.ax * regionScale(R, b, true) + grow,
+      da = R.ay * regionScale(R, a) + grow,
+      db = R.ay * regionScale(R, b) + grow,
+      taper = wb / wa,
+      depthTaper = db / da;
+    // The body itself keeps the region's exact profile. A garment piece refits the
+    // bulge (measured on the width) at the region's peak if inside, else its middle.
+    const local = grow === 0 ? R.peak : R.peak > a && R.peak < b ? (R.peak - a) / (b - a) : 0.5,
+      tm = a + local * (b - a),
+      bulge = grow === 0 ? R.bulge : Math.max(-0.95, Math.min(0.95, (R.ax * regionScale(R, tm, true) + grow) / wa - (1 + (taper - 1) * local)));
+    const flatNear = !roundNear,
+      flatFar = !roundFar,
+      r0 = Math.min(wa, da),
+      r1 = Math.min(wb, db),
+      c0 = flatNear ? r0 * 0.002 : r0,
+      c1 = flatFar ? r1 * 0.002 : r1,
+      body = (b - a) * R.length,
+      size = [2 * wa, 2 * da, body + c0 + c1],
+      along = a * R.length + size[2] / 2 - c0,
+      { vector, rotation } = AXES[R.axis];
+    return add(
+      R.joint,
+      key,
+      [R.origin[0] + vector[0] * along, R.origin[1] + vector[1] * along, R.origin[2] + vector[2] * along],
+      size,
+      roundedProfile({ taper, depthTaper, bulge, peak: Math.max(0.01, Math.min(0.99, local)), flatNear, flatFar, widthOnly: R.widthOnly }),
+      rotation,
+    );
+  };
+
+  // ── Trunk ──────────────────────────────────────────────────────────────────────
+  // Pelvis: the root of the trunk; gait sets its height again (bob). Its region runs from
+  // the waist down past the hip joints, widest at the hip bones (width-only bulge), with
+  // the seat behind the hip joints as in the 2D outline (hf … hb).
+  // Footwear and legwear thicken the sole; the whole body stands on them, so the grown
+  // sole (not the bare foot) meets the ground.
+  const lift = outfit.reduce((sum, g) => sum + (garmentCoverage(g).foot ? (g.thickness ?? GARMENT_SLOTS[g.slot].thickness) : 0), 0);
+  const pelvis = joint(root, 0, 0, m.hipZ + lift);
+  const ph = m.pelvis.height,
+    pelvisDepth = m.pelvis.depth / 2,
+    pelvisLength = ph,
+    hipAt = 0.5,
+    waistHalf = m.pelvis.waistWidth / 2,
+    // A small far dome tucks under between the thighs instead of hanging below them.
+    pelvisTaper = 0.68,
+    pelvisDepthTaper = 0.62;
+  const pelvisRegion = region(pelvis, {
+    origin: [0, -((C.hf + C.hb) / 2) * u, ph],
+    ax: waistHalf,
+    ay: pelvisDepth,
+    length: pelvisLength,
+    taper: pelvisTaper,
+    depthTaper: pelvisDepthTaper,
+    peak: hipAt,
+    bulge: m.pelvis.hipWidth / 2 / waistHalf - (1 + (pelvisTaper - 1) * hipAt),
+    widthOnly: true,
+  });
+  // Waist joint: spine lean and counter-twist bend here, above the hips.
+  const waist = joint(pelvis, 0, 0, m.waistZ - m.hipZ);
+  // Chest: shoulders down to the waist, narrowing (taper) with a slight ribcage swell.
+  // Its top dome is the shoulder line; deltoid caps sit over its outer corners.
+  const chestDepth = m.chest.depth / 2,
+    chestHalf = m.chest.width / 2,
+    chestTaper = waistHalf / chestHalf,
+    chestRegion = region(waist, {
+      origin: [0, -((C.tf + C.tb) / 2) * u, m.chest.height - Math.min(chestHalf, chestDepth)],
+      ax: chestHalf,
+      ay: chestDepth,
+      length: m.chest.height - Math.min(chestHalf, chestDepth) + 0.01,
+      taper: chestTaper,
+      peak: 0.32,
+      bulge: 0.05,
+      widthOnly: true,
+    });
+  // Neck: a cylinder from inside the head down into the shoulders.
+  const neck = joint(waist, 0, 0, m.chest.height - 0.02);
+  const neckLength = m.chinZ - (m.shoulderZ - 0.02),
+    neckRegion = region(neck, { origin: [0, m.neck.radius * 0.15, neckLength + 0.01], ax: m.neck.radius, ay: m.neck.radius, length: neckLength + 0.02, taper: 1.08 });
+  const head = joint(neck, 0, 0, neckLength);
+  const hw = m.head.width,
+    hd = m.head.depth,
+    hh = m.head.height;
+
+  // ── Limbs ──────────────────────────────────────────────────────────────────────
+  // Arms hang from shoulder pivots under the deltoids, legs from hip pivots in the pelvis.
+  // Each 2D taper becomes one region; its far radius equals the next segment's near
+  // radius, so elbows and knees stay joined at any bend.
+  const arms = [-1, 1].map((side) => {
+    const shoulder = joint(waist, side * m.shoulderSpacing, 0, m.shoulderJointZ - m.waistZ);
+    const upper = limbRegion(shoulder, [0, 0, 0], C.upper, m.upperArmLength, u);
+    const elbow = joint(shoulder, 0, 0, -m.upperArmLength);
+    const fore = limbRegion(elbow, [0, 0, 0], C.fore, m.forearmLength, u);
+    const wrist = joint(elbow, 0, 0, -m.forearmLength);
+    // Hands: thin across the arm (x), as wide as the palm front to back (y).
+    const hr = m.hand.thickness / 2,
+      hand = region(wrist, { origin: [0, 0, -hr * 0.4], ax: hr, ay: m.hand.width / 2, length: m.hand.length - hr * 1.8, taper: 0.82, bulge: 0.12, peak: 0.35 });
+    return { side, shoulder, elbow, wrist, regions: { upperArm: upper, forearm: fore, hand } };
+  });
+  const legs = [-1, 1].map((side) => {
+    const hip = joint(pelvis, side * m.hipSpacing, 0, 0);
+    const thigh = limbRegion(hip, [0, 0, 0], C.thigh, m.thighLength, u, 1.04);
+    const knee = joint(hip, 0, 0, -m.thighLength);
+    const calf = limbRegion(knee, [0, 0, 0], C.calf, m.shinLength, u, 1.06);
+    const ankle = joint(knee, 0, 0, -m.shinLength);
+    // Foot: heel to toes along -Y, sole at the ground in the rest pose. Local y of the
+    // rotated shape is vertical, so ay is half the foot's height.
+    const f = m.foot,
+      fy = f.height / 2,
+      heel = Math.min(f.width * 0.4, fy),
+      foot = region(ankle, {
+        origin: [0, f.length * 0.24 - heel, -f.height + fy],
+        axis: "forward",
+        ax: f.width * 0.4,
+        ay: fy,
+        length: f.length - heel * 2.15,
+        taper: 1.12,
+        bulge: 0.14,
+        peak: 0.62,
+        widthOnly: true,
+      });
+    return { side, hip, knee, ankle, regions: { thigh, calf, foot } };
+  });
+
+  // ── Skin ───────────────────────────────────────────────────────────────────────
+  const regions = { neck: [neckRegion], chest: [chestRegion], pelvis: [pelvisRegion] };
+  for (const key of ["upperArm", "forearm", "hand"]) regions[key] = arms.map((a) => a.regions[key]);
+  for (const key of ["thigh", "calf", "foot"]) regions[key] = legs.map((l) => l.regions[key]);
+  for (const list of Object.values(regions)) for (const R of list) span(R, 0, 1, 0, "skin");
+  // Deltoid caps ride on the arms, so they lift and swing with the shoulder joint.
+  const deltoid = C.del * u,
+    // Shifted toward the chest and down, so the cap merges into the shoulder dome and arm.
+    deltoids = arms.map((a) => ({ joint: a.shoulder, position: [-a.side * deltoid * 0.18, 0, -deltoid * 0.12], r: deltoid * 0.95 }));
+  for (const d of deltoids) sphere(d.joint, "skin", d.position, d.r, [1, 1, 1.2]);
+  // Bust (female canon): two spheres on the chest front, as in the 2D canon.
+  const bust = C.bust
+    ? [-1, 1].map((side) => ({
+        // Pushed back into the chest by a third of its radius so it reads as one form.
+        position: [side * C.bust.y * u * 0.85, -C.bust.x * u - (C.tf + C.tb) * u * 0.5 + C.bust.r * u * 0.62, chestRegion.origin[2] - chestRegion.length * 0.24],
+        r: C.bust.r * u * 1.15,
+      }))
+    : [];
+  for (const b of bust) sphere(waist, "skin", b.position, b.r, BUST_STRETCH);
+  // Head: an egg, wider at the crown than the jaw, plus ears. Its top is exactly `height`.
+  // Taper only: a bulge on a body this short would read as a belt around the face.
+  add(head, "skin", [0, -hd * 0.04, hh / 2], [hw, hd, hh], roundedProfile({ taper: 0.8 }));
+  for (const side of [-1, 1]) sphere(head, "skin", [side * hw * 0.48, hd * 0.04, hh * 0.46], hw * 0.09, [0.6, 1, 1.35]);
+  addHair(add, sphere, head, p.hair, hh, hw, hd);
+
+  // ── Clothes ────────────────────────────────────────────────────────────────────
+  // Each garment grows the regions it covers by its thickness over the layer below.
+  // Thickness accumulates in wear order, so a jacket sits over a top over legwear.
+  const worn = {};
+  outfit.forEach((g, index) => {
+    const coverage = garmentCoverage(g),
+      thickness = g.thickness ?? GARMENT_SLOTS[g.slot].thickness,
+      grow = (name) => (worn[name] = (worn[name] ?? 0) + thickness);
+    for (const [name, [a, b]] of Object.entries(coverage)) {
+      const g0 = grow(name);
+      for (const R of regions[name]) span(R, a, b, g0, index);
+    }
+    if (coverage.chest) {
+      const [a, b] = coverage.chest,
+        g0 = worn.chest;
+      // A top over the bust covers it too; sleeves carry the deltoid caps.
+      for (const s of bust) if (a <= 0.38 && b >= 0.2) sphere(waist, index, s.position, s.r + g0, BUST_STRETCH);
+      if (coverage.upperArm?.[0] === 0) for (const d of deltoids) sphere(d.joint, index, d.position, d.r + g0, [1, 1, 1.2]);
+    }
+    if (g.skirt) {
+      // Fitted from the waist over the hips, then a static flared cone to the hem.
+      // Cloth simulation (the 2D game's chains) is future work: legs can pass through it.
+      const g0 = grow("pelvis"),
+        R = pelvisRegion;
+      span(R, 0, R.peak, g0, index);
+      // The cone is centred between the hip joints (not on the seat) and starts wide and
+      // deep enough to contain the thighs' upper domes at rest.
+      const thighR = C.thigh[0] * u,
+        top = R.origin[2] - R.peak * R.length,
+        hem = -g.skirt.length * m.thighLength,
+        nearX = Math.max(R.ax * regionScale(R, R.peak, true), m.hipSpacing + thighR) + g0,
+        nearY = Math.max(R.ay * regionScale(R, R.peak) + Math.abs(R.origin[1]), thighR * 1.15) + g0,
+        length = top - hem,
+        flare = g.skirt.flare;
+      add(pelvis, index, [0, 0, top - length / 2], [nearX * 2, nearY * 2, length], roundedProfile({ taper: flare, flatNear: true, flatFar: true, bulge: 0.04, peak: 0.3 }));
+    }
+  });
+
+  // Backpack: attached to the chest so it follows lean/twist; its own pivot carries
+  // bounded secondary swing. Packs and straps stay boxes: they are boxy objects.
+  let pack = null;
+  if (p.backpack) {
+    const b = m.backpack,
+      back = chestRegion.origin[1] + chestDepth;
+    pack = joint(waist, 0, back, b.top);
+    add(pack, "bag", [0, b.depth / 2 + 0.005, -b.height / 2], [b.width, b.depth, b.height]);
+    add(pack, "bag", [0, b.depth * 0.62, -b.height * 0.64], [b.width * 0.72, b.depth * 0.5, b.height * 0.42]);
+    add(pack, "strap", [0, b.depth / 2, -0.02], [b.width * 0.86, b.depth * 0.9, 0.05]);
+    for (const side of [-1, 1]) add(waist, "strap", [side * chestHalf * 0.5, chestRegion.origin[1] - chestDepth * 1.02, m.chest.height * 0.62], [0.04, 0.02, m.chest.height * 0.62]);
+  }
+
+  return {
+    document: doc,
+    measurements: m,
+    root,
+    pelvis,
+    waist,
+    neck,
+    head,
+    arms,
+    legs,
+    pack,
+    parts,
+    outfit,
+    lift,
+    materials: slots,
+    garmentMaterials,
+    // Secondary-motion state belongs to this instance only.
+    motion: { packPitch: 0, packRoll: 0, packPitchRate: 0, packRollRate: 0, lean: 0, lastSpeed: 0 },
+    /** Show every part with one material (silhouette review) or restore palette and garments. */
+    override(material = null) {
+      for (const { entity, slot } of parts) entity.shape.material = material ?? (typeof slot === "number" ? garmentMaterials[slot] : slots[slot]);
+    },
+    /** Remove the figure and all descendants from its world. */
+    dispose() {
+      world.remove(root);
+    },
+  };
+}
+
+/** Shared profile for spheres and ellipsoids. */
+const ROUND = roundedProfile();
+/** Bust volumes are wider than deep and slightly tall, so they read as soft forms. */
+const BUST_STRETCH = Object.freeze([1.12, 0.78, 1.05]);
+
+/**
+ * Hair volumes enlarge the head outline the way real hair does; no strands. Curls are a
+ * deterministic cluster of spheres over the crown, back and sides (949's look in the 2D
+ * game), leaving the face clear.
+ */
+function addHair(add, sphere, head, style, hh, hw, hd) {
+  if (style === "none") return;
+  // A cap over the crown and back of the head is shared by every style.
+  add(head, "hair", [0, hd * 0.1, hh * 0.68], [hw * 1.08, hd * 1.06, hh * 0.7], ROUND);
+  if (style === "bun") sphere(head, "hair", [0, hd * 0.5, hh * 0.84], hw * 0.24);
+  if (style === "ponytail") {
+    sphere(head, "hair", [0, hd * 0.52, hh * 0.66], hw * 0.14);
+    add(head, "hair", [0, hd * 0.62, hh * 0.3], [hw * 0.26, hd * 0.24, hh * 0.8], roundedProfile({ taper: 0.45, bulge: 0.2, peak: 0.3 }), eulerRotation(0.18, 0, 0));
+  }
+  if (style === "curls") {
+    // Rings of curls on an ellipsoid shell; small deterministic size variation keeps the
+    // outline lumpy rather than a smooth helmet. Points facing the face are skipped.
+    const rings = [[-0.1, 11], [0.25, 11], [0.6, 9], [0.95, 6], [1.3, 3], [1.57, 1]];
+    let n = 0;
+    for (const [elevation, count] of rings)
+      for (let i = 0; i < count; i++) {
+        const azimuth = (i / count) * Math.PI * 2 + elevation * 1.7,
+          dx = Math.cos(elevation) * Math.sin(azimuth),
+          dy = Math.cos(elevation) * Math.cos(azimuth),
+          dz = Math.sin(elevation);
+        if (dy < -0.25 && elevation < 0.85) continue;
+        const size = hw * (0.17 + 0.04 * Math.sin(n++ * 2.39));
+        sphere(head, "hair", [dx * hw * 0.56, hd * 0.08 + dy * hd * 0.56, hh * 0.62 + dz * hh * 0.4], size);
+      }
+  }
+}
+
+/** Write a quaternion into an entity's existing rotation storage (no allocation per frame). */
+function setRotation(entity, x, y, z) {
+  const q = eulerRotation(x, y, z);
+  for (let i = 0; i < 4; i++) entity.rotation[i] = q[i];
+}
+
+/**
+ * Pose one rig. `state` is the caller's authoritative movement, never read from input:
+ *   phase   gait phase in radians (one stride = 2π)
+ *   amount  0 standing … 1 full walk
+ *   turn    signed yaw rate (rad/s), used for lean into turns
+ *   accel   forward acceleration (m/s²), used for pack inertia
+ *   dt      seconds since the previous pose, for the bounded pack spring
+ * Angle conventions: rotating a hanging limb by +x swings it backward (+Y).
+ */
+function poseHumanoid(rig, { phase = 0, amount = 0, turn = 0, accel = 0, dt = 0 } = {}) {
+  const p = rig.document.parameters,
+    m = rig.measurements,
+    a = Math.max(0, Math.min(1, amount)),
+    s = Math.sin(phase),
+    c = Math.cos(phase);
+  // Pelvis bob: lowest at double support (twice per stride), with a slight twist.
+  rig.pelvis.z = m.hipZ + rig.lift - 0.022 * a * (0.5 + 0.5 * Math.cos(2 * phase)) * (m.height / 1.7);
+  setRotation(rig.pelvis, 0, 0, 0.07 * a * s);
+  // Lean: resting posture, a little forward while walking, and toward the turn centre.
+  const motion = rig.motion,
+    targetLean = Math.max(-0.22, Math.min(0.22, turn * a * 0.09));
+  motion.lean += (targetLean - motion.lean) * Math.min(1, dt * 8);
+  // +x pitches the upper body forward (toward -Y); +y rolls it toward +X.
+  setRotation(rig.waist, p.spineLean + 0.05 * a, motion.lean, -0.1 * a * s);
+  setRotation(rig.head, p.headTilt - 0.03 * a, -motion.lean * 0.5, 0.05 * a * s);
+  for (const leg of rig.legs) {
+    // Right leg is half a stride behind the left.
+    const ls = leg.side < 0 ? s : -s,
+      lc = leg.side < 0 ? c : -c,
+      swing = -0.4 * a * ls,
+      // Knee bends mostly while the leg travels forward (swing phase).
+      knee = a * (0.08 + 0.62 * Math.max(0, lc) * Math.max(0, 0.4 + ls));
+    setRotation(leg.hip, swing, 0, 0);
+    setRotation(leg.knee, knee, 0, 0);
+    // Keep the sole roughly level with the ground instead of pointing with the shin.
+    setRotation(leg.ankle, -(swing + knee) * 0.75, 0, 0);
+  }
+  for (const arm of rig.arms) {
+    // Arms counter-swing their opposite leg; the spread keeps hands clear of the hips.
+    const as = arm.side < 0 ? s : -s;
+    setRotation(arm.shoulder, 0.3 * a * as, -arm.side * p.armSpread, 0);
+    setRotation(arm.elbow, -(0.12 + 0.28 * a * Math.max(0, -as)), 0, 0);
+  }
+  if (rig.pack) {
+    // Bounded damped spring: acceleration tips the pack back, turning swings it out.
+    // Heavier packs respond more slowly and swing further; mass never adds energy.
+    const mass = Math.max(1, p.backpackMass),
+      stiffness = 70 / Math.sqrt(mass),
+      damping = 2 * 0.55 * Math.sqrt(stiffness),
+      step = Math.min(dt, 1 / 30);
+    if (step > 0) {
+      const pitchForce = -stiffness * motion.packPitch - damping * motion.packPitchRate + accel * 0.08 * Math.sqrt(mass);
+      const rollForce = -stiffness * motion.packRoll - damping * motion.packRollRate + turn * a * 0.25 * Math.sqrt(mass);
+      motion.packPitchRate += pitchForce * step;
+      motion.packRollRate += rollForce * step;
+      motion.packPitch = Math.max(-0.3, Math.min(0.3, motion.packPitch + motion.packPitchRate * step));
+      motion.packRoll = Math.max(-0.3, Math.min(0.3, motion.packRoll + motion.packRollRate * step));
+    }
+    // Gait bounce adds a small rhythmic pitch on top of the spring.
+    setRotation(rig.pack, motion.packPitch + 0.03 * a * Math.cos(2 * phase), motion.packRoll, 0);
+  }
+}
+
+return {HUMANOID_GENERATOR_VERSION,BODY_CANON,BODY_BUILDS,HUMANOID_PARAMETERS,HUMANOID_CHOICES,HUMANOID_PALETTE_SLOTS,validateHumanoid,humanoidMeasurements,createHumanoid,poseHumanoid};
+})();
 // Source: engine/penthouse/controls.js
-const module42=(()=>{
+const module45=(()=>{
 /**
  * Penthouse / controls: parameterized HTML control templates over Basement actions.
  * HTML is intentional for accessible interface text; the world remains pure WebGL.
@@ -4097,7 +5263,7 @@ class ActionButton {
 return {Joystick,ActionButton};
 })();
 // Source: engine/penthouse/profiler-style.js
-const module44=(()=>{
+const module47=(()=>{
 /** Penthouse / profiler presentation: component-scoped styles; removed with the viewer root. */
 const PROFILER_STYLE=`
 .etrnl-profiler{position:absolute;right:30px;top:92px;width:min(390px,calc(100vw - 40px));max-height:calc(100dvh - 190px);overflow:auto;background:#11131eef;border:1px solid #c6ae774d;border-radius:7px;color:#d5cfdf;font:11px/1.55 system-ui,sans-serif;z-index:2;box-shadow:0 12px 50px #0004}
@@ -4122,15 +5288,15 @@ const PROFILER_STYLE=`
 return {PROFILER_STYLE};
 })();
 // Source: engine/penthouse/profiler-view.js
-const module43=(()=>{
+const module46=(()=>{
 /**
  * Penthouse / profiler viewer: accessible HTML/SVG, bounded tables and capture export.
  * Receives a generic subscription function; it never imports Lobby or starts a loop.
  * Closed viewers unsubscribe. Open viewers refresh at most twice a second by default.
  */
 const { Lifetime } = module6;
-const { diagnosticError } = module31;
-const { PROFILER_STYLE } = module44;
+const { diagnosticError } = module32;
+const { PROFILER_STYLE } = module47;
 
 /** Format measured values without turning unavailable measurements into zero. */
 function ms(value){return Number.isFinite(value)?value.toFixed(2):'—';}
@@ -4250,7 +5416,7 @@ class ProfilerView {
 return {ProfilerView};
 })();
 // Source: engine/penthouse/workspace-icons.js
-const module45=(()=>{
+const module48=(()=>{
 /** Penthouse / the Studio's original 24-unit SVG family. Paths are inert library data,
  * not DOM, textures or renderer assets. Directory exposes this immutable catalog;
  * applications request it explicitly and choose their own command-to-icon mapping.
@@ -4304,16 +5470,17 @@ const WORKSPACE_ICONS = Object.freeze({
 return {WORKSPACE_ICONS};
 })();
 // Source: engine/penthouse/penthouse.js
-const module38=(()=>{
+const module39=(()=>{
 /**
  * Penthouse assembly: expose inert libraries without coupling Directory to toy names.
  * ETRNLNINE installs these factories; games request them through Directory.
  */
-const { assembly } = module39;
-const { pavilion, actor, box } = module40;
-const { Joystick, ActionButton } = module42;
-const { ProfilerView } = module43;
-const { WORKSPACE_ICONS } = module45;
+const { assembly } = module40;
+const { pavilion, actor, box } = module41;
+const { createHumanoid } = module43;
+const { Joystick, ActionButton } = module45;
+const { ProfilerView } = module46;
+const { WORKSPACE_ICONS } = module48;
 
 class Penthouse {
   /** Catalog creation is inert: allocation begins only when a factory is requested. */
@@ -4323,6 +5490,8 @@ class Penthouse {
       'toy.box': options => box(options.world, options),
       'toy.pavilion': pavilion,
       'toy.actor': actor,
+      // Articulated proportion-review mannequin; callers supply a validated document.
+      'toy.humanoid': createHumanoid,
       'control.joystick': options => new Joystick(options),
       'control.button': options => new ActionButton(options),
       'tool.profiler':options=>new ProfilerView(options),
@@ -4343,9 +5512,9 @@ const module1=(()=>{
  */
 const { Basement } = module2;
 const { Lifetime } = module6;
-const { Runtime } = module32;
-const { Directory } = module35;
-const { Penthouse } = module38;
+const { Runtime } = module33;
+const { Directory } = module36;
+const { Penthouse } = module39;
 
 class ETRNLNINE {
   /** Build an empty engine, releasing earlier levels if a later constructor fails. */
@@ -4383,7 +5552,7 @@ class ETRNLNINE {
 return {ETRNLNINE};
 })();
 // Source: engine/basement/objects.js
-const module50=(()=>{
+const module53=(()=>{
 /** Basement / authored object tree. Origin-only nodes and geometry-bearing components
  * share identity, local transforms and inherited editor restrictions. No game/DOM policy.
  * Parent-before-child storage is validated at the project boundary, not repaired per frame. */
@@ -4501,15 +5670,15 @@ function reparentObject(scene, id, parent) {
 return {ancestors,lockOwner,descendants,objectPoses,objectPose,localPoint,localRotation,reparentObject};
 })();
 // Source: engine/basement/project.js
-const module49=(()=>{
+const module52=(()=>{
 /**
  * Basement / authored project contract. JSON is data, never executable behavior.
  * This first portable package contains scenes and assembly assets together. Validation
  * happens before adoption and packaging; IDs survive serialization independently of World IDs.
  * Limits bound synchronous parsing, history and procedural construction on mobile devices.
  */
-const { objectPoses } = module50;
-const { validateMaterial } = module41;
+const { objectPoses } = module53;
+const { validateMaterial } = module42;
 const PROJECT_LIMITS = Object.freeze({
   bytes: 524288,
   scenes: 8,
@@ -4885,11 +6054,11 @@ function upgradeProject(source) {
 return {PROJECT_LIMITS,copyData,parseProject,validateProject,upgradeProject};
 })();
 // Source: examples/atrium/project.js
-const module48=(()=>{
+const module51=(()=>{
 /** Atrium source of truth: portable JSON; behavior stays in the example's JavaScript. */
 const data=JSON.parse("{\"schemaVersion\":3,\"id\":\"project:atrium\",\"name\":\"Between Worlds\",\"scenes\":[{\"key\":\"amber\",\"name\":\"The Amber Atrium\",\"sun\":{\"direction\":[-0.5,0.8,1.2],\"color\":[0.58,0.49,0.62]},\"ethereal\":false,\"ambient\":[0.15,0.11,0.15],\"id\":\"scene:amber\",\"entities\":[{\"id\":\"amber:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"asset\":\"asset:amber:courtyard-foundation\",\"tag\":null,\"locked\":true,\"position\":[0,0,-0.25],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:central-inlay\",\"name\":\"Central inlay\",\"asset\":\"asset:amber:central-inlay\",\"tag\":null,\"locked\":true,\"position\":[0,-5,0.015],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:west-brass-inlay\",\"name\":\"West brass inlay\",\"asset\":\"asset:amber:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[-3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:east-brass-inlay\",\"name\":\"East brass inlay\",\"asset\":\"asset:amber:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:colonnade\",\"name\":\"Colonnade\",\"asset\":\"asset:amber:colonnade\",\"tag\":null,\"locked\":false,\"position\":[0,11,0],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:west-gallery\",\"name\":\"West gallery\",\"asset\":\"asset:amber:west-gallery\",\"tag\":null,\"locked\":false,\"position\":[-20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:west-entry-planter\",\"name\":\"West entry planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:west-court-planter\",\"name\":\"West court planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:west-entry-lantern\",\"name\":\"West entry lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:west-promenade-lantern\",\"name\":\"West promenade lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:west-gallery-lantern\",\"name\":\"West gallery lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:east-gallery\",\"name\":\"East gallery\",\"asset\":\"asset:amber:east-gallery\",\"tag\":null,\"locked\":false,\"position\":[20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:east-entry-planter\",\"name\":\"East entry planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:east-court-planter\",\"name\":\"East court planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:east-entry-lantern\",\"name\":\"East entry lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:east-promenade-lantern\",\"name\":\"East promenade lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:east-gallery-lantern\",\"name\":\"East gallery lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:crystal-lantern\",\"name\":\"Crystal lantern\",\"asset\":\"asset:amber:crystal-lantern\",\"tag\":\"lantern\",\"locked\":false,\"position\":[0,2,0.65],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:movable-plinth\",\"name\":\"Movable plinth\",\"asset\":\"asset:amber:movable-plinth\",\"tag\":\"prop\",\"locked\":false,\"position\":[6,-12,0.65],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null}],\"lights\":[{\"id\":\"light:0\",\"position\":[0,7,5],\"radius\":16,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:1\",\"position\":[-15,-4,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:2\",\"position\":[15,-4,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:3\",\"position\":[-15,9,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:4\",\"position\":[15,9,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:5\",\"position\":[0,2,3],\"radius\":10,\"color\":[0.3,1.1,2.7]},{\"id\":\"light:6\",\"position\":[-15,-18,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:7\",\"position\":[15,-18,4],\"radius\":12,\"color\":[2.4,0.85,0.3]}],\"lightVariants\":{\"cool\":{\"crystal\":[0.25,0.62,1],\"irradiance\":[0.3,1.1,2.7]},\"warm\":{\"crystal\":[1,0.34,0.19],\"irradiance\":[3,0.5,0.2]}}},{\"key\":\"violet\",\"name\":\"The Violet Court\",\"sun\":{\"direction\":[0.5,0.7,1.1],\"color\":[0.36,0.46,0.75]},\"ethereal\":true,\"ambient\":[0.09,0.11,0.26],\"id\":\"scene:violet\",\"entities\":[{\"id\":\"violet:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"asset\":\"asset:violet:courtyard-foundation\",\"tag\":null,\"locked\":true,\"position\":[0,0,-0.25],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:central-inlay\",\"name\":\"Central inlay\",\"asset\":\"asset:violet:central-inlay\",\"tag\":null,\"locked\":true,\"position\":[0,-5,0.015],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:west-brass-inlay\",\"name\":\"West brass inlay\",\"asset\":\"asset:violet:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[-3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:east-brass-inlay\",\"name\":\"East brass inlay\",\"asset\":\"asset:violet:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:colonnade\",\"name\":\"Colonnade\",\"asset\":\"asset:violet:colonnade\",\"tag\":null,\"locked\":false,\"position\":[0,11,0],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:west-gallery\",\"name\":\"West gallery\",\"asset\":\"asset:violet:west-gallery\",\"tag\":null,\"locked\":false,\"position\":[-20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:west-entry-planter\",\"name\":\"West entry planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:west-court-planter\",\"name\":\"West court planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:west-entry-lantern\",\"name\":\"West entry lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:west-promenade-lantern\",\"name\":\"West promenade lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:west-gallery-lantern\",\"name\":\"West gallery lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:east-gallery\",\"name\":\"East gallery\",\"asset\":\"asset:violet:east-gallery\",\"tag\":null,\"locked\":false,\"position\":[20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:east-entry-planter\",\"name\":\"East entry planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:east-court-planter\",\"name\":\"East court planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:east-entry-lantern\",\"name\":\"East entry lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:east-promenade-lantern\",\"name\":\"East promenade lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:east-gallery-lantern\",\"name\":\"East gallery lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:crystal-lantern\",\"name\":\"Crystal lantern\",\"asset\":\"asset:violet:crystal-lantern\",\"tag\":\"lantern\",\"locked\":false,\"position\":[0,2,0.65],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:movable-plinth\",\"name\":\"Movable plinth\",\"asset\":\"asset:violet:movable-plinth\",\"tag\":\"prop\",\"locked\":false,\"position\":[6,-12,0.65],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:west-prism\",\"name\":\"West prism\",\"asset\":\"asset:violet:prism\",\"tag\":null,\"locked\":false,\"position\":[-7,-3,2.5],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:east-prism\",\"name\":\"East prism\",\"asset\":\"asset:violet:prism\",\"tag\":null,\"locked\":false,\"position\":[7,-3,2.5],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null}],\"lights\":[{\"id\":\"light:0\",\"position\":[0,7,5],\"radius\":16,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:1\",\"position\":[-15,-4,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:2\",\"position\":[15,-4,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:3\",\"position\":[-15,9,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:4\",\"position\":[15,9,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:5\",\"position\":[0,2,3],\"radius\":10,\"color\":[0.3,1.1,2.7]},{\"id\":\"light:6\",\"position\":[-15,-18,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:7\",\"position\":[15,-18,4],\"radius\":12,\"color\":[0.35,0.9,2.5]}],\"lightVariants\":{\"cool\":{\"crystal\":[0.25,0.62,1],\"irradiance\":[0.3,1.1,2.7]},\"warm\":{\"crystal\":[1,0.34,0.19],\"irradiance\":[3,0.5,0.2]}}}],\"assets\":[{\"id\":\"asset:amber:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[58,68,0.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:1\"}}],\"colliders\":[]},{\"id\":\"asset:amber:central-inlay\",\"name\":\"Central inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[7,38,0.025],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:2\"}}],\"colliders\":[]},{\"id\":\"asset:amber:brass-inlay\",\"name\":\"Brass inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.05,38,0.035],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:3\"}}],\"colliders\":[]},{\"id\":\"asset:amber:colonnade\",\"name\":\"Colonnade\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":null},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.2],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[26,11,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,4.2,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.6,7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,7],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[25,10,0.6],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,-4.5,6.4],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.12,0.09],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:5\"}},{\"id\":\"part:5\",\"parent\":0,\"position\":[0,-4.5,6.1],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.16,0.1],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:6\",\"parent\":0,\"position\":[-12,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:7\",\"parent\":0,\"position\":[-12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:8\",\"parent\":0,\"position\":[-12,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:9\",\"parent\":0,\"position\":[-6,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:10\",\"parent\":0,\"position\":[-6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:11\",\"parent\":0,\"position\":[-6,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:12\",\"parent\":0,\"position\":[6,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:13\",\"parent\":0,\"position\":[6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:14\",\"parent\":0,\"position\":[6,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:15\",\"parent\":0,\"position\":[12,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:16\",\"parent\":0,\"position\":[12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:17\",\"parent\":0,\"position\":[12,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:18\",\"parent\":0,\"position\":[-9,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:19\",\"parent\":0,\"position\":[-9,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:20\",\"parent\":0,\"position\":[-6,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:21\",\"parent\":0,\"position\":[-6,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:22\",\"parent\":0,\"position\":[-3,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:23\",\"parent\":0,\"position\":[-3,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:24\",\"parent\":0,\"position\":[0,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:25\",\"parent\":0,\"position\":[0,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:26\",\"parent\":0,\"position\":[3,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:27\",\"parent\":0,\"position\":[3,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:28\",\"parent\":0,\"position\":[6,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:29\",\"parent\":0,\"position\":[6,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:30\",\"parent\":0,\"position\":[9,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:31\",\"parent\":0,\"position\":[9,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}}],\"colliders\":[{\"x\":0,\"y\":4.199999999999999,\"width\":24,\"depth\":0.7},{\"x\":-12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":-6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6}]},{\"id\":\"asset:amber:west-gallery\",\"name\":\"West gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:8\"}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:9\"}},{\"id\":\"part:2\",\"parent\":null,\"position\":[1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:3\",\"parent\":null,\"position\":[1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}},{\"id\":\"part:4\",\"parent\":null,\"position\":[1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:5\",\"parent\":null,\"position\":[1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}},{\"id\":\"part:6\",\"parent\":null,\"position\":[1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:7\",\"parent\":null,\"position\":[1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}},{\"id\":\"part:8\",\"parent\":null,\"position\":[1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:9\",\"parent\":null,\"position\":[1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}},{\"id\":\"part:10\",\"parent\":null,\"position\":[1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:11\",\"parent\":null,\"position\":[1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}},{\"id\":\"part:12\",\"parent\":null,\"position\":[1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:13\",\"parent\":null,\"position\":[1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}},{\"id\":\"part:14\",\"parent\":null,\"position\":[1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:15\",\"parent\":null,\"position\":[1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:amber:planter\",\"name\":\"Planter\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,2.4,1.1],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:12\"}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.8499999999999999],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.2,2.2,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:13\"}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,0,1.4999999999999998],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.8000000000000003,1.8000000000000003,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:13\"}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,2.1500000000000004],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.4000000000000001,1.4000000000000001,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:13\"}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,0,2.8],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1,1,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:13\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.4,\"depth\":2.4}]},{\"id\":\"asset:amber:lantern\",\"name\":\"Lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.18,0.18,3.6],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:14\"}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,1.9000000000000001],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.6,0.6,0.8],\"ambientBlocker\":true,\"castShadow\":false,\"material\":\"material:15\"}},{\"id\":\"part:2\",\"parent\":null,\"position\":[0,0,2.3500000000000005],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.12],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:14\"}}],\"colliders\":[]},{\"id\":\"asset:amber:east-gallery\",\"name\":\"East gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:16\"}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:17\"}},{\"id\":\"part:2\",\"parent\":null,\"position\":[-1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:3\",\"parent\":null,\"position\":[-1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}},{\"id\":\"part:4\",\"parent\":null,\"position\":[-1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:5\",\"parent\":null,\"position\":[-1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}},{\"id\":\"part:6\",\"parent\":null,\"position\":[-1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:7\",\"parent\":null,\"position\":[-1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}},{\"id\":\"part:8\",\"parent\":null,\"position\":[-1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:9\",\"parent\":null,\"position\":[-1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}},{\"id\":\"part:10\",\"parent\":null,\"position\":[-1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:11\",\"parent\":null,\"position\":[-1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}},{\"id\":\"part:12\",\"parent\":null,\"position\":[-1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:13\",\"parent\":null,\"position\":[-1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}},{\"id\":\"part:14\",\"parent\":null,\"position\":[-1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:15\",\"parent\":null,\"position\":[-1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:amber:crystal-lantern\",\"name\":\"Crystal lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.9,1.9,1.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:20\"}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.85],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.1,2.1,0.22],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:21\"}},{\"id\":\"crystal\",\"parent\":0,\"position\":[0,0,1.75],\"rotation\":[0,0,0.3826834323650898,0.9238795325112867],\"shape\":{\"size\":[0.7,0.7,1.4],\"ambientBlocker\":true,\"castShadow\":false,\"material\":\"material:22\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.1,\"depth\":2.1}]},{\"id\":\"asset:amber:movable-plinth\",\"name\":\"Movable plinth\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,2,1.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:23\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":2}]},{\"id\":\"asset:violet:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[58,68,0.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:24\"}}],\"colliders\":[]},{\"id\":\"asset:violet:central-inlay\",\"name\":\"Central inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[7,38,0.025],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:25\"}}],\"colliders\":[]},{\"id\":\"asset:violet:brass-inlay\",\"name\":\"Brass inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.05,38,0.035],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:26\"}}],\"colliders\":[]},{\"id\":\"asset:violet:colonnade\",\"name\":\"Colonnade\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":null},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.2],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[26,11,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,4.2,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.6,8.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,8.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[25,10,0.6],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,-4.5,7.9],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.12,0.09],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:28\"}},{\"id\":\"part:5\",\"parent\":0,\"position\":[0,-4.5,7.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.16,0.1],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:6\",\"parent\":0,\"position\":[-12,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:7\",\"parent\":0,\"position\":[-12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:8\",\"parent\":0,\"position\":[-12,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:9\",\"parent\":0,\"position\":[-6,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:10\",\"parent\":0,\"position\":[-6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:11\",\"parent\":0,\"position\":[-6,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:12\",\"parent\":0,\"position\":[6,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:13\",\"parent\":0,\"position\":[6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:14\",\"parent\":0,\"position\":[6,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:15\",\"parent\":0,\"position\":[12,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:16\",\"parent\":0,\"position\":[12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:17\",\"parent\":0,\"position\":[12,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:18\",\"parent\":0,\"position\":[-9,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:19\",\"parent\":0,\"position\":[-9,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:20\",\"parent\":0,\"position\":[-6,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:21\",\"parent\":0,\"position\":[-6,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:22\",\"parent\":0,\"position\":[-3,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:23\",\"parent\":0,\"position\":[-3,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:24\",\"parent\":0,\"position\":[0,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:25\",\"parent\":0,\"position\":[0,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:26\",\"parent\":0,\"position\":[3,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:27\",\"parent\":0,\"position\":[3,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:28\",\"parent\":0,\"position\":[6,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:29\",\"parent\":0,\"position\":[6,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:30\",\"parent\":0,\"position\":[9,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:31\",\"parent\":0,\"position\":[9,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}}],\"colliders\":[{\"x\":0,\"y\":4.199999999999999,\"width\":24,\"depth\":0.7},{\"x\":-12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":-6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6}]},{\"id\":\"asset:violet:west-gallery\",\"name\":\"West gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:31\"}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:32\"}},{\"id\":\"part:2\",\"parent\":null,\"position\":[1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:3\",\"parent\":null,\"position\":[1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}},{\"id\":\"part:4\",\"parent\":null,\"position\":[1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:5\",\"parent\":null,\"position\":[1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}},{\"id\":\"part:6\",\"parent\":null,\"position\":[1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:7\",\"parent\":null,\"position\":[1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}},{\"id\":\"part:8\",\"parent\":null,\"position\":[1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:9\",\"parent\":null,\"position\":[1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}},{\"id\":\"part:10\",\"parent\":null,\"position\":[1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:11\",\"parent\":null,\"position\":[1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}},{\"id\":\"part:12\",\"parent\":null,\"position\":[1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:13\",\"parent\":null,\"position\":[1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}},{\"id\":\"part:14\",\"parent\":null,\"position\":[1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:15\",\"parent\":null,\"position\":[1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:violet:planter\",\"name\":\"Planter\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,2.4,1.1],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:35\"}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.8499999999999999],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.2,2.2,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:36\"}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,0,1.4999999999999998],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.8000000000000003,1.8000000000000003,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:36\"}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,2.1500000000000004],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.4000000000000001,1.4000000000000001,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:36\"}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,0,2.8],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1,1,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:36\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.4,\"depth\":2.4}]},{\"id\":\"asset:violet:lantern\",\"name\":\"Lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.18,0.18,3.6],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:37\"}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,1.9000000000000001],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.6,0.6,0.8],\"ambientBlocker\":true,\"castShadow\":false,\"material\":\"material:38\"}},{\"id\":\"part:2\",\"parent\":null,\"position\":[0,0,2.3500000000000005],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.12],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:37\"}}],\"colliders\":[]},{\"id\":\"asset:violet:east-gallery\",\"name\":\"East gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:39\"}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:40\"}},{\"id\":\"part:2\",\"parent\":null,\"position\":[-1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:3\",\"parent\":null,\"position\":[-1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}},{\"id\":\"part:4\",\"parent\":null,\"position\":[-1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:5\",\"parent\":null,\"position\":[-1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}},{\"id\":\"part:6\",\"parent\":null,\"position\":[-1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:7\",\"parent\":null,\"position\":[-1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}},{\"id\":\"part:8\",\"parent\":null,\"position\":[-1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:9\",\"parent\":null,\"position\":[-1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}},{\"id\":\"part:10\",\"parent\":null,\"position\":[-1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:11\",\"parent\":null,\"position\":[-1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}},{\"id\":\"part:12\",\"parent\":null,\"position\":[-1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:13\",\"parent\":null,\"position\":[-1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}},{\"id\":\"part:14\",\"parent\":null,\"position\":[-1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:15\",\"parent\":null,\"position\":[-1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:violet:crystal-lantern\",\"name\":\"Crystal lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.9,1.9,1.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:43\"}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.85],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.1,2.1,0.22],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:44\"}},{\"id\":\"crystal\",\"parent\":0,\"position\":[0,0,1.75],\"rotation\":[0,0,0.3826834323650898,0.9238795325112867],\"shape\":{\"size\":[0.7,0.7,1.4],\"ambientBlocker\":true,\"castShadow\":false,\"material\":\"material:45\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.1,\"depth\":2.1}]},{\"id\":\"asset:violet:movable-plinth\",\"name\":\"Movable plinth\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,2,1.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:46\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":2}]},{\"id\":\"asset:violet:prism\",\"name\":\"Prism\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0.3826834323650898,0.9238795325112867],\"shape\":{\"size\":[0.7,0.7,3.8],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:47\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":1,\"depth\":1}]}],\"materials\":[{\"id\":\"material:1\",\"name\":\"Courtyard foundation · 1\",\"baseColor\":[0.14,0.115,0.14],\"emissionColor\":[0.14,0.115,0.14],\"emissionStrength\":0},{\"id\":\"material:2\",\"name\":\"Central inlay · 1\",\"baseColor\":[0.22,0.2,0.25],\"emissionColor\":[0.22,0.2,0.25],\"emissionStrength\":0},{\"id\":\"material:3\",\"name\":\"Brass inlay · 1\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:4\",\"name\":\"Colonnade · 1\",\"baseColor\":[0.24,0.18,0.2],\"emissionColor\":[0.24,0.18,0.2],\"emissionStrength\":0},{\"id\":\"material:5\",\"name\":\"Colonnade · 2\",\"baseColor\":[1,0.47,0.17],\"emissionColor\":[1,0.47,0.17],\"emissionStrength\":2.5},{\"id\":\"material:6\",\"name\":\"Colonnade · 3\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:7\",\"name\":\"Colonnade · 4\",\"baseColor\":[0.35,0.19,0.16],\"emissionColor\":[0.35,0.19,0.16],\"emissionStrength\":0.3},{\"id\":\"material:8\",\"name\":\"West gallery · 1\",\"baseColor\":[0.24,0.18,0.2],\"emissionColor\":[0.24,0.18,0.2],\"emissionStrength\":0},{\"id\":\"material:9\",\"name\":\"West gallery · 2\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:10\",\"name\":\"West gallery · 3\",\"baseColor\":[0.38,0.15,0.16],\"emissionColor\":[0.38,0.15,0.16],\"emissionStrength\":0.55},{\"id\":\"material:11\",\"name\":\"West gallery · 4\",\"baseColor\":[1,0.47,0.17],\"emissionColor\":[1,0.47,0.17],\"emissionStrength\":2},{\"id\":\"material:12\",\"name\":\"Planter · 1\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:13\",\"name\":\"Planter · 2\",\"baseColor\":[0.045,0.14,0.1],\"emissionColor\":[0.045,0.14,0.1],\"emissionStrength\":0},{\"id\":\"material:14\",\"name\":\"Lantern · 1\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:15\",\"name\":\"Lantern · 2\",\"baseColor\":[1,0.47,0.17],\"emissionColor\":[1,0.47,0.17],\"emissionStrength\":3},{\"id\":\"material:16\",\"name\":\"East gallery · 1\",\"baseColor\":[0.24,0.18,0.2],\"emissionColor\":[0.24,0.18,0.2],\"emissionStrength\":0},{\"id\":\"material:17\",\"name\":\"East gallery · 2\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:18\",\"name\":\"East gallery · 3\",\"baseColor\":[0.38,0.15,0.16],\"emissionColor\":[0.38,0.15,0.16],\"emissionStrength\":0.55},{\"id\":\"material:19\",\"name\":\"East gallery · 4\",\"baseColor\":[1,0.47,0.17],\"emissionColor\":[1,0.47,0.17],\"emissionStrength\":2},{\"id\":\"material:20\",\"name\":\"Crystal lantern · 1\",\"baseColor\":[0.24,0.18,0.2],\"emissionColor\":[0.24,0.18,0.2],\"emissionStrength\":0},{\"id\":\"material:21\",\"name\":\"Crystal lantern · 2\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:22\",\"name\":\"Crystal lantern · 3\",\"baseColor\":[0.25,0.62,1],\"emissionColor\":[0.25,0.62,1],\"emissionStrength\":2},{\"id\":\"material:23\",\"name\":\"Movable plinth · 1\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:24\",\"name\":\"Courtyard foundation · 1\",\"baseColor\":[0.075,0.09,0.18],\"emissionColor\":[0.075,0.09,0.18],\"emissionStrength\":0},{\"id\":\"material:25\",\"name\":\"Central inlay · 1\",\"baseColor\":[0.22,0.2,0.25],\"emissionColor\":[0.22,0.2,0.25],\"emissionStrength\":0},{\"id\":\"material:26\",\"name\":\"Brass inlay · 1\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:27\",\"name\":\"Colonnade · 1\",\"baseColor\":[0.14,0.16,0.31],\"emissionColor\":[0.14,0.16,0.31],\"emissionStrength\":0},{\"id\":\"material:28\",\"name\":\"Colonnade · 2\",\"baseColor\":[0.24,0.58,1],\"emissionColor\":[0.24,0.58,1],\"emissionStrength\":2.5},{\"id\":\"material:29\",\"name\":\"Colonnade · 3\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:30\",\"name\":\"Colonnade · 4\",\"baseColor\":[0.35,0.19,0.16],\"emissionColor\":[0.35,0.19,0.16],\"emissionStrength\":0.3},{\"id\":\"material:31\",\"name\":\"West gallery · 1\",\"baseColor\":[0.14,0.16,0.31],\"emissionColor\":[0.14,0.16,0.31],\"emissionStrength\":0},{\"id\":\"material:32\",\"name\":\"West gallery · 2\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:33\",\"name\":\"West gallery · 3\",\"baseColor\":[0.15,0.19,0.46],\"emissionColor\":[0.15,0.19,0.46],\"emissionStrength\":0.55},{\"id\":\"material:34\",\"name\":\"West gallery · 4\",\"baseColor\":[0.24,0.58,1],\"emissionColor\":[0.24,0.58,1],\"emissionStrength\":2},{\"id\":\"material:35\",\"name\":\"Planter · 1\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:36\",\"name\":\"Planter · 2\",\"baseColor\":[0.1,0.2,0.27],\"emissionColor\":[0.1,0.2,0.27],\"emissionStrength\":0},{\"id\":\"material:37\",\"name\":\"Lantern · 1\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:38\",\"name\":\"Lantern · 2\",\"baseColor\":[0.24,0.58,1],\"emissionColor\":[0.24,0.58,1],\"emissionStrength\":3},{\"id\":\"material:39\",\"name\":\"East gallery · 1\",\"baseColor\":[0.14,0.16,0.31],\"emissionColor\":[0.14,0.16,0.31],\"emissionStrength\":0},{\"id\":\"material:40\",\"name\":\"East gallery · 2\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:41\",\"name\":\"East gallery · 3\",\"baseColor\":[0.15,0.19,0.46],\"emissionColor\":[0.15,0.19,0.46],\"emissionStrength\":0.55},{\"id\":\"material:42\",\"name\":\"East gallery · 4\",\"baseColor\":[0.24,0.58,1],\"emissionColor\":[0.24,0.58,1],\"emissionStrength\":2},{\"id\":\"material:43\",\"name\":\"Crystal lantern · 1\",\"baseColor\":[0.14,0.16,0.31],\"emissionColor\":[0.14,0.16,0.31],\"emissionStrength\":0},{\"id\":\"material:44\",\"name\":\"Crystal lantern · 2\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:45\",\"name\":\"Crystal lantern · 3\",\"baseColor\":[0.25,0.62,1],\"emissionColor\":[0.25,0.62,1],\"emissionStrength\":2},{\"id\":\"material:46\",\"name\":\"Movable plinth · 1\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:47\",\"name\":\"Prism · 1\",\"baseColor\":[0.22,0.5,0.67],\"emissionColor\":[0.22,0.5,0.67],\"emissionStrength\":0.5}]}");
-const { validateProject } = module49;
-const { ASSEMBLY_GENERATORS } = module39;
+const { validateProject } = module52;
+const { ASSEMBLY_GENERATORS } = module40;
 /** Resolve authored generator identities against the libraries this example actually installs. */
 function validateAtriumProject(project){validateProject(project,{generators:ASSEMBLY_GENERATORS});
  // This application's injected Play behavior requires these explicit content conventions.
@@ -4912,7 +6081,7 @@ function canRemoveAtriumEntity(entity){return !entity.locked&&!['prop','lantern'
 return {validateAtriumProject,ATRIUM_PROJECT,cloneAtriumEntity,canRemoveAtriumEntity};
 })();
 // Source: engine/basement/transfer.js
-const module52=(()=>{
+const module55=(()=>{
 /**
  * Basement / transfer: validated, synchronous movement of one attachment tree.
  * No loading, scheduling, game rules, callbacks during mutation, or resource ownership.
@@ -4963,13 +6132,13 @@ function transferTree({ source, destination, root, landing, validate = () => tru
 return {transferTree};
 })();
 // Source: engine/lobby/travel.js
-const module51=(()=>{
+const module54=(()=>{
 /**
  * Lobby / travel: asynchronous preparation becomes a synchronous boundary commit.
  * It consumes generic residency tickets; it does not import Directory or game content.
  * The active ticket pins the source until a successful transfer replaces it.
  */
-const { transferTree } = module52;
+const { transferTree } = module55;
 
 class WorldTravel {
   /** Adopt an already-ready initial ticket/root. The owner must call advance at a boundary. */
@@ -5062,7 +6231,7 @@ class WorldTravel {
 return {WorldTravel};
 })();
 // Source: engine/basement/geometry.js
-const module54=(()=>{
+const module57=(()=>{
 /** Basement / geometry: pure horizontal collision helpers, with no world or game dependency. */
 
 /** Does a horizontal circle overlap an axis-aligned box? Touching is permitted. */
@@ -5075,10 +6244,10 @@ function circleOverlapsBox(x, y, radius, box) {
 return {circleOverlapsBox};
 })();
 // Source: engine/directory/material-library.js
-const module57=(()=>{
+const module60=(()=>{
 /** Directory / scene-owned runtime material library. Authored IDs resolve once to shared
  * mutable numeric objects. Play never borrows authoring objects; updates retain link identity. */
-const { createMaterial, updateMaterial } = module41;
+const { createMaterial, updateMaterial } = module42;
 class MaterialLibrary {
   /** Definitions are indexed cheaply; numerical runtime copies are created only for users. */
   constructor(materials) {
@@ -5118,14 +6287,14 @@ class MaterialLibrary {
 return {MaterialLibrary};
 })();
 // Source: engine/directory/scene-instance.js
-const module56=(()=>{
+const module59=(()=>{
 /**
  * Directory / live authored scene instance. Maps stable document IDs to temporary World
  * membership, and updates transforms/collision together. Owns scene runtime materials.
  * Owns no scheduler or game rules.
  * Collider queries remain planar conservative bounds; full 3D physics is future work.
  */
-const { MaterialLibrary } = module57;
+const { MaterialLibrary } = module60;
 const { rotateVector } = module4;
 class SceneInstance {
   /** Synchronous construction is available for the explicitly bounded editor preview. */
@@ -5345,11 +6514,11 @@ class SceneInstance {
 return {SceneInstance};
 })();
 // Source: examples/atrium/layout.js
-const module55=(()=>{
+const module58=(()=>{
 /** Atrium / map generic document instances to this game's named interaction targets. */
-const { createMaterial } = module41;
-const { SceneInstance } = module56;
-const { ATRIUM_PROJECT } = module48;
+const { createMaterial } = module42;
+const { SceneInstance } = module59;
+const { ATRIUM_PROJECT } = module51;
 function* buildLayout(engine,world,profile,project=ATRIUM_PROJECT){
  const instance=yield* SceneInstance.prepare(engine.directory,world,project,profile);
  const lantern=profile.entities.find(e=>e.tag==='lantern'),prop=profile.entities.find(e=>e.tag==='prop');
@@ -5360,16 +6529,16 @@ function* buildLayout(engine,world,profile,project=ATRIUM_PROJECT){
 return {buildLayout};
 })();
 // Source: examples/atrium/worlds.js
-const module53=(()=>{
+const module56=(()=>{
 /**
  * Atrium example / world definitions: authored realms, reconstruction and state schema.
  * Directory receives factories, not these names. Lobby budgets actual procedural work.
  * Persisted data is deliberately small: light selection, crystal rotation and prop position.
  */
-const { ATRIUM_PROJECT } = module48;
+const { ATRIUM_PROJECT } = module51;
 const { Lifetime } = module6;
-const { circleOverlapsBox } = module54;
-const { buildLayout } = module55;
+const { circleOverlapsBox } = module57;
+const { buildLayout } = module58;
 
 /** Immutable-by-convention authoring profiles; runtime mutable state is created per world. */
 const PROFILES = ATRIUM_PROJECT.scenes;
@@ -5427,16 +6596,16 @@ function worldFactory(engine, profile, id, project=ATRIUM_PROJECT) {
 return {PROFILES,legalLanding,applyLight,worldFactory};
 })();
 // Source: examples/atrium/journey.js
-const module47=(()=>{
+const module50=(()=>{
 /**
  * Atrium example / journey: game-specific realm links, initial actor and prewarming policy.
  * Loading/lifetime algorithms live in Directory; transaction scheduling lives in Lobby.
  * This module chooses the destination and asks for those mechanisms through public contracts.
  */
-const { ATRIUM_PROJECT } = module48;
+const { ATRIUM_PROJECT } = module51;
 const { Lifetime } = module6;
-const { WorldTravel } = module51;
-const { worldFactory, legalLanding, applyLight } = module53;
+const { WorldTravel } = module54;
+const { worldFactory, legalLanding, applyLight } = module56;
 
 /** Own the two realm definitions and their tickets for one example session. */
 function createJourney(engine,project=ATRIUM_PROJECT) {
@@ -5515,12 +6684,12 @@ function createJourney(engine,project=ATRIUM_PROJECT) {
 return {createJourney};
 })();
 // Source: examples/atrium/player.js
-const module58=(()=>{
+const module61=(()=>{
 /**
  * Atrium example / locomotion: game-owned steering/gait profile, independent of realm residency.
  * Actor references and velocity survive transfers. This is not a full physical body solver.
  */
-const { legalLanding } = module53;
+const { legalLanding } = module56;
 
 /** Create one controller whose mutable velocity/load state belongs only to this actor. */
 function playerController(actor, input, renderer) {
@@ -5556,15 +6725,15 @@ function playerController(actor, input, renderer) {
 return {playerController};
 })();
 // Source: examples/atrium/scene.js
-const module46=(()=>{
+const module49=(()=>{
 /**
  * Atrium example / scene: owns controls, phase registrations and the game's journey.
  * Layout/reconstruction, locomotion and world policy have their own focused modules.
  * Nothing here installs an engine patch or creates an independent animation loop.
  */
 const { Lifetime } = module6;
-const { createJourney } = module47;
-const { playerController } = module58;
+const { createJourney } = module50;
+const { playerController } = module61;
 
 /** Start preparing the scene immediately. Rendering remains valid while the first world loads. */
 function createScene(engine,{controlsHost,project,onStatus=()=>{},onError=()=>{}}){
@@ -5638,7 +6807,7 @@ const module0=(()=>{
  */
 const { ETRNLNINE } = module1;
 const { Lifetime } = module6;
-const { createScene } = module46;
+const { createScene } = module49;
 
 const canvas=document.querySelector('#world'), controlsHost=document.querySelector('#controls');
 const status=document.querySelector('#status'), errorBox=document.querySelector('#error');

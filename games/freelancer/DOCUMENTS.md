@@ -81,3 +81,9 @@ need no geometry asset. `locked` affects editing, `selectable` viewport picking,
 `visible` visual rendering; hidden colliders remain independent. Older files upgrade
 at ingress. See [the full contract](../../docs/decisions/0019-origins-locks-and-number-surfaces.md) for linked/unique geometry, inherited locks,
 precise slider/number fields and explicit remaining mesh/light-component limits.
+
+## Humanoid review
+
+`content/humanoid-949.json` holds Stella / 949's body, posture, hair, palette and outfit for the generic Penthouse humanoid; `content/wardrobe.json` holds the Freelancer wardrobe the outfit draws from. Both are proposals for review. Open `dist/ETRNLNINE-Humanoid-Review.html` to see front, three-quarter, side and back figures plus the gameplay camera, in shaded or solid-silhouette looks, standing or walking. The **Proportions** panel edits every parameter, the body canon and build, hair, and one garment per wardrobe slot, with undo; **Generate outfit** draws a random outfit; **Export JSON** downloads a replacement for the preset file.
+
+To add clothing, add a garment to `content/wardrobe.json`: a slot (`legwear`, `top`, `bottom`, `shoes`, `outer`), a linear-RGB colour, a finish (`matte`, `satin`, `gloss`) and the body spans it covers, using the `sleeve`/`legs`/`skirt` shorthands or explicit `[from, to]` spans. [Decision 0021](../../docs/decisions/0021-rounded-bodies-and-garments.md) lists every humanoid field and the garment rules. The street scene still uses the diagnostic traveler until the look is approved.

@@ -45,10 +45,12 @@ async function bundle(path) {
 // Validate authored sources before emitting any delivery target.
 const { ATRIUM_PROJECT }=await import('../examples/atrium/project.js');
 const { FREELANCER_PROJECT }=await import('../games/freelancer/project.js');
+const { STELLA_949 }=await import('../games/freelancer/humanoid/preset.js');
+if(!STELLA_949)throw new Error('No validated humanoid preset');
 if(!FREELANCER_PROJECT)throw new Error('No validated Freelancer project');
 if(!ATRIUM_PROJECT)throw new Error('No validated project');
 await mkdir(resolve(root,'dist'),{recursive:true});
-for(const [folder,name] of [['examples/atrium','Atrium'],['editor','Studio'],['games/freelancer','Freelancer']]){
+for(const [folder,name] of [['examples/atrium','Atrium'],['editor','Studio'],['games/freelancer','Freelancer'],['games/freelancer/humanoid','Humanoid-Review']]){
  modules.clear();visiting.clear();
  await bundle(resolve(root,folder,'main.js'));
  const code=[...modules.values()].map(m=>m.code).join('\n');

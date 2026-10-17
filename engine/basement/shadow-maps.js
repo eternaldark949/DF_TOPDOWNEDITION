@@ -50,7 +50,7 @@ export class ShadowMaps {
     this.sourceBatch=batch;
     this.casters.sync();
     try {
-      this.ensureProgram();gl.enable(gl.DEPTH_TEST);gl.useProgram(this.program);gl.bindVertexArray(this.casters.vao);
+      this.ensureProgram();gl.enable(gl.DEPTH_TEST);gl.useProgram(this.program);
       this.prepareSun();this.preparePoint();
     } catch(error) {
       // Program errors disable both paths until reconfiguration/restoration. Target
@@ -66,9 +66,10 @@ export class ShadowMaps {
   submit(target,matrix,face=0) {
     const gl=this.gl,r=this.renderer;target.face(face);gl.viewport(0,0,target.resolution,target.resolution);
     gl.clear(gl.DEPTH_BUFFER_BIT);gl.uniformMatrix4fv(this.matrixUniform,false,matrix);
-    gl.drawArraysInstanced(gl.TRIANGLES,0,36,this.casters.count);
-    this.frameDraws++;r.stats.draws++;r.stats.instances+=this.casters.count;
-    r.totals.draws++;r.totals.shadowDraws++;r.totals.instances+=this.casters.count;
+    // One submission per primitive stream (boxes, rounded shapes) present in the casters.
+    const submissions=this.casters.draw();
+    this.frameDraws+=submissions;r.stats.draws+=submissions;r.stats.instances+=this.casters.count;
+    r.totals.draws+=submissions;r.totals.shadowDraws+=submissions;r.totals.instances+=this.casters.count;
   }
 
   /** Sun cache includes the packed caster version and the complete snapped light transform. */
