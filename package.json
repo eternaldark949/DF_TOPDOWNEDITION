@@ -14,6 +14,7 @@
     "test:perspective": "ETRNLNINE_PERSPECTIVE=1 node tests/camera-browser.cjs && ETRNLNINE_PERSPECTIVE=1 node tests/studio-tools-browser.cjs && node tests/perspective-render-browser.cjs",
     "test:camera": "node tests/camera-browser.cjs",
     "test:studio-shell": "node tests/studio-shell-browser.cjs",
-    "test:viewport-ui": "node tests/viewport-ui-browser.cjs"
+    "test:viewport-ui": "node tests/viewport-ui-browser.cjs",
+    "test:tool-fold": "node tests/tool-fold-browser.cjs"
   }
 }

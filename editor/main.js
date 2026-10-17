@@ -23,14 +23,14 @@ const preferences=new StudioPreferences();
 // Query chooses an installed starter only; opening data always revalidates its own identity.
 const starter=STUDIO_PROJECTS.find(e=>e.label.toLowerCase()===new URLSearchParams(location.search).get('project'))??STUDIO_PROJECTS[0];
 let activeProject=starter;
-let session,panels,viewport,engine,profiler,guides,dock,iconography,viewportPanel;
+let session,panels,viewport,engine,profiler,guides,dock,toolDock,iconography,viewportPanel;
 /** Lazy selection bounds are resolved by the guide only after selection/document changes. */
 function selectionGuideBounds(){return selectedBounds(session);}
 /** Keep errors readable and dismissible, while the current document remains available. */
 function report(error){$('error').hidden=false;$('error').textContent=error.message;}
 /** Refresh command availability and status without replacing focused controls during previews. */
 function state(kind){if(!session||life.disposed)return;const doc=session.document;
- if(kind==='play')guides?.clear();dock?.suspend(!!session.play);
+ if(kind==='play')guides?.clear();dock?.suspend(!!session.play);toolDock?.suspend(!!session.play);
  activeProject=studioProject(doc.data);$('project').value=doc.data.id;$('project').disabled=!!session.play||doc.dirty;$('project').title=doc.dirty?'Export your changes or undo them before changing starter projects':'Choose a starter project';
  const selected=session.selectionKind==='material'?null:session.scene.entities.find(e=>e.id===session.selected);
  if(viewport){const dial=viewport.mode==='rotate'&&selected&&!selected.locked;$('rotate').disabled=!!session.play||!selected||selected.locked;document.body.classList.toggle('rotate-mode',!!dial);$('rotate').setAttribute('aria-pressed',String(!!dial));if(viewport.mode==='rotate')$('tool-readout').textContent=dial?'ROTATE':session.selectionKind==='material'?'MATERIAL':'SELECT LIGHT';}
@@ -52,7 +52,10 @@ try{
  guides=new AuthoringGuides(engine.basement.renderer);life.own(()=>guides.dispose());
  session=new StudioSession(engine,{guideLayers:()=>guides.layersFor({scene:session.scene,selected:session.selectionKind==='material'?null:session.selected,revision:session.document.revision,mode:viewport.mode,axis:viewport.axis,space:viewport.space,grid:preferences.value.grid,lights:preferences.value.lights,axes:preferences.value.axes,outlines:preferences.value.outlines,selectionBounds:selectionGuideBounds}),canRemove:entity=>activeProject.canRemove(entity,session.document.data),cloneEntity:entity=>activeProject.clone(entity),project:starter.project,validate:validateStudioProject,selectInitial:scene=>activeProject.select(scene)??scene.entities.find(e=>!e.locked)?.id,playFactory:(engine,options)=>studioProject(options.project).play(engine,options),controlsHost:$('controls'),onChange:state,onStatus:s=>{$('status').textContent=`Play · ${s.name} · ${s.prompt??activeProject.help}`;$('status').dataset.x=s.x??0;$('status').dataset.y=s.y??0;}});life.own(()=>session.dispose());
  viewport=new StudioViewport($('world'),session,report,guides);Object.assign(viewport,{axis:preferences.value.axis,space:preferences.value.space,angleSnap:preferences.value.angleSnap,showLights:preferences.value.lights});life.own(()=>viewport.dispose());
- dock=new PanelDock({root:$('workspace'),entries:[{key:'directory',panel:$('library'),label:'Directory',side:'left'},{key:'properties',panel:$('properties'),label:'Properties',side:'right'},{key:'viewport',panel:$('viewport-options'),label:'Viewport',side:'right'}],compact:matchMedia('(max-width:760px)'),defaults:{wide:['directory','properties'],compact:[]},onBeforeChange:()=>{const active=document.activeElement;if(active?.closest('.dock-panel'))active.blur();viewport.cancel();}});life.own(()=>dock.dispose());
+ dock=new PanelDock({root:$('workspace'),entries:[{key:'directory',panel:$('library'),label:'Directory',side:'left'},{key:'properties',panel:$('properties'),label:'Properties',side:'right'},{key:'viewport',panel:$('viewport-options'),label:'Viewport',side:'right'}],compact:matchMedia('(max-width:760px)'),defaults:{wide:['directory','properties'],compact:[]},onBeforeChange:()=>{const active=document.activeElement;if(active?.closest('.dock-panel')?.parentElement===$('workspace'))active.blur();viewport.cancel();}});life.own(()=>dock.dispose());
+ // The tool surface has its own dock host, so drawer exclusivity/placement cannot
+ // overwrite its visibility. Both use the same accessible widget and owned cleanup.
+ toolDock=new PanelDock({root:$('stage'),entries:[{key:'tools',panel:$('tools'),label:'Tools',side:'left'}],compact:matchMedia('(max-width:760px)'),defaults:{wide:['tools'],compact:['tools']},onBeforeChange:()=>viewport.cancel()});life.own(()=>toolDock.dispose());
  panels=new WorkspacePanels({fields:$('fields'),hierarchy:$('hierarchy'),assets:$('asset-list'),materials:$('material-list'),scene:$('scene'),name:$('selection-name'),id:$('selection-id')},{onError:report,onSelect:id=>{viewport.cancel();session.select(id);dock.setOpen('properties',true);},onSelectMaterial:id=>{viewport.cancel();session.selectMaterial(id);dock.setOpen('properties',true);},onPlace:id=>{viewport.cancel();viewport.placementAsset=id;setTool('place');dock.closeAll();}});life.own(()=>panels.dispose());life.own(()=>files.dispose());
  const renderer=engine.basement.renderer;
  const appearanceControls=new AppearanceControls({renderer,host:$('appearance-section'),title:'Appearance',subscribe:fn=>engine.lobby.on('render',fn,'studio.appearance-controls'),onError:report});life.own(()=>appearanceControls.dispose());

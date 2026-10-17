@@ -4,7 +4,7 @@
 
 **Owner: ETERNAL / @eternaldark949.**
 
-**Recorded 2026-10-15; updated 2026-10-16.**
+**Recorded 2026-10-15; updated 2026-10-17.**
 
 **Branch: `engine/etrnlnine`, an independent root history in `DF_TOPDOWNEDITION`.**
 
@@ -15,6 +15,8 @@ This document records the owner's requirements and the architectural agreement r
 The branch was intentionally created with only this plan. On 2026-10-15, after reviewing the plan and first-milestone proposal, the owner invited implementation to begin. The first runnable foundation follows [First Light decisions and source guide](docs/decisions/0001-first-light.md). No wholesale legacy import or expansion into every brainstorm is implied.
 
 **Studio direction and roadmap:** [3D engine, universal Studio, authored JSON and offline packaging](docs/decisions/0006-studio-3d-and-authored-data.md). The first edit/save/play workspace is now implemented; the first recreated street/vestibule slice is now implemented.
+
+**Foldable tools:** [independent toolbar control node](docs/decisions/0017-studio-tool-surface.md) · [previews and verification](docs/milestones/tool-fold/README.md).
 
 **Viewport and icons:** [coordinated view controls and the original SVG family](docs/decisions/0016-viewport-panel-and-iconography.md) · [previews and verification](docs/milestones/viewport-panel/README.md).
 

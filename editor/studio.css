@@ -163,13 +163,21 @@ body[data-navigation="pan"] #world {
   position: absolute;
   z-index: 2;
   top: 12px;
-  left: 12px;
+  left: 64px;
   right: 12px;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 6px;
   pointer-events: none;
+}
+/* Tools use their own PanelDock in the stage. The reopening node stays outside
+   the folded surface; side drawers can cover it without the node covering fields. */
+#stage > .panel-control[data-panel-toggle="tools"] {
+  left: 8px;
+  top: 12px;
+  transform: none;
+  z-index: 3;
 }
 .tools > * {
   pointer-events: auto;
@@ -637,7 +645,7 @@ body.playing .view-label {
     left: calc(var(--drawer-width) - 54px);
   }
   .tools {
-    left: 8px;
+    left: 60px;
     right: 8px;
     top: 8px;
     gap: 4px;
@@ -650,6 +658,18 @@ body.playing .view-label {
   .tools button {
     font-size: 11px;
     padding: 6px 8px;
+  }
+  #stage > .panel-control[data-panel-toggle="tools"] {
+    top: 8px;
+  }
+  /* Camera-mode names remain accessible while compact vectors keep both rows short. */
+  .navigation-strip .control-caption {
+    display: none;
+  }
+  .navigation-strip button {
+    width: 44px;
+    min-width: 44px;
+    padding: 8px;
   }
   /* Phone controls retain the same vectors and full native hit areas. */
   .tool-strip :is(#duplicate, #delete) .control-caption {

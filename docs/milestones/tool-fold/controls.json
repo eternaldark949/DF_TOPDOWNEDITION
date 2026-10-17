@@ -1,0 +1,16 @@
+{
+  "behavior": {
+    "independentToolbar": true,
+    "stableCanvas": true,
+    "retainsTool": true,
+    "keyboardFocus": true,
+    "nestedResizeFocus": true,
+    "touchPanWhileFolded": true,
+    "noDocumentEdits": true,
+    "playRestoresOpenAndClosed": true,
+    "layoutChoices": true,
+    "largeTarget": true
+  },
+  "errors": [],
+  "requests": []
+}

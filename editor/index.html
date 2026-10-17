@@ -75,7 +75,8 @@
           tabindex="0"
           aria-label="Studio WebGL viewport. Tap to select; choose Move to drag on the ground plane."
         ></canvas>
-        <nav class="tools" aria-label="Viewport tools">
+        <!-- This entire tool surface folds through the shared PanelDock. -->
+        <nav id="tools" class="tools" aria-label="Viewport tools">
           <div class="tool-strip">
             <button
               id="select"
