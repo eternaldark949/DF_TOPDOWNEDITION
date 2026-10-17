@@ -326,8 +326,10 @@ class InstanceBatch {
   /** Byte budgets: each stream reserves the whole capacity, since the mix can change. */
   get cpuBytes() { return (this.box?.data.byteLength ?? 0) + (this.rounded?.data.byteLength ?? 0); }
   get gpuBufferBytes() { return this.cpuBytes; }
-  /** The box stream's VAO, kept for diagnostics that predate rounded shapes. */
+  /** The box stream's VAO and retained records, kept for diagnostics and tests that
+   * predate rounded shapes. Rounded records live in `rounded.data` when present. */
   get vao() { return this.box?.vao ?? null; }
+  get data() { return this.box?.data ?? null; }
 
   /** (Re)create GPU state for the streams this batch already uses, e.g. after context restore. */
   initialize() {
