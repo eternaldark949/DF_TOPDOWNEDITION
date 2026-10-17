@@ -164,7 +164,7 @@ const server=http.createServer((req,res)=>{
     const exported=JSON.parse(fs.readFileSync(await download.path(),'utf8'));
     assert.equal(exported.units,'milliseconds');assert.equal(exported.captures.length,2);
     const capture=exported.captures.at(-1),values=Object.fromEntries(capture.frame.counters.map(item=>[item.name,item.value]));
-    const litCapacityBytes=2048*20*4,shadowCapacityBytes=2048*16*4;
+    const litCapacityBytes=2048*24*4,shadowCapacityBytes=2048*16*4;
     assert.equal(values['renderer.gpuBuffers'],864+2*litCapacityBytes+shadowCapacityBytes);
     assert.equal(values['directory.ownedGpuBuffers'],2*litCapacityBytes);
     assert.ok(capture.frame.scopes.some(scope=>scope.name==='atrium.presentation'));
@@ -251,7 +251,7 @@ const server=http.createServer((req,res)=>{
     });
     assert.deepEqual(report.engine.empty,{worlds:0,resources:0,draws:0});
     assert.equal(report.engine.warm.uploads,0,'Unchanged retained instances do not upload');
-    assert.ok(report.engine.moved.uploadedBytes>0 && report.engine.moved.uploadedBytes<=80,'One transform updates a bounded range');
+    assert.ok(report.engine.moved.uploadedBytes>0 && report.engine.moved.uploadedBytes<=96,'One transform updates a bounded range');
     assert.equal(report.engine.glError,0);assert.ok(report.engine.varied>10,'Actual non-background pixels rendered');
     // Real shadow pixels and cache/ownership behavior, separate from the example's artwork.
     report.lighting=await page.evaluate(()=>{
@@ -273,7 +273,7 @@ const server=http.createServer((req,res)=>{
       const flatOff=image('off'),flatOn=image('low'),flatDifference=compare(flatOff,flatOn);
       for(const[entity,shape]of elevated)entity.shape=shape;
       const unshadowed=image('off'),shadowed=image('low'),sunDifference=compare(unshadowed,shadowed);
-      const first=l.maps.inspect();wall.shape.material.baseColor=[0.1,0.2,0.3];r.render(batch);const cached=l.maps.inspect();
+      const first=l.maps.inspect();wall.shape.material.baseColor=[0.1,0.2,0.3];wall.shape.material.reflectivity=0.12;wall.shape.material.specularColor=[1,0.7,0.2];wall.shape.material.specularSharpness=0.8;r.render(batch);const cached=l.maps.inspect();
       const offscreenCaster=Array.from({length:l.maps.casters.count},(_,i)=>l.maps.casters.data[i*16]).includes(11);
       const offscreenVisible=Array.from({length:batch.count},(_,i)=>batch.data[i*batch.recordFloats]).includes(11);
       wall.x+=1;world.resolve();r.render(batch);const moved=l.maps.inspect();

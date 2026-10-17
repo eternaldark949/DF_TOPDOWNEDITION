@@ -1,0 +1,111 @@
+/* Penthouse / shared colour UI. All painting is CSS, including the continuous wheel.
+   A native top-layer dialog keeps phone drawers/viewport gestures outside its focus scope. */
+.color-pill {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border-radius: 24px !important;
+}
+.color-swatch {
+  width: 44px;
+  height: 24px;
+  border-radius: 20px;
+  border: 1px solid #ffffff55;
+  flex-shrink: 0;
+}
+.color-caption {
+  font: 12px monospace;
+}
+.color-dialog {
+  box-sizing: border-box;
+  width: min(350px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+  padding: 20px;
+  margin: auto;
+  color: var(--ui-text, #eee8df);
+  background: var(--ui-panel, #121019);
+  border: 1px solid var(--ui-violet, #a469ff);
+  border-radius: 16px;
+  box-shadow: 0 24px 100px #000b;
+}
+.color-dialog::backdrop {
+  background: #06040bd9;
+}
+.color-dialog h2 {
+  margin: 0 0 16px;
+  font:
+    24px Georgia,
+    serif;
+  color: var(--ui-gold, #d4a84b);
+}
+.color-wheel {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  margin: 12px auto 20px;
+  border-radius: 50%;
+  touch-action: none;
+  background:
+    radial-gradient(circle closest-side, #fff, transparent),
+    conic-gradient(#f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+  outline: 1px solid #ffffff44;
+}
+.color-wheel:focus-visible {
+  outline: 2px solid var(--ui-violet-bright, #ceadff);
+  outline-offset: 5px;
+}
+.color-cursor {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 2px solid white;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #000;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.color-components {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.color-dialog .color-components label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  font: 12px system-ui;
+  color: var(--ui-muted, #c2b6cf);
+}
+.color-components label:has(input[type="text"]) {
+  grid-column: span 2;
+}
+.color-dialog .color-components input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px;
+  font: 12px monospace;
+}
+.color-components input[type="range"] {
+  accent-color: var(--ui-violet, #a469ff);
+  padding: 0;
+}
+.color-note {
+  font: 11px/1.5 system-ui;
+  color: var(--ui-muted, #c2b6cf);
+}
+.color-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
+}
+.color-actions button {
+  min-height: 44px;
+}
+.color-actions button:last-child {
+  border-color: var(--ui-gold, #d4a84b);
+}

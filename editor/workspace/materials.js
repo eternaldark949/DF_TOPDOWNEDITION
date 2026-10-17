@@ -134,11 +134,16 @@ export class MaterialPanel {
         name.blur();
       }
     });
+    const response = document.createElement("p");
+    response.className = "note";
+    response.textContent = "Reflectivity sets direct-light reflectance. Sharpness shapes the highlight; specular colour tints it. Emission stays independent. Scene/mirror reflections and transparency are not enabled.";
+    host.append(response);
     const fields = document.createElement("div");
     fields.dataset.material = id;
     host.append(fields);
     this.inspector = new PropertyInspector({
       host: fields,
+      focusHost: host,
       document: doc,
       resolve: (data) => data.materials.find((m) => m.id === id),
       properties: MATERIAL_PROPERTIES,

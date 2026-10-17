@@ -1,7 +1,7 @@
 /**
  * Basement / renderer: WebGL 2 instancing with owned GPU batches and retained storage.
  * Cube geometry/program belong to the renderer; each world batch belongs to a lease.
- * Lit record: 20 floats (80 bytes): pose, dimensions, base colour/highlight, quaternion, emission RGB. Shadow records remain 16 floats (64 bytes), independent of materials.
+ * Lit record: 24 floats (96 bytes): pose, dimensions, base colour/highlight, quaternion, emission RGB/sharpness, specular RGB/reflectivity. Shadow records remain 16 floats (64 bytes), independent of materials.
  * Only changed contiguous instance ranges are uploaded after the initial allocation.
  */
 import { VERTEX, FRAGMENT } from './shaders.js';
@@ -83,7 +83,7 @@ export class Renderer {
     const gl = this.gl;
     const program=createProgram(gl,VERTEX,FRAGMENT);
     this.program = program; this.stats.programs++;
-    this.uniforms = Object.fromEntries(['uLinearOutput','uExposure','uViewProjection','uInverseViewProjection','uBlockerRotation[0]', 'uAmbient', 'uLights[0]', 'uLightColors[0]',
+    this.uniforms = Object.fromEntries(['uCameraEye','uCameraBack','uPerspective','uLinearOutput','uExposure','uViewProjection','uInverseViewProjection','uBlockerRotation[0]', 'uAmbient', 'uLights[0]', 'uLightColors[0]',
       'uAOMode','uAOStrength','uAORadius','uBlockerCount','uBlockerPose[0]','uBlockerSize[0]',
       'uAOScreen','uAODepth','uAONormals','uAOSize','uSunDirection','uSunColor','uSunShadowEnabled','uSunMatrix',
       'uSunShadow','uShadowParameters','uPointShadowIndex','uPointShadow','uPointShadowParameters','uPointShadowPosition','uPointShadowResolution']
@@ -172,6 +172,10 @@ export class Renderer {
     gl.uniform1i(this.uniforms.uLinearOutput,hdr?1:0);gl.uniform1f(this.uniforms.uExposure,this.presentation.settings.exposure);
     this.occlusion.bind(this.uniforms,screenReady);
     gl.uniformMatrix4fv(this.uniforms.uViewProjection,false,this.camera.matrix);
+    // Perspective uses fragment-to-eye; orthographic rays share the camera back direction.
+    gl.uniform3fv(this.uniforms.uCameraEye,this.camera.eye);
+    gl.uniform3fv(this.uniforms.uCameraBack,this.camera.back);
+    gl.uniform1i(this.uniforms.uPerspective,this.camera.projection==='perspective'?1:0);
     this.lighting.bind(this.uniforms);
     gl.bindVertexArray(batch.vao);
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, batch.count);
@@ -206,9 +210,9 @@ class InstanceBatch {
     if(!['camera','shadow'].includes(visibility))throw new RangeError('Invalid instance visibility policy');
     this.visibility=visibility;this.version=0;
     this.renderer = renderer; this.world = world; this.capacity = capacity;
-    this.data = new Float32Array(capacity * (visibility==='camera'?20:16));
+    this.data = new Float32Array(capacity * (visibility==='camera'?24:16));
     this.kind=visibility==='shadow'?'shadow-instance-buffer':'instance-buffer';this.cpuBytes=this.data.byteLength;this.gpuBufferBytes=this.data.byteLength;
-    this.recordFloats=visibility==='camera'?20:16;
+    this.recordFloats=visibility==='camera'?24:16;
     this.count = 0; this.disposed = false;
     this.initialize();
   }
@@ -225,7 +229,7 @@ class InstanceBatch {
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
     gl.bufferData(gl.ARRAY_BUFFER, this.data.byteLength, gl.DYNAMIC_DRAW);
-    for (let i = 0; i < (this.visibility==='camera'?5:4); i++) {
+    for (let i = 0; i < (this.visibility==='camera'?6:4); i++) {
       const location = i + 2;
       gl.enableVertexAttribArray(location); gl.vertexAttribPointer(location, 4, gl.FLOAT, false, this.recordFloats*4, i * 16);
       gl.vertexAttribDivisor(location, 1);
@@ -263,7 +267,7 @@ class InstanceBatch {
       this.write(0);
       for(let i=0;i<3;i++)this.write(this.visibility==='camera'?s.material.baseColor[i]:0);
       this.write(this.visibility==='camera'?(entity.highlight??0):0);for(let i=0;i<4;i++)this.write(p.rotation[i]);
-      if(this.visibility==='camera'){for(let i=0;i<3;i++)this.write(s.material.emissionColor[i]*s.material.emissionStrength);this.write(0);}
+      if(this.visibility==='camera'){for(let i=0;i<3;i++)this.write(s.material.emissionColor[i]*s.material.emissionStrength);this.write(s.material.specularSharpness);for(let i=0;i<3;i++)this.write(s.material.specularColor[i]);this.write(s.material.reflectivity);}
     }
     if(this.count!==this.cursor/this.recordFloats||this.lastDirty>=this.firstDirty)this.version++;
     this.count = this.cursor / this.recordFloats;

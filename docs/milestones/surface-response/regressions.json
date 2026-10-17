@@ -1,0 +1,43 @@
+[
+  {
+    "suite": "surface",
+    "exit": 0,
+    "seconds": 80.74,
+    "finalColorNoOpCheck": true
+  },
+  {
+    "suite": "runtime",
+    "exit": 0,
+    "seconds": 720.88
+  },
+  {
+    "suite": "materials",
+    "exit": 0,
+    "seconds": 310.67
+  },
+  {
+    "suite": "bloom",
+    "exit": 0,
+    "seconds": 152.41
+  },
+  {
+    "suite": "studio",
+    "exit": 0,
+    "seconds": 138.59
+  },
+  {
+    "suite": "tools",
+    "exit": 0,
+    "seconds": 128.84
+  },
+  {
+    "suite": "freelancer",
+    "exit": 0,
+    "seconds": 270.6
+  },
+  {
+    "suite": "camera",
+    "exit": 0,
+    "seconds": 148.26
+  }
+]

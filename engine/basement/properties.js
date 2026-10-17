@@ -3,6 +3,7 @@
  * labels and units for every inspector instance; controls do not invent field rules.
  * Rotation is stored as a unit quaternion, while the inspector presents XYZ degrees.
  */
+import { SURFACE_DEFAULTS } from "./material.js";
 import { eulerRotation, rotationEuler } from "./rotation.js";
 export const TRANSFORM_PROPERTIES = Object.freeze([
   {
@@ -45,6 +46,7 @@ export const LIGHT_PROPERTIES = Object.freeze([
   },
   {
     key: "color",
+    color: true,
     label: "Linear irradiance",
     unit: "RGB",
     components: ["R", "G", "B"],
@@ -66,7 +68,7 @@ export const LIGHT_PROPERTIES = Object.freeze([
 export function readProperty(target, descriptor) {
   if (descriptor.key === "rotation")
     return rotationEuler(target.rotation).map((n) => (n * 180) / Math.PI);
-  const v = target[descriptor.key];
+  const v = target[descriptor.key] ?? descriptor.defaultValue;
   return Array.isArray(v) ? [...v] : v;
 }
 /** Write only a declared numeric field, rejecting nonfinite/out-of-domain values atomically. */
@@ -91,6 +93,7 @@ export function writeProperty(target, descriptor, value) {
 export const MATERIAL_PROPERTIES = Object.freeze([
   {
     key: "baseColor",
+    color: true,
     label: "Base colour",
     unit: "linear RGB",
     components: ["R", "G", "B"],
@@ -100,12 +103,44 @@ export const MATERIAL_PROPERTIES = Object.freeze([
   },
   {
     key: "emissionColor",
+    color: true,
     label: "Emission colour",
     unit: "linear RGB",
     components: ["R", "G", "B"],
     min: 0,
     max: 16,
     step: 0.05,
+  },
+  {
+    key: "specularColor",
+    label: "Specular colour",
+    color: true,
+    unit: "linear RGB",
+    components: ["R", "G", "B"],
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: SURFACE_DEFAULTS.specularColor,
+  },
+  {
+    key: "specularSharpness",
+    label: "Specular sharpness",
+    unit: "0 soft · 1 polished",
+    components: null,
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: SURFACE_DEFAULTS.specularSharpness,
+  },
+  {
+    key: "reflectivity",
+    label: "Reflectivity",
+    unit: "F₀ · 0–1",
+    components: null,
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: SURFACE_DEFAULTS.reflectivity,
   },
   {
     key: "emissionStrength",

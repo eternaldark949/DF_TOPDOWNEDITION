@@ -70,3 +70,14 @@ Studio now provides [shared camera controls](../../docs/decisions/0010-viewport-
 ## Linked materials
 
 The project-level `materials` table defines base colour and independent emission colour/strength. Each shaped part references a material ID. Placement `materialOverrides` can redirect individual parts without copying source geometry. Old version-one files migrate once on import/recovery; exports use version two. Use Studio’s Materials tab or the object inspector’s Surface part/Assigned material controls. [Current contract](../../docs/decisions/0013-presentation-and-materials.md).
+
+## Specular surface tuning and colour controls
+
+Materials may also set `specularColor` (linear RGB 0–1, default white),
+`specularSharpness` (0 soft–1 polished, default 0.5), and `reflectivity`
+(normal-incidence reflectance 0–1, default 0). Omitted fields preserve the existing
+diffuse appearance; 0.04 reflectivity is a useful polished dielectric starting point.
+These reflect direct lights, not scene/mirror images. The shared inspector's colour
+pills open a CSS hue/saturation wheel, brightness, HDR intensity, sRGB hex and precise
+linear RGB fields. Apply commits one edit; Cancel/Escape restores the prior colour.
+See [the surface contract](../../docs/decisions/0018-surface-response-and-colour.md).

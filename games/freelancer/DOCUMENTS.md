@@ -62,3 +62,13 @@ Use the shared [viewport controls](../../docs/decisions/0010-viewport-navigation
 ## Linked materials and image presentation
 
 The authored source is schema version 2. Box parts share project material IDs; per-placement overrides support private materials. Edit material definitions in Studio’s Materials tab, or select a building/prop and choose a Surface part in its contextual inspector. Emission has its own RGB and strength, independent of base colour. These are real supported diffuse/emissive parameters; PBR/transparent glass is still future work. Exposure/HDR scene ownership now belongs to Presentation, and Bloom owns its filter only. [API and lifecycle](../../docs/decisions/0013-presentation-and-materials.md).
+
+## Surface polish
+
+Every linked material accepts optional `specularColor` (linear RGB 0–1),
+`specularSharpness` (0–1) and `reflectivity` (F₀, 0–1). Defaults are white, 0.5 and 0;
+existing content retains its diffuse appearance. Start around 0.04 reflectivity for
+polished stone. These controls render direct-light highlights, not mirror images of
+the street. Colour pills open the shared wheel/hex/linear-RGB/HDR editor; Apply is one
+undoable command and Cancel/Escape restores the opening value. Content palettes are
+not automatically rewritten. See [the contract](../../docs/decisions/0018-surface-response-and-colour.md).

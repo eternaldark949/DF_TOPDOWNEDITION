@@ -1,5 +1,10 @@
 # Presentation and linked materials · shared foundations
 
+**Surface update:** [decision 0018](0018-surface-response-and-colour.md) adds optional
+specular tint/sharpness/reflectivity, 24-float lit records and the shared colour wheel.
+The diffuse-only limitations below describe this earlier milestone.
+
+
 **Bloom controls update:** [decision 0014](0014-bloom-art-direction.md) expands shaping ranges, exposes scatter/soft knee, and adds haze/recipes.
 
 Implemented 2026-10-16 following the owner's request to separate shared HDR work from bloom and begin material editing. Supersedes HDR ownership/API and inline-appearance/schema limitations in decisions 0007/0012. House boundaries, native WebGL and the single Lobby scheduler remain unchanged.

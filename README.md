@@ -16,6 +16,8 @@ The branch was intentionally created with only this plan. On 2026-10-15, after r
 
 **Studio direction and roadmap:** [3D engine, universal Studio, authored JSON and offline packaging](docs/decisions/0006-studio-3d-and-authored-data.md). The first edit/save/play workspace is now implemented; the first recreated street/vestibule slice is now implemented.
 
+**Surface response and colour:** [specular tuning and shared HDR colour wheel](docs/decisions/0018-surface-response-and-colour.md) · [previews and verification](docs/milestones/surface-response/README.md).
+
 **Foldable tools:** [independent toolbar control node](docs/decisions/0017-studio-tool-surface.md) · [previews and verification](docs/milestones/tool-fold/README.md).
 
 **Viewport and icons:** [coordinated view controls and the original SVG family](docs/decisions/0016-viewport-panel-and-iconography.md) · [previews and verification](docs/milestones/viewport-panel/README.md).

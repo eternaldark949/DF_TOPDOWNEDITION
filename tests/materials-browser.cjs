@@ -260,6 +260,15 @@ const root = path.resolve(__dirname, ".."),
       ) > 1,
     );
     const edit = async (label, value) => {
+      const color =
+        /^(Base colour|Emission colour|Specular colour) [RGB]$/.test(label);
+      if (color)
+        await page
+          .getByRole("button", {
+            name: `Edit ${label.slice(0, -2)}`,
+            exact: true,
+          })
+          .click();
       const input = page.getByRole("spinbutton", { name: label, exact: true });
       await input.fill(String(value));
       await input.dispatchEvent("input");
@@ -270,18 +279,24 @@ const root = path.resolve(__dirname, ".."),
     await edit("Emission colour G", 0.5);
     await edit("Emission colour B", 1);
     await edit("Emission strength", 5);
+    await edit("Specular colour G", 0.7);
+    await edit("Specular sharpness", 0.8);
+    await edit("Reflectivity", 0.08);
     let changed = await exported(),
       m = changed.materials.find((m) => m.id === materialId);
     assert.equal(m.baseColor[0], 0.02);
     assert.deepEqual(m.emissionColor, [0.1, 0.5, 1]);
     assert.equal(m.emissionStrength, 5);
+    assert.deepEqual(m.specularColor, [1, 0.7, 1]);
+    assert.equal(m.specularSharpness, 0.8);
+    assert.equal(m.reflectivity, 0.08);
     assert.equal(changed.schemaVersion, 2);
     assert.deepEqual(changed.scenes, base.scenes);
     await page.locator("#undo").click();
     assert.equal(
       (await exported()).materials.find((m) => m.id === materialId)
-        .emissionStrength,
-      base.materials.find((m) => m.id === materialId).emissionStrength,
+        .reflectivity ?? 0,
+      base.materials.find((m) => m.id === materialId).reflectivity ?? 0,
     );
     await page.locator("#redo").click();
     console.log("Materials: shared edits / undo passed; making private copy");
@@ -294,6 +309,10 @@ const root = path.resolve(__dirname, ".."),
     const copy = changed.scenes[0].entities.find((e) => e.id === copyId),
       privateId = copy.materialOverrides[part.id];
     assert.notEqual(privateId, materialId);
+    const privateMaterial = changed.materials.find((m) => m.id === privateId);
+    assert.equal(privateMaterial.reflectivity, 0.08);
+    assert.equal(privateMaterial.specularSharpness, 0.8);
+    assert.deepEqual(privateMaterial.specularColor, [1, 0.7, 1]);
     assert.ok(
       asset.parts
         .filter((p) => p.shape)
@@ -345,7 +364,7 @@ const root = path.resolve(__dirname, ".."),
     console.log("Materials: Play isolation passed; capturing editor");
     await page.locator("#show-materials").click();
     await page.locator(`[data-material-id="${materialId}"]`).click();
-    await page.locator('[data-panel-toggle=viewport]').click();
+    await page.locator("[data-panel-toggle=viewport]").click();
     await page.locator("#projection").selectOption("perspective");
     await page.locator(".engine-appearance").evaluate((e) => (e.open = true));
     await page.locator("[data-bloom=mode]").selectOption("low");
@@ -354,13 +373,15 @@ const root = path.resolve(__dirname, ".."),
         document.querySelector(".engine-appearance output").dataset
           .effective === "low",
     );
-    await page.locator('[data-viewport-section=guides-section]').click();
+    await page.locator("[data-viewport-section=guides-section]").click();
     // A clean presentation view still uses the same native renderer and editable material.
     if ((await page.locator("#grid").getAttribute("aria-pressed")) === "true")
       await page.locator("#viewport-options [data-view-command=grid]").click();
     if ((await page.locator("#lights").getAttribute("aria-pressed")) === "true")
-      await page.locator("#viewport-options [data-view-command=lights]").click();
-    await page.locator('[data-panel-toggle=viewport]').click();
+      await page
+        .locator("#viewport-options [data-view-command=lights]")
+        .click();
+    await page.locator("[data-panel-toggle=viewport]").click();
     await page.locator("#library").evaluate((e) => {
       e.scrollTop = 0;
     });
