@@ -2,6 +2,7 @@
  * CSS paints the wheel; no Canvas, assets, polling or extra scheduler is used.
  * A modal session owns one preview transaction; Apply commits, Escape/Cancel rolls back.
  * The host owns persistence/validation. This widget only owns its DOM/listeners/gesture. */
+import { NumberControl } from "./number-control.js";
 import { Lifetime } from "../basement/lifetime.js";
 import {
   colorDisplay,
@@ -64,19 +65,55 @@ export class ColorControl {
     this.wheel.append(this.cursor);
     const controls = node("div", "color-components");
     this.inputs = {};
+    this.numberControls = {};
+    this.inputHandlers = {};
     /** Every input is native/labelled; keyboard and touch share exactly the same preview path. */
     const input = (key, title, type, min, max, step) => {
       const wrap = node("label", null, title),
-        el = node("input");
-      el.type = type;
+        temporary = node("input");
+      let el = temporary;
+      if (type === "number" || type === "range") {
+        const initial =
+          key === "gain"
+            ? Math.max(1, ...this.value)
+            : key.startsWith("rgb")
+              ? this.value[Number(key.slice(3))]
+              : key === "v"
+                ? 1
+                : 0;
+        const control = new NumberControl({
+          host: wrap,
+          label: `${label} ${title}`,
+          value: initial,
+          min,
+          max,
+          escape: "bubble",
+          step: step === "any" ? 0.01 : Number(step),
+          slider:
+            max > min
+              ? { min, max, curve: key === "gain" ? "log" : "linear" }
+              : null,
+          onPreview: () => this.inputHandlers[key]?.(),
+          onFinish: (commit) => {
+            if (!commit && this.active && !this.disposed)
+              this.inputHandlers[key]?.();
+          },
+          onError,
+        });
+        this.numberControls[key] = control;
+        this.life.own(() => control.dispose());
+        el = control.input;
+      } else {
+        el.type = type;
+        wrap.append(el);
+      }
       if (type === "number") el.inputMode = "decimal";
       if (min !== null) {
         el.min = min;
         el.max = max;
-        el.step = step;
+        if (!this.numberControls[key]) el.step = step;
       }
       el.setAttribute("aria-label", `${label} ${title}`);
-      wrap.append(el);
       controls.append(wrap);
       this.inputs[key] = el;
       return el;
@@ -102,7 +139,7 @@ export class ColorControl {
       ["v", val],
       ["gain", gain],
     ])
-      this.life.listen(el, "input", () => {
+      this.bindInput(el, () => {
         const n = el.valueAsNumber;
         if (!Number.isFinite(n) || n < Number(el.min) || n > Number(el.max)) {
           el.setCustomValidity("Value out of range");
@@ -112,7 +149,7 @@ export class ColorControl {
         this[key] = n;
         this.fromWheel();
       });
-    this.life.listen(hex, "input", () => {
+    this.bindInput(hex, () => {
       if (!/^#[0-9a-f]{6}$/i.test(hex.value)) {
         hex.setCustomValidity("Use #RRGGBB");
         return;
@@ -130,7 +167,7 @@ export class ColorControl {
     for (let i = 0; i < 3; i++) {
       const el = input(`rgb${i}`, ["R", "G", "B"][i], "number", 0, max, "any");
       this.rgb.push(el);
-      this.life.listen(el, "input", () => {
+      this.bindInput(el, () => {
         if (
           el.value.trim() === "" ||
           !Number.isFinite(el.valueAsNumber) ||
@@ -231,6 +268,14 @@ export class ColorControl {
     });
     this.sync();
   }
+  /** Numeric surfaces already own input/drag sessions; colour owns the outer transaction. */
+  bindInput(el, handler) {
+    const entry = Object.entries(this.numberControls).find(
+      ([, c]) => c.input === el,
+    );
+    if (entry) this.inputHandlers[entry[0]] = handler;
+    else this.life.listen(el, "input", handler);
+  }
   /** Opening alone does not dirty a document or quantize its existing colour. */
   open() {
     if (this.disposed || this.active) return;
@@ -288,8 +333,10 @@ export class ColorControl {
     })) {
       const el = this.inputs[key];
       if (el !== source) {
-        el.value =
-          typeof value === "number" ? Number(value.toPrecision(10)) : value;
+        if (this.numberControls[key]) this.numberControls[key].setValue(value);
+        else
+          el.value =
+            typeof value === "number" ? Number(value.toPrecision(10)) : value;
         el.setCustomValidity("");
       }
     }

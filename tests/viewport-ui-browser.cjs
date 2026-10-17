@@ -260,7 +260,8 @@ const server = http.createServer((req, res) => {
     await p.locator("#error").click();
     await p.locator("#fov").fill("200");
     await p.locator("#fov").dispatchEvent("change");
-    assert.equal(Number(await p.locator("#fov").inputValue()), 110);
+    assert.equal(Number(await p.locator("#fov").inputValue()), 70);
+    await p.locator("#error").click();
     await p.locator("#fov").fill("50");
     await p.locator("#fov").dispatchEvent("change");
     await shot("desktop-camera");
@@ -309,11 +310,12 @@ const server = http.createServer((req, res) => {
     await section("camera").click();
     await shot("phone-camera");
     await section("guides").click();
-    // Both optional native guides can release and recreate their layers independently.
+    // Axes release/recreate the ground layer. Enni's empty-origin marker retains
+    // the shared foreground layer when the optional selection outline is hidden.
     for (const key of ["axes", "outlines"])
       await p.locator(`#viewport-options [data-view-command=${key}]`).click();
     await p.waitForFunction(
-      () => document.querySelector("#status").dataset.guides === "0",
+      () => document.querySelector("#status").dataset.guides === "1",
     );
     for (const key of ["axes", "outlines"])
       await p.locator(`#viewport-options [data-view-command=${key}]`).click();

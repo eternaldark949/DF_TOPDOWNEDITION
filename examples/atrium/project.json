@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "id": "project:atrium",
   "name": "Between Worlds",
   "scenes": [
@@ -43,7 +43,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "amber:central-inlay",
@@ -62,7 +63,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "amber:west-brass-inlay",
@@ -81,7 +83,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "amber:east-brass-inlay",
@@ -100,7 +103,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "amber:colonnade",
@@ -119,7 +123,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "amber:west-gallery",
@@ -138,7 +143,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "amber:west-entry-planter",
@@ -157,7 +163,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "amber:west-court-planter",
@@ -176,7 +183,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "amber:west-entry-lantern",
@@ -195,7 +203,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "amber:west-promenade-lantern",
@@ -214,7 +223,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "amber:west-gallery-lantern",
@@ -233,7 +243,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "amber:east-gallery",
@@ -252,7 +263,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "amber:east-entry-planter",
@@ -271,7 +283,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "amber:east-court-planter",
@@ -290,7 +303,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "amber:east-entry-lantern",
@@ -309,7 +323,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "amber:east-promenade-lantern",
@@ -328,7 +343,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "amber:east-gallery-lantern",
@@ -347,7 +363,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "amber:crystal-lantern",
@@ -366,7 +383,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "amber:movable-plinth",
@@ -385,7 +403,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         }
       ],
       "lights": [
@@ -569,7 +588,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "violet:central-inlay",
@@ -588,7 +608,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "violet:west-brass-inlay",
@@ -607,7 +628,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "violet:east-brass-inlay",
@@ -626,7 +648,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "violet:colonnade",
@@ -645,7 +668,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "violet:west-gallery",
@@ -664,7 +688,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "violet:west-entry-planter",
@@ -683,7 +708,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "violet:west-court-planter",
@@ -702,7 +728,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "violet:west-entry-lantern",
@@ -721,7 +748,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "violet:west-promenade-lantern",
@@ -740,7 +768,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "violet:west-gallery-lantern",
@@ -759,7 +788,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "violet:east-gallery",
@@ -778,7 +808,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "violet:east-entry-planter",
@@ -797,7 +828,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "violet:east-court-planter",
@@ -816,7 +848,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "violet:east-entry-lantern",
@@ -835,7 +868,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "violet:east-promenade-lantern",
@@ -854,7 +888,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "violet:east-gallery-lantern",
@@ -873,7 +908,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "violet:crystal-lantern",
@@ -892,7 +928,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "violet:movable-plinth",
@@ -911,7 +948,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "violet:west-prism",
@@ -930,7 +968,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         },
         {
           "id": "violet:east-prism",
@@ -949,7 +988,8 @@
             0,
             1
           ],
-          "scale": 1
+          "scale": 1,
+          "parent": null
         }
       ],
       "lights": [

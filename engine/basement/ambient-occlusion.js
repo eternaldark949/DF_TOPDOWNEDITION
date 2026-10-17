@@ -55,7 +55,7 @@ export class AmbientOcclusion {
     const camera=this.renderer.camera;
     for(const entity of world.entities.values()) {
       const shape=entity.shape,p=entity.pose;
-      if(!shape||shape.ambientBlocker===false||Math.min(...shape.size)<0.15)continue;
+      if(!shape||p.visible===false||shape.ambientBlocker===false||Math.min(...shape.size)<0.15)continue;
       const [sx,sy,sz]=shape.size.map(n=>n*p.scale);
       if(p.z+sz/2<=0.05)continue; // The ground slab must not consume the blocker budget.
       this.candidates++;

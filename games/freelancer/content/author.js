@@ -710,6 +710,9 @@ const legacyProject = {
   scenes: [street, interior],
 };
 const project=upgradeProject(legacyProject);
+const building={id:'enni:origin',name:'Enni Cole',asset:null,parent:null,position:[0,0,0],rotation:[0,0,0,1],scale:1,locked:false};
+project.scenes[0].entities.unshift(building);
+for(const e of project.scenes[0].entities.slice(1))if(e.id.startsWith('enni:'))e.parent=building.id;
 validateProject(project, { generators: ASSEMBLY_GENERATORS });
 await writeFile(
   new URL("./project.json", import.meta.url),

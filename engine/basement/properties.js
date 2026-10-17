@@ -17,6 +17,7 @@ export const TRANSFORM_PROPERTIES = Object.freeze([
   },
   {
     key: "rotation",
+    slider:{min:-180,max:180},
     label: "Rotation",
     unit: "°",
     components: ["X", "Y", "Z"],
@@ -26,6 +27,7 @@ export const TRANSFORM_PROPERTIES = Object.freeze([
   },
   {
     key: "scale",
+    slider: {min:0.05,max:20,curve:"log"},
     label: "Uniform scale",
     unit: "×",
     components: null,
@@ -56,6 +58,7 @@ export const LIGHT_PROPERTIES = Object.freeze([
   },
   {
     key: "radius",
+    slider: {min:0.1,max:100,curve:"log"},
     label: "Radius",
     unit: "m",
     components: null,
@@ -124,6 +127,7 @@ export const MATERIAL_PROPERTIES = Object.freeze([
   },
   {
     key: "specularSharpness",
+    slider: {min:0,max:1},
     label: "Specular sharpness",
     unit: "0 soft · 1 polished",
     components: null,
@@ -134,6 +138,7 @@ export const MATERIAL_PROPERTIES = Object.freeze([
   },
   {
     key: "reflectivity",
+    slider: {min:0,max:1},
     label: "Reflectivity",
     unit: "F₀ · 0–1",
     components: null,
@@ -144,6 +149,7 @@ export const MATERIAL_PROPERTIES = Object.freeze([
   },
   {
     key: "emissionStrength",
+    slider: {min:0,max:32,curve:"power"},
     label: "Emission strength",
     unit: "×",
     components: null,

@@ -290,7 +290,7 @@ const root = path.resolve(__dirname, ".."),
     assert.deepEqual(m.specularColor, [1, 0.7, 1]);
     assert.equal(m.specularSharpness, 0.8);
     assert.equal(m.reflectivity, 0.08);
-    assert.equal(changed.schemaVersion, 2);
+    assert.equal(changed.schemaVersion, 3);
     assert.deepEqual(changed.scenes, base.scenes);
     await page.locator("#undo").click();
     assert.equal(
@@ -390,6 +390,9 @@ const root = path.resolve(__dirname, ".."),
       timeout: 120000,
     });
     await page.setViewportSize({ width: 412, height: 892 });
+    await page.waitForFunction(
+      () => document.querySelector("#workspace").dataset.compact === "true",
+    );
     await page.screenshot({
       path: path.join(root, "artifacts/material-studio-phone.png"),
       timeout: 120000,
@@ -406,6 +409,9 @@ const root = path.resolve(__dirname, ".."),
     assert.deepEqual(await exported(), saved);
     // New/duplicate definitions and per-part assignment use the same document commands.
     await page.setViewportSize({ width: 1440, height: 960 });
+    await page.waitForFunction(
+      () => document.querySelector("#workspace").dataset.compact === "false",
+    );
     await page.locator("#show-materials").click();
     await page.locator("[data-material-action=new]").click();
     const newId = await page.locator("#selection-id").textContent();

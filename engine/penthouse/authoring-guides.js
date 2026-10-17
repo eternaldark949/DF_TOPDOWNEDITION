@@ -113,8 +113,12 @@ export class AuthoringGuides {
     }
     const target = scene.entities.find((e) => e.id === selected),
       dial = mode === "rotate" && target && !target.locked;
+    const origins = scene.entities.filter(
+      (e) => e.asset === null && e.visible !== false,
+    );
+    const origin = origins.length > 0;
     const outline = outlines && target && selectionBounds;
-    if (!lights && !dial && !outline) {
+    if (!lights && !dial && !outline && !origin) {
       if (this.widgets) this.widgets.dispose();
       this.widgets = null;
       this.key = "";
@@ -131,9 +135,10 @@ export class AuthoringGuides {
       space,
       lights,
       !!outline,
+      origin,
       // Only screen-sized markers/dials depend on camera pose. A world-space
       // selection box keeps its buffer unchanged while the camera moves.
-      ...(lights || dial
+      ...(lights || dial || origin
         ? [
             camera.x,
             camera.y,
@@ -152,12 +157,24 @@ export class AuthoringGuides {
         : []),
     ].join("/");
     if (!this.widgets) {
-      this.widgets = r.lines.create(1024, { depthTest: false });
+      // 256 empty origins need 1024 vertices before light markers, the 168-vertex
+      // dial and 24-vertex selection box. Keep the complete validated scene bounded.
+      this.widgets = r.lines.create(2048, { depthTest: false });
       this.key = "";
     }
     if (key !== this.key) {
       camera.update(r.canvas.clientWidth / h);
       this.widgets.begin();
+      for (const item of origins) {
+        const center = item.position,
+          pixel = camera.worldUnitsPerPixel(center, h),
+          point = (x, y) =>
+            center.map(
+              (n, i) => n + pixel * (camera.right[i] * x + camera.up[i] * y),
+            );
+        this.widgets.segment(point(-8, 0), point(8, 0), [1, 0.85, 0.48, 1]);
+        this.widgets.segment(point(0, -8), point(0, 8), [1, 0.85, 0.48, 1]);
+      }
       if (outline) {
         // Resolve actual world-shape bounds only when document/selection changes. Camera
         // motion can rebuild screen-sized widgets without rescanning the selected assembly.
@@ -266,11 +283,12 @@ export class AuthoringGuides {
     return [this.grid, this.widgets].filter(Boolean);
   }
   /** Pick readable light icons in CSS pixels, independently of physical geometry/collision. */
-  pickLight(scene, x, y, width, height) {
+  pickLight(scene, x, y, width, height, eligible = () => true) {
     const camera = this.renderer.camera;
     let closest = null,
       distance = 22 * 22;
     for (const light of scene.lights) {
+      if (!eligible(light)) continue;
       const [px, py, pz] = light.position,
         p = camera.project({ x: px, y: py, z: pz }, width, height),
         d = (p.x - x) ** 2 + (p.y - y) ** 2;
@@ -292,5 +310,30 @@ export class AuthoringGuides {
   }
   dispose() {
     this.clear();
+  } /** Empty objects have no collision triangles; their editor-only origin marker is pickable. */
+  pickOrigin(scene, x, y, width, height, eligible = () => true) {
+    let best = null,
+      distance = 12;
+    for (const e of scene.entities) {
+      if (
+        e.asset !== null ||
+        e.visible === false ||
+        e.selectable === false ||
+        !eligible(e)
+      )
+        continue;
+      const p = this.renderer.camera.project(
+        { x: e.position[0], y: e.position[1], z: e.position[2] },
+        width,
+        height,
+      );
+      if (!p.visible) continue;
+      const d = Math.hypot(p.x - x, p.y - y);
+      if (d < distance) {
+        best = e;
+        distance = d;
+      }
+    }
+    return best;
   }
 }

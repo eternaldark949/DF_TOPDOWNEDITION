@@ -39,21 +39,48 @@ export class SceneInstance {
       if (!complete) instance.dispose();
     }
   }
-  /** Add one registered asset. The surrounding world owner cleans partial jobs on cancellation. */
+  /** The authored origin is independent of its geometry generator. Replacing a linked
+   * geometry source must not replace the origin's runtime identity or attachments. */
   add(directory, project, entity) {
-    const asset = project.assets.find((a) => a.id === entity.asset);
-    const built = directory.create(asset.generator, {
+    const item = {
+      root: this.world.create(),
+      geometryRoot: null,
+      parts: [],
+      asset: null,
+      colliders: [],
+    };
+    this.instances.set(entity.id, item);
+    this.bindGeometry(
+      entity.id,
+      project.assets.find((a) => a.id === entity.asset) ?? null,
+    );
+  }
+  /** Own one generated geometry branch beneath a stable object origin. Source data and
+   * materials remain linked; only this component's old generated membership is released. */
+  bindGeometry(id, asset) {
+    const item = this.instances.get(id);
+    for (const part of item.parts) this.authored.delete(part.id);
+    for (const collider of item.colliders) {
+      const i = this.colliders.indexOf(collider);
+      if (i !== -1) this.colliders.splice(i, 1);
+    }
+    if (item.geometryRoot) this.world.remove(item.geometryRoot);
+    item.asset = asset;
+    item.parts = [];
+    item.geometryRoot = null;
+    item.colliders = [];
+    if (!asset) return;
+    const built = this.directory.create(asset.generator, {
       world: this.world,
       asset,
       materials: this.materials,
     });
-    const colliders = asset.colliders.map((c) => {
-      const box = { ...c };
-      this.colliders.push(box);
-      return box;
-    });
-    this.instances.set(entity.id, { ...built, asset, colliders });
-    for (const part of built.parts) this.authored.set(part.id, entity.id);
+    item.geometryRoot = built.root;
+    item.parts = built.parts;
+    this.world.reparent(built.root, item.root);
+    for (const part of item.parts) this.authored.set(part.id, id);
+    item.colliders = asset.colliders.map((c) => ({ ...c }));
+    this.colliders.push(...item.colliders);
   }
   /** Update existing retained geometry; positions never require asset reconstruction. */
   apply(scene, project = null) {
@@ -64,7 +91,18 @@ export class SceneInstance {
     for (const id of this.instances.keys()) if (!ids.has(id)) this.remove(id);
     for (const entity of scene.entities) {
       const old = this.instances.get(entity.id);
-      if (old && old.asset.id !== entity.asset) this.remove(entity.id);
+      if (
+        old &&
+        (old.asset?.id ?? null) !== entity.asset &&
+        entity.asset !== null &&
+        !project
+      )
+        throw new Error("Project required when binding geometry");
+      if (old && (old.asset?.id ?? null) !== entity.asset)
+        this.bindGeometry(
+          entity.id,
+          project?.assets.find((a) => a.id === entity.asset) ?? null,
+        );
       if (!this.instances.has(entity.id)) {
         if (!project)
           throw new Error("Project required when adding an instance");
@@ -78,7 +116,7 @@ export class SceneInstance {
       if (!item) throw new Error("Scene topology changed: reopen preview");
       const r = item.root;
       const asset = project?.assets.find((a) => a.id === e.asset) ?? item.asset;
-      asset.parts.forEach((part, i) => {
+      (asset?.parts ?? []).forEach((part, i) => {
         if (part.shape) {
           const id = Object.hasOwn(e.materialOverrides ?? {}, part.id)
             ? e.materialOverrides[part.id]
@@ -91,7 +129,20 @@ export class SceneInstance {
       const length = Math.hypot(...e.rotation);
       r.rotation.splice(0, 4, ...e.rotation.map((n) => n / length));
       r.scale = e.scale;
-      item.asset.colliders.forEach((c, i) => {
+      r.visible = e.visible !== false;
+      this.world.reparent(
+        r,
+        e.parent ? this.instances.get(e.parent).root : null,
+      );
+    }
+    // Resolve full inherited poses before deriving planar collision bounds. A child
+    // keeps its local values while collision follows the same world pose as drawing.
+    this.world.snapshot();
+    this.world.resolve();
+    for (const e of scene.entities) {
+      const item = this.instances.get(e.id),
+        r = item.root.pose;
+      (item.asset?.colliders ?? []).forEach((c, i) => {
         rotateVector(r.rotation, c.x * r.scale, c.y * r.scale, 0, v);
         const b = item.colliders[i];
         b.x = r.x + v[0];
@@ -115,13 +166,16 @@ export class SceneInstance {
       });
     }
     this.materials.retain(usedMaterials);
-    this.world.snapshot();
-    this.world.resolve();
   }
   /** Remove only one tree and its derived mappings; shared asset data remains untouched. */
   remove(id) {
     const item = this.instances.get(id);
     if (!item) return;
+    // Authored children have independent ownership. Detach them before removing only
+    // this component's generated geometry, retaining their live IDs during reconciliation.
+    for (const other of this.instances.values())
+      if (other.root.parent === item.root)
+        this.world.reparent(other.root, null);
     for (const part of item.parts) this.authored.delete(part.id);
     for (const collider of item.colliders) {
       const index = this.colliders.indexOf(collider);
@@ -136,11 +190,23 @@ export class SceneInstance {
   }
   part(id, name) {
     const i = this.instances.get(id);
-    return i?.parts[i.asset.parts.findIndex((p) => p.id === name)];
+    return i?.parts[i.asset?.parts.findIndex((p) => p.id === name)];
   }
   /** Ray hits on assembly children map to their owning authored instance. */
   idFor(entity) {
     return this.authored.get(entity.id);
+  }
+  /** A picked surface carries authored component/source/part identity. Runtime IDs and
+   * array positions stay private; future mesh picking can extend this with face identity. */
+  surfaceFor(entity) {
+    if (!entity?.shape) return null;
+    const objectId = this.idFor(entity),
+      item = this.instances.get(objectId);
+    if (!item?.asset) return null;
+    const i = item.parts.indexOf(entity);
+    return i < 0
+      ? null
+      : { objectId, geometryId: item.asset.id, partId: item.asset.parts[i].id };
   }
   /** Release membership; the caller separately releases its world and GPU lease. */
   dispose() {

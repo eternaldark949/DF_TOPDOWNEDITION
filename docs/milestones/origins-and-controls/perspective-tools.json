@@ -1,0 +1,31 @@
+{
+  "projection": "perspective",
+  "workflow": {
+    "grid": true,
+    "lightPicking": true,
+    "lightMove": true,
+    "placement": true,
+    "groundOffset": true,
+    "duplicate": true,
+    "deleteUndo": true,
+    "rotationSnap": true,
+    "rotationCancel": true,
+    "playCycles": 2
+  },
+  "errors": [],
+  "requests": [],
+  "resources": {
+    "restored": 1,
+    "error": 0,
+    "afterLayer": {
+      "buffers": 1,
+      "programs": 1,
+      "layers": 0
+    },
+    "afterEngine": {
+      "buffers": 0,
+      "programs": 0,
+      "vaos": 0
+    }
+  }
+}

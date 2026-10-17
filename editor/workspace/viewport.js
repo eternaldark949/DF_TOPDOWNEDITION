@@ -1,3 +1,8 @@
+import {
+  localPoint,
+  localRotation,
+  lockOwner,
+} from "../../engine/basement/objects.js";
 /**
  * Studio / shared selection, placement, translation and rotation tools. One captured
  * pointer owns a transaction. High-rate movement coalesces through Lobby's input phase.
@@ -137,9 +142,10 @@ export class StudioViewport {
       event.preventDefault();
       return;
     }
-    const selected = session.selectionKind==='material'?null:session.scene.entities.find(
-      (e) => e.id === session.selected,
-    );
+    const selected =
+      session.selectionKind === "material"
+        ? null
+        : session.viewScene.entities.find((e) => e.id === session.selected);
     if (this.mode === "rotate" && selected && !selected.locked) {
       const ring = rotationRing(
           camera,
@@ -172,21 +178,47 @@ export class StudioViewport {
         return;
       }
     }
+    const originHit = this.guides?.pickOrigin(
+      session.viewScene,
+      p.x,
+      p.y,
+      p.width,
+      p.height,
+      (e) => !!session.pickId(e.id),
+    );
     const light = this.showLights
-      ? this.guides?.pickLight(session.scene, p.x, p.y, p.width, p.height)
+      ? this.guides?.pickLight(
+          session.scene,
+          p.x,
+          p.y,
+          p.width,
+          p.height,
+          (l) => !!session.pickId(l.id),
+        )
       : null;
-    const hit = light
-      ? null
-      : pickWorld(session.preview.world, ray, (entity) => {
-          const id = session.preview.instance.idFor(entity);
-          return session.scene.entities.some((e) => e.id === id && !e.locked);
-        });
-    if (!light && !hit) return;
-    const id = light?.id ?? session.preview.instance.idFor(hit);
-    session.select(id);
+    const hit =
+      light || originHit
+        ? null
+        : pickWorld(session.preview.world, ray, (entity) => {
+            const id = session.preview.instance.idFor(entity);
+            return !!session.pickId(id);
+          });
+    if (!light && !hit && !originHit) return;
+    const id =
+      light?.id ??
+      session.pickId(originHit?.id ?? session.preview.instance.idFor(hit));
+    if (!id) return;
+    session.select(id, hit ? session.preview.instance.surfaceFor(hit) : null);
     if (this.mode !== "move") return;
-    const entity = light ?? session.scene.entities.find((e) => e.id === id),
-      origin = camera.ground(p.x, p.y, p.width, p.height, entity.position[2]);
+    const entity = light ?? session.viewScene.entities.find((e) => e.id === id);
+    if (!light && lockOwner(session.scene, id)) return;
+    const origin = camera.ground(
+      p.x,
+      p.y,
+      p.width,
+      p.height,
+      entity.position[2],
+    );
     if (!origin)
       throw new Error("Use Top or Oblique view for ground-plane movement");
     this.canvas.setPointerCapture(event.pointerId);
@@ -216,7 +248,11 @@ export class StudioViewport {
         session.document.preview((data) => {
           data.scenes[session.sceneIndex].entities.find(
             (e) => e.id === d.id,
-          ).rotation = rotation;
+          ).rotation = localRotation(
+            session.scene,
+            session.scene.entities.find((e) => e.id === d.id).parent,
+            rotation,
+          );
         });
       } else {
         const hit = camera.ground(p.x, p.y, p.width, p.height, d.position[2]);
@@ -229,11 +265,15 @@ export class StudioViewport {
           const target = list.find((e) => e.id === d.id),
             quantize = (n) =>
               this.snap ? Math.round(n / this.snap) * this.snap : n;
-          target.position = [
+          const position = [
             quantize(d.position[0] + hit.x - d.origin.x),
             quantize(d.position[1] + hit.y - d.origin.y),
             d.position[2],
           ];
+          target.position =
+            d.kind === "light"
+              ? position
+              : localPoint(session.scene, target.parent, position);
         });
       }
     } catch (error) {

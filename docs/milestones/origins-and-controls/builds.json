@@ -1,0 +1,9 @@
+{
+  "algorithm": "sha256",
+  "repeatBuildIdentical": true,
+  "files": {
+    "dist/ETRNLNINE-Studio.html": "32a492716850a718a6f8643484750d67601fd6de550a556f44915d1a02af5207",
+    "dist/ETRNLNINE-Atrium.html": "85a01a06036d6b210f6b63f7161481254385fb3e5699171f1243ae7cc49aada6",
+    "dist/ETRNLNINE-Freelancer.html": "efb087679ebc700273827c3097bfd7fa2543e2301a7255c526ae2b3a92605a71"
+  }
+}

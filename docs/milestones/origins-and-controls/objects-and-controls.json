@@ -1,0 +1,21 @@
+{
+  "objects": {
+    "selectLocked": true,
+    "lockUndo": true,
+    "contextPicking": true,
+    "emptyOrigins": true,
+    "parentAttachment": true,
+    "linkedDuplication": true,
+    "uniqueGeometry": true,
+    "inheritedLock": true,
+    "parentedWorldTools": true
+  },
+  "numbers": {
+    "exactManualValues": true,
+    "oneUndoPerDrag": true,
+    "touchCancel": true,
+    "escape": true
+  },
+  "errors": [],
+  "requests": []
+}

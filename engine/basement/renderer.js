@@ -255,7 +255,7 @@ class InstanceBatch {
     this.cursor = 0; this.firstDirty = Infinity; this.lastDirty = -1;
     for (const entity of this.world.entities.values()) {
       const s = entity.shape, p = entity.pose;
-      if (!s || (this.visibility==='shadow'&&s.castShadow===false)) continue;
+      if (!s || p.visible===false || (this.visibility==='shadow'&&s.castShadow===false)) continue;
       r.totals.candidates++;
       // Sphere is conservative under any orientation. Shadow membership ignores the lens.
       const radius = Math.hypot(...s.size)*p.scale;

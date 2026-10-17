@@ -1,6 +1,7 @@
 /** Penthouse / shared image/effect controls for any engine host.
  * App supplies the renderer, host and Lobby subscription. No game/editor IDs or scheduler.
  * Settings are viewport policy; this widget never mutates authored project data/history. */
+import { NumberControl } from "./number-control.js";
 import { BLOOM_PARAMETERS } from "../basement/bloom-settings.js";
 import {
   BLOOM_PRESETS,
@@ -24,7 +25,8 @@ export class AppearanceControls {
     try {
       const summary = document.createElement("summary");
       summary.textContent = title;
-      summary.style.cssText = "cursor:pointer;padding:10px 3px;color:var(--ui-gold,#d9bb83)";
+      summary.style.cssText =
+        "cursor:pointer;padding:10px 3px;color:var(--ui-gold,#d9bb83)";
       this.element.append(summary);
       const body = document.createElement("div");
       body.style.cssText =
@@ -32,6 +34,7 @@ export class AppearanceControls {
       this.element.append(body);
       this.fields = {};
       this.owners = {};
+      this.numbers = {};
       /** One field factory: touch target, validation, app error policy and setting adoption are shared. */
       const field = (key, label, input, owner = renderer.bloom) => {
         const wrap = document.createElement("label");
@@ -124,16 +127,51 @@ export class AppearanceControls {
           hint: "Whole-scene presentation brightness; independent of bloom.",
         },
       ]) {
-        const input = document.createElement("input");
-        input.type = "number";
-        Object.assign(input, { min, max, step, title: hint });
-        field(
-          key,
+        const owner =
+          key === "exposure" ? renderer.presentation : renderer.bloom;
+        const wrap = document.createElement("label");
+        wrap.textContent = label;
+        wrap.style.cssText =
+          "display:grid;gap:5px;min-width:0;font:11px system-ui";
+        body.append(wrap);
+        let control;
+        control = new NumberControl({
+          host: wrap,
           label,
-          input,
-          key === "exposure" ? renderer.presentation : renderer.bloom,
-        );
+          value: owner.settings[key],
+          min,
+          max,
+          step,
+          slider: {
+            min,
+            max,
+            curve:
+              key === "exposure"
+                ? "log"
+                : ["strength", "threshold", "haze"].includes(key)
+                  ? "power"
+                  : "linear",
+          },
+          onPreview: (value) => {
+            owner.configure({ [key]: value });
+            this.refreshStatus();
+          },
+          onFinish: (commit) => {
+            if (!commit) owner.configure({ [key]: control.value });
+            this.refreshStatus();
+          },
+          onError,
+        });
+        control.input.title = hint;
+        control.input.dataset[
+          owner === renderer.bloom ? "bloom" : "presentation"
+        ] = key;
+        this.fields[key] = control.input;
+        this.owners[key] = owner;
+        this.numbers[key] = control;
+        this.life.own(() => control.dispose());
       }
+
       this.status = document.createElement("output");
       this.status.style.cssText =
         "grid-column:1/-1;font:11px/1.6 system-ui;color:var(--ui-muted,#a99bb6)";
@@ -163,8 +201,11 @@ export class AppearanceControls {
       if (
         (force || document.activeElement !== input) &&
         input.value !== String(this.owners[key].settings[key])
-      )
-        input.value = this.owners[key].settings[key];
+      ) {
+        if (this.numbers[key])
+          this.numbers[key].setValue(this.owners[key].settings[key], force);
+        else input.value = this.owners[key].settings[key];
+      }
     this.preset.value = matchingBloomPreset(this.renderer.bloom.settings);
     this.status.dataset.effective =
       p.effectiveMode === "hdr" && !b.failure ? b.mode : "off";

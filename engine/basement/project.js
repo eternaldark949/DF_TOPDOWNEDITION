@@ -4,6 +4,7 @@
  * happens before adoption and packaging; IDs survive serialization independently of World IDs.
  * Limits bound synchronous parsing, history and procedural construction on mobile devices.
  */
+import { objectPoses } from "./objects.js";
 import { validateMaterial } from "./material.js";
 export const PROJECT_LIMITS = Object.freeze({
   bytes: 524288,
@@ -25,6 +26,7 @@ function validateProjectData(
   project,
   { generators = null } = {},
   legacy = false,
+  flat = false,
 ) {
   const fail = (path, message) => {
     throw new Error(`${path}: ${message}`);
@@ -83,13 +85,20 @@ function validateProjectData(
     "package exceeds 512 KiB",
   );
   check(
-    project?.schemaVersion === (legacy ? 1 : 2),
+    project?.schemaVersion === (legacy ? 1 : flat ? 2 : 3),
     "schemaVersion",
-    "expected material-linked schema version 2",
+    "expected origin/component schema version 3",
   );
   text(project.id, "id");
   text(project.name, "name");
-  list(project.assets, PROJECT_LIMITS.assets, "assets");
+  if (!legacy && !flat)
+    check(
+      Array.isArray(project.assets) &&
+        project.assets.length <= PROJECT_LIMITS.assets,
+      "assets",
+      "expected 0–256 geometry assets",
+    );
+  else list(project.assets, PROJECT_LIMITS.assets, "assets");
   list(project.scenes, PROJECT_LIMITS.scenes, "scenes");
   let materialIds = new Set();
   if (!legacy) {
@@ -211,7 +220,26 @@ function validateProjectData(
     s.entities.forEach((e, i) => {
       const q = `${p}.entities[${i}]`;
       text(e.name, q + ".name");
-      check(assets.has(e.asset), q + ".asset", "unresolved asset");
+      check(
+        assets.has(e.asset) || (!legacy && !flat && e.asset === null),
+        q + ".asset",
+        "unresolved asset",
+      );
+      if (!legacy && !flat) {
+        check(
+          e.parent === null ||
+            s.entities.slice(0, i).some((p) => p.id === e.parent),
+          q + ".parent",
+          "parent must precede child",
+        );
+        for (const key of ["selectable", "visible"])
+          if (e[key] !== undefined)
+            check(
+              typeof e[key] === "boolean",
+              q + "." + key,
+              "expected boolean",
+            );
+      }
       vector(e.position, 3, q + ".position");
       rotation(e.rotation, q + ".rotation");
       number(e.scale, q + ".scale", 0.05, 20);
@@ -226,6 +254,11 @@ function validateProjectData(
           "expected material binding map",
         );
         const asset = project.assets.find((a) => a.id === e.asset);
+        check(
+          !!asset,
+          q + ".materialOverrides",
+          "origins have no surface bindings",
+        );
         for (const [part, material] of Object.entries(e.materialOverrides)) {
           check(
             asset.parts.some((p) => p.id === part && p.shape),
@@ -240,6 +273,19 @@ function validateProjectData(
         }
       }
     });
+    // Bound inherited transforms as well as local fields; otherwise many valid local
+    // scales could overflow GPU floats or collapse a child to numerical zero.
+    if (!legacy && !flat)
+      for (const [id, pose] of objectPoses(s)) {
+        vector(
+          pose.position,
+          3,
+          p + "." + id + ".worldPosition",
+          -1000000,
+          1000000,
+        );
+        number(pose.scale, p + "." + id + ".worldScale", 0.000001, 10000);
+      }
     if (s.lightVariants)
       for (const [name, v] of Object.entries(s.lightVariants)) {
         check(
@@ -263,6 +309,12 @@ function validateProjectData(
     );
     ids(s.lights, p + ".lights");
     s.lights.forEach((l, i) => {
+      if (!legacy && !flat)
+        check(
+          !s.entities.some((e) => e.id === l.id),
+          `${p}.lights[${i}].id`,
+          "light and object IDs must be distinct",
+        );
       vector(l.position, 3, `${p}.lights[${i}].position`);
       vector(l.color, 3, `${p}.lights[${i}].color`, 0, 16);
       number(l.radius, `${p}.lights[${i}].radius`, 0.1, 100);
@@ -286,6 +338,14 @@ export function validateProject(project, options = {}) {
  * Sharing is scoped to equal appearances inside each source asset, avoiding accidental links
  * between unrelated assets merely because their RGB values happen to match. */
 export function upgradeProject(source) {
+  if (source?.schemaVersion === 2) {
+    validateProjectData(source, {}, false, true);
+    const p = copyData(source);
+    p.schemaVersion = 3;
+    for (const scene of p.scenes)
+      for (const e of scene.entities) e.parent = null;
+    return validateProject(p);
+  }
   if (source?.schemaVersion !== 1) return source;
   validateProjectData(source, {}, true);
   const p = copyData(source);
@@ -315,5 +375,5 @@ export function upgradeProject(source) {
       delete shape.emission;
     }
   }
-  return validateProject(p);
+  return upgradeProject(p);
 }

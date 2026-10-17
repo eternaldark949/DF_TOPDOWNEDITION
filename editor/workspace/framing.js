@@ -1,14 +1,33 @@
 /** Studio / selection semantics for framing. Bounds/camera maths stay in Basement;
  * the application resolves authored selection to a runtime assembly or light influence. */
+import { descendants } from "../../engine/basement/objects.js";
 import { worldBounds } from "../../engine/basement/asset-bounds.js";
 /** Frame the complete placed hierarchy, or the point light's actual influence radius. */
 export function selectedBounds(session) {
-  if(session.selectionKind==='material')return null;
+  if (session.selectionKind === "material") return null;
   const item = session.preview?.instance.instances.get(session.selected);
+  const selectedIds = descendants(session.scene, session.selected);
   if (item)
-    return worldBounds(
-      session.preview.world,
-      new Set(item.parts.map((p) => p.id)),
+    return (
+      worldBounds(
+        session.preview.world,
+        new Set(
+          [...session.preview.instance.instances]
+            .filter(([id]) => selectedIds.has(id))
+            .flatMap(([, item]) => item.parts.map((p) => p.id)),
+        ),
+      ) ?? {
+        min: [
+          item.root.pose.x - 0.3,
+          item.root.pose.y - 0.3,
+          item.root.pose.z - 0.3,
+        ],
+        max: [
+          item.root.pose.x + 0.3,
+          item.root.pose.y + 0.3,
+          item.root.pose.z + 0.3,
+        ],
+      }
     );
   const light = session.scene.lights.find((l) => l.id === session.selected);
   return light

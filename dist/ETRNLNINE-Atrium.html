@@ -32,6 +32,74 @@ footer{position:absolute;bottom:max(25px,env(safe-area-inset-bottom));left:50%;t
 #error{position:absolute;top:40%;left:10%;width:80%;padding:24px;border:1px solid #bf8a6e;background:#241b24;z-index:3}
 @media(max-width:650px){header{left:20px;top:22px}.subtitle{max-width:180px;font-size:10px}nav{right:15px;top:24px}nav button{padding:9px;font-size:11px}h1{font-size:30px}.eyebrow{font-size:8px}footer{bottom:150px;width:90%}.hint{font-size:10px}.engine-joystick{left:22px}.engine-action{right:25px}#world-directory{left:20px;top:145px;max-width:245px;padding:9px 12px;font-size:10px}#world-directory:not([open]){background:#11111dcc}footer{bottom:215px}.hint{max-width:300px;margin:auto}}
 </style>
+<style>
+/* Penthouse / shared touch-sized number surfaces. Native range and number inputs retain
+   their accessibility roles. The fill is presentation only, never a second value store. */
+.number-control {
+  display: flex;
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid var(--ui-border, #3d304e);
+  border-radius: 7px;
+  background: var(--ui-panel, #121019);
+  box-sizing: border-box;
+}
+.number-control.has-slider {
+  background:
+    linear-gradient(
+      90deg,
+      #a469ff30 var(--number-fill, 0%),
+      transparent var(--number-fill, 0%)
+    ),
+    var(--ui-panel, #121019);
+}
+.number-control:focus-within {
+  outline: 2px solid var(--ui-violet-bright, #ceadff);
+  outline-offset: 2px;
+}
+.number-control > input[type="number"] {
+  box-sizing: border-box;
+  width: 100%;
+  border: 0 !important;
+  background: transparent !important;
+  min-height: 44px;
+  min-width: 0;
+  padding: 8px !important;
+  outline: none !important;
+}
+.number-control.has-slider > input[type="number"] {
+  width: 48%;
+  margin-left: auto;
+}
+.number-control > input[type="range"] {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 52%;
+  height: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 !important;
+  opacity: 0;
+  cursor: ew-resize;
+  touch-action: pan-y;
+}
+.number-control.has-slider::before {
+  content: "↔";
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  transform: translateY(-50%);
+  color: var(--ui-muted, #c2b6cf);
+  pointer-events: none;
+}
+.number-control:has(input:disabled) {
+  opacity: 0.55;
+}
+
+</style>
 </head>
 <body>
 <canvas id="world" tabindex="0" aria-label="Interactive WebGL courtyard. Use WASD or arrows to walk, E to change the lantern, B to change the pack response, F to flit between worlds, G to move the prop."></canvas>
@@ -92,9 +160,13 @@ const { multiplyRotation, rotateVector } = module4;
 
 class Identities {
   /** Engine-local monotonically increasing IDs; caller chooses the namespace. */
-  constructor() { this.next = 1; }
+  constructor() {
+    this.next = 1;
+  }
   /** IDs are never reused during this engine's lifetime, even after scene disposal. */
-  create(namespace) { return `${namespace}:${this.next++}`; }
+  create(namespace) {
+    return `${namespace}:${this.next++}`;
+  }
 }
 
 class World {
@@ -112,14 +184,46 @@ class World {
    * Parent must already exist in this world: this prevents cycles and foreign links.
    * Shape size is full width/depth/height; its origin is its center.
    */
-  create({ x = 0, y = 0, z = 0, yaw = 0, parent = null, shape = null, rotation = [0,0,0,1], scale = 1 } = {}) {
-    if (this.disposed) throw new Error('Cannot create in a disposed world');
-    if (parent && this.entities.get(parent.id) !== parent) throw new Error('Parent belongs to another world');
-    if(!Number.isFinite(scale)||scale<=0||rotation.length!==4||!rotation.every(Number.isFinite)||Math.abs(Math.hypot(...rotation)-1)>0.001)throw new RangeError('World requires a unit quaternion and positive uniform scale');
+  create({
+    x = 0,
+    y = 0,
+    z = 0,
+    yaw = 0,
+    parent = null,
+    shape = null,
+    rotation = [0, 0, 0, 1],
+    scale = 1,
+    visible = true,
+  } = {}) {
+    if (this.disposed) throw new Error("Cannot create in a disposed world");
+    if (parent && this.entities.get(parent.id) !== parent)
+      throw new Error("Parent belongs to another world");
+    if (
+      !Number.isFinite(scale) ||
+      scale <= 0 ||
+      rotation.length !== 4 ||
+      !rotation.every(Number.isFinite) ||
+      Math.abs(Math.hypot(...rotation) - 1) > 0.001
+    )
+      throw new RangeError(
+        "World requires a unit quaternion and positive uniform scale",
+      );
+    if (typeof visible !== "boolean")
+      throw new RangeError("Visibility must be boolean");
     const entity = {
-      id: this.identities.create('entity'), worldId: this.id, parent,
-      x, y, z, yaw, rotation:[...rotation], scale, previous: { x, y, z, yaw,rotation:[...rotation],scale },
-      pose: { x, y, z, yaw,rotation:[...rotation],scale }, shape,
+      id: this.identities.create("entity"),
+      worldId: this.id,
+      parent,
+      x,
+      y,
+      z,
+      yaw,
+      rotation: [...rotation],
+      scale,
+      visible,
+      previous: { x, y, z, yaw, rotation: [...rotation], scale },
+      pose: { x, y, z, yaw, rotation: [...rotation], scale },
+      shape,
       // Transient presentation amount; never authored/saved or packed into shadow depth.
       highlight: 0,
     };
@@ -131,9 +235,12 @@ class World {
   /** Capture local transforms before a fixed update, for smooth render interpolation. */
   snapshot() {
     for (const e of this.entities.values()) {
-      e.previous.x = e.x; e.previous.y = e.y;
-      e.previous.z = e.z; e.previous.yaw = e.yaw;e.previous.scale=e.scale;
-      for(let i=0;i<4;i++)e.previous.rotation[i]=e.rotation[i];
+      e.previous.x = e.x;
+      e.previous.y = e.y;
+      e.previous.z = e.z;
+      e.previous.yaw = e.yaw;
+      e.previous.scale = e.scale;
+      for (let i = 0; i < 4; i++) e.previous.rotation[i] = e.rotation[i];
     }
   }
 
@@ -142,31 +249,96 @@ class World {
    * Parent-before-child is guaranteed by create(); shortest-arc yaw avoids full spins.
    */
   resolve(alpha = 1) {
-    const local=this.localRotation??=new Float64Array(4),offset=this.offset??=new Float64Array(3),yawRotation=this.yawRotation??=new Float64Array(4);
+    const local = (this.localRotation ??= new Float64Array(4)),
+      offset = (this.offset ??= new Float64Array(3)),
+      yawRotation = (this.yawRotation ??= new Float64Array(4));
     for (const e of this.entities.values()) {
-      const a = e.previous, p = e.pose;
+      const a = e.previous,
+        p = e.pose;
       const x = a.x + (e.x - a.x) * alpha;
       const y = a.y + (e.y - a.y) * alpha;
       const z = a.z + (e.z - a.z) * alpha;
       const turn = Math.atan2(Math.sin(e.yaw - a.yaw), Math.cos(e.yaw - a.yaw));
       const yaw = a.yaw + turn * alpha;
-      let dot=0;for(let i=0;i<4;i++)dot+=a.rotation[i]*e.rotation[i];
-      for(let i=0;i<4;i++)local[i]=a.rotation[i]+((dot<0?-1:1)*e.rotation[i]-a.rotation[i])*alpha;
-      const length=Math.hypot(...local);for(let i=0;i<4;i++)local[i]/=length;
-      yawRotation[0]=yawRotation[1]=0;yawRotation[2]=Math.sin(yaw/2);yawRotation[3]=Math.cos(yaw/2);
-      multiplyRotation(yawRotation,local,local);p.scale=a.scale+(e.scale-a.scale)*alpha;
-      if(e.parent){
-        const b=e.parent.pose;rotateVector(b.rotation,x*b.scale,y*b.scale,z*b.scale,offset);
-        p.x=b.x+offset[0];p.y=b.y+offset[1];p.z=b.z+offset[2];p.yaw=b.yaw+yaw;p.scale*=b.scale;
-        multiplyRotation(b.rotation,local,p.rotation);
-      }else{p.x=x;p.y=y;p.z=z;p.yaw=yaw;for(let i=0;i<4;i++)p.rotation[i]=local[i];}
+      let dot = 0;
+      for (let i = 0; i < 4; i++) dot += a.rotation[i] * e.rotation[i];
+      for (let i = 0; i < 4; i++)
+        local[i] =
+          a.rotation[i] +
+          ((dot < 0 ? -1 : 1) * e.rotation[i] - a.rotation[i]) * alpha;
+      const length = Math.hypot(...local);
+      for (let i = 0; i < 4; i++) local[i] /= length;
+      yawRotation[0] = yawRotation[1] = 0;
+      yawRotation[2] = Math.sin(yaw / 2);
+      yawRotation[3] = Math.cos(yaw / 2);
+      multiplyRotation(yawRotation, local, local);
+      p.scale = a.scale + (e.scale - a.scale) * alpha;
+      p.visible = e.visible !== false && (e.parent?.pose.visible ?? true);
+      if (e.parent) {
+        const b = e.parent.pose;
+        rotateVector(b.rotation, x * b.scale, y * b.scale, z * b.scale, offset);
+        p.x = b.x + offset[0];
+        p.y = b.y + offset[1];
+        p.z = b.z + offset[2];
+        p.yaw = b.yaw + yaw;
+        p.scale *= b.scale;
+        multiplyRotation(b.rotation, local, p.rotation);
+      } else {
+        p.x = x;
+        p.y = y;
+        p.z = z;
+        p.yaw = yaw;
+        for (let i = 0; i < 4; i++) p.rotation[i] = local[i];
+      }
     }
   }
 
+  /** Change hierarchy without replacing IDs. Reorder the retained map once so resolve's
+   * allocation-free parent-before-child traversal remains valid after authoring changes. */
+  reparent(entity, parent) {
+    if (
+      this.entities.get(entity.id) !== entity ||
+      (parent && this.entities.get(parent.id) !== parent)
+    )
+      throw new Error("Foreign hierarchy member");
+    for (let p = parent; p; p = p.parent)
+      if (p === entity) throw new Error("Hierarchy cycle");
+    if (entity.parent === parent) return;
+    entity.parent = parent;
+    // Most attachments already have an earlier parent (notably freshly built geometry).
+    // Keep the map and avoid allocating a sort graph when traversal order is valid.
+    let earlier = !parent;
+    for (const e of this.entities.values()) {
+      if (e === parent) earlier = true;
+      if (e === entity) break;
+    }
+    if (earlier) {
+      this.revision++;
+      return;
+    }
+    const children = new Map();
+    for (const e of this.entities.values()) {
+      const key = e.parent?.id ?? null;
+      if (!children.has(key)) children.set(key, []);
+      children.get(key).push(e);
+    }
+    const ordered = [];
+    const visit = (key) => {
+      for (const e of children.get(key) ?? []) {
+        ordered.push(e);
+        visit(e.id);
+      }
+    };
+    visit(null);
+    this.entities.clear();
+    for (const e of ordered) this.entities.set(e.id, e);
+    this.revision++;
+  }
   /** Remove an entity and descendants; snapshot the map so recursive removal is safe. */
   remove(entity) {
     if (this.entities.get(entity.id) !== entity) return;
-    for (const child of [...this.entities.values()]) if (child.parent === entity) this.remove(child);
+    for (const child of [...this.entities.values()])
+      if (child.parent === entity) this.remove(child);
     this.entities.delete(entity.id);
     this.revision++;
   }
@@ -174,7 +346,9 @@ class World {
   /** Release CPU membership; Directory separately owns GPU/resource leases. */
   dispose() {
     if (this.disposed) return;
-    this.entities.clear(); this.revision++; this.disposed = true;
+    this.entities.clear();
+    this.revision++;
+    this.disposed = true;
   }
 }
 
@@ -944,7 +1118,7 @@ class AmbientOcclusion {
     const camera=this.renderer.camera;
     for(const entity of world.entities.values()) {
       const shape=entity.shape,p=entity.pose;
-      if(!shape||shape.ambientBlocker===false||Math.min(...shape.size)<0.15)continue;
+      if(!shape||p.visible===false||shape.ambientBlocker===false||Math.min(...shape.size)<0.15)continue;
       const [sx,sy,sz]=shape.size.map(n=>n*p.scale);
       if(p.z+sz/2<=0.05)continue; // The ground slab must not consume the blocker budget.
       this.candidates++;
@@ -2820,7 +2994,7 @@ class InstanceBatch {
     this.cursor = 0; this.firstDirty = Infinity; this.lastDirty = -1;
     for (const entity of this.world.entities.values()) {
       const s = entity.shape, p = entity.pose;
-      if (!s || (this.visibility==='shadow'&&s.castShadow===false)) continue;
+      if (!s || p.visible===false || (this.visibility==='shadow'&&s.castShadow===false)) continue;
       r.totals.candidates++;
       // Sphere is conservative under any orientation. Shadow membership ignores the lens.
       const radius = Math.hypot(...s.size)*p.scale;
@@ -4082,6 +4256,10 @@ const module45=(()=>{
  * applications request it explicitly and choose their own command-to-icon mapping.
  * Keep strokes legible at 18–20 CSS pixels; clipped corners echo the DFAB shell. */
 const WORKSPACE_ICONS = Object.freeze({
+  lock: "M5 10H19V21H5Z M8 10V6A4 4 0 0 1 16 6V10 M12 14V17",
+  unlock: "M5 10H19V21H5Z M8 10V6A4 4 0 0 1 16 6 M12 14V17",
+  lockInherited: "M5 10H19V21H5Z M8 10V6A4 4 0 0 1 16 6V10 M12 14V17 M2 3H5 M3 2V5 M19 3H22",
+  origin: "M12 2V8 M12 16V22 M2 12H8 M16 12H22 M12 8 16 12 12 16 8 12Z",
   axes: "M5 19H21 M5 19V3 M5 19 15 9 M18 16 21 19 18 22 M2 6 5 3 8 6 M11 9H15V13",
   outline:
     "M3 3H8 M16 3H21V8 M21 16V21H16 M8 21H3V16 M3 8V10 M3 12V14 M10 3H14 M21 10V14 M10 21H14",
@@ -4204,6 +4382,124 @@ class ETRNLNINE {
 
 return {ETRNLNINE};
 })();
+// Source: engine/basement/objects.js
+const module50=(()=>{
+/** Basement / authored object tree. Origin-only nodes and geometry-bearing components
+ * share identity, local transforms and inherited editor restrictions. No game/DOM policy.
+ * Parent-before-child storage is validated at the project boundary, not repaired per frame. */
+const { rotateVector, multiplyRotation } = module4;
+/** Ordered ancestors, closest first; callers can explain exactly where a lock originates. */
+function ancestors(scene, id) {
+  const list = [];
+  let node = scene.entities.find((e) => e.id === id);
+  while (node?.parent) {
+    node = scene.entities.find((e) => e.id === node.parent);
+    if (!node) break;
+    list.push(node);
+  }
+  return list;
+}
+/** Nearest effective lock, retaining its identity for inherited-lock explanations. */
+function lockOwner(scene, id) {
+  const node = scene.entities.find((e) => e.id === id);
+  return [node, ...ancestors(scene, id)].find((e) => e?.locked) ?? null;
+}
+/** Branch membership never treats null selection as the implicit scene root. */
+function descendants(scene, id) {
+  if (!scene.entities.some((e) => e.id === id)) return new Set();
+  const ids = new Set([id]);
+  for (const e of scene.entities) if (ids.has(e.parent)) ids.add(e.id);
+  return ids;
+}
+/** Compose one local origin with an optional resolved parent. Shared by bulk and path
+ * queries so gameplay does not need a complete scene pose map for a single anchor. */
+function composePose(e, p) {
+  const length = Math.hypot(...e.rotation),
+    q = e.rotation.map((n) => n / length),
+    position = [...e.position];
+  let rotation = q,
+    scale = e.scale;
+  if (p) {
+    rotateVector(p.rotation, ...position.map((n) => n * p.scale), position);
+    for (let i = 0; i < 3; i++) position[i] += p.position[i];
+    rotation = [0, 0, 0, 1];
+    multiplyRotation(p.rotation, q, rotation);
+    scale *= p.scale;
+  }
+  return {
+    position,
+    rotation,
+    scale,
+    visible: e.visible !== false && (p?.visible ?? true),
+  };
+}
+/** Resolved poses are derived data. Bulk editor display resolves each object once. */
+function objectPoses(scene) {
+  const poses = new Map();
+  for (const e of scene.entities)
+    poses.set(e.id, composePose(e, poses.get(e.parent)));
+  return poses;
+}
+/** Resolve only one ancestry path for occasional/gameplay anchor queries. No full-scene
+ * map or per-object pose arrays are allocated for unrelated geometry. Missing IDs return null. */
+function objectPose(scene, id) {
+  const node = scene.entities.find((e) => e.id === id);
+  if (!node) return null;
+  const path = [node, ...ancestors(scene, id)];
+  let pose;
+  for (let i = path.length - 1; i >= 0; i--) pose = composePose(path[i], pose);
+  return pose;
+}
+/** Convert a world-space point or orientation into the selected parent's local space. */
+function localPoint(scene, parent, world) {
+  const p = objectPoses(scene).get(parent);
+  if (!p) return [...world];
+  const v = world.map((n, i) => (n - p.position[i]) / p.scale);
+  rotateVector(p.rotation, ...v, v, true);
+  return v;
+}
+/** Parent-conjugate conversion for world-space rotation gestures. Uniform scale adds no shear. */
+function localRotation(scene, parent, world) {
+  const p = objectPoses(scene).get(parent);
+  if (!p) return [...world];
+  const out = [0, 0, 0, 1],
+    inv = p.rotation.map((n, i) => (i < 3 ? -n : n));
+  multiplyRotation(inv, world, out);
+  return out;
+}
+/** Reparent in world space, keeping every descendant's pose stable. IDs survive reorder. */
+function reparentObject(scene, id, parent) {
+  const node = scene.entities.find((e) => e.id === id);
+  if (!node) throw new Error("Missing object");
+  const branch = descendants(scene, id);
+  if (
+    parent &&
+    (branch.has(parent) || !scene.entities.some((e) => e.id === parent))
+  )
+    throw new Error("Invalid parent");
+  const poses = objectPoses(scene),
+    pose = poses.get(id);
+  node.position = localPoint(scene, parent, pose.position);
+  node.rotation = localRotation(scene, parent, pose.rotation);
+  node.scale = pose.scale / (poses.get(parent)?.scale ?? 1);
+  node.parent = parent;
+  const ordered = [],
+    pending = new Set(scene.entities);
+  while (pending.size) {
+    let changed = false;
+    for (const e of pending)
+      if (!e.parent || ordered.some((p) => p.id === e.parent)) {
+        ordered.push(e);
+        pending.delete(e);
+        changed = true;
+      }
+    if (!changed) throw new Error("Object cycle");
+  }
+  scene.entities = ordered;
+}
+
+return {ancestors,lockOwner,descendants,objectPoses,objectPose,localPoint,localRotation,reparentObject};
+})();
 // Source: engine/basement/project.js
 const module49=(()=>{
 /**
@@ -4212,6 +4508,7 @@ const module49=(()=>{
  * happens before adoption and packaging; IDs survive serialization independently of World IDs.
  * Limits bound synchronous parsing, history and procedural construction on mobile devices.
  */
+const { objectPoses } = module50;
 const { validateMaterial } = module41;
 const PROJECT_LIMITS = Object.freeze({
   bytes: 524288,
@@ -4233,6 +4530,7 @@ function validateProjectData(
   project,
   { generators = null } = {},
   legacy = false,
+  flat = false,
 ) {
   const fail = (path, message) => {
     throw new Error(`${path}: ${message}`);
@@ -4291,13 +4589,20 @@ function validateProjectData(
     "package exceeds 512 KiB",
   );
   check(
-    project?.schemaVersion === (legacy ? 1 : 2),
+    project?.schemaVersion === (legacy ? 1 : flat ? 2 : 3),
     "schemaVersion",
-    "expected material-linked schema version 2",
+    "expected origin/component schema version 3",
   );
   text(project.id, "id");
   text(project.name, "name");
-  list(project.assets, PROJECT_LIMITS.assets, "assets");
+  if (!legacy && !flat)
+    check(
+      Array.isArray(project.assets) &&
+        project.assets.length <= PROJECT_LIMITS.assets,
+      "assets",
+      "expected 0–256 geometry assets",
+    );
+  else list(project.assets, PROJECT_LIMITS.assets, "assets");
   list(project.scenes, PROJECT_LIMITS.scenes, "scenes");
   let materialIds = new Set();
   if (!legacy) {
@@ -4419,7 +4724,26 @@ function validateProjectData(
     s.entities.forEach((e, i) => {
       const q = `${p}.entities[${i}]`;
       text(e.name, q + ".name");
-      check(assets.has(e.asset), q + ".asset", "unresolved asset");
+      check(
+        assets.has(e.asset) || (!legacy && !flat && e.asset === null),
+        q + ".asset",
+        "unresolved asset",
+      );
+      if (!legacy && !flat) {
+        check(
+          e.parent === null ||
+            s.entities.slice(0, i).some((p) => p.id === e.parent),
+          q + ".parent",
+          "parent must precede child",
+        );
+        for (const key of ["selectable", "visible"])
+          if (e[key] !== undefined)
+            check(
+              typeof e[key] === "boolean",
+              q + "." + key,
+              "expected boolean",
+            );
+      }
       vector(e.position, 3, q + ".position");
       rotation(e.rotation, q + ".rotation");
       number(e.scale, q + ".scale", 0.05, 20);
@@ -4434,6 +4758,11 @@ function validateProjectData(
           "expected material binding map",
         );
         const asset = project.assets.find((a) => a.id === e.asset);
+        check(
+          !!asset,
+          q + ".materialOverrides",
+          "origins have no surface bindings",
+        );
         for (const [part, material] of Object.entries(e.materialOverrides)) {
           check(
             asset.parts.some((p) => p.id === part && p.shape),
@@ -4448,6 +4777,19 @@ function validateProjectData(
         }
       }
     });
+    // Bound inherited transforms as well as local fields; otherwise many valid local
+    // scales could overflow GPU floats or collapse a child to numerical zero.
+    if (!legacy && !flat)
+      for (const [id, pose] of objectPoses(s)) {
+        vector(
+          pose.position,
+          3,
+          p + "." + id + ".worldPosition",
+          -1000000,
+          1000000,
+        );
+        number(pose.scale, p + "." + id + ".worldScale", 0.000001, 10000);
+      }
     if (s.lightVariants)
       for (const [name, v] of Object.entries(s.lightVariants)) {
         check(
@@ -4471,6 +4813,12 @@ function validateProjectData(
     );
     ids(s.lights, p + ".lights");
     s.lights.forEach((l, i) => {
+      if (!legacy && !flat)
+        check(
+          !s.entities.some((e) => e.id === l.id),
+          `${p}.lights[${i}].id`,
+          "light and object IDs must be distinct",
+        );
       vector(l.position, 3, `${p}.lights[${i}].position`);
       vector(l.color, 3, `${p}.lights[${i}].color`, 0, 16);
       number(l.radius, `${p}.lights[${i}].radius`, 0.1, 100);
@@ -4494,6 +4842,14 @@ function validateProject(project, options = {}) {
  * Sharing is scoped to equal appearances inside each source asset, avoiding accidental links
  * between unrelated assets merely because their RGB values happen to match. */
 function upgradeProject(source) {
+  if (source?.schemaVersion === 2) {
+    validateProjectData(source, {}, false, true);
+    const p = copyData(source);
+    p.schemaVersion = 3;
+    for (const scene of p.scenes)
+      for (const e of scene.entities) e.parent = null;
+    return validateProject(p);
+  }
   if (source?.schemaVersion !== 1) return source;
   validateProjectData(source, {}, true);
   const p = copyData(source);
@@ -4523,7 +4879,7 @@ function upgradeProject(source) {
       delete shape.emission;
     }
   }
-  return validateProject(p);
+  return upgradeProject(p);
 }
 
 return {PROJECT_LIMITS,copyData,parseProject,validateProject,upgradeProject};
@@ -4531,7 +4887,7 @@ return {PROJECT_LIMITS,copyData,parseProject,validateProject,upgradeProject};
 // Source: examples/atrium/project.js
 const module48=(()=>{
 /** Atrium source of truth: portable JSON; behavior stays in the example's JavaScript. */
-const data=JSON.parse("{\"schemaVersion\":2,\"id\":\"project:atrium\",\"name\":\"Between Worlds\",\"scenes\":[{\"key\":\"amber\",\"name\":\"The Amber Atrium\",\"sun\":{\"direction\":[-0.5,0.8,1.2],\"color\":[0.58,0.49,0.62]},\"ethereal\":false,\"ambient\":[0.15,0.11,0.15],\"id\":\"scene:amber\",\"entities\":[{\"id\":\"amber:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"asset\":\"asset:amber:courtyard-foundation\",\"tag\":null,\"locked\":true,\"position\":[0,0,-0.25],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:central-inlay\",\"name\":\"Central inlay\",\"asset\":\"asset:amber:central-inlay\",\"tag\":null,\"locked\":true,\"position\":[0,-5,0.015],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-brass-inlay\",\"name\":\"West brass inlay\",\"asset\":\"asset:amber:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[-3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-brass-inlay\",\"name\":\"East brass inlay\",\"asset\":\"asset:amber:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:colonnade\",\"name\":\"Colonnade\",\"asset\":\"asset:amber:colonnade\",\"tag\":null,\"locked\":false,\"position\":[0,11,0],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-gallery\",\"name\":\"West gallery\",\"asset\":\"asset:amber:west-gallery\",\"tag\":null,\"locked\":false,\"position\":[-20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-entry-planter\",\"name\":\"West entry planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-court-planter\",\"name\":\"West court planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-entry-lantern\",\"name\":\"West entry lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-promenade-lantern\",\"name\":\"West promenade lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:west-gallery-lantern\",\"name\":\"West gallery lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-gallery\",\"name\":\"East gallery\",\"asset\":\"asset:amber:east-gallery\",\"tag\":null,\"locked\":false,\"position\":[20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-entry-planter\",\"name\":\"East entry planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-court-planter\",\"name\":\"East court planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-entry-lantern\",\"name\":\"East entry lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-promenade-lantern\",\"name\":\"East promenade lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:east-gallery-lantern\",\"name\":\"East gallery lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:crystal-lantern\",\"name\":\"Crystal lantern\",\"asset\":\"asset:amber:crystal-lantern\",\"tag\":\"lantern\",\"locked\":false,\"position\":[0,2,0.65],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"amber:movable-plinth\",\"name\":\"Movable plinth\",\"asset\":\"asset:amber:movable-plinth\",\"tag\":\"prop\",\"locked\":false,\"position\":[6,-12,0.65],\"rotation\":[0,0,0,1],\"scale\":1}],\"lights\":[{\"id\":\"light:0\",\"position\":[0,7,5],\"radius\":16,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:1\",\"position\":[-15,-4,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:2\",\"position\":[15,-4,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:3\",\"position\":[-15,9,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:4\",\"position\":[15,9,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:5\",\"position\":[0,2,3],\"radius\":10,\"color\":[0.3,1.1,2.7]},{\"id\":\"light:6\",\"position\":[-15,-18,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:7\",\"position\":[15,-18,4],\"radius\":12,\"color\":[2.4,0.85,0.3]}],\"lightVariants\":{\"cool\":{\"crystal\":[0.25,0.62,1],\"irradiance\":[0.3,1.1,2.7]},\"warm\":{\"crystal\":[1,0.34,0.19],\"irradiance\":[3,0.5,0.2]}}},{\"key\":\"violet\",\"name\":\"The Violet Court\",\"sun\":{\"direction\":[0.5,0.7,1.1],\"color\":[0.36,0.46,0.75]},\"ethereal\":true,\"ambient\":[0.09,0.11,0.26],\"id\":\"scene:violet\",\"entities\":[{\"id\":\"violet:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"asset\":\"asset:violet:courtyard-foundation\",\"tag\":null,\"locked\":true,\"position\":[0,0,-0.25],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:central-inlay\",\"name\":\"Central inlay\",\"asset\":\"asset:violet:central-inlay\",\"tag\":null,\"locked\":true,\"position\":[0,-5,0.015],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-brass-inlay\",\"name\":\"West brass inlay\",\"asset\":\"asset:violet:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[-3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-brass-inlay\",\"name\":\"East brass inlay\",\"asset\":\"asset:violet:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:colonnade\",\"name\":\"Colonnade\",\"asset\":\"asset:violet:colonnade\",\"tag\":null,\"locked\":false,\"position\":[0,11,0],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-gallery\",\"name\":\"West gallery\",\"asset\":\"asset:violet:west-gallery\",\"tag\":null,\"locked\":false,\"position\":[-20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-entry-planter\",\"name\":\"West entry planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-court-planter\",\"name\":\"West court planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-entry-lantern\",\"name\":\"West entry lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-promenade-lantern\",\"name\":\"West promenade lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-gallery-lantern\",\"name\":\"West gallery lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-gallery\",\"name\":\"East gallery\",\"asset\":\"asset:violet:east-gallery\",\"tag\":null,\"locked\":false,\"position\":[20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-entry-planter\",\"name\":\"East entry planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-court-planter\",\"name\":\"East court planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-entry-lantern\",\"name\":\"East entry lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-promenade-lantern\",\"name\":\"East promenade lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-gallery-lantern\",\"name\":\"East gallery lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:crystal-lantern\",\"name\":\"Crystal lantern\",\"asset\":\"asset:violet:crystal-lantern\",\"tag\":\"lantern\",\"locked\":false,\"position\":[0,2,0.65],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:movable-plinth\",\"name\":\"Movable plinth\",\"asset\":\"asset:violet:movable-plinth\",\"tag\":\"prop\",\"locked\":false,\"position\":[6,-12,0.65],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:west-prism\",\"name\":\"West prism\",\"asset\":\"asset:violet:prism\",\"tag\":null,\"locked\":false,\"position\":[-7,-3,2.5],\"rotation\":[0,0,0,1],\"scale\":1},{\"id\":\"violet:east-prism\",\"name\":\"East prism\",\"asset\":\"asset:violet:prism\",\"tag\":null,\"locked\":false,\"position\":[7,-3,2.5],\"rotation\":[0,0,0,1],\"scale\":1}],\"lights\":[{\"id\":\"light:0\",\"position\":[0,7,5],\"radius\":16,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:1\",\"position\":[-15,-4,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:2\",\"position\":[15,-4,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:3\",\"position\":[-15,9,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:4\",\"position\":[15,9,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:5\",\"position\":[0,2,3],\"radius\":10,\"color\":[0.3,1.1,2.7]},{\"id\":\"light:6\",\"position\":[-15,-18,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:7\",\"position\":[15,-18,4],\"radius\":12,\"color\":[0.35,0.9,2.5]}],\"lightVariants\":{\"cool\":{\"crystal\":[0.25,0.62,1],\"irradiance\":[0.3,1.1,2.7]},\"warm\":{\"crystal\":[1,0.34,0.19],\"irradiance\":[3,0.5,0.2]}}}],\"assets\":[{\"id\":\"asset:amber:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[58,68,0.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:1\"}}],\"colliders\":[]},{\"id\":\"asset:amber:central-inlay\",\"name\":\"Central inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[7,38,0.025],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:2\"}}],\"colliders\":[]},{\"id\":\"asset:amber:brass-inlay\",\"name\":\"Brass inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.05,38,0.035],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:3\"}}],\"colliders\":[]},{\"id\":\"asset:amber:colonnade\",\"name\":\"Colonnade\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":null},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.2],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[26,11,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,4.2,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.6,7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,7],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[25,10,0.6],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,-4.5,6.4],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.12,0.09],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:5\"}},{\"id\":\"part:5\",\"parent\":0,\"position\":[0,-4.5,6.1],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.16,0.1],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:6\",\"parent\":0,\"position\":[-12,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:7\",\"parent\":0,\"position\":[-12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:8\",\"parent\":0,\"position\":[-12,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:9\",\"parent\":0,\"position\":[-6,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:10\",\"parent\":0,\"position\":[-6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:11\",\"parent\":0,\"position\":[-6,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:12\",\"parent\":0,\"position\":[6,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:13\",\"parent\":0,\"position\":[6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:14\",\"parent\":0,\"position\":[6,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:15\",\"parent\":0,\"position\":[12,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:16\",\"parent\":0,\"position\":[12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:17\",\"parent\":0,\"position\":[12,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:18\",\"parent\":0,\"position\":[-9,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:19\",\"parent\":0,\"position\":[-9,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:20\",\"parent\":0,\"position\":[-6,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:21\",\"parent\":0,\"position\":[-6,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:22\",\"parent\":0,\"position\":[-3,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:23\",\"parent\":0,\"position\":[-3,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:24\",\"parent\":0,\"position\":[0,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:25\",\"parent\":0,\"position\":[0,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:26\",\"parent\":0,\"position\":[3,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:27\",\"parent\":0,\"position\":[3,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:28\",\"parent\":0,\"position\":[6,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:29\",\"parent\":0,\"position\":[6,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:30\",\"parent\":0,\"position\":[9,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:31\",\"parent\":0,\"position\":[9,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}}],\"colliders\":[{\"x\":0,\"y\":4.199999999999999,\"width\":24,\"depth\":0.7},{\"x\":-12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":-6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6}]},{\"id\":\"asset:amber:west-gallery\",\"name\":\"West gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:8\"}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:9\"}},{\"id\":\"part:2\",\"parent\":null,\"position\":[1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:3\",\"parent\":null,\"position\":[1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}},{\"id\":\"part:4\",\"parent\":null,\"position\":[1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:5\",\"parent\":null,\"position\":[1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}},{\"id\":\"part:6\",\"parent\":null,\"position\":[1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:7\",\"parent\":null,\"position\":[1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}},{\"id\":\"part:8\",\"parent\":null,\"position\":[1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:9\",\"parent\":null,\"position\":[1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}},{\"id\":\"part:10\",\"parent\":null,\"position\":[1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:11\",\"parent\":null,\"position\":[1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}},{\"id\":\"part:12\",\"parent\":null,\"position\":[1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:13\",\"parent\":null,\"position\":[1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}},{\"id\":\"part:14\",\"parent\":null,\"position\":[1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:15\",\"parent\":null,\"position\":[1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:amber:planter\",\"name\":\"Planter\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,2.4,1.1],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:12\"}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.8499999999999999],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.2,2.2,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:13\"}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,0,1.4999999999999998],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.8000000000000003,1.8000000000000003,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:13\"}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,2.1500000000000004],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.4000000000000001,1.4000000000000001,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:13\"}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,0,2.8],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1,1,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:13\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.4,\"depth\":2.4}]},{\"id\":\"asset:amber:lantern\",\"name\":\"Lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.18,0.18,3.6],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:14\"}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,1.9000000000000001],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.6,0.6,0.8],\"ambientBlocker\":true,\"castShadow\":false,\"material\":\"material:15\"}},{\"id\":\"part:2\",\"parent\":null,\"position\":[0,0,2.3500000000000005],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.12],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:14\"}}],\"colliders\":[]},{\"id\":\"asset:amber:east-gallery\",\"name\":\"East gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:16\"}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:17\"}},{\"id\":\"part:2\",\"parent\":null,\"position\":[-1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:3\",\"parent\":null,\"position\":[-1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}},{\"id\":\"part:4\",\"parent\":null,\"position\":[-1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:5\",\"parent\":null,\"position\":[-1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}},{\"id\":\"part:6\",\"parent\":null,\"position\":[-1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:7\",\"parent\":null,\"position\":[-1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}},{\"id\":\"part:8\",\"parent\":null,\"position\":[-1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:9\",\"parent\":null,\"position\":[-1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}},{\"id\":\"part:10\",\"parent\":null,\"position\":[-1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:11\",\"parent\":null,\"position\":[-1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}},{\"id\":\"part:12\",\"parent\":null,\"position\":[-1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:13\",\"parent\":null,\"position\":[-1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}},{\"id\":\"part:14\",\"parent\":null,\"position\":[-1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:15\",\"parent\":null,\"position\":[-1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:amber:crystal-lantern\",\"name\":\"Crystal lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.9,1.9,1.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:20\"}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.85],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.1,2.1,0.22],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:21\"}},{\"id\":\"crystal\",\"parent\":0,\"position\":[0,0,1.75],\"rotation\":[0,0,0.3826834323650898,0.9238795325112867],\"shape\":{\"size\":[0.7,0.7,1.4],\"ambientBlocker\":true,\"castShadow\":false,\"material\":\"material:22\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.1,\"depth\":2.1}]},{\"id\":\"asset:amber:movable-plinth\",\"name\":\"Movable plinth\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,2,1.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:23\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":2}]},{\"id\":\"asset:violet:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[58,68,0.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:24\"}}],\"colliders\":[]},{\"id\":\"asset:violet:central-inlay\",\"name\":\"Central inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[7,38,0.025],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:25\"}}],\"colliders\":[]},{\"id\":\"asset:violet:brass-inlay\",\"name\":\"Brass inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.05,38,0.035],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:26\"}}],\"colliders\":[]},{\"id\":\"asset:violet:colonnade\",\"name\":\"Colonnade\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":null},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.2],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[26,11,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,4.2,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.6,8.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,8.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[25,10,0.6],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,-4.5,7.9],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.12,0.09],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:28\"}},{\"id\":\"part:5\",\"parent\":0,\"position\":[0,-4.5,7.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.16,0.1],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:6\",\"parent\":0,\"position\":[-12,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:7\",\"parent\":0,\"position\":[-12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:8\",\"parent\":0,\"position\":[-12,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:9\",\"parent\":0,\"position\":[-6,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:10\",\"parent\":0,\"position\":[-6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:11\",\"parent\":0,\"position\":[-6,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:12\",\"parent\":0,\"position\":[6,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:13\",\"parent\":0,\"position\":[6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:14\",\"parent\":0,\"position\":[6,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:15\",\"parent\":0,\"position\":[12,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:16\",\"parent\":0,\"position\":[12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:17\",\"parent\":0,\"position\":[12,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:18\",\"parent\":0,\"position\":[-9,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:19\",\"parent\":0,\"position\":[-9,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:20\",\"parent\":0,\"position\":[-6,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:21\",\"parent\":0,\"position\":[-6,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:22\",\"parent\":0,\"position\":[-3,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:23\",\"parent\":0,\"position\":[-3,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:24\",\"parent\":0,\"position\":[0,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:25\",\"parent\":0,\"position\":[0,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:26\",\"parent\":0,\"position\":[3,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:27\",\"parent\":0,\"position\":[3,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:28\",\"parent\":0,\"position\":[6,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:29\",\"parent\":0,\"position\":[6,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:30\",\"parent\":0,\"position\":[9,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:31\",\"parent\":0,\"position\":[9,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}}],\"colliders\":[{\"x\":0,\"y\":4.199999999999999,\"width\":24,\"depth\":0.7},{\"x\":-12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":-6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6}]},{\"id\":\"asset:violet:west-gallery\",\"name\":\"West gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:31\"}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:32\"}},{\"id\":\"part:2\",\"parent\":null,\"position\":[1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:3\",\"parent\":null,\"position\":[1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}},{\"id\":\"part:4\",\"parent\":null,\"position\":[1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:5\",\"parent\":null,\"position\":[1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}},{\"id\":\"part:6\",\"parent\":null,\"position\":[1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:7\",\"parent\":null,\"position\":[1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}},{\"id\":\"part:8\",\"parent\":null,\"position\":[1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:9\",\"parent\":null,\"position\":[1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}},{\"id\":\"part:10\",\"parent\":null,\"position\":[1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:11\",\"parent\":null,\"position\":[1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}},{\"id\":\"part:12\",\"parent\":null,\"position\":[1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:13\",\"parent\":null,\"position\":[1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}},{\"id\":\"part:14\",\"parent\":null,\"position\":[1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:15\",\"parent\":null,\"position\":[1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:violet:planter\",\"name\":\"Planter\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,2.4,1.1],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:35\"}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.8499999999999999],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.2,2.2,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:36\"}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,0,1.4999999999999998],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.8000000000000003,1.8000000000000003,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:36\"}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,2.1500000000000004],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.4000000000000001,1.4000000000000001,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:36\"}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,0,2.8],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1,1,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:36\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.4,\"depth\":2.4}]},{\"id\":\"asset:violet:lantern\",\"name\":\"Lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.18,0.18,3.6],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:37\"}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,1.9000000000000001],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.6,0.6,0.8],\"ambientBlocker\":true,\"castShadow\":false,\"material\":\"material:38\"}},{\"id\":\"part:2\",\"parent\":null,\"position\":[0,0,2.3500000000000005],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.12],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:37\"}}],\"colliders\":[]},{\"id\":\"asset:violet:east-gallery\",\"name\":\"East gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:39\"}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:40\"}},{\"id\":\"part:2\",\"parent\":null,\"position\":[-1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:3\",\"parent\":null,\"position\":[-1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}},{\"id\":\"part:4\",\"parent\":null,\"position\":[-1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:5\",\"parent\":null,\"position\":[-1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}},{\"id\":\"part:6\",\"parent\":null,\"position\":[-1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:7\",\"parent\":null,\"position\":[-1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}},{\"id\":\"part:8\",\"parent\":null,\"position\":[-1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:9\",\"parent\":null,\"position\":[-1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}},{\"id\":\"part:10\",\"parent\":null,\"position\":[-1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:11\",\"parent\":null,\"position\":[-1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}},{\"id\":\"part:12\",\"parent\":null,\"position\":[-1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:13\",\"parent\":null,\"position\":[-1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}},{\"id\":\"part:14\",\"parent\":null,\"position\":[-1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:15\",\"parent\":null,\"position\":[-1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:violet:crystal-lantern\",\"name\":\"Crystal lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.9,1.9,1.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:43\"}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.85],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.1,2.1,0.22],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:44\"}},{\"id\":\"crystal\",\"parent\":0,\"position\":[0,0,1.75],\"rotation\":[0,0,0.3826834323650898,0.9238795325112867],\"shape\":{\"size\":[0.7,0.7,1.4],\"ambientBlocker\":true,\"castShadow\":false,\"material\":\"material:45\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.1,\"depth\":2.1}]},{\"id\":\"asset:violet:movable-plinth\",\"name\":\"Movable plinth\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,2,1.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:46\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":2}]},{\"id\":\"asset:violet:prism\",\"name\":\"Prism\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0.3826834323650898,0.9238795325112867],\"shape\":{\"size\":[0.7,0.7,3.8],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:47\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":1,\"depth\":1}]}],\"materials\":[{\"id\":\"material:1\",\"name\":\"Courtyard foundation · 1\",\"baseColor\":[0.14,0.115,0.14],\"emissionColor\":[0.14,0.115,0.14],\"emissionStrength\":0},{\"id\":\"material:2\",\"name\":\"Central inlay · 1\",\"baseColor\":[0.22,0.2,0.25],\"emissionColor\":[0.22,0.2,0.25],\"emissionStrength\":0},{\"id\":\"material:3\",\"name\":\"Brass inlay · 1\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:4\",\"name\":\"Colonnade · 1\",\"baseColor\":[0.24,0.18,0.2],\"emissionColor\":[0.24,0.18,0.2],\"emissionStrength\":0},{\"id\":\"material:5\",\"name\":\"Colonnade · 2\",\"baseColor\":[1,0.47,0.17],\"emissionColor\":[1,0.47,0.17],\"emissionStrength\":2.5},{\"id\":\"material:6\",\"name\":\"Colonnade · 3\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:7\",\"name\":\"Colonnade · 4\",\"baseColor\":[0.35,0.19,0.16],\"emissionColor\":[0.35,0.19,0.16],\"emissionStrength\":0.3},{\"id\":\"material:8\",\"name\":\"West gallery · 1\",\"baseColor\":[0.24,0.18,0.2],\"emissionColor\":[0.24,0.18,0.2],\"emissionStrength\":0},{\"id\":\"material:9\",\"name\":\"West gallery · 2\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:10\",\"name\":\"West gallery · 3\",\"baseColor\":[0.38,0.15,0.16],\"emissionColor\":[0.38,0.15,0.16],\"emissionStrength\":0.55},{\"id\":\"material:11\",\"name\":\"West gallery · 4\",\"baseColor\":[1,0.47,0.17],\"emissionColor\":[1,0.47,0.17],\"emissionStrength\":2},{\"id\":\"material:12\",\"name\":\"Planter · 1\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:13\",\"name\":\"Planter · 2\",\"baseColor\":[0.045,0.14,0.1],\"emissionColor\":[0.045,0.14,0.1],\"emissionStrength\":0},{\"id\":\"material:14\",\"name\":\"Lantern · 1\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:15\",\"name\":\"Lantern · 2\",\"baseColor\":[1,0.47,0.17],\"emissionColor\":[1,0.47,0.17],\"emissionStrength\":3},{\"id\":\"material:16\",\"name\":\"East gallery · 1\",\"baseColor\":[0.24,0.18,0.2],\"emissionColor\":[0.24,0.18,0.2],\"emissionStrength\":0},{\"id\":\"material:17\",\"name\":\"East gallery · 2\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:18\",\"name\":\"East gallery · 3\",\"baseColor\":[0.38,0.15,0.16],\"emissionColor\":[0.38,0.15,0.16],\"emissionStrength\":0.55},{\"id\":\"material:19\",\"name\":\"East gallery · 4\",\"baseColor\":[1,0.47,0.17],\"emissionColor\":[1,0.47,0.17],\"emissionStrength\":2},{\"id\":\"material:20\",\"name\":\"Crystal lantern · 1\",\"baseColor\":[0.24,0.18,0.2],\"emissionColor\":[0.24,0.18,0.2],\"emissionStrength\":0},{\"id\":\"material:21\",\"name\":\"Crystal lantern · 2\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:22\",\"name\":\"Crystal lantern · 3\",\"baseColor\":[0.25,0.62,1],\"emissionColor\":[0.25,0.62,1],\"emissionStrength\":2},{\"id\":\"material:23\",\"name\":\"Movable plinth · 1\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:24\",\"name\":\"Courtyard foundation · 1\",\"baseColor\":[0.075,0.09,0.18],\"emissionColor\":[0.075,0.09,0.18],\"emissionStrength\":0},{\"id\":\"material:25\",\"name\":\"Central inlay · 1\",\"baseColor\":[0.22,0.2,0.25],\"emissionColor\":[0.22,0.2,0.25],\"emissionStrength\":0},{\"id\":\"material:26\",\"name\":\"Brass inlay · 1\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:27\",\"name\":\"Colonnade · 1\",\"baseColor\":[0.14,0.16,0.31],\"emissionColor\":[0.14,0.16,0.31],\"emissionStrength\":0},{\"id\":\"material:28\",\"name\":\"Colonnade · 2\",\"baseColor\":[0.24,0.58,1],\"emissionColor\":[0.24,0.58,1],\"emissionStrength\":2.5},{\"id\":\"material:29\",\"name\":\"Colonnade · 3\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:30\",\"name\":\"Colonnade · 4\",\"baseColor\":[0.35,0.19,0.16],\"emissionColor\":[0.35,0.19,0.16],\"emissionStrength\":0.3},{\"id\":\"material:31\",\"name\":\"West gallery · 1\",\"baseColor\":[0.14,0.16,0.31],\"emissionColor\":[0.14,0.16,0.31],\"emissionStrength\":0},{\"id\":\"material:32\",\"name\":\"West gallery · 2\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:33\",\"name\":\"West gallery · 3\",\"baseColor\":[0.15,0.19,0.46],\"emissionColor\":[0.15,0.19,0.46],\"emissionStrength\":0.55},{\"id\":\"material:34\",\"name\":\"West gallery · 4\",\"baseColor\":[0.24,0.58,1],\"emissionColor\":[0.24,0.58,1],\"emissionStrength\":2},{\"id\":\"material:35\",\"name\":\"Planter · 1\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:36\",\"name\":\"Planter · 2\",\"baseColor\":[0.1,0.2,0.27],\"emissionColor\":[0.1,0.2,0.27],\"emissionStrength\":0},{\"id\":\"material:37\",\"name\":\"Lantern · 1\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:38\",\"name\":\"Lantern · 2\",\"baseColor\":[0.24,0.58,1],\"emissionColor\":[0.24,0.58,1],\"emissionStrength\":3},{\"id\":\"material:39\",\"name\":\"East gallery · 1\",\"baseColor\":[0.14,0.16,0.31],\"emissionColor\":[0.14,0.16,0.31],\"emissionStrength\":0},{\"id\":\"material:40\",\"name\":\"East gallery · 2\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:41\",\"name\":\"East gallery · 3\",\"baseColor\":[0.15,0.19,0.46],\"emissionColor\":[0.15,0.19,0.46],\"emissionStrength\":0.55},{\"id\":\"material:42\",\"name\":\"East gallery · 4\",\"baseColor\":[0.24,0.58,1],\"emissionColor\":[0.24,0.58,1],\"emissionStrength\":2},{\"id\":\"material:43\",\"name\":\"Crystal lantern · 1\",\"baseColor\":[0.14,0.16,0.31],\"emissionColor\":[0.14,0.16,0.31],\"emissionStrength\":0},{\"id\":\"material:44\",\"name\":\"Crystal lantern · 2\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:45\",\"name\":\"Crystal lantern · 3\",\"baseColor\":[0.25,0.62,1],\"emissionColor\":[0.25,0.62,1],\"emissionStrength\":2},{\"id\":\"material:46\",\"name\":\"Movable plinth · 1\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:47\",\"name\":\"Prism · 1\",\"baseColor\":[0.22,0.5,0.67],\"emissionColor\":[0.22,0.5,0.67],\"emissionStrength\":0.5}]}");
+const data=JSON.parse("{\"schemaVersion\":3,\"id\":\"project:atrium\",\"name\":\"Between Worlds\",\"scenes\":[{\"key\":\"amber\",\"name\":\"The Amber Atrium\",\"sun\":{\"direction\":[-0.5,0.8,1.2],\"color\":[0.58,0.49,0.62]},\"ethereal\":false,\"ambient\":[0.15,0.11,0.15],\"id\":\"scene:amber\",\"entities\":[{\"id\":\"amber:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"asset\":\"asset:amber:courtyard-foundation\",\"tag\":null,\"locked\":true,\"position\":[0,0,-0.25],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:central-inlay\",\"name\":\"Central inlay\",\"asset\":\"asset:amber:central-inlay\",\"tag\":null,\"locked\":true,\"position\":[0,-5,0.015],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:west-brass-inlay\",\"name\":\"West brass inlay\",\"asset\":\"asset:amber:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[-3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:east-brass-inlay\",\"name\":\"East brass inlay\",\"asset\":\"asset:amber:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:colonnade\",\"name\":\"Colonnade\",\"asset\":\"asset:amber:colonnade\",\"tag\":null,\"locked\":false,\"position\":[0,11,0],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:west-gallery\",\"name\":\"West gallery\",\"asset\":\"asset:amber:west-gallery\",\"tag\":null,\"locked\":false,\"position\":[-20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:west-entry-planter\",\"name\":\"West entry planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:west-court-planter\",\"name\":\"West court planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:west-entry-lantern\",\"name\":\"West entry lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:west-promenade-lantern\",\"name\":\"West promenade lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:west-gallery-lantern\",\"name\":\"West gallery lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:east-gallery\",\"name\":\"East gallery\",\"asset\":\"asset:amber:east-gallery\",\"tag\":null,\"locked\":false,\"position\":[20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:east-entry-planter\",\"name\":\"East entry planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:east-court-planter\",\"name\":\"East court planter\",\"asset\":\"asset:amber:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:east-entry-lantern\",\"name\":\"East entry lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:east-promenade-lantern\",\"name\":\"East promenade lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:east-gallery-lantern\",\"name\":\"East gallery lantern\",\"asset\":\"asset:amber:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:crystal-lantern\",\"name\":\"Crystal lantern\",\"asset\":\"asset:amber:crystal-lantern\",\"tag\":\"lantern\",\"locked\":false,\"position\":[0,2,0.65],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"amber:movable-plinth\",\"name\":\"Movable plinth\",\"asset\":\"asset:amber:movable-plinth\",\"tag\":\"prop\",\"locked\":false,\"position\":[6,-12,0.65],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null}],\"lights\":[{\"id\":\"light:0\",\"position\":[0,7,5],\"radius\":16,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:1\",\"position\":[-15,-4,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:2\",\"position\":[15,-4,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:3\",\"position\":[-15,9,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:4\",\"position\":[15,9,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:5\",\"position\":[0,2,3],\"radius\":10,\"color\":[0.3,1.1,2.7]},{\"id\":\"light:6\",\"position\":[-15,-18,4],\"radius\":12,\"color\":[2.4,0.85,0.3]},{\"id\":\"light:7\",\"position\":[15,-18,4],\"radius\":12,\"color\":[2.4,0.85,0.3]}],\"lightVariants\":{\"cool\":{\"crystal\":[0.25,0.62,1],\"irradiance\":[0.3,1.1,2.7]},\"warm\":{\"crystal\":[1,0.34,0.19],\"irradiance\":[3,0.5,0.2]}}},{\"key\":\"violet\",\"name\":\"The Violet Court\",\"sun\":{\"direction\":[0.5,0.7,1.1],\"color\":[0.36,0.46,0.75]},\"ethereal\":true,\"ambient\":[0.09,0.11,0.26],\"id\":\"scene:violet\",\"entities\":[{\"id\":\"violet:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"asset\":\"asset:violet:courtyard-foundation\",\"tag\":null,\"locked\":true,\"position\":[0,0,-0.25],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:central-inlay\",\"name\":\"Central inlay\",\"asset\":\"asset:violet:central-inlay\",\"tag\":null,\"locked\":true,\"position\":[0,-5,0.015],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:west-brass-inlay\",\"name\":\"West brass inlay\",\"asset\":\"asset:violet:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[-3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:east-brass-inlay\",\"name\":\"East brass inlay\",\"asset\":\"asset:violet:brass-inlay\",\"tag\":null,\"locked\":true,\"position\":[3.6,-5,0.035],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:colonnade\",\"name\":\"Colonnade\",\"asset\":\"asset:violet:colonnade\",\"tag\":null,\"locked\":false,\"position\":[0,11,0],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:west-gallery\",\"name\":\"West gallery\",\"asset\":\"asset:violet:west-gallery\",\"tag\":null,\"locked\":false,\"position\":[-20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:west-entry-planter\",\"name\":\"West entry planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:west-court-planter\",\"name\":\"West court planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[-10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:west-entry-lantern\",\"name\":\"West entry lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:west-promenade-lantern\",\"name\":\"West promenade lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:west-gallery-lantern\",\"name\":\"West gallery lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[-15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:east-gallery\",\"name\":\"East gallery\",\"asset\":\"asset:violet:east-gallery\",\"tag\":null,\"locked\":false,\"position\":[20,3,2.1],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:east-entry-planter\",\"name\":\"East entry planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,-12,0.55],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:east-court-planter\",\"name\":\"East court planter\",\"asset\":\"asset:violet:planter\",\"tag\":\"planter\",\"locked\":false,\"position\":[10,1,0.55],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:east-entry-lantern\",\"name\":\"East entry lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-18,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:east-promenade-lantern\",\"name\":\"East promenade lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,-4,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:east-gallery-lantern\",\"name\":\"East gallery lantern\",\"asset\":\"asset:violet:lantern\",\"tag\":null,\"locked\":false,\"position\":[15,9,1.8],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:crystal-lantern\",\"name\":\"Crystal lantern\",\"asset\":\"asset:violet:crystal-lantern\",\"tag\":\"lantern\",\"locked\":false,\"position\":[0,2,0.65],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:movable-plinth\",\"name\":\"Movable plinth\",\"asset\":\"asset:violet:movable-plinth\",\"tag\":\"prop\",\"locked\":false,\"position\":[6,-12,0.65],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:west-prism\",\"name\":\"West prism\",\"asset\":\"asset:violet:prism\",\"tag\":null,\"locked\":false,\"position\":[-7,-3,2.5],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null},{\"id\":\"violet:east-prism\",\"name\":\"East prism\",\"asset\":\"asset:violet:prism\",\"tag\":null,\"locked\":false,\"position\":[7,-3,2.5],\"rotation\":[0,0,0,1],\"scale\":1,\"parent\":null}],\"lights\":[{\"id\":\"light:0\",\"position\":[0,7,5],\"radius\":16,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:1\",\"position\":[-15,-4,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:2\",\"position\":[15,-4,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:3\",\"position\":[-15,9,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:4\",\"position\":[15,9,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:5\",\"position\":[0,2,3],\"radius\":10,\"color\":[0.3,1.1,2.7]},{\"id\":\"light:6\",\"position\":[-15,-18,4],\"radius\":12,\"color\":[0.35,0.9,2.5]},{\"id\":\"light:7\",\"position\":[15,-18,4],\"radius\":12,\"color\":[0.35,0.9,2.5]}],\"lightVariants\":{\"cool\":{\"crystal\":[0.25,0.62,1],\"irradiance\":[0.3,1.1,2.7]},\"warm\":{\"crystal\":[1,0.34,0.19],\"irradiance\":[3,0.5,0.2]}}}],\"assets\":[{\"id\":\"asset:amber:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[58,68,0.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:1\"}}],\"colliders\":[]},{\"id\":\"asset:amber:central-inlay\",\"name\":\"Central inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[7,38,0.025],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:2\"}}],\"colliders\":[]},{\"id\":\"asset:amber:brass-inlay\",\"name\":\"Brass inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.05,38,0.035],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:3\"}}],\"colliders\":[]},{\"id\":\"asset:amber:colonnade\",\"name\":\"Colonnade\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":null},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.2],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[26,11,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,4.2,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.6,7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,7],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[25,10,0.6],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,-4.5,6.4],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.12,0.09],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:5\"}},{\"id\":\"part:5\",\"parent\":0,\"position\":[0,-4.5,6.1],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.16,0.1],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:6\",\"parent\":0,\"position\":[-12,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:7\",\"parent\":0,\"position\":[-12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:8\",\"parent\":0,\"position\":[-12,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:9\",\"parent\":0,\"position\":[-6,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:10\",\"parent\":0,\"position\":[-6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:11\",\"parent\":0,\"position\":[-6,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:12\",\"parent\":0,\"position\":[6,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:13\",\"parent\":0,\"position\":[6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:14\",\"parent\":0,\"position\":[6,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:15\",\"parent\":0,\"position\":[12,-4.5,3.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:4\"}},{\"id\":\"part:16\",\"parent\":0,\"position\":[12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:17\",\"parent\":0,\"position\":[12,-4.5,6.65],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:18\",\"parent\":0,\"position\":[-9,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:19\",\"parent\":0,\"position\":[-9,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:20\",\"parent\":0,\"position\":[-6,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:21\",\"parent\":0,\"position\":[-6,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:22\",\"parent\":0,\"position\":[-3,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:23\",\"parent\":0,\"position\":[-3,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:24\",\"parent\":0,\"position\":[0,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:25\",\"parent\":0,\"position\":[0,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:26\",\"parent\":0,\"position\":[3,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:27\",\"parent\":0,\"position\":[3,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:28\",\"parent\":0,\"position\":[6,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:29\",\"parent\":0,\"position\":[6,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}},{\"id\":\"part:30\",\"parent\":0,\"position\":[9,3.85,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:7\"}},{\"id\":\"part:31\",\"parent\":0,\"position\":[9,3.7800000000000002,3.64],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,4.55],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:6\"}}],\"colliders\":[{\"x\":0,\"y\":4.199999999999999,\"width\":24,\"depth\":0.7},{\"x\":-12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":-6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6}]},{\"id\":\"asset:amber:west-gallery\",\"name\":\"West gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:8\"}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:9\"}},{\"id\":\"part:2\",\"parent\":null,\"position\":[1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:3\",\"parent\":null,\"position\":[1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}},{\"id\":\"part:4\",\"parent\":null,\"position\":[1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:5\",\"parent\":null,\"position\":[1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}},{\"id\":\"part:6\",\"parent\":null,\"position\":[1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:7\",\"parent\":null,\"position\":[1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}},{\"id\":\"part:8\",\"parent\":null,\"position\":[1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:9\",\"parent\":null,\"position\":[1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}},{\"id\":\"part:10\",\"parent\":null,\"position\":[1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:11\",\"parent\":null,\"position\":[1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}},{\"id\":\"part:12\",\"parent\":null,\"position\":[1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:13\",\"parent\":null,\"position\":[1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}},{\"id\":\"part:14\",\"parent\":null,\"position\":[1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:10\"}},{\"id\":\"part:15\",\"parent\":null,\"position\":[1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:11\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:amber:planter\",\"name\":\"Planter\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,2.4,1.1],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:12\"}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.8499999999999999],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.2,2.2,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:13\"}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,0,1.4999999999999998],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.8000000000000003,1.8000000000000003,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:13\"}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,2.1500000000000004],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.4000000000000001,1.4000000000000001,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:13\"}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,0,2.8],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1,1,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:13\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.4,\"depth\":2.4}]},{\"id\":\"asset:amber:lantern\",\"name\":\"Lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.18,0.18,3.6],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:14\"}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,1.9000000000000001],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.6,0.6,0.8],\"ambientBlocker\":true,\"castShadow\":false,\"material\":\"material:15\"}},{\"id\":\"part:2\",\"parent\":null,\"position\":[0,0,2.3500000000000005],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.12],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:14\"}}],\"colliders\":[]},{\"id\":\"asset:amber:east-gallery\",\"name\":\"East gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:16\"}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:17\"}},{\"id\":\"part:2\",\"parent\":null,\"position\":[-1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:3\",\"parent\":null,\"position\":[-1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}},{\"id\":\"part:4\",\"parent\":null,\"position\":[-1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:5\",\"parent\":null,\"position\":[-1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}},{\"id\":\"part:6\",\"parent\":null,\"position\":[-1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:7\",\"parent\":null,\"position\":[-1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}},{\"id\":\"part:8\",\"parent\":null,\"position\":[-1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:9\",\"parent\":null,\"position\":[-1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}},{\"id\":\"part:10\",\"parent\":null,\"position\":[-1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:11\",\"parent\":null,\"position\":[-1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}},{\"id\":\"part:12\",\"parent\":null,\"position\":[-1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:13\",\"parent\":null,\"position\":[-1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}},{\"id\":\"part:14\",\"parent\":null,\"position\":[-1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:18\"}},{\"id\":\"part:15\",\"parent\":null,\"position\":[-1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:19\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:amber:crystal-lantern\",\"name\":\"Crystal lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.9,1.9,1.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:20\"}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.85],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.1,2.1,0.22],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:21\"}},{\"id\":\"crystal\",\"parent\":0,\"position\":[0,0,1.75],\"rotation\":[0,0,0.3826834323650898,0.9238795325112867],\"shape\":{\"size\":[0.7,0.7,1.4],\"ambientBlocker\":true,\"castShadow\":false,\"material\":\"material:22\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.1,\"depth\":2.1}]},{\"id\":\"asset:amber:movable-plinth\",\"name\":\"Movable plinth\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,2,1.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:23\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":2}]},{\"id\":\"asset:violet:courtyard-foundation\",\"name\":\"Courtyard foundation\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[58,68,0.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:24\"}}],\"colliders\":[]},{\"id\":\"asset:violet:central-inlay\",\"name\":\"Central inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[7,38,0.025],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:25\"}}],\"colliders\":[]},{\"id\":\"asset:violet:brass-inlay\",\"name\":\"Brass inlay\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.05,38,0.035],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:26\"}}],\"colliders\":[]},{\"id\":\"asset:violet:colonnade\",\"name\":\"Colonnade\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":null},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.2],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[26,11,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,4.2,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.6,8.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,8.5],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[25,10,0.6],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,-4.5,7.9],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.12,0.09],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:28\"}},{\"id\":\"part:5\",\"parent\":0,\"position\":[0,-4.5,7.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[24,0.16,0.1],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:6\",\"parent\":0,\"position\":[-12,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:7\",\"parent\":0,\"position\":[-12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:8\",\"parent\":0,\"position\":[-12,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:9\",\"parent\":0,\"position\":[-6,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:10\",\"parent\":0,\"position\":[-6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:11\",\"parent\":0,\"position\":[-6,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:12\",\"parent\":0,\"position\":[6,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:13\",\"parent\":0,\"position\":[6,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:14\",\"parent\":0,\"position\":[6,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:15\",\"parent\":0,\"position\":[12,-4.5,4.25],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.5,0.5,8.5],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:27\"}},{\"id\":\"part:16\",\"parent\":0,\"position\":[12,-4.5,0.45],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.4],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:17\",\"parent\":0,\"position\":[12,-4.5,8.15],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.8,0.8,0.25],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:18\",\"parent\":0,\"position\":[-9,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:19\",\"parent\":0,\"position\":[-9,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:20\",\"parent\":0,\"position\":[-6,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:21\",\"parent\":0,\"position\":[-6,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:22\",\"parent\":0,\"position\":[-3,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:23\",\"parent\":0,\"position\":[-3,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:24\",\"parent\":0,\"position\":[0,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:25\",\"parent\":0,\"position\":[0,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:26\",\"parent\":0,\"position\":[3,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:27\",\"parent\":0,\"position\":[3,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:28\",\"parent\":0,\"position\":[6,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:29\",\"parent\":0,\"position\":[6,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}},{\"id\":\"part:30\",\"parent\":0,\"position\":[9,3.85,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,0.08,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:30\"}},{\"id\":\"part:31\",\"parent\":0,\"position\":[9,3.7800000000000002,4.42],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.055,0.05,5.525],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:29\"}}],\"colliders\":[{\"x\":0,\"y\":4.199999999999999,\"width\":24,\"depth\":0.7},{\"x\":-12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":-6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":6,\"y\":-4.5,\"width\":0.6,\"depth\":0.6},{\"x\":12,\"y\":-4.5,\"width\":0.6,\"depth\":0.6}]},{\"id\":\"asset:violet:west-gallery\",\"name\":\"West gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:31\"}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:32\"}},{\"id\":\"part:2\",\"parent\":null,\"position\":[1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:3\",\"parent\":null,\"position\":[1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}},{\"id\":\"part:4\",\"parent\":null,\"position\":[1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:5\",\"parent\":null,\"position\":[1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}},{\"id\":\"part:6\",\"parent\":null,\"position\":[1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:7\",\"parent\":null,\"position\":[1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}},{\"id\":\"part:8\",\"parent\":null,\"position\":[1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:9\",\"parent\":null,\"position\":[1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}},{\"id\":\"part:10\",\"parent\":null,\"position\":[1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:11\",\"parent\":null,\"position\":[1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}},{\"id\":\"part:12\",\"parent\":null,\"position\":[1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:13\",\"parent\":null,\"position\":[1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}},{\"id\":\"part:14\",\"parent\":null,\"position\":[1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:33\"}},{\"id\":\"part:15\",\"parent\":null,\"position\":[1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:34\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:violet:planter\",\"name\":\"Planter\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,2.4,1.1],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:35\"}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.8499999999999999],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.2,2.2,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:36\"}},{\"id\":\"part:2\",\"parent\":0,\"position\":[0,0,1.4999999999999998],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.8000000000000003,1.8000000000000003,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:36\"}},{\"id\":\"part:3\",\"parent\":0,\"position\":[0,0,2.1500000000000004],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.4000000000000001,1.4000000000000001,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:36\"}},{\"id\":\"part:4\",\"parent\":0,\"position\":[0,0,2.8],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1,1,0.9],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:36\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.4,\"depth\":2.4}]},{\"id\":\"asset:violet:lantern\",\"name\":\"Lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.18,0.18,3.6],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:37\"}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,1.9000000000000001],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.6,0.6,0.8],\"ambientBlocker\":true,\"castShadow\":false,\"material\":\"material:38\"}},{\"id\":\"part:2\",\"parent\":null,\"position\":[0,0,2.3500000000000005],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.9,0.9,0.12],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:37\"}}],\"colliders\":[]},{\"id\":\"asset:violet:east-gallery\",\"name\":\"East gallery\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,29,4.2],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:39\"}},{\"id\":\"part:1\",\"parent\":null,\"position\":[0,0,2.1999999999999997],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.4,29.5,0.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:40\"}},{\"id\":\"part:2\",\"parent\":null,\"position\":[-1.0500000000000007,-12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:3\",\"parent\":null,\"position\":[-1.129999999999999,-12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}},{\"id\":\"part:4\",\"parent\":null,\"position\":[-1.0500000000000007,-8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:5\",\"parent\":null,\"position\":[-1.129999999999999,-8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}},{\"id\":\"part:6\",\"parent\":null,\"position\":[-1.0500000000000007,-4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:7\",\"parent\":null,\"position\":[-1.129999999999999,-4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}},{\"id\":\"part:8\",\"parent\":null,\"position\":[-1.0500000000000007,0,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:9\",\"parent\":null,\"position\":[-1.129999999999999,0,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}},{\"id\":\"part:10\",\"parent\":null,\"position\":[-1.0500000000000007,4,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:11\",\"parent\":null,\"position\":[-1.129999999999999,4,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}},{\"id\":\"part:12\",\"parent\":null,\"position\":[-1.0500000000000007,8,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:13\",\"parent\":null,\"position\":[-1.129999999999999,8,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}},{\"id\":\"part:14\",\"parent\":null,\"position\":[-1.0500000000000007,12,0.19999999999999973],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.06,1.8,2.7],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:41\"}},{\"id\":\"part:15\",\"parent\":null,\"position\":[-1.129999999999999,12,1.6],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[0.08,2,0.07],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:42\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":29}]},{\"id\":\"asset:violet:crystal-lantern\",\"name\":\"Crystal lantern\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[1.9,1.9,1.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:43\"}},{\"id\":\"part:1\",\"parent\":0,\"position\":[0,0,0.85],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2.1,2.1,0.22],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:44\"}},{\"id\":\"crystal\",\"parent\":0,\"position\":[0,0,1.75],\"rotation\":[0,0,0.3826834323650898,0.9238795325112867],\"shape\":{\"size\":[0.7,0.7,1.4],\"ambientBlocker\":true,\"castShadow\":false,\"material\":\"material:45\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2.1,\"depth\":2.1}]},{\"id\":\"asset:violet:movable-plinth\",\"name\":\"Movable plinth\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0,1],\"shape\":{\"size\":[2,2,1.3],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:46\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":2,\"depth\":2}]},{\"id\":\"asset:violet:prism\",\"name\":\"Prism\",\"generator\":\"toy.assembly\",\"generatorVersion\":1,\"parts\":[{\"id\":\"part:0\",\"parent\":null,\"position\":[0,0,0],\"rotation\":[0,0,0.3826834323650898,0.9238795325112867],\"shape\":{\"size\":[0.7,0.7,3.8],\"ambientBlocker\":true,\"castShadow\":true,\"material\":\"material:47\"}}],\"colliders\":[{\"x\":0,\"y\":0,\"width\":1,\"depth\":1}]}],\"materials\":[{\"id\":\"material:1\",\"name\":\"Courtyard foundation · 1\",\"baseColor\":[0.14,0.115,0.14],\"emissionColor\":[0.14,0.115,0.14],\"emissionStrength\":0},{\"id\":\"material:2\",\"name\":\"Central inlay · 1\",\"baseColor\":[0.22,0.2,0.25],\"emissionColor\":[0.22,0.2,0.25],\"emissionStrength\":0},{\"id\":\"material:3\",\"name\":\"Brass inlay · 1\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:4\",\"name\":\"Colonnade · 1\",\"baseColor\":[0.24,0.18,0.2],\"emissionColor\":[0.24,0.18,0.2],\"emissionStrength\":0},{\"id\":\"material:5\",\"name\":\"Colonnade · 2\",\"baseColor\":[1,0.47,0.17],\"emissionColor\":[1,0.47,0.17],\"emissionStrength\":2.5},{\"id\":\"material:6\",\"name\":\"Colonnade · 3\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:7\",\"name\":\"Colonnade · 4\",\"baseColor\":[0.35,0.19,0.16],\"emissionColor\":[0.35,0.19,0.16],\"emissionStrength\":0.3},{\"id\":\"material:8\",\"name\":\"West gallery · 1\",\"baseColor\":[0.24,0.18,0.2],\"emissionColor\":[0.24,0.18,0.2],\"emissionStrength\":0},{\"id\":\"material:9\",\"name\":\"West gallery · 2\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:10\",\"name\":\"West gallery · 3\",\"baseColor\":[0.38,0.15,0.16],\"emissionColor\":[0.38,0.15,0.16],\"emissionStrength\":0.55},{\"id\":\"material:11\",\"name\":\"West gallery · 4\",\"baseColor\":[1,0.47,0.17],\"emissionColor\":[1,0.47,0.17],\"emissionStrength\":2},{\"id\":\"material:12\",\"name\":\"Planter · 1\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:13\",\"name\":\"Planter · 2\",\"baseColor\":[0.045,0.14,0.1],\"emissionColor\":[0.045,0.14,0.1],\"emissionStrength\":0},{\"id\":\"material:14\",\"name\":\"Lantern · 1\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:15\",\"name\":\"Lantern · 2\",\"baseColor\":[1,0.47,0.17],\"emissionColor\":[1,0.47,0.17],\"emissionStrength\":3},{\"id\":\"material:16\",\"name\":\"East gallery · 1\",\"baseColor\":[0.24,0.18,0.2],\"emissionColor\":[0.24,0.18,0.2],\"emissionStrength\":0},{\"id\":\"material:17\",\"name\":\"East gallery · 2\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:18\",\"name\":\"East gallery · 3\",\"baseColor\":[0.38,0.15,0.16],\"emissionColor\":[0.38,0.15,0.16],\"emissionStrength\":0.55},{\"id\":\"material:19\",\"name\":\"East gallery · 4\",\"baseColor\":[1,0.47,0.17],\"emissionColor\":[1,0.47,0.17],\"emissionStrength\":2},{\"id\":\"material:20\",\"name\":\"Crystal lantern · 1\",\"baseColor\":[0.24,0.18,0.2],\"emissionColor\":[0.24,0.18,0.2],\"emissionStrength\":0},{\"id\":\"material:21\",\"name\":\"Crystal lantern · 2\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:22\",\"name\":\"Crystal lantern · 3\",\"baseColor\":[0.25,0.62,1],\"emissionColor\":[0.25,0.62,1],\"emissionStrength\":2},{\"id\":\"material:23\",\"name\":\"Movable plinth · 1\",\"baseColor\":[0.68,0.43,0.18],\"emissionColor\":[0.68,0.43,0.18],\"emissionStrength\":0},{\"id\":\"material:24\",\"name\":\"Courtyard foundation · 1\",\"baseColor\":[0.075,0.09,0.18],\"emissionColor\":[0.075,0.09,0.18],\"emissionStrength\":0},{\"id\":\"material:25\",\"name\":\"Central inlay · 1\",\"baseColor\":[0.22,0.2,0.25],\"emissionColor\":[0.22,0.2,0.25],\"emissionStrength\":0},{\"id\":\"material:26\",\"name\":\"Brass inlay · 1\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:27\",\"name\":\"Colonnade · 1\",\"baseColor\":[0.14,0.16,0.31],\"emissionColor\":[0.14,0.16,0.31],\"emissionStrength\":0},{\"id\":\"material:28\",\"name\":\"Colonnade · 2\",\"baseColor\":[0.24,0.58,1],\"emissionColor\":[0.24,0.58,1],\"emissionStrength\":2.5},{\"id\":\"material:29\",\"name\":\"Colonnade · 3\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:30\",\"name\":\"Colonnade · 4\",\"baseColor\":[0.35,0.19,0.16],\"emissionColor\":[0.35,0.19,0.16],\"emissionStrength\":0.3},{\"id\":\"material:31\",\"name\":\"West gallery · 1\",\"baseColor\":[0.14,0.16,0.31],\"emissionColor\":[0.14,0.16,0.31],\"emissionStrength\":0},{\"id\":\"material:32\",\"name\":\"West gallery · 2\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:33\",\"name\":\"West gallery · 3\",\"baseColor\":[0.15,0.19,0.46],\"emissionColor\":[0.15,0.19,0.46],\"emissionStrength\":0.55},{\"id\":\"material:34\",\"name\":\"West gallery · 4\",\"baseColor\":[0.24,0.58,1],\"emissionColor\":[0.24,0.58,1],\"emissionStrength\":2},{\"id\":\"material:35\",\"name\":\"Planter · 1\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:36\",\"name\":\"Planter · 2\",\"baseColor\":[0.1,0.2,0.27],\"emissionColor\":[0.1,0.2,0.27],\"emissionStrength\":0},{\"id\":\"material:37\",\"name\":\"Lantern · 1\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:38\",\"name\":\"Lantern · 2\",\"baseColor\":[0.24,0.58,1],\"emissionColor\":[0.24,0.58,1],\"emissionStrength\":3},{\"id\":\"material:39\",\"name\":\"East gallery · 1\",\"baseColor\":[0.14,0.16,0.31],\"emissionColor\":[0.14,0.16,0.31],\"emissionStrength\":0},{\"id\":\"material:40\",\"name\":\"East gallery · 2\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:41\",\"name\":\"East gallery · 3\",\"baseColor\":[0.15,0.19,0.46],\"emissionColor\":[0.15,0.19,0.46],\"emissionStrength\":0.55},{\"id\":\"material:42\",\"name\":\"East gallery · 4\",\"baseColor\":[0.24,0.58,1],\"emissionColor\":[0.24,0.58,1],\"emissionStrength\":2},{\"id\":\"material:43\",\"name\":\"Crystal lantern · 1\",\"baseColor\":[0.14,0.16,0.31],\"emissionColor\":[0.14,0.16,0.31],\"emissionStrength\":0},{\"id\":\"material:44\",\"name\":\"Crystal lantern · 2\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:45\",\"name\":\"Crystal lantern · 3\",\"baseColor\":[0.25,0.62,1],\"emissionColor\":[0.25,0.62,1],\"emissionStrength\":2},{\"id\":\"material:46\",\"name\":\"Movable plinth · 1\",\"baseColor\":[0.35,0.56,0.7],\"emissionColor\":[0.35,0.56,0.7],\"emissionStrength\":0},{\"id\":\"material:47\",\"name\":\"Prism · 1\",\"baseColor\":[0.22,0.5,0.67],\"emissionColor\":[0.22,0.5,0.67],\"emissionStrength\":0.5}]}");
 const { validateProject } = module49;
 const { ASSEMBLY_GENERATORS } = module39;
 /** Resolve authored generator identities against the libraries this example actually installs. */
@@ -4556,7 +4912,7 @@ function canRemoveAtriumEntity(entity){return !entity.locked&&!['prop','lantern'
 return {validateAtriumProject,ATRIUM_PROJECT,cloneAtriumEntity,canRemoveAtriumEntity};
 })();
 // Source: engine/basement/transfer.js
-const module51=(()=>{
+const module52=(()=>{
 /**
  * Basement / transfer: validated, synchronous movement of one attachment tree.
  * No loading, scheduling, game rules, callbacks during mutation, or resource ownership.
@@ -4607,13 +4963,13 @@ function transferTree({ source, destination, root, landing, validate = () => tru
 return {transferTree};
 })();
 // Source: engine/lobby/travel.js
-const module50=(()=>{
+const module51=(()=>{
 /**
  * Lobby / travel: asynchronous preparation becomes a synchronous boundary commit.
  * It consumes generic residency tickets; it does not import Directory or game content.
  * The active ticket pins the source until a successful transfer replaces it.
  */
-const { transferTree } = module51;
+const { transferTree } = module52;
 
 class WorldTravel {
   /** Adopt an already-ready initial ticket/root. The owner must call advance at a boundary. */
@@ -4706,7 +5062,7 @@ class WorldTravel {
 return {WorldTravel};
 })();
 // Source: engine/basement/geometry.js
-const module53=(()=>{
+const module54=(()=>{
 /** Basement / geometry: pure horizontal collision helpers, with no world or game dependency. */
 
 /** Does a horizontal circle overlap an axis-aligned box? Touching is permitted. */
@@ -4719,7 +5075,7 @@ function circleOverlapsBox(x, y, radius, box) {
 return {circleOverlapsBox};
 })();
 // Source: engine/directory/material-library.js
-const module56=(()=>{
+const module57=(()=>{
 /** Directory / scene-owned runtime material library. Authored IDs resolve once to shared
  * mutable numeric objects. Play never borrows authoring objects; updates retain link identity. */
 const { createMaterial, updateMaterial } = module41;
@@ -4762,14 +5118,14 @@ class MaterialLibrary {
 return {MaterialLibrary};
 })();
 // Source: engine/directory/scene-instance.js
-const module55=(()=>{
+const module56=(()=>{
 /**
  * Directory / live authored scene instance. Maps stable document IDs to temporary World
  * membership, and updates transforms/collision together. Owns scene runtime materials.
  * Owns no scheduler or game rules.
  * Collider queries remain planar conservative bounds; full 3D physics is future work.
  */
-const { MaterialLibrary } = module56;
+const { MaterialLibrary } = module57;
 const { rotateVector } = module4;
 class SceneInstance {
   /** Synchronous construction is available for the explicitly bounded editor preview. */
@@ -4804,21 +5160,48 @@ class SceneInstance {
       if (!complete) instance.dispose();
     }
   }
-  /** Add one registered asset. The surrounding world owner cleans partial jobs on cancellation. */
+  /** The authored origin is independent of its geometry generator. Replacing a linked
+   * geometry source must not replace the origin's runtime identity or attachments. */
   add(directory, project, entity) {
-    const asset = project.assets.find((a) => a.id === entity.asset);
-    const built = directory.create(asset.generator, {
+    const item = {
+      root: this.world.create(),
+      geometryRoot: null,
+      parts: [],
+      asset: null,
+      colliders: [],
+    };
+    this.instances.set(entity.id, item);
+    this.bindGeometry(
+      entity.id,
+      project.assets.find((a) => a.id === entity.asset) ?? null,
+    );
+  }
+  /** Own one generated geometry branch beneath a stable object origin. Source data and
+   * materials remain linked; only this component's old generated membership is released. */
+  bindGeometry(id, asset) {
+    const item = this.instances.get(id);
+    for (const part of item.parts) this.authored.delete(part.id);
+    for (const collider of item.colliders) {
+      const i = this.colliders.indexOf(collider);
+      if (i !== -1) this.colliders.splice(i, 1);
+    }
+    if (item.geometryRoot) this.world.remove(item.geometryRoot);
+    item.asset = asset;
+    item.parts = [];
+    item.geometryRoot = null;
+    item.colliders = [];
+    if (!asset) return;
+    const built = this.directory.create(asset.generator, {
       world: this.world,
       asset,
       materials: this.materials,
     });
-    const colliders = asset.colliders.map((c) => {
-      const box = { ...c };
-      this.colliders.push(box);
-      return box;
-    });
-    this.instances.set(entity.id, { ...built, asset, colliders });
-    for (const part of built.parts) this.authored.set(part.id, entity.id);
+    item.geometryRoot = built.root;
+    item.parts = built.parts;
+    this.world.reparent(built.root, item.root);
+    for (const part of item.parts) this.authored.set(part.id, id);
+    item.colliders = asset.colliders.map((c) => ({ ...c }));
+    this.colliders.push(...item.colliders);
   }
   /** Update existing retained geometry; positions never require asset reconstruction. */
   apply(scene, project = null) {
@@ -4829,7 +5212,18 @@ class SceneInstance {
     for (const id of this.instances.keys()) if (!ids.has(id)) this.remove(id);
     for (const entity of scene.entities) {
       const old = this.instances.get(entity.id);
-      if (old && old.asset.id !== entity.asset) this.remove(entity.id);
+      if (
+        old &&
+        (old.asset?.id ?? null) !== entity.asset &&
+        entity.asset !== null &&
+        !project
+      )
+        throw new Error("Project required when binding geometry");
+      if (old && (old.asset?.id ?? null) !== entity.asset)
+        this.bindGeometry(
+          entity.id,
+          project?.assets.find((a) => a.id === entity.asset) ?? null,
+        );
       if (!this.instances.has(entity.id)) {
         if (!project)
           throw new Error("Project required when adding an instance");
@@ -4843,7 +5237,7 @@ class SceneInstance {
       if (!item) throw new Error("Scene topology changed: reopen preview");
       const r = item.root;
       const asset = project?.assets.find((a) => a.id === e.asset) ?? item.asset;
-      asset.parts.forEach((part, i) => {
+      (asset?.parts ?? []).forEach((part, i) => {
         if (part.shape) {
           const id = Object.hasOwn(e.materialOverrides ?? {}, part.id)
             ? e.materialOverrides[part.id]
@@ -4856,7 +5250,20 @@ class SceneInstance {
       const length = Math.hypot(...e.rotation);
       r.rotation.splice(0, 4, ...e.rotation.map((n) => n / length));
       r.scale = e.scale;
-      item.asset.colliders.forEach((c, i) => {
+      r.visible = e.visible !== false;
+      this.world.reparent(
+        r,
+        e.parent ? this.instances.get(e.parent).root : null,
+      );
+    }
+    // Resolve full inherited poses before deriving planar collision bounds. A child
+    // keeps its local values while collision follows the same world pose as drawing.
+    this.world.snapshot();
+    this.world.resolve();
+    for (const e of scene.entities) {
+      const item = this.instances.get(e.id),
+        r = item.root.pose;
+      (item.asset?.colliders ?? []).forEach((c, i) => {
         rotateVector(r.rotation, c.x * r.scale, c.y * r.scale, 0, v);
         const b = item.colliders[i];
         b.x = r.x + v[0];
@@ -4880,13 +5287,16 @@ class SceneInstance {
       });
     }
     this.materials.retain(usedMaterials);
-    this.world.snapshot();
-    this.world.resolve();
   }
   /** Remove only one tree and its derived mappings; shared asset data remains untouched. */
   remove(id) {
     const item = this.instances.get(id);
     if (!item) return;
+    // Authored children have independent ownership. Detach them before removing only
+    // this component's generated geometry, retaining their live IDs during reconciliation.
+    for (const other of this.instances.values())
+      if (other.root.parent === item.root)
+        this.world.reparent(other.root, null);
     for (const part of item.parts) this.authored.delete(part.id);
     for (const collider of item.colliders) {
       const index = this.colliders.indexOf(collider);
@@ -4901,11 +5311,23 @@ class SceneInstance {
   }
   part(id, name) {
     const i = this.instances.get(id);
-    return i?.parts[i.asset.parts.findIndex((p) => p.id === name)];
+    return i?.parts[i.asset?.parts.findIndex((p) => p.id === name)];
   }
   /** Ray hits on assembly children map to their owning authored instance. */
   idFor(entity) {
     return this.authored.get(entity.id);
+  }
+  /** A picked surface carries authored component/source/part identity. Runtime IDs and
+   * array positions stay private; future mesh picking can extend this with face identity. */
+  surfaceFor(entity) {
+    if (!entity?.shape) return null;
+    const objectId = this.idFor(entity),
+      item = this.instances.get(objectId);
+    if (!item?.asset) return null;
+    const i = item.parts.indexOf(entity);
+    return i < 0
+      ? null
+      : { objectId, geometryId: item.asset.id, partId: item.asset.parts[i].id };
   }
   /** Release membership; the caller separately releases its world and GPU lease. */
   dispose() {
@@ -4923,10 +5345,10 @@ class SceneInstance {
 return {SceneInstance};
 })();
 // Source: examples/atrium/layout.js
-const module54=(()=>{
+const module55=(()=>{
 /** Atrium / map generic document instances to this game's named interaction targets. */
 const { createMaterial } = module41;
-const { SceneInstance } = module55;
+const { SceneInstance } = module56;
 const { ATRIUM_PROJECT } = module48;
 function* buildLayout(engine,world,profile,project=ATRIUM_PROJECT){
  const instance=yield* SceneInstance.prepare(engine.directory,world,project,profile);
@@ -4938,7 +5360,7 @@ function* buildLayout(engine,world,profile,project=ATRIUM_PROJECT){
 return {buildLayout};
 })();
 // Source: examples/atrium/worlds.js
-const module52=(()=>{
+const module53=(()=>{
 /**
  * Atrium example / world definitions: authored realms, reconstruction and state schema.
  * Directory receives factories, not these names. Lobby budgets actual procedural work.
@@ -4946,8 +5368,8 @@ const module52=(()=>{
  */
 const { ATRIUM_PROJECT } = module48;
 const { Lifetime } = module6;
-const { circleOverlapsBox } = module53;
-const { buildLayout } = module54;
+const { circleOverlapsBox } = module54;
+const { buildLayout } = module55;
 
 /** Immutable-by-convention authoring profiles; runtime mutable state is created per world. */
 const PROFILES = ATRIUM_PROJECT.scenes;
@@ -5013,8 +5435,8 @@ const module47=(()=>{
  */
 const { ATRIUM_PROJECT } = module48;
 const { Lifetime } = module6;
-const { WorldTravel } = module50;
-const { worldFactory, legalLanding, applyLight } = module52;
+const { WorldTravel } = module51;
+const { worldFactory, legalLanding, applyLight } = module53;
 
 /** Own the two realm definitions and their tickets for one example session. */
 function createJourney(engine,project=ATRIUM_PROJECT) {
@@ -5093,12 +5515,12 @@ function createJourney(engine,project=ATRIUM_PROJECT) {
 return {createJourney};
 })();
 // Source: examples/atrium/player.js
-const module57=(()=>{
+const module58=(()=>{
 /**
  * Atrium example / locomotion: game-owned steering/gait profile, independent of realm residency.
  * Actor references and velocity survive transfers. This is not a full physical body solver.
  */
-const { legalLanding } = module52;
+const { legalLanding } = module53;
 
 /** Create one controller whose mutable velocity/load state belongs only to this actor. */
 function playerController(actor, input, renderer) {
@@ -5142,7 +5564,7 @@ const module46=(()=>{
  */
 const { Lifetime } = module6;
 const { createJourney } = module47;
-const { playerController } = module57;
+const { playerController } = module58;
 
 /** Start preparing the scene immediately. Rendering remains valid while the first world loads. */
 function createScene(engine,{controlsHost,project,onStatus=()=>{},onError=()=>{}}){

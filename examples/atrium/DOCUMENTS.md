@@ -6,7 +6,7 @@ Strict JSON cannot contain comments. This guide and the property metadata in `en
 
 ## Package and identity
 
-The package has `schemaVersion: 2`, a stable `id`, a display `name`, `materials`, `assets`, and `scenes`. This first milestone keeps dependencies together in **one portable package**, making phone import/export practical. Separate source documents and general dependency-graph loading remain future work. Both realms are embedded in the delivery HTML, but live worlds and GPU batches are constructed only when needed.
+The package has `schemaVersion: 3`, a stable `id`, a display `name`, `materials`, `assets`, and `scenes`. This first milestone keeps dependencies together in **one portable package**, making phone import/export practical. Separate source documents and general dependency-graph loading remain future work. Both realms are embedded in the delivery HTML, but live worlds and GPU batches are constructed only when needed.
 
 Authored entity, asset and scene IDs are persistent strings. Runtime `World` IDs are separate monotonic session identities. Undo, reload and Play must never write runtime identities back into the package. IDs must be unique within their table; asset references must resolve. Renaming an asset ID requires updating its placed references.
 
@@ -81,3 +81,12 @@ These reflect direct lights, not scene/mirror images. The shared inspector's col
 pills open a CSS hue/saturation wheel, brightness, HDR intensity, sRGB hex and precise
 linear RGB fields. Apply commits one edit; Cancel/Escape restores the prior colour.
 See [the surface contract](../../docs/decisions/0018-surface-response-and-colour.md).
+
+## Origin/component update
+
+Canonical packages are version 3. Objects have a nullable `asset` and a `parent` object
+ID (or null), with local transforms; parents precede children in storage. Empty origins
+need no geometry asset. `locked` affects editing, `selectable` viewport picking, and
+`visible` visual rendering; hidden colliders remain independent. Older files upgrade
+at ingress. See [the full contract](../../docs/decisions/0019-origins-locks-and-number-surfaces.md) for linked/unique geometry, inherited locks,
+precise slider/number fields and explicit remaining mesh/light-component limits.

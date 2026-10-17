@@ -1,6 +1,7 @@
 /** Studio / the shared action boundary for Viewport shortcuts and detailed settings.
  * Panel visibility belongs to PanelDock; camera/guide state remains with its existing
  * owners. This controller has no document edits, renderer passes or scheduler. */
+import { NumberControl } from "../../engine/penthouse/number-control.js";
 import { Lifetime } from "../../engine/basement/lifetime.js";
 export class ViewportPanel {
   /** Borrow one workspace; callers retain camera, preferences, icons and framing policies. */
@@ -21,7 +22,34 @@ export class ViewportPanel {
       const $ = (id) => root.querySelector("#" + id);
       this.lens = $("lens");
       this.projection = $("projection");
-      this.fov = $("fov");
+      const original = $("fov"),
+        parent = original.parentElement;
+      original.remove();
+      this.fovControl = new NumberControl({
+        host: parent,
+        label: "Vertical field of view",
+        value: (renderer.camera.fov * 180) / Math.PI,
+        min: 15,
+        max: 110,
+        step: 1,
+        slider: { min: 15, max: 110 },
+        onBegin: () => viewport.cancel(),
+        onPreview: (value) => {
+          renderer.camera.fov = (value * Math.PI) / 180;
+        },
+        onFinish: (commit) => {
+          if (!commit)
+            renderer.camera.fov = (this.fovControl.value * Math.PI) / 180;
+          this.sync();
+        },
+        onError,
+      });
+      this.fov = this.fovControl.input;
+      this.fov.id = "fov";
+      this.life.own(() => {
+        this.fovControl.dispose();
+        parent.append(original);
+      });
       /** Every copy of a command calls the same function; no synthetic click forwarding. */
       const commands = {
         lens: () =>
@@ -62,20 +90,6 @@ export class ViewportPanel {
         this.projection,
         "change",
         act(() => renderer.camera.setProjection(this.projection.value)),
-      );
-      this.life.listen(
-        this.fov,
-        "change",
-        act(() => {
-          const value = Number(this.fov.value);
-          if (!Number.isFinite(value) || !this.fov.value) {
-            this.fov.value = (renderer.camera.fov * 180) / Math.PI;
-            throw new Error("Field of view must be a number");
-          }
-          renderer.camera.fov =
-            (Math.max(15, Math.min(110, value)) * Math.PI) / 180;
-          this.fov.value = (renderer.camera.fov * 180) / Math.PI;
-        }),
       );
       this.life.listen(
         $("view"),
@@ -160,8 +174,9 @@ export class ViewportPanel {
     this.lens.setAttribute("aria-pressed", String(perspective));
     this.projection.value = camera.projection;
     this.fov.disabled = !perspective;
+    this.fovControl.range.disabled = !perspective;
     if (this.fov.ownerDocument.activeElement !== this.fov)
-      this.fov.value = Number(((camera.fov * 180) / Math.PI).toFixed(2));
+      this.fovControl.setValue((camera.fov * 180) / Math.PI);
     for (const key of ["grid", "lights", "axes", "outlines"])
       for (const button of this.root.querySelectorAll(
         `[data-view-command=${key}]`,

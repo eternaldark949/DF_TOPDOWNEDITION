@@ -1,0 +1,73 @@
+[
+  {
+    "suite": "objects",
+    "command": "npm run test:objects",
+    "exit": 0
+  },
+  {
+    "suite": "runtime",
+    "command": "npm run test:browser",
+    "exit": 0,
+    "seconds": 711.8
+  },
+  {
+    "suite": "studio",
+    "command": "npm run test:studio",
+    "exit": 0,
+    "seconds": 141.0
+  },
+  {
+    "suite": "tools",
+    "command": "npm run test:studio-tools",
+    "exit": 0,
+    "seconds": 131.3
+  },
+  {
+    "suite": "camera",
+    "command": "npm run test:camera",
+    "exit": 0,
+    "seconds": 155.7
+  },
+  {
+    "suite": "viewport",
+    "command": "npm run test:viewport-ui",
+    "exit": 0,
+    "seconds": 258.7
+  },
+  {
+    "suite": "materials",
+    "command": "npm run test:materials",
+    "exit": 0,
+    "seconds": 317.4
+  },
+  {
+    "suite": "surface",
+    "command": "npm run test:surface",
+    "exit": 0,
+    "seconds": 91.2
+  },
+  {
+    "suite": "bloom",
+    "command": "npm run test:bloom",
+    "exit": 0,
+    "seconds": 157.4
+  },
+  {
+    "suite": "freelancer",
+    "command": "npm run test:freelancer",
+    "exit": 0,
+    "seconds": 271.0
+  },
+  {
+    "suite": "perspective",
+    "command": "npm run test:perspective",
+    "exit": 0,
+    "seconds": 276.1
+  },
+  {
+    "suite": "phone-preview",
+    "command": "node artifacts/capture-origin-phone.cjs",
+    "exit": 0,
+    "seconds": 15.3
+  }
+]

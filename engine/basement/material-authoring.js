@@ -25,7 +25,7 @@ export function materialUsage(project, id) {
     for (const entity of scene.entities) {
       const asset = project.assets.find((a) => a.id === entity.asset);
       let used = false;
-      for (const part of asset.parts)
+      for (const part of asset?.parts??[])
         if (part.shape && partMaterial(entity, part) === id) {
           surfaces++;
           used = true;
@@ -45,7 +45,7 @@ export function isolateMaterial(project, entity, sourceId, newId) {
   };
   project.materials.push(m);
   const asset = project.assets.find((a) => a.id === entity.asset);
-  for (const part of asset.parts)
+  for (const part of asset?.parts??[])
     if (part.shape && partMaterial(entity, part) === sourceId)
       assignMaterial(entity, part.id, newId);
   return m;

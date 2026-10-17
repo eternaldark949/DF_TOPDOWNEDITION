@@ -16,6 +16,7 @@
     "test:studio-shell": "node tests/studio-shell-browser.cjs",
     "test:viewport-ui": "node tests/viewport-ui-browser.cjs",
     "test:tool-fold": "node tests/tool-fold-browser.cjs",
-    "test:surface": "node tests/surface-browser.cjs"
+    "test:surface": "node tests/surface-browser.cjs",
+    "test:objects": "node tests/objects-browser.cjs"
   }
 }

@@ -53,7 +53,7 @@ test("Version-one ingress migrates once, preserving geometry IDs and radiance; c
   const before = JSON.stringify(legacy),
     up = upgradeProject(legacy);
   assert.equal(JSON.stringify(legacy), before);
-  assert.equal(up.schemaVersion, 2);
+  assert.equal(up.schemaVersion, 3);
   assert.deepEqual(up.scenes, original.scenes);
   assert.deepEqual(
     up.assets.map((a) => a.parts.map((p) => p.id)),
@@ -72,7 +72,7 @@ test("Version-one ingress migrates once, preserving geometry IDs and radiance; c
     }
   assert.equal(upgradeProject(up), up);
   assert.equal(validateProject(up), up);
-  assert.equal(parseProject(JSON.stringify(legacy)).schemaVersion, 2);
+  assert.equal(parseProject(JSON.stringify(legacy)).schemaVersion, 3);
   const bad = copyData(legacy);
   bad.assets[0].parts[0].shape.emission = NaN;
   assert.throws(() => upgradeProject(bad));

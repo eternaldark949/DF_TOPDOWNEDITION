@@ -61,7 +61,7 @@ Use the shared [viewport controls](../../docs/decisions/0010-viewport-navigation
 
 ## Linked materials and image presentation
 
-The authored source is schema version 2. Box parts share project material IDs; per-placement overrides support private materials. Edit material definitions in Studio’s Materials tab, or select a building/prop and choose a Surface part in its contextual inspector. Emission has its own RGB and strength, independent of base colour. These are real supported diffuse/emissive parameters; PBR/transparent glass is still future work. Exposure/HDR scene ownership now belongs to Presentation, and Bloom owns its filter only. [API and lifecycle](../../docs/decisions/0013-presentation-and-materials.md).
+The authored source is schema version 3 (linked materials were introduced in version 2). Box parts share project material IDs; per-placement overrides support private materials. Edit material definitions in Studio’s Materials tab, or select a building/prop and choose a Surface part in its contextual inspector. Emission has its own RGB and strength, independent of base colour. These are real supported diffuse/emissive parameters; PBR/transparent glass is still future work. Exposure/HDR scene ownership now belongs to Presentation, and Bloom owns its filter only. [API and lifecycle](../../docs/decisions/0013-presentation-and-materials.md).
 
 ## Surface polish
 
@@ -72,3 +72,12 @@ polished stone. These controls render direct-light highlights, not mirror images
 the street. Colour pills open the shared wheel/hex/linear-RGB/HDR editor; Apply is one
 undoable command and Cancel/Escape restores the opening value. Content palettes are
 not automatically rewritten. See [the contract](../../docs/decisions/0018-surface-response-and-colour.md).
+
+## Origin/component update
+
+Canonical packages are version 3. Objects have a nullable `asset` and a `parent` object
+ID (or null), with local transforms; parents precede children in storage. Empty origins
+need no geometry asset. `locked` affects editing, `selectable` viewport picking, and
+`visible` visual rendering; hidden colliders remain independent. Older files upgrade
+at ingress. See [the full contract](../../docs/decisions/0019-origins-locks-and-number-surfaces.md) for linked/unique geometry, inherited locks,
+precise slider/number fields and explicit remaining mesh/light-component limits.

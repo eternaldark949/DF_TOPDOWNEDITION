@@ -3,6 +3,10 @@
  * applications request it explicitly and choose their own command-to-icon mapping.
  * Keep strokes legible at 18–20 CSS pixels; clipped corners echo the DFAB shell. */
 export const WORKSPACE_ICONS = Object.freeze({
+  lock: "M5 10H19V21H5Z M8 10V6A4 4 0 0 1 16 6V10 M12 14V17",
+  unlock: "M5 10H19V21H5Z M8 10V6A4 4 0 0 1 16 6 M12 14V17",
+  lockInherited: "M5 10H19V21H5Z M8 10V6A4 4 0 0 1 16 6V10 M12 14V17 M2 3H5 M3 2V5 M19 3H22",
+  origin: "M12 2V8 M12 16V22 M2 12H8 M16 12H22 M12 8 16 12 12 16 8 12Z",
   axes: "M5 19H21 M5 19V3 M5 19 15 9 M18 16 21 19 18 22 M2 6 5 3 8 6 M11 9H15V13",
   outline:
     "M3 3H8 M16 3H21V8 M21 16V21H16 M8 21H3V16 M3 8V10 M3 12V14 M10 3H14 M21 10V14 M10 21H14",

@@ -1,4 +1,6 @@
 /** Studio / contextual panels. One inspector and asset browser serve every placed asset. */
+import { ObjectPanel } from "./objects.js";
+import { descendants, lockOwner } from "../../engine/basement/objects.js";
 import { MaterialPanel } from "./materials.js";
 import { createMaterial } from "../../engine/basement/material.js";
 import {
@@ -8,12 +10,16 @@ import {
 import { PropertyInspector } from "../../engine/penthouse/property-inspector.js";
 export class WorkspacePanels {
   /** Element references and callbacks are supplied by the application shell. */
-  constructor(elements, { onSelect, onSelectMaterial, onPlace, onError }) {
+  constructor(
+    elements,
+    { onSelect, onSelectMaterial, onPlace, onError, library },
+  ) {
     this.elements = elements;
+    this.library = library;
+    this.objectPanel = null;
     this.onSelectMaterial = onSelectMaterial;
     this.materialPanel = null;
-    this.partId = null;
-    this.partEntity = null;
+
     this.onSelect = onSelect;
     this.onPlace = onPlace;
     this.onError = onError;
@@ -26,6 +32,8 @@ export class WorkspacePanels {
     if (this.refreshing) return;
     this.refreshing = true;
     try {
+      this.objectPanel?.dispose();
+      this.objectPanel = null;
       this.materialPanel?.dispose();
       this.materialPanel = null;
       this.inspector?.dispose();
@@ -61,23 +69,16 @@ export class WorkspacePanels {
           ? "Point light " + (scene.lights.indexOf(light) + 1)
           : (entity?.name ?? "Select an instance");
       e.id.textContent = target?.id ?? "";
-      for (const item of [
-        ...scene.entities.filter((e) => !e.locked),
-        ...scene.lights,
-      ]) {
-        const button = document.createElement("button");
-        button.textContent =
-          item.name ?? "◈ Point light " + (scene.lights.indexOf(item) + 1);
-        button.dataset.id = item.id;
-        button.dataset.light = String(!item.name);
-        button.setAttribute(
-          "aria-pressed",
-          String(!isMaterial && item.id === session.selected),
-        );
-        button.addEventListener("click", () => this.onSelect(item.id));
-        e.hierarchy.append(button);
-      }
-      if (target && !material && !entity?.locked && !session.play) {
+      this.objectPanel = new ObjectPanel({
+        host: e.hierarchy,
+        fields: e.fields,
+        session,
+        library: this.library,
+        onSelect: this.onSelect,
+        onError: this.onError,
+      });
+      const locked = !!entity && !!lockOwner(scene, entity.id);
+      if (target && !material && !session.play) {
         const id = target.id,
           index = session.sceneIndex,
           resolve = (data) =>
@@ -90,32 +91,31 @@ export class WorkspacePanels {
           document: doc,
           resolve,
           properties: light ? LIGHT_PROPERTIES : TRANSFORM_PROPERTIES,
+          disabled: locked,
           onError: this.onError,
         });
       }
-      if (!session.play && (material || (entity && !entity.locked))) {
-        if (this.partEntity !== entity?.id) {
-          this.partEntity = entity?.id;
-          this.partId = null;
-        }
+      if (!session.play && (material || entity?.asset)) {
         this.materialPanel = new MaterialPanel({
           host: e.fields,
           session,
           entity,
           materialId: material?.id,
-          partId: this.partId,
+          partId: session.surfacePart,
           onPart: (id) => {
-            this.partId = id;
+            session.surfacePart = id;
             this.refresh(session);
           },
           onError: this.onError,
+          readOnly: locked,
         });
       }
       this.renderMaterials(session);
+      const selectedIds = descendants(scene, session.selected);
       if (session.preview)
         for (const [id, item] of session.preview.instance.instances)
           for (const part of item.parts)
-            part.highlight = !isMaterial && id === session.selected ? 1 : 0;
+            part.highlight = !isMaterial && selectedIds.has(id) ? 1 : 0;
       this.renderAssets(session);
     } finally {
       this.refreshing = false;
@@ -196,6 +196,8 @@ export class WorkspacePanels {
   }
   /** Cancelled properties cannot spawn replacement controls during application disposal. */
   dispose() {
+    this.objectPanel?.dispose();
+    this.objectPanel = null;
     this.materialPanel?.dispose();
     this.materialPanel = null;
     this.inspector?.dispose();

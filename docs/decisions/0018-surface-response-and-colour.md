@@ -1,5 +1,8 @@
 # Surface response · colour as a first-class control
 
+**Object/control update:** [decision 0019](0019-origins-locks-and-number-surfaces.md) advances canonical objects to schema v3 and reuses NumberControl inside the color dialog and inspector.
+
+
 Implemented 2026-10-17 following the owner's request for specular colour, sharpness,
 reflectivity and a pill that opens a complete colour wheel. Extends
 [materials/presentation](0013-presentation-and-materials.md); the forward WebGL2

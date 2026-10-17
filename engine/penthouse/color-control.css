@@ -109,3 +109,21 @@
 .color-actions button:last-child {
   border-color: var(--ui-gold, #d4a84b);
 }
+/* Colour components use the same precise slider surfaces as the inspector. */
+.color-dialog .color-components .number-control > input[type="range"] {
+  width: 52%;
+  height: 100%;
+  padding: 0;
+}
+.color-dialog
+  .color-components
+  .number-control.has-slider
+  > input[type="number"] {
+  width: 48%;
+}
+.color-dialog .color-components .number-control > input[type="number"]:focus {
+  width: 100%;
+  position: relative;
+  z-index: 1;
+  background: var(--ui-panel, #121019) !important;
+}

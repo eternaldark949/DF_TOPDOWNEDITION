@@ -21,7 +21,7 @@ export function worldBounds(world,ids=null){
  const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity],v=[0,0,0];
  world.resolve();
  for(const entity of world.entities.values()){
-  if(!entity.shape||(ids&&!ids.has(entity.id)))continue;
+  if(!entity.shape||entity.pose.visible===false||(ids&&!ids.has(entity.id)))continue;
   const p=entity.pose,s=entity.shape.size;
   for(const x of [-1,1])for(const y of [-1,1])for(const z of [-1,1]){
    rotateVector(p.rotation,x*s[0]*p.scale/2,y*s[1]*p.scale/2,z*s[2]*p.scale/2,v);

@@ -1,5 +1,6 @@
 /** Studio / material context in the universal inspector. Linked definitions use the same
  * numeric controls/history as transforms and lights. Assignment/private copies are explicit. */
+import { TextControl } from "../../engine/penthouse/text-control.js";
 import { Lifetime } from "../../engine/basement/lifetime.js";
 import { createMaterial } from "../../engine/basement/material.js";
 import {
@@ -20,10 +21,10 @@ export class MaterialPanel {
     partId = null,
     onPart = () => {},
     onError,
+    readOnly = false,
   }) {
     this.life = new Lifetime();
     this.doc = session.document;
-    this.activeName = false;
     this.inspector = null;
     const doc = this.doc,
       index = session.sceneIndex,
@@ -53,6 +54,7 @@ export class MaterialPanel {
         input.append(option);
       }
       input.value = value;
+      input.disabled = readOnly;
       wrap.append(input);
       host.append(wrap);
       this.life.listen(input, "change", () => {
@@ -91,52 +93,29 @@ export class MaterialPanel {
     notice.dataset.materialUsers = usage.surfaces;
     notice.textContent = `Shared by ${usage.surfaces} placed surfaces in ${usage.instances} instances. Edits update every linked user, including other scenes.`;
     host.append(notice);
-    const label = document.createElement("label");
-    label.className = "material-field";
-    label.textContent = "Material name";
-    const name = document.createElement("input");
-    name.type = "text";
-    name.maxLength = 120;
-    name.value = material.name;
-    name.setAttribute("aria-label", "Material name");
-    label.append(name);
-    host.append(label);
-    this.life.listen(name, "focus", () => {
-      doc.cancel();
-      doc.begin("Rename material");
-      this.activeName = true;
-    });
-    this.life.listen(name, "input", () => {
-      try {
+    this.nameControl = new TextControl({
+      host,
+      label: "Material name",
+      value: material.name,
+      disabled: readOnly,
+      onBegin: () => {
+        doc.cancel();
+        doc.begin("Rename material");
+      },
+      onPreview: (name) =>
         doc.preview((data) => {
-          data.materials.find((m) => m.id === id).name = name.value;
-        });
-        name.setCustomValidity("");
-      } catch (error) {
-        name.setCustomValidity(error.message);
-      }
-    });
-    this.life.listen(name, "blur", () => {
-      if (!this.activeName) return;
-      this.activeName = false;
-      if (name.validity.valid) doc.commit();
-      else {
-        doc.cancel();
-        onError(new Error(name.validationMessage));
-      }
-    });
-    this.life.listen(name, "keydown", (e) => {
-      if (e.key === "Enter") name.blur();
-      if (e.key === "Escape") {
-        this.activeName = false;
-        doc.cancel();
-        name.value = material.name;
-        name.blur();
-      }
+          data.materials.find((m) => m.id === id).name = name;
+        }),
+      onFinish: (commit) => {
+        if (commit) doc.commit();
+        else doc.cancel();
+      },
+      onError,
     });
     const response = document.createElement("p");
     response.className = "note";
-    response.textContent = "Reflectivity sets direct-light reflectance. Sharpness shapes the highlight; specular colour tints it. Emission stays independent. Scene/mirror reflections and transparency are not enabled.";
+    response.textContent =
+      "Reflectivity shapes direct-light highlights; sharpness and specular colour shape their finish. Emission stays independent.";
     host.append(response);
     const fields = document.createElement("div");
     fields.dataset.material = id;
@@ -147,6 +126,7 @@ export class MaterialPanel {
       document: doc,
       resolve: (data) => data.materials.find((m) => m.id === id),
       properties: MATERIAL_PROPERTIES,
+      disabled: readOnly,
       onError,
     });
     const button = document.createElement("button");
@@ -154,7 +134,7 @@ export class MaterialPanel {
       ? "Make single user for this instance"
       : "Duplicate material";
     button.dataset.materialAction = entity ? "single-user" : "duplicate";
-    button.disabled = !!session.play;
+    button.disabled = !!session.play || readOnly;
     host.append(button);
     this.life.listen(button, "click", () => {
       try {
@@ -177,10 +157,7 @@ export class MaterialPanel {
   }
   /** Cancel unfinished text/numeric transactions before detaching their event listeners. */
   dispose() {
-    if (this.activeName) {
-      this.activeName = false;
-      this.doc.cancel();
-    }
+    this.nameControl?.dispose();
     this.inspector?.dispose();
     this.life.dispose();
   }

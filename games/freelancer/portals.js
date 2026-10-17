@@ -1,9 +1,10 @@
 /** Freelancer / authored doors and planar walking rules. No renderer or asynchronous mutation.
  * Portal positions follow their placed anchor, so Studio edits move the interaction too. */
+import { objectPose } from "../../engine/basement/objects.js";
 import { rotateVector } from "../../engine/basement/rotation.js";
 /** Resolve a local portal offset through its anchor's quaternion and uniform scale. */
 export function portalPosition(scene, portal) {
-  const anchor = scene.entities.find((e) => e.id === portal.anchor),
+  const anchor = objectPose(scene, portal.anchor),
     out = [0, 0, 0],
     q = anchor.rotation.map((n) => n / Math.hypot(...anchor.rotation));
   rotateVector(q, ...portal.offset.map((n) => n * anchor.scale), out);

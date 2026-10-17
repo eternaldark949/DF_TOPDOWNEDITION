@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "id": "freelancer.enni-slice.v1",
   "name": "Freelancer · Enni Cole",
   "assets": [
@@ -11223,6 +11223,25 @@
       },
       "entities": [
         {
+          "id": "enni:origin",
+          "name": "Enni Cole",
+          "asset": null,
+          "parent": null,
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": 1,
+          "locked": false
+        },
+        {
           "id": "street:ground",
           "name": "Midnight street",
           "asset": "street.foundation",
@@ -11239,7 +11258,8 @@
           ],
           "scale": 1,
           "locked": true,
-          "tag": null
+          "tag": null,
+          "parent": null
         },
         {
           "id": "street:pavement",
@@ -11258,7 +11278,8 @@
           ],
           "scale": 1,
           "locked": true,
-          "tag": null
+          "tag": null,
+          "parent": null
         },
         {
           "id": "street:road-seams",
@@ -11277,7 +11298,8 @@
           ],
           "scale": 1,
           "locked": true,
-          "tag": null
+          "tag": null,
+          "parent": null
         },
         {
           "id": "enni:building",
@@ -11296,7 +11318,8 @@
           ],
           "scale": 1,
           "locked": true,
-          "tag": null
+          "tag": null,
+          "parent": "enni:origin"
         },
         {
           "id": "enni:entrance",
@@ -11315,7 +11338,8 @@
           ],
           "scale": 1,
           "locked": true,
-          "tag": null
+          "tag": null,
+          "parent": "enni:origin"
         },
         {
           "id": "enni:sign",
@@ -11334,7 +11358,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": "enni:origin"
         },
         {
           "id": "enni:crown",
@@ -11353,7 +11378,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": "enni:origin"
         },
         {
           "id": "enni:window:-13.3",
@@ -11372,7 +11398,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": "enni:origin"
         },
         {
           "id": "enni:upper:-13.3",
@@ -11391,7 +11418,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": "enni:origin"
         },
         {
           "id": "enni:window:-9.1",
@@ -11410,7 +11438,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": "enni:origin"
         },
         {
           "id": "enni:upper:-9.1",
@@ -11429,7 +11458,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": "enni:origin"
         },
         {
           "id": "enni:window:-5",
@@ -11448,7 +11478,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": "enni:origin"
         },
         {
           "id": "enni:upper:-5",
@@ -11467,7 +11498,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": "enni:origin"
         },
         {
           "id": "enni:window:5",
@@ -11486,7 +11518,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": "enni:origin"
         },
         {
           "id": "enni:upper:5",
@@ -11505,7 +11538,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": "enni:origin"
         },
         {
           "id": "enni:window:9.1",
@@ -11524,7 +11558,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": "enni:origin"
         },
         {
           "id": "enni:upper:9.1",
@@ -11543,7 +11578,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": "enni:origin"
         },
         {
           "id": "enni:window:13.3",
@@ -11562,7 +11598,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": "enni:origin"
         },
         {
           "id": "enni:upper:13.3",
@@ -11581,7 +11618,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": "enni:origin"
         },
         {
           "id": "enni:side-window:2.6",
@@ -11600,7 +11638,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": "enni:origin"
         },
         {
           "id": "enni:side-upper:2.6",
@@ -11619,7 +11658,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": "enni:origin"
         },
         {
           "id": "enni:side-window:6.8",
@@ -11638,7 +11678,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": "enni:origin"
         },
         {
           "id": "enni:side-upper:6.8",
@@ -11657,7 +11698,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": "enni:origin"
         },
         {
           "id": "enni:side-window:11",
@@ -11676,7 +11718,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": "enni:origin"
         },
         {
           "id": "enni:side-upper:11",
@@ -11695,7 +11738,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": "enni:origin"
         },
         {
           "id": "street:planter:0",
@@ -11714,7 +11758,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": null
         },
         {
           "id": "street:planter:1",
@@ -11733,7 +11778,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": null
         },
         {
           "id": "street:planter:2",
@@ -11752,7 +11798,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": null
         },
         {
           "id": "street:planter:3",
@@ -11771,7 +11818,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": null
         },
         {
           "id": "street:lamp:0",
@@ -11790,7 +11838,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": null
         },
         {
           "id": "street:lamp:1",
@@ -11809,7 +11858,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": null
         },
         {
           "id": "street:lamp:2",
@@ -11828,7 +11878,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": null
         },
         {
           "id": "street:lamp:3",
@@ -11847,7 +11898,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": null
         },
         {
           "id": "street:bench:west",
@@ -11866,7 +11918,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": null
         },
         {
           "id": "street:bench:east",
@@ -11885,7 +11938,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": null
         }
       ],
       "lights": [
@@ -12082,7 +12136,8 @@
           ],
           "scale": 1,
           "locked": true,
-          "tag": null
+          "tag": null,
+          "parent": null
         },
         {
           "id": "interior:walls",
@@ -12101,7 +12156,8 @@
           ],
           "scale": 1,
           "locked": true,
-          "tag": null
+          "tag": null,
+          "parent": null
         },
         {
           "id": "interior:medallion",
@@ -12120,7 +12176,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": null
         },
         {
           "id": "interior:monogram",
@@ -12139,7 +12196,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": null
         },
         {
           "id": "interior:counter",
@@ -12158,7 +12216,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": null
         },
         {
           "id": "interior:chandelier",
@@ -12177,7 +12236,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": null
         },
         {
           "id": "interior:sign",
@@ -12196,7 +12256,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": null
         },
         {
           "id": "interior:planter:-9,-5",
@@ -12215,7 +12276,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": null
         },
         {
           "id": "interior:planter:-9,7",
@@ -12234,7 +12296,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": null
         },
         {
           "id": "interior:planter:9,-5",
@@ -12253,7 +12316,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": null
         },
         {
           "id": "interior:planter:9,7",
@@ -12272,7 +12336,8 @@
           ],
           "scale": 1,
           "locked": false,
-          "tag": null
+          "tag": null,
+          "parent": null
         }
       ],
       "lights": [

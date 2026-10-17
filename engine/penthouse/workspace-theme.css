@@ -106,3 +106,12 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* Shared text sessions accompany number/colour surfaces without application classes. */
+.workspace-theme .property-text {
+  display: grid;
+  gap: 7px;
+  margin: 12px 0;
+  color: var(--ui-muted);
+  font-size: 12px;
+}

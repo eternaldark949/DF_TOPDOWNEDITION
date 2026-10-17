@@ -25,6 +25,7 @@ export class ProjectDocument {
     if (!/^[a-z][a-z0-9-]{0,31}$/.test(namespace))
       throw new Error("Invalid authored namespace");
     const used = new Set([
+      ...this.data.assets.map(a=>a.id),
       ...this.data.materials.map((m) => m.id),
       ...this.data.scenes.flatMap((scene) =>
         scene.entities.map((entity) => entity.id),

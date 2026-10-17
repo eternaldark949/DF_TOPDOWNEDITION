@@ -1,0 +1,63 @@
+{
+  "surface": {
+    "dark": {
+      "sum": 352000,
+      "peak": 5,
+      "lit": 70400,
+      "red": 352000,
+      "green": 352000
+    },
+    "soft": {
+      "sum": 3162168,
+      "peak": 76,
+      "lit": 48976,
+      "red": 3162168,
+      "green": 3162168
+    },
+    "sharp": {
+      "sum": 1460910,
+      "peak": 255,
+      "lit": 1052,
+      "red": 1460910,
+      "green": 1460910
+    },
+    "tinted": {
+      "sum": 1460910,
+      "peak": 255,
+      "lit": 1052,
+      "red": 1460910,
+      "green": 626455
+    },
+    "lensDifference": 906344,
+    "movedDifference": 881761,
+    "sun": {
+      "sum": 5246287,
+      "peak": 254,
+      "lit": 12372,
+      "red": 5246287,
+      "green": 1656919
+    },
+    "stableUpload": true,
+    "recordFloats": 24,
+    "hdr": "hdr",
+    "error": 0,
+    "resources": {
+      "buffers": 0,
+      "programs": 0,
+      "vaos": 0
+    }
+  },
+  "color": {
+    "exactLinearValues": true,
+    "oneUndoPerDialog": true,
+    "cancelRestores": true,
+    "HDR": true,
+    "touchCancel": true,
+    "keyboardWheel": true,
+    "hex": true,
+    "invalidBlocked": true,
+    "repeatedModalCleanup": true,
+    "offlineRequests": 0
+  },
+  "errors": []
+}

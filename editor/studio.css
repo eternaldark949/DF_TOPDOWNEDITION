@@ -734,3 +734,13 @@ body.playing .view-label {
     transition: none !important;
   }
 }
+/* Object paths and status controls share the Studio vectors and native touch targets. */
+.object-path,.object-actions { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
+.object-path button { font-size:11px; }
+.object-tree { display:grid; gap:4px; margin-top:12px; }
+.object-row { display:flex; min-width:0; padding-left:calc(var(--object-depth,0)*12px); gap:4px; }
+.object-row > button:first-child { flex:1; min-width:0; text-align:left; overflow-wrap:anywhere; }
+.object-row > button[data-lock-state] { flex:0 0 44px; width:44px; }
+.object-row [data-lock-state=inherited] { opacity:.65; }
+.object-option { display:flex; align-items:center; min-height:44px; gap:10px; }
+.object-option input { width:20px; }
