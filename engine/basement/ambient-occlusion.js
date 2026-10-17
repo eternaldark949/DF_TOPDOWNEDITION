@@ -7,6 +7,7 @@ import { FULLSCREEN_VERTEX } from './fullscreen-shaders.js';
 import { createProgram } from './gl-program.js';
 import { VERTEX } from './shaders.js';
 import { NORMAL_FRAGMENT,  SSAO_FRAGMENT } from './occlusion-shaders.js';
+import { configurePaletteSampler } from './skinning.js';
 
 /** Validate atomically; world lengths and strengths must never become NaN shader uniforms. */
 export function occlusionSettings(previous, patch = {}) {
@@ -55,7 +56,9 @@ export class AmbientOcclusion {
     const camera=this.renderer.camera;
     for(const entity of world.entities.values()) {
       const shape=entity.shape,p=entity.pose;
-      if(!shape||p.visible===false||shape.ambientBlocker===false||Math.min(...shape.size)<0.15)continue;
+      // Meshes are not boxes: their size is a scale, and a posed limb has no fixed OBB.
+      // They still occlude through screen-space AO, which reads their real depth.
+      if(!shape||shape.mesh||p.visible===false||shape.ambientBlocker===false||Math.min(...shape.size)<0.15)continue;
       const [sx,sy,sz]=shape.size.map(n=>n*p.scale);
       if(p.z+sz/2<=0.05)continue; // The ground slab must not consume the blocker budget.
       this.candidates++;
@@ -84,7 +87,7 @@ export class AmbientOcclusion {
     this.releaseTargets();
     const target={...dimensions,textures:[],framebuffers:[]};this.targets=target;
     try {
-      if(!this.normalProgram){this.normalProgram=createProgram(gl,VERTEX,NORMAL_FRAGMENT);this.renderer.stats.programs++;}
+      if(!this.normalProgram){this.normalProgram=createProgram(gl,VERTEX,NORMAL_FRAGMENT);this.renderer.stats.programs++;configurePaletteSampler(gl,this.normalProgram);}
       if(!this.screenProgram){this.screenProgram=createProgram(gl,FULLSCREEN_VERTEX,SSAO_FRAGMENT);this.renderer.stats.programs++;}
       this.normalCamera=gl.getUniformLocation(this.normalProgram,'uViewProjection');
       this.screenUniforms=Object.fromEntries(['uRadius','uDepth','uNormals','uInverseViewProjection','uViewProjection','uProjectionScale'].map(n=>[n,gl.getUniformLocation(this.screenProgram,n)]));

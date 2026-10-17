@@ -3,9 +3,11 @@
  * Cube geometry/program belong to the renderer; each world batch belongs to a lease.
  * Lit record: 24 floats (96 bytes): pose, dimensions, base colour/highlight, quaternion, emission RGB/sharpness, specular RGB/reflectivity. Shadow records remain 16 floats (64 bytes), independent of materials.
  * Only changed contiguous instance ranges are uploaded after the initial allocation.
- * Two primitives share those records: unit boxes (pose.w = 0) and rounded tapered capsules
- * (rounded-shapes.js). Each batch keeps one stream per primitive; the rounded stream and
- * the renderer's rounded mesh are allocated only when a world first contains one.
+ * Three kinds of geometry share those records: unit boxes (pose.w = 0), rounded tapered
+ * capsules (pose.w > 0, rounded-shapes.js) and meshes (pose.w < 0, skinning.js). Each batch
+ * keeps one stream per primitive and one per mesh it draws; the rounded stream, the
+ * renderer's rounded mesh, mesh streams and the joint palette are allocated only when a
+ * world first contains one, and mesh streams/palettes are freed when it no longer does.
  */
 import { VERTEX, FRAGMENT } from './shaders.js';
 import { Lifetime } from './lifetime.js';
@@ -19,6 +21,9 @@ import { Presentation } from './presentation.js';
 import { Bloom } from './bloom.js';
 import { Camera } from './camera.js';
 import { roundedGeometry, packRoundedLane, packTaperLane, roundedReach } from './rounded-shapes.js';
+import { GpuMesh } from './gpu-mesh.js';
+import { MESH_STRIDE } from './mesh.js';
+import { JointPalette, configurePaletteSampler } from './skinning.js';
 
 /** Generate one unit cube with flat normals; uploaded once per WebGL context lifetime. */
 function cubeGeometry() {
@@ -45,9 +50,11 @@ export class Renderer {
     this.profiler=profiler; this.canvas = canvas; this.pixelRatio = pixelRatio; this.life = new Lifetime();
     const gl = canvas.getContext('webgl2', { alpha: false, antialias: true, powerPreference: 'low-power' });
     if (!gl) throw new Error('ETRNLNINE requires WebGL 2 on this device.');
-    this.gl = gl; this.batches = new Set(); this.disposed = false; this.lost = false;
+    this.gl = gl; this.batches = new Set(); this.meshes = new Set(); this.disposed = false; this.lost = false;
     this.camera = new Camera();
-    this.stats = { draws: 0, instances: 0, uploads: 0, uploadedBytes: 0, buffers: 0, programs: 0, vaos: 0, contextRestores: 0 };
+    // jointPalettes counts live joint-palette textures (skinning.js); other passes report
+    // their own textures through inspect().
+    this.stats = { draws: 0, instances: 0, uploads: 0, uploadedBytes: 0, buffers: 0, programs: 0, vaos: 0, jointPalettes: 0, contextRestores: 0 };
     this.totals={draws:0,instances:0,uploads:0,uploadedBytes:0,candidates:0,culled:0,shadowDraws:0,shadowHits:0};
     try {
       this.initialize();
@@ -67,8 +74,10 @@ export class Renderer {
       this.life.listen(canvas, 'webglcontextrestored', () => {
         // Browser invalidates all old handles on loss. Recreate from retained CPU data,
         // not by restarting the game or adding a second scheduler.
-        this.stats.buffers = this.stats.programs = this.stats.vaos = 0;
+        this.stats.buffers = this.stats.programs = this.stats.vaos = this.stats.jointPalettes = 0;
         this.initialize();
+        // Meshes before batches: per-mesh VAOs bind the meshes' new buffers.
+        for (const mesh of this.meshes) mesh.initialize();
         for (const batch of this.batches) batch.initialize();
         this.lines.restore();
         this.gpuTimer.restore(); this.stats.contextRestores++; this.lost = false;
@@ -87,6 +96,7 @@ export class Renderer {
     const gl = this.gl;
     const program=createProgram(gl,VERTEX,FRAGMENT);
     this.program = program; this.stats.programs++;
+    configurePaletteSampler(gl, program);
     this.uniforms = Object.fromEntries(['uCameraEye','uCameraBack','uPerspective','uLinearOutput','uExposure','uViewProjection','uInverseViewProjection','uBlockerRotation[0]', 'uAmbient', 'uLights[0]', 'uLightColors[0]',
       'uAOMode','uAOStrength','uAORadius','uBlockerCount','uBlockerPose[0]','uBlockerSize[0]',
       'uAOScreen','uAODepth','uAONormals','uAOSize','uSunDirection','uSunColor','uSunShadowEnabled','uSunMatrix',
@@ -117,10 +127,23 @@ export class Renderer {
     return (this.rounded = { vertexBuffer, indexBuffer, count: indices.length });
   }
 
-  /** Allocate a batch with an explicit maximum. Capacity is a budget, not silent growth. */
-  createBatch(world, capacity = 2048, {visibility='camera'} = {}) {
+  /**
+   * Allocate a batch with explicit maximums. Capacity is a budget, not silent growth:
+   * `capacity` bounds every instance, `meshes` bounds mesh instances (rigid or skinned),
+   * which is also the joint-palette row budget.
+   */
+  createBatch(world, capacity = 2048, {visibility='camera', meshes=32} = {}) {
     if (this.disposed) throw new Error('Renderer is disposed');
-    const batch = new InstanceBatch(this, world, capacity, visibility); this.batches.add(batch); return batch;
+    const batch = new InstanceBatch(this, world, capacity, visibility, meshes); this.batches.add(batch); return batch;
+  }
+
+  /**
+   * Make MeshData (mesh.js) resident on this context. The caller owns the returned mesh
+   * and must dispose it; shared meshes are leased through the Directory's MeshLibrary.
+   */
+  createMesh(data) {
+    if (this.disposed) throw new Error('Renderer is disposed');
+    const mesh = new GpuMesh(this, data); this.meshes.add(mesh); return mesh;
   }
 
   /**
@@ -216,9 +239,11 @@ export class Renderer {
     if (this.disposed) return;
     this.disposed = true; this.life.dispose(); this.lines.dispose(); this.gpuTimer.dispose(); this.occlusion.dispose(); this.lighting.dispose();this.bloom.dispose();this.presentation.dispose();
     for (const batch of [...this.batches]) batch.dispose();
+    // Owners should have released their meshes; free any that remain rather than leak them.
+    for (const mesh of [...this.meshes]) mesh.dispose();
     this.gl.deleteBuffer(this.cube); this.gl.deleteProgram(this.program);
     if (this.rounded) { this.gl.deleteBuffer(this.rounded.vertexBuffer); this.gl.deleteBuffer(this.rounded.indexBuffer); this.rounded = null; }
-    this.stats.buffers = this.stats.programs = this.stats.vaos = 0;
+    this.stats.buffers = this.stats.programs = this.stats.vaos = this.stats.jointPalettes = 0;
   }
 }
 
@@ -226,11 +251,13 @@ export class Renderer {
  * One primitive's records inside a batch: retained CPU floats, one dynamic GPU buffer and
  * the VAO that pairs them with the primitive's mesh. Dirty bounds are per stream, so a
  * walking figure re-uploads only its rounded range while static boxes stay untouched.
+ * primitive is 'box', 'rounded' or 'mesh'; a mesh stream draws one GpuMesh and holds up
+ * to the batch's mesh budget of records.
  */
 class InstanceStream {
-  constructor(batch, primitive) {
-    this.batch = batch; this.primitive = primitive;
-    this.data = new Float32Array(batch.capacity * batch.recordFloats);
+  constructor(batch, primitive, mesh = null) {
+    this.batch = batch; this.primitive = primitive; this.mesh = mesh;
+    this.data = new Float32Array((mesh ? batch.meshCapacity : batch.capacity) * batch.recordFloats);
     this.count = 0; this.cursor = 0; this.firstDirty = Infinity; this.lastDirty = -1;
     this.initialize();
   }
@@ -238,13 +265,20 @@ class InstanceStream {
   /** Configure the VAO for this primitive's mesh and allocate instance storage once per context. */
   initialize() {
     const r = this.batch.renderer, { gl, stats } = r;
-    const mesh = this.primitive === 'rounded' ? r.roundedMesh() : null;
+    const mesh = this.primitive === 'rounded' ? r.roundedMesh() : this.mesh;
     this.vao = gl.createVertexArray(); stats.vaos++;
     this.buffer = gl.createBuffer(); stats.buffers++;
     gl.bindVertexArray(this.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, mesh ? mesh.vertexBuffer : r.cube);
+    // Boxes and rounded meshes: 6 floats (position/parameters, normal/parameters).
+    // Meshes: the 32-byte skinned format of mesh.js, with joints and weights as bytes.
+    const stride = this.primitive === 'mesh' ? MESH_STRIDE : 24;
     for (let i = 0; i < 2; i++) {
-      gl.enableVertexAttribArray(i); gl.vertexAttribPointer(i, 3, gl.FLOAT, false, 24, i * 12);
+      gl.enableVertexAttribArray(i); gl.vertexAttribPointer(i, 3, gl.FLOAT, false, stride, i * 12);
+    }
+    if (this.primitive === 'mesh') {
+      gl.enableVertexAttribArray(8); gl.vertexAttribPointer(8, 4, gl.UNSIGNED_BYTE, false, stride, 24);
+      gl.enableVertexAttribArray(9); gl.vertexAttribPointer(9, 4, gl.UNSIGNED_BYTE, true, stride, 28);
     }
     if (mesh) gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.indexBuffer);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
@@ -292,6 +326,7 @@ class InstanceStream {
     const r = this.batch.renderer, gl = r.gl;
     gl.bindVertexArray(this.vao);
     if (this.primitive === 'rounded') gl.drawElementsInstanced(gl.TRIANGLES, r.rounded.count, gl.UNSIGNED_SHORT, 0, this.count);
+    else if (this.primitive === 'mesh') gl.drawElementsInstanced(gl.TRIANGLES, this.mesh.count, this.mesh.indexType, 0, this.count);
     else gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, this.count);
     return 1;
   }
@@ -308,24 +343,37 @@ class InstanceStream {
  * One world batch, independently owned/disposable through Directory.acquire().
  * This first renderer performs conservative view culling, not a full spatial grid.
  * Future spatial query output can replace this small-world scan through the same contract.
- * Capacity bounds boxes and rounded shapes together: it is the world's instance budget.
+ * Capacity bounds boxes, rounded shapes and meshes together: it is the world's instance
+ * budget. `meshCapacity` separately bounds mesh instances and joint-palette rows.
+ *
+ * Mesh entities carry `shape.mesh` (a GpuMesh this renderer made) and, when the mesh is
+ * skinned, `entity.skin` (a SkeletonPose of the mesh's skeleton). The batch borrows both
+ * only for the frame: a stream whose mesh no longer appears is freed on the next sync.
  */
 class InstanceBatch {
   /** Retain bounded CPU records so context restoration never depends on Canvas assets. */
-  constructor(renderer, world, capacity, visibility) {
+  constructor(renderer, world, capacity, visibility, meshCapacity) {
     if(!['camera','shadow'].includes(visibility))throw new RangeError('Invalid instance visibility policy');
+    if(!Number.isInteger(meshCapacity)||meshCapacity<1||meshCapacity>256)throw new RangeError('Mesh budget must be 1–256 instances');
     this.visibility=visibility;this.version=0;
-    this.renderer = renderer; this.world = world; this.capacity = capacity;
+    this.renderer = renderer; this.world = world; this.capacity = capacity; this.meshCapacity = meshCapacity;
     this.kind=visibility==='shadow'?'shadow-instance-buffer':'instance-buffer';
     this.recordFloats=visibility==='camera'?24:16;
-    this.count = 0; this.disposed = false;
-    this.box = null; this.rounded = null;
+    this.count = 0; this.meshCount = 0; this.disposed = false;
+    this.box = null; this.rounded = null; this.meshes = new Map(); this.palette = null;
     this.initialize();
   }
 
-  /** Byte budgets: each stream reserves the whole capacity, since the mix can change. */
-  get cpuBytes() { return (this.box?.data.byteLength ?? 0) + (this.rounded?.data.byteLength ?? 0); }
-  get gpuBufferBytes() { return this.cpuBytes; }
+  /** Byte budgets: each stream reserves its whole capacity, since the mix can change. */
+  get cpuBytes() {
+    let bytes = (this.box?.data.byteLength ?? 0) + (this.rounded?.data.byteLength ?? 0);
+    for (const stream of this.meshes.values()) bytes += stream.data.byteLength;
+    return bytes + (this.palette?.bytes ?? 0);
+  }
+  /** Instance buffers only; the palette is a texture (paletteBytes), not a buffer. */
+  get gpuBufferBytes() { return this.cpuBytes - this.paletteBytes; }
+  /** Estimated RGBA32F joint-palette texture storage. */
+  get paletteBytes() { return this.palette?.bytes ?? 0; }
   /** The box stream's VAO and retained records, kept for diagnostics and tests that
    * predate rounded shapes. Rounded records live in `rounded.data` when present. */
   get vao() { return this.box?.vao ?? null; }
@@ -335,6 +383,13 @@ class InstanceBatch {
   initialize() {
     if (this.box) this.box.initialize(); else this.box = new InstanceStream(this, 'box');
     this.rounded?.initialize();
+    // A mesh disposed since the last sync has no buffers to bind; its stream's old handles
+    // died with the lost context, so forgetting it releases everything it held.
+    for (const [mesh, stream] of this.meshes) {
+      if (mesh.disposed) { this.meshes.delete(mesh); stream.data = null; }
+      else stream.initialize();
+    }
+    this.palette?.initialize();
   }
 
   /**
@@ -344,29 +399,57 @@ class InstanceBatch {
   sync() {
     const r = this.renderer, camera = this.visibility === 'camera';
     this.box.begin(); this.rounded?.begin();
-    let total = 0;
+    for (const stream of this.meshes.values()) stream.begin();
+    let total = 0, meshes = 0, rows = 0, paletteChanged = false;
     for (const entity of this.world.entities.values()) {
       const s = entity.shape, p = entity.pose;
       if (!s || p.visible===false || (this.visibility==='shadow'&&s.castShadow===false)) continue;
       r.totals.candidates++;
-      const profile = s.rounded ?? null;
-      // Sphere is conservative under any orientation. Shadow membership ignores the lens.
-      const radius = Math.hypot(...s.size)*p.scale*(profile ? roundedReach(profile) : 1);
+      const profile = s.rounded ?? null, mesh = s.mesh ?? null;
+      if (mesh && (mesh.disposed || mesh.renderer !== r)) throw new Error(`World ${this.world.id} draws a mesh that is disposed or belongs to another renderer`);
+      // Sphere is conservative under any orientation and any pose (mesh.reach bounds every
+      // rotation-only pose). Shadow membership ignores the lens.
+      const radius = mesh ? mesh.reach*Math.max(...s.size)*p.scale : Math.hypot(...s.size)*p.scale*(profile ? roundedReach(profile) : 1);
       if (camera&&!r.camera.sphereVisible(p.x,p.y,p.z,radius)) {r.totals.culled++;continue;}
       if (++total > this.capacity) throw new Error(`World ${this.world.id} exceeds ${this.capacity} ${this.visibility} instances`);
-      const out = profile ? (this.rounded ??= new InstanceStream(this, 'rounded')) : this.box;
-      // pose.w / size.w carry the rounded profile (pose.w 0 = box); see rounded-shapes.js.
-      out.write(p.x); out.write(p.y); out.write(p.z); out.write(profile ? packTaperLane(profile) : 0);
+      let out, lane = 0, profileLane = 0;
+      if (mesh) {
+        if (++meshes > this.meshCapacity) throw new Error(`World ${this.world.id} exceeds ${this.meshCapacity} ${this.visibility} mesh instances`);
+        out = this.meshes.get(mesh);
+        if (!out) { out = new InstanceStream(this, 'mesh', mesh); out.begin(); this.meshes.set(mesh, out); }
+        lane = -1;
+        if (mesh.skinned) {
+          const skin = entity.skin;
+          if (!skin || skin.skeleton !== mesh.skeleton) throw new Error(`Entity ${entity.id} needs a SkeletonPose of its mesh's skeleton`);
+          this.palette ??= new JointPalette(this, this.meshCapacity);
+          if (this.palette.write(rows, skin.palette)) paletteChanged = true;
+          lane = -(rows++ + 2);
+        }
+      } else if (profile) {
+        out = (this.rounded ??= new InstanceStream(this, 'rounded'));
+        lane = packTaperLane(profile); profileLane = packRoundedLane(profile);
+      } else out = this.box;
+      // pose.w selects the primitive (0 box, > 0 rounded profile, < 0 mesh/palette row) and
+      // size.w carries the rounded profile; see rounded-shapes.js and skinning.js.
+      out.write(p.x); out.write(p.y); out.write(p.z); out.write(lane);
       out.write(s.size[0]*p.scale); out.write(s.size[1]*p.scale); out.write(s.size[2]*p.scale);
-      out.write(profile ? packRoundedLane(profile) : 0);
+      out.write(profileLane);
       // Depth-only records ignore material changes, so recoloring does not invalidate maps.
       for(let i=0;i<3;i++)out.write(camera?s.material.baseColor[i]:0);
       out.write(camera?(entity.highlight??0):0);for(let i=0;i<4;i++)out.write(p.rotation[i]);
       if(camera){for(let i=0;i<3;i++)out.write(s.material.emissionColor[i]*s.material.emissionStrength);out.write(s.material.specularSharpness);for(let i=0;i<3;i++)out.write(s.material.specularColor[i]);out.write(s.material.reflectivity);}
     }
-    const changedBox = this.box.finish(), changedRounded = this.rounded ? this.rounded.finish() : false;
-    if (changedBox || changedRounded || this.count !== total) this.version++;
-    this.count = total;
+    let changed = this.box.finish();
+    if (this.rounded?.finish()) changed = true;
+    for (const [mesh, stream] of this.meshes) {
+      if (stream.finish()) changed = true;
+      // Drop streams for meshes this world no longer draws, so no disposed mesh is borrowed.
+      if (!stream.count) { stream.dispose(); this.meshes.delete(mesh); }
+    }
+    if (rows) this.palette.upload();
+    else if (this.palette) { this.palette.dispose(); this.palette = null; }
+    if (changed || paletteChanged || this.count !== total) this.version++;
+    this.count = total; this.meshCount = meshes;
   }
 
   /**
@@ -375,7 +458,11 @@ class InstanceBatch {
    */
   draw() {
     const gl = this.renderer.gl;
-    const submissions = this.box.draw() + (this.rounded ? this.rounded.draw() : 0);
+    let submissions = this.box.draw() + (this.rounded ? this.rounded.draw() : 0);
+    if (this.meshes.size) {
+      this.palette?.bind();
+      for (const stream of this.meshes.values()) submissions += stream.draw();
+    }
     gl.bindVertexArray(null);
     return submissions;
   }
@@ -385,9 +472,11 @@ class InstanceBatch {
     if (this.disposed) return;
     this.disposed = true;
     this.box.dispose(); this.rounded?.dispose();
+    for (const stream of this.meshes.values()) stream.dispose();
+    this.palette?.dispose();
     this.renderer.batches.delete(this);
     this.renderer.lighting?.releaseBatch(this);
     // Disposal releases CPU storage too, even if a caller retains the old handle.
-    this.box = this.rounded = null; this.world = null;
+    this.box = this.rounded = this.palette = null; this.meshes.clear(); this.world = null;
   }
 }

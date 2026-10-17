@@ -4,7 +4,7 @@
  */
 export function runtimeDiagnostics(runtime,profiler){
   if(!profiler)return null;
-  const scopes={};for(const name of ['preparation','input','boundary','update','render'])scopes[name]=profiler.scope(`lobby.${name}`);
+  const scopes={};for(const name of ['preparation','input','boundary','update','animate','render'])scopes[name]=profiler.scope(`lobby.${name}`);
   const counters={steps:profiler.counter('runtime.steps'),dropped:profiler.counter('runtime.dropped','ms'),
     paused:profiler.counter('runtime.paused','flag'),chunks:profiler.counter('preparation.chunks'),pending:profiler.counter('preparation.pending')};
   let steps=0,dropped=0,chunks=0;

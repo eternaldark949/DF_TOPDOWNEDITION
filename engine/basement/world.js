@@ -3,7 +3,9 @@
  * Coordinates: x/y are horizontal world units; z is elevation; yaw is radians.
  * A world owns its entities. Identity is immutable and independent of array position.
  * Base orientations are unit quaternions; yaw adds procedural z rotation. Scale is uniform.
- * Uniform hierarchy scale avoids hidden shear. This is not a skeletal/physics solver.
+ * Uniform hierarchy scale avoids hidden shear. This is not a physics solver; skeletal
+ * meshes ride an entity as `shape.mesh` with a per-entity `skin` (skeleton.js), whose
+ * joints are not world entities.
  */
 import { multiplyRotation, rotateVector } from "./rotation.js";
 
@@ -31,7 +33,9 @@ export class World {
   /**
    * Add one entity. Shape is optional; invisible anchors allocate no GPU geometry.
    * Parent must already exist in this world: this prevents cycles and foreign links.
-   * Shape size is full width/depth/height; its origin is its center.
+   * Shape size is full width/depth/height; its origin is its center. For a mesh shape
+   * (`shape.mesh`), size is a per-axis scale of the mesh frame instead, and `skin` is the
+   * SkeletonPose the entity owns when that mesh is skinned.
    */
   create({
     x = 0,
@@ -43,6 +47,7 @@ export class World {
     rotation = [0, 0, 0, 1],
     scale = 1,
     visible = true,
+    skin = null,
   } = {}) {
     if (this.disposed) throw new Error("Cannot create in a disposed world");
     if (parent && this.entities.get(parent.id) !== parent)
@@ -59,6 +64,8 @@ export class World {
       );
     if (typeof visible !== "boolean")
       throw new RangeError("Visibility must be boolean");
+    if (skin !== null && !skin?.palette)
+      throw new TypeError("Skin must be a SkeletonPose");
     const entity = {
       id: this.identities.create("entity"),
       worldId: this.id,
@@ -75,6 +82,8 @@ export class World {
       shape,
       // Transient presentation amount; never authored/saved or packed into shadow depth.
       highlight: 0,
+      // The entity's own joint state for a skinned mesh, posed by its owner each frame.
+      skin,
     };
     this.entities.set(entity.id, entity);
     this.revision++;

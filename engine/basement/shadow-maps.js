@@ -8,6 +8,7 @@ import { createProgram } from './gl-program.js';
 import { directionalShadowMatrix, pointShadowMatrix } from './shadow-math.js';
 import { SHADOW_VERTEX, SHADOW_FRAGMENT } from './shadow-shaders.js';
 import { ShadowTarget } from './shadow-target.js';
+import { configurePaletteSampler } from './skinning.js';
 
 export class ShadowMaps {
   /** Retain matrices/keys; GPU allocations remain lazy until an enabled world is drawn. */
@@ -31,7 +32,7 @@ export class ShadowMaps {
 
   /** Create the shared depth program once; failed allocation leaves usable unshadowed lights. */
   ensureProgram() {
-    if(!this.program){this.program=createProgram(this.gl,SHADOW_VERTEX,SHADOW_FRAGMENT);this.renderer.stats.programs++;this.matrixUniform=this.gl.getUniformLocation(this.program,'uLightMatrix');}
+    if(!this.program){this.program=createProgram(this.gl,SHADOW_VERTEX,SHADOW_FRAGMENT);this.renderer.stats.programs++;this.matrixUniform=this.gl.getUniformLocation(this.program,'uLightMatrix');configurePaletteSampler(this.gl,this.program);}
   }
 
   /**
