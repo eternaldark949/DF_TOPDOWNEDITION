@@ -2,6 +2,12 @@
  * Lobby / runtime: sole animation-frame owner, explicit phases, and pause reasons.
  * All elapsed values are seconds. The engine advances fixed simulation steps and
  * interpolates render poses; long browser suspensions never trigger unlimited work.
+ *
+ * Phase order per frame: preparation → input → (boundary → update) × fixed steps →
+ * animate → render. `animate(alpha, time)` runs once per frame, paused or not, after the
+ * last simulation step and before anything draws: it is where skeletons are posed and
+ * clips sampled, so every render callback sees finished joint palettes. It receives the
+ * same interpolation alpha as render (1 while paused).
  */
 import { PreparationQueue } from './preparation.js';
 import { runtimeDiagnostics } from './runtime-diagnostics.js';
@@ -11,7 +17,7 @@ export class Runtime {
   constructor({ request = cb => requestAnimationFrame(cb), cancel = id => cancelAnimationFrame(id), step = 1 / 60, maxSteps = 5, profiler = null } = {}) {
     this.request = request; this.cancel = cancel; this.step = step; this.maxSteps = maxSteps;
     this.profiler = profiler; this.preparation = new PreparationQueue({profiler});
-    this.phases = { boundary: new Set(), input: new Set(), update: new Set(), render: new Set(), pause: new Set() };
+    this.phases = { boundary: new Set(), input: new Set(), update: new Set(), animate: new Set(), render: new Set(), pause: new Set() };
     this.reasons = new Set(); this.running = false; this.disposed = false;
     this.frameId = null; this.last = null; this.accumulator = 0; this.time = 0;
     this.stats = { frames: 0, steps: 0, droppedSeconds: 0 };
@@ -68,7 +74,7 @@ export class Runtime {
     }
   }
 
-  /** Execute budgeted preparation -> input -> boundary/fixed updates -> interpolated render. */
+  /** Execute budgeted preparation -> input -> boundary/fixed updates -> animate -> interpolated render. */
   tick(milliseconds) {
     if (!this.running) return;
     this.frameId = null;
@@ -95,8 +101,11 @@ export class Runtime {
           this.time += this.step; this.stats.steps++; count++;
         }
       }
+      const alpha = this.reasons.size ? 1 : this.accumulator / this.step;
+      token=this.beginPhase('animate');
+      try { this.emit('animate', alpha, this.time); } finally { this.endPhase(token); }
       token=this.beginPhase('render');
-      try { this.emit('render', this.reasons.size ? 1 : this.accumulator / this.step, this.time, milliseconds); }
+      try { this.emit('render', alpha, this.time, milliseconds); }
       finally { this.endPhase(token); }
       this.stats.frames++;failed=false;
     } catch (error) {

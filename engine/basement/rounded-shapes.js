@@ -26,9 +26,10 @@
  * Record packing: lit and shadow records keep their sizes (24 and 16 floats). The two
  * previously unused lanes carry the profile, so boxes and rounded shapes share every
  * record, upload and depth-cache path:
- *   pose.w  0 marks a box (the legacy value, so old records stay boxes); otherwise the
- *           integer part is the width taper in thousandths and the fraction is depth
- *           taper ÷ 4 (resolution about 0.002, finer than any visible change)
+ *   pose.w  0 marks a box (the legacy value, so old records stay boxes); negative values
+ *           mark meshes (skinning.js); otherwise the integer part is the width taper in
+ *           thousandths and the fraction is depth taper ÷ 4 (resolution about 0.002, finer
+ *           than any visible change)
  *   size.w  integer part = peak in hundredths + 100 × flags (1 flat near, 2 flat far,
  *           4 width-only bulge); fraction = (bulge + 1) / 2. Float32 keeps the fraction to
  *           about 1e-4 at the largest code (799), finer than any visible change.

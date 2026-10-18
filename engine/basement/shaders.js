@@ -1,6 +1,8 @@
 /**
- * Basement / shaders: GPU-native instanced boxes and rounded shapes, with inexpensive
- * surface lighting. shapeVertex() (rounded-shapes.js) places both primitives.
+ * Basement / shaders: GPU-native instanced boxes, rounded shapes and meshes, with
+ * inexpensive surface lighting. placeVertex() (skinning.js) places every primitive:
+ * boxes and rounded shapes through shapeVertex() (rounded-shapes.js), rigid and skinned
+ * meshes through the batch's joint palette.
  * Optional ambient visibility is supplied by the Basement occlusion capability.
  * No Canvas preparation, font atlas or external assets.
  * This is the first renderer material, not a full PBR material system.
@@ -9,11 +11,14 @@ import { AMBIENT_VISIBILITY } from './occlusion-shaders.js';
 import { SHADOW_VISIBILITY } from './shadow-shaders.js';
 import { ROTATION_GLSL } from './rotation.js';
 import { SHAPE_GLSL } from './rounded-shapes.js';
+import { SKIN_GLSL } from './skinning.js';
 
 export const VERTEX = `#version 300 es
 precision highp float;
-layout(location=0) in vec3 aPosition; // box corner, or rounded-mesh parameters
+layout(location=0) in vec3 aPosition; // box corner, rounded-mesh parameters or mesh position
 layout(location=1) in vec3 aNormal;
+layout(location=8) in vec4 aJoints;  // mesh joint indices (skinned meshes only)
+layout(location=9) in vec4 aWeights; // mesh joint weights, normalised to sum to 1
 // Per-instance layout, documented in renderer.js: pose/taper, dimensions/profile, color.
 layout(location=2) in vec4 aPose;
 layout(location=3) in vec4 aSize;
@@ -24,6 +29,7 @@ layout(location=7) in vec4 aSpecular; // tint / normal-incidence reflectance
 uniform mat4 uViewProjection;
 ${ROTATION_GLSL}
 ${SHAPE_GLSL}
+${SKIN_GLSL}
 out vec3 vWorld;
 out vec3 vNormal;
 out vec3 vColor;
@@ -32,7 +38,7 @@ flat out vec4 vSpecular;
 flat out float vSharpness;
 out float vHighlight;
 void main() {
-  vec3 local,normal;shapeVertex(aPosition,aNormal,aPose,aSize,local,normal);
+  vec3 local,normal;placeVertex(aPosition,aNormal,aJoints,aWeights,aPose,aSize,local,normal);
   vec3 p=rotateByQuaternion(aRotation,local)+aPose.xyz;
   vWorld=p;vNormal=rotateByQuaternion(aRotation,normal);
   vColor = aColor.rgb;

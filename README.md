@@ -1,6 +1,6 @@
 # ETRNLNINE — Engine foundation plan
 
-**Status: foundation, two-world flitting, integrated profiler, ambient occlusion, lighting/shadows, HDR bloom, linked material editing, Studio authoring tools, the first Freelancer street/doorway slice, and the procedural humanoid with rounded bodies and generated clothing implemented; broader engine work remains planned.**
+**Status: foundation, two-world flitting, integrated profiler, ambient occlusion, lighting/shadows, HDR bloom, linked material editing, Studio authoring tools, the first Freelancer street/doorway slice, the procedural humanoid with rounded bodies and generated clothing, and skeletons with GPU-skinned meshes implemented; broader engine work remains planned.**
 
 **Owner: ETERNAL / @eternaldark949.**
 
@@ -17,6 +17,8 @@ The branch was intentionally created with only this plan. On 2026-10-15, after r
 **Studio direction and roadmap:** [3D engine, universal Studio, authored JSON and offline packaging](docs/decisions/0006-studio-3d-and-authored-data.md). The first edit/save/play workspace is now implemented; the first recreated street/vestibule slice is now implemented.
 
 **Humanoid review:** [silhouette review stage](docs/decisions/0020-humanoid-silhouette-review.md) · [rounded bodies and generated clothing](docs/decisions/0021-rounded-bodies-and-garments.md) · [previews and verification](docs/milestones/humanoid/README.md). 949's look and outfit await the owner's review.
+
+**Skeletons and skinned meshes:** [decision 0022](docs/decisions/0022-skeletons-and-skinned-meshes.md) · [evidence](docs/milestones/skinning/README.md). Stage 1 of the modeling plan: joint hierarchies, the mesh format and loft builder, GPU skinning in every pass, the Lobby's animate phase and Directory mesh leases. The lofted body and the Studio modeling tools are the next stages.
 
 **Origins, locks and number surfaces:** [origin-first components, selectable locks and precise sliders](docs/decisions/0019-origins-locks-and-number-surfaces.md) · [previews and verification](docs/milestones/origins-and-controls/README.md).
 
@@ -512,7 +514,7 @@ Diagnostics should make the relevant costs observable: recording storage, reside
 | Home | First working responsibilities |
 | --- | --- |
 | Basement | Stable entity identities; local/world transforms and lightweight attachments; explicit resource/disposal contracts; device/action input; a minimal native WebGL renderer with retained geometry/material resources and resize handling. |
-| Lobby | One animation-frame owner; a fixed simulation step with bounded catch-up; render interpolation; explicit input/update/render phases; pause reasons; clean start, stop, and disposal. Document handling of browser suspension and large elapsed times. |
+| Lobby | One animation-frame owner; a fixed simulation step with bounded catch-up; render interpolation; explicit input/update/animate/render phases; pause reasons; clean start, stop, and disposal. Document handling of browser suspension and large elapsed times. |
 | Directory | Registration and lookup of a small set of presets/resources; explicit acquisition/release; ownership of the demonstration's active world and its resources through Basement contracts. No bulk loading of every toy. |
 | Penthouse | A simple configurable actor/building toy, a lightweight attachment, and parameterized touch button/joystick instances built on the engine's input interfaces. These are reusable toys, not hard-coded Freelancer entities. |
 | ETRNLNINE | Construct/connect the levels and expose the agreed lifecycle entry points. Keep detailed rendering, gameplay, and device handling in their responsible modules. |
