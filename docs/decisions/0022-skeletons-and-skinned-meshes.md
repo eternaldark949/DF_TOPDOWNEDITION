@@ -87,7 +87,7 @@ Each frame now runs preparation → input → (boundary → update) × fixed ste
 - `acquire(key, build)` runs `build()` only when no owner in the Directory holds `key`. Equal keys share one GPU mesh.
 - `release(key)` and `dispose()` release leases exactly once. The last release frees the buffers.
 
-Skeletons travel inside their skinned MeshData as immutable data, so they need no lease. Keys are stable strings: an authored asset ID once the JSON schema carries meshes (stage 3), or a generator plus its parameters today (`tubeKey(options)`).
+Skeletons travel inside their skinned MeshData as immutable data, so they need no lease. Keys are stable strings: a generator plus its parameters (`tubeKey(options)` here; authored recipes use `generator@version:parameters`, see [decision 0023](0023-authored-meshes-and-poses.md)).
 
 ## Penthouse: skinned tube
 
@@ -120,7 +120,7 @@ All of this runs on software WebGL. It does not measure phone performance.
 The later stages of the plan:
 
 - **Stage 2:** lofting the humanoid into one continuous skinned body, garments as lofted layers, and auto-weights.
-- **Stage 3:** the Studio body profile editor, and mesh, skeleton, skin and clip kinds in the project schema.
+- **Stage 3:** the Studio body profile editor, and skeleton, skin and clip kinds in the project schema. (Mesh recipes and joint poses arrived early, in [decision 0023](0023-authored-meshes-and-poses.md).)
 - **Stage 4:** skeleton, weight and pose tools, plus two-bone IK.
 - **Stage 5:** animation clips, the timeline, blending, and cloth and hair chains.
 - **Stage 6:** general polygon modeling, plus mirror and subdivide builders.

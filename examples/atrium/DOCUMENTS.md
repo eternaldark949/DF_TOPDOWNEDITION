@@ -84,7 +84,7 @@ See [the surface contract](../../docs/decisions/0018-surface-response-and-colour
 
 ## Origin/component update
 
-Canonical packages are version 3. Objects have a nullable `asset` and a `parent` object
+Canonical packages are version 4 (version 4 adds mesh recipes and joint poses; see [decision 0023](../../docs/decisions/0023-authored-meshes-and-poses.md)). Objects have a nullable `asset` and a `parent` object
 ID (or null), with local transforms; parents precede children in storage. Empty origins
 need no geometry asset. `locked` affects editing, `selectable` viewport picking, and
 `visible` visual rendering; hidden colliders remain independent. Older files upgrade

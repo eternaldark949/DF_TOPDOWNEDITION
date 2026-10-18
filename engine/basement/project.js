@@ -3,6 +3,14 @@
  * This first portable package contains scenes and assembly assets together. Validation
  * happens before adoption and packaging; IDs survive serialization independently of World IDs.
  * Limits bound synchronous parsing, history and procedural construction on mobile devices.
+ *
+ * Schema history (every older version upgrades once at ingress, upgradeProject()):
+ *   v1  inline part colours            v2  linked material library
+ *   v3  object origins and parenting   v4  mesh assets and joint poses (decision 0023)
+ * v4 adds `meshes`: authored mesh assets, each a generator recipe
+ *   { id, name, generator, generatorVersion, parameters }
+ * which part shapes reference with `shape.mesh` (size then scales the mesh frame per
+ * axis), and per-object `poses`: { partId: { jointName: offset quaternion from rest } }.
  */
 import { objectPoses } from "./objects.js";
 import { validateMaterial } from "./material.js";
@@ -14,20 +22,34 @@ export const PROJECT_LIMITS = Object.freeze({
   parts: 128,
   totalParts: 4096,
   materials: 4096,
+  meshes: 256,
+  parameters: 32,
+  poseJoints: 64,
 });
+
+/** Current schema version written by Studio and expected by validateProject(). */
+export const PROJECT_SCHEMA_VERSION = 4;
 
 /** Return an independent plain-data value; never share authoring storage with simulation. */
 export function copyData(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-/** Validate version, graph, numeric domains and the explicitly supported generator catalog. */
+/**
+ * Validate version, graph, numeric domains and the explicitly supported generator catalogs.
+ * `generators` maps assembly generator names to versions. `meshGenerators` maps mesh
+ * generator names to { version, validate(parameters), joints(parameters) } (Penthouse
+ * MESH_GENERATORS); without it, mesh recipes are checked for shape only. The flags select
+ * an older schema for one-time ingress validation (legacy v1, flat v2, origins v3).
+ */
 function validateProjectData(
   project,
-  { generators = null } = {},
+  { generators = null, meshGenerators = null } = {},
   legacy = false,
   flat = false,
+  origins = false,
 ) {
+  const current = !legacy && !flat && !origins;
   const fail = (path, message) => {
     throw new Error(`${path}: ${message}`);
   };
@@ -85,9 +107,9 @@ function validateProjectData(
     "package exceeds 512 KiB",
   );
   check(
-    project?.schemaVersion === (legacy ? 1 : flat ? 2 : 3),
+    project?.schemaVersion === (legacy ? 1 : flat ? 2 : origins ? 3 : PROJECT_SCHEMA_VERSION),
     "schemaVersion",
-    "expected origin/component schema version 3",
+    `expected mesh/pose schema version ${PROJECT_SCHEMA_VERSION}`,
   );
   text(project.id, "id");
   text(project.name, "name");
@@ -114,6 +136,49 @@ function validateProjectData(
       validateMaterial(m);
     });
   }
+  // v4 mesh assets: generator recipes, validated by the catalog when one is supplied.
+  const meshes = new Map();
+  if (current) {
+    check(
+      Array.isArray(project.meshes) && project.meshes.length <= PROJECT_LIMITS.meshes,
+      "meshes",
+      "expected 0–256 mesh assets",
+    );
+    ids(project.meshes, "meshes");
+    project.meshes.forEach((m, i) => {
+      const p = `meshes[${i}]`;
+      text(m.name, p + ".name");
+      text(m.generator, p + ".generator");
+      check(Number.isInteger(m.generatorVersion) && m.generatorVersion > 0, p + ".generatorVersion", "expected positive version");
+      check(
+        m.parameters !== null && typeof m.parameters === "object" && !Array.isArray(m.parameters) &&
+          Object.keys(m.parameters).length <= PROJECT_LIMITS.parameters,
+        p + ".parameters",
+        `expected an object of at most ${PROJECT_LIMITS.parameters} values`,
+      );
+      for (const [key, value] of Object.entries(m.parameters))
+        check(
+          typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value)) || (typeof value === "string" && value.length <= 120),
+          `${p}.parameters.${key}`,
+          "expected a number, boolean or short string",
+        );
+      let joints = null;
+      if (meshGenerators) {
+        const g = Object.hasOwn(meshGenerators, m.generator) ? meshGenerators[m.generator] : null;
+        check(g && g.version === m.generatorVersion, p, "unsupported mesh generator/version");
+        try {
+          g.validate(m.parameters);
+          joints = new Set(g.joints(m.parameters));
+        } catch (error) {
+          fail(p + ".parameters", error.message);
+        }
+      }
+      meshes.set(m.id, joints);
+    });
+  } else
+    // Older sources have no mesh library; an empty one (as left by a version downgrade
+    // in tools) carries nothing to lose and is replaced on upgrade.
+    check(project.meshes === undefined || (Array.isArray(project.meshes) && !project.meshes.length), "meshes", "mesh assets need schema version 4");
   const assets = ids(project.assets, "assets");
   ids(project.scenes, "scenes");
   let total = 0;
@@ -152,6 +217,8 @@ function validateProjectData(
       if (part.shape) {
         const s = part.shape;
         vector(s.size, 3, q + ".shape.size", 0.001, 1000);
+        if (s.mesh !== undefined)
+          check(current && meshes.has(s.mesh), q + ".shape.mesh", "unresolved mesh");
         if (legacy) {
           vector(s.color, 3, q + ".shape.color", 0, 16);
           number(s.emission, q + ".shape.emission", 0, 32);
@@ -243,6 +310,21 @@ function validateProjectData(
       vector(e.position, 3, q + ".position");
       rotation(e.rotation, q + ".rotation");
       number(e.scale, q + ".scale", 0.05, 20);
+      if (e.poses !== undefined) {
+        // Joint offsets from rest, per mesh part of this object's asset (schema v4).
+        check(current && e.poses !== null && typeof e.poses === "object" && !Array.isArray(e.poses), q + ".poses", "expected a part → joint pose map");
+        const asset = project.assets.find((a) => a.id === e.asset);
+        for (const [partId, joints] of Object.entries(e.poses)) {
+          const part = asset?.parts.find((p) => p.id === partId);
+          check(part?.shape?.mesh !== undefined, `${q}.poses.${partId}`, "expected a mesh part of this object's asset");
+          check(joints !== null && typeof joints === "object" && !Array.isArray(joints) && Object.keys(joints).length <= PROJECT_LIMITS.poseJoints, `${q}.poses.${partId}`, "expected a joint → rotation map");
+          const known = meshes.get(part.shape.mesh);
+          for (const [joint, offset] of Object.entries(joints)) {
+            check(!known || known.has(joint), `${q}.poses.${partId}.${joint}`, "unknown joint");
+            rotation(offset, `${q}.poses.${partId}.${joint}`);
+          }
+        }
+      }
       check(typeof e.locked === "boolean", q + ".locked", "expected boolean");
       if (e.materialOverrides !== undefined) {
         check(
@@ -338,13 +420,21 @@ export function validateProject(project, options = {}) {
  * Sharing is scoped to equal appearances inside each source asset, avoiding accidental links
  * between unrelated assets merely because their RGB values happen to match. */
 export function upgradeProject(source) {
+  if (source?.schemaVersion === 3) {
+    // v3 → v4: the project gains an empty mesh library; nothing else changes.
+    validateProjectData(source, {}, false, false, true);
+    const p = copyData(source);
+    p.schemaVersion = 4;
+    p.meshes = [];
+    return validateProject(p);
+  }
   if (source?.schemaVersion === 2) {
     validateProjectData(source, {}, false, true);
     const p = copyData(source);
     p.schemaVersion = 3;
     for (const scene of p.scenes)
       for (const e of scene.entities) e.parent = null;
-    return validateProject(p);
+    return upgradeProject(p);
   }
   if (source?.schemaVersion !== 1) return source;
   validateProjectData(source, {}, true);

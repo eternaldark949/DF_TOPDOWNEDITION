@@ -8,6 +8,7 @@ import { createHumanoid } from './humanoid.js';
 import { Joystick, ActionButton } from './controls.js';
 import { ProfilerView } from './profiler-view.js';
 import { WORKSPACE_ICONS } from './workspace-icons.js';
+import { meshLibraries } from './mesh-generators.js';
 
 export class Penthouse {
   /** Catalog creation is inert: allocation begins only when a factory is requested. */
@@ -24,6 +25,9 @@ export class Penthouse {
       'tool.profiler':options=>new ProfilerView(options),
       // Catalog lookup is inert: SVG DOM is created only by the requesting workspace.
       'ui.icons':()=>WORKSPACE_ICONS,
+      // Procedural mesh sources named by authored mesh assets (MESH_GENERATORS validates
+      // them); each returns CPU MeshData, which Directory leases onto the GPU.
+      ...meshLibraries(),
     });
   }
 }

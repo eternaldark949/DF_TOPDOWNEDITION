@@ -2,10 +2,11 @@
 import data from "./content/project.json" with { type: "json" };
 import { validateProject } from "../../engine/basement/project.js";
 import { ASSEMBLY_GENERATORS } from "../../engine/penthouse/assembly.js";
+import { MESH_GENERATORS } from "../../engine/penthouse/mesh-generators.js";
 import { portalPosition } from "./portals.js";
 /** Validate the game extension before loading, importing or packaging any world. */
 export function validateFreelancerProject(project) {
-  validateProject(project, { generators: ASSEMBLY_GENERATORS });
+  validateProject(project, { generators: ASSEMBLY_GENERATORS, meshGenerators: MESH_GENERATORS });
   if (project.id !== "freelancer.enni-slice.v1" || project.scenes.length !== 2)
     throw new Error("Expected the two-scene Freelancer slice");
   const vector = (v, n) =>

@@ -8,6 +8,7 @@ import { strokeLettering } from "../../../engine/penthouse/stroke-lettering.js";
 import { multiplyRotation } from "../../../engine/basement/rotation.js";
 import { validateProject, upgradeProject } from "../../../engine/basement/project.js";
 import { ASSEMBLY_GENERATORS } from "../../../engine/penthouse/assembly.js";
+import { MESH_GENERATORS } from "../../../engine/penthouse/mesh-generators.js";
 
 // Linear RGB: rose masonry, champagne metal, midnight framing and honey-lit displays.
 const rose = [0.25, 0.065, 0.12],
@@ -713,7 +714,7 @@ const project=upgradeProject(legacyProject);
 const building={id:'enni:origin',name:'Enni Cole',asset:null,parent:null,position:[0,0,0],rotation:[0,0,0,1],scale:1,locked:false};
 project.scenes[0].entities.unshift(building);
 for(const e of project.scenes[0].entities.slice(1))if(e.id.startsWith('enni:'))e.parent=building.id;
-validateProject(project, { generators: ASSEMBLY_GENERATORS });
+validateProject(project, { generators: ASSEMBLY_GENERATORS, meshGenerators: MESH_GENERATORS });
 await writeFile(
   new URL("./project.json", import.meta.url),
   JSON.stringify(project, null, 2) + "\n",

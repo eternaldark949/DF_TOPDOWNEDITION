@@ -147,16 +147,26 @@ export class SkeletonPose {
   }
 
   /**
+   * Set a joint's rotation as an offset from rest: local = rest × offset, so the offset's
+   * axes are the joint's own rest frame. This is how authored poses are stored (project
+   * schema v4 `poses`): a zero offset [0,0,0,1] is the rest pose whatever the rig.
+   */
+  offset(index, q) {
+    if (!(index >= 0 && index < this.skeleton.count)) throw new RangeError("Joint index out of range");
+    const r = this.skeleton.rotations, o = index * 4, [x, y, z, w] = [r[o], r[o + 1], r[o + 2], r[o + 3]], [i, j, k, l] = q;
+    // Hamilton product rest × offset (same order as rotation.js multiplyRotation).
+    return this.setRotation(index, [w * i + x * l + y * k - z * j, w * j - x * k + y * l + z * i, w * k + x * j - y * i + z * l, w * l - x * i - y * j - z * k]);
+  }
+
+  /**
    * Rotate a joint away from its rest rotation by `angle` radians about a local axis
-   * (normalised here). Rest × delta, so the axis is in the joint's own rest frame.
+   * (normalised here): offset() with an axis-angle quaternion.
    */
   bend(index, axis, angle) {
     const length = Math.hypot(axis[0], axis[1], axis[2]);
     if (!(length > 0) || !Number.isFinite(angle)) throw new RangeError("Bend needs a non-zero axis and a finite angle");
-    const s = Math.sin(angle / 2) / length, b = [axis[0] * s, axis[1] * s, axis[2] * s, Math.cos(angle / 2)];
-    const r = this.skeleton.rotations, o = index * 4, [x, y, z, w] = [r[o], r[o + 1], r[o + 2], r[o + 3]];
-    // Hamilton product rest × delta (same order as rotation.js multiplyRotation).
-    return this.setRotation(index, [w * b[0] + x * b[3] + y * b[2] - z * b[1], w * b[1] - x * b[2] + y * b[3] + z * b[0], w * b[2] + x * b[1] - y * b[0] + z * b[3], w * b[3] - x * b[0] - y * b[1] - z * b[2]]);
+    const s = Math.sin(angle / 2) / length;
+    return this.offset(index, [axis[0] * s, axis[1] * s, axis[2] * s, Math.cos(angle / 2)]);
   }
 
   /** Return every joint to its rest rotation. */

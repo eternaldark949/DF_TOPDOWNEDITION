@@ -15,6 +15,8 @@ import { SceneInstance } from "../../engine/directory/scene-instance.js";
 import { ProjectDocument } from "../../engine/basement/document.js";
 import { assetBounds } from "../../engine/basement/asset-bounds.js";
 import { copyData } from "../../engine/basement/project.js";
+import { createMaterial } from "../../engine/basement/material.js";
+import { ASSEMBLY_GENERATORS } from "../../engine/penthouse/assembly.js";
 import { Lifetime } from "../../engine/basement/lifetime.js";
 
 export class StudioSession {
@@ -117,6 +119,7 @@ export class StudioSession {
         world,
         project,
         project.scenes[index],
+        { renderer: basement.renderer },
       );
       lease = directory.acquire(
         `studio:${world.id}`,
@@ -214,7 +217,8 @@ export class StudioSession {
       throw new Error("Parent is locked");
     if (!asset) throw new Error("Unknown source asset");
     const id = this.document.allocateId(),
-      bounds = assetBounds(asset);
+      // Mesh parts measure from their resident mesh's rest bounds (the preview leases it).
+      bounds = assetBounds(asset, (mesh) => this.preview.instance.meshes.get(mesh).data.bounds);
     this.document.edit("Place asset", (data) =>
       data.scenes[this.sceneIndex].entities.push({
         id,
@@ -333,6 +337,51 @@ export class StudioSession {
       p.assets.push(copy);
       e.asset = id;
     });
+  }
+  /**
+   * Add a mesh recipe at its generator's defaults (empty `parameters`) and a one-part
+   * geometry source that draws it, as one undoable command, and return the source's ID
+   * for placement. `generator` is a mesh generator name and `descriptor` its catalog entry
+   * (label, version), injected by the application so the session knows no generator.
+   * The part borrows the project's first material, or adds a default one when there is
+   * none. Mesh and geometry stay separate data blocks: further sources may share the mesh.
+   */
+  createMeshAsset(generator, descriptor) {
+    if (this.play) return null;
+    this.document.cancel();
+    const meshId = this.document.allocateId("mesh"),
+      assetId = this.document.allocateId("asset"),
+      materialId =
+        this.document.data.materials[0]?.id ?? this.document.allocateId("material");
+    this.document.edit(`New ${descriptor.label.toLowerCase()} mesh`, (p) => {
+      if (!p.materials.length)
+        p.materials.push({ id: materialId, name: "Material", ...createMaterial() });
+      p.meshes.push({
+        id: meshId,
+        name: descriptor.label,
+        generator,
+        generatorVersion: descriptor.version,
+        parameters: {},
+      });
+      p.assets.push({
+        id: assetId,
+        name: descriptor.label,
+        generator: "toy.assembly",
+        generatorVersion: ASSEMBLY_GENERATORS["toy.assembly"],
+        parts: [
+          {
+            id: "part:0",
+            parent: null,
+            position: [0, 0, 0],
+            rotation: [0, 0, 0, 1],
+            // size scales the mesh's own frame per axis; 1 keeps the recipe's metres.
+            shape: { mesh: meshId, size: [1, 1, 1], material: materialId, castShadow: true, ambientBlocker: false },
+          },
+        ],
+        colliders: [],
+      });
+    });
+    return assetId;
   }
   /** Duplicate a complete branch with new stable IDs, retaining linked geometry resources. */
   duplicate() {

@@ -18,6 +18,7 @@ import { StudioSession } from './workspace/session.js';
 import { selectedBounds, sceneBounds } from './workspace/framing.js';
 import { StudioViewport } from './workspace/viewport.js';
 import { ProjectFiles } from './documents/files.js';
+import { MESH_GENERATORS } from '../engine/penthouse/mesh-generators.js';
 
 const $=id=>document.getElementById(id),life=new Lifetime(),files=new ProjectFiles(validateStudioProject);
 const preferences=new StudioPreferences();
@@ -57,7 +58,9 @@ try{
  // The tool surface has its own dock host, so drawer exclusivity/placement cannot
  // overwrite its visibility. Both use the same accessible widget and owned cleanup.
  toolDock=new PanelDock({root:$('stage'),entries:[{key:'tools',panel:$('tools'),label:'Tools',side:'left'}],compact:matchMedia('(max-width:760px)'),defaults:{wide:['tools'],compact:['tools']},onBeforeChange:()=>viewport.cancel()});life.own(()=>toolDock.dispose());
- panels=new WorkspacePanels({fields:$('fields'),hierarchy:$('hierarchy'),assets:$('asset-list'),materials:$('material-list'),scene:$('scene'),name:$('selection-name'),id:$('selection-id')},{library:engine.directory.create('ui.icons'),onError:report,onSelect:id=>{viewport.cancel();session.select(id);dock.setOpen('properties',true);},onSelectMaterial:id=>{viewport.cancel();session.selectMaterial(id);dock.setOpen('properties',true);},onPlace:id=>{viewport.cancel();viewport.placementAsset=id;setTool('place');dock.closeAll();}});life.own(()=>panels.dispose());life.own(()=>files.dispose());
+ panels=new WorkspacePanels({fields:$('fields'),hierarchy:$('hierarchy'),assets:$('asset-list'),materials:$('material-list'),scene:$('scene'),name:$('selection-name'),id:$('selection-id')},{library:engine.directory.create('ui.icons'),onError:report,onSelect:id=>{viewport.cancel();session.select(id);dock.setOpen('properties',true);},onSelectMaterial:id=>{viewport.cancel();session.selectMaterial(id);dock.setOpen('properties',true);},onPlace:id=>{viewport.cancel();viewport.placementAsset=id;setTool('place');dock.closeAll();},
+  // A new mesh is a recipe plus a geometry source; placing it follows the ordinary place tool.
+  meshGenerators:MESH_GENERATORS,onCreateMesh:(name,generator)=>{viewport.cancel();const id=session.createMeshAsset(name,generator);if(id){viewport.placementAsset=id;setTool('place');dock.closeAll();}}});life.own(()=>panels.dispose());life.own(()=>files.dispose());
  const renderer=engine.basement.renderer;
  const appearanceControls=new AppearanceControls({renderer,host:$('appearance-section'),title:'Appearance',subscribe:fn=>engine.lobby.on('render',fn,'studio.appearance-controls'),onError:report});life.own(()=>appearanceControls.dispose());
  appearanceControls.element.setAttribute('name','viewport-sections');

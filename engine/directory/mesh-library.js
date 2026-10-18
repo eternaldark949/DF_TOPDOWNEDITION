@@ -22,12 +22,14 @@ export class MeshLibrary {
   }
 
   /**
+   * Keys may be long (authored recipes embed up to 32 parameters), hence the 4000-character
+   * bound; they are compared, never displayed.
    * Lease the mesh registered under `key`, building it with build() only if no owner in
    * this Directory holds it yet. Repeated calls from one library share one lease.
    */
   acquire(key, build) {
     if (this.disposed) throw new Error("Mesh library is disposed");
-    if (typeof key !== "string" || !key.length || key.length > 200) throw new RangeError("Mesh key must contain 1–200 characters");
+    if (typeof key !== "string" || !key.length || key.length > 4000) throw new RangeError("Mesh key must contain 1–4000 characters");
     let lease = this.leases.get(key);
     if (!lease) {
       lease = this.directory.acquire(`mesh:${key}`, () => this.renderer.createMesh(build()), { owner: this.owner });

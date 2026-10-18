@@ -61,7 +61,7 @@ Use the shared [viewport controls](../../docs/decisions/0010-viewport-navigation
 
 ## Linked materials and image presentation
 
-The authored source is schema version 3 (linked materials were introduced in version 2). Box parts share project material IDs; per-placement overrides support private materials. Edit material definitions in Studio’s Materials tab, or select a building/prop and choose a Surface part in its contextual inspector. Emission has its own RGB and strength, independent of base colour. These are real supported diffuse/emissive parameters; PBR/transparent glass is still future work. Exposure/HDR scene ownership now belongs to Presentation, and Bloom owns its filter only. [API and lifecycle](../../docs/decisions/0013-presentation-and-materials.md).
+The authored source is schema version 4 (mesh recipes and poses arrived in version 4, linked materials were introduced in version 2). Box parts share project material IDs; per-placement overrides support private materials. Edit material definitions in Studio’s Materials tab, or select a building/prop and choose a Surface part in its contextual inspector. Emission has its own RGB and strength, independent of base colour. These are real supported diffuse/emissive parameters; PBR/transparent glass is still future work. Exposure/HDR scene ownership now belongs to Presentation, and Bloom owns its filter only. [API and lifecycle](../../docs/decisions/0013-presentation-and-materials.md).
 
 ## Surface polish
 
@@ -75,7 +75,7 @@ not automatically rewritten. See [the contract](../../docs/decisions/0018-surfac
 
 ## Origin/component update
 
-Canonical packages are version 3. Objects have a nullable `asset` and a `parent` object
+Canonical packages are version 4 (version 4 adds mesh recipes and joint poses; see [decision 0023](../../docs/decisions/0023-authored-meshes-and-poses.md)). Objects have a nullable `asset` and a `parent` object
 ID (or null), with local transforms; parents precede children in storage. Empty origins
 need no geometry asset. `locked` affects editing, `selectable` viewport picking, and
 `visible` visual rendering; hidden colliders remain independent. Older files upgrade

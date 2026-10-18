@@ -28,6 +28,7 @@ export function sceneWorldFactory(
               world,
               project,
               scene,
+              { renderer: basement.renderer },
             ),
             grid = new SpatialGrid(4);
           life.own(()=>instance.dispose());

@@ -290,7 +290,7 @@ const root = path.resolve(__dirname, ".."),
     assert.deepEqual(m.specularColor, [1, 0.7, 1]);
     assert.equal(m.specularSharpness, 0.8);
     assert.equal(m.reflectivity, 0.08);
-    assert.equal(changed.schemaVersion, 3);
+    assert.equal(changed.schemaVersion, 4);
     assert.deepEqual(changed.scenes, base.scenes);
     await page.locator("#undo").click();
     assert.equal(

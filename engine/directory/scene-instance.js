@@ -1,16 +1,23 @@
 /**
  * Directory / live authored scene instance. Maps stable document IDs to temporary World
  * membership, and updates transforms/collision together. Owns scene runtime materials.
- * Owns no scheduler or game rules.
+ * Owns no scheduler or game rules. Also owns the scene's mesh leases (AuthoredMeshes) and
+ * applies each object's authored joint `poses` to the SkeletonPoses of its skinned parts.
  * Collider queries remain planar conservative bounds; full 3D physics is future work.
  */
 import { MaterialLibrary } from "./material-library.js";
+import { AuthoredMeshes } from "./authored-meshes.js";
 import { rotateVector } from "../basement/rotation.js";
+import { SkeletonPose } from "../basement/skeleton.js";
 export class SceneInstance {
-  /** Synchronous construction is available for the explicitly bounded editor preview. */
-  constructor(directory, world, project, scene, { defer = false } = {}) {
+  /**
+   * Synchronous construction is available for the explicitly bounded editor preview.
+   * `renderer` makes mesh parts resident; scenes without mesh parts may omit it.
+   */
+  constructor(directory, world, project, scene, { defer = false, renderer = null } = {}) {
     this.disposed = false;
     this.materials = new MaterialLibrary(project.materials);
+    this.meshes = new AuthoredMeshes(directory, renderer, project.meshes ?? [], `scene:${scene.id}`.slice(0, 80));
     this.directory = directory;
     this.world = world;
     this.instances = new Map();
@@ -22,9 +29,10 @@ export class SceneInstance {
     }
   }
   /** Runtime loading yields once per bounded assembly, preserving Lobby's preparation budget. */
-  static *prepare(directory, world, project, scene) {
+  static *prepare(directory, world, project, scene, { renderer = null } = {}) {
     const instance = new SceneInstance(directory, world, project, scene, {
       defer: true,
+      renderer,
     });
     let complete = false;
     try {
@@ -74,6 +82,7 @@ export class SceneInstance {
       world: this.world,
       asset,
       materials: this.materials,
+      meshes: this.meshes,
     });
     item.geometryRoot = built.root;
     item.parts = built.parts;
@@ -85,7 +94,10 @@ export class SceneInstance {
   /** Update existing retained geometry; positions never require asset reconstruction. */
   apply(scene, project = null) {
     if (this.disposed) throw new Error("Scene instance is disposed");
-    if (project) this.materials.sync(project.materials);
+    if (project) {
+      this.materials.sync(project.materials);
+      this.meshes.sync(project.meshes ?? []);
+    }
     // Reconcile topology by authored ID, retaining every unaffected runtime tree and collider.
     const ids = new Set(scene.entities.map((e) => e.id));
     for (const id of this.instances.keys()) if (!ids.has(id)) this.remove(id);
@@ -110,6 +122,7 @@ export class SceneInstance {
       }
     }
     const usedMaterials = new Set(),
+      usedMeshes = new Set(),
       v = [0, 0, 0];
     for (const e of scene.entities) {
       const item = this.instances.get(e.id);
@@ -124,6 +137,7 @@ export class SceneInstance {
           usedMaterials.add(id);
           item.parts[i].shape.material = this.materials.get(id);
         }
+        if (part.shape?.mesh !== undefined) this.applyMesh(item.parts[i], part, e.poses?.[part.id], usedMeshes);
       });
       [r.x, r.y, r.z] = e.position;
       const length = Math.hypot(...e.rotation);
@@ -166,6 +180,25 @@ export class SceneInstance {
       });
     }
     this.materials.retain(usedMaterials);
+    // Entities now draw their current meshes, so replaced recipes can be released.
+    this.meshes.retain(usedMeshes);
+  }
+  /**
+   * Keep one mesh part current: swap in the resident mesh when its recipe changed (a new
+   * skeleton gets a fresh pose), then pose its joints from the object's authored offsets.
+   * Joints absent from `offsets` sit at rest, so removing an entry restores the rest pose.
+   */
+  applyMesh(entity, part, offsets = {}, used) {
+    const mesh = this.meshes.get(part.shape.mesh);
+    used.add(part.shape.mesh);
+    if (entity.shape.mesh !== mesh) {
+      if (entity.shape.mesh?.skeleton !== mesh.skeleton) entity.skin = mesh.skinned ? new SkeletonPose(mesh.skeleton) : null;
+      entity.shape.mesh = mesh;
+    }
+    if (!entity.skin) return;
+    entity.skin.reset();
+    for (const [joint, q] of Object.entries(offsets)) entity.skin.offset(entity.skin.joint(joint), q);
+    entity.skin.update();
   }
   /** Remove only one tree and its derived mappings; shared asset data remains untouched. */
   remove(id) {
@@ -217,6 +250,8 @@ export class SceneInstance {
     this.authored.clear();
     this.colliders.length = 0;
     this.materials.dispose();
+    // Entities left the world above, so no batch will draw these meshes again.
+    this.meshes.dispose();
     this.world = this.directory = null;
   }
 }

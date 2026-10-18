@@ -19,6 +19,7 @@
     "test:surface": "node tests/surface-browser.cjs",
     "test:objects": "node tests/objects-browser.cjs",
     "test:humanoid": "node tests/humanoid-browser.cjs",
-    "test:skinning": "node tests/skinning-browser.cjs"
+    "test:skinning": "node tests/skinning-browser.cjs",
+    "test:meshes": "node tests/meshes-browser.cjs"
   }
 }
