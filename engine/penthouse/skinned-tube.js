@@ -54,6 +54,8 @@ export function tubeRecipe(options = {}) {
   return { skeleton, mesh: createMesh({ ...loft({ rings, around: o.around }), skeleton }) };
 }
 
+/** Hermite ease from 0 at a to 1 at b with zero slope at both ends (GLSL smoothstep). The
+ * flat ends keep weights from changing abruptly where a blend zone starts and stops. */
 function smoothstep(a, b, x) {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
