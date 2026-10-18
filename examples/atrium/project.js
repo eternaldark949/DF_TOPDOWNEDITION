@@ -2,8 +2,9 @@
 import data from './project.json' with {type:'json'};
 import { validateProject } from '../../engine/basement/project.js';
 import { ASSEMBLY_GENERATORS } from '../../engine/penthouse/assembly.js';
+import { MESH_GENERATORS } from '../../engine/penthouse/mesh-generators.js';
 /** Resolve authored generator identities against the libraries this example actually installs. */
-export function validateAtriumProject(project){validateProject(project,{generators:ASSEMBLY_GENERATORS});
+export function validateAtriumProject(project){validateProject(project,{generators:ASSEMBLY_GENERATORS,meshGenerators:MESH_GENERATORS});
  // This application's injected Play behavior requires these explicit content conventions.
  // Generic schema and scene-instantiation mechanisms do not know the Atrium's names.
  for(const scene of project.scenes){

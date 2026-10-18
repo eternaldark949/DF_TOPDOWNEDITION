@@ -60,7 +60,7 @@ test("Version two ingress adds origins without changing flat geometry, IDs or so
   const before = JSON.stringify(p),
     up = upgradeProject(p);
   assert.equal(JSON.stringify(p), before);
-  assert.equal(up.schemaVersion, 3);
+  assert.equal(up.schemaVersion, 4);
   assert.deepEqual(up.assets, p.assets);
   assert.ok(up.scenes.every((s) => s.entities.every((e) => e.parent === null)));
   assert.equal(upgradeProject(up), up);

@@ -14,15 +14,38 @@
 import { createSkeleton } from "../basement/skeleton.js";
 import { createMesh, loft } from "../basement/mesh.js";
 
-const DEFAULTS = Object.freeze({ length: 0.8, radius: 0.07, taper: 0.7, joints: 3, rings: 33, around: 18, blend: 0.3 });
+/**
+ * The tube's parameter catalog: the single source for defaults, validation limits, units
+ * and editor controls (Studio draws mesh-asset fields from it, as the humanoid review page
+ * draws HUMANOID_PARAMETERS). Add a parameter here, never in one surface only.
+ *   key      authored JSON name       min/max  inclusive validation limits
+ *   integer  whole numbers only       step     editor slider step
+ *   unit     display unit ("m", "×" for a ratio, "" for a count)
+ */
+export const TUBE_PARAMETERS = Object.freeze([
+  { key: "length", label: "Length", value: 0.8, min: 0.05, max: 10, step: 0.01, unit: "m" },
+  { key: "radius", label: "Radius", value: 0.07, min: 0.005, max: 2, step: 0.005, unit: "m" },
+  { key: "taper", label: "Tip taper", value: 0.7, min: 0.05, max: 4, step: 0.01, unit: "×" },
+  { key: "joints", label: "Joints", value: 3, min: 1, max: 32, step: 1, unit: "", integer: true },
+  { key: "rings", label: "Rings", value: 33, min: 4, max: 256, step: 1, unit: "", integer: true },
+  { key: "around", label: "Sides", value: 18, min: 3, max: 64, step: 1, unit: "", integer: true },
+  { key: "blend", label: "Joint blend", value: 0.3, min: 0.02, max: 0.5, step: 0.01, unit: "×" },
+].map(Object.freeze));
 
-/** Validated, complete options. Units: metres; taper = tip radius ÷ root radius. */
+const DEFAULTS = Object.freeze(Object.fromEntries(TUBE_PARAMETERS.map((p) => [p.key, p.value])));
+
+/**
+ * Validated, complete options. Units: metres; taper = tip radius ÷ root radius; blend is a
+ * fraction of one segment. Omitted keys take defaults; unknown keys are rejected so a typo
+ * in authored JSON fails validation instead of silently building the default tube.
+ */
 export function tubeOptions(options = {}) {
+  for (const key of Object.keys(options)) if (!Object.hasOwn(DEFAULTS, key)) throw new RangeError(`Unknown tube parameter ${key}`);
   const o = { ...DEFAULTS, ...options };
-  const limits = { length: [0.05, 10], radius: [0.005, 2], taper: [0.05, 4], joints: [1, 32], rings: [4, 256], around: [3, 64], blend: [0.02, 0.5] };
-  for (const [key, [min, max]] of Object.entries(limits))
+  for (const { key, min, max, integer } of TUBE_PARAMETERS) {
     if (!Number.isFinite(o[key]) || o[key] < min || o[key] > max) throw new RangeError(`Tube ${key} must be ${min}–${max}`);
-  for (const key of ["joints", "rings", "around"]) if (!Number.isInteger(o[key])) throw new RangeError(`Tube ${key} must be an integer`);
+    if (integer && !Number.isInteger(o[key])) throw new RangeError(`Tube ${key} must be an integer`);
+  }
   return Object.freeze(o);
 }
 

@@ -2,6 +2,7 @@
 import { ObjectPanel } from "./objects.js";
 import { descendants, lockOwner } from "../../engine/basement/objects.js";
 import { MaterialPanel } from "./materials.js";
+import { MeshPanel } from "./meshes.js";
 import { createMaterial } from "../../engine/basement/material.js";
 import {
   TRANSFORM_PROPERTIES,
@@ -12,14 +13,25 @@ export class WorkspacePanels {
   /** Element references and callbacks are supplied by the application shell. */
   constructor(
     elements,
-    { onSelect, onSelectMaterial, onPlace, onError, library },
+    {
+      onSelect,
+      onSelectMaterial,
+      onPlace,
+      onCreateMesh = null,
+      onError,
+      library,
+      meshGenerators = {},
+    },
   ) {
     this.elements = elements;
     this.library = library;
     this.objectPanel = null;
     this.onSelectMaterial = onSelectMaterial;
     this.materialPanel = null;
-
+    // Mesh context: the generator catalog is injected so panels name no generator.
+    this.meshPanel = null;
+    this.meshGenerators = meshGenerators;
+    this.onCreateMesh = onCreateMesh;
     this.onSelect = onSelect;
     this.onPlace = onPlace;
     this.onError = onError;
@@ -36,6 +48,8 @@ export class WorkspacePanels {
       this.objectPanel = null;
       this.materialPanel?.dispose();
       this.materialPanel = null;
+      this.meshPanel?.dispose();
+      this.meshPanel = null;
       this.inspector?.dispose();
       this.inspector = null;
       const e = this.elements,
@@ -110,6 +124,18 @@ export class WorkspacePanels {
           readOnly: locked,
         });
       }
+      if (!session.play && entity?.asset)
+        this.meshPanel = new MeshPanel({
+          host: e.fields,
+          session,
+          entity,
+          meshGenerators: this.meshGenerators,
+          onPart: (id) => {
+            session.surfacePart = id;
+            this.refresh(session);
+          },
+          onError: this.onError,
+        });
       this.renderMaterials(session);
       const selectedIds = descendants(scene, session.selected);
       if (session.preview)
@@ -126,6 +152,23 @@ export class WorkspacePanels {
     const host = this.elements.assets;
     host.replaceChildren();
     const query = this.filter.trim().toLowerCase();
+    // One "New …" command per mesh generator: a recipe plus a geometry source to place.
+    if (this.onCreateMesh)
+      for (const [name, generator] of Object.entries(this.meshGenerators)) {
+        const add = document.createElement("button");
+        add.type = "button";
+        add.textContent = `New ${(generator.label ?? name).toLowerCase()} mesh`;
+        add.dataset.meshGenerator = name;
+        add.disabled = !!session.play;
+        add.addEventListener("click", () => {
+          try {
+            this.onCreateMesh(name, generator);
+          } catch (error) {
+            this.onError(error);
+          }
+        });
+        host.append(add);
+      }
     for (const asset of session.document.data.assets.filter((a) =>
       (a.name + " " + a.id).toLowerCase().includes(query),
     )) {
@@ -200,6 +243,8 @@ export class WorkspacePanels {
     this.objectPanel = null;
     this.materialPanel?.dispose();
     this.materialPanel = null;
+    this.meshPanel?.dispose();
+    this.meshPanel = null;
     this.inspector?.dispose();
     this.inspector = null;
   }

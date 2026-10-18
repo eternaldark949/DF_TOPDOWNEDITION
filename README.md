@@ -20,6 +20,8 @@ The branch was intentionally created with only this plan. On 2026-10-15, after r
 
 **Skeletons and skinned meshes:** [decision 0022](docs/decisions/0022-skeletons-and-skinned-meshes.md) · [evidence](docs/milestones/skinning/README.md). Stage 1 of the modeling plan: joint hierarchies, the mesh format and loft builder, GPU skinning in every pass, the Lobby's animate phase and Directory mesh leases. The lofted body and the Studio modeling tools are the next stages.
 
+**Authored meshes and poses:** [decision 0023](docs/decisions/0023-authored-meshes-and-poses.md) · [evidence](docs/milestones/authored-meshes/README.md). Project schema v4 stores mesh recipes and per-object joint poses; the Directory builds and shares them by recipe; Studio creates, places, poses and edits them through the shared inspector with undo, while Play poses only its own copy.
+
 **Origins, locks and number surfaces:** [origin-first components, selectable locks and precise sliders](docs/decisions/0019-origins-locks-and-number-surfaces.md) · [previews and verification](docs/milestones/origins-and-controls/README.md).
 
 **Surface response and colour:** [specular tuning and shared HDR colour wheel](docs/decisions/0018-surface-response-and-colour.md) · [previews and verification](docs/milestones/surface-response/README.md).

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "id": "freelancer.enni-slice.v1",
   "name": "Freelancer · Enni Cole",
   "assets": [
@@ -13576,5 +13576,6 @@
       ],
       "emissionStrength": 0.65
     }
-  ]
+  ],
+  "meshes": []
 }

@@ -121,7 +121,9 @@ const server = http.createServer((req, res) => {
       engine.lobby.pause("document-hidden", false);
       engine.start();
       const revision = pose.revision;
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      // Wait for frames, not wall time: software WebGL under load can render < 5 in 600 ms.
+      for (const deadline = performance.now() + 15000; rendered < 6 && performance.now() < deadline; )
+        await new Promise((resolve) => setTimeout(resolve, 50));
       engine.stop(); removeAnimate(); removeRender();
       const phase = { animated, rendered, alternating: /^(ar)+$/.test(order), revisions: pose.revision - revision };
 

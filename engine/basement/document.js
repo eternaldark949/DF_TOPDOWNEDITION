@@ -27,6 +27,7 @@ export class ProjectDocument {
     const used = new Set([
       ...this.data.assets.map(a=>a.id),
       ...this.data.materials.map((m) => m.id),
+      ...(this.data.meshes ?? []).map((m) => m.id),
       ...this.data.scenes.flatMap((scene) =>
         scene.entities.map((entity) => entity.id),
       ),
