@@ -935,7 +935,7 @@
         }
         const _P_SHADE = '24, 8, 20';
         /** Hair, shaded and textured in its layer: depth toward the edges, strands or coils, a sheen, the rim. */
-        function _portraitHairFinish(x, w, h, hair, cx, cy, fw, fh, rim, front) {
+        function _portraitHairFinish(x, w, h, hair, cx, cy, fw, fh, rim, rimA = 0.75) {
             const color = /^#[0-9a-f]{6}$/i.test(hair.color || '') ? hair.color : '#1a1a1a';
             const luma = _hairLuma(color), coily = hair.type === 'afro' || hair.type === 'curls';
             const dark = _hairShade(color, 0.55), mid = lightenHex(color, luma < 0.25 ? 50 : 30), lift = lightenHex(color, luma < 0.25 ? 110 : 70);
@@ -988,7 +988,7 @@
                 }
             }
             x.globalAlpha = 1; x.globalCompositeOperation = 'source-over';
-            _pRim(x, w, h, fw * 0.13, rim, 0.7);
+            _pRim(x, w, h, fw * 0.13, rim, rimA);
         }
         /** Draw a hair renderer with a darker rim round each piece it fills: curls read as clusters, not one blob. */
         function _portraitClusters(x, color, lw) {
@@ -1002,12 +1002,36 @@
             });
         }
         /** Draw one portrait hair layer (renderer key) through its own lit layer onto ctx. */
-        function _portraitHair(ctx, key, hair, cx, cy, fw, fh, w, h, rim, layer) {
+        /** The face's outline (forehead, temples, cheekbones, jaw, chin) added to the current path; k narrows it. */
+        function portraitFacePath(c, cx, cy, fw, fh, k = 1) {
+            c.moveTo(cx, cy - fh);
+            for (const s of [1, -1]) {
+                const X = v => cx + s * v * fw * k;
+                if (s < 0) c.moveTo(cx, cy - fh);
+                c.bezierCurveTo(X(0.62), cy - fh, X(0.95), cy - fh * 0.72, X(0.98), cy - fh * 0.3);      // forehead to temple
+                c.bezierCurveTo(X(1.0), cy + fh * 0.05, X(0.97), cy + fh * 0.3, X(0.86), cy + fh * 0.55);  // cheekbone to the jaw's angle
+                c.bezierCurveTo(X(0.72), cy + fh * 0.82, X(0.42), cy + fh * 1.02, cx, cy + fh * 1.04);      // jaw to chin
+            }
+        }
+        /**
+         * Draw one portrait hair layer (renderer key) through its own lit layer onto ctx.
+         * opts.front: the layer lies over the face, so it's cut away inside the face's outline below an
+         * arch at the brow (a fringe stays; side curtains frame the temples instead of cutting into the cheeks).
+         */
+        function _portraitHair(ctx, key, hair, cx, cy, fw, fh, w, h, rim, layer, opts = {}) {
             const renderer = PORTRAIT_HAIR_RENDERERS[key];
             if (!renderer) return;
             const L = _portraitLayer(layer, w, h), x = L.getContext('2d');
             renderer(hair.type === 'curls' ? _portraitClusters(x, /^#[0-9a-f]{6}$/i.test(hair.color || '') ? hair.color : '#1a1a1a', Math.max(1, fw * 0.05)) : x, hair.color, cx, cy, fw, fh);
-            _portraitHairFinish(x, w, h, hair, cx, cy, fw, fh, rim);
+            if (opts.front) {
+                x.save();
+                x.beginPath(); x.rect(0, cy + fh * 0.2, w, h);                 // below the cheekbones, and an arch up to the brow
+                x.ellipse(cx, cy + fh * 0.2, fw * 0.95, fh * 0.6, 0, 0, Math.PI * 2); x.clip('nonzero');
+                x.globalCompositeOperation = 'destination-out';
+                x.beginPath(); portraitFacePath(x, cx, cy, fw, fh, 0.94); x.fill();
+                x.restore();
+            }
+            _portraitHairFinish(x, w, h, hair, cx, cy, fw, fh, rim, opts.front ? 0.35 : 0.75);
             ctx.drawImage(L, 0, 0, w, h);
         }
 
@@ -1134,12 +1158,7 @@
             {
                 const faceLayer = _portraitLayer(2, w, h), f = faceLayer.getContext('2d');
                 f.fillStyle = skinColor;
-                f.beginPath(); f.ellipse(cx, cy, fw, fh, 0, 0, Math.PI * 2); f.fill();
-                f.beginPath();                                                // the jaw, narrowing to the chin
-                f.moveTo(cx - fw, cy);
-                f.quadraticCurveTo(cx - fw * 0.75, cy + fh * 1.1, cx, cy + fh * 1.05);
-                f.quadraticCurveTo(cx + fw * 0.75, cy + fh * 1.1, cx + fw, cy);
-                f.fill();
+                f.beginPath(); portraitFacePath(f, cx, cy, fw, fh); f.fill();
                 // Form: the face turns away from the key light on its left, the hairline and jaw shade
                 let g = f.createLinearGradient(cx - fw, 0, cx + fw, 0);
                 g.addColorStop(0, `rgba(${SK}, 0.42)`); g.addColorStop(0.3, `rgba(${SK}, 0.12)`);
@@ -1296,26 +1315,31 @@
                 ctx.stroke();
                 ctx.globalAlpha = 1.0;
                 // Eyeliner — top lid line, thickening to a small flick at the outer corner
+                // (Men: a plain lash line, no flick, short sparse lashes)
+                const masc = gender === 'male';
                 ctx.strokeStyle = '#140a12';
-                ctx.lineWidth = fw * 0.045 * (1 + lidTop * 0.6);
+                ctx.lineWidth = fw * (masc ? 0.03 : 0.045) * (1 + lidTop * 0.6);
                 ctx.beginPath();
                 ctx.moveTo(ex - eyeW, eyeY);
                 ctx.quadraticCurveTo(ex, lidY, ex + eyeW, eyeY);
                 ctx.stroke();
-                ctx.lineWidth = fw * 0.035;
-                ctx.beginPath(); ctx.moveTo(ex + side * eyeW * 0.92, eyeY - eyeH * 0.06); ctx.lineTo(ex + side * eyeW * 1.18, eyeY - eyeH * 0.42); ctx.stroke();
+                if (!masc) {
+                    ctx.lineWidth = fw * 0.035;
+                    ctx.beginPath(); ctx.moveTo(ex + side * eyeW * 0.92, eyeY - eyeH * 0.06); ctx.lineTo(ex + side * eyeW * 1.18, eyeY - eyeH * 0.42); ctx.stroke();
+                }
                 // Lashes along the top lid, longest toward the outer corner (down along a closed lid)
                 ctx.lineWidth = Math.max(0.6, fw * 0.022);
+                if (masc) { ctx.globalAlpha = 0.55; ctx.lineWidth = Math.max(0.5, fw * 0.015); }
                 ctx.beginPath();
                 for (let i = 0; i < 6; i++) {
                     const t = side > 0 ? 0.5 + i * 0.09 : 0.5 - i * 0.09, u = 1 - t;
                     const lx = u * u * (ex - eyeW) + 2 * u * t * ex + t * t * (ex + eyeW), ly = u * u * eyeY + 2 * u * t * lidY + t * t * eyeY;
-                    const len = eyeH * (0.45 + i * 0.12), down = lidTop > 0.7;
+                    const len = eyeH * (0.45 + i * 0.12) * (masc ? 0.5 : 1), down = lidTop > 0.7;
                     ctx.moveTo(lx, ly);
                     ctx.quadraticCurveTo(lx + side * len * 0.2, ly + (down ? len * 0.5 : -len * 0.6), lx + side * len * (0.35 + i * 0.1), ly + (down ? len * 0.7 : -len * (0.85 - i * 0.06)));
                 }
                 ctx.stroke();
-                ctx.lineCap = 'butt';
+                ctx.globalAlpha = 1; ctx.lineCap = 'butt';
                 // Lower lash line (subtle)
                 ctx.globalAlpha = 0.3;
                 ctx.beginPath();
@@ -1415,7 +1439,7 @@
                     ctx.beginPath(); ctx.rect(-w, -h, w * 3, h * 3);
                     ctx.ellipse(cx, cy + fh * 0.2, fw * 0.95, fh * 0.6, 0, 0, Math.PI * 2);
                     ctx.clip('evenodd');
-                    _portraitHair(ctx, hair.type, hair, cx, cy, fw, fh, w, h, rim, 3);
+                    _portraitHair(ctx, hair.type, hair, cx, cy, fw, fh, w, h, rim, 3, { front: true });
                     ctx.restore();
                 }
             }
