@@ -50166,8 +50166,13 @@ Object.assign(TrafficVehicle.prototype, {
             afro_back(ctx, color, cx, cy, fw, fh) {
                 // Full afro volume rendered BEHIND the face
                 ctx.fillStyle = color;
-                const r = Math.max(fw, fh) * 1.7;
+                const r = Math.max(fw, fh) * 1.45;
                 ctx.beginPath(); ctx.arc(cx, cy - fh * 0.15, r, 0, Math.PI * 2); ctx.fill();
+                // A cloud, not a ball: soft bumps round its edge
+                for (let i = 0; i < 16; i++) {
+                    const a = i / 16 * Math.PI * 2 + 0.2, br = r * (0.2 + (i % 3) * 0.035);
+                    ctx.beginPath(); ctx.arc(cx + Math.cos(a) * r * 0.9, cy - fh * 0.15 + Math.sin(a) * r * 0.9, br, 0, Math.PI * 2); ctx.fill();
+                }
                 // Side volume clusters (visible around face edges)
                 const clusters = [
                     [cx - fw * 1.1, cy - fh * 0.1, r * 0.3],
@@ -50188,9 +50193,12 @@ Object.assign(TrafficVehicle.prototype, {
             afro(ctx, color, cx, cy, fw, fh) {
                 // FRONT layer — only the top crown above the forehead
                 ctx.fillStyle = color;
-                // Crown arc sitting on top of head
+                // Crown arc sitting on top of head, meeting the forehead in a rounded hairline (lower at the temples)
                 ctx.beginPath();
                 ctx.ellipse(cx, cy - fh * 0.85, fw * 1.25, fh * 0.55, 0, Math.PI, Math.PI * 2);
+                ctx.lineTo(cx + fw * 1.0, cy - fh * 0.38);
+                ctx.quadraticCurveTo(cx, cy - fh * 1.3, cx - fw * 1.0, cy - fh * 0.38);
+                ctx.closePath();
                 ctx.fill();
                 // Texture clusters on top only
                 const topClusters = [
@@ -50443,8 +50451,25 @@ Object.assign(TrafficVehicle.prototype, {
         function portraitRimRGB(config) {
             if (config && config.rim) return config.rim;
             try {
-                const p = game.player, n = p && _lampNear(p.x, p.y, 400);
-                if (n && /^#[0-9a-f]{6}$/i.test(n.l.color || '')) return _portraitVivid(n.l.color);
+                // Of the lamps near the player, the most colourful wins (a near white downlight shouldn't
+                // drown out the violet trees beside it); nearer counts for more
+                const p = game.player, cells = p && _lampCells(), R = 420;
+                let best = null, bs = 0;
+                if (cells) {
+                    const gx = Math.floor(p.x / 200), gy = Math.floor(p.y / 200);
+                    for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) {
+                        const c = cells.get((gx + i) + ',' + (gy + j));
+                        if (c) for (const l of c) {
+                            if (!/^#[0-9a-f]{6}$/i.test(l.color || '')) continue;
+                            const d = Math.hypot(l.x - p.x, l.y - p.y);
+                            if (d >= R) continue;
+                            const n = parseInt(l.color.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+                            const sc = (0.15 + (Math.max(r, g, b) - Math.min(r, g, b)) / 255) * Math.sqrt(1 - d / R);
+                            if (sc > bs) { bs = sc; best = l.color; }
+                        }
+                    }
+                }
+                if (best) return _portraitVivid(best);
             } catch (e) { }
             return '255, 120, 150';
         }
@@ -50504,10 +50529,13 @@ Object.assign(TrafficVehicle.prototype, {
             x.globalCompositeOperation = 'source-atop'; x.lineCap = 'round';
             if (coily) {
                 // Coils: a tile scaled to the face, then a few lit curls toward the key light
-                const tile = _hairPatternTile('coil', color), s = fw * 0.26 / (6 * HAIR_FINISH_K);
-                const pat = x.createPattern(tile, 'repeat');
-                pat.setTransform(new DOMMatrix([s, 0, 0, s, 0, 0]));
-                x.fillStyle = pat; x.fillRect(0, 0, w, h);
+                const tile = _hairPatternTile('coil', color), s = fw * 0.17 / (6 * HAIR_FINISH_K);
+                for (const [k, a] of [[1, 0.6], [0.77, 0.35]]) {             // two scales, offset: no visible repeat
+                    const pat = x.createPattern(tile, 'repeat');
+                    pat.setTransform(new DOMMatrix([s * k, s * k * 0.2 * (k < 1 ? 1 : 0), 0, s * k, fw * 0.37 * (1 - k), fh * 0.29 * (1 - k)]));
+                    x.globalAlpha = a; x.fillStyle = pat; x.fillRect(0, 0, w, h);
+                }
+                x.globalAlpha = 1;
                 x.strokeStyle = lift; x.lineWidth = Math.max(0.8, fw * 0.035);
                 for (let i = 0; i < 26; i++) {
                     const a = i * 2.39996, r = fw * 1.3 * Math.sqrt((i + 0.5) / 26);
@@ -50557,8 +50585,7 @@ Object.assign(TrafficVehicle.prototype, {
             const renderer = PORTRAIT_HAIR_RENDERERS[key];
             if (!renderer) return;
             const L = _portraitLayer(layer, w, h), x = L.getContext('2d');
-            const coily = hair.type === 'afro' || hair.type === 'curls';
-            renderer(coily ? _portraitClusters(x, /^#[0-9a-f]{6}$/i.test(hair.color || '') ? hair.color : '#1a1a1a', Math.max(1, fw * 0.05)) : x, hair.color, cx, cy, fw, fh);
+            renderer(hair.type === 'curls' ? _portraitClusters(x, /^#[0-9a-f]{6}$/i.test(hair.color || '') ? hair.color : '#1a1a1a', Math.max(1, fw * 0.05)) : x, hair.color, cx, cy, fw, fh);
             _portraitHairFinish(x, w, h, hair, cx, cy, fw, fh, rim);
             ctx.drawImage(L, 0, 0, w, h);
         }
@@ -50590,6 +50617,7 @@ Object.assign(TrafficVehicle.prototype, {
             const fw = w * 0.21;     // Face width radius (a close bust: the face fills the frame)
             const fh = h * 0.26;     // Face height radius (oval)
             const rim = portraitRimRGB(config);                               // the room's light round the left edge
+            const skinLum = (0.3 * skinRGB.r + 0.59 * skinRGB.g + 0.11 * skinRGB.b) / 255;
             const SK = `${Math.round(skinRGB.r * 0.42)}, ${Math.round(skinRGB.g * 0.26)}, ${Math.round(skinRGB.b * 0.3)}`;   // skin's own shade, warm
 
             // ─── BACKDROP GLOW ─── the room's colour behind them, brightest on the rim side
@@ -50703,8 +50731,8 @@ Object.assign(TrafficVehicle.prototype, {
                 g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(${SK}, 0.32)`);
                 _pAtop(f, w, h, g);
                 for (const side of [-1, 1]) {
-                    _pSpot(f, w, h, cx + side * fw * 0.44, cy - fh * 0.18, fw * 0.3, fh * 0.15, SK, 0.2);     // eye sockets
-                    _pSpot(f, w, h, cx + side * fw * 0.72, cy + fh * 0.34, fw * 0.28, fh * 0.11, SK, 0.1);    // under the cheekbones
+                    _pSpot(f, w, h, cx + side * fw * 0.44, cy - fh * 0.18, fw * 0.3, fh * 0.15, SK, 0.2 * (1 - skinLum * 0.45));     // eye sockets
+                    _pSpot(f, w, h, cx + side * fw * 0.74, cy + fh * 0.36, fw * 0.2, fh * 0.08, SK, 0.1 * (1 - skinLum * 0.7));    // under the cheekbones
                     _pSpot(f, w, h, cx + side * fw * 0.48, cy + fh * 0.1, fw * 0.26, fh * 0.12, '255, 240, 228', side > 0 ? 0.2 : 0.07);   // cheekbones
                 }
                 _pSpot(f, w, h, cx + fw * 0.12, cy - fh * 0.58, fw * 0.4, fh * 0.16, '255, 244, 234', 0.16);       // brow
