@@ -411,10 +411,138 @@
             _hairFinishSprites.set(key, cv);
             return cv;
         }
+        /** A small tile of hair texture (coils, or fine swept strands), baked per colour for the lobes and ruffles. */
+        const _hairPatterns = new Map();
+        function _hairPattern(ctx, kind, color) {
+            const key = kind + color;
+            let p = _hairPatterns.get(key);
+            if (p) return p;
+            const K = HAIR_FINISH_K, U = 6, cv = document.createElement('canvas');
+            cv.width = cv.height = U * K;
+            const c = cv.getContext('2d'), luma = _hairLuma(color);
+            const dark = _hairShade(color, 0.5), mid = lightenHex(color, luma < 0.25 ? 45 : 28);
+            c.scale(K, K); c.lineCap = 'round'; c.lineWidth = 0.4;
+            if (kind === 'coil') {
+                const P = [[1.2, 1.3, 0.3], [4.2, 1.6, 2.1], [2.7, 4.3, 4.0], [5.6, 4.6, 1.2], [0.2, 4.6, 5.0]];
+                for (let i = 0; i < P.length; i++) {
+                    const [x, y, a] = P[i];
+                    c.strokeStyle = i % 2 ? mid : dark; c.globalAlpha = i % 2 ? 0.35 : 0.55;
+                    for (const dx of [0, -U, U]) for (const dy of [0, -U, U]) { c.beginPath(); c.arc(x + dx, y + dy, 0.9, a, a + 3.6); c.stroke(); }
+                }
+            } else {                                                    // fine strands lying back along -x, a little wavy
+                for (let i = 0; i < 5; i++) {
+                    const y = (i + 0.5) * U / 5;
+                    c.strokeStyle = i % 2 ? mid : dark; c.globalAlpha = i % 2 ? 0.3 : 0.5; c.lineWidth = i % 2 ? 0.45 : 0.35;
+                    c.beginPath(); c.moveTo(0, y); c.bezierCurveTo(U * 0.33, y - 0.35, U * 0.66, y + 0.35, U, y); c.stroke();
+                }
+            }
+            p = ctx.createPattern(cv, 'repeat');
+            p.setTransform(new DOMMatrix([1 / K, 0, 0, 1 / K, 0, 0]));
+            _hairPatterns.set(key, p);
+            return p;
+        }
+        /** Is this point outside the crown ellipse (where the crown's own finish doesn't reach)? */
+        function _offCrown(p, cx, cy, C) { return ((p.x - cx) / C[1]) ** 2 + ((p.y - cy) / C[2]) ** 2 >= 1; }
+        /**
+         * Strand lines along a lock, off its centre line by `off` (in units of its half-width w0→w1),
+         * only where it lies outside the crown. Adds to the current path.
+         */
+        function _hairFiber(ctx, st, off, w0, w1, cx, cy, C, from = 1) {
+            let pen = false;
+            const n = st.length - 1;
+            for (let i = from; i <= n; i++) {
+                const p = st[i];
+                if (!_offCrown(p, cx, cy, C)) { pen = false; continue; }
+                const a = st[Math.max(0, i - 1)], b = st[Math.min(n, i + 1)];
+                const dx = b.x - a.x, dy = b.y - a.y, m = Math.hypot(dx, dy) || 1;
+                const w = (w0 + (w1 - w0) * (i / n)) * 0.5 * off;
+                const x = p.x - dy / m * w, y = p.y + dx / m * w;
+                if (pen) ctx.lineTo(x, y); else { ctx.moveTo(x, y); pen = true; }
+            }
+        }
+        /** Clip to a set of circles [x, y, r] and fill them with a texture tile, then mark where they meet. */
+        function _hairLobes(ctx, lobes, pattern, edge) {
+            ctx.save();
+            ctx.beginPath();
+            for (const [x, y, r] of lobes) { ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, Math.PI * 2); }
+            ctx.clip();
+            ctx.fillStyle = pattern;
+            let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+            for (const [x, y, r] of lobes) { x0 = Math.min(x0, x - r); y0 = Math.min(y0, y - r); x1 = Math.max(x1, x + r); y1 = Math.max(y1, y + r); }
+            ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+            if (!edge) { ctx.restore(); return; }
+            // Each lobe's rim shades where it tucks under its neighbours: clusters, not one blob
+            ctx.strokeStyle = edge; ctx.lineWidth = 0.9; ctx.globalAlpha *= 0.4;
+            ctx.beginPath();
+            for (const [x, y, r] of lobes) { ctx.moveTo(x + r - 0.3, y); ctx.arc(x, y, r - 0.3, 0, Math.PI * 2); }
+            ctx.stroke();
+            ctx.restore();
+        }
+        /** The rest of each style beyond the crown: curtains, tails, locks, braids, lobes and ruffles. */
+        function _hairSecondary(ctx, type, color, headX, geo, cx, cy, C) {
+            const S = geo.strands, j = geo.jig || { x: 0, y: 0 }, a0 = ctx.globalAlpha, luma = _hairLuma(color);
+            const dark = _hairShade(color, 0.5), mid = lightenHex(color, luma < 0.25 ? 45 : 28), lift = lightenHex(color, luma < 0.25 ? 80 : 50);
+            const lines = (style, a, w, fn) => { ctx.strokeStyle = style; ctx.lineWidth = w; ctx.globalAlpha = a0 * a; ctx.beginPath(); fn(); ctx.stroke(); };
+            ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+            if (type === 'long' && S.length > 1) {
+                // The curtain between the locks gets its own strands, and darkens at its outer edges
+                const n = S[0].length, tmp = _hairSecondary.tmp || (_hairSecondary.tmp = []);
+                const between = (t) => {
+                    for (let s = 0; s < S.length - 1; s++) {
+                        const A = S[s], B = S[s + 1];
+                        for (let i = 0; i < n; i++) { const q = tmp[i] || (tmp[i] = { x: 0, y: 0 }); q.x = A[i].x + (B[i].x - A[i].x) * t; q.y = A[i].y + (B[i].y - A[i].y) * t; }
+                        tmp.length = n;
+                        _hairFiber(ctx, tmp, 0, 1, 1, cx, cy, C);
+                    }
+                };
+                lines(dark, 0.45, 0.4, () => { between(0.33); between(0.66); for (const st of S) _hairFiber(ctx, st, 0.5, 4, 3, cx, cy, C); });
+                lines(mid, 0.3, 0.45, () => { between(0.5); for (const st of S) _hairFiber(ctx, st, -0.4, 4, 3, cx, cy, C); });
+                lines(dark, 0.35, 2.2, () => { _hairFiber(ctx, S[0], 0.6, 4, 3, cx, cy, C); _hairFiber(ctx, S[S.length - 1], -0.6, 4, 3, cx, cy, C); });
+            } else if (type === 'ponytail' || type === 'demon_dancer' || type === 'dreadlocks') {
+                const w0 = type === 'ponytail' ? 5 : type === 'dreadlocks' ? 4 : 4.4, w1 = type === 'ponytail' ? 3 : type === 'dreadlocks' ? 3.2 : 0.8;
+                lines(dark, 0.5, 0.4, () => { for (const st of S) { _hairFiber(ctx, st, 0.7, w0, w1, cx, cy, C); if (type === 'ponytail') _hairFiber(ctx, st, -0.2, w0, w1, cx, cy, C); } });
+                lines(mid, 0.32, 0.45, () => { for (const st of S) { _hairFiber(ctx, st, -0.6, w0, w1, cx, cy, C); if (type === 'ponytail') _hairFiber(ctx, st, 0.25, w0, w1, cx, cy, C); } });
+                if (type === 'dreadlocks') lines(dark, 0.45, 0.6, () => {    // the locks' twisted bands
+                    for (const st of S) for (let i = 1; i < st.length; i++) {
+                        const p = st[i];
+                        if (!_offCrown(p, cx, cy, C)) continue;
+                        const a = st[i - 1], dx = p.x - a.x, dy = p.y - a.y, m = Math.hypot(dx, dy) || 1, w = (4 - 0.8 * i / st.length) * 0.45;
+                        const mx = (a.x + p.x) / 2, my = (a.y + p.y) / 2;
+                        ctx.moveTo(mx - dy / m * w - dx / m * 0.5, my + dx / m * w - dy / m * 0.5); ctx.lineTo(mx + dy / m * w + dx / m * 0.5, my - dx / m * w + dy / m * 0.5);
+                    }
+                });
+                if (type === 'ponytail') lines(dark, 0.4, 1.6, () => { for (const st of S) _hairFiber(ctx, st, 0.75, 5, 3, cx, cy, C, 0); });
+            } else if (type === 'braids') {
+                // Each plait catches a little light on its crest and a strand line down its middle
+                const stride = 1;
+                lines(lift, 0.3, 0.7, () => {
+                    for (const st of S) for (let i = 1; i < st.length; i += stride) {
+                        const a = st[i - 1], b = st[i], ang = Math.atan2(b.y - a.y, b.x - a.x) + (i % 2 ? 0.5 : -0.5);
+                        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+                        if (!_offCrown({ x: mx, y: my }, cx, cy, C)) continue;
+                        const ux = Math.cos(ang), uy = Math.sin(ang);
+                        ctx.moveTo(mx - ux * 1.1 - uy * 0.5, my - uy * 1.1 + ux * 0.5); ctx.lineTo(mx + ux * 0.6 - uy * 0.5, my + uy * 0.6 + ux * 0.5);
+                    }
+                });
+            } else if (type === 'afro') {
+                const hx = headX - 3 + j.x, hy = j.y;
+                _hairLobes(ctx, [[hx, hy, 11], [hx + 2 + j.x * 0.4, -8 + hy * 1.3, 7], [hx - 6 + j.x * 0.4, -3 + hy * 1.2, 8], [hx - 2 + j.x * 0.4, 7 + hy * 1.3, 7]],
+                    _hairPattern(ctx, 'coil', color), dark);
+            } else if (type === 'curls') {
+                const lobes = _hairSecondary.curls || (_hairSecondary.curls = _HAIR_CURL_RING.map(() => [0, 0, 0]));
+                _HAIR_CURL_RING.forEach((c, i) => { const L = lobes[i]; L[0] = headX - 1 + c.x + j.x * c.bounce; L[1] = c.y + j.y * c.bounce; L[2] = c.r; });
+                _hairLobes(ctx, lobes, _hairPattern(ctx, 'coil', color), dark);
+            } else if (type === 'short') {
+                _hairLobes(ctx, [[headX - 7 + j.x, -3 + j.y, 4], [headX - 7 + j.x, 3 + j.y, 3.5], [headX + 5, -3, 3.5], [headX + 5, 3, 3], [headX - 8 + j.x, j.y, 4.2]],
+                    _hairPattern(ctx, 'fiber', color), null);            // tucked under the crown: no cluster rims
+            }
+            ctx.globalAlpha = a0; ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+        }
         function _hairFinish(ctx, hair, headX, geo) {
             const C = HAIR_CROWNS[hair.type], color = hair.color || (hair.type === 'demon_dancer' ? '#0a0000' : null);
             if (!C || !color || !/^#[0-9a-f]{6}$/i.test(color)) return;
             const j = geo.jig, cx = headX + C[0] + (j ? j.x * C[4] : 0), cy = j ? j.y * C[4] : 0;
+            _hairSecondary(ctx, hair.type, color, headX, geo, cx, cy, C);
             // Sheen down the loose strands, from where they leave the crown
             if (geo.strands.length && C[3] !== 'coil') {
                 const a0 = ctx.globalAlpha, lift = lightenHex(color, _hairLuma(color) < 0.25 ? 80 : 50);

@@ -28,3 +28,4 @@ Ambient darkness, gallery visibility, hunter perception and spawn points are unc
 
 - Hair: every style gets depth close up (the crown darkens toward its edge), strands that follow the style (swept back, pulled into a tie, out from a braid part, or coils for afros and curls), a soft sheen band, and a sheen down loose strands. Baked once per style and colour (`_hairFinish` in `ui/humanoid-render.js`).
 - Rim light: indoors, the nearest room lamp now rims characters at any hour in its own colour (red-orange in the palace, violet under the Neural Systems trees), with a soft wrap, a bright edge round the hair and shoulder, and a tint on the lit side.
+- Secondary hair: the texture continues past the crown, with strands through long curtains, ponytails and tendrils, twisted bands on dreadlocks, lit crests on each braid plait, and coils over every afro and curl lobe.
