@@ -25,7 +25,7 @@
         engineMixin({
             /** Is she looking down a sniper's sight right now? */
             isScoping() {
-                if (GameSettings.scopeView === false || this.weaponMode !== 'sniper' || this.weaponHolstered || this.isDriving || this.paused) return false;
+                if (GameSettings.scopeView === false || this.weaponMode !== 'sniper' || (this.weaponHolstered && !this._quickDraw && !this.isDriving) || this.paused) return false;
                 const F = this.fireJoystick;
                 return !!((F.active && (F.aimed || F.armed)) || (this.mouseDown && this.mouseX));
             },
@@ -94,8 +94,8 @@
                 if (k <= 0) return;
                 const p = this.player, t = _gameTimeSec;
                 const steady = Math.min(1, (this._scopeHeld || 0) / SCOPE.STEADY);
-                // The lane leaves from the gun at her eye — the same line the shot takes (aimFromMuzzle)
-                const shot = p._muzzleLocal && p._muzzleReady ? aimFromMuzzle(p, p.angle) : { x: p.x + Math.cos(p.angle) * 6, y: p.y + Math.sin(p.angle) * 6, angle: p.angle };
+                // Use the same muzzle and window-constrained aim as the next shot, walking or driving.
+                const shot = this.getPlayerShotGeometry();
                 const a = shot.angle + (Math.sin(t * 1.7) * 0.7 + Math.sin(t * 3.1) * 0.3) * SCOPE.SWAY * (1 - steady);
                 const ex = shot.x, ey = shot.y;
                 const far = raycastNearest(ex, ey, ex + Math.cos(a) * SCOPE.RANGE, ey + Math.sin(a) * SCOPE.RANGE,

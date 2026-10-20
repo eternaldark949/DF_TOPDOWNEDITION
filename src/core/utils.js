@@ -91,11 +91,13 @@
             return { x: m[0], y: m[1] };
         }
 
+        /** Grip in the seated actor's frame, shared by drawing and shot/sight geometry. */
+        function drivingWeaponGrip(recoil = 0) { return { x: 44 - recoil * 6, y: -12, scale: 0.9 }; }
+
         /** World position of an actor's drawn muzzle if it faced `dirAngle` (falls back to its
          *  centre if no weapon has been drawn). The renderer records ent._muzzleLocal each
          *  frame in the actor's own frame (x forward, y to its right). */
-        function muzzleWorld(ent, dirAngle) {
-            const m = ent._muzzleLocal;
+        function muzzleWorld(ent, dirAngle, m = ent._muzzleLocal) {
             if (!m) return { x: ent.x, y: ent.y };
             const c = Math.cos(dirAngle), s = Math.sin(dirAngle);
             return { x: ent.x + m.x * c - m.y * s, y: ent.y + m.x * s + m.y * c };
@@ -104,8 +106,8 @@
         /** Shot origin + direction for an actor facing `dirAngle`: leaves from the muzzle and
          *  converges on (tx, ty) so the round lands where it was aimed, not a hand's width to
          *  the side. Aim points closer than 80px (or none) fire straight along the facing. */
-        function aimFromMuzzle(ent, dirAngle, tx, ty) {
-            let m = muzzleWorld(ent, dirAngle);
+        function aimFromMuzzle(ent, dirAngle, tx, ty, local = ent._muzzleLocal) {
+            let m = muzzleWorld(ent, dirAngle, local);
             // A long barrel poked through a wall (standing right against it): fire from the
             // body instead, so the round hits the wall rather than starting on the far side
             const map = (typeof game !== 'undefined' && game.activeMap) ? game.activeMap : null;

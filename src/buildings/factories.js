@@ -535,11 +535,11 @@
          * Cold blue/digital theme.
          */
         function createNeuralSystems(x, y, config = {}) {
-            return new BuildingV2({
+            return new NeuralSystemsBuilding({
                 id: 'neural_sys',
                 x: x,
                 y: y,
-                label: 'Neural Sys',
+                label: 'Neural Systems',
                 type: 'tech',
                 floors: 8,
                 

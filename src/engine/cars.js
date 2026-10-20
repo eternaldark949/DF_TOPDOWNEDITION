@@ -209,6 +209,8 @@
                     // --- ENTERING VEHICLE ---
                     const c = this.car;
                     if (!c || !c.visible || c.dead) return;         // nothing here to get into (cars live on the hub)
+                    this._cancelQuickDrawHold?.(); this.cancelQuickDraw();
+                    this.player._vehicleLean = 0; this._vehicleAimAngle = null;
                     this.isDriving = true;
 
                     // CHANGED: Player remains visible to render the "Lean Out" animation

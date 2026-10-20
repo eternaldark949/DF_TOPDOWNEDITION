@@ -21,7 +21,7 @@
             ethereal_plane: { def: 'marble' },
             church_boss: { def: 'stone' },
             keepers_hill: { def: 'grass' },
-            demoness_palace: { def: 'stone', rects: [[860, 760, 80, 226, 'carpet'], [860, 1000, 80, 386, 'carpet'], [14, 1000, 572, 386, 'carpet'],
+            demoness_palace: { def: 'stone', rects: [[840, 760, 120, 226, 'carpet'], [840, 1000, 120, 386, 'carpet'], [14, 1000, 572, 386, 'carpet'],
                                [600, 380, 600, 606, 'marble'], [600, 1000, 600, 386, 'marble'], [14, 14, 872, 352, 'grass']] }
         };
 

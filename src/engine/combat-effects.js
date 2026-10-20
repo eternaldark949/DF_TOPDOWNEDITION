@@ -443,6 +443,7 @@
             },
 
             fireWeapon() {
+                if ((this._quickDraw && !this._quickDrawFiring) || (this.weaponHolstered && !this.isDriving)) return;
                 // 1. VISIBILITY CHECKS
                 if (!this.player.visible && !this.isDriving) return;
                 if (this.paused) return;
@@ -487,32 +488,14 @@
             
                 // 2. Calculate Spawn Position & Angle
                 let px, py, angle = this.player.angle;
-                const onFoot = !(this.isDriving && this.car);
+                const shotGeometry = this.getPlayerShotGeometry();
+                px = shotGeometry.x; py = shotGeometry.y; angle = shotGeometry.angle;
 
-                // On foot: leave from the drawn muzzle and converge on the aim point — the same
-                // line the laser sight draws (see getLaserSight). Spread is applied after.
-                if (onFoot && this.player._muzzleLocal) {
-                    const ap = this.player._aimPoint;
-                    const shot = aimFromMuzzle(this.player, this.player.angle, ap ? ap.x : undefined, ap ? ap.y : undefined);
-                    px = shot.x; py = shot.y; angle = shot.angle;
-                }
-            
                 // Handle "Scatter" (Anavia) defined in stats, or specific ID check fallback
                 // You can add 'spread: 0.2' to your item stats to make this generic too!
                 if (this.currentWeapon.id === 'pistol_anavia' || stats.spread) {
                     const magnitude = this.resonance.stat('spread', stats.spread || 0.22);
                     angle += (Math.random() - 0.5) * magnitude;
-                }
-            
-                // Offset based on Vehicle vs On-Foot
-                if (!onFoot) {
-                    const offset = this.car.length / 2 + 10;
-                    px = this.car.x + Math.cos(angle) * offset;
-                    py = this.car.y + Math.sin(angle) * offset;
-                } else if (px === undefined) {
-                    // No weapon drawn yet (first frame): old hand offset (right side bias)
-                    px = this.player.x + Math.cos(angle) * 15 + Math.cos(angle + Math.PI/2) * 5;
-                    py = this.player.y + Math.sin(angle) * 15 + Math.sin(angle + Math.PI/2) * 5;
                 }
             
                 // 3. Resolve Projectile Properties
@@ -571,7 +554,7 @@
                     life: 3,
                     angle
                 });
-                if (onFoot) this.weaponFx(px, py, angle, this.currentWeapon.id, this.projectiles[this.projectiles.length - 1], this.player);
+                this.weaponFx(px, py, angle, this.currentWeapon.id, this.projectiles[this.projectiles.length - 1], this.player);
             },
 
             // Inside GameEngine class

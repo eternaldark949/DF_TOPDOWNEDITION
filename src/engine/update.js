@@ -4,6 +4,7 @@
          *  A prop whose interactionType isn't here is scenery (the sofa, the bedside tables…): no pill, no action.
          *  What each one does is engine/events.js interact(). */
         const PROP_ACTIONS = {
+            neural_counter:    ['Consult', 'Prisma'],
             medbay_refill:     ['Refill', 'Health station'],
             lost_luggage:      ['Search', 'Lost luggage', true],
             vending_machine:   ['Buy', 'MiniSpree'],
@@ -233,6 +234,7 @@
                 // --- 1. WEAPON COOLDOWN & FIRING ---
                 // Decrement the timer every frame
                 if (this.shootCooldown > 0) this.shootCooldown--;
+                this.updateQuickDraw();
             
                 // Aimed firing (the fire joystick, or the mouse once it has a position)
                 // happens in the walking/driving code in step 7, after this tick's aim
@@ -1132,44 +1134,8 @@
                     const driverSeatPos = this.car.getSeatWorldPos(0);
                     this.player.x = driverSeatPos.x; this.player.y = driverSeatPos.y;
             
-                    // Drive-By Shooting Logic: from the driver's window, so the aim is held
-                    // to the car's left half. A sniper on Fire on Release arms past the ring
-                    // and takes the shot when the thumb lifts, same as on foot.
-                    const F = this.fireJoystick;
-                    const clampToWindow = (aimAngle) => {
-                        let rel = aimAngle - this.car.angle;
-                        while (rel > Math.PI) rel -= Math.PI * 2;
-                        while (rel < -Math.PI) rel += Math.PI * 2;
-                        // Left side is -PI..0 relative to the car's facing; the right snaps to the nearer edge
-                        if (rel > 0 && rel < Math.PI) rel = rel < Math.PI / 2 ? 0 : -Math.PI;
-                        return this.car.angle + rel;
-                    };
-                    const releasing = this._releaseShot !== null && this._releaseShot !== undefined;
-                    const isShooting = (F.active && F.firing) || (this.mouseDown && this.mouseX);
-                    const armed = F.active && F.armed;
-                    this.isShootingFromCar = isShooting || armed || releasing; // Store for drawing
+                    if (!this.updatePlayerFireInput()) this.player.angle = this.car.angle;
 
-                    if (releasing) {
-                        this.player.angle = clampToWindow(this._releaseShot);
-                        if (this.shootCooldown <= 0) { this.fireWeapon(); this._releaseShot = null; }
-                        else if (++this._releaseWait > 30) this._releaseShot = null;
-                        if (this._releaseShot === null) this._releaseWait = 0;
-                    } else if (isShooting || armed) {
-                        let aimAngle;
-                        if (F.active) {
-                            aimAngle = Math.atan2(F.dy, F.dx);
-                        } else {
-                            const { x: worldX, y: worldY } = this.viewToWorld(this.mouseX, this.mouseY);   // through the view: look-ahead and lean included
-                            aimAngle = Math.atan2(worldY - this.player.y, worldX - this.player.x);
-                        }
-                        this.player.angle = clampToWindow(aimAngle);
-                        // Cooldown already counted down once this tick (step 1); armed only aims
-                        if (isShooting && this.shootCooldown <= 0) { this.fireWeapon(); }
-                    } else {
-                        // Not shooting - face car direction
-                        this.player.angle = this.car.angle;
-                    }
-            
                 } else {
                     // Walking Logic (Player Entity System)
                     this.isShootingFromCar = false; // Reset when not driving
@@ -1179,29 +1145,9 @@
                     if (walkInputMag > 1) { inputX /= walkInputMag; inputY /= walkInputMag; }
                     this.player.velX = inputX; this.player.velY = inputY; 
                     
-                    const F = this.fireJoystick;
-                    if (F.active || !this.mouseDown) this.player._aimPoint = null;   // stick / facing: fire straight
-                    if (this._releaseShot !== null && this._releaseShot !== undefined) {
-                        // Sniper fire-on-release: the thumb lifted with the shot armed — take it (waits out the cooldown briefly)
-                        this.player.angle = this._releaseShot;
-                        if (this.shootCooldown <= 0) { this.fireWeapon(); this._releaseShot = null; }
-                        else if (++this._releaseWait > 30) this._releaseShot = null;
-                        if (this._releaseShot === null) this._releaseWait = 0;
-                    } else if (F.active && F.aimed) {
-                        this.player.angle = Math.atan2(F.dy, F.dx);
-                        // Fire only past the threshold ring (Aim Before Firing), at the weapon's own rate;
-                        // cooldown already counted down once this tick (step 1)
-                        if (F.firing && this.shootCooldown <= 0) { this.fireWeapon(); }
-                    } else if (this.mouseDown && this.mouseX) {
-                        const { x: worldX, y: worldY } = this.viewToWorld(this.mouseX, this.mouseY);   // through the view: look-ahead and lean included
-                        this.player.angle = Math.atan2(worldY - this.player.y, worldX - this.player.x);
-                        this.player._aimPoint = { x: worldX, y: worldY };   // shots and the laser converge here
-                        // Cooldown already counted down once this tick (step 1)
-                        if (this.shootCooldown <= 0) { this.fireWeapon(); }
-                    } else {
-                        if (inputX !== 0 || inputY !== 0) this.player.angle = Math.atan2(inputY, inputX);
-                    }
-                    
+                    if (!this.updatePlayerFireInput() && (inputX !== 0 || inputY !== 0))
+                        this.player.angle = Math.atan2(inputY, inputX);
+
                     // Apply movement via PlayerEntity (collision resolution via CollisionSystem). Cars, hers included,
                     // push her out along their side in resolveTrafficCollisions, so she slides along them
                     this.player.applyMovement(inputX, inputY);
@@ -1373,7 +1319,7 @@
                     targetZoom = Math.max(CZ.FLOOR, 1.0 - speedRatio * CZ.SPAN);
                 } else {
                     // On foot: in a little closer with the gun away, and again indoors; by something to use (or talking), closer still (INTERACT_ZOOM)
-                    const C = CONFIG.CAMERA, holstered = this.weaponHolstered || this.weaponMode === 'none';
+                    const C = CONFIG.CAMERA, holstered = (this.weaponHolstered && !this._quickDraw) || this.weaponMode === 'none';
                     let base = 1.0;
                     if (holstered) base *= C.HOLSTER_ZOOM;
                     if (this.activeMap && this.activeMap.type === 'indoor') base *= C.INDOOR_ZOOM;

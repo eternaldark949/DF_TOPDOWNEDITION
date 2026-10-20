@@ -2,7 +2,7 @@
         /** Full-profiler-only stage hooks. Restored entirely when Full mode is off. */
         const PeopleProfiler = {
             active: false, hooks: null,
-            keys: ['Hair physics', 'Hair drawing', 'Cloth physics', 'Cloth drawing', 'Shading', 'Held items', 'Crowd sprites', 'Crowd baking'],
+            keys: ['Body shapes', 'Clothing', 'Hair physics', 'Hair drawing', 'Cloth physics', 'Cloth drawing', 'Shading', 'Held items', 'Crowd sprites', 'Crowd baking'],
 
             _wrap(part, original, entry, opaque) {
                 return function() {
@@ -42,6 +42,22 @@
                     bind('Held items', () => drawHeldGlass, fn => { drawHeldGlass = fn; });
                     bind('Held items', () => drawWeapon, fn => { drawWeapon = fn; });
                     bind('Held items', () => drawUmbrella, fn => { drawUmbrella = fn; });
+                    bind('Body shapes', () => bodyLimbPath, fn => { bodyLimbPath = fn; });
+                    bind('Body shapes', () => drawBodyHand, fn => { drawBodyHand = fn; });
+                    bind('Body shapes', () => drawBodyFoot, fn => { drawBodyFoot = fn; });
+                    bind('Body shapes', () => drawBodyCaps, fn => { drawBodyCaps = fn; });
+                    bind('Body shapes', () => bodyTorsoPath, fn => { bodyTorsoPath = fn; });
+                    bind('Body shapes', () => bodyHipPath, fn => { bodyHipPath = fn; });
+                    bind('Body shapes', () => bodyHeadPaths, fn => { bodyHeadPaths = fn; });
+                    for (const group of ['tops', 'bottoms', 'shoes', 'trains', 'hats', 'jewelry']) {
+                        for (const piece of Object.values(WARDROBE[group])) {
+                            for (const method of ['draw', 'detail', 'hips', 'tail', 'collar', 'fabric', 'under']) {
+                                if (typeof piece[method] === 'function') {
+                                    bind('Clothing', () => piece[method], fn => { piece[method] = fn; });
+                                }
+                            }
+                        }
+                    }
                     bind('Crowd sprites', () => CrowdImpostors.draw, fn => { CrowdImpostors.draw = fn; }, true);
                     bind('Crowd baking', () => CrowdImpostors._bake, fn => { CrowdImpostors._bake = fn; }, false, true);
                     for (const type of Object.keys(HAIR_RENDERERS)) {

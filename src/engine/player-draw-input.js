@@ -29,9 +29,12 @@
             },
 
             drawPlayer() {
-                this.ctx.save(); 
-                this.ctx.translate(this.player.x, this.player.y); 
-                this.ctx.rotate(this.player.angle); 
+                this.ctx.save();
+                const vehiclePose = this.isDriving && this.car
+                    ? this.car.occupantPose(0, this.player.angle, this.player._vehicleLean || 0, this.currentWeapon?.id) : null;
+                if (vehiclePose) this.car.clipOccupant(this.ctx,0,vehiclePose.lean>.05);
+                this.ctx.translate(this.player.x, this.player.y);
+                this.ctx.rotate(vehiclePose ? this.car.angle : this.player.angle);
                 
                 // Stealth/Flit Ghosting
                 if (this.player.isHidden || this.flitState.active) this.ctx.globalAlpha = 0.5;
@@ -71,6 +74,7 @@
                     stance: currentStance,
                     scopeK: currentStance === 'sniper' ? (this.scopeK || 0) : 0,   // eye to the sight (engine/scope.js)
                     isDriving: this.isDriving,
+                    vehiclePose, height: vehiclePose ? VEHICLE_OCCUPANT_SCALE : undefined,
                     isShootingFromCar: this.isDriving && this.isShootingFromCar,
                     carAngle: this.car ? this.car.angle : 0,
                     // Guns kick via `kick` (applied after smoothing); `recoil` only drives the legacy punch path
@@ -337,7 +341,7 @@
                     if (!GameSettings.flitRing || !J.ringArmed || !J.armed || !canFlit()) return;
                     J.ringArmed = false; J.armed = false;
                     if (this.triggerFlit(Math.atan2(dy, dx), 'ring')) {
-                        try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) { /* no haptics */ }
+                        try { if (GameSettings.flitHaptics !== false && navigator.vibrate) navigator.vibrate(12); } catch (e) { /* no haptics */ }
                     } else { J.ringArmed = true; J.armed = true; }   // blocked: still armed, a fresh flick tries again
                 };
                 const sampleRing = (e, dx, dy, radius) => {
@@ -433,8 +437,8 @@
                 const fireZone = document.getElementById('btn-fire'), knob = document.getElementById('fire-joystick-knob');
                 const ring = document.getElementById('fire-ring'), band = document.getElementById('fire-band'), gameUI = document.getElementById('game-ui');
                 const F = this.fireJoystick, MEMORY = 0.6, DRAG = 8, DEAD = 6, FIRE_IN = 62, FIRE_OUT = 45;   // fire past 62 px, stop inside 45
-                const aimMode = () => GameSettings.aimBeforeFire !== false;
-                const sniperRelease = () => aimMode() && GameSettings.sniperRelease !== false && this.weaponMode === 'sniper';
+                const aimMode = () => !!this._quickDraw || GameSettings.aimBeforeFire !== false;
+                const sniperRelease = () => !!this._quickDraw || (aimMode() && GameSettings.sniperRelease !== false && this.weaponMode === 'sniper');
                 const setKnob = (x, y) => { knob.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`; };
                 const buzz = () => { try { if (navigator.vibrate) navigator.vibrate(10); } catch (e) { /* no haptics */ } };
                 const showRing = () => { for (const el of [ring, band]) { if (!el) continue; el.classList.toggle('off', !aimMode()); el.classList.toggle('hot', !!F.firing); el.classList.toggle('armed', !!F.armed); } };
@@ -455,7 +459,7 @@
                     if (gameUI) gameUI.classList.add('aiming');
                     // Aim memory: back within 0.6 s → the old aim (and fire again only if she was firing)
                     const m = this._aimMemory;
-                    if (m && performance.now() / 1000 - m.at <= MEMORY) {
+                    if (!this._quickDraw && m && performance.now() / 1000 - m.at <= MEMORY) {
                         F.dx = Math.cos(m.angle); F.dy = Math.sin(m.angle); F.remembered = true; F.aimed = true;
                         if (aimMode()) { F.firing = !!m.firing && !sniperRelease(); F.armed = !!m.firing && sniperRelease(); }
                         const r = aimMode() && (F.firing || F.armed) ? FIRE_IN + 5 : 30;
@@ -485,7 +489,10 @@
                     e.preventDefault();
                     for (let i = 0; i < e.changedTouches.length; i++) {
                         if (e.changedTouches[i].identifier !== F.id) continue;
-                        if (F.armed && F.aimed) this._releaseShot = Math.atan2(F.dy, F.dx);   // sniper: lifting the thumb takes the shot (update.js)
+                        if (e.type !== 'touchcancel' && F.armed && F.aimed) {
+                            if (this._quickDraw) this.requestQuickDraw(Math.atan2(F.dy, F.dx));
+                            else this._releaseShot = Math.atan2(F.dy, F.dx);
+                        }   // sniper: lifting the thumb takes the shot (update.js)
                         if (F.aimed && Math.hypot(F.dx, F.dy) > 0.2) this._aimMemory = { angle: Math.atan2(F.dy, F.dx), at: performance.now() / 1000, firing: F.firing || F.armed };   // real time, not game time
                         F.active = false; F.dx = 0; F.dy = 0; F.remembered = false; F.aimed = false; F.firing = false; F.armed = false;
                         knob.style.transform = `translate(-50%, -50%)`;
@@ -504,7 +511,7 @@
                 if (fill !== this._ringFill) { this._ringFill = fill; el.style.setProperty('--fill', fill + '%'); }
                 if (ready !== this._ringReady) {
                     this._ringReady = ready; el.classList.toggle('dim', !ready);
-                    if (ready) { el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
+                    if (ready) this._restartRingAnim('pulse');
                 }
             },
         });

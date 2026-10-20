@@ -8,7 +8,7 @@
              * Laser sight geometry for this frame: from the drawn muzzle along the line the
              * next shot will fly (same aimFromMuzzle call as fireWeapon), clipped at the
              * first wall. Null when the sight shouldn't show (no attachment, holstered,
-             * driving, no weapon drawn). Cached per frame for the world and light passes.
+             * no weapon drawn). Cached per frame for the world and light passes.
              */
             getLaserSight() {
                 const key = _simTick + ':' + RenderInterp.alpha + ':' + this.player.x + ':' + this.player.y + ':' + this.player.angle;
@@ -16,11 +16,10 @@
                 this._laserKey = key;
                 this._laserGeom = null;
                 const attach = this.inventory.getEquippedAttachment();
-                if (attach?.effect !== 'laser_sight' || !this.player.visible || this.isDriving) return null;
-                if (!(this.weaponMode === 'normal' || this.weaponMode === 'sniper') || this.weaponHolstered) return null;
-                if (!this.player._muzzleLocal || !this.player._muzzleReady) return null;
-                const ap = this.player._aimPoint;
-                const shot = aimFromMuzzle(this.player, this.player.angle, ap ? ap.x : undefined, ap ? ap.y : undefined);
+                if (attach?.effect !== 'laser_sight' || !this.player.visible) return null;
+                if (!(this.weaponMode === 'normal' || this.weaponMode === 'sniper') || (this.weaponHolstered && !this._quickDraw && !this.isDriving)) return null;
+                if (!this.isDriving && (!this.player._muzzleLocal || !this.player._muzzleReady)) return null;
+                const shot = this.getPlayerShotGeometry();
                 const beamLength = 300;
                 const ex = shot.x + Math.cos(shot.angle) * beamLength, ey = shot.y + Math.sin(shot.angle) * beamLength;
                 const hitD = raycastNearest(shot.x, shot.y, ex, ey, [...(this.activeMap.walls || []), ...getColliders(this.activeMap)], beamLength);

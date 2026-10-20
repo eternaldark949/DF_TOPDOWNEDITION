@@ -3,10 +3,17 @@
         engineMixin({
             /** Keep diagnostics available on demand without timing normal gameplay. */
             _syncProfiler() {
-                _profileSampling = !!(this.showProfiler || PerfBench.active);
+                _profileSampling = !!(this.showProfiler || PerfBench.active || PerformanceBench.active);
                 this.profiler.setEnabled(_profileSampling);
-                PeopleProfiler.sync(!!(this.showProfiler && GameSettings.profilerMode === 'full'));
-                WorldRenderProfiler.sync(!!(this.showProfiler && GameSettings.profilerMode === 'full'));
+                // Detailed timing is independent of whether the profiler panel is visible.
+                this._profileDetailed = !!((this.showProfiler && GameSettings.profilerMode === 'full') ||
+                    (PerformanceBench.active && PerformanceBench.detailed));
+                PeopleProfiler.sync(this._profileDetailed);
+                // Sign hooks wrap the world hooks: unwind them first, install them last.
+                if (!this._profileDetailed) SignProfiler.sync(false);
+                WorldRenderProfiler.sync(this._profileDetailed);
+                TrafficProfiler.sync(this._profileDetailed);
+                if (this._profileDetailed) SignProfiler.sync(true);
             },
 
             /** Keep the view inside the map (GameSettings.cameraEdgeLock): the centre (x, y) moved so the screen at `zoom`
@@ -103,7 +110,7 @@
                 RenderStats.bodies = 0; RenderStats.liveBodies = 0; RenderStats.cachedBodies = 0; RenderStats.bakedBodies = 0;
                 RenderStats.culled = 0; RenderStats.peopleMs = 0; RenderStats.bldBase = 0; RenderStats.bldTops = 0;
                 RenderStats.peopleScope = false; RenderStats.peopleDepth = 0; RenderStats.peoplePart = null; RenderStats.peopleOpaque = false;
-                RenderStats.timed = !!(this.showProfiler && GameSettings.profilerMode === 'full');
+                RenderStats.timed = this._profileDetailed;
                 this.profiler.start('Render:Total');
                 this.profiler.markWrapper('Render:Total');
                 /* Render:Setup — the full-screen clear, camera transform, cull
@@ -554,8 +561,8 @@
                 if (RL.at('markers')) this.drawDropZone(this.ctx, cullBounds.world);
             
                 if (RenderStats.timed) this._entLap('Entities: Effects');
-                // Grid (Faint) - WITH VIEWPORT CULLING (not in the city: its ground is painted)
-                if (RL.at('floors') && !bakedGround) {
+                // Painted floors can supply their own material seams instead of the fallback grid.
+                if (RL.at('floors') && !bakedGround && !this.activeMap.paintedGrid) {
                 this.ctx.strokeStyle = 'rgba(164, 105, 255, 0.1)'; 
                 this.ctx.lineWidth = 1;
                 const gridSize = 100; 
@@ -821,14 +828,17 @@
                             ? occ.combatTargetAngle
                             : this.car.angle;
                         this.ctx.save();
+                        const vehiclePose = this.car.occupantPose(i, occAngle, occ._vehicleLean || 0, occ.equippedWeaponId);
+                        this.car.clipOccupant(this.ctx,i,vehiclePose.lean>.05);
                         this.ctx.translate(drawX, drawY);
-                        this.ctx.rotate(occAngle);
+                        this.ctx.rotate(this.car.angle);
                         
                         drawProceduralHumanoid(this.ctx, occ, {
                             ...look,
                             gender: look.gender || occ.gender || 'female',
                             isDriving: true,
-                            isShootingFromCar: isShooting,
+                            vehiclePose, height: VEHICLE_OCCUPANT_SCALE, build: undefined,
+                            isShootingFromCar: vehiclePose.lean>.05,
                             carAngle: this.car.angle,
                             recoil: isShooting ? 0.5 : 0,
                             stance: isShooting ? 'pistol' : 'idle',
@@ -1089,6 +1099,7 @@
                 }
                 // The veil at the edge of an outdoor map (world/map-edge.js), above the darkness
                 if (RL.at('edge')) this.drawMapEdge(this.ctx);
+                if (RL.at('stella')) this.drawFlitFeedback(this.ctx);
                 // Speech bubbles, above the darkness so they read at night (as the health bars do).
                 // Drawn this late they'd show through roofs and canopies, so a speaker the world
                 // hides (_speakerHidden) keeps quiet; her own emote always shows, like her halo.
@@ -1107,7 +1118,7 @@
                     if (RL.at('characters')) for (const tm of this.teammates) quip(tm);
                 }
                 // Looking down a sniper's sight: the world narrows to her line
-                if (RL.at('hud')) this.drawScopeView(this.ctx);
+                if (RL.at('hud')) { this.drawScopeView(this.ctx); this.drawVehicleAimGuide(this.ctx); }
                 // Health bars and damage numbers, above the darkness so they read at night
                 if (RL.at('combat')) {
                     this.drawCombatOverlays(this.ctx, cullBounds.entities);
@@ -1344,6 +1355,7 @@
                 // --- PROFILER END ---
                 this.profiler.stop('Render:Total');
                 if (PerfBench.active) PerfBench.sample(this.profiler.frameDeltas());
+                if (PerformanceBench.active) PerformanceBench.render(this.profiler.frameDeltas());
                 // Bench overlay draws regardless of the profiler panel state, so a
                 // sweep is always visible while it runs.
                 RL.at('frame');

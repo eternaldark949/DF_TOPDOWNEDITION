@@ -206,6 +206,11 @@
                 this.hitScore = 0;
                 this.hitCooldown = 0;
                 this.lastHitBy = null;
+                this._bumperTick = 0;
+                this._bumpContacts = new WeakMap();
+                this._escapeTicks = 0;
+                this._avoidTicks = 0;
+                this._avoidTarget = null;
                 
                 // Effects
                 this._sparkTimer = 0;
@@ -216,6 +221,8 @@
                 if (!this.isAI) return;
                 
                 this.aiSwitchTimer--;
+                this._avoidTicks = Math.max(0, this._avoidTicks - 1);
+                if (this._avoidTicks === 0) this._avoidTarget = null;
                 
                 // Stuck detection — if barely moved in 30 frames, reverse
                 if (this._sparkTimer % 30 === 0) {
@@ -235,7 +242,8 @@
                 // lead term vanishes and this behaves exactly like pure proximity,
                 // so the comeback pressure only switches on once someone pulls ahead.
                 if (!this.aiTarget || this.aiSwitchTimer <= 0) {
-                    const candidates = allCars.filter(c => c !== this && !c.dead);
+                    let candidates = allCars.filter(c => c !== this && !c.dead && c !== this._avoidTarget);
+                    if (!candidates.length) candidates = allCars.filter(c => c !== this && !c.dead);
                     if (candidates.length > 0) {
                         let topScore = 0;
                         for (const c of candidates) {
@@ -263,7 +271,15 @@
                 // Drive toward target
                 let gas = 0, turn = 0;
                 
-                if (this.aiReverseTimer > 0) {
+                if (this._escapeTicks > 0) {
+                    // Leave a scored encounter rather than repeatedly pushing the same opponent.
+                    this._escapeTicks--;
+                    const bounds = this._mapBounds || { w: 900, h: 900 };
+                    let diff = Math.atan2(bounds.h / 2 - this.y, bounds.w / 2 - this.x) - this.angle;
+                    diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+                    turn = clamp(diff * 3, -1, 1);
+                    gas = .85 * Math.max(.25, 1 - Math.abs(diff) / Math.PI);
+                } else if (this.aiReverseTimer > 0) {
                     // Reversing to unstick
                     gas = -0.7;
                     turn = (Math.random() - 0.5) * 2;
@@ -293,13 +309,14 @@
             _applyBumperPhysics(walls) {
                 if (typeof this.vx === 'undefined') { this.vx = 0; this.vy = 0; }
                 this.hitCooldown = Math.max(0, this.hitCooldown - 1);
+                this._bumperTick++;
                 
-                // Steering
-                if (Math.abs(this.speed) > 0.3) {
-                    const direction = this.speed > 0 ? 1 : -1;
-                    this.angle += this.manualTurn * this.handling * direction;
-                }
-                
+                // Pivot at low speed as well: direction controls must recover from a stop
+                // or a wall bounce. Only deliberate reverse driving flips the steering.
+                const direction = this.manualGas < -.1 ? -1 : 1;
+                const pivot = Math.abs(this.speed) > .6 ? 1 : .8;
+                this.angle += this.manualTurn * this.handling * direction * pivot;
+
                 // Acceleration
                 if (Math.abs(this.manualGas) > 0.1) {
                     this.vx += Math.cos(this.angle) * this.manualGas * this.accel;
@@ -389,6 +406,14 @@
                 const r2 = (other.length + other.vehicleWidth) / 4 + 3;
                 const minDist = r1 + r2;
                 
+                // Each pair needs daylight between its bumpers and a short recovery before
+                // another point. Physics still resolves every contact, including weak scrapes.
+                const contact = this._bumpContacts.get(other);
+                const otherContact = other._bumpContacts.get(this);
+                if (dist >= minDist + 18) {
+                    if (contact && this._bumperTick >= contact.nextTick) contact.armed = true;
+                    if (otherContact && other._bumperTick >= otherContact.nextTick) otherContact.armed = true;
+                }
                 if (dist < minDist && dist > 0) {
                     const nx = dx / dist;
                     const ny = dy / dist;
@@ -404,6 +429,12 @@
                     const dvx = this.vx - other.vx;
                     const dvy = this.vy - other.vy;
                     const relVelN = dvx * nx + dvy * ny;
+                    const approachThis = this.vx * nx + this.vy * ny;
+                    const approachOther = -(other.vx * nx + other.vy * ny);
+                    const freshImpact = relVelN >= 1.4 &&
+                        (!contact || (contact.armed && this._bumperTick >= contact.nextTick)) &&
+                        (!otherContact || (otherContact.armed && other._bumperTick >= otherContact.nextTick));
+                    const scoresBefore = this.hitScore + other.hitScore;
                     
                     // Only resolve if approaching
                     if (relVelN > 0) {
@@ -422,7 +453,7 @@
                     }
                     
                     // Impact strength for effects
-                    const impactSpeed = Math.abs(relVelN);
+                    const impactSpeed = Math.max(0, relVelN);
                     
                     // Sparks on any real contact
                     if (impactSpeed > 0.3) {
@@ -453,14 +484,14 @@
                     
                     const frontAngle = Math.PI / 3; // ±60° cone
                     
-                    if (Math.abs(faceDiffThis) < frontAngle && this.hitCooldown <= 0) {
+                    if (freshImpact && approachThis >= .9 && Math.abs(faceDiffThis) < frontAngle && this.hitCooldown <= 0) {
                         this.hitScore++;
                         this.hitCooldown = 10;
                         // Quips
                         if (this.driverName) captionSystem.bumperCarQuip(this.driverName, 'hit');
                         if (other.driverName) captionSystem.bumperCarQuip(other.driverName, 'gotHit');
                     }
-                    if (Math.abs(faceDiffOther) < frontAngle && other.hitCooldown <= 0) {
+                    if (freshImpact && approachOther >= .9 && Math.abs(faceDiffOther) < frontAngle && other.hitCooldown <= 0) {
                         other.hitScore++;
                         other.hitCooldown = 10;
                         // Quips
@@ -468,6 +499,19 @@
                         if (this.driverName) captionSystem.bumperCarQuip(this.driverName, 'gotHit');
                     }
                     
+                    if (this.hitScore + other.hitScore > scoresBefore) {
+                        this._bumpContacts.set(other, { armed: false, nextTick: this._bumperTick + 45 });
+                        other._bumpContacts.set(this, { armed: false, nextTick: other._bumperTick + 45 });
+                        for (const [car, opponent] of [[this, other], [other, this]]) if (car.isAI) {
+                            car._escapeTicks = 40;
+                            car._avoidTicks = 150;
+                            car._avoidTarget = opponent;
+                            car.aiTarget = null;
+                            car.aiSwitchTimer = 0;
+                            car.aiReverseTimer = 0;
+                        }
+                    }
+
                     return true;
                 }
                 return false;
@@ -489,50 +533,8 @@
                 
                 ctx.rotate(this.angle);
                 
-                const L = this.length;
-                const W = this.vehicleWidth;
-                
-                // Rubber bumper ring (outer)
-                ctx.fillStyle = this.bumperColor;
-                ctx.beginPath();
-                ctx.roundRect(-L/2 - 3, -W/2 - 3, L + 6, W + 6, 10);
-                ctx.fill();
-                
-                // Body
-                ctx.fillStyle = this.bodyColor;
-                ctx.beginPath();
-                ctx.roundRect(-L/2, -W/2, L, W, 6);
-                ctx.fill();
-                
-                // Body highlight stripe
-                ctx.fillStyle = 'rgba(255,255,255,0.12)';
-                ctx.fillRect(-L/2 + 4, -W/2 + 2, L - 8, W * 0.3);
-                
-                // Windshield
-                ctx.fillStyle = 'rgba(100,200,255,0.25)';
-                ctx.beginPath();
-                ctx.roundRect(L/2 - 10, -W/2 + 4, 8, W - 8, 2);
-                ctx.fill();
-                
-                // Headlights
-                ctx.fillStyle = '#ffffcc';
-                ctx.globalAlpha = 0.9;
-                ctx.beginPath(); ctx.arc(L/2 - 1, -W/2 + 5, 2.5, 0, Math.PI * 2); ctx.fill();
-                ctx.beginPath(); ctx.arc(L/2 - 1, W/2 - 5, 2.5, 0, Math.PI * 2); ctx.fill();
-                ctx.globalAlpha = 1.0;
-                
-                // Taillights
-                ctx.fillStyle = '#ff2222';
-                ctx.fillRect(-L/2, -W/2 + 3, 3, 4);
-                ctx.fillRect(-L/2, W/2 - 7, 3, 4);
-                
-                // Number label on roof
-                ctx.fillStyle = '#fff';
-                ctx.font = 'bold 10px Orbitron, monospace';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(this.labelChar, 0, 0);
-                
+                BiggsArt.bumper(ctx, this);
+
                 ctx.restore();
             }
         }
@@ -612,12 +614,12 @@
                 this.angle = 0;
                 this.facing = config.facing || 0;
                 this.rimGap = config.rimGap || 112;
-                this.rimColor = config.rimColor || '#8a6a20';
-                this.hubColor = config.hubColor || '#d4af37';
-                this.spokeColor = config.spokeColor || '#5a4a18';
-                this.strutColor = config.strutColor || '#3a2a10';
+                this.rimColor = config.rimColor || '#b99b72';
+                this.hubColor = config.hubColor || '#ead4a2';
+                this.spokeColor = config.spokeColor || '#82746d';
+                this.strutColor = config.strutColor || '#49353d';
                 this.gondolaColors = config.gondolaColors || [
-                    '#ff8800','#aa00ff','#dc143c','#00bfbf','#ff69b4','#d4af37','#4488ff','#22dd44'
+                    '#803747','#3e737a','#c19a65','#605777','#a34e57','#739185','#b17d63','#485e7b'
                 ];
             }
             update() {
@@ -633,6 +635,10 @@
                 const R = this.wheelRadius;
                 const hg = this.rimGap / 2;
                 const sf = R / 140;
+
+                // Soft footprint first, so the support feet retain their material highlights.
+                ctx.fillStyle = 'rgba(0,0,0,0.12)';
+                ctx.beginPath(); ctx.ellipse(5*sf, 7*sf, R+10, hg+18, 0, 0, Math.PI*2); ctx.fill();
 
                 // ─── A-FRAME SUPPORTS ───
                 const legSpread = R * 0.2;
@@ -650,9 +656,14 @@
                 ctx.beginPath(); ctx.moveTo(-legSpread*0.7, legLength*0.4); ctx.lineTo(-legSpread*0.7, -legLength*0.4); ctx.stroke();
                 ctx.beginPath(); ctx.moveTo(legSpread*0.7, legLength*0.4); ctx.lineTo(legSpread*0.7, -legLength*0.4); ctx.stroke();
 
-                // ─── GROUND SHADOW ───
-                ctx.fillStyle = 'rgba(0,0,0,0.12)';
-                ctx.beginPath(); ctx.ellipse(5*sf, 7*sf, R+10, hg+18, 0, 0, Math.PI*2); ctx.fill();
+                // Cream-enamel edges and brass foot plates, within the original support bounds.
+                ctx.strokeStyle = '#c2aa86'; ctx.lineWidth = .7*sf; ctx.beginPath();
+                for (const sy of [-1,1]) for (const sx of [-1,1]) {
+                    ctx.moveTo(sx*legSpread,sy*legLength);ctx.lineTo(0,sy*hg);
+                } ctx.stroke();
+                for (const sy of [-1,1]) for (const sx of [-1,1]) {
+                    BiggsArt.box(ctx,sx*legSpread-2.5*sf,sy*legLength-2.5*sf,5*sf,5*sf,'#4e3d39','#bba07a',sf);
+                }
 
                 ctx.restore();
             }
@@ -667,25 +678,27 @@
                 const shadowScale = 0.12;
                 const sf = R / 140;
 
-                // ─── RIMS ───
-                const rimT = 3 * sf;
-                for (const ry of [-hg, hg]) {
-                    ctx.fillStyle = this.rimColor;
-                    ctx.beginPath(); ctx.roundRect(-R-2, ry-rimT/2, (R+2)*2, rimT, rimT*0.5); ctx.fill();
-                    ctx.fillStyle = 'rgba(255,255,255,0.08)';
-                    ctx.fillRect(-R, ry-rimT/2, R*2, rimT*0.3);
-                }
+                // Brass-clad twin trusses: stationary ornament is a bounded local sprite.
+                const frameKey=[R,hg,this.rimColor].join('|');
+                if(this._biggsFrameKey!==frameKey){this._biggsFrameKey=frameKey;this._lkSprites=null;}
+                const frame=LandmarkKit.sprite(this,'biggs_frame',-R-3,-hg-6*sf,2*R+6,2*hg+12*sf,1,p=>{
+                    for(const ry of [-hg,hg]){
+                        BiggsArt.box(p,-R-2,ry-4*sf,2*R+4,8*sf,'#2b222c',this.rimColor,2*sf);
+                        p.strokeStyle=this.rimColor;p.lineWidth=.65*sf;p.beginPath();
+                        for(let x=-R+4*sf;x<R-4*sf;x+=10*sf){p.moveTo(x,ry-3*sf);p.lineTo(x+5*sf,ry+3*sf);p.lineTo(x+10*sf,ry-3*sf);}p.stroke();
+                        p.fillStyle='#f5d7a0';p.beginPath();
+                        for(let x=-R+4*sf;x<R;x+=8*sf){p.moveTo(x+.65*sf,ry-4*sf);p.arc(x,ry-4*sf,.65*sf,0,Math.PI*2);}p.fill();
+                    }
+                });
+                ctx.drawImage(frame.cv,frame.x,frame.y,frame.w,frame.h);
 
-                // ─── CROSS-TIES ───
-                ctx.strokeStyle = darkenHex(this.rimColor, 20);
-                ctx.lineWidth = 1.5*sf; ctx.globalAlpha = 0.35;
-                const tieCount = Math.max(16, Math.floor(R / 8));
-                for (let i = 0; i < tieCount; i++) {
-                    const ta = this.angle + (i/tieCount)*Math.PI*2;
-                    const tx = Math.cos(ta)*R;
-                    ctx.beginPath(); ctx.moveTo(tx, -hg); ctx.lineTo(tx, hg); ctx.stroke();
-                }
-                ctx.globalAlpha = 1.0;
+                // Moving cross-ties share one stroke, rather than a draw call per tie.
+                ctx.strokeStyle=this.spokeColor;ctx.lineWidth=.7*sf;ctx.globalAlpha=.4;ctx.beginPath();
+                const tieCount=Math.max(16,Math.floor(R/16));
+                for(let i=0;i<tieCount;i++){
+                    const tx=Math.cos(this.angle+i/tieCount*Math.PI*2)*R;
+                    ctx.moveTo(tx,-hg);ctx.lineTo(tx,hg);
+                }ctx.stroke();ctx.globalAlpha=1;
 
                 // ─── SPOKES ───
                 ctx.strokeStyle = this.spokeColor; ctx.lineWidth = 1.5*sf; ctx.globalAlpha = 0.5;
@@ -724,35 +737,14 @@
                     ctx.beginPath(); ctx.ellipse(g.x+so+3*sf, py+so+8*sf, gw*1.1, gh*0.25, 0, 0, Math.PI*2); ctx.fill();
 
                     // Suspension arms
-                    ctx.strokeStyle = '#666'; ctx.lineWidth = 1.5*s*sf;
+                    ctx.strokeStyle = '#b49b78'; ctx.lineWidth = 1.5*s*sf;
                     ctx.beginPath(); ctx.moveTo(g.x, -hg); ctx.lineTo(g.x - gw*0.25, py + 1.5*s*sf); ctx.stroke();
                     ctx.beginPath(); ctx.moveTo(g.x, hg); ctx.lineTo(g.x + gw*0.25, py + 1.5*s*sf); ctx.stroke();
 
-                    // Body
-                    ctx.fillStyle = color;
-                    ctx.beginPath(); ctx.roundRect(g.x-gw/2, py+2*s*sf, gw, gh, 4*s*sf); ctx.fill();
-
-                    // Roof
-                    ctx.fillStyle = darkenHex(color, 50);
-                    ctx.beginPath(); ctx.roundRect(g.x-gw/2-2*sf, py+0.5*s*sf, gw+4*sf, 4*s*sf, 2.5*s*sf); ctx.fill();
-
-                    // Side trim
-                    ctx.fillStyle = darkenHex(color, 25);
-                    ctx.fillRect(g.x-gw/2+1*sf, py+5*s*sf, 2*sf, gh-5*s*sf);
-                    ctx.fillRect(g.x+gw/2-3*sf, py+5*s*sf, 2*sf, gh-5*s*sf);
-
-                    // Windows
-                    ctx.fillStyle = 'rgba(150,200,255,0.2)';
-                    const ww = gw*0.28, wh = gh*0.28, wy = py+6.5*s*sf;
-                    ctx.fillRect(g.x-ww-1.5*sf, wy, ww, wh);
-                    ctx.fillRect(g.x+1.5*sf, wy, ww, wh);
-                    ctx.strokeStyle = darkenHex(color, 30); ctx.lineWidth = 0.5*sf;
-                    ctx.strokeRect(g.x-ww-1.5*sf, wy, ww, wh);
-                    ctx.strokeRect(g.x+1.5*sf, wy, ww, wh);
-
-                    // Floor bar
-                    ctx.fillStyle = darkenHex(color, 60);
-                    ctx.fillRect(g.x-gw/2, py+gh+1*s*sf, gw, 2.5*s*sf);
+                    // Enclosed jewel-toned cabin: lacquer, warm glazing, brass mullions.
+                    // Its local sprite follows the original height order and suspension geometry.
+                    const cabin=BiggsArt.cabin(this,g.ci,color);
+                    ctx.drawImage(cabin,g.x-gw/2-2*sf,py,gw+4*sf,gh+4*sf);
 
                     // Peak glow
                     if (g.nh > 0.82) {
@@ -818,6 +810,7 @@
                 
                 this.active = true;
                 this.timer = this.roundDuration;
+                this._chaseTarget = null;
                 this.cars = [];
                 this._resultsShown = false;
                 this._hiddenTeammates = [];
@@ -954,6 +947,26 @@
                 this._createHUD();
             }
             
+            _chaseHeading(inputAngle) {
+                const car = this.playerCar;
+                let best = null, bestCost = Infinity, bestAngle = inputAngle;
+                for (const other of this.cars) {
+                    if (other === car || other.dead) continue;
+                    const dx = other.x - car.x, dy = other.y - car.y, dist = Math.hypot(dx, dy);
+                    if (dist > 300 || dist < 45) continue;
+                    // Short lead, bounded so assistance never points far away from the stick.
+                    const lead = Math.min(12, dist / 16);
+                    const angle = Math.atan2(dy + (other.vy || 0) * lead, dx + (other.vx || 0) * lead);
+                    const diff = Math.atan2(Math.sin(angle - inputAngle), Math.cos(angle - inputAngle));
+                    const retained = other === this._chaseTarget;
+                    if (Math.abs(diff) > (retained ? .6 : .38)) continue;
+                    const cost = dist + Math.abs(diff) * 180 - (retained ? 75 : 0);
+                    if (cost < bestCost) { best = other; bestCost = cost; bestAngle = inputAngle + clamp(diff * .6, -.25, .25); }
+                }
+                this._chaseTarget = best;
+                return bestAngle;
+            }
+
             update(game) {
                 if (!this.active) return;
                 
@@ -978,16 +991,16 @@
                 // Apply input to player car
                 if (this.playerCar) {
                     let gas = 0, turn = 0;
-                    const inputMag = Math.hypot(inputX, inputY);
-                    if (inputMag > (GameSettings.preciseStick && game.joystick && game.joystick.active ? 0.03 : 0.15)) {   // Precise Stick has its own dead centre
-                        const inputAngle = Math.atan2(inputY, inputX);
-                        let angleDiff = inputAngle - this.playerCar.angle;
-                        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-                        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-                        turn = clamp(angleDiff * 2.0, -1, 1);
-                        gas = inputMag * (1.0 - Math.abs(angleDiff / Math.PI) * 0.5);
-                        if (Math.abs(angleDiff) > Math.PI * 0.75) gas = -0.5; // Reverse if facing away
-                    }
+                    const inputMag = Math.min(1, Math.hypot(inputX, inputY));
+                    if (inputMag > (GameSettings.preciseStick && game.joystick && game.joystick.active ? 0.03 : 0.15)) {
+                        let inputAngle = Math.atan2(inputY, inputX);
+                        inputAngle = this._chaseHeading(inputAngle);
+                        const angleDiff = Math.atan2(Math.sin(inputAngle - this.playerCar.angle), Math.cos(inputAngle - this.playerCar.angle));
+                        turn = clamp(angleDiff * 3, -1, 1);
+                        // Turn toward the requested direction even when it is behind us.
+                        // Ease the throttle during a U-turn instead of toggling into reverse.
+                        gas = inputMag * Math.max(.22, 1 - Math.abs(angleDiff) / Math.PI);
+                    } else this._chaseTarget = null;
                     this.playerCar.manualGas = gas;
                     this.playerCar.manualTurn = turn;
                     this.playerCar.updateManualDriving(walls);

@@ -104,7 +104,7 @@
              * @param {number} framesPerStep  Sampled frames per scale (after warmup).
              */
             run(scales = [1.0, 0.75, 0.5], framesPerStep = 120) {
-                if (this.active) { showMessage('PERFBENCH ALREADY RUNNING'); return; }
+                if (this.active || PerformanceBench.active) { showMessage('A BENCHMARK IS ALREADY RUNNING'); return; }
                 if (typeof game === 'undefined' || !game.running) {
                     showMessage('PERFBENCH: START A GAME FIRST'); return;
                 }

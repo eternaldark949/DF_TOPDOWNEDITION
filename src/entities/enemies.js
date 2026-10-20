@@ -2105,6 +2105,11 @@
         const GAUNTLET_LEAD_ERR = 300;           // a wave arrives knowing only her rough area (px off)
         const GAUNTLET_STALL_SECS = 20;          // no one has seen or heard her this long → a vague lead…
         const GAUNTLET_STALL_ERR = 220;          // …this far off: enough to sweep the right rooms
+        // Save values, never live navigation, entity or intro references.
+        const GAUNTLET_HOSTILE_NUMBERS = ['x', 'y', 'angle', 'hp', 'maxHp', 'speed', 'huntSpeed', 'visionRange',
+            'suspicion', 'cooldown', 'telegraphAngle', 'telegraphThreshold', 'dashMax', 'dashCDBase', 'dashCD',
+            'clawCD', 'clawDmg', 'clawReach', '_chain', 'whipCD', 'burstCooldown', 'burstCount', 'burstTimer',
+            'moveTimer', 'strafeDirection'];
 
         class HordeGauntlet {
             constructor() {
@@ -2145,14 +2150,76 @@
                 this.wave = 0;
                 this.totalKills = 0;
                 this.hostiles = [];
-                // Where to put her back when she walks out
-                this._returnX = game.player.x;
-                this._returnY = game.player.y;
-                this._returnMap = game.activeMap.id;
                 game.loadMap(this.mapId);
                 // Start first wave after a brief pause
                 this.waveDelay = 90; // 1.5 second before first wave
                 return true;
+            }
+
+            serialize(game) {
+                const data = { highestWave: this.highestWave, highestWaves: { ...this.highestWaves }, run: null };
+                if (!this.active || game.activeMap.id !== this.mapId) return data;
+                const living = this.hostiles.filter(h => !h.dead && game.enemies.includes(h));
+                data.run = {
+                    id: this.entry.id, wave: this.wave, waveDelay: this.waveDelay,
+                    totalKills: this.totalKills + this.hostiles.length - living.length,
+                    waveSize: this._waveSize || 0,
+                    hostiles: living.map(h => {
+                        const row = { kind: h instanceof Demoness ? 'demoness' : h instanceof Hunter ? 'hunter'
+                            : h instanceof GatlingGunner ? 'gunner' : 'ganger', alpha: !!h.alpha,
+                            weaponId: h.equippedWeaponId || null, look: h.look,
+                            state: h.state, isTelegraphing: !!h.isTelegraphing,
+                            investigateTarget: h.investigateTarget && { ...h.investigateTarget } };
+                        for (const key of GAUNTLET_HOSTILE_NUMBERS) if (Number.isFinite(h[key])) row[key] = h[key];
+                        return row;
+                    })
+                };
+                return data;
+            }
+
+            /** Called after the saved map and its navigation/props exist, including faded loads. */
+            deserialize(game, data) {
+                this.active = false; this.hostiles = []; this.wave = 0; this.waveDelay = 0; this.totalKills = 0;
+                this.highestWaves = { ...(data?.highestWaves || {}) };
+                if (!data?.highestWaves) this.highestWave = data?.highestWave || 0;
+                this._hudKey = null; clearTimeout(this._endT);
+                const entry = GAUNTLET_MAPS.find(g => !g.locked && g.mapId === game.activeMap.id);
+                if (!entry) { this._hud(game); return; }
+                this.entry = entry; this.mapId = entry.mapId; this.active = true;
+                this._waveStartedAt = _gameTimeSec; game._lastContactAt = _gameTimeSec;
+                const run = data?.run;
+                if (!run || run.id !== entry.id || !Array.isArray(run.hostiles)) {
+                    // Older saves kept only records, so their lost run cannot be reconstructed.
+                    this.waveDelay = 90;
+                    showMessage('GAUNTLET RESUMED — NEW RUN STARTS AT WAVE 1');
+                    this._hud(game); return;
+                }
+                this.wave = Math.max(0, Math.floor(run.wave || 0));
+                this.waveDelay = Math.max(0, Math.floor(run.waveDelay || 0));
+                this.totalKills = Math.max(0, Math.floor(run.totalKills || 0));
+                this._waveSize = Math.max(0, Math.floor(run.waveSize || 0));
+                for (const row of run.hostiles) {
+                    if (!Number.isFinite(row.x) || !Number.isFinite(row.y) || !(row.hp > 0)) continue;
+                    const cfg = { hp: row.maxHp || row.hp, speed: row.speed, visionRange: row.visionRange,
+                        weaponId: row.weaponId, alpha: row.alpha, look: row.look };
+                    let h;
+                    if (row.kind === 'demoness') h = new Demoness(row.x, row.y, cfg);
+                    else if (row.kind === 'hunter') h = new Hunter(row.x, row.y, cfg);
+                    else if (row.kind === 'gunner') h = new GatlingGunner(row.x, row.y, this.hostiles.length);
+                    else if (row.kind === 'ganger') h = new Ganger(row.x, row.y, cfg);
+                    else continue;
+                    for (const key of GAUNTLET_HOSTILE_NUMBERS) if (Number.isFinite(row[key])) h[key] = row[key];
+                    if (row.look) h.look = row.look;
+                    if (['IDLE', 'SUSPICIOUS', 'SEARCHING', 'ALERT', 'SUPPRESSING'].includes(row.state)) h.state = row.state;
+                    if (Number.isFinite(row.investigateTarget?.x) && Number.isFinite(row.investigateTarget?.y))
+                        h.investigateTarget = { x: row.investigateTarget.x, y: row.investigateTarget.y };
+                    h.isTelegraphing = !!row.isTelegraphing;
+                    // Resume combat, not a half-finished cinematic or an execution attachment.
+                    h.dormant = false; h.navMap = game.activeMap; h._gauntletWave = this.wave;
+                    this.hostiles.push(h); game.enemies.push(h);
+                }
+                if (!this.wave && !this.waveDelay) this.waveDelay = 90;
+                this._hud(game);
             }
 
             /** Walkable spawn points far enough from 949, shuffled; reused (jittered) when a wave outnumbers them. */
@@ -2349,11 +2416,6 @@
                     }
                 }
                 this.hostiles = [];
-                // Walked out the front door: back to where she met Grum
-                if (game.activeMap && game.activeMap.id === this._returnMap && this._returnX !== undefined && game.player) {
-                    game.player.x = this._returnX; game.player.y = this._returnY + 40;
-                    if (game.camera) { game.camera.x = game.player.x; game.camera.y = game.player.y; }
-                }
                 if (this.wave > 0) {
                     showMessage(`GAUNTLET OVER — WAVE ${this.wave} — ${this.totalKills} KILLS`);
                     this._hud(game, true);

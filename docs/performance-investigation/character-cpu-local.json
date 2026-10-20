@@ -1,0 +1,2370 @@
+{
+  "date": "2026-10-19",
+  "baselineSha256": "26cf153c4b495ed994b0fec810db2c4087bd09f6d3c14e243d0f185b3d7dff5b",
+  "changes": [
+    "Snapshot six native DOMMatrix coordinates into one reused plain object for hair/cloth point loops",
+    "Skip unused limb-shade geometry and reuse the outline length/angle when shade is drawn",
+    "Preserve particle pass styles once; retain full Canvas save/restore only for transformed ghosts"
+  ],
+  "characterFixtures": {
+    "method": {
+      "engine": "Desktop Chromium; no phone CPU emulation",
+      "canvas": "actual main world canvas; live hair and cloth",
+      "warmupFrames": 240,
+      "framesPerRun": 400,
+      "runsPerBuild": 4,
+      "profileTimers": false
+    },
+    "scenarios": {
+      "mixed": {
+        "runs": [
+          {
+            "build": "before",
+            "ms": 834.5,
+            "stateHash": "6cea0158349fe42dd70a4d40b23bf169d627cd920cd398f548caa1835073272b"
+          },
+          {
+            "build": "after",
+            "ms": 790.0999999977648,
+            "stateHash": "6cea0158349fe42dd70a4d40b23bf169d627cd920cd398f548caa1835073272b"
+          },
+          {
+            "build": "after",
+            "ms": 710.4000000022352,
+            "stateHash": "9510fcd71847114f5997cdaeca3db36caa8772f85a0605f8abb684379ced1ee1"
+          },
+          {
+            "build": "before",
+            "ms": 800.1999999992549,
+            "stateHash": "9510fcd71847114f5997cdaeca3db36caa8772f85a0605f8abb684379ced1ee1"
+          },
+          {
+            "build": "before",
+            "ms": 730.7999999970198,
+            "stateHash": "9b2c64ca3f70e4ae217cf9e79d54a8f10ee016202b8fc56959a619de86ca6ff0"
+          },
+          {
+            "build": "after",
+            "ms": 716.5,
+            "stateHash": "9b2c64ca3f70e4ae217cf9e79d54a8f10ee016202b8fc56959a619de86ca6ff0"
+          },
+          {
+            "build": "after",
+            "ms": 654.4000000022352,
+            "stateHash": "825c12a452cbd9328d06eff9f7df9fa683b79363df5913a5099c95aff62dfa2c"
+          },
+          {
+            "build": "before",
+            "ms": 793.3999999985099,
+            "stateHash": "825c12a452cbd9328d06eff9f7df9fa683b79363df5913a5099c95aff62dfa2c"
+          }
+        ],
+        "medianMs": {
+          "before": 796.7999999988824,
+          "after": 713.4500000011176
+        },
+        "evidence": {
+          "before": {
+            "bodies": 24,
+            "hairOwners": 24,
+            "strandOwners": 11,
+            "hairPoints": 335,
+            "clothPanels": 10,
+            "hairCap": 12,
+            "clothCap": 12
+          },
+          "after": {
+            "bodies": 24,
+            "hairOwners": 24,
+            "strandOwners": 11,
+            "hairPoints": 335,
+            "clothPanels": 10,
+            "hairCap": 12,
+            "clothCap": 12
+          }
+        },
+        "scheduling": {
+          "before": {
+            "once": {
+              "slices": 32,
+              "calls": 34
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 34
+            }
+          },
+          "after": {
+            "once": {
+              "slices": 32,
+              "calls": 34
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 34
+            }
+          }
+        },
+        "stateIdentical": true
+      },
+      "idle": {
+        "runs": [
+          {
+            "build": "before",
+            "ms": 817.8999999985099,
+            "stateHash": "76271345a1b0f26496cda95799df4fa47d5b0e441609de68ace2b7f58f856b74"
+          },
+          {
+            "build": "after",
+            "ms": 874.8000000007451,
+            "stateHash": "76271345a1b0f26496cda95799df4fa47d5b0e441609de68ace2b7f58f856b74"
+          },
+          {
+            "build": "after",
+            "ms": 821.5,
+            "stateHash": "9ea31d523a25415b795c94d8cad48466a5350cf2cad257c8af82cc6ef8a9164e"
+          },
+          {
+            "build": "before",
+            "ms": 808.1999999992549,
+            "stateHash": "9ea31d523a25415b795c94d8cad48466a5350cf2cad257c8af82cc6ef8a9164e"
+          },
+          {
+            "build": "before",
+            "ms": 794.3000000007451,
+            "stateHash": "7003b26be5e0491d71ebec388be446a5c8ccb02c1e774b29292ffe3c4aafc266"
+          },
+          {
+            "build": "after",
+            "ms": 812.1000000014901,
+            "stateHash": "7003b26be5e0491d71ebec388be446a5c8ccb02c1e774b29292ffe3c4aafc266"
+          },
+          {
+            "build": "after",
+            "ms": 774.6000000014901,
+            "stateHash": "d1be6bf422e0f105d26f42bb567e93e643be8af5d7dfb5b5bbd1ffa00b32225f"
+          },
+          {
+            "build": "before",
+            "ms": 868,
+            "stateHash": "d1be6bf422e0f105d26f42bb567e93e643be8af5d7dfb5b5bbd1ffa00b32225f"
+          }
+        ],
+        "medianMs": {
+          "before": 813.0499999988824,
+          "after": 816.8000000007451
+        },
+        "evidence": {
+          "before": {
+            "bodies": 24,
+            "hairOwners": 24,
+            "strandOwners": 11,
+            "hairPoints": 335,
+            "clothPanels": 10,
+            "hairCap": 12,
+            "clothCap": 12
+          },
+          "after": {
+            "bodies": 24,
+            "hairOwners": 24,
+            "strandOwners": 11,
+            "hairPoints": 335,
+            "clothPanels": 10,
+            "hairCap": 12,
+            "clothCap": 12
+          }
+        },
+        "scheduling": {
+          "before": {
+            "once": {
+              "slices": 28,
+              "calls": 34
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 34
+            }
+          },
+          "after": {
+            "once": {
+              "slices": 28,
+              "calls": 34
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 34
+            }
+          }
+        },
+        "stateIdentical": true
+      },
+      "day": {
+        "runs": [
+          {
+            "build": "before",
+            "ms": 1150.7999999970198,
+            "stateHash": "6cea0158349fe42dd70a4d40b23bf169d627cd920cd398f548caa1835073272b"
+          },
+          {
+            "build": "after",
+            "ms": 981.8999999985099,
+            "stateHash": "6cea0158349fe42dd70a4d40b23bf169d627cd920cd398f548caa1835073272b"
+          },
+          {
+            "build": "after",
+            "ms": 956.8999999985099,
+            "stateHash": "9510fcd71847114f5997cdaeca3db36caa8772f85a0605f8abb684379ced1ee1"
+          },
+          {
+            "build": "before",
+            "ms": 992,
+            "stateHash": "9510fcd71847114f5997cdaeca3db36caa8772f85a0605f8abb684379ced1ee1"
+          },
+          {
+            "build": "before",
+            "ms": 961.9000000022352,
+            "stateHash": "9b2c64ca3f70e4ae217cf9e79d54a8f10ee016202b8fc56959a619de86ca6ff0"
+          },
+          {
+            "build": "after",
+            "ms": 947.5,
+            "stateHash": "9b2c64ca3f70e4ae217cf9e79d54a8f10ee016202b8fc56959a619de86ca6ff0"
+          },
+          {
+            "build": "after",
+            "ms": 1107.1000000014901,
+            "stateHash": "825c12a452cbd9328d06eff9f7df9fa683b79363df5913a5099c95aff62dfa2c"
+          },
+          {
+            "build": "before",
+            "ms": 1047.8999999985099,
+            "stateHash": "825c12a452cbd9328d06eff9f7df9fa683b79363df5913a5099c95aff62dfa2c"
+          }
+        ],
+        "medianMs": {
+          "before": 1019.9499999992549,
+          "after": 969.3999999985099
+        },
+        "evidence": {
+          "before": {
+            "bodies": 24,
+            "hairOwners": 24,
+            "strandOwners": 11,
+            "hairPoints": 335,
+            "clothPanels": 10,
+            "hairCap": 12,
+            "clothCap": 12
+          },
+          "after": {
+            "bodies": 24,
+            "hairOwners": 24,
+            "strandOwners": 11,
+            "hairPoints": 335,
+            "clothPanels": 10,
+            "hairCap": 12,
+            "clothCap": 12
+          }
+        },
+        "scheduling": {
+          "before": {
+            "once": {
+              "slices": 32,
+              "calls": 34
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 34
+            }
+          },
+          "after": {
+            "once": {
+              "slices": 32,
+              "calls": 34
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 34
+            }
+          }
+        },
+        "stateIdentical": true
+      },
+      "hair-heavy": {
+        "runs": [
+          {
+            "build": "before",
+            "ms": 1507.199999999255,
+            "stateHash": "a4c591aed109add46cca273b7cd71631239b9fa7da6e0c021da9d371eff6e42e"
+          },
+          {
+            "build": "after",
+            "ms": 1387.8999999985099,
+            "stateHash": "a4c591aed109add46cca273b7cd71631239b9fa7da6e0c021da9d371eff6e42e"
+          },
+          {
+            "build": "after",
+            "ms": 1103.5,
+            "stateHash": "60f93492823c7b1423cd763aa2ce1569832d702fb22a9be0d629f542170b93a5"
+          },
+          {
+            "build": "before",
+            "ms": 1370.3999999985099,
+            "stateHash": "60f93492823c7b1423cd763aa2ce1569832d702fb22a9be0d629f542170b93a5"
+          },
+          {
+            "build": "before",
+            "ms": 1388.0999999977648,
+            "stateHash": "2f6d2892e01cac8d2f309324917b7b97e900f05d876bbcbb8902c8b54d8e7944"
+          },
+          {
+            "build": "after",
+            "ms": 1251.2999999970198,
+            "stateHash": "2f6d2892e01cac8d2f309324917b7b97e900f05d876bbcbb8902c8b54d8e7944"
+          },
+          {
+            "build": "after",
+            "ms": 1330.8999999985099,
+            "stateHash": "19a24ed16148ea43ac33e442b6e62df3f01e3a78c699dd049b3e55e3c673ebe0"
+          },
+          {
+            "build": "before",
+            "ms": 1330.8999999985099,
+            "stateHash": "19a24ed16148ea43ac33e442b6e62df3f01e3a78c699dd049b3e55e3c673ebe0"
+          }
+        ],
+        "medianMs": {
+          "before": 1379.2499999981374,
+          "after": 1291.0999999977648
+        },
+        "evidence": {
+          "before": {
+            "bodies": 24,
+            "hairOwners": 24,
+            "strandOwners": 24,
+            "hairPoints": 734,
+            "clothPanels": 72,
+            "hairCap": 12,
+            "clothCap": 12
+          },
+          "after": {
+            "bodies": 24,
+            "hairOwners": 24,
+            "strandOwners": 24,
+            "hairPoints": 734,
+            "clothPanels": 72,
+            "hairCap": 12,
+            "clothCap": 12
+          }
+        },
+        "scheduling": {
+          "before": {
+            "once": {
+              "slices": 96,
+              "calls": 96
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 96
+            }
+          },
+          "after": {
+            "once": {
+              "slices": 96,
+              "calls": 96
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 96
+            }
+          }
+        },
+        "stateIdentical": true
+      },
+      "catch-up": {
+        "runs": [
+          {
+            "build": "before",
+            "ms": 1582.699999999255,
+            "stateHash": "85503537332181f38e1a1e1268ee5906ae7c55bf14affb35d0880ec4605a6e35"
+          },
+          {
+            "build": "after",
+            "ms": 1866.300000000745,
+            "stateHash": "85503537332181f38e1a1e1268ee5906ae7c55bf14affb35d0880ec4605a6e35"
+          },
+          {
+            "build": "after",
+            "ms": 1495.800000000745,
+            "stateHash": "656a613c01dc0c61316bf70d6426d976891bb89c8ee162b4a02efc16e30de555"
+          },
+          {
+            "build": "before",
+            "ms": 1673.5999999977648,
+            "stateHash": "656a613c01dc0c61316bf70d6426d976891bb89c8ee162b4a02efc16e30de555"
+          },
+          {
+            "build": "before",
+            "ms": 1676.199999999255,
+            "stateHash": "846ba782d33d9e9b814b1c6af46e4e10351bf1cc850021e5ee7d22c256579668"
+          },
+          {
+            "build": "after",
+            "ms": 1533.300000000745,
+            "stateHash": "846ba782d33d9e9b814b1c6af46e4e10351bf1cc850021e5ee7d22c256579668"
+          },
+          {
+            "build": "after",
+            "ms": 1621.199999999255,
+            "stateHash": "666a739a294ce32ab96f6365f42ea4da771947dd213cda37e440b3e5bf7c0f78"
+          },
+          {
+            "build": "before",
+            "ms": 1826.800000000745,
+            "stateHash": "666a739a294ce32ab96f6365f42ea4da771947dd213cda37e440b3e5bf7c0f78"
+          }
+        ],
+        "medianMs": {
+          "before": 1674.8999999985099,
+          "after": 1577.25
+        },
+        "evidence": {
+          "before": {
+            "bodies": 24,
+            "hairOwners": 24,
+            "strandOwners": 24,
+            "hairPoints": 734,
+            "clothPanels": 72,
+            "hairCap": 12,
+            "clothCap": 12
+          },
+          "after": {
+            "bodies": 24,
+            "hairOwners": 24,
+            "strandOwners": 24,
+            "hairPoints": 734,
+            "clothPanels": 72,
+            "hairCap": 12,
+            "clothCap": 12
+          }
+        },
+        "scheduling": {
+          "before": {
+            "once": {
+              "slices": 576,
+              "calls": 96
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 96
+            }
+          },
+          "after": {
+            "once": {
+              "slices": 576,
+              "calls": 96
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 96
+            }
+          }
+        },
+        "stateIdentical": true
+      },
+      "physics": {
+        "runs": [
+          {
+            "build": "before",
+            "ms": 250.60000000149012,
+            "stateHash": "0e930dad85fd7064e95c2b53c441224c0ed476371c29d969b4b6674654e808f6"
+          },
+          {
+            "build": "after",
+            "ms": 148.59999999776483,
+            "stateHash": "0e930dad85fd7064e95c2b53c441224c0ed476371c29d969b4b6674654e808f6"
+          },
+          {
+            "build": "after",
+            "ms": 163.89999999850988,
+            "stateHash": "3e4c6848e8f441009ba93bc2aade5dc1154b3e37a78ed56945574f4788cb5637"
+          },
+          {
+            "build": "before",
+            "ms": 222.5,
+            "stateHash": "3e4c6848e8f441009ba93bc2aade5dc1154b3e37a78ed56945574f4788cb5637"
+          },
+          {
+            "build": "before",
+            "ms": 216.70000000298023,
+            "stateHash": "ff88a9d75fe32357e0c81cb464d9db214c2409f0fbe5079d6b1e6f095b487522"
+          },
+          {
+            "build": "after",
+            "ms": 160.40000000223517,
+            "stateHash": "ff88a9d75fe32357e0c81cb464d9db214c2409f0fbe5079d6b1e6f095b487522"
+          },
+          {
+            "build": "after",
+            "ms": 145.89999999850988,
+            "stateHash": "391ef8d1549df1e3066b349372f7aef3a41835825b819a7510b100967a6b7052"
+          },
+          {
+            "build": "before",
+            "ms": 220.60000000149012,
+            "stateHash": "391ef8d1549df1e3066b349372f7aef3a41835825b819a7510b100967a6b7052"
+          }
+        ],
+        "medianMs": {
+          "before": 221.55000000074506,
+          "after": 154.5
+        },
+        "evidence": {
+          "before": {
+            "bodies": 24,
+            "hairOwners": 24,
+            "strandOwners": 24,
+            "hairPoints": 734,
+            "clothPanels": 24,
+            "hairCap": 12,
+            "clothCap": 12
+          },
+          "after": {
+            "bodies": 24,
+            "hairOwners": 24,
+            "strandOwners": 24,
+            "hairPoints": 734,
+            "clothPanels": 24,
+            "hairCap": 12,
+            "clothCap": 12
+          }
+        },
+        "scheduling": {
+          "before": {
+            "once": {
+              "slices": 48,
+              "calls": 48
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 48
+            }
+          },
+          "after": {
+            "once": {
+              "slices": 48,
+              "calls": 48
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 48
+            }
+          }
+        },
+        "stateIdentical": true
+      },
+      "physics-catch-up": {
+        "runs": [
+          {
+            "build": "before",
+            "ms": 364.4000000022352,
+            "stateHash": "185deaaf635c4170a357e716631226a50869c31d499ff82e1ef62498fd36501d"
+          },
+          {
+            "build": "after",
+            "ms": 312.1000000014901,
+            "stateHash": "185deaaf635c4170a357e716631226a50869c31d499ff82e1ef62498fd36501d"
+          },
+          {
+            "build": "after",
+            "ms": 288.6000000014901,
+            "stateHash": "f28f03a1b7dfda3671d7c08844d0c1a7ab7ea18205c004ab83179480e0290067"
+          },
+          {
+            "build": "before",
+            "ms": 395.5,
+            "stateHash": "f28f03a1b7dfda3671d7c08844d0c1a7ab7ea18205c004ab83179480e0290067"
+          },
+          {
+            "build": "before",
+            "ms": 389.5999999977648,
+            "stateHash": "c173abf5cd10916c779f2900e7796d867f16a9b233c902892d7da4205224a854"
+          },
+          {
+            "build": "after",
+            "ms": 304.30000000074506,
+            "stateHash": "c173abf5cd10916c779f2900e7796d867f16a9b233c902892d7da4205224a854"
+          },
+          {
+            "build": "after",
+            "ms": 274.5,
+            "stateHash": "7b9ad0c7c64c15af1c88434b2de7100cc7e2e0a3ecde59e860c52c4d1a974252"
+          },
+          {
+            "build": "before",
+            "ms": 354.70000000298023,
+            "stateHash": "7b9ad0c7c64c15af1c88434b2de7100cc7e2e0a3ecde59e860c52c4d1a974252"
+          }
+        ],
+        "medianMs": {
+          "before": 377.0,
+          "after": 296.4500000011176
+        },
+        "evidence": {
+          "before": {
+            "bodies": 24,
+            "hairOwners": 24,
+            "strandOwners": 24,
+            "hairPoints": 734,
+            "clothPanels": 24,
+            "hairCap": 12,
+            "clothCap": 12
+          },
+          "after": {
+            "bodies": 24,
+            "hairOwners": 24,
+            "strandOwners": 24,
+            "hairPoints": 734,
+            "clothPanels": 24,
+            "hairCap": 12,
+            "clothCap": 12
+          }
+        },
+        "scheduling": {
+          "before": {
+            "once": {
+              "slices": 288,
+              "calls": 48
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 48
+            }
+          },
+          "after": {
+            "once": {
+              "slices": 288,
+              "calls": 48
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 48
+            }
+          }
+        },
+        "stateIdentical": true
+      }
+    },
+    "errors": []
+  },
+  "cityFixturesWithPhoneGraphicsSettings": {
+    "method": {
+      "engine": "Desktop Chromium; no phone CPU emulation",
+      "canvas": "actual main world canvas; live hair and cloth",
+      "warmupFrames": 240,
+      "framesPerRun": 180,
+      "runsPerBuild": 3,
+      "profileTimers": false,
+      "baselineSha256": "26cf153c4b495ed994b0fec810db2c4087bd09f6d3c14e243d0f185b3d7dff5b",
+      "candidateSha256": "b055b770cbfa43291a56e6bfc1ea0148f2a4fb4ca51bb373b6b3f935441dec2f",
+      "viewport": [
+        880,
+        411
+      ],
+      "quality": "high",
+      "rngSeed": 72841,
+      "clock": "explicit fixed game-time increments; timings exclude state hashing and image export",
+      "settings": {
+        "resolutionScale": 1,
+        "fpsLimit": 60,
+        "baseZoom": 1,
+        "lightingQuality": "high",
+        "adaptiveLighting": false,
+        "softShadows": true,
+        "bloom": false,
+        "reflections": "off",
+        "trafficDensity": "high",
+        "pedestrianDensity": "high",
+        "crowdQuality": "high",
+        "lampShadows": "off",
+        "foliageDensity": "high",
+        "rainDensity": "high",
+        "filmGrain": false,
+        "devicePreset": false
+      }
+    },
+    "scenarios": {
+      "city": {
+        "runs": [
+          {
+            "build": "before",
+            "ms": 3458.2999999970198,
+            "stateHash": "d08eb7db63f807edf7d279a858278c7fcf2161f9d7e442ac9f2fb33b890fa565"
+          },
+          {
+            "build": "after",
+            "ms": 3307.300000000745,
+            "stateHash": "d08eb7db63f807edf7d279a858278c7fcf2161f9d7e442ac9f2fb33b890fa565"
+          },
+          {
+            "build": "after",
+            "ms": 4289.199999999255,
+            "stateHash": "dc3e569270166a50b7aa10c5a4bbafc4421a46a5e77cd7f860e3ff73c87fbfa6"
+          },
+          {
+            "build": "before",
+            "ms": 4241,
+            "stateHash": "dc3e569270166a50b7aa10c5a4bbafc4421a46a5e77cd7f860e3ff73c87fbfa6"
+          },
+          {
+            "build": "before",
+            "ms": 3990.300000000745,
+            "stateHash": "c2f6a941bd63be499a8b22c98e627f222c9bc5fe482689d77e623f9d32191cdb"
+          },
+          {
+            "build": "after",
+            "ms": 3960.89999999851,
+            "stateHash": "c2f6a941bd63be499a8b22c98e627f222c9bc5fe482689d77e623f9d32191cdb"
+          }
+        ],
+        "medianMs": {
+          "before": 3990.300000000745,
+          "after": 3960.89999999851
+        },
+        "evidence": {
+          "before": {
+            "bodies": 100,
+            "meanDrawnBodies": 12.248215701823948,
+            "cars": 60,
+            "running": true,
+            "paused": false,
+            "playerDead": false,
+            "hairOwners": 45,
+            "strandOwners": 21,
+            "clothPanels": 10,
+            "hairCap": 12,
+            "clothCap": 12
+          },
+          "after": {
+            "bodies": 100,
+            "meanDrawnBodies": 12.248215701823948,
+            "cars": 60,
+            "running": true,
+            "paused": false,
+            "playerDead": false,
+            "hairOwners": 45,
+            "strandOwners": 21,
+            "clothPanels": 10,
+            "hairCap": 12,
+            "clothCap": 12
+          }
+        },
+        "scheduling": {
+          "before": {
+            "once": {
+              "slices": 44,
+              "calls": 23
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 23
+            }
+          },
+          "after": {
+            "once": {
+              "slices": 44,
+              "calls": 23
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 23
+            }
+          }
+        },
+        "stateIdentical": true,
+        "pixelsIdentical": true,
+        "sampledSelfMs": {
+          "drawImage": 959.69,
+          "fill": 614.57,
+          "restore": 601.12,
+          "save": 347.75,
+          "stroke": 315.33,
+          "update": 203.85,
+          "draw": 172.26,
+          "rotate": 139.07,
+          "(program)": 136.64,
+          "translate": 116.07,
+          "transform": 113.89,
+          "(garbage collector)": 110.5,
+          "query": 88.6,
+          "updateAIDriving": 86.02,
+          "(idle)": 46.01,
+          "_drawHumanoidBody": 45.81,
+          "(anonymous)": 44.38,
+          "drawRainOverlay": 42.44,
+          "refresh": 41.18,
+          "closePath": 35.22
+        }
+      },
+      "city-day": {
+        "runs": [
+          {
+            "build": "before",
+            "ms": 4345.300000000745,
+            "stateHash": "d08eb7db63f807edf7d279a858278c7fcf2161f9d7e442ac9f2fb33b890fa565"
+          },
+          {
+            "build": "after",
+            "ms": 4128.39999999851,
+            "stateHash": "d08eb7db63f807edf7d279a858278c7fcf2161f9d7e442ac9f2fb33b890fa565"
+          },
+          {
+            "build": "after",
+            "ms": 5495.10000000149,
+            "stateHash": "dc3e569270166a50b7aa10c5a4bbafc4421a46a5e77cd7f860e3ff73c87fbfa6"
+          },
+          {
+            "build": "before",
+            "ms": 6142.199999999255,
+            "stateHash": "dc3e569270166a50b7aa10c5a4bbafc4421a46a5e77cd7f860e3ff73c87fbfa6"
+          },
+          {
+            "build": "before",
+            "ms": 5392.10000000149,
+            "stateHash": "c2f6a941bd63be499a8b22c98e627f222c9bc5fe482689d77e623f9d32191cdb"
+          },
+          {
+            "build": "after",
+            "ms": 5109,
+            "stateHash": "c2f6a941bd63be499a8b22c98e627f222c9bc5fe482689d77e623f9d32191cdb"
+          }
+        ],
+        "medianMs": {
+          "before": 5392.10000000149,
+          "after": 5109
+        },
+        "evidence": {
+          "before": {
+            "bodies": 100,
+            "meanDrawnBodies": 12.248215701823948,
+            "cars": 60,
+            "running": true,
+            "paused": false,
+            "playerDead": false,
+            "hairOwners": 45,
+            "strandOwners": 21,
+            "clothPanels": 10,
+            "hairCap": 12,
+            "clothCap": 12
+          },
+          "after": {
+            "bodies": 100,
+            "meanDrawnBodies": 12.248215701823948,
+            "cars": 60,
+            "running": true,
+            "paused": false,
+            "playerDead": false,
+            "hairOwners": 45,
+            "strandOwners": 21,
+            "clothPanels": 10,
+            "hairCap": 12,
+            "clothCap": 12
+          }
+        },
+        "scheduling": {
+          "before": {
+            "once": {
+              "slices": 44,
+              "calls": 23
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 23
+            }
+          },
+          "after": {
+            "once": {
+              "slices": 44,
+              "calls": 23
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 23
+            }
+          }
+        },
+        "stateIdentical": true,
+        "pixelsIdentical": true,
+        "sampledSelfMs": {
+          "drawImage": 1098.24,
+          "restore": 1029.97,
+          "translate": 668.97,
+          "fill": 519.75,
+          "stroke": 372.86,
+          "save": 203.36,
+          "update": 197.1,
+          "draw": 177.41,
+          "fillRect": 166.22,
+          "(garbage collector)": 147.75,
+          "(program)": 131.98,
+          "rotate": 112.67,
+          "updateAIDriving": 88.61,
+          "query": 79.08,
+          "(idle)": 62.57,
+          "drawRainOverlay": 47.12,
+          "refresh": 45.84,
+          "(anonymous)": 44.28,
+          "closePath": 42.73,
+          "_drawHumanoidBody": 36.84
+        }
+      }
+    },
+    "errors": []
+  },
+  "correctnessOnly": {
+    "mixed": {
+      "stateIdentical": true,
+      "pixelsIdentical": true,
+      "evidence": {
+        "before": {
+          "bodies": 24,
+          "hairOwners": 24,
+          "strandOwners": 11,
+          "hairPoints": 335,
+          "clothPanels": 10,
+          "hairCap": 12,
+          "clothCap": 12
+        },
+        "after": {
+          "bodies": 24,
+          "hairOwners": 24,
+          "strandOwners": 11,
+          "hairPoints": 335,
+          "clothPanels": 10,
+          "hairCap": 12,
+          "clothCap": 12
+        }
+      },
+      "scheduling": {
+        "before": {
+          "once": {
+            "slices": 32,
+            "calls": 34
+          },
+          "repeated": {
+            "slices": 0,
+            "calls": 34
+          }
+        },
+        "after": {
+          "once": {
+            "slices": 32,
+            "calls": 34
+          },
+          "repeated": {
+            "slices": 0,
+            "calls": 34
+          }
+        }
+      }
+    },
+    "idle": {
+      "stateIdentical": true,
+      "pixelsIdentical": true,
+      "evidence": {
+        "before": {
+          "bodies": 24,
+          "hairOwners": 24,
+          "strandOwners": 11,
+          "hairPoints": 335,
+          "clothPanels": 10,
+          "hairCap": 12,
+          "clothCap": 12
+        },
+        "after": {
+          "bodies": 24,
+          "hairOwners": 24,
+          "strandOwners": 11,
+          "hairPoints": 335,
+          "clothPanels": 10,
+          "hairCap": 12,
+          "clothCap": 12
+        }
+      },
+      "scheduling": {
+        "before": {
+          "once": {
+            "slices": 28,
+            "calls": 34
+          },
+          "repeated": {
+            "slices": 0,
+            "calls": 34
+          }
+        },
+        "after": {
+          "once": {
+            "slices": 28,
+            "calls": 34
+          },
+          "repeated": {
+            "slices": 0,
+            "calls": 34
+          }
+        }
+      }
+    },
+    "day": {
+      "stateIdentical": true,
+      "pixelsIdentical": true,
+      "evidence": {
+        "before": {
+          "bodies": 24,
+          "hairOwners": 24,
+          "strandOwners": 11,
+          "hairPoints": 335,
+          "clothPanels": 10,
+          "hairCap": 12,
+          "clothCap": 12
+        },
+        "after": {
+          "bodies": 24,
+          "hairOwners": 24,
+          "strandOwners": 11,
+          "hairPoints": 335,
+          "clothPanels": 10,
+          "hairCap": 12,
+          "clothCap": 12
+        }
+      },
+      "scheduling": {
+        "before": {
+          "once": {
+            "slices": 32,
+            "calls": 34
+          },
+          "repeated": {
+            "slices": 0,
+            "calls": 34
+          }
+        },
+        "after": {
+          "once": {
+            "slices": 32,
+            "calls": 34
+          },
+          "repeated": {
+            "slices": 0,
+            "calls": 34
+          }
+        }
+      }
+    },
+    "hair-heavy": {
+      "stateIdentical": true,
+      "pixelsIdentical": true,
+      "evidence": {
+        "before": {
+          "bodies": 24,
+          "hairOwners": 24,
+          "strandOwners": 24,
+          "hairPoints": 734,
+          "clothPanels": 72,
+          "hairCap": 12,
+          "clothCap": 12
+        },
+        "after": {
+          "bodies": 24,
+          "hairOwners": 24,
+          "strandOwners": 24,
+          "hairPoints": 734,
+          "clothPanels": 72,
+          "hairCap": 12,
+          "clothCap": 12
+        }
+      },
+      "scheduling": {
+        "before": {
+          "once": {
+            "slices": 96,
+            "calls": 96
+          },
+          "repeated": {
+            "slices": 0,
+            "calls": 96
+          }
+        },
+        "after": {
+          "once": {
+            "slices": 96,
+            "calls": 96
+          },
+          "repeated": {
+            "slices": 0,
+            "calls": 96
+          }
+        }
+      }
+    },
+    "catch-up": {
+      "stateIdentical": true,
+      "pixelsIdentical": true,
+      "evidence": {
+        "before": {
+          "bodies": 24,
+          "hairOwners": 24,
+          "strandOwners": 24,
+          "hairPoints": 734,
+          "clothPanels": 72,
+          "hairCap": 12,
+          "clothCap": 12
+        },
+        "after": {
+          "bodies": 24,
+          "hairOwners": 24,
+          "strandOwners": 24,
+          "hairPoints": 734,
+          "clothPanels": 72,
+          "hairCap": 12,
+          "clothCap": 12
+        }
+      },
+      "scheduling": {
+        "before": {
+          "once": {
+            "slices": 576,
+            "calls": 96
+          },
+          "repeated": {
+            "slices": 0,
+            "calls": 96
+          }
+        },
+        "after": {
+          "once": {
+            "slices": 576,
+            "calls": 96
+          },
+          "repeated": {
+            "slices": 0,
+            "calls": 96
+          }
+        }
+      }
+    },
+    "physics": {
+      "stateIdentical": true,
+      "pixelsIdentical": true,
+      "evidence": {
+        "before": {
+          "bodies": 24,
+          "hairOwners": 24,
+          "strandOwners": 24,
+          "hairPoints": 734,
+          "clothPanels": 24,
+          "hairCap": 12,
+          "clothCap": 12
+        },
+        "after": {
+          "bodies": 24,
+          "hairOwners": 24,
+          "strandOwners": 24,
+          "hairPoints": 734,
+          "clothPanels": 24,
+          "hairCap": 12,
+          "clothCap": 12
+        }
+      },
+      "scheduling": {
+        "before": {
+          "once": {
+            "slices": 48,
+            "calls": 48
+          },
+          "repeated": {
+            "slices": 0,
+            "calls": 48
+          }
+        },
+        "after": {
+          "once": {
+            "slices": 48,
+            "calls": 48
+          },
+          "repeated": {
+            "slices": 0,
+            "calls": 48
+          }
+        }
+      }
+    },
+    "physics-catch-up": {
+      "stateIdentical": true,
+      "pixelsIdentical": true,
+      "evidence": {
+        "before": {
+          "bodies": 24,
+          "hairOwners": 24,
+          "strandOwners": 24,
+          "hairPoints": 734,
+          "clothPanels": 24,
+          "hairCap": 12,
+          "clothCap": 12
+        },
+        "after": {
+          "bodies": 24,
+          "hairOwners": 24,
+          "strandOwners": 24,
+          "hairPoints": 734,
+          "clothPanels": 24,
+          "hairCap": 12,
+          "clothCap": 12
+        }
+      },
+      "scheduling": {
+        "before": {
+          "once": {
+            "slices": 288,
+            "calls": 48
+          },
+          "repeated": {
+            "slices": 0,
+            "calls": 48
+          }
+        },
+        "after": {
+          "once": {
+            "slices": 288,
+            "calls": 48
+          },
+          "repeated": {
+            "slices": 0,
+            "calls": 48
+          }
+        }
+      }
+    }
+  },
+  "poseAndQualityAtlas": {
+    "pixelIdentical": {
+      "city": true,
+      "high-night": true,
+      "high-day": true,
+      "medium-night": true,
+      "medium-day": true,
+      "low-night": true,
+      "low-day": true
+    },
+    "errors": []
+  },
+  "interpretation": "Character math changes: moving-character fixtures show approximately 5-10% lower synchronous CPU/submission time; isolated hair/cloth solvers 21-30% lower; idle is flat. Particle state handling: isolated mixed effects 43.7% lower, shadow/filter/clip stress 27.1% lower. Longer five-pair complete-city comparison: night flat (0.08% higher median), daylight 2.28% lower, with sample variation. A dependable whole-city FPS gain has not been established. These are local headless Chromium probes, not phone CPU/GPU emulation.",
+  "limits": [
+    "No phone CPU/GPU emulation",
+    "Earlier preview-canvas garment probes did not exercise live hair/cloth; these fixtures assert actual world-canvas simulation",
+    "The seven character timing fixtures use direct character drawing, so bloom/reflection passes are absent; full-city fixtures explicitly match reported graphics settings",
+    "Correctness-only runs occurred alongside regression checks and are excluded from timing conclusions",
+    "CPU sampling uses separate intervals after timing runs; native Canvas calls can include deferred rendering work",
+    "Same-time repeated draws run zero extra physics slices; simulation cadence, topology and catch-up caps are unchanged",
+    "The final city comparison includes all three production changes; earlier city and character comparisons isolate the two character math changes, and particleComparison isolates the subsequent particle change."
+  ],
+  "characterMathCandidateSha256": "b055b770cbfa43291a56e6bfc1ea0148f2a4fb4ca51bb373b6b3f935441dec2f",
+  "particleComparison": {
+    "method": {
+      "engine": "Desktop Chromium; no phone CPU emulation",
+      "canvas": "actual main world canvas; live hair and cloth",
+      "warmupFrames": 240,
+      "framesPerRun": 180,
+      "runsPerBuild": 3,
+      "profileTimers": false,
+      "baselineSha256": "b055b770cbfa43291a56e6bfc1ea0148f2a4fb4ca51bb373b6b3f935441dec2f",
+      "candidateSha256": "20ffd2730b3b0c4fed217e8a6e22de0cc4394f40b80ffae0f01c84a80dfb3e26",
+      "viewport": [
+        880,
+        411
+      ],
+      "quality": "high",
+      "rngSeed": 72841,
+      "clock": "explicit fixed game-time increments; timings exclude state hashing and image export",
+      "settings": {
+        "resolutionScale": 1,
+        "fpsLimit": 60,
+        "baseZoom": 1,
+        "lightingQuality": "high",
+        "adaptiveLighting": false,
+        "softShadows": true,
+        "bloom": false,
+        "reflections": "off",
+        "trafficDensity": "high",
+        "pedestrianDensity": "high",
+        "crowdQuality": "high",
+        "lampShadows": "off",
+        "foliageDensity": "high",
+        "rainDensity": "high",
+        "filmGrain": false,
+        "devicePreset": false
+      }
+    },
+    "scenarios": {
+      "particles": {
+        "runs": [
+          {
+            "build": "before",
+            "ms": 47.400000002235174,
+            "stateHash": "d0df19b66f0ef270348841f6a55f556e7c6e3d1946717954bb0d8608a0671e52"
+          },
+          {
+            "build": "after",
+            "ms": 25.5,
+            "stateHash": "d0df19b66f0ef270348841f6a55f556e7c6e3d1946717954bb0d8608a0671e52"
+          },
+          {
+            "build": "after",
+            "ms": 27.900000002235174,
+            "stateHash": "d0df19b66f0ef270348841f6a55f556e7c6e3d1946717954bb0d8608a0671e52"
+          },
+          {
+            "build": "before",
+            "ms": 40.80000000074506,
+            "stateHash": "d0df19b66f0ef270348841f6a55f556e7c6e3d1946717954bb0d8608a0671e52"
+          },
+          {
+            "build": "before",
+            "ms": 50.899999998509884,
+            "stateHash": "d0df19b66f0ef270348841f6a55f556e7c6e3d1946717954bb0d8608a0671e52"
+          },
+          {
+            "build": "after",
+            "ms": 26.699999999254942,
+            "stateHash": "d0df19b66f0ef270348841f6a55f556e7c6e3d1946717954bb0d8608a0671e52"
+          }
+        ],
+        "medianMs": {
+          "before": 47.400000002235174,
+          "after": 26.699999999254942
+        },
+        "evidence": {
+          "before": {
+            "particles": 240
+          },
+          "after": {
+            "particles": 240
+          }
+        },
+        "scheduling": {
+          "before": {
+            "once": {
+              "slices": 0,
+              "calls": 0
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 0
+            }
+          },
+          "after": {
+            "once": {
+              "slices": 0,
+              "calls": 0
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 0
+            }
+          }
+        },
+        "stateIdentical": true,
+        "pixelsIdentical": true
+      },
+      "particles-effects": {
+        "runs": [
+          {
+            "build": "before",
+            "ms": 247.19999999925494,
+            "stateHash": "8cda77e68022d347eab44cb6e23fa31b5a4eb32d23f673e26428ac061fb463d8"
+          },
+          {
+            "build": "after",
+            "ms": 183.30000000074506,
+            "stateHash": "8cda77e68022d347eab44cb6e23fa31b5a4eb32d23f673e26428ac061fb463d8"
+          },
+          {
+            "build": "after",
+            "ms": 173.89999999850988,
+            "stateHash": "8cda77e68022d347eab44cb6e23fa31b5a4eb32d23f673e26428ac061fb463d8"
+          },
+          {
+            "build": "before",
+            "ms": 247.30000000074506,
+            "stateHash": "8cda77e68022d347eab44cb6e23fa31b5a4eb32d23f673e26428ac061fb463d8"
+          },
+          {
+            "build": "before",
+            "ms": 253.60000000149012,
+            "stateHash": "8cda77e68022d347eab44cb6e23fa31b5a4eb32d23f673e26428ac061fb463d8"
+          },
+          {
+            "build": "after",
+            "ms": 180.39999999850988,
+            "stateHash": "8cda77e68022d347eab44cb6e23fa31b5a4eb32d23f673e26428ac061fb463d8"
+          }
+        ],
+        "medianMs": {
+          "before": 247.30000000074506,
+          "after": 180.39999999850988
+        },
+        "evidence": {
+          "before": {
+            "particles": 240
+          },
+          "after": {
+            "particles": 240
+          }
+        },
+        "scheduling": {
+          "before": {
+            "once": {
+              "slices": 0,
+              "calls": 0
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 0
+            }
+          },
+          "after": {
+            "once": {
+              "slices": 0,
+              "calls": 0
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 0
+            }
+          }
+        },
+        "stateIdentical": true,
+        "pixelsIdentical": true
+      },
+      "city": {
+        "runs": [
+          {
+            "build": "before",
+            "ms": 3090.300000000745,
+            "stateHash": "dc423aef6324bea694ce944256f2e1e2b688922e7f2e7bddf0f3f7c557f44f81"
+          },
+          {
+            "build": "after",
+            "ms": 3227.900000002235,
+            "stateHash": "dc423aef6324bea694ce944256f2e1e2b688922e7f2e7bddf0f3f7c557f44f81"
+          },
+          {
+            "build": "after",
+            "ms": 4095.5,
+            "stateHash": "d56f89a05d8e4b136caecb136777ab43dd8e9305c990d4dc92d5c32ae65a9477"
+          },
+          {
+            "build": "before",
+            "ms": 4342.900000002235,
+            "stateHash": "d56f89a05d8e4b136caecb136777ab43dd8e9305c990d4dc92d5c32ae65a9477"
+          },
+          {
+            "build": "before",
+            "ms": 4394.70000000298,
+            "stateHash": "e8ab6cce7f823a1028c3db9bbce8c49b32631cc332f50e49ee30c0d969acefef"
+          },
+          {
+            "build": "after",
+            "ms": 3921.60000000149,
+            "stateHash": "e8ab6cce7f823a1028c3db9bbce8c49b32631cc332f50e49ee30c0d969acefef"
+          }
+        ],
+        "medianMs": {
+          "before": 4342.900000002235,
+          "after": 3921.60000000149
+        },
+        "evidence": {
+          "before": {
+            "bodies": 100,
+            "meanDrawnBodies": 12.248215701823948,
+            "cars": 60,
+            "running": true,
+            "paused": false,
+            "playerDead": false,
+            "hairOwners": 45,
+            "strandOwners": 21,
+            "clothPanels": 10,
+            "hairCap": 12,
+            "clothCap": 12
+          },
+          "after": {
+            "bodies": 100,
+            "meanDrawnBodies": 12.248215701823948,
+            "cars": 60,
+            "running": true,
+            "paused": false,
+            "playerDead": false,
+            "hairOwners": 45,
+            "strandOwners": 21,
+            "clothPanels": 10,
+            "hairCap": 12,
+            "clothCap": 12
+          }
+        },
+        "scheduling": {
+          "before": {
+            "once": {
+              "slices": 44,
+              "calls": 23
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 23
+            }
+          },
+          "after": {
+            "once": {
+              "slices": 44,
+              "calls": 23
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 23
+            }
+          }
+        },
+        "stateIdentical": true,
+        "pixelsIdentical": true
+      },
+      "city-day": {
+        "runs": [
+          {
+            "build": "before",
+            "ms": 4437.800000000745,
+            "stateHash": "dc423aef6324bea694ce944256f2e1e2b688922e7f2e7bddf0f3f7c557f44f81"
+          },
+          {
+            "build": "after",
+            "ms": 4006.2999999970198,
+            "stateHash": "dc423aef6324bea694ce944256f2e1e2b688922e7f2e7bddf0f3f7c557f44f81"
+          },
+          {
+            "build": "after",
+            "ms": 5418,
+            "stateHash": "d56f89a05d8e4b136caecb136777ab43dd8e9305c990d4dc92d5c32ae65a9477"
+          },
+          {
+            "build": "before",
+            "ms": 5159.099999997765,
+            "stateHash": "d56f89a05d8e4b136caecb136777ab43dd8e9305c990d4dc92d5c32ae65a9477"
+          },
+          {
+            "build": "before",
+            "ms": 5214.300000000745,
+            "stateHash": "e8ab6cce7f823a1028c3db9bbce8c49b32631cc332f50e49ee30c0d969acefef"
+          },
+          {
+            "build": "after",
+            "ms": 5252.199999999255,
+            "stateHash": "e8ab6cce7f823a1028c3db9bbce8c49b32631cc332f50e49ee30c0d969acefef"
+          }
+        ],
+        "medianMs": {
+          "before": 5159.099999997765,
+          "after": 5252.199999999255
+        },
+        "evidence": {
+          "before": {
+            "bodies": 100,
+            "meanDrawnBodies": 12.248215701823948,
+            "cars": 60,
+            "running": true,
+            "paused": false,
+            "playerDead": false,
+            "hairOwners": 45,
+            "strandOwners": 21,
+            "clothPanels": 10,
+            "hairCap": 12,
+            "clothCap": 12
+          },
+          "after": {
+            "bodies": 100,
+            "meanDrawnBodies": 12.248215701823948,
+            "cars": 60,
+            "running": true,
+            "paused": false,
+            "playerDead": false,
+            "hairOwners": 45,
+            "strandOwners": 21,
+            "clothPanels": 10,
+            "hairCap": 12,
+            "clothCap": 12
+          }
+        },
+        "scheduling": {
+          "before": {
+            "once": {
+              "slices": 44,
+              "calls": 23
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 23
+            }
+          },
+          "after": {
+            "once": {
+              "slices": 44,
+              "calls": 23
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 23
+            }
+          }
+        },
+        "stateIdentical": true,
+        "pixelsIdentical": true
+      }
+    },
+    "errors": []
+  },
+  "finalCityComparison": {
+    "method": {
+      "engine": "Desktop Chromium; no phone CPU emulation",
+      "canvas": "actual main world canvas; live hair and cloth",
+      "warmupFrames": 240,
+      "framesPerRun": 240,
+      "runsPerBuild": 5,
+      "profileTimers": false,
+      "baselineSha256": "26cf153c4b495ed994b0fec810db2c4087bd09f6d3c14e243d0f185b3d7dff5b",
+      "candidateSha256": "20ffd2730b3b0c4fed217e8a6e22de0cc4394f40b80ffae0f01c84a80dfb3e26",
+      "viewport": [
+        880,
+        411
+      ],
+      "quality": "high",
+      "rngSeed": 72841,
+      "clock": "explicit fixed game-time increments; timings exclude state hashing and image export",
+      "settings": {
+        "resolutionScale": 1,
+        "fpsLimit": 60,
+        "baseZoom": 1,
+        "lightingQuality": "high",
+        "adaptiveLighting": false,
+        "softShadows": true,
+        "bloom": false,
+        "reflections": "off",
+        "trafficDensity": "high",
+        "pedestrianDensity": "high",
+        "crowdQuality": "high",
+        "lampShadows": "off",
+        "foliageDensity": "high",
+        "rainDensity": "high",
+        "filmGrain": false,
+        "devicePreset": false
+      }
+    },
+    "scenarios": {
+      "city": {
+        "runs": [
+          {
+            "build": "before",
+            "ms": 4222.89999999851,
+            "stateHash": "c99d4d22f8618d6c6288d32573b59fe161c554e24b54b8ef4ae5e144cab23ec9"
+          },
+          {
+            "build": "after",
+            "ms": 3870.099999997765,
+            "stateHash": "c99d4d22f8618d6c6288d32573b59fe161c554e24b54b8ef4ae5e144cab23ec9"
+          },
+          {
+            "build": "after",
+            "ms": 5851.199999999255,
+            "stateHash": "42761b5801b6d310d7563efe57d9657efc5de5fab110a112b214762ffadc9eb7"
+          },
+          {
+            "build": "before",
+            "ms": 5374,
+            "stateHash": "42761b5801b6d310d7563efe57d9657efc5de5fab110a112b214762ffadc9eb7"
+          },
+          {
+            "build": "before",
+            "ms": 5617.10000000149,
+            "stateHash": "f08f1597cc735936450071f6d555c900741500fbb2244e07a4c98357216f0c18"
+          },
+          {
+            "build": "after",
+            "ms": 5486.5,
+            "stateHash": "f08f1597cc735936450071f6d555c900741500fbb2244e07a4c98357216f0c18"
+          },
+          {
+            "build": "after",
+            "ms": 5101.199999999255,
+            "stateHash": "f113e3c4c38ba0619e9f7c9fa1825724853288a858d8705ef5918c28dc0f468a"
+          },
+          {
+            "build": "before",
+            "ms": 5481.89999999851,
+            "stateHash": "f113e3c4c38ba0619e9f7c9fa1825724853288a858d8705ef5918c28dc0f468a"
+          },
+          {
+            "build": "before",
+            "ms": 6657.39999999851,
+            "stateHash": "ccaedb4d9e47aea62b62d9c84f833b37ffa7122eee09b267cda7d2c949f07438"
+          },
+          {
+            "build": "after",
+            "ms": 6357,
+            "stateHash": "ccaedb4d9e47aea62b62d9c84f833b37ffa7122eee09b267cda7d2c949f07438"
+          }
+        ],
+        "medianMs": {
+          "before": 5481.89999999851,
+          "after": 5486.5
+        },
+        "evidence": {
+          "before": {
+            "bodies": 100,
+            "meanDrawnBodies": 15.670137442732194,
+            "cars": 71,
+            "running": true,
+            "paused": false,
+            "playerDead": false,
+            "hairOwners": 70,
+            "strandOwners": 32,
+            "clothPanels": 20,
+            "hairCap": 12,
+            "clothCap": 12
+          },
+          "after": {
+            "bodies": 100,
+            "meanDrawnBodies": 15.670137442732194,
+            "cars": 71,
+            "running": true,
+            "paused": false,
+            "playerDead": false,
+            "hairOwners": 70,
+            "strandOwners": 32,
+            "clothPanels": 20,
+            "hairCap": 12,
+            "clothCap": 12
+          }
+        },
+        "scheduling": {
+          "before": {
+            "once": {
+              "slices": 71,
+              "calls": 37
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 37
+            }
+          },
+          "after": {
+            "once": {
+              "slices": 71,
+              "calls": 37
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 37
+            }
+          }
+        },
+        "stateIdentical": true,
+        "pixelsIdentical": true
+      },
+      "city-day": {
+        "runs": [
+          {
+            "build": "before",
+            "ms": 5811,
+            "stateHash": "c99d4d22f8618d6c6288d32573b59fe161c554e24b54b8ef4ae5e144cab23ec9"
+          },
+          {
+            "build": "after",
+            "ms": 5477.60000000149,
+            "stateHash": "c99d4d22f8618d6c6288d32573b59fe161c554e24b54b8ef4ae5e144cab23ec9"
+          },
+          {
+            "build": "after",
+            "ms": 6968,
+            "stateHash": "42761b5801b6d310d7563efe57d9657efc5de5fab110a112b214762ffadc9eb7"
+          },
+          {
+            "build": "before",
+            "ms": 7226.099999997765,
+            "stateHash": "42761b5801b6d310d7563efe57d9657efc5de5fab110a112b214762ffadc9eb7"
+          },
+          {
+            "build": "before",
+            "ms": 6878,
+            "stateHash": "f08f1597cc735936450071f6d555c900741500fbb2244e07a4c98357216f0c18"
+          },
+          {
+            "build": "after",
+            "ms": 7061.699999999255,
+            "stateHash": "f08f1597cc735936450071f6d555c900741500fbb2244e07a4c98357216f0c18"
+          },
+          {
+            "build": "after",
+            "ms": 7200.60000000149,
+            "stateHash": "f113e3c4c38ba0619e9f7c9fa1825724853288a858d8705ef5918c28dc0f468a"
+          },
+          {
+            "build": "before",
+            "ms": 7286.89999999851,
+            "stateHash": "f113e3c4c38ba0619e9f7c9fa1825724853288a858d8705ef5918c28dc0f468a"
+          },
+          {
+            "build": "before",
+            "ms": 7908.5,
+            "stateHash": "ccaedb4d9e47aea62b62d9c84f833b37ffa7122eee09b267cda7d2c949f07438"
+          },
+          {
+            "build": "after",
+            "ms": 7294,
+            "stateHash": "ccaedb4d9e47aea62b62d9c84f833b37ffa7122eee09b267cda7d2c949f07438"
+          }
+        ],
+        "medianMs": {
+          "before": 7226.099999997765,
+          "after": 7061.699999999255
+        },
+        "evidence": {
+          "before": {
+            "bodies": 100,
+            "meanDrawnBodies": 15.670137442732194,
+            "cars": 71,
+            "running": true,
+            "paused": false,
+            "playerDead": false,
+            "hairOwners": 70,
+            "strandOwners": 32,
+            "clothPanels": 20,
+            "hairCap": 12,
+            "clothCap": 12
+          },
+          "after": {
+            "bodies": 100,
+            "meanDrawnBodies": 15.670137442732194,
+            "cars": 71,
+            "running": true,
+            "paused": false,
+            "playerDead": false,
+            "hairOwners": 70,
+            "strandOwners": 32,
+            "clothPanels": 20,
+            "hairCap": 12,
+            "clothCap": 12
+          }
+        },
+        "scheduling": {
+          "before": {
+            "once": {
+              "slices": 71,
+              "calls": 37
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 37
+            }
+          },
+          "after": {
+            "once": {
+              "slices": 71,
+              "calls": 37
+            },
+            "repeated": {
+              "slices": 0,
+              "calls": 37
+            }
+          }
+        },
+        "stateIdentical": true,
+        "pixelsIdentical": true
+      }
+    },
+    "errors": []
+  },
+  "candidateSha256": "20ffd2730b3b0c4fed217e8a6e22de0cc4394f40b80ffae0f01c84a80dfb3e26",
+  "finalVerification": {
+    "focusedTests": {
+      "character-rendering": {
+        "passed": 7,
+        "results": [
+          "Garment paths are reused across characters while colors remain live",
+          "Cached garment details fit different body proportions and keep alpha/transforms",
+          "Warm static clothing creates no new paths or raster sprites",
+          "Clothing bust shapes retain separate fills and reuse outlines across colors",
+          "Detailed clothing/body timings are exclusive, scoped and restore their original functions",
+          "Hair/cloth transforms snapshot native coordinates once and reuse plain numeric fields",
+          "Limb shading reuses outline geometry and preserves collapsed-joint length"
+        ]
+      },
+      "particle-rendering": {
+        "passed": 3,
+        "results": [
+          "Only transformed ghost particles copy the full Canvas state",
+          "Particle order, inherited alpha, styles and transforms survive mixed draws",
+          "Culled and interpolated particles retain their existing geometry and source state"
+        ]
+      },
+      "performance-bench": {
+        "passed": 8,
+        "results": [
+          "Rejects invalid starts and conflicting benches; cancellation restores diagnostic settings",
+          "Includes every simulation tick, survives profiler resets, reports stalls and overlapping sections honestly",
+          "Frame limiter skips never become extra rendered frames or halve the measured interval",
+          "Warmup and hidden/paused intervals are excluded; visible long stalls are retained",
+          "Game reset cancels capture and restores idle profiling",
+          "Detailed capture reuses entity/character/world hooks without the Full panel and restores original functions",
+          "Summary capture disables detailed hooks and cancellation restores an already visible Full profiler",
+          "Tiny dropped-time totals are distinguished from sustained simulation backlog"
+        ]
+      },
+      "performance-investigation": {
+        "passed": 5,
+        "tests": [
+          "Static cell cache preserves slots, duplicates and hit order, including negative coordinates",
+          "Static cell hits skip grid work and invalidate on geometry edits, slot changes and explicit same-tick invalidation",
+          "Nonfinite ranges, sparse arrays and unknown geometry retain their fallback behavior",
+          "Detailed traffic and sign hooks are exclusive and unwind back to exact original functions",
+          "Map-entry warmup prepares ordinary signs only when their font is ready and keeps warm caches reusable"
+        ]
+      },
+      "traffic-efficiency": {
+        "passed": 4,
+        "results": [
+          "Reused route buffers discard old points after pose and route changes",
+          "Lane checks retain exact 700px boundary and independently sensed player car",
+          "Reverse removals retain grid slots (live source)",
+          "Reverse removals retain grid slots (parked snapshot)"
+        ]
+      },
+      "traffic-crossings": {
+        "passed": 5,
+        "results": [
+          "Perception grid preserves order, range boundaries, moved cars and removals",
+          "Spatial traffic sensing matches full-list sensing in a populated city",
+          "Full crossing queues keep six spaced walkers on the pavement and divert overflow",
+          "Queues fit short approaches, retain road users, and clear when crossing opens",
+          "Blocked queues retain timeout rerouting"
+        ]
+      }
+    },
+    "poseAndQualityAtlas": {
+      "pixelIdentical": {
+        "city": true,
+        "high-night": true,
+        "high-day": true,
+        "medium-night": true,
+        "medium-day": true,
+        "low-night": true,
+        "low-day": true
+      },
+      "errors": []
+    },
+    "browserReport": {
+      "pixelIdentical": true,
+      "errors": [],
+      "sections": 76,
+      "traffic": [
+        "Traffic: Manager",
+        "Traffic: People sensing",
+        "Traffic: Driving decisions",
+        "Traffic: Physics integration",
+        "Traffic: Signals",
+        "Traffic: Route sensing",
+        "Traffic: Vehicle contacts",
+        "Traffic: Wall contacts",
+        "Traffic: Static broadphase",
+        "Traffic: Junctions",
+        "Traffic: Static geometry validation",
+        "Traffic: Lane decisions"
+      ],
+      "signs": [
+        "Signs: Street neon",
+        "Signs: Double Nights"
+      ],
+      "exports": [
+        "txt",
+        "json"
+      ]
+    },
+    "legacyAtlasNote": "Initial immediate city snapshot differed at 39 pixels (channel deltas <=2); legacy fixture now waits for document.fonts.ready and the repeat matched exactly. Dedicated warmed final city fixtures also matched exactly. Six pose/quality sheets matched in both runs.",
+    "gameRegressions": {
+      "file": "/workspace/DF_TOPDOWNEDITION/DFAB V8.html",
+      "passed": 91,
+      "failed": 0,
+      "assertions": 1363,
+      "results": [
+        {
+          "name": "Level 50 progression, new node gates and point conservation",
+          "status": "passed"
+        },
+        {
+          "name": "Legacy save/load and cap PP settlement preserve XP without duplicate payouts",
+          "status": "passed"
+        },
+        {
+          "name": "Rejected Flit spends no charge, only the blocked cue; shortened landing clears the actor radius",
+          "status": "passed"
+        },
+        {
+          "name": "Flit VFX draws without shadowBlur and keeps one body per spirit across frames",
+          "status": "passed"
+        },
+        {
+          "name": "Held ring flick requires fresh outward speed, rearms deliberately and preserves standalone flick",
+          "status": "passed"
+        },
+        {
+          "name": "Precise Stick: dead centre, gentle response curve, and steering that grows with the push",
+          "status": "passed"
+        },
+        {
+          "name": "A car turned into a wall or corner can always drive away from it",
+          "status": "passed"
+        },
+        {
+          "name": "Player autodrive follows connected roads and arrives without teleport",
+          "status": "passed"
+        },
+        {
+          "name": "Zib autodrive follows connected roads and arrives without teleport",
+          "status": "passed"
+        },
+        {
+          "name": "Player completes a passed endpoint stop on R0.S0.L2",
+          "status": "passed"
+        },
+        {
+          "name": "Player completes a passed endpoint stop on R1.S1.L2",
+          "status": "passed"
+        },
+        {
+          "name": "Zib completes a passed endpoint stop on R0.S0.L2",
+          "status": "passed"
+        },
+        {
+          "name": "Zib completes a passed endpoint stop on R1.S1.L2",
+          "status": "passed"
+        },
+        {
+          "name": "Map-edge dead ends start no ride, keep her pin, and a failed route is free",
+          "status": "passed"
+        },
+        {
+          "name": "A map switch mid-ride ends the ride uncharged, with no ghost cab",
+          "status": "passed"
+        },
+        {
+          "name": "Player stopped beside the final stop arrives after a still half-second",
+          "status": "passed"
+        },
+        {
+          "name": "Zib stopped beside the final stop arrives after a still half-second",
+          "status": "passed"
+        },
+        {
+          "name": "Arrival without a drive route keeps the direct-distance threshold",
+          "status": "passed"
+        },
+        {
+          "name": "Autodrive keyboard repeat, player takeover and passenger input guards",
+          "status": "passed"
+        },
+        {
+          "name": "Closed profiler samples no clocks or reports; visible profiler and benchmark can sample",
+          "status": "passed"
+        },
+        {
+          "name": "Player marker keeps CSS-pixel size, hides in special views and restores Canvas state",
+          "status": "passed"
+        },
+        {
+          "name": "Mirage rings keep one quarter-resolution snapshot, at most four bends and no outlines",
+          "status": "passed"
+        },
+        {
+          "name": "Every rapid-fire bullet that lands deals damage; a melee swing keeps its i-frames",
+          "status": "passed"
+        },
+        {
+          "name": "Nav grid: once per tick, local invalidation, failed searches back off, steering falls back straight",
+          "status": "passed"
+        },
+        {
+          "name": "Melee steps in only on a target in reach",
+          "status": "passed"
+        },
+        {
+          "name": "Pause \u2192 Equip opens the Weapons tab and lists the equipped gun; furniture waits for the apartment",
+          "status": "passed"
+        },
+        {
+          "name": "Adaptive lighting survives zoom lamp-budget steps and lightning",
+          "status": "passed"
+        },
+        {
+          "name": "Baseline layer panel: each layer gated and billed; with Baseline off nothing is gated or counted",
+          "status": "passed"
+        },
+        {
+          "name": "Velvet routes around walls without teleporting or walking through geometry",
+          "status": "passed"
+        },
+        {
+          "name": "Velvet waits at unreachable routes and leaves rest when the player departs",
+          "status": "passed"
+        },
+        {
+          "name": "Contact shadows stay on the ground across rotation, bobbing, vector and sprite passes",
+          "status": "passed"
+        },
+        {
+          "name": "Humanoid contact and sun shadows keep their world placement as bodies turn",
+          "status": "passed"
+        },
+        {
+          "name": "Furniture sprites: painted runs never change over time, loops repeat per period, stamps follow state",
+          "status": "passed"
+        },
+        {
+          "name": "A landmark just off screen still throws its beams but skips its roof pass",
+          "status": "passed"
+        },
+        {
+          "name": "A landmark whose body is off screen draws only its beams in the glow pass",
+          "status": "passed"
+        },
+        {
+          "name": "Portico marquee: one stamp a bulb, from a sprite baked to the screen scale",
+          "status": "passed"
+        },
+        {
+          "name": "Apartment lights: each lamp shade and festoon bulb is one stamp, glow and bulb together",
+          "status": "passed"
+        },
+        {
+          "name": "The window city draws nothing while its strip is off screen",
+          "status": "passed"
+        },
+        {
+          "name": "City view: the hub kit seen from a window; its bake leaves the camera as it found it, and each car is one stamp",
+          "status": "passed"
+        },
+        {
+          "name": "City traffic: the cars on a lane share its speed, and never close on each other",
+          "status": "passed"
+        },
+        {
+          "name": "City parallax: the city slides slower than the floor, never past its picture, and sits as laid out at the edge",
+          "status": "passed"
+        },
+        {
+          "name": "Look-out: at the veranda edge the camera leans out over the city; nowhere else",
+          "status": "passed"
+        },
+        {
+          "name": "Camera edge lock: the view stays inside the map, a narrow map is centred, and off it follows her as before",
+          "status": "passed"
+        },
+        {
+          "name": "Ultra reflections: lights at half size, detail at full size and only where it has something, art at the scale it is seen",
+          "status": "passed"
+        },
+        {
+          "name": "Ultra reflections: art repaints on a cadence, crowd bakes are shared and pace-proof, puddles bake once, rects never overlap",
+          "status": "passed"
+        },
+        {
+          "name": "Adaptive reflections: slow frames step Ultra down to High then Medium (never Off), steady frames bring it back, the saved choice untouched",
+          "status": "passed"
+        },
+        {
+          "name": "Device Preset: off by default; on applies this device's tier, a save can't undo it, and off puts every setting back",
+          "status": "passed"
+        },
+        {
+          "name": "Rooftop festoons: every bulb at its own shimmer of the string, in one fill per shimmer",
+          "status": "passed"
+        },
+        {
+          "name": "Landmark roofs: every painted run draws the same at any time and in any wind",
+          "status": "passed"
+        },
+        {
+          "name": "An unmarked plane (the Moon City canopy) stamps as one sprite instead of drawing its art",
+          "status": "passed"
+        },
+        {
+          "name": "Cars live on the hub: after a hijack nothing of hers is drawn, solid or offered indoors, and each is back where she left it",
+          "status": "passed"
+        },
+        {
+          "name": "Out of a hijacked car: lights left on, still hers to Drive; taking another sends it back to traffic, lit, and an empty one has nobody to put out",
+          "status": "passed"
+        },
+        {
+          "name": "Amber's van is sanctioned: never duplicated, parked where she leaves it, home for a new job",
+          "status": "passed"
+        },
+        {
+          "name": "Her car on foot: Drive from behind or in front walks round the corner without a stall; walking into it slides along its side like any car",
+          "status": "passed"
+        },
+        {
+          "name": "Markers: pins over what is on screen after the light; the compass round her for what is not; none indoors",
+          "status": "passed"
+        },
+        {
+          "name": "The package: drawn by the van and lit at night, picked up there or loaded with the van; the readout follows the job",
+          "status": "passed"
+        },
+        {
+          "name": "Hijacking: a ganger at the wheel comes out fighting; a civilian, or an empty car, does not",
+          "status": "passed"
+        },
+        {
+          "name": "Traffic goes round her parked car: a lane change, or a stop and an overtake when both lanes are hers; never a shove",
+          "status": "passed"
+        },
+        {
+          "name": "People in the road: someone crossing is let across, someone standing is stopped for and gone round at a walk; nobody is touched",
+          "status": "passed"
+        },
+        {
+          "name": "Tempers: the calm wait longer and give more room than the pushy; walled in, a car backs up and waits (the pushy on the horn), never pushes",
+          "status": "passed"
+        },
+        {
+          "name": "Street pedestrians: one standing in the lane is gone round; one on the pavement by the kerb never slows a car",
+          "status": "passed"
+        },
+        {
+          "name": "Hit by a car: 10 once, then a moment of grace, not a hit every tick it touches",
+          "status": "passed"
+        },
+        {
+          "name": "Parked on its nose: a car backs up off her car, then goes round it without a touch",
+          "status": "passed"
+        },
+        {
+          "name": "Junction lights follow demand: green rests on its road while the other is empty, and turns for the first car that waits",
+          "status": "passed"
+        },
+        {
+          "name": "Junction lights: a red is stopped for at the line behind the crosswalk; amber stops the calm, the pushy run it",
+          "status": "passed"
+        },
+        {
+          "name": "Junction lights: right turns only from the kerb lane, and a kerb right turn goes with the car going straight beside it",
+          "status": "passed"
+        },
+        {
+          "name": "Junction lights: a left turn waits for what is coming the other way; nobody goes into a box whose way out is full",
+          "status": "passed"
+        },
+        {
+          "name": "Pedestrians walk on: turn back only at a dead end or full crossing, never re-cross straight back, and connect block ends",
+          "status": "passed"
+        },
+        {
+          "name": "Junction lights: a turn arrow lets waiting turns go before the straight-on traffic, and frees a left turn stuck on a green",
+          "status": "passed"
+        },
+        {
+          "name": "Walkers at junction lights wait at the kerb for the walk (asking for it), then cross; crossings join the pavement",
+          "status": "passed"
+        },
+        {
+          "name": "A busy junction moves more cars with the lights than with the old one-at-a-time queue, and nobody touches",
+          "status": "passed"
+        },
+        {
+          "name": "Saves from the old city: a spot where a building stands now loads at the spawn, her car where it waits in a new game",
+          "status": "passed"
+        },
+        {
+          "name": "Saves: her car stays where she parked it through a save made indoors; a hijacked drive loads on foot",
+          "status": "passed"
+        },
+        {
+          "name": "Garage switch while out in a hijacked car keeps her in it, and the old model leaves no invisible wall",
+          "status": "passed"
+        },
+        {
+          "name": "Visibility: her halo by day, by night and in night vision (and off with Player Glow off); only hostiles burn white in night vision",
+          "status": "passed"
+        },
+        {
+          "name": "City: no building, portico, forecourt or drive in the hub reaches a pavement or road",
+          "status": "passed"
+        },
+        {
+          "name": "City helpers: the hand-laid block has its shop parade wall to wall on Hotel Dr., and no building overlaps another",
+          "status": "passed"
+        },
+        {
+          "name": "Doors any side: a building faces the street it is placed on, door, sign, lights, landmark and Zib drop-off with it",
+          "status": "passed"
+        },
+        {
+          "name": "The bigger city: four times the old area, near square, every landmark placed clear of the street and reachable by Zib and autodrive",
+          "status": "passed"
+        },
+        {
+          "name": "Street-front fill: auto-filled blocks grow rows along the streets they front, facing the road",
+          "status": "passed"
+        },
+        {
+          "name": "Angled streets: Lantern Cut joins its roads at shaped junctions, with pavements, crossings, walks and buildings to match",
+          "status": "passed"
+        },
+        {
+          "name": "The newer city's angled and curved streets: Foxglove Cut is built like the first ones",
+          "status": "passed"
+        },
+        {
+          "name": "The newer city's angled and curved streets: Starling Diagonal is built like the first ones",
+          "status": "passed"
+        },
+        {
+          "name": "The newer city's angled and curved streets: Crescent Row is built like the first ones",
+          "status": "passed"
+        },
+        {
+          "name": "The newer city's angled and curved streets: Velvet Hook is built like the first ones",
+          "status": "passed"
+        },
+        {
+          "name": "Curved streets: Halfmoon Bend joins its roads at shaped junctions, with pavements, crossings, walks and buildings round the bend",
+          "status": "passed"
+        },
+        {
+          "name": "Angled streets: cars drive Lantern Cut and turn in and out at both ends",
+          "status": "passed"
+        },
+        {
+          "name": "Curved streets: cars slow for Halfmoon Bend, keep to their lanes round it and turn in and out at both ends",
+          "status": "passed"
+        },
+        {
+          "name": "Junction turns curve straight into the lane out: no swing the other way first, on square, angled and curved streets",
+          "status": "passed"
+        },
+        {
+          "name": "Every bundled map loads, updates and draws without runtime errors",
+          "status": "passed"
+        },
+        {
+          "name": "Thigh-high finishes buy, replace footwear and persist alongside thigh bands",
+          "status": "passed"
+        }
+      ]
+    },
+    "totalTestsPassed": 123
+  }
+}

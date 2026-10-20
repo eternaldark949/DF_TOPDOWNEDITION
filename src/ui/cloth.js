@@ -38,8 +38,14 @@
         function _simTransform(ctx) {
             if (!_worldMatrix || ctx.canvas !== _worldCanvas) return null;
             if (_stInvSrc !== _worldMatrix) { _stInv = _worldMatrix.inverse(); _stInvSrc = _worldMatrix; }   // (a new matrix each frame)
-            const M = _stInv.multiply(ctx.getTransform());                   // camera and shake cancel out
-            _stM = M; _stDet = M.a * M.d - M.b * M.c;
+            const frame = _stInv.multiply(ctx.getTransform());               // camera and shake cancel out
+            // DOMMatrix coordinates are native getters. Snapshot their exact values
+            // once: every strand/cloth point and toLInto can then use plain fields.
+            // Like _simT, this scratch matrix is consumed before the next sim call.
+            const M = _stM || (_stM = { a: 0, b: 0, c: 0, d: 0, e: 0, f: 0 });
+            M.a = frame.a; M.b = frame.b; M.c = frame.c;
+            M.d = frame.d; M.e = frame.e; M.f = frame.f;
+            _stDet = M.a * M.d - M.b * M.c;
             _simT.M = M; _simT.sc = Math.hypot(M.a, M.b) || 1; _simT.ang = Math.atan2(M.b, M.a);   // the frame's +x in world
             return _simT;
         }

@@ -3,8 +3,48 @@
         // GameEngine.prototype (see engineMixin in game-engine.js); the decor drawer is a plain
         // function that entities/props-decor.js dispatches to.
 
-        const PALACE = { obsidian: '#0b0509', obsidianHi: '#1c0d16', gold: '#e3a64a', goldDim: 'rgba(227,166,74,0.45)', blood: '#7a0618',
+        const PALACE = { obsidian: '#0b0509', obsidianHi: '#1c0d16', gold: '#ffc64b', goldDim: 'rgba(255,190,58,0.65)', blood: '#7a0618',
                       crimson: '#b0122e', ember: '#ff6a3a', bone: '#e9d8c6', thorn: '#2a0e12', rose: '#c0143e', water: '#14060c' };
+
+        // Shared palace ornament: flowing channels, leaf-like mineral facets, no inherited religious emblem.
+        function palaceCrystalCrest(c,r) {
+            c.strokeStyle='rgba(255,194,61,.95)';c.lineWidth=1.5;c.beginPath();
+            for(let i=0;i<6;i++){
+                const a=i*Math.PI/3,cs=Math.cos(a),sn=Math.sin(a);
+                c.moveTo(cs*r*.24,sn*r*.24);
+                c.bezierCurveTo(Math.cos(a-.42)*r*.57,Math.sin(a-.42)*r*.57,
+                    Math.cos(a+.32)*r*.81,Math.sin(a+.32)*r*.81,cs*r,sn*r);
+            }c.stroke();
+            c.strokeStyle='rgba(255,183,47,.42)';c.lineWidth=1;c.beginPath();c.ellipse(0,0,r+8,r+8,0,.12,Math.PI*1.8);c.stroke();
+            c.fillStyle='#c60b38';c.strokeStyle='#ffd36a';c.lineWidth=1.3;
+            c.beginPath();c.moveTo(0,-r*.48);c.lineTo(r*.22,0);c.lineTo(0,r*.48);c.lineTo(-r*.22,0);c.closePath();c.fill();c.stroke();
+            c.fillStyle='#ff4560';c.beginPath();c.moveTo(0,-r*.4);c.lineTo(0,r*.29);c.lineTo(-r*.14,-1);c.closePath();c.fill();
+        }
+
+        function palaceFlowers(p) {
+            if(p._palaceFlowers)return p._palaceFlowers;
+            const rnd=seededRandom((p.x*31+p.y)|0),out=[],count=Math.max(12,Math.floor(p.width*p.height/280));
+            const cols=Math.max(2,Math.round(Math.sqrt(count*p.width/p.height))),rows=Math.ceil(count/cols);
+            for(let i=0;i<count;i++)out.push({x:8+((i%cols)+.2+rnd()*.6)*(p.width-16)/cols,
+                y:7+(Math.floor(i/cols)+.2+rnd()*.6)*(p.height-14)/rows,r:3+rnd()*2,a:rnd()*6.28,blood:i%4===0});
+            return p._palaceFlowers=out;
+        }
+
+        function palaceFlowerGlow(c,p,t) {
+            if(!p._flowerGlow){
+                const cv=document.createElement('canvas');cv.width=Math.ceil(p.width+24);cv.height=Math.ceil(p.height+24);
+                const g=cv.getContext('2d');
+                for(const f of palaceFlowers(p))if(f.blood){
+                    const x=f.x+12,y=f.y+12,halo=g.createRadialGradient(x,y,0,x,y,11);
+                    halo.addColorStop(0,'rgba(255,65,90,.88)');halo.addColorStop(.25,'rgba(255,10,55,.52)');halo.addColorStop(1,'rgba(190,0,45,0)');
+                    g.fillStyle=halo;g.fillRect(x-11,y-11,22,22);
+                    g.strokeStyle='rgba(255,38,82,.9)';g.lineWidth=.7;g.beginPath();
+                    for(let j=0;j<6;j++){const a=f.a+j*Math.PI/3;g.moveTo(x,y);g.ellipse(x+Math.cos(a)*2.6,y+Math.sin(a)*2.6,2.4,1.2,a,0,Math.PI*2);}g.stroke();
+                    g.fillStyle='#ffd89a';g.beginPath();g.arc(x,y,.9,0,Math.PI*2);g.fill();
+                }p._flowerGlow=cv;
+            }
+            c.save();c.globalAlpha*=.82+.12*Math.sin(t*1.4+p.x*.01);c.drawImage(p._flowerGlow,p.x-12,p.y-12);c.restore();
+        }
 
         engineMixin({
             drawPalaceInterior(ctx) {
@@ -13,45 +53,82 @@
             },
 
             _paintPalaceFloor() {
-                const cv = document.createElement('canvas'); cv.width = 1800; cv.height = 1400;
-                const c = cv.getContext('2d'), r = seededRandom(666);
-                const fill = (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
-                fill(0, 0, 1800, 1400, '#0a0407');
-                // Obsidian slabs with gold seams (throne hall, entrance, galleries)
-                const slabs = (x0, y0, x1, y1, s, base) => {
-                    for (let y = y0; y < y1; y += s) for (let x = x0; x < x1; x += s) { const v = r() * 6 | 0; c.fillStyle = `rgb(${base[0] + v},${base[1] + v * 0.4 | 0},${base[2] + v})`; c.fillRect(x, y, s, s); }
-                    c.strokeStyle = 'rgba(227,166,74,0.16)'; c.lineWidth = 1; c.beginPath();
-                    for (let x = x0; x <= x1; x += s) { c.moveTo(x, y0); c.lineTo(x, y1); }
-                    for (let y = y0; y <= y1; y += s) { c.moveTo(x0, y); c.lineTo(x1, y); }
-                    c.stroke();
-                    for (let i = 0; i < (x1 - x0) * (y1 - y0) / 9000; i++) {                       // veins of ember in the stone
-                        let x = x0 + r() * (x1 - x0), y = y0 + r() * (y1 - y0); c.strokeStyle = `rgba(255,110,70,${0.04 + r() * 0.07})`; c.lineWidth = 0.6 + r();
-                        c.beginPath(); c.moveTo(x, y); for (let k = 0; k < 4; k++) { x += (r() - 0.3) * 60; y += (r() - 0.5) * 40; c.lineTo(x, y); } c.stroke();
+                const cv=document.createElement('canvas');cv.width=1800;cv.height=1400;
+                const c=cv.getContext('2d'),r=seededRandom(666);
+                const box=(x,y,w,h,col,edge,rad=0)=>{c.beginPath();c.roundRect(x,y,w,h,rad);c.fillStyle=col;c.fill();if(edge){c.strokeStyle=edge;c.lineWidth=1;c.stroke();}};
+                const slabs=(x,y,w,h,size,base)=>{
+                    c.save();c.beginPath();c.rect(x,y,w,h);c.clip();
+                    for(let yy=y;yy<y+h;yy+=size)for(let xx=x;xx<x+w;xx+=size){
+                        const v=r()*7|0;c.fillStyle=`rgb(${base[0]+v},${base[1]+v},${base[2]+v})`;c.fillRect(xx,yy,size,size);
                     }
+                    c.strokeStyle='rgba(226,191,135,.15)';c.lineWidth=.8;c.beginPath();
+                    for(let xx=x;xx<=x+w;xx+=size){c.moveTo(xx,y);c.lineTo(xx,y+h);}
+                    for(let yy=y;yy<=y+h;yy+=size){c.moveTo(x,yy);c.lineTo(x+w,yy);}c.stroke();
+                    c.strokeStyle='rgba(220,175,175,.08)';c.lineWidth=.7;
+                    for(let i=0;i<w*h/7500;i++){
+                        let xx=x+r()*w,yy=y+r()*h;c.beginPath();c.moveTo(xx,yy);
+                        for(let j=0;j<4;j++){xx+=(r()-.3)*45;yy+=(r()-.5)*35;c.lineTo(xx,yy);}c.stroke();
+                    }c.restore();
                 };
-                slabs(600, 380, 1200, 986, 60, [12, 6, 10]);
-                slabs(600, 1000, 1200, 1386, 60, [14, 7, 11]);
-                slabs(14, 380, 586, 986, 48, [16, 8, 14]); slabs(1214, 380, 1786, 986, 48, [16, 8, 14]);
-                // The throne hall: a gold inlaid sigil before the throne, and a crimson runner from the arch
-                c.save(); c.translate(900, 520);
-                c.strokeStyle = PALACE.gold; c.lineWidth = 2; c.beginPath(); c.arc(0, 0, 96, 0, Math.PI * 2); c.stroke();
-                c.lineWidth = 1; c.beginPath(); c.arc(0, 0, 84, 0, Math.PI * 2); c.stroke();
-                c.beginPath(); for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * Math.PI * 4 / 5; c[i ? 'lineTo' : 'moveTo'](Math.cos(a) * 82, Math.sin(a) * 82); } c.closePath(); c.stroke();
-                for (let i = 0; i < 20; i++) { const a = i * Math.PI / 10; c.fillStyle = i % 2 ? PALACE.gold : PALACE.crimson; c.beginPath(); c.arc(Math.cos(a) * 90, Math.sin(a) * 90, 2, 0, Math.PI * 2); c.fill(); }
-                c.restore();
-                fill(860, 760, 80, 226, '#4a0612'); fill(864, 760, 2, 226, PALACE.goldDim); fill(934, 760, 2, 226, PALACE.goldDim);
-                fill(860, 1000, 80, 386, '#4a0612'); fill(864, 1000, 2, 386, PALACE.goldDim); fill(934, 1000, 2, 386, PALACE.goldDim);
-                // The garden: dark earth, a path of bone-white stones to the fountain
-                for (let i = 0; i < 900; i++) { c.fillStyle = r() < 0.5 ? 'rgba(60,10,16,0.35)' : 'rgba(0,0,0,0.3)'; c.fillRect(14 + r() * 872, 14 + r() * 352, 2 + r() * 4, 2 + r() * 3); }
-                for (let y = 30; y < 366; y += 26) { c.fillStyle = 'rgba(233,216,198,0.18)'; c.beginPath(); c.ellipse(450 + (r() - 0.5) * 8, y, 14, 9, 0, 0, Math.PI * 2); c.fill(); }
-                // Shrine: black stone and a ring of gold; the bath: ash-dark tiles
-                slabs(900, 14, 1386, 366, 44, [10, 5, 9]);
-                c.strokeStyle = PALACE.goldDim; c.lineWidth = 2; c.beginPath(); c.arc(1145, 210, 110, 0, Math.PI * 2); c.stroke();
-                slabs(1400, 14, 1786, 366, 40, [20, 10, 8]);
-                // Dressing room: rose carpet; the kennels: scored stone and straw
-                fill(14, 1000, 572, 386, '#2a0a16'); for (let i = 0; i < 500; i++) { c.fillStyle = 'rgba(255,120,160,0.03)'; c.fillRect(14 + r() * 572, 1000 + r() * 386, 3, 3); }
-                slabs(1214, 1000, 1786, 1386, 50, [18, 12, 8]);
-                for (let i = 0; i < 260; i++) { c.strokeStyle = 'rgba(200,160,90,0.12)'; c.lineWidth = 1; const x = 1230 + r() * 540, y = 1110 + r() * 260, a = r() * 6.28; c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * 8, y + Math.sin(a) * 8); c.stroke(); }
+                const carpet=(y,h)=>{
+                    box(840,y,120,h,'#930922','#ffc64b',3);box(848,y+4,104,h-8,'#c80e34','#da9639',2);
+                    const sheen=c.createLinearGradient(850,0,950,0);sheen.addColorStop(0,'rgba(18,5,20,.25)');sheen.addColorStop(.48,'rgba(255,83,97,.18)');sheen.addColorStop(1,'rgba(18,5,20,.25)');
+                    c.fillStyle=sheen;c.fillRect(850,y+5,100,h-10);
+                    c.strokeStyle='rgba(255,204,86,.85)';c.lineWidth=1;c.beginPath();
+                    for(let yy=y+24;yy<y+h-12;yy+=38)for(const side of [-1,1]){
+                        const x=900+side*43;c.moveTo(x,yy+12);c.quadraticCurveTo(x-side*14,yy,x,yy-12);
+                        c.moveTo(x,yy);c.lineTo(x-side*8,yy-4);
+                    }c.stroke();
+                };
+                box(0,0,1800,1400,'#19121d');
+                // Polished plum-black stone in the main route; matte dusk stone in the hunting lanes.
+                slabs(600,380,600,606,60,[29,20,31]);slabs(600,1000,600,386,60,[34,23,34]);
+                slabs(14,380,572,606,64,[42,31,43]);slabs(1214,380,572,606,64,[42,31,43]);
+                slabs(900,14,486,352,48,[34,23,40]);slabs(1400,14,386,352,44,[43,25,25]);
+                // Pale route margins give the red velvet readable edges even in deep shadow.
+                for(const y of [760,1000]){
+                    const h=y===760?226:386;box(821,y,158,h,'#6d5b63');carpet(y,h);
+                    c.strokeStyle='rgba(246,220,184,.3)';c.lineWidth=1;c.strokeRect(825,y+1,150,h-2);
+                }
+                for(const [x,y,w,h] of [[618,398,564,570],[32,398,536,570],[1232,398,536,570]]){
+                    c.strokeStyle='rgba(211,173,118,.26)';c.lineWidth=1;c.strokeRect(x,y,w,h);
+                }
+                // Six flowing gold channels and a ruby focus: an original mineral/organic crest.
+                c.save();c.translate(900,535);palaceCrystalCrest(c,90);c.restore();
+                // The Blood Garden: silver-veined earth, soft moss and curved ivory paths.
+                box(14,14,872,352,'#252029');
+                for(let i=0;i<1300;i++){
+                    const x=18+r()*862,y=18+r()*342;c.fillStyle=i%3?'rgba(70,86,66,.25)':'rgba(156,101,112,.13)';
+                    c.fillRect(x,y,1+r()*3,1+r()*3);
+                }
+                const paths=[[[330,366],[330,285],[363,230],[417,205]],[[745,366],[745,258],[570,270],[484,212]],
+                    [[886,190],[735,170],[586,184],[495,190]],[[450,14],[466,67],[420,92],[444,145]]];
+                for(const a of paths){
+                    c.beginPath();c.moveTo(...a[0]);c.bezierCurveTo(...a[1],...a[2],...a[3]);
+                    c.strokeStyle='#51424b';c.lineWidth=47;c.lineCap='round';c.stroke();
+                    c.strokeStyle='#ae9b94';c.lineWidth=37;c.stroke();c.strokeStyle='rgba(248,223,195,.32)';c.lineWidth=1;c.stroke();
+                }
+                c.strokeStyle='rgba(228,193,160,.25)';c.lineWidth=1;
+                for(let yy=20;yy<360;yy+=25){c.beginPath();c.moveTo(429,yy);c.lineTo(465,yy+3);c.stroke();}
+                // Fountain terrace and a few petals carried beyond the raised beds.
+                c.fillStyle='#8a7579';c.beginPath();c.ellipse(450,190,75,67,0,0,Math.PI*2);c.fill();
+                c.strokeStyle='#edbc5c';c.lineWidth=1.5;c.stroke();
+                for(let i=0;i<95;i++){c.fillStyle=i%4?'#b90d32':'#fa3258';c.beginPath();c.ellipse(100+r()*720,25+r()*310,1.2+r()*1.5,.7+r(),r()*3,0,Math.PI*2);c.fill();}
+                // Crystal chamber: inlaid channels converge toward a floating mineral focus.
+                c.save();c.translate(1145,180);palaceCrystalCrest(c,109);c.restore();
+                for(const x of [925,1360])for(const y of [40,332])box(x-8,y-8,16,16,'#71545f','#cda77f',4);
+                // Dressing room: deep silk with a pearl border. Kennels retain their dark recesses.
+                box(14,1000,572,386,'#452037');box(34,1020,532,346,'#4e253b','#ac846c',5);
+                slabs(1214,1000,572,386,52,[26,20,26]);
+                for(let i=0;i<220;i++){
+                    c.strokeStyle='rgba(190,157,109,.12)';c.lineWidth=1;const x=1230+r()*540,y=1120+r()*250;
+                    c.beginPath();c.moveTo(x,y);c.lineTo(x+r()*10,y+r()*6);c.stroke();
+                }
+                // Matching petal-shaped threshold inlays frame the deliberately unlit side galleries.
+                for(const x of [600,1200])for(const y of [625,738]){
+                    c.save();c.translate(x,y);c.strokeStyle='#9f7c76';c.lineWidth=1;
+                    c.beginPath();c.moveTo(-13,0);c.quadraticCurveTo(0,-8,13,0);c.quadraticCurveTo(0,8,-13,0);c.stroke();c.restore();
+                }
                 return cv;
             },
 
@@ -62,16 +139,17 @@
                 for (const p of this.props || []) {
                     if (!p.decorType || !p.decorType.startsWith('dp_')) continue;
                     const cx = p.x + p.width / 2, cy = p.y + p.height / 2, f = 0.8 + 0.2 * Math.sin(t * 9 + cx);
-                    if (p.decorType === 'dp_brazier') { glow(cx, cy, 46, '255, 110, 60', 0.5 * f); glow(cx, cy, 14, '255, 220, 160', 0.7 * f); }
+                    if (p.decorType === 'dp_roses') { palaceFlowerGlow(ctx,p,t); }
+                    else if (p.decorType === 'dp_brazier') { glow(cx, cy, 46, '255, 110, 60', 0.5 * f); glow(cx, cy, 14, '255, 220, 160', 0.7 * f); }
                     else if (p.decorType === 'dp_embers') glow(cx, cy, 140, '255, 90, 30', 0.28 + 0.06 * Math.sin(t * 1.3));
-                    else if (p.decorType === 'dp_fountain') glow(cx, cy, 60, '255, 60, 100', 0.25 + 0.05 * Math.sin(t * 2));
+                    else if (p.decorType === 'dp_fountain') glow(cx, cy, 60, '255, 24, 75', 0.3 + 0.05 * Math.sin(t * 2));
                     else if (p.decorType === 'dp_altar') { glow(cx - 30, cy, 18, '255, 180, 110', 0.5 * f); glow(cx + 30, cy, 18, '255, 180, 110', 0.5 * f); glow(cx, cy, 50, '255, 70, 90', 0.25); }
-                    else if (p.decorType === 'dp_throne') glow(cx, cy - 6, 70, '255, 40, 80', 0.22 + 0.06 * Math.sin(t * 0.9));
+                    else if (p.decorType === 'dp_throne') glow(cx, cy - 6, 70, '255, 28, 70', 0.22 + 0.03 * Math.sin(t * 0.9));
                     else if (p.decorType === 'dp_pool') glow(cx, cy, 70, '200, 20, 60', 0.14);
                     else if (p.decorType === 'dp_cage') glow(cx, cy, 30, '255, 60, 20', 0.12);
                 }
                 // The red moon through the oculus, over the throne
-                glow(900, 470, 170, '255, 40, 70', 0.12 + 0.03 * Math.sin(t * 0.5));
+                glow(900, 470, 160, '255, 75, 110', 0.07 + 0.02 * Math.sin(t * 0.5));
                 // Sparks rising from the braziers and the embers
                 for (let i = 0; i < 36; i++) {
                     const src = i % 3 === 0 ? [1590, 175] : [[733, 573], [1067, 573], [733, 833], [1067, 833]][i % 4];
@@ -140,16 +218,18 @@
             const shadow = (r = 4) => rr(x + 3, y + 3, w, h, r, 'rgba(0,0,0,0.4)');
             switch (p.decorType) {
                 case 'dp_throne': {
-                    shadow(10);
-                    rr(x, y, w, h, 10, '#1a0710', C.gold, 1.5);                                   // the seat
-                    ctx.fillStyle = '#4a0612'; ctx.beginPath(); ctx.roundRect(x + 10, y + 14, w - 20, h - 20, 6); ctx.fill();   // crimson velvet
-                    // the back: a crest of black horns rising behind the seat, gilded at the tips
-                    for (const s of [-1, 1]) {
-                        ctx.fillStyle = '#120408'; ctx.beginPath();
-                        ctx.moveTo(cx + s * 8, y + 6); ctx.quadraticCurveTo(cx + s * 34, y - 6, cx + s * 40, y - 26); ctx.quadraticCurveTo(cx + s * 22, y - 8, cx + s * 4, y + 12); ctx.fill();
-                        circ(cx + s * 40, y - 26, 2.4, C.gold);
+                    shadow(10);rr(x-4,y-2,w+8,h+6,12,'#332333','#f1b43d',1.4);
+                    rr(x+5,y+8,w-10,h-12,8,'#b1092d','#f4b94c',1);
+                    // Obsidian ribs sweep around a ruby focus above the upholstered seat.
+                    for(const side of [-1,1]){
+                        ctx.fillStyle='#322436';ctx.strokeStyle='#ffd06b';ctx.lineWidth=1.1;ctx.beginPath();
+                        ctx.moveTo(cx+side*7,y+8);ctx.bezierCurveTo(cx+side*32,y+4,cx+side*39,y-15,cx+side*34,y-25);
+                        ctx.quadraticCurveTo(cx+side*21,y-8,cx+side*5,y+13);ctx.fill();ctx.stroke();
+                        rr(cx+side*24-4,y+20,8,27,3,'#44303f','#d5a03e',1);
                     }
-                    circ(cx, y + 4, 5, C.crimson, C.gold, 1.2);
+                    ctx.fillStyle='#df143e';ctx.strokeStyle='#ffda77';ctx.lineWidth=1;
+                    ctx.beginPath();ctx.moveTo(cx,y-22);ctx.lineTo(cx+8,y-4);ctx.lineTo(cx,y+8);ctx.lineTo(cx-8,y-4);ctx.closePath();ctx.fill();ctx.stroke();
+                    ctx.fillStyle='#ff5a65';ctx.beginPath();ctx.moveTo(cx,y-18);ctx.lineTo(cx,y+4);ctx.lineTo(cx-5,y-4);ctx.closePath();ctx.fill();
                     break;
                 }
                 case 'dp_pool': {
@@ -172,15 +252,32 @@
                     break;
                 }
                 case 'dp_fountain': {
-                    circ(cx, cy, w / 2, '#1e0c12', C.goldDim, 2); circ(cx, cy, w / 2 - 8, C.water);
+                    circ(cx, cy, w / 2, '#68505d', '#efc366', 2); circ(cx, cy, w / 2 - 8, '#302234');
                     circ(cx, cy, 10, '#2a1018', C.gold, 1.2);                                      // the spout
-                    ctx.strokeStyle = 'rgba(255,60,100,0.3)'; for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 + t * 0.4; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * 10, cy + Math.sin(a) * 10); ctx.quadraticCurveTo(cx + Math.cos(a) * 24, cy + Math.sin(a) * 24 - 6, cx + Math.cos(a) * 32, cy + Math.sin(a) * 32); ctx.stroke(); }
+                    ctx.strokeStyle = 'rgba(255,106,129,0.7)'; for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 + t * 0.4; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * 10, cy + Math.sin(a) * 10); ctx.quadraticCurveTo(cx + Math.cos(a) * 24, cy + Math.sin(a) * 24 - 6, cx + Math.cos(a) * 32, cy + Math.sin(a) * 32); ctx.stroke(); }
                     break;
                 }
                 case 'dp_roses': {
-                    rr(x, y, w, h, 8, '#1a0a0c', 'rgba(0,0,0,0.4)');
-                    const R = seededRandom((x * 31 + y) | 0);
-                    for (let i = 0; i < 16; i++) { const px = x + 8 + R() * (w - 16), py = y + 6 + R() * (h - 12); circ(px, py, 3 + R() * 2, '#1e3a1a'); circ(px + 1, py - 1, 2.2 + R(), i % 3 ? C.rose : '#ff4a6a'); }
+                    shadow(12);rr(x,y,w,h,12,'#4a3442','#d9a742',1.3);
+                    rr(x+4,y+4,w-8,h-8,9,'#211f2a','rgba(225,177,152,.18)');
+                    for(const f of palaceFlowers(p)){
+                        const px=x+f.x,py=y+f.y;
+                        ctx.fillStyle=f.blood?'#385953':'#2b573c';ctx.beginPath();
+                        ctx.ellipse(px-2,py+2,f.r*1.5,f.r*.7,f.a,0,Math.PI*2);ctx.fill();
+                        ctx.strokeStyle='#71806d';ctx.lineWidth=.6;ctx.beginPath();ctx.moveTo(px-3,py+4);ctx.lineTo(px+1,py-1);ctx.stroke();
+                        for(let j=0;j<6;j++){
+                            const a=f.a+j*Math.PI/3;
+                            ctx.fillStyle=f.blood?(j%2?'#da0c40':'#ff3a62'):(j%2?'#a70a2d':'#ef1947');
+                            ctx.beginPath();ctx.ellipse(px+Math.cos(a)*f.r*.5,py+Math.sin(a)*f.r*.5,f.r*.75,f.r*.42,a,0,Math.PI*2);ctx.fill();
+                        }
+                        circ(px,py,f.r*.4,f.blood?'#ffd09a':'#680b25');
+                        if(!f.blood){ctx.strokeStyle='#ff5772';ctx.lineWidth=.55;ctx.beginPath();ctx.arc(px,py,f.r*.52,f.a,f.a+3.8);ctx.stroke();}
+                    }break;
+                }
+                case 'dp_bench': {
+                    shadow(5);rr(x,y,w,h,5,'#5a4751','#ebba55',1.3);
+                    rr(x+8,y+4,w-16,h-8,3,'#a30a30','#db3856');
+                    for(const dx of [3,w-8])rr(x+dx,y+2,5,h-4,2,'#ad8c69');
                     break;
                 }
                 case 'dp_hedge': {
@@ -189,18 +286,26 @@
                     break;
                 }
                 case 'dp_altar': {
-                    shadow(6); rr(x, y, w, h, 6, '#160810', C.gold, 1.4);
-                    ctx.fillStyle = '#e9d8c6'; ctx.beginPath(); ctx.ellipse(cx, cy, 12, 9, 0, 0, Math.PI * 2); ctx.fill();   // a skull of bone, horned
-                    ctx.fillStyle = '#120408'; ctx.beginPath(); ctx.arc(cx - 4, cy - 1, 2.4, 0, 6.28); ctx.arc(cx + 4, cy - 1, 2.4, 0, 6.28); ctx.fill();
-                    for (const s of [-1, 1]) { ctx.strokeStyle = '#2a1010'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(cx + s * 8, cy - 6); ctx.quadraticCurveTo(cx + s * 20, cy - 16, cx + s * 16, cy - 22); ctx.stroke(); }
-                    for (const s of [-1, 1]) { circ(cx + s * 30, cy, 3, C.bone); const f = 0.75 + 0.25 * Math.sin(t * 11 + s); circ(cx + s * 30, cy - 4, 2.4 * f, '#ffb46a'); }
+                    shadow(12);rr(x,y,w,h,12,'#352738','#c2a080',1.4);
+                    rr(x+7,y+6,w-14,h-12,9,'#543349','rgba(225,179,147,.45)');
+                    // Mineral facets hang over a reflecting cradle, with faint red-black filaments.
+                    const bob=Math.sin(t*1.1)*2;
+                    for(const side of [-1,1]){
+                        circ(cx+side*32,cy+5,7,'#3d293d','#d3b28b');
+                        ctx.strokeStyle='rgba(232,30,77,.65)';ctx.lineWidth=1;ctx.beginPath();
+                        ctx.moveTo(cx+side*30,cy+2);ctx.bezierCurveTo(cx+side*19,cy-13,cx+side*15,cy+12,cx,cy+bob);ctx.stroke();
+                    }
+                    ctx.fillStyle='#dc0e40';ctx.strokeStyle='#ffd570';ctx.lineWidth=1;
+                    ctx.beginPath();ctx.moveTo(cx,cy-24+bob);ctx.lineTo(cx+13,cy-1+bob);ctx.lineTo(cx,cy+23+bob);ctx.lineTo(cx-13,cy-1+bob);ctx.closePath();ctx.fill();ctx.stroke();
+                    ctx.fillStyle='#ff526c';ctx.beginPath();ctx.moveTo(cx,cy-20+bob);ctx.lineTo(cx,cy+17+bob);ctx.lineTo(cx-9,cy-1+bob);ctx.closePath();ctx.fill();
                     break;
                 }
                 case 'dp_statue': {
-                    shadow(15); circ(cx, cy, w / 2, '#241018', 'rgba(0,0,0,0.5)');
-                    circ(cx, cy - 2, w / 2 - 6, '#3a1c24');                                        // a kneeling figure, from above
-                    circ(cx, cy - 6, 4, '#4a2a30');
-                    break;
+                    shadow(10);circ(cx,cy,w/2,'#493540','#b39172');
+                    for(const [dx,dy,scale] of [[-5,1,.65],[5,4,.55],[0,-4,1]]){
+                        ctx.fillStyle=dx<0?'#756072':dx>0?'#442c47':'#987c91';ctx.strokeStyle='#c6a28f';ctx.lineWidth=.7;
+                        ctx.beginPath();ctx.moveTo(cx+dx,cy+dy-11*scale);ctx.lineTo(cx+dx+6*scale,cy+dy);ctx.lineTo(cx+dx,cy+dy+9*scale);ctx.lineTo(cx+dx-5*scale,cy+dy);ctx.closePath();ctx.fill();ctx.stroke();
+                    }break;
                 }
                 case 'dp_embers': {
                     rr(x - 4, y - 4, w + 8, h + 8, 24, '#2a0e08', C.goldDim, 2);

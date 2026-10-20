@@ -562,6 +562,11 @@
                 const key = text + '|' + size + '|' + lampColor;
                 if (this._signSpr && this._signSpr.key === key) return true;
                 if (typeof document === 'undefined' || !document.fonts || !document.fonts.check(`${size}px "Great Vibes"`)) return false;
+                return this._bakeSignSprites(text, size, lampColor, rgb, key);
+            }
+
+            /** Cold glyph/glow generation is separate from the warm lookup for diagnostics. */
+            _bakeSignSprites(text, size, lampColor, rgb, key) {
                 const R = 2, pad = 60, m = document.createElement('canvas').getContext('2d');
                 m.font = `${size}px "Great Vibes", cursive`;
                 const w = Math.ceil(m.measureText(text).width) + pad * 2, h = Math.ceil(size * 1.6) + pad * 2;

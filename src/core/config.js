@@ -12,6 +12,8 @@
 
         function clearGameplayInputs(g) {
             if (!g) return;
+            g._cancelQuickDrawHold?.();
+            g.interruptQuickDrawShot?.();
             g.mouseDown = false;
             if (g.keys) for (const k in g.keys) g.keys[k] = false;
             if (g.joystick) Object.assign(g.joystick, { active: false, dx: 0, dy: 0, id: null, armed: true, ringArmed: true, trail: [] });

@@ -43,6 +43,13 @@
         /** A fixture hidden in the ceiling: its light, no lamp drawn. */
         const hiddenLamp = (x, y, color, lightRadius) => Object.assign(new LampEntity({ x, y, lampType: 4, color, lightRadius }), { visible: false });
 
+        // Raised beds leave the fountain approach, both southern entrances and the
+        // eastern garden arch clear. Dense flower detail is painted once per bed.
+        const PALACE_GARDEN_BEDS = [
+            [52,42,240,65],[602,42,230,65],[52,268,240,64],[602,268,230,64],
+            [48,130,64,104],[788,120,64,40]
+        ];
+
         function createMapEntities(mapId) {
             const e = { props: [], npcs: [], lamps: [] };
             switch (mapId) {
@@ -607,59 +614,58 @@
                 case 'neural_sys_interior':
                     e.props = [
                         // Sequencing counter (center) — Prisma stands behind this
-                        new PropEntity({ x: 400, y: 220, width: 200, height: 30, color: '#1a1a3a', interactionType: 'neural_counter' }),
+                        new PropEntity({ x: 400, y: 220, width: 200, height: 30, color: '#1a1a3a', decorType:'ns_counter', mass:1e5, interactionType: 'neural_counter' }),
                         // Display consoles (left)
-                        new PropEntity({ x: 120, y: 120, width: 60, height: 80, color: '#0a0a2a' }),
-                        new PropEntity({ x: 120, y: 300, width: 60, height: 80, color: '#0a0a2a' }),
+                        new PropEntity({ x: 120, y: 120, width: 60, height: 80, decorType:'ns_console',variant:0,mass:1e5 }),
+                        new PropEntity({ x: 120, y: 300, width: 60, height: 80, decorType:'ns_console',variant:1,mass:1e5 }),
                         // Display consoles (right)
-                        new PropEntity({ x: 820, y: 120, width: 60, height: 80, color: '#0a0a2a' }),
-                        new PropEntity({ x: 820, y: 300, width: 60, height: 80, color: '#0a0a2a' }),
+                        new PropEntity({ x: 820, y: 120, width: 60, height: 80, decorType:'ns_console',variant:2,mass:1e5 }),
+                        new PropEntity({ x: 820, y: 300, width: 60, height: 80, decorType:'ns_console',variant:3,mass:1e5 }),
                         // Sequencing pod (left alcove)
-                        new PropEntity({ x: 150, y: 620, width: 80, height: 80, color: '#161640' }),
+                        new PropEntity({ x: 150, y: 620, width: 80, height: 80, decorType:'ns_pod',mass:1e5 }),
                         // Server racks (right room)
-                        new PropEntity({ x: 650, y: 590, width: 40, height: 120, color: '#0c0c30' }),
-                        new PropEntity({ x: 730, y: 590, width: 40, height: 120, color: '#0c0c30' }),
-                        new PropEntity({ x: 810, y: 590, width: 40, height: 120, color: '#0c0c30' }),
-                        new PropEntity({ x: 890, y: 590, width: 40, height: 120, color: '#0c0c30' }),
+                        new PropEntity({ x: 650, y: 590, width: 40, height: 120, decorType:'ns_server',mass:1e5 }),
+                        new PropEntity({ x: 730, y: 590, width: 40, height: 120, decorType:'ns_server',mass:1e5 }),
+                        new PropEntity({ x: 810, y: 590, width: 40, height: 120, decorType:'ns_server',mass:1e5 }),
+                        new PropEntity({ x: 890, y: 590, width: 40, height: 120, decorType:'ns_server',mass:1e5 }),
+                        new PropEntity({x:270,y:130,width:80,height:64,decorType:'ns_table',mass:1e5}),
+                        new PropEntity({x:650,y:130,width:80,height:64,decorType:'ns_table',mass:1e5}),
+                        new PropEntity({x:250,y:325,width:90,height:65,decorType:'ns_table',mass:1e5}),
+                        new PropEntity({x:660,y:325,width:90,height:65,decorType:'ns_table',mass:1e5}),
+                        new PropEntity({x:255,y:455,width:130,height:42,decorType:'ns_sofa',mass:1e5}),
+                        new PropEntity({x:615,y:455,width:130,height:42,decorType:'ns_sofa',mass:1e5}),
+                        new PropEntity({x:65,y:450,width:32,height:32,decorType:'ns_planter',mass:1e5}),
+                        new PropEntity({x:903,y:450,width:32,height:32,decorType:'ns_planter',mass:1e5}),
                     ];
                     e.npcs = [ new NPC(500, 170, "Prisma", 'shopkeeper') ];
                     e.lamps = [
-                        // Main showroom — cold blue tech light
-                        new LampEntity({ x: 300, y: 200, lampType: 3, color: '#0088ff', lightRadius: 350 }),
-                        new LampEntity({ x: 700, y: 200, lampType: 3, color: '#0088ff', lightRadius: 350 }),
-                        new LampEntity({ x: 500, y: 400, lampType: 3, color: '#4444ff', lightRadius: 300 }),
-                        // Counter accent — magenta glow
-                        new LampEntity({ x: 500, y: 230, lampType: 5, color: '#ff00ff', lightRadius: 200 }),
+                        // Neutral key light keeps the blue materials and identity samples readable
+                        new LampEntity({ x: 300, y: 200, lampType: 3, color: '#b5cce4', lightRadius: 350 }),
+                        new LampEntity({ x: 700, y: 200, lampType: 3, color: '#b5cce4', lightRadius: 350 }),
+                        new LampEntity({ x: 500, y: 400, lampType: 3, color: '#89a9d2', lightRadius: 300 }),
+                        // Restrained champagne counter and consultation light
+                        new LampEntity({ x: 500, y: 230, lampType: 5, color: '#d8cbb6', lightRadius: 200 }),
                         // Left alcove — sequencing pod glow
-                        new LampEntity({ x: 200, y: 650, lampType: 3, color: '#ff00ff', lightRadius: 200 }),
+                        new LampEntity({ x: 200, y: 650, lampType: 3, color: '#d8cbb6', lightRadius: 200 }),
                         // Right server room — dim blue pulse
-                        new LampEntity({ x: 775, y: 650, lampType: 3, color: '#0044aa', lightRadius: 200 }),
+                        new LampEntity({ x: 775, y: 650, lampType: 3, color: '#5275ad', lightRadius: 200 }),
                         // Exit area
-                        new LampEntity({ x: 500, y: 700, lampType: 3, color: '#0066cc', lightRadius: 250 }),
+                        new LampEntity({ x: 500, y: 700, lampType: 3, color: '#9fb9da', lightRadius: 250 }),
                     ];
                     break;
 
                 case 'biggs_arena':
                     e.npcs = [ new NPC(450, 780, "Biggs", 'shopkeeper') ];
                     e.lamps = [
-                        // ── OVERHEAD FLOODLIGHTS (warm white wash covering entire arena) ──
-                        new LampEntity({ x: 225, y: 200, lampType: 4, color: '#ffddaa', lightRadius: 500 }),
-                        new LampEntity({ x: 675, y: 200, lampType: 4, color: '#ffddaa', lightRadius: 500 }),
-                        new LampEntity({ x: 225, y: 500, lampType: 4, color: '#ffeebb', lightRadius: 500 }),
-                        new LampEntity({ x: 675, y: 500, lampType: 4, color: '#ffeebb', lightRadius: 500 }),
-                        new LampEntity({ x: 450, y: 350, lampType: 4, color: '#ffeecc', lightRadius: 550 }),
-                        new LampEntity({ x: 450, y: 650, lampType: 4, color: '#ffddbb', lightRadius: 450 }),
-                        // ── CORNER CARNIVAL ACCENT (alternating violet & amber) ──
-                        new LampEntity({ x: 100, y: 100, lampType: 3, color: '#ff8800', lightRadius: 350 }),
-                        new LampEntity({ x: 800, y: 100, lampType: 3, color: '#cc44ff', lightRadius: 350 }),
-                        new LampEntity({ x: 100, y: 760, lampType: 3, color: '#cc44ff', lightRadius: 350 }),
-                        new LampEntity({ x: 800, y: 760, lampType: 3, color: '#ff8800', lightRadius: 350 }),
-                        // ── SIDE WALL LIGHTS (fill edge gaps) ──
-                        new LampEntity({ x: 100, y: 420, lampType: 3, color: '#ff9944', lightRadius: 350 }),
-                        new LampEntity({ x: 800, y: 420, lampType: 3, color: '#ff9944', lightRadius: 350 }),
-                        new LampEntity({ x: 450, y: 100, lampType: 3, color: '#ddaaff', lightRadius: 350 }),
-                        // ── ENTRANCE GLOW ──
-                        new LampEntity({ x: 450, y: 820, lampType: 3, color: '#ffaa44', lightRadius: 350 }),
+                        // Recessed ceiling fill: the rink remains readable without visible discs over cars.
+                        hiddenLamp(260, 270, '#f0d9b8', 430),
+                        hiddenLamp(640, 270, '#f0d9b8', 430),
+                        hiddenLamp(260, 590, '#dfcbd1', 400),
+                        hiddenLamp(640, 590, '#dfcbd1', 400),
+                        // Practical brass wall lights, matching the perimeter's incandescent trim.
+                        ...[[81,180],[819,180],[81,650],[819,650]].map(([x,y]) =>
+                            new LampEntity({x,y,lampType:3,color:'#e8b989',lightRadius:190})),
+                        hiddenLamp(450, 810, '#f6d4a2', 190)
                     ];
                     break;
 
@@ -672,15 +678,16 @@
                         F(866, 396, 68, 52, 'dp_throne'), F(820, 640, 160, 110, 'dp_pool'),
                         F(650, 430, 36, 36, 'dp_pillar'), F(1114, 430, 36, 36, 'dp_pillar'), F(650, 900, 36, 36, 'dp_pillar'), F(1114, 900, 36, 36, 'dp_pillar'),
                         brazier(720, 560), brazier(1054, 560), brazier(720, 820), brazier(1054, 820),
-                        // Blood Garden: a fountain of dark water, rose beds, thorn hedges
+                        // Blood Garden: rose thickets, luminous blood flowers and a shared fountain.
                         F(405, 145, 90, 90, 'dp_fountain'),
-                        F(80, 60, 110, 40, 'dp_roses'), F(680, 60, 110, 40, 'dp_roses'), F(80, 290, 110, 40, 'dp_roses'), F(680, 290, 110, 40, 'dp_roses'),
-                        F(250, 170, 22, 60, 'dp_hedge'), F(620, 170, 22, 60, 'dp_hedge'),
-                        // Shrine: an altar of horns and candles
-                        F(1095, 50, 100, 44, 'dp_altar'), F(950, 260, 30, 30, 'dp_statue'), F(1320, 260, 30, 30, 'dp_statue'),
+                        ...PALACE_GARDEN_BEDS.map(([x,y,w,h]) => F(x,y,w,h,'dp_roses',
+                            {light:{radius:105,color:'#efb1b6',intensity:.26}})),
+                        F(310,75,90,24,'dp_bench'), F(510,270,80,24,'dp_bench'),
+                        // A chamber for a crystalline focus, with sculpted mineral forms.
+                        F(1095,65,100,65,'dp_altar'), F(950,260,30,30,'dp_statue'), F(1320,260,30,30,'dp_statue'),
                         // Bath of Embers: a sunken pool of glowing coals
                         F(1470, 100, 240, 150, 'dp_embers'),
-                        // Galleries: statues of her conquests
+                        // Shadow galleries: sculpted mineral forms stand between the hunters’ routes
                         ...[460, 640, 820].map(y => F(300, y, 30, 30, 'dp_statue')), ...[460, 640, 820].map(y => F(1470, y, 30, 30, 'dp_statue')),
                         // Dressing Room: a tall mirror, a vanity, a wardrobe
                         F(40, 1020, 80, 16, 'dp_mirror', { noNav: true }), F(240, 1180, 90, 40, 'dp_vanity'), F(440, 1020, 120, 30, 'dp_wardrobe'),
@@ -690,18 +697,20 @@
                         ...[1260, 1400, 1540, 1680].map(x => F(x, 1040, 80, 60, 'dp_cage'))
                     ];
                     e.npcs = [];
-                    const L = (x, y, color, lightRadius, lampType = 4, extra = {}) => Object.assign(new LampEntity({ x, y, lampType, color, lightRadius, ...extra }), extra);
-                    const ember = (x, y, r = 300) => L(x, y, '#ff6a3a', r, 4, { candle: true });
+                    const L = (x,y,color,r) => hiddenLamp(x,y,color,r);
                     e.lamps = [
-                        ember(733, 573), ember(1067, 573), ember(733, 833), ember(1067, 833),           // the throne hall's braziers
-                        L(900, 520, '#ff3a5a', 340), L(900, 700, '#b0204a', 260),                     // the red moon on the throne, its glow in the pool
-                        L(450, 190, '#ff4a6a', 300), L(150, 80, '#a02040', 220), L(730, 300, '#a02040', 220),   // the garden: the fountain, the roses
-                        ember(1145, 72, 260), L(1145, 200, '#ff7a3a', 240),                          // the altar
-                        L(1590, 175, '#ff5a1a', 320),                                                 // the bath of embers
-                        L(300, 520, '#c03050', 260), L(300, 840, '#c03050', 260), L(1500, 520, '#c03050', 260), L(1500, 840, '#c03050', 260),   // the galleries
-                        L(285, 1200, '#ff8a6a', 240), L(80, 1060, '#ffb0c0', 180),                    // the dressing room, the mirror
-                        ember(773, 1313), ember(1027, 1313), L(900, 1100, '#ff5a4a', 260),            // the entrance
-                        L(1500, 1200, '#ff3a1a', 300)                                                 // the kennels
+                        // Warm architectural fill stays local: the galleries retain dark lanes.
+                        L(733,573,'#ffd1a0',215),L(1067,573,'#ffd1a0',215),
+                        L(733,833,'#edb399',195),L(1067,833,'#edb399',195),
+                        L(900,495,'#eab1ad',210),L(900,700,'#cf4670',155),
+                        L(450,190,'#ffe0b6',265),L(260,195,'#e4b6a5',150),L(680,190,'#efb4bd',150),
+                        L(1145,105,'#ffe2bc',225),L(1145,260,'#b25b8a',140),
+                        L(1590,175,'#ffa874',260),
+                        L(300,520,'#a34b67',140),L(300,840,'#a34b67',140),
+                        L(1500,520,'#a34b67',140),L(1500,840,'#a34b67',140),
+                        L(285,1200,'#efbaa9',195),L(80,1060,'#e1b5c7',130),
+                        L(773,1313,'#ffdbad',215),L(1027,1313,'#ffdbad',215),L(900,1090,'#efb3a3',190),
+                        L(1500,1200,'#ad5b59',170)
                     ];
                     break;
                 }

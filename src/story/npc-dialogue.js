@@ -46,7 +46,7 @@
                 endFirst: true, accept: g => g.openCosmeticsShop()
             },
             'Biggs': {
-                text: g => `Welcome to Biggs Amusement Park! CRASH ROYALE is our flagship — 7 cars, 60 seconds, pure chaos. Entry: ${g.bumperMinigame.entryCost} personics. You in?`,
+                text: g => `Welcome to Biggs Amusement Park! CRASH ROYALE — 7 cars, 60 seconds, pure chaos. Point where you want to drive. Land a solid front-bumper hit, break away, then go again — leaning on a car won't score! Entry: ${g.bumperMinigame.entryCost} personics. You in?`,
                 endFirst: true, accept: g => g.bumperMinigame.start(g)
             },
             'Grum North': {

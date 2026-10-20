@@ -12,6 +12,7 @@
          * - Avoids player and other pedestrians
          * - Dynamic spawn/despawn based on player proximity
          */
+        const CROSSING_QUEUE = { MAX: 6, SPACING: 28, SETBACK: 18, REACH: 190 };
         class Pedestrian extends ActorEntity {
             // Appearance presets for variety
             static APPEARANCES = [
@@ -150,6 +151,15 @@
                     }
                 }
                 
+                const queues = typeof game !== 'undefined' && game.pedestrians && game.pedestrians.crossingQueues;
+                if (!currentNode.isCrosswalk && queues) {
+                    const room = candidates.filter(id => {
+                        const node = this._getNode(id), queue = queues.get(id);
+                        return !node?.isCrosswalk || !queue || queue.length < CROSSING_QUEUE.MAX;
+                    });
+                    if (room.length) candidates = room;
+                }
+
                 // Crosswalk bias — uniform random weighted heavily toward sidewalk
                 // continuations means peds rarely picked the lone crosswalk option
                 // and shuffled along one side of the street forever. Now: when a
@@ -525,6 +535,42 @@
                 const dy = targetNode.y - this.y;
                 const dist = Math.hypot(dx, dy);
                 
+                // Queue on the approach pavement, never on the road. Existing
+                // kerb-to-kerb movement is handled separately and must finish.
+                if (targetNode.isCrosswalk && !currentNode.isCrosswalk && dist < CROSSING_QUEUE.REACH) {
+                    const manager = typeof game !== 'undefined' && game.pedestrians;
+                    const queue = manager && manager.crossingQueues.get(targetNode.id);
+                    const rank = queue ? queue.indexOf(this) : -1;
+                    const ax = targetNode.x - currentNode.x, ay = targetNode.y - currentNode.y;
+                    const length = Math.hypot(ax, ay) || 1;
+                    const capacity = Math.min(CROSSING_QUEUE.MAX, Math.max(1,
+                        1 + Math.floor((length - 5 - CROSSING_QUEUE.SETBACK) / CROSSING_QUEUE.SPACING)));
+                    this._queueWait = (this._queueWait || 0) + 1;
+                    if (rank >= capacity || this._queueWait > (this._crossingSignal(targetNode.crosswalkData) ? 900 : 300)) {
+                        let alternatives = currentNode.connections.filter(id => id !== this.prevNodeId && !this._getNode(id)?.isCrosswalk);
+                        if (!alternatives.length) alternatives = currentNode.connections.filter(id => !this._getNode(id)?.isCrosswalk);
+                        if (alternatives.length) {
+                            this.targetNodeId = alternatives[Math.floor(Math.random() * alternatives.length)];
+                            this._queueDetour = { from: this.currentNodeId, to: this.targetNodeId };
+                            this.state = 'walking'; this._queueSince = undefined; this._queueWait = 0;
+                            if (rank >= 0) queue.splice(rank, 1);
+                            return;
+                        }
+                    }
+                    if (rank > 0 || !this._isTrafficClear(targetNode.crosswalkData, trafficVehicles, searches && searches.vehicles)) {
+                        const back = Math.min(Math.max(0, length - 5), CROSSING_QUEUE.SETBACK + Math.max(0, rank) * CROSSING_QUEUE.SPACING);
+                        const qx = targetNode.x - ax / length * back, qy = targetNode.y - ay / length * back;
+                        const qdx = qx - this.x, qdy = qy - this.y, qdist = Math.hypot(qdx, qdy);
+                        if (qdist > 1) {
+                            const step = Math.min(this.speed, qdist);
+                            gaitCommand(this, qdx / qdist * step, qdy / qdist * step);
+                            this.x += qdx / qdist * step; this.y += qdy / qdist * step;
+                            this.facingAngle = Math.atan2(qdy, qdx);
+                        } else gaitCommand(this, 0, 0);
+                        return;
+                    }
+                }
+
                 // Check if approaching a crosswalk
                 if (targetNode.isCrosswalk && dist < 50 && !currentNode.isCrosswalk) {
                     // Check for traffic before crossing
@@ -608,6 +654,11 @@
             }
             
             _updateWaiting(trafficVehicles, carSearch = null) {
+                const from = this._getNode(this.currentNodeId);
+                if (from && !from.isCrosswalk) {
+                    this.state = 'walking';
+                    return; // approach queues are positioned by _updateWalking
+                }
                 this.waitTimer++;
                 
                 const targetNode = this._getNode(this.targetNodeId);
@@ -1007,6 +1058,7 @@
             constructor() {
                 this.pedestrians = [];
                 this.network = null; // Sidewalk network from CityLayout
+                this.crossingQueues = new Map();
                 this.spawnTimer = 0;
                 this.maxPedestrians = 40;
                 this._localSearches = { pedestrians: new OrderedCrowdPointGrid(64), vehicles: new OrderedCrowdPointGrid(128) };
@@ -1030,6 +1082,7 @@
                 }
                 this.pedestrians = [];
                 this.network = null;
+                this.crossingQueues.clear();
                 this._localSearches.pedestrians.clear(true); this._localSearches.vehicles.clear(true);
             }
             
@@ -1045,6 +1098,28 @@
                 // Only in outdoor maps with a network
                 if (map.type === 'indoor' || !this.network || !this.network.nodes) return;
                 
+                // Reserve at most six waiting places per kerb. Once somebody steps
+                // onto the crossing they are never rerouted or removed by this policy.
+                this.crossingQueues.clear();
+                for (const p of this.pedestrians) {
+                    const from = p._getNode(p.currentNodeId), to = p._getNode(p.targetNodeId);
+                    const atKerb = from?.isCrosswalk && to?.isCrosswalk && from.crosswalkData === to.crosswalkData;
+                    const node = atKerb ? from : to;
+                    if (p.dead || !node?.isCrosswalk || (p.state !== 'walking' && p.state !== 'waiting') ||
+                        Math.hypot(p.x - node.x, p.y - node.y) > CROSSING_QUEUE.REACH) { p._queueSince = undefined; p._queueWait = 0; continue; }
+                    if (p._queueNode !== node.id) p._queueSince = undefined;
+                    p._queueNode = node.id;
+                    p._queueSince ??= _simTick;
+                    let queue = this.crossingQueues.get(node.id);
+                    if (!queue) this.crossingQueues.set(node.id, queue = []);
+                    queue.push(p);
+                }
+                for (const queue of this.crossingQueues.values()) queue.sort((a, b) => {
+                    const kerb = p => p._getNode(p.currentNodeId)?.isCrosswalk ? 0 : 1;
+                    const distance = p => { const n = p._getNode(p._queueNode); return Math.hypot(p.x - n.x, p.y - n.y); };
+                    return kerb(a) - kerb(b) || a._queueSince - b._queueSince || distance(a) - distance(b);
+                });
+
                 // Car centers do not move during this pass; speed changes from impacts stay live.
                 const searches = this._localSearches;
                 searches.pedestrians.build(this.pedestrians); searches.vehicles.build(trafficVehicles);

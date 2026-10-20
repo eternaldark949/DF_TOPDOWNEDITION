@@ -1,0 +1,84 @@
+{
+  "runs": [
+    {
+      "totalMs": 1202.4000000003725,
+      "trafficMs": 698.9000000096858,
+      "routeCalls": 25322,
+      "cars": 36,
+      "pedestrians": 100,
+      "build": "before"
+    },
+    {
+      "totalMs": 1105.2000000011176,
+      "trafficMs": 646.0000000111759,
+      "routeCalls": 24637,
+      "cars": 36,
+      "pedestrians": 100,
+      "build": "after"
+    },
+    {
+      "totalMs": 1095,
+      "trafficMs": 637.4000000096858,
+      "routeCalls": 24637,
+      "cars": 36,
+      "pedestrians": 100,
+      "build": "after"
+    },
+    {
+      "totalMs": 1168,
+      "trafficMs": 685.8000000286847,
+      "routeCalls": 25322,
+      "cars": 36,
+      "pedestrians": 100,
+      "build": "before"
+    },
+    {
+      "totalMs": 1195.9000000003725,
+      "trafficMs": 699.500000031665,
+      "routeCalls": 25322,
+      "cars": 36,
+      "pedestrians": 100,
+      "build": "before"
+    },
+    {
+      "totalMs": 1081.800000000745,
+      "trafficMs": 629.1999999750406,
+      "routeCalls": 24637,
+      "cars": 36,
+      "pedestrians": 100,
+      "build": "after"
+    }
+  ],
+  "medians": {
+    "before": {
+      "totalMs": 1195.9000000003725,
+      "trafficMs": 698.9000000096858,
+      "routeCalls": 25322
+    },
+    "after": {
+      "totalMs": 1095,
+      "trafficMs": 637.4000000096858,
+      "routeCalls": 24637
+    }
+  },
+  "errors": [],
+  "method": {
+    "date": "2026-10-19",
+    "engine": "Headless desktop Chromium; mobile viewport only, no A53 CPU emulation",
+    "warmupTicks": 1000,
+    "measuredTicks": 1000,
+    "runsPerBuild": 3,
+    "order": [
+      "before",
+      "after",
+      "after",
+      "before",
+      "before",
+      "after"
+    ],
+    "density": "high traffic and pedestrians",
+    "measurement": "Synchronous simulation only; trafficMs times TrafficManager.update, excludes render and separate vehicle collision pass",
+    "baseline": "Local build immediately before October 19 traffic decision pass",
+    "limitations": "Small desktop sample; does not predict phone FPS. Earlier grid-query variant was discarded."
+  }
+}

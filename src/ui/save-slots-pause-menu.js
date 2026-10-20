@@ -1061,7 +1061,7 @@
                 this._updateValueEl('set-lighting', GameSettings.lightingQuality);
                 this._updateValueEl('set-adaptive-lighting', GameSettings.adaptiveLighting ? 'on' : 'off');
                 this._updateValueEl('set-grain', GameSettings.filmGrain ? 'on' : 'off');
-                for (const [id, key] of [['set-flitring', 'flitRing'], ['set-flitflick', 'flitFlick'], ['set-flittwo', 'flitTwoFinger'], ['set-flitbtn', 'flitButton'], ['set-aimfire', 'aimBeforeFire'], ['set-sniperrelease', 'sniperRelease'], ['set-precisestick', 'preciseStick'], ['set-scopeview', 'scopeView'], ['set-scopeslow', 'scopeSlow'], ['set-camedge', 'cameraEdgeLock']])
+                for (const [id, key] of [['set-flitring', 'flitRing'], ['set-flitflick', 'flitFlick'], ['set-flittwo', 'flitTwoFinger'], ['set-flitbtn', 'flitButton'], ['set-flithaptics', 'flitHaptics'], ['set-aimfire', 'aimBeforeFire'], ['set-sniperrelease', 'sniperRelease'], ['set-precisestick', 'preciseStick'], ['set-scopeview', 'scopeView'], ['set-scopeslow', 'scopeSlow'], ['set-camedge', 'cameraEdgeLock']])
                     this._updateValueEl(id, GameSettings[key] ? 'on' : 'off');
                 this._updateValueEl('set-softshadows', GameSettings.softShadows ? 'on' : 'off');
                 this._updateValueEl('set-bloom', GameSettings.bloom ? 'on' : 'off');
@@ -1117,7 +1117,7 @@
             _cycleSetting(el) {
                 const key = el.dataset.key;
                 
-                if (key === 'flitRing' || key === 'flitFlick' || key === 'flitTwoFinger' || key === 'flitButton' || key === 'aimBeforeFire' || key === 'sniperRelease' || key === 'preciseStick' || key === 'scopeView' || key === 'scopeSlow' || key === 'cameraEdgeLock') {
+                if (key === 'flitRing' || key === 'flitFlick' || key === 'flitTwoFinger' || key === 'flitButton' || key === 'flitHaptics' || key === 'aimBeforeFire' || key === 'sniperRelease' || key === 'preciseStick' || key === 'scopeView' || key === 'scopeSlow' || key === 'cameraEdgeLock') {
                     GameSettings[key] = !GameSettings[key];
                     GameSettings.applyControls();
                     this._updateValueEl(el.id, GameSettings[key] ? 'on' : 'off');
@@ -1250,6 +1250,10 @@
                     game.weaponMode = game.weaponMode === 'sniper' ? 'normal' : 'sniper';
                     showMessage(game.weaponMode === 'sniper' ? 'SNIPER MODE: PENETRATING ROUNDS ACTIVE' : 'NORMAL MODE: STANDARD ROUNDS ACTIVE');
                     this._updateValueEl(el.id, game.weaponMode);
+
+                } else if (key === 'performanceBench') {
+                    this.closeSettings(); this.close();
+                    PerformanceBench.run();
 
                 } else if (key === 'perfBench') {
                     // The resolution sweep (entities/static-builders-profiler.js PerfBench): back in the game to measure it
