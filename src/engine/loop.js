@@ -37,6 +37,12 @@
              * Resets: inventory, quest progress, health, currency, driving, entities.
              */
             resetGameState() {
+                this._cancelQuickDrawHold?.(); this.cancelQuickDraw();
+                this._pendingGauntletLoad = null;
+                clearTimeout(this.hordeGauntlet?._endT);
+                this.hordeGauntlet = null;
+                this._releaseLightingBase();
+                if (PerformanceBench.active) PerformanceBench.cancel();
                 this._cancelMapTextureWarmup(true);
                 this._clearRenderSpatial();
                 this._releaseReflectionScratch();
@@ -70,6 +76,8 @@
                 this.maxBoosters = 4;
                 this.healthRegenTimer = 0;
                 this.weaponMode = 'none';
+                this.setWeaponHolstered(false); this.holsterAnim = 1;
+                this._drawnAt = undefined; this._drawShotUsed = false;
                 this.shootCooldown = 0;
                 this.currentWeapon = null;
                 this.nightVision = false;
@@ -175,7 +183,7 @@
                     attunement: 120, maxAttunement: 120, 
                     dashCost: 40, rechargeRate: 2
                 };
-                this.flitVFX = [];
+                this.flitVFX = []; this._resetFlitFeedback();
                 this.graveyardGhosts = [];
                 this.timeSlowState = { active: false, scale: 1.0, targetScale: 1.0, duration: 0, transitionSpeed: 0.05 };
                 
@@ -226,6 +234,7 @@
             loop() {
                 if (!this.running) return;
                 this._syncProfiler();
+                if (PerformanceBench.active) PerformanceBench.beginFrame();
                 const _a0 = this.profiler.enabled ? performance.now() : 0;
                 ambience.update(this);                                   // the beds, the music, the motor (Audio:Ambience in the profiler)
                 if (this.profiler.enabled) this.profiler.add('Audio:Ambience', performance.now() - _a0);
@@ -252,6 +261,8 @@
                     this._nextDrawDue = undefined;
                 }
                 
+                if (PerformanceBench.active) PerformanceBench.acceptFrame();
+
                 // Sync global frame time cache (used by all draw methods)
                 _frameTime = Date.now();
                 _frameTimeSec = _frameTime / 1000;
@@ -281,6 +292,7 @@
 
                 // Clamp so a stall (alt-tab, GC pause, debugger) doesn't queue a
                 // huge backlog and fast-forward the world when focus returns.
+                const clampedMs = Math.max(0, elapsed - CONFIG.LOOP.MAX_FRAME_MS);
                 if (elapsed > CONFIG.LOOP.MAX_FRAME_MS) elapsed = CONFIG.LOOP.MAX_FRAME_MS;
                 if (elapsed < 0) elapsed = 0;
                 this._accumulator = (this._accumulator || 0) + elapsed;
@@ -300,9 +312,12 @@
                     steps++;
                 }
                 // Machine can't keep up — drop the backlog rather than spiral.
+                const droppedMs = clampedMs + (steps >= CONFIG.LOOP.MAX_STEPS ? this._accumulator : 0);
                 if (steps >= CONFIG.LOOP.MAX_STEPS) this._accumulator = 0;
                 RenderStats.ticks = steps;   // sim ticks this frame (the profiler: a slow frame runs several, and its update rows add them up)
                 
+                if (PerformanceBench.active) PerformanceBench.afterSimulation();
+
                 // Always draw for smooth visuals — blended between the last two ticks
                 if (interp) RenderInterp.apply(this, this._accumulator / stepMs);
                 const tickSec = CONFIG.LOOP.STEP_MS / 1000;
@@ -314,6 +329,7 @@
                 } finally {
                     if (interp) RenderInterp.restore(this);
                 }
+                if (PerformanceBench.active) PerformanceBench.endFrame(steps, droppedMs);
                 requestAnimationFrame(() => this.loop()); 
             },
         });

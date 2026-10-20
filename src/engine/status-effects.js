@@ -11,6 +11,32 @@
 
         const STATUS = { BLEED_MAX: 3, BLEED_TICK: 0.5 };
 
+        // One game-time pose for the arm, the held blade and its trailing edge.
+        const MELEE_SWING = { duration: .22, windup: .0264, cutEnd: .1584 };
+        function sampleMeleeSwing(age, side, out = {}) {
+            if (age < 0 || age > MELEE_SWING.duration) return null;
+            const smooth = x => x * x * (3 - 2 * x);
+            const sign = side || 1;
+            let a, x, y, twist;
+            if (age < MELEE_SWING.windup) {
+                const w = smooth(age / MELEE_SWING.windup);
+                a = .35 + (sign * 1.15 - .35) * w;
+                x = 8; y = 9 + sign * 8 * w; twist = sign * .18 * w;
+            } else if (age <= MELEE_SWING.cutEnd) {
+                const p = smooth((age - MELEE_SWING.windup) / (MELEE_SWING.cutEnd - MELEE_SWING.windup));
+                a = sign * (1.15 - 2.3 * p);
+                x = 8 + 14 * Math.sin(p * Math.PI);
+                y = 9 + sign * 8 * Math.cos(p * Math.PI);
+                twist = sign * .18 * Math.cos(p * Math.PI);
+            } else {
+                const r = smooth((age - MELEE_SWING.cutEnd) / (MELEE_SWING.duration - MELEE_SWING.cutEnd));
+                a = -sign * 1.15 + (.35 + sign * 1.15) * r;
+                x = 8; y = 9 - sign * 8 * (1 - r); twist = -sign * .18 * (1 - r);
+            }
+            out.a = a; out.handX = x; out.handY = y; out.twist = twist; out.reach = x - 8;
+            return out;
+        }
+
         engineMixin({
             /** Put a status on an actor: 'bleed' {dps, secs, by} */
             applyStatus(actor, kind, o = {}) {
@@ -170,11 +196,8 @@
             /** The blade's swing for the renderer: angle across the slash, and how far it reaches out (null at rest) */
             slashAngle() {
                 if (this._slashT === undefined) return null;
-                const t = (_gameTimeSec - this._slashT) / 0.22;
-                if (t < 0 || t > 1) return null;
-                const e = t < 0.6 ? 1 - Math.pow(1 - t / 0.6, 3) : 1, back = t < 0.6 ? 0 : (t - 0.6) / 0.4;
-                const s = this._slashSide || 1;
-                return { a: -s * (-1.25 + 2.5 * e) * (1 - back * 0.7), reach: 6 * Math.sin(Math.min(1, t * 1.6) * Math.PI) };
+                return sampleMeleeSwing(_gameTimeSec - this._slashT, this._slashSide,
+                    this._slashPose || (this._slashPose = {}));
             },
 
             /** Slash arcs: a crescent of gold light where the blade went (world space) */
@@ -185,13 +208,29 @@
                 for (let i = L.length - 1; i >= 0; i--) {
                     const s = L[i], age = now - s.t0;
                     if (age > 0.3) { L.splice(i, 1); continue; }
-                    const k = 1 - age / 0.3, a0 = s.a - s.arc / 2, a1 = s.a + s.arc / 2;
-                    const from = s.side > 0 ? a0 : a1, to = s.side > 0 ? a1 : a0, prog = Math.min(1, age / 0.13);
-                    const end = from + (to - from) * prog, r = s.reach * 0.92;
-                    for (const [w, col, al] of [[7, '255, 200, 100', 0.25], [3, '255, 231, 160', 0.6], [1.2, '255, 250, 230', 0.9]]) {
-                        ctx.strokeStyle = `rgba(${col}, ${al * k})`; ctx.lineWidth = w; ctx.lineCap = 'round';
-                        ctx.beginPath(); ctx.arc(s.x, s.y, r, Math.min(from, end), Math.max(from, end)); ctx.stroke();
+                    if (age < MELEE_SWING.windup) continue;
+                    // Keep the newest cut attached to the moving wielder, then let its last
+                    // position fade. Recovery does not paint a second, backward slash.
+                    if (s.t0 === this._slashT && age <= MELEE_SWING.duration && this.weaponMode === 'melee' && !this.weaponHolstered) {
+                        s.drawX = this.player.x; s.drawY = this.player.y; s.drawA = this.player.angle;
                     }
+                    const k = 1 - age / .3;
+                    const end = Math.min(age, MELEE_SWING.cutEnd), start = Math.max(MELEE_SWING.windup, end - .065);
+                    const pose = this._slashTrailPose || (this._slashTrailPose = {});
+                    ctx.save(); ctx.translate(s.drawX ?? s.x, s.drawY ?? s.y); ctx.rotate(s.drawA ?? s.a);
+                    ctx.beginPath();
+                    for (let j = 0; j <= 8; j++) {
+                        sampleMeleeSwing(start + (end - start) * j / 8, s.side, pose);
+                        const c = Math.cos(pose.a), sn = Math.sin(pose.a);
+                        // The gold edge of the real model, held at the same hand anchor.
+                        const x = pose.handX + (19.4 * c - 2.6 * sn) * .95;
+                        const y = pose.handY + (19.4 * sn + 2.6 * c) * .95;
+                        if (j) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+                    }
+                    for (const [w, col, al] of [[7, '255, 200, 100', .22], [3, '255, 231, 160', .55], [1.2, '255, 250, 230', .85]]) {
+                        ctx.strokeStyle = `rgba(${col}, ${al * k})`; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.stroke();
+                    }
+                    ctx.restore();
                 }
                 ctx.restore();
             }

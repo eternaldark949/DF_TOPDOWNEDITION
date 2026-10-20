@@ -292,7 +292,8 @@
             },
             'neural_sys_interior': {
                 id: 'neural_sys_interior', width: 1000, height: 800, type: 'indoor',
-                label: 'Neural Systems — Sequencing Lab', floorColor: '#0c0c1a',
+                label: 'Neural Systems — Identity Atelier', floorColor: '#101f36', ambientDarkness: .45, navProps:'all',
+                wallStyle: { fill:'#0c1b32',stroke:'rgba(152,178,204,.55)' },
                 spawn: { x: 500, y: 700 },
                 zones: [
                     // Main showroom — dark blue-black with faint grid feel
@@ -327,6 +328,8 @@
             'biggs_arena': {
                 id: 'biggs_arena', width: 900, height: 900, type: 'indoor',
                 label: 'Biggs Amusement Park — Crash Royale', floorColor: '#1a0a20',
+                paintedGrid: true,
+                wallStyle: { fill: '#35232e', stroke: '#997957' },
                 ambientDarkness: 0.65, // Carnival arena — enough darkness for headlight beams
                 spawn: { x: 450, y: 820 },
                 zones: [
@@ -409,13 +412,15 @@
             'demoness_palace': {
                 id: 'demoness_palace', width: 1800, height: 1400, type: 'indoor',
                 label: 'The Demoness Palace', floorColor: '#0c0508',
-                ambientDarkness: 0.88,
+                ambientDarkness: 0.88, // Local warm pools; the hunters keep their shadowed galleries.
+                paintedGrid: true,
+                lightingTint: '28, 10, 24', // Wine-black shadows preserve the crimson palette.
                 navProps: 'all',
                 wallStyle: { fill: '#140810', stroke: 'rgba(230,150,90,0.42)' },   // obsidian, ember-gold trim
                 spawn: { x: 900, y: 1320 },
                 zones: [
                     { x: 14, y: 14, w: 872, h: 352, color: '#160a0c' },        // Blood Garden: dark earth
-                    { x: 900, y: 14, w: 486, h: 352, color: '#120810' },       // Shrine
+                    { x: 900, y: 14, w: 486, h: 352, color: '#120810' },       // Crystal Chamber
                     { x: 1400, y: 14, w: 386, h: 352, color: '#1a0c0c' },      // Bath of Embers
                     { x: 14, y: 380, w: 572, h: 606, color: '#110710' },       // West Gallery
                     { x: 600, y: 380, w: 600, h: 606, color: '#0b0509' },      // Throne Hall: obsidian
@@ -429,7 +434,7 @@
                     { x: 0, y: 1386, w: 830, h: 14 }, { x: 970, y: 1386, w: 830, h: 14 },
                     { x: 14, y: 366, w: 1772, h: 14 }, { x: 14, y: 986, w: 1772, h: 14 },      // the two cross walls
                     { x: 586, y: 380, w: 14, h: 1006 }, { x: 1200, y: 380, w: 14, h: 1006 },  // the spines
-                    { x: 886, y: 14, w: 14, h: 352 }, { x: 1386, y: 14, w: 14, h: 352 },      // garden | shrine | bath
+                    { x: 886, y: 14, w: 14, h: 352 }, { x: 1386, y: 14, w: 14, h: 352 },      // garden | crystal chamber | bath
                 ],
                 transitions: [ { x: 830, y: 1370, w: 140, h: 30, target: 'hub_949', label: 'Leave the Palace' } ],
                 landmarks: [ { id: 'palace_throne', x: 900, y: 520 }, { id: 'palace_garden', x: 450, y: 190 } ]

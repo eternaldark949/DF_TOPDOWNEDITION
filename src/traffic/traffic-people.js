@@ -79,7 +79,10 @@
                     if (need > Math.abs(step)) step = dir * need;
                     return true;
                 };
-                for (const p of folk) {
+                const sensing = this._trafficSensing;
+                const people = sensing?.active && sensing.source === this._allVehicles
+                    ? sensing.people.query(this.x, this.y, range) : folk;
+                for (const p of people) {
                     if (!p || p.dead) continue;
                     const dx = p.x - this.x, dy = p.y - this.y;
                     if (dx > range || dx < -range || dy > range || dy < -range) continue;

@@ -1628,7 +1628,7 @@ test('Junction lights: a left turn waits for what is coming the other way; nobod
   ok(r.held.went, 'and goes once there is room');
 }, {events:true});
 
-test('Pedestrians walk on down the street: they only turn back at a dead end, never re-cross straight back, and every block end joins the corner', env => {
+test('Pedestrians walk on: turn back only at a dead end or full crossing, never re-cross straight back, and connect block ends', env => {
   env.run(`{
     let s=4242; Math.random=()=>(s=(s*16807)%2147483647)/2147483647;
     game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=true; game.paused=false;
@@ -1637,14 +1637,18 @@ test('Pedestrians walk on down the street: they only turn back at a dead end, ne
   for (let c = 0; c < 6; c++) env.run(`{
     for(let t=0;t<500;t++){ game.update();
       for(const p of game.pedestrians.pedestrians){ let L=__hops.get(p); if(!L) __hops.set(p,L=[]);
-        if(L[L.length-1]!==p.currentNodeId) L.push(p.currentNodeId); } }
+        if(L[L.length-1]!==p.currentNodeId) {
+          if (!L.detours) L.detours=new Set();
+          if (p._queueDetour && p._queueDetour.from===L[L.length-1] && p._queueDetour.to===p.currentNodeId) L.detours.add(L.length);
+          L.push(p.currentNodeId);
+        } } }
   }`);
   const r = value(env, `
     const nodes=game.pedestrians.network.nodes;
     let hops=0, turned=0, crossed=0, recrossed=0;
     for(const L of __hops.values()) { let last=null;
       for(let i=1;i<L.length;i++){ hops++; const a=nodes[L[i-1]], b=nodes[L[i]];
-        if(i>=2 && L[i]===L[i-2] && a.connections.length>1) turned++;
+        if(i>=2 && L[i]===L[i-2] && a.connections.length>1 && !L.detours.has(i)) turned++;
         if(a.isCrosswalk && b.isCrosswalk && a.crosswalkData===b.crosswalkData){ crossed++;
           if(last && last.to===a.id && i-last.i<=4) recrossed++; last={to:b.id,i}; } } }
     // a pavement node with one link is the end of a walk: only at the city's edge
@@ -1654,7 +1658,7 @@ test('Pedestrians walk on down the street: they only turn back at a dead end, ne
     return {hops, turned, crossed, recrossed, inner, ends, total:nodes.length};
   `);
   ok(r.hops > 1000, `they walk (${r.hops} node to node)`);
-  equal(r.turned, 0, 'nobody turns round where the walk goes on');
+  equal(r.turned, 0, 'nobody turns round where the walk goes on except an explicit crossing-queue detour');
   ok(r.crossed > 20, `they cross the street (${r.crossed} crossings)`);
   equal(r.recrossed, 0, 'nobody crosses straight back over');
   // (3 still stop at the wide mouth of a diagonal: its pavement and crossing are 400+ px off, past buildings)

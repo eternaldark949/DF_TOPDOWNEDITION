@@ -992,6 +992,10 @@
 
             draw(ctx, bounds, zoom = 1) {
                 const ip = RenderInterp, alpha = ip.alpha, snap = CONFIG.LOOP.INTERP_SNAP_DIST;
+                // Plain particles only alter these styles. Keep their incoming values
+                // once, rather than cloning the entire Canvas state for every circle
+                // or spark. Transformed/blurred ghosts still use a full save/restore.
+                const fill = ctx.fillStyle, stroke = ctx.strokeStyle, width = ctx.lineWidth, opacity = ctx.globalAlpha;
                 const scale = zoom > 0 ? zoom : 1;
                 // Shadows use backing-store pixels; keep four blur radii plus antialias reach.
                 const blur = Math.max(0, ctx.shadowBlur || 0);
@@ -1040,14 +1044,19 @@
                             life = previous.life + (life - previous.life) * alpha;
                         }
                     }
-                    ctx.save();
+                    // Invalid CSS/alpha assignments are ignored by Canvas. Start from
+                    // the caller's values so those inputs retain the old fallback.
+                    ctx.globalAlpha = opacity;
                     if (p.type === 'ghost') {
+                        ctx.save(); ctx.fillStyle = fill;
                         ctx.translate(x, y); ctx.rotate(angle); ctx.fillStyle = `rgba(164, 255, 255, ${life * 0.6})`;
                         ctx.shadowColor = '#fff'; ctx.shadowBlur = 10;
                         ctx.beginPath(); ctx.moveTo(0, -10); ctx.bezierCurveTo(10, -10, 10, 10, 0, 15); ctx.bezierCurveTo(-10, 10, -10, -10, 0, -10); ctx.fill();
                         ctx.shadowBlur = 0;
+                        ctx.restore();
                     }
                     else if (p.type === 'spark') {
+                                ctx.strokeStyle = stroke;
                                 ctx.strokeStyle = `rgba(255, 220, 100, ${life})`;
                                 ctx.lineWidth = 2;
                                 ctx.beginPath();
@@ -1056,13 +1065,14 @@
                                 ctx.stroke();
                     } else {
                         // Its colour's alpha follows its life (as the old per-frame string edit did), folded into globalAlpha
+                        ctx.fillStyle = fill;
                         const st = _particleStyle(p.color), L = Math.min(1, life);
                         if (st) { ctx.fillStyle = st.fill; ctx.globalAlpha = L * (st.mode === 1 ? L : st.mode === 0.5 ? Math.min(1, life * 0.5) : 1); }
                         else { ctx.fillStyle = p.color.replace('1)', `${life})`).replace('0.5)', `${life * 0.5})`); ctx.globalAlpha = life; }
                         ctx.beginPath(); ctx.arc(x, y, p.size, 0, Math.PI*2); ctx.fill();
                     }
-                    ctx.restore();
                 }
+                ctx.fillStyle = fill; ctx.strokeStyle = stroke; ctx.lineWidth = width;
                 ctx.globalAlpha = 1.0;
             }
             /**

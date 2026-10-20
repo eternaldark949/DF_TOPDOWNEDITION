@@ -1396,7 +1396,7 @@
         function _humanoidDrawBuffer(entity) {
             let h = _humanoidDrawBuffers.get(entity);
             if (h) return h;
-            h = { entity, clothes: {}, shadeConfig: { _wet: 0 }, scaleFrame: { x: 1, y: 1, k: 1 },
+            h = { entity, clothes: {}, shadeConfig: { _wet: 0 }, scaleFrame: { x: 1, y: 1, k: 1 }, limbGeometry: { length: 0, angle: 0 },
                 clothDyn: { wind: null },
                 driveDyn: { owner: entity, sway: 0, drag: 0, bounce: 0, wiggle: 0, android: null },
                 walkDyn: { owner: entity, sway: 0, drag: 0, bounce: 0, wiggle: 0, wind: null, android: null } };
@@ -1419,10 +1419,11 @@
                     ctx.fillStyle = fill;
                     return;
                 }
-                ctx.fillStyle = color; bodyLimbPath(ctx, x1, y1, x2, y2, T); ctx.fill(); ctx.beginPath();
-                const len = Math.hypot(x2-x1, y2-y1)/2 + 2, ang = Math.atan2(y2-y1, x2-x1), width = Math.max(T[0], T[1]);
+                const shaded = gloss || SH.lx || SH.ly, geometry = shaded ? h.limbGeometry : null;
+                ctx.fillStyle = color; bodyLimbPath(ctx, x1, y1, x2, y2, T, geometry); ctx.fill(); ctx.beginPath();
+                if (!shaded) return;
+                const len = geometry.length/2 + 2, ang = geometry.angle, width = Math.max(T[0], T[1]);
                 const c = Math.cos(ang), s = Math.sin(ang), ly = -s * SH.lx + c * SH.ly, lx = (c * SH.lx + s * SH.ly) * len * 0.1;
-                if (!gloss && !SH.lx && !SH.ly) return;
                 ctx.save(); ctx.translate((x1+x2)/2, (y1+y2)/2); ctx.rotate(ang);
                 if (gloss) {
                     ctx.fillStyle = SH.hl2;
@@ -1470,7 +1471,10 @@
             const carAngle = config.carAngle || 0;
             const recoil = config.recoil || 0;
             const gender = config.gender || 'androgynous';
-            const stance = config.stance || 'idle'; 
+            const bladeGame = !isDriving && entity.type === 'player' && entity._game &&
+                entity._game.weaponMode === 'melee' && !entity._game.weaponHolstered ? entity._game : null;
+            const bladeSwing = bladeGame && bladeGame.slashAngle ? bladeGame.slashAngle() : null;
+            const stance = bladeGame ? 'knife' : (config.stance || 'idle');
             const held = config.held || null;
             // Which hand (if any) is holding a drink — it's held out and swings less
             // Weather on this character (world/weather-response.js): wind, rain, lightning; null indoors
@@ -1586,6 +1590,9 @@
                 const gunLineY = stance === 'sniper' ? rFistY + 0.5 : rFistY - 0.5;   // centerline of the drawn model
                 lFistX = rFistX + (stance === 'sniper' ? 18 : 14) + (config.scopeK || 0) * 4;   // on the handguard / fore-end (further out, scoped)
                 lFistY = gunLineY;
+            } else if (stance === 'knife') {
+                lFistX = 5; lFistY = -10;
+                rFistX = 8; rFistY = 9;
             } else if (stance === 'punch' && punchStrike !== null) {
                 // --- PUNCH: guard pose only. The strike (reach, cross, off-hand pull,
                 // torso twist, lean) is shaped by CONFIG.PUNCH and added after smoothing.
@@ -1640,7 +1647,7 @@
                 // An open umbrella's handle is held up close to the chest
                 if (umbrellaOpen > 0.15) { if (glassHand === 'right') { rFistX = 3 + bounce; rFistY = 5; } else { lFistX = 3 + bounce; lFistY = -5; } }
             }
-            const walkArms = !isDriving && stance !== 'pistol' && stance !== 'rifle' && stance !== 'sniper' && stance !== 'punch';
+            const walkArms = !isDriving && stance !== 'pistol' && stance !== 'rifle' && stance !== 'sniper' && stance !== 'punch' && stance !== 'knife';
             // Pose: hands (unarmed only; a hand holding a drink keeps it), twist and breathing
             if (pose) {
                 if (walkArms && pose.l && glassHand !== 'left') { lFistX += (pose.l[0] - lFistX) * poseW; lFistY += (pose.l[1] - lFistY) * poseW; }
@@ -1820,6 +1827,21 @@
                 }
             }
             
+            // The strike goes on AFTER smoothing, as with punches: a short cut must
+            // reach its full pose even when the display only shows a few attack frames.
+            if (bladeGame) {
+                if (bladeSwing) {
+                    rFistX = bladeSwing.handX + walkBounce; rFistY = bladeSwing.handY;
+                    torsoRotation += bladeSwing.twist;
+                    lFistX -= Math.max(0, bladeSwing.reach) * .2;
+                }
+                const sx = shoulderX - rShoulderY * Math.sin(torsoRotation), sy = rShoulderY * Math.cos(torsoRotation);
+                const dx = rFistX - sx, dy = rFistY - sy, d = Math.max(.001, Math.hypot(dx, dy));
+                const bend = Math.sqrt(Math.max(0, 14 * 14 - d * d / 4));
+                rElbowX = (sx + rFistX) / 2 - dy / d * bend;
+                rElbowY = (sy + rFistY) / 2 + dx / d * bend;
+            }
+
             const drawLimb = h.drawLimb;
             let gunHand = false;                                            // the right hand closes round a drawn weapon
             
@@ -1869,10 +1891,11 @@
                         entity._muzzleLocal = { x: wx + mz.x * scale, y: wy + mz.y * scale };
                         entity._muzzleReady = anim > 0.95;
                     } else if (game.weaponMode === 'melee') {
-                        // a blade, held low and forward; a slash sweeps it across (engine/status-effects.js meleeSlash)
-                        const S = game.slashAngle ? game.slashAngle() : null;
-                        const ang = S ? S.a : 0.35;
-                        drawWeapon(ctx, weaponId, wx + (S ? S.reach : 0), wyBase + 1, ang, scale * 0.95, false);
+                        // The blade stays in the animated fist, rather than extending
+                        // independently from a stationary arm.
+                        const ang = bladeSwing ? bladeSwing.a : .35;
+                        const wy = hipY + (rFistY - hipY) * anim;
+                        drawWeapon(ctx, weaponId, wx, wy, ang, scale * .95, false);
                         entity._muzzleLocal = null; entity._muzzleReady = false;
                     }
 
@@ -1907,6 +1930,35 @@
             const sleeve = clothes.top ? (topP ? topP.sleeve : 'long') : 'none';
             // Sleeves can come from the shirt under a vest; legs from trousers under an apron
             const sleeveCol = clothes.top ? (topP && topP.sleeveFrom === 'inner' ? (clothes.top.inner || '#f2f2f2') : topColor(clothes.top)) : null;
+            if (isDriving && config.vehiclePose) {
+                const q = config.vehiclePose, k = VEHICLE_OCCUPANT_SCALE, side = q.side;
+                const sleeveColor = sleeve !== 'none' ? darken(sleeveCol,.15) : skinColor;
+                const foreColor = sleeve === 'long' ? darken(sleeveCol,.2) : skinColor;
+                const lean = q.lean, torsoY = side * lean * 4 / k;
+                const turn = Math.max(-.5, Math.min(.5, q.rel)) * lean;
+                // Hips remain at the seat. Only the shoulders and head lean toward the window.
+                ctx.save();ctx.translate(0,torsoY);ctx.rotate(turn);
+                ctx.fillStyle=darken(clothes.top ? topColor(clothes.top) : skinColor,.1);
+                ctx.fill(bodyTorsoPath(BC,1));ctx.restore();
+                const sy=side*BC.sh+torsoY;
+                const gx=q.gripX/k,gy=q.gripY/k;
+                const active=lean>.05;
+                const hx=active?gx:13,hy=active?gy:side*4;
+                const ex=hx*.48,ey=(sy+hy)*.5;
+                drawLimb(0,sy,ex,ey,BC.upper,sleeveColor);
+                drawLimb(ex,ey,hx,hy,BC.fore,foreColor);
+                ctx.fillStyle=skinColor;drawBodyHand(ctx,ex,ey,hx,hy,true,BC);
+                // Driver keeps the other hand forward on the wheel; passengers brace inside.
+                const bs=-side*BC.sh+torsoY,bx=q.driver?16:6,by=q.driver?-side*3:-side*6;
+                drawLimb(0,bs,6,bs,BC.upper,sleeveColor);drawLimb(6,bs,bx,by,BC.fore,foreColor);
+                ctx.fillStyle=skinColor;drawBodyHand(ctx,6,bs,bx,by,true,BC);
+                if(active && q.weaponId) drawWeapon(ctx,q.weaponId,gx,gy,q.rel,q.scale/k);
+                ctx.save();ctx.translate(0,side*lean*7/k);ctx.rotate(turn);
+                const driveDyn=h.driveDyn;driveDyn.android=A;
+                withHead(0,hx=>drawHeadAndHair(ctx,hx,skinColor,config.faceDark||'#3e2723',config.faceLight||'#5d4037',clothes.hair,driveDyn,clothes.hat,clothes.jewelry));
+                ctx.restore();return;
+            }
+
             if (isDriving) {
                 // Driving mode rendering - different poses for shooting vs not shooting
                 ctx.save();
@@ -1959,7 +2011,8 @@
                     // Draw weapon in left hand
                     if (entity.type === 'player' && entity._game && entity._game.currentWeapon) {
                         const weaponId = entity._game.currentWeapon.id;
-                        drawWeapon(ctx, weaponId, lFistXAdj + 2, lFistYAdj, 0, 0.9);
+                        const grip = drivingWeaponGrip(recoil);
+                        drawWeapon(ctx, weaponId, grip.x - (driveOffset - bodyRecoil + shootLean), grip.y, 0, grip.scale);
                     }
                     drawBodyCaps(ctx, BC, capColor, lElbowXAdj, lElbowYAdj, rElbowXAdj, rElbowYAdj);
                     

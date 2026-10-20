@@ -4,9 +4,11 @@
            fixed seeds, so they're let go when she leaves the map and painted again (under the door fade) on
            the next visit. The Keeper's two places travel together (the prologue walks between them). */
         const MAP_BAKES = {
+            biggs_arena: ['_biggsFloor'],
             house_of_death: ['_houseFloor'], hotel_lobby: ['_lobbyFloor'], church_boss: ['_sanctumFloor'],
             hotel_suite: ['_suiteFloor'], moon_city_nightclub: ['_clubFloor'], demoness_palace: ['_palaceFloor'],
             apt_949: ['_cityView', '_aptFloor'], van_interior: ['_vanCabin'], cozy_cafe_interior: ['_cafeFloor'],
+            neural_sys_interior: ['_neuralFloor'],
             enni_cole_interior: ['_enniFloor'], enni_cole_upper: ['_enniUpperFloor'],
             keepers_hill: ['_keeperHill', '_keeperHouse', '_keeperParlor'], keepers_parlor: ['_keeperHill', '_keeperHouse', '_keeperParlor']
         };
@@ -107,6 +109,7 @@ engineMixin({
                     hotel_suite: [['_suiteFloor', '_paintSuiteFloor']],
                     moon_city_nightclub: [['_clubFloor', '_paintClubFloor']],
                     cozy_cafe_interior: [['_cafeFloor', '_paintCafeFloor']],
+                    neural_sys_interior: [['_neuralFloor','_paintNeuralFloor']],
                     enni_cole_interior: [['_enniFloor', '_paintEnniFloor']],
                     enni_cole_upper: [['_enniUpperFloor', '_paintEnniUpperFloor']],
                     apt_949: [['_aptFloor', '_paintAptFloor']],
@@ -126,6 +129,20 @@ engineMixin({
                 // The furniture's sprites (entities/prop-sprites.js), a handful a job, at the zoom the map opens at
                 const props = (this.props || []).filter(p => p && PropSprites.kindOf(p));
                 for (let i = 0; i < props.length; i += 8) jobs.push(() => PropSprites.prepare(props.slice(i, i + 8), this.camera.zoom));
+                // Prepare ordinary sign glows one job at a time behind the map-entry fade.
+                // Readiness stays in _signSprites, so a pending font never freezes fallback art.
+                if (map.buildings) {
+                    const view = this._firstMapGroundView();
+                    for (const b of map.buildings) {
+                        if (!b.isV2 || !b.attachedSign || !b._signSprites || b.variant ||
+                            b.style === 'double_nights' || b.style === 'moon_city' || typeof b.inView !== 'function' || !b.inView(view, this.camera)) continue;
+                        jobs.push(() => {
+                            const text = b.attachedSign.text, size = b.attachedSign.fontSize || 45;
+                            const color = b.colors ? b.colors.accent : (b.attachedSign.color || '#a469ff');
+                            b._signSprites(text, size, color, b._hexToRgb(color));
+                        });
+                    }
+                }
                 // Ground labels use a downloaded font: speculative preparation must not freeze an
                 // earlier fallback face. The ordinary first draw remains responsible if it is not ready.
                 if (this.groundBaker && this.groundBaker.activeFor(map) &&
@@ -233,7 +250,7 @@ engineMixin({
                 if (this.finisher) this.endFinisher(true);
                 this.finCam = null;
                 this.timeSlowState = { active: false, scale: 1.0, targetScale: 1.0, duration: 0, transitionSpeed: 0.05 };
-                this.casings = []; this.shotFx = []; this.muzzleFlashes = []; this.flitVFX = [];
+                this.casings = []; this.shotFx = []; this.muzzleFlashes = []; this.flitVFX = []; this._resetFlitFeedback();
                 this._fireTrail = []; this._fireTrailSerial = 0;
                 this.noiseRipples = []; this.lastKnownMarkers = [];
                 this._edgeRipples = null; this._edgeTouch = null;                       // the veil's ripples (world/map-edge.js)
@@ -252,6 +269,18 @@ engineMixin({
             },
 
             _doLoadMap(mapId, spawnAt) {
+                this._cancelQuickDrawHold?.(); this.cancelQuickDraw();
+                const previousMapId = this.activeMap?.id;
+                if (this._bossIntro) {
+                    this.cutscene?.end();
+                    if (this._bossIntroSkip) {
+                        window.removeEventListener('pointerdown', this._bossIntroSkip);
+                        window.removeEventListener('keydown', this._bossIntroSkip);
+                    }
+                    this._bossIntroSkip = null; this._bossIntro = null; this._bossIntros = [];
+                    document.getElementById('boss-title')?.classList.remove('show');
+                }
+                this._releaseLightingBase();
                 // =========================================================
                 //  PHASE 1: CLEANUP
                 // =========================================================
@@ -906,7 +935,7 @@ engineMixin({
                     
                     // Keep the landmark forecourts (Silver Queen's portico and carpet, Double Nights' drive and fountain) clear of street trees
                     for (const b of mapData.buildings || []) {
-                        const court = b.style === 'silver_queen' && b._sqForecourt ? b._sqForecourt() : b.style === 'double_nights' ? b._dnForecourt() : b.style === 'moon_city' ? b._mcForecourt() : null;
+                        const court = b.style === 'silver_queen' && b._sqForecourt ? b._sqForecourt() : b.style === 'double_nights' ? b._dnForecourt() : b.style === 'moon_city' ? b._mcForecourt() : b._neuralForecourt ? b._neuralForecourt() : null;
                         if (!court) continue;
                         const inCourt = (o, front = 0) => o.x > court.x && o.x < court.x + court.w && o.y > court.y && o.y < court.y + court.h + front;
                         mapData.foliage = mapData.foliage.filter(f => !inCourt(f, 110));   // nor on the pavement in front, where a canopy would hide the steps
@@ -1356,6 +1385,13 @@ engineMixin({
                 // =========================================================
                 
                 // CASE A: DYNAMIC RETURN (e.g. Exiting a building to the Hub)
+                // Arenas have no city doorway. Always return to today's Grum location,
+                // including a loaded or inactive run; never use the hub's default spawn.
+                if (!this._pendingGauntletLoad && mapId === 'hub_949'
+                    && GAUNTLET_MAPS.some(g => !g.locked && g.mapId === previousMapId)) {
+                    const grum = this.npcs.find(n => n.role === 'arena_master');
+                    if (grum) spawnAt = { x: grum.x, y: grum.y + 40 };
+                }
                 if (spawnAt && spawnAt.linkFrom) {
                     // Find the transition on the NEW map that targets the OLD map
                     // Example: If loading 'hub_949' coming from 'apt_949', find the Hub door that points to 'apt_949'
@@ -1555,6 +1591,13 @@ engineMixin({
                 // 5. Reset animation state AFTER all positioning to prevent limb splay
                 resetHumanoidAnim(this.player);
                 this.teammates.forEach(t => resetHumanoidAnim(t));
+
+                if (this._pendingGauntletLoad) {
+                    const pending = this._pendingGauntletLoad; this._pendingGauntletLoad = null;
+                    this.hordeGauntlet.deserialize(this, pending.data);
+                } else if (this.hordeGauntlet.active && this.activeMap.id !== this.hordeGauntlet.mapId) {
+                    this.hordeGauntlet.end(this);
+                }
 
                 this.camera.zoom = GameSettings.baseZoom || 1;   // from the player's Base Zoom, so a new map doesn't open with a zoom out
                 this.resize();

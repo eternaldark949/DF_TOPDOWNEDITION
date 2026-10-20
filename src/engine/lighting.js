@@ -181,6 +181,83 @@
                 return (lamp._sprites = { hole, color, x: lamp.x - R, y: lamp.y - R, d: 2 * R });
             },
 
+            /** One exact, screen-sized static base. No camera snapping or light decimation.
+             * Moving views stay on the ordinary path; live holes and colour are never cached. */
+            _prepareLightingBase(ctx, w, h, tint, left, top, right, bottom, interiors, lamps, rooms) {
+                let cache = this._lightingBase;
+                if (cache && (cache.unavailable || cache.ctx?.isContextLost?.())) {
+                    cache.valid = false;
+                    return null;
+                }
+                if (rooms || !this.lightingBaked || w * h > 1048576 || ctx.globalAlpha !== 1 ||
+                    ctx.globalCompositeOperation !== 'source-over' || ctx.shadowBlur ||
+                    ctx.shadowOffsetX || ctx.shadowOffsetY ||
+                    (ctx.shadowColor && ctx.shadowColor !== 'rgba(0, 0, 0, 0)') ||
+                    (ctx.filter && ctx.filter !== 'none')) {
+                    if (cache) { cache.valid = false; cache.still = 0; }
+                    return null;
+                }
+                if (!cache) cache = this._lightingBase = { pose: [], key: [], next: [], still: 0, valid: false };
+                const M = ctx.getTransform(), pose = cache.pose;
+                const same = pose[0] === w && pose[1] === h && pose[2] === M.a && pose[3] === M.b &&
+                    pose[4] === M.c && pose[5] === M.d && pose[6] === M.e && pose[7] === M.f;
+                if (!same) {
+                    pose[0] = w; pose[1] = h; pose[2] = M.a; pose[3] = M.b;
+                    pose[4] = M.c; pose[5] = M.d; pose[6] = M.e; pose[7] = M.f;
+                    cache.still = 0; cache.valid = false;
+                    return null;
+                }
+                // Avoid an extra raster copy for a camera that merely repeats once.
+                if (++cache.still < 2) return null;
+                const key = cache.next; key.length = 0;
+                key.push(this.activeMap, this.activeMap._renderSpatialRevision || 0, tint,
+                    left, top, right, bottom, interiors.length, lamps.length);
+                for (const l of interiors) {
+                    const s = l._sprites;
+                    key.push(s.hole, s.x, s.y, s.d);
+                }
+                for (const l of lamps) key.push(l._shadowPath, l._holeGrad, Math.min(1, l._litK));
+                const match = key.length === cache.key.length && key.every((v, i) => v === cache.key[i]);
+                if (!match) {
+                    cache.valid = false; cache.inputs = 0;
+                    const old = cache.key; cache.key = key; cache.next = old;
+                    return null;
+                }
+                cache.hit = cache.valid;
+                // A changing/flickering base must settle before paying for a copy.
+                if (!cache.hit && ++cache.inputs < 2) return null;
+                return cache;
+            },
+
+            _storeLightingBase(cache) {
+                const w = this.lightCanvas.width, h = this.lightCanvas.height;
+                try {
+                    if (typeof OffscreenCanvas !== 'function') throw new Error('Lighting bitmap cache unavailable');
+                    const cv = cache.canvas || (cache.canvas = new OffscreenCanvas(w, h));
+                    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+                    const c = cache.ctx || (cache.ctx = cv.getContext('2d'));
+                    if (!c || c.isContextLost?.()) throw new Error('Lighting base context unavailable');
+                    c.globalCompositeOperation = 'copy'; c.drawImage(this.lightCanvas, 0, 0);
+                    const image = cv.transferToImageBitmap();
+                    if (cache.image) cache.image.close();
+                    cache.image = image;
+                    const old = cache.key; cache.key = cache.next; cache.next = old;
+                    cache.valid = true;
+                } catch (_) {
+                    // This optional cache must not prevent the already painted frame.
+                    cache.valid = false; cache.unavailable = true;
+                    if (cache.image) { cache.image.close(); cache.image = null; }
+                    if (cache.canvas) cache.canvas.width = cache.canvas.height = 1;
+                }
+            },
+
+            _releaseLightingBase() {
+                const c = this._lightingBase;
+                if (c && c.image) c.image.close();
+                if (c && c.canvas) c.canvas.width = c.canvas.height = 1;
+                this._lightingBase = null;
+            },
+
             /* =====================================================================
                LIGHTING — the darkness layer
                ---------------------------------------------------------------------
@@ -362,28 +439,21 @@
                 const visBottom = Math.min(this.activeMap.height, vB + lightViewMargin);
             
                 // 3. THE DARK — tinted: the hour's colour outdoors, night's violet-indigo indoors
-                const tint = this.activeMap.type === 'indoor' ? '22, 10, 48' : dc.tintRGB;
-                lc.fillStyle = `rgb(${tint})`;
-                lc.fillRect(visLeft, visTop, visRight - visLeft, visBottom - visTop);
-                // Outdoor rooms (a veranda) carry the sky's light
-                if (rsOn) rs.carveSkyLight(lc, ambient, dc.darkness);
+                const tint = this.activeMap.lightingTint || (this.activeMap.type === 'indoor' ? '22, 10, 48' : dc.tintRGB);
             
                 // 3b. INTERIOR LIGHTS (buildings on the city map) — baked sprites, each with its own wall shadows
                 const iLights = this.activeMap._interiorLights;
                 const iVisible = scratch.iVisible;
                 if (iLights && iLights.length > 0) {
                     const iSegsByLevel = this.activeMap._interiorShadowSegs || {};
-                    lc.globalCompositeOperation = 'destination-out';
                     for (const lamp of iLights) {
                         if (!inView(lamp.x, lamp.y, lamp.radius)) continue;
-                        const sp = this._interiorLightSprites(lamp, iSegsByLevel[lamp.level] || []);
-                        lc.drawImage(sp.hole, sp.x, sp.y, sp.d, sp.d);
+                        this._interiorLightSprites(lamp, iSegsByLevel[lamp.level] || []);
                         iVisible.push(lamp);
                     }
                 }
             
                 // 4. STREET AND ROOM LAMPS — cached shadow shapes and gradients, nearest first within the budget
-                lc.globalCompositeOperation = 'destination-out';
                 const litLamps = scratch.litLamps;
                 if (this.lightingBaked) {
                     const visibleLamps = scratch.visibleLamps;
@@ -415,13 +485,31 @@
                             g.addColorStop(0, 'rgba(255, 255, 255, 1)'); g.addColorStop(1, 'rgba(255, 255, 255, 0)');
                             lamp._holeGrad = g; lamp._holeGradX = lamp.x; lamp._holeGradY = lamp.y; lamp._holeGradRadius = lamp.radius;
                         }
-                        lc.globalAlpha = Math.min(1, lamp._litK);
-                        lc.fillStyle = lamp._holeGrad;
-                        lc.fill(lamp._shadowPath);
                         litLamps.push(lamp);
                     }
-                    lc.globalAlpha = 1;
                 }
+
+                const base = this._prepareLightingBase(lc, lw, lh, tint, visLeft, visTop, visRight, visBottom, iVisible, litLamps, rsOn);
+                if (base && base.hit) {
+                    lc.save(); lc.setTransform(1, 0, 0, 1, 0, 0);
+                    lc.globalCompositeOperation = 'copy'; lc.drawImage(base.image, 0, 0); lc.restore();
+                } else {
+                    lc.fillStyle = `rgb(${tint})`;
+                    lc.fillRect(visLeft, visTop, visRight - visLeft, visBottom - visTop);
+                    if (rsOn) rs.carveSkyLight(lc, ambient, dc.darkness);
+                    lc.globalCompositeOperation = 'destination-out';
+                    for (const lamp of iVisible) {
+                        const sp = lamp._sprites;
+                        lc.drawImage(sp.hole, sp.x, sp.y, sp.d, sp.d);
+                    }
+                    for (const lamp of litLamps) {
+                        lc.globalAlpha = Math.min(1, lamp._litK);
+                        lc.fillStyle = lamp._holeGrad; lc.fill(lamp._shadowPath);
+                    }
+                    if (this.lightingBaked) lc.globalAlpha = 1;
+                    if (base) this._storeLightingBase(base);
+                }
+                lc.globalCompositeOperation = 'destination-out';
             
                 // 5. DYNAMIC HOLES — shots and muzzle flashes light softly around them
                 const white = glowSprite('255, 255, 255', 0.3);

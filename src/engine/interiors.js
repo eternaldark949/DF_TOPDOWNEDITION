@@ -6,6 +6,7 @@
            A new place adds one line here; the painters live below and in keeper-art.js.
            ===================================================================== */
         const INTERIOR_ART = {
+            biggs_arena:        { floor: (g, c) => g.drawBiggsInterior(c) },
             apt_949:             { floor: (g, c) => { g.drawApartmentBackdrop(c); g.drawApartmentInterior(c); }, glow: (g, c) => g.drawApartmentGlow(c) },
             medbay_sw:           { floor: (g, c) => g.drawClinicInterior(c) },
             house_of_death:      { floor: (g, c) => g.drawHouseInterior(c),   glow: (g, c) => g.drawHouseGlow(c) },
@@ -21,6 +22,7 @@
             enni_cole_interior:  { floor: (g, c) => g.drawEnniInterior(c),    glow: (g, c) => g.drawEnniGlow(c) },
             enni_cole_upper:     { floor: (g, c) => g.drawEnniUpperInterior(c), glow: (g, c) => g.drawEnniUpperGlow(c) },
             cozy_cafe_interior:  { floor: (g, c) => g.drawCafeInterior(c),    glow: (g, c) => g.drawCafeGlow(c) },     // the hearth, candles, pendants, steam
+            neural_sys_interior: { floor: (g,c) => g.drawNeuralInterior(c), glow: (g,c) => g.drawNeuralGlow(c) },
             demoness_palace:     { floor: (g, c) => g.drawPalaceInterior(c), glow: (g, c) => g.drawPalaceGlow(c) }   // engine/palace-art.js      // engine/reflections.js: its mirror floor gives this back
         };
 

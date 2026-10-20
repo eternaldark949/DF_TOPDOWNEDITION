@@ -108,10 +108,7 @@ engineMixin({
                     } : null,
                     
                     // --- HORDE GAUNTLET ---
-                    hordeGauntlet: this.hordeGauntlet ? {
-                        highestWave: this.hordeGauntlet.highestWave || 0,       // best on any map (older builds read this)
-                        highestWaves: { ...this.hordeGauntlet.highestWaves }
-                    } : null,
+                    hordeGauntlet: this.hordeGauntlet ? this.hordeGauntlet.serialize(this) : null,
                     
                     // --- SETTINGS ---
                     settings: {
@@ -505,6 +502,8 @@ engineMixin({
                     let mapId = worldData.mapId ?? rawSave.mapId ?? defaults.world.mapId;
                     const playerX = playerData.x ?? rawSave.player?.x ?? defaults.player.x;
                     const playerY = playerData.y ?? rawSave.player?.y ?? defaults.player.y;
+                    // Consumed by _doLoadMap after entities exist, not while the previous map fades out.
+                    this._pendingGauntletLoad = { data: save.hordeGauntlet };
                     // Saved in Grum's old arena: it's the House of Death now — start at its door
                     if (mapId === 'grum_arena') { mapId = 'house_of_death'; this.loadMap(mapId); }
                     else if (mapId === 'road_test') { mapId = 'hub_949'; this.loadMap(mapId); }   // the old road test zone is gone: back to the city's spawn
@@ -747,14 +746,6 @@ engineMixin({
                     if (this.restrictedZone && save.restrictedZone) {
                         this.restrictedZone.clearCount = save.restrictedZone.clearCount || 0;
                         console.log(`[LOAD] Restored restricted zone clearCount: ${this.restrictedZone.clearCount}`);
-                    }
-
-                    // 11d. Restore Horde Gauntlet
-                    if (this.hordeGauntlet && save.hordeGauntlet) {
-                        // Per map; an old save's single number becomes the House of Death's
-                        this.hordeGauntlet.highestWaves = { ...(save.hordeGauntlet.highestWaves || {}) };
-                        if (!save.hordeGauntlet.highestWaves) this.hordeGauntlet.highestWave = save.hordeGauntlet.highestWave || 0;
-                        console.log(`[LOAD] Restored horde gauntlet highestWave: ${this.hordeGauntlet.highestWave}`);
                     }
 
                     // 12. Restore Settings

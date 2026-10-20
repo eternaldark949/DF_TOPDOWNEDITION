@@ -1,0 +1,108 @@
+{
+  "date": "2026-10-19",
+  "environment": "Headless desktop Chromium; no phone CPU emulation; detailed profiling disabled during timings",
+  "fullCharacterComparison": {
+    "runs": [
+      {
+        "build": "before",
+        "ms": 937.7000000029802
+      },
+      {
+        "build": "after",
+        "ms": 913.6000000014901
+      },
+      {
+        "build": "after",
+        "ms": 1020.4000000022352
+      },
+      {
+        "build": "before",
+        "ms": 1043.5
+      },
+      {
+        "build": "before",
+        "ms": 940.0999999977648
+      },
+      {
+        "build": "after",
+        "ms": 999.8000000007451
+      },
+      {
+        "build": "after",
+        "ms": 1219.5
+      },
+      {
+        "build": "before",
+        "ms": 1182.699999999255
+      }
+    ],
+    "medianMs": {
+      "before": 991.7999999988824,
+      "after": 1010.1000000014901
+    }
+  },
+  "isolatedGarmentComparison": {
+    "runs": [
+      {
+        "build": "before",
+        "ms": 734.2000000029802
+      },
+      {
+        "build": "after",
+        "ms": 761.1000000014901
+      },
+      {
+        "build": "after",
+        "ms": 676.1999999992549
+      },
+      {
+        "build": "before",
+        "ms": 702.6000000014901
+      },
+      {
+        "build": "before",
+        "ms": 718
+      },
+      {
+        "build": "after",
+        "ms": 696.1999999992549
+      },
+      {
+        "build": "after",
+        "ms": 666.1999999992549
+      },
+      {
+        "build": "before",
+        "ms": 647.5
+      }
+    ],
+    "medianMs": {
+      "before": 710.3000000007451,
+      "after": 686.1999999992549
+    }
+  },
+  "contextCalls": {
+    "before": 6566,
+    "after": 6503,
+    "characters": 24,
+    "description": "One warm high-quality character frame; drawing/path/transform methods, excluding state assignments"
+  },
+  "visualChecks": {
+    "pixelIdentical": {
+      "city": true,
+      "high-night": true,
+      "high-day": true,
+      "medium-night": true,
+      "medium-day": true,
+      "low-night": true,
+      "low-day": true
+    },
+    "errors": []
+  },
+  "method": {
+    "fullCharacter": "Same browser page; alternate original/candidate top draw methods; 24 bodies, two thirds moving; 60 warmup frames then 600 measured frames per interval, four intervals per variant",
+    "garmentOnly": "Same page; 24 garment draws per frame, female curvy body, six common tops; 100 warmup frames then 1500 measured frames per interval, four intervals per variant"
+  },
+  "interpretation": "Context-call reduction is modest. Isolated garment timing is slightly lower, but full-character timing does not establish an overall CPU improvement. Neither test predicts phone FPS.",
+  "rejectedPrototype": "Per-limb retained paths were tested and removed: moving and idle-pose geometry often changes, and caching/allocation overhead did not justify enabling them."
+}

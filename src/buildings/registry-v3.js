@@ -633,7 +633,7 @@
                 { x: 75, y: 200, w: 250, h: 200 }
             ],
             accentColor: '#0088ff',
-            label: 'Neural Sys',
+            label: 'Neural Systems',
             type: 'tech',
             category: 'commercial',
             floors: 8,
@@ -674,10 +674,10 @@
 
         /**
          * Factory function to create Biggs Amusement Park.
-         * Flashy, wide building with violet/amber carnival theming.
+         * Striped burgundy pavilion with brass trim; art in buildings/biggs-park.js.
          */
         function createBiggsAmusementPark(x, y, config = {}) {
-            return new BuildingV2({
+            return new BiggsParkBuilding({
                 id: 'biggs_park',
                 x: x, y: y,
                 label: 'Biggs Park',

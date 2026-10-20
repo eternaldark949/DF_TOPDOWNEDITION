@@ -412,12 +412,9 @@
                 const seat = car.seatLayout[this.seatIndex];
                 if (!seat) return null;
                 const seatPos = car.getSeatWorldPos(this.seatIndex);
-                const leanOutDist = car.width / 2 + 8;
-                const outwardAngle = car.angle + (seat.side === 'left' ? -Math.PI / 2 : Math.PI / 2);
-                const fireX = seatPos.x + Math.cos(outwardAngle) * leanOutDist;
-                const fireY = seatPos.y + Math.sin(outwardAngle) * leanOutDist;
-                this.x = fireX;
-                this.y = fireY;
+                this.x = seatPos.x; this.y = seatPos.y;
+                this._vehicleLean = (this._vehicleLean || 0) + ((this.combatTargetTimer > 0 ? 1 : 0) - (this._vehicleLean || 0)) * .18;
+                const fireX = seatPos.x, fireY = seatPos.y;
 
                 if (!this.equippedWeaponId && !this.equippedAbilityId) return null;
                 if (this.cooldown > 0) { this.cooldown--; return null; }
@@ -431,7 +428,7 @@
                 let nearest = null;
                 let minDist = range;
                 for (let e of enemies) {
-                    if (e.dead) continue;
+                    if (e.dead || !car.isAngleValidForSeat(this.seatIndex, Math.atan2(e.y-fireY,e.x-fireX))) continue;
                     const d = Math.hypot(fireX - e.x, fireY - e.y);
                     if (d < minDist) { minDist = d; nearest = e; }
                 }
@@ -441,7 +438,7 @@
                 const angleToTarget = Math.atan2(nearest.y - fireY, nearest.x - fireX);
                 this.combatTargetAngle = angleToTarget;
                 this.combatTargetTimer = 20;
-                if (!car.isAngleValidForSeat(this.seatIndex, angleToTarget)) return null;
+                if (!car.isAngleValidForSeat(this.seatIndex, angleToTarget) || this._vehicleLean < .7) return null;
 
                 // Fire using centralized functions
                 if (hasWeapon) {
@@ -453,11 +450,13 @@
                         this.cooldown = (stats.fireRate || 20) * Math.max(this.burstSize, 2);
                         this.shotsLeftInBurst = this.burstSize;
                     }
-                    return fireWeaponProjectile(this, angleToTarget, this.equippedWeaponId, { spreadMod: this.accuracyMod || 1.0 });
+                    const shot = car.occupantShot(this.seatIndex, angleToTarget, this._vehicleLean, this.equippedWeaponId);
+                    return fireWeaponProjectile(this, shot.angle, this.equippedWeaponId, { spreadMod: this.accuracyMod || 1.0, origin: shot });
                 } else if (hasAbility) {
                     const stats = ABILITY_REGISTRY[this.equippedAbilityId].stats;
                     this.cooldown = stats.fireRate || 70;
-                    return castAbilityProjectile(this, angleToTarget, this.equippedAbilityId);
+                    const shot = car.occupantShot(this.seatIndex, angleToTarget, this._vehicleLean);
+                    return castAbilityProjectile(this, shot.angle, this.equippedAbilityId, { origin: shot });
                 }
                 return null;
             }

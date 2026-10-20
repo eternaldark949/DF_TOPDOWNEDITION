@@ -5,7 +5,10 @@
             interact() {
                 if (this.activeInteraction && this.activeInteraction.type === 'execute') { this.execute(this.activeInteraction.target); return; }
                 if (this.activeInteraction) {
-                    if(this.activeInteraction.interactionType === 'medbay_refill') {
+                    if(this.activeInteraction.interactionType === 'neural_counter') {
+                        const prisma=this.npcs.find(n=>n.name==='Prisma');
+                        if(prisma)this.startDialogue(prisma);
+                    } else if(this.activeInteraction.interactionType === 'medbay_refill') {
                         this.refillStims();
                     } else if(this.activeInteraction.interactionType === 'vending_machine') {
                         this.buyBubbleTea();
@@ -101,6 +104,7 @@
                 to the Autosave slot, stop the radio, and open the pause menu so she isn't ambushed on return. */
             onPageHidden() {
                 if (!this.running) return;
+                clearGameplayInputs(this);
                 try { this.saveGame({ auto: true }); } catch (e) { console.warn('autosave', e); }
                 if (this.musicWidget && this.musicWidget.isPlaying) this.musicWidget.togglePlay(false);
                 const pm = typeof pauseMenuController !== 'undefined' ? pauseMenuController : null;
@@ -147,7 +151,7 @@
                 this.mouseY = 0;
                 this.mouseDown = false;
                 
-                this.canvas.addEventListener('mousemove', (e) => {
+                const aimMouse = (e) => {
                     /* getBoundingClientRect is CSS space, but mouseX is compared
                        against canvas.width/2 (backing-store space) when aiming.
                        Those were equal only because the two always matched; with
@@ -159,14 +163,22 @@
                     const sy = rect.height ? (this.canvas.height / rect.height) : 1;
                     this.mouseX = (e.clientX - rect.left) * sx;
                     this.mouseY = (e.clientY - rect.top)  * sy;
-                });
+                };
+                this.canvas.addEventListener('mousemove', aimMouse);
                 
                 this.canvas.addEventListener('mousedown', (e) => {
                     if (!this.running || this.paused || hudInputBlocked()) return;
+                    if (e.button !== 0) return;
+                    aimMouse(e);
                     this.mouseDown = true;
                 });
                 
-                this.canvas.addEventListener('mouseup', (e) => {
+                window.addEventListener('mouseup', (e) => {
+                    if (e.button === 0 && this.mouseDown && this._quickDraw) {
+                        aimMouse(e);
+                        const p = this.viewToWorld(this.mouseX, this.mouseY);
+                        this.requestQuickDraw(Math.atan2(p.y - this.player.y, p.x - this.player.x), p);
+                    }
                     this.mouseDown = false;
                 });
                 
@@ -336,27 +348,7 @@
 
                 const sneakBtn = document.getElementById('btn-sneak');
                 if (sneakBtn) { const tog = (e) => { e.preventDefault(); e.stopPropagation(); this.toggleSneak(); }; sneakBtn.addEventListener('mousedown', tog); sneakBtn.addEventListener('touchstart', tog, { passive: false }); }
-                const toggleHolster = (e) => {
-                    e.preventDefault();
-                    this.weaponHolstered = !this.weaponHolstered;
-                    if (!this.weaponHolstered) { this._drawnAt = _gameTimeSec; this._drawShotUsed = false; }   // Arms: Quick-Draw
-                    this.holsterAnimTarget = this.weaponHolstered ? 0 : 1;
-                    if (this.weaponHolstered) {
-                        this.holsterBtn.classList.add('holstered');
-                        this.holsterBtn.innerHTML = 'DRAW';
-                        this.fireBtn.style.display = 'none';
-                        this.emoteBtn.style.display = 'flex';
-                        showMessage('WEAPON HOLSTERED');
-                    } else {
-                        this.holsterBtn.classList.remove('holstered');
-                        this.holsterBtn.innerHTML = 'HOLSTER';
-                        this.fireBtn.style.display = 'flex';
-                        this.emoteBtn.style.display = 'none';
-                        showMessage('WEAPON DRAWN');
-                    }
-                };
-                this.holsterBtn.addEventListener('mousedown', toggleHolster);
-                this.holsterBtn.addEventListener('touchstart', toggleHolster);
+                this.initQuickDrawControl();
 
                 // ── Emote Joystick ──
                 // Drag from emote button, four overlays appear over heal/nv/flit/holster slots.

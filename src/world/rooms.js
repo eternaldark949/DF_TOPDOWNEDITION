@@ -1319,7 +1319,7 @@
                 return {
                     rooms: {
                         garden:   { x: 14,   y: 14,   w: 872, h: 352, type: 'outdoor', label: 'Blood Garden' },
-                        shrine:   { x: 900,  y: 14,   w: 486, h: 352, type: 'indoor',  label: 'Shrine' },
+                        shrine:   { x: 900,  y: 14,   w: 486, h: 352, type: 'indoor',  label: 'Crystal Chamber' },
                         bath:     { x: 1400, y: 14,   w: 386, h: 352, type: 'indoor',  label: 'Bath of Embers' },
                         westgal:  { x: 14,   y: 380,  w: 572, h: 606, type: 'indoor',  label: 'West Gallery' },
                         throne:   { x: 600,  y: 380,  w: 600, h: 606, type: 'indoor',  label: 'Throne Hall' },
@@ -1330,6 +1330,7 @@
                     },
                     doors: [
                         arch(820, 986, 160, 'H', ['entrance', 'throne']),
+                        arch(886, 130, 120, 'V', ['garden', 'shrine']),
                         hinged(586, 1150, 'V', ['entrance', 'dressing']),
                         hinged(1200, 1150, 'V', ['entrance', 'kennels'], 'right'),
                         hinged(586, 640, 'V', ['throne', 'westgal']),

@@ -98,6 +98,39 @@
                                 ...ring.slice().reverse().map(([ax, ay, tx, ty]) => ({ a: { x: ax, y: ay }, t: { x: tx, y: ty } }))];
                 return { segs: 2, stiffness: 0.12, damping: 0.87, keepOut: 6, chains };
             };
+            // Static garment outlines share the same canonical body dimensions as
+            // bodyTorsoPath. Keep vector art at full resolution; colors, wetness,
+            // lighting and the body's transform remain live at draw time.
+            const garmentGeometry = new WeakMap();
+            const garmentPaths = g => {
+                const B = g.body;
+                let p = garmentGeometry.get(B);
+                if (p) return p;
+                const x = B.tb, w = B.tf - B.tb, front = x + w;
+                const polygon = points => {
+                    const path = new Path2D(); path.moveTo(...points[0]);
+                    for (let i = 1; i < points.length; i++) path.lineTo(...points[i]);
+                    path.closePath(); return path;
+                };
+                p = {
+                    suit: polygon([[front - 6, -4], [front - 3, 0], [front - 6, 4]]),
+                    racerback: polygon([[x + 2.2, -B.back * 0.85], [x + w / 2, -2], [x + w / 2, 2],
+                        [x + 2.2, B.back * 0.85], [x + 0.6, B.back * 0.4], [x + 0.6, -B.back * 0.4]]),
+                    crop: new Path2D(), strings: new Path2D(), inner: new Path2D(),
+                    lapels: [-1, 1].map(s => polygon([[front - 0.6, s * 2.6],
+                        [front - 5.5, s * Math.min(7, B.chest * 0.8)], [front - 2.2, s * B.chest * 0.72]])),
+                    vest: polygon([[front + 1, -3.4], [front - w * 0.45, 0], [front + 1, 3.4]]),
+                    tie: polygon([[front - 1.5, 0], [front + 0.5, -2], [front + 0.5, 2]]),
+                    scrubs: polygon([[front - 1, -2.5], [front - 4.5, 0], [front - 1, 2.5]]),
+                    bust: new Map()
+                };
+                p.crop.ellipse(x + 1.5, 0, 1.3, B.back * 0.45, 0, 0, Math.PI * 2);
+                for (const s of [-1, 1]) {
+                    p.strings.moveTo(front - 1, s * 2.5); p.strings.lineTo(front + 2.5, s * 2.8);
+                }
+                p.inner.roundRect(front - 4, -3, 4, 6, 1.5);
+                garmentGeometry.set(B, p); return p;
+            };
             const rr = (ctx, x, y, w, h, r, fill) => { ctx.fillStyle = fill; ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill(); };
             // The top over the torso. y0..y1 is how far across it reaches, ±10 being shoulder to shoulder:
             // less keeps to a band (a tank top's straps), more pads it out (a hoodie's bulk).
@@ -110,7 +143,13 @@
                 const B = g.body.bust;
                 if (!B) return;
                 ctx.fillStyle = g.darken(c.color, shade);
-                for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(B.x + 0.15, s * B.y, B.r * (r + 0.4) / 3.5, 0, Math.PI * 2); ctx.fill(); }
+                const cache = garmentPaths(g).bust;
+                let paths = cache.get(r);
+                if (!paths) {
+                    paths = [-1, 1].map(s => { const p = new Path2D(); p.arc(B.x + 0.15, s * B.y, B.r * (r + 0.4) / 3.5, 0, Math.PI * 2); return p; });
+                    cache.set(r, paths);
+                }
+                ctx.beginPath(); for (const path of paths) ctx.fill(path);
             };
             const collarRing = (ctx, g, color, r = 9.3, width = 2.2) => {
                 ctx.strokeStyle = color; ctx.lineWidth = width;
@@ -147,8 +186,7 @@
                     sleeve: 'long',
                     draw(ctx, g, c) {
                         body(ctx, g, c);
-                        const lx = g.torso.x + g.torso.w - 6;
-                        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(lx, -4); ctx.lineTo(lx + 3, 0); ctx.lineTo(lx, 4); ctx.fill();
+                        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.fill(garmentPaths(g).suit);
                         bust(ctx, g, c, 0.15, 3);
                     },
                     portrait(ctx, P, c, skinShadow) { pShoulders(ctx, P, c.color); pNeckline(ctx, P, '#f2f2f2', 0.55, 0.3); }
@@ -159,8 +197,7 @@
                         body(ctx, g, c);
                         bust(ctx, g, c, 0.15, 3.5);
                         ctx.fillStyle = g.darken(c.color, 0.05);                 // the racerback, narrowing up the back
-                        const x = g.torso.x, w = g.torso.w, b = g.body.back;
-                        ctx.beginPath(); ctx.moveTo(x + 2.2, -b * 0.85); ctx.lineTo(x + w / 2, -2); ctx.lineTo(x + w / 2, 2); ctx.lineTo(x + 2.2, b * 0.85); ctx.lineTo(x + 0.6, b * 0.4); ctx.lineTo(x + 0.6, -b * 0.4); ctx.fill();
+                        ctx.beginPath(); ctx.fill(garmentPaths(g).racerback);
                     },
                     portrait(ctx, P, c, skinShadow) { pShoulders(ctx, P, skinShadow); const { cx, cy, fw, fh } = P; ctx.fillStyle = c.color; ctx.beginPath(); ctx.ellipse(cx, cy + fh * 2.55, fw * 1.6, fh * 0.55, 0, Math.PI, 0); ctx.fill(); ctx.strokeStyle = c.color; ctx.lineWidth = fw * 0.12; ctx.beginPath(); for (const s of [-1, 1]) { ctx.moveTo(cx + s * fw * 0.9, cy + fh * 2.1); ctx.lineTo(cx + s * fw * 0.75, cy + fh * 1.5); } ctx.stroke(); }
                 },
@@ -188,7 +225,7 @@
                     draw(ctx, g, c) {
                         body(ctx, g, c, 0.1, -8.5, 8.5); bust(ctx, g, c, 0.16, 3.2);
                         ctx.fillStyle = g.darken(g.skin, 0.05);                   // bare skin at the small of the back
-                        ctx.beginPath(); ctx.ellipse(g.torso.x + 1.5, 0, 1.3, g.body.back * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+                        ctx.beginPath(); ctx.fill(garmentPaths(g).crop);
                     },
                     portrait(ctx, P, c, skinShadow) { tops.tank.portrait(ctx, P, c, skinShadow); const { cx, cy, fw, fh } = P; ctx.fillStyle = skinShadow; ctx.fillRect(cx - fw * 1.6, cy + fh * 2.55, fw * 3.2, fh * 0.3); }
                 },
@@ -203,8 +240,7 @@
                     draw(ctx, g, c) {
                         body(ctx, g, c, 0.08, -10.5, 10.5); bust(ctx, g, c, 0.14, 3);
                         ctx.strokeStyle = c.trim || '#e8e8e8'; ctx.lineWidth = 0.8; ctx.beginPath();   // drawstrings
-                        for (const s of [-1, 1]) { ctx.moveTo(g.torso.x + g.torso.w - 1, s * 2.5); ctx.lineTo(g.torso.x + g.torso.w + 2.5, s * 2.8); }
-                        ctx.stroke();
+                        ctx.stroke(garmentPaths(g).strings);
                     },
                     collar(ctx, g, c) {                                   // the hood, bunched behind the neck; it bobs as you move
                         const h = g.headInTorso, bob = g.cloth('hood', pieceSpec('hood', h, 0, 0, hoodSpec))[0];
@@ -243,10 +279,10 @@
                     sleeve: 'long', padded: 0.6,
                     draw(ctx, g, c) {
                         ctx.fillStyle = g.darken(c.color, 0.1); ctx.fill(bodyTorsoPath(g.body, 0.8));         // a touch wider: padded shoulders
-                        const front = g.torso.x + g.torso.w, ch = g.body.chest;
-                        rr(ctx, front - 4, -3, 4, 6, 1.5, g.darken(c.inner || '#111', 0.05));                  // the top underneath
+                        const P = garmentPaths(g);
+                        ctx.fillStyle = g.darken(c.inner || '#111', 0.05); ctx.beginPath(); ctx.fill(P.inner);                  // the top underneath
                         ctx.fillStyle = c.trim || g.darken(c.color, 0.02);                                       // lapels
-                        for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(front - 0.6, s * 2.6); ctx.lineTo(front - 5.5, s * Math.min(7, ch * 0.8)); ctx.lineTo(front - 2.2, s * ch * 0.72); ctx.closePath(); ctx.fill(); }
+                        ctx.beginPath(); for (const path of P.lapels) ctx.fill(path);
                     },
                     portrait(ctx, P, c, skinShadow) {
                         pShoulders(ctx, P, c.color, 0.55); const { cx, cy, fw, fh } = P;
@@ -276,13 +312,12 @@
                         const shirt = c.inner || '#f2f2f2', torso = bodyTorsoPath(g.body);
                         ctx.fillStyle = g.darken(c.color, 0.1); ctx.fill(torso);  // the waistcoat (the shirt's sleeves are the shoulder caps)
                         bust(ctx, g, { color: c.color }, 0.14, 2.8);
-                        const front = g.torso.x + g.torso.w;
                         ctx.save(); ctx.clip(torso);                              // open in a V at the front, the shirt showing
                         ctx.fillStyle = g.darken(shirt, 0.08);
-                        ctx.beginPath(); ctx.moveTo(front + 1, -3.4); ctx.lineTo(front - g.torso.w * 0.45, 0); ctx.lineTo(front + 1, 3.4); ctx.closePath(); ctx.fill();
+                        ctx.beginPath(); ctx.fill(garmentPaths(g).vest);
                         ctx.restore();
                         ctx.fillStyle = c.trim || '#8b0000';                      // bow tie
-                        ctx.beginPath(); ctx.moveTo(front - 1.5, 0); ctx.lineTo(front + 0.5, -2); ctx.lineTo(front + 0.5, 2); ctx.closePath(); ctx.fill();
+                        ctx.beginPath(); ctx.fill(garmentPaths(g).tie);
                     },
                     portrait(ctx, P, c) {
                         const { cx, cy, fw, fh } = P, shirt = c.inner || '#f2f2f2';
@@ -319,8 +354,7 @@
                     sleeve: 'short', seams: true,
                     draw(ctx, g, c) {
                         body(ctx, g, c); bust(ctx, g, c, 0.16, 3);
-                        const front = g.torso.x + g.torso.w;
-                        ctx.fillStyle = g.skin; ctx.beginPath(); ctx.moveTo(front - 1, -2.5); ctx.lineTo(front - 4.5, 0); ctx.lineTo(front - 1, 2.5); ctx.closePath(); ctx.fill();
+                        ctx.fillStyle = g.skin; ctx.beginPath(); ctx.fill(garmentPaths(g).scrubs);
                     },
                     portrait(ctx, P, c, skinShadow) {
                         pShoulders(ctx, P, c.color); const { cx, cy, fw, fh } = P;

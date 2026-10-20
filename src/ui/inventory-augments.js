@@ -176,8 +176,8 @@
             const spread = (Math.random() - 0.5) * (stats.spread || 0.1);
             
             return new ProjectileEntity({
-                x: source.x,
-                y: source.y,
+                x: (opts.origin || source).x,
+                y: (opts.origin || source).y,
                 angle: angle + spread,
                 isEnemy: opts.isEnemy || false,
                 owner: source,
@@ -202,6 +202,7 @@
                 const mode = def.weaponMode || 'normal';
                 action = (item) => {
                     if (game) {
+                        game.cancelQuickDraw();
                         game.currentWeapon = item;
                         game.weaponMode = mode;
                         game._drawnAt = _gameTimeSec; game._drawShotUsed = false;   // Arms: Quick-Draw

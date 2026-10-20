@@ -1214,3 +1214,6 @@
             font-size: max(6px, 1.2rem - var(--font-trim)); color: var(--df-lavender-pale, #f1e8fe); background: rgba(20, 8, 30, 0.7); border: 1px dotted rgba(232, 194, 122, 0.7);
             box-shadow: 0 0 10px rgba(232, 194, 122, 0.25); user-select: none; touch-action: none; }
         .grab-rot:active { background: rgba(93, 20, 226, 0.5); }
+
+        #btn-holster.quick-draw { color: #ffdc8d; border-color: #f5bc63; box-shadow: 0 0 12px rgba(245,188,99,.3); }
+        #btn-holster.quick-draw.recovering { color: #a9987b; border-color: #8a7253; box-shadow: none; }

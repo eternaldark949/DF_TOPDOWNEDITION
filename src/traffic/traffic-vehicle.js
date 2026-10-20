@@ -246,11 +246,11 @@
                 }
                 
                 // The body: painted once per look, light sliding over it (traffic/car-art.js).
-                // The car you're driving is drawn once, over its occupants (drawOccupantOverlay).
+                // The occupied car partitions this sprite into lower/interior and roof/frame passes.
                 if (!(typeof game !== 'undefined' && game.isDriving && game.car === this && this.hasDriver)) {
                     drawCarBody(ctx, this, farLOD);
                     this.drawLights(ctx, farLOD);
-                }
+                } else this.drawOccupantLower(ctx);
                 
                 ctx.restore();
             }
@@ -269,12 +269,12 @@
             /**
              * Draw car body overlay on top of occupants.
              * Creates the illusion of characters being INSIDE the car.
-             * Redraws the car body, lights, and turn signals over occupants.
+             * The cached upper layer covers occupants while their open windows remain clear.
              */
             // ── SEAT LAYOUT SYSTEM ──
             // Generates local-space seat positions and firing arcs.
             // Seat 0 = driver (front-left). Right side = positive localY.
-            // Each seat has a 180° firing arc on its side of the car.
+            // Each seat fires through its own side window; vehicle-occupants.js resolves the cabin.
             static generateSeatLayout(seatCount, vehicleLength, vehicleWidth) {
                 const seats = [];
                 const hw = vehicleWidth / 2;
@@ -312,7 +312,7 @@
                             localY: leftY,
                             side: 'left',
                             isDriver: isFirstRow && seatsFilled === 0,
-                            fireAngle: Math.PI
+                            fireAngle: -Math.PI / 2
                         });
                         seatsFilled++;
                     }
@@ -323,7 +323,7 @@
                             localY: rightY,
                             side: 'right',
                             isDriver: false,
-                            fireAngle: 0
+                            fireAngle: Math.PI / 2
                         });
                         seatsFilled++;
                     }
@@ -337,6 +337,7 @@
              * Transforms local seat coords by the vehicle's position + angle.
              */
             getSeatWorldPos(seatIndex) {
+                this.occupantWindows();
                 const seat = this.seatLayout[seatIndex];
                 if (!seat) return { x: this.x, y: this.y };
                 const cos = Math.cos(this.angle);
@@ -348,21 +349,17 @@
             }
 
             /**
-             * Check if a world-space firing angle falls within a seat's valid 180° arc.
+             * Check a world-space firing angle against a seat's outward window arc.
              * Left-side seats fire into the left hemisphere (relative to car forward).
              * Right-side seats fire into the right hemisphere.
              */
             isAngleValidForSeat(seatIndex, worldAngle) {
                 const seat = this.seatLayout[seatIndex];
                 if (!seat) return false;
-                // Seat's outward-facing direction in world space
-                const seatWorldAngle = this.angle + seat.fireAngle;
-                // Angle difference between desired shot and seat's outward direction
-                let diff = worldAngle - seatWorldAngle;
-                while (diff > Math.PI) diff -= Math.PI * 2;
-                while (diff < -Math.PI) diff += Math.PI * 2;
-                // Valid if within ±90° (half of 180° arc)
-                return Math.abs(diff) <= Math.PI / 2;
+                const center = this.angle + (seat.side === 'left' ? -Math.PI / 2 : Math.PI / 2);
+                const diff = Math.atan2(Math.sin(worldAngle - center), Math.cos(worldAngle - center));
+                return Math.abs(diff) <= VEHICLE_SEAT_ARC;
+
             }
 
             /**
@@ -374,7 +371,7 @@
                     if (!this.seatOccupants[i]) {
                         this.seatOccupants[i] = entity;
                         entity.seatIndex = i;
-                        entity.inCar = true;
+                        entity.inCar = true; entity._vehicleLean = 0; entity.combatTargetTimer = 0;
                         return i;
                     }
                 }
@@ -387,28 +384,12 @@
                     const occ = this.seatOccupants[i];
                     if (occ && occ !== true) {
                         occ.seatIndex = -1;
-                        occ.inCar = false;
+                        occ.inCar = false; occ._vehicleLean = 0;
                     }
                     this.seatOccupants[i] = null;
                 }
             }
 
-            drawOccupantOverlay(ctx) {
-                if (!this.visible || !this.hasDriver) return;
-                
-                ctx.save();
-                ctx.translate(this.x, this.y);
-                ctx.rotate(this.angle);
-                
-                // Redraw the car body (same as in draw())
-                drawCarBody(ctx, this, false);
-                
-                // Unified lights (same function as draw() — ensures headlight color consistency)
-                this.drawLights(ctx, false);
-                
-                ctx.restore();
-            }
-        
             // --- NAVIGATION HELPERS ---
             getDistanceAlongLane() {
                 if (!this.currentLane) return 0;
@@ -625,8 +606,13 @@
              * while changing lanes. Cached per decision.
              */
             _routeProbe(range) {
-                const L = this.length, step = 14, out = [];
-                const poly = [{ x: this.x, y: this.y }];
+                // Both buffers belong to this car and are consumed before its next decision.
+                // Keep point/route storage warm instead of allocating it every simulation tick.
+                const L = this.length, step = 14;
+                const out = this._routeProbePoints || (this._routeProbePoints = []);
+                const poly = this._routeProbePolyline || (this._routeProbePolyline = []);
+                out.length = poly.length = 0;
+                poly.push({ x: this.x, y: this.y });
                 const tail = (ln) => { if (ln && ln.start) poly.push({ x: ln.start.x + ln.ux * range, y: ln.start.y + ln.uy * range }); };
                 if (this.laneChangeState !== 'NONE' || (!this.currentLane && !this.currentTurnPath)) {
                     poly.push({ x: this.x + Math.cos(this.angle) * range, y: this.y + Math.sin(this.angle) * range });
@@ -739,9 +725,13 @@
                 const ux = dir.ux, uy = dir.uy, mySpeed = Math.max(0, Math.abs(this.speed));
                 const isOpposing = !!this.currentLane && (targetLane.isOpposing !== this.currentLane.isOpposing);
                 const ahead = isOpposing ? 260 + (mySpeed + 9) * 70 : Math.max(checkDistance || 0, this.stoppingDistance() + this.length);
-                const cands = (this._allVehicles || []).slice();
-                if (this._playerCar && this._playerCar.visible && !cands.includes(this._playerCar)) cands.push(this._playerCar);
-                for (const v of cands) {
+                const source = this._allVehicles || [];
+                const cands = source;
+                // Her car can be outside the traffic source. Visit it last, as before,
+                // without copying the complete fleet just to append one vehicle.
+                const extra = this._playerCar && this._playerCar.visible && !source.includes(this._playerCar) ? this._playerCar : null;
+                for (let i = 0; i < cands.length + (extra ? 1 : 0); i++) {
+                    const v = i < cands.length ? cands[i] : extra;
                     if (v === this || v.dead || !v.length) continue;
                     const dx = v.x - this.x, dy = v.y - this.y;
                     if (dx * dx + dy * dy > 700 * 700) continue;
@@ -867,8 +857,8 @@
                 // 3. Physics Calculations
                 const fwdX = Math.cos(this.angle);
                 const fwdY = Math.sin(this.angle);
-                const rightX = -Math.sin(this.angle);
-                const rightY = Math.cos(this.angle);
+                const rightX = -fwdY;
+                const rightY = fwdX;
                 
                 // Slide Velocity = How fast are we moving SIDEWAYS?
                 const slideVelocity = this.vx * rightX + this.vy * rightY;
@@ -1072,8 +1062,8 @@
                 // --- DRIFT DECOMPOSITION ---
                 const fwdX = Math.cos(this.angle);
                 const fwdY = Math.sin(this.angle);
-                const rightX = -Math.sin(this.angle);
-                const rightY = Math.cos(this.angle);
+                const rightX = -fwdY;
+                const rightY = fwdX;
                 let fwdVelocity = this.vx * fwdX + this.vy * fwdY;
                 let slideVelocity = this.vx * rightX + this.vy * rightY;
 
@@ -1406,8 +1396,8 @@
                 // --- CALCULATE CURRENT DRIFT STATE (Used for speed control) ---
                 const fwdX = Math.cos(this.angle);
                 const fwdY = Math.sin(this.angle);
-                const rightX = -Math.sin(this.angle);
-                const rightY = Math.cos(this.angle);
+                const rightX = -fwdY;
+                const rightY = fwdX;
                 const currentSlide = Math.abs(this.vx * rightX + this.vy * rightY);
                 const isDrifting = currentSlide > 1.5; // Threshold for "drifting"
                 const driftSeverity = Math.min(1, (currentSlide - 1.5) / 4); // 0-1 scale of how hard we're drifting
@@ -1539,8 +1529,8 @@
                 this.isWaiting = waitingForIntersection;
 
                 // --- 1. ENHANCED SENSORS (Speed-based range & width) ---
-                const cos = Math.cos(this.angle);
-                const sin = Math.sin(this.angle);
+                const cos = fwdX;
+                const sin = fwdY;
                 
                 // Dynamic sensing parameters based on speed
                 const currentSpeed = Math.abs(this.speed);
@@ -1579,12 +1569,14 @@
                 // Cars to queue behind are found along the route itself (lane, planned turn, exit lane),
                 // as a bumper-to-bumper gap; parked ones still come from the heading tunnel (swerve targets)
                 const probeRange = Math.max(this.length * 3, this.stoppingDistance() + this.length * 2 + 60);
-                const probe = this._routeProbe(probeRange);
+                // An empty stretch needs no sampled route. Build it only after a car
+                // passes the same distance test used by the original queue sensor.
+                let probe = null;
                 const probeReach = (probeRange + 120) * (probeRange + 120);
                 const senseQueue = (v) => {
                     const dx = v.x - this.x, dy = v.y - this.y;
                     if (dx * dx + dy * dy > probeReach) return;
-                    const gap = this._probeGap(v, probe);
+                    const gap = this._probeGap(v, probe || (probe = this._routeProbe(probeRange)));
                     if (gap < trafficObstacleDist) { trafficObstacle = v; trafficObstacleDist = gap; }
                 };
 
@@ -1621,7 +1613,10 @@
                 // Check for other traffic vehicles
                 // PERFORMANCE: Pre-filter by distance — skip vehicles beyond look-ahead range
                 const lookAheadSq = Math.max((lookAheadDist + 100) * (lookAheadDist + 100), probeReach);
-                for (let v of allVehicles) { 
+                const sensing = this._trafficSensing;
+                const vehicleCandidates = sensing?.active && sensing.source === allVehicles
+                    ? sensing.cars.query(this.x, this.y, Math.sqrt(lookAheadSq)) : allVehicles;
+                for (let v of vehicleCandidates) {
                     if (v === this || v === playerCar) continue;
                     
                     // Quick distance rejection — much cheaper than tunnel check
@@ -2324,9 +2319,16 @@
                 // Plan early enough to see where we're going from the stop line (and to check the exit has room)
                 const planReach = 200 + this.length / 2 + this.stoppingDistance();
                 const isAutodrive = this.controlMode === 'AI' && (this.driverType === 'player' || this.driverType === 'zib');
+                let lastX, lastY, lastNear;
                 let relevantPaths = this.currentLane.turnPaths.filter(p => {
                     const start = p.controlPoints[0];
-                    return Math.hypot(start.x - this.x, start.y - this.y) < planReach;
+                    // Turn choices from one gate share a start. Evaluate that distance
+                    // once, while still supporting paths with different/mutated starts.
+                    if (start.x !== lastX || start.y !== lastY) {
+                        lastX = start.x; lastY = start.y;
+                        lastNear = Math.hypot(start.x - this.x, start.y - this.y) < planReach;
+                    }
+                    return lastNear;
                 });
                 // Traffic doesn't U-turn in the box (too tight: it ends up across both lanes)
                 if (!isAutodrive) {

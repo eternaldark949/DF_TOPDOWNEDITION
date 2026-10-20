@@ -69,6 +69,7 @@
             constructor() { 
                 this.vehicles = []; 
                 this.spawnTimer = 0; 
+                this.sensing = { active: false, cars: new OrderedCrowdPointGrid(256), people: new OrderedCrowdPointGrid(128) };
                 this.folk = [];                // everyone on foot the cars look out for, this tick (update)
                 this.network = new RoadNetwork(); 
                 // OPTIMIZATION: Grid size 150 covers roughly 2-3 car lengths
@@ -105,6 +106,8 @@
                 this.vehicles = []; 
                 this.network = new RoadNetwork(); 
                 this.grid.clear();
+                this.sensing.active = false; this.sensing.source = null;
+                this.sensing.cars.clear(true); this.sensing.people.clear(true);
             }
             
             /** `playerCar`: the car she's in or last left; `parked`: her cars on the map she isn't driving (the owned
@@ -181,49 +184,63 @@
                     for (const c of parked) if (!this.vehicles.includes(c)) sensed.push(c);
                 }
                 
-                // 1. VEHICLE UPDATES & CLEANUP
-                for (let i = this.vehicles.length - 1; i >= 0; i--) {
-                    let v = this.vehicles[i]; 
-                    const distToPlayer = Math.hypot(v.x - player.x, v.y - player.y);
+                // AI perception has a longer reach than collision neighbours. Preserve source
+                // order and update moved cars immediately for the sequential simulation.
+                const sensing = this.sensing;
+                sensing.source = sensed; sensing.cars.build(sensed); sensing.people.build(folk);
+                // Traffic occupies the first slots in both source forms. Descending
+                // removal leaves every not-yet-visited index unchanged, so the loop's
+                // index is also the grid record index; no per-tick identity map needed.
+                sensing.active = true;
+                try {
+                    // 1. VEHICLE UPDATES & CLEANUP
+                    for (let i = this.vehicles.length - 1; i >= 0; i--) {
+                        let v = this.vehicles[i];
+                        v._trafficSensing = sensing;
+                        const distToPlayer = Math.hypot(v.x - player.x, v.y - player.y);
                     
-                    // Check if vehicle is near end of a dead-end lane (no connections)
-                    let nearDeadEnd = false;
-                    if (v.currentLane && v.controlMode === 'AI' && v.driverType !== 'player') {
-                        const lane = v.currentLane;
-                        const hasConnections = (lane.connections && lane.connections.length > 0) || 
-                                              (lane.turnPaths && lane.turnPaths.length > 0);
-                        if (!hasConnections) {
-                            // Calculate distance to lane end
-                            const lx = v.x - lane.start.x;
-                            const ly = v.y - lane.start.y;
-                            const distAlongLane = lx * lane.ux + ly * lane.uy;
-                            const distToEnd = lane.length - distAlongLane;
+                        // Check if vehicle is near end of a dead-end lane (no connections)
+                        let nearDeadEnd = false;
+                        if (v.currentLane && v.controlMode === 'AI' && v.driverType !== 'player') {
+                            const lane = v.currentLane;
+                            const hasConnections = (lane.connections && lane.connections.length > 0) ||
+                                                  (lane.turnPaths && lane.turnPaths.length > 0);
+                            if (!hasConnections) {
+                                // Calculate distance to lane end
+                                const lx = v.x - lane.start.x;
+                                const ly = v.y - lane.start.y;
+                                const distAlongLane = lx * lane.ux + ly * lane.uy;
+                                const distToEnd = lane.length - distAlongLane;
                             
-                            // Despawn if within 2 car lengths of dead-end (mirrors spawn offset)
-                            if (distToEnd < 140) {
-                                nearDeadEnd = true;
+                                // Despawn if within 2 car lengths of dead-end (mirrors spawn offset)
+                                if (distToEnd < 140) {
+                                    nearDeadEnd = true;
+                                }
                             }
+                        }
+
+                        // Gridlock relief: a car frozen for 15 s somewhere the player can't see quietly goes away
+                        if (v.controlMode === 'AI' && Math.abs(v.speed || 0) < 0.2) v._frozen = (v._frozen || 0) + 1; else v._frozen = 0;
+                        const frozenOut = v._frozen > 900 && v.driverType !== 'player' && v.driverType !== 'zib' && !v.isOwnedCar &&
+                            !v.isDeliveryVehicle && distToPlayer > 900;
+                        // Leaving: fade out over ~0.5 s (still rolling on into the lane's end), then go
+                        if (!v.fading && (v.dead || distToPlayer > CONFIG.CULLING.VEHICLE_DESPAWN || nearDeadEnd || frozenOut)) v.fading = true;
+                        if (v.fading) v.fade = Math.min(v.fade ?? 1, 1) - 1 / 30;
+                        else if ((v.fade ?? 1) < 1) v.fade = Math.min(1, v.fade + 1 / 36);       // arriving: fade in over ~0.6 s
+                        if (v.fading && (v.fade <= 0 || distToPlayer > CONFIG.CULLING.VEHICLE_DESPAWN + 600)) {
+                            if (v.currentIntersection) v.currentIntersection.releaseEntry(v);
+                            // Properly destroy entity to unregister from collision system
+                            if (!v.markedForDestroy) v.destroy();
+                            if (sensed === this.vehicles) sensing.cars.remove(i);
+                            this.vehicles.splice(i, 1);
+                        } else if (!v.dead) {
+                            // Pass decalSystem to update
+                            v.update(player, playerCar, sensed, weather, this.network.intersections, map.walls, getColliders(map), decalSystem, folk);
+                            sensing.cars.update(i);
                         }
                     }
                     
-                    // Gridlock relief: a car frozen for 15 s somewhere the player can't see quietly goes away
-                    if (v.controlMode === 'AI' && Math.abs(v.speed || 0) < 0.2) v._frozen = (v._frozen || 0) + 1; else v._frozen = 0;
-                    const frozenOut = v._frozen > 900 && v.driverType !== 'player' && v.driverType !== 'zib' && !v.isOwnedCar &&
-                        !v.isDeliveryVehicle && distToPlayer > 900;
-                    // Leaving: fade out over ~0.5 s (still rolling on into the lane's end), then go
-                    if (!v.fading && (v.dead || distToPlayer > CONFIG.CULLING.VEHICLE_DESPAWN || nearDeadEnd || frozenOut)) v.fading = true;
-                    if (v.fading) v.fade = Math.min(v.fade ?? 1, 1) - 1 / 30;
-                    else if ((v.fade ?? 1) < 1) v.fade = Math.min(1, v.fade + 1 / 36);       // arriving: fade in over ~0.6 s
-                    if (v.fading && (v.fade <= 0 || distToPlayer > CONFIG.CULLING.VEHICLE_DESPAWN + 600)) {
-                        if (v.currentIntersection) v.currentIntersection.releaseEntry(v);
-                        // Properly destroy entity to unregister from collision system
-                        if (!v.markedForDestroy) v.destroy();
-                        this.vehicles.splice(i, 1);
-                    } else if (!v.dead) {
-                        // Pass decalSystem to update
-                        v.update(player, playerCar, sensed, weather, this.network.intersections, map.walls, getColliders(map), decalSystem, folk);
-                    }
-                }
+                } finally { sensing.active = false; }
                 
                 // Her parked cars roll on to a stop (then park: TrafficVehicle.updateManualDriving)
                 if (parked) for (const c of parked) {

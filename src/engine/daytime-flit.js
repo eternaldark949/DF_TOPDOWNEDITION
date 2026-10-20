@@ -193,16 +193,14 @@
 
                 const landing = this.findFlitLanding(flitAngle, flitDist);
                 if (!landing) {
-                    // No clear landing that way (the map's edge, a solid run of wall): no charge spent, and she
-                    // feels it — the ring shudders crimson with a soft knock (at most every 0.4 s)
-                    if (!(this._flitBlockedAt > _gameTimeSec - 0.4)) {
-                        this._flitBlockedAt = _gameTimeSec;
-                        this._restartRingAnim('blocked');
-                        audioSys.sfx('knock');
-                    }
+                    // A failed attempt gives feedback, but never renews the previous flit's protection.
+                    this._signalFlitLanding('blocked', flitAngle);
                     return false;
                 }
                 const targetX = landing.x, targetY = landing.y;
+                const traveled = Math.hypot(targetX - startX, targetY - startY);
+                if (flitDist - traveled > Math.max(6, flitDist * .05)) this._signalFlitLanding('short', flitAngle);
+                else this._flitFeedback = null;
 
                 this._restartRingAnim('flash');
                 
@@ -351,12 +349,78 @@
                 }
             },
 
-            /** Restart the flit ring's CSS animation (`flash`, `blocked`) without forcing a layout mid-frame:
-             *  drop the class now and add it back on the next frame. */
+            /** One bounded cue, shared by every input method and independent of the joystick ring. */
+            _signalFlitLanding(kind, angle) {
+                if (!Number.isFinite(angle)) return;
+                const cue = this._flitFeedback || (this._flitFeedback = {});
+                cue.kind = kind; cue.angle = angle; cue.at = _gameTimeSec;
+                if (kind === 'blocked' && !(this._flitBlockedAt > _gameTimeSec - .4)) {
+                    this._flitBlockedAt = _gameTimeSec;
+                    this._restartRingAnim('blocked');
+                    audioSys.sfx('knock');
+                    if (GameSettings.flitHaptics !== false) {
+                        try { if (navigator.vibrate) navigator.vibrate([15, 35, 15]); } catch (e) { /* unsupported */ }
+                    }
+                }
+            },
+
+            /** After lighting: legible in dark rooms and at low FPS. No glow blur or new light source. */
+            drawFlitFeedback(ctx) {
+                const cue = this._flitFeedback;
+                if (!cue) return;
+                const age = _gameTimeSec - cue.at, blocked = cue.kind === 'blocked', life = blocked ? .65 : .55;
+                if (age < 0 || age >= life) { this._flitFeedback = null; return; }
+                if (!this.player.visible || this.player.dead || this.isDriving) return;
+                const m = ctx.getTransform(), p = this.player, w = ctx.canvas.width, h = ctx.canvas.height;
+                const x = m.a * p.x + m.c * p.y + m.e, y = m.b * p.x + m.d * p.y + m.f;
+                if (x < -64 || x > w + 64 || y < -64 || y > h + 64) return;
+                const a = cue.angle, ux = Math.cos(a), uy = Math.sin(a);
+                const screenA = Math.atan2(m.b * ux + m.d * uy, m.a * ux + m.c * uy);
+                const dx = Math.cos(screenA), dy = Math.sin(screenA), r = Math.max(24, (p.radius || 12) * Math.hypot(m.a, m.b) + 8);
+                const alpha = Math.min(1, (life - age) / .25), color = blocked ? '#ff5276' : '#ffd27b';
+                ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha *= alpha;
+                ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                // Broken brackets around Stella, plus a stop mark or a short landing arrow.
+                ctx.beginPath();
+                ctx.arc(x,y,r,screenA+.65,screenA+1.65);
+                ctx.moveTo(x+Math.cos(screenA-1.65)*r,y+Math.sin(screenA-1.65)*r);
+                ctx.arc(x,y,r,screenA-1.65,screenA-.65);
+                ctx.strokeStyle = 'rgba(8,3,17,.95)'; ctx.lineWidth = 6; ctx.stroke();
+                ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.stroke();
+                const tx = Math.max(10,Math.min(w-10,x+dx*(r+10))), ty = Math.max(10,Math.min(h-10,y+dy*(r+10)));
+                ctx.beginPath();
+                if (blocked) {
+                    ctx.moveTo(tx-dx*5-dy*5,ty-dy*5+dx*5);ctx.lineTo(tx+dx*5+dy*5,ty+dy*5-dx*5);
+                    ctx.moveTo(tx-dx*5+dy*5,ty-dy*5-dx*5);ctx.lineTo(tx+dx*5-dy*5,ty+dy*5+dx*5);
+                } else {
+                    ctx.moveTo(tx-dx*7-dy*5,ty-dy*7+dx*5);ctx.lineTo(tx,ty);ctx.lineTo(tx-dx*7+dy*5,ty-dy*7-dx*5);
+                }
+                ctx.strokeStyle = '#090410';ctx.lineWidth = 6;ctx.stroke();
+                ctx.strokeStyle = color;ctx.lineWidth = 2.5;ctx.stroke();
+                // Clamp the label to the view: a blocked flit at a map edge must still be readable.
+                ctx.font = 'bold 11px Orbitron, monospace';ctx.textAlign = 'center';ctx.textBaseline = 'middle';
+                const text = blocked ? 'FLIT BLOCKED' : 'SHORT FLIT', width = ctx.measureText(text).width+18;
+                const lx = Math.max(width/2+5,Math.min(w-width/2-5,x));
+                let ly = y-r-20;if (ly < 15) ly = y+r+20;ly = Math.max(15,Math.min(h-15,ly));
+                ctx.fillStyle = 'rgba(9,4,18,.9)';ctx.beginPath();ctx.roundRect(lx-width/2,ly-12,width,24,6);ctx.fill();
+                ctx.strokeStyle = color;ctx.lineWidth = 1;ctx.stroke();ctx.fillStyle = '#fff2df';ctx.fillText(text,lx,ly);
+                ctx.restore();
+            },
+
+            _resetFlitFeedback() {
+                this._flitFeedback = null; this._flitBlockedAt = -Infinity;
+                this._ringAnimToken = (this._ringAnimToken || 0) + 1;
+                if (this.flitRingEl) this.flitRingEl.classList.remove('flash','blocked','pulse');
+            },
+
+            /** One ring animation at a time; stale callbacks cannot overwrite a newer result. */
             _restartRingAnim(cls) {
                 const r = this.flitRingEl; if (!r) return;
-                r.classList.remove(cls);
-                requestAnimationFrame(() => r.classList.add(cls));
+                const token = this._ringAnimToken = (this._ringAnimToken || 0) + 1;
+                r.classList.remove('flash','blocked','pulse');
+                requestAnimationFrame(() => {
+                    if (this._ringAnimToken === token && this.flitRingEl === r) r.classList.add(cls);
+                });
             },
 
             /* Drawn without shadowBlur: every blurred stroke or dot is its own blur pass, a dozen

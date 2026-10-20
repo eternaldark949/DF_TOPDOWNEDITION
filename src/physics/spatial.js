@@ -409,7 +409,7 @@
             records: new WeakMap(),
             track(items) {
                 if (!items || this.records.has(items)) return;
-                this.records.set(items, { grid: new OrderedRenderGrid(400), slots: [], geometry: [], epoch: -1, dirty: true, linear: false, entries: [], items: [] });
+                this.records.set(items, { grid: new OrderedRenderGrid(400), slots: [], geometry: [], epoch: -1, dirty: true, linear: false, entries: [], items: [], cellQueries: new Map(), cachedSlots: 0 });
             },
             invalidate(items) {
                 if (!items) { this.clear(); return; }
@@ -417,10 +417,7 @@
                 if (c) c.dirty = true;
             },
             clear() { this.records = new WeakMap(); },
-            query(items, bounds) {
-                if (!items) return items;
-                const c = this.records.get(items);
-                if (!c) return items;
+            refresh(items, c) {
                 let changed = c.dirty || c.slots.length !== items.length;
                 if (!changed && c.epoch !== _simTick) {
                     for (let i = 0; i < items.length; i++) {
@@ -429,6 +426,7 @@
                     }
                 }
                 if (changed) {
+                    c.cellQueries.clear(); c.cachedSlots = 0;
                     c.slots.length = items.length; c.geometry.length = items.length * 4;
                     c.linear = false;
                     for (let i = 0; i < items.length; i++) {
@@ -441,10 +439,40 @@
                     c.dirty = false;
                 }
                 c.epoch = _simTick;
+            },
+            query(items, bounds) {
+                if (!items) return items;
+                const c = this.records.get(items);
+                if (!c) return items;
+                if (c.dirty || c.slots.length !== items.length || c.epoch !== _simTick) this.refresh(items, c);
                 if (c.linear) return items;
+                // Grid candidates depend on cell range, not the precise query rectangle.
+                // Cars and sight rays repeatedly visit the same static cells. Cache their
+                // ordered slot lists until geometry changes, with a bounded per-source FIFO.
+                let key = null;
+                if (bounds && Number.isFinite(bounds.left) && Number.isFinite(bounds.right) &&
+                    Number.isFinite(bounds.top) && Number.isFinite(bounds.bottom)) {
+                    const S = c.grid.cellSize, x0 = Math.floor(bounds.left / S), x1 = Math.floor(bounds.right / S);
+                    const y0 = Math.floor(bounds.top / S), y1 = Math.floor(bounds.bottom / S);
+                    if (Number.isSafeInteger(x0) && Number.isSafeInteger(x1) && Number.isSafeInteger(y0) && Number.isSafeInteger(y1) &&
+                        x1 >= x0 && y1 >= y0 && (x1 - x0 + 1) * (y1 - y0 + 1) <= 8192) key = x0 + ':' + x1 + ':' + y0 + ':' + y1;
+                }
+                const cached = key === null ? null : c.cellQueries.get(key);
+                if (cached) {
+                    c.items.length = cached.length;
+                    for (let i = 0; i < cached.length; i++) c.items[i] = cached[i];
+                    return c.items;
+                }
                 c.grid.query(bounds, c.entries);
                 c.items.length = c.entries.length;
                 for (let i = 0; i < c.entries.length; i++) c.items[i] = c.entries[i].item;
+                if (key !== null && c.items.length <= 1024) {
+                    while (c.cellQueries.size && (c.cellQueries.size >= 256 || c.cachedSlots + c.items.length > 16384)) {
+                        const oldest = c.cellQueries.keys().next().value;
+                        c.cachedSlots -= c.cellQueries.get(oldest).length; c.cellQueries.delete(oldest);
+                    }
+                    c.cellQueries.set(key, c.items.slice()); c.cachedSlots += c.items.length;
+                }
                 return c.items;
             }
         };

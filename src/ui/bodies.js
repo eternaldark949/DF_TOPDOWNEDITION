@@ -153,9 +153,12 @@
         }
 
         /** A limb segment from joint (x1, y1) to joint (x2, y2), tapered by T, as the current path. */
-        function bodyLimbPath(ctx, x1, y1, x2, y2, T) {
+        function bodyLimbPath(ctx, x1, y1, x2, y2, T, geometry = null) {
             const r0 = T[0], rb = T[1], tb = T[2], r1 = T[3];
-            const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1e-6, a = Math.atan2(dy, dx);
+            const dx = x2 - x1, dy = y2 - y1, distance = Math.hypot(dx, dy), L = distance || 1e-6, a = Math.atan2(dy, dx);
+            // The shade uses these same values; its length is the raw distance,
+            // including zero, rather than the outline's collapsed-joint fallback.
+            if (geometry) { geometry.length = distance; geometry.angle = a; }
             const ux = dx / L, uy = dy / L, nx = -uy, ny = ux;
             const c1 = Math.max(0.05, tb * 0.85) * L, c2 = (tb + (1 - tb) * 0.5) * L;
             const w1 = Math.max(rb * 1.05, r0), w2 = (rb + r1) * 0.5;
