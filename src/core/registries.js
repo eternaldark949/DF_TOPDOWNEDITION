@@ -234,6 +234,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             'leg_thigh_heels_violet': { id: 'leg_thigh_heels_violet', category: 'legwear', name: 'Violet Patent Thigh Highs', desc: 'Electric violet stiletto boots with a glossy patent finish.', price: 450, data: { color: '#b88aff', shoes: { type: 'thigh_heels', color: '#b88aff', finish: 'gloss' } } },
             'leg_thigh_heels_pearl': { id: 'leg_thigh_heels_pearl', category: 'legwear', name: 'Pearl Patent Thigh Highs', desc: 'Ivory pearl stilettos with a polished glossy finish.', price: 450, data: { color: '#fff3e5', shoes: { type: 'thigh_heels', color: '#fff3e5', finish: 'gloss' } } },
             'leg_thigh_heels_emerald': { id: 'leg_thigh_heels_emerald', category: 'legwear', name: 'Emerald Velvet Thigh Highs', desc: 'Jewel-green velvet stiletto boots with a soft fabric finish.', price: 500, data: { color: '#329676', shoes: { type: 'thigh_heels', color: '#329676', finish: 'velvet' } } },
+            'leg_hose_stripe': { id: 'leg_hose_stripe', category: 'legwear', name: 'Noir Stripe Stockings', desc: 'Sheer black thigh-highs with bold vertical stripes and a solid welt.', price: 250, data: { type: 'hose', style: 'stripe', length: 'thigh', color: '#0c0a0e' } },
+            'leg_hose_net_stripe': { id: 'leg_hose_net_stripe', category: 'legwear', name: 'Net Stripe Tights', desc: 'Opaque black stripes between panels of fine fishnet.', price: 250, data: { type: 'hose', style: 'net_stripe', length: 'full', color: '#0c0a0e' } },
+            'leg_hose_argyle': { id: 'leg_hose_argyle', category: 'legwear', name: 'Crimson Argyle Tights', desc: 'Red and cocoa diamonds over sheer black, a fine red overcheck.', price: 300, data: { type: 'hose', style: 'argyle', length: 'full', color: '#140c0e', accent: '#a3122e', accent2: '#4a3328' } },
+            'leg_hose_pointelle': { id: 'leg_hose_pointelle', category: 'legwear', name: 'Pointelle Knit Over-Knees', desc: 'Soft black knit with lacy eyelet columns and a scrunched cuff.', price: 250, data: { type: 'hose', style: 'pointelle', length: 'thigh', cuff: true, color: '#100c10' } },
+            'leg_hose_heart_lace': { id: 'leg_hose_heart_lace', category: 'legwear', name: 'Sweetheart Lace Tights', desc: 'Fine-ribbed sheer black scattered with outlined hearts.', price: 300, data: { type: 'hose', style: 'heart_lace', length: 'full', color: '#0c0a10', accent: 'rgba(232,206,206,0.75)' } },
+            'leg_hose_heart_net': { id: 'leg_hose_heart_net', category: 'legwear', name: 'Heart Net Tights', desc: 'Delicate fishnet dotted with tiny solid hearts.', price: 250, data: { type: 'hose', style: 'heart_net', length: 'full', color: '#0c0a0e' } },
+            'leg_hose_deco': { id: 'leg_hose_deco', category: 'legwear', name: 'Gilded Deco Tights', desc: 'Art-deco panels: dotted columns, lace rosettes and a bold diagonal sweep.', price: 350, data: { type: 'hose', style: 'deco', length: 'full', color: '#0c0a0e' } },
         };
 
         // ============================================================================
@@ -304,6 +311,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 else if (entry.category === 'legwear') {
                     // One pair of shoes at a time: new shoes take the place of any already on
                     if (entry.data.shoes) this.equippedLegwear = this.equippedLegwear.filter(l => !COSMETICS_REGISTRY[l]?.data.shoes);
+                    // and one pair of tights or stockings
+                    if (entry.data.type === 'hose') this.equippedLegwear = this.equippedLegwear.filter(l => COSMETICS_REGISTRY[l]?.data.type !== 'hose');
                     if (!this.equippedLegwear.includes(id)) this.equippedLegwear.push(id);
                 }
                 return true;

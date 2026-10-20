@@ -2126,6 +2126,10 @@
                 ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6;
                 for (const [x, y] of [[lKneeX, lKneeY], [rKneeX, rKneeY]]) { ctx.beginPath(); ctx.arc(x, y, 2.2, 0, Math.PI * 2); ctx.stroke(); }
             }
+            if (clothes.jewelry && WD) for (const j of clothes.jewelry) {  // tights and stockings, under boots and bands
+                const p = WD.jewelry[j.type];
+                if (p && p.at === 'legs') p.draw(ctx, g, j, { legs, boot: shoeP && shoeP.calf && !shoeP.thigh ? shoeP.calf : 0 });
+            }
             if (botP && botP.detail) botP.detail(ctx, g, clothes.bottom);   // cuffs, pockets, stripes
             if (shoeP && shoeP.thigh) {
                 // Paint the entire boot AFTER both bare leg segments: the rounded thigh end must
