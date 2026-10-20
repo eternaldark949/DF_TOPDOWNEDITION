@@ -10,7 +10,7 @@ test('Still furniture paints through the existing sprite system and remains stat
  game._doLoadMap('neural_sys_interior');const props=game.props.filter(p=>p.decorType?.startsWith('ns_'));
  const before=props.map(p=>[p.x,p.y,p.angle]);for(const p of props)p.draw(game.ctx);
  return {count:props.length,cacheable:props.every(p=>PropSprites.kindOf(p)==='still'),fixed:props.every(p=>p.fixedRotation),before,after:props.map(p=>[p.x,p.y,p.angle])};`,r=>{
- assert.equal(r.count,18);assert.equal(r.cacheable,true);assert.equal(r.fixed,true);assert.deepEqual(r.after,r.before);});
+ assert.equal(r.count,22);assert.equal(r.cacheable,true);assert.equal(r.fixed,true);assert.deepEqual(r.after,r.before);});
 test('Interior floor is retained while visiting and released on exit',`
  game._doLoadMap('neural_sys_interior');game.drawNeuralInterior(game.ctx);const first=game._neuralFloor;game.drawNeuralInterior(game.ctx);const retained=game._neuralFloor===first;
  game._doLoadMap('apt_949');const released=!game._neuralFloor;game._doLoadMap('neural_sys_interior');game.drawNeuralInterior(game.ctx);

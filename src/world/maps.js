@@ -292,7 +292,8 @@
             },
             'neural_sys_interior': {
                 id: 'neural_sys_interior', width: 1000, height: 800, type: 'indoor',
-                label: 'Neural Systems — Identity Atelier', floorColor: '#101f36', ambientDarkness: .45, navProps:'all',
+                label: 'Neural Systems — Identity Atelier', floorColor: '#070f22', ambientDarkness: .5, navProps:'all',
+                lightingTint: '6, 10, 34', // Midnight-sapphire shadows rather than periwinkle haze.
                 wallStyle: { fill:'#0c1b32',stroke:'rgba(152,178,204,.55)' },
                 spawn: { x: 500, y: 700 },
                 zones: [

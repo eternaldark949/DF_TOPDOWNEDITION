@@ -636,12 +636,14 @@
                         new PropEntity({x:615,y:455,width:130,height:42,decorType:'ns_sofa',mass:1e5}),
                         new PropEntity({x:65,y:450,width:32,height:32,decorType:'ns_planter',mass:1e5}),
                         new PropEntity({x:903,y:450,width:32,height:32,decorType:'ns_planter',mass:1e5}),
+                        // Artificial violet trees: slim crystal trunks, canopies drawn in the glow pass
+                        ...NEURAL_TREES.map(([x,y])=>new PropEntity({x:x-9,y:y-9,width:18,height:18,decorType:'ns_tree',mass:1e5})),
                     ];
                     e.npcs = [ new NPC(500, 170, "Prisma", 'shopkeeper') ];
                     e.lamps = [
                         // Neutral key light keeps the blue materials and identity samples readable
-                        new LampEntity({ x: 300, y: 200, lampType: 3, color: '#b5cce4', lightRadius: 350 }),
-                        new LampEntity({ x: 700, y: 200, lampType: 3, color: '#b5cce4', lightRadius: 350 }),
+                        new LampEntity({ x: 300, y: 200, lampType: 3, color: '#c8d8ee', lightRadius: 320 }),
+                        new LampEntity({ x: 700, y: 200, lampType: 3, color: '#c8d8ee', lightRadius: 320 }),
                         new LampEntity({ x: 500, y: 400, lampType: 3, color: '#89a9d2', lightRadius: 300 }),
                         // Restrained champagne counter and consultation light
                         new LampEntity({ x: 500, y: 230, lampType: 5, color: '#d8cbb6', lightRadius: 200 }),
@@ -651,6 +653,8 @@
                         new LampEntity({ x: 775, y: 650, lampType: 3, color: '#5275ad', lightRadius: 200 }),
                         // Exit area
                         new LampEntity({ x: 500, y: 700, lampType: 3, color: '#9fb9da', lightRadius: 250 }),
+                        // Violet light beneath the artificial trees
+                        ...NEURAL_TREES.map(([x,y])=>Object.assign(new LampEntity({ x, y, lampType: 4, color: '#a678ff', lightRadius: 150 }),{visible:false})),
                     ];
                     break;
 
