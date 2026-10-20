@@ -700,12 +700,15 @@
                     const L = (x,y,color,r) => hiddenLamp(x,y,color,r);
                     e.lamps = [
                         // Warm architectural fill stays local: the galleries retain dark lanes.
-                        L(733,573,'#ffd1a0',215),L(1067,573,'#ffd1a0',215),
-                        L(733,833,'#edb399',195),L(1067,833,'#edb399',195),
-                        L(900,495,'#eab1ad',210),L(900,700,'#cf4670',155),
-                        L(450,190,'#ffe0b6',265),L(260,195,'#e4b6a5',150),L(680,190,'#efb4bd',150),
-                        L(1145,105,'#ffe2bc',225),L(1145,260,'#b25b8a',140),
-                        L(1590,175,'#ffa874',260),
+                        L(733,573,'#ffb27a',225),L(1067,573,'#ffb27a',225),
+                        L(733,833,'#ff9a6a',205),L(1067,833,'#ff9a6a',205),
+                        L(900,495,'#ff7a7e',220),L(900,700,'#e8204e',170),
+                        L(450,190,'#ffd6a6',275),L(260,195,'#f0a090',160),L(680,190,'#ff9aa8',160),
+                        L(1145,105,'#ffd2a4',230),L(1145,260,'#d0507a',150),
+                        L(1590,175,'#ff8a50',270),
+                        // Sconces and the runner: red, orange and beige pools along the walls and the carpet.
+                        ...PALACE_SCONCES.map(([x,y],i) => L(x,y,i%2?'#ff8f5a':'#ffc89a',125)),
+                        L(900,920,'#ffb488',150),L(900,1180,'#ffc49a',160),
                         L(300,520,'#a34b67',140),L(300,840,'#a34b67',140),
                         L(1500,520,'#a34b67',140),L(1500,840,'#a34b67',140),
                         L(285,1200,'#efbaa9',195),L(80,1060,'#e1b5c7',130),

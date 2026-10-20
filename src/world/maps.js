@@ -416,7 +416,7 @@
                 paintedGrid: true,
                 lightingTint: '28, 10, 24', // Wine-black shadows preserve the crimson palette.
                 navProps: 'all',
-                wallStyle: { fill: '#140810', stroke: 'rgba(230,150,90,0.42)' },   // obsidian, ember-gold trim
+                wallStyle: { fill: '#16070f', stroke: 'rgba(255,184,90,0.6)' },   // obsidian, ember-gold trim
                 spawn: { x: 900, y: 1320 },
                 zones: [
                     { x: 14, y: 14, w: 872, h: 352, color: '#160a0c' },        // Blood Garden: dark earth
