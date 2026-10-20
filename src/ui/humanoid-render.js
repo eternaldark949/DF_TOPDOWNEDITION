@@ -1047,7 +1047,7 @@
             // Wardrobe pieces (ui/wardrobe.js) draw their own front view; anything else is a plain shape
             const WD = typeof WARDROBE !== 'undefined' ? WARDROBE : null;
             const bw = portraitBreadth(config);                               // shoulder breadth from the build
-            const P = { cx, cy, fw, fh, w, h, eyeY: cy - fh * 0.15, eyeSpacing: fw * 0.44, bw };
+            const P = { cx, cy, fw, fh, w, h, eyeY: cy - fh * 0.15, eyeSpacing: fw * 0.5, bw };
             const jewelry = (config.jewelry || []).filter(j => WD && WD.jewelry[j.type]);
             const topPiece = WD && top ? WD.tops[top.type] : null;
             if (topPiece) {
@@ -1124,7 +1124,7 @@
                 g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(${SK}, 0.32)`);
                 _pAtop(f, w, h, g);
                 for (const side of [-1, 1]) {
-                    _pSpot(f, w, h, cx + side * fw * 0.44, cy - fh * 0.18, fw * 0.3, fh * 0.15, SK, 0.2);     // eye sockets
+                    _pSpot(f, w, h, cx + side * fw * 0.5, cy - fh * 0.18, fw * 0.27, fh * 0.14, SK, 0.2);     // eye sockets
                     _pSpot(f, w, h, cx + side * fw * 0.72, cy + fh * 0.34, fw * 0.28, fh * 0.11, SK, 0.1);    // under the cheekbones
                     _pSpot(f, w, h, cx + side * fw * 0.48, cy + fh * 0.1, fw * 0.26, fh * 0.12, '255, 240, 228', side > 0 ? 0.2 : 0.07);   // cheekbones
                 }
@@ -1147,7 +1147,7 @@
                 ctx.strokeStyle = `rgba(${Math.max(0, skinRGB.r - 60)}, ${Math.max(0, skinRGB.g - 55)}, ${Math.max(0, skinRGB.b - 45)}, ${0.35 * k})`;
                 ctx.lineWidth = Math.max(0.6, fw * 0.025); ctx.lineCap = 'round';
                 for (const side of [-1, 1]) {
-                    const ex = cx + side * fw * 0.44, ey = cy - fh * 0.15;
+                    const ex = cx + side * fw * 0.5, ey = cy - fh * 0.15;
                     for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(ex + side * fw * 0.2, ey + i * fh * 0.04); ctx.lineTo(ex + side * fw * 0.3, ey + i * fh * 0.07); ctx.stroke(); }   // crow's feet
                     ctx.beginPath(); ctx.moveTo(ex - side * fw * 0.08, ey + fh * 0.09); ctx.quadraticCurveTo(ex, ey + fh * 0.14, ex + side * fw * 0.12, ey + fh * 0.08); ctx.stroke();   // under the eye
                     ctx.beginPath(); ctx.moveTo(cx + side * fw * 0.2, cy + fh * 0.12); ctx.quadraticCurveTo(cx + side * fw * 0.3, cy + fh * 0.3, cx + side * fw * 0.24, cy + fh * 0.44); ctx.stroke();   // nose to mouth
@@ -1172,9 +1172,9 @@
                 for (const side of [-1, 1]) {
                     const up = (X.brow.lift + (side > 0 ? X.brow.raise : 0)) * fh * 0.1;
                     ctx.beginPath();
-                    ctx.moveTo(cx + side * fw * 0.66, browY + fh * 0.05 - up + X.brow.tilt * fh * 0.03);
-                    ctx.quadraticCurveTo(cx + side * fw * 0.44, browY - fh * 0.08 - up - X.brow.arch * fh * 0.08,
-                                         cx + side * fw * 0.22, browY + fh * 0.02 - up - X.brow.tilt * fh * 0.1);
+                    ctx.moveTo(cx + side * fw * 0.72, browY + fh * 0.05 - up + X.brow.tilt * fh * 0.03);
+                    ctx.quadraticCurveTo(cx + side * fw * 0.5, browY - fh * 0.08 - up - X.brow.arch * fh * 0.08,
+                                         cx + side * fw * 0.28, browY + fh * 0.02 - up - X.brow.tilt * fh * 0.1);
                     ctx.stroke();
                 }
             };
@@ -1183,9 +1183,9 @@
 
             // ─── EYES ───
             const eyeY = cy - fh * 0.15;
-            const eyeSpacing = fw * 0.44;
-            const eyeW = fw * 0.235;
-            const eyeH = fh * 0.118;
+            const eyeSpacing = fw * 0.5;
+            const eyeW = fw * 0.2;
+            const eyeH = fh * 0.1;
             const irisHex = /^#[0-9a-f]{6}$/i.test(eyeColor) ? eyeColor : '#6b4a2e';
             const lidColor = /^#[0-9a-f]{6}$/i.test(skinColor) ? darkenHex(skinColor, 22) : skinColor;   // the lid sits in the socket's shade
 
