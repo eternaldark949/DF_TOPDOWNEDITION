@@ -345,6 +345,98 @@
             }
         };
         
+        /* ── Hair finish ── Close up (LOD 0) every style gets depth over its flat fill: the crown darkens
+           toward its edge (the hair curving away), strands sweep back from the hairline (or out from a
+           part, or into a tie; tight styles get coils), and a soft sheen band rides the crown. Baked once
+           per style and colour into a small sprite; long styles add a sheen down their loose strands. */
+        // type → [crown x offset, rx, ry, how the strands lie, jig follow]
+        const HAIR_CROWNS = {
+            long: [-2, 10.5, 10, 'sweep', 0], short: [0, 10, 9, 'sweep', 0.3], ponytail: [0, 10, 9, 'tie', 0],
+            braids: [-1, 10, 9, 'part', 0], dreadlocks: [0, 10, 9, 'sweep', 0], demon_dancer: [-1, 9.5, 8.5, 'sweep', 0],
+            afro: [-3, 11, 11, 'coil', 1], curls: [-1, 9.5, 9.5, 'coil', 0.5]
+        };
+        const _hairFinishSprites = new Map();
+        const HAIR_FINISH_K = 4;                                       // sprite px per body unit (crisp when zoomed in)
+        function _hairLuma(hex) {
+            const n = parseInt(hex.slice(1), 16);
+            return (0.3 * (n >> 16) + 0.59 * ((n >> 8) & 255) + 0.11 * (n & 255)) / 255;
+        }
+        function _hairFinishSprite(type, color) {
+            const key = type + color;
+            let cv = _hairFinishSprites.get(key);
+            if (cv) return cv;
+            const [, rx, ry, lie] = HAIR_CROWNS[type], K = HAIR_FINISH_K, pad = 1;
+            cv = document.createElement('canvas');
+            cv.width = Math.ceil((rx + pad) * 2 * K); cv.height = Math.ceil((ry + pad) * 2 * K);
+            const c = cv.getContext('2d');
+            c.translate(cv.width / 2, cv.height / 2); c.scale(K, K);
+            c.beginPath(); c.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2); c.clip();
+            const luma = _hairLuma(color), dark = _hairShade(color, 0.5);
+            const lift = lightenHex(color, luma < 0.25 ? 95 : 60), mid = lightenHex(color, luma < 0.25 ? 45 : 28);
+            // Depth: the crown falls away into shadow at its edge, nearest the hairline stays fullest
+            const g = c.createRadialGradient(rx * 0.2, 0, 0, 0, 0, Math.max(rx, ry));
+            g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.55, 'rgba(0,0,0,0)');
+            g.addColorStop(0.85, hexToRgba('#0a0610', 0.28)); g.addColorStop(1, hexToRgba('#0a0610', 0.6));
+            c.fillStyle = g; c.fillRect(-rx, -ry, rx * 2, ry * 2);
+            c.lineCap = 'round';
+            const strands = (n, fn) => {
+                for (let i = 0; i < n; i++) {
+                    const u = (i + 0.5) / n * 2 - 1, odd = i % 3;
+                    c.strokeStyle = odd === 1 ? mid : dark; c.globalAlpha = odd === 1 ? 0.3 : 0.5; c.lineWidth = odd === 1 ? 0.45 : 0.35;
+                    c.beginPath(); fn(u); c.stroke();
+                }
+                c.globalAlpha = 1;
+            };
+            if (lie === 'sweep') strands(15, u => { c.moveTo(rx * 0.95, u * ry * 0.45); c.quadraticCurveTo(rx * 0.1, u * ry * 1.15, -rx * 1.05, u * ry * 1.05); });
+            else if (lie === 'tie') strands(15, u => { c.moveTo(rx * 0.95, u * ry * 0.55); c.quadraticCurveTo(0, u * ry * 1.2, -rx * 0.92, u * 0.6); });
+            else if (lie === 'part') strands(16, u => { const s = u < 0 ? -1 : 1, x = rx * (0.9 - Math.abs(u) * 1.9); c.moveTo(x, s * 0.4); c.quadraticCurveTo(x - 1, s * ry * 0.6, x - 3.5, s * ry * 1.05); });
+            else {                                                      // coils: little C-curls packed over the crown
+                for (let y = -ry; y <= ry; y += 2.3) for (let x = -rx; x <= rx; x += 2.3) {
+                    const j = Math.sin(x * 12.9 + y * 78.2) * 0.8, a = (x * 7 + y * 3) % 6;
+                    c.strokeStyle = (Math.round(x + y) & 1) ? mid : dark; c.globalAlpha = 0.5; c.lineWidth = 0.4;
+                    c.beginPath(); c.arc(x + j, y - j * 0.5, 0.9, a, a + 3.6); c.stroke();
+                }
+                c.globalAlpha = 1;
+            }
+            // Sheen: a soft band across the crown toward the face, brightest in its middle
+            const band = (w, a) => {
+                c.strokeStyle = lift; c.globalAlpha = a; c.lineWidth = w;
+                c.beginPath();
+                if (lie === 'coil') c.ellipse(rx * 0.15, 0, rx * 0.5, ry * 0.55, 0, -1.2, 1.2);
+                else c.ellipse(rx * 0.05, 0, rx * 0.55, ry * 0.68, 0, -1.05, 1.05);
+                c.stroke();
+            };
+            band(2.6, 0.12); band(1.5, 0.2); band(0.6, lie === 'coil' ? 0.25 : 0.38);
+            c.globalAlpha = 1;
+            _hairFinishSprites.set(key, cv);
+            return cv;
+        }
+        function _hairFinish(ctx, hair, headX, geo) {
+            const C = HAIR_CROWNS[hair.type], color = hair.color || (hair.type === 'demon_dancer' ? '#0a0000' : null);
+            if (!C || !color || !/^#[0-9a-f]{6}$/i.test(color)) return;
+            const j = geo.jig, cx = headX + C[0] + (j ? j.x * C[4] : 0), cy = j ? j.y * C[4] : 0;
+            // Sheen down the loose strands, from where they leave the crown
+            if (geo.strands.length && C[3] !== 'coil') {
+                const a0 = ctx.globalAlpha, lift = lightenHex(color, _hairLuma(color) < 0.25 ? 80 : 50);
+                ctx.strokeStyle = lift; ctx.lineCap = 'round'; ctx.lineWidth = 0.8;
+                ctx.beginPath();
+                for (let s = 0; s < geo.strands.length; s++) {
+                    if (geo.strands.length > 2 && s % 2) continue;
+                    const st = geo.strands[s];
+                    let k = 1;
+                    while (k < st.length && ((st[k].x - cx) / C[1]) ** 2 + ((st[k].y - cy) / C[2]) ** 2 < 1) k++;
+                    if (k >= st.length - 1) continue;
+                    const end = Math.min(st.length - 1, k + Math.ceil((st.length - k) * 0.55));
+                    ctx.moveTo(st[k].x, st[k].y);
+                    for (let i = k + 1; i <= end; i++) ctx.lineTo(st[i].x, st[i].y);
+                }
+                ctx.globalAlpha = a0 * 0.22; ctx.stroke();
+                ctx.globalAlpha = a0; ctx.lineCap = 'butt';
+            }
+            const sp = _hairFinishSprite(hair.type, color), K = HAIR_FINISH_K;
+            ctx.drawImage(sp, cx - sp.width / (2 * K), cy - sp.height / (2 * K), sp.width / K, sp.height / K);
+        }
+
         // ════════════════════════════════════════════════════════════════════════
         //  PORTRAIT RENDERER — Front-facing bust portrait for sidebar & UI
         //  Uses same appearance config as drawProceduralHumanoid.
@@ -1006,7 +1098,11 @@
             // A raised hood hides short styles; long ones still spill out from under it.
             if (hair && !(hatPiece && hatPiece.hides === 'most' && !HAIR_SPILLS_FROM_HOOD.includes(hair.type))) {
                 const renderer = HAIR_RENDERERS[hair.type];
-                if (renderer) renderer(ctx, hair.color, headX, dyn, hairGeometry(ctx, headX, hair, dyn));
+                if (renderer) {
+                    const geo = hairGeometry(ctx, headX, hair, dyn);
+                    renderer(ctx, hair.color, headX, dyn, geo);
+                    if (!geo.lod && !_crowdLite) _hairFinish(ctx, hair, headX, geo);
+                }
             }
             // Other head jewelry keeps its existing layer above hair.
             if (jewelry && typeof WARDROBE !== 'undefined') {
@@ -1127,12 +1223,14 @@
                 const n = _lampNear(entity.x, entity.y, C.RIM_R);
                 if (n) {
                     const on = lampWake(n.l) * lampFlicker(n.l) * (n.l.intensity ?? 1);
-                    const k = on * (1 - n.d / C.RIM_R) * Math.min(1, (sun.night - 0.3) / 0.4) * C.RIM_A;
+                    const indoor = game.activeMap && game.activeMap.type !== 'outdoor';    // a room's lamps burn all night and day
+                    const k = on * (1 - n.d / C.RIM_R) * (indoor ? C.RIM_INDOOR : Math.min(1, (sun.night - 0.3) / 0.4)) * C.RIM_A;
                     if (k > 0.03) {
                         if (ped && !entity._reflectionProxy) _shadeRims++;
                         const wx = n.l.x - entity.x, wy = n.l.y - entity.y, m = Math.hypot(wx, wy) || 1;
                         const col = /^#[0-9a-f]{6}$/i.test(n.l.color || '') ? hexToRgb(n.l.color) : '255, 238, 187';
-                        S.rim = { ang: Math.atan2(-s * wx / m + c * wy / m, c * wx / m + s * wy / m), style: `rgba(${col}, ${k.toFixed(3)})` };
+                        S.rim = { ang: Math.atan2(-s * wx / m + c * wy / m, c * wx / m + s * wy / m), style: `rgba(${col}, ${k.toFixed(3)})`,
+                                  soft: `rgba(${col}, ${(k * 0.35).toFixed(3)})`, rgb: col, k };
                     }
                 }
             }
@@ -2325,9 +2423,16 @@
                 const r = SH.rim.ang;
                 ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = SH.rim.style; ctx.lineWidth = 1.4; ctx.lineCap = 'round';
                 const rimX = 9.5, rimY = BC.sh + BC.del * 0.55, rt = Math.atan2(rimX * Math.sin(r), rimY * Math.cos(r));   // round the shoulders
-                ctx.beginPath(); ctx.ellipse(-1.5, 0, rimX, rimY, 0, rt - 0.6, rt + 0.6);
-                ctx.moveTo(headX + Math.cos(r - 0.9) * 8, Math.sin(r - 0.9) * 8); ctx.arc(headX, 0, 8, r - 0.9, r + 0.9);
-                ctx.stroke(); ctx.restore();
+                ctx.beginPath(); ctx.ellipse(-1.5, 0, rimX, rimY, 0, rt - 0.75, rt + 0.75);
+                const crown = clothes.hair && !clothes.hat ? HAIR_CROWNS[clothes.hair.type] : null;     // round the hair, not the scalp under it
+                const hcx = headX + (crown ? crown[0] : 0), hr = crown ? Math.max(crown[1], crown[2]) - 0.3 : 8.5;
+                ctx.moveTo(hcx + Math.cos(r - 1.1) * hr, Math.sin(r - 1.1) * hr); ctx.arc(hcx, 0, hr, r - 1.1, r + 1.1);
+                ctx.strokeStyle = SH.rim.soft; ctx.lineWidth = 3.6; ctx.stroke();          // the light wrapping round, soft
+                ctx.strokeStyle = SH.rim.style; ctx.lineWidth = 1.2; ctx.stroke();         // … and its bright edge
+                // The lit side of the head and shoulder takes on the lamp's colour
+                _softSpot(ctx, hcx + Math.cos(r) * hr * 0.6, Math.sin(r) * hr * 0.6, 15, 15, SH.rim.rgb, SH.rim.k * 0.4);
+                _softSpot(ctx, -1.5 + Math.cos(rt) * rimX * 0.7, Math.sin(rt) * rimY * 0.7, 12, 12, SH.rim.rgb, SH.rim.k * 0.3);
+                ctx.restore();
             }
             if (hitK > 0.05) {                                              // the flash of the hit
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';       // a cached glow (lightning flashes every body outdoors at once)

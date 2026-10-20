@@ -23,3 +23,8 @@ Red and black energy arcs crackle from the throne's arms, in the manner of the D
 The Blood Garden adds gold blooms among the red, lusher leaves, rain pools on the paths and loam, a wet sheen down each path and four lanterns round the fountain terrace. Gold blooms share each bed's existing glow canvas, so there are no new allocations.
 
 Ambient darkness, gallery visibility, hunter perception and spawn points are unchanged; `tools/test-palace-redesign.cjs` still passes.
+
+## Character fidelity pass
+
+- Hair: every style gets depth close up (the crown darkens toward its edge), strands that follow the style (swept back, pulled into a tie, out from a braid part, or coils for afros and curls), a soft sheen band, and a sheen down loose strands. Baked once per style and colour (`_hairFinish` in `ui/humanoid-render.js`).
+- Rim light: indoors, the nearest room lamp now rims characters at any hour in its own colour (red-orange in the palace, violet under the Neural Systems trees), with a soft wrap, a bright edge round the hair and shoulder, and a tint on the lit side.

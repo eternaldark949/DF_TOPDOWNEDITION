@@ -409,6 +409,7 @@
                 CONTACT_RX: 18, CONTACT_RY: 14,        // centred ground contact radii
                 RIM_R: 180,             // a lamp this close (px) rims them in its colour
                 RIM_A: 0.6,
+                RIM_INDOOR: 0.85,       // … indoors (the room's own lamps, any hour)
                 RIM_PEDS: 8,            // pedestrians rimmed per frame (named characters always are)
                 // Lamp shadows (how much: Settings → Lamp Shadows, ui/humanoid-render.js)
                 LAMP_SHADOW_R: 230,     // … from a lamp this close (px); it fades out toward here
