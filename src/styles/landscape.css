@@ -32,12 +32,7 @@
         body.landscape #btn-sneak { bottom: calc(232px - var(--paw-drop)); }
         body.landscape #action-dock { bottom: calc(300px - var(--paw-drop)); }
 
-        /* --- Dialogue: narrower and lower, so the scene stays in view --- */
-        body.landscape #dialogue-box { bottom: 8px; width: 62%; max-width: 640px; }
-        body.landscape .dialogue-inner { padding: 10px 16px 10px 20px; gap: 12px; }
-        body.landscape #dialogue-portrait { width: 48px; height: 48px; min-width: 48px; }
-        body.landscape #npc-text { margin-bottom: 8px; line-height: 1.45; }
-        body.landscape #npc-name { font-size: max(6px, 1.05rem - var(--font-trim)); margin-bottom: 3px; }
+        /* (Dialogue and comms in landscape: styles/panels-phone.css, beside each talk style) */
         body.landscape #dialogue-caption { bottom: 70px; }
         body.landscape #message-modal { bottom: 60px; }
 

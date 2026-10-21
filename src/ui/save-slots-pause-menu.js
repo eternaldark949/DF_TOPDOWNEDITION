@@ -1082,6 +1082,7 @@
                 this._updateValueEl('set-baseline', GameSettings.baseline ? 'on' : 'off');
                 this._updateValueEl('set-propsprites', GameSettings.propSprites !== false ? 'on' : 'off');
                 this._updateValueEl('set-debug', game.debugMode ? 'on' : 'off');
+                this._updateValueEl('set-talkstyle', TalkStyle.get());
                 this._updateValueEl('set-weather', game.weather && game.weather.scheduleLocked ? game.weather.condition : 'auto');
                 this._updateValueEl('set-weaponmode', game.weaponMode === 'sniper' ? 'sniper' : 'normal');
                 this._updateValueEl('set-audio', GameSettings.audioEnabled ? 'on' : 'off');
@@ -1231,6 +1232,12 @@
                     GameSettings.propSprites = GameSettings.propSprites === false;
                     if (!GameSettings.propSprites && typeof PropSprites !== 'undefined') { PropSprites.clear(game.props); PlaneSprites.clear(game.activeMap && game.activeMap.buildings); }
                     this._updateValueEl(el.id, GameSettings.propSprites ? 'on' : 'off');
+
+                } else if (key === 'talkStyle') {
+                    // Veil (bust and subtitles, a thread of comms) or Ribbon (gilded panel, a comms cameo): ui/comms.js
+                    TalkStyle.set(TalkStyle.get() === 'veil' ? 'ribbon' : 'veil');
+                    this._updateValueEl(el.id, TalkStyle.get());
+                    if (game._dialogueFace) { game._dialogueFace.last = ''; game._paintDialogueFace(); }   // an open dialogue repaints its face
 
                 } else if (key === 'debugView') {
                     game.debugMode = !game.debugMode;

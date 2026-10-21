@@ -335,7 +335,10 @@
                 const key = blink + '|' + talk;
                 if (key === f.last) return;
                 f.last = key;
-                this.paintPortraitTo(canvas, f.speaker, undefined, { expression: f.expression, blink, talk });
+                // Veil: the bust alone, standing in the veil; Ribbon: the medallion with its backdrop (ui/comms.js TalkStyle)
+                const veil = typeof TalkStyle === 'undefined' || TalkStyle.get() === 'veil', px = veil ? 300 : 200;
+                if (canvas.width !== px) { canvas.width = px; canvas.height = px; }
+                this.paintPortraitTo(canvas, f.speaker, veil ? null : undefined, veil ? { expression: f.expression, blink, talk, backdrop: false } : { expression: f.expression, blink, talk });
             },
 
             /**

@@ -498,6 +498,12 @@
                     this.endDialogue();
                 });
 
+                // Veil: a tap on the line goes on to the next one (the buttons keep their own taps)
+                document.querySelector('#dialogue-box .dialogue-inner').addEventListener('click', (e) => {
+                    if (typeof TalkStyle === 'undefined' || TalkStyle.get() !== 'veil' || e.target.closest('button')) return;
+                    if (this.dialogueSeq && this.dialogueSeq.isActive() && this.btnAccept.style.display !== 'none') this.btnAccept.click();
+                });
+
                 this.btnDecline.addEventListener('click', () => { 
                     const npc = this.activeInteraction;
                     const D = npc instanceof NPC ? npcDialogueFor(npc) : null;

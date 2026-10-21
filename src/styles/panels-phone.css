@@ -439,124 +439,150 @@
         .hidden { display: none !important; }
 
         /* --- DIALOGUE & COMMS --- */
-        /* The talk box: a veil of dusk rather than a panel. Deep violet that
-           fades out at the top, a gold hairline that breathes, and a halo in
-           the speaker's own colour (--who, set per line in screens-ui.js). */
-        #dialogue-box {
-            --who: #e8c27a;
-            position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
-            width: 92%; max-width: 620px;
-            padding: 0; display: none; pointer-events: auto; z-index: 200;
-            border: none; border-radius: 22px 22px 14px 14px; overflow: hidden; isolation: isolate;
-            background:
-                radial-gradient(90% 120% at 12% 100%, color-mix(in srgb, var(--who) 16%, transparent) 0%, transparent 60%),
-                radial-gradient(70% 90% at 100% 0%, rgba(164, 105, 255, 0.14) 0%, transparent 70%),
-                linear-gradient(180deg, rgba(20, 9, 34, 0.72) 0%, rgba(12, 5, 22, 0.9) 45%, rgba(8, 3, 14, 0.94) 100%);
-            box-shadow: 0 18px 50px rgba(4, 0, 10, 0.7), 0 0 60px -20px color-mix(in srgb, var(--who) 45%, transparent),
-                inset 0 0 0 1px rgba(232, 194, 122, 0.08);
-            backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2);
-            animation: dlgIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
-            transition: box-shadow 0.6s ease;
-        }
-        /* Gold hairline along the top, bright in the middle, shimmering slowly */
-        #dialogue-box::before {
-            content: ''; position: absolute; left: 6%; right: 6%; top: 0; height: 1px; z-index: 1; pointer-events: none;
-            background: linear-gradient(90deg, transparent, rgba(232, 194, 122, 0.25) 20%, #f3dca6 50%, rgba(232, 194, 122, 0.25) 80%, transparent);
-            background-size: 200% 100%; animation: dlgShimmer 7s ease-in-out infinite;
-            box-shadow: 0 0 12px rgba(232, 194, 122, 0.5);
-        }
-        /* Drifting motes: a few soft specks rising through the veil */
-        #dialogue-box::after {
-            content: ''; position: absolute; inset: -40% 0 0 0; z-index: -1; pointer-events: none; opacity: 0.55;
-            background-image:
-                radial-gradient(1.5px 1.5px at 12% 80%, rgba(243, 220, 166, 0.9), transparent),
-                radial-gradient(1px 1px at 34% 60%, rgba(220, 190, 255, 0.8), transparent),
-                radial-gradient(1.5px 1.5px at 58% 90%, rgba(243, 220, 166, 0.7), transparent),
-                radial-gradient(1px 1px at 76% 70%, rgba(220, 190, 255, 0.9), transparent),
-                radial-gradient(1.2px 1.2px at 90% 85%, rgba(243, 220, 166, 0.6), transparent);
-            background-size: 100% 50%; animation: dlgMotes 14s linear infinite;
-        }
-        @keyframes dlgIn { from { opacity: 0; transform: translate(-50%, 14px); filter: blur(6px); } to { opacity: 1; transform: translate(-50%, 0); filter: none; } }
-        @keyframes dlgShimmer { 0%, 100% { background-position: 100% 0; opacity: 0.7; } 50% { background-position: 0% 0; opacity: 1; } }
-        @keyframes dlgMotes { from { transform: translateY(0); } to { transform: translateY(-50%); } }
+        /* Two looks, picked in Settings → Developer → Talk Style (GameSettings.talkStyle, core/settings.js):
+             Veil (default): no box. A dusk veil rises from the bottom edge, the speaker's painted bust
+               stands in it and the line sits beside them as a subtitle; the choices are quiet gold words.
+               Tap the line to go on. Comms run as a thread of slim chips down the left edge.
+             Ribbon (body.talk-ribbon): a compact gilded panel with the portrait in a gold medallion and
+               the name on a plaque; comms are a single cameo under the health bar.
+           --who is the speaker's colour, set per line in screens-ui.js. */
+        @keyframes veilIn { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+        @keyframes ribbonIn { from { opacity: 0; transform: translate(-50%, 14px); filter: blur(6px); } to { opacity: 1; transform: translate(-50%, 0); filter: none; } }
         @keyframes dlgLine { from { opacity: 0; filter: blur(3px); transform: translateY(3px); } to { opacity: 1; filter: none; transform: none; } }
 
+        #dialogue-box {
+            --who: #e8c27a;
+            position: absolute; left: 0; right: 0; bottom: 0; display: none; z-index: 200;
+            padding: 80px 0 0; pointer-events: none !important;   /* only the line itself takes touches; the veil lets the scene through */
+            background: linear-gradient(180deg, transparent 0%, rgba(8, 3, 14, 0.5) 32%, rgba(8, 3, 14, 0.88) 70%, rgba(6, 2, 10, 0.95) 100%);
+            animation: veilIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
         .dialogue-inner {
-            display: flex; align-items: flex-start; gap: 16px;
-            padding: 18px 20px 14px 18px;
+            position: relative; pointer-events: auto; cursor: pointer;
+            display: flex; align-items: flex-end; gap: 22px;
+            max-width: 940px; margin: 0 auto; padding: 0 28px 18px 24px;
         }
         #dialogue-portrait {
-            width: 64px; height: 64px; min-width: 64px; border-radius: 50%; margin-top: 2px;
-            background: radial-gradient(circle at 50% 35%, rgba(60, 20, 70, 0.9), rgba(10, 4, 18, 0.95));
-            border: 1px solid rgba(243, 220, 166, 0.55);
-            box-shadow: 0 0 0 3px rgba(10, 4, 18, 0.7), 0 0 0 4px color-mix(in srgb, var(--who) 40%, transparent),
-                0 0 26px color-mix(in srgb, var(--who) 45%, transparent);
-            transition: box-shadow 0.5s ease;
+            width: 176px; height: 176px; min-width: 176px; margin-bottom: -18px;
+            -webkit-mask-image: linear-gradient(180deg, #000 62%, transparent 97%); mask-image: linear-gradient(180deg, #000 62%, transparent 97%);
+            filter: drop-shadow(0 0 22px color-mix(in srgb, var(--who) 35%, transparent));
         }
-        .dialogue-text-col { flex: 1; min-width: 0; }
+        .dialogue-text-col { flex: 1; min-width: 0; max-width: 62ch; padding-bottom: 2px; }
         #npc-name {
-            display: flex; align-items: center; gap: 10px;
-            font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; font-weight: 600;
-            color: #ff0055; font-size: max(6px, 1.22rem - var(--font-trim)); letter-spacing: 0.04em; line-height: 1.1;
-            margin-bottom: 6px; text-transform: none;
-            text-shadow: 0 0 14px color-mix(in srgb, currentColor 55%, transparent);
-        }
-        #npc-name::after {
-            content: ''; flex: 1; max-width: 140px; height: 1px; opacity: 0.6;
-            background: linear-gradient(90deg, currentColor, transparent);
+            font-family: 'Great Vibes', 'Cormorant Garamond', cursive; font-weight: 400; font-style: normal;
+            color: #ff0055; font-size: max(6px, 2.1rem - var(--font-trim)); line-height: 1.05; letter-spacing: 0.01em;
+            margin-bottom: 4px; text-shadow: 0 0 16px color-mix(in srgb, currentColor 60%, transparent), 0 2px 4px rgba(0, 0, 0, 0.8);
         }
         #npc-text {
-            font-family: 'Montserrat', sans-serif; color: #efe6fb;
-            font-size: max(6px, 0.86rem - var(--font-trim)); line-height: 1.55; font-weight: 400; letter-spacing: 0.01em;
-            margin-bottom: 14px; font-style: normal;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+            font-family: 'Montserrat', sans-serif; color: #f3ecfb;
+            font-size: max(6px, 0.95rem - var(--font-trim)); line-height: 1.55; letter-spacing: 0.01em;
+            margin-bottom: 10px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 18px rgba(0, 0, 0, 0.7);
         }
         #npc-text.line-in, #npc-name.line-in { animation: dlgLine 0.45s ease-out both; }
-        .dialogue-options { display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
+        .dialogue-options { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; }
         .dialogue-btn {
-            position: relative; cursor: pointer;
-            background: linear-gradient(180deg, rgba(164, 105, 255, 0.10), rgba(164, 105, 255, 0.02));
-            border: 1px solid rgba(220, 190, 255, 0.18); border-radius: 999px;
-            color: #d9ccef; padding: 7px 15px;
-            font-family: 'Montserrat', sans-serif; font-weight: 600; text-transform: uppercase;
-            font-size: max(6px, 0.64rem - var(--font-trim)); letter-spacing: 0.16em; transition: all 0.25s ease;
-            -webkit-tap-highlight-color: transparent;
+            cursor: pointer; background: none; border: none; padding: 6px 0; display: inline-flex; align-items: center; gap: 8px;
+            color: #e8c27a; font-family: 'Montserrat', sans-serif; font-weight: 600; text-transform: uppercase;
+            font-size: max(6px, 0.66rem - var(--font-trim)); letter-spacing: 0.28em; transition: color 0.25s ease, text-shadow 0.25s ease;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); -webkit-tap-highlight-color: transparent;
         }
-        .dialogue-btn:hover, .dialogue-btn:active {
-            color: #fff6e0; border-color: rgba(243, 220, 166, 0.7);
-            background: linear-gradient(180deg, rgba(232, 194, 122, 0.22), rgba(164, 105, 255, 0.10));
-            box-shadow: 0 0 16px rgba(232, 194, 122, 0.35);
-        }
-        #btn-accept { color: #f3dca6; border-color: rgba(232, 194, 122, 0.45); box-shadow: 0 0 12px rgba(232, 194, 122, 0.12); }
-        .dialogue-nav-btn { padding: 7px 11px; font-size: max(6px, 0.62rem - var(--font-trim)); letter-spacing: 0; min-width: 32px; }
+        .dialogue-btn::before { content: '◆'; font-size: 0.75em; letter-spacing: 0; }
+        .dialogue-btn:hover, .dialogue-btn:active { color: #fff6e0; text-shadow: 0 0 12px rgba(232, 194, 122, 0.8); }
+        #btn-decline { color: #b9aec4; }
+        .dialogue-nav-btn { letter-spacing: 0; color: #b9aec4; padding: 6px 4px; }
+        .dialogue-nav-btn::before { content: none; }
         .dialogue-nav-btn:disabled { opacity: 0.25; cursor: default; }
-        .dialogue-nav-btn:disabled:hover { background: linear-gradient(180deg, rgba(164, 105, 255, 0.10), rgba(164, 105, 255, 0.02)); border-color: rgba(220, 190, 255, 0.18); color: #d9ccef; box-shadow: none; }
         #dialogue-peek-indicator {
             display: none;
             font-family: 'Cormorant Garamond', Georgia, serif; font-size: max(6px, 0.8rem - var(--font-trim)); font-style: italic;
-            color: #e8c27a; letter-spacing: 0.06em;
-            margin-bottom: 4px; opacity: 0.8;
+            color: #e8c27a; letter-spacing: 0.06em; margin-bottom: 4px; opacity: 0.85;
         }
         #dialogue-box.peeking #dialogue-peek-indicator { display: block; }
         #dialogue-box.peeking #npc-text { color: #a99cbc; }
+        /* A phone on its side: a smaller bust beside the ability button, the line kept clear of the joystick */
+        body.landscape #dialogue-box { padding-top: 46px; }
+        body.landscape .dialogue-inner { padding: 0 150px 8px 66px; gap: 12px; max-width: none; }
+        body.landscape #dialogue-portrait { width: 112px; height: 112px; min-width: 112px; margin-bottom: -8px; }
+        body.landscape #npc-name { font-size: max(6px, 1.6rem - var(--font-trim)); margin-bottom: 0; }
+        body.landscape #npc-text { font-size: max(6px, 0.84rem - var(--font-trim)); line-height: 1.45; margin-bottom: 4px; }
 
-        /* --- LIVE COMMS BAR (Fixed Size) --- */
-        #comms-bar {
-            position: absolute; top: -100px; left: 20px; right: 20px;
-            width: auto; max-width: none; height: 65px;
-            background: rgba(8, 5, 12, 0.75);
-            border: none; border-radius: 18px;
-            display: flex; align-items: center; padding: 0 18px;
-            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-            transition: top 0.4s cubic-bezier(0.22, 1, 0.36, 1);
-            z-index: 150; pointer-events: none;
+        /* Ribbon */
+        body.talk-ribbon #dialogue-box {
+            left: 50%; right: auto; bottom: 14px; width: min(560px, 72%); padding: 0; border-radius: 14px; pointer-events: auto !important;
+            transform: translateX(-50%); animation: ribbonIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+            background: linear-gradient(180deg, rgba(22, 10, 38, 0.86), rgba(10, 4, 18, 0.94));
+            border: 1px solid rgba(232, 194, 122, 0.28);
+            box-shadow: 0 14px 40px rgba(4, 0, 10, 0.6), 0 0 50px -18px color-mix(in srgb, var(--who) 45%, transparent),
+                inset 0 0 0 4px rgba(10, 4, 18, 0.6), inset 0 0 0 5px rgba(232, 194, 122, 0.12);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
         }
-        #comms-bar.active { top: 20px; }
-        #comms-portrait { width: 40px; height: 40px; border-radius: 50%; background: #333; margin-right: 15px; border: 2px solid rgba(255,255,255,0.2); flex-shrink: 0; }
-        .comms-content { flex: 1; display: flex; flex-direction: column; justify-content: center; }
-        #comms-speaker { font-family: 'Orbitron'; font-size: max(6px, 0.7rem - var(--font-trim)); color: var(--glow-color); margin-bottom: 2px; }
-        #comms-text { font-family: 'Montserrat'; font-size: max(6px, 0.8rem - var(--font-trim)); color: #fff; line-height: 1.2; }
+        body.talk-ribbon #dialogue-box::before, body.talk-ribbon #dialogue-box::after {   /* gilt corners */
+            content: ''; position: absolute; right: 6px; width: 18px; height: 18px; border: 1px solid #e8c27a; opacity: 0.75; pointer-events: none;
+        }
+        body.talk-ribbon #dialogue-box::before { top: 6px; border-left: 0; border-bottom: 0; border-top-right-radius: 8px; }
+        body.talk-ribbon #dialogue-box::after { bottom: 6px; border-left: 0; border-top: 0; border-bottom-right-radius: 8px; }
+        body.talk-ribbon .dialogue-inner { display: block; max-width: none; margin: 0; padding: 14px 26px 10px 104px; cursor: default; }
+        body.talk-ribbon #dialogue-portrait {
+            position: absolute; left: -16px; top: -28px; width: 104px; height: 104px; min-width: 0; margin: 0; padding: 3px; border-radius: 50%;
+            -webkit-mask-image: none; mask-image: none; filter: none;
+            background: conic-gradient(from 210deg, #f6dfa8, #7a5a22, #e8c27a, #fff3d0, #7a5a22, #f6dfa8);
+            box-shadow: 0 0 22px color-mix(in srgb, var(--who) 55%, transparent), 0 8px 18px rgba(0, 0, 0, 0.6);
+        }
+        body.talk-ribbon #npc-name {
+            position: absolute; left: 100px; top: -27px; padding: 3px 14px 4px; border-radius: 7px 7px 0 0;
+            background: linear-gradient(180deg, #2a1640, #160a26); border: 1px solid rgba(232, 194, 122, 0.35); border-bottom: 0;
+            font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; font-weight: 600; font-size: max(6px, 1.08rem - var(--font-trim)); line-height: 1.2;
+        }
+        body.talk-ribbon #npc-text { font-size: max(6px, 0.84rem - var(--font-trim)); margin-bottom: 6px; }
+        body.talk-ribbon .dialogue-options { justify-content: flex-end; gap: 8px; }
+        body.talk-ribbon .dialogue-btn {
+            padding: 6px 14px; border-radius: 999px; border: 1px solid rgba(232, 194, 122, 0.45); letter-spacing: 0.2em; color: #f6dfa8;
+            background: linear-gradient(180deg, rgba(232, 194, 122, 0.16), rgba(232, 194, 122, 0.03)); text-shadow: none;
+        }
+        body.talk-ribbon .dialogue-btn::before { content: none; }
+        body.talk-ribbon #btn-decline { color: #b9aec4; border-color: rgba(185, 174, 196, 0.3); background: none; }
+        body.talk-ribbon .dialogue-nav-btn { border: none; background: none; padding: 6px 6px; color: #b9aec4; }
+        body.talk-ribbon.landscape #dialogue-box { bottom: 8px; width: min(520px, 60%); }
+        body.talk-ribbon.landscape .dialogue-inner { padding: 12px 22px 8px 86px; }
+        body.talk-ribbon.landscape #dialogue-portrait { width: 84px; height: 84px; left: -12px; top: -22px; margin: 0; }
+        body.talk-ribbon.landscape #npc-name { left: 84px; top: -25px; font-size: max(6px, 0.98rem - var(--font-trim)); }
+
+        /* --- COMMS --- the earpiece: each line a chip (ui/comms.js) */
+        @keyframes commIn { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+        @keyframes commBar { to { transform: scaleY(0.4); } }
+        #comms-bar { position: absolute; left: 14px; top: 34%; z-index: 150; pointer-events: none; display: flex; flex-direction: column; gap: 7px; width: min(340px, 44vw); }
+        .comm-chip {
+            --who: #e8c27a; display: flex; align-items: center; gap: 10px; padding: 5px 16px 5px 5px; border-radius: 999px;
+            background: linear-gradient(90deg, rgba(16, 7, 28, 0.9), rgba(16, 7, 28, 0.55));
+            border: 1px solid color-mix(in srgb, var(--who) 35%, transparent); box-shadow: 0 0 14px color-mix(in srgb, var(--who) 18%, transparent);
+            transform-origin: left center; animation: commIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+        .comm-chip.old { opacity: 0.45; transform: scale(0.94); }
+        .comm-chip.older { opacity: 0.2; transform: scale(0.88); }
+        .comm-chip.out { opacity: 0; transform: translateX(-14px); }
+        .comm-face { width: 34px; height: 34px; flex: none; border-radius: 50%; border: 1px solid #e8c27a; overflow: hidden; display: grid; place-items: center;
+            background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--who) 40%, #1a0a2a), #0a0412);
+            font: italic 600 1rem 'Cormorant Garamond', Georgia, serif; color: #f6dfa8; }
+        .comm-face img { width: 100%; height: 100%; display: block; }
+        .comm-body { min-width: 0; }
+        .comm-name { display: flex; align-items: center; gap: 6px; font: italic 600 max(6px, 0.95rem - var(--font-trim))/1.1 'Cormorant Garamond', Georgia, serif;
+            color: var(--who); text-shadow: 0 0 10px color-mix(in srgb, var(--who) 60%, transparent); }
+        .comm-sig { display: inline-flex; gap: 2px; align-items: flex-end; height: 9px; }
+        .comm-sig i { width: 2px; background: var(--who); border-radius: 1px; animation: commBar 0.9s ease-in-out infinite alternate; }
+        .comm-sig i:nth-child(1) { height: 40%; } .comm-sig i:nth-child(2) { height: 100%; animation-delay: 0.2s; } .comm-sig i:nth-child(3) { height: 65%; animation-delay: 0.4s; }
+        .comm-text { font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.76rem - var(--font-trim)); color: #f3ecfb; line-height: 1.3; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); }
+        /* Ribbon: one cameo under the health bar, the line on a smoked-glass ribbon unfurling from a gold ring */
+        body.talk-ribbon #comms-bar { left: 16px; top: 128px; width: min(420px, 60vw); }
+        body.talk-ribbon.landscape #comms-bar { left: 16px; top: 108px; }
+        body.talk-ribbon .comm-chip { padding: 0; gap: 0; border: none; border-radius: 0; background: none; box-shadow: none; }
+        body.talk-ribbon .comm-face { position: relative; z-index: 1; width: 52px; height: 52px; padding: 2px; border: none;
+            background: conic-gradient(from 200deg, #f6dfa8, #8a6a2e, #e8c27a, #fff3d0, #f6dfa8); box-shadow: 0 0 16px color-mix(in srgb, var(--who) 55%, transparent); }
+        body.talk-ribbon .comm-face img { border-radius: 50%; }
+        body.talk-ribbon .comm-body { margin-left: -24px; padding: 7px 18px 8px 34px; border-radius: 0 18px 18px 0;
+            background: linear-gradient(90deg, rgba(16, 7, 28, 0.92), rgba(16, 7, 28, 0.78) 70%, rgba(16, 7, 28, 0.4));
+            border-top: 1px solid rgba(232, 194, 122, 0.35); border-bottom: 1px solid rgba(232, 194, 122, 0.12); }
+        @media (prefers-reduced-motion: reduce) { .comm-sig i, .comm-chip, #dialogue-box { animation: none !important; } }
 
         /* Captions */
         #dialogue-caption { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); max-width: 80%; text-align: center; pointer-events: none; z-index: 100; opacity: 0; transition: opacity 0.3s ease-in-out; }
