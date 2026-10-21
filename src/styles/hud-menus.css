@@ -1093,148 +1093,82 @@
         body.cinematic-view #capture-pill { display: none; }
         @keyframes cineHint { 0% { opacity: 0; } 15% { opacity: 0.85; } 65% { opacity: 0.85; } 100% { opacity: 0; } }
 
-        /* --- SAVE SLOT OVERLAY --- */
+        /* --- IMPRINTS: the save and load cards (ui/save-slots-pause-menu.js) ---
+           Each card is sized by its height; everything inside is in cqh, so the card scales as a whole. */
         #save-slot-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 5, 15, 0.92);
+            position: fixed; inset: 0; z-index: 10000; opacity: 0; transition: opacity 0.3s ease;
             display: none; align-items: center; justify-content: center;
-            z-index: 10000; opacity: 0;
-            transition: opacity 0.3s ease;
-            font-family: 'Segoe UI', sans-serif;
+            background: radial-gradient(ellipse at 50% 40%, rgba(30, 12, 48, 0.82), rgba(5, 2, 10, 0.94));
+            backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+            font-family: 'Montserrat', sans-serif; color: #f1e8fe;
         }
         #save-slot-overlay.active { display: flex; }
-        .save-slot-panel {
-            width: 90%; max-width: 480px;
-            background: linear-gradient(180deg, rgba(15, 10, 30, 0.98), rgba(5, 5, 15, 0.98));
-            border: 1px solid rgba(255, 170, 0, 0.25);
-            border-radius: 10px;
-            padding: 24px 20px 18px;
-            box-shadow: 0 0 40px rgba(138, 43, 226, 0.15), inset 0 1px 0 rgba(255,255,255,0.04);
-        }
-        .save-slot-title {
-            text-align: center; font-size: max(6px, 15px - var(--font-trim)); letter-spacing: 4px;
-            color: #ffaa00; margin-bottom: 18px; text-transform: uppercase;
-            text-shadow: 0 0 12px rgba(255, 170, 0, 0.4);
-        }
-        .save-slot-card {
-            background: rgba(255,255,255,0.03);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 8px; padding: 14px 16px; margin-bottom: 10px;
-            cursor: pointer; transition: all 0.2s ease; position: relative;
-        }
-        .save-slot-card:hover {
-            border-color: rgba(255, 170, 0, 0.5);
-            background: rgba(255, 170, 0, 0.06);
-            box-shadow: 0 0 15px rgba(255, 170, 0, 0.1);
-        }
-        .save-slot-card.active-slot {
-            border-color: rgba(138, 43, 226, 0.5);
-            box-shadow: 0 0 12px rgba(138, 43, 226, 0.15);
-        }
-        .save-slot-card.empty-slot { opacity: 0.45; }
-        .save-slot-card.empty-slot.mode-load { cursor: default; }
-        .save-slot-card.empty-slot.mode-load:hover {
-            border-color: rgba(255,255,255,0.08);
-            background: rgba(255,255,255,0.03);
-            box-shadow: none;
-        }
-        .save-slot-header {
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 6px;
-        }
-        .save-slot-label {
-            font-size: max(6px, 13px - var(--font-trim)); font-weight: 600; color: #e0d8c8;
-            letter-spacing: 1.5px; text-transform: uppercase;
-        }
-        .save-slot-badge {
-            font-size: max(6px, 9px - var(--font-trim)); padding: 2px 7px; border-radius: 3px;
-            letter-spacing: 1px; text-transform: uppercase;
-        }
-        .save-slot-badge.badge-active {
-            background: rgba(138, 43, 226, 0.25); color: #c4a8e8;
-            border: 1px solid rgba(138, 43, 226, 0.4);
-        }
-        .save-slot-meta {
-            display: flex; flex-wrap: wrap; gap: 8px 16px;
-            font-size: max(6px, 11px - var(--font-trim)); color: #888; line-height: 1.6;
-        }
-        .save-slot-meta span { white-space: nowrap; }
-        .save-slot-meta .meta-map { color: #aaa; }
-        .save-slot-meta .meta-date { color: #777; }
-        .save-slot-meta .meta-currency { color: #daa520; }
-        .save-slot-meta .meta-story { color: #88aacc; }
-        .save-slot-empty-text {
-            color: #555; font-size: max(6px, 12px - var(--font-trim)); letter-spacing: 1px;
-            text-align: center; padding: 4px 0;
-        }
-        .save-slot-delete {
-            position: absolute; top: 10px; right: 12px;
-            background: none; border: none; color: #553333; font-size: max(6px, 14px - var(--font-trim));
-            cursor: pointer; padding: 2px 6px; line-height: 1;
-            transition: color 0.2s;
-        }
-        .save-slot-delete:hover { color: #cc4444; }
-        .save-slot-close-btn {
-            background: none; border: 1px solid rgba(255,255,255,0.12);
-            color: #888; font-size: max(6px, 11px - var(--font-trim)); letter-spacing: 2px;
-            padding: 8px 28px; border-radius: 5px; cursor: pointer;
-            text-transform: uppercase; transition: all 0.2s;
-        }
-        .save-slot-close-btn:hover {
-            border-color: rgba(255,255,255,0.3); color: #ccc;
-        }
-        .save-slot-confirm {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.85); border-radius: 8px;
-            display: flex; flex-direction: column; align-items: center;
-            justify-content: center; gap: 10px; z-index: 2;
-        }
-        .save-slot-confirm-text {
-            color: #ddd; font-size: max(6px, 12px - var(--font-trim)); letter-spacing: 1px; text-align: center;
-        }
-        .save-slot-confirm-btns { display: flex; gap: 12px; }
-        .save-slot-confirm-btns button {
-            background: none; border: 1px solid rgba(255,255,255,0.15);
-            color: #bbb; font-size: max(6px, 11px - var(--font-trim)); letter-spacing: 1px;
-            padding: 6px 20px; border-radius: 4px; cursor: pointer;
-            transition: all 0.15s;
-        }
-        .save-slot-confirm-btns button.confirm-yes {
-            border-color: rgba(255, 80, 80, 0.5); color: #ff8888;
-        }
-        .save-slot-confirm-btns button.confirm-yes:hover {
-            background: rgba(255, 80, 80, 0.15);
-        }
-        .save-slot-confirm-btns button:hover {
-            border-color: rgba(255,255,255,0.3); color: #fff;
-        }
-        .save-slot-footer {
-            display: flex; justify-content: space-between; align-items: center; margin-top: 14px;
-        }
-        .save-slot-footer-actions { display: flex; gap: 8px; }
-        .save-slot-action-btn {
-            background: none; border: 1px solid rgba(255,255,255,0.08);
-            color: #666; font-size: max(6px, 0.55rem - var(--font-trim)); letter-spacing: 1.5px;
-            padding: 6px 14px; border-radius: 4px; cursor: pointer;
-            text-transform: uppercase; font-family: 'Montserrat', sans-serif;
-            transition: all 0.2s;
-        }
-        .save-slot-action-btn:hover { border-color: rgba(255,255,255,0.2); color: #aaa; }
-        .save-slot-action-btn.import-btn:hover { border-color: rgba(100,200,150,0.4); color: #88ccaa; }
-        .save-slot-action-btn.export-btn:hover { border-color: rgba(100,150,255,0.4); color: #88aaff; }
-        .save-slot-export-single {
-            position: absolute; top: 10px; right: 32px;
-            background: none; border: none; color: #444; font-size: max(6px, 12px - var(--font-trim));
-            cursor: pointer; padding: 2px 5px; line-height: 1;
-            transition: color 0.2s;
-        }
-        .save-slot-export-single:hover { color: #88aaff; }
-        .save-slot-import-msg {
-            text-align: center; font-size: max(6px, 0.65rem - var(--font-trim)); color: #88ccaa;
-            margin-top: 8px; letter-spacing: 1px; opacity: 0;
-            transition: opacity 0.3s;
-        }
+        .ks-panel { box-sizing: border-box; width: 100%; max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; align-items: center; gap: clamp(10px, 2.6vh, 22px);
+            padding: max(14px, env(safe-area-inset-top, 0px)) 0 max(12px, env(safe-area-inset-bottom, 0px)); }
+        .ks-title { text-align: center; font: 400 clamp(2rem, 7vh, 3.4rem)/1 'Great Vibes', cursive; color: #f6dfa8; text-shadow: 0 0 18px rgba(232, 194, 122, 0.45); }
+        .ks-title small { display: block; margin-top: 6px; font: 600 max(6px, 0.62rem - var(--font-trim))/1 'Montserrat', sans-serif; letter-spacing: 0.42em; text-transform: uppercase; color: #b9aec4; }
+        .ks-deck { box-sizing: border-box; display: flex; gap: clamp(10px, 2.4vw, 26px); max-width: 100%; overflow-x: auto; scroll-snap-type: x mandatory; justify-content: safe center;
+            padding: 12px max(16px, env(safe-area-inset-left, 0px)) 14px max(16px, env(safe-area-inset-right, 0px)); scrollbar-width: none; }
+        .ks-deck::-webkit-scrollbar { display: none; }
+
+        .ks-card { --gild: linear-gradient(160deg, rgba(232, 194, 122, 0.55), rgba(232, 194, 122, 0.08) 40%, rgba(232, 194, 122, 0.4));
+            position: relative; flex: none; height: clamp(220px, 60vh, 340px); aspect-ratio: 0.71; container-type: size; scroll-snap-align: center;
+            border-radius: 5cqh; padding: 1cqh; background: var(--gild); box-shadow: 0 14px 34px rgba(0, 0, 0, 0.6); cursor: pointer;
+            transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease; outline: none; }
+        .ks-card:hover, .ks-card:focus-visible { transform: translateY(-4px); box-shadow: 0 0 22px rgba(232, 194, 122, 0.3), 0 18px 36px rgba(0, 0, 0, 0.6); }
+        .ks-card.ks-current { --gild: linear-gradient(160deg, #f6dfa8, #8a6a2e 45%, #e8c27a); transform: translateY(-6px); box-shadow: 0 0 26px rgba(232, 194, 122, 0.35), 0 18px 36px rgba(0, 0, 0, 0.6); }
+        .ks-card.ks-auto { height: clamp(190px, 52vh, 296px); align-self: center; opacity: 0.85; }
+        .ks-in { position: relative; height: 100%; border-radius: 4cqh; overflow: hidden; background: linear-gradient(180deg, #1a0d2c, #0c0516); }
+        .ks-shot { height: 42cqh; background-size: cover; background-position: center; -webkit-mask-image: linear-gradient(180deg, #000 68%, transparent); mask-image: linear-gradient(180deg, #000 68%, transparent); }
+        .ks-noshot { display: grid; place-items: center; background: radial-gradient(circle at 50% 40%, #3a1d56, #12081e); font: italic 600 5cqh/1.1 'Cormorant Garamond', serif; color: #b9aec4; text-align: center; padding: 0 6cqh 6cqh; }
+        .ks-medal { position: absolute; left: 50%; top: 25cqh; transform: translateX(-50%); width: 23cqh; height: 23cqh; border-radius: 50%; padding: 0.9cqh;
+            background: conic-gradient(from 210deg, #f6dfa8, #7a5a22, #e8c27a, #fff3d0, #7a5a22, #f6dfa8); box-shadow: 0 0 6cqh rgba(232, 194, 122, 0.35), 0 2cqh 5cqh rgba(0, 0, 0, 0.6); pointer-events: none; }
+        .ks-medal img { width: 100%; height: 100%; border-radius: 50%; display: block; object-fit: cover; }
+        .ks-body { position: absolute; left: 0; right: 0; top: 51cqh; padding: 0 5cqh; text-align: center; display: grid; gap: 1.4cqh; }
+        .ks-num { font: 600 3.1cqh/1 'Montserrat', sans-serif; letter-spacing: 0.4em; text-transform: uppercase; color: #b9aec4; }
+        .ks-chap { font: 400 9.4cqh/1 'Great Vibes', cursive; color: #f6dfa8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ks-obj { font: italic 500 5.2cqh/1.15 'Cormorant Garamond', Georgia, serif; color: #f1e8fe; }
+        .ks-meta { font: 500 3.5cqh/1.5 'Montserrat', sans-serif; color: #b9aec4; margin-top: 0.6cqh; }
+        .ks-meta b { color: #e8c27a; font-weight: 600; }
+        .ks-tray { position: absolute; left: 3cqh; top: 3cqh; display: flex; gap: 2cqh; }
+        .ks-tray button { width: 8.6cqh; height: 8.6cqh; padding: 0; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
+            font: 4cqh/1 'Montserrat', sans-serif; color: #f1e8fe; background: rgba(10, 4, 18, 0.7); border: 1px solid rgba(232, 194, 122, 0.4); transition: background 0.2s, color 0.2s; }
+        .ks-tray button:hover { background: rgba(232, 194, 122, 0.25); color: #fff3d0; }
+        .ks-flag { position: absolute; right: 3cqh; top: 3.6cqh; padding: 1.4cqh 2.8cqh; border-radius: 999px; background: #e8c27a; color: #0b0613;
+            font: 700 2.8cqh/1 'Montserrat', sans-serif; letter-spacing: 0.24em; text-transform: uppercase; }
+
+        /* A blank card: a crescent on a faint lattice */
+        .ks-card.ks-empty { --gild: linear-gradient(160deg, rgba(232, 194, 122, 0.25), rgba(232, 194, 122, 0.05)); }
+        .ks-card.ks-shut { cursor: default; opacity: 0.6; }
+        .ks-card.ks-shut:hover { transform: none; box-shadow: 0 14px 34px rgba(0, 0, 0, 0.6); }
+        .ks-blank { height: 100%; display: grid; place-items: center; align-content: center; gap: 4cqh; text-align: center; padding: 0 6cqh;
+            background: repeating-linear-gradient(45deg, rgba(232, 194, 122, 0.04) 0 2cqh, transparent 2cqh 4cqh), radial-gradient(circle at 50% 40%, #241238, #0c0516); }
+        .ks-moon { width: 26cqh; height: 26cqh; border-radius: 50%; box-shadow: inset 5cqh -2cqh 0 0 #e8c27a; opacity: 0.75; transform: rotate(-20deg); filter: drop-shadow(0 0 4cqh rgba(232, 194, 122, 0.5)); }
+        .ks-hint { font: italic 500 5.2cqh/1.25 'Cormorant Garamond', Georgia, serif; color: #b9aec4; }
+        .ks-card.ks-open .ks-moon { animation: ksBreathe 3.2s ease-in-out infinite; }
+        @keyframes ksBreathe { 50% { opacity: 1; filter: drop-shadow(0 0 7cqh rgba(232, 194, 122, 0.8)); } }
+
+        /* Overwrite or delete: the card turns over */
+        .ks-card.ks-flip .ks-in { animation: ksFlip 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+        @keyframes ksFlip { from { transform: perspective(600px) rotateY(-90deg); } to { transform: none; } }
+        .ks-back { height: 100%; display: grid; place-items: center; align-content: center; gap: 4cqh; padding: 0 8cqh; text-align: center;
+            background: radial-gradient(circle at 50% 30%, #2c1646, #0c0516); }
+        .ks-q { font: italic 600 7cqh/1.15 'Cormorant Garamond', Georgia, serif; color: #f1e8fe; margin-bottom: 2cqh; }
+        .ks-pill { width: 100%; padding: 3.2cqh 0; border-radius: 999px; cursor: pointer; font: 600 3.4cqh/1 'Montserrat', sans-serif; letter-spacing: 0.24em; text-transform: uppercase;
+            color: #f6dfa8; border: 1px solid rgba(232, 194, 122, 0.55); background: linear-gradient(180deg, rgba(232, 194, 122, 0.2), rgba(232, 194, 122, 0.04)); }
+        .ks-pill.ks-no { color: #b9aec4; border-color: rgba(185, 174, 196, 0.35); background: none; }
+        .ks-pill:hover { filter: brightness(1.25); }
+
+        .ks-foot { display: flex; gap: clamp(18px, 4vw, 40px); }
+        .ks-foot button { background: none; border: none; padding: 6px 2px; cursor: pointer; font: 600 max(6px, 0.62rem - var(--font-trim))/1 'Montserrat', sans-serif;
+            letter-spacing: 0.28em; text-transform: uppercase; color: #b9aec4; transition: color 0.2s; }
+        .ks-foot button::before { content: '◆ '; color: #e8c27a; font-size: 0.8em; }
+        .ks-foot button:hover { color: #f1e8fe; }
+        .ks-foot .ks-close { color: #f6dfa8; }
+        .ks-foot .ks-close::before { content: '✕ '; }
+        .save-slot-import-msg { min-height: 1em; text-align: center; font-size: max(6px, 0.65rem - var(--font-trim)); color: #88ccaa; letter-spacing: 1px; opacity: 0; transition: opacity 0.3s; }
         .save-slot-import-msg.show { opacity: 1; }
+        @media (prefers-reduced-motion: reduce) { .ks-card, .ks-card .ks-in, .ks-moon { animation: none !important; transition: none !important; } }
 
         /* (The augment shop and the other shops: styles/shops.css) */
 

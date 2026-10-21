@@ -424,13 +424,16 @@ engineMixin({
                     role: t.role || 'civilian'
                 }));
         
+                // The imprint card's picture of the room and her face (ui/save-slots-pause-menu.js)
+                if (typeof saveSlotManager !== 'undefined') saveData.keepsake = saveSlotManager.keepsake();
+
                 if (auto) { try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(saveData)); } catch (e) { /* storage full: skip */ } return; }
                 localStorage.setItem(
                     (typeof saveSlotManager !== 'undefined') ? saveSlotManager.getActiveKey() : 'dfab_save_slot_0',
                     JSON.stringify(saveData)
                 );
-                const slotLabel = (typeof saveSlotManager !== 'undefined') ? ` [SLOT ${saveSlotManager.activeSlot + 1}]` : '';
-                showMessage(`GAME SAVED TO DISK.${slotLabel}`);
+                const slotLabel = (typeof saveSlotManager !== 'undefined') ? ` · ${SaveSlotManager.ROMAN[saveSlotManager.activeSlot] || saveSlotManager.activeSlot + 1}` : '';
+                showMessage(`MOMENT IMPRINTED${slotLabel}`);
                 audioSys.sfx('ui');
                 console.log('[SAVE] Game saved:', saveData);
                 if (saveData.phone) {
