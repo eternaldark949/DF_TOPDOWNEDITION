@@ -1035,7 +1035,7 @@
             ctx.drawImage(L, 0, 0, w, h);
         }
 
-        function drawCharacterPortrait(ctx, w, h, config) {
+        function drawCharacterPortraitClassic(ctx, w, h, config) {
             const A = androidLook(config.body);                              // Double Nights android (ui/bodies.js)
             const me = APPEARANCES['949'];                                   // unset parts default to Stella's
             const skinColor = A ? A.plate : (config.skinColor || me.skinColor);
