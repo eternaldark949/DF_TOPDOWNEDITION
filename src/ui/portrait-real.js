@@ -1173,6 +1173,8 @@
                         x.restore();
                         if (T === 'joggers') { x.save(); x.globalCompositeOperation = 'source-atop'; x.fillStyle = rgb(mul(col, 0.72)); x.fillRect(CX - 400, 3400, 800, 90); x.restore(); }   // the cuffs
                         x.fillStyle = rgb(mul(col, 0.75)); x.fillRect(CX - 200, 1345, 400, 40);    // the waistband
+                    } else if (T === 'ball_gown' || T === 'mermaid' || T === 'slit_gown' || T === 'slip_skirt') {
+                        gownSkirt(x, T, col, bot, rig);
                     } else {
                         // Skirts: a waist, then a shape out to the hem
                         const hem = T === 'pencil_skirt' ? 2760 : T === 'pleated_skirt' ? 2250 : longSkirt ? 3720 : 2420;
@@ -1206,6 +1208,7 @@
                         }
                         x.restore();
                     }
+                    fabricOn(x, bot, col, 1350, T === 'ball_gown' || T === 'mermaid' || T === 'slit_gown' ? 3780 : 3000);
                     if (lum(col) > 0.85) atop(x, 'rgba(120,110,150,1)', 0.12);   // white cloth still takes the room's shade
                     modelLayer(lay, rim, 0.85);
                     put(c, lay);
@@ -1231,7 +1234,9 @@
                     x.fillStyle = rgb(col);
                     const band = (y0, y1, grow = 10) => { x.save(); x.beginPath(); x.rect(CX - 600, y0, 1200, y1 - y0); x.clip(); torsoPath(x); x.fill(); x.lineWidth = grow * 2; x.strokeStyle = rgb(col); x.stroke(); x.restore(); };
                     const sleeves = (t1, grow = 10) => { for (const s of [-1, 1]) { limbPath(x, limbPart(rig.arms[s], 0, t1, grow)); x.fill(); } };
-                    if (T === 'sports_bra' || T === 'crop_top' || T === 'sleeved_crop' || T === 'tank') {
+                    if (T === 'corset' || T === 'halter' || T === 'off_shoulder' || T === 'slip') {
+                        bodice(x, T, col, top, rig);
+                    } else if (T === 'sports_bra' || T === 'crop_top' || T === 'sleeved_crop' || T === 'tank') {
                         const y1 = T === 'sports_bra' ? 1150 : 1210;
                         x.save(); x.beginPath(); x.rect(CX - 600, 950, 1200, y1 - 950); x.clip(); torsoPath(x); x.fill(); x.restore();
                         x.beginPath(); x.moveTo(CX - 290, 960); x.quadraticCurveTo(CX - 150, 900, CX, 1000); x.quadraticCurveTo(CX + 150, 900, CX + 290, 960);
@@ -1277,6 +1282,7 @@
                         for (const s of [-1, 1]) blob(x, CX + s * 150, 1120, 90, 60, mul(col, 0.65), 0.4, 30);    // under the bust
                         x.restore();
                     }
+                    fabricOn(x, top, col, 760, 1480);
                     if (lum(col) > 0.85) atop(x, 'rgba(120,110,150,1)', 0.12);
                     modelLayer(lay, rim, 0.85);
                     put(c, lay);
@@ -1294,6 +1300,132 @@
                         }
                     }
                 }
+            }
+
+            /** The evening bodices, each to the waist over bare shoulders: corset (sweetheart, boned, a pointed
+             *  basque), halter (to the nape, a keyhole), off the shoulder (a band across the arms), slip (a V on straps). */
+            function bodice(x, T, col, top, rig) {
+                x.save(); torsoPath(x); x.clip();
+                x.beginPath();
+                if (T === 'corset') {
+                    x.moveTo(CX - 420, 1010); x.lineTo(CX - 300, 1000);
+                    x.quadraticCurveTo(CX - 150, 905, CX - 6, 1015); x.quadraticCurveTo(CX + 150, 905, CX + 300, 1000); x.lineTo(CX + 420, 1010);
+                    x.lineTo(CX + 420, 1395); x.lineTo(CX + 140, 1410); x.lineTo(CX, 1480); x.lineTo(CX - 140, 1410); x.lineTo(CX - 420, 1395);
+                } else if (T === 'halter') {
+                    x.moveTo(CX - 64, 760); x.lineTo(CX + 64, 760); x.lineTo(CX + 285, 1010); x.lineTo(CX + 420, 1400); x.lineTo(CX - 420, 1400); x.lineTo(CX - 285, 1010);
+                } else if (T === 'off_shoulder') {
+                    x.moveTo(CX - 420, 905); x.quadraticCurveTo(CX, 990, CX + 420, 905); x.lineTo(CX + 420, 1400); x.lineTo(CX - 420, 1400);
+                } else {
+                    x.moveTo(CX - 420, 985); x.lineTo(CX - 260, 980); x.quadraticCurveTo(CX - 110, 1000, CX, 1130); x.quadraticCurveTo(CX + 110, 1000, CX + 260, 980);
+                    x.lineTo(CX + 420, 985); x.lineTo(CX + 420, 1400); x.lineTo(CX - 420, 1400);
+                }
+                x.closePath(); x.fill();
+                x.restore();
+                if (T === 'halter') {   // the keyhole, and the band at her nape
+                    x.save(); x.globalCompositeOperation = 'destination-out'; x.beginPath(); x.ellipse(CX, 950, 34, 72, 0, 0, TAU); x.fill(); x.restore();
+                    x.fillStyle = rgb(mul(col, 0.8)); x.beginPath(); x.roundRect(CX - 66, 742, 132, 40, 12); x.fill();
+                }
+                if (T === 'off_shoulder') {   // the band wraps her upper arms
+                    for (const s of [-1, 1]) { limbPath(x, limbPart(rig.arms[s], 0.09, 0.2, 9)); x.fill(); }
+                    softLine(x, [CX - 400, 925, CX, 1005, CX + 400, 925], mix(col, [255, 250, 245], 0.4), 0.45, 14, 6);
+                }
+                if (T === 'slip') for (const s of [-1, 1]) softLine(x, [CX + s * 175, 990, CX + s * 172, 900, CX + s * 168, 812], col, 1, 7, 0.5);
+                x.save(); x.globalCompositeOperation = 'source-atop';
+                for (const s of [-1, 1]) blob(x, CX + s * 140, 1030, 80, 46, mix(col, [255, 250, 245], 0.35), 0.28, 24);   // the light on the bust
+                if (T === 'corset') {
+                    for (const k of [-230, -150, -70, 70, 150, 230]) softLine(x, [CX + k, 1090, CX + k * 0.92, 1250, CX + k * 0.85, 1405], mul(col, 0.55), 0.5, 6, 3);   // the boning
+                    if (top.trim) {
+                        x.strokeStyle = rgb(hx(top.trim)); x.lineWidth = 9; x.beginPath();
+                        x.moveTo(CX - 300, 1000); x.quadraticCurveTo(CX - 150, 905, CX - 6, 1015); x.quadraticCurveTo(CX + 150, 905, CX + 300, 1000); x.stroke();
+                        x.lineWidth = 4; x.beginPath();   // lacing down the front
+                        for (let y = 1060; y < 1400; y += 46) { x.moveTo(CX - 26, y); x.lineTo(CX + 26, y + 40); x.moveTo(CX + 26, y); x.lineTo(CX - 26, y + 40); }
+                        x.stroke();
+                    }
+                }
+                x.restore();
+            }
+
+            /** A smooth curve on through points (already at the first), tangent-continuous at each. */
+            function through(c, P) {
+                for (let i = 1; i < P.length; i++) {
+                    const p0 = P[Math.max(0, i - 2)], p1 = P[i - 1], p2 = P[i], p3 = P[Math.min(P.length - 1, i + 1)];
+                    c.bezierCurveTo(p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6, p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6, p2[0], p2[1]);
+                }
+            }
+            /** Gowns and the slip's skirt: ball gown (a bell over petticoats, tulle over it), mermaid (close to the knee,
+             *  flaring to the floor), slit gown (floor length, open to the thigh on her left), slip skirt (bias-cut to mid-calf). */
+            function gownSkirt(x, T, col, bot, rig) {
+                const acc = bot.accent ? hx(bot.accent) : null;
+                const side = (s, pts) => pts.map(([px, py]) => [CX + s * px, py]);
+                let L;   // the right-hand outline from the waist down to the hem's edge, as [x, y] from the centre line
+                if (T === 'ball_gown') L = [[190, 1350], [300, 1500], [400, 1800], [520, 2600], [640, 3760]];
+                else if (T === 'mermaid') L = [[190, 1350], [290, 1500], [326, 1680], [290, 2150], [205, 2750], [260, 3220], [430, 3790]];
+                else if (T === 'slit_gown') L = [[190, 1350], [290, 1500], [326, 1690], [335, 2300], [380, 3000], [420, 3750]];
+                else L = [[190, 1350], [290, 1500], [326, 1690], [322, 2300], [340, 2960]];
+                x.save(); x.beginPath(); x.rect(CX - 600, 1350, 1200, 600); x.clip(); torsoPath(x); x.fill(); x.lineWidth = 16; x.strokeStyle = rgb(col); x.stroke(); x.restore();   // over her hips first
+                const hem = L[L.length - 1][1];
+                const path = () => {
+                    x.beginPath();
+                    const left = side(-1, L), right = side(1, L).reverse();
+                    x.moveTo(left[0][0], left[0][1]); through(x, left);
+                    const n = T === 'ball_gown' ? 9 : 7, w = L[L.length - 1][0];   // a softly waved hem
+                    for (let k = 1; k <= n; k++) { const xa = CX - w + (2 * w) * (k - 0.5) / n, xb = CX - w + (2 * w) * k / n; x.quadraticCurveTo(xa, hem + (T === 'slip_skirt' ? 34 * (k / n) : 38), xb, hem + (T === 'slip_skirt' ? 26 * (k / n) : 0)); }
+                    x.lineTo(right[0][0], right[0][1]); through(x, right);
+                    x.closePath();
+                };
+                path(); x.fill();
+                x.save(); x.globalCompositeOperation = 'source-atop';
+                if (acc) {   // ombré to the hem
+                    const g = x.createLinearGradient(0, 1700, 0, hem); g.addColorStop(0, rgb(col, 0)); g.addColorStop(1, rgb(acc, 0.95));
+                    x.fillStyle = g; x.fillRect(CX - 800, 1350, 1600, hem - 1300);
+                }
+                const folds = T === 'ball_gown' ? [-0.8, -0.55, -0.3, -0.05, 0.2, 0.45, 0.7] : [-0.6, -0.25, 0.15, 0.5];
+                const fy = T === 'mermaid' ? 2900 : 1700, w = L[L.length - 1][0];
+                for (const k of folds) softLine(x, [CX + k * 200, fy, CX + k * w * 0.75, (fy + hem) / 2, CX + k * w, hem], mul(col, 0.5), 0.4, T === 'ball_gown' ? 34 : 24, 20);
+                for (const k of folds) softLine(x, [CX + (k + 0.12) * 200, fy, CX + (k + 0.12) * w * 0.75, (fy + hem) / 2, CX + (k + 0.12) * w, hem], mix(col, [255, 250, 245], 0.45), 0.24, 16, 14);
+                if (T === 'mermaid') softLine(x, [CX - 210, 2760, CX, 2800, CX + 210, 2760], mul(col, 0.5), 0.5, 10, 6);   // where the flare is set in
+                if (T === 'slip_skirt') softLine(x, [CX + 120, 1500, CX + 180, 2200, CX + 120, 2900], [255, 250, 245], 0.35, 30, 22);   // the bias's long sheen
+                x.restore();
+                if (T === 'ball_gown') {   // tulle: a sheer second skirt, a shade lighter, a little wider at the hem
+                    x.save(); x.globalAlpha = 0.28; x.fillStyle = rgb(mix(acc || col, [255, 255, 255], 0.35));
+                    x.beginPath(); x.moveTo(CX - 190, 1350); x.bezierCurveTo(CX - 330, 1500, CX - 520, 2400, CX - 690, 3770);
+                    for (let k = 1; k <= 12; k++) x.quadraticCurveTo(CX - 690 + 1380 * (k - 0.5) / 12, 3800, CX - 690 + 1380 * k / 12, 3770 - (k % 2) * 20);
+                    x.bezierCurveTo(CX + 520, 2400, CX + 330, 1500, CX + 190, 1350); x.closePath(); x.fill(); x.restore();
+                }
+                if (T === 'slit_gown') {   // open from the thigh on her left (the viewer's right), the leg showing through
+                    x.save(); x.globalCompositeOperation = 'destination-out';
+                    x.beginPath(); x.moveTo(CX + 175, 2150); x.quadraticCurveTo(CX + 210, 3000, CX + 330, 3800); x.lineTo(CX + 30, 3800); x.quadraticCurveTo(CX + 120, 3000, CX + 175, 2150); x.fill();
+                    x.restore();
+                    softLine(x, [CX + 175, 2150, CX + 125, 3000, CX + 40, 3790], mul(col, 0.45), 0.8, 12, 5);
+                }
+            }
+
+            /** The cloth itself: sequins (a scatter of glints), satin (long soft sheens), velvet (deep and soft-edged). */
+            function fabricOn(x, piece, col, y0, y1) {
+                const f = piece.fabric;
+                if (!f) return;
+                x.save(); x.globalCompositeOperation = 'source-atop';
+                if (f === 'sequin') {
+                    const acc = piece.accent ? hx(piece.accent) : null;
+                    for (let k = 0; k < 900; k++) {
+                        const px = R(CX - 720, CX + 720), py = R(y0, y1), t = rnd();
+                        x.fillStyle = t < 0.12 ? 'rgba(255,255,255,0.95)' : t < 0.5 ? rgb(mix(col, [255, 255, 255], 0.55), 0.8) : rgb(mul(acc && rnd() < 0.5 ? acc : col, 0.55), 0.7);
+                        x.fillRect(px, py, t < 0.12 ? 7 : 5, t < 0.12 ? 7 : 5);
+                    }
+                    for (let k = 0; k < 26; k++) {   // a few stars of light
+                        const px = R(CX - 400, CX + 450), py = R(y0, y1), r = R(10, 22);
+                        x.fillStyle = 'rgba(255,255,255,0.9)'; x.beginPath();
+                        x.moveTo(px - r, py); x.lineTo(px, py - 2.5); x.lineTo(px + r, py); x.lineTo(px, py + 2.5); x.closePath();
+                        x.moveTo(px, py - r); x.lineTo(px + 2.5, py); x.lineTo(px, py + r); x.lineTo(px - 2.5, py); x.closePath(); x.fill();
+                    }
+                } else if (f === 'satin') {
+                    for (const k of [0.15, 0.45]) softLine(x, [CX + k * 300, y0, CX + k * 380, (y0 + y1) / 2, CX + k * 300, y1], [255, 252, 245], 0.32, 46, 30);
+                } else if (f === 'velvet') {
+                    const g = x.createLinearGradient(CX - 500, 0, CX + 500, 0);
+                    g.addColorStop(0, 'rgba(0,0,0,0.45)'); g.addColorStop(0.3, 'rgba(0,0,0,0.05)'); g.addColorStop(0.62, 'rgba(255,220,230,0.1)'); g.addColorStop(1, 'rgba(0,0,0,0.5)');
+                    x.fillStyle = g; x.fillRect(CX - 800, y0 - 100, 1600, y1 - y0 + 200);
+                }
+                x.restore();
             }
 
             /** Stockings and tights: the pattern over the sheer base, inside the current clip. */
