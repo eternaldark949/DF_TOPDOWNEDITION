@@ -1770,6 +1770,8 @@
                 const canPullOut = this.currentLane && !this.currentTurnPath && !(this._reverseLeft > 0) &&
                     this.laneChangeState === 'NONE' && this.state === 'DRIVING' &&
                     !approachingIntersection && !waitingForIntersection && !isPlayerAutodrive;
+                // Autodrive and Zib: a route that moves over to the lane its next turn goes from does it once there's room
+                if (isPlayerAutodrive) this._routeLaneChange();
                 if (folkMove === 'round' && canPullOut) {
                     this._goRound(folkPlan);
                 } else if (shouldOvertake && canPullOut && !(backOff && this._backUp(backOff))) {
@@ -2594,6 +2596,8 @@
                 // Onto the target lane's line; done once on it (or well past where it was meant to end)
                 const { steer, off } = this._steerOntoLane(this.targetLane, 0.6, this._pullOutLook);
                 if (off < 6 || this.laneChangeProgress >= 1.0 && off < 15 || currentDist > totalDist * 2.5) {
+                    const st = this._driveRoute?.transitions[this._driveRoute.index];
+                    if (st && st.change && st.toLane === this.targetLane) this._driveRoute.index++;   // the route's move across, made
                     this.currentLane = this.targetLane;
                     this.laneChangeState = 'NONE';
                     this.targetLane = null;
@@ -2690,6 +2694,21 @@
                 return steer;
             }
             
+            /**
+             * The route's next step is across to the lane beside (traffic/roads.js buildDrivePath `change`): move over as soon
+             * as that lane has room, anywhere along the stretch, not waiting for the junction. Too near the line to make it
+             * (lane changes give up inside 150 px of a junction), the route is marked `missed` and planned again from here,
+             * where it can't ask for the move any more (engine/update.js).
+             */
+            _routeLaneChange() {
+                const route = this._driveRoute, step = route && route.transitions[route.index];
+                if (!step || !step.change || this.currentTurnPath || this.currentLane !== step.fromLane) return;
+                if (this.laneChangeState !== 'NONE' || this._reverseLeft > 0) return;
+                const left = this.currentLane.length - this.getDistanceAlongLane();
+                if (left < 280) { route.missed = true; return; }                       // (under buildDrivePath's CHANGE_ROOM)
+                if (this.isLaneClear(step.toLane, this.length * 2)) this.initiateNormalLaneChange(step.toLane);
+            }
+
             initiateNormalLaneChange(targetLane) {
                 this.laneChangeState = 'CHANGING';
                 this._pullOutLook = Math.abs(this.speed) < 2 ? this.length * 0.75 : undefined;   // from a crawl: pulling out round something

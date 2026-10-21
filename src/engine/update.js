@@ -1105,7 +1105,7 @@
                             const changed = !route || route.target.x !== this.navDestination.x || route.target.y !== this.navDestination.y;
                             const expected = route && (route.transitions[route.index]?.fromLane || route.endLane);
                             const offRoute = route && this.car.currentLane && this.car.currentLane !== expected;
-                            if (!this.car.currentTurnPath && (changed || (offRoute && this.car._gpsCheckTimer > 180))) {
+                            if (!this.car.currentTurnPath && (changed || route?.missed || (offRoute && this.car._gpsCheckTimer > 180))) {
                                 if (!route && this.car._gpsCheckTimer < 30) {
                                     // A failed route retries at most twice per second.
                                 } else {

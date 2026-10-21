@@ -39054,23 +39054,48 @@ class NeuralSystemsBuilding extends BuildingV2 {
                     if (point.distance > nearest + (lane.road.laneWidth || 60) + 0.01) targets.delete(lane);
                 }
                 const distances = new Map(), previous = new Map(), settled = new Set();
+                // Moving across to the lane beside (same stretch, same way) is a link too, so a route takes its turns
+                // from the lane meant for them: it moves over on the way (`change`, done by the car when there's room,
+                // traffic/traffic-vehicle.js _routeLaneChange) rather than turning across the next lane, which the lights
+                // hold for whatever crosses it. A turn from the wrong lane stays possible, at a price.
+                const CHANGE_COST = 80, CHANGE_ROOM = 300, WRONG_LANE = 600;   // (CHANGE_ROOM: more than the car gives up at, so a replan here never asks again)
+                const mayTake = typeof TrafficVehicle !== 'undefined' && TrafficVehicle.laneMayTake;
+                const entry = new Map([[startLane, origin.along]]);            // how far along each lane we come onto it
                 const relax = (fromLane, cost, source = false) => {
                     const links = (fromLane.connections || []).map(toLane => ({ fromLane, toLane, turnPath: null }));
                     for (const turnPath of fromLane.turnPaths || []) {
                         if (turnPath.fromLane === fromLane && turnPath.toLane) links.push({ fromLane, toLane: turnPath.toLane, turnPath });
                     }
+                    const room = fromLane.length - (entry.get(fromLane) || 0);
+                    if (fromLane.segment && fromLane.road && !fromLane.road.isCurved && room >= CHANGE_ROOM) {
+                        for (const side of fromLane.segment.lanes || []) {
+                            if (side !== fromLane && side.direction === fromLane.direction && Math.abs(side.laneIndex - fromLane.laneIndex) === 1)
+                                links.push({ fromLane, toLane: side, turnPath: null, change: true });
+                        }
+                    }
                     for (const link of links) {
                         if (!targets.has(link.toLane) && !this.allLanes.includes(link.toLane)) continue;
+                        if (link.change) {                                     // reaches the lane beside where we are, not its start
+                            const nextCost = cost - fromLane.length + CHANGE_COST;
+                            if (nextCost < (distances.get(link.toLane) ?? Infinity)) {
+                                distances.set(link.toLane, nextCost);
+                                previous.set(link.toLane, { link, from: source ? null : fromLane });
+                                entry.set(link.toLane, (entry.get(fromLane) || 0) + 90);   // across once a car and a half on
+                            }
+                            continue;
+                        }
                         const cp = link.turnPath?.controlPoints;
                         const length = cp ? cp.slice(1).reduce((sum, point, i) => sum + Math.hypot(point.x - cp[i].x, point.y - cp[i].y), 0)
                             : Math.hypot(fromLane.end.x - link.toLane.start.x, fromLane.end.y - link.toLane.start.y);
-                        const nextCost = cost + length;
+                        const nextCost = cost + length + (link.turnPath && mayTake && !mayTake(fromLane, link.turnPath) ? WRONG_LANE : 0);
                         if (nextCost < (distances.get(link.toLane) ?? Infinity)) {
                             distances.set(link.toLane, nextCost);
                             previous.set(link.toLane, { link, from: source ? null : fromLane });
+                            entry.set(link.toLane, 0);
                         }
                     }
                 };
+                distances.set(startLane, -origin.along); settled.add(startLane);   // (no route back onto it from beside)
                 relax(startLane, startLane.length - origin.along, true);
                 let best = null, bestCost = Infinity;
                 const direct = targets.get(startLane);
@@ -39086,7 +39111,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
                     if (!lane) break;
                     settled.add(lane);
                     const point = targets.get(lane);
-                    const finalCost = point ? cost + point.along + point.distance * 4 : Infinity;
+                    const finalCost = point && point.along >= (entry.get(lane) || 0) ? cost + point.along + point.distance * 4 : Infinity;
                     if (finalCost < bestCost) { best = { lane, point, direct: false }; bestCost = finalCost; }
                     relax(lane, cost + lane.length);
                 }
@@ -39106,6 +39131,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
                     road: lane.road, roadId: lane.roadId });
                 const waypoints = [lanePoint('LANE_START', startLane, { x: startX, y: startY })];
                 for (const link of transitions) {
+                    if (link.change) continue;                                 // moving over on the way: no point of its own
                     waypoints.push(lanePoint('LANE_END', link.fromLane, link.fromLane.end));
                     const tp = link.turnPath;
                     if (tp) {
@@ -42486,6 +42512,8 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 const canPullOut = this.currentLane && !this.currentTurnPath && !(this._reverseLeft > 0) &&
                     this.laneChangeState === 'NONE' && this.state === 'DRIVING' &&
                     !approachingIntersection && !waitingForIntersection && !isPlayerAutodrive;
+                // Autodrive and Zib: a route that moves over to the lane its next turn goes from does it once there's room
+                if (isPlayerAutodrive) this._routeLaneChange();
                 if (folkMove === 'round' && canPullOut) {
                     this._goRound(folkPlan);
                 } else if (shouldOvertake && canPullOut && !(backOff && this._backUp(backOff))) {
@@ -43310,6 +43338,8 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 // Onto the target lane's line; done once on it (or well past where it was meant to end)
                 const { steer, off } = this._steerOntoLane(this.targetLane, 0.6, this._pullOutLook);
                 if (off < 6 || this.laneChangeProgress >= 1.0 && off < 15 || currentDist > totalDist * 2.5) {
+                    const st = this._driveRoute?.transitions[this._driveRoute.index];
+                    if (st && st.change && st.toLane === this.targetLane) this._driveRoute.index++;   // the route's move across, made
                     this.currentLane = this.targetLane;
                     this.laneChangeState = 'NONE';
                     this.targetLane = null;
@@ -43406,6 +43436,21 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 return steer;
             }
             
+            /**
+             * The route's next step is across to the lane beside (traffic/roads.js buildDrivePath `change`): move over as soon
+             * as that lane has room, anywhere along the stretch, not waiting for the junction. Too near the line to make it
+             * (lane changes give up inside 150 px of a junction), the route is marked `missed` and planned again from here,
+             * where it can't ask for the move any more (engine/update.js).
+             */
+            _routeLaneChange() {
+                const route = this._driveRoute, step = route && route.transitions[route.index];
+                if (!step || !step.change || this.currentTurnPath || this.currentLane !== step.fromLane) return;
+                if (this.laneChangeState !== 'NONE' || this._reverseLeft > 0) return;
+                const left = this.currentLane.length - this.getDistanceAlongLane();
+                if (left < 280) { route.missed = true; return; }                       // (under buildDrivePath's CHANGE_ROOM)
+                if (this.isLaneClear(step.toLane, this.length * 2)) this.initiateNormalLaneChange(step.toLane);
+            }
+
             initiateNormalLaneChange(targetLane) {
                 this.laneChangeState = 'CHANGING';
                 this._pullOutLook = Math.abs(this.speed) < 2 ? this.length * 0.75 : undefined;   // from a crawl: pulling out round something
@@ -71822,7 +71867,7 @@ engineMixin({
                             const changed = !route || route.target.x !== this.navDestination.x || route.target.y !== this.navDestination.y;
                             const expected = route && (route.transitions[route.index]?.fromLane || route.endLane);
                             const offRoute = route && this.car.currentLane && this.car.currentLane !== expected;
-                            if (!this.car.currentTurnPath && (changed || (offRoute && this.car._gpsCheckTimer > 180))) {
+                            if (!this.car.currentTurnPath && (changed || route?.missed || (offRoute && this.car._gpsCheckTimer > 180))) {
                                 if (!route && this.car._gpsCheckTimer < 30) {
                                     // A failed route retries at most twice per second.
                                 } else {
