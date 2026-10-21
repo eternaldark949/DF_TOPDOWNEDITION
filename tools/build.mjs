@@ -171,6 +171,7 @@ const SCRIPTS = [
     'engine/loop.js',
     'app/menu-wiring.js',
     'ui/phone.js',
+    'ui/messages.js',
     'ui/screens.js',
     'ui/sidebars.js',
     'ui/save-slots-pause-menu.js',

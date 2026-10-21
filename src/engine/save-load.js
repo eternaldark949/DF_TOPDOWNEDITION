@@ -70,6 +70,7 @@ engineMixin({
                         contactOverrides: (typeof phoneSystem !== 'undefined') ? phoneSystem.contactOverrides : {},
                         unread: (typeof phoneSystem !== 'undefined') ? phoneSystem.unread : {},
                         lastMessageAt: (typeof phoneSystem !== 'undefined') ? phoneSystem.lastMessageAt : {},
+                        feed: (typeof phoneSystem !== 'undefined' && phoneSystem.feed) ? phoneSystem.feed : null,
                         metNPCs: (typeof phoneSystem !== 'undefined') ? phoneSystem.getMetNPCsList() : []
                     },
                     
@@ -683,6 +684,7 @@ engineMixin({
                             for (const name in phoneData.contactOverrides) phoneSystem.unread[name] = 1;
                         }
                         if (phoneData && phoneData.lastMessageAt) phoneSystem.lastMessageAt = phoneData.lastMessageAt;
+                        if (phoneSystem.resetFeed) { phoneSystem.resetFeed(); if (phoneData && phoneData.feed) Object.assign(phoneSystem.feed, phoneData.feed); }
                         phoneSystem.refreshNotifications();
                         // Restore met NPCs list
                         if (phoneData && phoneData.metNPCs) {

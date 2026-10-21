@@ -210,6 +210,7 @@
                     phoneSystem.lastMessageAt = {};
                     if (phoneSystem.contactOverrides) phoneSystem.contactOverrides = {};
                     phoneSystem.metNPCs = new Set();
+                    if (phoneSystem.resetFeed) phoneSystem.resetFeed();
                     phoneSystem.seedDefaultContacts();
                     phoneSystem.refreshNotifications();
                 }

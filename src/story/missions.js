@@ -344,6 +344,8 @@
                 if (m.type === MISSION_TYPES.BOUNTY && this.completedBounties === 5) {
                     game.addPausableTimeout(() => showMessage('ANAVIA HAS NOTICED YOUR WORK. VISIT HER.'), 2000);
                 }
+                // The crew's take on it, in the group chat (ui/messages.js)
+                if (typeof phoneSystem !== 'undefined' && phoneSystem.crewBanter) phoneSystem.crewBanter(m, game);
                 
                 this.activeMission = null;
             }

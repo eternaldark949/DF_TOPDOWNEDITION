@@ -2266,36 +2266,6 @@
         .phone-app-title { font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.9rem - var(--font-trim)); color: rgba(140, 20, 30, 0.8); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
         .phone-app-content { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 5px; scrollbar-width: thin; scrollbar-color: rgba(140,20,30,0.4) rgba(255, 255, 255, 0.05); }
         
-        .contact-item { display: flex; align-items: center; padding: 12px; background: rgba(255, 255, 255, 0.03); border-radius: 8px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s; }
-        .contact-item:hover { background: rgba(140, 20, 30, 0.1); }
-        .contact-unread-count { flex-shrink: 0; margin-left: 8px; min-width: 18px; padding: 0 5px; height: 18px; border-radius: 9px; background: #ff0055; color: #fff; font-family: 'Orbitron', sans-serif; font-size: max(6px, 0.6rem - var(--font-trim)); font-weight: bold; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 6px rgba(255, 0, 85, 0.6); }
-        .contact-avatar { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, rgba(140,20,30,0.6), rgba(218,165,32,0.4)); display: flex; justify-content: center; align-items: center; font-size: max(6px, 1.2rem - var(--font-trim)); margin-right: 12px; position: relative; flex-shrink: 0; border: 2px solid transparent; box-sizing: border-box; transition: border-color 0.3s; }
-        /* Portrait fills the circle; the gradient above stays visible behind the
-           transparent PNG, so the app keeps its look instead of a flat dark disc. */
-        .contact-avatar.has-portrait { overflow: visible; }
-        .avatar-portrait { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
-        /* Original emoji, demoted to a corner badge: identity from the face, role
-           from the glyph. */
-        .avatar-glyph { position: absolute; bottom: -3px; right: -4px; font-size: max(6px, 0.62rem - var(--font-trim)); line-height: 1; padding: 2px; border-radius: 50%; background: rgba(12,6,10,0.92); z-index: 2; }
-        .contact-avatar.avatar-unread { border-color: #ff0055; animation: avatarPulse 1.4s infinite; }
-        @keyframes avatarPulse {
-            0%   { box-shadow: 0 0 0 0 rgba(255,0,85,0.55); }
-            70%  { box-shadow: 0 0 0 6px rgba(255,0,85,0); }
-            100% { box-shadow: 0 0 0 0 rgba(255,0,85,0); }
-        }
-        /* Downed teammates can't actually be reached — say so visually. */
-        .contact-avatar.avatar-downed { filter: grayscale(1) brightness(0.55); border-color: rgba(90,90,90,0.6); }
-        .contact-avatar.avatar-downed .avatar-glyph { filter: grayscale(1); }
-        .contact-info { flex: 1; }
-        .contact-name { color: #fff; font-size: max(6px, 0.9rem - var(--font-trim)); margin-bottom: 3px; }
-        .contact-role { color: #888; font-size: max(6px, 0.7rem - var(--font-trim)); }
-        .typing-anim { color: #c07878; font-style: italic; animation: pulseText 1s infinite alternate; }
-        /* Unread rows: brighter + bold so the block reads at a glance. Applied to
-           the name as well as the preview, since bolding only the preview made the
-           row look lopsided against the lighter name above it. */
-        .contact-item.unread .contact-name { font-weight: 700; color: #fff; }
-        .contact-item.unread .contact-role { font-weight: 700; color: #d8b0b8; }
-        
         /* Typing Indicator - Flickering Periwinkle with Bouncing Dots */
         .phone-typing-indicator {
             position: absolute;
@@ -2336,65 +2306,172 @@
             30% { transform: translateY(-6px); }
         }
         @keyframes pulseText { from { opacity: 0.5; } to { opacity: 1; } }
-        .contact-message { background: rgba(255, 255, 255, 0.03); padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid rgba(140, 20, 30, 0.5); }
-        .contact-message-label { color: #888; font-size: max(6px, 0.7rem - var(--font-trim)); margin-bottom: 5px; }
-        .contact-message-text { color: #ddd; font-size: max(6px, 0.85rem - var(--font-trim)); line-height: 1.4; }
-
         /* =========================================================
-           MESSAGE THREAD — conversation, not notice board
-           Incoming keeps the left-accent card. 949's replies are
-           right-aligned periwinkle so the two voices read apart.
+           MESSAGES — Velvet Thread (ui/messages.js)
+           On its side: the inbox rail (34%) beside the thread.
+           Upright: the list, or the thread (.has-thread).
+           Her lines violet on the right, theirs smoke on the left,
+           gold reply chips, painted faces with the bond's ring.
            ========================================================= */
-        .thread-avatar-slot { display: flex; align-items: center; margin-right: 10px; }
-        .thread-avatar-slot .contact-avatar { width: 30px; height: 30px; margin-right: 0; font-size: max(6px, 0.9rem - var(--font-trim)); }
-        .thread-avatar-slot .avatar-glyph { font-size: max(6px, 0.48rem - var(--font-trim)); bottom: -2px; right: -3px; }
+        #screen-contacts { flex-direction: row; padding: 0 0 42px; position: relative;
+            background: radial-gradient(ellipse 70% 60% at 30% 15%, rgba(93, 20, 226, 0.22), transparent 70%), linear-gradient(180deg, #0e0418, #07020c); }
+        body.phone-wide #screen-contacts { padding: 0 0 34px; }
+        .msg-rail { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; padding: 14px 12px 0; }
+        .msg-pane { flex: 1 1 auto; min-width: 0; display: none; flex-direction: column; position: relative; }
+        #screen-contacts.has-thread .msg-rail { display: none; }
+        #screen-contacts.has-thread .msg-pane { display: flex; }
+        body.phone-wide .msg-rail { flex: 0 0 34%; display: flex !important; padding: 8px 6px 0 10px; border-right: 1px solid rgba(232, 194, 122, 0.18); }
+        body.phone-wide .msg-pane { display: flex; }
+        body.phone-wide #contact-detail-back { display: none; }
+        #screen-contacts:not(.has-thread) .msg-head, #screen-contacts:not(.has-thread) .msg-feed, #screen-contacts:not(.has-thread) #contact-reply-bar { display: none; }
 
-        .msg-row { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 10px; }
-        .msg-row.from-me { flex-direction: row-reverse; }
-        .msg-row .contact-message { margin-bottom: 0; flex: 1 1 auto; min-width: 0; }
-        .msg-avatar { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; position: relative;
-                      background: linear-gradient(135deg, rgba(140,20,30,0.6), rgba(218,165,32,0.4));
-                      display: flex; align-items: center; justify-content: center; font-size: max(6px, 0.75rem - var(--font-trim)); overflow: hidden; }
-        .msg-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
-        .msg-avatar.is-me { background: linear-gradient(135deg, rgba(120,120,225,0.6), rgba(185,175,255,0.35)); }
+        .msg-rail-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .msg-rail-head .phone-back-btn { margin: 0; width: 24px; height: 24px; font-size: max(6px, 0.7rem - var(--font-trim)); flex: none; }
+        .msg-title { font: 400 max(6px, 1.7rem - var(--font-trim))/1 'Great Vibes', cursive; color: #f6dfa8; text-shadow: 0 0 14px rgba(232, 194, 122, 0.35); }
+        body.phone-wide .msg-title { font-size: max(6px, 1.45rem - var(--font-trim)); }
+        .msg-tabs { display: flex; gap: 4px; margin-bottom: 6px; }
+        .msg-tabs button { font: 600 max(6px, 0.5rem - var(--font-trim))/1 'Montserrat', sans-serif; letter-spacing: 0.1em; text-transform: uppercase; padding: 5px 8px; border-radius: 999px;
+            border: 1px dotted rgba(202, 176, 250, 0.4); background: transparent; color: var(--df-lilac-grey); cursor: pointer; }
+        .msg-tabs button.on { background: var(--df-lavender-pale); color: var(--df-violet-ink); border: 1px solid #fff; }
+        .msg-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column; gap: 2px; padding-bottom: 6px; }
+        .msg-list::-webkit-scrollbar { display: none; }
+        .msg-sec { font: 600 max(6px, 0.45rem - var(--font-trim))/1 'Montserrat', sans-serif; letter-spacing: 0.3em; text-transform: uppercase; color: #e8c27a; margin: 6px 0 2px 4px; }
+        .msg-none { text-align: center; margin-top: 24px; font: italic 500 max(6px, 0.85rem - var(--font-trim)) 'Cormorant Garamond', Georgia, serif; color: var(--df-lilac-grey); }
+        .msg-item { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 10px; cursor: pointer; transition: background 0.18s; flex: none; }
+        .msg-item:hover { background: rgba(93, 20, 226, 0.18); }
+        .msg-item.on { background: linear-gradient(90deg, rgba(93, 20, 226, 0.5), rgba(35, 5, 93, 0.25)); box-shadow: inset 0 0 0 1px rgba(232, 194, 122, 0.3); }
+        .msg-who { flex: 1; min-width: 0; }
+        .msg-who b { display: block; font: 600 max(6px, 0.66rem - var(--font-trim))/1.25 'Montserrat', sans-serif; color: #f1e8fe; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .msg-who i { display: block; font: italic 500 max(6px, 0.74rem - var(--font-trim))/1.2 'Cormorant Garamond', Georgia, serif; color: var(--df-lilac-grey); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .msg-who i.typing { color: #f6dfa8; animation: pulseText 1s infinite alternate; }
+        .msg-item.unread .msg-who b { color: #fff; }
+        .msg-item.unread .msg-who i { color: #f1e8fe; font-weight: 700; }
+        .msg-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex: none; }
+        .msg-meta small { font: 500 max(6px, 0.45rem - var(--font-trim))/1 'Montserrat', sans-serif; color: var(--df-lilac-grey); white-space: nowrap; }
+        .msg-count { min-width: 14px; height: 14px; padding: 0 4px; box-sizing: border-box; border-radius: 7px; background: #ff3d7a; color: #fff; display: grid; place-items: center;
+            font: 700 max(6px, 0.48rem - var(--font-trim))/1 'Montserrat', sans-serif; box-shadow: 0 0 8px rgba(255, 61, 122, 0.7); }
 
-        .msg-row.from-me .contact-message {
-            background: rgba(155,155,240,0.13);
-            border-left: none;
-            border-right: 3px solid #9b9bf0;
-            text-align: right;
-        }
-        .msg-row.from-me .contact-message-label { color: #9b9bf0; }
-        .msg-row.from-me .contact-message-text { color: #dedcff; }
+        /* Faces: the painted bust in a circle, a gold hairline, the bond's ring for the crew */
+        .mav { --ring: rgba(232, 194, 122, 0.55); width: 32px; height: 32px; border-radius: 50%; flex: none; position: relative; overflow: hidden; display: grid; place-items: center;
+            background: radial-gradient(circle at 50% 35%, #3a1d78, #12061f); box-shadow: 0 0 0 1.5px var(--ring); color: #f6dfa8;
+            font: italic 600 max(6px, 0.95rem - var(--font-trim)) 'Cormorant Garamond', Georgia, serif; }
+        .mav img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .mav.big { width: 30px; height: 30px; }
+        .mav.downed img { filter: grayscale(1) brightness(0.55); }
+        .msg-item.unread .mav { box-shadow: 0 0 0 1.5px #ff3d7a, 0 0 10px rgba(255, 61, 122, 0.6); }
+        .mav.stack { overflow: visible; background: none; box-shadow: none; display: block; }
+        .mav.stack .mav-mini { position: absolute; width: 62%; height: 62%; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 1.5px #12061f, 0 0 0 2.5px rgba(232, 194, 122, 0.5); background: #23055d; }
+        .mav.stack .mav-mini img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .mav.stack .mav-mini:nth-child(1) { left: 0; top: 0; } .mav.stack .mav-mini:nth-child(2) { right: 0; top: 10%; } .mav.stack .mav-mini:nth-child(3) { left: 19%; bottom: 0; }
 
-        /* --- REPLY BAR --- */
-        #contact-reply-bar { flex-shrink: 0; padding-top: 10px; margin-top: 4px; border-top: 1px solid rgba(140,20,30,0.2); }
-        #contact-reply-options { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; align-items: flex-end; }
+        /* The thread */
+        .msg-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 7px; border-bottom: 1px solid rgba(232, 194, 122, 0.15); flex: none; }
+        body.phone-wide .msg-head { padding: 7px 12px 6px; }
+        .msg-head .phone-back-btn { margin: 0; width: 24px; height: 24px; font-size: max(6px, 0.7rem - var(--font-trim)); flex: none; }
+        .msg-head .thread-avatar-slot { display: flex; }
+        .msg-head-text { min-width: 0; }
+        .msg-head-text b { display: block; font: italic 600 max(6px, 1.1rem - var(--font-trim))/1 'Cormorant Garamond', Georgia, serif; color: #f6dfa8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .msg-head-text small { display: block; font: 500 max(6px, 0.48rem - var(--font-trim))/1.4 'Montserrat', sans-serif; color: var(--df-lilac-grey); letter-spacing: 0.08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .msg-feed { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 6px 12px 8px; display: flex; flex-direction: column; scrollbar-width: thin; scrollbar-color: rgba(232, 194, 122, 0.3) transparent; }
+        .mb-day { align-self: center; margin: 10px 0 4px; font: 600 max(6px, 0.45rem - var(--font-trim))/1 'Montserrat', sans-serif; letter-spacing: 0.26em; text-transform: uppercase; color: var(--df-lilac-grey); text-align: center; }
+        .mb-day.call { letter-spacing: 0.12em; color: #f6dfa8; }
+        .mb-row { display: flex; align-items: flex-end; gap: 6px; margin-top: 6px; }
+        .mb-row.cont { margin-top: 2px; }
+        .mb-row.me { justify-content: flex-end; }
+        .mb-col { display: flex; flex-direction: column; align-items: flex-start; max-width: 80%; min-width: 0; }
+        .mb-row.me .mb-col { align-items: flex-end; }
+        .mb-av { width: 20px; height: 20px; flex: none; }
+        .mb-av.blank { visibility: hidden; }
+        .mb-av.mav { box-shadow: 0 0 0 1px var(--ring); font-size: max(6px, 0.6rem - var(--font-trim)); }
+        .mb-who { font: 600 max(6px, 0.48rem - var(--font-trim))/1.4 'Montserrat', sans-serif; letter-spacing: 0.1em; margin: 0 0 1px 4px; }
+        .mb-wrap { position: relative; max-width: 100%; display: flex; flex-direction: column; gap: 4px; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+        .mb-row.me .mb-wrap { align-items: flex-end; }
+        .mb-wrap.has-pip { margin-bottom: 9px; }
+        .mb { padding: 6px 10px; border-radius: 14px; font: 500 max(6px, 0.66rem - var(--font-trim))/1.38 'Montserrat', sans-serif; color: #f1e8fe; overflow-wrap: anywhere; animation: mbIn 0.25s ease-out both; }
+        .mb-row.them .mb { background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(202, 176, 250, 0.16); border-bottom-left-radius: 4px; }
+        .mb-row.me .mb { background: linear-gradient(180deg, #6a24ea, #3e0fa6); border-bottom-right-radius: 4px; box-shadow: 0 0 12px rgba(93, 20, 226, 0.4); }
+        .mb-row.cont.them .mb { border-top-left-radius: 6px; } .mb-row.cont.me .mb { border-top-right-radius: 6px; }
+        @keyframes mbIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+        .mb-pip { position: absolute; bottom: -10px; right: -4px; font-size: max(6px, 0.58rem - var(--font-trim)); line-height: 1; padding: 2px 5px; border-radius: 999px; background: #241238; border: 1px solid rgba(232, 194, 122, 0.45); animation: pipIn 0.3s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+        .mb-row.me .mb-pip { right: auto; left: -4px; }
+        @keyframes pipIn { from { transform: scale(0); } to { transform: none; } }
+        .mb-wrap.glint .mb { box-shadow: 0 0 0 1px rgba(232, 194, 122, 0.8), 0 0 16px rgba(232, 194, 122, 0.55); transition: box-shadow 1.2s; }
+        .mb-picker { display: flex; gap: 2px; padding: 3px 6px; margin-bottom: 4px; border-radius: 999px; background: #241238; border: 1px solid rgba(202, 176, 250, 0.3); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5); animation: mbIn 0.18s ease-out both; }
+        .mb-picker button { background: none; border: 0; padding: 2px 4px; font-size: max(6px, 0.85rem - var(--font-trim)); line-height: 1; cursor: pointer; border-radius: 50%; transition: transform 0.12s; }
+        .mb-picker button:hover { transform: scale(1.25); }
+        .mb-picker button.on { background: rgba(232, 194, 122, 0.25); }
+        .mb-seen { align-self: flex-end; margin-top: 3px; font: 500 max(6px, 0.45rem - var(--font-trim))/1 'Montserrat', sans-serif; color: var(--df-lilac-grey); }
+        .mb-typing { align-self: flex-start; display: flex; gap: 3px; margin-top: 6px; padding: 7px 10px; border-radius: 14px; background: rgba(255, 255, 255, 0.05); }
+        .mb-typing i { width: 5px; height: 5px; border-radius: 50%; background: var(--df-lilac-grey); animation: mbDot 1.2s infinite ease-in-out; }
+        .mb-typing i:nth-child(2) { animation-delay: 0.15s; } .mb-typing i:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes mbDot { 0%, 60%, 100% { opacity: 0.3; transform: none; } 30% { opacity: 1; transform: translateY(-3px); } }
+
+        /* Cards: a pin, a job, a photo */
+        .mb-card { width: 190px; max-width: 100%; border-radius: 14px; overflow: hidden; border: 1px solid rgba(232, 194, 122, 0.4); background: #0d0718; animation: mbIn 0.25s ease-out both; }
+        .mb-map { height: 70px; position: relative; background: #160a26 center / cover no-repeat; }
+        .mb-map.sketch { background:
+            linear-gradient(90deg, transparent 47%, rgba(202, 176, 250, 0.22) 47% 50%, transparent 50%),
+            linear-gradient(0deg, transparent 58%, rgba(202, 176, 250, 0.22) 58% 61%, transparent 61%),
+            linear-gradient(30deg, transparent 70%, rgba(202, 176, 250, 0.14) 70% 72%, transparent 72%), #160a26; }
+        .mb-map i { position: absolute; left: 50%; top: 50%; width: 12px; height: 12px; margin: -14px 0 0 -6px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+            background: #ff3d7a; box-shadow: 0 0 10px #ff3d7a; animation: pinDrop 0.5s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+        .mb-map i::after { content: ''; position: absolute; inset: 3.5px; border-radius: 50%; background: #2a0614; }
+        @keyframes pinDrop { from { transform: translateY(-14px) rotate(-45deg); opacity: 0; } to { transform: rotate(-45deg); opacity: 1; } }
+        .mb-cap { padding: 6px 8px 7px 10px; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+        .mb-cap > div { min-width: 0; }
+        .mb-cap b, .mb-brief b { display: block; font: italic 600 max(6px, 0.82rem - var(--font-trim))/1.1 'Cormorant Garamond', Georgia, serif; color: #f6dfa8; }
+        .mb-cap small { display: block; font: 500 max(6px, 0.48rem - var(--font-trim))/1.4 'Montserrat', sans-serif; color: var(--df-lilac-grey); }
+        .mb-btn { flex: none; font: 600 max(6px, 0.45rem - var(--font-trim))/1 'Montserrat', sans-serif; letter-spacing: 0.12em; text-transform: uppercase; padding: 6px 8px; border-radius: 999px;
+            border: 0; background: #ffc248; color: #2a1458; cursor: pointer; white-space: nowrap; box-shadow: 0 0 10px rgba(255, 194, 72, 0.35); }
+        .mb-btn:active { transform: scale(0.95); }
+        .mb-brief { padding: 8px 10px; display: grid; gap: 3px; background: linear-gradient(160deg, rgba(232, 194, 122, 0.14), rgba(93, 20, 226, 0.16)), #0d0718; }
+        .mb-brief .k { font: 600 max(6px, 0.42rem - var(--font-trim))/1 'Montserrat', sans-serif; letter-spacing: 0.3em; text-transform: uppercase; color: #e8c27a; }
+        .mb-brief p { margin: 0; font: 500 max(6px, 0.54rem - var(--font-trim))/1.35 'Montserrat', sans-serif; color: var(--df-lilac-grey); }
+        .mb-brief .row { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 2px; font: 600 max(6px, 0.52rem - var(--font-trim))/1 'Montserrat', sans-serif; color: #f1e8fe; }
+        .mb-brief em { font-style: normal; color: #f6dfa8; font-size: max(6px, 0.5rem - var(--font-trim)); }
+        .mb-brief.lapsed { opacity: 0.55; }
+        .mb-snap { position: relative; width: 180px; }
+        .mb-snap img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: #160a26; }
+        .mb-snap.gone img { aspect-ratio: 16 / 6; }
+        .mb-snap span { position: absolute; left: 6px; bottom: 6px; padding: 2px 6px; border-radius: 999px; background: rgba(13, 7, 24, 0.75); font: 500 max(6px, 0.45rem - var(--font-trim))/1.3 'Montserrat', sans-serif; color: #f1e8fe; }
+        .mb-row.me .mb-snap { border-color: rgba(142, 85, 245, 0.7); box-shadow: 0 0 12px rgba(93, 20, 226, 0.35); }
+
+        /* Voice notes: a waveform that fills as it plays, and the earpiece chip under it */
+        .mb-voice { display: flex; align-items: center; gap: 7px; width: 176px; max-width: 100%; padding: 6px 9px 6px 6px; border-radius: 14px; border-bottom-left-radius: 4px;
+            background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(202, 176, 250, 0.16); box-sizing: border-box; animation: mbIn 0.25s ease-out both; }
+        .mb-play { width: 22px; height: 22px; flex: none; border-radius: 50%; border: 0; background: #ffc248; color: #2a1458; font-size: max(6px, 0.5rem - var(--font-trim)); cursor: pointer; display: grid; place-items: center; padding: 0; }
+        .mb-voice.fresh .mb-play { box-shadow: 0 0 0 2px rgba(255, 194, 72, 0.35), 0 0 10px rgba(255, 194, 72, 0.5); }
+        .mb-wave { flex: 1; height: 20px; display: flex; align-items: center; gap: 1.5px; }
+        .mb-wave i { flex: 1; border-radius: 2px; background: rgba(142, 85, 245, 0.55); transition: background 0.15s; }
+        .mb-wave i.lit { background: #f6dfa8; }
+        .mb-voice small { font: 500 max(6px, 0.48rem - var(--font-trim))/1 'Montserrat', sans-serif; color: var(--df-lilac-grey); font-variant-numeric: tabular-nums; }
+        .mb-sub { margin-top: 2px; padding: 3px 12px 3px 3px; max-width: 220px; animation: commIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+        .mb-sub .comm-face { width: 24px; height: 24px; }
+        .mb-sub .comm-name { font-size: max(6px, 0.7rem - var(--font-trim)); }
+        .mb-sub .comm-text { font-size: max(6px, 0.58rem - var(--font-trim)); animation: mbIn 0.3s ease-out both; }
+
+        /* The reply bar: gold chips above a slim input with the camera */
+        #contact-reply-bar { flex-shrink: 0; padding: 0 10px; }
+        #contact-reply-options { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; margin: 2px 0 5px; }
         #contact-reply-options:empty { display: none; }
-        .reply-chip {
-            max-width: 100%; padding: 7px 12px;
-            border-radius: 14px 14px 4px 14px;
-            background: rgba(155,155,240,0.14);
-            border: 1px solid rgba(155,155,240,0.45);
-            color: #cfccff; font-family: 'Montserrat', sans-serif;
-            font-size: max(6px, 0.72rem - var(--font-trim)); line-height: 1.35; text-align: right;
-            cursor: pointer; transition: background 0.18s, transform 0.1s;
-            animation: chipIn 0.22s ease-out both;
-        }
+        .reply-chip { max-width: 100%; padding: 5px 9px; border-radius: 999px; border: 1px solid rgba(232, 194, 122, 0.5); background: rgba(232, 194, 122, 0.06); color: #f6dfa8;
+            font: 500 max(6px, 0.58rem - var(--font-trim))/1.25 'Montserrat', sans-serif; cursor: pointer; text-align: right; transition: background 0.18s, transform 0.1s; animation: chipIn 0.22s ease-out both; }
         @keyframes chipIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-        .reply-chip:hover { background: rgba(155,155,240,0.28); }
+        .reply-chip:hover { background: rgba(232, 194, 122, 0.18); }
         .reply-chip:active { transform: scale(0.97); }
-        #contact-reply-input {
-            display: flex; align-items: center; gap: 8px; padding: 8px 12px;
-            border-radius: 16px; background: rgba(255,255,255,0.04);
-            border: 1px solid rgba(255,255,255,0.08); color: #6c6c7a;
-            font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.7rem - var(--font-trim));
-        }
-        #contact-reply-input.armed { border-color: rgba(155,155,240,0.35); color: #9b9bf0; }
-        #contact-reply-send { margin-left: auto; width: 20px; height: 20px; border-radius: 50%;
-                              background: rgba(155,155,240,0.18); color: #9b9bf0;
-                              display: flex; align-items: center; justify-content: center; font-size: max(6px, 0.55rem - var(--font-trim)); }
-        .msg-typing { font-style: italic; color: #c07878; animation: pulseText 1s infinite alternate; }
+        #contact-reply-input { display: flex; align-items: center; gap: 7px; padding: 3px 4px 3px 3px; border-radius: 999px; background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08); color: #6c6c7a; font: 500 max(6px, 0.56rem - var(--font-trim)) 'Montserrat', sans-serif; }
+        #contact-reply-input.armed { border-color: rgba(232, 194, 122, 0.35); color: #e8c27a; }
+        #contact-reply-snap { width: 22px; height: 22px; flex: none; border-radius: 50%; border: 0; padding: 0; background: rgba(202, 176, 250, 0.14); font-size: max(6px, 0.6rem - var(--font-trim)); cursor: pointer; display: grid; place-items: center; }
+        #contact-reply-snap:disabled { opacity: 0.35; cursor: default; }
+        #contact-reply-snap:not(:disabled):hover { background: rgba(232, 194, 122, 0.3); }
+        #contact-reply-send { margin-left: auto; width: 20px; height: 20px; border-radius: 50%; background: rgba(232, 194, 122, 0.16); color: #e8c27a;
+            display: flex; align-items: center; justify-content: center; font-size: max(6px, 0.5rem - var(--font-trim)); }
+
+        .msg-empty { display: none; }
+        #screen-contacts:not(.has-thread) .msg-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+        .msg-empty-script { font: 400 max(6px, 2.4rem - var(--font-trim))/1 'Great Vibes', cursive; color: rgba(246, 223, 168, 0.55); }
+        .msg-empty-line { font: 600 max(6px, 0.48rem - var(--font-trim))/1 'Montserrat', sans-serif; letter-spacing: 0.26em; text-transform: uppercase; color: var(--df-lilac-grey); }
         
         #phone-map-canvas { width: 100%; height: 300px; background: #0b0614; border-radius: 12px; border: 1px solid rgba(217, 204, 255, 0.25); box-shadow: 0 0 18px rgba(139, 92, 246, 0.18) inset; }
         .help-section { background: rgba(255, 255, 255, 0.05); padding: 12px; border-radius: 10px; margin-bottom: 10px; }
@@ -3913,9 +3990,9 @@
                             <div id="phone-apps">
                                 <div class="phone-app-container" id="app-contacts">
                                     <div class="phone-app-icon-circle" style="position:relative;">
-                                        👤 <div class="app-badge" id="badge-contacts"></div> 
+                                        💬 <div class="app-badge" id="badge-contacts"></div> 
                                     </div>
-                                    <div class="phone-app-name">Contacts</div>
+                                    <div class="phone-app-name">Messages</div>
                                 </div>
                                 <div class="phone-app-container" id="app-maps">
                                     <div class="phone-app-icon-circle">🗺️</div>
@@ -3957,30 +4034,43 @@
                             </div>
                         </div>
                         
+                        <!-- Messages (ui/messages.js): the inbox rail beside the open thread on its side, one or the other upright -->
                         <div class="phone-app-screen" id="screen-contacts">
-                            <div class="phone-app-header">
-                                <button class="phone-back-btn" id="contacts-back">◀</button>
-                                <span class="phone-app-title">Contacts</span>
+                            <div class="msg-rail">
+                                <div class="msg-rail-head">
+                                    <button class="phone-back-btn" id="contacts-back">◀</button>
+                                    <span class="msg-title">Messages</span>
+                                </div>
+                                <div class="msg-tabs" id="msg-tabs">
+                                    <button data-tab="all" class="on">All</button><button data-tab="crew">Crew</button><button data-tab="unread">Unread</button>
+                                </div>
+                                <div class="msg-list" id="contacts-list"></div>
                             </div>
-                            <div class="phone-app-content" id="contacts-list"></div>
-                        </div>
-                        
-                        <div class="phone-app-screen" id="screen-contact-detail">
-                            <div class="phone-app-header">
-                                <button class="phone-back-btn" id="contact-detail-back">◀</button>
-                                <div class="thread-avatar-slot" id="contact-detail-avatar"></div>
-                                <span class="phone-app-title" id="contact-detail-name">Name</span>
-                            </div>
-                            <div class="phone-app-content contact-detail" id="contact-detail-content"></div>
-                            <div id="contact-reply-bar">
-                                <div id="contact-reply-options"></div>
-                                <div id="contact-reply-input">
-                                    <span id="contact-reply-hint">No reply needed</span>
-                                    <span id="contact-reply-send">➤</span>
+                            <div class="msg-pane" id="screen-contact-detail">
+                                <div class="msg-head">
+                                    <button class="phone-back-btn" id="contact-detail-back">◀</button>
+                                    <div class="thread-avatar-slot" id="contact-detail-avatar"></div>
+                                    <div class="msg-head-text">
+                                        <b id="contact-detail-name">Name</b>
+                                        <small id="contact-detail-sub"></small>
+                                    </div>
+                                </div>
+                                <div class="msg-feed" id="contact-detail-content"></div>
+                                <div id="contact-reply-bar">
+                                    <div id="contact-reply-options"></div>
+                                    <div id="contact-reply-input">
+                                        <button id="contact-reply-snap" title="Send a snapshot">📷</button>
+                                        <span id="contact-reply-hint">No reply needed</span>
+                                        <span id="contact-reply-send">➤</span>
+                                    </div>
+                                </div>
+                                <div class="msg-empty" id="msg-empty">
+                                    <div class="msg-empty-script">Messages</div>
+                                    <div class="msg-empty-line" id="msg-empty-line">Choose a conversation</div>
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="phone-app-screen" id="screen-maps">
                             <div class="phone-app-header">
                                 <button class="phone-back-btn" id="maps-back">◀</button>
@@ -8811,6 +8901,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                         condition: "CONTRACTOR_REWARDED",
                                         onStart: (game) => {
                                             game.questState.ambushCleared = true;
+                                            // Where to find her, as a pin she can set as her waypoint (ui/messages.js)
+                                            if (typeof phoneSystem !== 'undefined' && phoneSystem.dropPin) phoneSystem.dropPin('Mirabel', 'moon_city', 'Moon City. My lounge, upstairs. Don\'t keep me waiting.', 2400);
                                             game.hud.reveal('autodrive');
                                             game.hud.reveal('handbrake');
                                         }
@@ -57669,6 +57761,8 @@ Object.assign(TrafficVehicle.prototype, {
                 if (m.type === MISSION_TYPES.BOUNTY && this.completedBounties === 5) {
                     game.addPausableTimeout(() => showMessage('ANAVIA HAS NOTICED YOUR WORK. VISIT HER.'), 2000);
                 }
+                // The crew's take on it, in the group chat (ui/messages.js)
+                if (typeof phoneSystem !== 'undefined' && phoneSystem.crewBanter) phoneSystem.crewBanter(m, game);
                 
                 this.activeMission = null;
             }
@@ -67657,6 +67751,7 @@ engineMixin({
                         contactOverrides: (typeof phoneSystem !== 'undefined') ? phoneSystem.contactOverrides : {},
                         unread: (typeof phoneSystem !== 'undefined') ? phoneSystem.unread : {},
                         lastMessageAt: (typeof phoneSystem !== 'undefined') ? phoneSystem.lastMessageAt : {},
+                        feed: (typeof phoneSystem !== 'undefined' && phoneSystem.feed) ? phoneSystem.feed : null,
                         metNPCs: (typeof phoneSystem !== 'undefined') ? phoneSystem.getMetNPCsList() : []
                     },
                     
@@ -68270,6 +68365,7 @@ engineMixin({
                             for (const name in phoneData.contactOverrides) phoneSystem.unread[name] = 1;
                         }
                         if (phoneData && phoneData.lastMessageAt) phoneSystem.lastMessageAt = phoneData.lastMessageAt;
+                        if (phoneSystem.resetFeed) { phoneSystem.resetFeed(); if (phoneData && phoneData.feed) Object.assign(phoneSystem.feed, phoneData.feed); }
                         phoneSystem.refreshNotifications();
                         // Restore met NPCs list
                         if (phoneData && phoneData.metNPCs) {
@@ -78722,6 +78818,7 @@ engineMixin({
                     phoneSystem.lastMessageAt = {};
                     if (phoneSystem.contactOverrides) phoneSystem.contactOverrides = {};
                     phoneSystem.metNPCs = new Set();
+                    if (phoneSystem.resetFeed) phoneSystem.resetFeed();
                     phoneSystem.seedDefaultContacts();
                     phoneSystem.refreshNotifications();
                 }
@@ -79140,24 +79237,30 @@ engineMixin({
             
             // --- MESSAGE HISTORY SYSTEM ---
             // Add a message to history (persists across mission steps)
-            addMessage(contactName, text, isNew = true, from = 'them') {
+            // `extra` carries a rich message's fields (ui/messages.js): kind ('pin' | 'brief' | 'voice' | 'snap'),
+            // data, who (the speaker in a group chat), id. Returns the record, or null when it was a repeat.
+            addMessage(contactName, text, isNew = true, from = 'them', extra = null) {
                 if (!this.messageHistory[contactName]) {
                     this.messageHistory[contactName] = [];
                 }
                 // Incoming lines dedupe on text so a repeated story beat doesn't
-                // stack. Player replies never dedupe — answering "On my way." to
-                // two different messages is legitimate and should show twice.
+                // stack (rich messages on their id). Player replies never dedupe:
+                // answering "On my way." to two different messages is legitimate.
                 if (from === 'them') {
+                    const id = extra && extra.id;
                     const exists = this.messageHistory[contactName]
-                        .some(m => m.text === text && (m.from || 'them') === 'them');
-                    if (exists) return;
+                        .some(m => id ? m.id === id : (!m.kind && m.text === text && (m.from || 'them') === 'them'));
+                    if (exists) return null;
                 }
-                this.messageHistory[contactName].push({
+                const rec = {
                     text: text,
                     timestamp: game?.worldMinutes || 0,
                     isNew: isNew,
-                    from: from
-                });
+                    from: from,
+                    ...(extra || {})
+                };
+                this.messageHistory[contactName].push(rec);
+                return rec;
             },
             
             // Get all messages for a contact (default + history)
@@ -79198,22 +79301,22 @@ engineMixin({
             },
             
             // Send a new text message (sets override + adds to history + shows typing)
-            sendText(contactName, text, showTypingFirst = false, typingDuration = 2000) {
+            sendText(contactName, text, showTypingFirst = false, typingDuration = 2000, extra = null) {
                 if (showTypingFirst) {
                     // Show typing indicator first
                     this.setTyping(contactName, true);
                     setTimeout(() => {
                         this.setTyping(contactName, false);
-                        this._deliverMessage(contactName, text);
+                        this._deliverMessage(contactName, text, extra);
                     }, typingDuration);
                 } else {
-                    this._deliverMessage(contactName, text);
+                    this._deliverMessage(contactName, text, extra);
                 }
             },
             
-            _deliverMessage(contactName, text) {
+            _deliverMessage(contactName, text, extra = null) {
                 // Add to history
-                this.addMessage(contactName, text, true);
+                if (!this.addMessage(contactName, text, true, 'them', extra)) return;
                 // Set as current override (shows in preview)
                 this.contactOverrides[contactName] = text;
                 // Bump the ledger — this is the ONLY place unread counts grow.
@@ -79278,182 +79381,11 @@ engineMixin({
                 if (btn) btn.classList.toggle('notify', total > 0);
                 if (appDot) appDot.classList.toggle('active', total > 0);
 
-                // Keep an open phone live. A message landing while the player is
-                // already looking at the contacts list previously left that list
-                // stale until they navigated away and back — which is exactly
-                // what happens to Anavia's intro message, since it lands 2.5s
-                // after Mirabel's and the player is told to open the phone.
-                if (this.isOpen && this.currentApp === 'contacts') {
-                    this.renderContacts();
-                }
+                // Keep an open Messages app live (ui/messages.js): the inbox repaints, and a line
+                // landing in the thread she's reading is read on arrival.
+                if (this.isOpen && (this.currentApp === 'contacts' || this.currentApp === 'details') && this.messagesLive) this.messagesLive();
             },
             
-            showContacts() {
-                this.currentApp = 'contacts';
-                this.currentContact = null;
-                
-                // BROADCAST: Explicitly tell NSM contacts were opened
-                this.broadcast('APP_OPENED', { app: 'contacts' });
-                
-                this.homeScreen.style.display = 'none';
-                document.getElementById('screen-contacts').style.display = 'flex';
-                document.getElementById('screen-contact-detail').style.display = 'none';
-                
-                this.contactsList.innerHTML = '';
-                
-                const defaultContacts = [
-                    { name: 'Mirabel', role: 'Contractor', avatar: '🤖', messages: ['949. I hope you\'re awake. I\'ve found him.', 'The Dark Maker was spotted leaving the sector.'] },
-                    { name: 'Dr. Yin', role: 'Medic', avatar: '⚕️', messages: ['Visit my clinic for supplies!', 'Stim refills available.'] },
-                    { name: '747', role: 'Freelancer', avatar: '🎭', messages: ['Stay sharp, Nine.', 'I\'ve got your six. Always.'] },
-                    { name: 'Victoria', role: 'Freelancer', avatar: '💜', messages: ['Save me from these sad motherfuckers.', 'Ready to roll out whenever you are.'] },
-                    { name: 'Yenna', role: 'Freelancer', avatar: '🎯', messages: ['Eyes on the perimeter. All clear.', 'Say the word and the SR-86 speaks.'] },
-                    { name: 'Sabrina', role: 'Freelancer', avatar: '🌙', messages: ['You know where to find me.', 'Sarcasm is free. Bullets cost extra.'] },
-                    { name: 'Max', role: 'Freelancer', avatar: '⚡', messages: ['This is bullshit.', 'I swear if one more thing goes sideways...'] },
-                    { name: 'Josh', role: 'Freelancer', avatar: '📋', messages: ['Intel updated. Standing by.', 'Of course. You\'re welcome.'] },
-                    { name: 'Larissa', role: 'Handler', avatar: '🗂️', messages: ['Your assignment particulars are with Mirabel. Please coordinate with her directly.', 'The Empereal Lord remains pleased with your work.'] }
-                ];
-                
-                this.metNPCs.forEach(name => {
-                    if (!defaultContacts.find(c => c.name === name)) defaultContacts.push({ name, role: 'Contact', avatar: '👤', messages: ['No new messages.'] });
-                });
-
-                this._contactDefs = defaultContacts;
-                this.renderContacts();
-            },
-
-            /**
-             * Paint the contact list from `_contactDefs`. Split out of
-             * showContacts() so refreshNotifications() can repaint a list that's
-             * already on screen when a message lands mid-view.
-             *
-             * ORDERING (stable sort, so ties keep authored order):
-             *   1. Unread — most recently received first
-             *   2. Read, but has message history — most recent first
-             *   3. Never messaged — authored order
-             * Recency comes from `lastMessageAt`, written by _deliverMessage,
-             * rather than from messageHistory timestamps: addMessage dedupes on
-             * text, so a repeated line never updates its history timestamp and
-             * would sort as though it had never arrived.
-             */
-            renderContacts() {
-                const defaultContacts = this._contactDefs;
-                if (!defaultContacts || !this.contactsList) return;
-
-                this.contactsList.innerHTML = '';
-
-                const recencyOf = (name) => {
-                    if (this.lastMessageAt && this.lastMessageAt[name] != null) return this.lastMessageAt[name];
-                    const hist = this.messageHistory[name];
-                    if (hist && hist.length) return hist[hist.length - 1].timestamp || 0;
-                    return null; // never messaged
-                };
-                const rankOf = (name) => {
-                    if (this.unread[name]) return 0;
-                    return recencyOf(name) != null ? 1 : 2;
-                };
-
-                const ordered = defaultContacts.slice().sort((a, b) => {
-                    const ra = rankOf(a.name), rb = rankOf(b.name);
-                    if (ra !== rb) return ra - rb;
-                    if (ra === 2) return 0;                    // stable: authored order
-                    return (recencyOf(b.name) || 0) - (recencyOf(a.name) || 0);
-                });
-
-                ordered.forEach(contact => {
-                    const item = document.createElement('div');
-                    item.className = 'contact-item';
-                    
-                    // Get all messages including history
-                    const allMessages = this.getMessages(contact.name, contact.messages);
-                    contact.allMessages = allMessages; // Store for detail view
-                    
-                    // Preview shows most recent message or override
-                    let previewText = allMessages[allMessages.length - 1] || contact.messages[0];
-                    let hasNewMessage = false;
-                    
-                    if (this.contactOverrides[contact.name]) {
-                        previewText = this.contactOverrides[contact.name];
-                        hasNewMessage = true;
-                    }
-                    const unreadCount = this.unread[contact.name] || 0;
-                    
-                    // Truncate preview if too long
-                    if (previewText.length > 35) {
-                        previewText = previewText.substring(0, 35) + '...';
-                    }
-                    
-                    const previewClass = hasNewMessage ? 'contact-role typing-anim' : 'contact-role';
-                    // Drive the bold state off the ledger, not off hasNewMessage:
-                    // contactOverrides is also set by seeding/restore paths, whereas
-                    // `unread` is only ever incremented by an actual delivery.
-                    if (unreadCount > 0) item.classList.add('unread');
-                    
-                    item.innerHTML = `
-                        ${this._avatarMarkup(contact, unreadCount > 0)}
-                        <div class="contact-info">
-                            <div class="contact-name">${contact.name}</div>
-                            <div class="${previewClass}">${previewText}</div>
-                        </div>
-                        ${unreadCount > 0 ? `<div class="contact-unread-count">${unreadCount > 99 ? '99+' : unreadCount}</div>` : ''}`;
-                        
-                    item.addEventListener('click', () => this.showContactDetail(contact));
-                    this.contactsList.appendChild(item);
-                });
-            },
-            
-            /**
-             * Build the avatar cell for one contact row.
-             *
-             * Layers, outermost in:
-             *   ring    — relationship tier colour (teammates only), or unread pulse
-             *   portrait— drawn bust via game.getPortraitDataURL, transparent bg so
-             *             the existing .contact-avatar gradient shows through
-             *   glyph   — the original emoji, demoted to a corner badge
-             *
-             * Falls back to the plain emoji avatar whenever a portrait would be the
-             * grey silhouette (`isFallback`), which covers unknown/never-met contacts.
-             * Rendered at 2x display size so faces stay crisp on high-DPR screens.
-             */
-            _avatarMarkup(contact, isUnread) {
-                const DISPLAY = 40;
-                let portraitURL = null;
-                let ring = null;
-                let downed = false;
-
-                if (typeof game !== 'undefined' && game && game.getPortraitDataURL) {
-                    try {
-                        const entry = game.getPortraitCanvas(contact.name, DISPLAY * 2, null);
-                        // Transparent backdrop — the CSS gradient behind is the app's look.
-                        if (entry && entry.config && !entry.config.isFallback) {
-                            portraitURL = game.getPortraitDataURL(contact.name, DISPLAY * 2, null);
-                        }
-                    } catch (e) { portraitURL = null; }
-
-                    // Tier ring + downed state, teammates only.
-                    const tm = (game.teammates || []).find(t => t.name === contact.name);
-                    if (tm) {
-                        downed = !!tm.downed;
-                        if (game.bonding && typeof tm.relationship === 'number') {
-                            const tier = BONDING_TIERS[game.bonding.getTier(tm.relationship)];
-                            if (tier && tier.ring) ring = tier.ring;
-                        }
-                    }
-                }
-
-                const cls = ['contact-avatar'];
-                if (portraitURL) cls.push('has-portrait');
-                if (isUnread) cls.push('avatar-unread');
-                if (downed) cls.push('avatar-downed');
-
-                const style = ring && !isUnread ? ` style="border-color:${ring}"` : '';
-                const inner = portraitURL
-                    ? `<img class="avatar-portrait" src="${portraitURL}" alt="">
-                       <span class="avatar-glyph">${contact.avatar}</span>`
-                    : contact.avatar;
-
-                return `<div class="${cls.join(' ')}"${style}>${inner}</div>`;
-            },
-
             /* =================================================================
                REPLY OPTIONS
                -----------------------------------------------------------------
@@ -79555,198 +79487,6 @@ engineMixin({
                 const short = x.length < y.length ? x : y;
                 const long  = x.length < y.length ? y : x;
                 return short.length >= 12 && long.startsWith(short);
-            },
-
-            /**
-             * Relative timestamp from world time. Authored/seeded lines carry no
-             * real timestamp (0), so they read as EARLIER rather than pretending
-             * to a precision they don't have.
-             */
-            _relTime(ts, isNow) {
-                if (isNow) return 'NOW';
-                if (!ts) return 'EARLIER';
-                const d = Math.max(0, (game?.worldMinutes || 0) - ts);
-                if (d < 2)    return 'JUST NOW';
-                if (d < 60)   return `${Math.round(d)}M AGO`;
-                if (d < 1440) return `${Math.round(d / 60)}H AGO`;
-                return `${Math.round(d / 1440)}D AGO`;
-            },
-
-            /** Small circular avatar for one message row. */
-            _msgAvatar(contact, mine) {
-                if (mine) {
-                    let url = null;
-                    try {
-                        if (game && game.getPortraitDataURL) {
-                            const e = game.getPortraitCanvas('949', 52, null);
-                            if (e && e.config && !e.config.isFallback) url = game.getPortraitDataURL('949', 52, null);
-                        }
-                    } catch (err) { url = null; }
-                    return `<div class="msg-avatar is-me">${url ? `<img src="${url}" alt="">` : '🎧'}</div>`;
-                }
-                let url = null;
-                try {
-                    if (game && game.getPortraitDataURL) {
-                        const e = game.getPortraitCanvas(contact.name, 52, null);
-                        if (e && e.config && !e.config.isFallback) url = game.getPortraitDataURL(contact.name, 52, null);
-                    }
-                } catch (err) { url = null; }
-                return `<div class="msg-avatar">${url ? `<img src="${url}" alt="">` : (contact.avatar || '👤')}</div>`;
-            },
-
-            showContactDetail(contact) {
-                this.currentApp = 'details';
-                this.currentContact = contact.name;
-                this._activeContact = contact;
-
-                // BROADCAST: Explicitly tell NSM which contact is being viewed
-                this.broadcast('CONTACT_VIEWED', { name: contact.name });
-
-                document.getElementById('screen-contacts').style.display = 'none';
-                document.getElementById('screen-contact-detail').style.display = 'flex';
-                document.getElementById('contact-detail-name').textContent = contact.name;
-
-                // Carry the face through from the list — the thread used to drop it.
-                const slot = document.getElementById('contact-detail-avatar');
-                if (slot) slot.innerHTML = this._avatarMarkup(contact, false);
-
-                // The unread line renders as NOW, then persists and clears.
-                const nowText = this.contactOverrides[contact.name] || null;
-                this.renderThread(contact, nowText);
-                if (nowText) this.addMessage(contact.name, nowText, false, 'them');
-                this.markRead(contact.name);
-            },
-
-            /**
-             * Paint the whole conversation. Rebuilt on every reply, so it is the
-             * single place that decides ordering, dedupe and labelling.
-             */
-            renderThread(contact, nowText = null) {
-                const content = document.getElementById('contact-detail-content');
-                if (!content) return;
-                content.innerHTML = '';
-
-                const rendered = [];   // normalised texts already on screen
-                const rows = [];
-
-                const consider = (text, ts, from, isNow) => {
-                    if (!text) return;
-                    // Player replies always render; only incoming lines dedupe.
-                    if (from === 'them' && rendered.some(r => this._isNearDup(r, text))) return;
-                    if (from === 'them') rendered.push(text);
-                    rows.push({ text, ts, from, isNow });
-                };
-
-                // 1. Authored defaults — no real timestamp, so they read as EARLIER.
-                //    Skip any that the unread line duplicates, or it would appear
-                //    twice: once as EARLIER here and again as NOW at the bottom.
-                (contact.messages || []).forEach(msg => {
-                    if (nowText && this._isNearDup(msg, nowText)) return;
-                    consider(msg, 0, 'them', false);
-                });
-
-                // 2. Everything exchanged in play, in the order it happened.
-                (this.messageHistory[contact.name] || []).forEach(m => {
-                    if (nowText && m.text === nowText && (m.from || 'them') === 'them') return; // shown as NOW below
-                    consider(m.text, m.timestamp, m.from || 'them', false);
-                });
-
-                // 3. The unread line last, flagged NOW.
-                if (nowText) rows.push({ text: nowText, ts: game?.worldMinutes || 0, from: 'them', isNow: true });
-
-                rows.forEach(r => {
-                    const mine = r.from === 'me';
-                    const row = document.createElement('div');
-                    row.className = 'msg-row ' + (mine ? 'from-me' : 'from-them');
-
-                    const msg = document.createElement('div');
-                    msg.className = 'contact-message';
-                    if (r.isNow) msg.style.borderLeftColor = '#ff0055';
-                    else if (!mine && r.ts) msg.style.borderLeftColor = '#a469ff';
-
-                    const labelColor = r.isNow ? '#ff0055' : (!mine && r.ts ? '#a469ff' : '');
-                    msg.innerHTML =
-                        `<div class="contact-message-label"${labelColor ? ` style="color:${labelColor}"` : ''}>${this._relTime(r.ts, r.isNow)}</div>` +
-                        `<div class="contact-message-text"></div>`;
-                    msg.querySelector('.contact-message-text').textContent = r.text;
-
-                    row.innerHTML = this._msgAvatar(contact, mine);
-                    row.appendChild(msg);
-                    content.appendChild(row);
-                });
-
-                this._lastIncoming = rows.filter(r => r.from === 'them').pop() || null;
-                // If her reply is the last thing in the thread, the ball is in their
-                // court — otherwise she could fire all three answers at one message.
-                this._awaitingThem = rows.length > 0 && rows[rows.length - 1].from === 'me';
-                this.renderReplyOptions(contact);
-                setTimeout(() => { content.scrollTop = content.scrollHeight; }, 10);
-            },
-
-            /** Periwinkle chips answering whatever they said last. */
-            renderReplyOptions(contact) {
-                const box  = document.getElementById('contact-reply-options');
-                const bar  = document.getElementById('contact-reply-input');
-                const hint = document.getElementById('contact-reply-hint');
-                if (!box) return;
-                box.innerHTML = '';
-
-                const opts = this._awaitingThem
-                    ? null
-                    : this.getReplyOptions(contact, this._lastIncoming ? this._lastIncoming.text : null);
-                if (!opts || opts.length === 0) {
-                    if (bar)  bar.classList.remove('armed');
-                    if (hint) hint.textContent = this._awaitingThem ? 'Sent' : 'No reply needed';
-                    return;
-                }
-                if (bar)  bar.classList.add('armed');
-                if (hint) hint.textContent = `Reply to ${contact.name}…`;
-
-                opts.forEach(opt => {
-                    const chip = document.createElement('div');
-                    chip.className = 'reply-chip';
-                    chip.textContent = opt.text;
-                    chip.addEventListener('click', () => this.sendReply(contact, opt));
-                    box.appendChild(chip);
-                });
-            },
-
-            getReplyOptions(contact, lastIncoming) {
-                if (lastIncoming) {
-                    const hit = this._replyIndex()[this._normalizeMsg(lastIncoming)];
-                    if (hit) return hit;
-                }
-                return this._replyTable.byContact[contact.name] || this._replyTable.generic;
-            },
-
-            /**
-             * Post 949's reply, then let them write back if the option carries a
-             * response. The follow-up is appended straight into the open thread
-             * rather than going through _deliverMessage, so reading a conversation
-             * you're already looking at can't raise an unread badge for itself.
-             */
-            sendReply(contact, opt) {
-                this.addMessage(contact.name, opt.text, false, 'me');
-                audioSys.sfx('ui');
-                this.renderThread(contact);
-
-                if (!opt.response) return;
-
-                this.setTyping(contact.name, true);
-                setTimeout(() => {
-                    this.setTyping(contact.name, false);
-                    this.addMessage(contact.name, opt.response, false, 'them');
-                    this.lastMessageAt[contact.name] = game?.worldMinutes || 0;
-                    if (this.currentApp === 'details' && this.currentContact === contact.name) {
-                        this.renderThread(contact);
-                    } else {
-                        // They answered after she closed the thread — treat it as
-                        // a normal arrival so it badges like any other message.
-                        this.contactOverrides[contact.name] = opt.response;
-                        this.unread[contact.name] = (this.unread[contact.name] || 0) + 1;
-                        this.refreshNotifications();
-                    }
-                }, 1400 + Math.random() * 900);
             },
 
             showMaps() {
@@ -80582,6 +80322,1181 @@ engineMixin({
             }
         });
         
+        /* =====================================================================
+           MESSAGES — the phone's Messages app ("Velvet Thread")
+           ---------------------------------------------------------------------
+           Extends phoneSystem (ui/phone.js), which keeps the ledger: message
+           history, unread counts, typing, delivery and the reply table. This
+           file is everything she sees and the people who write to her.
+
+           Layout (index.html #screen-contacts): on its side the inbox rail sits
+           beside the open thread; upright the list slides into the thread
+           (.has-thread). currentApp stays 'contacts' (list) / 'details' (thread)
+           because the story's PHONE_OPENED_CONTACTS reads those names.
+
+           A history record is { text, timestamp, from: 'them' | 'me', ... } plus,
+           for the rich kinds:
+             kind 'pin'    data.place           a map card; Set waypoint pins it on UMaps
+             kind 'brief'  data.mission, state  a job card; Accept puts it on the tracker
+             kind 'voice'  data.lines, secs     a waveform; playing it runs the earpiece subtitle
+             kind 'snap'   data.place, mood     a photo painted from their portrait and the place
+                           data.img             (hers) a JPEG of the game view, the newest few kept
+           who     the speaker in The Freelancers group chat
+           react   her reaction to their line; theirReact, theirs to hers
+           seen    world minute they read her line ("Seen 11:40")
+
+           The feed (feed.nextAt / done / pendingPin, saved with the phone) has the
+           crew and contacts write on their own once chapter 1 is over: places,
+           photos, voice notes and jobs. crewBanter() is called by
+           MissionSystem.completeMission and writes the group chat's take on the
+           job: who came along, who went down, how fast and how clean.
+           ===================================================================== */
+        const MSG_GROUP = 'The Freelancers';
+        const MSG_CREW = ['747', 'Victoria', 'Yenna', 'Sabrina', 'Max', 'Josh'];
+        const MSG_REACTIONS = ['❤️', '🔥', '😂', '👀', '🖤'];
+        /** The reactions each of the crew likes to get (and gives): one of these nudges the bond a little */
+        const MSG_TASTE = { Victoria: ['❤️', '🔥'], Yenna: ['👀', '🔥'], Sabrina: ['🖤', '😂'], Max: ['😂', '🔥'], Josh: ['👀', '😂'], '747': ['🖤', '❤️'] };
+
+        /** Who's in the inbox and what was said before the game began (shown under "Earlier") */
+        const MSG_CONTACTS = [
+            { name: MSG_GROUP, role: 'Group', group: true, pinned: true },
+            { name: 'Mirabel', role: 'W. Mindustrial', pinned: true, messages: ['949. I hope you\'re awake. I\'ve found him.', 'The Dark Maker was spotted leaving the sector.'] },
+            { name: 'Dr. Yin', role: 'Clinic', messages: ['Visit my clinic for supplies!', 'Stim refills available.'] },
+            { name: '747', role: 'Freelancer', crew: true, messages: ['Stay sharp, Nine.', 'I\'ve got your six. Always.'] },
+            { name: 'Victoria', role: 'Freelancer', crew: true, messages: ['Save me from these sad motherfuckers.', 'Ready to roll out whenever you are.'] },
+            { name: 'Yenna', role: 'Freelancer', crew: true, messages: ['Eyes on the perimeter. All clear.', 'Say the word and the SR-86 speaks.'] },
+            { name: 'Sabrina', role: 'Freelancer', crew: true, messages: ['You know where to find me.', 'Sarcasm is free. Bullets cost extra.'] },
+            { name: 'Max', role: 'Freelancer', crew: true, messages: ['This is bullshit.', 'I swear if one more thing goes sideways...'] },
+            { name: 'Josh', role: 'Freelancer', crew: true, messages: ['Intel updated. Standing by.', 'Of course. You\'re welcome.'] },
+            { name: 'Larissa', role: 'Handler', messages: ['Your assignment particulars are with Mirabel. Please coordinate with her directly.', 'The Empereal Lord remains pleased with your work.'] },
+        ];
+
+        /** Places a pin or a photo can be from: the hub building (by id) and how a photo there looks */
+        const MSG_PLACES = {
+            moon_city:     { label: 'Moon City Nightclub', kind: 'Nightclub', x: 5075, y: 5155, w: 600, h: 500, look: 'club',   tint: ['#2a0638', '#0a0214'], glow: ['#ff2a8a', '#8a3cff', '#28d8ff'] },
+            cozy_cafe:     { label: 'Cozy Cafe',           kind: 'Café',      x: 4715, y: 1835, w: 350, h: 350, look: 'cafe',   tint: ['#3a1a0c', '#140804'], glow: ['#ffb45a', '#ff8a3c', '#ffe0a0'] },
+            torque_auto:   { label: 'Torque Auto',         kind: 'Garage',    x: 6785, y: 1835, w: 700, h: 350, look: 'garage', tint: ['#1a1a24', '#08080c'], glow: ['#ff9a2a', '#ffd06a', '#5a8cff'] },
+            dr_yins:       { label: 'Dr. Yin\'s Clinic',   kind: 'Clinic',    x: 11455, y: 3145, w: 500, h: 400, look: 'clinic', tint: ['#06222a', '#020a0e'], glow: ['#00f3ff', '#7affd8', '#ffffff'] },
+            neural_sys:    { label: 'Neural Systems',      kind: 'Boutique',  x: 12740, y: 3145, w: 400, h: 400, look: 'club',   tint: ['#1c0636', '#08020f'], glow: ['#b06aff', '#ff6ad8', '#6ad8ff'] },
+            biggs_park:    { label: 'Biggs Park',          kind: 'Park',      x: 8455, y: 7880, w: 450, h: 400, look: 'park',   tint: ['#3a1a3a', '#0c0612'], glow: ['#ff9a6a', '#ffd08a', '#c06aff'] },
+            double_nights: { label: 'Double Nights Hotel', kind: 'Hotel',     x: 1600, y: 200,  w: 700, h: 408, look: 'street', tint: ['#1a0a24', '#06020a'], glow: ['#e8c27a', '#ff6a8a', '#8a6aff'] },
+            enni_cole:     { label: 'Enni Cole',           kind: 'Boutique',  x: 6175, y: 5150, w: 900, h: 700, look: 'street', tint: ['#2a0a1a', '#0a0208'], glow: ['#ff6aa8', '#e8c27a', '#ffffff'] },
+            silver_queen:  { label: 'Silver Queen Apts',   kind: 'Home',      x: 172,  y: 17,   w: 700, h: 880, look: 'street', tint: ['#14102a', '#05040c'], glow: ['#cab0fa', '#e8c27a', '#6a8aff'] },
+        };
+
+        /* ── What they write on their own (feed) ── */
+        const MSG_FEED = [
+            // Location drops
+            { id: 'pin_747_cafe', who: '747', kind: 'pin', place: 'cozy_cafe', text: 'Coffee. Now. Your treat.' },
+            { id: 'pin_yin', who: 'Dr. Yin', kind: 'pin', place: 'dr_yins', text: 'Stims restocked. My door is open.' },
+            { id: 'pin_vic_torque', who: 'Victoria', kind: 'pin', place: 'torque_auto', text: 'Torque got a new wrap in. Come look before Max claims it.' },
+            { id: 'pin_sab_club', who: 'Sabrina', kind: 'pin', place: 'moon_city', text: 'Booth at the back. I\'m saving you a seat.' },
+            { id: 'pin_yen_park', who: 'Yenna', kind: 'pin', place: 'biggs_park', text: 'Quiet spot. Good sightlines. Come shoot cans.' },
+            { id: 'pin_josh_neural', who: 'Josh', kind: 'pin', place: 'neural_sys', text: 'Prisma has a sale on V.O.C.A.L.s. Don\'t tell Max.' },
+            { id: 'pin_max_enni', who: 'Max', kind: 'pin', place: 'enni_cole', text: 'Need a second opinion on a jacket. Don\'t laugh.' },
+            // Snapshots
+            { id: 'snap_vic', who: 'Victoria', kind: 'snap', place: 'torque_auto', mood: 'grin', text: 'New wrap. Thoughts? Wrong answers only.' },
+            { id: 'snap_sab', who: 'Sabrina', kind: 'snap', place: 'moon_city', mood: 'smirk', text: 'Guess where I am.' },
+            { id: 'snap_yen', who: 'Yenna', kind: 'snap', place: 'biggs_park', mood: 'smile', text: 'Sunset from my spot.' },
+            { id: 'snap_747', who: '747', kind: 'snap', place: 'cozy_cafe', mood: 'smile', text: 'Saved you a seat. Coffee\'s getting cold.' },
+            { id: 'snap_max', who: 'Max', kind: 'snap', place: 'double_nights', mood: 'annoyed', text: 'This hotel\'s minibar is a crime.' },
+            { id: 'snap_josh', who: 'Josh', kind: 'snap', place: 'neural_sys', mood: 'neutral', text: 'Prisma made me try one. Don\'t.' },
+            { id: 'snap_anavia', who: 'Anavia', kind: 'snap', place: 'enni_cole', mood: 'sultry', text: 'Thinking of you. Come see me.', needs: g => phoneSystem._knows('Anavia') },
+            // Voice notes
+            { id: 'voice_mirabel', who: 'Mirabel', kind: 'voice', lines: ['949. A voice note, because some things shouldn\'t be typed.', 'The Dark Maker left a trail. I\'m pulling the thread.', 'When I call, answer.'] },
+            { id: 'voice_747', who: '747', kind: 'voice', lines: ['Nine. Just checking you made it home.', 'Get some sleep. That\'s an order, technically.'] },
+            { id: 'voice_vic', who: 'Victoria', kind: 'voice', lines: ['Okay so don\'t be mad.', 'I may have borrowed your jacket. The good one.', 'It looks better on me. Bye!'] },
+            { id: 'voice_larissa', who: 'Larissa', kind: 'voice', lines: ['This is Larissa. The Empereal Lord sends his regards.', 'That is all.'] },
+            { id: 'voice_yen', who: 'Yenna', kind: 'voice', lines: ['Found a rooftop with perfect sightlines.', 'Bring snacks. Not the crunchy kind.'] },
+            { id: 'voice_sab', who: 'Sabrina', kind: 'voice', lines: ['Nine. It\'s late and I\'m bored.', 'Entertain me.'] },
+        ];
+        /** Who sends a job, and what kind */
+        const MSG_BRIEFS = [
+            { who: 'Mirabel', type: 'bounty', text: 'Someone\'s been selling my name. Make them stop.' },
+            { who: '747', type: 'bounty', text: 'Contract came through. Thought of you.' },
+            { who: 'Yenna', type: 'bounty', text: 'Got eyes on a mark. Want it?' },
+            { who: 'Victoria', type: 'delivery', text: 'Amber\'s short a driver. Easy money, Nine.' },
+            { who: 'Anavia', type: 'salvage', text: 'I found something buried. Dig it up for me.', needs: g => g.missions.completedBounties >= 5 && phoneSystem._knows('Anavia') },
+        ];
+        /** What they say back to her photo */
+        const MSG_SNAP_REPLIES = {
+            Victoria: 'Okay, iconic.', Yenna: 'Nice framing.', Sabrina: 'Cute. Don\'t let it go to your head.', Max: 'Why are you sending me this.',
+            Josh: 'Saved to the archive.', '747': 'Looking good, Nine.', Mirabel: 'Don\'t send me pictures, 949. Send me results.',
+            'Dr. Yin': 'You look tired. Come see me.', Larissa: 'Received.', Anavia: 'Mm. Come closer next time.',
+        };
+
+        /* ── The group chat ── */
+        const MSG_GROUP_SEED = [
+            { who: 'Josh', text: 'Made us a group chat. Try to keep it professional.' },
+            { who: 'Victoria', text: 'No.' },
+            { who: 'Max', text: 'This is bullshit.' },
+            { who: 'Sabrina', text: 'Muting this.' },
+        ];
+        const MSG_BANTER = {
+            clean: { Victoria: 'Clean. Didn\'t even chip my nails.', Yenna: 'Not one wasted round. That\'s how it\'s done.', Sabrina: 'That was almost elegant, Nine.',
+                     Max: 'Okay. Fine. That went well. Don\'t get used to it.', Josh: 'Logged it. Zero complications. Of course.', '747': 'Clean work, Nine.' },
+            quick: { Victoria: 'In and out. I barely finished my song.', Yenna: 'Under half an hour. Mark it.', Sabrina: 'Fast. I like fast.',
+                     Max: 'Done already? I was just getting angry.', Josh: 'Fastest turnaround this month. I timed it. You\'re welcome.', '747': 'Quick. Good. Nobody saw us coming.' },
+            rough: { Victoria: 'My heart can\'t do that again. Who\'s buying drinks?', Yenna: 'Too close. I\'m recalibrating my scope.', Sabrina: 'Well. That was ugly.',
+                     Max: 'This is bullshit. That job was NOT as advertised.', Josh: 'Medical bills attached. Again.', '747': 'We got out. That\'s what counts. Patch up, Nine.' },
+            fine:  { Victoria: 'Paid is paid. I\'m getting my nails done.', Yenna: 'Job\'s done. Cleaning the rifle.', Sabrina: 'Not bad. Not bad at all.',
+                     Max: 'Could\'ve gone worse. Could\'ve gone better.', Josh: 'Payment cleared. {reward} PP.', '747': 'Good work out there.' },
+        };
+        const MSG_BANTER_TYPE = {
+            bounty:   { Victoria: 'Who names themselves {mark}, honestly.', Yenna: '{mark} had a decent rifle. Had.', Max: '{mark} won\'t be a problem anymore.',
+                        Josh: 'Updated the board. {mark}: closed.', Sabrina: 'Goodnight, {mark}.', '747': '{mark} picked the wrong city.' },
+            delivery: { Victoria: 'Did anyone else smell the package? No? Just me?', Josh: 'Amber says thanks. In writing. I framed it.', Sabrina: 'Couriers. We\'re glorified couriers.',
+                        Max: 'We drove a box across town. Thrilling.', Yenna: 'Route was clear. Boring is good.', '747': 'Delivered and paid. Easy night.' },
+            salvage:  { Max: 'That\'s a lot of scrap. I want first pick.', Josh: 'Crate\'s inventoried. Anavia will be pleased.', Victoria: 'My arms hurt from carrying a box.',
+                        Yenna: 'Guards were sloppy. Lucky for them we weren\'t.', Sabrina: 'Treasure hunting. How quaint.', '747': 'Good haul, Nine.' },
+        };
+        const MSG_BANTER_DOWN = { Victoria: 'Note to self: don\'t stand in front of the bullets.', Yenna: 'I\'m fine. Mostly fine.', Sabrina: 'Tell nobody about this.',
+                                  Max: 'I am NOT fine. For the record.', Josh: 'Ow. Logged.', '747': 'Just a scratch, Nine.' };
+        const MSG_BANTER_LEFT = { Victoria: 'You went without me? Rude.', Yenna: 'Next time take the sniper.', Sabrina: 'Heard you had fun without me.',
+                                  Max: 'Oh, sure, don\'t call Max.', Josh: 'I watched it on the feed. Like a fan.', '747': 'Call me next time, Nine.' };
+
+        // The group's chips, answered by one of the crew
+        phoneSystem._replyTable.byContact[MSG_GROUP] = [
+            { text: 'Drinks are on me.', response: { who: 'Victoria', text: 'I\'m holding you to that.' } },
+            { text: 'Good work, everyone.', response: { who: '747', text: 'Same to you, Nine.' } },
+            { text: 'Next one\'s harder.', response: { who: 'Max', text: 'Of course it is.' } },
+        ];
+
+        const _msgBaseTyping = phoneSystem.updateTypingIndicator;
+        const _msgBaseSeed = phoneSystem.seedDefaultContacts;
+
+        Object.assign(phoneSystem, {
+            msgTab: 'all',
+            feed: { nextAt: null, done: {}, pendingPin: null },
+            _typingWho: {},
+            _snapCache: new Map(),
+            _mapCache: new Map(),
+
+            /* ───────────────────────── world time ───────────────────────── */
+            _now() { return (typeof game !== 'undefined' && game && game.worldMinutes) || 0; },
+            /** "11:38 PM" */
+            _clock(ts) {
+                const d = ((ts % 1440) + 1440) % 1440, h = Math.floor(d / 60), m = d % 60;
+                return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+            },
+            /** Which night a minute belongs to: a night runs from 5 AM to 5 AM, so 1 AM is still "Tonight" */
+            _nightOf(ts) { return Math.floor((ts - 300) / 1440); },
+            _dayLabel(ts) {
+                const gap = this._nightOf(this._now()) - this._nightOf(ts), h = Math.floor((((ts % 1440) + 1440) % 1440) / 60);
+                const night = h >= 18 || h < 5;
+                if (gap <= 0) return night ? 'Tonight' : h < 12 ? 'This morning' : 'This afternoon';
+                if (gap === 1) return night ? 'Last night' : 'Yesterday';
+                return `${gap} days ago`;
+            },
+            /** The inbox's time column: the clock tonight, else how long ago */
+            _railTime(ts) {
+                if (!ts) return '';
+                const gap = this._nightOf(this._now()) - this._nightOf(ts);
+                return gap <= 0 ? this._clock(ts) : gap === 1 ? 'Yesterday' : `${gap}d`;
+            },
+
+            /* ───────────────────────── faces ───────────────────────── */
+            _faceURL(name, size) {
+                try {
+                    if (typeof game === 'undefined' || !game || !game.getPortraitCanvas) return null;
+                    const e = game.getPortraitCanvas(name, size, null);
+                    return e && e.config && !e.config.isFallback ? game.getPortraitDataURL(name, size, null) : null;
+                } catch (err) { return null; }
+            },
+            _ring(name) {
+                const tm = typeof game !== 'undefined' && game && (game.teammates || []).find(t => t.name === name);
+                if (!tm || !game.bonding || typeof tm.relationship !== 'number') return null;
+                const tier = BONDING_TIERS[game.bonding.getTier(tm.relationship)];
+                return tier && tier.ring;
+            },
+            /** A round painted face (or the name's initial), with the bond's ring for the crew */
+            _face(name, cls = 'mav', size = 96) {
+                const el = document.createElement('div');
+                el.className = cls;
+                const url = this._faceURL(name, size);
+                if (url) { const img = new Image(); img.alt = ''; img.src = url; el.appendChild(img); }
+                else el.textContent = String(name).replace(/[^A-Za-z0-9]/g, '').charAt(0) || '?';
+                const ring = this._ring(name);
+                if (ring) el.style.setProperty('--ring', ring);
+                const tm = typeof game !== 'undefined' && game && (game.teammates || []).find(t => t.name === name);
+                if (tm && tm.downed) el.classList.add('downed');
+                return el;
+            },
+            /** The group's avatar: three of the crew, stacked */
+            _groupFace(cls = 'mav') {
+                const el = document.createElement('div');
+                el.className = cls + ' stack';
+                for (const n of ['Victoria', '747', 'Max']) el.appendChild(this._face(n, 'mav-mini', 64));
+                return el;
+            },
+            _color(name) { return (typeof SPEAKER_COLORS !== 'undefined' && SPEAKER_COLORS[name]) || '#e8c27a'; },
+            _knows(name) { return this.metNPCs.has(name) || !!(this.messageHistory[name] && this.messageHistory[name].length); },
+            _isCrew(name) { return MSG_CREW.includes(name); },
+
+            /* ───────────────────────── the inbox ───────────────────────── */
+            seedDefaultContacts() {
+                _msgBaseSeed.call(this);
+                const g = this.messageHistory[MSG_GROUP] || (this.messageHistory[MSG_GROUP] = []);
+                if (g.length === 0) for (const l of MSG_GROUP_SEED) g.push({ text: l.text, timestamp: 0, isNew: false, from: 'them', who: l.who });
+            },
+
+            _buildContactDefs() {
+                const defs = MSG_CONTACTS.map(c => ({ ...c }));
+                const add = (name) => {
+                    if (!name || name === '949' || defs.some(c => c.name === name)) return;
+                    defs.push({ name, role: 'Contact' });
+                };
+                this.metNPCs.forEach(add);
+                Object.keys(this.messageHistory).forEach(n => { if (this.messageHistory[n].length) add(n); });
+                this._contactDefs = defs;
+                return defs;
+            },
+
+            showContacts() {
+                this.currentApp = 'contacts';
+                this.currentContact = null;
+                this._activeContact = null;
+                this._stopVoice();
+                this.broadcast('APP_OPENED', { app: 'contacts' });
+                this.homeScreen.style.display = 'none';
+                document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
+                const scr = document.getElementById('screen-contacts');
+                scr.style.display = 'flex';
+                scr.classList.remove('has-thread');
+                this._buildContactDefs();
+                this.renderContacts();
+                this._paintEmpty();
+            },
+
+            _lastRec(name) { const h = this.messageHistory[name]; return h && h.length ? h[h.length - 1] : null; },
+            _recency(name) {
+                if (this.lastMessageAt[name] != null) return this.lastMessageAt[name];
+                const r = this._lastRec(name);
+                return r ? (r.timestamp || 0) : null;
+            },
+            _preview(rec) {
+                if (!rec) return 'No messages yet';
+                const who = rec.from === 'me' ? 'You: ' : rec.who ? `${rec.who}: ` : '';
+                const d = rec.data || {};
+                const body = rec.kind === 'pin' ? `📍 ${(MSG_PLACES[d.place] || {}).label || 'A location'}`
+                    : rec.kind === 'brief' ? `✦ Job · ${this._jobTitle(d.mission)}`
+                    : rec.kind === 'voice' ? '🎙 Voice note'
+                    : rec.kind === 'snap' ? '📷 Photo'
+                    : rec.text;
+                return who + body;
+            },
+
+            /**
+             * The inbox. ORDER (stable): unread first, most recent first; then by
+             * recency; never-messaged contacts keep their authored order. Pinned
+             * conversations (the group, Mirabel) sit on top under the All tab.
+             */
+            renderContacts() {
+                const list = this.contactsList;
+                if (!list || !this._contactDefs) return;
+                list.innerHTML = '';
+                document.querySelectorAll('#msg-tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === this.msgTab));
+
+                const rank = n => this.unread[n] ? 0 : this._recency(n) != null ? 1 : 2;
+                let rows = this._contactDefs.slice().sort((a, b) => {
+                    const ra = rank(a.name), rb = rank(b.name);
+                    if (ra !== rb) return ra - rb;
+                    return ra === 2 ? 0 : (this._recency(b.name) || 0) - (this._recency(a.name) || 0);
+                });
+                if (this.msgTab === 'crew') rows = rows.filter(c => c.crew || c.group);
+                if (this.msgTab === 'unread') rows = rows.filter(c => this.unread[c.name]);
+
+                const label = (t) => { const el = document.createElement('div'); el.className = 'msg-sec'; el.textContent = t; list.appendChild(el); };
+                const pinned = this.msgTab === 'all' ? rows.filter(c => c.pinned) : [];
+                const rest = rows.filter(c => !pinned.includes(c));
+                if (pinned.length) { label('Pinned'); pinned.forEach(c => list.appendChild(this._row(c))); label('Recent'); }
+                rest.forEach(c => list.appendChild(this._row(c)));
+                if (!rows.length) {
+                    const e = document.createElement('div');
+                    e.className = 'msg-none';
+                    e.textContent = this.msgTab === 'unread' ? 'All caught up.' : 'No one yet.';
+                    list.appendChild(e);
+                }
+            },
+
+            _row(c) {
+                const n = this.unread[c.name] || 0;
+                const item = document.createElement('div');
+                item.className = 'msg-item' + (n ? ' unread' : '') + (this._activeContact && this._activeContact.name === c.name ? ' on' : '');
+                item.appendChild(c.group ? this._groupFace() : this._face(c.name));
+                const who = document.createElement('div');
+                who.className = 'msg-who';
+                const b = document.createElement('b'); b.textContent = c.name;
+                const i = document.createElement('i');
+                const last = this._lastRec(c.name) || (c.messages ? { text: c.messages[c.messages.length - 1], from: 'them' } : null);
+                i.textContent = this.typingState[c.name] ? 'typing…' : this._preview(last);
+                if (this.typingState[c.name]) i.classList.add('typing');
+                who.append(b, i);
+                const meta = document.createElement('div');
+                meta.className = 'msg-meta';
+                const t = document.createElement('small'); t.textContent = this._railTime(this._recency(c.name));
+                meta.appendChild(t);
+                if (n) { const k = document.createElement('span'); k.className = 'msg-count'; k.textContent = n > 99 ? '99+' : n; meta.appendChild(k); }
+                item.append(who, meta);
+                item.addEventListener('click', () => this.showContactDetail(c));
+                return item;
+            },
+
+            /** The pane with no conversation open (on its side): a word on what's waiting */
+            _paintEmpty() {
+                const line = document.getElementById('msg-empty-line');
+                if (!line) return;
+                const n = this.unreadTotal();
+                line.textContent = n ? `${n} unread · choose a conversation` : 'Choose a conversation';
+            },
+
+            /* ───────────────────────── the thread ───────────────────────── */
+            showContactDetail(contact) {
+                if (typeof contact === 'string') contact = this._buildContactDefs().find(c => c.name === contact) || { name: contact, role: 'Contact' };
+                this._stopVoice();
+                this.currentApp = 'details';
+                this.currentContact = contact.name;
+                this._activeContact = contact;
+                this.broadcast('CONTACT_VIEWED', { name: contact.name });
+
+                this.homeScreen.style.display = 'none';
+                document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
+                const scr = document.getElementById('screen-contacts');
+                scr.style.display = 'flex';
+                scr.classList.add('has-thread');
+                if (!this._contactDefs) this._buildContactDefs();
+
+                this._adoptDefaults(contact);
+                // A line that only lives in the preview (a restored old save) joins the thread
+                const pending = this.contactOverrides[contact.name];
+                if (pending && !(this.messageHistory[contact.name] || []).some(m => m.text === pending)) this.addMessage(contact.name, pending, false, 'them');
+
+                this.markRead(contact.name);   // repaints the inbox through messagesLive
+                this.renderThread(contact, true);
+                this.renderContacts();
+            },
+
+            /**
+             * Fold a contact's authored lines into their history (under "Earlier") the
+             * first time the thread opens, so every line on screen is a record that can
+             * carry a reaction. A longer authored line replaces the seeded short one
+             * it begins with ("949. I hope you're awake." → "...I've found him.").
+             */
+            _adoptDefaults(contact) {
+                if (!contact.messages || !contact.messages.length) return;
+                const h = this.messageHistory[contact.name] || (this.messageHistory[contact.name] = []);
+                if (h.some(m => m.adopted)) return;
+                const early = [];
+                for (const text of contact.messages) {
+                    const dup = h.find(m => m.from === 'them' && !m.kind && !m.timestamp && this._isNearDup(m.text, text));
+                    if (dup) { if (text.length > dup.text.length) dup.text = text; dup.adopted = true; if (!early.includes(dup)) early.push(dup); }
+                    else early.push({ text, timestamp: 0, isNew: false, from: 'them', adopted: true });
+                }
+                // Authored order first, then everything else as it happened
+                const rest = h.filter(m => !early.includes(m));
+                h.length = 0;
+                h.push(...early, ...rest);
+            },
+
+            _sub(contact) {
+                if (this.typingState[contact.name]) {
+                    const w = this._typingWho[contact.name];
+                    return w ? `${w} is typing…` : 'typing…';
+                }
+                if (contact.group) {
+                    const crew = (typeof game !== 'undefined' && game && game.teammates || []).filter(t => t.recruited).map(t => t.name);
+                    return crew.length ? crew.join(', ') : 'The crew';
+                }
+                const tm = typeof game !== 'undefined' && game && (game.teammates || []).find(t => t.name === contact.name);
+                if (tm && game.bonding && typeof tm.relationship === 'number') {
+                    return `${contact.role || 'Freelancer'} · ${BONDING_TIERS[game.bonding.getTier(tm.relationship)].name}${tm.downed ? ' · down' : ''}`;
+                }
+                return contact.role || 'Contact';
+            },
+
+            renderThread(contact, toBottom = false) {
+                const feed = document.getElementById('contact-detail-content');
+                if (!feed) return;
+                const stick = toBottom || feed.scrollHeight - feed.scrollTop - feed.clientHeight < 48;
+                const keep = feed.scrollTop;
+                this._closePicker();
+
+                // Header
+                const slot = document.getElementById('contact-detail-avatar');
+                if (slot) { slot.innerHTML = ''; slot.appendChild(contact.group ? this._groupFace('mav big') : this._face(contact.name, 'mav big')); }
+                document.getElementById('contact-detail-name').textContent = contact.name;
+                document.getElementById('contact-detail-sub').textContent = this._sub(contact);
+
+                feed.innerHTML = '';
+                const hist = this.messageHistory[contact.name] || [];
+                let lastMine = -1;
+                hist.forEach((r, i) => { if (r.from === 'me') lastMine = i; });
+                let prevTs = null, prevKey = null, earlier = false;
+
+                hist.forEach((rec, i) => {
+                    const ts = rec.timestamp || 0;
+                    // Day dividers: "Earlier" for lines from before the game; then a stamp
+                    // whenever the night changes or the talk paused for a while
+                    if (!ts) {
+                        if (!earlier) { feed.appendChild(this._divider('Earlier')); earlier = true; prevKey = null; }
+                    } else if (prevTs == null || this._nightOf(ts) !== this._nightOf(prevTs) || ts - prevTs >= 45) {
+                        feed.appendChild(this._divider(`${this._dayLabel(ts)} · ${this._clock(ts)}`));
+                        prevKey = null;
+                    }
+                    if (ts) prevTs = ts;
+
+                    if (rec.from !== 'me' && rec.from !== 'them') {          // a call: one line across the thread
+                        feed.appendChild(this._divider(`${rec.text}${ts ? ' · ' + this._clock(ts) : ''}`, 'call'));
+                        prevKey = null;
+                        return;
+                    }
+                    const key = rec.from === 'me' ? 'me' : 'them:' + (rec.who || '');
+                    feed.appendChild(this._message(contact, rec, key === prevKey));
+                    prevKey = key;
+
+                    if (i === lastMine && i === hist.length - 1 && rec.seen) {
+                        const s = document.createElement('div');
+                        s.className = 'mb-seen';
+                        s.textContent = `Seen ${this._clock(rec.seen)}`;
+                        feed.appendChild(s);
+                    }
+                });
+
+                if (this.typingState[contact.name]) {
+                    const t = document.createElement('div');
+                    t.className = 'mb-typing';
+                    t.innerHTML = '<i></i><i></i><i></i>';
+                    feed.appendChild(t);
+                }
+                if (!hist.length) feed.appendChild(this._divider('No messages yet'));
+
+                const last = hist[hist.length - 1];
+                this._lastIncoming = [...hist].reverse().find(r => r.from === 'them') || null;
+                this._awaitingThem = !!(last && last.from === 'me' && last.awaiting);
+                this.renderReplyOptions(contact);
+                this._resumeVoice();
+                if (stick) requestAnimationFrame(() => { feed.scrollTop = feed.scrollHeight; });
+                else feed.scrollTop = keep;
+            },
+
+            _divider(text, cls = '') {
+                const d = document.createElement('div');
+                d.className = 'mb-day' + (cls ? ' ' + cls : '');
+                d.textContent = text;
+                return d;
+            },
+
+            /** One line in the thread: its bubble or card, the face and name in the group, the reaction */
+            _message(contact, rec, cont) {
+                const mine = rec.from === 'me';
+                const row = document.createElement('div');
+                row.className = 'mb-row ' + (mine ? 'me' : 'them') + (cont ? ' cont' : '');
+                if (contact.group && !mine) {
+                    const av = cont ? document.createElement('div') : this._face(rec.who || '?', 'mav mb-av', 48);
+                    if (cont) av.className = 'mb-av blank';
+                    row.appendChild(av);
+                }
+                const col = document.createElement('div');
+                col.className = 'mb-col';
+                if (contact.group && !mine && !cont && rec.who) {
+                    const w = document.createElement('div');
+                    w.className = 'mb-who';
+                    w.style.color = this._color(rec.who);
+                    w.textContent = rec.who;
+                    col.appendChild(w);
+                }
+                const wrap = document.createElement('div');
+                wrap.className = 'mb-wrap';
+                const kind = rec.kind;
+                if (rec.text && kind !== 'voice') {
+                    const b = document.createElement('div');
+                    b.className = 'mb';
+                    b.textContent = rec.text;
+                    wrap.appendChild(b);
+                }
+                if (kind === 'pin') wrap.appendChild(this._pinCard(rec));
+                else if (kind === 'brief') wrap.appendChild(this._briefCard(rec));
+                else if (kind === 'voice') wrap.appendChild(this._voiceBubble(contact, rec));
+                else if (kind === 'snap') wrap.appendChild(this._snapCard(contact, rec));
+
+                const pip = mine ? rec.theirReact : rec.react;
+                if (pip) {
+                    const p = document.createElement('span');
+                    p.className = 'mb-pip';
+                    p.textContent = pip;
+                    wrap.appendChild(p);
+                    wrap.classList.add('has-pip');
+                }
+                if (this._glint === rec) wrap.classList.add('glint');
+                if (!mine) this._bindHold(wrap, rec, contact);
+                col.appendChild(wrap);
+                row.appendChild(col);
+                return row;
+            },
+
+            /* ───────────────────────── replies ───────────────────────── */
+            getReplyOptions(contact, lastIncoming) {
+                if (lastIncoming) {
+                    const hit = this._replyIndex()[this._normalizeMsg(lastIncoming)];
+                    if (hit) return hit;
+                }
+                return this._replyTable.byContact[contact.name] || this._replyTable.generic;
+            },
+
+            /** Gold chips answering whatever they said last; the camera sends her snapshot */
+            renderReplyOptions(contact) {
+                const box = document.getElementById('contact-reply-options');
+                const bar = document.getElementById('contact-reply-input');
+                const hint = document.getElementById('contact-reply-hint');
+                const cam = document.getElementById('contact-reply-snap');
+                if (!box) return;
+                box.innerHTML = '';
+                if (cam) cam.disabled = this._awaitingThem;
+                const li = this._lastIncoming;
+                // Only words get worded answers: a card or a photo leaves the chips to the contact's usual lines
+                const opts = this._awaitingThem || !li ? null : this.getReplyOptions(contact, li.kind ? null : li.text);
+                const answered = li && this.messageHistory[contact.name] && this.messageHistory[contact.name].slice(-1)[0].from === 'me';
+                if (!opts || !opts.length || answered) {
+                    bar && bar.classList.remove('armed');
+                    if (hint) hint.textContent = this._awaitingThem ? 'Delivered' : answered ? 'Sent' : 'No reply needed';
+                    return;
+                }
+                bar && bar.classList.add('armed');
+                if (hint) hint.textContent = contact.group ? 'Message the crew…' : `Reply to ${contact.name}…`;
+                opts.forEach(opt => {
+                    const chip = document.createElement('button');
+                    chip.className = 'reply-chip';
+                    chip.textContent = opt.text;
+                    chip.addEventListener('click', () => this.sendReply(contact, opt));
+                    box.appendChild(chip);
+                });
+            },
+
+            /**
+             * Post her reply, then: they read it (Seen), maybe react to it, and if
+             * the option carries a response they type and write back. A response
+             * landing after she's left the thread arrives like any message.
+             */
+            sendReply(contact, opt) {
+                const mine = this.addMessage(contact.name, opt.text, false, 'me', opt.response ? { awaiting: true } : null);
+                this.lastMessageAt[contact.name] = this._now();
+                audioSys.sfx('ui');
+                this.renderThread(contact, true);
+                this._answer(contact, mine, opt.response || null);
+            },
+
+            _answer(contact, mine, response) {
+                const name = contact.name;
+                const resp = typeof response === 'string' ? { text: response } : response;
+                const reactor = contact.group ? (resp && resp.who) || this._someCrew() : name;
+                const seenAt = 450 + Math.random() * 500;
+                const viewing = () => this.isOpen && this.currentApp === 'details' && this.currentContact === name;
+                setTimeout(() => {
+                    mine.seen = this._now();
+                    // The crew react to her lines (and to her photos) the way they like to
+                    if (MSG_TASTE[reactor] && Math.random() < (mine.kind === 'snap' ? 0.9 : 0.55)) mine.theirReact = MSG_TASTE[reactor][mine.kind === 'snap' ? 0 : Math.floor(Math.random() * 2)];
+                    if (resp) { this._typingWho[name] = contact.group ? resp.who : null; this.setTyping(name, true); }
+                    else if (viewing()) this.renderThread(contact);
+                }, seenAt);
+                if (!resp) return;
+                setTimeout(() => {
+                    this.setTyping(name, false);
+                    delete mine.awaiting;
+                    const extra = { ...(resp.who ? { who: resp.who } : {}), ...(resp.extra || {}) };
+                    this.addMessage(name, resp.text, false, 'them', Object.keys(extra).length ? extra : null);
+                    this.lastMessageAt[name] = this._now();
+                    if (viewing()) { this.renderThread(contact); this.renderContacts(); }
+                    else {
+                        this.contactOverrides[name] = resp.text;
+                        this.unread[name] = (this.unread[name] || 0) + 1;
+                        this.refreshNotifications();
+                    }
+                }, seenAt + 1300 + Math.random() * 900);
+            },
+
+            _someCrew() {
+                const crew = (typeof game !== 'undefined' && game && game.teammates || []).filter(t => t.recruited && MSG_CREW.includes(t.name)).map(t => t.name);
+                const pool = crew.length ? crew : MSG_CREW;
+                return pool[Math.floor(Math.random() * pool.length)];
+            },
+
+            /** Called by refreshNotifications while Messages is open: repaint, and read what lands in the open thread */
+            messagesLive() {
+                const c = this._activeContact;
+                if (this.currentApp === 'details' && c && this.unread[c.name]) { this.markRead(c.name); return; }
+                this._buildContactDefs();
+                this.renderContacts();
+                this._paintEmpty();
+                if (this.currentApp === 'details' && c) this.renderThread(c);
+            },
+
+            /** Typing shows in the thread (dots, "is typing…") and the inbox instead of the old banner */
+            updateTypingIndicator() {
+                const inMessages = this.isOpen && (this.currentApp === 'contacts' || this.currentApp === 'details');
+                if (!inMessages) return _msgBaseTyping.call(this);
+                if (this.typingIndicator) this.typingIndicator.classList.remove('active');
+                this.renderContacts();
+                if (this.currentApp === 'details' && this._activeContact) this.renderThread(this._activeContact);
+            },
+
+            /* ───────────────────────── reactions ───────────────────────── */
+            /** Hold a line (or right-click / double-click it) to react */
+            _bindHold(wrap, rec, contact) {
+                let t = null, sx = 0, sy = 0;
+                const open = () => { t = null; this._openPicker(wrap, rec, contact); };
+                const cancel = () => { clearTimeout(t); t = null; };
+                wrap.addEventListener('pointerdown', e => {
+                    if (e.target.closest('button')) return;
+                    sx = e.clientX; sy = e.clientY; cancel(); t = setTimeout(open, 420);
+                });
+                wrap.addEventListener('pointermove', e => { if (t && Math.hypot(e.clientX - sx, e.clientY - sy) > 8) cancel(); });
+                ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => wrap.addEventListener(ev, cancel));
+                wrap.addEventListener('contextmenu', e => { e.preventDefault(); cancel(); open(); });
+                wrap.addEventListener('dblclick', e => { if (!e.target.closest('button')) open(); });
+            },
+            _openPicker(wrap, rec, contact) {
+                this._closePicker();
+                const p = document.createElement('div');
+                p.className = 'mb-picker';
+                for (const e of MSG_REACTIONS) {
+                    const b = document.createElement('button');
+                    b.textContent = e;
+                    if (rec.react === e) b.classList.add('on');
+                    b.addEventListener('click', ev => { ev.stopPropagation(); this.react(contact, rec, e); });
+                    p.appendChild(b);
+                }
+                wrap.parentElement.insertBefore(p, wrap);
+                this._picker = p;
+                try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) { /* no haptics */ }
+                setTimeout(() => {
+                    this._pickerOff = ev => { if (!p.contains(ev.target)) this._closePicker(); };
+                    document.addEventListener('pointerdown', this._pickerOff, true);
+                }, 0);
+            },
+            _closePicker() {
+                if (this._pickerOff) { document.removeEventListener('pointerdown', this._pickerOff, true); this._pickerOff = null; }
+                if (this._picker) { this._picker.remove(); this._picker = null; }
+            },
+            /**
+             * Her reaction to one of their lines. One the crew member likes (MSG_TASTE)
+             * nudges the bond (+2, once per line), and can tip it into the next tier.
+             */
+            react(contact, rec, emoji) {
+                rec.react = rec.react === emoji ? null : emoji;
+                this._closePicker();
+                audioSys.sfx('ui');
+                const who = contact.group ? rec.who : contact.name;
+                const tm = typeof game !== 'undefined' && game && (game.teammates || []).find(t => t.name === who);
+                if (rec.react && tm && !rec.bonded && (MSG_TASTE[who] || []).includes(emoji) && typeof tm.relationship === 'number' && game.bonding) {
+                    rec.bonded = true;
+                    const before = game.bonding.getTier(tm.relationship);
+                    tm.relationship = Math.min(100, tm.relationship + 2);
+                    const after = game.bonding.getTier(tm.relationship);
+                    showMessage(`♡ ${who.toUpperCase()} LIKED THAT`);
+                    if (after > before && BONDING_TIERS[after].message) setTimeout(() => showMessage(`${who.toUpperCase()}: ${BONDING_TIERS[after].message}`), 1200);
+                    this._glint = rec;
+                }
+                this.renderThread(contact);
+                this._glint = null;
+            },
+
+            /* ───────────────────────── location drops ───────────────────────── */
+            _place(id) {
+                const P = MSG_PLACES[id];
+                if (!P) return null;
+                // The live building wins over the table (a map edit moves the pin with it)
+                const bs = (typeof game !== 'undefined' && game) && (game._hubBuildingsCache || (game.activeMap && game.activeMap.id === 'hub_949' && game.activeMap.buildings));
+                const b = bs && bs.find(x => x.id === id);
+                const x = b ? b.x : P.x, y = b ? b.y : P.y, w = b ? (b.w || 100) : P.w, h = b ? (b.h || 100) : P.h;
+                return { ...P, id, tx: x + w / 2, ty: y + h + 30 };
+            },
+            _pinCard(rec) {
+                const d = rec.data || {}, P = this._place(d.place) || { label: 'Somewhere', kind: '' };
+                const card = document.createElement('div');
+                card.className = 'mb-card mb-pin';
+                const map = document.createElement('div');
+                map.className = 'mb-map';
+                const url = this._pinMap(d.place);
+                if (url) map.style.backgroundImage = `url(${url})`;
+                else map.classList.add('sketch');
+                const pin = document.createElement('i');
+                map.appendChild(pin);
+                const cap = document.createElement('div');
+                cap.className = 'mb-cap';
+                const t = document.createElement('div');
+                const b = document.createElement('b'); b.textContent = P.label;
+                const s = document.createElement('small');
+                const set = game && game.navDestination && P.tx != null && Math.hypot(game.navDestination.x - P.tx, game.navDestination.y - P.ty) < 4;
+                s.textContent = set ? 'Waypoint set' : this.feed.pendingPin === d.place ? 'Waypoint saved for the city' : P.kind;
+                t.append(b, s);
+                const btn = document.createElement('button');
+                btn.className = 'mb-btn';
+                btn.textContent = set ? '✓ Set' : 'Set waypoint';
+                btn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    if (this.setWaypoint(d.place)) { audioSys.sfx('ui'); this._activeContact && this.renderThread(this._activeContact); }
+                });
+                cap.append(t, btn);
+                card.append(map, cap);
+                return card;
+            },
+            /** A crop of the city of light around the place (UMaps' painter), when she's in the city */
+            _pinMap(id) {
+                const g = typeof game !== 'undefined' && game, M = g && g.activeMap;
+                if (!M || M.id !== 'hub_949' || typeof MapArt === 'undefined') return null;
+                const key = id + '|' + M.id;
+                if (this._mapCache.has(key)) return this._mapCache.get(key);
+                const P = this._place(id);
+                if (!P) return null;
+                let url = null;
+                try {
+                    const W = 400, H = 160, span = 4200, fs = W / span;
+                    const c = document.createElement('canvas'); c.width = W; c.height = H;
+                    const ctx = c.getContext('2d');
+                    ctx.fillStyle = MAP_PAL.base; ctx.fillRect(0, 0, W, H);
+                    const ox = W / 2 - (P.x + P.w / 2) * fs, oy = H / 2 - (P.y + P.h / 2) * fs;
+                    ctx.setTransform(fs, 0, 0, fs, ox, oy);
+                    MapArt.paintCity(ctx, M, { px: fs, dpr: 1, bounds: { x: -ox / fs, y: -oy / fs, w: W / fs, h: H / fs },
+                        network: g.traffic ? g.traffic.network : null, lamps: g.lamps });
+                    ctx.setTransform(1, 0, 0, 1, 0, 0);
+                    MapArt.bloom(c);
+                    url = c.toDataURL('image/jpeg', 0.8);
+                } catch (e) { url = null; }
+                this._mapCache.set(key, url);
+                return url;
+            },
+            /** Pin the place on UMaps (the same marker a double-tap there sets); outside the city it waits for her return */
+            setWaypoint(id) {
+                const P = this._place(id), g = game, ui = g && g.ui;
+                if (!P) return false;
+                if (!g.activeMap || g.activeMap.id !== 'hub_949' || !ui) {
+                    this.feed.pendingPin = id;
+                    showMessage(`WAYPOINT SAVED · ${P.label.toUpperCase()}`);
+                    return true;
+                }
+                this.feed.pendingPin = null;
+                ui.navMarker = { x: P.tx, y: P.ty };
+                ui.navPathDirty = true;
+                g.navDestination = ui.navMarker;
+                if (g.isDriving && g.car && g.car.controlMode === 'AI') {
+                    g.car.navDestination = null;
+                    if (!g.car.currentTurnPath && !g._refreshAutoDriveRoute()) {
+                        g.car.disableAutoDrive(); g.car.clearNavWaypoints(); g.autodriveBtn.classList.remove('engaged');
+                    }
+                }
+                if (ui.calculateNavPath) ui.calculateNavPath();
+                showMessage(`WAYPOINT SET · ${P.label.toUpperCase()}`);
+                if (ui.renderGoldenMap) ui.renderGoldenMap();
+                return true;
+            },
+            /** A contact drops a pin (the story uses this for Mirabel's lounge) */
+            dropPin(name, place, text, delay = 1600) {
+                this.sendText(name, text, true, delay, { kind: 'pin', id: `pin_${place}_${this._now()}`, data: { place } });
+            },
+
+            /* ───────────────────────── mission briefs ───────────────────────── */
+            _jobTitle(m) {
+                if (!m) return 'A job';
+                if (m.type === 'bounty') return m.targetName || 'Bounty';
+                if (m.type === 'delivery') return `Delivery to ${m.targetLabel || 'the apartments'}`;
+                return String(m.title || 'Salvage').replace(/^SALVAGE: /, '').toLowerCase().replace(/(^|\s)\S/g, s => s.toUpperCase());
+            },
+            _briefCard(rec) {
+                const d = rec.data || {}, m = d.mission || {};
+                const card = document.createElement('div');
+                card.className = 'mb-card mb-brief';
+                const k = document.createElement('div'); k.className = 'k';
+                k.textContent = `Job · ${m.type === 'bounty' ? 'Bounty' : m.type === 'delivery' ? 'Delivery' : 'Salvage'}`;
+                const b = document.createElement('b'); b.textContent = this._jobTitle(m);
+                const p = document.createElement('p'); p.textContent = m.description || '';
+                const row = document.createElement('div'); row.className = 'row';
+                const pay = document.createElement('span'); pay.textContent = `${m.reward || 0} PP · ${m.scrapReward || 0} scrap`;
+                row.appendChild(pay);
+                if (d.state === 'open') {
+                    const btn = document.createElement('button');
+                    btn.className = 'mb-btn';
+                    btn.textContent = 'Accept';
+                    btn.addEventListener('click', e => { e.stopPropagation(); this.acceptBrief(rec); });
+                    row.appendChild(btn);
+                } else {
+                    const st = document.createElement('em');
+                    st.textContent = d.state === 'accepted' ? '✓ On the tracker' : 'Taken by someone else';
+                    row.appendChild(st);
+                    card.classList.add(d.state);
+                }
+                card.append(k, b, p, row);
+                return card;
+            },
+            /** Take the job: it goes on the tracker exactly as if the bartender or barista had handed it over */
+            acceptBrief(rec) {
+                const g = game, d = rec.data;
+                if (!g.missions || !d || d.state !== 'open') return;
+                const m = JSON.parse(JSON.stringify(d.mission));
+                m.id = `${m.type}_${Date.now()}`;
+                if (!g.missions.acceptMission(m, g)) return;     // a job's already running: it says so
+                d.state = 'accepted';
+                if (m.type === 'delivery') { if (g.returnVanHome) g.returnVanHome(); showMessage('PICK UP THE PACKAGE FROM THE AMBER DELIVERY VEHICLE AT COZY CAFE.'); }
+                if (this._activeContact) this.renderThread(this._activeContact);
+            },
+            sendBrief(who, type, text) {
+                const g = game, M = g && g.missions;
+                if (!M) return false;
+                const m = type === 'delivery' ? M.generateDelivery(g) : type === 'salvage' ? M.generateSalvage(g) : M.generateBounty(g);
+                if (!m) return false;
+                // One open job on the phone at a time: an older one goes to someone else
+                for (const n in this.messageHistory) for (const r of this.messageHistory[n]) if (r.kind === 'brief' && r.data && r.data.state === 'open') r.data.state = 'lapsed';
+                this.sendText(who, text, true, 2000, { kind: 'brief', id: `brief_${m.id}`, data: { mission: m, state: 'open' } });
+                return true;
+            },
+
+            /* ───────────────────────── voice notes ───────────────────────── */
+            _voiceSecs(lines) { return Math.max(3, Math.round(lines.reduce((s, l) => s + 0.9 + l.length * 0.065, 0))); },
+            _voiceBubble(contact, rec) {
+                const d = rec.data || {}, secs = d.secs || this._voiceSecs(d.lines || [rec.text]);
+                const v = document.createElement('div');
+                v.className = 'mb-voice' + (d.heard ? '' : ' fresh');
+                v.dataset.vid = rec.id;
+                const play = document.createElement('button');
+                play.className = 'mb-play';
+                play.textContent = '▶';
+                play.addEventListener('click', e => { e.stopPropagation(); this.playVoice(contact, rec); });
+                const wave = document.createElement('div');
+                wave.className = 'mb-wave';
+                let h = 7;
+                for (const ch of String(rec.id || rec.text)) h = (h * 31 + ch.charCodeAt(0)) % 9973;
+                for (let i = 0; i < 26; i++) {
+                    h = (h * 1103 + 12345) % 9973;
+                    const bar = document.createElement('i');
+                    bar.style.height = `${22 + (h % 70) * (0.6 + 0.4 * Math.sin(i / 3))}%`;
+                    wave.appendChild(bar);
+                }
+                const t = document.createElement('small');
+                t.textContent = `0:${String(secs).padStart(2, '0')}`;
+                v.append(play, wave, t);
+                return v;
+            },
+            /**
+             * Play a voice note: the waveform fills, and the earpiece subtitle (a comms
+             * chip in the speaker's caption colour) runs line by line under it.
+             */
+            playVoice(contact, rec) {
+                if (this._voice && this._voice.rec === rec) { this._stopVoice(); this.renderThread(contact); return; }
+                this._stopVoice();
+                const d = rec.data || (rec.data = {});
+                const lines = d.lines || [rec.text], secs = d.secs || this._voiceSecs(lines);
+                const total = lines.reduce((s, l) => s + 1 + l.length, 0);
+                let acc = 0;
+                const marks = lines.map(l => { const at = acc / total; acc += 1 + l.length; return at; });
+                d.heard = true;
+                this._voice = { rec, contact, lines, marks, secs, t0: performance.now(), line: -1 };
+                audioSys.sfx('ui');
+                this._resumeVoice();
+            },
+            _resumeVoice() {
+                const V = this._voice;
+                if (!V || !V.rec.id) return;
+                const step = () => {
+                    if (this._voice !== V) return;
+                    const el = document.querySelector(`.mb-voice[data-vid="${V.rec.id}"]`);
+                    const p = Math.min(1, (performance.now() - V.t0) / (V.secs * 1000));
+                    if (el) {
+                        el.classList.add('playing'); el.classList.remove('fresh');
+                        el.querySelector('.mb-play').textContent = '❚❚';
+                        const bars = el.querySelectorAll('.mb-wave i');
+                        bars.forEach((b, i) => b.classList.toggle('lit', i / bars.length < p));
+                        let li = 0;
+                        V.marks.forEach((m, i) => { if (p >= m) li = i; });
+                        let sub = el.parentElement.querySelector('.mb-sub');
+                        if (!sub) {
+                            sub = this._subChip(V.contact.group ? (V.rec.who || '') : V.contact.name);
+                            el.parentElement.appendChild(sub);
+                        }
+                        if (li !== V.line || !sub.dataset.line) {
+                            V.line = li;
+                            sub.dataset.line = li;
+                            const txt = sub.querySelector('.comm-text');
+                            txt.textContent = V.lines[li];
+                            txt.style.animation = 'none'; void txt.offsetWidth; txt.style.animation = '';
+                        }
+                    }
+                    if (p >= 1) { setTimeout(() => { if (this._voice === V) { this._voice = null; if (this._activeContact) this.renderThread(this._activeContact); } }, 1600); return; }
+                    V.raf = requestAnimationFrame(step);
+                };
+                cancelAnimationFrame(V.raf);
+                V.raf = requestAnimationFrame(step);
+            },
+            _stopVoice() {
+                if (this._voice) cancelAnimationFrame(this._voice.raf);
+                this._voice = null;
+            },
+            /** The earpiece chip (ui/comms.js's look), held in the thread under the note */
+            _subChip(speaker) {
+                const chip = document.createElement('div');
+                chip.className = 'comm-chip mb-sub';
+                chip.style.setProperty('--who', this._color(speaker));
+                const face = this._face(speaker, 'comm-face', 64);
+                const body = document.createElement('div'); body.className = 'comm-body';
+                const name = document.createElement('div'); name.className = 'comm-name'; name.textContent = speaker;
+                const sig = document.createElement('span'); sig.className = 'comm-sig'; sig.innerHTML = '<i></i><i></i><i></i>';
+                name.appendChild(sig);
+                const line = document.createElement('div'); line.className = 'comm-text';
+                body.append(name, line);
+                chip.append(face, body);
+                return chip;
+            },
+            sendVoice(who, lines, id) {
+                this.sendText(who, lines.join(' '), true, 2400, { kind: 'voice', id: id || `voice_${who}_${this._now()}`, data: { lines, secs: this._voiceSecs(lines), heard: false } });
+            },
+
+            /* ───────────────────────── snapshots ───────────────────────── */
+            _snapCard(contact, rec) {
+                const d = rec.data || {};
+                const card = document.createElement('div');
+                card.className = 'mb-card mb-snap';
+                const img = new Image();
+                img.alt = '';
+                if (rec.from === 'me') {
+                    if (d.img) img.src = d.img; else card.classList.add('gone');
+                } else {
+                    const url = this._paintSnap(rec, contact.group ? rec.who : contact.name);
+                    if (url) img.src = url;
+                }
+                card.appendChild(img);
+                const P = d.place && MSG_PLACES[d.place];
+                if (P) { const tag = document.createElement('span'); tag.textContent = `📍 ${P.label}`; card.appendChild(tag); }
+                if (rec.from === 'me' && !d.img) { const tag = document.createElement('span'); tag.textContent = 'Photo no longer kept'; card.appendChild(tag); }
+                return card;
+            },
+            /**
+             * Their photo, painted: the place (a night-lit backdrop for its kind of spot)
+             * and them in it, their own portrait wearing the photo's mood. Kept for the
+             * session; nothing is stored in the save.
+             */
+            _paintSnap(rec, who) {
+                const key = (rec.id || rec.text) + '|' + who;
+                if (this._snapCache.has(key)) return this._snapCache.get(key);
+                const d = rec.data || {}, P = MSG_PLACES[d.place] || MSG_PLACES.double_nights;
+                let url = null;
+                try {
+                    const W = 480, H = 300, c = document.createElement('canvas');
+                    c.width = W; c.height = H;
+                    const ctx = c.getContext('2d');
+                    let seed = 0; for (const ch of key) seed = (seed * 31 + ch.charCodeAt(0)) % 99991;
+                    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+                    const g = ctx.createLinearGradient(0, 0, 0, H);
+                    g.addColorStop(0, P.tint[0]); g.addColorStop(1, P.tint[1]);
+                    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+                    this._snapScene(ctx, W, H, P, rnd);
+                    // Bokeh: out-of-focus lights of the place
+                    for (let i = 0; i < 22; i++) {
+                        const x = rnd() * W, y = rnd() * H * 0.75, r = 6 + rnd() * 22, col = P.glow[i % P.glow.length];
+                        const rg = ctx.createRadialGradient(x, y, 0, x, y, r);
+                        rg.addColorStop(0, col + 'aa'); rg.addColorStop(0.7, col + '33'); rg.addColorStop(1, col + '00');
+                        ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+                    }
+                    // Them, a little off-centre, as a phone held at arm's length frames a face
+                    const cfg = typeof game !== 'undefined' && game && game.resolvePortraitConfig ? game.resolvePortraitConfig(who) : null;
+                    if (cfg && !cfg.isFallback) {
+                        const S = 300, f = document.createElement('canvas');
+                        f.width = f.height = S;
+                        drawCharacterPortrait(f.getContext('2d'), S, S, { ...cfg, backdrop: false, expression: d.mood || 'smile' });
+                        ctx.save();
+                        ctx.translate(W * 0.62, H * 0.56); ctx.rotate(-0.04);
+                        ctx.drawImage(f, -S / 2, -S / 2 + 20, S, S);
+                        ctx.restore();
+                    }
+                    // The phone's look: warm lift, vignette
+                    ctx.globalCompositeOperation = 'soft-light';
+                    ctx.fillStyle = P.glow[0] + '55'; ctx.fillRect(0, 0, W, H);
+                    ctx.globalCompositeOperation = 'source-over';
+                    const v = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.62);
+                    v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.55)');
+                    ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+                    url = c.toDataURL('image/jpeg', 0.82);
+                } catch (e) { url = null; }
+                this._snapCache.set(key, url);
+                if (this._snapCache.size > 24) this._snapCache.delete(this._snapCache.keys().next().value);
+                return url;
+            },
+            /** The place behind them, by kind: neon for a club, warm panes for a cafe, a shutter for a garage… */
+            _snapScene(ctx, W, H, P, rnd) {
+                const glow = (x, y, w, h, col, a = 0.85) => {
+                    ctx.save(); ctx.shadowColor = col; ctx.shadowBlur = 18; ctx.globalAlpha = a; ctx.fillStyle = col; ctx.fillRect(x, y, w, h); ctx.restore();
+                };
+                if (P.look === 'club') {
+                    for (let i = 0; i < 5; i++) glow(20 + i * 70 + rnd() * 20, 30 + rnd() * 40, 40 + rnd() * 40, 4, P.glow[i % 3]);
+                    ctx.save(); ctx.strokeStyle = P.glow[1]; ctx.shadowColor = P.glow[1]; ctx.shadowBlur = 16; ctx.lineWidth = 4;
+                    ctx.beginPath(); ctx.arc(120, 150, 70, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); ctx.restore();
+                    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, H * 0.78, W, H * 0.22);
+                } else if (P.look === 'cafe') {
+                    for (let r = 0; r < 2; r++) for (let i = 0; i < 4; i++) {
+                        ctx.fillStyle = `rgba(255, 190, 110, ${0.18 + rnd() * 0.25})`; ctx.fillRect(16 + i * 64, 40 + r * 74, 54, 64);
+                    }
+                    for (let i = 0; i < 3; i++) { const x = 50 + i * 90; ctx.strokeStyle = 'rgba(255,220,160,0.35)'; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 26); ctx.stroke(); glow(x - 9, 26, 18, 8, '#ffcf8a'); }
+                    ctx.fillStyle = 'rgba(40, 18, 8, 0.75)'; ctx.fillRect(0, H * 0.8, W, H * 0.2);
+                } else if (P.look === 'garage') {
+                    ctx.fillStyle = 'rgba(160, 160, 190, 0.12)';
+                    for (let y = 30; y < H * 0.7; y += 10) ctx.fillRect(10, y, 230, 4);
+                    glow(10, 20, 230, 5, P.glow[0]);
+                    ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.beginPath(); ctx.ellipse(130, H * 0.82, 120, 34, 0, 0, Math.PI * 2); ctx.fill();
+                    glow(30, H * 0.78, 30, 6, '#ff3a3a'); glow(200, H * 0.78, 30, 6, '#ff3a3a');
+                } else if (P.look === 'clinic') {
+                    glow(60, 50, 60, 18, P.glow[0]); glow(81, 29, 18, 60, P.glow[0]);
+                    ctx.fillStyle = 'rgba(200, 255, 255, 0.07)'; ctx.fillRect(0, 140, W, 8); ctx.fillRect(0, 200, W, 4);
+                } else if (P.look === 'park') {
+                    const sky = ctx.createLinearGradient(0, 0, 0, H * 0.7);
+                    sky.addColorStop(0, '#3a1a5a'); sky.addColorStop(0.6, '#c0507a'); sky.addColorStop(1, '#ffb070');
+                    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H * 0.7);
+                    glow(70, H * 0.55, 60, 3, '#ffe0a0', 0.6);
+                    ctx.fillStyle = '#120818';
+                    for (let i = 0; i < 6; i++) { const x = rnd() * W, r = 24 + rnd() * 30; ctx.beginPath(); ctx.arc(x, H * 0.66, r, 0, Math.PI * 2); ctx.fill(); }
+                    ctx.fillRect(0, H * 0.66, W, H * 0.34);
+                } else {
+                    for (let i = 0; i < 40; i++) {
+                        ctx.fillStyle = rnd() < 0.5 ? `rgba(232, 194, 122, ${0.15 + rnd() * 0.3})` : 'rgba(255,255,255,0.04)';
+                        ctx.fillRect(10 + (i % 8) * 30, 20 + Math.floor(i / 8) * 34, 18, 22);
+                    }
+                    glow(0, H * 0.8, W, 3, P.glow[0], 0.5);
+                }
+            },
+            sendSnap(who, place, mood, text, id) {
+                this.sendText(who, text, true, 2200, { kind: 'snap', id: id || `snap_${who}_${this._now()}`, data: { place, mood } });
+            },
+            /** Her snapshot: a frame of the game view (as an imprint keeps one), sent to whoever's open */
+            sendSnapshot(contact) {
+                if (!contact || this._awaitingThem) return;
+                let img = null;
+                try {
+                    const src = document.getElementById('game-canvas');
+                    if (src && src.width) {
+                        const w = 320, h = Math.round(w * src.height / src.width), c = document.createElement('canvas');
+                        c.width = w; c.height = h;
+                        c.getContext('2d').drawImage(src, 0, 0, w, h);
+                        img = c.toDataURL('image/jpeg', 0.7);
+                    }
+                } catch (e) { img = null; }
+                if (!img) { showMessage('NO PICTURE TO SEND'); return; }
+                const place = this._whereAmI();
+                const mine = this.addMessage(contact.name, '', false, 'me', { kind: 'snap', id: `snap_me_${Date.now()}`, awaiting: true, data: { img, place } });
+                this._trimSnaps();
+                this.lastMessageAt[contact.name] = this._now();
+                audioSys.sfx('ui');
+                this.renderThread(contact, true);
+                const who = contact.group ? this._someCrew() : contact.name;
+                this._answer(contact, mine, { text: MSG_SNAP_REPLIES[who] || 'Nice.', who: contact.group ? who : undefined });
+            },
+            /** Which pinned place she's nearest (for the photo's tag), if she's in the city and close to one */
+            _whereAmI() {
+                const g = game, p = g && g.player;
+                if (!p || !g.activeMap || g.activeMap.id !== 'hub_949') return null;
+                let best = null, bd = 900;
+                for (const id in MSG_PLACES) {
+                    const P = this._place(id), dd = Math.hypot(P.tx - p.x, P.ty - p.y);
+                    if (dd < bd) { bd = dd; best = id; }
+                }
+                return best;
+            },
+            /** Only her newest six photos keep their picture, so the save stays small */
+            _trimSnaps() {
+                const all = [];
+                for (const n in this.messageHistory) for (const r of this.messageHistory[n]) if (r.kind === 'snap' && r.from === 'me' && r.data && r.data.img) all.push(r);
+                all.sort((a, b) => String(b.id).localeCompare(String(a.id)));
+                all.slice(6).forEach(r => { r.data.img = null; });
+            },
+
+            /* ───────────────────────── the group chat ───────────────────────── */
+            /**
+             * After a job: the crew's take, in the group chat. Who opens is someone
+             * who came along; it reads the job (bounty / delivery / salvage) and how it
+             * went (rough if she came out hurt or someone went down, quick under half
+             * an hour, clean if she's barely scratched); anyone down says so, anyone
+             * left home complains, and sometimes it ends with a pin to Moon City.
+             */
+            crewBanter(m, g) {
+                if (!m || !g) return;
+                const p = g.player, hp = p && p.maxHp ? p.hp / p.maxHp : 1;
+                const crew = (g.teammates || []).filter(t => MSG_CREW.includes(t.name));
+                const came = crew.filter(t => t.recruited && !t.downed).map(t => t.name);
+                const down = crew.filter(t => t.recruited && t.downed).map(t => t.name);
+                const home = crew.filter(t => !t.recruited).map(t => t.name);
+                const mins = g.worldMinutes - (m.startTime != null ? m.startTime : g.worldMinutes);
+                const how = down.length || hp < 0.35 ? 'rough' : mins < 30 ? 'quick' : hp > 0.75 ? 'clean' : 'fine';
+                const pick = a => a[Math.floor(Math.random() * a.length)];
+                const fill = s => s.replace(/\{mark\}/g, m.targetName || 'the mark').replace(/\{reward\}/g, m.reward || 0);
+                const lines = [];
+                const voices = came.length ? came.slice() : ['Josh'];
+                const first = pick(voices);
+                lines.push({ who: first, text: fill(MSG_BANTER[how][first]) });
+                const typeLines = MSG_BANTER_TYPE[m.type] || {};
+                const others = voices.filter(n => n !== first && typeLines[n]);
+                const second = others.length ? pick(others) : first !== 'Josh' ? 'Josh' : null;
+                if (second && typeLines[second]) lines.push({ who: second, text: fill(typeLines[second]) });
+                if (down.length) { const d = pick(down); lines.push({ who: d, text: MSG_BANTER_DOWN[d] }); }
+                if (home.length && Math.random() < 0.8) { const h = pick(home); lines.push({ who: h, text: MSG_BANTER_LEFT[h] }); }
+                const pin = Math.random() < 0.3;
+                if (pin) lines.push({ who: first === 'Victoria' ? 'Sabrina' : 'Victoria', text: 'Drinks. Moon City. First round\'s on Josh.', pin: 'moon_city' });
+
+                const stamp = Date.now();
+                let at = 2600;
+                lines.forEach((l, i) => {
+                    setTimeout(() => this._typingAs(l.who, true), at);
+                    at += 1300 + l.text.length * 25;
+                    setTimeout(() => {
+                        this._typingAs(l.who, false);
+                        this._deliverMessage(MSG_GROUP, l.text, { who: l.who, id: `banter_${stamp}_${i}`, ...(l.pin ? { kind: 'pin', data: { place: l.pin } } : {}) });
+                    }, at);
+                    at += 500 + Math.random() * 700;
+                });
+            },
+            _typingAs(who, on) {
+                this._typingWho[MSG_GROUP] = on ? who : null;
+                this.setTyping(MSG_GROUP, on);
+            },
+
+            /* ───────────────────────── the feed ───────────────────────── */
+            /** After chapter 1 the city texts back */
+            _freePlay() {
+                const S = typeof game !== 'undefined' && game && game.story;
+                if (!S || !S.state) return false;
+                if (S.state.part > 1) return true;
+                return S.isBefore ? !S.isBefore('CHAPTER_COMPLETE') : false;
+            },
+            _feedTick() {
+                const g = typeof game !== 'undefined' && game;
+                if (!g || !g.activeMap || !g.player) return;
+                if (this.feed.pendingPin && g.activeMap.id === 'hub_949' && !g.navDestination) this.setWaypoint(this.feed.pendingPin);
+                if (!this._freePlay() || (g.scenes && g.scenes.running) || (g.pauseSystem && g.pauseSystem.tokens && g.pauseSystem.tokens.size)) return;
+                const now = g.worldMinutes;
+                if (this.feed.nextAt == null || this.feed.nextAt - now > 600) { this.feed.nextAt = now + 20; return; }
+                if (now < this.feed.nextAt) return;
+                this.feed.nextAt = now + 150 + Math.floor(Math.random() * 120);
+                this.feedNext();
+            },
+            /** Send the next thing someone writes on their own: a job when she's free (a third of the time), else a place, a photo or a voice note */
+            feedNext() {
+                const g = game;
+                const briefOpen = Object.values(this.messageHistory).some(h => h.some(r => r.kind === 'brief' && r.data && r.data.state === 'open'));
+                if (g.missions && !g.missions.activeMission && !briefOpen && Math.random() < 0.35) {
+                    const opts = MSG_BRIEFS.filter(b => !b.needs || b.needs(g));
+                    const b = opts[Math.floor(Math.random() * opts.length)];
+                    if (b && this.sendBrief(b.who, b.type, b.text)) return b;
+                }
+                const left = MSG_FEED.filter(e => !this.feed.done[e.id] && (!e.needs || e.needs(g)));
+                if (!left.length) return null;
+                const e = left[Math.floor(Math.random() * left.length)];
+                this.feed.done[e.id] = 1;
+                if (e.kind === 'pin') this.dropPin(e.who, e.place, e.text);
+                else if (e.kind === 'snap') this.sendSnap(e.who, e.place, e.mood, e.text, e.id);
+                else if (e.kind === 'voice') this.sendVoice(e.who, e.lines, e.id);
+                return e;
+            },
+            resetFeed() { this.feed = { nextAt: null, done: {}, pendingPin: null }; this._snapCache.clear(); this._mapCache.clear(); },
+        });
+
+        // Tabs, the camera, and the feed's clock
+        document.querySelectorAll('#msg-tabs button').forEach(b => b.addEventListener('click', () => { phoneSystem.msgTab = b.dataset.tab; phoneSystem.renderContacts(); }));
+        document.getElementById('contact-reply-snap').addEventListener('click', () => phoneSystem.sendSnapshot(phoneSystem._activeContact));
+        setInterval(() => { try { phoneSystem._feedTick(); } catch (e) { console.error(e); } }, 1000);
         // --- SCREENS: the one way the sidebar-nav screens open and close ---
         // Two panels: #map-interface (the golden map) and #freelancer-menu (every other
         // screen, as a sub-screen of #inv-main-content). Screens.open(name) closes the other

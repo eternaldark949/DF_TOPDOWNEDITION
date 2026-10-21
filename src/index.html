@@ -451,9 +451,9 @@
                             <div id="phone-apps">
                                 <div class="phone-app-container" id="app-contacts">
                                     <div class="phone-app-icon-circle" style="position:relative;">
-                                        👤 <div class="app-badge" id="badge-contacts"></div> 
+                                        💬 <div class="app-badge" id="badge-contacts"></div> 
                                     </div>
-                                    <div class="phone-app-name">Contacts</div>
+                                    <div class="phone-app-name">Messages</div>
                                 </div>
                                 <div class="phone-app-container" id="app-maps">
                                     <div class="phone-app-icon-circle">🗺️</div>
@@ -495,30 +495,43 @@
                             </div>
                         </div>
                         
+                        <!-- Messages (ui/messages.js): the inbox rail beside the open thread on its side, one or the other upright -->
                         <div class="phone-app-screen" id="screen-contacts">
-                            <div class="phone-app-header">
-                                <button class="phone-back-btn" id="contacts-back">◀</button>
-                                <span class="phone-app-title">Contacts</span>
+                            <div class="msg-rail">
+                                <div class="msg-rail-head">
+                                    <button class="phone-back-btn" id="contacts-back">◀</button>
+                                    <span class="msg-title">Messages</span>
+                                </div>
+                                <div class="msg-tabs" id="msg-tabs">
+                                    <button data-tab="all" class="on">All</button><button data-tab="crew">Crew</button><button data-tab="unread">Unread</button>
+                                </div>
+                                <div class="msg-list" id="contacts-list"></div>
                             </div>
-                            <div class="phone-app-content" id="contacts-list"></div>
-                        </div>
-                        
-                        <div class="phone-app-screen" id="screen-contact-detail">
-                            <div class="phone-app-header">
-                                <button class="phone-back-btn" id="contact-detail-back">◀</button>
-                                <div class="thread-avatar-slot" id="contact-detail-avatar"></div>
-                                <span class="phone-app-title" id="contact-detail-name">Name</span>
-                            </div>
-                            <div class="phone-app-content contact-detail" id="contact-detail-content"></div>
-                            <div id="contact-reply-bar">
-                                <div id="contact-reply-options"></div>
-                                <div id="contact-reply-input">
-                                    <span id="contact-reply-hint">No reply needed</span>
-                                    <span id="contact-reply-send">➤</span>
+                            <div class="msg-pane" id="screen-contact-detail">
+                                <div class="msg-head">
+                                    <button class="phone-back-btn" id="contact-detail-back">◀</button>
+                                    <div class="thread-avatar-slot" id="contact-detail-avatar"></div>
+                                    <div class="msg-head-text">
+                                        <b id="contact-detail-name">Name</b>
+                                        <small id="contact-detail-sub"></small>
+                                    </div>
+                                </div>
+                                <div class="msg-feed" id="contact-detail-content"></div>
+                                <div id="contact-reply-bar">
+                                    <div id="contact-reply-options"></div>
+                                    <div id="contact-reply-input">
+                                        <button id="contact-reply-snap" title="Send a snapshot">📷</button>
+                                        <span id="contact-reply-hint">No reply needed</span>
+                                        <span id="contact-reply-send">➤</span>
+                                    </div>
+                                </div>
+                                <div class="msg-empty" id="msg-empty">
+                                    <div class="msg-empty-script">Messages</div>
+                                    <div class="msg-empty-line" id="msg-empty-line">Choose a conversation</div>
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="phone-app-screen" id="screen-maps">
                             <div class="phone-app-header">
                                 <button class="phone-back-btn" id="maps-back">◀</button>

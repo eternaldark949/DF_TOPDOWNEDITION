@@ -200,6 +200,8 @@
                                         condition: "CONTRACTOR_REWARDED",
                                         onStart: (game) => {
                                             game.questState.ambushCleared = true;
+                                            // Where to find her, as a pin she can set as her waypoint (ui/messages.js)
+                                            if (typeof phoneSystem !== 'undefined' && phoneSystem.dropPin) phoneSystem.dropPin('Mirabel', 'moon_city', 'Moon City. My lounge, upstairs. Don\'t keep me waiting.', 2400);
                                             game.hud.reveal('autodrive');
                                             game.hud.reveal('handbrake');
                                         }

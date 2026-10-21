@@ -709,36 +709,6 @@
         .phone-app-title { font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.9rem - var(--font-trim)); color: rgba(140, 20, 30, 0.8); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
         .phone-app-content { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 5px; scrollbar-width: thin; scrollbar-color: rgba(140,20,30,0.4) rgba(255, 255, 255, 0.05); }
         
-        .contact-item { display: flex; align-items: center; padding: 12px; background: rgba(255, 255, 255, 0.03); border-radius: 8px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s; }
-        .contact-item:hover { background: rgba(140, 20, 30, 0.1); }
-        .contact-unread-count { flex-shrink: 0; margin-left: 8px; min-width: 18px; padding: 0 5px; height: 18px; border-radius: 9px; background: #ff0055; color: #fff; font-family: 'Orbitron', sans-serif; font-size: max(6px, 0.6rem - var(--font-trim)); font-weight: bold; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 6px rgba(255, 0, 85, 0.6); }
-        .contact-avatar { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, rgba(140,20,30,0.6), rgba(218,165,32,0.4)); display: flex; justify-content: center; align-items: center; font-size: max(6px, 1.2rem - var(--font-trim)); margin-right: 12px; position: relative; flex-shrink: 0; border: 2px solid transparent; box-sizing: border-box; transition: border-color 0.3s; }
-        /* Portrait fills the circle; the gradient above stays visible behind the
-           transparent PNG, so the app keeps its look instead of a flat dark disc. */
-        .contact-avatar.has-portrait { overflow: visible; }
-        .avatar-portrait { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
-        /* Original emoji, demoted to a corner badge: identity from the face, role
-           from the glyph. */
-        .avatar-glyph { position: absolute; bottom: -3px; right: -4px; font-size: max(6px, 0.62rem - var(--font-trim)); line-height: 1; padding: 2px; border-radius: 50%; background: rgba(12,6,10,0.92); z-index: 2; }
-        .contact-avatar.avatar-unread { border-color: #ff0055; animation: avatarPulse 1.4s infinite; }
-        @keyframes avatarPulse {
-            0%   { box-shadow: 0 0 0 0 rgba(255,0,85,0.55); }
-            70%  { box-shadow: 0 0 0 6px rgba(255,0,85,0); }
-            100% { box-shadow: 0 0 0 0 rgba(255,0,85,0); }
-        }
-        /* Downed teammates can't actually be reached — say so visually. */
-        .contact-avatar.avatar-downed { filter: grayscale(1) brightness(0.55); border-color: rgba(90,90,90,0.6); }
-        .contact-avatar.avatar-downed .avatar-glyph { filter: grayscale(1); }
-        .contact-info { flex: 1; }
-        .contact-name { color: #fff; font-size: max(6px, 0.9rem - var(--font-trim)); margin-bottom: 3px; }
-        .contact-role { color: #888; font-size: max(6px, 0.7rem - var(--font-trim)); }
-        .typing-anim { color: #c07878; font-style: italic; animation: pulseText 1s infinite alternate; }
-        /* Unread rows: brighter + bold so the block reads at a glance. Applied to
-           the name as well as the preview, since bolding only the preview made the
-           row look lopsided against the lighter name above it. */
-        .contact-item.unread .contact-name { font-weight: 700; color: #fff; }
-        .contact-item.unread .contact-role { font-weight: 700; color: #d8b0b8; }
-        
         /* Typing Indicator - Flickering Periwinkle with Bouncing Dots */
         .phone-typing-indicator {
             position: absolute;
@@ -779,65 +749,172 @@
             30% { transform: translateY(-6px); }
         }
         @keyframes pulseText { from { opacity: 0.5; } to { opacity: 1; } }
-        .contact-message { background: rgba(255, 255, 255, 0.03); padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid rgba(140, 20, 30, 0.5); }
-        .contact-message-label { color: #888; font-size: max(6px, 0.7rem - var(--font-trim)); margin-bottom: 5px; }
-        .contact-message-text { color: #ddd; font-size: max(6px, 0.85rem - var(--font-trim)); line-height: 1.4; }
-
         /* =========================================================
-           MESSAGE THREAD — conversation, not notice board
-           Incoming keeps the left-accent card. 949's replies are
-           right-aligned periwinkle so the two voices read apart.
+           MESSAGES — Velvet Thread (ui/messages.js)
+           On its side: the inbox rail (34%) beside the thread.
+           Upright: the list, or the thread (.has-thread).
+           Her lines violet on the right, theirs smoke on the left,
+           gold reply chips, painted faces with the bond's ring.
            ========================================================= */
-        .thread-avatar-slot { display: flex; align-items: center; margin-right: 10px; }
-        .thread-avatar-slot .contact-avatar { width: 30px; height: 30px; margin-right: 0; font-size: max(6px, 0.9rem - var(--font-trim)); }
-        .thread-avatar-slot .avatar-glyph { font-size: max(6px, 0.48rem - var(--font-trim)); bottom: -2px; right: -3px; }
+        #screen-contacts { flex-direction: row; padding: 0 0 42px; position: relative;
+            background: radial-gradient(ellipse 70% 60% at 30% 15%, rgba(93, 20, 226, 0.22), transparent 70%), linear-gradient(180deg, #0e0418, #07020c); }
+        body.phone-wide #screen-contacts { padding: 0 0 34px; }
+        .msg-rail { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; padding: 14px 12px 0; }
+        .msg-pane { flex: 1 1 auto; min-width: 0; display: none; flex-direction: column; position: relative; }
+        #screen-contacts.has-thread .msg-rail { display: none; }
+        #screen-contacts.has-thread .msg-pane { display: flex; }
+        body.phone-wide .msg-rail { flex: 0 0 34%; display: flex !important; padding: 8px 6px 0 10px; border-right: 1px solid rgba(232, 194, 122, 0.18); }
+        body.phone-wide .msg-pane { display: flex; }
+        body.phone-wide #contact-detail-back { display: none; }
+        #screen-contacts:not(.has-thread) .msg-head, #screen-contacts:not(.has-thread) .msg-feed, #screen-contacts:not(.has-thread) #contact-reply-bar { display: none; }
 
-        .msg-row { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 10px; }
-        .msg-row.from-me { flex-direction: row-reverse; }
-        .msg-row .contact-message { margin-bottom: 0; flex: 1 1 auto; min-width: 0; }
-        .msg-avatar { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; position: relative;
-                      background: linear-gradient(135deg, rgba(140,20,30,0.6), rgba(218,165,32,0.4));
-                      display: flex; align-items: center; justify-content: center; font-size: max(6px, 0.75rem - var(--font-trim)); overflow: hidden; }
-        .msg-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
-        .msg-avatar.is-me { background: linear-gradient(135deg, rgba(120,120,225,0.6), rgba(185,175,255,0.35)); }
+        .msg-rail-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .msg-rail-head .phone-back-btn { margin: 0; width: 24px; height: 24px; font-size: max(6px, 0.7rem - var(--font-trim)); flex: none; }
+        .msg-title { font: 400 max(6px, 1.7rem - var(--font-trim))/1 'Great Vibes', cursive; color: #f6dfa8; text-shadow: 0 0 14px rgba(232, 194, 122, 0.35); }
+        body.phone-wide .msg-title { font-size: max(6px, 1.45rem - var(--font-trim)); }
+        .msg-tabs { display: flex; gap: 4px; margin-bottom: 6px; }
+        .msg-tabs button { font: 600 max(6px, 0.5rem - var(--font-trim))/1 'Montserrat', sans-serif; letter-spacing: 0.1em; text-transform: uppercase; padding: 5px 8px; border-radius: 999px;
+            border: 1px dotted rgba(202, 176, 250, 0.4); background: transparent; color: var(--df-lilac-grey); cursor: pointer; }
+        .msg-tabs button.on { background: var(--df-lavender-pale); color: var(--df-violet-ink); border: 1px solid #fff; }
+        .msg-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column; gap: 2px; padding-bottom: 6px; }
+        .msg-list::-webkit-scrollbar { display: none; }
+        .msg-sec { font: 600 max(6px, 0.45rem - var(--font-trim))/1 'Montserrat', sans-serif; letter-spacing: 0.3em; text-transform: uppercase; color: #e8c27a; margin: 6px 0 2px 4px; }
+        .msg-none { text-align: center; margin-top: 24px; font: italic 500 max(6px, 0.85rem - var(--font-trim)) 'Cormorant Garamond', Georgia, serif; color: var(--df-lilac-grey); }
+        .msg-item { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 10px; cursor: pointer; transition: background 0.18s; flex: none; }
+        .msg-item:hover { background: rgba(93, 20, 226, 0.18); }
+        .msg-item.on { background: linear-gradient(90deg, rgba(93, 20, 226, 0.5), rgba(35, 5, 93, 0.25)); box-shadow: inset 0 0 0 1px rgba(232, 194, 122, 0.3); }
+        .msg-who { flex: 1; min-width: 0; }
+        .msg-who b { display: block; font: 600 max(6px, 0.66rem - var(--font-trim))/1.25 'Montserrat', sans-serif; color: #f1e8fe; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .msg-who i { display: block; font: italic 500 max(6px, 0.74rem - var(--font-trim))/1.2 'Cormorant Garamond', Georgia, serif; color: var(--df-lilac-grey); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .msg-who i.typing { color: #f6dfa8; animation: pulseText 1s infinite alternate; }
+        .msg-item.unread .msg-who b { color: #fff; }
+        .msg-item.unread .msg-who i { color: #f1e8fe; font-weight: 700; }
+        .msg-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex: none; }
+        .msg-meta small { font: 500 max(6px, 0.45rem - var(--font-trim))/1 'Montserrat', sans-serif; color: var(--df-lilac-grey); white-space: nowrap; }
+        .msg-count { min-width: 14px; height: 14px; padding: 0 4px; box-sizing: border-box; border-radius: 7px; background: #ff3d7a; color: #fff; display: grid; place-items: center;
+            font: 700 max(6px, 0.48rem - var(--font-trim))/1 'Montserrat', sans-serif; box-shadow: 0 0 8px rgba(255, 61, 122, 0.7); }
 
-        .msg-row.from-me .contact-message {
-            background: rgba(155,155,240,0.13);
-            border-left: none;
-            border-right: 3px solid #9b9bf0;
-            text-align: right;
-        }
-        .msg-row.from-me .contact-message-label { color: #9b9bf0; }
-        .msg-row.from-me .contact-message-text { color: #dedcff; }
+        /* Faces: the painted bust in a circle, a gold hairline, the bond's ring for the crew */
+        .mav { --ring: rgba(232, 194, 122, 0.55); width: 32px; height: 32px; border-radius: 50%; flex: none; position: relative; overflow: hidden; display: grid; place-items: center;
+            background: radial-gradient(circle at 50% 35%, #3a1d78, #12061f); box-shadow: 0 0 0 1.5px var(--ring); color: #f6dfa8;
+            font: italic 600 max(6px, 0.95rem - var(--font-trim)) 'Cormorant Garamond', Georgia, serif; }
+        .mav img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .mav.big { width: 30px; height: 30px; }
+        .mav.downed img { filter: grayscale(1) brightness(0.55); }
+        .msg-item.unread .mav { box-shadow: 0 0 0 1.5px #ff3d7a, 0 0 10px rgba(255, 61, 122, 0.6); }
+        .mav.stack { overflow: visible; background: none; box-shadow: none; display: block; }
+        .mav.stack .mav-mini { position: absolute; width: 62%; height: 62%; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 1.5px #12061f, 0 0 0 2.5px rgba(232, 194, 122, 0.5); background: #23055d; }
+        .mav.stack .mav-mini img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .mav.stack .mav-mini:nth-child(1) { left: 0; top: 0; } .mav.stack .mav-mini:nth-child(2) { right: 0; top: 10%; } .mav.stack .mav-mini:nth-child(3) { left: 19%; bottom: 0; }
 
-        /* --- REPLY BAR --- */
-        #contact-reply-bar { flex-shrink: 0; padding-top: 10px; margin-top: 4px; border-top: 1px solid rgba(140,20,30,0.2); }
-        #contact-reply-options { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; align-items: flex-end; }
+        /* The thread */
+        .msg-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 7px; border-bottom: 1px solid rgba(232, 194, 122, 0.15); flex: none; }
+        body.phone-wide .msg-head { padding: 7px 12px 6px; }
+        .msg-head .phone-back-btn { margin: 0; width: 24px; height: 24px; font-size: max(6px, 0.7rem - var(--font-trim)); flex: none; }
+        .msg-head .thread-avatar-slot { display: flex; }
+        .msg-head-text { min-width: 0; }
+        .msg-head-text b { display: block; font: italic 600 max(6px, 1.1rem - var(--font-trim))/1 'Cormorant Garamond', Georgia, serif; color: #f6dfa8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .msg-head-text small { display: block; font: 500 max(6px, 0.48rem - var(--font-trim))/1.4 'Montserrat', sans-serif; color: var(--df-lilac-grey); letter-spacing: 0.08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .msg-feed { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 6px 12px 8px; display: flex; flex-direction: column; scrollbar-width: thin; scrollbar-color: rgba(232, 194, 122, 0.3) transparent; }
+        .mb-day { align-self: center; margin: 10px 0 4px; font: 600 max(6px, 0.45rem - var(--font-trim))/1 'Montserrat', sans-serif; letter-spacing: 0.26em; text-transform: uppercase; color: var(--df-lilac-grey); text-align: center; }
+        .mb-day.call { letter-spacing: 0.12em; color: #f6dfa8; }
+        .mb-row { display: flex; align-items: flex-end; gap: 6px; margin-top: 6px; }
+        .mb-row.cont { margin-top: 2px; }
+        .mb-row.me { justify-content: flex-end; }
+        .mb-col { display: flex; flex-direction: column; align-items: flex-start; max-width: 80%; min-width: 0; }
+        .mb-row.me .mb-col { align-items: flex-end; }
+        .mb-av { width: 20px; height: 20px; flex: none; }
+        .mb-av.blank { visibility: hidden; }
+        .mb-av.mav { box-shadow: 0 0 0 1px var(--ring); font-size: max(6px, 0.6rem - var(--font-trim)); }
+        .mb-who { font: 600 max(6px, 0.48rem - var(--font-trim))/1.4 'Montserrat', sans-serif; letter-spacing: 0.1em; margin: 0 0 1px 4px; }
+        .mb-wrap { position: relative; max-width: 100%; display: flex; flex-direction: column; gap: 4px; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+        .mb-row.me .mb-wrap { align-items: flex-end; }
+        .mb-wrap.has-pip { margin-bottom: 9px; }
+        .mb { padding: 6px 10px; border-radius: 14px; font: 500 max(6px, 0.66rem - var(--font-trim))/1.38 'Montserrat', sans-serif; color: #f1e8fe; overflow-wrap: anywhere; animation: mbIn 0.25s ease-out both; }
+        .mb-row.them .mb { background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(202, 176, 250, 0.16); border-bottom-left-radius: 4px; }
+        .mb-row.me .mb { background: linear-gradient(180deg, #6a24ea, #3e0fa6); border-bottom-right-radius: 4px; box-shadow: 0 0 12px rgba(93, 20, 226, 0.4); }
+        .mb-row.cont.them .mb { border-top-left-radius: 6px; } .mb-row.cont.me .mb { border-top-right-radius: 6px; }
+        @keyframes mbIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+        .mb-pip { position: absolute; bottom: -10px; right: -4px; font-size: max(6px, 0.58rem - var(--font-trim)); line-height: 1; padding: 2px 5px; border-radius: 999px; background: #241238; border: 1px solid rgba(232, 194, 122, 0.45); animation: pipIn 0.3s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+        .mb-row.me .mb-pip { right: auto; left: -4px; }
+        @keyframes pipIn { from { transform: scale(0); } to { transform: none; } }
+        .mb-wrap.glint .mb { box-shadow: 0 0 0 1px rgba(232, 194, 122, 0.8), 0 0 16px rgba(232, 194, 122, 0.55); transition: box-shadow 1.2s; }
+        .mb-picker { display: flex; gap: 2px; padding: 3px 6px; margin-bottom: 4px; border-radius: 999px; background: #241238; border: 1px solid rgba(202, 176, 250, 0.3); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5); animation: mbIn 0.18s ease-out both; }
+        .mb-picker button { background: none; border: 0; padding: 2px 4px; font-size: max(6px, 0.85rem - var(--font-trim)); line-height: 1; cursor: pointer; border-radius: 50%; transition: transform 0.12s; }
+        .mb-picker button:hover { transform: scale(1.25); }
+        .mb-picker button.on { background: rgba(232, 194, 122, 0.25); }
+        .mb-seen { align-self: flex-end; margin-top: 3px; font: 500 max(6px, 0.45rem - var(--font-trim))/1 'Montserrat', sans-serif; color: var(--df-lilac-grey); }
+        .mb-typing { align-self: flex-start; display: flex; gap: 3px; margin-top: 6px; padding: 7px 10px; border-radius: 14px; background: rgba(255, 255, 255, 0.05); }
+        .mb-typing i { width: 5px; height: 5px; border-radius: 50%; background: var(--df-lilac-grey); animation: mbDot 1.2s infinite ease-in-out; }
+        .mb-typing i:nth-child(2) { animation-delay: 0.15s; } .mb-typing i:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes mbDot { 0%, 60%, 100% { opacity: 0.3; transform: none; } 30% { opacity: 1; transform: translateY(-3px); } }
+
+        /* Cards: a pin, a job, a photo */
+        .mb-card { width: 190px; max-width: 100%; border-radius: 14px; overflow: hidden; border: 1px solid rgba(232, 194, 122, 0.4); background: #0d0718; animation: mbIn 0.25s ease-out both; }
+        .mb-map { height: 70px; position: relative; background: #160a26 center / cover no-repeat; }
+        .mb-map.sketch { background:
+            linear-gradient(90deg, transparent 47%, rgba(202, 176, 250, 0.22) 47% 50%, transparent 50%),
+            linear-gradient(0deg, transparent 58%, rgba(202, 176, 250, 0.22) 58% 61%, transparent 61%),
+            linear-gradient(30deg, transparent 70%, rgba(202, 176, 250, 0.14) 70% 72%, transparent 72%), #160a26; }
+        .mb-map i { position: absolute; left: 50%; top: 50%; width: 12px; height: 12px; margin: -14px 0 0 -6px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+            background: #ff3d7a; box-shadow: 0 0 10px #ff3d7a; animation: pinDrop 0.5s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+        .mb-map i::after { content: ''; position: absolute; inset: 3.5px; border-radius: 50%; background: #2a0614; }
+        @keyframes pinDrop { from { transform: translateY(-14px) rotate(-45deg); opacity: 0; } to { transform: rotate(-45deg); opacity: 1; } }
+        .mb-cap { padding: 6px 8px 7px 10px; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+        .mb-cap > div { min-width: 0; }
+        .mb-cap b, .mb-brief b { display: block; font: italic 600 max(6px, 0.82rem - var(--font-trim))/1.1 'Cormorant Garamond', Georgia, serif; color: #f6dfa8; }
+        .mb-cap small { display: block; font: 500 max(6px, 0.48rem - var(--font-trim))/1.4 'Montserrat', sans-serif; color: var(--df-lilac-grey); }
+        .mb-btn { flex: none; font: 600 max(6px, 0.45rem - var(--font-trim))/1 'Montserrat', sans-serif; letter-spacing: 0.12em; text-transform: uppercase; padding: 6px 8px; border-radius: 999px;
+            border: 0; background: #ffc248; color: #2a1458; cursor: pointer; white-space: nowrap; box-shadow: 0 0 10px rgba(255, 194, 72, 0.35); }
+        .mb-btn:active { transform: scale(0.95); }
+        .mb-brief { padding: 8px 10px; display: grid; gap: 3px; background: linear-gradient(160deg, rgba(232, 194, 122, 0.14), rgba(93, 20, 226, 0.16)), #0d0718; }
+        .mb-brief .k { font: 600 max(6px, 0.42rem - var(--font-trim))/1 'Montserrat', sans-serif; letter-spacing: 0.3em; text-transform: uppercase; color: #e8c27a; }
+        .mb-brief p { margin: 0; font: 500 max(6px, 0.54rem - var(--font-trim))/1.35 'Montserrat', sans-serif; color: var(--df-lilac-grey); }
+        .mb-brief .row { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 2px; font: 600 max(6px, 0.52rem - var(--font-trim))/1 'Montserrat', sans-serif; color: #f1e8fe; }
+        .mb-brief em { font-style: normal; color: #f6dfa8; font-size: max(6px, 0.5rem - var(--font-trim)); }
+        .mb-brief.lapsed { opacity: 0.55; }
+        .mb-snap { position: relative; width: 180px; }
+        .mb-snap img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: #160a26; }
+        .mb-snap.gone img { aspect-ratio: 16 / 6; }
+        .mb-snap span { position: absolute; left: 6px; bottom: 6px; padding: 2px 6px; border-radius: 999px; background: rgba(13, 7, 24, 0.75); font: 500 max(6px, 0.45rem - var(--font-trim))/1.3 'Montserrat', sans-serif; color: #f1e8fe; }
+        .mb-row.me .mb-snap { border-color: rgba(142, 85, 245, 0.7); box-shadow: 0 0 12px rgba(93, 20, 226, 0.35); }
+
+        /* Voice notes: a waveform that fills as it plays, and the earpiece chip under it */
+        .mb-voice { display: flex; align-items: center; gap: 7px; width: 176px; max-width: 100%; padding: 6px 9px 6px 6px; border-radius: 14px; border-bottom-left-radius: 4px;
+            background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(202, 176, 250, 0.16); box-sizing: border-box; animation: mbIn 0.25s ease-out both; }
+        .mb-play { width: 22px; height: 22px; flex: none; border-radius: 50%; border: 0; background: #ffc248; color: #2a1458; font-size: max(6px, 0.5rem - var(--font-trim)); cursor: pointer; display: grid; place-items: center; padding: 0; }
+        .mb-voice.fresh .mb-play { box-shadow: 0 0 0 2px rgba(255, 194, 72, 0.35), 0 0 10px rgba(255, 194, 72, 0.5); }
+        .mb-wave { flex: 1; height: 20px; display: flex; align-items: center; gap: 1.5px; }
+        .mb-wave i { flex: 1; border-radius: 2px; background: rgba(142, 85, 245, 0.55); transition: background 0.15s; }
+        .mb-wave i.lit { background: #f6dfa8; }
+        .mb-voice small { font: 500 max(6px, 0.48rem - var(--font-trim))/1 'Montserrat', sans-serif; color: var(--df-lilac-grey); font-variant-numeric: tabular-nums; }
+        .mb-sub { margin-top: 2px; padding: 3px 12px 3px 3px; max-width: 220px; animation: commIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+        .mb-sub .comm-face { width: 24px; height: 24px; }
+        .mb-sub .comm-name { font-size: max(6px, 0.7rem - var(--font-trim)); }
+        .mb-sub .comm-text { font-size: max(6px, 0.58rem - var(--font-trim)); animation: mbIn 0.3s ease-out both; }
+
+        /* The reply bar: gold chips above a slim input with the camera */
+        #contact-reply-bar { flex-shrink: 0; padding: 0 10px; }
+        #contact-reply-options { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; margin: 2px 0 5px; }
         #contact-reply-options:empty { display: none; }
-        .reply-chip {
-            max-width: 100%; padding: 7px 12px;
-            border-radius: 14px 14px 4px 14px;
-            background: rgba(155,155,240,0.14);
-            border: 1px solid rgba(155,155,240,0.45);
-            color: #cfccff; font-family: 'Montserrat', sans-serif;
-            font-size: max(6px, 0.72rem - var(--font-trim)); line-height: 1.35; text-align: right;
-            cursor: pointer; transition: background 0.18s, transform 0.1s;
-            animation: chipIn 0.22s ease-out both;
-        }
+        .reply-chip { max-width: 100%; padding: 5px 9px; border-radius: 999px; border: 1px solid rgba(232, 194, 122, 0.5); background: rgba(232, 194, 122, 0.06); color: #f6dfa8;
+            font: 500 max(6px, 0.58rem - var(--font-trim))/1.25 'Montserrat', sans-serif; cursor: pointer; text-align: right; transition: background 0.18s, transform 0.1s; animation: chipIn 0.22s ease-out both; }
         @keyframes chipIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-        .reply-chip:hover { background: rgba(155,155,240,0.28); }
+        .reply-chip:hover { background: rgba(232, 194, 122, 0.18); }
         .reply-chip:active { transform: scale(0.97); }
-        #contact-reply-input {
-            display: flex; align-items: center; gap: 8px; padding: 8px 12px;
-            border-radius: 16px; background: rgba(255,255,255,0.04);
-            border: 1px solid rgba(255,255,255,0.08); color: #6c6c7a;
-            font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.7rem - var(--font-trim));
-        }
-        #contact-reply-input.armed { border-color: rgba(155,155,240,0.35); color: #9b9bf0; }
-        #contact-reply-send { margin-left: auto; width: 20px; height: 20px; border-radius: 50%;
-                              background: rgba(155,155,240,0.18); color: #9b9bf0;
-                              display: flex; align-items: center; justify-content: center; font-size: max(6px, 0.55rem - var(--font-trim)); }
-        .msg-typing { font-style: italic; color: #c07878; animation: pulseText 1s infinite alternate; }
+        #contact-reply-input { display: flex; align-items: center; gap: 7px; padding: 3px 4px 3px 3px; border-radius: 999px; background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08); color: #6c6c7a; font: 500 max(6px, 0.56rem - var(--font-trim)) 'Montserrat', sans-serif; }
+        #contact-reply-input.armed { border-color: rgba(232, 194, 122, 0.35); color: #e8c27a; }
+        #contact-reply-snap { width: 22px; height: 22px; flex: none; border-radius: 50%; border: 0; padding: 0; background: rgba(202, 176, 250, 0.14); font-size: max(6px, 0.6rem - var(--font-trim)); cursor: pointer; display: grid; place-items: center; }
+        #contact-reply-snap:disabled { opacity: 0.35; cursor: default; }
+        #contact-reply-snap:not(:disabled):hover { background: rgba(232, 194, 122, 0.3); }
+        #contact-reply-send { margin-left: auto; width: 20px; height: 20px; border-radius: 50%; background: rgba(232, 194, 122, 0.16); color: #e8c27a;
+            display: flex; align-items: center; justify-content: center; font-size: max(6px, 0.5rem - var(--font-trim)); }
+
+        .msg-empty { display: none; }
+        #screen-contacts:not(.has-thread) .msg-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+        .msg-empty-script { font: 400 max(6px, 2.4rem - var(--font-trim))/1 'Great Vibes', cursive; color: rgba(246, 223, 168, 0.55); }
+        .msg-empty-line { font: 600 max(6px, 0.48rem - var(--font-trim))/1 'Montserrat', sans-serif; letter-spacing: 0.26em; text-transform: uppercase; color: var(--df-lilac-grey); }
         
         #phone-map-canvas { width: 100%; height: 300px; background: #0b0614; border-radius: 12px; border: 1px solid rgba(217, 204, 255, 0.25); box-shadow: 0 0 18px rgba(139, 92, 246, 0.18) inset; }
         .help-section { background: rgba(255, 255, 255, 0.05); padding: 12px; border-radius: 10px; margin-bottom: 10px; }
