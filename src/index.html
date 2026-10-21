@@ -577,24 +577,18 @@
                             <div class="phone-app-content" id="log-content"></div>
                         </div>
                         <div class="phone-app-screen" id="screen-neume">
-                            <div class="phone-app-header">
-                                <button class="phone-back-btn" id="neume-back">◀</button>
-                                <span class="phone-app-title" style="color:#ff00ff; text-shadow:0 0 10px #ff00ff;">NEU.ME</span>
+                            <!-- NEU.ME: her dressing room. The stage paints all of her (RealPortrait.figure) as you mix and match. -->
+                            <div class="nm-stage">
+                                <button class="phone-back-btn nm-back" id="neume-back">◀</button>
+                                <div class="nm-arch"></div>
+                                <canvas id="neume-figure"></canvas>
+                                <div class="nm-plinth"></div>
+                                <div class="nm-caption"><span id="neume-look"></span><span id="neume-status">Re-sequenced</span></div>
                             </div>
-                            <div class="phone-app-content" style="display:flex; flex-direction:column; align-items:center; gap:12px; padding-top:12px;">
-                                <div style="width:100px; height:100px; background:#111; border:2px solid #ff00ff; border-radius:50%; display:flex; justify-content:center; align-items:center; overflow:hidden; box-shadow:0 0 20px rgba(255,0,255,0.3);">
-                                    <div id="neume-preview" style="font-size:max(6px, 2.5rem - var(--font-trim));">🧬</div>
-                                </div>
-                                <div style="text-align:center; color:#fff; font-family:'Montserrat'; font-size:max(6px, 0.7rem - var(--font-trim));">
-                                    IDENTITY PROTOCOLS<br><span style="color:#888; font-size:max(6px, 0.6rem - var(--font-trim));">Mix & match from owned cosmetics</span>
-                                </div>
-
-                                <!-- Cosmetics loadout slots -->
-                                <div id="neume-loadout" style="width:100%; padding:0 10px; display:flex; flex-direction:column; gap:6px;"></div>
-                                
-                                <div id="neume-status" style="color:#ff00ff; font-size:max(6px, 0.65rem - var(--font-trim)); margin-top:4px; opacity:0; transition:opacity 0.5s;">
-                                    RE-SEQUENCING DNA...
-                                </div>
+                            <div class="nm-panel">
+                                <div class="nm-head"><span class="nm-title">Neu.me</span><span class="nm-sub">Identity protocols</span></div>
+                                <div class="nm-tabs" id="neume-tabs"></div>
+                                <div class="nm-grid" id="neume-loadout"></div>
                             </div>
                         </div>
 

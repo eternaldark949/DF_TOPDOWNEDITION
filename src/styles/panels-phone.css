@@ -1243,3 +1243,54 @@
 
         #btn-holster.quick-draw { color: #ffdc8d; border-color: #f5bc63; box-shadow: 0 0 12px rgba(245,188,99,.3); }
         #btn-holster.quick-draw.recovering { color: #a9987b; border-color: #8a7253; box-shadow: none; }
+
+        /* --- NEU.ME: her dressing room. The stage (all of her, painted) beside the wardrobe (tabs over cards) --- */
+        #screen-neume { padding: 0 0 34px; flex-direction: column; background:
+            radial-gradient(ellipse 70% 45% at 50% 30%, rgba(93, 20, 226, 0.22), transparent 70%),
+            linear-gradient(180deg, rgba(14, 4, 24, 0.94), rgba(6, 2, 10, 0.97)); }
+        #screen-neume[style*="flex"] { display: grid !important; grid-template-rows: 46% minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); }
+        body.phone-wide #screen-neume[style*="flex"] { grid-template-rows: minmax(0, 1fr); grid-template-columns: 38% minmax(0, 1fr); padding: 0 0 34px; }
+        .nm-stage { position: relative; min-height: 0; overflow: hidden; border-bottom: 1px solid rgba(216, 198, 162, 0.22); }
+        body.phone-wide .nm-stage { border-bottom: 0; border-right: 1px solid rgba(216, 198, 162, 0.22); }
+        .nm-back { position: absolute; left: 8px; top: 8px; z-index: 3; margin: 0; background: rgba(10, 4, 16, 0.6); color: var(--df-champagne); border: 1px solid rgba(216, 198, 162, 0.3); }
+        .nm-arch { position: absolute; left: 50%; bottom: 13%; width: 62%; max-width: 150px; height: 82%; transform: translateX(-50%);
+            border-radius: 999px 999px 0 0; border: 1px solid rgba(216, 198, 162, 0.45); border-bottom: 0;
+            background: radial-gradient(ellipse 80% 60% at 50% 35%, rgba(202, 176, 250, 0.2), rgba(35, 5, 93, 0.25) 60%, rgba(10, 4, 16, 0.2));
+            box-shadow: inset 0 0 0 4px rgba(10, 4, 16, 0.5), inset 0 0 0 5px rgba(216, 198, 162, 0.18), 0 0 30px rgba(93, 20, 226, 0.25); }
+        .nm-plinth { position: absolute; left: 50%; bottom: 10%; width: 74%; max-width: 180px; height: 7%; transform: translateX(-50%); border-radius: 50%;
+            background: radial-gradient(ellipse at 50% 40%, rgba(255, 194, 72, 0.28), rgba(93, 20, 226, 0.12) 55%, transparent 72%); }
+        #neume-figure { position: absolute; left: 0; right: 0; top: 4%; bottom: 10%; width: 100%; height: 86%; z-index: 2; pointer-events: none; }
+        .nm-caption { position: absolute; left: 0; right: 0; bottom: 2%; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 1px; pointer-events: none; }
+        #neume-look { font: italic 600 max(6px, 0.78rem - var(--font-trim))/1.1 'Cormorant Garamond', Georgia, serif; color: var(--df-cream); text-shadow: 0 1px 6px #000;
+            max-width: 92%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #neume-status { font: 600 max(6px, 0.42rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 3px; text-transform: uppercase; color: var(--df-gold);
+            opacity: 0; transition: opacity 0.4s; }
+        #neume-status.on { opacity: 0.9; }
+        .nm-panel { display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: 6px 10px 0; }
+        .nm-head { display: flex; align-items: baseline; gap: 8px; padding: 0 2px 4px; }
+        .nm-title { font-family: 'Great Vibes', 'Cormorant Garamond', cursive; font-size: max(6px, 1.5rem - var(--font-trim)); line-height: 1; color: #f6dfa8;
+            text-shadow: 0 0 12px rgba(255, 194, 72, 0.35); }
+        .nm-sub { font: 500 max(6px, 0.42rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 3px; text-transform: uppercase; color: var(--df-lilac-grey); }
+        .nm-tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding: 2px 0 6px; flex-shrink: 0;
+            -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); }
+        .nm-tabs::-webkit-scrollbar { display: none; }
+        .nm-tab { flex-shrink: 0; padding: 4px 10px; border-radius: 999px; border: 1px dotted rgba(202, 176, 250, 0.35); background: rgba(35, 5, 93, 0.25); cursor: pointer;
+            font: 600 max(6px, 0.5rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 1px; color: var(--df-lilac-grey); position: relative; }
+        .nm-tab.worn::after { content: ''; position: absolute; top: 2px; right: 3px; width: 4px; height: 4px; border-radius: 50%; background: var(--df-gold); opacity: 0.8; }
+        .nm-tab.on { background: var(--df-lavender-pale); color: var(--df-violet-ink); border: 1px solid #fff; box-shadow: 0 0 10px rgba(202, 176, 250, 0.45); }
+        .nm-grid { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 5px; align-content: start;
+            padding: 2px 2px 8px; scrollbar-width: thin; scrollbar-color: rgba(202, 176, 250, 0.35) transparent; }
+        body.phone-wide .nm-grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+        .nm-card { display: flex; align-items: center; gap: 6px; min-height: 30px; padding: 4px 7px 4px 5px; border-radius: 8px; cursor: pointer; text-align: left;
+            border: 1px solid rgba(202, 176, 250, 0.16); background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+            transition: border-color 0.2s, background 0.2s, transform 0.12s; }
+        .nm-card:active { transform: scale(0.96); }
+        .nm-card i { flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%; box-shadow: inset 0 -3px 5px rgba(0, 0, 0, 0.4), inset 0 2px 3px rgba(255, 255, 255, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.12); }
+        .nm-card.none i { border: 1px dashed rgba(202, 176, 250, 0.5); box-shadow: none; }
+        .nm-card span { font: 500 max(6px, 0.5rem - var(--font-trim))/1.15 'Montserrat', sans-serif; color: #b6acc4; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+        .nm-card.on { border-color: var(--df-champagne); background: linear-gradient(180deg, rgba(93, 20, 226, 0.55), rgba(35, 5, 93, 0.6)); box-shadow: 0 0 12px rgba(93, 20, 226, 0.45), inset 0 0 0 1px rgba(255, 194, 72, 0.25); }
+        .nm-card.on span { color: #fff; }
+        .nm-card.small { min-height: 24px; }
+        .nm-card.small i { width: 12px; height: 12px; }
+        .nm-note { grid-column: 1 / -1; margin: 4px 2px 0; font: italic max(6px, 0.62rem - var(--font-trim)) 'Cormorant Garamond', Georgia, serif; color: var(--df-lilac-grey); }
+        .nm-sub-head { grid-column: 1 / -1; margin: 6px 2px 0; font: 600 max(6px, 0.42rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 3px; text-transform: uppercase; color: var(--df-champagne); }

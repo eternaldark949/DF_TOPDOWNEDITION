@@ -1396,92 +1396,102 @@
         });
         
         const statusText = document.getElementById('neume-status');
-        
-        function updateNeumeUI() {
-            // Cosmetics loadout slots (one row per category)
-            const loadout = document.getElementById('neume-loadout');
-            let html = '';
-            
-            const slots = [
-                { label: 'O.U.T.F.I.T', category: 'outfit', equipped: game.cosmetics.equippedOutfit },
-                { label: 'W.I.G', category: 'wig', equipped: game.cosmetics.equippedWig },
-                { label: 'S.K.I.N', category: 'skin', equipped: game.cosmetics.equippedSkin },
-                { label: 'V.O.C.A.L', category: 'vocal', equipped: game.cosmetics.equippedVocal },
-                { label: 'H.A.T', category: 'hat', equipped: game.cosmetics.equippedHat },
-                { label: 'J.E.W.E.L.R.Y', category: 'jewelry', equipped: null },
-                { label: 'L.E.G.S', category: 'legwear', equipped: null },
-                { label: 'A.C.C.E.S.S.O.R.Y', category: 'accessory', equipped: game.cosmetics.equippedAccessory }
-            ];
+        // The dressing room: a tab per kind of thing she wears, a card per piece she owns, and all of her on the stage
+        const NEUME_TABS = [['outfit', 'Outfit'], ['wig', 'Wig'], ['skin', 'Skin'], ['legwear', 'Legs'], ['hat', 'Hat'],
+                            ['jewelry', 'Jewelry'], ['accessory', 'In hand'], ['mask', 'Mask'], ['vocal', 'Voice']];
+        let neumeTab = 'outfit';
 
-            for (const slot of slots) {
-                const owned = Object.values(COSMETICS_REGISTRY).filter(e => e.category === slot.category && game.cosmetics.isOwned(e.id));
-                const current = COSMETICS_REGISTRY[slot.equipped];
-                
-                html += `<div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,0,255,0.15); border-radius:6px; padding:8px 10px;">`;
-                html += `<div style="font-family:Orbitron,sans-serif; font-size:max(6px, 0.5rem - var(--font-trim)); color:#ff00ff; letter-spacing:2px; margin-bottom:4px;">${slot.label}</div>`;
-                html += `<div style="display:flex; gap:4px; flex-wrap:wrap;">`;
-                
-                for (const item of owned) {
-                    const isEquipped = game.cosmetics.isEquipped(item.id);
-                    let chipColor = '#555';
-                    if (slot.category === 'wig') chipColor = item.data.color;
-                    else if (slot.category === 'skin') chipColor = item.data.skinColor;
-                    else if (slot.category === 'vocal') chipColor = item.data.captionColor;
-                    else if (slot.category === 'outfit') chipColor = item.data.top.color;
-                    else if (slot.category === 'hat' || slot.category === 'jewelry' || slot.category === 'legwear') chipColor = item.data.color;
-                    else if (slot.category === 'accessory' && item.data.held === 'umbrella') chipColor = item.data.color;
-                    else if (slot.category === 'accessory') chipColor = (GLASS_DRINKS[game.cosmetics.getAccessoryOption(item.id, 'drink')] || GLASS_DRINKS.champagne).liquid;
-                    
-                    const borderStyle = isEquipped ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.15)';
-                    html += `<div class="neume-chip" data-id="${item.id}" data-cat="${slot.category}" style="display:flex; align-items:center; gap:4px; padding:4px 8px; border-radius:12px; border:${borderStyle}; cursor:pointer; background:${isEquipped ? 'rgba(255,0,255,0.1)' : 'rgba(255,255,255,0.03)'}; transition:border 0.2s;">`;
-                    html += `<div style="width:10px;height:10px;border-radius:50%;background:${chipColor};flex-shrink:0;"></div>`;
-                    html += `<span style="font-size:max(6px, 0.5rem - var(--font-trim)); color:${isEquipped ? '#fff' : '#999'}; white-space:nowrap;">${item.name}</span>`;
-                    html += `</div>`;
-                }
-                
-                if (slot.category === 'accessory') {
-                    // "None" chip, then the drink row when the glass is in hand
-                    const none = !slot.equipped;
-                    html += `<div class="neume-chip" data-id="" data-cat="accessory" style="display:flex; align-items:center; padding:4px 8px; border-radius:12px; border:${none ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.15)'}; cursor:pointer; background:${none ? 'rgba(255,0,255,0.1)' : 'rgba(255,255,255,0.03)'};"><span style="font-size:max(6px, 0.5rem - var(--font-trim)); color:${none ? '#fff' : '#999'};">None</span></div>`;
-                    html += `</div>`;
-                    const accEntry = COSMETICS_REGISTRY[slot.equipped];
-                    if (accEntry && accEntry.data.held === 'glass') {
-                        const cur = game.cosmetics.getAccessoryOption(accEntry.id, 'drink');
-                        html += `<div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:6px;">`;
-                        for (const [key, d] of Object.entries(GLASS_DRINKS)) {
-                            const on = key === cur;
-                            html += `<div class="neume-drink" data-acc="${accEntry.id}" data-drink="${key}" style="display:flex; align-items:center; gap:3px; padding:3px 6px; border-radius:10px; border:${on ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.12)'}; cursor:pointer;"><div style="width:8px;height:8px;border-radius:50%;background:${d.liquid};"></div><span style="font-size:max(6px, 0.45rem - var(--font-trim)); color:${on ? '#fff' : '#999'};">${d.name}</span></div>`;
-                        }
-                        html += `</div>`;
-                    }
-                    html += `</div>`;
-                    continue;
-                }
-                if (slot.category === 'hat') {
-                    const none = !slot.equipped;
-                    html += `<div class="neume-chip" data-id="" data-cat="hat" style="display:flex; align-items:center; padding:4px 8px; border-radius:12px; border:${none ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.15)'}; cursor:pointer; background:${none ? 'rgba(255,0,255,0.1)' : 'rgba(255,255,255,0.03)'};"><span style="font-size:max(6px, 0.5rem - var(--font-trim)); color:${none ? '#fff' : '#999'};">None</span></div>`;
-                }
-                if ((slot.category === 'jewelry' || slot.category === 'legwear') && !owned.length) {
-                    html += `<span style="font-size:max(6px, 0.45rem - var(--font-trim)); color:#777;">None owned yet. Find ${slot.category === 'jewelry' ? 'jewelry' : 'legwear'} at Neural Systems.</span>`;
-                }
-                html += `</div></div>`;
+        /** Her whole look as the figure painter takes it (the same pieces the portrait and the world draw from). */
+        function neumeFigureConfig() {
+            const c = game.cosmetics.getRenderConfig(), me = APPEARANCES['949'];
+            return { skinColor: c.skinColor, hair: c.hair, eyeColor: me.eyeColor, gender: me.gender, top: c.outfit.top, bottom: c.outfit.bottom,
+                     shoes: c.outfit.shoes, train: c.outfit.train || null, hat: c.hat, jewelry: withFieldMask(game, c.jewelry), held: c.held || null };
+        }
+        let neumePaintQueued = false;
+        function paintNeumeFigure() {
+            if (neumePaintQueued) return;
+            neumePaintQueued = true;
+            // After the cards have redrawn, so the tap answers at once and the painting follows
+            requestAnimationFrame(() => setTimeout(() => {
+                neumePaintQueued = false;
+                const cv = document.getElementById('neume-figure');
+                if (!cv || !cv.offsetParent || typeof RealPortrait === 'undefined' || !RealPortrait.supported()) return;
+                const r = cv.getBoundingClientRect(), k = Math.min(window.devicePixelRatio || 1, 2);
+                const w = Math.round(r.width * k), h = Math.min(1600, Math.round(r.height * k));
+                if (w < 8 || h < 8) return;
+                if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+                const x = cv.getContext('2d');
+                x.clearRect(0, 0, w, h);
+                RealPortrait.figure(x, w, h, neumeFigureConfig());
+            }, 0));
+        }
+
+        if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => paintNeumeFigure()).observe(document.getElementById('neume-figure'));   // the phone turning on its side
+
+        /** The colour a card shows for a piece. */
+        function neumeSwatch(item) {
+            const d = item.data || {};
+            switch (item.category) {
+                case 'outfit': return `linear-gradient(160deg, ${d.top.color} 0 46%, ${d.bottom ? d.bottom.color : d.top.color} 54% 100%)`;
+                case 'wig': return d.color;
+                case 'skin': return d.skinColor;
+                case 'vocal': return d.captionColor;
+                case 'accessory': return d.held === 'umbrella' ? d.color : (GLASS_DRINKS[game.cosmetics.getAccessoryOption(item.id, 'drink')] || GLASS_DRINKS.champagne).liquid;
+                default: return d.color || (d.shoes && d.shoes.color) || '#555';
             }
-            // M.A.S.K: her field mask: Auto (on in the field, off at home), always On, or Off
-            const mm = game.cosmetics.maskMode || 'auto';
-            html += `<div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,0,255,0.15); border-radius:6px; padding:8px 10px;">`;
-            html += `<div style="font-family:Orbitron,sans-serif; font-size:max(6px, 0.5rem - var(--font-trim)); color:#ff00ff; letter-spacing:2px; margin-bottom:4px;">M.A.S.K</div><div style="display:flex; gap:4px; flex-wrap:wrap;">`;
-            for (const [mode, label, dot] of [['auto', 'Auto', 'linear-gradient(90deg,#6a2a7a 50%,#888 50%)'], ['on', 'On', '#6a2a7a'], ['off', 'Off', '#555']]) {
-                const on = mm === mode;
-                html += `<div class="neume-mask" data-mode="${mode}" style="display:flex; align-items:center; gap:4px; padding:4px 8px; border-radius:12px; border:${on ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.15)'}; cursor:pointer; background:${on ? 'rgba(255,0,255,0.1)' : 'rgba(255,255,255,0.03)'};"><div style="width:10px;height:10px;border-radius:50%;background:${dot};flex-shrink:0;"></div><span style="font-size:max(6px, 0.5rem - var(--font-trim)); color:${on ? '#fff' : '#999'};">${label}</span></div>`;
+        }
+        function neumeCard(cls, data, on, swatch, name) {
+            return `<button class="nm-card ${cls}${on ? ' on' : ''}" ${data}><i style="background:${swatch}"></i><span>${name}</span></button>`;
+        }
+
+        function updateNeumeUI() {
+            const tabs = document.getElementById('neume-tabs'), loadout = document.getElementById('neume-loadout');
+            const cos = game.cosmetics;
+            const ownedIn = cat => Object.values(COSMETICS_REGISTRY).filter(e => e.category === cat && cos.isOwned(e.id));
+            const worn = cat => cat === 'mask' ? (cos.maskMode || 'auto') !== 'off'
+                : cat === 'hat' ? !!cos.equippedHat : cat === 'accessory' ? !!cos.equippedAccessory
+                : cat === 'jewelry' ? cos.equippedJewelry.length > 0 : cat === 'legwear' ? cos.equippedLegwear.length > 0 : false;   // a dot on the optional tabs with something on
+            tabs.innerHTML = NEUME_TABS.map(([cat, label]) =>
+                `<button class="nm-tab${cat === neumeTab ? ' on' : ''}${worn(cat) ? ' worn' : ''}" data-tab="${cat}">${label}</button>`).join('');
+
+            let html = '';
+            if (neumeTab === 'mask') {
+                // Her field mask: Auto (on in the field, off at home), always On, or Off
+                const mm = cos.maskMode || 'auto';
+                for (const [mode, label, dot] of [['auto', 'Auto', 'linear-gradient(90deg,#6a2a7a 50%,#8a8494 50%)'], ['on', 'Always on', '#6a2a7a'], ['off', 'Off', '#3a3440']])
+                    html += neumeCard('neume-mask', `data-mode="${mode}"`, mm === mode, dot, label);
+                html += `<p class="nm-note">Auto wears it in the field and takes it off at home.</p>`;
+            } else {
+                const owned = ownedIn(neumeTab);
+                if (neumeTab === 'hat' || neumeTab === 'accessory') {
+                    const none = neumeTab === 'hat' ? !cos.equippedHat : !cos.equippedAccessory;
+                    html += neumeCard('neume-chip none', `data-id="" data-cat="${neumeTab}"`, none, 'transparent', 'None');
+                }
+                for (const item of owned)
+                    html += neumeCard('neume-chip', `data-id="${item.id}" data-cat="${neumeTab}"`, cos.isEquipped(item.id), neumeSwatch(item), item.name);
+                if ((neumeTab === 'jewelry' || neumeTab === 'legwear') && !owned.length)
+                    html += `<p class="nm-note">None owned yet. Find ${neumeTab === 'jewelry' ? 'jewelry' : 'legwear'} at Neural Systems.</p>`;
+                else if (neumeTab === 'jewelry' || neumeTab === 'legwear') html += `<p class="nm-note">Tap to put on or take off. Wear as many as you like.</p>`;
+                // The drink, when the glass is in hand
+                const acc = COSMETICS_REGISTRY[cos.equippedAccessory];
+                if (neumeTab === 'accessory' && acc && acc.data.held === 'glass') {
+                    const cur = cos.getAccessoryOption(acc.id, 'drink');
+                    html += `<div class="nm-sub-head">Pour</div>`;
+                    for (const [key, d] of Object.entries(GLASS_DRINKS))
+                        html += neumeCard('neume-drink small', `data-acc="${acc.id}" data-drink="${key}"`, key === cur, d.liquid, d.name);
+                }
             }
-            html += `</div></div>`;
             loadout.innerHTML = html;
 
+            const outfit = COSMETICS_REGISTRY[cos.equippedOutfit], wig = COSMETICS_REGISTRY[cos.equippedWig];
+            document.getElementById('neume-look').textContent = [outfit && outfit.name, wig && wig.name].filter(Boolean).join(' · ');
+
+            tabs.querySelectorAll('.nm-tab').forEach(t => t.addEventListener('click', () => {
+                neumeTab = t.dataset.tab; audioSys.sfx('ui'); updateNeumeUI(); loadout.scrollTop = 0;
+            }));
             loadout.querySelectorAll('.neume-mask').forEach(chip => {
                 chip.addEventListener('click', () => { game.cosmetics.maskMode = chip.dataset.mode; triggerSequencingEffect(); });
             });
-
-            // Bind chip clicks
             loadout.querySelectorAll('.neume-chip').forEach(chip => {
                 chip.addEventListener('click', () => {
                     const id = chip.dataset.id, cat = chip.dataset.cat;
@@ -1498,13 +1508,18 @@
                     triggerSequencingEffect();
                 });
             });
+            paintNeumeFigure();
         }
-        
+
+        let neumeStatusTimer = null;
         function triggerSequencingEffect() {
+            const scroll = document.getElementById('neume-loadout').scrollTop;
             updateNeumeUI();
-            statusText.style.opacity = '1';
+            document.getElementById('neume-loadout').scrollTop = scroll;
+            statusText.classList.add('on');
             audioSys.sfx('ui');
-            setTimeout(() => { statusText.style.opacity = '0'; }, 1500);
+            clearTimeout(neumeStatusTimer);
+            neumeStatusTimer = setTimeout(() => statusText.classList.remove('on'), 1500);
         }
 
         
