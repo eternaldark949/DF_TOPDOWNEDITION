@@ -37448,9 +37448,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
         class TorqueAutoBuilding extends BuildingV2 {
             _setupSign() { this.attachedSign = null; }                  // the script is on the roof's board
             _generateLights() {
-                const x = this.x, wy = this.y + 350;
-                for (const [dx, color, r] of [[90, '#fff0dc', 110], [410, '#fff0dc', 110], [600, '#fff0dc', 140]])
-                    this.attachedLights.push(new LampEntity({ x: x + dx, y: wy + 16, lampType: 3, color, lightRadius: r }));
+                super._generateLights();                                   // Torque's hot orange lamps round every edge (its accent, #ff8800): ETERNAL's block colour
                 this.topReach = 60; this.glowReach = 60;
             }
             _k() { return CONFIG.BUILDINGS.LEAN ? 1 + this._leanScale() : 1; }
@@ -37558,7 +37556,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 // The board along the hall's front: the Torque script lit amber, the trades under it
                 const [bx, by, bw, bh] = Pl.BOARD;
                 if (!glow) { B(p, x + bx, y + by, bw, bh, '#0d0c10', T.steel, 6, 2); B(p, x + bx + 5, y + by + 5, bw - 10, bh - 10, null, 'rgba(255,154,42,.4)', 4, 1); }
-                TorqueArt.text(p, 'Torque', x + bx + bw / 2, y + by + 26, 40, glow ? '#ffb347' : '#e88a2a', '"Great Vibes", cursive');
+                TorqueArt.text(p, 'Torque', x + bx + bw / 2, y + by + 26, 40, glow ? '#ff8800' : '#e88a2a', '"Great Vibes", cursive');
                 TorqueArt.text(p, 'A U T O   ·   S E R V I C E   ·   W R A P S', x + bx + bw / 2, y + by + 52, 7, glow ? '#ffd9a0' : '#b8aca2');
                 // Lady's billboard on the wing
                 const [lx, ly, lw, lh] = Pl.BILL;
@@ -37568,9 +37566,9 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 TorqueArt.text(p, 'est. 5930  ·  at Torque', x + lx + lw / 2, y + ly + 58, 6, glow ? '#ffd9a0' : '#8d8178');
                 if (glow) {
                     // The north lights lit from inside, the skylight's warmth, a string of bulbs round the board
-                    for (let i = 0; i < Pl.TEETH; i++) { p.fillStyle = 'rgba(255,170,70,.75)'; p.fillRect(x + 8, y + 8 + i * Pl.TEETH_D, 484, 7); }
+                    for (let i = 0; i < Pl.TEETH; i++) { p.fillStyle = 'rgba(255,136,0,.85)'; p.fillRect(x + 8, y + 8 + i * Pl.TEETH_D, 484, 7); }
                     const [sx, sy, sw, sh] = Pl.SKY; p.fillStyle = 'rgba(255,214,150,.35)'; p.fillRect(x + sx + 2, y + sy + 2, sw - 4, sh - 4);
-                    p.fillStyle = '#ffd08a';
+                    p.fillStyle = '#ffa030';
                     for (let xx = bx + 8; xx < bx + bw - 4; xx += 14) for (const yy of [by + 2, by + bh - 2]) { p.beginPath(); p.arc(x + xx, y + yy, 1.6, 0, Math.PI * 2); p.fill(); }
                 }
             }
