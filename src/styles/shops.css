@@ -115,3 +115,24 @@
         body.landscape .df-shop .df-section { margin: 12px 0 8px; }
         body.landscape .df-shop .df-section:first-child { margin-top: 4px; }
         body.landscape .df-shop-panel { width: min(860px, 100%); }
+
+        /* ── The spec sheet (traffic/garage-zib.js carSpecBarsHtml): Lady's blueprint bars, on Car.ME and at Torque ── */
+        .car-spec { display: grid; gap: 5px; margin: 4px 0 2px; --spec: #ff9a2a; --spec-hi: #ffd08a; }
+        .car-spec-row { display: grid; grid-template-columns: 1fr auto; align-items: baseline; row-gap: 3px; }
+        .car-spec-row span { font: 600 max(6px, 0.42rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.2em; text-transform: uppercase; color: #b8aca2; }
+        .car-spec-row b { font: 700 max(6px, 0.5rem - var(--font-trim)) Orbitron, sans-serif; color: #f4efe8; font-variant-numeric: tabular-nums; }
+        .car-spec-row i { grid-column: 1 / -1; position: relative; height: 5px; border-radius: 1px; overflow: hidden;
+                          background: linear-gradient(90deg, var(--spec), var(--spec-hi) var(--v), rgba(255, 255, 255, 0.1) var(--v)); }
+        .car-spec-row i::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 2px), rgba(6, 4, 8, 0.85) calc(10% - 2px) 10%); }
+        .df-shop .car-spec { grid-template-columns: 1fr 1fr; column-gap: 18px; margin-top: 6px; }
+        @media (max-width: 560px) { .df-shop .car-spec { grid-template-columns: 1fr; } }
+        .df-card.lit .car-spec { --spec: #5d14e2; --spec-hi: #a46cff; }
+        .df-card.lit .car-spec-row span { color: #6b5a8e; }
+        .df-card.lit .car-spec-row b { color: #2a1458; }
+        .df-card.lit .car-spec-row i { background: linear-gradient(90deg, var(--spec), var(--spec-hi) var(--v), rgba(60, 30, 120, 0.14) var(--v)); }
+        .df-card.lit .car-spec-row i::after { background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 2px), rgba(236, 226, 255, 0.95) calc(10% - 2px) 10%); }
+        /* Torque Auto's cards: each car on its own little turntable, nose up */
+        .ta-portrait { flex: none; width: 64px; height: 104px; display: grid; place-items: center; border-radius: 12px; align-self: center;
+                       background: radial-gradient(closest-side, rgba(255, 154, 42, 0.28), transparent 75%), repeating-radial-gradient(circle, transparent 0 11px, rgba(223, 227, 234, 0.08) 11px 12px), #0d0a10;
+                       border: 1px solid rgba(255, 154, 42, 0.3); }
+        .ta-portrait img { max-height: 92px; max-width: 54px; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.7)); }

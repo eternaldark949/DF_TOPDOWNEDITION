@@ -262,17 +262,15 @@
                 ]
             },
             'auto_shop': {
+                // Torque Auto: a graphite epoxy service bay with two lifts and the wrap bay, a black porcelain showroom
+                // with the plinth and the counter, the parts room on diamond plate. Floor in drawTorqueInterior,
+                // furniture in drawTorqueDecorProp (ta_*), light in drawTorqueGlow (engine/torque-art.js).
                 id: 'auto_shop', width: 1400, height: 1000, type: 'indoor',
-                label: 'Torque Auto — Service Bay', floorColor: '#222222',
+                label: 'Torque Auto — Service Bay', floorColor: '#1d1d22',
+                ambientDarkness: 0.45,                              // a working garage: bright under the strips
+                wallStyle: { fill: '#1c1c22', stroke: 'rgba(255,154,42,0.4)' },   // graphite panelling, an amber trim line
                 spawn: { x: 700, y: 900 },
-                zones: [
-                    // Service bay floor — oil-stained concrete
-                    { x: 50, y: 50, w: 800, h: 600, color: '#2a2a2a', texture: 'concrete' },
-                    // Counter/showroom area (right side)
-                    { x: 900, y: 50, w: 450, h: 600, color: '#1a1520' },
-                    // Backroom / parts storage
-                    { x: 900, y: 700, w: 450, h: 250, color: '#1a1a1a' }
-                ],
+                zones: [],
                 walls: [
                     // Outer walls
                     { x: 0, y: 0, w: 1400, h: 50 }, { x: 0, y: 950, w: 600, h: 50 }, { x: 800, y: 950, w: 600, h: 50 },

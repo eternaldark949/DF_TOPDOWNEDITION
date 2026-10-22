@@ -599,7 +599,7 @@
          * Wide, low industrial garage with amber/orange accent.
          */
         function createTorqueAutoShop(x, y, config = {}) {
-            return new BuildingV2({
+            return new TorqueAutoBuilding({                // its art: buildings/torque-auto.js
                 id: 'torque_auto',
                 x: x,
                 y: y,

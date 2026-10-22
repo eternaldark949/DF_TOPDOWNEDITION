@@ -905,77 +905,56 @@
                 document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
                 document.getElementById('screen-carme').style.display = 'flex';
 
-                const container = document.getElementById('carme-content');
+                const container = document.getElementById('carme-content'), G = game.garage;
                 const isIndoor = game.activeMap.type === 'indoor';
                 const noSummon = game.activeMap.id !== 'sdc';   // cars live on the hub (engine/cars.js)
-                let html = '';
+                const where = document.getElementById('carme-where');
+                where.textContent = noSummon ? (isIndoor ? 'Indoors' : 'Out of range') : 'In range';
+                where.classList.toggle('off', noSummon);
+                const TIER = { 'ultra-luxury': 'Ultra luxury', 'mid-luxury': 'Mid luxury', 'economy': 'Economy' };
+                const name = i => { const c = G.get(i); return VEHICLE_BRANDS[c.brand]?.models[c.model]?.name || G.getDisplayName(i); };
+                const look = c => carPortraitUrl(c.brand, c.model, c.paintColor, c.underglowColor);
+                const dot = (label, col, glow) => `<span class="cm-dot"><i style="background:${col || 'transparent'};${glow && col ? `box-shadow:0 0 6px ${col}` : ''}"></i>${label}</span>`;
 
-                // Current active car indicator
-                const activeName = game.garage.getDisplayName(game.garage.activeIndex);
-                html += `<div style="font-family:Orbitron,sans-serif; font-size:max(6px, 0.6rem - var(--font-trim)); color:#ff8800; letter-spacing:2px; margin-bottom:4px;">MY GARAGE</div>`;
-                html += `<div style="font-size:max(6px, 0.65rem - var(--font-trim)); color:#888; margin-bottom:12px;">Active: <span style="color:#ddd;">${activeName}</span></div>`;
+                // The active car on its turntable: the portrait, its spec sheet, the summon
+                const a = G.activeIndex, car = G.get(a), brand = VEHICLE_BRANDS[car.brand];
+                let html = `<div class="cm-hero">`;
+                html += `<div class="cm-bay"><img src="${look(car)}" alt=""></div>`;
+                html += `<div class="cm-info"><div class="cm-eyebrow">${car.brand} · ${TIER[brand?.tier] || ''}${car.isDefault ? ' · <em>Yours for good</em>' : ''}</div>`;
+                html += `<div class="cm-name">${name(a)}</div>`;
+                html += `<div class="cm-dots">${dot('Paint', car.paintColor)}${dot('Glow', car.underglowColor, true)}${dot('Lights', car.headlightColor, true)}</div>`;
+                html += carSpecBarsHtml(car.brand, car.model);
+                html += `<button class="cm-summon" data-index="${a}"${noSummon ? ' disabled' : ''}>Summon</button>`;
+                if (noSummon) html += `<div class="cm-note">${isIndoor ? 'Step outside to call it round.' : 'No road out here to bring it to.'}</div>`;
+                html += `</div></div>`;
 
-                for (let i = 0; i < game.garage.count; i++) {
-                    const car = game.garage.get(i);
-                    const isActive = i === game.garage.activeIndex;
-                    const name = game.garage.getDisplayName(i);
-                    const borderCol = isActive ? 'rgba(255,136,0,0.3)' : 'rgba(255,255,255,0.08)';
-
-                    html += `<div style="background:rgba(255,255,255,0.03); border:1px solid ${borderCol}; border-radius:8px; padding:10px; margin-bottom:8px;">`;
-
-                    // Name + color swatch + status
-                    html += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">`;
-                    html += `<div style="display:flex; align-items:center; gap:6px;">`;
-                    html += `<div style="width:14px; height:9px; border-radius:2px; background:${car.paintColor}; border:1px solid rgba(255,255,255,0.15);"></div>`;
-                    html += `<span style="font-family:Orbitron,sans-serif; font-size:max(6px, 0.7rem - var(--font-trim)); color:#ddd; letter-spacing:1px;">${name}</span>`;
-                    if (car.isDefault) html += `<span style="font-size:max(6px, 0.4rem - var(--font-trim)); color:#d4af37; letter-spacing:1px; border:1px solid rgba(212,175,55,0.3); padding:1px 4px; border-radius:2px;">DEFAULT</span>`;
-                    html += `</div>`;
-                    html += `<span style="font-size:max(6px, 0.45rem - var(--font-trim)); color:${isActive ? '#00ff88' : '#555'};">${isActive ? '● ACTIVE' : ''}</span>`;
-                    html += `</div>`;
-
-                    // Action buttons
-                    html += `<div style="display:flex; gap:5px;">`;
-                    if (!isActive) {
-                        html += `<button class="carme-activate" data-index="${i}" style="flex:1; font-family:Orbitron,sans-serif; font-size:max(6px, 0.5rem - var(--font-trim)); letter-spacing:1px; padding:6px; background:rgba(0,255,136,0.08); border:1px solid rgba(0,255,136,0.25); color:#00ff88; border-radius:4px; cursor:pointer;">SET ACTIVE</button>`;
-                    }
-                    html += `<button class="carme-summon" data-index="${i}" style="flex:1; font-family:Orbitron,sans-serif; font-size:max(6px, 0.5rem - var(--font-trim)); letter-spacing:1px; padding:6px; background:rgba(255,136,0,0.1); border:1px solid rgba(255,136,0,0.3); color:#ff8800; border-radius:4px; cursor:pointer;${noSummon ? ' opacity:0.3; pointer-events:none;' : ''}">SUMMON</button>`;
-                    html += `</div>`;
-
+                // The rest of the garage: a tile each
+                html += `<div class="cm-sec"><span>The garage</span><small>${G.count} vehicle${G.count === 1 ? '' : 's'}</small></div><div class="cm-tiles">`;
+                for (let i = 0; i < G.count; i++) {
+                    const c = G.get(i), on = i === a;
+                    html += `<div class="cm-tile${on ? ' on' : ''}"><img src="${look(c)}" alt=""><div class="cm-tile-txt"><b>${name(i)}</b><small>${c.brand}</small></div>`;
+                    html += on ? `<span class="cm-chip">● Active</span>` : `<button class="cm-drive" data-index="${i}">Drive</button>`;
                     html += `</div>`;
                 }
-
-                if (noSummon) {
-                    html += `<div style="font-size:max(6px, 0.6rem - var(--font-trim)); color:#555; text-align:center; margin-top:8px; font-style:italic;">${isIndoor ? 'Cannot summon vehicles indoors.' : 'No road out here to bring it to.'}</div>`;
-                }
-
+                html += `</div>`;
                 container.innerHTML = html;
 
-                // Wire buttons
-                container.querySelectorAll('.carme-activate').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        const idx = parseInt(btn.dataset.index);
-                        game.switchGarageCar(idx);
-                        this.showCarMe(); // Re-render
-                    });
-                });
-
-                container.querySelectorAll('.carme-summon').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        const idx = parseInt(btn.dataset.index);
-                        // Switch to this car if not already active
-                        if (idx !== game.garage.activeIndex) {
-                            game.switchGarageCar(idx);
-                        }
-                        // Summon to player position (the hub only: cars live there)
-                        if (game.activeMap.id !== 'sdc' || (game.isDriving && game.car === game.ownedCar)) return;
-                        Object.assign(game.ownedCar, { x: game.player.x + 50, y: game.player.y, vx: 0, vy: 0, speed: 0 });
-                        game.ownedCar.visible = true;
-                        const name = game.garage.getDisplayName(idx);
-                        showMessage(`${name.toUpperCase()} DELIVERED`);
-                        audioSys.sfx('ui');
-                        this.close();
-                    });
-                });
+                container.querySelectorAll('.cm-drive').forEach(btn => btn.addEventListener('click', () => {
+                    game.switchGarageCar(parseInt(btn.dataset.index));
+                    audioSys.sfx('ui');
+                    this.showCarMe();
+                }));
+                container.querySelectorAll('.cm-summon').forEach(btn => btn.addEventListener('click', () => {
+                    const idx = parseInt(btn.dataset.index);
+                    if (idx !== game.garage.activeIndex) game.switchGarageCar(idx);
+                    // Summon to player position (the hub only: cars live there)
+                    if (game.activeMap.id !== 'sdc' || (game.isDriving && game.car === game.ownedCar)) return;
+                    Object.assign(game.ownedCar, { x: game.player.x + 50, y: game.player.y, vx: 0, vy: 0, speed: 0 });
+                    game.ownedCar.visible = true;
+                    showMessage(`${game.garage.getDisplayName(idx).toUpperCase()} DELIVERED`);
+                    audioSys.sfx('ui');
+                    this.close();
+                }));
             }
         };
        

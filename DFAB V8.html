@@ -2998,6 +2998,51 @@
         .nm-card.small i { width: 12px; height: 12px; }
         .nm-note { grid-column: 1 / -1; margin: 4px 2px 0; font: italic max(6px, 0.62rem - var(--font-trim)) 'Cormorant Garamond', Georgia, serif; color: var(--df-lilac-grey); }
         .nm-sub-head { grid-column: 1 / -1; margin: 6px 2px 0; font: 600 max(6px, 0.42rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 3px; text-transform: uppercase; color: var(--df-champagne); }
+
+        /* ── Car.ME (ui/phone.js showCarMe): the key, the garage, the summon. Graphite, amber, chrome ── */
+        .cm-icon { color: #ffb347; border-color: rgba(255, 160, 60, 0.45) !important; background: radial-gradient(circle at 50% 30%, rgba(255, 170, 70, 0.25), rgba(24, 16, 12, 0.6)) !important; }
+        #screen-carme { background: radial-gradient(90% 55% at 22% 0%, rgba(255, 136, 0, 0.13), transparent 62%), linear-gradient(180deg, #121014, #08070a); }
+        .cm-head { display: flex; align-items: center; gap: 8px; padding: 6px 2px 8px; border-bottom: 1px solid rgba(255, 160, 60, 0.18); }
+        .cm-head .phone-back-btn { margin: 0; width: 24px; height: 24px; font-size: max(6px, 0.7rem - var(--font-trim)); flex: none; }
+        .cm-brand { flex: 1; display: flex; flex-direction: column; line-height: 1; }
+        .cm-brand b { font: 800 max(6px, 0.95rem - var(--font-trim)) Orbitron, sans-serif; letter-spacing: 0.06em; color: #ff9a2a; text-shadow: 0 0 10px rgba(255, 136, 0, 0.45); }
+        .cm-brand b i { font-style: normal; color: #dfe3ea; text-shadow: 0 0 8px rgba(223, 227, 234, 0.35); }
+        .cm-brand small { font: 600 max(6px, 0.4rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.32em; text-transform: uppercase; color: #9a8a7c; margin-top: 3px; }
+        .cm-where { font: 700 max(6px, 0.45rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.14em; text-transform: uppercase; padding: 4px 9px; border-radius: 99px;
+                    color: #9cf0b0; background: rgba(120, 220, 140, 0.1); border: 1px solid rgba(120, 220, 140, 0.4); }
+        .cm-where::before { content: '● '; }
+        .cm-where.off { color: #9a8a7c; background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.14); }
+        .cm-body { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 2px 12px; display: flex; flex-direction: column; gap: 9px; scrollbar-width: thin; scrollbar-color: rgba(255, 154, 42, 0.4) transparent; }
+        .cm-hero { display: grid; grid-template-columns: minmax(110px, 0.7fr) 1.3fr; gap: 12px; align-items: stretch; padding: 10px; border-radius: 14px;
+                   background: linear-gradient(160deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01)); border: 1px solid rgba(223, 227, 234, 0.14); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06); }
+        @media (max-width: 520px) { .cm-hero { grid-template-columns: 1fr; } .cm-bay { min-height: 150px; } }
+        .cm-bay { position: relative; display: grid; place-items: center; min-height: 170px; border-radius: 12px; overflow: hidden;
+                  background: radial-gradient(closest-side, rgba(255, 154, 42, 0.26), rgba(255, 154, 42, 0.04) 70%, transparent),
+                              repeating-radial-gradient(circle at 50% 50%, transparent 0 17px, rgba(223, 227, 234, 0.07) 17px 18px), #0b0a0d; }
+        .cm-bay::before { content: ''; position: absolute; inset: 10px; border: 1px dashed rgba(255, 154, 42, 0.25); border-radius: 50%; }
+        .cm-bay img { position: relative; height: 82%; max-height: 190px; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.7)); }
+        .cm-info { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+        .cm-eyebrow { font: 600 max(6px, 0.42rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.24em; text-transform: uppercase; color: #a08f80; }
+        .cm-eyebrow em { font-style: normal; color: #d4af37; }
+        .cm-name { font: 700 max(6px, 0.95rem - var(--font-trim))/1.1 Orbitron, sans-serif; letter-spacing: 0.06em; color: #f4efe8; }
+        .cm-dots { display: flex; flex-wrap: wrap; gap: 4px 10px; font: 600 max(6px, 0.42rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.12em; text-transform: uppercase; color: #8d8178; }
+        .cm-dot i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; border: 1px solid rgba(255, 255, 255, 0.25); }
+        .cm-summon { margin-top: 4px; font: 800 max(6px, 0.56rem - var(--font-trim)) Orbitron, sans-serif; letter-spacing: 0.3em; text-transform: uppercase; padding: 9px 14px; border-radius: 99px; cursor: pointer;
+                     color: #1e0f02; border: none; background: linear-gradient(180deg, #ffc061, #ff8a1a); box-shadow: 0 0 0 1px rgba(255, 210, 140, 0.5) inset, 0 4px 14px rgba(255, 136, 0, 0.35); }
+        .cm-summon:disabled { background: rgba(255, 255, 255, 0.06); color: #6f655d; box-shadow: none; cursor: default; }
+        .cm-note { font: italic 500 max(6px, 0.5rem - var(--font-trim)) 'Montserrat', sans-serif; color: #8d8178; text-align: center; }
+        .cm-sec { display: flex; justify-content: space-between; align-items: baseline; font: 700 max(6px, 0.46rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.28em; text-transform: uppercase; color: #ff9a2a; }
+        .cm-sec small { letter-spacing: 0.08em; text-transform: none; color: #8d8178; font-weight: 500; }
+        .cm-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+        .cm-tile { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 10px; background: rgba(255, 255, 255, 0.035); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .cm-tile.on { border-color: rgba(255, 154, 42, 0.5); background: linear-gradient(150deg, rgba(255, 154, 42, 0.12), rgba(255, 154, 42, 0.02)); }
+        .cm-tile img { height: 40px; width: 22px; object-fit: contain; flex: none; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6)); }
+        .cm-tile-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.15; }
+        .cm-tile-txt b { font: 700 max(6px, 0.55rem - var(--font-trim)) Orbitron, sans-serif; letter-spacing: 0.04em; color: #ece6de; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .cm-tile-txt small { font: 600 max(6px, 0.4rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.2em; text-transform: uppercase; color: #8d8178; }
+        .cm-chip { font: 700 max(6px, 0.42rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.12em; text-transform: uppercase; color: #ffb347; }
+        .cm-drive { font: 700 max(6px, 0.44rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.16em; text-transform: uppercase; padding: 5px 10px; border-radius: 99px; cursor: pointer;
+                    background: transparent; color: #dfe3ea; border: 1px solid rgba(223, 227, 234, 0.35); }
         /* =========================================
            CINEMATIC DIALOGUE (ui/cinematic-dialogue.js)
            Subtitles over a soft scrim, portrait cameos, choices on the right,
@@ -3534,6 +3579,27 @@
         body.landscape .df-shop .df-section { margin: 12px 0 8px; }
         body.landscape .df-shop .df-section:first-child { margin-top: 4px; }
         body.landscape .df-shop-panel { width: min(860px, 100%); }
+
+        /* ── The spec sheet (traffic/garage-zib.js carSpecBarsHtml): Lady's blueprint bars, on Car.ME and at Torque ── */
+        .car-spec { display: grid; gap: 5px; margin: 4px 0 2px; --spec: #ff9a2a; --spec-hi: #ffd08a; }
+        .car-spec-row { display: grid; grid-template-columns: 1fr auto; align-items: baseline; row-gap: 3px; }
+        .car-spec-row span { font: 600 max(6px, 0.42rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.2em; text-transform: uppercase; color: #b8aca2; }
+        .car-spec-row b { font: 700 max(6px, 0.5rem - var(--font-trim)) Orbitron, sans-serif; color: #f4efe8; font-variant-numeric: tabular-nums; }
+        .car-spec-row i { grid-column: 1 / -1; position: relative; height: 5px; border-radius: 1px; overflow: hidden;
+                          background: linear-gradient(90deg, var(--spec), var(--spec-hi) var(--v), rgba(255, 255, 255, 0.1) var(--v)); }
+        .car-spec-row i::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 2px), rgba(6, 4, 8, 0.85) calc(10% - 2px) 10%); }
+        .df-shop .car-spec { grid-template-columns: 1fr 1fr; column-gap: 18px; margin-top: 6px; }
+        @media (max-width: 560px) { .df-shop .car-spec { grid-template-columns: 1fr; } }
+        .df-card.lit .car-spec { --spec: #5d14e2; --spec-hi: #a46cff; }
+        .df-card.lit .car-spec-row span { color: #6b5a8e; }
+        .df-card.lit .car-spec-row b { color: #2a1458; }
+        .df-card.lit .car-spec-row i { background: linear-gradient(90deg, var(--spec), var(--spec-hi) var(--v), rgba(60, 30, 120, 0.14) var(--v)); }
+        .df-card.lit .car-spec-row i::after { background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 2px), rgba(236, 226, 255, 0.95) calc(10% - 2px) 10%); }
+        /* Torque Auto's cards: each car on its own little turntable, nose up */
+        .ta-portrait { flex: none; width: 64px; height: 104px; display: grid; place-items: center; border-radius: 12px; align-self: center;
+                       background: radial-gradient(closest-side, rgba(255, 154, 42, 0.28), transparent 75%), repeating-radial-gradient(circle, transparent 0 11px, rgba(223, 227, 234, 0.08) 11px 12px), #0d0a10;
+                       border: 1px solid rgba(255, 154, 42, 0.3); }
+        .ta-portrait img { max-height: 92px; max-width: 54px; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.7)); }
         /* =========================================
            LANDSCAPE (a phone on its side)
            body.landscape is set by resize() (engine/combat-effects.js) when the window is wider
@@ -4073,7 +4139,7 @@
                                     <div class="phone-app-name">Sticky.ME</div>
                                 </div>
                                 <div class="phone-app-container" id="app-carme">
-                                    <div class="phone-app-icon-circle">🚗</div>
+                                    <div class="phone-app-icon-circle cm-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="7" y="2.5" width="10" height="19" rx="4.5"/><path d="M8.6 8.2h6.8M8.6 16.6h6.8"/><circle cx="12" cy="12.4" r="1.3" fill="currentColor" stroke="none"/></svg></div>
                                     <div class="phone-app-name">Car.ME</div>
                                 </div>
                                 <div class="phone-app-container" id="app-skyme">
@@ -4243,13 +4309,12 @@
 
                         <!-- Car.ME Garage Screen -->
                         <div class="phone-app-screen" id="screen-carme">
-                            <div class="phone-app-header">
+                            <div class="cm-head">
                                 <button class="phone-back-btn" id="carme-back">◀</button>
-                                <span class="phone-app-title" style="color:#ff8800; text-shadow:0 0 8px rgba(255,136,0,0.4);">Car.ME</span>
+                                <div class="cm-brand"><b>Car<i>.ME</i></b><small>key · garage · summon</small></div>
+                                <span class="cm-where" id="carme-where"></span>
                             </div>
-                            <div class="phone-app-content" id="carme-content" style="padding:10px; overflow-y:auto;">
-                                <!-- Populated dynamically -->
-                            </div>
+                            <div class="cm-body" id="carme-content"></div>
                         </div>
                     </div>
                     <div id="phone-typing-indicator" class="phone-typing-indicator">
@@ -14060,17 +14125,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ]
             },
             'auto_shop': {
+                // Torque Auto: a graphite epoxy service bay with two lifts and the wrap bay, a black porcelain showroom
+                // with the plinth and the counter, the parts room on diamond plate. Floor in drawTorqueInterior,
+                // furniture in drawTorqueDecorProp (ta_*), light in drawTorqueGlow (engine/torque-art.js).
                 id: 'auto_shop', width: 1400, height: 1000, type: 'indoor',
-                label: 'Torque Auto — Service Bay', floorColor: '#222222',
+                label: 'Torque Auto — Service Bay', floorColor: '#1d1d22',
+                ambientDarkness: 0.45,                              // a working garage: bright under the strips
+                wallStyle: { fill: '#1c1c22', stroke: 'rgba(255,154,42,0.4)' },   // graphite panelling, an amber trim line
                 spawn: { x: 700, y: 900 },
-                zones: [
-                    // Service bay floor — oil-stained concrete
-                    { x: 50, y: 50, w: 800, h: 600, color: '#2a2a2a', texture: 'concrete' },
-                    // Counter/showroom area (right side)
-                    { x: 900, y: 50, w: 450, h: 600, color: '#1a1520' },
-                    // Backroom / parts storage
-                    { x: 900, y: 700, w: 450, h: 250, color: '#1a1a1a' }
-                ],
+                zones: [],
                 walls: [
                     // Outer walls
                     { x: 0, y: 0, w: 1400, h: 50 }, { x: 0, y: 950, w: 600, h: 50 }, { x: 800, y: 950, w: 600, h: 50 },
@@ -14855,52 +14918,43 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
 
-                case 'auto_shop':
+                case 'auto_shop': {
+                    // Torque Auto: the furniture art in drawTorqueDecorProp (ta_*), the floor in drawTorqueInterior,
+                    // the strip lights, the plinth's spots and the neon in drawTorqueGlow (engine/torque-art.js)
+                    const F = decorPropsIn('#2a2a30');
                     e.props = [
-                        // Service bay — vehicle lifts (2 bays)
-                        new PropEntity({ x: 150, y: 150, width: 200, height: 120, color: '#3a3a3a' }),
-                        new PropEntity({ x: 150, y: 380, width: 200, height: 120, color: '#3a3a3a' }),
-                        // Lift hydraulics
-                        new PropEntity({ x: 250, y: 170, width: 20, height: 80, color: '#666' }),
-                        new PropEntity({ x: 250, y: 400, width: 20, height: 80, color: '#666' }),
-                        // Tool racks (left wall)
-                        new PropEntity({ x: 60, y: 120, width: 40, height: 160, color: '#4a3020' }),
-                        new PropEntity({ x: 60, y: 350, width: 40, height: 160, color: '#4a3020' }),
-                        // Workbench (center bay)
-                        new PropEntity({ x: 500, y: 200, width: 120, height: 50, color: '#555' }),
-                        new PropEntity({ x: 500, y: 400, width: 120, height: 50, color: '#555' }),
-                        // Tire stacks
-                        new PropEntity({ x: 700, y: 100, width: 60, height: 60, color: '#222' }),
-                        new PropEntity({ x: 700, y: 500, width: 60, height: 60, color: '#222' }),
-                        // Showroom counter
-                        new PropEntity({ x: 950, y: 250, width: 200, height: 40, color: '#2a1a2a', interactionType: 'auto_shop_counter' }),
-                        // Parts shelves (backroom)
-                        new PropEntity({ x: 920, y: 730, width: 180, height: 40, color: '#333' }),
-                        new PropEntity({ x: 920, y: 820, width: 180, height: 40, color: '#333' }),
-                        new PropEntity({ x: 1150, y: 730, width: 150, height: 40, color: '#333' }),
-                        new PropEntity({ x: 1150, y: 820, width: 150, height: 40, color: '#333' }),
-                        // Oil drums
-                        new PropEntity({ x: 780, y: 300, width: 30, height: 30, color: '#1a3a1a' }),
-                        new PropEntity({ x: 780, y: 350, width: 30, height: 30, color: '#3a1a1a' }),
-                        // Vending machine
-                        new PropEntity({ x: 1280, y: 600, width: 40, height: 60, mass: 1e7, color: '#00f3ff', interactionType: 'vending_machine' }),
+                        // The bay: two cars up on lifts, Victoria's wrap bay, chests and the bench along the north wall
+                        F(110, 140, 160, 96, 'ta_lift', { variant: 0 }), F(110, 380, 160, 96, 'ta_lift', { variant: 1 }),
+                        F(410, 140, 190, 96, 'ta_wrap'),
+                        F(60, 58, 64, 32, 'ta_chest'), F(132, 58, 64, 32, 'ta_chest'),
+                        F(640, 56, 150, 40, 'ta_bench'), F(808, 58, 44, 40, 'ta_compressor'),
+                        F(58, 600, 34, 170, 'ta_rack'),
+                        F(330, 560, 44, 44, 'ta_tires'), F(378, 574, 40, 40, 'ta_tires', { variant: 1 }), F(826, 700, 44, 44, 'ta_tires'),
+                        F(836, 600, 30, 30, 'ta_drum'), F(836, 640, 30, 30, 'ta_drum', { variant: 1 }),
+                        // By the door: the waiting sofa and its table
+                        F(80, 880, 140, 44, 'ta_sofa'), F(240, 888, 30, 30, 'ta_table'),
+                        // The showroom: Torque's counter, the rim wall, the plinth, the lounge
+                        F(950, 250, 200, 40, 'ta_counter', { interactionType: 'auto_shop_counter' }),
+                        F(910, 58, 200, 30, 'ta_rims'),
+                        F(1099, 439, 132, 132, 'ta_turntable'),
+                        F(930, 470, 44, 44, 'ta_chair', { face: 'E' }), F(930, 574, 44, 44, 'ta_chair', { face: 'E' }), F(937, 528, 30, 30, 'ta_table'),
+                        F(1280, 600, 40, 60, null, { color: '#00f3ff', interactionType: 'vending_machine' }),
+                        // The parts room
+                        F(920, 730, 180, 40, 'ta_shelf'), F(920, 820, 180, 40, 'ta_shelf'),
+                        F(1150, 730, 150, 40, 'ta_shelf'), F(1150, 820, 150, 40, 'ta_shelf'),
                     ];
+                    TorqueArt.warm();                                                              // the show cars' sprites, painted before any piece is
                     e.npcs = [ new NPC(1050, 200, "Torque", 'mechanic') ];
+                    e.npcs[0].angle = Math.PI / 2;                                                 // Torque faces his counter
+                    const L = hiddenLamp;
                     e.lamps = [
-                        // Service bay — industrial amber
-                        new LampEntity({ x: 250, y: 200, lampType: 4, color: '#ffaa00', lightRadius: 350 }),
-                        new LampEntity({ x: 250, y: 450, lampType: 4, color: '#ffaa00', lightRadius: 350 }),
-                        new LampEntity({ x: 550, y: 300, lampType: 4, color: '#ffaa00', lightRadius: 300 }),
-                        new LampEntity({ x: 700, y: 300, lampType: 3, color: '#ff8800', lightRadius: 250 }),
-                        // Showroom — cooler light
-                        new LampEntity({ x: 1050, y: 200, lampType: 3, color: '#ccddff', lightRadius: 300 }),
-                        new LampEntity({ x: 1050, y: 450, lampType: 3, color: '#ccddff', lightRadius: 300 }),
-                        // Backroom — dim
-                        new LampEntity({ x: 1050, y: 800, lampType: 3, color: '#ff6600', lightRadius: 200 }),
-                        // Exit area
-                        new LampEntity({ x: 700, y: 880, lampType: 3, color: '#ffaa00', lightRadius: 250 }),
+                        L(190, 188, '#fff0dc', 300), L(190, 428, '#fff0dc', 300), L(505, 188, '#fff0dc', 300),   // over the bays
+                        L(470, 640, '#ffc890', 340), L(700, 880, '#ffd9a8', 260), L(720, 110, '#ffd9a8', 220),   // the floor, the door, the bench
+                        L(1050, 200, '#e8eeff', 300), L(1165, 505, '#fff4e0', 280), L(950, 540, '#ffd9a0', 200),   // the counter, the plinth, the lounge
+                        L(1100, 800, '#ffb070', 230),                                                               // the parts room
                     ];
                     break;
+                }
 
                 case 'neural_sys_interior':
                     e.props = [
@@ -19137,6 +19191,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             if (p.decorType.startsWith('dn_')) return drawLobbyDecorProp(ctx, p);
             if (p.decorType.startsWith('hod_')) return drawHouseDecorProp(ctx, p);
             if (p.decorType.startsWith('ns_')) return drawNeuralDecorProp(ctx,p);
+            if (p.decorType.startsWith('ta_')) return drawTorqueDecorProp(ctx, p);
             if (p.decorType.startsWith('dp_')) return drawPalaceDecorProp(ctx, p);
             if (p.decorType.startsWith('cc_')) return drawCafeDecorProp(ctx, p);
             if (p.decorType.startsWith('ec_')) return drawEnniDecorProp(ctx, p);
@@ -19629,7 +19684,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             apt_vanity: 13, apt_planter: 11, apt_fireplace: 10, apt_bed: 9,
             ps_suitcase: 27, ps_piano: 16, ps_wardrobe: 16, ps_telescope: 11, mc_coatcheck: 17, mc_lost_purse: 11, mc_dj: 9,
             dn_lost_luggage: 14, dn_palm: 10, cc_fireplace: 13, cc_plant: 12, cc_sacks: 9, hod_chair: 10, sc_fallen: 11, sc_altar: 9,
-            dp_throne: 31, dp_pool: 9, dp_embers: 9, light_switch: 10, vending_machine: 12, medbay_refill: 14
+            ta_lift: 14, ta_wrap: 12, ta_turntable: 12, dp_throne: 31, dp_pool: 9, dp_embers: 9, light_switch: 10, vending_machine: 12, medbay_refill: 14
         };
         // One period of the sway, painted as `frames` phase frames
         const PROP_LOOP = {
@@ -19649,6 +19704,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             sc_altar: true, sc_candles: true, sc_brazier: true,                                                                  // flames and coals
             cc_espresso: true, cc_fireplace: true, cc_record: true, cc_stove: true,                                              // gauge, embers, arc, flame
             monitor: true,                                                                                                       // the trace
+            ta_turntable: true,                                                                                                  // the plinth turns
             dp_pool: true, dp_pillar: true, dp_brazier: true, dp_fountain: true, dp_altar: true, dp_embers: true                 // ripples, arc, fire, jets, embers
         };
 
@@ -35875,7 +35931,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
          * Wide, low industrial garage with amber/orange accent.
          */
         function createTorqueAutoShop(x, y, config = {}) {
-            return new BuildingV2({
+            return new TorqueAutoBuilding({                // its art: buildings/torque-auto.js
                 id: 'torque_auto',
                 x: x,
                 y: y,
@@ -37373,6 +37429,159 @@ class NeuralSystemsBuilding extends BuildingV2 {
     }
     drawSign(){}
 }
+        /* =====================================================================
+           TORQUE AUTO — Crimson Blvd's garage, beside the Cozy Cafe
+           ---------------------------------------------------------------------
+           The garage hall under a sawtooth roof (its north-light glazing glows
+           amber at night), the Torque script on a lit board along its front,
+           two roll-up doors either side of the glass entry. The showroom wing
+           has a skylight over the plinth and Lady's billboard on its roof.
+           Graphite walls with an amber pinstripe. The sections, door and
+           collision are the factory's; this only paints them.
+           ===================================================================== */
+        const TQX = { wall: '#1f1f25', wallHi: '#34343c', rib: 'rgba(0,0,0,.28)', amber: '#ff9a2a', amberHi: '#ffc46a',
+            steel: '#9aa3ad', steelHi: '#dfe3ea', roof: '#2a2b31', roofLo: '#17171c', glass: '#26384a', glassHi: '#4d6880', ink: '#0c0b0f' };
+        // Relative to the building's corner: the sawtooth bands, the sign board, the doors on the front wall, the wing's skylight and billboard
+        const TQ_PLAN = { TEETH: 4, TEETH_D: 65, BOARD: [60, 272, 380, 64], ROLLUPS: [[28, 130], [342, 130]], ENTRY: [190, 120],
+            SKY: [522, 76, 156, 168], BILL: [514, 266, 172, 70] };
+
+        class TorqueAutoBuilding extends BuildingV2 {
+            _setupSign() { this.attachedSign = null; }                  // the script is on the roof's board
+            _generateLights() {
+                const x = this.x, wy = this.y + 350;
+                for (const [dx, color, r] of [[90, '#fff0dc', 110], [410, '#fff0dc', 110], [600, '#fff0dc', 140]])
+                    this.attachedLights.push(new LampEntity({ x: x + dx, y: wy + 16, lampType: 3, color, lightRadius: r }));
+                this.topReach = 60; this.glowReach = 60;
+            }
+            _k() { return CONFIG.BUILDINGS.LEAN ? 1 + this._leanScale() : 1; }
+            _layer(c, key, x, y, w, h, paint, k = 1) {
+                const ready = !document.fonts || (document.fonts.check('36px "Great Vibes"') && document.fonts.check('12px Orbitron'));
+                if (!ready) { c.save(); LandmarkKit.plane(c, k); paint(c); c.restore(); return; }
+                LandmarkKit.drawSprite(c, LandmarkKit.sprite(this, key, this.x + x, this.y + y, w, h, 1, paint), k);
+            }
+            /** Under her feet: the apron in front, chevrons before each roll-up, the A-frame and the air station */
+            drawBase(c) {
+                super.drawBase(c);
+                this._layer(c, 'tq_apron', -10, 340, 720, 60, p => {
+                    const x = this.x, y = this.y + 350, B = TorqueArt.box;
+                    p.fillStyle = 'rgba(40,40,46,.85)'; p.fillRect(x, y, 700, 40);
+                    p.strokeStyle = 'rgba(0,0,0,.35)'; p.lineWidth = 1; p.beginPath();
+                    for (let xx = 50; xx < 700; xx += 50) { p.moveTo(x + xx, y); p.lineTo(x + xx, y + 40); } p.stroke();
+                    for (const [dx, w] of TQ_PLAN.ROLLUPS) {
+                        p.save(); p.beginPath(); p.rect(x + dx, y + 4, w, 32); p.clip();
+                        for (let k = -2; k < w / 14 + 2; k++) { p.fillStyle = 'rgba(255,170,40,.55)'; p.beginPath(); p.moveTo(x + dx + k * 14, y + 4); p.lineTo(x + dx + k * 14 + 7, y + 4); p.lineTo(x + dx + k * 14 + 19, y + 36); p.lineTo(x + dx + k * 14 + 12, y + 36); p.closePath(); p.fill(); }
+                        p.restore();
+                    }
+                    const [ex, ew] = TQ_PLAN.ENTRY;
+                    B(p, x + ex + 20, y + 4, ew - 40, 18, '#1c1c20', 'rgba(255,154,42,.6)', 2, 1);
+                    TorqueArt.text(p, 'TORQUE', x + ex + ew / 2, y + 13, 7, 'rgba(255,170,70,.75)');
+                    // The A-frame by the door (WRAPS · TINT · TUNES) and a tyre display on the other side
+                    B(p, x + ex + ew + 4, y + 8, 22, 26, '#2a2a30', TQX.amber, 2, 1);
+                    TorqueArt.text(p, 'WRAPS', x + ex + ew + 15, y + 15, 4.5, TQX.amberHi);
+                    TorqueArt.text(p, 'TINT', x + ex + ew + 15, y + 21, 4.5, '#ffffff');
+                    TorqueArt.text(p, 'TUNES', x + ex + ew + 15, y + 27, 4.5, TQX.amberHi);
+                    for (const [tx, ty] of [[x + ex - 18, y + 22], [x + ex - 32, y + 16]]) {
+                        p.fillStyle = TQX.ink; p.beginPath(); p.arc(tx, ty, 9, 0, Math.PI * 2); p.fill();
+                        p.strokeStyle = TQX.steelHi; p.lineWidth = 1; p.beginPath(); p.arc(tx, ty, 4.5, 0, Math.PI * 2); p.stroke();
+                    }
+                    // The air and water station at the west corner
+                    B(p, x + 6, y + 6, 14, 22, '#b4321e', '#4e120a', 2, 1);
+                    p.fillStyle = TQX.steelHi; p.fillRect(x + 9, y + 10, 8, 4);
+                    p.strokeStyle = '#111'; p.lineWidth = 1.4; p.beginPath(); p.moveTo(x + 20, y + 20); p.quadraticCurveTo(x + 30, y + 34, x + 22, y + 36); p.stroke();
+                });
+            }
+            /** Over her: the walls (ribs, pinstripe, the doors and the showroom glass), then the roof */
+            drawTop(c) {
+                const cam = game.camera, k = this._k(), T = TQX;
+                const P = (x, y) => [cam.x + (x - cam.x) * k, cam.y + (y - cam.y) * k];
+                const at = (x, y, f) => { const q = P(x, y); return [x + (q[0] - x) * f, y + (q[1] - y) * f]; };   // a point f of the way up the wall
+                const quad = (x0, y0, x1, y1, f0, f1) => { const a = at(x0, y0, f0), b = at(x1, y1, f0), cc = at(x1, y1, f1), d = at(x0, y0, f1);
+                    c.beginPath(); c.moveTo(...a); c.lineTo(...b); c.lineTo(...cc); c.lineTo(...d); c.closePath(); };
+                c.save();
+                for (const f of this._visibleFaces(cam)) {
+                    const a = P(f.x1, f.y1), b = P(f.x2, f.y2), g = c.createLinearGradient(f.x1, f.y1, a[0], a[1]);
+                    g.addColorStop(0, '#141418'); g.addColorStop(1, f.side === 'S' ? T.wallHi : T.wall);
+                    c.fillStyle = g; c.beginPath(); c.moveTo(f.x1, f.y1); c.lineTo(f.x2, f.y2); c.lineTo(...b); c.lineTo(...a); c.closePath(); c.fill();
+                    c.strokeStyle = 'rgba(0,0,0,.5)'; c.lineWidth = 1; c.stroke();
+                    // Corrugated ribs, an amber pinstripe under the eave
+                    const len = Math.hypot(f.x2 - f.x1, f.y2 - f.y1), n = Math.floor(len / 9);
+                    c.strokeStyle = T.rib; c.lineWidth = 1; c.beginPath();
+                    for (let i = 1; i < n; i++) { const u = i / n, x = f.x1 + (f.x2 - f.x1) * u, y = f.y1 + (f.y2 - f.y1) * u, q = P(x, y); c.moveTo(x, y); c.lineTo(...q); }
+                    c.stroke();
+                    c.strokeStyle = T.amber; c.lineWidth = 1.6; c.beginPath(); c.moveTo(...at(f.x1, f.y1, 0.86)); c.lineTo(...at(f.x2, f.y2, 0.86)); c.stroke();
+                    if (f.side !== 'S') continue;
+                    const lo = Math.min(f.x1, f.x2), hi = Math.max(f.x1, f.x2), y = f.y1, wx = (dx) => this.x + dx;
+                    const span = (x0, w, fill, top) => { const a0 = Math.max(lo, x0), a1 = Math.min(hi, x0 + w); if (a1 - a0 < 4) return false; quad(a0, y, a1, y, 0, top); c.fillStyle = fill; c.fill(); return [a0, a1]; };
+                    // The roll-up doors: steel slats in a hazard-striped frame
+                    for (const [dx, w] of TQ_PLAN.ROLLUPS) {
+                        const r = span(wx(dx) - 5, w + 10, '#e0a028', 0.66); if (!r) continue;
+                        const s = span(wx(dx), w, '#5b616a', 0.6);
+                        if (s) { c.strokeStyle = 'rgba(20,20,24,.55)'; c.lineWidth = 1; c.beginPath();
+                            for (let i = 1; i < 10; i++) { const f0 = 0.6 * i / 10; c.moveTo(...at(s[0], y, f0)); c.lineTo(...at(s[1], y, f0)); } c.stroke(); }
+                    }
+                    // The glass entry and the showroom's glass
+                    const [ex, ew] = TQ_PLAN.ENTRY, gl = c.createLinearGradient(0, y, 0, y - 30);
+                    gl.addColorStop(0, '#3a3020'); gl.addColorStop(1, '#6a5a40');
+                    if (span(wx(ex), ew, gl, 0.62)) { c.strokeStyle = T.steel; c.lineWidth = 1.2; c.stroke(); }
+                    if (span(wx(512), 176, gl, 0.74)) { c.strokeStyle = T.steel; c.lineWidth = 1.2; c.stroke();
+                        c.beginPath(); for (let i = 1; i < 4; i++) { const xx = wx(512) + i * 44; c.moveTo(...at(xx, y, 0)); c.lineTo(...at(xx, y, 0.74)); } c.stroke(); }
+                }
+                c.restore();
+                this._layer(c, 'tq_roof', -6, -6, 712, 362, p => this._roof(p, false), k);
+            }
+            _roof(p, glow) {
+                const x = this.x, y = this.y, T = TQX, B = TorqueArt.box, Pl = TQ_PLAN;
+                if (!glow) {
+                    // The hall: sawtooth bays, each a metal slope rising to its glazed north light
+                    B(p, x, y, 500, 350, T.roofLo, '#45454e', 3, 2);
+                    for (let i = 0; i < Pl.TEETH; i++) {
+                        const ty = y + 8 + i * Pl.TEETH_D, g = p.createLinearGradient(0, ty, 0, ty + Pl.TEETH_D);
+                        g.addColorStop(0, '#3a3b43'); g.addColorStop(1, '#1a1a1f');
+                        p.fillStyle = g; p.fillRect(x + 8, ty + 8, 484, Pl.TEETH_D - 8);
+                        p.strokeStyle = 'rgba(0,0,0,.25)'; p.lineWidth = 1; p.beginPath();
+                        for (let xx = x + 14; xx < x + 492; xx += 7) { p.moveTo(xx, ty + 9); p.lineTo(xx, ty + Pl.TEETH_D); } p.stroke();
+                        const gg = p.createLinearGradient(0, ty, 0, ty + 8); gg.addColorStop(0, T.glassHi); gg.addColorStop(1, T.glass);
+                        p.fillStyle = gg; p.fillRect(x + 8, ty, 484, 8);
+                        p.fillStyle = 'rgba(223,227,234,.35)'; for (let xx = x + 8; xx < x + 492; xx += 40) p.fillRect(xx, ty, 1.2, 8);
+                    }
+                    // Rooftop kit between the teeth: two vents and a unit
+                    for (const [dx, dy] of [[40, 230], [455, 40]]) { B(p, x + dx, y + dy, 26, 20, '#4a4d55', '#2a2c31', 2, 1); p.strokeStyle = '#2a2c31'; p.beginPath(); for (let i = 1; i < 4; i++) { p.moveTo(x + dx + 3, y + dy + i * 5); p.lineTo(x + dx + 23, y + dy + i * 5); } p.stroke(); }
+                    // The wing: flat roof, the skylight over the plinth, the billboard
+                    B(p, x + 500, y + 50, 200, 300, '#26262c', '#45454e', 3, 2);
+                    const [sx, sy, sw, sh] = Pl.SKY;
+                    B(p, x + sx, y + sy, sw, sh, T.glass, T.steel, 3, 1.5);
+                    p.strokeStyle = 'rgba(223,227,234,.4)'; p.lineWidth = 1; p.beginPath();
+                    for (let i = 1; i < 4; i++) { p.moveTo(x + sx + i * sw / 4, y + sy); p.lineTo(x + sx + i * sw / 4, y + sy + sh); }
+                    for (let i = 1; i < 3; i++) { p.moveTo(x + sx, y + sy + i * sh / 3); p.lineTo(x + sx + sw, y + sy + i * sh / 3); } p.stroke();
+                    p.fillStyle = 'rgba(200,225,255,.12)'; p.beginPath(); p.moveTo(x + sx + 6, y + sy + 6); p.lineTo(x + sx + 50, y + sy + 6); p.lineTo(x + sx + 6, y + sy + 60); p.closePath(); p.fill();
+                }
+                // The board along the hall's front: the Torque script lit amber, the trades under it
+                const [bx, by, bw, bh] = Pl.BOARD;
+                if (!glow) { B(p, x + bx, y + by, bw, bh, '#0d0c10', T.steel, 6, 2); B(p, x + bx + 5, y + by + 5, bw - 10, bh - 10, null, 'rgba(255,154,42,.4)', 4, 1); }
+                TorqueArt.text(p, 'Torque', x + bx + bw / 2, y + by + 26, 40, glow ? '#ffb347' : '#e88a2a', '"Great Vibes", cursive');
+                TorqueArt.text(p, 'A U T O   ·   S E R V I C E   ·   W R A P S', x + bx + bw / 2, y + by + 52, 7, glow ? '#ffd9a0' : '#b8aca2');
+                // Lady's billboard on the wing
+                const [lx, ly, lw, lh] = Pl.BILL;
+                if (!glow) { B(p, x + lx, y + ly, lw, lh, '#08080a', T.steelHi, 3, 1.5); p.fillStyle = 'rgba(223,227,234,.08)'; p.fillRect(x + lx + 4, y + ly + 4, lw - 8, lh * 0.4); }
+                TorqueArt.text(p, 'L A D Y', x + lx + lw / 2, y + ly + 20, 15, glow ? '#ffffff' : T.steelHi);
+                TorqueArt.text(p, 'BlackMark V3', x + lx + lw / 2, y + ly + 40, 16, glow ? '#f2f2f6' : '#c9ccd2', '"Great Vibes", cursive');
+                TorqueArt.text(p, 'est. 5930  ·  at Torque', x + lx + lw / 2, y + ly + 58, 6, glow ? '#ffd9a0' : '#8d8178');
+                if (glow) {
+                    // The north lights lit from inside, the skylight's warmth, a string of bulbs round the board
+                    for (let i = 0; i < Pl.TEETH; i++) { p.fillStyle = 'rgba(255,170,70,.75)'; p.fillRect(x + 8, y + 8 + i * Pl.TEETH_D, 484, 7); }
+                    const [sx, sy, sw, sh] = Pl.SKY; p.fillStyle = 'rgba(255,214,150,.35)'; p.fillRect(x + sx + 2, y + sy + 2, sw - 4, sh - 4);
+                    p.fillStyle = '#ffd08a';
+                    for (let xx = bx + 8; xx < bx + bw - 4; xx += 14) for (const yy of [by + 2, by + bh - 2]) { p.beginPath(); p.arc(x + xx, y + yy, 1.6, 0, Math.PI * 2); p.fill(); }
+                }
+            }
+            drawEmissive(c, dark, beamsOnly) {
+                if (beamsOnly || dark <= 0.04) return;
+                c.save(); c.globalAlpha *= Math.min(0.9, dark * 0.9); c.globalCompositeOperation = 'lighter';
+                this._layer(c, 'tq_glow', -6, -6, 712, 362, p => this._roof(p, true), this._k());
+                c.restore();
+            }
+            drawSign() {}
+        }
         /* --- NEW TRAFFIC SYSTEM (WITH UNIQUE IDs FOR AUTODRIVE) --- */
         /* === ID-BASED ROAD NETWORK ARCHITECTURE === 
          * All entities have unique IDs for clean navigation:
@@ -39846,8 +40055,8 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 colors: ['#050505', '#1a0b1a', '#0b1a1a', '#1a1a0b', '#2b0000'],
                 glowColor: '#ffffff', headlightColor: '#ffffff', visualStyle: 'blackmark',
                 models: { 
-                    suv: { name: 'BlackMark V1', length: 95, width: 44, speedMod: 1.0 },
-                    suv2: { name: 'BlackMark V3', length: 88, width: 42, speedMod: 1.05, noHearseCap: true, seats: 6 }
+                    suv: { name: 'BlackMark V1', length: 95, width: 44, speedMod: 1.0, spec: [100, 80, 80, 90, 100] },
+                    suv2: { name: 'BlackMark V3', length: 88, width: 42, speedMod: 1.05, noHearseCap: true, seats: 6, spec: [100, 86, 88, 78, 95] }
                 }
             },
             Zenxera: {
@@ -39859,10 +40068,10 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 glowColor: '#00f3ff', headlightColor: '#ccddff', // Cool blue-white
                 visualStyle: 'angular',
                 models: {
-                    sedan:  { name: 'Stratos',   length: 72, width: 40, speedMod: 1.0, seats: 4 },
-                    suv:    { name: 'Apex',      length: 78, width: 46, speedMod: 0.9, seats: 6 },
-                    sports: { name: 'Bolt',      length: 63, width: 36, speedMod: 1.25, seats: 2 },
-                    truck:  { name: 'Freighter', length: 92, width: 50, speedMod: 0.75, seats: 2 }
+                    sedan:  { name: 'Stratos',   length: 72, width: 40, speedMod: 1.0, seats: 4, spec: [76, 82, 46, 52, 72] },
+                    suv:    { name: 'Apex',      length: 78, width: 46, speedMod: 0.9, seats: 6, spec: [68, 76, 40, 66, 72] },
+                    sports: { name: 'Bolt',      length: 63, width: 36, speedMod: 1.25, seats: 2, spec: [95, 90, 58, 36, 72] },
+                    truck:  { name: 'Freighter', length: 92, width: 50, speedMod: 0.75, seats: 2, spec: [57, 62, 30, 82, 72] }
                 }
             },
             Gelfash: {
@@ -39872,14 +40081,48 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 colors: ['#fff', '#aaa', '#555', '#a469ff', '#00f3ff'],
                 glowColor: null, headlightColor: '#ffffaa', visualStyle: 'boxy',
                 models: {
-                    sedan:  { name: 'Commuter',  length: 70, width: 40, speedMod: 1.0, seats: 4 },
-                    suv:    { name: 'Ranger',    length: 75, width: 44, speedMod: 0.9, seats: 5 },
-                    sports: { name: 'Sprint',    length: 62, width: 36, speedMod: 1.15, seats: 2 },
-                    truck:  { name: 'Workhorse', length: 90, width: 50, speedMod: 0.7, seats: 2 }
+                    sedan:  { name: 'Commuter',  length: 70, width: 40, speedMod: 1.0, seats: 4, spec: [68, 64, 40, 46, 50] },
+                    suv:    { name: 'Ranger',    length: 75, width: 44, speedMod: 0.9, seats: 5, spec: [61, 60, 35, 56, 52] },
+                    sports: { name: 'Sprint',    length: 62, width: 36, speedMod: 1.15, seats: 2, spec: [78, 70, 46, 34, 50] },
+                    truck:  { name: 'Workhorse', length: 90, width: 50, speedMod: 0.7, seats: 2, spec: [48, 56, 26, 72, 50] }
                 }
             }
         };
         
+        /** The blueprint ratings, out of 100, in the order of a model's `spec`: Lady's own spec sheet for the
+            BlackMark V1 set the scale (100 / 80 / 80 / 90 / 100); the rest are rated against it. */
+        const CAR_SPEC_LABELS = ['Top speed', 'Traction rating', 'Acceleration', 'Toughness / armor', 'Lighting element'];
+
+        /** A model's ratings as [{label, v}], or null for an unknown car */
+        function carSpec(brand, model) {
+            const m = VEHICLE_BRANDS[brand]?.models[model];
+            return m && m.spec ? m.spec.map((v, i) => ({ label: CAR_SPEC_LABELS[i], v })) : null;
+        }
+
+        /** The spec sheet's bars (Car.ME, Torque Auto): a label, the rating, a ticked bar */
+        function carSpecBarsHtml(brand, model) {
+            const spec = carSpec(brand, model);
+            if (!spec) return '';
+            return `<div class="car-spec">${spec.map(s => `<div class="car-spec-row"><span>${s.label}</span><b>${s.v}</b><i style="--v:${s.v}%"></i></div>`).join('')}</div>`;
+        }
+
+        /** A model's top-down portrait as an image URL (its painted sprite, nose up), cached by look */
+        const _carPortraits = new Map();
+        function carPortraitUrl(brand, model, color, glow) {
+            const B = VEHICLE_BRANDS[brand], m = B?.models[model];
+            if (!m || typeof carSprite !== 'function') return '';
+            const key = [brand, model, color, glow].join('|');
+            if (_carPortraits.has(key)) return _carPortraits.get(key);
+            const sp = carSprite({ brand, model, visualStyle: B.visualStyle, length: m.length, width: m.width,
+                noHearseCap: !!m.noHearseCap, color: color || B.colors[0], glowColor: glow || null });
+            const cv = document.createElement('canvas'); cv.width = sp.cv.height; cv.height = sp.cv.width;
+            const c = cv.getContext('2d'); c.translate(cv.width / 2, cv.height / 2); c.rotate(-Math.PI / 2);
+            c.drawImage(sp.cv, -sp.cv.width / 2, -sp.cv.height / 2);
+            const url = cv.toDataURL();
+            _carPortraits.set(key, url);
+            return url;
+        }
+
         // Spawn weights by brand (can be adjusted per map zone later)
         const VEHICLE_SPAWN_WEIGHTS = { LADY: 0.1, Zenxera: 0.25, Gelfash: 0.65 };
         const VEHICLE_MODEL_WEIGHTS = { sedan: 0.5, suv: 0.2, suv2: 0.1, sports: 0.1, truck: 0.1 };
@@ -65857,9 +66100,6 @@ engineMixin({
             // ── BROWSE TAB: Purchase new vehicles ──
             _renderBrowseTab(container) {
                 const TIER = { 'ultra-luxury': ['gold', 'Ultra Luxury'], 'mid-luxury': ['mint', 'Mid Luxury'], 'economy': ['info', 'Economy'] };
-                // the fastest car on sale sets the speed bars' scale
-                let topSpeed = 0;
-                for (const b in VEHICLE_BRANDS) for (const m in VEHICLE_BRANDS[b].models) topSpeed = Math.max(topSpeed, VEHICLE_BRANDS[b].baseStats.maxSpeed * VEHICLE_BRANDS[b].models[m].speedMod);
                 let html = '';
                 for (const brandKey in VEHICLE_BRANDS) {
                     const brand = VEHICLE_BRANDS[brandKey], [tc, tl] = TIER[brand.tier] || ['info', brand.tier];
@@ -65868,11 +66108,11 @@ engineMixin({
                         const model = brand.models[modelKey], price = CAR_PRICES[brandKey]?.[modelKey];
                         if (!price) continue;
                         const owned = this.garage.cars.some(c => c.brand === brandKey && c.model === modelKey), afford = this.currency >= price;
-                        const spd = brand.baseStats.maxSpeed * model.speedMod, seats = model.seats || brand.baseStats.seats || 4;
+                        const seats = model.seats || brand.baseStats.seats || 4;
                         html += `<div class="df-card${owned ? ' lit' : afford ? '' : ' unaffordable'}" data-key="${brandKey}:${modelKey}"><div class="df-head">`;
-                        html += `<div class="note-ico">${ACTION_ICONS && ACTION_ICONS.car ? `<span style="width:24px;height:24px;color:var(--df-gold);display:inline-flex">${ACTION_ICONS.car}</span>` : '🚗'}</div>`;
+                        html += `<div class="ta-portrait"><img src="${carPortraitUrl(brandKey, modelKey, brandKey === 'LADY' ? BLACKMARK_DEFAULTS.paintColor : brand.colors[0], brand.glowColor)}" alt=""></div>`;
                         html += `<div class="grow"><div class="eyebrow">${brandKey} · ${modelKey}</div><div class="title">${model.name}</div>`;
-                        html += `<div class="df-bar-label"><span>Top speed</span><span>${spd.toFixed(1)}</span></div><div class="df-bar${owned ? '' : ' gold'}" style="--v:${Math.round(spd / topSpeed * 100)}%"><i></i></div>`;
+                        html += carSpecBarsHtml(brandKey, modelKey);
                         html += `<div class="df-chips" style="margin-top:8px;"><span class="df-chip">${seats} seats</span></div></div>`;
                         html += `<div class="df-shop-side">${owned ? '<span class="df-chip active">✓ Owned</span>' : `${this._priceHtml(price, this.currency)}<button class="df-btn small auto-buy-btn" data-brand="${brandKey}" data-model="${modelKey}"${afford ? '' : ' disabled'}>Buy</button>`}</div>`;
                         html += `</div></div>`;
@@ -65901,8 +66141,9 @@ engineMixin({
                 for (let i = 0; i < this.garage.count; i++) {
                     const car = this.garage.get(i), isActive = i === this.garage.activeIndex, name = this.garage.getDisplayName(i);
                     html += `<div class="df-card${isActive ? ' lit' : ''}"><div class="df-head">`;
-                    html += `<div class="df-swatch sq" style="background:${car.paintColor}"></div>`;
+                    html += `<div class="ta-portrait"><img src="${carPortraitUrl(car.brand, car.model, car.paintColor, car.underglowColor)}" alt=""></div>`;
                     html += `<div class="grow"><div class="eyebrow">${car.brand} · ${car.model}</div><div class="title">${name}</div>`;
+                    html += carSpecBarsHtml(car.brand, car.model);
                     html += `<div class="df-chips" style="margin-top:8px;">`;
                     html += `<span class="df-chip">Paint <i class="df-swatch small sq" style="background:${car.paintColor}"></i></span>`;
                     html += `<span class="df-chip">Glow <i class="df-swatch small" style="background:${car.underglowColor || 'transparent'};${car.underglowColor ? `box-shadow:0 0 5px ${car.underglowColor}` : ''}"></i></span>`;
@@ -69014,7 +69255,7 @@ engineMixin({
             house_of_death: ['_houseFloor'], hotel_lobby: ['_lobbyFloor'], church_boss: ['_sanctumFloor'],
             hotel_suite: ['_suiteFloor'], moon_city_nightclub: ['_clubFloor'], demoness_palace: ['_palaceFloor'],
             apt_949: ['_cityView', '_aptFloor'], van_interior: ['_vanCabin'], cozy_cafe_interior: ['_cafeFloor'],
-            neural_sys_interior: ['_neuralFloor'],
+            neural_sys_interior: ['_neuralFloor'], auto_shop: ['_torqueFloor'],
             enni_cole_interior: ['_enniFloor'], enni_cole_upper: ['_enniUpperFloor'],
             keepers_hill: ['_keeperHill', '_keeperHouse', '_keeperParlor'], keepers_parlor: ['_keeperHill', '_keeperHouse', '_keeperParlor']
         };
@@ -75041,6 +75282,7 @@ engineMixin({
             enni_cole_upper:     { floor: (g, c) => g.drawEnniUpperInterior(c), glow: (g, c) => g.drawEnniUpperGlow(c) },
             cozy_cafe_interior:  { floor: (g, c) => g.drawCafeInterior(c),    glow: (g, c) => g.drawCafeGlow(c) },     // the hearth, candles, pendants, steam
             neural_sys_interior: { floor: (g,c) => g.drawNeuralInterior(c), glow: (g,c) => g.drawNeuralGlow(c) },
+            auto_shop:           { floor: (g, c) => g.drawTorqueInterior(c),  glow: (g, c) => g.drawTorqueGlow(c) },     // engine/torque-art.js
             demoness_palace:     { floor: (g, c) => g.drawPalaceInterior(c), glow: (g, c) => g.drawPalaceGlow(c) }   // engine/palace-art.js      // engine/reflections.js: its mirror floor gives this back
         };
 
@@ -76941,6 +77183,338 @@ engineMixin({
             }
         }
         c.restore();
+    }
+});
+// Torque Auto inside: a graphite epoxy service bay under strip lights, two cars up on lifts and Victoria's
+// wrap bay; through the arch a black porcelain showroom with Lady's BlackMark V3 turning on its plinth and
+// Torque's steel counter; behind its own door, the parts room on diamond plate. Amber is the house colour.
+// Floor: drawTorqueInterior (painted once, released on leaving: MAP_BAKES). Furniture: drawTorqueDecorProp
+// (ta_*, entities/props-decor.js). Light: drawTorqueGlow. The pieces stand where world/map-entities.js puts them.
+const TQ = { amber: '#ff9a2a', amberHi: '#ffc46a', steel: '#9aa3ad', steelHi: '#dfe3ea', steelLo: '#4a5059', ink: '#0d0c10',
+    graphite: '#24242a', chest: '#b4321e', chestHi: '#e0552e', rubber: '#141416', wrap: '#ff4fa3' };
+// The cars on show: the lifts' two, the wrap bay's, the plinth's (a model, its paint and glow)
+const TQ_CARS = [
+    { brand: 'Zenxera', model: 'sports', color: '#CCCCFF', glowColor: '#00f3ff' },
+    { brand: 'Gelfash', model: 'suv', color: '#e8e6ee', glowColor: null },
+    { brand: 'Zenxera', model: 'sedan', color: '#C0C0C0', glowColor: '#00f3ff', wrapped: true },
+    { brand: 'LADY', model: 'suv2', color: '#1a1a1a', glowColor: '#ffffff' }
+].map(c => { const B = VEHICLE_BRANDS[c.brand], m = B.models[c.model];
+    return Object.assign(c, { visualStyle: B.visualStyle, length: m.length, width: m.width, noHearseCap: !!m.noHearseCap }); });
+const TQ_TURNTABLE = { x: 1165, y: 505, r: 64 };
+const TQ_BAYS = [[90, 128, 200, 120, '01'], [90, 368, 200, 120, '02'], [400, 128, 210, 120, '03']];
+// The lifts' status lamps (the posts stand mid-car, north and south of it: ta_lift)
+const TQ_LIFT_LAMPS = [[196, 143], [196, 225], [196, 383], [196, 465]];
+
+const TorqueArt = {
+    box(c, x, y, w, h, fill, stroke, r = 0, lw = 1) {
+        c.beginPath(); c.roundRect(x, y, w, h, r);
+        if (fill) { c.fillStyle = fill; c.fill(); }
+        if (stroke) { c.strokeStyle = stroke; c.lineWidth = lw; c.stroke(); }
+    },
+    text(c, s, x, y, size, color, font = 'Orbitron, monospace') {
+        c.fillStyle = color; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = `${size}px ${font}`; c.fillText(s, x, y);
+    },
+    /** One of TQ_CARS at cx, cy, nose along `ang`; `raised` lifts it off the floor (a softer, further shadow) */
+    car(c, car, cx, cy, ang, raised) {
+        const sp = car.wrapped ? TorqueArt._wrapped(car) : carSprite(car), P = CAR_ART.PAD, L = sp.L, W = sp.W;
+        c.save(); c.translate(cx, cy); c.rotate(ang);
+        if (raised) { c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.roundRect(-L / 2 + 6, -W / 2 + 7, L, W, 10); c.fill(); c.scale(1.06, 1.06); }
+        c.drawImage(sp.cv, -L / 2 - P, -W / 2 - P, L + P * 2, W + P * 2);
+        c.restore();
+    },
+    /** Paint the show cars' sprites now (the map's build), so a piece's own paint never does it */
+    warm() { for (const car of TQ_CARS) car.wrapped ? TorqueArt._wrapped(car) : carSprite(car); },
+    /** The wrap bay's car: Victoria's pink vinyl laid over its back half, the edge left raw */
+    _wrapped(car) {
+        if (car._wrap) return car._wrap;
+        const sp = carSprite(car), cv = document.createElement('canvas'); cv.width = sp.cv.width; cv.height = sp.cv.height;
+        const c = cv.getContext('2d'), S = CAR_ART.SCALE, edge = cv.width * 0.52;
+        c.drawImage(sp.cv, 0, 0);
+        c.globalCompositeOperation = 'source-atop';
+        const g = c.createLinearGradient(0, 0, 0, cv.height); g.addColorStop(0, '#c23a7c'); g.addColorStop(0.45, TQ.wrap); g.addColorStop(1, '#a12864');
+        c.globalAlpha = 0.82; c.fillStyle = g; c.fillRect(0, 0, edge, cv.height);
+        c.globalAlpha = 1; c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(edge - 1.2 * S, 0, 1.2 * S, cv.height);
+        return (car._wrap = { cv, L: sp.L, W: sp.W });
+    }
+};
+
+function drawTorqueDecorProp(c, p) {
+    const x = p.x, y = p.y, w = p.width, h = p.height, d = p.decor || {}, B = TorqueArt.box, T = TQ;
+    const steel = (x0, y0, x1, y1) => { const g = c.createLinearGradient(x0, y0, x1, y1); g.addColorStop(0, '#6c747e'); g.addColorStop(0.45, T.steelHi); g.addColorStop(0.55, '#a9b1ba'); g.addColorStop(1, '#565d66'); return g; };
+    switch (p.decorType) {
+        case 'ta_lift': {                                   // a two-post lift, the car up on its arms
+            const cx = x + w / 2, cy = y + h / 2;
+            B(c, x + 2, y + 10, w - 4, h - 20, 'rgba(255,154,42,.06)', 'rgba(255,154,42,.35)', 4, 1);
+            c.strokeStyle = '#3a3f46'; c.lineWidth = 4; c.lineCap = 'round'; c.beginPath();      // the arms, swung in under the sills
+            for (const s of [-1, 1]) { const py = s < 0 ? y + 9 : y + h - 9; c.moveTo(cx, py); c.lineTo(cx - 30, cy + s * 12); c.moveTo(cx, py); c.lineTo(cx + 26, cy + s * 12); }
+            c.stroke(); c.lineCap = 'butt';
+            TorqueArt.car(c, TQ_CARS[d.variant | 0], cx, cy, 0, true);
+            for (const py of [y, y + h - 14]) {             // the posts, amber with a steel cap and a status lamp
+                B(c, cx - 9, py, 18, 14, T.amber, '#7a4206', 2, 1);
+                B(c, cx - 6, py + 3, 12, 8, steel(cx - 6, py, cx + 6, py), null, 1);
+                c.fillStyle = '#3cff8a'; c.beginPath(); c.arc(cx + 6, py + 3, 1.4, 0, Math.PI * 2); c.fill();
+            }
+            break;
+        }
+        case 'ta_wrap': {                                   // the wrap bay: a car half in pink vinyl, the roll on its stand
+            const cx = x + w / 2 - 10, cy = y + h / 2;
+            B(c, x, y + 4, w, h - 8, 'rgba(255,79,163,.05)', 'rgba(255,79,163,.4)', 6, 1);
+            TorqueArt.car(c, TQ_CARS[2], cx, cy, 0, false);
+            B(c, x + w - 22, y + 14, 16, h - 28, '#2b2b31', '#5b5e66', 3);
+            const rg = c.createLinearGradient(x + w - 20, 0, x + w - 8, 0); rg.addColorStop(0, '#8e1f55'); rg.addColorStop(0.5, '#ff7cc0'); rg.addColorStop(1, '#8e1f55');
+            B(c, x + w - 20, y + 20, 12, h - 40, rg, null, 5);
+            c.fillStyle = 'rgba(255,124,192,.55)'; c.beginPath(); c.moveTo(x + w - 20, y + h / 2 - 8); c.lineTo(cx + 22, cy - 6); c.lineTo(cx + 22, cy + 6); c.lineTo(x + w - 20, y + h / 2 + 8); c.closePath(); c.fill();
+            break;
+        }
+        case 'ta_chest': {                                  // a rolling tool chest: lacquer red, drawer pulls, a tray of spanners on top
+            B(c, x + 2, y + 3, w, h, 'rgba(0,0,0,.35)', null, 3);
+            const g = c.createLinearGradient(x, y, x, y + h); g.addColorStop(0, T.chestHi); g.addColorStop(1, '#7c1e12');
+            B(c, x, y, w, h, g, '#4e120a', 3, 1);
+            B(c, x + 3, y + 3, w - 6, h * 0.42, '#1a1a1e', '#5a5a62', 2, 0.8);
+            c.strokeStyle = T.steelHi; c.lineWidth = 1; c.beginPath();
+            for (let i = 0; i < 6; i++) { const sx = x + 7 + i * (w - 14) / 6; c.moveTo(sx, y + 6); c.lineTo(sx + 3, y + h * 0.4 - 2); }
+            c.stroke();
+            c.fillStyle = 'rgba(255,255,255,.55)';
+            for (let i = 0; i < 3; i++) c.fillRect(x + 6, y + h * 0.55 + i * h * 0.14, w - 12, 1.2);
+            break;
+        }
+        case 'ta_bench': {                                  // the workbench: butcher block, pegboard behind, a vise and a lamp
+            B(c, x + 2, y + 3, w, h, 'rgba(0,0,0,.35)', null, 2);
+            B(c, x, y, w, h * 0.34, '#2c2f35', '#4d525a', 1);
+            c.fillStyle = 'rgba(223,227,234,.25)';
+            for (let px = x + 5; px < x + w - 3; px += 6) for (let py = y + 3; py < y + h * 0.32; py += 5) c.fillRect(px, py, 1, 1);
+            for (const [tx, tl] of [[x + 20, 8], [x + 34, 10], [x + 48, 7], [x + w - 40, 9]]) { c.strokeStyle = T.steelHi; c.lineWidth = 1.4; c.beginPath(); c.moveTo(tx, y + 2); c.lineTo(tx, y + 2 + tl); c.stroke(); }
+            const wood = c.createLinearGradient(x, y, x, y + h); wood.addColorStop(0, '#8a5a32'); wood.addColorStop(1, '#5e3a1e');
+            B(c, x, y + h * 0.34, w, h * 0.66, wood, '#3a2412', 2, 1);
+            c.strokeStyle = 'rgba(40,20,8,.35)'; c.lineWidth = 0.7; c.beginPath();
+            for (let px = x + 8; px < x + w; px += 8) { c.moveTo(px, y + h * 0.34); c.lineTo(px, y + h); } c.stroke();
+            B(c, x + w - 28, y + h * 0.42, 20, 12, '#3c414a', T.steel, 2, 0.8);
+            c.fillStyle = T.steelHi; c.fillRect(x + w - 32, y + h * 0.5, 28, 1.6);
+            B(c, x + 14, y + h * 0.5, 24, 9, '#1c1c20', T.amber, 2, 0.8);
+            break;
+        }
+        case 'ta_compressor': {                             // the air compressor: tank, motor and a coiled amber hose
+            B(c, x + 2, y + 3, w, h, 'rgba(0,0,0,.35)', null, 8);
+            B(c, x, y + h * 0.25, w, h * 0.6, steel(x, y, x, y + h), '#3d434b', h * 0.3, 1);
+            B(c, x + w * 0.2, y + 2, w * 0.5, h * 0.32, '#1e2024', '#4d525a', 3, 1);
+            c.strokeStyle = T.amber; c.lineWidth = 1.6;
+            for (let i = 0; i < 3; i++) { c.beginPath(); c.arc(x + w * 0.78, y + h * 0.5, 4 + i * 2.2, 0, Math.PI * 2); c.stroke(); }
+            break;
+        }
+        case 'ta_tires': {                                  // a stack of tyres, the top one's tread and rim
+            const cx = x + w / 2, cy = y + h / 2, r = Math.min(w, h) / 2;
+            c.fillStyle = 'rgba(0,0,0,.4)'; c.beginPath(); c.arc(cx + 3, cy + 4, r, 0, Math.PI * 2); c.fill();
+            c.fillStyle = T.rubber; c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fill();
+            c.strokeStyle = '#2c2c30'; c.lineWidth = 1;
+            for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2; c.beginPath(); c.moveTo(cx + Math.cos(a) * r * 0.78, cy + Math.sin(a) * r * 0.78); c.lineTo(cx + Math.cos(a) * r * 0.98, cy + Math.sin(a) * r * 0.98); c.stroke(); }
+            c.fillStyle = '#0a0a0c'; c.beginPath(); c.arc(cx, cy, r * 0.55, 0, Math.PI * 2); c.fill();
+            c.strokeStyle = d.variant ? T.amber : T.steelHi; c.lineWidth = 1.2; c.beginPath(); c.arc(cx, cy, r * 0.42, 0, Math.PI * 2); c.stroke();
+            c.fillStyle = 'rgba(255,255,255,.08)'; c.beginPath(); c.arc(cx - r * 0.3, cy - r * 0.3, r * 0.35, 0, Math.PI * 2); c.fill();
+            break;
+        }
+        case 'ta_rack': {                                   // a tyre rack on the wall, tyres stood on edge
+            B(c, x + 2, y + 3, w, h, 'rgba(0,0,0,.35)', null, 2);
+            B(c, x, y, w, h, '#2a2d33', T.steelLo, 2, 1);
+            const n = Math.floor(h / 15);
+            for (let i = 0; i < n; i++) { const ty = y + 4 + i * (h - 8) / n; B(c, x + 3, ty, w - 6, (h - 8) / n - 2, T.rubber, '#36363c', 3, 0.8); c.fillStyle = '#3a3a40'; c.fillRect(x + 5, ty + (h - 8) / n / 2 - 1.5, w - 10, 1); }
+            break;
+        }
+        case 'ta_drum': {                                   // an oil drum: ribbed lid, the brand's band
+            const cx = x + w / 2, cy = y + h / 2, r = w / 2;
+            c.fillStyle = 'rgba(0,0,0,.4)'; c.beginPath(); c.arc(cx + 2, cy + 3, r, 0, Math.PI * 2); c.fill();
+            c.fillStyle = d.variant ? '#7a1f1a' : '#1f4a2c'; c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fill();
+            c.strokeStyle = 'rgba(255,255,255,.25)'; c.lineWidth = 1; c.beginPath(); c.arc(cx, cy, r * 0.75, 0, Math.PI * 2); c.stroke();
+            c.fillStyle = T.steel; c.beginPath(); c.arc(cx + r * 0.4, cy - r * 0.2, 2, 0, Math.PI * 2); c.fill();
+            break;
+        }
+        case 'ta_counter': {                                // Torque's counter: brushed steel, an amber light line, the till and the bell
+            B(c, x + 3, y + 4, w, h, 'rgba(0,0,0,.4)', null, 6);
+            B(c, x, y, w, h, steel(x, y, x, y + h), '#3a3f46', 6, 1);
+            B(c, x + 4, y + 4, w - 8, h - 12, '#16161a', '#5d636c', 4, 0.8);
+            c.fillStyle = T.amber; c.fillRect(x + 6, y + h - 6, w - 12, 2);
+            B(c, x + 18, y + 8, 30, 18, '#0d0d10', T.steel, 2, 0.8);
+            c.fillStyle = '#58d0ff'; c.fillRect(x + 21, y + 11, 24, 7);
+            c.fillStyle = T.steelHi; c.beginPath(); c.arc(x + w - 26, y + 16, 5, 0, Math.PI * 2); c.fill();
+            c.fillStyle = '#2b2b30'; c.beginPath(); c.arc(x + w - 26, y + 16, 1.6, 0, Math.PI * 2); c.fill();
+            for (let i = 0; i < 3; i++) B(c, x + 60 + i * 20, y + 9, 15, 11, ['#e9e4dc', '#ffcf8a', '#c9c2ff'][i], null, 1);   // brochures
+            TorqueArt.text(c, 'TORQUE', x + w - 66, y + 16, 7, 'rgba(255,196,106,.75)');
+            break;
+        }
+        case 'ta_rims': {                                   // the rim wall: alloys hung in a row, a price chip under each
+            B(c, x + 2, y + 3, w, h, 'rgba(0,0,0,.35)', null, 3);
+            B(c, x, y, w, h, '#1b1b20', '#4b5059', 3, 1);
+            const n = Math.floor(w / 30);
+            for (let i = 0; i < n; i++) {
+                const cx = x + 15 + i * (w - 30) / Math.max(1, n - 1), cy = y + h / 2, r = h / 2 - 3;
+                c.fillStyle = T.rubber; c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fill();
+                c.fillStyle = ['#c9ccd2', '#d4af37', '#2c2c32', '#b9b6c4', '#ff9a2a'][i % 5]; c.beginPath(); c.arc(cx, cy, r * 0.72, 0, Math.PI * 2); c.fill();
+                c.strokeStyle = 'rgba(0,0,0,.55)'; c.lineWidth = 1.2; c.beginPath();
+                for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2 + i; c.moveTo(cx, cy); c.lineTo(cx + Math.cos(a) * r * 0.7, cy + Math.sin(a) * r * 0.7); } c.stroke();
+                c.fillStyle = T.steelHi; c.beginPath(); c.arc(cx, cy, 1.6, 0, Math.PI * 2); c.fill();
+            }
+            break;
+        }
+        case 'ta_chair': {                                  // a showroom lounge chair, cognac leather on a chrome frame
+            const f = d.face === 'W' ? -1 : 1;
+            B(c, x + 2, y + 3, w, h, 'rgba(0,0,0,.35)', null, 8);
+            B(c, x, y, w, h, '#6a3a1c', '#2e180a', 8, 1);
+            B(c, f > 0 ? x : x + w - 10, y + 2, 10, h - 4, '#542c14', null, 5);
+            B(c, x + 4, y + 4, w - 8, h - 8, null, 'rgba(255,214,160,.25)', 6, 0.8);
+            c.strokeStyle = T.steelHi; c.lineWidth = 1; c.beginPath(); c.moveTo(x + 3, y + h - 1); c.lineTo(x + w - 3, y + h - 1); c.stroke();
+            break;
+        }
+        case 'ta_table': {                                  // a glass side table: magazines and a Bellafore
+            c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.arc(x + w / 2 + 2, y + h / 2 + 3, w / 2, 0, Math.PI * 2); c.fill();
+            c.fillStyle = 'rgba(190,210,230,.25)'; c.strokeStyle = T.steelHi; c.lineWidth = 1; c.beginPath(); c.arc(x + w / 2, y + h / 2, w / 2, 0, Math.PI * 2); c.fill(); c.stroke();
+            c.save(); c.translate(x + w / 2, y + h / 2); c.rotate(0.3); B(c, -8, -6, 12, 9, '#e94a7a', null, 1); c.restore();
+            c.fillStyle = '#ffcf8a'; c.beginPath(); c.arc(x + w / 2 + 5, y + h / 2 + 3, 2.4, 0, Math.PI * 2); c.fill();
+            break;
+        }
+        case 'ta_shelf': {                                  // parts shelving: steel uprights, labelled boxes
+            B(c, x + 2, y + 3, w, h, 'rgba(0,0,0,.35)', null, 2);
+            B(c, x, y, w, h, '#2b2e34', T.steelLo, 2, 1);
+            let bx = x + 4, i = 0;
+            while (bx < x + w - 10) {
+                const bw = 14 + ((bx * 7 + y) % 13);
+                if (bx + bw > x + w - 4) break;
+                B(c, bx, y + 4, bw, h - 8, ['#a87a4a', '#c79a5e', '#4a5a7a', '#8a2a24', '#d8d2c4'][i++ % 5], 'rgba(0,0,0,.4)', 1, 0.6);
+                c.fillStyle = 'rgba(255,255,255,.7)'; c.fillRect(bx + 3, y + h / 2 - 1.5, bw - 6, 3);
+                bx += bw + 3;
+            }
+            c.fillStyle = T.amber; c.fillRect(x, y + h - 2, w, 2);
+            break;
+        }
+        case 'ta_sofa': {                                   // the waiting sofa by the door
+            B(c, x + 2, y + 3, w, h, 'rgba(0,0,0,.35)', null, 9);
+            B(c, x, y, w, h, '#5a3218', '#2e180a', 9, 1);
+            B(c, x, y + h - 12, w, 12, '#46260f', null, 6);
+            for (let i = 0; i < 3; i++) B(c, x + 6 + i * (w - 12) / 3, y + 5, (w - 12) / 3 - 3, h - 19, '#6e3e1e', 'rgba(255,214,160,.3)', 5, 0.8);
+            break;
+        }
+        case 'ta_turntable': {                              // the plinth: a brushed disc turning slowly, Lady's V3 on it
+            const { x: cx, y: cy, r } = TQ_TURNTABLE, a = (_frameTime / 1000) * 0.12;
+            c.fillStyle = 'rgba(0,0,0,.45)'; c.beginPath(); c.arc(cx + 3, cy + 4, r + 4, 0, Math.PI * 2); c.fill();
+            const g = c.createRadialGradient(cx - 20, cy - 24, 6, cx, cy, r + 4); g.addColorStop(0, '#5a6069'); g.addColorStop(0.7, '#2c3036'); g.addColorStop(1, '#16181c');
+            c.fillStyle = g; c.beginPath(); c.arc(cx, cy, r + 4, 0, Math.PI * 2); c.fill();
+            c.strokeStyle = TQ.amber; c.lineWidth = 1.4; c.stroke();
+            c.strokeStyle = 'rgba(223,227,234,.12)'; c.lineWidth = 0.8;
+            for (let k = 0; k < 6; k++) { c.beginPath(); c.arc(cx, cy, r * (0.3 + k * 0.12), a + k, a + k + 4); c.stroke(); }
+            TorqueArt.car(c, TQ_CARS[3], cx, cy, -Math.PI / 2 + a, false);
+            break;
+        }
+    }
+}
+
+engineMixin({
+    drawTorqueInterior(c) { if (!this._torqueFloor) this._torqueFloor = this._paintTorqueFloor(); c.drawImage(this._torqueFloor, 0, 0); },
+    _paintTorqueFloor() {
+        const W = 1400, H = 1000, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+        const c = cv.getContext('2d'), r = seededRandom(5930), B = TorqueArt.box, T = TQ;
+        c.fillStyle = '#0e0d11'; c.fillRect(0, 0, W, H);
+        // The bay: graphite epoxy with a fleck in it, saw cuts every 100, a sheen where the lights sit
+        const ep = c.createLinearGradient(50, 50, 880, 950); ep.addColorStop(0, '#2b2b31'); ep.addColorStop(1, '#1d1d22');
+        c.fillStyle = ep; c.fillRect(50, 50, 830, 900);
+        for (let i = 0; i < 2600; i++) { c.fillStyle = r() < 0.12 ? 'rgba(255,170,80,.18)' : r() < 0.5 ? 'rgba(223,227,234,.10)' : 'rgba(0,0,0,.25)'; c.fillRect(50 + r() * 830, 50 + r() * 900, 1.2, 1.2); }
+        c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 1; c.beginPath();
+        for (let x = 150; x < 880; x += 100) { c.moveTo(x, 50); c.lineTo(x, 950); }
+        for (let y = 150; y < 950; y += 100) { c.moveTo(50, y); c.lineTo(880, y); } c.stroke();
+        for (const [cx, cy, rr] of [[195, 195, 170], [195, 435, 170], [515, 195, 170], [560, 600, 260]]) {
+            const g = c.createRadialGradient(cx, cy, 10, cx, cy, rr); g.addColorStop(0, 'rgba(255,236,210,.07)'); g.addColorStop(1, 'rgba(255,236,210,0)'); c.fillStyle = g; c.fillRect(cx - rr, cy - rr, rr * 2, rr * 2);
+        }
+        // Oil under the lifts
+        for (let i = 0; i < 14; i++) { const cx = 195 + (r() - 0.5) * 120, cy = (i % 2 ? 195 : 435) + (r() - 0.5) * 60, s = 6 + r() * 16; c.fillStyle = `rgba(4,3,6,${0.18 + r() * 0.2})`; c.beginPath(); c.ellipse(cx, cy, s, s * 0.6, r() * 3, 0, Math.PI * 2); c.fill(); }
+        // The bays: amber lines, their numbers stencilled at the open end, a hazard band across it
+        for (const [x, y, w, h, n] of TQ_BAYS) {
+            c.strokeStyle = 'rgba(255,154,42,.75)'; c.lineWidth = 3; c.strokeRect(x, y, w, h);
+            c.save(); c.beginPath(); c.rect(x + w - 16, y, 14, h); c.clip();
+            for (let k = -2; k < h / 10 + 2; k++) { c.fillStyle = k % 2 ? '#141416' : 'rgba(255,170,40,.8)'; c.beginPath(); c.moveTo(x + w - 16, y + k * 10); c.lineTo(x + w - 2, y + k * 10 + 10); c.lineTo(x + w - 2, y + k * 10 + 20); c.lineTo(x + w - 16, y + k * 10 + 10); c.closePath(); c.fill(); }
+            c.restore();
+            TorqueArt.text(c, n, x + w - 40, y + h - 20, 26, 'rgba(255,154,42,.28)');
+            c.strokeStyle = 'rgba(223,227,234,.3)'; c.lineWidth = 1; c.strokeRect(x + w / 2 - 14, y + h / 2 - 4, 28, 8);   // the drain grate
+            for (let k = 1; k < 7; k++) { c.beginPath(); c.moveTo(x + w / 2 - 14 + k * 4, y + h / 2 - 4); c.lineTo(x + w / 2 - 14 + k * 4, y + h / 2 + 4); c.stroke(); }
+        }
+        TorqueArt.text(c, 'W R A P S', 515, 112, 9, 'rgba(255,79,163,.6)');
+        // The walkway: from the door to the arch, a pair of white dashes
+        c.strokeStyle = 'rgba(232,232,240,.35)'; c.lineWidth = 2; c.setLineDash([14, 10]);
+        for (const off of [-30, 30]) { c.beginPath(); c.moveTo(700 + off, 950); c.lineTo(700 + off, 380 - off); c.lineTo(880, 380 - off); c.stroke(); }
+        c.setLineDash([]);
+        // The house seal: a gear ring with TORQUE in it, under the middle of the bay
+        c.save(); c.translate(470, 640);
+        c.strokeStyle = 'rgba(255,154,42,.35)'; c.lineWidth = 3; c.beginPath(); c.arc(0, 0, 74, 0, Math.PI * 2); c.stroke();
+        c.fillStyle = 'rgba(255,154,42,.3)';
+        for (let i = 0; i < 24; i++) { c.save(); c.rotate(i / 24 * Math.PI * 2); c.fillRect(-5, -88, 10, 12); c.restore(); }
+        c.lineWidth = 1.2; c.beginPath(); c.arc(0, 0, 62, 0, Math.PI * 2); c.stroke();
+        c.restore();
+        TorqueArt.text(c, 'Torque', 470, 632, 40, 'rgba(255,170,70,.42)', '"Great Vibes", cursive');
+        TorqueArt.text(c, 'A U T O  ·  S D C', 470, 666, 8, 'rgba(255,170,70,.45)');
+        // The doormat
+        B(c, 630, 846, 140, 40, '#1c1c20', 'rgba(255,154,42,.6)', 3, 1.5);
+        TorqueArt.text(c, 'TORQUE AUTO', 700, 866, 10, 'rgba(255,170,70,.7)');
+        // The showroom: black porcelain, bronze joints, the plinth's steel ring set in the floor, a runner from the arch
+        for (let y = 50; y < 690; y += 64) for (let x = 900; x < 1350; x += 64) {
+            const v = r(), g = c.createLinearGradient(x, y, x + 64, y + 64);
+            g.addColorStop(0, `rgb(${22 + v * 8 | 0},${21 + v * 8 | 0},${26 + v * 9 | 0})`); g.addColorStop(1, '#0f0f13');
+            c.fillStyle = g; c.fillRect(x, y, 64, 64);
+            c.fillStyle = 'rgba(255,255,255,.035)'; c.beginPath(); c.moveTo(x, y); c.lineTo(x + 30, y); c.lineTo(x, y + 30); c.closePath(); c.fill();
+        }
+        c.strokeStyle = 'rgba(190,140,80,.28)'; c.lineWidth = 0.8; c.beginPath();
+        for (let x = 900; x <= 1350; x += 64) { c.moveTo(x, 50); c.lineTo(x, 690); }
+        for (let y = 50; y <= 690; y += 64) { c.moveTo(900, y); c.lineTo(1350, y); } c.stroke();
+        const { x: tx, y: ty, r: tr } = TQ_TURNTABLE;
+        c.strokeStyle = T.steel; c.lineWidth = 3; c.beginPath(); c.arc(tx, ty, tr + 14, 0, Math.PI * 2); c.stroke();
+        c.strokeStyle = 'rgba(255,154,42,.5)'; c.lineWidth = 1; c.beginPath(); c.arc(tx, ty, tr + 20, 0, Math.PI * 2); c.stroke();
+        B(c, 906, 350, 44, 60, '#1b1a20', 'rgba(255,154,42,.5)', 2, 1);   // the mat in the arch
+        TorqueArt.text(c, 'L A D Y  ·  B L A C K M A R K  V 3', tx, ty + tr + 34, 8, 'rgba(223,227,234,.55)');
+        TorqueArt.text(c, 'est. 5930', tx, ty + tr + 48, 12, 'rgba(223,227,234,.4)', '"Great Vibes", cursive');
+        // The parts room: diamond plate
+        c.fillStyle = '#2a2c31'; c.fillRect(900, 710, 450, 240);
+        c.fillStyle = 'rgba(255,255,255,.07)';
+        for (let y = 714; y < 950; y += 12) for (let x = 904 + ((y / 12) % 2) * 9; x < 1350; x += 18) { c.save(); c.translate(x, y); c.rotate(0.6); c.fillRect(-4, -1, 8, 2); c.restore(); }
+        TorqueArt.text(c, 'PARTS', 1125, 935, 10, 'rgba(255,154,42,.45)');
+        // Depth: every room darkens toward its walls
+        for (const [x, y, w, h] of [[50, 50, 830, 900], [900, 50, 450, 640], [900, 710, 450, 240]]) {
+            for (const [x0, y0, x1, y1, rx, ry, rw, rh] of [[x, y, x, y + 40, x, y, w, 40], [x, y, x + 40, y, x, y, 40, h], [x + w, y, x + w - 40, y, x + w - 40, y, 40, h]]) {
+                const g = c.createLinearGradient(x0, y0, x1, y1); g.addColorStop(0, 'rgba(0,0,0,.45)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(rx, ry, rw, rh);
+            }
+        }
+        return cv;
+    },
+    drawTorqueGlow(c) {
+        const t = _frameTime / 1000, mirror = c !== this.ctx;
+        c.save(); c.globalCompositeOperation = 'lighter';
+        // Strip lights over each bay: two tubes, a cool-white wash under them
+        for (const [x, y, w, h] of TQ_BAYS) {
+            glowA(c, x + w / 2, y + h / 2, 150, '255, 238, 214', 0.13);
+            for (const yy of [y + 24, y + h - 24]) for (let xx = x + 30; xx <= x + w - 30; xx += 34) glowA(c, xx, yy, 22, '255, 244, 226', 0.22);
+        }
+        glowA(c, 470, 640, 200, '255, 170, 70', 0.08);
+        // The showroom: four spots on the plinth, the counter's amber line, the neon script on the north wall
+        const { x: tx, y: ty, r: tr } = TQ_TURNTABLE;
+        glowA(c, tx, ty, tr + 70, '255, 246, 230', 0.16);
+        for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4; glowA(c, tx + Math.cos(a) * (tr + 6), ty + Math.sin(a) * (tr + 6), 40, '255, 236, 200', 0.18); }
+        glowA(c, tx, ty, tr + 18, '255, 154, 42', 0.1 + 0.03 * Math.sin(t * 1.3));
+        for (let x = 960; x <= 1140; x += 30) glowA(c, x, 290, 26, '255, 154, 42', 0.3);
+        const hum = 0.85 + 0.08 * Math.sin(t * 1.7) + 0.05 * Math.sin(t * 13);
+        c.globalAlpha = 0.55 * hum; TorqueArt.text(c, 'Torque', 1235, 96, 42, '#ff9a2a', '"Great Vibes", cursive');
+        glowA(c, 1235, 96, 80, '255, 154, 42', 0.22 * hum);
+        // The parts room's caged bulb, the lifts' lamps
+        glowA(c, 1100, 800, 90, '255, 176, 112', 0.14);
+        for (const [x, y] of TQ_LIFT_LAMPS) glowA(c, x, y, 7, '60, 255, 138', 0.5);
+        // Sparks at the bench now and then: a grinder's spray
+        if (!mirror) {
+            const ph = (t * 0.25) % 1;
+            if (ph < 0.3) for (let i = 0; i < 9; i++) {
+                const k = ((t * 3 + i * 0.137) % 1), a = -0.4 - i * 0.12;
+                glowA(c, 712 + Math.cos(a) * k * 46, 92 + Math.sin(a) * k * -22 + k * k * 30, 2.5, '255, 200, 120', 0.9 * (1 - k));
+            }
+        }
+        c.restore();
+        // The tubes themselves, drawn solid over the room
+        if (!mirror) {
+            c.save(); c.fillStyle = '#f6efe2'; c.strokeStyle = '#3a3a42'; c.lineWidth = 1;
+            for (const [x, y, w, h] of TQ_BAYS) for (const yy of [y + 24, y + h - 24]) { c.beginPath(); c.roundRect(x + 24, yy - 2, w - 48, 4, 2); c.fill(); c.stroke(); }
+            c.restore();
+        }
     }
 });
         // GameEngine — the Keeper's hill and parlor (the prologue's fireside). Scene-only places:
@@ -80437,77 +81011,56 @@ engineMixin({
                 document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
                 document.getElementById('screen-carme').style.display = 'flex';
 
-                const container = document.getElementById('carme-content');
+                const container = document.getElementById('carme-content'), G = game.garage;
                 const isIndoor = game.activeMap.type === 'indoor';
                 const noSummon = game.activeMap.id !== 'sdc';   // cars live on the hub (engine/cars.js)
-                let html = '';
+                const where = document.getElementById('carme-where');
+                where.textContent = noSummon ? (isIndoor ? 'Indoors' : 'Out of range') : 'In range';
+                where.classList.toggle('off', noSummon);
+                const TIER = { 'ultra-luxury': 'Ultra luxury', 'mid-luxury': 'Mid luxury', 'economy': 'Economy' };
+                const name = i => { const c = G.get(i); return VEHICLE_BRANDS[c.brand]?.models[c.model]?.name || G.getDisplayName(i); };
+                const look = c => carPortraitUrl(c.brand, c.model, c.paintColor, c.underglowColor);
+                const dot = (label, col, glow) => `<span class="cm-dot"><i style="background:${col || 'transparent'};${glow && col ? `box-shadow:0 0 6px ${col}` : ''}"></i>${label}</span>`;
 
-                // Current active car indicator
-                const activeName = game.garage.getDisplayName(game.garage.activeIndex);
-                html += `<div style="font-family:Orbitron,sans-serif; font-size:max(6px, 0.6rem - var(--font-trim)); color:#ff8800; letter-spacing:2px; margin-bottom:4px;">MY GARAGE</div>`;
-                html += `<div style="font-size:max(6px, 0.65rem - var(--font-trim)); color:#888; margin-bottom:12px;">Active: <span style="color:#ddd;">${activeName}</span></div>`;
+                // The active car on its turntable: the portrait, its spec sheet, the summon
+                const a = G.activeIndex, car = G.get(a), brand = VEHICLE_BRANDS[car.brand];
+                let html = `<div class="cm-hero">`;
+                html += `<div class="cm-bay"><img src="${look(car)}" alt=""></div>`;
+                html += `<div class="cm-info"><div class="cm-eyebrow">${car.brand} · ${TIER[brand?.tier] || ''}${car.isDefault ? ' · <em>Yours for good</em>' : ''}</div>`;
+                html += `<div class="cm-name">${name(a)}</div>`;
+                html += `<div class="cm-dots">${dot('Paint', car.paintColor)}${dot('Glow', car.underglowColor, true)}${dot('Lights', car.headlightColor, true)}</div>`;
+                html += carSpecBarsHtml(car.brand, car.model);
+                html += `<button class="cm-summon" data-index="${a}"${noSummon ? ' disabled' : ''}>Summon</button>`;
+                if (noSummon) html += `<div class="cm-note">${isIndoor ? 'Step outside to call it round.' : 'No road out here to bring it to.'}</div>`;
+                html += `</div></div>`;
 
-                for (let i = 0; i < game.garage.count; i++) {
-                    const car = game.garage.get(i);
-                    const isActive = i === game.garage.activeIndex;
-                    const name = game.garage.getDisplayName(i);
-                    const borderCol = isActive ? 'rgba(255,136,0,0.3)' : 'rgba(255,255,255,0.08)';
-
-                    html += `<div style="background:rgba(255,255,255,0.03); border:1px solid ${borderCol}; border-radius:8px; padding:10px; margin-bottom:8px;">`;
-
-                    // Name + color swatch + status
-                    html += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">`;
-                    html += `<div style="display:flex; align-items:center; gap:6px;">`;
-                    html += `<div style="width:14px; height:9px; border-radius:2px; background:${car.paintColor}; border:1px solid rgba(255,255,255,0.15);"></div>`;
-                    html += `<span style="font-family:Orbitron,sans-serif; font-size:max(6px, 0.7rem - var(--font-trim)); color:#ddd; letter-spacing:1px;">${name}</span>`;
-                    if (car.isDefault) html += `<span style="font-size:max(6px, 0.4rem - var(--font-trim)); color:#d4af37; letter-spacing:1px; border:1px solid rgba(212,175,55,0.3); padding:1px 4px; border-radius:2px;">DEFAULT</span>`;
-                    html += `</div>`;
-                    html += `<span style="font-size:max(6px, 0.45rem - var(--font-trim)); color:${isActive ? '#00ff88' : '#555'};">${isActive ? '● ACTIVE' : ''}</span>`;
-                    html += `</div>`;
-
-                    // Action buttons
-                    html += `<div style="display:flex; gap:5px;">`;
-                    if (!isActive) {
-                        html += `<button class="carme-activate" data-index="${i}" style="flex:1; font-family:Orbitron,sans-serif; font-size:max(6px, 0.5rem - var(--font-trim)); letter-spacing:1px; padding:6px; background:rgba(0,255,136,0.08); border:1px solid rgba(0,255,136,0.25); color:#00ff88; border-radius:4px; cursor:pointer;">SET ACTIVE</button>`;
-                    }
-                    html += `<button class="carme-summon" data-index="${i}" style="flex:1; font-family:Orbitron,sans-serif; font-size:max(6px, 0.5rem - var(--font-trim)); letter-spacing:1px; padding:6px; background:rgba(255,136,0,0.1); border:1px solid rgba(255,136,0,0.3); color:#ff8800; border-radius:4px; cursor:pointer;${noSummon ? ' opacity:0.3; pointer-events:none;' : ''}">SUMMON</button>`;
-                    html += `</div>`;
-
+                // The rest of the garage: a tile each
+                html += `<div class="cm-sec"><span>The garage</span><small>${G.count} vehicle${G.count === 1 ? '' : 's'}</small></div><div class="cm-tiles">`;
+                for (let i = 0; i < G.count; i++) {
+                    const c = G.get(i), on = i === a;
+                    html += `<div class="cm-tile${on ? ' on' : ''}"><img src="${look(c)}" alt=""><div class="cm-tile-txt"><b>${name(i)}</b><small>${c.brand}</small></div>`;
+                    html += on ? `<span class="cm-chip">● Active</span>` : `<button class="cm-drive" data-index="${i}">Drive</button>`;
                     html += `</div>`;
                 }
-
-                if (noSummon) {
-                    html += `<div style="font-size:max(6px, 0.6rem - var(--font-trim)); color:#555; text-align:center; margin-top:8px; font-style:italic;">${isIndoor ? 'Cannot summon vehicles indoors.' : 'No road out here to bring it to.'}</div>`;
-                }
-
+                html += `</div>`;
                 container.innerHTML = html;
 
-                // Wire buttons
-                container.querySelectorAll('.carme-activate').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        const idx = parseInt(btn.dataset.index);
-                        game.switchGarageCar(idx);
-                        this.showCarMe(); // Re-render
-                    });
-                });
-
-                container.querySelectorAll('.carme-summon').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        const idx = parseInt(btn.dataset.index);
-                        // Switch to this car if not already active
-                        if (idx !== game.garage.activeIndex) {
-                            game.switchGarageCar(idx);
-                        }
-                        // Summon to player position (the hub only: cars live there)
-                        if (game.activeMap.id !== 'sdc' || (game.isDriving && game.car === game.ownedCar)) return;
-                        Object.assign(game.ownedCar, { x: game.player.x + 50, y: game.player.y, vx: 0, vy: 0, speed: 0 });
-                        game.ownedCar.visible = true;
-                        const name = game.garage.getDisplayName(idx);
-                        showMessage(`${name.toUpperCase()} DELIVERED`);
-                        audioSys.sfx('ui');
-                        this.close();
-                    });
-                });
+                container.querySelectorAll('.cm-drive').forEach(btn => btn.addEventListener('click', () => {
+                    game.switchGarageCar(parseInt(btn.dataset.index));
+                    audioSys.sfx('ui');
+                    this.showCarMe();
+                }));
+                container.querySelectorAll('.cm-summon').forEach(btn => btn.addEventListener('click', () => {
+                    const idx = parseInt(btn.dataset.index);
+                    if (idx !== game.garage.activeIndex) game.switchGarageCar(idx);
+                    // Summon to player position (the hub only: cars live there)
+                    if (game.activeMap.id !== 'sdc' || (game.isDriving && game.car === game.ownedCar)) return;
+                    Object.assign(game.ownedCar, { x: game.player.x + 50, y: game.player.y, vx: 0, vy: 0, speed: 0 });
+                    game.ownedCar.visible = true;
+                    showMessage(`${game.garage.getDisplayName(idx).toUpperCase()} DELIVERED`);
+                    audioSys.sfx('ui');
+                    this.close();
+                }));
             }
         };
        
@@ -82316,7 +82869,7 @@ engineMixin({
             cozy_cafe: { map: 'cozy_cafe_interior', label: 'Cozy Cafe', what: 'Coffee at Cozy Cafe', host: '747',
                 solo: { me: { x: 167, y: 433, a: Math.PI / 2, pose: 'sit' }, them: { x: 309, y: 540, a: Math.PI, pose: 'sit' }, cam: { x: 230, y: 500 }, zoom: 2.9, after: { x: 380, y: 520 } } },
             torque_auto: { map: 'auto_shop', label: 'Torque Auto', what: 'Wraps at Torque Auto', host: 'Victoria',
-                solo: { me: { x: 560, y: 470, a: -0.6, pose: 'arms_crossed' }, them: { x: 640, y: 452, a: -2.4, pose: 'lean' }, cam: { x: 600, y: 440 }, zoom: 2.8, after: { x: 600, y: 520 } } },
+                solo: { me: { x: 470, y: 296, a: -1.2, pose: 'arms_crossed' }, them: { x: 566, y: 288, a: -1.9, pose: 'lean' }, cam: { x: 518, y: 248 }, zoom: 2.8, after: { x: 600, y: 380 } } },   // at the wrap bay
             biggs_park: { map: 'sdc', label: 'Biggs Park', what: 'Cans at Biggs Park', host: 'Yenna', park: { x: 8680, y: 8080, r: 320 },
                 solo: { me: { x: 8650, y: 8100, a: -Math.PI / 2 }, them: { x: 8700, y: 8100, a: -Math.PI / 2, pose: 'arms_crossed' }, cam: { x: 8675, y: 8070 }, zoom: 2.7, after: { x: 8650, y: 8110 } } },
             neural_sys: { map: 'neural_sys_interior', label: 'Neural Systems', what: 'Browsing at Neural Systems', host: 'Josh',

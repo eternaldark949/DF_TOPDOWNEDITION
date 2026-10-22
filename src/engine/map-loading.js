@@ -8,7 +8,7 @@
             house_of_death: ['_houseFloor'], hotel_lobby: ['_lobbyFloor'], church_boss: ['_sanctumFloor'],
             hotel_suite: ['_suiteFloor'], moon_city_nightclub: ['_clubFloor'], demoness_palace: ['_palaceFloor'],
             apt_949: ['_cityView', '_aptFloor'], van_interior: ['_vanCabin'], cozy_cafe_interior: ['_cafeFloor'],
-            neural_sys_interior: ['_neuralFloor'],
+            neural_sys_interior: ['_neuralFloor'], auto_shop: ['_torqueFloor'],
             enni_cole_interior: ['_enniFloor'], enni_cole_upper: ['_enniUpperFloor'],
             keepers_hill: ['_keeperHill', '_keeperHouse', '_keeperParlor'], keepers_parlor: ['_keeperHill', '_keeperHouse', '_keeperParlor']
         };

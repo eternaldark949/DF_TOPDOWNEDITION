@@ -48,7 +48,7 @@
             cozy_cafe: { map: 'cozy_cafe_interior', label: 'Cozy Cafe', what: 'Coffee at Cozy Cafe', host: '747',
                 solo: { me: { x: 167, y: 433, a: Math.PI / 2, pose: 'sit' }, them: { x: 309, y: 540, a: Math.PI, pose: 'sit' }, cam: { x: 230, y: 500 }, zoom: 2.9, after: { x: 380, y: 520 } } },
             torque_auto: { map: 'auto_shop', label: 'Torque Auto', what: 'Wraps at Torque Auto', host: 'Victoria',
-                solo: { me: { x: 560, y: 470, a: -0.6, pose: 'arms_crossed' }, them: { x: 640, y: 452, a: -2.4, pose: 'lean' }, cam: { x: 600, y: 440 }, zoom: 2.8, after: { x: 600, y: 520 } } },
+                solo: { me: { x: 470, y: 296, a: -1.2, pose: 'arms_crossed' }, them: { x: 566, y: 288, a: -1.9, pose: 'lean' }, cam: { x: 518, y: 248 }, zoom: 2.8, after: { x: 600, y: 380 } } },   // at the wrap bay
             biggs_park: { map: 'sdc', label: 'Biggs Park', what: 'Cans at Biggs Park', host: 'Yenna', park: { x: 8680, y: 8080, r: 320 },
                 solo: { me: { x: 8650, y: 8100, a: -Math.PI / 2 }, them: { x: 8700, y: 8100, a: -Math.PI / 2, pose: 'arms_crossed' }, cam: { x: 8675, y: 8070 }, zoom: 2.7, after: { x: 8650, y: 8110 } } },
             neural_sys: { map: 'neural_sys_interior', label: 'Neural Systems', what: 'Browsing at Neural Systems', host: 'Josh',

@@ -2018,6 +2018,7 @@
             if (p.decorType.startsWith('dn_')) return drawLobbyDecorProp(ctx, p);
             if (p.decorType.startsWith('hod_')) return drawHouseDecorProp(ctx, p);
             if (p.decorType.startsWith('ns_')) return drawNeuralDecorProp(ctx,p);
+            if (p.decorType.startsWith('ta_')) return drawTorqueDecorProp(ctx, p);
             if (p.decorType.startsWith('dp_')) return drawPalaceDecorProp(ctx, p);
             if (p.decorType.startsWith('cc_')) return drawCafeDecorProp(ctx, p);
             if (p.decorType.startsWith('ec_')) return drawEnniDecorProp(ctx, p);

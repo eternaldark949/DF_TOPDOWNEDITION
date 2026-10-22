@@ -23,6 +23,7 @@
             enni_cole_upper:     { floor: (g, c) => g.drawEnniUpperInterior(c), glow: (g, c) => g.drawEnniUpperGlow(c) },
             cozy_cafe_interior:  { floor: (g, c) => g.drawCafeInterior(c),    glow: (g, c) => g.drawCafeGlow(c) },     // the hearth, candles, pendants, steam
             neural_sys_interior: { floor: (g,c) => g.drawNeuralInterior(c), glow: (g,c) => g.drawNeuralGlow(c) },
+            auto_shop:           { floor: (g, c) => g.drawTorqueInterior(c),  glow: (g, c) => g.drawTorqueGlow(c) },     // engine/torque-art.js
             demoness_palace:     { floor: (g, c) => g.drawPalaceInterior(c), glow: (g, c) => g.drawPalaceGlow(c) }   // engine/palace-art.js      // engine/reflections.js: its mirror floor gives this back
         };
 
