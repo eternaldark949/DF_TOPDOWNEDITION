@@ -49,7 +49,7 @@
                 solo: { me: { x: 167, y: 433, a: Math.PI / 2, pose: 'sit' }, them: { x: 309, y: 540, a: Math.PI, pose: 'sit' }, cam: { x: 230, y: 500 }, zoom: 2.9, after: { x: 380, y: 520 } } },
             torque_auto: { map: 'auto_shop', label: 'Torque Auto', what: 'Wraps at Torque Auto', host: 'Victoria',
                 solo: { me: { x: 470, y: 296, a: -1.2, pose: 'arms_crossed' }, them: { x: 566, y: 288, a: -1.9, pose: 'lean' }, cam: { x: 518, y: 248 }, zoom: 2.8, after: { x: 600, y: 380 } } },   // at the wrap bay
-            biggs_park: { map: 'sdc', label: 'Biggs Park', what: 'Cans at Biggs Park', host: 'Yenna', park: { x: 8680, y: 8080, r: 320 },
+            biggs_park: { map: 'sdc', label: 'Biggs Park', what: 'Cans at Biggs Park', host: 'Yenna', park: { x: 8680, y: 8080, r: 560 }, inside: 'biggs_arena',
                 solo: { me: { x: 8650, y: 8100, a: -Math.PI / 2 }, them: { x: 8700, y: 8100, a: -Math.PI / 2, pose: 'arms_crossed' }, cam: { x: 8675, y: 8070 }, zoom: 2.7, after: { x: 8650, y: 8110 } } },
             neural_sys: { map: 'neural_sys_interior', label: 'Neural Systems', what: 'Browsing at Neural Systems', host: 'Josh',
                 solo: { me: { x: 470, y: 340, a: -Math.PI / 2 }, them: { x: 530, y: 340, a: -Math.PI / 2, pose: 'arms_crossed' }, cam: { x: 500, y: 310 }, zoom: 2.9, after: { x: 500, y: 400 } } },
@@ -391,14 +391,25 @@
                     }
                     return;
                 }
-                if (now < plan.from || (g.scenes && g.scenes.running) || (g.pauseSystem && g.pauseSystem.tokens && g.pauseSystem.tokens.size)) return;
-                const V = CREW_VENUES[plan.venue];
-                if (g.activeMap.id !== V.map) { this._arrived = 0; return; }
-                if (V.park && (g.isDriving || Math.hypot(g.player.x - V.park.x, g.player.y - V.park.y) > V.park.r)) { this._arrived = 0; return; }
+                if ((g.scenes && g.scenes.running) || (g.pauseSystem && g.pauseSystem.tokens && g.pauseSystem.tokens.size)) return;
+                const V = CREW_VENUES[plan.venue], who = plan.solo ? plan.host : 'The crew';
+                const there = g.activeMap.id === V.map && (!V.park || Math.hypot((g.isDriving && g.car ? g.car.x : g.player.x) - V.park.x, (g.isDriving && g.car ? g.car.y : g.player.y) - V.park.y) <= V.park.r);
+                // Turned up and nothing would happen: say why, once each (too early, still in the car, gone inside)
+                if (now < plan.from) { if (there) this._hint(plan, 'early', `${who} gets here at ${phoneSystem._clock(plan.from)}.`); this._arrived = 0; return; }
+                if (V.inside && g.activeMap.id === V.inside) { this._hint(plan, 'inside', `${who}'s waiting out front.`); this._arrived = 0; return; }
+                if (!there) { this._arrived = 0; return; }
+                if (V.park && g.isDriving) { this._hint(plan, 'car', `${who}'s here. Park and step out.`); this._arrived = 0; return; }
                 if (g.missions && g.missions.activeMission && g.missions.activeMission.type !== 'delivery' && (g.enemies || []).some(e => !e.dead && Math.hypot(e.x - g.player.x, e.y - g.player.y) < 500)) return;
                 if (++this._arrived < 2) return;          // a beat inside the door first
                 this._arrived = 0;
                 this.play(plan);
+            },
+
+            _hint(plan, key, text) {
+                const k = plan.id + key;
+                if (this._hinted === k) return;
+                this._hinted = k;
+                showMessage(text);
             },
 
             play(plan) {
@@ -595,6 +606,11 @@
                     }
                 }
                 return _crewBaseFeed.call(this);
+            },
+            /** A crew pin waits while a plan's on: sent now it would be a bare pin, with no night behind it */
+            crewPinWaits(e) {
+                const S = CrewNights.state();
+                return !!(CREW_IDS[e.who] && S.plan && (S.plan.state === 'open' || S.plan.state === 'yes'));
             },
             /** One of the crew's place pins from the feed becomes an invite to their place */
             crewPlanFromPin(e) {

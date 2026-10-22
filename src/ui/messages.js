@@ -1190,7 +1190,7 @@
                     const b = opts[Math.floor(Math.random() * opts.length)];
                     if (b && this.sendBrief(b.who, b.type, b.text)) return b;
                 }
-                const left = MSG_FEED.filter(e => !this.feed.done[e.id] && (!e.needs || e.needs(g)));
+                const left = MSG_FEED.filter(e => !this.feed.done[e.id] && (!e.needs || e.needs(g)) && !(e.kind === 'pin' && this.crewPinWaits && this.crewPinWaits(e)));
                 if (!left.length) return null;
                 const e = left[Math.floor(Math.random() * left.length)];
                 this.feed.done[e.id] = 1;
