@@ -482,7 +482,8 @@
                    (WALL_BOUNCE_FACTOR); the free axis keeps most of its speed
                    (WALL_SLIDE_FRICTION) so a glancing hit scrapes along a wall
                    instead of stopping the car dead and throwing it backwards. */
-                WALL_SLIDE_FRICTION: 0.88,      // Tangential velocity retained when sliding
+                WALL_SLIDE_FRICTION: 0.88,      // Tangential velocity retained when sliding (parked cars)
+                WALL_MU: 0.2,                   // Friction along a wall at the point of contact (PhysicsSystem.impulseAt)
                 WALL_PUSHOUT: 1.5               // Separation nudge, in units of post-hit velocity
             },
 
@@ -530,13 +531,10 @@
                 PEDAL_IN: 0.17,                 // Throttle travel per tick (about 0.2 s to the floor)
                 PEDAL_BRAKE_IN: 0.4,            // The brake bites over a few ticks
                 PEDAL_OUT: 0.3,                 // Lifting off
-                YAW_MAX: 0.13,                  // rad/tick, however wild the slide
-                OVERSTEER_COUPLE: 0.1,          // Rear/front grip imbalance (px/tick²) → yaw-rate offset
                 LOAD_FWD_GRIP: 0.3,             // Front grip gained per unit of forward load…
                 LOAD_REAR_GRIP: 0.55,           // …and rear grip lost
                 LOAD_RATE: 0.14,                // How fast the load shifts (÷ brand weight)
                 HANDBRAKE_REAR_GRIP: 0.3,       // Rear grip while the handbrake's up
-                HANDBRAKE_SWING: 2.5,           // …and the tail swings this much harder
                 HANDBRAKE_DECEL: 0.07,          // px/tick² scrubbed by locked rear wheels
                 REVERSE_BELOW: 0.5,             // Pull-back only reverses under this speed
                 CAM_LOOK_AHEAD: { PER_SPEED: 13, TAU_MS: 700 },   // camera leads by velocity × this (engine/draw.js)
@@ -544,7 +542,17 @@
                 STICK_YAW_DAMP: 5,
                 STICK_LIGHT_LOCK: 0.35,         // Precise Stick: wheel lock at the lightest push…
                 STICK_FULL_LOCK_PUSH: 0.6,      // …growing to full lock by this shaped push (about two-thirds out)
-                IMPACT_YAW: 0.9,                // Twist from an off-centre knock (onImpact)              // Touch stick unwinds by this × yawRate (no overshoot)
+                // Rigid body (PhysicsSystem.impulseAt, the TYRES in applyDrivePhysics)
+                SPIN_INERTIA: 1,                // × a plain box's inertia (m(L²+W²)/12): higher, a hit turns the car less
+                YAW_SPIN_MAX: 0.3,              // rad/tick, the fastest any car spins
+                AXLE_FROM_CENTRE: 0.33,         // Each axle sits this × length ahead of / behind the centre
+                TYRE_STIFF: 0.22,               // How much of an axle's sideways slide its tyres take out per tick (front × the brand's turnIn)
+                WHEEL_LOCK: 1.1,                // Most the front wheels turn (rad)
+                KNOCK_MIN_HIT: 1.5,             // Traffic on traffic: closing speed (px/tick) below this doesn't spin them
+                KNOCK_SPIN_DECAY: 0.88,         // Traffic: spin kept per tick after a knock (its tyres scrub it)
+                PARKED_SCRUB: 0.85,             // A shunted parked car: speed and spin kept per tick on locked wheels…
+                PARKED_HOLD: 0.6,               // …after this much speed (px/tick) is taken off first: a brush doesn't move it
+                PARKED_HOLD_SPIN: 0.01,         // …and this much spin (rad/tick)
                 COAST_DRAG: 0.3                 // Extra off-throttle drag per unit of (1 - friction)
             }
         });

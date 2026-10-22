@@ -555,7 +555,7 @@
                     
                     // Disable autodrive if it was following nav
                     if (this.isDriving && this.car && this.car.controlMode === 'AI') {
-                        this.car.vx = this.car.vy = this.car.speed = 0;
+                        this.car.vx = this.car.vy = this.car.speed = this.car.yawRate = this.car.spin = 0;
                         this.car.disableAutoDrive();
                         this.autodriveBtn.classList.remove('engaged');
                     }
