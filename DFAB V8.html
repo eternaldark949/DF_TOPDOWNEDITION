@@ -40656,9 +40656,13 @@ class NeuralSystemsBuilding extends BuildingV2 {
            paint shaded across its curve, a glass greenhouse (windshield, side
            glass, rear glass) under the roof, mirrors, lamp housings, and each
            brand's character:
-             LADY BlackMark  deep lacquer, a gold pinstripe, gold rims; the V1's
-                             pearl hearse cap with a gold crescent; the V3's
-                             panoramic black-glass roof
+             LADY BlackMark  deep lacquer, a gold pinstripe, gold rims; the V1 is a
+                             coach from ETERNAL's blueprint: swelling fenders over
+                             each wheel, a long hood with a spine to the silver
+                             ornament on the nose, round headlights in the fenders,
+                             chrome bumpers and grille, four round tail lights on
+                             the red bar, the pearl cap with a gold crescent; the
+                             V3's panoramic black-glass roof
              Zenxera         a faceted wedge: lit and shaded facets on the hood,
                              a cyan line down each flank, LED slits
              Gelfash         honest boxes: black bumpers, roof rails, a pickup bed
@@ -40674,10 +40678,12 @@ class NeuralSystemsBuilding extends BuildingV2 {
             // windshield base, roof front, roof back, rear glass end
             CABIN: {
                 sedan: [0.30, 0.43, 0.70, 0.81], suv: [0.24, 0.35, 0.86, 0.94], suv2: [0.27, 0.38, 0.82, 0.91],
-                sports: [0.38, 0.52, 0.72, 0.84], truck: [0.17, 0.27, 0.41, 0.45], hearse: [0.22, 0.32, 0.93, 0.97]
+                sports: [0.38, 0.52, 0.72, 0.84], truck: [0.17, 0.27, 0.41, 0.45], hearse: [0.27, 0.37, 0.88, 0.9]
             },
             GLOSS: { blackmark: 1.5, angular: 1.1, boxy: 0.8, sleek: 1 },
-            GOLD: '#d9bf86',
+            GOLD: '#d9bf86', SILVER: '#dfe3ea',
+            // The V1 coach's outline: half-widths (of W/2) at the nose, the tail and the waist between the fenders
+            COACH: { nose: 0.62, tail: 0.66, waist: 0.84 },
             WHEEL_LOCK: 0.5,        // drawn front-wheel angle at full steer (rad)
             ROLL_PX: 1.8,           // body shift out of a turn at full lean
             PITCH_PX: 1.1           // body shift forward under full braking
@@ -40708,7 +40714,8 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 const pts = [[L / 2, -W * 0.26], [L / 2 - 9, -W / 2], [-L / 2 + 6, -W / 2 + 1], [-L / 2, -W / 2 + 7],
                              [-L / 2, W / 2 - 7], [-L / 2 + 6, W / 2 - 1], [L / 2 - 9, W / 2], [L / 2, W * 0.26]];
                 pts.forEach((p, i) => i ? body.lineTo(p[0], p[1]) : body.moveTo(p[0], p[1])); body.closePath();
-            } else if (st === 'blackmark') body.roundRect(-L / 2, -W / 2, L, W, [6, 11, 11, 6]);
+            } else if (hearse) _coachPath(body, L, W);
+            else if (st === 'blackmark') body.roundRect(-L / 2, -W / 2, L, W, [6, 11, 11, 6]);
             else body.roundRect(-L / 2, -W / 2, L, W, [4, 7, 7, 4]);
             const si = W * 0.13;                                            // glass sits this far in from the flanks
             return (v._carGeo = {
@@ -40717,6 +40724,41 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 axleF: L / 2 - L * 0.21, axleR: -L / 2 + L * 0.2
             });
         }
+
+        /** The V1 coach: an oval pinched at the waist, the fenders swelling out over each axle, nose and tail rounded. */
+        function _coachPath(p, L, W) {
+            const C = CAR_ART.COACH, h = W / 2, nose = C.nose * h, tail = C.tail * h, waist = C.waist * h;
+            const fF = L / 2 - L * 0.21, fR = -L / 2 + L * 0.2;
+            p.moveTo(L / 2, 0);
+            p.bezierCurveTo(L / 2, -nose * 0.9, L / 2 - 3, -nose, fF + L * 0.12, -h * 0.94);         // the near flank, nose to tail
+            p.bezierCurveTo(fF + L * 0.04, -h, fF - L * 0.06, -h, fF - L * 0.13, -waist);
+            p.bezierCurveTo(0, -waist * 0.99, fR + L * 0.16, -waist, fR + L * 0.11, -h * 0.97);
+            p.bezierCurveTo(fR + L * 0.03, -h, fR - L * 0.08, -h, -L / 2 + 5, -tail);
+            p.bezierCurveTo(-L / 2, -tail * 0.7, -L / 2, -tail * 0.3, -L / 2, 0);
+            p.bezierCurveTo(-L / 2, tail * 0.3, -L / 2, tail * 0.7, -L / 2 + 5, tail);                // the far flank, tail to nose
+            p.bezierCurveTo(fR - L * 0.08, h, fR + L * 0.03, h, fR + L * 0.11, h * 0.97);
+            p.bezierCurveTo(fR + L * 0.16, waist, 0, waist * 0.99, fF - L * 0.13, waist);
+            p.bezierCurveTo(fF - L * 0.06, h, fF + L * 0.04, h, fF + L * 0.12, h * 0.94);
+            p.bezierCurveTo(L / 2 - 3, nose, L / 2, nose * 0.9, L / 2, 0);
+            p.closePath();
+        }
+
+        /** The LADY ornament on the V1's nose: a silver figure seen from above, leaning into the wind, arms swept back, her dress trailing. */
+        function _ladyOrnament(c, x) {
+            c.save(); c.translate(x, 0);
+            const g = c.createLinearGradient(0, -3, 0, 3);
+            g.addColorStop(0, '#ffffff'); g.addColorStop(0.45, CAR_ART.SILVER); g.addColorStop(1, '#7d838e');
+            c.fillStyle = 'rgba(20, 18, 28, 0.45)'; c.beginPath(); c.ellipse(-1.5, 0.5, 3.6, 2.2, 0, 0, Math.PI * 2); c.fill();
+            c.fillStyle = g;
+            for (const s of [-1, 1]) { c.beginPath(); c.moveTo(1.4, s * 0.5); c.quadraticCurveTo(-0.6, s * 1.4, -2.8, s * 3.3); c.quadraticCurveTo(-1.6, s * 1.1, -0.2, s * 0.2); c.closePath(); c.fill(); }
+            c.beginPath(); c.moveTo(1.6, 0); c.quadraticCurveTo(0.6, -1.1, -1.6, -0.9); c.quadraticCurveTo(-3.6, -0.6, -4.6, -1.4); c.quadraticCurveTo(-3.8, 0, -4.6, 1.4);
+            c.quadraticCurveTo(-3.6, 0.6, -1.6, 0.9); c.quadraticCurveTo(0.6, 1.1, 1.6, 0); c.fill();
+            c.beginPath(); c.arc(2.1, 0, 0.85, 0, Math.PI * 2); c.fill();
+            c.fillStyle = '#ffffff'; c.globalAlpha = 0.9; c.beginPath(); c.arc(2.3, -0.3, 0.3, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1;
+            c.restore();
+        }
+        /** Where the V1's round lamps sit (car frame): headlights in the front fenders, two tail lights each side */
+        const coachLamps = (L, W) => ({ head: { x: L / 2 - L * 0.085, y: W / 2 * 0.5, r: 2.6 }, tail: [0.26, 0.5].map(k => ({ x: -L / 2 + L * 0.06, y: W / 2 * k, r: 1.9 })) });
 
         /** The body sprite (painted once per look). */
         function carSprite(v) {
@@ -40754,7 +40796,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
             const { L, W, st, si, x0, x1, x2, x3 } = g, col = _carRGB(v.color);
             const lum = (col[0] * 0.3 + col[1] * 0.59 + col[2] * 0.11) / 255;
             const lady = st === 'blackmark', zen = st === 'angular', gel = !lady && !zen;
-            const truck = v.model === 'truck';
+            const truck = v.model === 'truck', coach = g.hearse, h = W / 2;
             // Contact shadow: soft, a little wider than the car
             c.save(); c.filter = 'blur(3px)'; c.fillStyle = 'rgba(8, 4, 16, 0.55)';
             c.beginPath(); c.roundRect(-L / 2 - 1, -W / 2 - 1, L + 2, W + 2, 8); c.fill(); c.restore();
@@ -40765,9 +40807,10 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 c.fillStyle = rim; c.globalAlpha = 0.85; c.fillRect(ax - tyreL * 0.28, s * (W / 2 + 0.9) - 0.5, tyreL * 0.56, 1); c.globalAlpha = 1;
             }
             // Mirrors, at the windshield base
+            const mw = coach ? CAR_ART.COACH.waist * h + (1 - CAR_ART.COACH.waist) * h * 0.6 : h;   // the coach's sit on its waist
             for (const s of [-1, 1]) {
-                c.fillStyle = _carMix(col, -0.35); c.beginPath(); c.roundRect(x0 - 3, s > 0 ? W / 2 - 1 : -W / 2 - 2.6, 4.5, 3.6, 1.2); c.fill();
-                c.fillStyle = 'rgba(210, 200, 240, 0.35)'; c.fillRect(x0 - 2.4, s > 0 ? W / 2 + 1.6 : -W / 2 - 2.2, 3.2, 0.7);
+                c.fillStyle = _carMix(col, -0.35); c.beginPath(); c.roundRect(x0 - 3, s > 0 ? mw - 1 : -mw - 2.6, 4.5, 3.6, 1.2); c.fill();
+                c.fillStyle = coach ? CAR_ART.SILVER : 'rgba(210, 200, 240, 0.35)'; c.fillRect(x0 - 2.4, s > 0 ? mw + 1.6 : -mw - 2.2, 3.2, 0.7);
             }
             // Paint, shaded round the body's curve
             c.save(); c.clip(g.body);
@@ -40795,6 +40838,21 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 c.beginPath(); c.moveTo(L / 2, W * 0.26); c.lineTo(x0, W / 2 - si); c.lineTo(x0, 0); c.lineTo(L / 2 - 2, 0); c.closePath(); c.fill();
                 c.fillStyle = 'rgba(0,0,0,0.14)';                          // the tail's facets
                 c.beginPath(); c.moveTo(x3, -W / 2 + si); c.lineTo(-L / 2, -W / 2 + 7); c.lineTo(-L / 2, 0); c.lineTo(x3, 0); c.closePath(); c.fill();
+            } else if (coach) {
+                // The fenders: light on each swell, a seam where it meets the body
+                for (const ax of [g.axleF, g.axleR]) for (const s of [-1, 1]) {
+                    const a = c.createRadialGradient(ax, s * h * 0.8, 1, ax, s * h * 0.8, 13);
+                    a.addColorStop(0, 'rgba(255,255,255,0.16)'); a.addColorStop(1, 'rgba(255,255,255,0)');
+                    c.fillStyle = a; c.fillRect(ax - 14, s * h - 14, 28, 28);
+                    c.lineWidth = 0.8;
+                    c.strokeStyle = 'rgba(0,0,0,0.5)'; c.beginPath(); c.ellipse(ax, s * h, 12.5, 0.36 * h, 0, s > 0 ? Math.PI * 1.08 : 0.08, s > 0 ? Math.PI * 1.92 : Math.PI * 0.92); c.stroke();
+                    c.strokeStyle = 'rgba(255,255,255,0.12)'; c.beginPath(); c.ellipse(ax, s * h, 12.5, 0.36 * h - 0.8, 0, s > 0 ? Math.PI * 1.1 : 0.1, s > 0 ? Math.PI * 1.9 : Math.PI * 0.9); c.stroke();
+                }
+                // The hood: a raised spine to the ornament, the panel lines either side
+                c.strokeStyle = 'rgba(255,255,255,0.22)'; c.lineWidth = 1.1; c.beginPath(); c.moveTo(x0, 0); c.lineTo(L / 2 - 4, 0); c.stroke();
+                c.strokeStyle = CAR_ART.SILVER; c.globalAlpha = 0.75; c.lineWidth = 0.6; c.beginPath(); c.moveTo(x0, -0.6); c.lineTo(L / 2 - 4, -0.6); c.stroke(); c.globalAlpha = 1;
+                c.strokeStyle = 'rgba(0,0,0,0.25)'; c.lineWidth = 0.8;
+                for (const s of [-1, 1]) { c.beginPath(); c.moveTo(L / 2 - 6, s * h * 0.42); c.quadraticCurveTo(x0 + 8, s * h * 0.5, x0 + 1, s * h * 0.56); c.stroke(); }
             } else if (!truck) {
                 c.strokeStyle = 'rgba(0,0,0,0.18)'; c.lineWidth = 0.8;
                 for (const s of [-1, 1]) { c.beginPath(); c.moveTo(L / 2 - 3, s * W * 0.2); c.lineTo(x0 + 1, s * W * 0.24); c.stroke(); }
@@ -40805,6 +40863,17 @@ class NeuralSystemsBuilding extends BuildingV2 {
             // Shoulder light and a crisp edge
             c.save(); c.scale((L - 3) / L, (W - 3) / W); c.strokeStyle = 'rgba(255,255,255,0.13)'; c.lineWidth = 0.9; c.stroke(g.body); c.restore();
             if (lady) { c.save(); c.scale((L - 6) / L, (W - 6) / W); c.strokeStyle = CAR_ART.GOLD; c.globalAlpha = 0.8; c.lineWidth = 0.7; c.stroke(g.body); c.restore(); }
+            if (coach) {                                                       // chrome bumpers wrapping nose and tail, the grille between the headlights
+                c.save(); c.clip(g.body);
+                for (const [bx, d, k] of [[L / 2, 1, CAR_ART.COACH.nose], [-L / 2, -1, CAR_ART.COACH.tail]]) {
+                    const ch = c.createLinearGradient(bx - d * 3, 0, bx, 0);
+                    ch.addColorStop(0, '#6f7480'); ch.addColorStop(0.5, '#eef1f6'); ch.addColorStop(1, '#9aa0aa');
+                    c.fillStyle = ch; c.beginPath(); c.ellipse(bx, 0, 3.2, h * k * 0.98, 0, 0, Math.PI * 2); c.fill();
+                }
+                c.fillStyle = '#2a2730'; c.fillRect(L / 2 - 3.6, -5, 1.6, 10);
+                c.fillStyle = '#c9ced6'; for (let i = -4; i <= 4; i += 2) c.fillRect(L / 2 - 3.6, i - 0.3, 1.6, 0.6);
+                c.restore();
+            }
             if (zen) {                                                         // the cyan line down each flank
                 c.strokeStyle = v.glowColor || '#00f3ff'; c.globalAlpha = 0.75; c.lineWidth = 0.9;
                 for (const s of [-1, 1]) { c.beginPath(); c.moveTo(L / 2 - 10, s * (W / 2 - 1.8)); c.lineTo(-L / 2 + 8, s * (W / 2 - 2.6)); c.stroke(); }
@@ -40821,7 +40890,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 }
             }
             // The greenhouse: glass under the roof
-            const gw = W / 2 - si, glass = c.createLinearGradient(x0, 0, x3, 0);
+            const gw = coach ? Math.min(W / 2 - si, CAR_ART.COACH.waist * h - 3.5) : W / 2 - si, glass = c.createLinearGradient(x0, 0, x3, 0);
             glass.addColorStop(0, '#1d1a3a'); glass.addColorStop(0.2, '#0b0916'); glass.addColorStop(1, '#100d20');
             c.fillStyle = glass;
             c.beginPath(); c.moveTo(x0, -gw); c.lineTo(x1, -gw + 1); c.lineTo(x2, -gw + 1); c.lineTo(x3, -gw + 2.5);
@@ -40838,9 +40907,10 @@ class NeuralSystemsBuilding extends BuildingV2 {
             if (g.hearse) {                                                   // pearl hearse cap to the tail
                 const pr = c.createLinearGradient(0, -rw, 0, rw);
                 pr.addColorStop(0, '#8d80a6'); pr.addColorStop(0.45, '#c8bdd6'); pr.addColorStop(1, '#7c6f98');
-                c.fillStyle = pr; c.beginPath(); c.roundRect(-L / 2 + 4, -rw, x1 - (-L / 2 + 4), rw * 2, [4, 3, 3, 4]); c.fill();
+                const cb = -L / 2 + (coach ? 9 : 4);                            // (clear of the coach's tail lights)
+                c.fillStyle = pr; c.beginPath(); c.roundRect(cb, -rw, x1 - cb, rw * 2, [4, 3, 3, 4]); c.fill();
                 c.strokeStyle = CAR_ART.GOLD; c.lineWidth = 0.7; c.stroke();
-                const mx = (-L / 2 + 4 + x1) / 2 - 6;                         // a gold crescent, the house's mark
+                const mx = (cb + x1) / 2 - 6;                         // a gold crescent, the house's mark
                 c.fillStyle = CAR_ART.GOLD; c.beginPath(); c.arc(mx, 0, 3.4, 0, Math.PI * 2); c.arc(mx + 1.6, -0.6, 2.9, 0, Math.PI * 2, true); c.fill('evenodd');
             } else if (lady) {                                                // panoramic black glass, gold-framed
                 const pg = c.createLinearGradient(rx1, -rw, rx0, rw);
@@ -40872,16 +40942,27 @@ class NeuralSystemsBuilding extends BuildingV2 {
             }
             // Lamp housings (the lamps themselves are live: drawCarLamps)
             c.fillStyle = '#17131f';
+            if (coach) {                                                      // round lamps: headlights ringed in silver, two tail lights a side
+                const Lp = coachLamps(L, W);
+                for (const s of [-1, 1]) {
+                    c.fillStyle = '#17131f'; c.beginPath(); c.arc(Lp.head.x, s * Lp.head.y, Lp.head.r + 1, 0, Math.PI * 2); c.fill();
+                    c.strokeStyle = CAR_ART.SILVER; c.lineWidth = 0.6; c.stroke();
+                    for (const t of Lp.tail) { c.fillStyle = '#17131f'; c.beginPath(); c.arc(t.x, s * t.y, t.r + 0.6, 0, Math.PI * 2); c.fill(); }
+                }
+                c.fillStyle = '#2a060e'; c.beginPath(); c.roundRect(-L / 2 + 1.4, -h * 0.36, 2, h * 0.72, 1); c.fill();
+            } else
             for (const s of [-1, 1]) {
                 if (zen) { c.beginPath(); c.moveTo(L / 2 - 1, s * W * 0.27); c.lineTo(L / 2 - 8.5, s * (W / 2 - 0.8)); c.lineTo(L / 2 - 10, s * (W / 2 - 3)); c.lineTo(L / 2 - 3, s * W * 0.22); c.closePath(); c.fill(); }
                 else if (lady) c.fillRect(L / 2 - 2.6, s > 0 ? W / 2 - 12 : -W / 2 + 2.5, 2.2, 9.5);
                 else { c.beginPath(); c.roundRect(L / 2 - 4, s > 0 ? W / 2 - 10.5 : -W / 2 + 2, 3.4, 8.5, 1.5); c.fill(); }
             }
             c.fillStyle = '#2a060e';
-            if (lady) c.fillRect(-L / 2 + 0.5, -W / 2 + 4, 2.2, W - 8);            // a full-width light bar
+            if (coach) { /* the bar's drawn with the round lamps */ }
+            else if (lady) c.fillRect(-L / 2 + 0.5, -W / 2 + 4, 2.2, W - 8);            // a full-width light bar
             else for (const s of [-1, 1]) c.fillRect(-L / 2 + 0.4, s > 0 ? W / 2 - 11.5 : -W / 2 + 1.5, 3, 10);
             // The outline
             c.strokeStyle = 'rgba(6, 3, 12, 0.7)'; c.lineWidth = 0.9; c.stroke(g.body);
+            if (coach) _ladyOrnament(c, L / 2 + 1.2);
         }
 
         /** Stamp the body, then the light sliding over it. */
@@ -41023,13 +41104,18 @@ class NeuralSystemsBuilding extends BuildingV2 {
             }
             const rev = v.state === 'REVERSING', brake = on && (v.speed < 0.5 || rev);
             ctx.fillStyle = rev ? '#f4f0ff' : brake ? '#ff2244' : on ? '#9a1028' : '#4a0a16';
-            if (g.st === 'blackmark') ctx.fillRect(-L / 2 + 0.6, -W / 2 + 4.5, 1.8, W - 9);
+            if (g.hearse) {
+                const Lp = coachLamps(L, W);
+                ctx.beginPath(); ctx.roundRect(-L / 2 + 1.6, -W / 2 * 0.34, 1.6, W * 0.34, 0.8); ctx.fill();
+                for (const s of [-1, 1]) for (const t of Lp.tail) { ctx.beginPath(); ctx.arc(t.x, s * t.y, t.r, 0, Math.PI * 2); ctx.fill(); }
+            } else if (g.st === 'blackmark') ctx.fillRect(-L / 2 + 0.6, -W / 2 + 4.5, 1.8, W - 9);
             else for (const s of [-1, 1]) ctx.fillRect(-L / 2 + 0.6, s > 0 ? W / 2 - 11 : -W / 2 + 2, 2.4, 9);
             if (brake && !farLOD) { ctx.globalAlpha = 0.35; for (const s of [-1, 1]) drawGlow(ctx, -L / 2, s * (W / 2 - 6), 8, rev ? '#ffffff' : '#ff2244'); ctx.globalAlpha = 1; }
             const hl = v.headlightColor || '#ffffaa';
             ctx.fillStyle = on ? hl : _carMix(_carRGB(hl), -0.55);
             for (const s of [-1, 1]) {
                 if (g.st === 'angular') { ctx.save(); ctx.translate(L / 2 - 5, s * (W / 2 - 4.5)); ctx.rotate(s * -0.75); ctx.fillRect(-3.5, -0.8, 7, 1.6); ctx.restore(); }
+                else if (g.hearse) { const H = coachLamps(L, W).head; ctx.beginPath(); ctx.arc(H.x, s * H.y, H.r, 0, Math.PI * 2); ctx.fill(); }
                 else if (g.st === 'blackmark') ctx.fillRect(L / 2 - 2, s > 0 ? W / 2 - 11 : -W / 2 + 3, 1.6, 8);
                 else { ctx.beginPath(); ctx.roundRect(L / 2 - 3.4, s > 0 ? W / 2 - 9.5 : -W / 2 + 3, 2.4, 6.5, 1); ctx.fill(); }
             }
@@ -41043,10 +41129,11 @@ class NeuralSystemsBuilding extends BuildingV2 {
             const rev = v.state === 'REVERSING', brake = v.speed < 0.5 || rev;
             ctx.save(); ctx.translate(v.x, v.y); ctx.rotate(v.angle); ctx.globalCompositeOperation = 'lighter';
             ctx.globalAlpha = a * (brake ? 0.8 : 0.38);
-            for (const s of [-1, 1]) drawGlow(ctx, -L / 2 + 1, s * (W / 2 - 6), brake ? 15 : 10, rev ? '#fff4f8' : '#ff2848');
+            const tY = g.hearse ? W / 2 * 0.38 : W / 2 - 6, hY = g.hearse ? W / 2 * 0.5 : W / 2 - 6;   // the coach's lamps sit further in
+            for (const s of [-1, 1]) drawGlow(ctx, -L / 2 + 1, s * tY, brake ? 15 : 10, rev ? '#fff4f8' : '#ff2848');
             if (v._lod === 1) { ctx.restore(); return; }                   // far away: just the tail lights
             ctx.globalAlpha = a * 0.5;
-            for (const s of [-1, 1]) drawGlow(ctx, L / 2 - 1, s * (W / 2 - 6), 10, v.headlightColor || '#ffffaa');
+            for (const s of [-1, 1]) drawGlow(ctx, L / 2 - (g.hearse ? L * 0.06 : 1), s * hY, 10, v.headlightColor || '#ffffaa');
             if (v.turnSignal && v.turnSignalTimer > 0 && Math.floor(v.turnSignalTimer / 10) % 2 === 0) {
                 const s = v.turnSignal === 'left' ? -1 : 1; ctx.globalAlpha = a * 0.8;
                 drawGlow(ctx, L / 2 - 3, s * (W / 2 - 2), 10, '#ffaa00'); drawGlow(ctx, -L / 2 + 2, s * (W / 2 - 2), 10, '#ffaa00');
