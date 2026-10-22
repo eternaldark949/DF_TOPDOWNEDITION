@@ -47,7 +47,11 @@
             { name: 'Larissa', role: 'Handler', messages: ['Your assignment particulars are with Mirabel. Please coordinate with her directly.', 'The Empereal Lord remains pleased with your work.'] },
         ];
 
-        /** Places a pin or a photo can be from: the hub building (by id) and how a photo there looks */
+        /** What the people met in the city are, in the inbox (anyone else is a 'Contact') */
+        const MSG_ROLES = { 'Barista Ren': 'Cozy Cafe', 'Bartender': 'Moon City', 'Anavia': 'Enni Cole', 'Torque': 'Torque Auto', 'Prisma': 'Neural Systems' };
+
+        /** Places a pin or a photo can be from: the hub building (by id) and how a photo there looks.
+         *  A pin can also carry a spot of its own, { x, y, label, kind } (a job's drop-off or a mark's corner). */
         const MSG_PLACES = {
             moon_city:     { label: 'Moon City Nightclub', kind: 'Nightclub', x: 5075, y: 5155, w: 600, h: 500, look: 'club',   tint: ['#2a0638', '#0a0214'], glow: ['#ff2a8a', '#8a3cff', '#28d8ff'] },
             cozy_cafe:     { label: 'Cozy Cafe',           kind: 'Café',      x: 4715, y: 1835, w: 350, h: 350, look: 'cafe',   tint: ['#3a1a0c', '#140804'], glow: ['#ffb45a', '#ff8a3c', '#ffe0a0'] },
@@ -220,7 +224,7 @@
                 const defs = MSG_CONTACTS.map(c => ({ ...c }));
                 const add = (name) => {
                     if (!name || name === '949' || defs.some(c => c.name === name)) return;
-                    defs.push({ name, role: 'Contact' });
+                    defs.push({ name, role: MSG_ROLES[name] || 'Contact' });
                 };
                 this.metNPCs.forEach(add);
                 Object.keys(this.messageHistory).forEach(n => { if (this.messageHistory[n].length) add(n); });
@@ -254,7 +258,7 @@
                 if (!rec) return 'No messages yet';
                 const who = rec.from === 'me' ? 'You: ' : rec.who ? `${rec.who}: ` : '';
                 const d = rec.data || {};
-                const body = rec.kind === 'pin' ? `📍 ${(MSG_PLACES[d.place] || {}).label || 'A location'}`
+                const body = rec.kind === 'pin' ? `📍 ${(this._place(d.place) || {}).label || 'A location'}`
                     : rec.kind === 'brief' ? `✦ Job · ${this._jobTitle(d.mission)}`
                     : rec.kind === 'voice' ? '🎙 Voice note'
                     : rec.kind === 'snap' ? '📷 Photo'
@@ -677,7 +681,14 @@
             },
 
             /* ───────────────────────── location drops ───────────────────────── */
+            /** A pin's key (a place's id, or its spot) */
+            _pinKey(id) { return id && typeof id === 'object' ? `${Math.round(id.x)},${Math.round(id.y)}` : id; },
             _place(id) {
+                if (id && typeof id === 'object') {                                  // a spot of its own: the point is the pin
+                    if (typeof id.x !== 'number' || typeof id.y !== 'number') return null;
+                    return { label: id.label || 'A location', kind: id.kind || 'Pinned spot', look: 'street', tint: ['#14102a', '#05040c'], glow: ['#e8c27a', '#ff9a4a', '#8a6aff'],
+                             id, x: id.x - 150, y: id.y - 330, w: 300, h: 300, tx: id.x, ty: id.y };
+                }
                 const P = MSG_PLACES[id];
                 if (!P) return null;
                 // The live building wins over the table (a map edit moves the pin with it)
@@ -703,7 +714,7 @@
                 const b = document.createElement('b'); b.textContent = P.label;
                 const s = document.createElement('small');
                 const set = game && game.navDestination && P.tx != null && Math.hypot(game.navDestination.x - P.tx, game.navDestination.y - P.ty) < 4;
-                s.textContent = set ? 'Waypoint set' : this.feed.pendingPin === d.place ? 'Waypoint saved for the city' : P.kind;
+                s.textContent = set ? 'Waypoint set' : this._pinKey(this.feed.pendingPin) === this._pinKey(d.place) ? 'Waypoint saved for the city' : P.kind;
                 t.append(b, s);
                 const btn = document.createElement('button');
                 btn.className = 'mb-btn';
@@ -720,7 +731,7 @@
             _pinMap(id) {
                 const g = typeof game !== 'undefined' && game, M = g && g.activeMap;
                 if (!M || M.id !== 'hub_949' || typeof MapArt === 'undefined') return null;
-                const key = id + '|' + M.id;
+                const key = this._pinKey(id) + '|' + M.id;
                 if (this._mapCache.has(key)) return this._mapCache.get(key);
                 const P = this._place(id);
                 if (!P) return null;
@@ -767,14 +778,14 @@
             },
             /** A contact drops a pin (the story uses this for Mirabel's lounge) */
             dropPin(name, place, text, delay = 1600) {
-                this.sendText(name, text, true, delay, { kind: 'pin', id: `pin_${place}_${this._now()}`, data: { place } });
+                this.sendText(name, text, true, delay, { kind: 'pin', id: `pin_${this._pinKey(place)}_${this._now()}`, data: { place } });
             },
 
             /* ───────────────────────── mission briefs ───────────────────────── */
             _jobTitle(m) {
                 if (!m) return 'A job';
                 if (m.type === 'bounty') return m.targetName || 'Bounty';
-                if (m.type === 'delivery') return `Delivery to ${m.targetLabel || 'the apartments'}`;
+                if (m.type === 'delivery') return `To ${m.targetLabel || 'the apartments'}`;
                 return String(m.title || 'Salvage').replace(/^SALVAGE: /, '').toLowerCase().replace(/(^|\s)\S/g, s => s.toUpperCase());
             },
             _briefCard(rec) {
@@ -785,6 +796,8 @@
                 k.textContent = `Job · ${m.type === 'bounty' ? 'Bounty' : m.type === 'delivery' ? 'Delivery' : 'Salvage'}`;
                 const b = document.createElement('b'); b.textContent = this._jobTitle(m);
                 const p = document.createElement('p'); p.textContent = m.description || '';
+                if (m.type === 'delivery' && m.handed) p.textContent += ' · Courier brings the box to you';
+                if (m.type === 'delivery' && m.km) p.textContent += ` · ${(m.km / 1000).toFixed(1)} km`;
                 const row = document.createElement('div'); row.className = 'row';
                 const pay = document.createElement('span'); pay.textContent = `${m.reward || 0} PP · ${m.scrapReward || 0} scrap`;
                 row.appendChild(pay);
@@ -801,7 +814,23 @@
                     card.classList.add(d.state);
                 }
                 card.append(k, b, p, row);
+                // Where it is: the same map crop a pin gets, with its own pin
+                const spot = this._jobSpot(m), url = spot && this._pinMap(spot);
+                if (url) {
+                    const map = document.createElement('div');
+                    map.className = 'mb-map mb-brief-map';
+                    map.style.backgroundImage = `url(${url})`;
+                    map.appendChild(document.createElement('i'));
+                    card.insertBefore(map, row);
+                }
                 return card;
+            },
+            /** A job's spot for a pin: { x, y, label, kind } (the drop-off, the mark's corner, the salvage site) */
+            _jobSpot(m) {
+                if (!m || typeof m.targetX !== 'number') return null;
+                if (m.type === 'delivery') return { x: m.targetX, y: m.targetY, label: m.targetLabel || 'Drop-off', kind: `Drop-off · ${m.targetKind || 'Apartments'}` };
+                if (m.type === 'bounty') return { x: m.targetX, y: m.targetY, label: m.near ? `Outside the ${m.near.toLowerCase()}` : 'Last seen', kind: `${m.targetName || 'The mark'} · last seen` };
+                return { x: m.targetX, y: m.targetY, label: this._jobTitle(m), kind: 'Salvage site' };
             },
             /** Take the job: it goes on the tracker exactly as if the bartender or barista had handed it over */
             acceptBrief(rec) {
@@ -811,13 +840,15 @@
                 m.id = `${m.type}_${Date.now()}`;
                 if (!g.missions.acceptMission(m, g)) return;     // a job's already running: it says so
                 d.state = 'accepted';
-                if (m.type === 'delivery') { if (g.returnVanHome) g.returnVanHome(); showMessage('PICK UP THE PACKAGE FROM THE AMBER DELIVERY VEHICLE AT COZY CAFE.'); }
+                if (m.type === 'delivery' && m.handed) showMessage('AMBER\'S COURIER HANDS YOU THE PACKAGE. WALK IT TO THE DOOR.');
+                else if (m.type === 'delivery') { if (g.returnVanHome) g.returnVanHome(); showMessage('PICK UP THE PACKAGE FROM THE AMBER DELIVERY VEHICLE AT COZY CAFE.'); }
+                if (!(m.type === 'delivery' && !m.handed)) { const spot = this._jobSpot(m); if (spot) this.setWaypoint(spot); }
                 if (this._activeContact) this.renderThread(this._activeContact);
             },
-            sendBrief(who, type, text) {
+            sendBrief(who, type, text, opts) {
                 const g = game, M = g && g.missions;
                 if (!M) return false;
-                const m = type === 'delivery' ? M.generateDelivery(g) : type === 'salvage' ? M.generateSalvage(g) : M.generateBounty(g);
+                const m = type === 'delivery' ? M.generateDelivery(g, opts) : type === 'salvage' ? M.generateSalvage(g) : M.generateBounty(g);
                 if (!m) return false;
                 // One open job on the phone at a time: an older one goes to someone else
                 for (const n in this.messageHistory) for (const r of this.messageHistory[n]) if (r.kind === 'brief' && r.data && r.data.state === 'open') r.data.state = 'lapsed';

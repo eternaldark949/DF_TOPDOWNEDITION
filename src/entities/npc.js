@@ -569,7 +569,7 @@
                     const angle = Math.atan2(gait.dirY, gait.dirX);
                     this.angle = angle;
                     ctx.rotate(usesRawAngle ? angle : angle - Math.PI/2); 
-                } else if ((this.hired || this.recruited) && player) {
+                } else if ((this.hired || this.recruited || this.facePlayer) && player) {
                     // IDLE & HIRED/RECRUITED: Face Player
                     const angle = Math.atan2(player.y - this.y, player.x - this.x);
                     ctx.rotate(usesRawAngle ? angle : angle - Math.PI/2);
@@ -582,6 +582,7 @@
 
                 // --- RENDERER --- (every look lives in core/appearances.js)
                 if (this.role === 'teammate') this.drawTeammate(ctx, look);
+                else if (this.heldParcel) drawProceduralHumanoid(ctx, this, { stance: 'idle', ...look, held: PARCEL_HELD });   // a resident with their delivery
                 else drawCrowdHumanoid(ctx, this, { stance: 'idle', ...look });   // a standing NPC: by Crowd Quality (ui/crowd-impostors.js)
                 if (this.name === 'Prisma') this.drawPrismaShimmer(ctx);
 

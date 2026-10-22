@@ -479,6 +479,12 @@
                                     <div class="phone-app-icon-circle" style="border-color: rgba(255,0,255,0.2);">🧬</div>
                                     <div class="phone-app-name">NEU.ME</div>
                                 </div>
+                                <div class="phone-app-container" id="app-amber" style="display:none">
+                                    <div class="phone-app-icon-circle amb-icon" style="position:relative;">
+                                        📦 <div class="app-badge" id="badge-amber"></div>
+                                    </div>
+                                    <div class="phone-app-name">Amber</div>
+                                </div>
                                 <div class="phone-app-container" id="app-help">
                                     <div class="phone-app-icon-circle">❓</div>
                                     <div class="phone-app-name">Help.ME</div>
@@ -603,6 +609,16 @@
                                 <div class="nm-tabs" id="neume-tabs"></div>
                                 <div class="nm-grid" id="neume-loadout"></div>
                             </div>
+                        </div>
+
+                        <!-- Amber Delivery (ui/amber-app.js): orders near her, tips, her rating, Premium -->
+                        <div class="phone-app-screen" id="screen-amber">
+                            <div class="amb-head">
+                                <button class="phone-back-btn" id="amber-back">◀</button>
+                                <div class="amb-brand"><b>amber</b><small>delivery · driver</small></div>
+                                <button class="amb-toggle" id="amber-online">Offline</button>
+                            </div>
+                            <div class="amb-body" id="amber-body"></div>
                         </div>
 
                         <!-- Sky.ME Weather Monitor -->

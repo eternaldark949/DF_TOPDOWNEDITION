@@ -23,19 +23,28 @@
             'Barista Ren': {
                 text: g => g.missions.activeMission
                     ? "You've already got a job running. Finish that first, then come back for more work."
-                    : "Hey! We've got an Amber delivery that needs to go out. Want to run it? Good personics in it for you.",
+                    : g.missions.amber.unlocked
+                        ? "Stella! You're on the Amber app now, orders come straight to your phone. But I've got one here if you want it."
+                        : "Hey! We've got an Amber delivery that needs to go out. Want to run it? Good personics in it for you.",
                 accept(g) {
                     if (g.missions.activeMission) { showMessage('FINISH YOUR CURRENT MISSION FIRST.'); return; }
-                    const delivery = g.missions.generateDelivery(g);
-                    if (delivery) { g.missions.acceptMission(delivery, g); g.returnVanHome(); showMessage('PICK UP THE PACKAGE FROM THE AMBER DELIVERY VEHICLE OUTSIDE.'); }
-                    else showMessage('NO DELIVERIES AVAILABLE. TRY AGAIN LATER.');
+                    const delivery = g.missions.generateDelivery(g, { source: 'ren' });
+                    if (delivery && g.missions.acceptMission(delivery, g)) {
+                        g.returnVanHome(); showMessage('PICK UP THE PACKAGE FROM THE AMBER DELIVERY VEHICLE OUTSIDE.');
+                        phoneSystem.jobText('Barista Ren', delivery, 'Drop-off\'s pinned. The box is waiting by the van out front.');   // ui/amber-app.js
+                    }
+                    else if (!delivery) showMessage('NO DELIVERIES AVAILABLE. TRY AGAIN LATER.');
                 }
             },
             'Bartender': {
                 text: g => g.missions.activeMission
                     ? "Handle your current contract first, Freelancer. Then we'll talk bounties."
                     : "Welcome to Moon City. We've got a bounty that needs handling — dangerous type, good payout. Interested?",
-                accept(g) { const bounty = g.missions.generateBounty(g); if (bounty) g.missions.acceptMission(bounty, g); }
+                accept(g) {
+                    const bounty = g.missions.generateBounty(g);
+                    if (bounty && g.missions.acceptMission(bounty, g))
+                        phoneSystem.jobText('Bartender', bounty, `${bounty.targetName} hangs around here. Bring them down and the drinks are on the house.`);   // ui/amber-app.js
+                }
             },
             'Torque': {
                 text: () => "Welcome to Torque Auto, Freelancer. Need a new ride, paint job, or some glow work? Step up to the counter.",

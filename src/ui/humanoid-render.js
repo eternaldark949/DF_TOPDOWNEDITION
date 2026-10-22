@@ -1966,6 +1966,8 @@
             const umbrella = held && held.type === 'umbrella' && !isDrivingCfg(config) ? held : null;
             const umbrellaOpen = umbrella ? (umbrella.open !== undefined ? umbrella.open : (W && W.rain > 0.05 ? 1 : 0)) : 0;
             const glassHand = (held && !isDrivingCfg(config) && (held.type === 'glass' || held.type === 'champagne_glass' || umbrella)) ? (held.hand || 'right') : null;
+            // A parcel is carried in both hands, out in front (a delivery: PARCEL_HELD)
+            const parcel = !!(held && held.type === 'parcel' && !isDrivingCfg(config) && stance === 'idle');
         
             const h = _humanoidDrawBuffer(entity), clothes = h.clothes;
             h.ctx = ctx; h.scale = S; h.skin = skinColor;
@@ -2129,12 +2131,14 @@
                 else if (glassHand === 'left') { lFistX += 7; lFistY = -9; }
                 // An open umbrella's handle is held up close to the chest
                 if (umbrellaOpen > 0.15) { if (glassHand === 'right') { rFistX = 3 + bounce; rFistY = 5; } else { lFistX = 3 + bounce; lFistY = -5; } }
+                // Carrying a parcel: both hands forward, either side of the box
+                if (parcel) { lFistX = rFistX = 7.5 + bounce * 0.3; lFistY = -6.6; rFistY = 6.6; }
             }
             const walkArms = !isDriving && stance !== 'pistol' && stance !== 'rifle' && stance !== 'sniper' && stance !== 'punch' && stance !== 'knife';
             // Pose: hands (unarmed only; a hand holding a drink keeps it), twist and breathing
             if (pose) {
-                if (walkArms && pose.l && glassHand !== 'left') { lFistX += (pose.l[0] - lFistX) * poseW; lFistY += (pose.l[1] - lFistY) * poseW; }
-                if (walkArms && pose.r && glassHand !== 'right') { rFistX += (pose.r[0] - rFistX) * poseW; rFistY += (pose.r[1] - rFistY) * poseW; }
+                if (walkArms && pose.l && glassHand !== 'left' && !parcel) { lFistX += (pose.l[0] - lFistX) * poseW; lFistY += (pose.l[1] - lFistY) * poseW; }
+                if (walkArms && pose.r && glassHand !== 'right' && !parcel) { rFistX += (pose.r[0] - rFistX) * poseW; rFistY += (pose.r[1] - rFistY) * poseW; }
                 torsoRotation += (pose.torso || 0) * poseW;
                 hipRotation += (pose.hip || 0) * poseW;
                 bounce += (pose.bounce || 0) * poseW;
@@ -2150,9 +2154,10 @@
             // Drink hand: elbow bent softly out to the side
             if (glassHand === 'right' && stance === 'idle') rElbowY += 3.5;
             else if (glassHand === 'left' && stance === 'idle') lElbowY -= 3.5;
+            if (parcel) { lElbowY -= 3; rElbowY += 3; }                     // elbows out round the box
             if (pose && walkArms) {
-                if (pose.le && glassHand !== 'left') { lElbowX += (pose.le[0] - lElbowX) * poseW; lElbowY += (pose.le[1] - lElbowY) * poseW; }
-                if (pose.re && glassHand !== 'right') { rElbowX += (pose.re[0] - rElbowX) * poseW; rElbowY += (pose.re[1] - rElbowY) * poseW; }
+                if (pose.le && glassHand !== 'left' && !parcel) { lElbowX += (pose.le[0] - lElbowX) * poseW; lElbowY += (pose.le[1] - lElbowY) * poseW; }
+                if (pose.re && glassHand !== 'right' && !parcel) { rElbowX += (pose.re[0] - rElbowX) * poseW; rElbowY += (pose.re[1] - rElbowY) * poseW; }
             }
         
             if (isDriving) {
@@ -2232,7 +2237,7 @@
             anim.armSwingW = lerp(anim.armSwingW, walkArms ? 1 : 0, lerpSpeed);
             if (anim.armSwingW > 0.001 && strideLen > 0) {
                 const handSwing = walkOppSin * strideLen * CONFIG.GAIT.ARM_SWING_RATIO * anim.armSwingW;
-                const ls = glassHand === 'left' ? 0.25 : 1, rs = glassHand === 'right' ? 0.25 : 1;   // keep the drink steady
+                const ls = parcel ? 0.12 : glassHand === 'left' ? 0.25 : 1, rs = parcel ? 0.12 : glassHand === 'right' ? 0.25 : 1;   // keep the drink (or the box) steady
                 lFistX += handSwing * ls;
                 rFistX -= handSwing * rs;
                 lElbowX += handSwing * 0.5 * ls;   // elbow sits midway between shoulder and hand
@@ -2832,6 +2837,14 @@
                 // 'champagne_glass' is the legacy id (NPC configs); it's the glass with champagne
                 if (held.type === 'glass' || held.type === 'champagne_glass') {
                     drawHeldGlass(ctx, hX, hY, held.drink || 'champagne', entity, held.hand);
+                } else if (parcel) {
+                    // The box between her hands, a little ahead of them, then her fingertips over its sides
+                    const bx = (lFistX + rFistX) / 2 + 4, by = (lFistY + rFistY) / 2, lat = Math.max(10, rFistY - lFistY - 0.6);
+                    ctx.save(); ctx.translate(bx, by);
+                    drawCozyParcel(ctx, 11, lat, 0.75);
+                    ctx.restore();
+                    ctx.fillStyle = skinColor;
+                    for (const [fx, fy] of [[lFistX + 1.6, lFistY + 0.9], [rFistX + 1.6, rFistY - 0.9]]) { ctx.beginPath(); ctx.ellipse(fx, fy, 1.7, 1.2, 0, 0, Math.PI * 2); ctx.fill(); }
                 } else if (umbrella) {
                     // Canopy over the head, held a little into the wind, bobbing with the step
                     const lean = W ? 2.5 + W.strong * 3 : 0;
@@ -2858,6 +2871,43 @@
          * Keeps the original sparkle: an occasional star glint on the rim.
          */
         function isDrivingCfg(config) { return !!(config && config.isDriving); }
+
+        /** What a delivery in someone's hands is (drawProceduralHumanoid's `held`) */
+        const PARCEL_HELD = Object.freeze({ type: 'parcel' });
+
+        /**
+         * A Cozy Cafe delivery box, seen from above, centred on the origin: w along the carrier's facing (x), h across.
+         * Kraft card with its flaps' seam, a cocoa band round it with cream stitching, the cafe's round sticker (a cup,
+         * steam rising) and a heart tape tab on the near end. `shade` (0..1) darkens its side for the light.
+         */
+        function drawCozyParcel(ctx, w, h, shade = 1) {
+            const x0 = -w / 2, y0 = -h / 2, u = Math.min(w, h);
+            ctx.fillStyle = `rgba(70, 38, 16, ${0.75 * shade})`; ctx.fillRect(x0 + u * 0.06, y0 + u * 0.09, w, h);      // its side, in shade
+            const g = ctx.createLinearGradient(x0, y0, x0 + w, y0 + h);
+            g.addColorStop(0, '#e2b27a'); g.addColorStop(0.55, '#cf9658'); g.addColorStop(1, '#b37a40');
+            ctx.fillStyle = g; ctx.fillRect(x0, y0, w, h);                                                   // kraft card
+            ctx.strokeStyle = 'rgba(255, 238, 210, 0.5)'; ctx.lineWidth = u * 0.045; ctx.strokeRect(x0 + u * 0.03, y0 + u * 0.03, w - u * 0.06, h - u * 0.06);
+            ctx.strokeStyle = 'rgba(110, 62, 26, 0.55)'; ctx.lineWidth = u * 0.04;                          // the flaps' seam
+            ctx.beginPath(); ctx.moveTo(x0 + u * 0.05, 0); ctx.lineTo(x0 + w - u * 0.05, 0); ctx.stroke();
+            const bw = w * 0.2;                                                                               // the cocoa band across
+            ctx.fillStyle = '#4a2416'; ctx.fillRect(-bw / 2, y0, bw, h);
+            ctx.strokeStyle = 'rgba(255, 228, 190, 0.75)'; ctx.lineWidth = u * 0.03; ctx.setLineDash([u * 0.07, u * 0.06]);
+            ctx.beginPath(); ctx.moveTo(-bw / 2 + u * 0.05, y0); ctx.lineTo(-bw / 2 + u * 0.05, y0 + h); ctx.moveTo(bw / 2 - u * 0.05, y0); ctx.lineTo(bw / 2 - u * 0.05, y0 + h); ctx.stroke();
+            ctx.setLineDash([]);
+            const r = u * 0.27;                                                                               // the cafe's sticker
+            ctx.fillStyle = '#fbf0dc'; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#c4874a'; ctx.lineWidth = u * 0.035; ctx.beginPath(); ctx.arc(0, 0, r * 0.82, 0, Math.PI * 2); ctx.stroke();
+            ctx.fillStyle = '#6b3a1f';                                                                        // a cup with a handle
+            ctx.beginPath(); ctx.moveTo(-r * 0.42, -r * 0.05); ctx.lineTo(r * 0.3, -r * 0.05); ctx.lineTo(r * 0.2, r * 0.45); ctx.lineTo(-r * 0.32, r * 0.45); ctx.closePath(); ctx.fill();
+            ctx.strokeStyle = '#6b3a1f'; ctx.lineWidth = u * 0.03; ctx.beginPath(); ctx.arc(r * 0.34, r * 0.17, r * 0.14, -Math.PI / 2, Math.PI / 2); ctx.stroke();
+            ctx.strokeStyle = '#e0913a'; ctx.lineWidth = u * 0.028; ctx.lineCap = 'round';                   // steam
+            for (const sx of [-r * 0.18, r * 0.08]) { ctx.beginPath(); ctx.moveTo(sx, -r * 0.15); ctx.quadraticCurveTo(sx + r * 0.16, -r * 0.35, sx, -r * 0.55); ctx.stroke(); }
+            ctx.lineCap = 'butt';
+            ctx.fillStyle = '#e8485e';                                                                        // the heart tab on the near end
+            const hx = x0 + w - u * 0.12, hs = u * 0.075;
+            ctx.beginPath(); ctx.arc(hx - hs * 0.2, -hs * 0.55, hs * 0.7, 0, Math.PI * 2); ctx.arc(hx - hs * 0.2, hs * 0.55, hs * 0.7, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(hx - hs * 0.6, -hs * 1.1); ctx.lineTo(hx + hs * 1.1, 0); ctx.lineTo(hx - hs * 0.6, hs * 1.1); ctx.closePath(); ctx.fill();
+        }
 
         function drawHeldGlass(ctx, hX, hY, drinkId, owner, hand) {
             const D = GLASS_DRINKS[drinkId] || GLASS_DRINKS.champagne;

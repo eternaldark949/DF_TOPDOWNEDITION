@@ -1207,6 +1207,7 @@
                 if (this.controlMode !== 'PLAYER') return;
                 this.yawRate = clamp((this.yawRate || 0) + kick, -CONFIG.VEHICLE_DRIVE.YAW_SPIN_MAX, CONFIG.VEHICLE_DRIVE.YAW_SPIN_MAX);
                 if (strength < 0.7 || this._crunchCd > 0) return;
+                if (typeof game !== 'undefined' && game.missions && game.missions.knock) game.missions.knock(strength);   // a package aboard feels it
                 this._crunchCd = 8;
                 audioSys.sfx('crunch', { gain: Math.min(1, strength / 5) });
                 if (typeof game !== 'undefined' && game.triggerShake) game.triggerShake(Math.min(12, 2 + strength * 1.8));

@@ -2429,6 +2429,59 @@
         .mb-brief p { margin: 0; font: 500 max(6px, 0.54rem - var(--font-trim))/1.35 'Montserrat', sans-serif; color: var(--df-lilac-grey); }
         .mb-brief .row { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 2px; font: 600 max(6px, 0.52rem - var(--font-trim))/1 'Montserrat', sans-serif; color: #f1e8fe; }
         .mb-brief em { font-style: normal; color: #f6dfa8; font-size: max(6px, 0.5rem - var(--font-trim)); }
+        .mb-brief .mb-brief-map { height: 56px; margin: 3px -10px 1px; border-top: 1px solid rgba(232, 194, 122, 0.18); border-bottom: 1px solid rgba(232, 194, 122, 0.18); }
+
+        /* ── Amber Delivery (ui/amber-app.js): kraft, cocoa and amber light ── */
+        .amb-icon { border-color: rgba(255, 170, 70, 0.4) !important; background: radial-gradient(circle at 50% 35%, rgba(255, 180, 90, 0.22), rgba(40, 16, 6, 0.4)); }
+        #screen-amber { flex-direction: column; background: radial-gradient(120% 60% at 50% 0%, rgba(255, 150, 50, 0.16), transparent 60%), linear-gradient(180deg, #1c0d06, #0d0604); }
+        .amb-head { display: flex; align-items: center; gap: 8px; padding: 6px 2px 8px; border-bottom: 1px solid rgba(255, 170, 70, 0.18); }
+        .amb-head .phone-back-btn { margin: 0; width: 24px; height: 24px; font-size: max(6px, 0.7rem - var(--font-trim)); flex: none; }
+        .amb-brand { flex: 1; display: flex; flex-direction: column; line-height: 1; }
+        .amb-brand b { font: italic 700 max(6px, 1.05rem - var(--font-trim)) 'Cormorant Garamond', Georgia, serif; color: #ffb347; letter-spacing: 0.02em; text-shadow: 0 0 10px rgba(255, 150, 50, 0.45); }
+        .amb-brand small { font: 600 max(6px, 0.42rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.3em; text-transform: uppercase; color: #c9a27a; margin-top: 2px; }
+        .amb-toggle { font: 700 max(6px, 0.5rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.12em; text-transform: uppercase; padding: 5px 10px; border-radius: 99px; cursor: pointer;
+                      background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); color: #a08a78; }
+        .amb-toggle.on { background: rgba(120, 220, 140, 0.14); border-color: rgba(120, 220, 140, 0.5); color: #9cf0b0; box-shadow: 0 0 10px rgba(120, 220, 140, 0.25); }
+        .amb-toggle.on::before { content: '● '; }
+        .amb-body { flex: 1; overflow-y: auto; padding: 8px 2px 12px; display: flex; flex-direction: column; gap: 7px; }
+        .amb-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+        .amb-stats div { background: rgba(255, 170, 70, 0.07); border: 1px solid rgba(255, 170, 70, 0.14); border-radius: 8px; padding: 6px 4px; text-align: center; }
+        .amb-stats b { display: block; font: 700 max(6px, 0.82rem - var(--font-trim))/1 'Montserrat', sans-serif; color: #ffe2b8; }
+        .amb-stats b i { font-style: normal; color: #ffb347; font-size: 0.8em; margin-left: 1px; }
+        .amb-stats small { font: 600 max(6px, 0.4rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.14em; text-transform: uppercase; color: #a8876a; }
+        .amb-sec { display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px; font: 700 max(6px, 0.48rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.26em; text-transform: uppercase; color: #ffb347; }
+        .amb-sec small { letter-spacing: 0.08em; text-transform: none; color: #8f7560; font-weight: 500; }
+        .amb-card { position: relative; padding: 8px 10px; border-radius: 10px; background: linear-gradient(150deg, rgba(226, 178, 122, 0.12), rgba(74, 36, 22, 0.35)); border: 1px solid rgba(226, 178, 122, 0.2); display: grid; gap: 4px; }
+        .amb-card::before { content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: #c4874a; }
+        .amb-card.express { border-color: rgba(255, 200, 90, 0.5); box-shadow: 0 0 14px rgba(255, 170, 60, 0.18); }
+        .amb-card.express::before { background: #ffd06a; }
+        .amb-card b { font: italic 600 max(6px, 0.86rem - var(--font-trim))/1.1 'Cormorant Garamond', Georgia, serif; color: #fbe6c6; }
+        .amb-k { font: 600 max(6px, 0.44rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.16em; text-transform: uppercase; color: #c9a27a; }
+        .amb-card.express .amb-k { color: #ffd06a; }
+        .amb-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; font: 700 max(6px, 0.6rem - var(--font-trim)) 'Montserrat', sans-serif; color: #ffe2b8; }
+        .amb-row small { font-weight: 500; color: #a8876a; }
+        .amb-btn { font: 700 max(6px, 0.5rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.1em; text-transform: uppercase; padding: 6px 12px; border-radius: 99px; cursor: pointer;
+                   background: linear-gradient(180deg, #ffb347, #e0832a); border: none; color: #2a1206; box-shadow: 0 2px 8px rgba(224, 131, 42, 0.35); }
+        .amb-btn:disabled { background: rgba(255, 255, 255, 0.08); color: #7a6656; box-shadow: none; cursor: default; }
+        .amb-btn.ghost { justify-self: start; background: transparent; border: 1px solid rgba(255, 179, 71, 0.45); color: #ffb347; box-shadow: none; }
+        .amb-btn.gold { background: linear-gradient(180deg, #ffe08a, #e8b23a); }
+        .amb-live { border-color: rgba(255, 179, 71, 0.45); }
+        .amb-bars { display: flex; gap: 12px; font: 600 max(6px, 0.5rem - var(--font-trim)) 'Montserrat', sans-serif; color: #a8876a; }
+        .amb-bars em { font-style: normal; color: #ffe2b8; margin-left: 3px; }
+        .amb-bars em.late { color: #ff8a7a; }
+        .amb-meter { height: 4px; border-radius: 99px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+        .amb-meter i { display: block; height: 100%; background: linear-gradient(90deg, #ffd06a, #ff9a3c); }
+        .amb-meter i.late { background: #ff7a6a; }
+        .amb-tip { padding: 6px 10px; border-radius: 8px; background: rgba(120, 220, 140, 0.08); border: 1px solid rgba(120, 220, 140, 0.25); font: 500 max(6px, 0.52rem - var(--font-trim)) 'Montserrat', sans-serif; color: #c9f0d2; }
+        .amb-tip b { color: #9cf0b0; }
+        .amb-none { font: italic 500 max(6px, 0.6rem - var(--font-trim)) 'Cormorant Garamond', Georgia, serif; color: #8f7560; text-align: center; padding: 8px; }
+        .amb-prem { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 8px; padding: 9px 10px; border-radius: 10px; margin-top: 2px;
+                    background: linear-gradient(135deg, rgba(255, 208, 106, 0.16), rgba(140, 60, 220, 0.14)); border: 1px solid rgba(255, 208, 106, 0.35); }
+        .amb-prem b { font: italic 700 max(6px, 0.8rem - var(--font-trim)) 'Cormorant Garamond', Georgia, serif; color: #ffe08a; }
+        .amb-prem small { grid-column: 1; font: 500 max(6px, 0.48rem - var(--font-trim))/1.3 'Montserrat', sans-serif; color: #d8c2a0; }
+        .amb-prem .amb-btn { grid-column: 2; grid-row: 1 / span 2; }
+        .amb-prem.on { grid-template-columns: 1fr; }
+        .amb-prem.on b::after { content: ' ✓'; color: #9cf0b0; font-style: normal; }
         .mb-brief.lapsed { opacity: 0.55; }
         .mb-snap { position: relative; width: 180px; }
         .mb-snap img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: #160a26; }
@@ -4018,6 +4071,12 @@
                                     <div class="phone-app-icon-circle" style="border-color: rgba(255,0,255,0.2);">🧬</div>
                                     <div class="phone-app-name">NEU.ME</div>
                                 </div>
+                                <div class="phone-app-container" id="app-amber" style="display:none">
+                                    <div class="phone-app-icon-circle amb-icon" style="position:relative;">
+                                        📦 <div class="app-badge" id="badge-amber"></div>
+                                    </div>
+                                    <div class="phone-app-name">Amber</div>
+                                </div>
                                 <div class="phone-app-container" id="app-help">
                                     <div class="phone-app-icon-circle">❓</div>
                                     <div class="phone-app-name">Help.ME</div>
@@ -4142,6 +4201,16 @@
                                 <div class="nm-tabs" id="neume-tabs"></div>
                                 <div class="nm-grid" id="neume-loadout"></div>
                             </div>
+                        </div>
+
+                        <!-- Amber Delivery (ui/amber-app.js): orders near her, tips, her rating, Premium -->
+                        <div class="phone-app-screen" id="screen-amber">
+                            <div class="amb-head">
+                                <button class="phone-back-btn" id="amber-back">◀</button>
+                                <div class="amb-brand"><b>amber</b><small>delivery · driver</small></div>
+                                <button class="amb-toggle" id="amber-online">Offline</button>
+                            </div>
+                            <div class="amb-body" id="amber-body"></div>
                         </div>
 
                         <!-- Sky.ME Weather Monitor -->
@@ -24509,7 +24578,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const angle = Math.atan2(gait.dirY, gait.dirX);
                     this.angle = angle;
                     ctx.rotate(usesRawAngle ? angle : angle - Math.PI/2); 
-                } else if ((this.hired || this.recruited) && player) {
+                } else if ((this.hired || this.recruited || this.facePlayer) && player) {
                     // IDLE & HIRED/RECRUITED: Face Player
                     const angle = Math.atan2(player.y - this.y, player.x - this.x);
                     ctx.rotate(usesRawAngle ? angle : angle - Math.PI/2);
@@ -24522,6 +24591,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
                 // --- RENDERER --- (every look lives in core/appearances.js)
                 if (this.role === 'teammate') this.drawTeammate(ctx, look);
+                else if (this.heldParcel) drawProceduralHumanoid(ctx, this, { stance: 'idle', ...look, held: PARCEL_HELD });   // a resident with their delivery
                 else drawCrowdHumanoid(ctx, this, { stance: 'idle', ...look });   // a standing NPC: by Crowd Quality (ui/crowd-impostors.js)
                 if (this.name === 'Prisma') this.drawPrismaShimmer(ctx);
 
@@ -42183,6 +42253,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 if (this.controlMode !== 'PLAYER') return;
                 this.yawRate = clamp((this.yawRate || 0) + kick, -CONFIG.VEHICLE_DRIVE.YAW_SPIN_MAX, CONFIG.VEHICLE_DRIVE.YAW_SPIN_MAX);
                 if (strength < 0.7 || this._crunchCd > 0) return;
+                if (typeof game !== 'undefined' && game.missions && game.missions.knock) game.missions.knock(strength);   // a package aboard feels it
                 this._crunchCd = 8;
                 audioSys.sfx('crunch', { gain: Math.min(1, strength / 5) });
                 if (typeof game !== 'undefined' && game.triggerShake) game.triggerShake(Math.min(12, 2 + strength * 1.8));
@@ -51874,6 +51945,8 @@ Object.assign(TrafficVehicle.prototype, {
             const umbrella = held && held.type === 'umbrella' && !isDrivingCfg(config) ? held : null;
             const umbrellaOpen = umbrella ? (umbrella.open !== undefined ? umbrella.open : (W && W.rain > 0.05 ? 1 : 0)) : 0;
             const glassHand = (held && !isDrivingCfg(config) && (held.type === 'glass' || held.type === 'champagne_glass' || umbrella)) ? (held.hand || 'right') : null;
+            // A parcel is carried in both hands, out in front (a delivery: PARCEL_HELD)
+            const parcel = !!(held && held.type === 'parcel' && !isDrivingCfg(config) && stance === 'idle');
         
             const h = _humanoidDrawBuffer(entity), clothes = h.clothes;
             h.ctx = ctx; h.scale = S; h.skin = skinColor;
@@ -52037,12 +52110,14 @@ Object.assign(TrafficVehicle.prototype, {
                 else if (glassHand === 'left') { lFistX += 7; lFistY = -9; }
                 // An open umbrella's handle is held up close to the chest
                 if (umbrellaOpen > 0.15) { if (glassHand === 'right') { rFistX = 3 + bounce; rFistY = 5; } else { lFistX = 3 + bounce; lFistY = -5; } }
+                // Carrying a parcel: both hands forward, either side of the box
+                if (parcel) { lFistX = rFistX = 7.5 + bounce * 0.3; lFistY = -6.6; rFistY = 6.6; }
             }
             const walkArms = !isDriving && stance !== 'pistol' && stance !== 'rifle' && stance !== 'sniper' && stance !== 'punch' && stance !== 'knife';
             // Pose: hands (unarmed only; a hand holding a drink keeps it), twist and breathing
             if (pose) {
-                if (walkArms && pose.l && glassHand !== 'left') { lFistX += (pose.l[0] - lFistX) * poseW; lFistY += (pose.l[1] - lFistY) * poseW; }
-                if (walkArms && pose.r && glassHand !== 'right') { rFistX += (pose.r[0] - rFistX) * poseW; rFistY += (pose.r[1] - rFistY) * poseW; }
+                if (walkArms && pose.l && glassHand !== 'left' && !parcel) { lFistX += (pose.l[0] - lFistX) * poseW; lFistY += (pose.l[1] - lFistY) * poseW; }
+                if (walkArms && pose.r && glassHand !== 'right' && !parcel) { rFistX += (pose.r[0] - rFistX) * poseW; rFistY += (pose.r[1] - rFistY) * poseW; }
                 torsoRotation += (pose.torso || 0) * poseW;
                 hipRotation += (pose.hip || 0) * poseW;
                 bounce += (pose.bounce || 0) * poseW;
@@ -52058,9 +52133,10 @@ Object.assign(TrafficVehicle.prototype, {
             // Drink hand: elbow bent softly out to the side
             if (glassHand === 'right' && stance === 'idle') rElbowY += 3.5;
             else if (glassHand === 'left' && stance === 'idle') lElbowY -= 3.5;
+            if (parcel) { lElbowY -= 3; rElbowY += 3; }                     // elbows out round the box
             if (pose && walkArms) {
-                if (pose.le && glassHand !== 'left') { lElbowX += (pose.le[0] - lElbowX) * poseW; lElbowY += (pose.le[1] - lElbowY) * poseW; }
-                if (pose.re && glassHand !== 'right') { rElbowX += (pose.re[0] - rElbowX) * poseW; rElbowY += (pose.re[1] - rElbowY) * poseW; }
+                if (pose.le && glassHand !== 'left' && !parcel) { lElbowX += (pose.le[0] - lElbowX) * poseW; lElbowY += (pose.le[1] - lElbowY) * poseW; }
+                if (pose.re && glassHand !== 'right' && !parcel) { rElbowX += (pose.re[0] - rElbowX) * poseW; rElbowY += (pose.re[1] - rElbowY) * poseW; }
             }
         
             if (isDriving) {
@@ -52140,7 +52216,7 @@ Object.assign(TrafficVehicle.prototype, {
             anim.armSwingW = lerp(anim.armSwingW, walkArms ? 1 : 0, lerpSpeed);
             if (anim.armSwingW > 0.001 && strideLen > 0) {
                 const handSwing = walkOppSin * strideLen * CONFIG.GAIT.ARM_SWING_RATIO * anim.armSwingW;
-                const ls = glassHand === 'left' ? 0.25 : 1, rs = glassHand === 'right' ? 0.25 : 1;   // keep the drink steady
+                const ls = parcel ? 0.12 : glassHand === 'left' ? 0.25 : 1, rs = parcel ? 0.12 : glassHand === 'right' ? 0.25 : 1;   // keep the drink (or the box) steady
                 lFistX += handSwing * ls;
                 rFistX -= handSwing * rs;
                 lElbowX += handSwing * 0.5 * ls;   // elbow sits midway between shoulder and hand
@@ -52740,6 +52816,14 @@ Object.assign(TrafficVehicle.prototype, {
                 // 'champagne_glass' is the legacy id (NPC configs); it's the glass with champagne
                 if (held.type === 'glass' || held.type === 'champagne_glass') {
                     drawHeldGlass(ctx, hX, hY, held.drink || 'champagne', entity, held.hand);
+                } else if (parcel) {
+                    // The box between her hands, a little ahead of them, then her fingertips over its sides
+                    const bx = (lFistX + rFistX) / 2 + 4, by = (lFistY + rFistY) / 2, lat = Math.max(10, rFistY - lFistY - 0.6);
+                    ctx.save(); ctx.translate(bx, by);
+                    drawCozyParcel(ctx, 11, lat, 0.75);
+                    ctx.restore();
+                    ctx.fillStyle = skinColor;
+                    for (const [fx, fy] of [[lFistX + 1.6, lFistY + 0.9], [rFistX + 1.6, rFistY - 0.9]]) { ctx.beginPath(); ctx.ellipse(fx, fy, 1.7, 1.2, 0, 0, Math.PI * 2); ctx.fill(); }
                 } else if (umbrella) {
                     // Canopy over the head, held a little into the wind, bobbing with the step
                     const lean = W ? 2.5 + W.strong * 3 : 0;
@@ -52766,6 +52850,43 @@ Object.assign(TrafficVehicle.prototype, {
          * Keeps the original sparkle: an occasional star glint on the rim.
          */
         function isDrivingCfg(config) { return !!(config && config.isDriving); }
+
+        /** What a delivery in someone's hands is (drawProceduralHumanoid's `held`) */
+        const PARCEL_HELD = Object.freeze({ type: 'parcel' });
+
+        /**
+         * A Cozy Cafe delivery box, seen from above, centred on the origin: w along the carrier's facing (x), h across.
+         * Kraft card with its flaps' seam, a cocoa band round it with cream stitching, the cafe's round sticker (a cup,
+         * steam rising) and a heart tape tab on the near end. `shade` (0..1) darkens its side for the light.
+         */
+        function drawCozyParcel(ctx, w, h, shade = 1) {
+            const x0 = -w / 2, y0 = -h / 2, u = Math.min(w, h);
+            ctx.fillStyle = `rgba(70, 38, 16, ${0.75 * shade})`; ctx.fillRect(x0 + u * 0.06, y0 + u * 0.09, w, h);      // its side, in shade
+            const g = ctx.createLinearGradient(x0, y0, x0 + w, y0 + h);
+            g.addColorStop(0, '#e2b27a'); g.addColorStop(0.55, '#cf9658'); g.addColorStop(1, '#b37a40');
+            ctx.fillStyle = g; ctx.fillRect(x0, y0, w, h);                                                   // kraft card
+            ctx.strokeStyle = 'rgba(255, 238, 210, 0.5)'; ctx.lineWidth = u * 0.045; ctx.strokeRect(x0 + u * 0.03, y0 + u * 0.03, w - u * 0.06, h - u * 0.06);
+            ctx.strokeStyle = 'rgba(110, 62, 26, 0.55)'; ctx.lineWidth = u * 0.04;                          // the flaps' seam
+            ctx.beginPath(); ctx.moveTo(x0 + u * 0.05, 0); ctx.lineTo(x0 + w - u * 0.05, 0); ctx.stroke();
+            const bw = w * 0.2;                                                                               // the cocoa band across
+            ctx.fillStyle = '#4a2416'; ctx.fillRect(-bw / 2, y0, bw, h);
+            ctx.strokeStyle = 'rgba(255, 228, 190, 0.75)'; ctx.lineWidth = u * 0.03; ctx.setLineDash([u * 0.07, u * 0.06]);
+            ctx.beginPath(); ctx.moveTo(-bw / 2 + u * 0.05, y0); ctx.lineTo(-bw / 2 + u * 0.05, y0 + h); ctx.moveTo(bw / 2 - u * 0.05, y0); ctx.lineTo(bw / 2 - u * 0.05, y0 + h); ctx.stroke();
+            ctx.setLineDash([]);
+            const r = u * 0.27;                                                                               // the cafe's sticker
+            ctx.fillStyle = '#fbf0dc'; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#c4874a'; ctx.lineWidth = u * 0.035; ctx.beginPath(); ctx.arc(0, 0, r * 0.82, 0, Math.PI * 2); ctx.stroke();
+            ctx.fillStyle = '#6b3a1f';                                                                        // a cup with a handle
+            ctx.beginPath(); ctx.moveTo(-r * 0.42, -r * 0.05); ctx.lineTo(r * 0.3, -r * 0.05); ctx.lineTo(r * 0.2, r * 0.45); ctx.lineTo(-r * 0.32, r * 0.45); ctx.closePath(); ctx.fill();
+            ctx.strokeStyle = '#6b3a1f'; ctx.lineWidth = u * 0.03; ctx.beginPath(); ctx.arc(r * 0.34, r * 0.17, r * 0.14, -Math.PI / 2, Math.PI / 2); ctx.stroke();
+            ctx.strokeStyle = '#e0913a'; ctx.lineWidth = u * 0.028; ctx.lineCap = 'round';                   // steam
+            for (const sx of [-r * 0.18, r * 0.08]) { ctx.beginPath(); ctx.moveTo(sx, -r * 0.15); ctx.quadraticCurveTo(sx + r * 0.16, -r * 0.35, sx, -r * 0.55); ctx.stroke(); }
+            ctx.lineCap = 'butt';
+            ctx.fillStyle = '#e8485e';                                                                        // the heart tab on the near end
+            const hx = x0 + w - u * 0.12, hs = u * 0.075;
+            ctx.beginPath(); ctx.arc(hx - hs * 0.2, -hs * 0.55, hs * 0.7, 0, Math.PI * 2); ctx.arc(hx - hs * 0.2, hs * 0.55, hs * 0.7, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(hx - hs * 0.6, -hs * 1.1); ctx.lineTo(hx + hs * 1.1, 0); ctx.lineTo(hx - hs * 0.6, hs * 1.1); ctx.closePath(); ctx.fill();
+        }
 
         function drawHeldGlass(ctx, hX, hY, drinkId, owner, hand) {
             const D = GLASS_DRINKS[drinkId] || GLASS_DRINKS.champagne;
@@ -57538,7 +57659,9 @@ Object.assign(TrafficVehicle.prototype, {
            MISSION SYSTEM
            ---------------------------------------------------------------------
            Manages delivery and bounty missions.
-           Delivery: Pick up from Cozy Cafe delivery vehicle → drop at apartment.
+           Delivery: Pick up from Cozy Cafe delivery vehicle (or have it handed to
+           her: Ren's follow-ups, Amber Delivery orders) → walk it to the resident
+           at the apartment's door.
            Bounty: Accept at Club or Cafe → hunt target in city.
            ===================================================================== */
         const MISSION_TYPES = {
@@ -57552,41 +57675,66 @@ Object.assign(TrafficVehicle.prototype, {
                 this.activeMission = null;
                 this.completedCount = 0;
                 this.completedBounties = 0;
+                this.completedDeliveries = 0;
+                this.amber = MissionSystem.freshAmber();
                 this.missionLog = [];
+                this._recipients = [];          // residents out on their doorstep (tickRecipients)
             }
 
-            // Generate a delivery mission
-            generateDelivery(game) {
-                // Always reference hub map buildings for delivery targets (player may be in cafe interior)
-                let buildings = [];
-                if (game._hubBuildingsCache) {
-                    buildings = game._hubBuildingsCache;
-                } else if (game.activeMap && game.activeMap.buildings) {
-                    buildings = game.activeMap.buildings;
-                }
-                
+            /** Amber Delivery, the app (ui/amber-app.js): unlocked after five runs for Ren */
+            static freshAmber() {
+                return { unlocked: false, online: false, premium: false, runs: 0, tips: 0, earned: 0, stars: [], orders: [], ordersAt: null, lastTip: null };
+            }
+
+            /** The city's buildings, from wherever she is (the hub's, cached, while she's inside) */
+            _hubBuildings(game) {
+                if (game._hubBuildingsCache) return game._hubBuildingsCache;
+                return (game.activeMap && game.activeMap.id === 'hub_949' && game.activeMap.buildings) || [];
+            }
+
+            /**
+             * A delivery. opts: { source: 'ren' | 'brief' | 'amber' (who it came from), handed: true (the package is
+             * already in her hands, brought to her by Amber's courier: no trip to the van), from: {x, y} (where she
+             * is, for the pay and the time it should take), express: true (Amber Premium's rush order) }
+             */
+            generateDelivery(game, opts = {}) {
+                const buildings = this._hubBuildings(game);
                 // Pick apartments as delivery destinations
                 const apartments = buildings.filter(b => 
                     (b.type === 'apartment' || b.id === 'apartment_small') && b.id !== 'silver_queen'
                 );
                 
                 // Fallback: use ANY building with a label
-                const targets = apartments.length > 0 ? apartments : buildings.filter(b => b.label && b.id !== 'cozy_cafe');
+                let targets = apartments.length > 0 ? apartments : buildings.filter(b => b.label && b.id !== 'cozy_cafe');
                 if (targets.length === 0) return null;
+                // Not on her doorstep: somewhere worth the drive
+                const from = opts.from;
+                if (from) { const far = targets.filter(b => Math.hypot(b.x + (b.w || 100) / 2 - from.x, b.y + (b.h || 100) - from.y) > 900); if (far.length) targets = far; }
 
                 const target = targets[Math.floor(Math.random() * targets.length)];
-                const reward = 120 + Math.floor(Math.random() * 80); // 120-200 PP
+                const tx = target.x + (target.w || 100) / 2, ty = target.y + (target.h || 100) + 30;
+                const km = from ? Math.hypot(tx - from.x, ty - from.y) : 2500;
+                let reward = 120 + Math.floor(Math.random() * 80); // 120-200 PP
+                if (opts.source === 'amber') reward = 90 + Math.round(km / 60 + Math.random() * 30);
+                if (opts.express) reward = Math.round(reward * 1.6);
                 const scrapReward = 2 + Math.floor(Math.random() * 5);
+                // A street address, so two orders to apartments read apart: the nearest street, a number along it
+                const city = game._hubCache && game._hubCache.cityLayout;
+                let road = null, off = Infinity, along = 0;
+                for (const r of (city && city.horizontalRoads) || []) { const d = Math.abs(r.centerY - ty); if (d < off) { off = d; road = r; along = tx; } }
+                for (const r of (city && city.verticalRoads) || []) { const d = Math.abs(r.centerX - tx); if (d < off) { off = d; road = r; along = ty; } }
+                const place = road ? `${Math.max(1, Math.round(along / 24)) * 2 + (Math.round(tx + ty) % 2)} ${road.name}` : (target.label || 'Apartments');
 
                 return {
                     type: MISSION_TYPES.DELIVERY,
-                    id: `delivery_${Date.now()}`,
-                    title: 'AMBER DELIVERY',
-                    description: `Deliver package to ${target.label || 'Apartments'}`,
-                    banner: `DELIVER TO: ${(target.label || 'APARTMENTS').toUpperCase()}`,
-                    targetLabel: target.label || 'Apartments',
-                    targetX: target.x + (target.w || 100) / 2,
-                    targetY: target.y + (target.h || 100) + 30,
+                    id: `delivery_${Date.now()}_${Math.floor(Math.random() * 1e4)}`,
+                    title: opts.express ? 'AMBER EXPRESS' : 'AMBER DELIVERY',
+                    description: `Deliver package to ${target.label || 'Apartments'}, ${place}`,
+                    banner: `DELIVER TO: ${place.toUpperCase()}`,
+                    targetLabel: place,
+                    targetKind: target.label || 'Apartments',
+                    targetX: tx,
+                    targetY: ty,
                     targetRadius: 100,
                     reward: reward,
                     scrapReward: scrapReward,
@@ -57594,6 +57742,13 @@ Object.assign(TrafficVehicle.prototype, {
                     startTime: null,
                     status: 'available',
                     pickedUp: false,
+                    source: opts.source || 'ren',
+                    handed: !!opts.handed,
+                    express: !!opts.express,
+                    km: Math.round(km),
+                    // How long it should take, in world minutes (1 = 2 real seconds): the tip rides on it
+                    etaMin: Math.round((4 + km / 320) * (opts.express ? 0.75 : 1)),
+                    condition: 100,                              // knocks in the car bruise the box (knock)
                 };
             }
 
@@ -57604,10 +57759,16 @@ Object.assign(TrafficVehicle.prototype, {
                 const reward = 200 + Math.floor(Math.random() * 200);
                 const scrapReward = 15 + Math.floor(Math.random() * 11);
                 
-                // Random spawn location in the city (spawnBountyTarget moves it in front of a building)
+                // Where the mark hangs about: in front of one of the city's buildings, chosen now so the
+                // Bartender can text the spot (a random point in the city if the buildings aren't known yet)
                 const hub = MAP_DATA.hub_949;
-                const spawnX = 400 + Math.random() * (hub.width - 800);
-                const spawnY = 400 + Math.random() * (hub.height - 800);
+                let spawnX = 400 + Math.random() * (hub.width - 800);
+                let spawnY = 400 + Math.random() * (hub.height - 800), sited = false, near = null;
+                const bs = this._hubBuildings(game).filter(b => b.x > 200 && b.y > 200);
+                if (bs.length) {
+                    const b = bs[Math.floor(Math.random() * bs.length)];
+                    spawnX = b.x + (b.w || 100) / 2; spawnY = b.y + (b.h || 100) + 60; sited = true; near = b.label || null;
+                }
 
                 return {
                     type: MISSION_TYPES.BOUNTY,
@@ -57619,6 +57780,7 @@ Object.assign(TrafficVehicle.prototype, {
                     targetX: spawnX,
                     targetY: spawnY,
                     targetRadius: 100,
+                    sited, near,
                     targetEntity: null, // Will be set when spawned
                     reward: reward,
                     scrapReward: scrapReward,
@@ -57723,6 +57885,7 @@ Object.assign(TrafficVehicle.prototype, {
                 }
                 mission.status = 'active';
                 mission.startTime = game.worldMinutes;
+                if (mission.type === MISSION_TYPES.DELIVERY && mission.handed) mission.pickedUp = true;   // Amber's courier brought it to her
                 this.activeMission = mission;
                 showMessage(`MISSION ACCEPTED: ${mission.title}`);
                 if (game.ui && game.ui.showMissionBanner) {
@@ -57752,8 +57915,8 @@ Object.assign(TrafficVehicle.prototype, {
                 let spawnX = m.targetX;
                 let spawnY = m.targetY;
                 
-                // Try to find a valid road-adjacent position
-                if (game.activeMap.buildings && game.activeMap.buildings.length > 0) {
+                // Try to find a valid road-adjacent position (unless it was chosen with the job)
+                if (!m.sited && game.activeMap.buildings && game.activeMap.buildings.length > 0) {
                     const buildings = game.activeMap.buildings.filter(b => b.x > 200 && b.y > 200);
                     if (buildings.length > 0) {
                         const b = buildings[Math.floor(Math.random() * buildings.length)];
@@ -57785,7 +57948,82 @@ Object.assign(TrafficVehicle.prototype, {
                 m.targetEntity = target;
             }
 
+            /** The resident at the drop-off: out of the door when she's close, over to her when she walks up with the
+             *  box, a word of thanks with it in their hands, then back inside */
+            _spawnRecipient(game, m) {
+                const doorX = m.targetX, doorY = m.targetY - 26;
+                const npc = new NPC(doorX, doorY, 'Resident');
+                npc.isDeliveryRecipient = true;
+                npc.facePlayer = true;
+                game.npcs.push(npc);
+                npc.active = true;
+                npc.reregister();
+                m._recipientEntity = npc;
+                const r = { npc, doorX, doorY, mission: m, phase: 'out', t: 0 };
+                this._recipients.push(r);
+                return r;
+            }
+
+            _dropRecipient(game, r) {
+                const i = game.npcs.indexOf(r.npc);
+                if (i > -1) game.npcs.splice(i, 1);
+                if (r.npc.destroy) r.npc.destroy();
+                if (r.mission && r.mission._recipientEntity === r.npc) r.mission._recipientEntity = null;
+            }
+
+            /** Every tick: walk the residents (a few px a tick, straight; they never stray far from their door) */
+            tickRecipients(game) {
+                if (!this._recipients.length) return;
+                const p = game.player, step = (r, x, y, v) => {
+                    const dx = x - r.npc.x, dy = y - r.npc.y, d = Math.hypot(dx, dy);
+                    if (d < 1) return true;
+                    const k = Math.min(1, v / d); r.npc.x += dx * k; r.npc.y += dy * k;
+                    return d <= v;
+                };
+                for (let i = this._recipients.length - 1; i >= 0; i--) {
+                    const r = this._recipients[i];
+                    if (!game.npcs.includes(r.npc)) { if (r.mission && r.mission._recipientEntity === r.npc) r.mission._recipientEntity = null; this._recipients.splice(i, 1); continue; }
+                    r.t++;
+                    if (r.phase === 'out') {
+                        if (this.activeMission !== r.mission || r.mission.status !== 'active') { r.phase = 'in'; continue; }
+                        // Over to her while she's on foot and near; otherwise a step out of the door, waiting
+                        const onFoot = !game.isDriving && !p.inCar, dd = Math.hypot(p.x - r.doorX, p.y - r.doorY);
+                        if (onFoot && dd < 200) {
+                            const a = Math.atan2(p.y - r.doorY, p.x - r.doorX), reach = Math.min(70, Math.max(0, dd - 30));
+                            step(r, r.doorX + Math.cos(a) * reach, r.doorY + Math.sin(a) * reach, 1.4);
+                        } else step(r, r.doorX, r.doorY + 14, 1.2);
+                    } else if (r.phase === 'thanks') {
+                        if (r.t > 70) { r.phase = 'in'; r.t = 0; r.npc.facePlayer = false; }
+                    } else if (step(r, r.doorX, r.doorY - 6, 1.3) || r.t > 240) {
+                        this._dropRecipient(game, r); this._recipients.splice(i, 1);
+                    }
+                }
+            }
+
+            /** The car she's carrying the package in took a knock (TrafficVehicle.onImpact): the box feels it */
+            knock(strength) {
+                const m = this.activeMission;
+                if (!m || m.type !== MISSION_TYPES.DELIVERY || !m.pickedUp || strength < 1.2) return;
+                const was = m.condition;
+                m.condition = Math.max(0, Math.round(m.condition - Math.min(30, (strength - 1) * 6)));
+                if (was >= 70 && m.condition < 70) showMessage('CAREFUL — THE PACKAGE IS TAKING A BEATING.');
+            }
+
+            /** What the drop-off is worth on top of the pay, for an Amber Delivery order: { tip, stars, onTime }.
+             *  The tip rides on time against the order's estimate and the box's condition; Premium lifts it half again. */
+            _tipFor(m, game) {
+                const took = Math.max(0, (game.worldMinutes || 0) - (m.startTime || 0)), eta = Math.max(1, m.etaMin || 6);
+                const onTime = took <= eta;
+                const pace = onTime ? 1 : Math.max(0.2, 1 - (took - eta) / eta);
+                const care = Math.max(0, (m.condition == null ? 100 : m.condition) / 100);
+                let tip = Math.round(m.reward * 0.35 * pace * (0.25 + 0.75 * care) * (0.85 + Math.random() * 0.3));
+                if (this.amber.premium) tip = Math.round(tip * 1.5);
+                const stars = Math.max(1, Math.min(5, Math.round(1 + 4 * (0.5 * pace + 0.5 * care))));
+                return { tip, stars, onTime, took };
+            }
+
             checkCompletion(game) {
+                this.tickRecipients(game);
                 if (!this.activeMission || this.activeMission.status !== 'active') return;
                 const m = this.activeMission;
 
@@ -57796,29 +58034,22 @@ Object.assign(TrafficVehicle.prototype, {
                             m._guidanceShown = true;
                             showMessage('HEAD TO THE AMBER DELIVERY VEHICLE NEAR COZY CAFE.');
                         }
-                    } else {
-                        // Check if near delivery target
+                    } else if (game.activeMap.id === 'hub_949') {
                         const dist = Math.hypot(game.player.x - m.targetX, game.player.y - m.targetY);
-                        
-                        // Spawn a recipient NPC when player gets close
-                        if (dist < 200 && !m._recipientSpawned && game.activeMap.id === 'hub_949') {
-                            m._recipientSpawned = true;
-                            const recipient = new NPC(m.targetX, m.targetY - 20, 'Resident');
-                            recipient.isDeliveryRecipient = true;
-                            game.npcs.push(recipient);
-                            recipient.active = true;
-                            recipient.reregister();
-                            m._recipientEntity = recipient;
+                        // The resident comes out to meet her as she pulls up
+                        let r = m._recipientEntity && this._recipients.find(q => q.npc === m._recipientEntity);
+                        if (!r && dist < 320) r = this._spawnRecipient(game, m);
+                        // The box goes hand to hand: she has to walk it to them
+                        if (dist < m.targetRadius && game.isDriving && !m._walkHint) {
+                            m._walkHint = true;
+                            showMessage('STEP OUT AND WALK THE PACKAGE TO THE DOOR.');
                         }
-                        
-                        if (dist < m.targetRadius) {
+                        if (r && !game.isDriving && !game.player.inCar && Math.hypot(game.player.x - r.npc.x, game.player.y - r.npc.y) < 40) {
+                            r.phase = 'thanks'; r.t = 0;
+                            r.npc.heldParcel = true;
+                            r.npc._setQuip(m.condition < 60 ? 'Is it… supposed to rattle?' : ['Thank you!', 'Oh, that smells amazing.', 'Right on time. Thanks!', 'You\'re a lifesaver.'][Math.floor(Math.random() * 4)]);
+                            audioSys.sfx('ui');
                             this.completeMission(game);
-                            // Clean up recipient
-                            if (m._recipientEntity) {
-                                const idx = game.npcs.indexOf(m._recipientEntity);
-                                if (idx > -1) game.npcs.splice(idx, 1);
-                                m._recipientEntity.destroy();
-                            }
                         }
                     }
                 } else if (m.type === MISSION_TYPES.BOUNTY) {
@@ -57863,6 +58094,18 @@ Object.assign(TrafficVehicle.prototype, {
                 const m = this.activeMission;
                 if (!m) return;
                 m.status = 'completed';
+                let tip = null;
+                if (m.type === MISSION_TYPES.DELIVERY) {
+                    this.completedDeliveries++;
+                    if (m.source === 'amber') {
+                        tip = this._tipFor(m, game);
+                        const A = this.amber;
+                        A.runs++; A.tips += tip.tip; A.earned += m.reward + tip.tip;
+                        A.stars.push(tip.stars); if (A.stars.length > 50) A.stars.shift();
+                        A.lastTip = { tip: tip.tip, stars: tip.stars, onTime: tip.onTime, label: m.targetLabel, at: game.worldMinutes };
+                        game.currency += tip.tip;
+                    }
+                }
                 game.currency += m.reward;
                 if (game.resonance) game.earnResonance(100, 'MISSION');
                 game.scrap += (m.scrapReward || 0);
@@ -57870,7 +58113,8 @@ Object.assign(TrafficVehicle.prototype, {
                 if (m.type === MISSION_TYPES.BOUNTY) this.completedBounties++;
                 this.missionLog.push({ id: m.id, title: m.title, reward: m.reward });
                 game.updateUI();
-                showMessage(`MISSION COMPLETE: +${m.reward} PERSONICS, +${m.scrapReward || 0} SCRAP`);
+                showMessage(tip ? `DELIVERED · +${m.reward} PP · TIP +${tip.tip} PP · ${'★'.repeat(tip.stars)}${'☆'.repeat(5 - tip.stars)}`
+                    : `MISSION COMPLETE: +${m.reward} PERSONICS, +${m.scrapReward || 0} SCRAP`);
                 if (game.ui && game.ui.showMissionBanner) {
                     game.ui.showMissionBanner(m.banner || m.title, 'gold', 'COMPLETED');
                 }
@@ -57884,6 +58128,8 @@ Object.assign(TrafficVehicle.prototype, {
                 if (typeof phoneSystem !== 'undefined' && phoneSystem.crewBanter) phoneSystem.crewBanter(m, game);
                 
                 this.activeMission = null;
+                // Ren asks if she's up for another, or (five in) points her to the app (ui/amber-app.js)
+                if (m.type === MISSION_TYPES.DELIVERY && typeof phoneSystem !== 'undefined' && phoneSystem.afterDelivery) phoneSystem.afterDelivery(m, game, tip);
             }
 
             abandonMission() {
@@ -57903,7 +58149,12 @@ Object.assign(TrafficVehicle.prototype, {
                 const m = this.activeMission;
                 if (!m) return null;
                 if (m.type === MISSION_TYPES.DELIVERY) {
-                    return { title: 'Amber delivery', step: m.pickedUp ? `Deliver to ${m.targetLabel || 'the apartments'}` : 'Pick up the package at Cozy Cafe' };
+                    const g = typeof game !== 'undefined' ? game : null;
+                    const there = m.pickedUp && g && g.player && Math.hypot(g.player.x - m.targetX, g.player.y - m.targetY) < m.targetRadius * 1.6;
+                    const step = !m.pickedUp ? 'Pick up the package at Cozy Cafe'
+                        : there ? (g.isDriving ? 'Step out and walk it to the door' : 'Hand it to the resident')
+                        : `Deliver to ${m.targetLabel || 'the apartments'}`;
+                    return { title: m.express ? 'Amber express' : 'Amber delivery', step };
                 }
                 if (m.type === MISSION_TYPES.BOUNTY) return { title: `Bounty · ${m.targetName || 'the mark'}`, step: 'Find them and take them down' };
                 if (m.type === MISSION_TYPES.SALVAGE) {
@@ -57939,8 +58190,10 @@ Object.assign(TrafficVehicle.prototype, {
                 return {
                     completedCount: this.completedCount,
                     completedBounties: this.completedBounties,
+                    completedDeliveries: this.completedDeliveries,
+                    amber: { ...this.amber, orders: [] },
                     missionLog: this.missionLog.slice(-20),
-                    activeMission: this.activeMission ? { ...this.activeMission, targetEntity: null, _guardEntities: null, _crateEntity: null } : null
+                    activeMission: this.activeMission ? { ...this.activeMission, targetEntity: null, _guardEntities: null, _crateEntity: null, _recipientEntity: null } : null
                 };
             }
 
@@ -57948,6 +58201,8 @@ Object.assign(TrafficVehicle.prototype, {
                 if (data) {
                     this.completedCount = data.completedCount || 0;
                     this.completedBounties = data.completedBounties || 0;
+                    this.completedDeliveries = data.completedDeliveries || 0;
+                    this.amber = Object.assign(MissionSystem.freshAmber(), data.amber || {}, { orders: [], ordersAt: null });
                     this.missionLog = data.missionLog || [];
                     // Active missions don't persist across saves (complex entity refs)
                     this.activeMission = null;
@@ -58549,19 +58804,28 @@ Object.assign(TrafficVehicle.prototype, {
             'Barista Ren': {
                 text: g => g.missions.activeMission
                     ? "You've already got a job running. Finish that first, then come back for more work."
-                    : "Hey! We've got an Amber delivery that needs to go out. Want to run it? Good personics in it for you.",
+                    : g.missions.amber.unlocked
+                        ? "Stella! You're on the Amber app now, orders come straight to your phone. But I've got one here if you want it."
+                        : "Hey! We've got an Amber delivery that needs to go out. Want to run it? Good personics in it for you.",
                 accept(g) {
                     if (g.missions.activeMission) { showMessage('FINISH YOUR CURRENT MISSION FIRST.'); return; }
-                    const delivery = g.missions.generateDelivery(g);
-                    if (delivery) { g.missions.acceptMission(delivery, g); g.returnVanHome(); showMessage('PICK UP THE PACKAGE FROM THE AMBER DELIVERY VEHICLE OUTSIDE.'); }
-                    else showMessage('NO DELIVERIES AVAILABLE. TRY AGAIN LATER.');
+                    const delivery = g.missions.generateDelivery(g, { source: 'ren' });
+                    if (delivery && g.missions.acceptMission(delivery, g)) {
+                        g.returnVanHome(); showMessage('PICK UP THE PACKAGE FROM THE AMBER DELIVERY VEHICLE OUTSIDE.');
+                        phoneSystem.jobText('Barista Ren', delivery, 'Drop-off\'s pinned. The box is waiting by the van out front.');   // ui/amber-app.js
+                    }
+                    else if (!delivery) showMessage('NO DELIVERIES AVAILABLE. TRY AGAIN LATER.');
                 }
             },
             'Bartender': {
                 text: g => g.missions.activeMission
                     ? "Handle your current contract first, Freelancer. Then we'll talk bounties."
                     : "Welcome to Moon City. We've got a bounty that needs handling — dangerous type, good payout. Interested?",
-                accept(g) { const bounty = g.missions.generateBounty(g); if (bounty) g.missions.acceptMission(bounty, g); }
+                accept(g) {
+                    const bounty = g.missions.generateBounty(g);
+                    if (bounty && g.missions.acceptMission(bounty, g))
+                        phoneSystem.jobText('Bartender', bounty, `${bounty.targetName} hangs around here. Bring them down and the drinks are on the house.`);   // ui/amber-app.js
+                }
             },
             'Torque': {
                 text: () => "Welcome to Torque Auto, Freelancer. Need a new ride, paint job, or some glow work? Step up to the counter.",
@@ -71453,8 +71717,8 @@ engineMixin({
         // GameEngine.prototype (see engineMixin in game-engine.js).
         //
         // On the street (world space, under the light; lit again after it by drawMissionGlow):
-        //   the package, by the side door of Amber's van while a delivery waits to be fetched: a parcel in amber
-        //   card with a violet ribbon, a pickup ring breathing out on the pavement round it, motes rising off it
+        //   the package, by the side door of Amber's van while a delivery waits to be fetched: a Cozy Cafe box
+        //   (drawCozyParcel), a pickup ring breathing out on the pavement round it, motes rising off it
         //   (drawDeliveryPackage). Getting into the van loads it (pickUpPackage).
         //   the drop-off: a gold ring the size of the zone she has to reach, turning, a pulse running in to its
         //   centre (drawDropZone).
@@ -71487,6 +71751,12 @@ engineMixin({
                 const off = van.width / 2 + 18, p = this._pkgSpot || (this._pkgSpot = { x: 0, y: 0, angle: 0 });
                 p.x = van.x - Math.sin(van.angle) * off; p.y = van.y + Math.cos(van.angle) * off; p.angle = van.angle;
                 return p;
+            },
+
+            /** She's on foot in the city with a delivery in her hands: she carries it (player-draw-input.js) */
+            carryingParcel() {
+                const m = this._job();
+                return !!(m && m.type === MISSION_TYPES.DELIVERY && m.pickedUp && !this.isDriving && !this.player.inCar && this.activeMap && this.activeMap.id === 'hub_949');
             },
 
             /** She has the package: picked up by the van (the pill), or loaded with it when she drives off in the van */
@@ -71540,20 +71810,7 @@ engineMixin({
                 ctx.fillStyle = 'rgba(8, 2, 14, 0.38)';
                 ctx.beginPath(); ctx.ellipse(1.5, 2.5, 12.5, 10, 0, 0, Math.PI * 2); ctx.fill();
                 ctx.rotate(at.angle);
-                const w = 20, h = 16;
-                ctx.fillStyle = '#8a4d14'; ctx.fillRect(-w / 2 + 1, -h / 2 + 1.5, w, h);              // its side, in shade
-                const g = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
-                g.addColorStop(0, '#f2b45a'); g.addColorStop(1, '#c47a26');
-                ctx.fillStyle = g; ctx.fillRect(-w / 2, -h / 2, w, h);                               // amber card
-                ctx.strokeStyle = 'rgba(255, 236, 196, 0.55)'; ctx.lineWidth = 0.8; ctx.strokeRect(-w / 2 + 0.4, -h / 2 + 0.4, w - 0.8, h - 0.8);
-                ctx.fillStyle = '#7c4fe0'; ctx.fillRect(-1.6, -h / 2, 3.2, h); ctx.fillRect(-w / 2, -1.6, w, 3.2);   // the violet ribbon
-                ctx.fillStyle = '#b79bff'; ctx.fillRect(-0.6, -h / 2, 1, h); ctx.fillRect(-w / 2, -0.6, w, 1);
-                ctx.fillStyle = '#9b74ff';                                                            // the bow
-                ctx.beginPath(); ctx.ellipse(-3.2, -1.2, 3.2, 2, -0.5, 0, Math.PI * 2); ctx.fill();
-                ctx.beginPath(); ctx.ellipse(3.2, -1.2, 3.2, 2, 0.5, 0, Math.PI * 2); ctx.fill();
-                ctx.fillStyle = '#ffd76a'; ctx.beginPath(); ctx.arc(0, -0.6, 1.5, 0, Math.PI * 2); ctx.fill();
-                ctx.fillStyle = '#fbf3e4'; ctx.fillRect(w / 2 - 7.5, h / 2 - 5.5, 6, 4);              // the address label
-                ctx.fillStyle = 'rgba(80, 40, 20, 0.6)'; ctx.fillRect(w / 2 - 6.5, h / 2 - 4.5, 4, 0.7); ctx.fillRect(w / 2 - 6.5, h / 2 - 3.1, 3, 0.7);
+                drawCozyParcel(ctx, 20, 17);                                                        // a Cozy Cafe box (ui/humanoid-render.js)
                 ctx.rotate(-at.angle);
                 // motes rising off it, gold
                 for (let i = 0; i < 3; i++) {
@@ -78302,8 +78559,9 @@ engineMixin({
                     jewelry: withFieldMask(this, cosmeticConfig.jewelry),   // masked in the field (core/appearances.js)
                     pose: pushing ? 'push' : typeof phoneSystem !== 'undefined' && phoneSystem.isOpen ? 'phone' : this.sneaking ? 'sneak' : undefined,
                     poseWhileMoving: pushing || this.sneaking,
-                    // A drawn gun takes the hand; the umbrella waits
-                    held: armed && cosmeticConfig.held && cosmeticConfig.held.type === 'umbrella' ? null : (cosmeticConfig.held || outfit.held || null)
+                    // A delivery she's carrying takes both hands (engine/markers.js); a drawn gun takes the hand, the umbrella waits
+                    held: currentStance === 'idle' && !pushing && this.carryingParcel() ? PARCEL_HELD
+                        : armed && cosmeticConfig.held && cosmeticConfig.held.type === 'umbrella' ? null : (cosmeticConfig.held || outfit.held || null)
                 });
                 SilhouetteFX.glow = false;
                 
@@ -78875,6 +79133,9 @@ engineMixin({
                 if (this.missions) {
                     this.missions.activeMission = null;
                     this.missions.completedCount = 0;
+                    this.missions.completedDeliveries = 0;
+                    this.missions.amber = MissionSystem.freshAmber();
+                    this.missions._recipients = [];
                     if (this.missions.missionLog) this.missions.missionLog = [];
                 }
                 
@@ -80490,7 +80751,11 @@ engineMixin({
             { name: 'Larissa', role: 'Handler', messages: ['Your assignment particulars are with Mirabel. Please coordinate with her directly.', 'The Empereal Lord remains pleased with your work.'] },
         ];
 
-        /** Places a pin or a photo can be from: the hub building (by id) and how a photo there looks */
+        /** What the people met in the city are, in the inbox (anyone else is a 'Contact') */
+        const MSG_ROLES = { 'Barista Ren': 'Cozy Cafe', 'Bartender': 'Moon City', 'Anavia': 'Enni Cole', 'Torque': 'Torque Auto', 'Prisma': 'Neural Systems' };
+
+        /** Places a pin or a photo can be from: the hub building (by id) and how a photo there looks.
+         *  A pin can also carry a spot of its own, { x, y, label, kind } (a job's drop-off or a mark's corner). */
         const MSG_PLACES = {
             moon_city:     { label: 'Moon City Nightclub', kind: 'Nightclub', x: 5075, y: 5155, w: 600, h: 500, look: 'club',   tint: ['#2a0638', '#0a0214'], glow: ['#ff2a8a', '#8a3cff', '#28d8ff'] },
             cozy_cafe:     { label: 'Cozy Cafe',           kind: 'Café',      x: 4715, y: 1835, w: 350, h: 350, look: 'cafe',   tint: ['#3a1a0c', '#140804'], glow: ['#ffb45a', '#ff8a3c', '#ffe0a0'] },
@@ -80663,7 +80928,7 @@ engineMixin({
                 const defs = MSG_CONTACTS.map(c => ({ ...c }));
                 const add = (name) => {
                     if (!name || name === '949' || defs.some(c => c.name === name)) return;
-                    defs.push({ name, role: 'Contact' });
+                    defs.push({ name, role: MSG_ROLES[name] || 'Contact' });
                 };
                 this.metNPCs.forEach(add);
                 Object.keys(this.messageHistory).forEach(n => { if (this.messageHistory[n].length) add(n); });
@@ -80697,7 +80962,7 @@ engineMixin({
                 if (!rec) return 'No messages yet';
                 const who = rec.from === 'me' ? 'You: ' : rec.who ? `${rec.who}: ` : '';
                 const d = rec.data || {};
-                const body = rec.kind === 'pin' ? `📍 ${(MSG_PLACES[d.place] || {}).label || 'A location'}`
+                const body = rec.kind === 'pin' ? `📍 ${(this._place(d.place) || {}).label || 'A location'}`
                     : rec.kind === 'brief' ? `✦ Job · ${this._jobTitle(d.mission)}`
                     : rec.kind === 'voice' ? '🎙 Voice note'
                     : rec.kind === 'snap' ? '📷 Photo'
@@ -81120,7 +81385,14 @@ engineMixin({
             },
 
             /* ───────────────────────── location drops ───────────────────────── */
+            /** A pin's key (a place's id, or its spot) */
+            _pinKey(id) { return id && typeof id === 'object' ? `${Math.round(id.x)},${Math.round(id.y)}` : id; },
             _place(id) {
+                if (id && typeof id === 'object') {                                  // a spot of its own: the point is the pin
+                    if (typeof id.x !== 'number' || typeof id.y !== 'number') return null;
+                    return { label: id.label || 'A location', kind: id.kind || 'Pinned spot', look: 'street', tint: ['#14102a', '#05040c'], glow: ['#e8c27a', '#ff9a4a', '#8a6aff'],
+                             id, x: id.x - 150, y: id.y - 330, w: 300, h: 300, tx: id.x, ty: id.y };
+                }
                 const P = MSG_PLACES[id];
                 if (!P) return null;
                 // The live building wins over the table (a map edit moves the pin with it)
@@ -81146,7 +81418,7 @@ engineMixin({
                 const b = document.createElement('b'); b.textContent = P.label;
                 const s = document.createElement('small');
                 const set = game && game.navDestination && P.tx != null && Math.hypot(game.navDestination.x - P.tx, game.navDestination.y - P.ty) < 4;
-                s.textContent = set ? 'Waypoint set' : this.feed.pendingPin === d.place ? 'Waypoint saved for the city' : P.kind;
+                s.textContent = set ? 'Waypoint set' : this._pinKey(this.feed.pendingPin) === this._pinKey(d.place) ? 'Waypoint saved for the city' : P.kind;
                 t.append(b, s);
                 const btn = document.createElement('button');
                 btn.className = 'mb-btn';
@@ -81163,7 +81435,7 @@ engineMixin({
             _pinMap(id) {
                 const g = typeof game !== 'undefined' && game, M = g && g.activeMap;
                 if (!M || M.id !== 'hub_949' || typeof MapArt === 'undefined') return null;
-                const key = id + '|' + M.id;
+                const key = this._pinKey(id) + '|' + M.id;
                 if (this._mapCache.has(key)) return this._mapCache.get(key);
                 const P = this._place(id);
                 if (!P) return null;
@@ -81210,14 +81482,14 @@ engineMixin({
             },
             /** A contact drops a pin (the story uses this for Mirabel's lounge) */
             dropPin(name, place, text, delay = 1600) {
-                this.sendText(name, text, true, delay, { kind: 'pin', id: `pin_${place}_${this._now()}`, data: { place } });
+                this.sendText(name, text, true, delay, { kind: 'pin', id: `pin_${this._pinKey(place)}_${this._now()}`, data: { place } });
             },
 
             /* ───────────────────────── mission briefs ───────────────────────── */
             _jobTitle(m) {
                 if (!m) return 'A job';
                 if (m.type === 'bounty') return m.targetName || 'Bounty';
-                if (m.type === 'delivery') return `Delivery to ${m.targetLabel || 'the apartments'}`;
+                if (m.type === 'delivery') return `To ${m.targetLabel || 'the apartments'}`;
                 return String(m.title || 'Salvage').replace(/^SALVAGE: /, '').toLowerCase().replace(/(^|\s)\S/g, s => s.toUpperCase());
             },
             _briefCard(rec) {
@@ -81228,6 +81500,8 @@ engineMixin({
                 k.textContent = `Job · ${m.type === 'bounty' ? 'Bounty' : m.type === 'delivery' ? 'Delivery' : 'Salvage'}`;
                 const b = document.createElement('b'); b.textContent = this._jobTitle(m);
                 const p = document.createElement('p'); p.textContent = m.description || '';
+                if (m.type === 'delivery' && m.handed) p.textContent += ' · Courier brings the box to you';
+                if (m.type === 'delivery' && m.km) p.textContent += ` · ${(m.km / 1000).toFixed(1)} km`;
                 const row = document.createElement('div'); row.className = 'row';
                 const pay = document.createElement('span'); pay.textContent = `${m.reward || 0} PP · ${m.scrapReward || 0} scrap`;
                 row.appendChild(pay);
@@ -81244,7 +81518,23 @@ engineMixin({
                     card.classList.add(d.state);
                 }
                 card.append(k, b, p, row);
+                // Where it is: the same map crop a pin gets, with its own pin
+                const spot = this._jobSpot(m), url = spot && this._pinMap(spot);
+                if (url) {
+                    const map = document.createElement('div');
+                    map.className = 'mb-map mb-brief-map';
+                    map.style.backgroundImage = `url(${url})`;
+                    map.appendChild(document.createElement('i'));
+                    card.insertBefore(map, row);
+                }
                 return card;
+            },
+            /** A job's spot for a pin: { x, y, label, kind } (the drop-off, the mark's corner, the salvage site) */
+            _jobSpot(m) {
+                if (!m || typeof m.targetX !== 'number') return null;
+                if (m.type === 'delivery') return { x: m.targetX, y: m.targetY, label: m.targetLabel || 'Drop-off', kind: `Drop-off · ${m.targetKind || 'Apartments'}` };
+                if (m.type === 'bounty') return { x: m.targetX, y: m.targetY, label: m.near ? `Outside the ${m.near.toLowerCase()}` : 'Last seen', kind: `${m.targetName || 'The mark'} · last seen` };
+                return { x: m.targetX, y: m.targetY, label: this._jobTitle(m), kind: 'Salvage site' };
             },
             /** Take the job: it goes on the tracker exactly as if the bartender or barista had handed it over */
             acceptBrief(rec) {
@@ -81254,13 +81544,15 @@ engineMixin({
                 m.id = `${m.type}_${Date.now()}`;
                 if (!g.missions.acceptMission(m, g)) return;     // a job's already running: it says so
                 d.state = 'accepted';
-                if (m.type === 'delivery') { if (g.returnVanHome) g.returnVanHome(); showMessage('PICK UP THE PACKAGE FROM THE AMBER DELIVERY VEHICLE AT COZY CAFE.'); }
+                if (m.type === 'delivery' && m.handed) showMessage('AMBER\'S COURIER HANDS YOU THE PACKAGE. WALK IT TO THE DOOR.');
+                else if (m.type === 'delivery') { if (g.returnVanHome) g.returnVanHome(); showMessage('PICK UP THE PACKAGE FROM THE AMBER DELIVERY VEHICLE AT COZY CAFE.'); }
+                if (!(m.type === 'delivery' && !m.handed)) { const spot = this._jobSpot(m); if (spot) this.setWaypoint(spot); }
                 if (this._activeContact) this.renderThread(this._activeContact);
             },
-            sendBrief(who, type, text) {
+            sendBrief(who, type, text, opts) {
                 const g = game, M = g && g.missions;
                 if (!M) return false;
-                const m = type === 'delivery' ? M.generateDelivery(g) : type === 'salvage' ? M.generateSalvage(g) : M.generateBounty(g);
+                const m = type === 'delivery' ? M.generateDelivery(g, opts) : type === 'salvage' ? M.generateSalvage(g) : M.generateBounty(g);
                 if (!m) return false;
                 // One open job on the phone at a time: an older one goes to someone else
                 for (const n in this.messageHistory) for (const r of this.messageHistory[n]) if (r.kind === 'brief' && r.data && r.data.state === 'open') r.data.state = 'lapsed';
@@ -81616,6 +81908,239 @@ engineMixin({
         document.querySelectorAll('#msg-tabs button').forEach(b => b.addEventListener('click', () => { phoneSystem.msgTab = b.dataset.tab; phoneSystem.renderContacts(); }));
         document.getElementById('contact-reply-snap').addEventListener('click', () => phoneSystem.sendSnapshot(phoneSystem._activeContact));
         setInterval(() => { try { phoneSystem._feedTick(); } catch (e) { console.error(e); } }, 1000);
+        /* =====================================================================
+           AMBER DELIVERY — the delivery loop on her phone.
+
+             Ren and the Bartender text the job they hand her in person: the
+             drop-off, or the corner the mark hangs about, as a pin (jobText).
+             After each delivery Ren asks if she's up for another (a brief in
+             Messages; Accept and Amber's courier brings the box to wherever
+             she is: no trip back to the cafe). Five runs in, Ren puts her on
+             the driver app instead (afterDelivery).
+
+             The app (#screen-amber): orders near her, any time (pay by the
+             distance, an estimate of the time it should take), tips on top
+             (on time and the box in one piece: MissionSystem._tipFor), her
+             rating, and Amber Premium (1,200 PP once: tips half again, an
+             Express order on the board, a fourth order). Online, a new order
+             pings her phone while she's free.
+
+           The state lives on game.missions.amber (saved with the missions).
+           ===================================================================== */
+        const AMBER_PREMIUM_COST = 1200;
+        const REN_AGAIN = [
+            'That was quick! Got another one ready. The courier can meet you wherever you are. Want it?',
+            'People are loving you. Another order just came in. You in?',
+            'Three for three, Stella. One more?',
+            'Rush hour at Cozy. Can you take one more?',
+        ];
+        const REN_APP = [
+            'Five runs, Stella. You\'re officially our favourite driver.',
+            'Amber has a driver app. Orders whenever you want, tips straight to you, the works. I put your name in. Check your phone!',
+        ];
+
+        const _amberBaseHome = phoneSystem.showHome;
+
+        Object.assign(phoneSystem, {
+            /* ───────────────────────── texts from the people who hand out jobs ───────────────────────── */
+            /** Whoever handed her a job in person texts where it is, as a pin she can set a waypoint from */
+            jobText(who, m, text) {
+                const spot = this._jobSpot(m);
+                if (spot) this.dropPin(who, spot, text, 1800);
+            },
+
+            /** A delivery's done: Ren asks for another, or (five in) hands her over to the app */
+            afterDelivery(m, g, tip) {
+                const M = g.missions, A = M.amber;
+                if (m.source === 'amber') { this._amberOrders(true); this._amberPing(false); if (this.currentApp === 'amber') this.renderAmber(); return; }
+                if (A.unlocked) return;
+                const n = M.completedDeliveries;
+                if (n >= 5) {
+                    A.unlocked = true;
+                    A.pingAt = (g.worldMinutes || 0) + 10;
+                    this.sendText('Barista Ren', REN_APP[0], true, 2200);
+                    g.addPausableTimeout(() => {
+                        this.sendText('Barista Ren', REN_APP[1], true, 2400);
+                        g.addPausableTimeout(() => { showMessage('NEW APP · AMBER DELIVERY'); this._amberIcon(); }, 2600);
+                    }, 2600);
+                    return;
+                }
+                const onHub = g.activeMap && g.activeMap.id === 'hub_949';
+                this.sendBrief('Barista Ren', 'delivery', REN_AGAIN[(n - 1) % REN_AGAIN.length],
+                    { source: 'ren', handed: true, from: onHub ? { x: g.player.x, y: g.player.y } : null });
+            },
+
+            /* ───────────────────────── the app ───────────────────────── */
+            _amber() { return typeof game !== 'undefined' && game && game.missions ? game.missions.amber : null; },
+
+            /** The icon on the home screen, once Ren's put her on the app; its dot while an order's waiting */
+            _amberIcon() {
+                const A = this._amber(), icon = document.getElementById('app-amber');
+                if (icon) icon.style.display = A && A.unlocked ? '' : 'none';
+                const dot = document.getElementById('badge-amber');
+                if (dot) dot.classList.toggle('active', !!(A && A.unlocked && A.fresh));
+            },
+
+            showHome() {
+                _amberBaseHome.call(this);
+                this._amberIcon();
+            },
+
+            showAmber() {
+                const A = this._amber();
+                if (!A || !A.unlocked) return;
+                this.currentApp = 'amber';
+                this.homeScreen.style.display = 'none';
+                document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
+                document.getElementById('screen-amber').style.display = 'flex';
+                A.fresh = false; this._amberIcon();
+                this._amberOrders(false);
+                this.renderAmber();
+            },
+
+            /** Where she is, for an order's distance: herself in the city, the cafe from anywhere else */
+            _amberFrom() {
+                const g = game;
+                if (g.activeMap && g.activeMap.id === 'hub_949') return { x: g.player.x, y: g.player.y };
+                const P = this._place('cozy_cafe');
+                return P ? { x: P.tx, y: P.ty } : null;
+            },
+
+            /** The board: three orders (four with Premium, the first an Express), kept half an hour of world time */
+            _amberOrders(force) {
+                const g = game, A = this._amber();
+                if (!A || !g.missions) return [];
+                const now = g.worldMinutes || 0;
+                if (!force && A.orders.length && A.ordersAt != null && now - A.ordersAt < 30) return A.orders;
+                const from = this._amberFrom(), n = A.premium ? 4 : 3, out = [];
+                for (let i = 0; i < n; i++) {
+                    const m = g.missions.generateDelivery(g, { source: 'amber', handed: true, from, express: A.premium && i === 0 });
+                    if (m && !out.some(o => o.targetLabel === m.targetLabel && Math.abs(o.targetX - m.targetX) < 1)) out.push(m);
+                }
+                A.orders = out; A.ordersAt = now;
+                return out;
+            },
+
+            /** Take an order: the courier hands her the box where she stands, and the drop-off goes on UMaps */
+            acceptAmber(i) {
+                const g = game, A = this._amber(), o = A && A.orders[i];
+                if (!o) return;
+                if (g.activeMap.id !== 'hub_949') { showMessage('AMBER ORDERS ARE PICKED UP IN THE CITY.'); return; }
+                const m = { ...o, id: `delivery_${Date.now()}` };
+                if (!g.missions.acceptMission(m, g)) return;
+                A.orders.splice(i, 1);
+                showMessage('AMBER\'S COURIER HANDS YOU THE PACKAGE. WALK IT TO THE DOOR.');
+                const spot = this._jobSpot(m);
+                if (spot) this.setWaypoint(spot);
+                this.renderAmber();
+            },
+
+            buyAmberPremium() {
+                const g = game, A = this._amber();
+                if (!A || A.premium) return;
+                if (g.currency < AMBER_PREMIUM_COST) { showMessage(`AMBER PREMIUM · ${AMBER_PREMIUM_COST} PP NEEDED`); return; }
+                g.currency -= AMBER_PREMIUM_COST;
+                A.premium = true;
+                g.updateUI();
+                audioSys.sfx('ui');
+                showMessage('AMBER PREMIUM · WELCOME ABOARD');
+                this._amberOrders(true);
+                this.renderAmber();
+            },
+
+            toggleAmberOnline() {
+                const A = this._amber();
+                if (!A) return;
+                A.online = !A.online;
+                A.pingAt = (game.worldMinutes || 0) + 6;
+                showMessage(A.online ? 'AMBER · YOU\'RE ONLINE' : 'AMBER · OFFLINE');
+                this.renderAmber();
+            },
+
+            /** Online and free in the city: now and then a new order lands on the board, with a ping */
+            _amberPing(announce = true) {
+                const g = game, A = this._amber();
+                if (!A) return;
+                A.pingAt = (g.worldMinutes || 0) + 18 + Math.floor(Math.random() * 22);
+                if (!announce) return;
+                const o = this._amberOrders(true)[0];
+                if (!o) return;
+                A.fresh = true; this._amberIcon();
+                showMessage(`AMBER · NEW ORDER · ${o.targetLabel.toUpperCase()} · ${o.reward} PP`);
+                audioSys.sfx('ui');
+                if (this.currentApp === 'amber' && this.isOpen) this.renderAmber();
+            },
+            _amberTick() {
+                const g = typeof game !== 'undefined' && game, A = this._amber();
+                if (!g || !A || !A.unlocked || !A.online || !g.running || g.missions.activeMission) return;
+                if (!g.activeMap || g.activeMap.id !== 'hub_949') return;
+                if (A.pingAt == null) A.pingAt = (g.worldMinutes || 0) + 6;
+                if ((g.worldMinutes || 0) >= A.pingAt) this._amberPing(true);
+            },
+
+            _amberStars() {
+                const s = this._amber().stars;
+                return s.length ? (s.reduce((a, b) => a + b, 0) / s.length) : 5;
+            },
+
+            renderAmber() {
+                const el = document.getElementById('amber-body'), A = this._amber(), g = game;
+                if (!el || !A) return;
+                const on = document.getElementById('amber-online');
+                if (on) { on.textContent = A.online ? 'Online' : 'Offline'; on.classList.toggle('on', A.online); }
+                const esc = t => String(t).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+                const now = g.worldMinutes || 0, m = g.missions.activeMission;
+                let h = '';
+                // Her numbers
+                h += `<div class="amb-stats"><div><b>${this._amberStars().toFixed(1)}<i>★</i></b><small>Rating</small></div>`
+                   + `<div><b>${A.runs}</b><small>Runs</small></div><div><b>${A.tips}</b><small>Tips · PP</small></div>`
+                   + `<div><b>${A.earned}</b><small>Earned · PP</small></div></div>`;
+                // The order she's on
+                if (m && m.type === 'delivery' && m.status === 'active') {
+                    const took = Math.max(0, now - (m.startTime || now)), eta = m.etaMin || 6, late = took > eta;
+                    const cond = m.condition == null ? 100 : m.condition;
+                    h += `<div class="amb-card amb-live"><div class="amb-k">${m.source === 'amber' ? (m.express ? 'Express · on the way' : 'On the way') : 'Delivery for Ren'}</div>`
+                       + `<b>${esc(m.targetLabel)}</b>`
+                       + `<div class="amb-bars"><span>Time <em class="${late ? 'late' : ''}">${took} / ${eta} min</em></span><span>Box <em class="${cond < 60 ? 'late' : ''}">${cond}%</em></span></div>`
+                       + `<div class="amb-meter"><i style="width:${Math.min(100, took / eta * 100)}%" class="${late ? 'late' : ''}"></i></div>`
+                       + `<button class="amb-btn ghost" data-amb="way">Set waypoint</button></div>`;
+                }
+                if (A.lastTip && now - A.lastTip.at < 60) {
+                    h += `<div class="amb-tip">${'★'.repeat(A.lastTip.stars)}${'☆'.repeat(5 - A.lastTip.stars)} · ${esc(A.lastTip.label)} tipped <b>${A.lastTip.tip} PP</b>${A.lastTip.onTime ? ' · on time' : ''}</div>`;
+                }
+                // The board
+                h += `<div class="amb-sec">Orders near you<small>${A.online ? 'pings on' : 'go online for pings'}</small></div>`;
+                const busy = !!m, orders = this._amberOrders(false);
+                if (!orders.length) h += '<div class="amb-none">No orders right now.</div>';
+                orders.forEach((o, i) => {
+                    const tipMax = Math.round(o.reward * 0.35 * 1.15 * (A.premium ? 1.5 : 1));
+                    h += `<div class="amb-card${o.express ? ' express' : ''}"><div class="amb-k">${o.express ? '⚡ Express' : 'Cozy Cafe'} · ${(o.km / 1000).toFixed(1)} km · ~${o.etaMin} min</div>`
+                       + `<b>${esc(o.targetLabel)}</b>`
+                       + `<div class="amb-row"><span>${o.reward} PP <small>+ tips up to ${tipMax}</small></span>`
+                       + `<button class="amb-btn" data-amb="take" data-i="${i}"${busy ? ' disabled' : ''}>${busy ? 'Busy' : 'Accept'}</button></div></div>`;
+                });
+                // Premium
+                if (A.premium) h += '<div class="amb-prem on"><b>Amber Premium</b><small>Tips ×1.5 · Express orders · a fourth order on the board</small></div>';
+                else h += `<div class="amb-prem"><b>Amber Premium</b><small>Tips ×1.5 · Express orders that pay 60% more · a fourth order on the board</small>`
+                        + `<button class="amb-btn gold" data-amb="prem">${AMBER_PREMIUM_COST} PP</button></div>`;
+                el.innerHTML = h;
+                el.querySelectorAll('[data-amb]').forEach(b => b.addEventListener('click', e => {
+                    e.stopPropagation();
+                    const k = b.dataset.amb;
+                    if (k === 'take') this.acceptAmber(+b.dataset.i);
+                    else if (k === 'prem') this.buyAmberPremium();
+                    else if (k === 'way') { const spot = this._jobSpot(game.missions.activeMission); if (spot && this.setWaypoint(spot)) audioSys.sfx('ui'); }
+                }));
+            },
+        });
+
+        document.getElementById('app-amber').addEventListener('click', () => phoneSystem.showAmber());
+        document.getElementById('amber-back').addEventListener('click', () => phoneSystem.showHome());
+        document.getElementById('amber-online').addEventListener('click', () => phoneSystem.toggleAmberOnline());
+        setInterval(() => {
+            phoneSystem._amberTick();
+            if (phoneSystem.isOpen && phoneSystem.currentApp === 'amber' && game && game.missions.activeMission) phoneSystem.renderAmber();
+        }, 1000);
         // --- SCREENS: the one way the sidebar-nav screens open and close ---
         // Two panels: #map-interface (the golden map) and #freelancer-menu (every other
         // screen, as a sub-screen of #inv-main-content). Screens.open(name) closes the other

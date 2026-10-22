@@ -148,6 +148,9 @@
                 if (this.missions) {
                     this.missions.activeMission = null;
                     this.missions.completedCount = 0;
+                    this.missions.completedDeliveries = 0;
+                    this.missions.amber = MissionSystem.freshAmber();
+                    this.missions._recipients = [];
                     if (this.missions.missionLog) this.missions.missionLog = [];
                 }
                 
