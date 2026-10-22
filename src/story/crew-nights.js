@@ -49,8 +49,9 @@
                 solo: { me: { x: 167, y: 433, a: Math.PI / 2, pose: 'sit' }, them: { x: 309, y: 540, a: Math.PI, pose: 'sit' }, cam: { x: 230, y: 500 }, zoom: 2.9, after: { x: 380, y: 520 } } },
             torque_auto: { map: 'auto_shop', label: 'Torque Auto', what: 'Wraps at Torque Auto', host: 'Victoria',
                 solo: { me: { x: 470, y: 296, a: -1.2, pose: 'arms_crossed' }, them: { x: 566, y: 288, a: -1.9, pose: 'lean' }, cam: { x: 518, y: 248 }, zoom: 2.8, after: { x: 600, y: 380 } } },   // at the wrap bay
-            biggs_park: { map: 'sdc', label: 'Biggs Park', what: 'Cans at Biggs Park', host: 'Yenna', park: { x: 8680, y: 8080, r: 560 }, inside: 'biggs_arena',
-                solo: { me: { x: 8650, y: 8100, a: -Math.PI / 2 }, them: { x: 8700, y: 8100, a: -Math.PI / 2, pose: 'arms_crossed' }, cam: { x: 8675, y: 8070 }, zoom: 2.7, after: { x: 8650, y: 8110 } } },
+            biggs_park: { map: 'sdc', label: 'Biggs Park', what: 'Cans at Biggs Park', host: 'Yenna', park: { x: 8260, y: 8160, r: 600 }, inside: 'biggs_arena',
+                // The open plaza west of the pavilion, facing north up a clear lane (room for a range: cans along y≈7960)
+                solo: { me: { x: 8230, y: 8320, a: -Math.PI / 2 }, them: { x: 8290, y: 8320, a: -Math.PI / 2, pose: 'arms_crossed' }, cam: { x: 8260, y: 8250 }, zoom: 2.4, after: { x: 8230, y: 8340 } } },
             neural_sys: { map: 'neural_sys_interior', label: 'Neural Systems', what: 'Browsing at Neural Systems', host: 'Josh',
                 solo: { me: { x: 470, y: 340, a: -Math.PI / 2 }, them: { x: 530, y: 340, a: -Math.PI / 2, pose: 'arms_crossed' }, cam: { x: 500, y: 310 }, zoom: 2.9, after: { x: 500, y: 400 } } },
             enni_cole: { map: 'enni_cole_interior', label: 'Enni Cole', what: 'Shopping at Enni Cole', host: 'Max',
