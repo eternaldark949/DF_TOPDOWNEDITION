@@ -596,7 +596,7 @@
                     e.lamps = [
                         L(190, 188, '#fff0dc', 300), L(190, 428, '#fff0dc', 300), L(505, 188, '#fff0dc', 300),   // over the bays
                         L(470, 640, '#ffc890', 340), L(700, 880, '#ffd9a8', 260), L(720, 110, '#ffd9a8', 220),   // the floor, the door, the bench
-                        L(1050, 200, '#e8eeff', 300), L(1165, 505, '#fff4e0', 280), L(950, 540, '#ffd9a0', 200),   // the counter, the plinth, the lounge
+                        L(1050, 200, '#e8eeff', 300), L(1165, 505, '#f6c2ac', 280), L(950, 540, '#ffd9a0', 200),   // the counter, the plinth, the lounge
                         L(1100, 800, '#ffb070', 230),                                                               // the parts room
                     ];
                     break;

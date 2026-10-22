@@ -301,11 +301,11 @@ engineMixin({
             for (const yy of [y + 24, y + h - 24]) for (let xx = x + 30; xx <= x + w - 30; xx += 34) glowA(c, xx, yy, 22, '255, 244, 226', 0.22);
         }
         glowA(c, 470, 640, 200, '255, 170, 70', 0.08);
-        // The showroom: four spots on the plinth, the counter's amber line, the neon script on the north wall
+        // The showroom: four rose-gold spots on the plinth, the counter's amber line, the neon script on the north wall
         const { x: tx, y: ty, r: tr } = TQ_TURNTABLE;
-        glowA(c, tx, ty, tr + 70, '255, 246, 230', 0.16);
-        for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4; glowA(c, tx + Math.cos(a) * (tr + 6), ty + Math.sin(a) * (tr + 6), 40, '255, 236, 200', 0.18); }
-        glowA(c, tx, ty, tr + 18, '255, 154, 42', 0.1 + 0.03 * Math.sin(t * 1.3));
+        glowA(c, tx, ty, tr + 70, '250, 206, 188', 0.17);
+        for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4; glowA(c, tx + Math.cos(a) * (tr + 6), ty + Math.sin(a) * (tr + 6), 40, '248, 190, 168', 0.2); }
+        glowA(c, tx, ty, tr + 18, '236, 168, 142', 0.1 + 0.03 * Math.sin(t * 1.3));
         for (let x = 960; x <= 1140; x += 30) glowA(c, x, 290, 26, '255, 154, 42', 0.3);
         const hum = 0.85 + 0.08 * Math.sin(t * 1.7) + 0.05 * Math.sin(t * 13);
         c.globalAlpha = 0.55 * hum; TorqueArt.text(c, 'Torque', 1235, 96, 42, '#ff9a2a', '"Great Vibes", cursive');

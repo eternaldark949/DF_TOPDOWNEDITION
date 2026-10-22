@@ -9,7 +9,7 @@
            collision are the factory's; this only paints them.
            ===================================================================== */
         const TQX = { wall: '#1f1f25', wallHi: '#34343c', rib: 'rgba(0,0,0,.28)', amber: '#ff9a2a', amberHi: '#ffc46a',
-            steel: '#9aa3ad', steelHi: '#dfe3ea', roof: '#2a2b31', roofLo: '#17171c', glass: '#26384a', glassHi: '#4d6880', ink: '#0c0b0f' };
+            steel: '#9aa3ad', steelHi: '#dfe3ea', roseGold: '#f4b49a', roof: '#2a2b31', roofLo: '#17171c', glass: '#26384a', glassHi: '#4d6880', ink: '#0c0b0f' };
         // Relative to the building's corner: the sawtooth bands, the sign board, the doors on the front wall, the wing's skylight and billboard
         const TQ_PLAN = { TEETH: 4, TEETH_D: 65, BOARD: [60, 272, 380, 64], ROLLUPS: [[28, 130], [342, 130]], ENTRY: [190, 120],
             SKY: [522, 76, 156, 168], BILL: [514, 266, 172, 70] };
@@ -17,7 +17,14 @@
         class TorqueAutoBuilding extends BuildingV2 {
             _setupSign() { this.attachedSign = null; }                  // the script is on the roof's board
             _generateLights() {
-                super._generateLights();                                   // Torque's hot orange lamps round every edge (its accent, #ff8800): ETERNAL's block colour
+                // The hall keeps Torque's hot orange lamps round every edge (its accent, #ff8800: ETERNAL's block colour);
+                // the showroom wing's are rose gold so the BlackMark's corner reads apart
+                const all = this.sections, accent = this.colors.accent;
+                this.sections = all.slice(0, 1); super._generateLights();
+                const n = this.attachedLights.length;
+                this.sections = all.slice(1); this.colors.accent = TQX.roseGold; super._generateLights();
+                for (const l of this.attachedLights.slice(n)) l.keepColor = true;   // the block's orange tint passes them by
+                this.sections = all; this.colors.accent = accent;
                 this.topReach = 60; this.glowReach = 60;
             }
             _k() { return CONFIG.BUILDINGS.LEAN ? 1 + this._leanScale() : 1; }
@@ -132,11 +139,11 @@
                 if (!glow) { B(p, x + lx, y + ly, lw, lh, '#08080a', T.steelHi, 3, 1.5); p.fillStyle = 'rgba(223,227,234,.08)'; p.fillRect(x + lx + 4, y + ly + 4, lw - 8, lh * 0.4); }
                 TorqueArt.text(p, 'L A D Y', x + lx + lw / 2, y + ly + 20, 15, glow ? '#ffffff' : T.steelHi);
                 TorqueArt.text(p, 'BlackMark V3', x + lx + lw / 2, y + ly + 40, 16, glow ? '#f2f2f6' : '#c9ccd2', '"Great Vibes", cursive');
-                TorqueArt.text(p, 'est. 5930  ·  at Torque', x + lx + lw / 2, y + ly + 58, 6, glow ? '#ffd9a0' : '#8d8178');
+                TorqueArt.text(p, 'est. 5930  ·  at Torque', x + lx + lw / 2, y + ly + 58, 6, glow ? '#f8d2c2' : '#8d8178');
                 if (glow) {
-                    // The north lights lit from inside, the skylight's warmth, a string of bulbs round the board
+                    // The north lights lit from inside, the wing's skylight rose gold, a string of bulbs round the board
                     for (let i = 0; i < Pl.TEETH; i++) { p.fillStyle = 'rgba(255,136,0,.85)'; p.fillRect(x + 8, y + 8 + i * Pl.TEETH_D, 484, 7); }
-                    const [sx, sy, sw, sh] = Pl.SKY; p.fillStyle = 'rgba(255,214,150,.35)'; p.fillRect(x + sx + 2, y + sy + 2, sw - 4, sh - 4);
+                    const [sx, sy, sw, sh] = Pl.SKY; p.fillStyle = 'rgba(248,190,168,.4)'; p.fillRect(x + sx + 2, y + sy + 2, sw - 4, sh - 4);
                     p.fillStyle = '#ffa030';
                     for (let xx = bx + 8; xx < bx + bw - 4; xx += 14) for (const yy of [by + 2, by + bh - 2]) { p.beginPath(); p.arc(x + xx, y + yy, 1.6, 0, Math.PI * 2); p.fill(); }
                 }
