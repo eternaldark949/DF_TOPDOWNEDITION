@@ -260,6 +260,7 @@
                 const d = rec.data || {};
                 const body = rec.kind === 'pin' ? `📍 ${(this._place(d.place) || {}).label || 'A location'}`
                     : rec.kind === 'brief' ? `✦ Job · ${this._jobTitle(d.mission)}`
+                    : rec.kind === 'plan' ? '🥂 Plans'
                     : rec.kind === 'voice' ? '🎙 Voice note'
                     : rec.kind === 'snap' ? '📷 Photo'
                     : rec.text;
@@ -496,6 +497,7 @@
                 }
                 if (kind === 'pin') wrap.appendChild(this._pinCard(rec));
                 else if (kind === 'brief') wrap.appendChild(this._briefCard(rec));
+                else if (kind === 'plan' && this._planCard) wrap.appendChild(this._planCard(rec));   // story/crew-nights.js
                 else if (kind === 'voice') wrap.appendChild(this._voiceBubble(contact, rec));
                 else if (kind === 'snap') wrap.appendChild(this._snapCard(contact, rec));
 
@@ -1140,8 +1142,8 @@
                 if (second && typeLines[second]) lines.push({ who: second, text: fill(typeLines[second]) });
                 if (down.length) { const d = pick(down); lines.push({ who: d, text: MSG_BANTER_DOWN[d] }); }
                 if (home.length && Math.random() < 0.8) { const h = pick(home); lines.push({ who: h, text: MSG_BANTER_LEFT[h] }); }
-                const pin = Math.random() < 0.3;
-                if (pin) lines.push({ who: first === 'Victoria' ? 'Sabrina' : 'Victoria', text: 'Drinks. Moon City. First round\'s on Josh.', pin: 'moon_city' });
+                // Sometimes it ends with drinks: a crew night at Moon City (story/crew-nights.js)
+                if (Math.random() < 0.35 && this.crewGroupInvite) this.crewGroupInvite();
 
                 const stamp = Date.now();
                 let at = 2600;
@@ -1192,7 +1194,7 @@
                 if (!left.length) return null;
                 const e = left[Math.floor(Math.random() * left.length)];
                 this.feed.done[e.id] = 1;
-                if (e.kind === 'pin') this.dropPin(e.who, e.place, e.text);
+                if (e.kind === 'pin') { if (!(this.crewPlanFromPin && this.crewPlanFromPin(e))) this.dropPin(e.who, e.place, e.text); }
                 else if (e.kind === 'snap') this.sendSnap(e.who, e.place, e.mood, e.text, e.id);
                 else if (e.kind === 'voice') this.sendVoice(e.who, e.lines, e.id);
                 return e;

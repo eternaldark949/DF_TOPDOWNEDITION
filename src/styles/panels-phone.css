@@ -874,6 +874,20 @@
         .mb-brief em { font-style: normal; color: #f6dfa8; font-size: max(6px, 0.5rem - var(--font-trim)); }
         .mb-brief .mb-brief-map { height: 56px; margin: 3px -10px 1px; border-top: 1px solid rgba(232, 194, 122, 0.18); border-bottom: 1px solid rgba(232, 194, 122, 0.18); }
 
+        /* ── A crew night's invite (story/crew-nights.js): the brief's card in rose and violet ── */
+        .mb-plan { padding: 8px 10px; display: grid; gap: 3px; background: linear-gradient(160deg, rgba(255, 90, 160, 0.16), rgba(93, 20, 226, 0.2)), #0d0718; }
+        .mb-plan .k { font: 600 max(6px, 0.42rem - var(--font-trim))/1 'Montserrat', sans-serif; letter-spacing: 0.3em; text-transform: uppercase; color: #ff9ac8; }
+        .mb-plan b { display: block; font: italic 600 max(6px, 0.82rem - var(--font-trim))/1.1 'Cormorant Garamond', Georgia, serif; color: #ffd6ea; }
+        .mb-plan p { margin: 0; font: 600 max(6px, 0.54rem - var(--font-trim))/1.35 'Montserrat', sans-serif; color: var(--df-lilac-grey); }
+        .mb-plan .row { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 2px; }
+        .mb-plan .row em { margin-right: auto; font-style: normal; color: #ffd6ea; font: 600 max(6px, 0.5rem - var(--font-trim)) 'Montserrat', sans-serif; }
+        .mb-plan .mb-btn.ghost { background: transparent; border: 1px solid rgba(255, 154, 200, 0.5); color: #ff9ac8; }
+        .mb-plan-faces { display: flex; margin: 2px 0 1px; }
+        .mb-plan-faces .mb-plan-av { width: 22px; height: 22px; margin-right: -5px; font-size: max(6px, 0.5rem - var(--font-trim)); box-shadow: 0 0 0 1.5px #12081e; }
+        .mb-plan .mb-brief-map { margin: 3px -10px 1px; }
+        .mb-plan.no, .mb-plan.missed, .mb-plan.lapsed { opacity: 0.6; }
+        .mb-plan.done { box-shadow: inset 0 0 0 1px rgba(255, 154, 200, 0.4); }
+
         /* ── Amber Delivery (ui/amber-app.js): kraft, cocoa and amber light ── */
         .amb-icon { border-color: rgba(255, 170, 70, 0.4) !important; background: radial-gradient(circle at 50% 35%, rgba(255, 180, 90, 0.22), rgba(40, 16, 6, 0.4)); }
         #screen-amber { flex-direction: column; background: radial-gradient(120% 60% at 50% 0%, rgba(255, 150, 50, 0.16), transparent 60%), linear-gradient(180deg, #1c0d06, #0d0604); }

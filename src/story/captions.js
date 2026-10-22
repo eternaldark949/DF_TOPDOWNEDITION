@@ -318,6 +318,7 @@
             },
             
             show(speaker, text, duration = 3000) {
+                if (typeof game !== 'undefined' && game && game.scenes && game.scenes.running) return;   // a scene has its own subtitles
                 // Check cooldown for this speaker
                 const now = Date.now();
                 const cooldownKey = speaker.toLowerCase();

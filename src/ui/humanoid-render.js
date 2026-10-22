@@ -2837,6 +2837,10 @@
                 // 'champagne_glass' is the legacy id (NPC configs); it's the glass with champagne
                 if (held.type === 'glass' || held.type === 'champagne_glass') {
                     drawHeldGlass(ctx, hX, hY, held.drink || 'champagne', entity, held.hand);
+                } else if (held.type === 'parcel' && held.tucked && !isDrivingCfg(config)) {
+                    ctx.save(); ctx.translate(-1.5, -12.5); ctx.rotate(0.12);           // against her left side, under the arm
+                    drawCozyParcel(ctx, 10, 6.5, 0.6);
+                    ctx.restore();
                 } else if (parcel) {
                     // The box between her hands, a little ahead of them, then her fingertips over its sides
                     const bx = (lFistX + rFistX) / 2 + 4, by = (lFistY + rFistY) / 2, lat = Math.max(10, rFistY - lFistY - 0.6);
@@ -2874,6 +2878,8 @@
 
         /** What a delivery in someone's hands is (drawProceduralHumanoid's `held`) */
         const PARCEL_HELD = Object.freeze({ type: 'parcel' });
+        /** …and tucked under her left arm, when her hands are on a gun */
+        const PARCEL_TUCKED = Object.freeze({ type: 'parcel', tucked: true });
 
         /**
          * A Cozy Cafe delivery box, seen from above, centred on the origin: w along the carrier's facing (x), h across.

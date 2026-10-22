@@ -94,7 +94,7 @@
                     pose: pushing ? 'push' : typeof phoneSystem !== 'undefined' && phoneSystem.isOpen ? 'phone' : this.sneaking ? 'sneak' : undefined,
                     poseWhileMoving: pushing || this.sneaking,
                     // A delivery she's carrying takes both hands (engine/markers.js); a drawn gun takes the hand, the umbrella waits
-                    held: currentStance === 'idle' && !pushing && this.carryingParcel() ? PARCEL_HELD
+                    held: !pushing && this.carryingParcel() ? (currentStance === 'idle' ? PARCEL_HELD : PARCEL_TUCKED)
                         : armed && cosmeticConfig.held && cosmeticConfig.held.type === 'umbrella' ? null : (cosmeticConfig.held || outfit.held || null)
                 });
                 SilhouetteFX.glow = false;

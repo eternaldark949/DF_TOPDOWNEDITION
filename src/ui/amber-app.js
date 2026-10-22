@@ -12,7 +12,7 @@
              distance, an estimate of the time it should take), tips on top
              (on time and the box in one piece: MissionSystem._tipFor), her
              rating, and Amber Premium (1,200 PP once: tips half again, an
-             Express order on the board, a fourth order). Online, a new order
+             Express order that pays 50% more, a fourth order). Online, a new order
              pings her phone while she's free.
 
            The state lives on game.missions.amber (saved with the missions).
@@ -203,7 +203,7 @@
                 const busy = !!m, orders = this._amberOrders(false);
                 if (!orders.length) h += '<div class="amb-none">No orders right now.</div>';
                 orders.forEach((o, i) => {
-                    const tipMax = Math.round(o.reward * 0.35 * 1.15 * (A.premium ? 1.5 : 1));
+                    const tipMax = Math.round(o.reward * 0.3 * 1.15 * (A.premium ? 1.5 : 1));
                     h += `<div class="amb-card${o.express ? ' express' : ''}"><div class="amb-k">${o.express ? '⚡ Express' : 'Cozy Cafe'} · ${(o.km / 1000).toFixed(1)} km · ~${o.etaMin} min</div>`
                        + `<b>${esc(o.targetLabel)}</b>`
                        + `<div class="amb-row"><span>${o.reward} PP <small>+ tips up to ${tipMax}</small></span>`
@@ -211,7 +211,7 @@
                 });
                 // Premium
                 if (A.premium) h += '<div class="amb-prem on"><b>Amber Premium</b><small>Tips ×1.5 · Express orders · a fourth order on the board</small></div>';
-                else h += `<div class="amb-prem"><b>Amber Premium</b><small>Tips ×1.5 · Express orders that pay 60% more · a fourth order on the board</small>`
+                else h += `<div class="amb-prem"><b>Amber Premium</b><small>Tips ×1.5 · Express orders that pay 50% more · a fourth order on the board</small>`
                         + `<button class="amb-btn gold" data-amb="prem">${AMBER_PREMIUM_COST} PP</button></div>`;
                 el.innerHTML = h;
                 el.querySelectorAll('[data-amb]').forEach(b => b.addEventListener('click', e => {

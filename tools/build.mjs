@@ -173,6 +173,7 @@ const SCRIPTS = [
     'ui/phone.js',
     'ui/messages.js',
     'ui/amber-app.js',
+    'story/crew-nights.js',
     'ui/screens.js',
     'ui/sidebars.js',
     'ui/save-slots-pause-menu.js',

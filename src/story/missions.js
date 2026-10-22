@@ -58,8 +58,8 @@
                 const tx = target.x + (target.w || 100) / 2, ty = target.y + (target.h || 100) + 30;
                 const km = from ? Math.hypot(tx - from.x, ty - from.y) : 2500;
                 let reward = 120 + Math.floor(Math.random() * 80); // 120-200 PP
-                if (opts.source === 'amber') reward = 90 + Math.round(km / 60 + Math.random() * 30);
-                if (opts.express) reward = Math.round(reward * 1.6);
+                if (opts.source === 'amber') reward = 70 + Math.round(km / 90 + Math.random() * 25);    // ~125 across town, ~200 corner to corner: under a bounty
+                if (opts.express) reward = Math.round(reward * 1.5);
                 const scrapReward = 2 + Math.floor(Math.random() * 5);
                 // A street address, so two orders to apartments read apart: the nearest street, a number along it
                 const city = game._hubCache && game._hubCache.cityLayout;
@@ -124,6 +124,7 @@
                     targetY: spawnY,
                     targetRadius: 100,
                     sited, near,
+                    weaponId: ['pistol_fpx', 'rifle_rb98', 'sniper_sr86', 'pistol_anavia', 'sniper_sara'][Math.floor(Math.random() * 5)],   // what they carry (the crew may know)
                     targetEntity: null, // Will be set when spawned
                     reward: reward,
                     scrapReward: scrapReward,
@@ -273,7 +274,7 @@
                 
                 // Bounty targets carry better weapons
                 const bountyWeapons = ['pistol_fpx', 'rifle_rb98', 'sniper_sr86', 'pistol_anavia', 'sniper_sara'];
-                const weaponId = bountyWeapons[Math.floor(Math.random() * bountyWeapons.length)];
+                const weaponId = m.weaponId || bountyWeapons[Math.floor(Math.random() * bountyWeapons.length)];
                 
                 const target = new Ganger(spawnX, spawnY, {
                     hp: 200,
@@ -314,14 +315,16 @@
                 if (r.mission && r.mission._recipientEntity === r.npc) r.mission._recipientEntity = null;
             }
 
-            /** Every tick: walk the residents (a few px a tick, straight; they never stray far from their door) */
+            /** Every tick: walk the residents (round whatever's in the way, on the city's nav grid; they never stray
+             *  far from their door) */
             tickRecipients(game) {
                 if (!this._recipients.length) return;
                 const p = game.player, step = (r, x, y, v) => {
                     const dx = x - r.npc.x, dy = y - r.npc.y, d = Math.hypot(dx, dy);
                     if (d < 1) return true;
-                    const k = Math.min(1, v / d); r.npc.x += dx * k; r.npc.y += dy * k;
-                    return d <= v;
+                    const s = typeof actorSteer === 'function' ? actorSteer(r.npc, x, y, v, game.activeMap) : { x: dx * Math.min(1, v / d), y: dy * Math.min(1, v / d) };
+                    r.npc.x += s.x; r.npc.y += s.y;
+                    return d <= v || (Math.abs(s.x) + Math.abs(s.y) < 1e-3 && d < 24);
                 };
                 for (let i = this._recipients.length - 1; i >= 0; i--) {
                     const r = this._recipients[i];
@@ -359,7 +362,7 @@
                 const onTime = took <= eta;
                 const pace = onTime ? 1 : Math.max(0.2, 1 - (took - eta) / eta);
                 const care = Math.max(0, (m.condition == null ? 100 : m.condition) / 100);
-                let tip = Math.round(m.reward * 0.35 * pace * (0.25 + 0.75 * care) * (0.85 + Math.random() * 0.3));
+                let tip = Math.round(m.reward * 0.3 * pace * (0.25 + 0.75 * care) * (0.85 + Math.random() * 0.3));
                 if (this.amber.premium) tip = Math.round(tip * 1.5);
                 const stars = Math.max(1, Math.min(5, Math.round(1 + 4 * (0.5 * pace + 0.5 * care))));
                 return { tip, stars, onTime, took };
