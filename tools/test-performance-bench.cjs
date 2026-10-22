@@ -105,7 +105,7 @@ test('Detailed capture reuses entity/character/world hooks without the Full pane
   const env=setup();
   const r=value(env, `
     performance.now=()=>{clock+=0.01;return clock;};
-    game._doLoadMap('hub_949'); game.running=true;game.paused=false;
+    game._doLoadMap('sdc'); game.running=true;game.paused=false;
     const hair=hairGeometry, top=BuildingV2.prototype.drawTop;
     PerformanceBench.run({durationMs:100,warmupMs:0});
     const during={people:PeopleProfiler.active,world:WorldRenderProfiler.active,panel:game.showProfiler,

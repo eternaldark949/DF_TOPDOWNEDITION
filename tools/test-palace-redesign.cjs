@@ -13,7 +13,7 @@ test('Garden approaches, chamber arch, all rooms, wave spawns and boss position 
  return {points:points.map(p=>({p,clear:nav.walkable(...p),route:!!nav.findPath(900,1320,...p)})),
  spawns:entry.spawns.map(p=>nav.walkable(...p)),boss:nav.walkable(900,480),arch:nav.lineWalkable(850,190,930,190),
  exit:game.activeMap.transitions[0].target};`);
- assert.ok(r.points.every(p=>p.clear&&p.route),JSON.stringify(r.points));assert.ok(r.spawns.every(Boolean));assert.equal(r.boss,true);assert.equal(r.arch,true);assert.equal(r.exit,'hub_949');
+ assert.ok(r.points.every(p=>p.clear&&p.route),JSON.stringify(r.points));assert.ok(r.spawns.every(Boolean));assert.equal(r.boss,true);assert.equal(r.arch,true);assert.equal(r.exit,'sdc');
 });
 test('Garden thickets share retained flower records and glow canvases across warm frames',e=>{
  const r=value(e,`

@@ -8,7 +8,7 @@
            on the front edge light it up.
 
            Add one by copying a line below:
-             map     which map it's on ('hub_949' is the city)
+             map     which map it's on ('sdc' is the city)
              x, y    centre of the panel's front (bottom) edge, in world px;
                      the picture extends north (up the screen) from there
              w       panel width in world px (the height follows the picture)
@@ -16,8 +16,8 @@
              frame   frame colour; light: colour of the night spotlights
            ===================================================================== */
         const BILLBOARDS = [
-            { map: 'hub_949', x: 560, y: 1610, w: 150, image: 'posters/anavia',             frame: '#e8c27a', light: '#ffd9a0' },
-            { map: 'hub_949', x: 890, y: 900,  w: 150, image: 'posters/art_builds_freedom', frame: '#c9a46a', light: '#d9c2ff' },
+            { map: 'sdc', x: 560, y: 1610, w: 150, image: 'posters/anavia',             frame: '#e8c27a', light: '#ffd9a0' },
+            { map: 'sdc', x: 890, y: 900,  w: 150, image: 'posters/art_builds_freedom', frame: '#c9a46a', light: '#d9c2ff' },
         ];
 
         class Billboard {

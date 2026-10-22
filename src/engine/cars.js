@@ -306,7 +306,7 @@
             _placeCarsForMap() {
                 this._endDrive();
                 this.player.visible = true;
-                const hub = this.activeMap.id === 'hub_949';
+                const hub = this.activeMap.id === 'sdc';
                 if (hub && !this.deliveryVehicle) this._spawnDeliveryVan();
                 for (const c of [this.ownedCar, this.deliveryVehicle, this.car]) {
                     if (!c) continue;

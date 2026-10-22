@@ -270,7 +270,7 @@
                 }
 
                 // Restricted Zone — in-world crimson hazard border
-                if (RL.at('markers') && this.restrictedZone && this.activeMap.id === 'hub_949') {
+                if (RL.at('markers') && this.restrictedZone && this.activeMap.id === 'sdc') {
                     const rz = this.restrictedZone;
                     const wb = cullBounds.world;
                     // Only draw if zone is visible in viewport

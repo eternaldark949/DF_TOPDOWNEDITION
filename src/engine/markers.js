@@ -41,7 +41,7 @@
             /** She's on foot in the city with a delivery in her hands: she carries it (player-draw-input.js) */
             carryingParcel() {
                 const m = this._job();
-                return !!(m && m.type === MISSION_TYPES.DELIVERY && m.pickedUp && !this.isDriving && !this.player.inCar && this.activeMap && this.activeMap.id === 'hub_949');
+                return !!(m && m.type === MISSION_TYPES.DELIVERY && m.pickedUp && !this.isDriving && !this.player.inCar && this.activeMap && this.activeMap.id === 'sdc');
             },
 
             /** She has the package: picked up by the van (the pill), or loaded with it when she drives off in the van */
@@ -58,7 +58,7 @@
              *  near (within this, she's there), lift (how high the pin stands) } or null. (One reused record.) */
             jobTarget() {
                 const m = this._job();
-                if (!m || !this.activeMap || this.activeMap.id !== 'hub_949') return null;
+                if (!m || !this.activeMap || this.activeMap.id !== 'sdc') return null;
                 const t = this._jobTarget || (this._jobTarget = {});
                 if (m.type === MISSION_TYPES.DELIVERY && !m.pickedUp) {
                     const p = this.deliveryPackageSpot(); if (!p) return null;
@@ -109,7 +109,7 @@
             /** The delivery's drop-off (world space, under the light): the zone she has to reach, ringed in gold */
             drawDropZone(ctx, cull) {
                 const m = this._job();
-                if (!m || m.type !== MISSION_TYPES.DELIVERY || !m.pickedUp || this.activeMap.id !== 'hub_949') return;
+                if (!m || m.type !== MISSION_TYPES.DELIVERY || !m.pickedUp || this.activeMap.id !== 'sdc') return;
                 const r = m.targetRadius || 100, x = m.targetX, y = m.targetY;
                 if (cull && (x + r < cull.left || x - r > cull.right || y + r < cull.top || y - r > cull.bottom)) return;
                 const t = _frameTime / 1000, k = (t * 0.45) % 1;
@@ -142,7 +142,7 @@
                     ctx.beginPath(); ctx.arc(p.x, p.y, 21, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
                 }
                 const m = this._job();
-                if (m && m.type === MISSION_TYPES.DELIVERY && m.pickedUp && this.activeMap.id === 'hub_949') {
+                if (m && m.type === MISSION_TYPES.DELIVERY && m.pickedUp && this.activeMap.id === 'sdc') {
                     const r = m.targetRadius || 100;
                     ctx.globalAlpha = a * 0.45; ctx.lineWidth = 2.5; ctx.strokeStyle = '#ffc248';
                     ctx.setLineDash([16, 11]); ctx.lineDashOffset = -t * 14;
@@ -158,7 +158,7 @@
             /** The pins over what's on screen and the compass round her for what isn't (see the top of the file) */
             drawMarkers(ctx) {
                 const v = this.view, p = this.player;
-                if (!this.running || !v || !p || !this.activeMap || this.activeMap.id !== 'hub_949' ||
+                if (!this.running || !v || !p || !this.activeMap || this.activeMap.id !== 'sdc' ||
                     (this.scenes && this.scenes.running) || (this.cutscene && this.cutscene.active) ||
                     this.cineCam || this.finisher || this.finCam || (this.bumperMinigame && this.bumperMinigame.active)) return;
                 const s = this._renderScale || 1, z = v.zoom, cw = this.canvas.width, ch = this.canvas.height;

@@ -9,7 +9,7 @@ function test(name, source, check) {
   const result = structuredClone(e.run(`(()=>{${source}})()`));
   check(result); assert.deepEqual(e.errors, []); results.push(name);
 }
-const setup = `game._doLoadMap('hub_949'); game.running=true; game.paused=false;
+const setup = `game._doLoadMap('sdc'); game.running=true; game.paused=false;
  game.loadMap=function(id,at){this._doLoadMap(id,at);};
  const hg=game.hordeGauntlet;`;
 for (const id of ['house_of_death','demoness_palace']) {
@@ -51,10 +51,10 @@ test('Between-wave countdown resumes without awarding the cleared wave twice',se
 for(const id of ['house_of_death','demoness_palace']) {
  test(`${id}: loaded and inactive exits land beside Grum`,setup+`
   hg.start(game,'${id}'); hg.waveDelay=1; hg.update(game); game.saveGame({auto:true});
-  game.loadGame('dfab_save_slot_auto'); game._doLoadMap('hub_949',{linkFrom:'${id}'});
+  game.loadGame('dfab_save_slot_auto'); game._doLoadMap('sdc',{linkFrom:'${id}'});
   const grum=game.npcs.find(n=>n.role==='arena_master');
   const activeExit={x:game.player.x,y:game.player.y}; const active=hg.active;
-  game._doLoadMap('${id}'); game._doLoadMap('hub_949',{linkFrom:'${id}'});
+  game._doLoadMap('${id}'); game._doLoadMap('sdc',{linkFrom:'${id}'});
   return {activeExit,inactiveExit:{x:game.player.x,y:game.player.y},expected:{x:grum.x,y:grum.y+40},active};`,r=>{
   assert.deepEqual(r.activeExit,r.expected); assert.deepEqual(r.inactiveExit,r.expected); assert.equal(r.active,false);
  });
@@ -71,10 +71,10 @@ test('Loading a hub save from an active gauntlet stops it and respects saved cit
  game.player.x=2000;game.player.y=1400;game.saveGame({auto:true});
  hg.start(game);hg.waveDelay=1;hg.update(game);game.loadGame('dfab_save_slot_auto');
  return {active:hg.active,count:hg.hostiles.length,x:game.player.x,y:game.player.y,map:game.activeMap.id};`,r=>{
- assert.deepEqual(r,{active:false,count:0,x:2000,y:1400,map:'hub_949'});
+ assert.deepEqual(r,{active:false,count:0,x:2000,y:1400,map:'sdc'});
 });
 test('Real faded load defers gauntlet restoration until the saved map exists',`
- game._doLoadMap('hub_949'); game.running=true;game.paused=false;
+ game._doLoadMap('sdc'); game.running=true;game.paused=false;
  const hg=game.hordeGauntlet; hg.active=true;hg.entry=GAUNTLET_MAPS[1];hg.mapId=hg.entry.mapId;
  game._doLoadMap('demoness_palace');hg.wave=2;hg.waveDelay=0;hg.spawnWave(game);hg.hostiles[0].hp=19;
  game.saveGame({auto:true});game._doLoadMap('apt_949');game.loadGame('dfab_save_slot_auto');

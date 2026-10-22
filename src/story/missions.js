@@ -32,7 +32,7 @@
             /** The city's buildings, from wherever she is (the hub's, cached, while she's inside) */
             _hubBuildings(game) {
                 if (game._hubBuildingsCache) return game._hubBuildingsCache;
-                return (game.activeMap && game.activeMap.id === 'hub_949' && game.activeMap.buildings) || [];
+                return (game.activeMap && game.activeMap.id === 'sdc' && game.activeMap.buildings) || [];
             }
 
             /**
@@ -104,7 +104,7 @@
                 
                 // Where the mark hangs about: in front of one of the city's buildings, chosen now so the
                 // Bartender can text the spot (a random point in the city if the buildings aren't known yet)
-                const hub = MAP_DATA.hub_949;
+                const hub = MAP_DATA.sdc;
                 let spawnX = 400 + Math.random() * (hub.width - 800);
                 let spawnY = 400 + Math.random() * (hub.height - 800), sited = false, near = null;
                 const bs = this._hubBuildings(game).filter(b => b.x > 200 && b.y > 200);
@@ -239,12 +239,12 @@
 
                 // Bounty targets are spawned via spawnBountyTarget() when on hub map
                 // If already on hub map, spawn immediately
-                if (mission.type === MISSION_TYPES.BOUNTY && game.activeMap && game.activeMap.id === 'hub_949') {
+                if (mission.type === MISSION_TYPES.BOUNTY && game.activeMap && game.activeMap.id === 'sdc') {
                     this.spawnBountyTarget(game);
                 }
                 
                 // Salvage guards spawn on hub map
-                if (mission.type === MISSION_TYPES.SALVAGE && game.activeMap && game.activeMap.id === 'hub_949') {
+                if (mission.type === MISSION_TYPES.SALVAGE && game.activeMap && game.activeMap.id === 'sdc') {
                     this.spawnSalvageGuards(game);
                 }
                 return true;
@@ -376,11 +376,11 @@
                 if (m.type === MISSION_TYPES.DELIVERY) {
                     if (!m.pickedUp) {
                         // Guidance: show message periodically if player isn't near vehicle
-                        if (!m._guidanceShown && game.activeMap.id === 'hub_949') {
+                        if (!m._guidanceShown && game.activeMap.id === 'sdc') {
                             m._guidanceShown = true;
                             showMessage('HEAD TO THE AMBER DELIVERY VEHICLE NEAR COZY CAFE.');
                         }
-                    } else if (game.activeMap.id === 'hub_949') {
+                    } else if (game.activeMap.id === 'sdc') {
                         const dist = Math.hypot(game.player.x - m.targetX, game.player.y - m.targetY);
                         // The resident comes out to meet her as she pulls up
                         let r = m._recipientEntity && this._recipients.find(q => q.npc === m._recipientEntity);

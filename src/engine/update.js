@@ -251,7 +251,7 @@
                 this.profiler.start('Logic:Events');
                 
                 // Ganger Spawning (Hub Only)
-                if (this.activeMap.id === 'hub_949' && this.enemies.length < 6 && Math.random() < 0.02) {
+                if (this.activeMap.id === 'sdc' && this.enemies.length < 6 && Math.random() < 0.02) {
                     const ex = Math.random() * this.activeMap.width;
                     const ey = Math.random() * this.activeMap.height;
                     let hitObstacle = false;
@@ -292,7 +292,7 @@
                 }
 
                 // Graveyard Humanoid Ghosts (the cemetery, HUB_GRAVEYARD, and a little round it)
-                const G = HUB_GRAVEYARD, inGraveyard = this.activeMap.id === 'hub_949' &&
+                const G = HUB_GRAVEYARD, inGraveyard = this.activeMap.id === 'sdc' &&
                     this.player.x > G.x - 100 && this.player.x < G.x + G.w + 100 &&
                     this.player.y > G.y - 200 && this.player.y < G.y + G.h + 200;
                 if (inGraveyard) {
@@ -369,7 +369,7 @@
                 if (this.restrictedZone) {
                     this.restrictedZone.update(this);
                     // Update location label when inside zone
-                    if (this.activeMap.id === 'hub_949') {
+                    if (this.activeMap.id === 'sdc') {
                         const rz = this.restrictedZone;
                         const inside = rz._playerInside(this);
                         if (inside && !rz._labelShown) {

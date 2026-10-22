@@ -49,7 +49,7 @@
                 for (const c of map.crosswalks || []) if (x >= c.x && x < c.x + c.w && y >= c.y && y < c.y + c.h && (!c.poly || Poly.contains(c.poly, x, y))) return 'concrete';
                 for (const p of map.pavements || []) if (x >= p.x && x < p.x + p.w && y >= p.y && y < p.y + p.h && (!p.poly || Poly.contains(p.poly, x, y))) return 'concrete';
                 const net = this.traffic && this.traffic.network;
-                if (net && map.id === 'hub_949') {
+                if (net && map.id === 'sdc') {
                     for (const ix of net.intersections) if (ix.containsPoint(x, y)) return 'asphalt';
                     for (const r of net.roads) if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return 'asphalt';
                 }

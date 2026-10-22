@@ -30,7 +30,7 @@ engineMixin({
                     
                     // --- WORLD STATE ---
                     world: {
-                        mapId: this.activeMap?.id ?? 'hub_949',
+                        mapId: this.activeMap?.id ?? 'sdc',
                         worldMinutes: this.worldMinutes ?? 480,
                         questState: this.questState ?? {},
                         // Weather is part of world state — reloading shouldn't
@@ -46,7 +46,7 @@ engineMixin({
                         x: this.ownedCar?.x ?? CAR_START.x,
                         y: this.ownedCar?.y ?? CAR_START.y,
                         angle: this.ownedCar?.angle ?? CAR_START.angle,
-                        mapId: 'hub_949',
+                        mapId: 'sdc',
                         visible: true
                     },
                     garage: this.garage?.serialize() ?? null,
@@ -165,7 +165,7 @@ engineMixin({
                         buffs: {}
                     },
                     world: {
-                        mapId: 'hub_949',
+                        mapId: 'sdc',
                         worldMinutes: 480,
                         questState: {},
                         weather: null
@@ -174,7 +174,7 @@ engineMixin({
                         x: CAR_START.x,
                         y: CAR_START.y,
                         angle: CAR_START.angle,
-                        mapId: 'hub_949',
+                        mapId: 'sdc',
                         visible: true
                     },
                     garage: null,
@@ -504,19 +504,20 @@ engineMixin({
                     this.car = this.ownedCar;
                     this.returnVanHome();
                     let mapId = worldData.mapId ?? rawSave.mapId ?? defaults.world.mapId;
+                    if (mapId === 'hub_949') mapId = 'sdc';                                     // Southern Dimensions City's old id
                     const playerX = playerData.x ?? rawSave.player?.x ?? defaults.player.x;
                     const playerY = playerData.y ?? rawSave.player?.y ?? defaults.player.y;
                     // Consumed by _doLoadMap after entities exist, not while the previous map fades out.
                     this._pendingGauntletLoad = { data: save.hordeGauntlet };
                     // Saved in Grum's old arena: it's the House of Death now — start at its door
                     if (mapId === 'grum_arena') { mapId = 'house_of_death'; this.loadMap(mapId); }
-                    else if (mapId === 'road_test') { mapId = 'hub_949'; this.loadMap(mapId); }   // the old road test zone is gone: back to the city's spawn
+                    else if (mapId === 'road_test') { mapId = 'sdc'; this.loadMap(mapId); }   // the old road test zone is gone: back to the city's spawn
                     else this.loadMap(mapId, { x: playerX, y: playerY });
                     // The city's layout changes now and then (it grew four times over): a spot saved where a building stands now
                     // goes back to the city's spawn, and her car (below) to where it waits in a new game
-                    const hubCols = this.activeMap.id === 'hub_949' ? this.activeMap.buildingColliders : this._hubCache && this._hubCache.buildingColliders;
+                    const hubCols = this.activeMap.id === 'sdc' ? this.activeMap.buildingColliders : this._hubCache && this._hubCache.buildingColliders;
                     const inBuilding = (x, y) => (hubCols || []).some(b => x > b.x && x < b.x + b.w && y > b.y && y < b.y + b.h);
-                    if (this.activeMap.id === 'hub_949' && inBuilding(this.player.x, this.player.y)) { this.player.x = this.activeMap.spawn.x; this.player.y = this.activeMap.spawn.y; }
+                    if (this.activeMap.id === 'sdc' && inBuilding(this.player.x, this.player.y)) { this.player.x = this.activeMap.spawn.x; this.player.y = this.activeMap.spawn.y; }
         
                     // 4. Restore Teammates (unified — permanent + contract)
                     const savedTeammates = save.teammates || rawSave.teammates || [];
@@ -611,7 +612,7 @@ engineMixin({
                         (carData.x === 0 && carData.y === 0);                             // (saved before it first reached the hub: it had no spot yet)
                     if (carAtStart || inBuilding(this.ownedCar.x, this.ownedCar.y)) Object.assign(this.ownedCar, CAR_START);
                     // Shown on the hub, put away anywhere else (engine/cars.js)
-                    this._setCarHere(this.ownedCar, this.activeMap.id === 'hub_949');
+                    this._setCarHere(this.ownedCar, this.activeMap.id === 'sdc');
         
                     // 7. Restore Driving State
                     const wasDriving = save.isDriving ?? rawSave.isDriving ?? false;

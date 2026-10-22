@@ -694,7 +694,7 @@
                 const P = MSG_PLACES[id];
                 if (!P) return null;
                 // The live building wins over the table (a map edit moves the pin with it)
-                const bs = (typeof game !== 'undefined' && game) && (game._hubBuildingsCache || (game.activeMap && game.activeMap.id === 'hub_949' && game.activeMap.buildings));
+                const bs = (typeof game !== 'undefined' && game) && (game._hubBuildingsCache || (game.activeMap && game.activeMap.id === 'sdc' && game.activeMap.buildings));
                 const b = bs && bs.find(x => x.id === id);
                 const x = b ? b.x : P.x, y = b ? b.y : P.y, w = b ? (b.w || 100) : P.w, h = b ? (b.h || 100) : P.h;
                 return { ...P, id, tx: x + w / 2, ty: y + h + 30 };
@@ -732,7 +732,7 @@
             /** A crop of the city of light around the place (UMaps' painter), when she's in the city */
             _pinMap(id) {
                 const g = typeof game !== 'undefined' && game, M = g && g.activeMap;
-                if (!M || M.id !== 'hub_949' || typeof MapArt === 'undefined') return null;
+                if (!M || M.id !== 'sdc' || typeof MapArt === 'undefined') return null;
                 const key = this._pinKey(id) + '|' + M.id;
                 if (this._mapCache.has(key)) return this._mapCache.get(key);
                 const P = this._place(id);
@@ -758,7 +758,7 @@
             setWaypoint(id) {
                 const P = this._place(id), g = game, ui = g && g.ui;
                 if (!P) return false;
-                if (!g.activeMap || g.activeMap.id !== 'hub_949' || !ui) {
+                if (!g.activeMap || g.activeMap.id !== 'sdc' || !ui) {
                     this.feed.pendingPin = id;
                     showMessage(`WAYPOINT SAVED · ${P.label.toUpperCase()}`);
                     return true;
@@ -1097,7 +1097,7 @@
             /** Which pinned place she's nearest (for the photo's tag), if she's in the city and close to one */
             _whereAmI() {
                 const g = game, p = g && g.player;
-                if (!p || !g.activeMap || g.activeMap.id !== 'hub_949') return null;
+                if (!p || !g.activeMap || g.activeMap.id !== 'sdc') return null;
                 let best = null, bd = 900;
                 for (const id in MSG_PLACES) {
                     const P = this._place(id), dd = Math.hypot(P.tx - p.x, P.ty - p.y);
@@ -1173,7 +1173,7 @@
             _feedTick() {
                 const g = typeof game !== 'undefined' && game;
                 if (!g || !g.activeMap || !g.player) return;
-                if (this.feed.pendingPin && g.activeMap.id === 'hub_949' && !g.navDestination) this.setWaypoint(this.feed.pendingPin);
+                if (this.feed.pendingPin && g.activeMap.id === 'sdc' && !g.navDestination) this.setWaypoint(this.feed.pendingPin);
                 if (!this._freePlay() || (g.scenes && g.scenes.running) || (g.pauseSystem && g.pauseSystem.tokens && g.pauseSystem.tokens.size)) return;
                 const now = g.worldMinutes;
                 if (this.feed.nextAt == null || this.feed.nextAt - now > 600) { this.feed.nextAt = now + 20; return; }

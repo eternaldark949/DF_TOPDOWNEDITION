@@ -1,6 +1,6 @@
         // ============================================================================
         //  HUB SCRIPTED NPC ANCHORS
-        //  hub_949's buildings are NOT authored — they're generated at load time by
+        //  sdc's buildings are NOT authored — they're generated at load time by
         //  city.autoFillAll(), which picks positions with Math.random(). These NPC
         //  spawns are fixed literals, so nothing reconciles the two: on some loads a
         //  filler building lands on top of Mirabel or Anavia. Map NPCs never go
@@ -54,7 +54,7 @@
             const e = { props: [], npcs: [], lamps: [] };
             switch (mapId) {
 
-                case 'hub_949':
+                case 'sdc':
                     e.props = [ new PropEntity({ x: 1900, y: 1330 }), new PropEntity({ x: 2100, y: 1330 }) ];
                     e.npcs = [
                         ...HUB_NPC_ANCHORS.map(a => new NPC(a.x, a.y, a.name, a.role)),

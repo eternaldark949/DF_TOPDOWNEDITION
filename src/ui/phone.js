@@ -907,7 +907,7 @@
 
                 const container = document.getElementById('carme-content');
                 const isIndoor = game.activeMap.type === 'indoor';
-                const noSummon = game.activeMap.id !== 'hub_949';   // cars live on the hub (engine/cars.js)
+                const noSummon = game.activeMap.id !== 'sdc';   // cars live on the hub (engine/cars.js)
                 let html = '';
 
                 // Current active car indicator
@@ -967,7 +967,7 @@
                             game.switchGarageCar(idx);
                         }
                         // Summon to player position (the hub only: cars live there)
-                        if (game.activeMap.id !== 'hub_949' || (game.isDriving && game.car === game.ownedCar)) return;
+                        if (game.activeMap.id !== 'sdc' || (game.isDriving && game.car === game.ownedCar)) return;
                         Object.assign(game.ownedCar, { x: game.player.x + 50, y: game.player.y, vx: 0, vy: 0, speed: 0 });
                         game.ownedCar.visible = true;
                         const name = game.garage.getDisplayName(idx);

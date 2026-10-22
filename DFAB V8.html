@@ -8838,14 +8838,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                     1: {
                                         name: "ENTER_HOTEL",
                                         banner: "ENTER DOUBLE NIGHTS",
-                                        targetMap: "hub_949",
+                                        targetMap: "sdc",
                                         target: "hotel_entrance",
                                         condition: "LOC_HOTEL_LOBBY",
                                         onStart: (game) => {
                                             const H = game.hud, S = game.story;
                                             H.reveal('health'); H.reveal('location');
                                             const x0 = game.player.x, y0 = game.player.y;
-                                            if (game.activeMap.id === 'hub_949' && !game.coach.taught.has('move'))
+                                            if (game.activeMap.id === 'sdc' && !game.coach.taught.has('move'))
                                                 H.reveal('move', { title: 'Move', text: 'Drag anywhere here to move.', ghost: 'drag', timeout: 12000,
                                                                    until: g => Math.hypot(g.player.x - x0, g.player.y - y0) > 40 });
                                             else H.reveal('move');
@@ -8965,7 +8965,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                     6: {
                                         name: "LEAVE_HOTEL",
                                         banner: "GET TO THE BLACKMARK",
-                                        targetMap: "hub_949",
+                                        targetMap: "sdc",
                                         target: "player_car",
                                         condition: "PLAYER_IN_OWNED_CAR",
                                         onStart: (game) => {
@@ -8973,7 +8973,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                             game.addPausableTimeout(() => { game.triggerShake(6); S.triggerComms("Josh", "RAAAGH—", 1600); }, 1200);
                                             game.addPausableTimeout(() => S.triggerComms("949", "Josh.", 2000), 3200);
                                             game.addPausableTimeout(() => S.triggerComms("747", "News crews'll be on us any minute. The BlackMark's out front, Nine.", 4200), 6000);
-                                            S.watch(g => g.activeMap.id === 'hub_949' && (S.placeCarAtHotel(), true));   // once she's back on the street
+                                            S.watch(g => g.activeMap.id === 'sdc' && (S.placeCarAtHotel(), true));   // once she's back on the street
                                             S.watch(g => {
                                                 if (!g.isDriving || g.coach.cur) return false;
                                                 g.hud.reveal('autodrive', { title: 'Auto-drive', text: 'Tap to let the BlackMark drive you to your marker.', mode: 'ring', timeout: 6000 });
@@ -8990,7 +8990,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                     7: {
                                         name: "REPORT_TO_MIRABEL",
                                         banner: "MEET MIRABEL AT MOON CITY NIGHTCLUB",
-                                        targetMap: "hub_949",
+                                        targetMap: "sdc",
                                         target: "club_entrance",
                                         condition: "CONTRACTOR_REWARDED",
                                         onStart: (game) => {
@@ -10358,7 +10358,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // The van, on the way to the job (the intro): over the rain on the roof and the road
             van_interior: { track: 'van 2', volume: 0.45 },
             // Grave Stories: the southern graveyard in Southern Dimensions City (its walls, engine/map-loading.js 11d)
-            hub_949: [
+            sdc: [
                 { track: 'grave stories (1)', volume: 0.5, area: HUB_GRAVEYARD, fade: 600 },
                 // Moon City's bass through its walls: heard as you come up to the club, low-passed to the thump; its lights keep time
                 { track: 'moon city nightclub - swig', building: 'moon_city', volume: 0.32, fade: 420, lowpass: 260, bpm: 140, beat0: 0 }
@@ -13801,8 +13801,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         //  Entity instances (props, npcs, lamps) are created by createMapEntities()
         // ============================================================================
         const MAP_DATA = {
-            'hub_949': {
-                id: 'hub_949', width: 13200, height: 13200, type: 'outdoor',
+            'sdc': {
+                id: 'sdc', width: 13200, height: 13200, type: 'outdoor',
                 label: 'Southern Dimensions City', floorColor: '#2a262e',
                 climate: 'city',   // Rain-heavy: clear sky is rare and short here
                 spawn: { x: 1200, y: 550 },
@@ -13823,7 +13823,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 spawn: { x: 600, y: 1000 },
                 zones: [ { x: 100, y: 100, w: 1000, h: 1000, color: '#150025' } ],
                 walls: [ {x:0, y:0, w:1200, h:50}, {x:0, y:1150, w:1200, h:50}, {x:0, y:0, w:50, h:1200}, {x:1150, y:0, w:50, h:1200} ],
-                transitions: [ { x: 550, y: 1100, w: 100, h: 50, target: 'hub_949', label: 'Return to Body' } ]
+                transitions: [ { x: 550, y: 1100, w: 100, h: 50, target: 'sdc', label: 'Return to Body' } ]
             },
             'apt_949': {
                 id: 'apt_949', width: 1400, height: 900, type: 'indoor',
@@ -13843,7 +13843,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     { x: 0, y: 892, w: 620, h: 8 }, { x: 780, y: 892, w: 620, h: 8 },
                     { x: 900, y: 208, w: 8, h: 684 }, { x: 908, y: 548, w: 484, h: 8 },
                 ],
-                transitions: [ { x: 620, y: 860, w: 160, h: 40, target: 'hub_949', label: 'Exit to City' } ],
+                transitions: [ { x: 620, y: 860, w: 160, h: 40, target: 'sdc', label: 'Exit to City' } ],
                 landmarks: [
                     { id: 'apt_door', x: 700, y: 880 }, { id: 'apt_bed', x: 1050, y: 350 },
                     { id: 'apt_terminal', x: 700, y: 100 }, { id: 'apt_balcony', x: 700, y: 100 },
@@ -13863,7 +13863,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 spawn: { x: 500, y: 1100 },
                 zones: [],
                 walls: [ { x: 0, y: 0, w: 1000, h: 50 }, { x: 0, y: 1150, w: 400, h: 50 }, { x: 600, y: 1150, w: 400, h: 50 }, { x: 0, y: 0, w: 50, h: 1200 }, { x: 950, y: 0, w: 50, h: 1200 }, { x: 350, y: 100, w: 300, h: 50 }, { x: 0, y: 300, w: 80, h: 100 }, { x: 0, y: 500, w: 80, h: 100 }, { x: 0, y: 700, w: 80, h: 100 }, { x: 920, y: 300, w: 80, h: 100 }, { x: 920, y: 500, w: 80, h: 100 }, { x: 920, y: 700, w: 80, h: 100 } ],
-                transitions: [ { x: 400, y: 1150, w: 200, h: 50, target: 'hub_949', label: 'Exit Hotel' }, { x: 50, y: 300, w: 100, h: 500, target: 'hotel_suite', label: 'Use Elevator', quiet: true }, { x: 850, y: 300, w: 100, h: 500, target: 'hotel_suite', label: 'Use Elevator', quiet: true } ],
+                transitions: [ { x: 400, y: 1150, w: 200, h: 50, target: 'sdc', label: 'Exit Hotel' }, { x: 50, y: 300, w: 100, h: 500, target: 'hotel_suite', label: 'Use Elevator', quiet: true }, { x: 850, y: 300, w: 100, h: 500, target: 'hotel_suite', label: 'Use Elevator', quiet: true } ],
                 landmarks: [
                     { id: 'hotel_exit', x: 500, y: 1175 }, { id: 'hotel_desk', x: 500, y: 125 },
                     { id: 'hotel_elevator_left', x: 100, y: 500 }, { id: 'hotel_elevator_right', x: 900, y: 500 },
@@ -13917,7 +13917,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 respawn: { x: 212, y: 328 },   // beside the recovery bed (see PlayerEntity.die)
                 zones: [],
                 walls: [ {x:0,y:0,w:800,h:50}, {x:0,y:750,w:350,h:50}, {x:450,y:750,w:350,h:50}, {x:0,y:0,w:50,h:800}, {x:750,y:0,w:50,h:800} ],
-                transitions: [ {x: 350, y: 720, w: 100, h: 80, target: 'hub_949', label: 'Exit Clinic'} ],
+                transitions: [ {x: 350, y: 720, w: 100, h: 80, target: 'sdc', label: 'Exit Clinic'} ],
                 landmarks: [
                     { id: 'clinic_exit', x: 400, y: 760 }, { id: 'clinic_dr_yin', x: 400, y: 200 },
                     { id: 'clinic_bed_left', x: 200, y: 400 }, { id: 'clinic_bed_right', x: 600, y: 400 },
@@ -13949,7 +13949,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     { x: 1330, y: 290, w: 14, h: 896 },                                      // corridor | suites
                     { x: 1344, y: 580, w: 242, h: 14 }, { x: 1344, y: 884, w: 242, h: 14 },  // suite walls
                 ],
-                transitions: [ {x: 740, y: 1170, w: 120, h: 30, target: 'hub_949', label: 'Exit Nightclub'} ],
+                transitions: [ {x: 740, y: 1170, w: 120, h: 30, target: 'sdc', label: 'Exit Nightclub'} ],
                 landmarks: [
                     { id: 'club_exit', x: 800, y: 1165 }, { id: 'mirabel_booth', x: 1470, y: 200 },
                     { id: 'club_bar', x: 530, y: 500 }, { id: 'club_dancefloor', x: 800, y: 500 },
@@ -13996,7 +13996,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     { x: 50, y: 680, w: 570, h: 20 }, { x: 1380, y: 680, w: 570, h: 20 }
                 ],
                 transitions: [
-                    { x: 850, y: 1320, w: 300, h: 80, target: 'hub_949', label: 'Exit to City' },
+                    { x: 850, y: 1320, w: 300, h: 80, target: 'sdc', label: 'Exit to City' },
                     { x: 880, y: 50, w: 240, h: 60, target: 'enni_cole_upper', label: 'Upstairs', quiet: true }
                 ],
                 landmarks: [
@@ -14052,7 +14052,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     { x: 690, y: 60, w: 15, h: 240 }, { x: 950, y: 700, w: 200, h: 15 },
                     { x: 940, y: 700, w: 15, h: 250 },
                 ],
-                transitions: [ { x: 500, y: 920, w: 200, h: 80, target: 'hub_949', label: 'Exit to City' } ],
+                transitions: [ { x: 500, y: 920, w: 200, h: 80, target: 'sdc', label: 'Exit to City' } ],
                 landmarks: [
                     { id: 'cafe_exit', x: 600, y: 960 }, { id: 'cafe_counter', x: 250, y: 200 },
                     { id: 'cafe_dining', x: 560, y: 550 }, { id: 'cafe_booths', x: 1040, y: 500 },
@@ -14081,7 +14081,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     { x: 880, y: 690, w: 470, h: 20 },
                     { x: 880, y: 650, w: 20, h: 40 }, { x: 880, y: 710, w: 20, h: 240 }
                 ],
-                transitions: [ { x: 600, y: 920, w: 200, h: 80, target: 'hub_949', label: 'Exit to City' } ],
+                transitions: [ { x: 600, y: 920, w: 200, h: 80, target: 'sdc', label: 'Exit to City' } ],
                 landmarks: [
                     { id: 'shop_exit', x: 700, y: 960 }, { id: 'shop_counter', x: 1100, y: 300 },
                     { id: 'shop_bay_1', x: 250, y: 200 }, { id: 'shop_bay_2', x: 250, y: 450 },
@@ -14115,7 +14115,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // Back wall accent strip
                     { x: 200, y: 50, w: 600, h: 8 }
                 ],
-                transitions: [ { x: 400, y: 720, w: 200, h: 80, target: 'hub_949', label: 'Exit Neural Systems' } ],
+                transitions: [ { x: 400, y: 720, w: 200, h: 80, target: 'sdc', label: 'Exit Neural Systems' } ],
                 landmarks: [
                     { id: 'neural_exit', x: 500, y: 760 },
                     { id: 'neural_counter', x: 500, y: 250 },
@@ -14160,7 +14160,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     { x: 350, y: 350, w: 40, h: 40 },
                     { x: 510, y: 470, w: 40, h: 40 }
                 ],
-                transitions: [ { x: 350, y: 840, w: 200, h: 60, target: 'hub_949', label: 'Exit Biggs Park' } ],
+                transitions: [ { x: 350, y: 840, w: 200, h: 60, target: 'sdc', label: 'Exit Biggs Park' } ],
                 landmarks: [
                     { id: 'biggs_entrance', x: 450, y: 850 },
                     { id: 'biggs_center', x: 450, y: 450 }
@@ -14201,7 +14201,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     { x: 1560, y: 14, w: 14, h: 416 },                                     // bedroom | bath
                     { x: 1240, y: 1164, w: 396, h: 14 }, { x: 1622, y: 1178, w: 14, h: 308 }, // the reliquary inside the gallery's L
                 ],
-                transitions: [ { x: 830, y: 1470, w: 140, h: 30, target: 'hub_949', label: 'Leave the House' } ],
+                transitions: [ { x: 830, y: 1470, w: 140, h: 30, target: 'sdc', label: 'Leave the House' } ],
                 landmarks: [
                     { id: 'house_foyer', x: 900, y: 1300 }, { id: 'house_hall', x: 900, y: 720 },
                     { id: 'house_chapel', x: 900, y: 200 }, { id: 'house_courtyard', x: 1510, y: 720 }
@@ -14235,7 +14235,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     { x: 586, y: 380, w: 14, h: 1006 }, { x: 1200, y: 380, w: 14, h: 1006 },  // the spines
                     { x: 886, y: 14, w: 14, h: 352 }, { x: 1386, y: 14, w: 14, h: 352 },      // garden | crystal chamber | bath
                 ],
-                transitions: [ { x: 830, y: 1370, w: 140, h: 30, target: 'hub_949', label: 'Leave the Palace' } ],
+                transitions: [ { x: 830, y: 1370, w: 140, h: 30, target: 'sdc', label: 'Leave the Palace' } ],
                 landmarks: [ { id: 'palace_throne', x: 900, y: 520 }, { id: 'palace_garden', x: 450, y: 190 } ]
             },
             'ollo_test': {
@@ -14257,7 +14257,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     { x: 1970, y: 0, w: 30, h: 1500 }
                 ],
                 transitions: [
-                    { x: 400, y: 1450, w: 1200, h: 50, target: 'hub_949', label: 'Return to City' }
+                    { x: 400, y: 1450, w: 1200, h: 50, target: 'sdc', label: 'Return to City' }
                 ],
                 pavements: [], crosswalks: [],
                 landmarks: [ { id: 'ollo_entrance', x: 1000, y: 700 } ]
@@ -14291,7 +14291,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         const OLLO_BUILDING_DATA = {"name":"ollo_exp","category":"commercial","w":500,"h":400,"hasCollision":true,"footprint":[{"x":-700,"y":-480,"w":1400,"h":480,"fill":"#000000","stroke":"#ffffff","strokeWidth":1,"opacity":1,"rotation":0,"cornerRadius":4,"name":"","type":"roundrect","level":"top"},{"x":-120,"y":0,"w":20,"h":10,"fill":"#000000","stroke":"#ffffff","strokeWidth":1,"opacity":1,"rotation":0,"cornerRadius":4,"name":"","type":"roundrect","level":"lv_78685"},{"x":-60,"y":0,"w":20,"h":10,"fill":"#000000","stroke":"#ffffff","strokeWidth":1,"opacity":1,"rotation":0,"cornerRadius":4,"name":"","type":"roundrect","level":"lv_78685"},{"x":-180,"y":0,"w":20,"h":10,"fill":"#000000","stroke":"#ffffff","strokeWidth":1,"opacity":1,"rotation":0,"cornerRadius":4,"name":"","type":"roundrect","level":"lv_78685"},{"x":40,"y":0,"w":20,"h":10,"fill":"#000000","stroke":"#ffffff","strokeWidth":1,"opacity":1,"rotation":0,"cornerRadius":4,"name":"","type":"roundrect","level":"lv_78685"},{"x":100,"y":0,"w":20,"h":10,"fill":"#000000","stroke":"#ffffff","strokeWidth":1,"opacity":1,"rotation":0,"cornerRadius":4,"name":"","type":"roundrect","level":"lv_78685"},{"x":160,"y":0,"w":20,"h":10,"fill":"#000000","stroke":"#ffffff","strokeWidth":1,"opacity":1,"rotation":0,"cornerRadius":4,"name":"","type":"roundrect","level":"lv_78685"},{"x":-40,"y":0,"w":40,"h":10,"fill":"#000000","stroke":"#ffffff","strokeWidth":1,"opacity":1,"rotation":0,"name":"","type":"rect","level":"lv_29826"},{"x":0,"y":0,"w":40,"h":10,"fill":"#000000","stroke":"#ffffff","strokeWidth":1,"opacity":1,"rotation":0,"name":"","type":"rect","level":"lv_29826"},{"x":-250,"y":0,"w":500,"h":130,"fill":"#5c1e1f","stroke":"#3d2510","strokeWidth":1,"opacity":1,"rotation":0,"name":"","type":"rect","level":"lv_66877","inset":false},{"x":-250,"y":130,"w":500,"h":20,"fill":"#d8b388","stroke":"#ffffff","strokeWidth":1,"opacity":1,"rotation":0,"name":"","type":"rect","level":"lv_66877","inset":false}],"details":[{"x":-40,"y":10,"w":80,"h":44,"target":"","name":"","type":"entrance","level":"base"},{"x":-110,"y":10,"color":"#ffeebb","intensity":0.6,"radius":60,"shape":"square","edge":"bottom","name":"","type":"wall_lamp","level":"lv_29826"},{"x":0,"y":-50,"text":"OllO","color":"#ffdc8a","fontSize":60,"name":"","type":"neon_sign","level":"lv_27173"},{"x":-80,"y":-20,"r":5,"color":"#ffcc44","name":"","type":"roof_light","level":"top"},{"x":-50,"y":10,"color":"#ffeebb","intensity":0.6,"radius":60,"shape":"square","edge":"bottom","name":"","type":"wall_lamp","level":"lv_29826"},{"x":-170,"y":10,"color":"#ffeebb","intensity":0.6,"radius":60,"shape":"square","edge":"bottom","name":"","type":"wall_lamp","level":"lv_29826"},{"x":0,"y":-110,"radius":120,"color":"#ffeebb","intensity":0.8,"lampType":3,"angle":0,"name":"","type":"lamp","level":"lv_27173","animOffset":2901.979257161702},{"x":0,"y":-20,"radius":120,"color":"#ffbb33","intensity":0.8,"lampType":3,"angle":0,"name":"","type":"lamp","level":"lv_27173","animOffset":2260.7082197626737},{"x":-60,"y":0,"x2":-40,"y2":0,"color":"#8a7a6a","name":"","type":"interior_wall","level":"base"},{"x":-120,"y":0,"x2":-100,"y2":0,"color":"#8a7a6a","name":"","type":"interior_wall","level":"base"},{"x":-180,"y":0,"x2":-160,"y2":0,"color":"#8a7a6a","name":"","type":"interior_wall","level":"base"},{"x":-240,"y":-100,"color":"#ffac47","intensity":0.7,"radius":200,"name":"","type":"interior_lamp","level":"base"},{"x":-140,"y":-70,"color":"#ffac47","intensity":1,"radius":400,"name":"","type":"interior_lamp","level":"base"},{"x":-170,"y":80,"radius":120,"color":"#ffeebb","intensity":0.8,"lampType":2,"angle":0,"name":"","type":"lamp","level":"base","animOffset":2706.428559465008},{"x":-50,"y":80,"radius":120,"color":"#ffeebb","intensity":0.8,"lampType":2,"angle":0,"name":"","type":"lamp","level":"base","animOffset":2706.428559465008},{"x":50,"y":80,"radius":120,"color":"#ffeebb","intensity":0.8,"lampType":2,"angle":0,"name":"","type":"lamp","level":"base","animOffset":2706.428559465008},{"x":170,"y":80,"radius":120,"color":"#ffeebb","intensity":0.8,"lampType":2,"angle":0,"name":"","type":"lamp","level":"base","animOffset":2706.428559465008},{"x":50,"y":10,"color":"#ffeebb","intensity":0.6,"radius":60,"shape":"square","edge":"bottom","name":"","type":"wall_lamp","level":"lv_29826"},{"x":110,"y":10,"color":"#ffeebb","intensity":0.6,"radius":60,"shape":"square","edge":"bottom","name":"","type":"wall_lamp","level":"lv_29826"},{"x":170,"y":10,"color":"#ffeebb","intensity":0.6,"radius":60,"shape":"square","edge":"bottom","name":"","type":"wall_lamp","level":"lv_29826"},{"x":80,"y":-20,"r":5,"color":"#ffcc44","name":"","type":"roof_light","level":"top"},{"x":-40,"y":-250,"w":80,"h":160,"color":"#ffb566","name":"","type":"skylight","level":"lv_37888"},{"x":-80,"y":-250,"w":40,"h":160,"curveX":30,"curveY":0,"color":"#ffb566","name":"","type":"skylight_corner","level":"lv_37888"},{"x":40,"y":-250,"w":40,"h":160,"curveX":30,"curveY":0,"color":"#ffb566","name":"","type":"skylight_corner","level":"lv_37888","rotation":0,"scaleX":-1},{"x":-40,"y":-410,"w":80,"h":160,"color":"#ffb566","name":"","type":"skylight","level":"lv_37888"},{"x":-120,"y":-410,"w":80,"h":160,"color":"#ffb566","name":"","type":"skylight","level":"lv_37888"},{"x":40,"y":-410,"w":80,"h":160,"color":"#ffb566","name":"","type":"skylight","level":"lv_37888"},{"x":100,"y":-70,"radius":120,"color":"#ff3d3d","intensity":0.8,"lampType":3,"angle":0,"name":"","type":"lamp","level":"lv_27173","animOffset":2260.7082197626737},{"x":-100,"y":-70,"radius":120,"color":"#ff3d3d","intensity":0.8,"lampType":3,"angle":0,"name":"","type":"lamp","level":"lv_27173","animOffset":2260.7082197626737},{"x":40,"y":0,"x2":60,"y2":0,"color":"#8a7a6a","name":"","type":"interior_wall","level":"base"},{"x":100,"y":0,"x2":120,"y2":0,"color":"#8a7a6a","name":"","type":"interior_wall","level":"base"},{"x":160,"y":0,"x2":180,"y2":0,"color":"#8a7a6a","name":"","type":"interior_wall","level":"base"},{"x":140,"y":-70,"color":"#ffac47","intensity":1,"radius":400,"name":"","type":"interior_lamp","level":"base"},{"x":0,"y":-330,"radius":120,"color":"#ffeebb","intensity":0.8,"lampType":3,"angle":0,"name":"","type":"lamp","level":"lv_1755","animOffset":2384.3235611068035},{"x":120,"y":-330,"radius":120,"color":"#ffeebb","intensity":0.8,"lampType":3,"angle":0,"name":"","type":"lamp","level":"lv_1755","animOffset":2384.3235611068035},{"x":-120,"y":-330,"radius":120,"color":"#ffeebb","intensity":0.8,"lampType":3,"angle":0,"name":"","type":"lamp","level":"lv_1755","animOffset":2384.3235611068035}],"type":"building","levels":[{"id":"lv_66877","name":"Ground Details","visible":true},{"id":"base","name":"Base","visible":true},{"id":"lv_78685","name":"Base Details","visible":true},{"id":"lv_29826","name":"Base Details Lights","visible":true},{"id":"top","name":"Top","visible":true},{"id":"lv_37888","name":"Top Details","visible":true},{"id":"lv_27173","name":"Neon Sign","visible":true},{"id":"lv_1755","name":"Level 6","visible":true}],"version":"1.0"};
         // ============================================================================
         //  HUB SCRIPTED NPC ANCHORS
-        //  hub_949's buildings are NOT authored — they're generated at load time by
+        //  sdc's buildings are NOT authored — they're generated at load time by
         //  city.autoFillAll(), which picks positions with Math.random(). These NPC
         //  spawns are fixed literals, so nothing reconciles the two: on some loads a
         //  filler building lands on top of Mirabel or Anavia. Map NPCs never go
@@ -14345,7 +14345,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const e = { props: [], npcs: [], lamps: [] };
             switch (mapId) {
 
-                case 'hub_949':
+                case 'sdc':
                     e.props = [ new PropEntity({ x: 1900, y: 1330 }), new PropEntity({ x: 2100, y: 1330 }) ];
                     e.npcs = [
                         ...HUB_NPC_ANCHORS.map(a => new NPC(a.x, a.y, a.name, a.role)),
@@ -29137,7 +29137,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.cleared = false;
                 this.clearCount = 0;
                 this.hostiles = [];
-                this.mapId = config.mapId || 'hub_949';
+                this.mapId = config.mapId || 'sdc';
                 this.active = false; // Only active when first entered or respawning
             }
 
@@ -45275,7 +45275,7 @@ Object.assign(TrafficVehicle.prototype, {
             }
 
             /** Only the city is baked (other maps keep their own ground). */
-            activeFor(map) { return !!(map && map.id === 'hub_949' && this.game.traffic && this.game.traffic.network && this.game.traffic.network.roads.length); }
+            activeFor(map) { return !!(map && map.id === 'sdc' && this.game.traffic && this.game.traffic.network && this.game.traffic.network.roads.length); }
 
             // Geometry/order edits must invalidate the baked pixels and their static candidates together.
             invalidate() { this.cache.clear(); this.weight = 0; this._sources = null; }
@@ -45851,7 +45851,7 @@ Object.assign(TrafficVehicle.prototype, {
                 this.mapCtx = this.mapCanvas.getContext('2d');
                 
                 // --- VIEWPORT-EXTENDED CACHE ---
-                // Instead of caching the entire map (which for hub_949 is 13200×13200 =
+                // Instead of caching the entire map (which for sdc is 13200×13200 =
                 // 174 Mp / ~700 MB and would crash phones), we cache only the currently
                 // visible viewport plus a 50% buffer ring on each side, at current
                 // display scale. Memory becomes constant (~6 Mp / 22 MB) regardless
@@ -47372,7 +47372,7 @@ Object.assign(TrafficVehicle.prototype, {
                         return g.activeMap.id === 'moon_city_nightclub';
         
                     case "LOC_HUB":
-                        return g.activeMap.id === 'hub_949';
+                        return g.activeMap.id === 'sdc';
         
                     case "LOC_HOTEL_LOBBY":
                         return g.activeMap.id === 'hotel_lobby';
@@ -56673,7 +56673,7 @@ Object.assign(TrafficVehicle.prototype, {
            on the front edge light it up.
 
            Add one by copying a line below:
-             map     which map it's on ('hub_949' is the city)
+             map     which map it's on ('sdc' is the city)
              x, y    centre of the panel's front (bottom) edge, in world px;
                      the picture extends north (up the screen) from there
              w       panel width in world px (the height follows the picture)
@@ -56681,8 +56681,8 @@ Object.assign(TrafficVehicle.prototype, {
              frame   frame colour; light: colour of the night spotlights
            ===================================================================== */
         const BILLBOARDS = [
-            { map: 'hub_949', x: 560, y: 1610, w: 150, image: 'posters/anavia',             frame: '#e8c27a', light: '#ffd9a0' },
-            { map: 'hub_949', x: 890, y: 900,  w: 150, image: 'posters/art_builds_freedom', frame: '#c9a46a', light: '#d9c2ff' },
+            { map: 'sdc', x: 560, y: 1610, w: 150, image: 'posters/anavia',             frame: '#e8c27a', light: '#ffd9a0' },
+            { map: 'sdc', x: 890, y: 900,  w: 150, image: 'posters/art_builds_freedom', frame: '#c9a46a', light: '#d9c2ff' },
         ];
 
         class Billboard {
@@ -57713,7 +57713,7 @@ Object.assign(TrafficVehicle.prototype, {
             /** The city's buildings, from wherever she is (the hub's, cached, while she's inside) */
             _hubBuildings(game) {
                 if (game._hubBuildingsCache) return game._hubBuildingsCache;
-                return (game.activeMap && game.activeMap.id === 'hub_949' && game.activeMap.buildings) || [];
+                return (game.activeMap && game.activeMap.id === 'sdc' && game.activeMap.buildings) || [];
             }
 
             /**
@@ -57785,7 +57785,7 @@ Object.assign(TrafficVehicle.prototype, {
                 
                 // Where the mark hangs about: in front of one of the city's buildings, chosen now so the
                 // Bartender can text the spot (a random point in the city if the buildings aren't known yet)
-                const hub = MAP_DATA.hub_949;
+                const hub = MAP_DATA.sdc;
                 let spawnX = 400 + Math.random() * (hub.width - 800);
                 let spawnY = 400 + Math.random() * (hub.height - 800), sited = false, near = null;
                 const bs = this._hubBuildings(game).filter(b => b.x > 200 && b.y > 200);
@@ -57920,12 +57920,12 @@ Object.assign(TrafficVehicle.prototype, {
 
                 // Bounty targets are spawned via spawnBountyTarget() when on hub map
                 // If already on hub map, spawn immediately
-                if (mission.type === MISSION_TYPES.BOUNTY && game.activeMap && game.activeMap.id === 'hub_949') {
+                if (mission.type === MISSION_TYPES.BOUNTY && game.activeMap && game.activeMap.id === 'sdc') {
                     this.spawnBountyTarget(game);
                 }
                 
                 // Salvage guards spawn on hub map
-                if (mission.type === MISSION_TYPES.SALVAGE && game.activeMap && game.activeMap.id === 'hub_949') {
+                if (mission.type === MISSION_TYPES.SALVAGE && game.activeMap && game.activeMap.id === 'sdc') {
                     this.spawnSalvageGuards(game);
                 }
                 return true;
@@ -58057,11 +58057,11 @@ Object.assign(TrafficVehicle.prototype, {
                 if (m.type === MISSION_TYPES.DELIVERY) {
                     if (!m.pickedUp) {
                         // Guidance: show message periodically if player isn't near vehicle
-                        if (!m._guidanceShown && game.activeMap.id === 'hub_949') {
+                        if (!m._guidanceShown && game.activeMap.id === 'sdc') {
                             m._guidanceShown = true;
                             showMessage('HEAD TO THE AMBER DELIVERY VEHICLE NEAR COZY CAFE.');
                         }
-                    } else if (game.activeMap.id === 'hub_949') {
+                    } else if (game.activeMap.id === 'sdc') {
                         const dist = Math.hypot(game.player.x - m.targetX, game.player.y - m.targetY);
                         // The resident comes out to meet her as she pulls up
                         let r = m._recipientEntity && this._recipients.find(q => q.npc === m._recipientEntity);
@@ -60216,7 +60216,7 @@ Object.assign(TrafficVehicle.prototype, {
            knocks; they pour out in front of the hotel.
            The novel's lines, verbatim where it has them.
            ===================================================================== */
-        const VAN_DROP = {                                   // where everyone stands when the scene hands over (hub_949, under the Double Nights canopy)
+        const VAN_DROP = {                                   // where everyone stands when the scene hands over (sdc, under the Double Nights canopy)
             van: { x: 2010, y: 836, angle: 0 },              // on the drive, in front of the porte-cochère (buildings/double-nights.js)
             '949': { x: 2000, y: 784 }, '747': { x: 2036, y: 792 },
             Yenna: { x: 1962, y: 792 }, Sabrina: { x: 1940, y: 806 }, Max: { x: 2060, y: 806 },
@@ -60258,7 +60258,7 @@ Object.assign(TrafficVehicle.prototype, {
             if (g.hud) { g.hud.reveal('phone'); g.hud.reveal('pp'); }
             if (typeof phoneSystem !== 'undefined') phoneSystem.endCall();
             g.fieldMask = null; g.vanMoving = undefined; g.camera.sway = 0;
-            if (!g.activeMap || g.activeMap.id !== 'hub_949') { g._doLoadMap('hub_949', { x: VAN_DROP['949'].x, y: VAN_DROP['949'].y }); g.bakeStaticLighting(); }
+            if (!g.activeMap || g.activeMap.id !== 'sdc') { g._doLoadMap('sdc', { x: VAN_DROP['949'].x, y: VAN_DROP['949'].y }); g.bakeStaticLighting(); }
             g.player.x = VAN_DROP['949'].x; g.player.y = VAN_DROP['949'].y; g.player.angle = -Math.PI / 2; g.player.visible = true;
             for (const t of g.teammates || []) { const p = VAN_DROP[t.name]; if (p) { t.x = p.x; t.y = p.y; } }
             g.camera.x = g.player.x; g.camera.y = g.player.y; g.camera.zoom = 1.6;
@@ -60396,7 +60396,7 @@ Object.assign(TrafficVehicle.prototype, {
 
             // ── Double Nights ───────────────────────────────────────────────
             const V = VAN_DROP.van;
-            s.map('hub_949', { at: { x: VAN_DROP['949'].x, y: VAN_DROP['949'].y }, cam: { x: 1990, y: 830 }, zoom: 1.9 });
+            s.map('sdc', { at: { x: VAN_DROP['949'].x, y: VAN_DROP['949'].y }, cam: { x: 1990, y: 830 }, zoom: 1.9 });
             parkCrew(g);
             const van = s.prop('van', drawVanExterior, V.x, V.y, V.angle); van.doors = 0;
             const rear = { x: V.x - 64, y: V.y };
@@ -63332,7 +63332,7 @@ engineMixin({
                     P.push({ x, y, ang, lobes, d: 0.25 + rnd() * 0.75, r });
                 };
                 const net = this.traffic && this.traffic.network;
-                if (net && map.id === 'hub_949') {
+                if (net && map.id === 'sdc') {
                     for (const road of net.roads) {
                         if (!road.length) continue;
                         const ang = Math.atan2(road.y2 - road.y1, road.x2 - road.x1), half = road.thickness / 2;
@@ -63421,7 +63421,7 @@ engineMixin({
                 const wetBox = q === 'ultra' ? (this._ultraWet || (this._ultraWet = [])) : null;
                 if (wetBox) wetBox.length = 0;
                 mc.setTransform(1, 0, 0, 1, 0, 0); mc.clearRect(0, 0, rw, rh); toView(mc);
-                const net = wet >= 0.02 && this.activeMap.id === 'hub_949' && this.traffic && this.traffic.network;
+                const net = wet >= 0.02 && this.activeMap.id === 'sdc' && this.traffic && this.traffic.network;
                 if (net) {
                     mc.fillStyle = `rgba(255,255,255,${(REFLECT.ROAD * Math.min(1, wet * 1.3)).toFixed(3)})`;
                     for (const road of net.roads) {
@@ -64323,7 +64323,7 @@ engineMixin({
                 for (const c of map.crosswalks || []) if (x >= c.x && x < c.x + c.w && y >= c.y && y < c.y + c.h && (!c.poly || Poly.contains(c.poly, x, y))) return 'concrete';
                 for (const p of map.pavements || []) if (x >= p.x && x < p.x + p.w && y >= p.y && y < p.y + p.h && (!p.poly || Poly.contains(p.poly, x, y))) return 'concrete';
                 const net = this.traffic && this.traffic.network;
-                if (net && map.id === 'hub_949') {
+                if (net && map.id === 'sdc') {
                     for (const ix of net.intersections) if (ix.containsPoint(x, y)) return 'asphalt';
                     for (const r of net.roads) if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return 'asphalt';
                 }
@@ -68127,7 +68127,7 @@ engineMixin({
                     
                     // --- WORLD STATE ---
                     world: {
-                        mapId: this.activeMap?.id ?? 'hub_949',
+                        mapId: this.activeMap?.id ?? 'sdc',
                         worldMinutes: this.worldMinutes ?? 480,
                         questState: this.questState ?? {},
                         // Weather is part of world state — reloading shouldn't
@@ -68143,7 +68143,7 @@ engineMixin({
                         x: this.ownedCar?.x ?? CAR_START.x,
                         y: this.ownedCar?.y ?? CAR_START.y,
                         angle: this.ownedCar?.angle ?? CAR_START.angle,
-                        mapId: 'hub_949',
+                        mapId: 'sdc',
                         visible: true
                     },
                     garage: this.garage?.serialize() ?? null,
@@ -68262,7 +68262,7 @@ engineMixin({
                         buffs: {}
                     },
                     world: {
-                        mapId: 'hub_949',
+                        mapId: 'sdc',
                         worldMinutes: 480,
                         questState: {},
                         weather: null
@@ -68271,7 +68271,7 @@ engineMixin({
                         x: CAR_START.x,
                         y: CAR_START.y,
                         angle: CAR_START.angle,
-                        mapId: 'hub_949',
+                        mapId: 'sdc',
                         visible: true
                     },
                     garage: null,
@@ -68601,19 +68601,20 @@ engineMixin({
                     this.car = this.ownedCar;
                     this.returnVanHome();
                     let mapId = worldData.mapId ?? rawSave.mapId ?? defaults.world.mapId;
+                    if (mapId === 'hub_949') mapId = 'sdc';                                     // Southern Dimensions City's old id
                     const playerX = playerData.x ?? rawSave.player?.x ?? defaults.player.x;
                     const playerY = playerData.y ?? rawSave.player?.y ?? defaults.player.y;
                     // Consumed by _doLoadMap after entities exist, not while the previous map fades out.
                     this._pendingGauntletLoad = { data: save.hordeGauntlet };
                     // Saved in Grum's old arena: it's the House of Death now — start at its door
                     if (mapId === 'grum_arena') { mapId = 'house_of_death'; this.loadMap(mapId); }
-                    else if (mapId === 'road_test') { mapId = 'hub_949'; this.loadMap(mapId); }   // the old road test zone is gone: back to the city's spawn
+                    else if (mapId === 'road_test') { mapId = 'sdc'; this.loadMap(mapId); }   // the old road test zone is gone: back to the city's spawn
                     else this.loadMap(mapId, { x: playerX, y: playerY });
                     // The city's layout changes now and then (it grew four times over): a spot saved where a building stands now
                     // goes back to the city's spawn, and her car (below) to where it waits in a new game
-                    const hubCols = this.activeMap.id === 'hub_949' ? this.activeMap.buildingColliders : this._hubCache && this._hubCache.buildingColliders;
+                    const hubCols = this.activeMap.id === 'sdc' ? this.activeMap.buildingColliders : this._hubCache && this._hubCache.buildingColliders;
                     const inBuilding = (x, y) => (hubCols || []).some(b => x > b.x && x < b.x + b.w && y > b.y && y < b.y + b.h);
-                    if (this.activeMap.id === 'hub_949' && inBuilding(this.player.x, this.player.y)) { this.player.x = this.activeMap.spawn.x; this.player.y = this.activeMap.spawn.y; }
+                    if (this.activeMap.id === 'sdc' && inBuilding(this.player.x, this.player.y)) { this.player.x = this.activeMap.spawn.x; this.player.y = this.activeMap.spawn.y; }
         
                     // 4. Restore Teammates (unified — permanent + contract)
                     const savedTeammates = save.teammates || rawSave.teammates || [];
@@ -68708,7 +68709,7 @@ engineMixin({
                         (carData.x === 0 && carData.y === 0);                             // (saved before it first reached the hub: it had no spot yet)
                     if (carAtStart || inBuilding(this.ownedCar.x, this.ownedCar.y)) Object.assign(this.ownedCar, CAR_START);
                     // Shown on the hub, put away anywhere else (engine/cars.js)
-                    this._setCarHere(this.ownedCar, this.activeMap.id === 'hub_949');
+                    this._setCarHere(this.ownedCar, this.activeMap.id === 'sdc');
         
                     // 7. Restore Driving State
                     const wasDriving = save.isDriving ?? rawSave.isDriving ?? false;
@@ -68933,6 +68934,7 @@ engineMixin({
 
 engineMixin({
             loadMap(mapId, spawnAt) {
+                if (mapId === 'hub_949') mapId = 'sdc';            // Southern Dimensions City's old id (older saves, stored targets)
                 // 1. Initial Load (No Fade)
                 if (!this.activeMap) {
                     this._doLoadMap(mapId, spawnAt);
@@ -69187,6 +69189,7 @@ engineMixin({
             },
 
             _doLoadMap(mapId, spawnAt) {
+                if (mapId === 'hub_949') mapId = 'sdc';
                 this._cancelQuickDrawHold?.(); this.cancelQuickDraw();
                 const previousMapId = this.activeMap?.id;
                 if (this._bossIntro) {
@@ -69239,7 +69242,7 @@ engineMixin({
                 
                 this.neonSigns = [];
                 
-                if (mapId !== 'hub_949') {
+                if (mapId !== 'sdc') {
                     this.traffic.reset();
                     this.pedestrians.reset();
                 }
@@ -69274,8 +69277,8 @@ engineMixin({
                 // =========================================================
                 
                 // --- HUB 949 (CITYLAYOUT V2) ---
-                if (mapId === 'hub_949') {
-                    const mapData = maps['hub_949'];
+                if (mapId === 'sdc') {
+                    const mapData = maps['sdc'];
                     
                     if (this._hubCache) {
                         // =============================================================
@@ -69596,7 +69599,7 @@ engineMixin({
                             h: rzBlock.h - 20,
                             hostileCount: 8,
                             respawnDelay: 900, // ~15 seconds
-                            mapId: 'hub_949'
+                            mapId: 'sdc'
                         });
                         // Set block lamp color to danger crimson
                         city.setBlockLampColors({ [HUB_BLOCKS.scrapyard]: '#ff2200' });
@@ -70025,7 +70028,7 @@ engineMixin({
                 // =========================================================
                 //  PHASE 4: LOAD MAP DATA
                 // =========================================================
-                this.activeMap = maps[mapId] || maps['hub_949'];
+                this.activeMap = maps[mapId] || maps['sdc'];
                 this.uiLocation.textContent = this.activeMap.label;
 
                 // --- WEATHER: adopt this map's climate ---
@@ -70081,7 +70084,7 @@ engineMixin({
                     }
                     
                     // The Ollo test zone's door (on the city's southern edge, east of the graveyard)
-                    if (this.activeMap.id === 'hub_949') {
+                    if (this.activeMap.id === 'sdc') {
                         this.activeMap.transitions.push({
                             ...HUB_OLLO_DOOR,
                             target: 'ollo_test',
@@ -70217,7 +70220,7 @@ engineMixin({
                     if (this.activeMap.buildings) { this._staticBuildingEntities = createStaticEntitiesFromBuildings(this.activeMap.buildings); }
                 }
                 // Hub billboards are parked for now; keep their authored data for a later return.
-                this.activeMap.billboards = this.activeMap.id === 'hub_949' ? []
+                this.activeMap.billboards = this.activeMap.id === 'sdc' ? []
                     : BILLBOARDS.filter(b => b.map === this.activeMap.id).map(cfg => new Billboard(cfg));
                 if (this.useNewCollisionSystem) this._staticBillboardEntities = this.activeMap.billboards.flatMap(b => b.colliders());
                 
@@ -70227,13 +70230,13 @@ engineMixin({
                 _physicsSpatial.track(getColliders(this.activeMap));
                 
                 // Ms. Jean pays her respects at the centre of the graveyard (HUB_GRAVEYARD)
-                if (this.activeMap.id === 'hub_949' && this.questState.ambushCleared) {
+                if (this.activeMap.id === 'sdc' && this.questState.ambushCleared) {
                     const G = HUB_GRAVEYARD;
                     this.npcs.push(new NPC(G.x + G.w / 2, G.y + G.h / 2, "Ms. Jean", 'ms_jean'));
                 }
                 
                 // Spawn Grum North near the Scrapyard
-                if (this.activeMap.id === 'hub_949' && this.restrictedZone) {
+                if (this.activeMap.id === 'sdc' && this.restrictedZone) {
                     const rz = this.restrictedZone;
                     // Place Grum just south of the zone entrance, on the road
                     this.npcs.push(new NPC(rz.x + rz.w / 2 - 40, rz.y + rz.h + 60, "Grum North", 'arena_master'));
@@ -70246,7 +70249,7 @@ engineMixin({
                 
                 // Spawn bounty target on hub if active bounty mission
                 // Must re-spawn on every hub entry because enemies array is cleared on map load
-                if (this.activeMap.id === 'hub_949' && this.missions && this.missions.activeMission
+                if (this.activeMap.id === 'sdc' && this.missions && this.missions.activeMission
                     && this.missions.activeMission.type === MISSION_TYPES.BOUNTY
                     && this.missions.activeMission.status === 'active') {
                     // Clear stale entity reference (entity was destroyed on previous map unload)
@@ -70255,7 +70258,7 @@ engineMixin({
                 }
                 
                 // Spawn salvage guards on hub if active salvage mission
-                if (this.activeMap.id === 'hub_949' && this.missions && this.missions.activeMission
+                if (this.activeMap.id === 'sdc' && this.missions && this.missions.activeMission
                     && this.missions.activeMission.type === MISSION_TYPES.SALVAGE
                     && this.missions.activeMission.status === 'active'
                     && !this.missions.activeMission.crateCollected) {
@@ -70267,7 +70270,7 @@ engineMixin({
                 }
                 
                 // Show active mission guidance on hub load
-                if (this.activeMap.id === 'hub_949' && this.missions && this.missions.activeMission) {
+                if (this.activeMap.id === 'sdc' && this.missions && this.missions.activeMission) {
                     const m = this.missions.activeMission;
                     if (m.status === 'active') {
                         this.addPausableTimeout(() => {
@@ -70280,7 +70283,7 @@ engineMixin({
                 }
                 
                 // --- VELVET CAT ---
-                if (this.activeMap.id === 'hub_949') {
+                if (this.activeMap.id === 'sdc') {
                     if (this.questState.hasVelvetCat) {
                         // Owned — temp position, repositioned by placeEntitySmart in Phase 5
                         this.velvetCat = new VelvetCat(this.activeMap.spawn.x, this.activeMap.spawn.y);
@@ -70305,14 +70308,14 @@ engineMixin({
                 // CASE A: DYNAMIC RETURN (e.g. Exiting a building to the Hub)
                 // Arenas have no city doorway. Always return to today's Grum location,
                 // including a loaded or inactive run; never use the hub's default spawn.
-                if (!this._pendingGauntletLoad && mapId === 'hub_949'
+                if (!this._pendingGauntletLoad && mapId === 'sdc'
                     && GAUNTLET_MAPS.some(g => !g.locked && g.mapId === previousMapId)) {
                     const grum = this.npcs.find(n => n.role === 'arena_master');
                     if (grum) spawnAt = { x: grum.x, y: grum.y + 40 };
                 }
                 if (spawnAt && spawnAt.linkFrom) {
                     // Find the transition on the NEW map that targets the OLD map
-                    // Example: If loading 'hub_949' coming from 'apt_949', find the Hub door that points to 'apt_949'
+                    // Example: If loading 'sdc' coming from 'apt_949', find the Hub door that points to 'apt_949'
                     const returnGate = this._transitionGrid.findByTarget(spawnAt.linkFrom);
                     
                     if (returnGate && this.activeMap.type === 'indoor') {
@@ -70956,7 +70959,7 @@ engineMixin({
                         'hotel_lobby': "DOUBLE NIGHTS HOTEL",
                         'hotel_suite': "PENTHOUSE SUITE",
                         'church_boss': "THE SANCTUM",
-                        'hub_949': "CITY SECTOR 9",
+                        'sdc': "SOUTHERN DIMENSIONS CITY",
                         'auto_shop': "TORQUE AUTO",
                         'neural_sys_interior': "NEURAL SYSTEMS",
                         'enni_cole_interior': "ENNI COLE",
@@ -71737,7 +71740,7 @@ engineMixin({
             _placeCarsForMap() {
                 this._endDrive();
                 this.player.visible = true;
-                const hub = this.activeMap.id === 'hub_949';
+                const hub = this.activeMap.id === 'sdc';
                 if (hub && !this.deliveryVehicle) this._spawnDeliveryVan();
                 for (const c of [this.ownedCar, this.deliveryVehicle, this.car]) {
                     if (!c) continue;
@@ -71789,7 +71792,7 @@ engineMixin({
             /** She's on foot in the city with a delivery in her hands: she carries it (player-draw-input.js) */
             carryingParcel() {
                 const m = this._job();
-                return !!(m && m.type === MISSION_TYPES.DELIVERY && m.pickedUp && !this.isDriving && !this.player.inCar && this.activeMap && this.activeMap.id === 'hub_949');
+                return !!(m && m.type === MISSION_TYPES.DELIVERY && m.pickedUp && !this.isDriving && !this.player.inCar && this.activeMap && this.activeMap.id === 'sdc');
             },
 
             /** She has the package: picked up by the van (the pill), or loaded with it when she drives off in the van */
@@ -71806,7 +71809,7 @@ engineMixin({
              *  near (within this, she's there), lift (how high the pin stands) } or null. (One reused record.) */
             jobTarget() {
                 const m = this._job();
-                if (!m || !this.activeMap || this.activeMap.id !== 'hub_949') return null;
+                if (!m || !this.activeMap || this.activeMap.id !== 'sdc') return null;
                 const t = this._jobTarget || (this._jobTarget = {});
                 if (m.type === MISSION_TYPES.DELIVERY && !m.pickedUp) {
                     const p = this.deliveryPackageSpot(); if (!p) return null;
@@ -71857,7 +71860,7 @@ engineMixin({
             /** The delivery's drop-off (world space, under the light): the zone she has to reach, ringed in gold */
             drawDropZone(ctx, cull) {
                 const m = this._job();
-                if (!m || m.type !== MISSION_TYPES.DELIVERY || !m.pickedUp || this.activeMap.id !== 'hub_949') return;
+                if (!m || m.type !== MISSION_TYPES.DELIVERY || !m.pickedUp || this.activeMap.id !== 'sdc') return;
                 const r = m.targetRadius || 100, x = m.targetX, y = m.targetY;
                 if (cull && (x + r < cull.left || x - r > cull.right || y + r < cull.top || y - r > cull.bottom)) return;
                 const t = _frameTime / 1000, k = (t * 0.45) % 1;
@@ -71890,7 +71893,7 @@ engineMixin({
                     ctx.beginPath(); ctx.arc(p.x, p.y, 21, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
                 }
                 const m = this._job();
-                if (m && m.type === MISSION_TYPES.DELIVERY && m.pickedUp && this.activeMap.id === 'hub_949') {
+                if (m && m.type === MISSION_TYPES.DELIVERY && m.pickedUp && this.activeMap.id === 'sdc') {
                     const r = m.targetRadius || 100;
                     ctx.globalAlpha = a * 0.45; ctx.lineWidth = 2.5; ctx.strokeStyle = '#ffc248';
                     ctx.setLineDash([16, 11]); ctx.lineDashOffset = -t * 14;
@@ -71906,7 +71909,7 @@ engineMixin({
             /** The pins over what's on screen and the compass round her for what isn't (see the top of the file) */
             drawMarkers(ctx) {
                 const v = this.view, p = this.player;
-                if (!this.running || !v || !p || !this.activeMap || this.activeMap.id !== 'hub_949' ||
+                if (!this.running || !v || !p || !this.activeMap || this.activeMap.id !== 'sdc' ||
                     (this.scenes && this.scenes.running) || (this.cutscene && this.cutscene.active) ||
                     this.cineCam || this.finisher || this.finCam || (this.bumperMinigame && this.bumperMinigame.active)) return;
                 const s = this._renderScale || 1, z = v.zoom, cw = this.canvas.width, ch = this.canvas.height;
@@ -72291,7 +72294,7 @@ engineMixin({
                 this.profiler.start('Logic:Events');
                 
                 // Ganger Spawning (Hub Only)
-                if (this.activeMap.id === 'hub_949' && this.enemies.length < 6 && Math.random() < 0.02) {
+                if (this.activeMap.id === 'sdc' && this.enemies.length < 6 && Math.random() < 0.02) {
                     const ex = Math.random() * this.activeMap.width;
                     const ey = Math.random() * this.activeMap.height;
                     let hitObstacle = false;
@@ -72332,7 +72335,7 @@ engineMixin({
                 }
 
                 // Graveyard Humanoid Ghosts (the cemetery, HUB_GRAVEYARD, and a little round it)
-                const G = HUB_GRAVEYARD, inGraveyard = this.activeMap.id === 'hub_949' &&
+                const G = HUB_GRAVEYARD, inGraveyard = this.activeMap.id === 'sdc' &&
                     this.player.x > G.x - 100 && this.player.x < G.x + G.w + 100 &&
                     this.player.y > G.y - 200 && this.player.y < G.y + G.h + 200;
                 if (inGraveyard) {
@@ -72409,7 +72412,7 @@ engineMixin({
                 if (this.restrictedZone) {
                     this.restrictedZone.update(this);
                     // Update location label when inside zone
-                    if (this.activeMap.id === 'hub_949') {
+                    if (this.activeMap.id === 'sdc') {
                         const rz = this.restrictedZone;
                         const inside = rz._playerInside(this);
                         if (inside && !rz._labelShown) {
@@ -73793,7 +73796,7 @@ engineMixin({
                 }
 
                 // Restricted Zone — in-world crimson hazard border
-                if (RL.at('markers') && this.restrictedZone && this.activeMap.id === 'hub_949') {
+                if (RL.at('markers') && this.restrictedZone && this.activeMap.id === 'sdc') {
                     const rz = this.restrictedZone;
                     const wb = cullBounds.world;
                     // Only draw if zone is visible in viewport
@@ -74945,7 +74948,7 @@ engineMixin({
             keepers_hill:        { floor: (g, c) => g.drawKeeperInterior(c),  glow: (g, c) => g.drawKeeperGlow(c) },   // the prologue's fireside (engine/keeper-art.js)
             keepers_parlor:      { floor: (g, c) => g.drawKeeperInterior(c),  glow: (g, c) => g.drawKeeperGlow(c) },
             van_interior:        { floor: (g, c) => g.drawVanInterior(c),     glow: (g, c) => g.drawVanGlow(c) },     // chapter 1's ride (engine/van-art.js)
-            hub_949:             { glow: (g, c) => g.drawGraveyardGlow(c) },
+            sdc:             { glow: (g, c) => g.drawGraveyardGlow(c) },
             ethereal_plane:      { glow: (g, c) => g.drawEtherealGlow(c) },
             enni_cole_interior:  { floor: (g, c) => g.drawEnniInterior(c),    glow: (g, c) => g.drawEnniGlow(c) },
             enni_cole_upper:     { floor: (g, c) => g.drawEnniUpperInterior(c), glow: (g, c) => g.drawEnniUpperGlow(c) },
@@ -80349,7 +80352,7 @@ engineMixin({
 
                 const container = document.getElementById('carme-content');
                 const isIndoor = game.activeMap.type === 'indoor';
-                const noSummon = game.activeMap.id !== 'hub_949';   // cars live on the hub (engine/cars.js)
+                const noSummon = game.activeMap.id !== 'sdc';   // cars live on the hub (engine/cars.js)
                 let html = '';
 
                 // Current active car indicator
@@ -80409,7 +80412,7 @@ engineMixin({
                             game.switchGarageCar(idx);
                         }
                         // Summon to player position (the hub only: cars live there)
-                        if (game.activeMap.id !== 'hub_949' || (game.isDriving && game.car === game.ownedCar)) return;
+                        if (game.activeMap.id !== 'sdc' || (game.isDriving && game.car === game.ownedCar)) return;
                         Object.assign(game.ownedCar, { x: game.player.x + 50, y: game.player.y, vx: 0, vy: 0, speed: 0 });
                         game.ownedCar.visible = true;
                         const name = game.garage.getDisplayName(idx);
@@ -81431,7 +81434,7 @@ engineMixin({
                 const P = MSG_PLACES[id];
                 if (!P) return null;
                 // The live building wins over the table (a map edit moves the pin with it)
-                const bs = (typeof game !== 'undefined' && game) && (game._hubBuildingsCache || (game.activeMap && game.activeMap.id === 'hub_949' && game.activeMap.buildings));
+                const bs = (typeof game !== 'undefined' && game) && (game._hubBuildingsCache || (game.activeMap && game.activeMap.id === 'sdc' && game.activeMap.buildings));
                 const b = bs && bs.find(x => x.id === id);
                 const x = b ? b.x : P.x, y = b ? b.y : P.y, w = b ? (b.w || 100) : P.w, h = b ? (b.h || 100) : P.h;
                 return { ...P, id, tx: x + w / 2, ty: y + h + 30 };
@@ -81469,7 +81472,7 @@ engineMixin({
             /** A crop of the city of light around the place (UMaps' painter), when she's in the city */
             _pinMap(id) {
                 const g = typeof game !== 'undefined' && game, M = g && g.activeMap;
-                if (!M || M.id !== 'hub_949' || typeof MapArt === 'undefined') return null;
+                if (!M || M.id !== 'sdc' || typeof MapArt === 'undefined') return null;
                 const key = this._pinKey(id) + '|' + M.id;
                 if (this._mapCache.has(key)) return this._mapCache.get(key);
                 const P = this._place(id);
@@ -81495,7 +81498,7 @@ engineMixin({
             setWaypoint(id) {
                 const P = this._place(id), g = game, ui = g && g.ui;
                 if (!P) return false;
-                if (!g.activeMap || g.activeMap.id !== 'hub_949' || !ui) {
+                if (!g.activeMap || g.activeMap.id !== 'sdc' || !ui) {
                     this.feed.pendingPin = id;
                     showMessage(`WAYPOINT SAVED · ${P.label.toUpperCase()}`);
                     return true;
@@ -81834,7 +81837,7 @@ engineMixin({
             /** Which pinned place she's nearest (for the photo's tag), if she's in the city and close to one */
             _whereAmI() {
                 const g = game, p = g && g.player;
-                if (!p || !g.activeMap || g.activeMap.id !== 'hub_949') return null;
+                if (!p || !g.activeMap || g.activeMap.id !== 'sdc') return null;
                 let best = null, bd = 900;
                 for (const id in MSG_PLACES) {
                     const P = this._place(id), dd = Math.hypot(P.tx - p.x, P.ty - p.y);
@@ -81910,7 +81913,7 @@ engineMixin({
             _feedTick() {
                 const g = typeof game !== 'undefined' && game;
                 if (!g || !g.activeMap || !g.player) return;
-                if (this.feed.pendingPin && g.activeMap.id === 'hub_949' && !g.navDestination) this.setWaypoint(this.feed.pendingPin);
+                if (this.feed.pendingPin && g.activeMap.id === 'sdc' && !g.navDestination) this.setWaypoint(this.feed.pendingPin);
                 if (!this._freePlay() || (g.scenes && g.scenes.running) || (g.pauseSystem && g.pauseSystem.tokens && g.pauseSystem.tokens.size)) return;
                 const now = g.worldMinutes;
                 if (this.feed.nextAt == null || this.feed.nextAt - now > 600) { this.feed.nextAt = now + 20; return; }
@@ -82000,7 +82003,7 @@ engineMixin({
                     }, 2600);
                     return;
                 }
-                const onHub = g.activeMap && g.activeMap.id === 'hub_949';
+                const onHub = g.activeMap && g.activeMap.id === 'sdc';
                 this.sendBrief('Barista Ren', 'delivery', REN_AGAIN[(n - 1) % REN_AGAIN.length],
                     { source: 'ren', handed: true, from: onHub ? { x: g.player.x, y: g.player.y } : null });
             },
@@ -82036,7 +82039,7 @@ engineMixin({
             /** Where she is, for an order's distance: herself in the city, the cafe from anywhere else */
             _amberFrom() {
                 const g = game;
-                if (g.activeMap && g.activeMap.id === 'hub_949') return { x: g.player.x, y: g.player.y };
+                if (g.activeMap && g.activeMap.id === 'sdc') return { x: g.player.x, y: g.player.y };
                 const P = this._place('cozy_cafe');
                 return P ? { x: P.tx, y: P.ty } : null;
             },
@@ -82060,7 +82063,7 @@ engineMixin({
             acceptAmber(i) {
                 const g = game, A = this._amber(), o = A && A.orders[i];
                 if (!o) return;
-                if (g.activeMap.id !== 'hub_949') { showMessage('AMBER ORDERS ARE PICKED UP IN THE CITY.'); return; }
+                if (g.activeMap.id !== 'sdc') { showMessage('AMBER ORDERS ARE PICKED UP IN THE CITY.'); return; }
                 const m = { ...o, id: `delivery_${Date.now()}` };
                 if (!g.missions.acceptMission(m, g)) return;
                 A.orders.splice(i, 1);
@@ -82108,7 +82111,7 @@ engineMixin({
             _amberTick() {
                 const g = typeof game !== 'undefined' && game, A = this._amber();
                 if (!g || !A || !A.unlocked || !A.online || !g.running || g.missions.activeMission) return;
-                if (!g.activeMap || g.activeMap.id !== 'hub_949') return;
+                if (!g.activeMap || g.activeMap.id !== 'sdc') return;
                 if (A.pingAt == null) A.pingAt = (g.worldMinutes || 0) + 6;
                 if ((g.worldMinutes || 0) >= A.pingAt) this._amberPing(true);
             },
@@ -82227,7 +82230,7 @@ engineMixin({
                 solo: { me: { x: 167, y: 433, a: Math.PI / 2, pose: 'sit' }, them: { x: 309, y: 540, a: Math.PI, pose: 'sit' }, cam: { x: 230, y: 500 }, zoom: 2.9, after: { x: 380, y: 520 } } },
             torque_auto: { map: 'auto_shop', label: 'Torque Auto', what: 'Wraps at Torque Auto', host: 'Victoria',
                 solo: { me: { x: 560, y: 470, a: -0.6, pose: 'arms_crossed' }, them: { x: 640, y: 452, a: -2.4, pose: 'lean' }, cam: { x: 600, y: 440 }, zoom: 2.8, after: { x: 600, y: 520 } } },
-            biggs_park: { map: 'hub_949', label: 'Biggs Park', what: 'Cans at Biggs Park', host: 'Yenna', park: { x: 8680, y: 8080, r: 320 },
+            biggs_park: { map: 'sdc', label: 'Biggs Park', what: 'Cans at Biggs Park', host: 'Yenna', park: { x: 8680, y: 8080, r: 320 },
                 solo: { me: { x: 8650, y: 8100, a: -Math.PI / 2 }, them: { x: 8700, y: 8100, a: -Math.PI / 2, pose: 'arms_crossed' }, cam: { x: 8675, y: 8070 }, zoom: 2.7, after: { x: 8650, y: 8110 } } },
             neural_sys: { map: 'neural_sys_interior', label: 'Neural Systems', what: 'Browsing at Neural Systems', host: 'Josh',
                 solo: { me: { x: 470, y: 340, a: -Math.PI / 2 }, them: { x: 530, y: 340, a: -Math.PI / 2, pose: 'arms_crossed' }, cam: { x: 500, y: 310 }, zoom: 2.9, after: { x: 500, y: 400 } } },
@@ -83652,7 +83655,7 @@ engineMixin({
                 this._modeBeforeDelete = null;
                 
                 this.MAP_NAMES = {
-                    'hub_949': 'Moon City',
+                    'sdc': 'Moon City',
                     'ethereal_plane': 'Ethereal Plane',
                     'apt_949': '949\'s Apartment',
                     'hotel_lobby': 'Double Nights Hotel',
@@ -83697,7 +83700,7 @@ engineMixin({
             getSlotSummary(index) {
                 const data = this.getSlotData(index);
                 if (!data) return null;
-                const mapId = data.world?.mapId || data.mapId || 'hub_949';
+                const mapId = data.world?.mapId || data.mapId || 'sdc';
                 return {
                     timestamp: data.timestamp || 0,
                     mapName: this.MAP_NAMES[mapId] || mapId,

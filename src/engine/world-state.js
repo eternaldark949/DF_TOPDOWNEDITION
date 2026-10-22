@@ -365,7 +365,7 @@
                         'hotel_lobby': "DOUBLE NIGHTS HOTEL",
                         'hotel_suite': "PENTHOUSE SUITE",
                         'church_boss': "THE SANCTUM",
-                        'hub_949': "CITY SECTOR 9",
+                        'sdc': "SOUTHERN DIMENSIONS CITY",
                         'auto_shop': "TORQUE AUTO",
                         'neural_sys_interior': "NEURAL SYSTEMS",
                         'enni_cole_interior': "ENNI COLE",

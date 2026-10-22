@@ -43,14 +43,14 @@
                                     1: {
                                         name: "ENTER_HOTEL",
                                         banner: "ENTER DOUBLE NIGHTS",
-                                        targetMap: "hub_949",
+                                        targetMap: "sdc",
                                         target: "hotel_entrance",
                                         condition: "LOC_HOTEL_LOBBY",
                                         onStart: (game) => {
                                             const H = game.hud, S = game.story;
                                             H.reveal('health'); H.reveal('location');
                                             const x0 = game.player.x, y0 = game.player.y;
-                                            if (game.activeMap.id === 'hub_949' && !game.coach.taught.has('move'))
+                                            if (game.activeMap.id === 'sdc' && !game.coach.taught.has('move'))
                                                 H.reveal('move', { title: 'Move', text: 'Drag anywhere here to move.', ghost: 'drag', timeout: 12000,
                                                                    until: g => Math.hypot(g.player.x - x0, g.player.y - y0) > 40 });
                                             else H.reveal('move');
@@ -170,7 +170,7 @@
                                     6: {
                                         name: "LEAVE_HOTEL",
                                         banner: "GET TO THE BLACKMARK",
-                                        targetMap: "hub_949",
+                                        targetMap: "sdc",
                                         target: "player_car",
                                         condition: "PLAYER_IN_OWNED_CAR",
                                         onStart: (game) => {
@@ -178,7 +178,7 @@
                                             game.addPausableTimeout(() => { game.triggerShake(6); S.triggerComms("Josh", "RAAAGH—", 1600); }, 1200);
                                             game.addPausableTimeout(() => S.triggerComms("949", "Josh.", 2000), 3200);
                                             game.addPausableTimeout(() => S.triggerComms("747", "News crews'll be on us any minute. The BlackMark's out front, Nine.", 4200), 6000);
-                                            S.watch(g => g.activeMap.id === 'hub_949' && (S.placeCarAtHotel(), true));   // once she's back on the street
+                                            S.watch(g => g.activeMap.id === 'sdc' && (S.placeCarAtHotel(), true));   // once she's back on the street
                                             S.watch(g => {
                                                 if (!g.isDriving || g.coach.cur) return false;
                                                 g.hud.reveal('autodrive', { title: 'Auto-drive', text: 'Tap to let the BlackMark drive you to your marker.', mode: 'ring', timeout: 6000 });
@@ -195,7 +195,7 @@
                                     7: {
                                         name: "REPORT_TO_MIRABEL",
                                         banner: "MEET MIRABEL AT MOON CITY NIGHTCLUB",
-                                        targetMap: "hub_949",
+                                        targetMap: "sdc",
                                         target: "club_entrance",
                                         condition: "CONTRACTOR_REWARDED",
                                         onStart: (game) => {

@@ -8,7 +8,7 @@
            knocks; they pour out in front of the hotel.
            The novel's lines, verbatim where it has them.
            ===================================================================== */
-        const VAN_DROP = {                                   // where everyone stands when the scene hands over (hub_949, under the Double Nights canopy)
+        const VAN_DROP = {                                   // where everyone stands when the scene hands over (sdc, under the Double Nights canopy)
             van: { x: 2010, y: 836, angle: 0 },              // on the drive, in front of the porte-cochère (buildings/double-nights.js)
             '949': { x: 2000, y: 784 }, '747': { x: 2036, y: 792 },
             Yenna: { x: 1962, y: 792 }, Sabrina: { x: 1940, y: 806 }, Max: { x: 2060, y: 806 },
@@ -50,7 +50,7 @@
             if (g.hud) { g.hud.reveal('phone'); g.hud.reveal('pp'); }
             if (typeof phoneSystem !== 'undefined') phoneSystem.endCall();
             g.fieldMask = null; g.vanMoving = undefined; g.camera.sway = 0;
-            if (!g.activeMap || g.activeMap.id !== 'hub_949') { g._doLoadMap('hub_949', { x: VAN_DROP['949'].x, y: VAN_DROP['949'].y }); g.bakeStaticLighting(); }
+            if (!g.activeMap || g.activeMap.id !== 'sdc') { g._doLoadMap('sdc', { x: VAN_DROP['949'].x, y: VAN_DROP['949'].y }); g.bakeStaticLighting(); }
             g.player.x = VAN_DROP['949'].x; g.player.y = VAN_DROP['949'].y; g.player.angle = -Math.PI / 2; g.player.visible = true;
             for (const t of g.teammates || []) { const p = VAN_DROP[t.name]; if (p) { t.x = p.x; t.y = p.y; } }
             g.camera.x = g.player.x; g.camera.y = g.player.y; g.camera.zoom = 1.6;
@@ -188,7 +188,7 @@
 
             // ── Double Nights ───────────────────────────────────────────────
             const V = VAN_DROP.van;
-            s.map('hub_949', { at: { x: VAN_DROP['949'].x, y: VAN_DROP['949'].y }, cam: { x: 1990, y: 830 }, zoom: 1.9 });
+            s.map('sdc', { at: { x: VAN_DROP['949'].x, y: VAN_DROP['949'].y }, cam: { x: 1990, y: 830 }, zoom: 1.9 });
             parkCrew(g);
             const van = s.prop('van', drawVanExterior, V.x, V.y, V.angle); van.doors = 0;
             const rear = { x: V.x - 64, y: V.y };

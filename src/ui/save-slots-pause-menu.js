@@ -16,7 +16,7 @@
                 this._modeBeforeDelete = null;
                 
                 this.MAP_NAMES = {
-                    'hub_949': 'Moon City',
+                    'sdc': 'Moon City',
                     'ethereal_plane': 'Ethereal Plane',
                     'apt_949': '949\'s Apartment',
                     'hotel_lobby': 'Double Nights Hotel',
@@ -61,7 +61,7 @@
             getSlotSummary(index) {
                 const data = this.getSlotData(index);
                 if (!data) return null;
-                const mapId = data.world?.mapId || data.mapId || 'hub_949';
+                const mapId = data.world?.mapId || data.mapId || 'sdc';
                 return {
                     timestamp: data.timestamp || 0,
                     mapName: this.MAP_NAMES[mapId] || mapId,

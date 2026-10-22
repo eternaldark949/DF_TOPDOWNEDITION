@@ -5,7 +5,7 @@
                 this.mapCtx = this.mapCanvas.getContext('2d');
                 
                 // --- VIEWPORT-EXTENDED CACHE ---
-                // Instead of caching the entire map (which for hub_949 is 13200×13200 =
+                // Instead of caching the entire map (which for sdc is 13200×13200 =
                 // 174 Mp / ~700 MB and would crash phones), we cache only the currently
                 // visible viewport plus a 50% buffer ring on each side, at current
                 // display scale. Memory becomes constant (~6 Mp / 22 MB) regardless

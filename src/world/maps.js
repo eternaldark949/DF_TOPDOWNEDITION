@@ -3,8 +3,8 @@
         //  Entity instances (props, npcs, lamps) are created by createMapEntities()
         // ============================================================================
         const MAP_DATA = {
-            'hub_949': {
-                id: 'hub_949', width: 13200, height: 13200, type: 'outdoor',
+            'sdc': {
+                id: 'sdc', width: 13200, height: 13200, type: 'outdoor',
                 label: 'Southern Dimensions City', floorColor: '#2a262e',
                 climate: 'city',   // Rain-heavy: clear sky is rare and short here
                 spawn: { x: 1200, y: 550 },
@@ -25,7 +25,7 @@
                 spawn: { x: 600, y: 1000 },
                 zones: [ { x: 100, y: 100, w: 1000, h: 1000, color: '#150025' } ],
                 walls: [ {x:0, y:0, w:1200, h:50}, {x:0, y:1150, w:1200, h:50}, {x:0, y:0, w:50, h:1200}, {x:1150, y:0, w:50, h:1200} ],
-                transitions: [ { x: 550, y: 1100, w: 100, h: 50, target: 'hub_949', label: 'Return to Body' } ]
+                transitions: [ { x: 550, y: 1100, w: 100, h: 50, target: 'sdc', label: 'Return to Body' } ]
             },
             'apt_949': {
                 id: 'apt_949', width: 1400, height: 900, type: 'indoor',
@@ -45,7 +45,7 @@
                     { x: 0, y: 892, w: 620, h: 8 }, { x: 780, y: 892, w: 620, h: 8 },
                     { x: 900, y: 208, w: 8, h: 684 }, { x: 908, y: 548, w: 484, h: 8 },
                 ],
-                transitions: [ { x: 620, y: 860, w: 160, h: 40, target: 'hub_949', label: 'Exit to City' } ],
+                transitions: [ { x: 620, y: 860, w: 160, h: 40, target: 'sdc', label: 'Exit to City' } ],
                 landmarks: [
                     { id: 'apt_door', x: 700, y: 880 }, { id: 'apt_bed', x: 1050, y: 350 },
                     { id: 'apt_terminal', x: 700, y: 100 }, { id: 'apt_balcony', x: 700, y: 100 },
@@ -65,7 +65,7 @@
                 spawn: { x: 500, y: 1100 },
                 zones: [],
                 walls: [ { x: 0, y: 0, w: 1000, h: 50 }, { x: 0, y: 1150, w: 400, h: 50 }, { x: 600, y: 1150, w: 400, h: 50 }, { x: 0, y: 0, w: 50, h: 1200 }, { x: 950, y: 0, w: 50, h: 1200 }, { x: 350, y: 100, w: 300, h: 50 }, { x: 0, y: 300, w: 80, h: 100 }, { x: 0, y: 500, w: 80, h: 100 }, { x: 0, y: 700, w: 80, h: 100 }, { x: 920, y: 300, w: 80, h: 100 }, { x: 920, y: 500, w: 80, h: 100 }, { x: 920, y: 700, w: 80, h: 100 } ],
-                transitions: [ { x: 400, y: 1150, w: 200, h: 50, target: 'hub_949', label: 'Exit Hotel' }, { x: 50, y: 300, w: 100, h: 500, target: 'hotel_suite', label: 'Use Elevator', quiet: true }, { x: 850, y: 300, w: 100, h: 500, target: 'hotel_suite', label: 'Use Elevator', quiet: true } ],
+                transitions: [ { x: 400, y: 1150, w: 200, h: 50, target: 'sdc', label: 'Exit Hotel' }, { x: 50, y: 300, w: 100, h: 500, target: 'hotel_suite', label: 'Use Elevator', quiet: true }, { x: 850, y: 300, w: 100, h: 500, target: 'hotel_suite', label: 'Use Elevator', quiet: true } ],
                 landmarks: [
                     { id: 'hotel_exit', x: 500, y: 1175 }, { id: 'hotel_desk', x: 500, y: 125 },
                     { id: 'hotel_elevator_left', x: 100, y: 500 }, { id: 'hotel_elevator_right', x: 900, y: 500 },
@@ -119,7 +119,7 @@
                 respawn: { x: 212, y: 328 },   // beside the recovery bed (see PlayerEntity.die)
                 zones: [],
                 walls: [ {x:0,y:0,w:800,h:50}, {x:0,y:750,w:350,h:50}, {x:450,y:750,w:350,h:50}, {x:0,y:0,w:50,h:800}, {x:750,y:0,w:50,h:800} ],
-                transitions: [ {x: 350, y: 720, w: 100, h: 80, target: 'hub_949', label: 'Exit Clinic'} ],
+                transitions: [ {x: 350, y: 720, w: 100, h: 80, target: 'sdc', label: 'Exit Clinic'} ],
                 landmarks: [
                     { id: 'clinic_exit', x: 400, y: 760 }, { id: 'clinic_dr_yin', x: 400, y: 200 },
                     { id: 'clinic_bed_left', x: 200, y: 400 }, { id: 'clinic_bed_right', x: 600, y: 400 },
@@ -151,7 +151,7 @@
                     { x: 1330, y: 290, w: 14, h: 896 },                                      // corridor | suites
                     { x: 1344, y: 580, w: 242, h: 14 }, { x: 1344, y: 884, w: 242, h: 14 },  // suite walls
                 ],
-                transitions: [ {x: 740, y: 1170, w: 120, h: 30, target: 'hub_949', label: 'Exit Nightclub'} ],
+                transitions: [ {x: 740, y: 1170, w: 120, h: 30, target: 'sdc', label: 'Exit Nightclub'} ],
                 landmarks: [
                     { id: 'club_exit', x: 800, y: 1165 }, { id: 'mirabel_booth', x: 1470, y: 200 },
                     { id: 'club_bar', x: 530, y: 500 }, { id: 'club_dancefloor', x: 800, y: 500 },
@@ -198,7 +198,7 @@
                     { x: 50, y: 680, w: 570, h: 20 }, { x: 1380, y: 680, w: 570, h: 20 }
                 ],
                 transitions: [
-                    { x: 850, y: 1320, w: 300, h: 80, target: 'hub_949', label: 'Exit to City' },
+                    { x: 850, y: 1320, w: 300, h: 80, target: 'sdc', label: 'Exit to City' },
                     { x: 880, y: 50, w: 240, h: 60, target: 'enni_cole_upper', label: 'Upstairs', quiet: true }
                 ],
                 landmarks: [
@@ -254,7 +254,7 @@
                     { x: 690, y: 60, w: 15, h: 240 }, { x: 950, y: 700, w: 200, h: 15 },
                     { x: 940, y: 700, w: 15, h: 250 },
                 ],
-                transitions: [ { x: 500, y: 920, w: 200, h: 80, target: 'hub_949', label: 'Exit to City' } ],
+                transitions: [ { x: 500, y: 920, w: 200, h: 80, target: 'sdc', label: 'Exit to City' } ],
                 landmarks: [
                     { id: 'cafe_exit', x: 600, y: 960 }, { id: 'cafe_counter', x: 250, y: 200 },
                     { id: 'cafe_dining', x: 560, y: 550 }, { id: 'cafe_booths', x: 1040, y: 500 },
@@ -283,7 +283,7 @@
                     { x: 880, y: 690, w: 470, h: 20 },
                     { x: 880, y: 650, w: 20, h: 40 }, { x: 880, y: 710, w: 20, h: 240 }
                 ],
-                transitions: [ { x: 600, y: 920, w: 200, h: 80, target: 'hub_949', label: 'Exit to City' } ],
+                transitions: [ { x: 600, y: 920, w: 200, h: 80, target: 'sdc', label: 'Exit to City' } ],
                 landmarks: [
                     { id: 'shop_exit', x: 700, y: 960 }, { id: 'shop_counter', x: 1100, y: 300 },
                     { id: 'shop_bay_1', x: 250, y: 200 }, { id: 'shop_bay_2', x: 250, y: 450 },
@@ -317,7 +317,7 @@
                     // Back wall accent strip
                     { x: 200, y: 50, w: 600, h: 8 }
                 ],
-                transitions: [ { x: 400, y: 720, w: 200, h: 80, target: 'hub_949', label: 'Exit Neural Systems' } ],
+                transitions: [ { x: 400, y: 720, w: 200, h: 80, target: 'sdc', label: 'Exit Neural Systems' } ],
                 landmarks: [
                     { id: 'neural_exit', x: 500, y: 760 },
                     { id: 'neural_counter', x: 500, y: 250 },
@@ -362,7 +362,7 @@
                     { x: 350, y: 350, w: 40, h: 40 },
                     { x: 510, y: 470, w: 40, h: 40 }
                 ],
-                transitions: [ { x: 350, y: 840, w: 200, h: 60, target: 'hub_949', label: 'Exit Biggs Park' } ],
+                transitions: [ { x: 350, y: 840, w: 200, h: 60, target: 'sdc', label: 'Exit Biggs Park' } ],
                 landmarks: [
                     { id: 'biggs_entrance', x: 450, y: 850 },
                     { id: 'biggs_center', x: 450, y: 450 }
@@ -403,7 +403,7 @@
                     { x: 1560, y: 14, w: 14, h: 416 },                                     // bedroom | bath
                     { x: 1240, y: 1164, w: 396, h: 14 }, { x: 1622, y: 1178, w: 14, h: 308 }, // the reliquary inside the gallery's L
                 ],
-                transitions: [ { x: 830, y: 1470, w: 140, h: 30, target: 'hub_949', label: 'Leave the House' } ],
+                transitions: [ { x: 830, y: 1470, w: 140, h: 30, target: 'sdc', label: 'Leave the House' } ],
                 landmarks: [
                     { id: 'house_foyer', x: 900, y: 1300 }, { id: 'house_hall', x: 900, y: 720 },
                     { id: 'house_chapel', x: 900, y: 200 }, { id: 'house_courtyard', x: 1510, y: 720 }
@@ -437,7 +437,7 @@
                     { x: 586, y: 380, w: 14, h: 1006 }, { x: 1200, y: 380, w: 14, h: 1006 },  // the spines
                     { x: 886, y: 14, w: 14, h: 352 }, { x: 1386, y: 14, w: 14, h: 352 },      // garden | crystal chamber | bath
                 ],
-                transitions: [ { x: 830, y: 1370, w: 140, h: 30, target: 'hub_949', label: 'Leave the Palace' } ],
+                transitions: [ { x: 830, y: 1370, w: 140, h: 30, target: 'sdc', label: 'Leave the Palace' } ],
                 landmarks: [ { id: 'palace_throne', x: 900, y: 520 }, { id: 'palace_garden', x: 450, y: 190 } ]
             },
             'ollo_test': {
@@ -459,7 +459,7 @@
                     { x: 1970, y: 0, w: 30, h: 1500 }
                 ],
                 transitions: [
-                    { x: 400, y: 1450, w: 1200, h: 50, target: 'hub_949', label: 'Return to City' }
+                    { x: 400, y: 1450, w: 1200, h: 50, target: 'sdc', label: 'Return to City' }
                 ],
                 pavements: [], crosswalks: [],
                 landmarks: [ { id: 'ollo_entrance', x: 1000, y: 700 } ]

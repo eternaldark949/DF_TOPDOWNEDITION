@@ -3,6 +3,8 @@
 Every piece of *Dimensions: Freelancer (top-down)* and what lives in it. `tools/build.mjs` joins them, **in the order below**, into the playable `DFAB V8.html`.
 Order matters: a file can only use, when it loads, what the files above it declared.
 
+**The world's names.** Dimensions City has four quadrants, NDC, EDC, WDC and SDC (north, east, west, south), and the DCE (Dimensions City Epicenter) at its heart. The open city map is Southern Dimensions City, map id `sdc` (it was `hub_949`; `loadMap` and save loading still accept the old id). Other quadrants get their own ids the same way (`ndc`, `edc`, `wdc`, `dce`).
+
 For editor/runtime batches that change static building or foliage geometry, reach, or same-length collections, call `game.invalidateRenderSpatial()` after the batch. It also invalidates effect and physics indexes. Physics-only edits can use `game.invalidatePhysicsSpatial(items)`; lamp/puddle edits within the same tick/draw can use `game.invalidateEffectSpatial()`. Map loading and known wall removal call the relevant hooks automatically.
 
 ## Page and styles

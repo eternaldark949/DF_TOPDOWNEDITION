@@ -35,7 +35,7 @@ test('Spatial traffic sensing matches full-list sensing in a populated city', ()
     const env = runtime(file);
     const r = value(env, `
       let seed=72841; Math.random=()=>((seed=seed*16807%2147483647)-1)/2147483646;
-      game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=true; game.paused=false;
+      game.story.update=()=>{}; game._doLoadMap('sdc'); game.running=true; game.paused=false;
       GameSettings.trafficDensity='high'; GameSettings.pedestrianDensity='high';
       let visits=0, queries=0;
       for (const grid of [game.traffic.sensing.cars,game.traffic.sensing.people]) {

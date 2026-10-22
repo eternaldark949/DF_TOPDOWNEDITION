@@ -194,7 +194,7 @@
                         return g.activeMap.id === 'moon_city_nightclub';
         
                     case "LOC_HUB":
-                        return g.activeMap.id === 'hub_949';
+                        return g.activeMap.id === 'sdc';
         
                     case "LOC_HOTEL_LOBBY":
                         return g.activeMap.id === 'hotel_lobby';

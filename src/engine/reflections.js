@@ -228,7 +228,7 @@
                     P.push({ x, y, ang, lobes, d: 0.25 + rnd() * 0.75, r });
                 };
                 const net = this.traffic && this.traffic.network;
-                if (net && map.id === 'hub_949') {
+                if (net && map.id === 'sdc') {
                     for (const road of net.roads) {
                         if (!road.length) continue;
                         const ang = Math.atan2(road.y2 - road.y1, road.x2 - road.x1), half = road.thickness / 2;
@@ -317,7 +317,7 @@
                 const wetBox = q === 'ultra' ? (this._ultraWet || (this._ultraWet = [])) : null;
                 if (wetBox) wetBox.length = 0;
                 mc.setTransform(1, 0, 0, 1, 0, 0); mc.clearRect(0, 0, rw, rh); toView(mc);
-                const net = wet >= 0.02 && this.activeMap.id === 'hub_949' && this.traffic && this.traffic.network;
+                const net = wet >= 0.02 && this.activeMap.id === 'sdc' && this.traffic && this.traffic.network;
                 if (net) {
                     mc.fillStyle = `rgba(255,255,255,${(REFLECT.ROAD * Math.min(1, wet * 1.3)).toFixed(3)})`;
                     for (const road of net.roads) {

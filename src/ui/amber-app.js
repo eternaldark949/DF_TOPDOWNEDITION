@@ -55,7 +55,7 @@
                     }, 2600);
                     return;
                 }
-                const onHub = g.activeMap && g.activeMap.id === 'hub_949';
+                const onHub = g.activeMap && g.activeMap.id === 'sdc';
                 this.sendBrief('Barista Ren', 'delivery', REN_AGAIN[(n - 1) % REN_AGAIN.length],
                     { source: 'ren', handed: true, from: onHub ? { x: g.player.x, y: g.player.y } : null });
             },
@@ -91,7 +91,7 @@
             /** Where she is, for an order's distance: herself in the city, the cafe from anywhere else */
             _amberFrom() {
                 const g = game;
-                if (g.activeMap && g.activeMap.id === 'hub_949') return { x: g.player.x, y: g.player.y };
+                if (g.activeMap && g.activeMap.id === 'sdc') return { x: g.player.x, y: g.player.y };
                 const P = this._place('cozy_cafe');
                 return P ? { x: P.tx, y: P.ty } : null;
             },
@@ -115,7 +115,7 @@
             acceptAmber(i) {
                 const g = game, A = this._amber(), o = A && A.orders[i];
                 if (!o) return;
-                if (g.activeMap.id !== 'hub_949') { showMessage('AMBER ORDERS ARE PICKED UP IN THE CITY.'); return; }
+                if (g.activeMap.id !== 'sdc') { showMessage('AMBER ORDERS ARE PICKED UP IN THE CITY.'); return; }
                 const m = { ...o, id: `delivery_${Date.now()}` };
                 if (!g.missions.acceptMission(m, g)) return;
                 A.orders.splice(i, 1);
@@ -163,7 +163,7 @@
             _amberTick() {
                 const g = typeof game !== 'undefined' && game, A = this._amber();
                 if (!g || !A || !A.unlocked || !A.online || !g.running || g.missions.activeMission) return;
-                if (!g.activeMap || g.activeMap.id !== 'hub_949') return;
+                if (!g.activeMap || g.activeMap.id !== 'sdc') return;
                 if (A.pingAt == null) A.pingAt = (g.worldMinutes || 0) + 6;
                 if ((g.worldMinutes || 0) >= A.pingAt) this._amberPing(true);
             },

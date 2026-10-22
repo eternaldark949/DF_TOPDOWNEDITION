@@ -21,7 +21,7 @@ const path = require('path');
 let chromium;
 try { ({ chromium } = require('playwright')); } catch (e) { console.error('Playwright not found: npm i -D playwright (or set NODE_PATH to a global install).'); process.exit(2); }
 
-const args = process.argv.slice(2), file = path.resolve(args[0] || 'DFAB V8.html'), maps = args.length > 1 ? args.slice(1) : ['hub_949'];
+const args = process.argv.slice(2), file = path.resolve(args[0] || 'DFAB V8.html'), maps = args.length > 1 ? args.slice(1) : ['sdc'];
 
 (async () => {
     const browser = await chromium.launch(), page = await (await browser.newContext({ viewport: { width: 915, height: 412 } })).newPage();

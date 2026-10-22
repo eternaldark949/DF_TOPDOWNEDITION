@@ -66,7 +66,7 @@ test('Detailed traffic and sign hooks are exclusive and unwind back to exact ori
  const env=runtime(file);
  const r=value(env,`
   let now=1000;performance.now=()=>now+=0.02;
-  game.story.update=()=>{};game._doLoadMap('hub_949');game.running=true;game.paused=false;
+  game.story.update=()=>{};game._doLoadMap('sdc');game.running=true;game.paused=false;
   for(let i=0;i<200;i++)game.update();
   const before={paint:BuildingV2.prototype._paintSign,draw:BuildingV2.prototype.drawTop,manager:TrafficManager.prototype.update,query:_physicsSpatial.query};
   PerformanceBench.run({durationMs:150,warmupMs:0});
@@ -92,7 +92,7 @@ test('Detailed traffic and sign hooks are exclusive and unwind back to exact ori
 test('Map-entry warmup prepares ordinary signs only when their font is ready and keeps warm caches reusable',()=>{
  const env=runtime(file);
  const r=value(env,`
-  game.story.update=()=>{};game._doLoadMap('hub_949');
+  game.story.update=()=>{};game._doLoadMap('sdc');
   const b=game.activeMap.buildings.find(b=>b.isV2&&b.attachedSign&&!b.variant&&b.style!=='double_nights'&&b.style!=='moon_city');
   game.activeMap.buildings=[b];game.props=[];game.groundBaker.activeFor=()=>false;b.inView=()=>true;delete b._signSpr;
   let ready=false;document.fonts.check=()=>ready;
