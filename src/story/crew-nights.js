@@ -261,6 +261,15 @@
         const CREW_STIM = { '747': 'Left a stim in your bag. Don\'t argue.', Victoria: 'You looked rough. There\'s a stim in your pocket. You\'re welcome, darling.', Yenna: 'Stim in your kit. Use it.',
                             Sabrina: 'Slipped you a stim. Don\'t make it a habit.', Max: 'Stim. Your bag. Don\'t make me patch you up.', Josh: 'Restocked one stim. Logged as a gift.' };
 
+        /** Asking her out again, after the first time (the feed's pins are the first) */
+        const CREW_SOLO_ASK = {
+            Victoria: ['Torque\'s open late. Come judge my paint choices.', 'I need you at the garage. It\'s urgent. It\'s about rims.', 'Bored. Garage. You. Now.'],
+            Sabrina: ['Bar\'s quiet tonight. Come be quiet with me.', 'I\'m at Moon City. Drinking alone is a choice and I\'m un-choosing it.', 'Booth at the back. Bring your bad jokes.'],
+            Yenna: ['Range is clear. Fifty paces. Loser buys.', 'Park, after dark. The cans miss you.', 'Need a spotter. Not for work.'],
+            Josh: ['Neural Systems got a new shipment. I require supervision.', 'I\'ve booked thirty minutes for us. That came out wrong. Come to Neural Systems.', 'Prisma restocked. Please stop me.'],
+            Max: ['Enni Cole. I need a second opinion. Again. Shut up.', 'Found a jacket. Need your eyes. Don\'t tell Victoria.', 'Come to Enni Cole. Don\'t make it weird.']
+        };
+
         const CrewNights = {
             _run: null,          // the night playing right now
 
@@ -545,7 +554,7 @@
         });
 
         /* ── Hooks into Messages ── */
-        const _crewBaseReplies = phoneSystem.getReplyOptions, _crewBaseSend = phoneSystem.sendReply, _crewBaseReset = phoneSystem.resetFeed;
+        const _crewBaseFeed = phoneSystem.feedNext, _crewBaseReplies = phoneSystem.getReplyOptions, _crewBaseSend = phoneSystem.sendReply, _crewBaseReset = phoneSystem.resetFeed;
         Object.assign(phoneSystem, {
             _planCard(rec) { return CrewNights.card(rec); },
             /** Her own asks: "Drinks tonight?" to the group, "Want to hang out?" to one of them, while no plan's on */
@@ -571,6 +580,22 @@
                 }
             },
             resetFeed() { _crewBaseReset.call(this); this.feed.crew = { plan: null, seen: {}, nights: 0, lastAsk: {} }; },
+            /** Now and then one of them asks her out on their own: the closer, the more often (at most one a night) */
+            feedNext() {
+                const g = game, S = CrewNights.state(), busy = S.plan && (S.plan.state === 'open' || S.plan.state === 'yes');
+                const now = g.worldMinutes || 0;
+                if (!busy && now - (S.lastSolo || -1e9) > 720) {
+                    const here = CrewNights._crewHere(g).filter(n => CREW_SOLO_ASK[n]);
+                    const weights = here.map(n => 1 + CrewNights._tier(g, n)), sum = weights.reduce((a, b) => a + b, 0);
+                    if (here.length && Math.random() < 0.15 + 0.06 * sum / here.length) {
+                        let r = Math.random() * sum, k = 0;
+                        while (r > weights[k] && k < here.length - 1) r -= weights[k++];
+                        const who = here[k];
+                        if (CrewNights.invite(who, CREW_HOME_VENUE[who], CrewNights._pick(CREW_SOLO_ASK[who]), { solo: true })) { S.lastSolo = now; return { who, kind: 'plan' }; }
+                    }
+                }
+                return _crewBaseFeed.call(this);
+            },
             /** One of the crew's place pins from the feed becomes an invite to their place */
             crewPlanFromPin(e) {
                 const venue = CREW_IDS[e.who] && CREW_HOME_VENUE[e.who];

@@ -489,6 +489,9 @@
         .dialogue-btn::before { content: '◆'; font-size: 0.75em; letter-spacing: 0; }
         .dialogue-btn:hover, .dialogue-btn:active { color: #fff6e0; text-shadow: 0 0 12px rgba(232, 194, 122, 0.8); }
         #btn-decline { color: #b9aec4; }
+        .dialogue-btn.talk-btn { color: #9fd8c4; }
+        .dialogue-btn.talk-btn.fresh { color: #c8fff0; animation: talkFresh 1.6s ease-in-out infinite; }
+        @keyframes talkFresh { 50% { text-shadow: 0 0 14px rgba(102, 204, 170, 0.95); } }
         .dialogue-nav-btn { letter-spacing: 0; color: #b9aec4; padding: 6px 4px; }
         .dialogue-nav-btn::before { content: none; }
         .dialogue-nav-btn:disabled { opacity: 0.25; cursor: default; }

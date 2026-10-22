@@ -189,6 +189,7 @@
                     this._extraDialogueBtn.textContent = B.extra;
                     this._extraDialogueBtn.style.display = '';
                 }
+                if (typeof Talks !== 'undefined') Talks.button(this, entity);   // story/talks.js: sit down and talk
                 if (D.noLock) return;
                 
                 // 4. LOCK UI INTERACTIONS (Except Dialogue Box)
@@ -485,6 +486,7 @@
                 
                 // 2b. Hide the third button (Grum's menu)
                 if (this._extraDialogueBtn) this._extraDialogueBtn.style.display = 'none';
+                if (this._talkDialogueBtn) this._talkDialogueBtn.style.display = 'none';
                 
                 // 3. RESET POINTER EVENTS (Re-enable Buttons)
                 document.getElementById('game-ui').style.pointerEvents = 'none'; 

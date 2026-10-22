@@ -14,5 +14,9 @@
             sabrina:   { name: 'Sabrina', look: 'Sabrina', color: SPEAKER_COLORS['Sabrina'], side: 'right' },
             max:       { name: 'Max', look: 'Max', color: SPEAKER_COLORS['Max'], side: 'right' },
             josh:      { name: 'Josh', look: 'Josh', color: SPEAKER_COLORS['Josh'], side: 'right' },
-            victoria:  { name: 'Victoria', look: 'Victoria', color: SPEAKER_COLORS['Victoria'], side: 'right' }
+            victoria:  { name: 'Victoria', look: 'Victoria', color: SPEAKER_COLORS['Victoria'], side: 'right' },
+            anavia:    { name: 'Anavia', look: 'Anavia', color: SPEAKER_COLORS['Anavia'], side: 'right' },
+            ren:       { name: 'Ren', look: 'Barista Ren', color: SPEAKER_COLORS['Barista Ren'], side: 'right' },
+            bartender: { name: 'Bartender', look: 'Bartender', color: SPEAKER_COLORS['Bartender'], side: 'right' },
+            yin:       { name: 'Dr. Yin', look: 'Dr. Yin', color: SPEAKER_COLORS['Dr. Yin'], side: 'right' }
         };
