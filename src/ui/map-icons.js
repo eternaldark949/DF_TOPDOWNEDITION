@@ -2,6 +2,7 @@
            MAP ICONS & MAP ART — one icon set and one city look for the golden map
            (ui/ui-system.js) and the phone's map (ui/phone.js).
              MapIcons.draw(ctx, kind, x, y, opts)   a crisp icon at a FIXED size in CSS px
+             MapIcons.drawMagic(ctx, kind, x, y, opts)  the same, alive: aura, orbiting motes, sparks (golden map)
                  (never the window width, never the map zoom; a gentle zoomK if asked),
                  painted once per kind/size/dpr into a sprite and stamped after. Paths
                  only — no emoji or text glyphs (Safari's colour-emoji fallback at big
@@ -61,6 +62,86 @@
                 ctx.globalAlpha = a0;
             },
 
+            /**
+             * The golden map's magic: the icon stamped as draw() does, wrapped in light that lives. Pins float and
+             * breathe a violet aura from their tip, motes orbit and twinkle, and now and then a spark drifts up;
+             * you send out a slow violet ripple. opts as draw(), plus t (seconds) and seed (a phase, from map coords,
+             * so each place keeps its own rhythm). Only cached sprites and a few stamps per icon: cheap at 60fps.
+             */
+            drawMagic(ctx, kind, x, y, opts = {}) {
+                const D = opts.dpr || 1, base = kind.split(':')[0], css = (opts.css || this.SIZE[base] || 16), t = opts.t || 0, sd = opts.seed || 0;
+                const R = css * D, pin = base === 'pin' || base === 'amberPin' || base === 'goldPin' || base === 'dest', you = base === 'player';
+                const gold = base === 'goldPin' || base === 'objective' || base === 'client', amber = base === 'amberPin';
+                const hue = amber ? this.MAGIC.amber : gold ? this.MAGIC.gold : this.MAGIC.violet;
+                const breath = 0.5 + 0.5 * Math.sin(t * 1.9 + sd), lift = pin ? (1.2 + 1.6 * Math.sin(t * 1.5 + sd)) * D : 0;
+                const ax = x, ay = pin ? y - R * 0.06 : y;                     // the aura's centre: a pin's tip, else the icon's heart
+                const a0 = ctx.globalAlpha, op = ctx.globalCompositeOperation;
+                ctx.globalCompositeOperation = 'lighter';
+                // The aura: a breathing pool of light
+                const ar = R * (pin ? 1.0 : 1.1) * (0.85 + 0.3 * breath);
+                ctx.globalAlpha = a0 * (0.4 + 0.4 * breath);
+                ctx.drawImage(this._magicGlow(hue.glow), ax - ar, ay - ar, ar * 2, ar * 2);
+                if (you) {                                                    // your ripple: a ring that widens and fades
+                    const ph = (t * 0.55 + sd) % 1, rr = R * (0.45 + 1.2 * ph);
+                    ctx.globalAlpha = a0 * 0.8 * (1 - ph) * (1 - ph);
+                    ctx.strokeStyle = hue.ring; ctx.lineWidth = 1.4 * D;
+                    ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI * 2); ctx.stroke();
+                }
+                // Orbiting motes, on a tilted ring round the base, twinkling as they pass
+                const n = you ? 3 : pin ? 3 : 1, orb = R * (pin ? 0.5 : 0.7), spd = you ? 1.1 : 0.8;
+                for (let i = 0; i < n; i++) {
+                    const a = t * spd + sd * 3 + i * Math.PI * 2 / n, tw = 0.5 + 0.5 * Math.sin(t * 4.2 + i * 2.1 + sd * 5);
+                    const mx = ax + Math.cos(a) * orb, my = ay + Math.sin(a) * orb * 0.42 - (pin ? R * 0.02 : 0);
+                    const front = Math.sin(a) > 0, sz = D * (pin || you ? 4.2 : 3) * (0.55 + 0.45 * tw);
+                    ctx.globalAlpha = a0 * (front ? 0.95 : 0.45) * (0.35 + 0.65 * tw);
+                    ctx.drawImage(this._magicStar(i % 2 ? this.MAGIC.gold.mote : hue.mote), mx - sz, my - sz, sz * 2, sz * 2);
+                }
+                // A spark that drifts up and fades, once every few seconds per place
+                if (pin || you || gold) {
+                    const cyc = 2.2, ph = ((t + sd * 7) % cyc) / cyc;
+                    if (ph < 0.6) {
+                        const q = ph / 0.6, sx = ax + Math.sin(q * 6 + sd * 11) * R * 0.18, sy = ay - R * (pin ? 0.3 : 0.1) - q * R * 0.9, sz = D * 3.6 * (1 - q * 0.5);
+                        ctx.globalAlpha = a0 * Math.sin(q * Math.PI) * 0.9;
+                        ctx.drawImage(this._magicStar(this.MAGIC.gold.mote), sx - sz, sy - sz, sz * 2, sz * 2);
+                    }
+                }
+                ctx.globalAlpha = a0; ctx.globalCompositeOperation = op;
+                this.draw(ctx, kind, x, y - lift, opts);
+                // A glint: a white-gold star that flares on the icon, briefly, every few seconds
+                const gph = ((t * 0.3 + sd * 1.7) % 1);
+                if (gph < 0.12 && (pin || gold || you)) {
+                    const q = gph / 0.12, gz = R * 0.32 * Math.sin(q * Math.PI);
+                    ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = a0 * 0.9;
+                    ctx.drawImage(this._magicStar('255, 244, 214'), x + R * 0.16 - gz, y - lift - R * (pin ? 0.78 : 0.2) - gz, gz * 2, gz * 2);
+                    ctx.globalAlpha = a0; ctx.globalCompositeOperation = op;
+                }
+            },
+            MAGIC: {
+                violet: { glow: '124, 58, 237', ring: 'rgba(168, 118, 255, 1)', mote: '196, 160, 255' },
+                gold: { glow: '255, 170, 40', ring: 'rgba(255, 196, 90, 1)', mote: '255, 210, 120' },
+                amber: { glow: '255, 130, 30', ring: 'rgba(255, 170, 70, 1)', mote: '255, 190, 110' }
+            },
+            _magicCache: new Map(),
+            /** A soft round glow, white-hot at the heart (64 px, stretched as needed). */
+            _magicGlow(rgb) {
+                const key = 'g' + rgb; let cv = this._magicCache.get(key); if (cv) return cv;
+                cv = document.createElement('canvas'); cv.width = cv.height = 64; const c = cv.getContext('2d');
+                const g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+                g.addColorStop(0, `rgba(${rgb}, 0.9)`); g.addColorStop(0.35, `rgba(${rgb}, 0.35)`); g.addColorStop(1, `rgba(${rgb}, 0)`);
+                c.fillStyle = g; c.fillRect(0, 0, 64, 64);
+                this._magicCache.set(key, cv); return cv;
+            },
+            /** A twinkling mote: a four-point star in a small halo (32 px). */
+            _magicStar(rgb) {
+                const key = 's' + rgb; let cv = this._magicCache.get(key); if (cv) return cv;
+                cv = document.createElement('canvas'); cv.width = cv.height = 32; const c = cv.getContext('2d');
+                const g = c.createRadialGradient(16, 16, 0, 16, 16, 16);
+                g.addColorStop(0, `rgba(${rgb}, 0.8)`); g.addColorStop(1, `rgba(${rgb}, 0)`);
+                c.fillStyle = g; c.fillRect(0, 0, 32, 32);
+                this._star(c, 16, 16, 14, `rgba(${rgb}, 1)`); this._star(c, 16, 16, 6, 'rgba(255, 255, 255, 0.95)');
+                this._magicCache.set(key, cv); return cv;
+            },
+
             // ── Painters: each draws inside an S×S box (0..S), soft glows baked in (once), returns the anchor y ──
             _glow(c, x, y, r, rgb, a) {
                 const g = c.createRadialGradient(x, y, 0, x, y, r);
@@ -72,7 +153,7 @@
                  *  `amberPin:<glyph>` and `goldPin:<glyph>` are the same in amber (Amber's van, the package) and gold (the job). */
                 pin(c, S, glyph, tint = MapIcons.TINT.crimson) {
                     const cx = S / 2, r = S * 0.3, cy = S * 0.36, tip = S * 0.98;
-                    this._glow(c, cx, tip - S * 0.06, S * 0.42, '139, 92, 246', 0.55);
+                    this._glow(c, cx, tip - S * 0.06, S * 0.42, '124, 58, 237', 0.6);
                     c.beginPath(); c.arc(cx, cy, r, Math.PI * 0.82, Math.PI * 0.18); c.lineTo(cx, tip); c.closePath();
                     const g = c.createLinearGradient(0, cy - r, 0, tip);
                     g.addColorStop(0, tint.top); g.addColorStop(1, tint.tip);
