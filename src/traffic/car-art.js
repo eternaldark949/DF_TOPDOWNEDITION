@@ -12,7 +12,7 @@
                              rounding the nose with the round headlights in their
                              tips, the hood sunk between them with a round badge,
                              a double-curved cowl over the windshield, the long
-                             pearl hearse cap with a gold crescent, the retro wheel
+                             ivory hearse cap with a gold crescent, the retro wheel
                              hoods standing out over the rear wheels, three round
                              tail lights wrapping each corner of the rounded tail;
                              the V3's panoramic black-glass roof
@@ -273,7 +273,7 @@
             c.restore();
             // Shoulder light and a crisp edge
             c.save(); c.scale((L - 3) / L, (W - 3) / W); c.strokeStyle = 'rgba(255,255,255,0.13)'; c.lineWidth = 0.9; c.stroke(g.body); c.restore();
-            if (lady) { c.save(); c.scale((L - 6) / L, (W - 6) / W); c.strokeStyle = CAR_ART.GOLD; c.globalAlpha = 0.8; c.lineWidth = 0.7; c.stroke(g.body); c.restore(); }
+            if (lady && !coach) { c.save(); c.scale((L - 6) / L, (W - 6) / W); c.strokeStyle = CAR_ART.GOLD; c.globalAlpha = 0.8; c.lineWidth = 0.7; c.stroke(g.body); c.restore(); }
             if (zen) {                                                         // the cyan line down each flank
                 c.strokeStyle = v.glowColor || '#00f3ff'; c.globalAlpha = 0.75; c.lineWidth = 0.9;
                 for (const s of [-1, 1]) { c.beginPath(); c.moveTo(L / 2 - 10, s * (W / 2 - 1.8)); c.lineTo(-L / 2 + 8, s * (W / 2 - 2.6)); c.stroke(); }
@@ -290,7 +290,7 @@
                 }
             }
             // The greenhouse: glass under the roof. The V1's is one narrow band arched across behind the hood; the cap's
-            // black shell runs forward from the pearl top to meet it.
+            // black shell runs forward from the ivory top to meet it.
             if (coach) {
                 const C = CAR_ART.COACH, X = u => L / 2 - u * L, [f0, fa, b0, ba, bw] = C.band, sw = C.shell * h;
                 const band = new Path2D(); band.moveTo(X(f0), -bw * h); band.quadraticCurveTo(X(fa), 0, X(f0), bw * h);
@@ -339,25 +339,25 @@
             }
             // The roof
             const rw = gw - 2.6, rx0 = x2, rx1 = x1;
-            if (g.hearse) {                                                   // the pearl hearse cap, its edge drawn twice as in the sketch
+            if (g.hearse) {                                                   // the ivory hearse cap, its edge drawn twice as in the sketch
                 const [cu0, cu1, cv] = CAR_ART.COACH.cap, cw = cv * h, cf = L / 2 - cu0 * L, cb = L / 2 - cu1 * L;
                 const cr = cw * 0.85, cap = new Path2D(); cap.roundRect(cb, -cw, cf - cb, cw * 2, [cr, 5, 5, cr]);   // its back end well rounded
                 c.save(); c.filter = 'blur(1px)'; c.fillStyle = 'rgba(0,0,0,0.5)'; c.beginPath(); c.roundRect(cb - 0.5, -cw - 0.6, cf - cb + 1, cw * 2 + 1.2, [cr + 1, 6, 6, cr + 1]); c.fill(); c.restore();
                 // A flat top, evenly lit, with only a faint sheen across it
                 const pr = c.createLinearGradient(cb, -cw, cf, cw);
-                pr.addColorStop(0, '#bdb1cd'); pr.addColorStop(0.55, '#c9bfd7'); pr.addColorStop(1, '#c3b8d2');
+                pr.addColorStop(0, '#e6dcca'); pr.addColorStop(0.55, '#f2eadc'); pr.addColorStop(1, '#ebe2d1');   // warm ivory
                 c.fillStyle = pr; c.fill(cap);
                 c.save(); c.clip(cap);
                 // Its edges roll off down the sides and over the back; the front stays level, running on into the roof
                 const e = 3 / (cw * 2); let fo = c.createLinearGradient(0, -cw, 0, cw);
-                fo.addColorStop(0, 'rgba(46, 34, 70, 0.75)'); fo.addColorStop(e, 'rgba(46, 34, 70, 0)');
-                fo.addColorStop(1 - e, 'rgba(46, 34, 70, 0)'); fo.addColorStop(1, 'rgba(46, 34, 70, 0.75)');
+                fo.addColorStop(0, 'rgba(74, 56, 36, 0.7)'); fo.addColorStop(e, 'rgba(74, 56, 36, 0)');
+                fo.addColorStop(1 - e, 'rgba(74, 56, 36, 0)'); fo.addColorStop(1, 'rgba(74, 56, 36, 0.7)');
                 c.fillStyle = fo; c.fill(cap);
-                fo = c.createLinearGradient(cb, 0, cb + cr, 0); fo.addColorStop(0, 'rgba(46, 34, 70, 0.85)'); fo.addColorStop(1, 'rgba(46, 34, 70, 0)');
+                fo = c.createLinearGradient(cb, 0, cb + cr, 0); fo.addColorStop(0, 'rgba(74, 56, 36, 0.8)'); fo.addColorStop(1, 'rgba(74, 56, 36, 0)');
                 c.save(); c.filter = 'blur(1.4px)'; c.strokeStyle = fo; c.lineWidth = 7; c.stroke(cap); c.restore();
                 c.restore();
                 // A thin bevel: lit where the top turns over, the front edge crisp
-                c.strokeStyle = 'rgba(255, 250, 255, 0.55)'; c.lineWidth = 0.6;
+                c.strokeStyle = 'rgba(255, 252, 244, 0.6)'; c.lineWidth = 0.6;
                 c.beginPath(); c.roundRect(cb + 3.2, -cw + 2.8, cf - cb - 3.6, cw * 2 - 5.6, [cr - 2.8, 3, 3, cr - 2.8]); c.stroke();
                 c.strokeStyle = CAR_ART.GOLD; c.lineWidth = 0.7; c.stroke(cap);
                 const mx = (cb + cf) / 2 - 4;                         // a gold crescent, the house's mark
