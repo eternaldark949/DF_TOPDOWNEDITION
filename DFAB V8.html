@@ -41285,6 +41285,15 @@ class NeuralSystemsBuilding extends BuildingV2 {
             tail: [[[0.935, 0.84], [0.965, 0.74], 0.6], [[0.965, 0.74], [0.987, 0.58], 0.6], [[0.987, 0.58], [0.998, 0.38], 0.55]]
                 .map(([a, b, f]) => _coachPod(L, W, a, b, f, 1.35, 1.8)),
             slab: { x: -L / 2 - 2, d: 2.4, w: W / 2 * 0.34 } });    // the hooded slab: its back edge, depth, half-width
+        /** The V1's running turn signal: its three tail pods on the turning side light one by one from the inside out,
+            hold, then go dark. Returns the side and which pods are lit ([inner, middle, outer] as tail indices), or null. */
+        const SIGNAL_STEP = 6;                                              // frames per beat: 3 to fill, 2 to hold, 2 dark
+        function _coachSignal(v) {
+            if (!v.turnSignal || !(v.turnSignalTimer > 0)) return null;
+            const beat = Math.floor((1e6 - v.turnSignalTimer) / SIGNAL_STEP) % 7;
+            const n = beat < 3 ? beat + 1 : beat < 5 ? 3 : 0;
+            return n ? { s: v.turnSignal === 'left' ? -1 : 1, lit: [2, 1, 0].slice(0, n) } : null;
+        }
         /** Trace a lamp pod (grown by g) as the current path, on side s */
         function _podPath(ctx, t, s, g = 0) {
             ctx.save(); ctx.translate(t.x, s * t.y); ctx.rotate(s * t.a);
@@ -41692,7 +41701,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
         /** Lamps: turn signals, tail and brake lights, headlights (in the car's frame). */
         function drawCarLamps(ctx, v, farLOD) {
             const g = carGeo(v), L = g.L, W = g.W, on = carLampsOn(v);
-            if (v.turnSignal && v.turnSignalTimer > 0 && Math.floor(v.turnSignalTimer / 10) % 2 === 0) {
+            if (!g.hearse && v.turnSignal && v.turnSignalTimer > 0 && Math.floor(v.turnSignalTimer / 10) % 2 === 0) {
                 const s = v.turnSignal === 'left' ? -1 : 1;
                 ctx.fillStyle = '#ffb030';
                 ctx.fillRect(L / 2 - 5, s > 0 ? W / 2 - 3.5 : 0.5 - W / 2, 3.5, 3); ctx.fillRect(-L / 2 + 0.5, s > 0 ? W / 2 - 3.5 : 0.5 - W / 2, 3, 3);
@@ -41704,6 +41713,12 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 const Lp = coachLamps(L, W);
                 for (const s of [-1, 1]) for (const t of Lp.tail) { _podPath(ctx, t, s); ctx.fill(); }
                 ctx.beginPath(); ctx.roundRect(Lp.slab.x - 0.2, -Lp.slab.w + 0.6, 1, Lp.slab.w * 2 - 1.2, 0.5); ctx.fill();
+                const sig = _coachSignal(v);                                    // the running signal sweeps out over its side's pods
+                if (sig) {
+                    ctx.fillStyle = '#ffb030';
+                    for (const i of sig.lit) { _podPath(ctx, Lp.tail[i], sig.s); ctx.fill(); }
+                    if (!farLOD) { ctx.globalAlpha = 0.6; for (const i of sig.lit) drawGlow(ctx, Lp.tail[i].x, sig.s * Lp.tail[i].y, 6, '#ffaa00'); ctx.globalAlpha = 1; }
+                }
             } else if (g.st === 'blackmark') ctx.fillRect(-L / 2 + 0.6, -W / 2 + 4.5, 1.8, W - 9);
             else for (const s of [-1, 1]) ctx.fillRect(-L / 2 + 0.6, s > 0 ? W / 2 - 11 : -W / 2 + 2, 2.4, 9);
             if (brake && !farLOD) { ctx.globalAlpha = 0.35; for (const s of [-1, 1]) drawGlow(ctx, -L / 2, s * (W / 2 - 6), 8, rev ? '#ffffff' : '#ff2244'); ctx.globalAlpha = 1; }
@@ -41732,7 +41747,11 @@ class NeuralSystemsBuilding extends BuildingV2 {
             if (v._lod === 1) { ctx.restore(); return; }                   // far away: just the tail lights
             ctx.globalAlpha = a * 0.5;
             for (const s of [-1, 1]) drawGlow(ctx, hX, s * hY, 10, v.headlightColor || '#ffffaa');
-            if (v.turnSignal && v.turnSignalTimer > 0 && Math.floor(v.turnSignalTimer / 10) % 2 === 0) {
+            const sig = g.hearse && _coachSignal(v);
+            if (sig) {
+                ctx.globalAlpha = a * 0.7;
+                for (const i of sig.lit) drawGlow(ctx, Lp.tail[i].x, sig.s * Lp.tail[i].y, 8, '#ffaa00');
+            } else if (!g.hearse && v.turnSignal && v.turnSignalTimer > 0 && Math.floor(v.turnSignalTimer / 10) % 2 === 0) {
                 const s = v.turnSignal === 'left' ? -1 : 1; ctx.globalAlpha = a * 0.8;
                 drawGlow(ctx, L / 2 - 3, s * (W / 2 - 2), 10, '#ffaa00'); drawGlow(ctx, -L / 2 + 2, s * (W / 2 - 2), 10, '#ffaa00');
             }
