@@ -41283,12 +41283,12 @@ class NeuralSystemsBuilding extends BuildingV2 {
         const coachLamps = (L, W) => ({
             head: _coachPod(L, W, [0.008, 0.6], [0.006, 0.74], 0.9, 4.6, 2.4),
             tail: [[[0.935, 0.84], [0.965, 0.74], 0.6], [[0.965, 0.74], [0.987, 0.58], 0.6], [[0.987, 0.58], [0.998, 0.38], 0.55]]
-                .map(([a, b, f]) => _coachPod(L, W, a, b, f, 2.7, 1.8)),
+                .map(([a, b, f]) => _coachPod(L, W, a, b, f, 1.35, 1.8)),
             slab: { x: -L / 2 - 2, d: 2.4, w: W / 2 * 0.34 } });    // the hooded slab: its back edge, depth, half-width
         /** Trace a lamp pod (grown by g) as the current path, on side s */
         function _podPath(ctx, t, s, g = 0) {
             ctx.save(); ctx.translate(t.x, s * t.y); ctx.rotate(s * t.a);
-            ctx.beginPath(); ctx.roundRect(-t.w / 2 - g, -t.d / 2 - g, t.w + g * 2, t.d + g * 2, t.d / 2 + g - 0.3); ctx.restore();
+            ctx.beginPath(); ctx.roundRect(-t.w / 2 - g, -t.d / 2 - g, t.w + g * 2, t.d + g * 2, Math.min(t.w, t.d) / 2 + g - 0.3); ctx.restore();
         }
 
         /** The body sprite (painted once per look). */
