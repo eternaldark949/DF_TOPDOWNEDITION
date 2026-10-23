@@ -37,10 +37,10 @@
             GOLD: '#d9bf86', SILVER: '#dfe3ea',
             // The V1 from ETERNAL's sketch, in fractions of its length from the nose (u) and of its half-width (v).
             // OUTLINE is the near flank, nose to tail (mirrored for the far one): the fender hump round each side
-            // of the nose, the waist along the cap, the wheel hood standing out over the rear wheel, the round tail.
+            // of the nose (as wide as the rear), the waist along the cap, the wheel hood standing out over the rear wheel, the round tail.
             COACH: {
-                OUTLINE: [[0.035, 0], [0.032, 0.3], [0.036, 0.45], [0.028, 0.5], [0.008, 0.58], [0.004, 0.7], [0.018, 0.8], [0.05, 0.87],
-                          [0.1, 0.885], [0.17, 0.89], [0.25, 0.885], [0.3, 0.86], [0.4, 0.84], [0.52, 0.84], [0.6, 0.86], [0.635, 0.93],
+                OUTLINE: [[0.035, 0], [0.032, 0.3], [0.036, 0.45], [0.028, 0.5], [0.008, 0.6], [0.006, 0.74], [0.022, 0.88], [0.06, 0.96],
+                          [0.12, 0.995], [0.19, 1], [0.26, 0.985], [0.305, 0.9], [0.36, 0.85], [0.4, 0.84], [0.52, 0.84], [0.6, 0.86], [0.635, 0.93],
                           [0.67, 0.99], [0.745, 1], [0.82, 0.99], [0.86, 0.95], [0.895, 0.9], [0.935, 0.84], [0.965, 0.74], [0.987, 0.58],
                           [0.998, 0.38], [1, 0]],
                 axles: [0.19, 0.745], waist: 0.84, hood: 0.49,  // the hood runs between the fender seams at ±hood
@@ -110,7 +110,7 @@
         }
         /** Where the V1's lamps sit (car frame): headlights in the fender tips, three round tail lights round each back corner,
             and the hooded slab out of the middle of the tail (from above, only its lit back edge shows under the hood) */
-        const coachLamps = (L, W) => ({ head: { x: L / 2 - L * 0.055, y: W / 2 * 0.67, r: 2.1 },
+        const coachLamps = (L, W) => ({ head: { x: L / 2 - L * 0.055, y: W / 2 * 0.72, r: 2.1 },
             tail: [[0.928, 0.79], [0.958, 0.66], [0.98, 0.5]].map(([u, k]) => ({ x: L / 2 - u * L, y: W / 2 * k, r: 1.5 })),
             slab: { x: -L / 2 - 2, d: 2.4, w: W / 2 * 0.34 } });    // the hooded slab: its back edge, depth, half-width
 
@@ -194,11 +194,18 @@
                 c.beginPath(); c.moveTo(x3, -W / 2 + si); c.lineTo(-L / 2, -W / 2 + 7); c.lineTo(-L / 2, 0); c.lineTo(x3, 0); c.closePath(); c.fill();
             } else if (coach) {
                 const C = CAR_ART.COACH, X = u => L / 2 - u * L, hv = C.hood * h;
-                // The fender humps either side of the hood: light on each crown, a seam down its inner edge
+                // Height: the body rolls away at every edge (a soft inner shadow round the outline)
+                c.save(); c.filter = 'blur(2px)'; c.strokeStyle = 'rgba(0,0,0,0.55)'; c.lineWidth = 7; c.stroke(g.body); c.restore();
+                // The fender humps either side of the hood: a lit crown running their length, a seam down the inner edge,
+                // and their walls shading the sunk hood
                 for (const s of [-1, 1]) {
-                    const a = c.createRadialGradient(X(0.06), s * h * 0.7, 1, X(0.06), s * h * 0.7, L * 0.13);
-                    a.addColorStop(0, 'rgba(255,255,255,0.2)'); a.addColorStop(1, 'rgba(255,255,255,0)');
-                    c.fillStyle = a; c.fillRect(X(0.2), s > 0 ? 0 : -h, L * 0.2, h);
+                    c.save(); c.translate(X(0.14), s * h * 0.75); c.scale(1, 0.26);
+                    const a = c.createRadialGradient(0, 0, 0, 0, 0, L * 0.15);
+                    a.addColorStop(0, 'rgba(255,255,255,0.3)'); a.addColorStop(0.5, 'rgba(255,255,255,0.1)'); a.addColorStop(1, 'rgba(255,255,255,0)');
+                    c.fillStyle = a; c.fillRect(-L * 0.15, -L * 0.15, L * 0.3, L * 0.3); c.restore();
+                    const wall = c.createLinearGradient(0, s * hv, 0, s * hv * 0.35);
+                    wall.addColorStop(0, 'rgba(0,0,0,0.42)'); wall.addColorStop(1, 'rgba(0,0,0,0)');
+                    c.fillStyle = wall; c.fillRect(X(0.25), s > 0 ? hv * 0.35 : -hv, L * 0.22, hv * 0.65);
                     c.lineWidth = 0.9; c.strokeStyle = 'rgba(0,0,0,0.55)';
                     c.beginPath(); c.moveTo(X(0.03), s * hv); c.quadraticCurveTo(X(0.15), s * hv * 1.02, X(0.245), s * hv * 1.12); c.stroke();
                     c.lineWidth = 0.6; c.strokeStyle = 'rgba(255,255,255,0.16)';
@@ -214,9 +221,10 @@
                 c.beginPath(); c.moveTo(X(0.32), -0.66 * h); c.quadraticCurveTo(X(0.208), 0, X(0.32), 0.66 * h); c.stroke();
                 // The wheel hoods standing out over the rear wheels: a seam where each meets the body, light on its crown
                 for (const s of [-1, 1]) {
-                    const a = c.createRadialGradient(X(0.745), s * h * 0.93, 1, X(0.745), s * h * 0.93, L * 0.12);
-                    a.addColorStop(0, 'rgba(255,255,255,0.18)'); a.addColorStop(1, 'rgba(255,255,255,0)');
-                    c.fillStyle = a; c.fillRect(X(0.88), s > 0 ? h * 0.6 : -h, L * 0.27, h * 0.4);
+                    c.save(); c.translate(X(0.745), s * h * 0.88); c.scale(1, 0.24);
+                    const a = c.createRadialGradient(0, 0, 0, 0, 0, L * 0.12);
+                    a.addColorStop(0, 'rgba(255,255,255,0.3)'); a.addColorStop(0.5, 'rgba(255,255,255,0.1)'); a.addColorStop(1, 'rgba(255,255,255,0)');
+                    c.fillStyle = a; c.fillRect(-L * 0.12, -L * 0.12, L * 0.24, L * 0.24); c.restore();
                     c.lineWidth = 0.9; c.strokeStyle = 'rgba(0,0,0,0.55)';
                     c.beginPath(); c.moveTo(X(0.625), s * h * 0.87); c.quadraticCurveTo(X(0.745), s * h * 0.72, X(0.88), s * h * 0.89); c.stroke();
                     c.lineWidth = 0.6; c.strokeStyle = 'rgba(255,255,255,0.14)';
@@ -278,10 +286,24 @@
                 const [cu0, cu1, cv] = CAR_ART.COACH.cap, cw = cv * h, cf = L / 2 - cu0 * L, cb = L / 2 - cu1 * L;
                 const pr = c.createLinearGradient(0, -cw, 0, cw);
                 pr.addColorStop(0, '#8d80a6'); pr.addColorStop(0.45, '#c8bdd6'); pr.addColorStop(1, '#7c6f98');
-                c.fillStyle = 'rgba(0,0,0,0.35)'; c.beginPath(); c.roundRect(cb - 0.6, -cw - 0.8, cf - cb + 1.2, cw * 2 + 1.6, 6); c.fill();
-                c.fillStyle = pr; c.beginPath(); c.roundRect(cb, -cw, cf - cb, cw * 2, 5.5); c.fill();
-                c.strokeStyle = CAR_ART.GOLD; c.lineWidth = 0.7; c.stroke();
-                c.strokeStyle = 'rgba(90, 76, 116, 0.6)'; c.lineWidth = 0.6; c.beginPath(); c.roundRect(cb + 1.6, -cw + 1.6, cf - cb - 3.2, cw * 2 - 3.2, 4.2); c.stroke();
+                const cap = new Path2D(); cap.roundRect(cb, -cw, cf - cb, cw * 2, 5.5);
+                // It stands up off the body: a soft shadow all round its foot
+                c.save(); c.filter = 'blur(1.6px)'; c.fillStyle = 'rgba(0,0,0,0.6)'; c.beginPath(); c.roundRect(cb - 1.2, -cw - 1.4, cf - cb + 2.4, cw * 2 + 2.8, 7); c.fill(); c.restore();
+                c.fillStyle = pr; c.fill(cap);
+                c.save(); c.clip(cap);
+                // Its rounded shoulders falling away on every side, and the ends curving down
+                c.save(); c.filter = 'blur(2.2px)'; c.strokeStyle = 'rgba(44, 32, 66, 0.75)'; c.lineWidth = 8; c.stroke(cap); c.restore();
+                const ends = c.createLinearGradient(cb, 0, cf, 0);
+                ends.addColorStop(0, 'rgba(40, 28, 60, 0.45)'); ends.addColorStop(0.14, 'rgba(40, 28, 60, 0)'); ends.addColorStop(0.88, 'rgba(40, 28, 60, 0)'); ends.addColorStop(1, 'rgba(40, 28, 60, 0.35)');
+                c.fillStyle = ends; c.fill(cap);
+                // The flat top catching the light: a long soft highlight down its crown, a brighter streak just off centre
+                const top = c.createLinearGradient(0, -cw, 0, cw);
+                top.addColorStop(0.18, 'rgba(255,255,255,0)'); top.addColorStop(0.4, 'rgba(255,250,255,0.32)'); top.addColorStop(0.47, 'rgba(255,255,255,0.5)');
+                top.addColorStop(0.55, 'rgba(255,250,255,0.18)'); top.addColorStop(0.8, 'rgba(255,255,255,0)');
+                c.fillStyle = top; c.fillRect(cb + 4, -cw, cf - cb - 8, cw * 2);
+                c.restore();
+                c.strokeStyle = CAR_ART.GOLD; c.lineWidth = 0.7; c.stroke(cap);
+                c.strokeStyle = 'rgba(255, 246, 255, 0.35)'; c.lineWidth = 0.5; c.beginPath(); c.roundRect(cb + 1.8, -cw + 1.8, cf - cb - 3.6, cw * 2 - 3.6, 4); c.stroke();
                 const mx = (cb + cf) / 2 - 4;                         // a gold crescent, the house's mark
                 c.fillStyle = CAR_ART.GOLD; c.beginPath(); c.arc(mx, 0, 3.4, 0, Math.PI * 2); c.arc(mx + 1.6, -0.6, 2.9, 0, Math.PI * 2, true); c.fill('evenodd');
             } else if (lady) {                                                // panoramic black glass, gold-framed
@@ -509,7 +531,7 @@
             const rev = v.state === 'REVERSING', brake = v.speed < 0.5 || rev;
             ctx.save(); ctx.translate(v.x, v.y); ctx.rotate(v.angle); ctx.globalCompositeOperation = 'lighter';
             ctx.globalAlpha = a * (brake ? 0.8 : 0.38);
-            const tY = g.hearse ? W / 2 * 0.66 : W / 2 - 6, hY = g.hearse ? W / 2 * 0.67 : W / 2 - 6;   // the coach's lamps sit further in
+            const tY = g.hearse ? W / 2 * 0.66 : W / 2 - 6, hY = g.hearse ? W / 2 * 0.72 : W / 2 - 6;   // the coach's lamps sit further in
             for (const s of [-1, 1]) drawGlow(ctx, -L / 2 + (g.hearse ? L * 0.04 : 1), s * tY, brake ? 15 : 10, rev ? '#fff4f8' : '#ff2848');
             if (g.hearse) drawGlow(ctx, -L / 2 - 2.5, 0, brake ? 13 : 8, rev ? '#fff4f8' : '#ff2848');    // the hooded slab
             if (v._lod === 1) { ctx.restore(); return; }                   // far away: just the tail lights
