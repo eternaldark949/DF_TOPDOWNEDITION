@@ -41427,9 +41427,9 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 c.strokeStyle = 'rgba(223,227,234,0.5)'; c.lineWidth = 0.6;          // chrome along its leading edge
                 c.beginPath(); c.moveTo(X(f0) - 0.6, -bw * h); c.quadraticCurveTo(X(fa) - 0.6, 0, X(f0) - 0.6, bw * h); c.stroke();
                 // The shell: body paint, rounded over its sides, sloping down into the windshield at its front
-                const cb = X(C.cap[1]) - 1.8, r = 6, sh = new Path2D();
+                const cb = X(C.cap[1]) - 1.8, r = sw * 0.85, sh = new Path2D();
                 sh.moveTo(X(b0), -sw); sh.quadraticCurveTo(X(ba), 0, X(b0), sw);
-                sh.lineTo(cb + r, sw); sh.quadraticCurveTo(cb, sw, cb, sw - r); sh.lineTo(cb, -sw + r); sh.quadraticCurveTo(cb, -sw, cb + r, -sw); sh.closePath();
+                sh.lineTo(cb + r, sw); sh.bezierCurveTo(cb + r * 0.3, sw, cb, sw - r * 0.45, cb, sw - r); sh.lineTo(cb, -sw + r); sh.bezierCurveTo(cb, -sw + r * 0.45, cb + r * 0.3, -sw, cb + r, -sw); sh.closePath();
                 c.save(); c.filter = 'blur(1.6px)'; c.strokeStyle = 'rgba(0,0,0,0.65)'; c.lineWidth = 3; c.stroke(sh); c.restore();
                 c.fillStyle = `rgb(${col.join(',')})`; c.fill(sh);
                 c.save(); c.clip(sh);
@@ -41438,8 +41438,8 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 sg.addColorStop(0, 'rgba(0,0,0,0.6)'); sg.addColorStop(e, 'rgba(0,0,0,0)'); sg.addColorStop(e * 1.6, 'rgba(255,255,255,0.07)');
                 sg.addColorStop(1 - e * 1.6, 'rgba(255,255,255,0.07)'); sg.addColorStop(1 - e, 'rgba(0,0,0,0)'); sg.addColorStop(1, 'rgba(0,0,0,0.6)');
                 c.fillStyle = sg; c.fill(sh);
-                sg = c.createLinearGradient(cb, 0, cb + 4, 0); sg.addColorStop(0, 'rgba(0,0,0,0.6)'); sg.addColorStop(1, 'rgba(0,0,0,0)');
-                c.fillStyle = sg; c.fillRect(cb, -sw, 4, sw * 2);
+                sg = c.createLinearGradient(cb, 0, cb + r, 0); sg.addColorStop(0, 'rgba(0,0,0,0.65)'); sg.addColorStop(1, 'rgba(0,0,0,0)');
+                c.save(); c.filter = 'blur(1.4px)'; c.strokeStyle = sg; c.lineWidth = 7; c.stroke(sh); c.restore();
                 c.strokeStyle = 'rgba(255,255,255,0.18)'; c.lineWidth = 0.7;          // the lip where the flat roof breaks over into the glass
                 c.beginPath(); c.moveTo(X(b0) - 0.8, -sw); c.quadraticCurveTo(X(ba) - 0.8, 0, X(b0) - 0.8, sw); c.stroke();
                 c.restore();
@@ -41463,8 +41463,8 @@ class NeuralSystemsBuilding extends BuildingV2 {
             const rw = gw - 2.6, rx0 = x2, rx1 = x1;
             if (g.hearse) {                                                   // the pearl hearse cap, its edge drawn twice as in the sketch
                 const [cu0, cu1, cv] = CAR_ART.COACH.cap, cw = cv * h, cf = L / 2 - cu0 * L, cb = L / 2 - cu1 * L;
-                const cap = new Path2D(); cap.roundRect(cb, -cw, cf - cb, cw * 2, 5);
-                c.save(); c.filter = 'blur(1px)'; c.fillStyle = 'rgba(0,0,0,0.5)'; c.beginPath(); c.roundRect(cb - 0.5, -cw - 0.6, cf - cb + 1, cw * 2 + 1.2, 6); c.fill(); c.restore();
+                const cr = cw * 0.85, cap = new Path2D(); cap.roundRect(cb, -cw, cf - cb, cw * 2, [cr, 5, 5, cr]);   // its back end well rounded
+                c.save(); c.filter = 'blur(1px)'; c.fillStyle = 'rgba(0,0,0,0.5)'; c.beginPath(); c.roundRect(cb - 0.5, -cw - 0.6, cf - cb + 1, cw * 2 + 1.2, [cr + 1, 6, 6, cr + 1]); c.fill(); c.restore();
                 // A flat top, evenly lit, with only a faint sheen across it
                 const pr = c.createLinearGradient(cb, -cw, cf, cw);
                 pr.addColorStop(0, '#bdb1cd'); pr.addColorStop(0.55, '#c9bfd7'); pr.addColorStop(1, '#c3b8d2');
@@ -41475,12 +41475,12 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 fo.addColorStop(0, 'rgba(46, 34, 70, 0.75)'); fo.addColorStop(e, 'rgba(46, 34, 70, 0)');
                 fo.addColorStop(1 - e, 'rgba(46, 34, 70, 0)'); fo.addColorStop(1, 'rgba(46, 34, 70, 0.75)');
                 c.fillStyle = fo; c.fill(cap);
-                fo = c.createLinearGradient(cb, 0, cb + 4.5, 0); fo.addColorStop(0, 'rgba(46, 34, 70, 0.8)'); fo.addColorStop(1, 'rgba(46, 34, 70, 0)');
-                c.fillStyle = fo; c.fillRect(cb, -cw, 4.5, cw * 2);
+                fo = c.createLinearGradient(cb, 0, cb + cr, 0); fo.addColorStop(0, 'rgba(46, 34, 70, 0.85)'); fo.addColorStop(1, 'rgba(46, 34, 70, 0)');
+                c.save(); c.filter = 'blur(1.4px)'; c.strokeStyle = fo; c.lineWidth = 7; c.stroke(cap); c.restore();
                 c.restore();
                 // A thin bevel: lit where the top turns over, the front edge crisp
                 c.strokeStyle = 'rgba(255, 250, 255, 0.55)'; c.lineWidth = 0.6;
-                c.beginPath(); c.roundRect(cb + 3.2, -cw + 2.8, cf - cb - 3.6, cw * 2 - 5.6, 3); c.stroke();
+                c.beginPath(); c.roundRect(cb + 3.2, -cw + 2.8, cf - cb - 3.6, cw * 2 - 5.6, [cr - 2.8, 3, 3, cr - 2.8]); c.stroke();
                 c.strokeStyle = CAR_ART.GOLD; c.lineWidth = 0.7; c.stroke(cap);
                 const mx = (cb + cf) / 2 - 4;                         // a gold crescent, the house's mark
                 c.fillStyle = CAR_ART.GOLD; c.beginPath(); c.arc(mx, 0, 3.4, 0, Math.PI * 2); c.arc(mx + 1.6, -0.6, 2.9, 0, Math.PI * 2, true); c.fill('evenodd');
