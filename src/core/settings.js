@@ -253,7 +253,8 @@
             // after a save's settings load (app/boot.js, engine/save-load.js) while it's on.
             devicePreset: (() => { try { return !!(JSON.parse(localStorage.getItem('dfab_device_preset') || '{}') || {}).on; } catch (e) { return false; } })(),
             _PRESET_KEYS: ['lightingQuality', 'trafficDensity', 'pedestrianDensity', 'foliageDensity', 'rainDensity',
-                           'filmGrain', 'softShadows', 'bloom', 'wetReflections', 'reflections', 'soundRings'],
+                           'filmGrain', 'softShadows', 'bloom', 'wetReflections', 'reflections', 'soundRings',
+                           'crowdQuality', 'lampShadows'],
             /** This device's tier, from what the browser says of it: 'low' | 'medium' | 'high' */
             deviceTier() {
                 const nav = typeof navigator !== 'undefined' ? navigator : {}, mem = nav.deviceMemory, cores = nav.hardwareConcurrency || 0;
@@ -274,6 +275,7 @@
                     rec.before = null;
                 }
                 this.devicePreset = !!on; rec.on = this.devicePreset;
+                if (typeof CrowdImpostors !== 'undefined') CrowdImpostors.clear();   // crowd quality may have changed
                 this.saveDensity();
                 try { localStorage.setItem('dfab_device_preset', JSON.stringify(rec)); } catch (e) { /* private mode */ }
             },
@@ -294,6 +296,8 @@
                     this.wetReflections = false;
                     this.reflections = 'off';
                     this.soundRings = 'simple';
+                    this.crowdQuality = 'low';      // the crowd from its baked sprites (ui/crowd-impostors.js), not drawn live
+                    this.lampShadows = 'off';
                 } else if (preset === 'medium') {
                     this.lightingQuality = 'medium';
                     this.trafficDensity = 'medium';
@@ -305,6 +309,7 @@
                     this.bloom = true;
                     this.wetReflections = false;
                     this.reflections = 'medium';
+                    this.crowdQuality = 'low';      // phones: baked crowd sprites; Stella, the crew and enemies stay live
                 }
                 // 'high' is the default — no changes needed
             },

@@ -308,16 +308,20 @@
                 const stepMs = CONFIG.LOOP.STEP_MS / Math.max(0.05, (CONFIG.LOOP.GAME_SPEED || 1) * slow);
                 const interp = CONFIG.LOOP.INTERPOLATE;
 
-                let steps = 0;
+                let steps = 0, overBudget = false;
+                const simStart = performance.now(), simBudget = CONFIG.LOOP.MAX_SIM_MS || Infinity;
                 while (this._accumulator >= stepMs && steps < CONFIG.LOOP.MAX_STEPS) {
                     if (interp) RenderInterp.snapshot(this);
                     this.update();
                     this._accumulator -= stepMs;
                     steps++;
+                    // Slow ticks: each catch-up tick makes this frame (and so the next backlog) longer still
+                    if (this._accumulator >= stepMs && performance.now() - simStart >= simBudget) { overBudget = true; break; }
                 }
                 // Machine can't keep up — drop the backlog rather than spiral.
-                const droppedMs = clampedMs + (steps >= CONFIG.LOOP.MAX_STEPS ? this._accumulator : 0);
-                if (steps >= CONFIG.LOOP.MAX_STEPS) this._accumulator = 0;
+                const capped = overBudget || steps >= CONFIG.LOOP.MAX_STEPS;
+                const droppedMs = clampedMs + (capped ? this._accumulator : 0);
+                if (capped) this._accumulator = 0;
                 RenderStats.ticks = steps;   // sim ticks this frame (the profiler: a slow frame runs several, and its update rows add them up)
                 
                 if (PerformanceBench.active) PerformanceBench.afterSimulation();

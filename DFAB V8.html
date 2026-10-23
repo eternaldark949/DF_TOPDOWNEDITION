@@ -5277,6 +5277,8 @@
                 STEP_MS: 1000 / 60,   // One sim tick of GAME time — matches how everything was tuned
                 MAX_FRAME_MS: 250,    // Ignore stalls longer than this (alt-tab, GC)
                 MAX_STEPS: 5,         // Catch-up cap; beyond this, drop the backlog
+                MAX_SIM_MS: 34,       // Catch-up time budget (real ms): when ticks are this slow (a phone in a busy street),
+                                      // more of them only make the next frame later still, so the rest of the backlog is dropped
 
                 /* GAME_SPEED scales how often ticks happen in REAL time, not what a
                    tick means. 0.5 = 30 ticks/sec, so the whole world (movement, AI,
@@ -8636,7 +8638,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // after a save's settings load (app/boot.js, engine/save-load.js) while it's on.
             devicePreset: (() => { try { return !!(JSON.parse(localStorage.getItem('dfab_device_preset') || '{}') || {}).on; } catch (e) { return false; } })(),
             _PRESET_KEYS: ['lightingQuality', 'trafficDensity', 'pedestrianDensity', 'foliageDensity', 'rainDensity',
-                           'filmGrain', 'softShadows', 'bloom', 'wetReflections', 'reflections', 'soundRings'],
+                           'filmGrain', 'softShadows', 'bloom', 'wetReflections', 'reflections', 'soundRings',
+                           'crowdQuality', 'lampShadows'],
             /** This device's tier, from what the browser says of it: 'low' | 'medium' | 'high' */
             deviceTier() {
                 const nav = typeof navigator !== 'undefined' ? navigator : {}, mem = nav.deviceMemory, cores = nav.hardwareConcurrency || 0;
@@ -8657,6 +8660,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     rec.before = null;
                 }
                 this.devicePreset = !!on; rec.on = this.devicePreset;
+                if (typeof CrowdImpostors !== 'undefined') CrowdImpostors.clear();   // crowd quality may have changed
                 this.saveDensity();
                 try { localStorage.setItem('dfab_device_preset', JSON.stringify(rec)); } catch (e) { /* private mode */ }
             },
@@ -8677,6 +8681,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.wetReflections = false;
                     this.reflections = 'off';
                     this.soundRings = 'simple';
+                    this.crowdQuality = 'low';      // the crowd from its baked sprites (ui/crowd-impostors.js), not drawn live
+                    this.lampShadows = 'off';
                 } else if (preset === 'medium') {
                     this.lightingQuality = 'medium';
                     this.trafficDensity = 'medium';
@@ -8688,6 +8694,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.bloom = true;
                     this.wetReflections = false;
                     this.reflections = 'medium';
+                    this.crowdQuality = 'low';      // phones: baked crowd sprites; Stella, the crew and enemies stay live
                 }
                 // 'high' is the default — no changes needed
             },
@@ -80021,16 +80028,20 @@ engineMixin({
                 const stepMs = CONFIG.LOOP.STEP_MS / Math.max(0.05, (CONFIG.LOOP.GAME_SPEED || 1) * slow);
                 const interp = CONFIG.LOOP.INTERPOLATE;
 
-                let steps = 0;
+                let steps = 0, overBudget = false;
+                const simStart = performance.now(), simBudget = CONFIG.LOOP.MAX_SIM_MS || Infinity;
                 while (this._accumulator >= stepMs && steps < CONFIG.LOOP.MAX_STEPS) {
                     if (interp) RenderInterp.snapshot(this);
                     this.update();
                     this._accumulator -= stepMs;
                     steps++;
+                    // Slow ticks: each catch-up tick makes this frame (and so the next backlog) longer still
+                    if (this._accumulator >= stepMs && performance.now() - simStart >= simBudget) { overBudget = true; break; }
                 }
                 // Machine can't keep up — drop the backlog rather than spiral.
-                const droppedMs = clampedMs + (steps >= CONFIG.LOOP.MAX_STEPS ? this._accumulator : 0);
-                if (steps >= CONFIG.LOOP.MAX_STEPS) this._accumulator = 0;
+                const capped = overBudget || steps >= CONFIG.LOOP.MAX_STEPS;
+                const droppedMs = clampedMs + (capped ? this._accumulator : 0);
+                if (capped) this._accumulator = 0;
                 RenderStats.ticks = steps;   // sim ticks this frame (the profiler: a slow frame runs several, and its update rows add them up)
                 
                 if (PerformanceBench.active) PerformanceBench.afterSimulation();
