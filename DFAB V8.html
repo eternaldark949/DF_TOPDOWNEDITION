@@ -41223,7 +41223,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 axles: [0.19, 0.745], waist: 0.83, hood: 0.49,
                 band: [0.275, 0.19, 0.375, 0.29, 0.72],
                 shell: 0.74,                                     // the windows' half-width
-                roof: [0.955, 0.5],                              // the roof: back end, half-width (its front runs in under the band)
+                roof: [0.955, 0.6],                              // the roof: back end, half-width (its front runs in under the band)
                 head: [[0.008, 0.58], [0.003, 0.74], 0.9],
                 tail: [[[0.945, 0.8], [0.972, 0.7], 0.45], [[0.972, 0.7], [0.99, 0.55], 0.6], [[0.99, 0.55], [0.998, 0.36], 0.65]],
                 slab: false, mirror: 5, tyreIn: 2.3
@@ -41503,10 +41503,10 @@ class NeuralSystemsBuilding extends BuildingV2 {
                     c.restore();
                     // The roof: the body's paint, flat on top, rolling off at its sides and round its back into the glass
                     const rw = C.roof[1] * h, rb = X(C.roof[0]) + 2.2, rr = rw * 0.95;
-                    const t = (1 + rw / sw) / 2, ex = X(b0) * (1 - 2 * t + 2 * t * t) + X(ba) * 2 * t * (1 - t) - 0.4;   // where the band's back edge meets the roof's sides
-                    const rf = new Path2D(); rf.moveTo(ex, -rw); rf.quadraticCurveTo(2 * (X(ba) - 0.4) - ex, 0, ex, rw);
+                    const t = (1 + rw / sw) / 2, ex = X(b0) * (1 - 2 * t + 2 * t * t) + X(ba) * 2 * t * (1 - t);   // where the band's back edge meets the roof's sides
+                    const rf = new Path2D(); rf.moveTo(ex, -rw); rf.quadraticCurveTo(ex + (2 * t - 1) ** 2 * (X(ba) - X(b0)), 0, ex, rw);   // (the band's back edge, between the roof's sides)
                     rf.lineTo(rb + rr, rw); rf.bezierCurveTo(rb + rr * 0.3, rw, rb, rw - rr * 0.45, rb, rw - rr); rf.lineTo(rb, -rw + rr); rf.bezierCurveTo(rb, -rw + rr * 0.45, rb + rr * 0.3, -rw, rb + rr, -rw); rf.closePath();
-                    c.save(); c.filter = 'blur(1.2px)'; c.strokeStyle = 'rgba(0,0,0,0.6)'; c.lineWidth = 2; c.stroke(rf); c.restore();
+                    c.save(); c.clip(gl); c.filter = 'blur(1.2px)'; c.strokeStyle = 'rgba(0,0,0,0.6)'; c.lineWidth = 2; c.stroke(rf); c.restore();   // (kept off the windshield)
                     c.fillStyle = `rgb(${col.join(',')})`; c.fill(rf);
                     c.save(); c.clip(rf);
                     const e = 2.6 / (rw * 2); let rg = c.createLinearGradient(0, -rw, 0, rw);
@@ -41517,6 +41517,11 @@ class NeuralSystemsBuilding extends BuildingV2 {
                     c.save(); c.filter = 'blur(1.2px)'; c.strokeStyle = rg; c.lineWidth = 6; c.stroke(rf); c.restore();
                     c.restore();
                     c.strokeStyle = 'rgba(255,255,255,0.14)'; c.lineWidth = 0.5; c.stroke(rf);
+                    // A crisp break where the roof meets the windshield: the glass's dark edge, then the roof's lit lip
+                    c.strokeStyle = 'rgba(0,0,0,0.85)'; c.lineWidth = 0.9;
+                    c.beginPath(); c.moveTo(X(b0), -sw); c.quadraticCurveTo(X(ba), 0, X(b0), sw); c.stroke();
+                    c.save(); c.clip(rf); c.strokeStyle = 'rgba(255,255,255,0.3)'; c.lineWidth = 0.6;
+                    c.beginPath(); c.moveTo(X(b0) - 1, -sw); c.quadraticCurveTo(X(ba) - 1, 0, X(b0) - 1, sw); c.stroke(); c.restore();
                     c.strokeStyle = CAR_ART.GOLD; c.lineWidth = 0.7; c.stroke(gl);       // the gold line round the glass
                     c.save(); c.translate(rb + (ex - rb) * 0.55, 0); c.fillStyle = CAR_ART.GOLD;    // the house's crescent on the roof
                     c.beginPath(); c.arc(0, 0, 3.2, 0, Math.PI * 2); c.arc(1.5, -0.6, 2.7, 0, Math.PI * 2, true); c.fill('evenodd'); c.restore();
