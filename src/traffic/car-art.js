@@ -102,13 +102,15 @@
         }
 
         /** The round LADY badge on the V1's hood: a silver ring round black enamel, the house's gold crescent in it. */
-        function _ladyBadge(c, x, r) {
-            const g = c.createLinearGradient(x - r, -r, x + r, r);
-            g.addColorStop(0, '#ffffff'); g.addColorStop(0.45, CAR_ART.SILVER); g.addColorStop(1, '#7d838e');
-            c.fillStyle = 'rgba(8, 4, 12, 0.5)'; c.beginPath(); c.arc(x - 0.4, 0.5, r + 0.4, 0, Math.PI * 2); c.fill();
+        function _ladyBadge(c, x, r) {                                   // a polished silver bauble, the crescent struck into it
+            c.save(); c.filter = 'blur(0.7px)'; c.fillStyle = 'rgba(4, 2, 8, 0.7)'; c.beginPath(); c.arc(x - 0.5, 0.6, r + 0.5, 0, Math.PI * 2); c.fill(); c.restore();
+            const g = c.createRadialGradient(x + r * 0.35, -r * 0.4, r * 0.05, x, 0, r);
+            g.addColorStop(0, '#ffffff'); g.addColorStop(0.3, '#f1f4f8'); g.addColorStop(0.62, '#a9b0bc'); g.addColorStop(0.85, '#5d6470'); g.addColorStop(1, '#2a2e36');
             c.fillStyle = g; c.beginPath(); c.arc(x, 0, r, 0, Math.PI * 2); c.fill();
-            c.fillStyle = '#120e18'; c.beginPath(); c.arc(x, 0, r * 0.68, 0, Math.PI * 2); c.fill();
-            c.fillStyle = CAR_ART.GOLD; c.beginPath(); c.arc(x, 0, r * 0.45, 0, Math.PI * 2); c.arc(x + r * 0.2, -r * 0.1, r * 0.38, 0, Math.PI * 2, true); c.fill('evenodd');
+            c.strokeStyle = 'rgba(255,255,255,0.55)'; c.lineWidth = 0.35; c.beginPath(); c.arc(x, 0, r - 0.3, -2.4, -0.2); c.stroke();   // the rim catching light
+            c.fillStyle = 'rgba(40, 44, 54, 0.75)';
+            c.beginPath(); c.arc(x, 0, r * 0.48, 0, Math.PI * 2); c.arc(x + r * 0.22, -r * 0.1, r * 0.4, 0, Math.PI * 2, true); c.fill('evenodd');
+            c.fillStyle = '#ffffff'; c.beginPath(); c.arc(x + r * 0.5, -r * 0.55, r * 0.14, 0, Math.PI * 2); c.fill();                // the glint
         }
         /** Where the V1's lamps sit (car frame, +y side; mirror for the other): small rounded pods standing out of the
             outline, a headlight off each fender tip and three tail lights round each back corner, and the hooded slab out
@@ -393,7 +395,7 @@
             // The outline
             c.strokeStyle = 'rgba(6, 3, 12, 0.7)'; c.lineWidth = 0.9; c.stroke(g.body);
             if (coach) {
-                _ladyBadge(c, L / 2 - L * 0.045, 2.3);
+                _ladyBadge(c, L / 2 - L * 0.08, 2.8);
                 // The lamp pods: dark housings standing out of the body, ringed in silver (the lamps in them are live)
                 const Lp = coachLamps(L, W);
                 for (const s of [-1, 1]) for (const t of [Lp.head, ...Lp.tail]) {
