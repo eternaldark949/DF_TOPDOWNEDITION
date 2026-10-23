@@ -1957,6 +1957,7 @@
             const bladeGame = !isDriving && entity.type === 'player' && entity._game &&
                 entity._game.weaponMode === 'melee' && !entity._game.weaponHolstered ? entity._game : null;
             const bladeSwing = bladeGame && bladeGame.slashAngle ? bladeGame.slashAngle() : null;
+            const bladeWide = !!(bladeGame && bladeGame.currentWeapon && weaponModel(bladeGame.currentWeapon.id).swing === 'wide');
             const stance = bladeGame ? 'knife' : (config.stance || 'idle');
             const held = config.held || null;
             // Which hand (if any) is holding a drink — it's held out and swings less
@@ -2318,16 +2319,24 @@
             // The strike goes on AFTER smoothing, as with punches: a short cut must
             // reach its full pose even when the display only shows a few attack frames.
             if (bladeGame) {
-                if (bladeSwing) {
-                    rFistX = bladeSwing.handX + walkBounce; rFistY = bladeSwing.handY;
-                    torsoRotation += bladeSwing.twist;
-                    lFistX -= Math.max(0, bladeSwing.reach) * .2;
+                // A long blade (swing 'wide': Blood Pact) is held in both hands, at guard or mid-sweep
+                // (engine/status-effects.js); the left hand rides the grip behind the right
+                const pose = bladeWide ? (bladeSwing || wideGrip({ ...WIDE_SWING.guard, twist: 0 })) : bladeSwing;
+                if (pose) {
+                    rFistX = pose.handX + walkBounce; rFistY = pose.handY;
+                    torsoRotation += pose.twist || 0;
+                    if (bladeWide) { lFistX = pose.lHandX + walkBounce; lFistY = pose.lHandY; }
+                    else lFistX -= Math.max(0, pose.reach) * .2;
                 }
-                const sx = shoulderX - rShoulderY * Math.sin(torsoRotation), sy = rShoulderY * Math.cos(torsoRotation);
-                const dx = rFistX - sx, dy = rFistY - sy, d = Math.max(.001, Math.hypot(dx, dy));
-                const bend = Math.sqrt(Math.max(0, 14 * 14 - d * d / 4));
-                rElbowX = (sx + rFistX) / 2 - dy / d * bend;
-                rElbowY = (sy + rFistY) / 2 + dx / d * bend;
+                // Elbows bend outward to their own side: the right arm's to her right, the left's to her left
+                const ik = (shY, fx, fy, out) => {
+                    const sx = shoulderX - shY * Math.sin(torsoRotation), sy = shY * Math.cos(torsoRotation);
+                    const dx = fx - sx, dy = fy - sy, d = Math.max(.001, Math.hypot(dx, dy));
+                    const bend = Math.sqrt(Math.max(0, 14 * 14 - d * d / 4)) * out;
+                    return [(sx + fx) / 2 - dy / d * bend, (sy + fy) / 2 + dx / d * bend];
+                };
+                [rElbowX, rElbowY] = ik(rShoulderY, rFistX, rFistY, 1);
+                if (bladeWide) [lElbowX, lElbowY] = ik(lShoulderY, lFistX, lFistY, -1);
             }
 
             const drawLimb = h.drawLimb;
@@ -2381,7 +2390,7 @@
                     } else if (game.weaponMode === 'melee') {
                         // The blade stays in the animated fist, rather than extending
                         // independently from a stationary arm.
-                        const ang = bladeSwing ? bladeSwing.a : .35;
+                        const ang = bladeSwing ? bladeSwing.a : bladeWide ? WIDE_SWING.guard.a : .35;
                         const wy = hipY + (rFistY - hipY) * anim;
                         drawWeapon(ctx, weaponId, wx, wy, ang, scale * .95, false);
                         entity._muzzleLocal = null; entity._muzzleReady = false;

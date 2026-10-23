@@ -169,6 +169,25 @@
                 glow: [[3.6, 0, 1.6, '#ffd76a'], [18, 2, 1.4, '#fff1c4']],
                 run: [5, 18, 1.4, '#fffaea']                                                    // the glint along the edge
             },
+            blood_pact: {                                                                       // Blood Pact: a long blood-red katana, a black wrapped grip, a crimson tsuba
+                stance: 'knife', muzzle: [50, -1.6], rail: [8, 0], brass: null, melee: true, swing: 'wide',   // a two-handed sweep (engine/status-effects.js)
+                edge: [50.5, -1.9],                                                             // the tip, where the slash trail runs (engine/status-effects.js)
+                trail: { dust: '#ff3a5c', cols: [[9, '200, 20, 50', .26], [3.4, '255, 70, 100', .6], [1.3, '255, 210, 220', .9]] },
+                parts: [
+                    _cap(-10.4, -8.4, 0, 2.7, 'crimson'),                                       // the pommel cap
+                    _r(-9, 1.8, 0, 2.4, 'abyss', 0.8),                                          // the long two-hand grip
+                    ...[-7.4, -5.2, -3, -0.8].map(x => _r(x, x + 0.9, 0, 2.5, 'crimson', 0.4)), // the crimson wrap across it
+                    _r(1.8, 3, 0, 5.6, 'abyss', 0.6),                                           // the tsuba
+                    _ce(2.4, 0, 0.7, '#ff2448'),                                                // a blood gem in it
+                    _r(3, 4.6, 0, 2.3, 'gold', 0.3),                                            // the collar
+                    { poly: [[3.5, -1], [10, -0.99], [17, -1.04], [24, -1.14], [31, -1.31], [38, -1.54], [44, -1.79], [47, -1.93], [50.5, -1.9],
+                             [47.6, -0.5], [44, -0.25], [38, 0.07], [31, 0.37], [24, 0.62], [17, 0.81], [10, 0.94], [3.5, 1]], m: 'crimson' },  // the gently curved blade
+                    { poly: [[4.6, 0.45], [17, 0.3], [31, -0.1], [44, -0.65], [49.6, -1.6], [47.4, -0.62], [44, -0.32], [31, 0.3], [17, 0.74], [4.6, 0.9]], c: '#ff5a78', emit: true },   // its glowing edge
+                    { poly: [[6, -0.48], [20, -0.5], [36, -0.85], [36, -0.62], [20, -0.28], [6, -0.26]], c: '#3a0412' }   // the blood groove
+                ],
+                glow: [[2.4, 0, 1.8, '#ff2448'], [30, -0.2, 1.6, '#ff5a78'], [49, -1.6, 1.6, '#ffb0c0']],
+                run: [5, 48, 1.5, '#ffd0da']                                                    // the glint along the edge
+            },
             empg: {                                                                             // the EMP blaster (catalog): a bulbous body, twin orbs at the front
                 stance: 'pistol', muzzle: [14.6, 1], rail: [9, 5.4], brass: null, fx: { trail: 'static', col: '#b48cff', core: '#efe4ff' }, 
                 parts: [
@@ -191,7 +210,7 @@
         function weaponModel(id) {
             id = id || '';
             return WEAPON_MODELS[id] || (id.includes('sniper') ? WEAPON_MODELS.sniper_sara : id.includes('rifle') ? WEAPON_MODELS.rifle_rb98
-                : id.includes('kukri') ? WEAPON_MODELS.maiden_kukri : id.includes('golden') ? WEAPON_MODELS.golden_child : id.includes('emp') ? WEAPON_MODELS.empg : id.includes('anavia') ? WEAPON_MODELS.pistol_anavia : WEAPON_MODELS.pistol_fpx);
+                : id.includes('kukri') ? WEAPON_MODELS.maiden_kukri : id.includes('pact') || id.includes('katana') ? WEAPON_MODELS.blood_pact : id.includes('golden') ? WEAPON_MODELS.golden_child : id.includes('emp') ? WEAPON_MODELS.empg : id.includes('anavia') ? WEAPON_MODELS.pistol_anavia : WEAPON_MODELS.pistol_fpx);
         }
 
         const _weaponSprites = new Map();

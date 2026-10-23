@@ -9,6 +9,7 @@ const setup=`game._doLoadMap('ollo_test');game.running=true;game.paused=false;ga
  game.activeMap={id:'fire_test',width:3000,height:3000,walls:[],buildings:[],buildingColliders:[]};
  game.player.x=1000;game.player.y=1000;game.player.angle=-.5;game.player._muzzleLocal={x:20,y:3};game.player._muzzleReady=true;
  game.currentWeapon=createItemFromRegistry('sniper_sara',game);game.weaponMode='sniper';game.shootCooldown=0;
+ game.rollCrit=()=>1;// crits are random (engine/combat-fx.js); these compare exact damage
  game.car.x=1000;game.car.y=1000;game.car.angle=0;game.car.length=100;
  _zoomLOD=0;game.weaponHolstered=false;game.projectiles=[];game.muzzleFlashes=[];game.shotFx=[];game.casings=[];
  const fire=(id,drive)=>{game.currentWeapon=createItemFromRegistry(id,game);game.weaponMode=id.startsWith('sniper')?'sniper':'normal';

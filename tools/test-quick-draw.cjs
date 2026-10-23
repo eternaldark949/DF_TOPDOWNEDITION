@@ -7,6 +7,7 @@ const tests=[];
 function test(name,code,check){const e=runtime(join(__dirname,'..','DFAB V8.html'),{events:true,timers:true});e.scope.dispatchEvent=e.dispatchWindow;const r=structuredClone(e.run(`(()=>{${setup}${code}})()`));check(r);assert.deepEqual(e.errors,[]);tests.push(name);}
 const setup=`game._doLoadMap('ollo_test');game.running=true;game.paused=false;game.player.visible=true;
  game.currentWeapon=createItemFromRegistry('sniper_sara',game);game.weaponMode='sniper';game.shootCooldown=0;
+ game.rollCrit=()=>1;// crits are random (engine/combat-fx.js); these compare exact damage
  game.resonance.deserialize({level:50,points:0,ranks:{hollow_points:3,quick_draw:3,flit_strike:3,quick_hands:3}});
  _gameTimeSec=10;game.flitState.lastFlitAt=9.8;
  const tick=(n)=>{for(let i=0;i<n;i++){_gameTimeSec+=1/60;if(game.shootCooldown>0)game.shootCooldown--;game.updateQuickDraw();}};

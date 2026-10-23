@@ -23,8 +23,8 @@
         /** The Audio Buffer setting → the context's latencyHint (read once, at launch) */
         const AUDIO_BUFFERS = { low: 'interactive', balanced: 'balanced', smooth: 'playback' };
         /** sfx(): how long each one rings (s) and how many may ring at once */
-        const SFX_DUR = { shoot: 0.16, explode: 0.31, thunder: 2.8, knock: 0.14, bump: 0.32, crunch: 0.3, ui: 0.06, flit: 0.21 };
-        const SFX_CAP = { shoot: 4, explode: 3, thunder: 2, ui: 3, crunch: 3 };
+        const SFX_DUR = { shoot: 0.16, explode: 0.31, thunder: 2.8, knock: 0.14, bump: 0.32, crunch: 0.3, ui: 0.06, flit: 0.21, crit: 0.14 };
+        const SFX_CAP = { shoot: 4, explode: 3, thunder: 2, ui: 3, crunch: 3, crit: 3 };
 
         /** Bring a gain in over a few ms instead of jumping to it — a jump is a click */
         function softStart(param, t, amp, ramp = 0.003) {
@@ -264,6 +264,16 @@
                     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
                     osc.start(now);
                     osc.stop(now + 0.06);
+                }
+                else if (type === 'crit') {
+                    // CRITICAL HIT: a bright ping that rises, over the hit itself
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(1500, now);
+                    osc.frequency.exponentialRampToValueAtTime(2600, now + 0.05);
+                    softStart(gain.gain, now, 0.09);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.13);
+                    osc.start(now);
+                    osc.stop(now + 0.14);
                 }
                 else if (type === 'flit') {
                     // TELEPORT: Smooth triangle wave rising in pitch

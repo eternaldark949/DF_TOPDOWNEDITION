@@ -666,9 +666,9 @@
                     
                     const kbX = (projectile.vx / speed) * knockbackStrength;
                     const kbY = (projectile.vy / speed) * knockbackStrength;
-                    this.takeDamage(projectile.damage, kbX, kbY);
+                    this.takeDamage(projectile.damage, kbX, kbY, projectile.crit ? { crit: true } : null);
                 } else {
-                    this.takeDamage(projectile.damage);
+                    this.takeDamage(projectile.damage, 0, 0, projectile.crit ? { crit: true } : null);
                 }
             }
             
@@ -1122,9 +1122,9 @@
                     
                     const kbX = (projectile.vx / speed) * knockbackStrength;
                     const kbY = (projectile.vy / speed) * knockbackStrength;
-                    this.takeDamage(projectile.damage, kbX, kbY);
+                    this.takeDamage(projectile.damage, kbX, kbY, projectile.crit ? { crit: true } : null);
                 } else {
-                    this.takeDamage(projectile.damage);
+                    this.takeDamage(projectile.damage, 0, 0, projectile.crit ? { crit: true } : null);
                 }
             }
 
@@ -1867,8 +1867,8 @@
                     const knockbackStrength = projectile.damage * 0.3;
                     const kbX = (projectile.vx / speed) * knockbackStrength;
                     const kbY = (projectile.vy / speed) * knockbackStrength;
-                    if (this.takeDamage(projectile.damage, kbX, kbY) && projectile.melee) this.interruptMelee();
-                } else if (this.takeDamage(projectile.damage) && projectile.melee) { this.interruptMelee(); }
+                    if (this.takeDamage(projectile.damage, kbX, kbY, projectile.crit ? { crit: true } : null) && projectile.melee) this.interruptMelee();
+                } else if (this.takeDamage(projectile.damage, 0, 0, projectile.crit ? { crit: true } : null) && projectile.melee) { this.interruptMelee(); }
             }
 
             /** The vision cone's outline in world space, cast against the map's walls and buildings (cached). */

@@ -6,14 +6,67 @@
         // three) drains dps for its seconds, a fresh cut refreshes it, the ticks show as small
         // crimson numbers and leave a trail of drips; a blood-drop mark rides above them.
         //
-        // Melee weapons (weaponMode 'melee', the Maiden's Kukri first) slash in an arc before her:
-        // no projectile, nothing through walls, damage and bleeding, a gold arc, a quiet noise.
+        // Melee weapons (weaponMode 'melee': the Maiden's Kukri, Blood Pact) slash in an arc before her:
+        // no projectile, nothing through walls, damage and bleeding, an arc in the blade's colour, a
+        // quiet noise. Each cut rolls its own crit per target (engine/combat-fx.js). A blade's stats
+        // can slow its swing (swingSecs, the Kukri's 0.22 s by default); its model names the edge
+        // the trail follows and the trail's colours (ui/weapon-models.js).
 
         const STATUS = { BLEED_MAX: 3, BLEED_TICK: 0.5 };
 
-        // One game-time pose for the arm, the held blade and its trailing edge.
+        // The Kukri's trail: its gold edge tip (model units) and three strokes [width, 'r, g, b', alpha]
+        const DEFAULT_SLASH_TRAIL = { edge: [19.4, 2.6], dust: '#ffd76a',
+            cols: [[7, '255, 200, 100', .22], [3, '255, 231, 160', .55], [1.2, '255, 250, 230', .85]] };
+
+        // One game-time pose for the arm, the held blade and its trailing edge. `secs` stretches the
+        // whole swing (a heavier blade); the phases keep their shares of it.
         const MELEE_SWING = { duration: .22, windup: .0264, cutEnd: .1584 };
-        function sampleMeleeSwing(age, side, out = {}) {
+
+        /* A long blade's swing (a model with swing: 'wide', Blood Pact): two hands on the grip, she
+           winds the blade far back to one side, then sweeps it round in front of her in one wide arc
+           (the hands travel a half-circle about her chest), body turning with it, and settles back to
+           a two-handed guard. Phases are shares of the swing's time; the left hand rides the grip,
+           WIDE_SWING.grip model units behind the right. */
+        const WIDE_SWING = { windup: .22, cutEnd: .7, guard: { a: .3, handX: 11, handY: 3 },
+            centerX: 2, radius: 16, handArc: 1.25, bladeArc: 2.0, twist: .45, grip: 6.2 };
+        function _wideHand(theta, out) {
+            out.handX = WIDE_SWING.centerX + WIDE_SWING.radius * Math.cos(theta);
+            out.handY = WIDE_SWING.radius * Math.sin(theta);
+        }
+        function sampleWideSwing(u, sign, out) {
+            const W = WIDE_SWING, G = W.guard, smooth = x => x * x * (3 - 2 * x);
+            if (u < W.windup) {                                                     // wind back to one side
+                const w = smooth(u / W.windup);
+                _wideHand(sign * W.handArc, out);
+                out.handX = G.handX + (out.handX - G.handX) * w; out.handY = G.handY + (out.handY - G.handY) * w;
+                out.a = G.a + (sign * W.bladeArc - G.a) * w; out.twist = sign * W.twist * w;
+            } else if (u <= W.cutEnd) {                                             // the sweep across her front
+                const p = smooth((u - W.windup) / (W.cutEnd - W.windup));
+                _wideHand(sign * W.handArc * (1 - 2 * p), out);
+                out.a = sign * W.bladeArc * (1 - 2 * p); out.twist = sign * W.twist * Math.cos(p * Math.PI);
+            } else {                                                                // the follow-through settles to guard
+                const r = smooth((u - W.cutEnd) / (1 - W.cutEnd));
+                _wideHand(-sign * W.handArc, out);
+                out.handX += (G.handX - out.handX) * r; out.handY += (G.handY - out.handY) * r;
+                out.a = -sign * W.bladeArc + (G.a + sign * W.bladeArc) * r; out.twist = -sign * W.twist * (1 - r);
+            }
+            out.reach = out.handX - 8;
+            return wideGrip(out);
+        }
+        /** The left hand on a long blade's grip, behind the right (sets lHandX/lHandY on a pose) */
+        function wideGrip(pose) {
+            pose.lHandX = pose.handX - WIDE_SWING.grip * Math.cos(pose.a);
+            pose.lHandY = pose.handY - WIDE_SWING.grip * Math.sin(pose.a);
+            return pose;
+        }
+        /** A swing style's phase times, as shares of the swing */
+        function swingPhases(style) {
+            return style === 'wide' ? WIDE_SWING : { windup: MELEE_SWING.windup / MELEE_SWING.duration, cutEnd: MELEE_SWING.cutEnd / MELEE_SWING.duration };
+        }
+
+        function sampleMeleeSwing(age, side, out = {}, secs = MELEE_SWING.duration, style = 'knife') {
+            if (style === 'wide') return age < 0 || age > secs ? null : sampleWideSwing(age / secs, side || 1, out);
+            age *= MELEE_SWING.duration / secs;
             if (age < 0 || age > MELEE_SWING.duration) return null;
             const smooth = x => x * x * (3 - 2 * x);
             const sign = side || 1;
@@ -146,7 +199,8 @@
                 const W = this.currentWeapon, st = (W && W.stats) || {}, pl = this.player;
                 this.shootCooldown = st.fireRate || 16;
                 const side = this._slashSide = -(this._slashSide || 1);
-                this._slashT = _gameTimeSec;
+                this._slashT = _gameTimeSec; this._slashSecs = st.swingSecs || MELEE_SWING.duration;
+                this._slashStyle = weaponModel(W && W.id).swing || 'knife';
                 const ang = pl.angle, reach = st.reach || 36, arc = st.arc || 1.4;
                 const walls = this.activeMap.walls, cols = getColliders(this.activeMap);
                 // Step in only when there's someone to step in on: a slash at nothing stays where she is
@@ -171,21 +225,22 @@
                     if (isLineBlocked(pl.x, pl.y, e.x, e.y, walls, cols)) continue;
                     e.lastHitBy = pl; e.lastHitMelee = true;
                     const kx = dx / (d || 1) * 3, ky = dy / (d || 1) * 3;
-                    const dmg = Math.round(bladeDamage);
-                    if (!e.takeDamage(dmg, kx, ky, { type: st.damageType || 'melee' })) continue;
+                    const crit = this.rollCrit(st), dmg = Math.round(bladeDamage * crit);
+                    if (!e.takeDamage(dmg, kx, ky, { type: st.damageType || 'melee', crit: crit > 1 })) continue;
                     if (!e.dead && e.interruptMelee) e.interruptMelee();
                     if (st.bleedDps) this.applyStatus(e, 'bleed', { dps: st.bleedDps, secs: st.bleedSecs || 3, by: pl });
                     if (!e.dead && typeof Ganger !== 'undefined' && e instanceof Ganger) { e.suspicion = 100; e.state = 'ALERT'; e.angle = Math.atan2(-dy, -dx); }
                     hit++;
                 }
-                // the gold arc and its sparkle
+                // the arc and its sparkle, in the blade's colour (gold for the Kukri)
+                const M = weaponModel(W && W.id), trail = M.trail || DEFAULT_SLASH_TRAIL;
                 const L = this.slashes || (this.slashes = []);
-                L.push({ x: pl.x, y: pl.y, a: ang, side, t0: _gameTimeSec, reach, arc, hit: hit > 0 });
+                L.push({ x: pl.x, y: pl.y, a: ang, side, t0: _gameTimeSec, reach, arc, hit: hit > 0, secs: this._slashSecs, style: this._slashStyle, edge: M.edge || DEFAULT_SLASH_TRAIL.edge, cols: trail.cols });
                 if (L.length > 8) L.shift();
                 const fx = this.shotFx || (this.shotFx = []);
                 for (let i = 0; i < (hit ? 8 : 3); i++) {
                     const a = ang + (Math.random() - 0.5) * arc, r = reach * (0.5 + Math.random() * 0.5);
-                    fx.push({ k: 'dust', x: pl.x + Math.cos(a) * r, y: pl.y + Math.sin(a) * r, vx: Math.cos(a) * 0.4, vy: Math.sin(a) * 0.4, t: -i, life: 30, col: '#ffd76a', ph: Math.random() * 6.28 });
+                    fx.push({ k: 'dust', x: pl.x + Math.cos(a) * r, y: pl.y + Math.sin(a) * r, vx: Math.cos(a) * 0.4, vy: Math.sin(a) * 0.4, t: -i, life: 30, col: trail.dust, ph: Math.random() * 6.28 });
                 }
                 if (typeof ambience !== 'undefined' && ambience.slash) ambience.slash(hit > 0);
                 this.emitNoise(pl.x, pl.y, st.noise || 60, 'slash');
@@ -197,7 +252,7 @@
             slashAngle() {
                 if (this._slashT === undefined) return null;
                 return sampleMeleeSwing(_gameTimeSec - this._slashT, this._slashSide,
-                    this._slashPose || (this._slashPose = {}));
+                    this._slashPose || (this._slashPose = {}), this._slashSecs || MELEE_SWING.duration, this._slashStyle);
             },
 
             /** Slash arcs: a crescent of gold light where the blade went (world space) */
@@ -207,27 +262,34 @@
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 for (let i = L.length - 1; i >= 0; i--) {
                     const s = L[i], age = now - s.t0;
-                    if (age > 0.3) { L.splice(i, 1); continue; }
-                    if (age < MELEE_SWING.windup) continue;
+                    // Times scaled from the Kukri's swing (q stretches them for a slower blade), phases by style
+                    const secs = s.secs || MELEE_SWING.duration, q = secs / MELEE_SWING.duration, life = .3 * q;
+                    const ph = swingPhases(s.style), windT = ph.windup * secs, cutT = ph.cutEnd * secs;
+                    if (age > life) { L.splice(i, 1); continue; }
+                    if (age < windT) continue;
                     // Keep the newest cut attached to the moving wielder, then let its last
                     // position fade. Recovery does not paint a second, backward slash.
-                    if (s.t0 === this._slashT && age <= MELEE_SWING.duration && this.weaponMode === 'melee' && !this.weaponHolstered) {
+                    if (s.t0 === this._slashT && age <= MELEE_SWING.duration * q && this.weaponMode === 'melee' && !this.weaponHolstered) {
                         s.drawX = this.player.x; s.drawY = this.player.y; s.drawA = this.player.angle;
                     }
-                    const k = 1 - age / .3;
-                    const end = Math.min(age, MELEE_SWING.cutEnd), start = Math.max(MELEE_SWING.windup, end - .065);
+                    const k = 1 - age / life;
+                    // a wide sweep leaves a longer crescent: three quarters of its cut
+                    const span = s.style === 'wide' ? (cutT - windT) * .75 : .065 * q;
+                    const end = Math.min(age, cutT), start = Math.max(windT, end - span);
                     const pose = this._slashTrailPose || (this._slashTrailPose = {});
+                    const [ex, ey] = s.edge || DEFAULT_SLASH_TRAIL.edge;
                     ctx.save(); ctx.translate(s.drawX ?? s.x, s.drawY ?? s.y); ctx.rotate(s.drawA ?? s.a);
                     ctx.beginPath();
-                    for (let j = 0; j <= 8; j++) {
-                        sampleMeleeSwing(start + (end - start) * j / 8, s.side, pose);
+                    const n = s.style === 'wide' ? 24 : 8;                      // a smooth curve round a wide sweep
+                    for (let j = 0; j <= n; j++) {
+                        sampleMeleeSwing(start + (end - start) * j / n, s.side, pose, secs, s.style);
                         const c = Math.cos(pose.a), sn = Math.sin(pose.a);
-                        // The gold edge of the real model, held at the same hand anchor.
-                        const x = pose.handX + (19.4 * c - 2.6 * sn) * .95;
-                        const y = pose.handY + (19.4 * sn + 2.6 * c) * .95;
+                        // The edge of the real model, held at the same hand anchor.
+                        const x = pose.handX + (ex * c - ey * sn) * .95;
+                        const y = pose.handY + (ex * sn + ey * c) * .95;
                         if (j) ctx.lineTo(x, y); else ctx.moveTo(x, y);
                     }
-                    for (const [w, col, al] of [[7, '255, 200, 100', .22], [3, '255, 231, 160', .55], [1.2, '255, 250, 230', .85]]) {
+                    for (const [w, col, al] of (s.cols || DEFAULT_SLASH_TRAIL.cols)) {
                         ctx.strokeStyle = `rgba(${col}, ${al * k})`; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.stroke();
                     }
                     ctx.restore();
