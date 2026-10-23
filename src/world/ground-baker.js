@@ -16,7 +16,8 @@
 
            The look: wet asphalt with grain and repairs, champagne lane dashes and
            a lavender centre line, worn ivory crossings, paver pavements with a
-           lit kerb, drains and manholes; lawns where the ground is green.
+           lit kerb, drains and manholes; lawns where the ground is green; and
+           round the buildings, each block's own grounds (world/lot-grounds.js).
            ===================================================================== */
         const GROUND_LOOK = {
             lot: '#221e28', asphalt: '#16141b', asphaltHi: '#1e1b25', joint: '#121017',
@@ -172,12 +173,20 @@
                 }
                 const sources = this._groundSources(map, g.traffic.network);
                 const query = i => sources[i].grid.query(R, sources[i].results);
-                // 2. Floor zones: green ones are lawns, the rest tint the ground
+                // 2. Floor zones tint the ground; then each block's grounds round its buildings go over the
+                //    tint (lawn, blooms, paved courts: world/lot-grounds.js); green zones are lawns, over both
                 for (const entry of query(0)) {
                     const z = entry.item;
-                    if (!hits(z.x, z.y, z.w, z.h)) continue;
-                    if (this._isGreen(z.color)) this._paintLawn(c, z, R, rnd);
-                    else { c.globalAlpha = 0.45; c.fillStyle = z.color; c.fillRect(z.x, z.y, z.w, z.h); c.globalAlpha = 1; }
+                    if (!hits(z.x, z.y, z.w, z.h) || this._isGreen(z.color)) continue;
+                    c.globalAlpha = 0.45; c.fillStyle = z.color; c.fillRect(z.x, z.y, z.w, z.h); c.globalAlpha = 1;
+                }
+                if (map.cityLayout) for (const entry of query(1)) {
+                    const b = entry.item;
+                    if (b.type === 'BLOCK' && hits(b.x, b.y, b.w, b.h)) paintLotGround(c, b, map.buildings || [], R, lod);
+                }
+                for (const entry of query(0)) {
+                    const z = entry.item;
+                    if (hits(z.x, z.y, z.w, z.h) && this._isGreen(z.color)) this._paintLawn(c, z, R, rnd);
                 }
                 // 3. Parks and plazas (city-layout zones)
                 const city = map.cityLayout;

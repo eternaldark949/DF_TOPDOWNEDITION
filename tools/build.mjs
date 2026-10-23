@@ -98,6 +98,7 @@ const SCRIPTS = [
     'traffic/traffic-manager.js',
     'traffic/traffic-profiler.js',
     'world/parks.js',
+    'world/lot-grounds.js',
     'world/ground-baker.js',
     'ui/map-icons.js',
     'ui/ui-system.js',
