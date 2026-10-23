@@ -110,11 +110,27 @@
             c.fillStyle = '#120e18'; c.beginPath(); c.arc(x, 0, r * 0.68, 0, Math.PI * 2); c.fill();
             c.fillStyle = CAR_ART.GOLD; c.beginPath(); c.arc(x, 0, r * 0.45, 0, Math.PI * 2); c.arc(x + r * 0.2, -r * 0.1, r * 0.38, 0, Math.PI * 2, true); c.fill('evenodd');
         }
-        /** Where the V1's lamps sit (car frame): headlights in the fender tips, three round tail lights round each back corner,
-            and the hooded slab out of the middle of the tail (from above, only its lit back edge shows under the hood) */
-        const coachLamps = (L, W) => ({ head: { x: L / 2 - L * 0.055, y: W / 2 * 0.72, r: 2.1 },
-            tail: [[0.928, 0.79], [0.958, 0.66], [0.98, 0.5]].map(([u, k]) => ({ x: L / 2 - u * L, y: W / 2 * k, r: 1.5 })),
+        /** Where the V1's lamps sit (car frame, +y side; mirror for the other): small rounded pods standing out of the
+            outline, a headlight off each fender tip and three tail lights round each back corner, and the hooded slab out
+            of the middle of the tail (from above, only its lit back edge shows under the hood). A pod is centred a little
+            outside the outline at [u, k] along the outline's run from [u0, k0] to [u1, k1], long side along it. */
+        const _coachPod = (L, W, [u0, k0], [u1, k1], f, len, d) => {
+            const u = u0 + (u1 - u0) * f, k = k0 + (k1 - k0) * f, x = L / 2 - u * L, y = W / 2 * k;
+            const tx = -(u1 - u0) * L, ty = (k1 - k0) * W / 2, tl = Math.hypot(tx, ty);
+            let nx = ty / tl, ny = -tx / tl; if (nx * x + ny * y < 0) { nx = -nx; ny = -ny; }
+            const out = d * 0.2;                                                // how far it stands proud of the body
+            return { x: x + nx * out, y: y + ny * out, a: Math.atan2(ty, tx), w: len, d };
+        };
+        const coachLamps = (L, W) => ({
+            head: _coachPod(L, W, [0.008, 0.6], [0.006, 0.74], 0.9, 4.6, 2.4),
+            tail: [[[0.935, 0.84], [0.965, 0.74], 0.6], [[0.965, 0.74], [0.987, 0.58], 0.6], [[0.987, 0.58], [0.998, 0.38], 0.55]]
+                .map(([a, b, f]) => _coachPod(L, W, a, b, f, 2.7, 1.8)),
             slab: { x: -L / 2 - 2, d: 2.4, w: W / 2 * 0.34 } });    // the hooded slab: its back edge, depth, half-width
+        /** Trace a lamp pod (grown by g) as the current path, on side s */
+        function _podPath(ctx, t, s, g = 0) {
+            ctx.save(); ctx.translate(t.x, s * t.y); ctx.rotate(s * t.a);
+            ctx.beginPath(); ctx.roundRect(-t.w / 2 - g, -t.d / 2 - g, t.w + g * 2, t.d + g * 2, t.d / 2 + g - 0.3); ctx.restore();
+        }
 
         /** The body sprite (painted once per look). */
         function carSprite(v) {
@@ -355,14 +371,7 @@
             }
             // Lamp housings (the lamps themselves are live: drawCarLamps)
             c.fillStyle = '#17131f';
-            if (coach) {                                                      // round lamps: headlights ringed in silver, two tail lights a side
-                const Lp = coachLamps(L, W);
-                for (const s of [-1, 1]) {
-                    c.fillStyle = '#17131f'; c.beginPath(); c.arc(Lp.head.x, s * Lp.head.y, Lp.head.r + 1, 0, Math.PI * 2); c.fill();
-                    c.strokeStyle = CAR_ART.SILVER; c.lineWidth = 0.6; c.stroke();
-                    for (const t of Lp.tail) { c.fillStyle = '#17131f'; c.beginPath(); c.arc(t.x, s * t.y, t.r + 0.6, 0, Math.PI * 2); c.fill(); c.strokeStyle = 'rgba(223,227,234,0.5)'; c.lineWidth = 0.4; c.stroke(); }
-                }
-            } else
+            if (coach) { /* the V1's lamp pods stand out of the outline: drawn after it */ } else
             for (const s of [-1, 1]) {
                 if (zen) { c.beginPath(); c.moveTo(L / 2 - 1, s * W * 0.27); c.lineTo(L / 2 - 8.5, s * (W / 2 - 0.8)); c.lineTo(L / 2 - 10, s * (W / 2 - 3)); c.lineTo(L / 2 - 3, s * W * 0.22); c.closePath(); c.fill(); }
                 else if (lady) c.fillRect(L / 2 - 2.6, s > 0 ? W / 2 - 12 : -W / 2 + 2.5, 2.2, 9.5);
@@ -376,6 +385,13 @@
             c.strokeStyle = 'rgba(6, 3, 12, 0.7)'; c.lineWidth = 0.9; c.stroke(g.body);
             if (coach) {
                 _ladyBadge(c, L / 2 - L * 0.065, 2.3);
+                // The lamp pods: dark housings standing out of the body, ringed in silver (the lamps in them are live)
+                const Lp = coachLamps(L, W);
+                for (const s of [-1, 1]) for (const t of [Lp.head, ...Lp.tail]) {
+                    c.save(); c.filter = 'blur(0.8px)'; c.fillStyle = 'rgba(0,0,0,0.6)'; _podPath(c, t, s, 0.7); c.fill(); c.restore();
+                    c.fillStyle = '#17131f'; _podPath(c, t, s, 0.6); c.fill();
+                    c.strokeStyle = t === Lp.head ? CAR_ART.SILVER : 'rgba(223,227,234,0.55)'; c.lineWidth = 0.5; c.stroke();
+                }
                 // The long light slab standing out of the tail, hooded: from above, the hood's lip over a dark housing
                 const S = coachLamps(L, W).slab;
                 c.fillStyle = '#100c16'; c.beginPath(); c.roundRect(S.x - 0.4, -S.w - 0.4, S.d + 2.4, S.w * 2 + 0.8, 1); c.fill();
@@ -527,7 +543,7 @@
             ctx.fillStyle = rev ? '#f4f0ff' : brake ? '#ff2244' : on ? '#9a1028' : '#4a0a16';
             if (g.hearse) {
                 const Lp = coachLamps(L, W);
-                for (const s of [-1, 1]) for (const t of Lp.tail) { ctx.beginPath(); ctx.arc(t.x, s * t.y, t.r, 0, Math.PI * 2); ctx.fill(); }
+                for (const s of [-1, 1]) for (const t of Lp.tail) { _podPath(ctx, t, s); ctx.fill(); }
                 ctx.beginPath(); ctx.roundRect(Lp.slab.x - 0.2, -Lp.slab.w + 0.6, 1, Lp.slab.w * 2 - 1.2, 0.5); ctx.fill();
             } else if (g.st === 'blackmark') ctx.fillRect(-L / 2 + 0.6, -W / 2 + 4.5, 1.8, W - 9);
             else for (const s of [-1, 1]) ctx.fillRect(-L / 2 + 0.6, s > 0 ? W / 2 - 11 : -W / 2 + 2, 2.4, 9);
@@ -536,7 +552,7 @@
             ctx.fillStyle = on ? hl : _carMix(_carRGB(hl), -0.55);
             for (const s of [-1, 1]) {
                 if (g.st === 'angular') { ctx.save(); ctx.translate(L / 2 - 5, s * (W / 2 - 4.5)); ctx.rotate(s * -0.75); ctx.fillRect(-3.5, -0.8, 7, 1.6); ctx.restore(); }
-                else if (g.hearse) { const H = coachLamps(L, W).head; ctx.beginPath(); ctx.arc(H.x, s * H.y, H.r, 0, Math.PI * 2); ctx.fill(); }
+                else if (g.hearse) { _podPath(ctx, coachLamps(L, W).head, s); ctx.fill(); }
                 else if (g.st === 'blackmark') ctx.fillRect(L / 2 - 2, s > 0 ? W / 2 - 11 : -W / 2 + 3, 1.6, 8);
                 else { ctx.beginPath(); ctx.roundRect(L / 2 - 3.4, s > 0 ? W / 2 - 9.5 : -W / 2 + 3, 2.4, 6.5, 1); ctx.fill(); }
             }
@@ -550,12 +566,13 @@
             const rev = v.state === 'REVERSING', brake = v.speed < 0.5 || rev;
             ctx.save(); ctx.translate(v.x, v.y); ctx.rotate(v.angle); ctx.globalCompositeOperation = 'lighter';
             ctx.globalAlpha = a * (brake ? 0.8 : 0.38);
-            const tY = g.hearse ? W / 2 * 0.66 : W / 2 - 6, hY = g.hearse ? W / 2 * 0.72 : W / 2 - 6;   // the coach's lamps sit further in
-            for (const s of [-1, 1]) drawGlow(ctx, -L / 2 + (g.hearse ? L * 0.04 : 1), s * tY, brake ? 15 : 10, rev ? '#fff4f8' : '#ff2848');
+            const Lp = g.hearse ? coachLamps(L, W) : null, T = Lp && Lp.tail[1];    // the coach's: round its pods
+            const tX = Lp ? T.x : -L / 2 + 1, tY = Lp ? T.y : W / 2 - 6, hX = Lp ? Lp.head.x : L / 2 - 1, hY = Lp ? Lp.head.y : W / 2 - 6;
+            for (const s of [-1, 1]) drawGlow(ctx, tX, s * tY, brake ? 15 : 10, rev ? '#fff4f8' : '#ff2848');
             if (g.hearse) drawGlow(ctx, -L / 2 - 2.5, 0, brake ? 13 : 8, rev ? '#fff4f8' : '#ff2848');    // the hooded slab
             if (v._lod === 1) { ctx.restore(); return; }                   // far away: just the tail lights
             ctx.globalAlpha = a * 0.5;
-            for (const s of [-1, 1]) drawGlow(ctx, L / 2 - (g.hearse ? L * 0.055 : 1), s * hY, 10, v.headlightColor || '#ffffaa');
+            for (const s of [-1, 1]) drawGlow(ctx, hX, s * hY, 10, v.headlightColor || '#ffffaa');
             if (v.turnSignal && v.turnSignalTimer > 0 && Math.floor(v.turnSignalTimer / 10) % 2 === 0) {
                 const s = v.turnSignal === 'left' ? -1 : 1; ctx.globalAlpha = a * 0.8;
                 drawGlow(ctx, L / 2 - 3, s * (W / 2 - 2), 10, '#ffaa00'); drawGlow(ctx, -L / 2 + 2, s * (W / 2 - 2), 10, '#ffaa00');
