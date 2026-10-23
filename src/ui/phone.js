@@ -208,24 +208,30 @@
             
             // --- MESSAGE HISTORY SYSTEM ---
             // Add a message to history (persists across mission steps)
-            addMessage(contactName, text, isNew = true, from = 'them') {
+            // `extra` carries a rich message's fields (ui/messages.js): kind ('pin' | 'brief' | 'voice' | 'snap'),
+            // data, who (the speaker in a group chat), id. Returns the record, or null when it was a repeat.
+            addMessage(contactName, text, isNew = true, from = 'them', extra = null) {
                 if (!this.messageHistory[contactName]) {
                     this.messageHistory[contactName] = [];
                 }
                 // Incoming lines dedupe on text so a repeated story beat doesn't
-                // stack. Player replies never dedupe — answering "On my way." to
-                // two different messages is legitimate and should show twice.
+                // stack (rich messages on their id). Player replies never dedupe:
+                // answering "On my way." to two different messages is legitimate.
                 if (from === 'them') {
+                    const id = extra && extra.id;
                     const exists = this.messageHistory[contactName]
-                        .some(m => m.text === text && (m.from || 'them') === 'them');
-                    if (exists) return;
+                        .some(m => id ? m.id === id : (!m.kind && m.text === text && (m.from || 'them') === 'them'));
+                    if (exists) return null;
                 }
-                this.messageHistory[contactName].push({
+                const rec = {
                     text: text,
                     timestamp: game?.worldMinutes || 0,
                     isNew: isNew,
-                    from: from
-                });
+                    from: from,
+                    ...(extra || {})
+                };
+                this.messageHistory[contactName].push(rec);
+                return rec;
             },
             
             // Get all messages for a contact (default + history)
@@ -266,22 +272,22 @@
             },
             
             // Send a new text message (sets override + adds to history + shows typing)
-            sendText(contactName, text, showTypingFirst = false, typingDuration = 2000) {
+            sendText(contactName, text, showTypingFirst = false, typingDuration = 2000, extra = null) {
                 if (showTypingFirst) {
                     // Show typing indicator first
                     this.setTyping(contactName, true);
                     setTimeout(() => {
                         this.setTyping(contactName, false);
-                        this._deliverMessage(contactName, text);
+                        this._deliverMessage(contactName, text, extra);
                     }, typingDuration);
                 } else {
-                    this._deliverMessage(contactName, text);
+                    this._deliverMessage(contactName, text, extra);
                 }
             },
             
-            _deliverMessage(contactName, text) {
+            _deliverMessage(contactName, text, extra = null) {
                 // Add to history
-                this.addMessage(contactName, text, true);
+                if (!this.addMessage(contactName, text, true, 'them', extra)) return;
                 // Set as current override (shows in preview)
                 this.contactOverrides[contactName] = text;
                 // Bump the ledger — this is the ONLY place unread counts grow.
@@ -346,182 +352,11 @@
                 if (btn) btn.classList.toggle('notify', total > 0);
                 if (appDot) appDot.classList.toggle('active', total > 0);
 
-                // Keep an open phone live. A message landing while the player is
-                // already looking at the contacts list previously left that list
-                // stale until they navigated away and back — which is exactly
-                // what happens to Anavia's intro message, since it lands 2.5s
-                // after Mirabel's and the player is told to open the phone.
-                if (this.isOpen && this.currentApp === 'contacts') {
-                    this.renderContacts();
-                }
+                // Keep an open Messages app live (ui/messages.js): the inbox repaints, and a line
+                // landing in the thread she's reading is read on arrival.
+                if (this.isOpen && (this.currentApp === 'contacts' || this.currentApp === 'details') && this.messagesLive) this.messagesLive();
             },
             
-            showContacts() {
-                this.currentApp = 'contacts';
-                this.currentContact = null;
-                
-                // BROADCAST: Explicitly tell NSM contacts were opened
-                this.broadcast('APP_OPENED', { app: 'contacts' });
-                
-                this.homeScreen.style.display = 'none';
-                document.getElementById('screen-contacts').style.display = 'flex';
-                document.getElementById('screen-contact-detail').style.display = 'none';
-                
-                this.contactsList.innerHTML = '';
-                
-                const defaultContacts = [
-                    { name: 'Mirabel', role: 'Contractor', avatar: '🤖', messages: ['949. I hope you\'re awake. I\'ve found him.', 'The Dark Maker was spotted leaving the sector.'] },
-                    { name: 'Dr. Yin', role: 'Medic', avatar: '⚕️', messages: ['Visit my clinic for supplies!', 'Stim refills available.'] },
-                    { name: '747', role: 'Freelancer', avatar: '🎭', messages: ['Stay sharp, Nine.', 'I\'ve got your six. Always.'] },
-                    { name: 'Victoria', role: 'Freelancer', avatar: '💜', messages: ['Save me from these sad motherfuckers.', 'Ready to roll out whenever you are.'] },
-                    { name: 'Yenna', role: 'Freelancer', avatar: '🎯', messages: ['Eyes on the perimeter. All clear.', 'Say the word and the SR-86 speaks.'] },
-                    { name: 'Sabrina', role: 'Freelancer', avatar: '🌙', messages: ['You know where to find me.', 'Sarcasm is free. Bullets cost extra.'] },
-                    { name: 'Max', role: 'Freelancer', avatar: '⚡', messages: ['This is bullshit.', 'I swear if one more thing goes sideways...'] },
-                    { name: 'Josh', role: 'Freelancer', avatar: '📋', messages: ['Intel updated. Standing by.', 'Of course. You\'re welcome.'] },
-                    { name: 'Larissa', role: 'Handler', avatar: '🗂️', messages: ['Your assignment particulars are with Mirabel. Please coordinate with her directly.', 'The Empereal Lord remains pleased with your work.'] }
-                ];
-                
-                this.metNPCs.forEach(name => {
-                    if (!defaultContacts.find(c => c.name === name)) defaultContacts.push({ name, role: 'Contact', avatar: '👤', messages: ['No new messages.'] });
-                });
-
-                this._contactDefs = defaultContacts;
-                this.renderContacts();
-            },
-
-            /**
-             * Paint the contact list from `_contactDefs`. Split out of
-             * showContacts() so refreshNotifications() can repaint a list that's
-             * already on screen when a message lands mid-view.
-             *
-             * ORDERING (stable sort, so ties keep authored order):
-             *   1. Unread — most recently received first
-             *   2. Read, but has message history — most recent first
-             *   3. Never messaged — authored order
-             * Recency comes from `lastMessageAt`, written by _deliverMessage,
-             * rather than from messageHistory timestamps: addMessage dedupes on
-             * text, so a repeated line never updates its history timestamp and
-             * would sort as though it had never arrived.
-             */
-            renderContacts() {
-                const defaultContacts = this._contactDefs;
-                if (!defaultContacts || !this.contactsList) return;
-
-                this.contactsList.innerHTML = '';
-
-                const recencyOf = (name) => {
-                    if (this.lastMessageAt && this.lastMessageAt[name] != null) return this.lastMessageAt[name];
-                    const hist = this.messageHistory[name];
-                    if (hist && hist.length) return hist[hist.length - 1].timestamp || 0;
-                    return null; // never messaged
-                };
-                const rankOf = (name) => {
-                    if (this.unread[name]) return 0;
-                    return recencyOf(name) != null ? 1 : 2;
-                };
-
-                const ordered = defaultContacts.slice().sort((a, b) => {
-                    const ra = rankOf(a.name), rb = rankOf(b.name);
-                    if (ra !== rb) return ra - rb;
-                    if (ra === 2) return 0;                    // stable: authored order
-                    return (recencyOf(b.name) || 0) - (recencyOf(a.name) || 0);
-                });
-
-                ordered.forEach(contact => {
-                    const item = document.createElement('div');
-                    item.className = 'contact-item';
-                    
-                    // Get all messages including history
-                    const allMessages = this.getMessages(contact.name, contact.messages);
-                    contact.allMessages = allMessages; // Store for detail view
-                    
-                    // Preview shows most recent message or override
-                    let previewText = allMessages[allMessages.length - 1] || contact.messages[0];
-                    let hasNewMessage = false;
-                    
-                    if (this.contactOverrides[contact.name]) {
-                        previewText = this.contactOverrides[contact.name];
-                        hasNewMessage = true;
-                    }
-                    const unreadCount = this.unread[contact.name] || 0;
-                    
-                    // Truncate preview if too long
-                    if (previewText.length > 35) {
-                        previewText = previewText.substring(0, 35) + '...';
-                    }
-                    
-                    const previewClass = hasNewMessage ? 'contact-role typing-anim' : 'contact-role';
-                    // Drive the bold state off the ledger, not off hasNewMessage:
-                    // contactOverrides is also set by seeding/restore paths, whereas
-                    // `unread` is only ever incremented by an actual delivery.
-                    if (unreadCount > 0) item.classList.add('unread');
-                    
-                    item.innerHTML = `
-                        ${this._avatarMarkup(contact, unreadCount > 0)}
-                        <div class="contact-info">
-                            <div class="contact-name">${contact.name}</div>
-                            <div class="${previewClass}">${previewText}</div>
-                        </div>
-                        ${unreadCount > 0 ? `<div class="contact-unread-count">${unreadCount > 99 ? '99+' : unreadCount}</div>` : ''}`;
-                        
-                    item.addEventListener('click', () => this.showContactDetail(contact));
-                    this.contactsList.appendChild(item);
-                });
-            },
-            
-            /**
-             * Build the avatar cell for one contact row.
-             *
-             * Layers, outermost in:
-             *   ring    — relationship tier colour (teammates only), or unread pulse
-             *   portrait— drawn bust via game.getPortraitDataURL, transparent bg so
-             *             the existing .contact-avatar gradient shows through
-             *   glyph   — the original emoji, demoted to a corner badge
-             *
-             * Falls back to the plain emoji avatar whenever a portrait would be the
-             * grey silhouette (`isFallback`), which covers unknown/never-met contacts.
-             * Rendered at 2x display size so faces stay crisp on high-DPR screens.
-             */
-            _avatarMarkup(contact, isUnread) {
-                const DISPLAY = 40;
-                let portraitURL = null;
-                let ring = null;
-                let downed = false;
-
-                if (typeof game !== 'undefined' && game && game.getPortraitDataURL) {
-                    try {
-                        const entry = game.getPortraitCanvas(contact.name, DISPLAY * 2, null);
-                        // Transparent backdrop — the CSS gradient behind is the app's look.
-                        if (entry && entry.config && !entry.config.isFallback) {
-                            portraitURL = game.getPortraitDataURL(contact.name, DISPLAY * 2, null);
-                        }
-                    } catch (e) { portraitURL = null; }
-
-                    // Tier ring + downed state, teammates only.
-                    const tm = (game.teammates || []).find(t => t.name === contact.name);
-                    if (tm) {
-                        downed = !!tm.downed;
-                        if (game.bonding && typeof tm.relationship === 'number') {
-                            const tier = BONDING_TIERS[game.bonding.getTier(tm.relationship)];
-                            if (tier && tier.ring) ring = tier.ring;
-                        }
-                    }
-                }
-
-                const cls = ['contact-avatar'];
-                if (portraitURL) cls.push('has-portrait');
-                if (isUnread) cls.push('avatar-unread');
-                if (downed) cls.push('avatar-downed');
-
-                const style = ring && !isUnread ? ` style="border-color:${ring}"` : '';
-                const inner = portraitURL
-                    ? `<img class="avatar-portrait" src="${portraitURL}" alt="">
-                       <span class="avatar-glyph">${contact.avatar}</span>`
-                    : contact.avatar;
-
-                return `<div class="${cls.join(' ')}"${style}>${inner}</div>`;
-            },
-
             /* =================================================================
                REPLY OPTIONS
                -----------------------------------------------------------------
@@ -623,198 +458,6 @@
                 const short = x.length < y.length ? x : y;
                 const long  = x.length < y.length ? y : x;
                 return short.length >= 12 && long.startsWith(short);
-            },
-
-            /**
-             * Relative timestamp from world time. Authored/seeded lines carry no
-             * real timestamp (0), so they read as EARLIER rather than pretending
-             * to a precision they don't have.
-             */
-            _relTime(ts, isNow) {
-                if (isNow) return 'NOW';
-                if (!ts) return 'EARLIER';
-                const d = Math.max(0, (game?.worldMinutes || 0) - ts);
-                if (d < 2)    return 'JUST NOW';
-                if (d < 60)   return `${Math.round(d)}M AGO`;
-                if (d < 1440) return `${Math.round(d / 60)}H AGO`;
-                return `${Math.round(d / 1440)}D AGO`;
-            },
-
-            /** Small circular avatar for one message row. */
-            _msgAvatar(contact, mine) {
-                if (mine) {
-                    let url = null;
-                    try {
-                        if (game && game.getPortraitDataURL) {
-                            const e = game.getPortraitCanvas('949', 52, null);
-                            if (e && e.config && !e.config.isFallback) url = game.getPortraitDataURL('949', 52, null);
-                        }
-                    } catch (err) { url = null; }
-                    return `<div class="msg-avatar is-me">${url ? `<img src="${url}" alt="">` : '🎧'}</div>`;
-                }
-                let url = null;
-                try {
-                    if (game && game.getPortraitDataURL) {
-                        const e = game.getPortraitCanvas(contact.name, 52, null);
-                        if (e && e.config && !e.config.isFallback) url = game.getPortraitDataURL(contact.name, 52, null);
-                    }
-                } catch (err) { url = null; }
-                return `<div class="msg-avatar">${url ? `<img src="${url}" alt="">` : (contact.avatar || '👤')}</div>`;
-            },
-
-            showContactDetail(contact) {
-                this.currentApp = 'details';
-                this.currentContact = contact.name;
-                this._activeContact = contact;
-
-                // BROADCAST: Explicitly tell NSM which contact is being viewed
-                this.broadcast('CONTACT_VIEWED', { name: contact.name });
-
-                document.getElementById('screen-contacts').style.display = 'none';
-                document.getElementById('screen-contact-detail').style.display = 'flex';
-                document.getElementById('contact-detail-name').textContent = contact.name;
-
-                // Carry the face through from the list — the thread used to drop it.
-                const slot = document.getElementById('contact-detail-avatar');
-                if (slot) slot.innerHTML = this._avatarMarkup(contact, false);
-
-                // The unread line renders as NOW, then persists and clears.
-                const nowText = this.contactOverrides[contact.name] || null;
-                this.renderThread(contact, nowText);
-                if (nowText) this.addMessage(contact.name, nowText, false, 'them');
-                this.markRead(contact.name);
-            },
-
-            /**
-             * Paint the whole conversation. Rebuilt on every reply, so it is the
-             * single place that decides ordering, dedupe and labelling.
-             */
-            renderThread(contact, nowText = null) {
-                const content = document.getElementById('contact-detail-content');
-                if (!content) return;
-                content.innerHTML = '';
-
-                const rendered = [];   // normalised texts already on screen
-                const rows = [];
-
-                const consider = (text, ts, from, isNow) => {
-                    if (!text) return;
-                    // Player replies always render; only incoming lines dedupe.
-                    if (from === 'them' && rendered.some(r => this._isNearDup(r, text))) return;
-                    if (from === 'them') rendered.push(text);
-                    rows.push({ text, ts, from, isNow });
-                };
-
-                // 1. Authored defaults — no real timestamp, so they read as EARLIER.
-                //    Skip any that the unread line duplicates, or it would appear
-                //    twice: once as EARLIER here and again as NOW at the bottom.
-                (contact.messages || []).forEach(msg => {
-                    if (nowText && this._isNearDup(msg, nowText)) return;
-                    consider(msg, 0, 'them', false);
-                });
-
-                // 2. Everything exchanged in play, in the order it happened.
-                (this.messageHistory[contact.name] || []).forEach(m => {
-                    if (nowText && m.text === nowText && (m.from || 'them') === 'them') return; // shown as NOW below
-                    consider(m.text, m.timestamp, m.from || 'them', false);
-                });
-
-                // 3. The unread line last, flagged NOW.
-                if (nowText) rows.push({ text: nowText, ts: game?.worldMinutes || 0, from: 'them', isNow: true });
-
-                rows.forEach(r => {
-                    const mine = r.from === 'me';
-                    const row = document.createElement('div');
-                    row.className = 'msg-row ' + (mine ? 'from-me' : 'from-them');
-
-                    const msg = document.createElement('div');
-                    msg.className = 'contact-message';
-                    if (r.isNow) msg.style.borderLeftColor = '#ff0055';
-                    else if (!mine && r.ts) msg.style.borderLeftColor = '#a469ff';
-
-                    const labelColor = r.isNow ? '#ff0055' : (!mine && r.ts ? '#a469ff' : '');
-                    msg.innerHTML =
-                        `<div class="contact-message-label"${labelColor ? ` style="color:${labelColor}"` : ''}>${this._relTime(r.ts, r.isNow)}</div>` +
-                        `<div class="contact-message-text"></div>`;
-                    msg.querySelector('.contact-message-text').textContent = r.text;
-
-                    row.innerHTML = this._msgAvatar(contact, mine);
-                    row.appendChild(msg);
-                    content.appendChild(row);
-                });
-
-                this._lastIncoming = rows.filter(r => r.from === 'them').pop() || null;
-                // If her reply is the last thing in the thread, the ball is in their
-                // court — otherwise she could fire all three answers at one message.
-                this._awaitingThem = rows.length > 0 && rows[rows.length - 1].from === 'me';
-                this.renderReplyOptions(contact);
-                setTimeout(() => { content.scrollTop = content.scrollHeight; }, 10);
-            },
-
-            /** Periwinkle chips answering whatever they said last. */
-            renderReplyOptions(contact) {
-                const box  = document.getElementById('contact-reply-options');
-                const bar  = document.getElementById('contact-reply-input');
-                const hint = document.getElementById('contact-reply-hint');
-                if (!box) return;
-                box.innerHTML = '';
-
-                const opts = this._awaitingThem
-                    ? null
-                    : this.getReplyOptions(contact, this._lastIncoming ? this._lastIncoming.text : null);
-                if (!opts || opts.length === 0) {
-                    if (bar)  bar.classList.remove('armed');
-                    if (hint) hint.textContent = this._awaitingThem ? 'Sent' : 'No reply needed';
-                    return;
-                }
-                if (bar)  bar.classList.add('armed');
-                if (hint) hint.textContent = `Reply to ${contact.name}…`;
-
-                opts.forEach(opt => {
-                    const chip = document.createElement('div');
-                    chip.className = 'reply-chip';
-                    chip.textContent = opt.text;
-                    chip.addEventListener('click', () => this.sendReply(contact, opt));
-                    box.appendChild(chip);
-                });
-            },
-
-            getReplyOptions(contact, lastIncoming) {
-                if (lastIncoming) {
-                    const hit = this._replyIndex()[this._normalizeMsg(lastIncoming)];
-                    if (hit) return hit;
-                }
-                return this._replyTable.byContact[contact.name] || this._replyTable.generic;
-            },
-
-            /**
-             * Post 949's reply, then let them write back if the option carries a
-             * response. The follow-up is appended straight into the open thread
-             * rather than going through _deliverMessage, so reading a conversation
-             * you're already looking at can't raise an unread badge for itself.
-             */
-            sendReply(contact, opt) {
-                this.addMessage(contact.name, opt.text, false, 'me');
-                audioSys.sfx('ui');
-                this.renderThread(contact);
-
-                if (!opt.response) return;
-
-                this.setTyping(contact.name, true);
-                setTimeout(() => {
-                    this.setTyping(contact.name, false);
-                    this.addMessage(contact.name, opt.response, false, 'them');
-                    this.lastMessageAt[contact.name] = game?.worldMinutes || 0;
-                    if (this.currentApp === 'details' && this.currentContact === contact.name) {
-                        this.renderThread(contact);
-                    } else {
-                        // They answered after she closed the thread — treat it as
-                        // a normal arrival so it badges like any other message.
-                        this.contactOverrides[contact.name] = opt.response;
-                        this.unread[contact.name] = (this.unread[contact.name] || 0) + 1;
-                        this.refreshNotifications();
-                    }
-                }, 1400 + Math.random() * 900);
             },
 
             showMaps() {
@@ -1262,77 +905,56 @@
                 document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
                 document.getElementById('screen-carme').style.display = 'flex';
 
-                const container = document.getElementById('carme-content');
+                const container = document.getElementById('carme-content'), G = game.garage;
                 const isIndoor = game.activeMap.type === 'indoor';
-                const noSummon = game.activeMap.id !== 'hub_949';   // cars live on the hub (engine/cars.js)
-                let html = '';
+                const noSummon = game.activeMap.id !== 'sdc';   // cars live on the hub (engine/cars.js)
+                const where = document.getElementById('carme-where');
+                where.textContent = noSummon ? (isIndoor ? 'Indoors' : 'Out of range') : 'In range';
+                where.classList.toggle('off', noSummon);
+                const TIER = { 'ultra-luxury': 'Ultra luxury', 'mid-luxury': 'Mid luxury', 'economy': 'Economy' };
+                const name = i => { const c = G.get(i); return VEHICLE_BRANDS[c.brand]?.models[c.model]?.name || G.getDisplayName(i); };
+                const look = c => carPortraitUrl(c.brand, c.model, c.paintColor, c.underglowColor);
+                const dot = (label, col, glow) => `<span class="cm-dot"><i style="background:${col || 'transparent'};${glow && col ? `box-shadow:0 0 6px ${col}` : ''}"></i>${label}</span>`;
 
-                // Current active car indicator
-                const activeName = game.garage.getDisplayName(game.garage.activeIndex);
-                html += `<div style="font-family:Orbitron,sans-serif; font-size:max(6px, 0.6rem - var(--font-trim)); color:#ff8800; letter-spacing:2px; margin-bottom:4px;">MY GARAGE</div>`;
-                html += `<div style="font-size:max(6px, 0.65rem - var(--font-trim)); color:#888; margin-bottom:12px;">Active: <span style="color:#ddd;">${activeName}</span></div>`;
+                // The active car on its turntable: the portrait, its spec sheet, the summon
+                const a = G.activeIndex, car = G.get(a), brand = VEHICLE_BRANDS[car.brand];
+                let html = `<div class="cm-hero">`;
+                html += `<div class="cm-bay"><img src="${look(car)}" alt=""></div>`;
+                html += `<div class="cm-info"><div class="cm-eyebrow">${car.brand} · ${TIER[brand?.tier] || ''}${car.isDefault ? ' · <em>Yours for good</em>' : ''}</div>`;
+                html += `<div class="cm-name">${name(a)}</div>`;
+                html += `<div class="cm-dots">${dot('Paint', car.paintColor)}${dot('Glow', car.underglowColor, true)}${dot('Lights', car.headlightColor, true)}</div>`;
+                html += carSpecBarsHtml(car.brand, car.model);
+                html += `<button class="cm-summon" data-index="${a}"${noSummon ? ' disabled' : ''}>Summon</button>`;
+                if (noSummon) html += `<div class="cm-note">${isIndoor ? 'Step outside to call it round.' : 'No road out here to bring it to.'}</div>`;
+                html += `</div></div>`;
 
-                for (let i = 0; i < game.garage.count; i++) {
-                    const car = game.garage.get(i);
-                    const isActive = i === game.garage.activeIndex;
-                    const name = game.garage.getDisplayName(i);
-                    const borderCol = isActive ? 'rgba(255,136,0,0.3)' : 'rgba(255,255,255,0.08)';
-
-                    html += `<div style="background:rgba(255,255,255,0.03); border:1px solid ${borderCol}; border-radius:8px; padding:10px; margin-bottom:8px;">`;
-
-                    // Name + color swatch + status
-                    html += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">`;
-                    html += `<div style="display:flex; align-items:center; gap:6px;">`;
-                    html += `<div style="width:14px; height:9px; border-radius:2px; background:${car.paintColor}; border:1px solid rgba(255,255,255,0.15);"></div>`;
-                    html += `<span style="font-family:Orbitron,sans-serif; font-size:max(6px, 0.7rem - var(--font-trim)); color:#ddd; letter-spacing:1px;">${name}</span>`;
-                    if (car.isDefault) html += `<span style="font-size:max(6px, 0.4rem - var(--font-trim)); color:#d4af37; letter-spacing:1px; border:1px solid rgba(212,175,55,0.3); padding:1px 4px; border-radius:2px;">DEFAULT</span>`;
-                    html += `</div>`;
-                    html += `<span style="font-size:max(6px, 0.45rem - var(--font-trim)); color:${isActive ? '#00ff88' : '#555'};">${isActive ? '● ACTIVE' : ''}</span>`;
-                    html += `</div>`;
-
-                    // Action buttons
-                    html += `<div style="display:flex; gap:5px;">`;
-                    if (!isActive) {
-                        html += `<button class="carme-activate" data-index="${i}" style="flex:1; font-family:Orbitron,sans-serif; font-size:max(6px, 0.5rem - var(--font-trim)); letter-spacing:1px; padding:6px; background:rgba(0,255,136,0.08); border:1px solid rgba(0,255,136,0.25); color:#00ff88; border-radius:4px; cursor:pointer;">SET ACTIVE</button>`;
-                    }
-                    html += `<button class="carme-summon" data-index="${i}" style="flex:1; font-family:Orbitron,sans-serif; font-size:max(6px, 0.5rem - var(--font-trim)); letter-spacing:1px; padding:6px; background:rgba(255,136,0,0.1); border:1px solid rgba(255,136,0,0.3); color:#ff8800; border-radius:4px; cursor:pointer;${noSummon ? ' opacity:0.3; pointer-events:none;' : ''}">SUMMON</button>`;
-                    html += `</div>`;
-
+                // The rest of the garage: a tile each
+                html += `<div class="cm-sec"><span>The garage</span><small>${G.count} vehicle${G.count === 1 ? '' : 's'}</small></div><div class="cm-tiles">`;
+                for (let i = 0; i < G.count; i++) {
+                    const c = G.get(i), on = i === a;
+                    html += `<div class="cm-tile${on ? ' on' : ''}"><img src="${look(c)}" alt=""><div class="cm-tile-txt"><b>${name(i)}</b><small>${c.brand}</small></div>`;
+                    html += on ? `<span class="cm-chip">● Active</span>` : `<button class="cm-drive" data-index="${i}">Drive</button>`;
                     html += `</div>`;
                 }
-
-                if (noSummon) {
-                    html += `<div style="font-size:max(6px, 0.6rem - var(--font-trim)); color:#555; text-align:center; margin-top:8px; font-style:italic;">${isIndoor ? 'Cannot summon vehicles indoors.' : 'No road out here to bring it to.'}</div>`;
-                }
-
+                html += `</div>`;
                 container.innerHTML = html;
 
-                // Wire buttons
-                container.querySelectorAll('.carme-activate').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        const idx = parseInt(btn.dataset.index);
-                        game.switchGarageCar(idx);
-                        this.showCarMe(); // Re-render
-                    });
-                });
-
-                container.querySelectorAll('.carme-summon').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        const idx = parseInt(btn.dataset.index);
-                        // Switch to this car if not already active
-                        if (idx !== game.garage.activeIndex) {
-                            game.switchGarageCar(idx);
-                        }
-                        // Summon to player position (the hub only: cars live there)
-                        if (game.activeMap.id !== 'hub_949' || (game.isDriving && game.car === game.ownedCar)) return;
-                        Object.assign(game.ownedCar, { x: game.player.x + 50, y: game.player.y, vx: 0, vy: 0, speed: 0 });
-                        game.ownedCar.visible = true;
-                        const name = game.garage.getDisplayName(idx);
-                        showMessage(`${name.toUpperCase()} DELIVERED`);
-                        audioSys.sfx('ui');
-                        this.close();
-                    });
-                });
+                container.querySelectorAll('.cm-drive').forEach(btn => btn.addEventListener('click', () => {
+                    game.switchGarageCar(parseInt(btn.dataset.index));
+                    audioSys.sfx('ui');
+                    this.showCarMe();
+                }));
+                container.querySelectorAll('.cm-summon').forEach(btn => btn.addEventListener('click', () => {
+                    const idx = parseInt(btn.dataset.index);
+                    if (idx !== game.garage.activeIndex) game.switchGarageCar(idx);
+                    // Summon to player position (the hub only: cars live there)
+                    if (game.activeMap.id !== 'sdc' || (game.isDriving && game.car === game.ownedCar)) return;
+                    Object.assign(game.ownedCar, { x: game.player.x + 50, y: game.player.y, vx: 0, vy: 0, speed: 0 });
+                    game.ownedCar.visible = true;
+                    showMessage(`${game.garage.getDisplayName(idx).toUpperCase()} DELIVERED`);
+                    audioSys.sfx('ui');
+                    this.close();
+                }));
             }
         };
        
@@ -1396,92 +1018,102 @@
         });
         
         const statusText = document.getElementById('neume-status');
-        
-        function updateNeumeUI() {
-            // Cosmetics loadout slots (one row per category)
-            const loadout = document.getElementById('neume-loadout');
-            let html = '';
-            
-            const slots = [
-                { label: 'O.U.T.F.I.T', category: 'outfit', equipped: game.cosmetics.equippedOutfit },
-                { label: 'W.I.G', category: 'wig', equipped: game.cosmetics.equippedWig },
-                { label: 'S.K.I.N', category: 'skin', equipped: game.cosmetics.equippedSkin },
-                { label: 'V.O.C.A.L', category: 'vocal', equipped: game.cosmetics.equippedVocal },
-                { label: 'H.A.T', category: 'hat', equipped: game.cosmetics.equippedHat },
-                { label: 'J.E.W.E.L.R.Y', category: 'jewelry', equipped: null },
-                { label: 'L.E.G.S', category: 'legwear', equipped: null },
-                { label: 'A.C.C.E.S.S.O.R.Y', category: 'accessory', equipped: game.cosmetics.equippedAccessory }
-            ];
+        // The dressing room: a tab per kind of thing she wears, a card per piece she owns, and all of her on the stage
+        const NEUME_TABS = [['outfit', 'Outfit'], ['wig', 'Wig'], ['skin', 'Skin'], ['legwear', 'Legs'], ['hat', 'Hat'],
+                            ['jewelry', 'Jewelry'], ['accessory', 'In hand'], ['mask', 'Mask'], ['vocal', 'Voice']];
+        let neumeTab = 'outfit';
 
-            for (const slot of slots) {
-                const owned = Object.values(COSMETICS_REGISTRY).filter(e => e.category === slot.category && game.cosmetics.isOwned(e.id));
-                const current = COSMETICS_REGISTRY[slot.equipped];
-                
-                html += `<div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,0,255,0.15); border-radius:6px; padding:8px 10px;">`;
-                html += `<div style="font-family:Orbitron,sans-serif; font-size:max(6px, 0.5rem - var(--font-trim)); color:#ff00ff; letter-spacing:2px; margin-bottom:4px;">${slot.label}</div>`;
-                html += `<div style="display:flex; gap:4px; flex-wrap:wrap;">`;
-                
-                for (const item of owned) {
-                    const isEquipped = game.cosmetics.isEquipped(item.id);
-                    let chipColor = '#555';
-                    if (slot.category === 'wig') chipColor = item.data.color;
-                    else if (slot.category === 'skin') chipColor = item.data.skinColor;
-                    else if (slot.category === 'vocal') chipColor = item.data.captionColor;
-                    else if (slot.category === 'outfit') chipColor = item.data.top.color;
-                    else if (slot.category === 'hat' || slot.category === 'jewelry' || slot.category === 'legwear') chipColor = item.data.color;
-                    else if (slot.category === 'accessory' && item.data.held === 'umbrella') chipColor = item.data.color;
-                    else if (slot.category === 'accessory') chipColor = (GLASS_DRINKS[game.cosmetics.getAccessoryOption(item.id, 'drink')] || GLASS_DRINKS.champagne).liquid;
-                    
-                    const borderStyle = isEquipped ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.15)';
-                    html += `<div class="neume-chip" data-id="${item.id}" data-cat="${slot.category}" style="display:flex; align-items:center; gap:4px; padding:4px 8px; border-radius:12px; border:${borderStyle}; cursor:pointer; background:${isEquipped ? 'rgba(255,0,255,0.1)' : 'rgba(255,255,255,0.03)'}; transition:border 0.2s;">`;
-                    html += `<div style="width:10px;height:10px;border-radius:50%;background:${chipColor};flex-shrink:0;"></div>`;
-                    html += `<span style="font-size:max(6px, 0.5rem - var(--font-trim)); color:${isEquipped ? '#fff' : '#999'}; white-space:nowrap;">${item.name}</span>`;
-                    html += `</div>`;
-                }
-                
-                if (slot.category === 'accessory') {
-                    // "None" chip, then the drink row when the glass is in hand
-                    const none = !slot.equipped;
-                    html += `<div class="neume-chip" data-id="" data-cat="accessory" style="display:flex; align-items:center; padding:4px 8px; border-radius:12px; border:${none ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.15)'}; cursor:pointer; background:${none ? 'rgba(255,0,255,0.1)' : 'rgba(255,255,255,0.03)'};"><span style="font-size:max(6px, 0.5rem - var(--font-trim)); color:${none ? '#fff' : '#999'};">None</span></div>`;
-                    html += `</div>`;
-                    const accEntry = COSMETICS_REGISTRY[slot.equipped];
-                    if (accEntry && accEntry.data.held === 'glass') {
-                        const cur = game.cosmetics.getAccessoryOption(accEntry.id, 'drink');
-                        html += `<div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:6px;">`;
-                        for (const [key, d] of Object.entries(GLASS_DRINKS)) {
-                            const on = key === cur;
-                            html += `<div class="neume-drink" data-acc="${accEntry.id}" data-drink="${key}" style="display:flex; align-items:center; gap:3px; padding:3px 6px; border-radius:10px; border:${on ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.12)'}; cursor:pointer;"><div style="width:8px;height:8px;border-radius:50%;background:${d.liquid};"></div><span style="font-size:max(6px, 0.45rem - var(--font-trim)); color:${on ? '#fff' : '#999'};">${d.name}</span></div>`;
-                        }
-                        html += `</div>`;
-                    }
-                    html += `</div>`;
-                    continue;
-                }
-                if (slot.category === 'hat') {
-                    const none = !slot.equipped;
-                    html += `<div class="neume-chip" data-id="" data-cat="hat" style="display:flex; align-items:center; padding:4px 8px; border-radius:12px; border:${none ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.15)'}; cursor:pointer; background:${none ? 'rgba(255,0,255,0.1)' : 'rgba(255,255,255,0.03)'};"><span style="font-size:max(6px, 0.5rem - var(--font-trim)); color:${none ? '#fff' : '#999'};">None</span></div>`;
-                }
-                if ((slot.category === 'jewelry' || slot.category === 'legwear') && !owned.length) {
-                    html += `<span style="font-size:max(6px, 0.45rem - var(--font-trim)); color:#777;">None owned yet. Find ${slot.category === 'jewelry' ? 'jewelry' : 'legwear'} at Neural Systems.</span>`;
-                }
-                html += `</div></div>`;
+        /** Her whole look as the figure painter takes it (the same pieces the portrait and the world draw from). */
+        function neumeFigureConfig() {
+            const c = game.cosmetics.getRenderConfig(), me = APPEARANCES['949'];
+            return { skinColor: c.skinColor, hair: c.hair, eyeColor: me.eyeColor, gender: me.gender, top: c.outfit.top, bottom: c.outfit.bottom,
+                     shoes: c.outfit.shoes, train: c.outfit.train || null, hat: c.hat, jewelry: withFieldMask(game, c.jewelry), held: c.held || null };
+        }
+        let neumePaintQueued = false;
+        function paintNeumeFigure() {
+            if (neumePaintQueued) return;
+            neumePaintQueued = true;
+            // After the cards have redrawn, so the tap answers at once and the painting follows
+            requestAnimationFrame(() => setTimeout(() => {
+                neumePaintQueued = false;
+                const cv = document.getElementById('neume-figure');
+                if (!cv || !cv.offsetParent || typeof RealPortrait === 'undefined' || !RealPortrait.supported()) return;
+                const r = cv.getBoundingClientRect(), k = Math.min(window.devicePixelRatio || 1, 2);
+                const w = Math.round(r.width * k), h = Math.min(1600, Math.round(r.height * k));
+                if (w < 8 || h < 8) return;
+                if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+                const x = cv.getContext('2d');
+                x.clearRect(0, 0, w, h);
+                RealPortrait.figure(x, w, h, neumeFigureConfig());
+            }, 0));
+        }
+
+        if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => paintNeumeFigure()).observe(document.getElementById('neume-figure'));   // the phone turning on its side
+
+        /** The colour a card shows for a piece. */
+        function neumeSwatch(item) {
+            const d = item.data || {};
+            switch (item.category) {
+                case 'outfit': return `linear-gradient(160deg, ${d.top.color} 0 46%, ${d.bottom ? d.bottom.color : d.top.color} 54% 100%)`;
+                case 'wig': return d.color;
+                case 'skin': return d.skinColor;
+                case 'vocal': return d.captionColor;
+                case 'accessory': return d.held === 'umbrella' ? d.color : (GLASS_DRINKS[game.cosmetics.getAccessoryOption(item.id, 'drink')] || GLASS_DRINKS.champagne).liquid;
+                default: return d.color || (d.shoes && d.shoes.color) || '#555';
             }
-            // M.A.S.K: her field mask: Auto (on in the field, off at home), always On, or Off
-            const mm = game.cosmetics.maskMode || 'auto';
-            html += `<div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,0,255,0.15); border-radius:6px; padding:8px 10px;">`;
-            html += `<div style="font-family:Orbitron,sans-serif; font-size:max(6px, 0.5rem - var(--font-trim)); color:#ff00ff; letter-spacing:2px; margin-bottom:4px;">M.A.S.K</div><div style="display:flex; gap:4px; flex-wrap:wrap;">`;
-            for (const [mode, label, dot] of [['auto', 'Auto', 'linear-gradient(90deg,#6a2a7a 50%,#888 50%)'], ['on', 'On', '#6a2a7a'], ['off', 'Off', '#555']]) {
-                const on = mm === mode;
-                html += `<div class="neume-mask" data-mode="${mode}" style="display:flex; align-items:center; gap:4px; padding:4px 8px; border-radius:12px; border:${on ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.15)'}; cursor:pointer; background:${on ? 'rgba(255,0,255,0.1)' : 'rgba(255,255,255,0.03)'};"><div style="width:10px;height:10px;border-radius:50%;background:${dot};flex-shrink:0;"></div><span style="font-size:max(6px, 0.5rem - var(--font-trim)); color:${on ? '#fff' : '#999'};">${label}</span></div>`;
+        }
+        function neumeCard(cls, data, on, swatch, name) {
+            return `<button class="nm-card ${cls}${on ? ' on' : ''}" ${data}><i style="background:${swatch}"></i><span>${name}</span></button>`;
+        }
+
+        function updateNeumeUI() {
+            const tabs = document.getElementById('neume-tabs'), loadout = document.getElementById('neume-loadout');
+            const cos = game.cosmetics;
+            const ownedIn = cat => Object.values(COSMETICS_REGISTRY).filter(e => e.category === cat && cos.isOwned(e.id));
+            const worn = cat => cat === 'mask' ? (cos.maskMode || 'auto') !== 'off'
+                : cat === 'hat' ? !!cos.equippedHat : cat === 'accessory' ? !!cos.equippedAccessory
+                : cat === 'jewelry' ? cos.equippedJewelry.length > 0 : cat === 'legwear' ? cos.equippedLegwear.length > 0 : false;   // a dot on the optional tabs with something on
+            tabs.innerHTML = NEUME_TABS.map(([cat, label]) =>
+                `<button class="nm-tab${cat === neumeTab ? ' on' : ''}${worn(cat) ? ' worn' : ''}" data-tab="${cat}">${label}</button>`).join('');
+
+            let html = '';
+            if (neumeTab === 'mask') {
+                // Her field mask: Auto (on in the field, off at home), always On, or Off
+                const mm = cos.maskMode || 'auto';
+                for (const [mode, label, dot] of [['auto', 'Auto', 'linear-gradient(90deg,#6a2a7a 50%,#8a8494 50%)'], ['on', 'Always on', '#6a2a7a'], ['off', 'Off', '#3a3440']])
+                    html += neumeCard('neume-mask', `data-mode="${mode}"`, mm === mode, dot, label);
+                html += `<p class="nm-note">Auto wears it in the field and takes it off at home.</p>`;
+            } else {
+                const owned = ownedIn(neumeTab);
+                if (neumeTab === 'hat' || neumeTab === 'accessory') {
+                    const none = neumeTab === 'hat' ? !cos.equippedHat : !cos.equippedAccessory;
+                    html += neumeCard('neume-chip none', `data-id="" data-cat="${neumeTab}"`, none, 'transparent', 'None');
+                }
+                for (const item of owned)
+                    html += neumeCard('neume-chip', `data-id="${item.id}" data-cat="${neumeTab}"`, cos.isEquipped(item.id), neumeSwatch(item), item.name);
+                if ((neumeTab === 'jewelry' || neumeTab === 'legwear') && !owned.length)
+                    html += `<p class="nm-note">None owned yet. Find ${neumeTab === 'jewelry' ? 'jewelry' : 'legwear'} at Neural Systems.</p>`;
+                else if (neumeTab === 'jewelry' || neumeTab === 'legwear') html += `<p class="nm-note">Tap to put on or take off. Wear as many as you like.</p>`;
+                // The drink, when the glass is in hand
+                const acc = COSMETICS_REGISTRY[cos.equippedAccessory];
+                if (neumeTab === 'accessory' && acc && acc.data.held === 'glass') {
+                    const cur = cos.getAccessoryOption(acc.id, 'drink');
+                    html += `<div class="nm-sub-head">Pour</div>`;
+                    for (const [key, d] of Object.entries(GLASS_DRINKS))
+                        html += neumeCard('neume-drink small', `data-acc="${acc.id}" data-drink="${key}"`, key === cur, d.liquid, d.name);
+                }
             }
-            html += `</div></div>`;
             loadout.innerHTML = html;
 
+            const outfit = COSMETICS_REGISTRY[cos.equippedOutfit], wig = COSMETICS_REGISTRY[cos.equippedWig];
+            document.getElementById('neume-look').textContent = [outfit && outfit.name, wig && wig.name].filter(Boolean).join(' · ');
+
+            tabs.querySelectorAll('.nm-tab').forEach(t => t.addEventListener('click', () => {
+                neumeTab = t.dataset.tab; audioSys.sfx('ui'); updateNeumeUI(); loadout.scrollTop = 0;
+            }));
             loadout.querySelectorAll('.neume-mask').forEach(chip => {
                 chip.addEventListener('click', () => { game.cosmetics.maskMode = chip.dataset.mode; triggerSequencingEffect(); });
             });
-
-            // Bind chip clicks
             loadout.querySelectorAll('.neume-chip').forEach(chip => {
                 chip.addEventListener('click', () => {
                     const id = chip.dataset.id, cat = chip.dataset.cat;
@@ -1498,13 +1130,18 @@
                     triggerSequencingEffect();
                 });
             });
+            paintNeumeFigure();
         }
-        
+
+        let neumeStatusTimer = null;
         function triggerSequencingEffect() {
+            const scroll = document.getElementById('neume-loadout').scrollTop;
             updateNeumeUI();
-            statusText.style.opacity = '1';
+            document.getElementById('neume-loadout').scrollTop = scroll;
+            statusText.classList.add('on');
             audioSys.sfx('ui');
-            setTimeout(() => { statusText.style.opacity = '0'; }, 1500);
+            clearTimeout(neumeStatusTimer);
+            neumeStatusTimer = setTimeout(() => statusText.classList.remove('on'), 1500);
         }
 
         

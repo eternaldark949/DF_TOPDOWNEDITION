@@ -24,7 +24,7 @@
             apt_vanity: 13, apt_planter: 11, apt_fireplace: 10, apt_bed: 9,
             ps_suitcase: 27, ps_piano: 16, ps_wardrobe: 16, ps_telescope: 11, mc_coatcheck: 17, mc_lost_purse: 11, mc_dj: 9,
             dn_lost_luggage: 14, dn_palm: 10, cc_fireplace: 13, cc_plant: 12, cc_sacks: 9, hod_chair: 10, sc_fallen: 11, sc_altar: 9,
-            dp_throne: 31, dp_pool: 9, dp_embers: 9, light_switch: 10, vending_machine: 12, medbay_refill: 14
+            ta_lift: 14, ta_wrap: 12, ta_turntable: 12, dp_throne: 31, dp_pool: 9, dp_embers: 9, light_switch: 10, vending_machine: 12, medbay_refill: 14
         };
         // One period of the sway, painted as `frames` phase frames
         const PROP_LOOP = {
@@ -44,6 +44,7 @@
             sc_altar: true, sc_candles: true, sc_brazier: true,                                                                  // flames and coals
             cc_espresso: true, cc_fireplace: true, cc_record: true, cc_stove: true,                                              // gauge, embers, arc, flame
             monitor: true,                                                                                                       // the trace
+            ta_turntable: true,                                                                                                  // the plinth turns
             dp_pool: true, dp_pillar: true, dp_brazier: true, dp_fountain: true, dp_altar: true, dp_embers: true                 // ripples, arc, fire, jets, embers
         };
 

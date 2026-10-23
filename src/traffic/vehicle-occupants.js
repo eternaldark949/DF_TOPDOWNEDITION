@@ -72,13 +72,12 @@ Object.assign(TrafficVehicle.prototype, {
         const make = () => {const cv=document.createElement('canvas');cv.width=sprite.cv.width;cv.height=sprite.cv.height;return cv;};
         const lower=make(),upper=make(),lc=lower.getContext('2d'),uc=upper.getContext('2d');
         for (const ctx of [lc,uc]) {ctx.drawImage(sprite.cv,0,0);ctx.setTransform(S,0,0,S,(g.L/2+P)*S,(g.W/2+P)*S);}
-        // Partition the existing artwork; the roof and door frames are painted only in the upper pass.
+        // Partition the existing artwork: the cabin floor below, the roof and its glass (whole, as when parked) above.
+        // A window opens only while someone leans out of it (drawOccupantOverlay clips it out).
         lc.globalCompositeOperation='destination-out';lc.fillRect(g.x3-1,-g.W/2-2,g.x0-g.x3+2,g.W+4);
         lc.globalCompositeOperation='source-over';lc.fillStyle='#100c18';
         lc.fillRect(g.x3-1,-g.W/2+1,g.x0-g.x3+2,g.W-2);
         uc.globalCompositeOperation='destination-in';uc.fillRect(g.x3-1,-g.W/2-2,g.x0-g.x3+2,g.W+4);
-        uc.globalCompositeOperation='destination-out';
-        for(const w of windows.windows) uc.fillRect(w.x-w.half,w.side<0?-w.outer:w.inner,w.half*2,w.outer-w.inner);
         return (sprite.occupants={key,lower,upper});
     },
     drawOccupantLower(ctx) {
@@ -88,17 +87,19 @@ Object.assign(TrafficVehicle.prototype, {
     },
     drawOccupantOverlay(ctx) {
         if (!this.visible || !this.hasDriver) return;
-        const layers=this.occupantLayers(),P=CAR_ART.PAD;
+        const layers=this.occupantLayers(),P=CAR_ART.PAD,windows=this.occupantWindows().windows;
         ctx.save();ctx.translate(this.x,this.y);ctx.rotate(this.angle);
-        ctx.drawImage(layers.upper,-this.length/2-P,-this.width/2-P,this.length+P*2,this.width+P*2);
-        drawCarSheen(ctx,this);
-        // Closed windows retain a little tint; an occupant leaning out opens their own window.
-        ctx.fillStyle='rgba(26,22,47,.32)';
+        // The car's own glass stays shut; an occupant leaning out opens their window (cut from the roof pass)
+        let open=null;
         for(let i=0;i<this.seatLayout.length;i++){
-            const actor=i===0?game.player:this.seatOccupants[i],w=this.occupantWindows().windows[i];
-            if(actor && actor!==true && (actor._vehicleLean||0)>.1) continue;
-            ctx.fillRect(w.x-w.half,w.side<0?-w.outer:w.inner,w.half*2,w.outer-w.inner);
+            const actor=i===0?game.player:this.seatOccupants[i],w=windows[i];
+            if(!w || !actor || actor===true || (actor._vehicleLean||0)<=.1) continue;
+            if(!open){open=new Path2D();open.rect(-this.length/2-P,-this.width/2-P,this.length+P*2,this.width+P*2);}
+            open.rect(w.x-w.half,w.side<0?-w.outer:w.inner,w.half*2,w.outer-w.inner);
         }
+        ctx.save();if(open)ctx.clip(open,'evenodd');
+        ctx.drawImage(layers.upper,-this.length/2-P,-this.width/2-P,this.length+P*2,this.width+P*2);
+        drawCarSheen(ctx,this);ctx.restore();
         this.drawLights(ctx,false);ctx.restore();
     }
 });

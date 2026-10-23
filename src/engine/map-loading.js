@@ -8,13 +8,14 @@
             house_of_death: ['_houseFloor'], hotel_lobby: ['_lobbyFloor'], church_boss: ['_sanctumFloor'],
             hotel_suite: ['_suiteFloor'], moon_city_nightclub: ['_clubFloor'], demoness_palace: ['_palaceFloor'],
             apt_949: ['_cityView', '_aptFloor'], van_interior: ['_vanCabin'], cozy_cafe_interior: ['_cafeFloor'],
-            neural_sys_interior: ['_neuralFloor'],
+            neural_sys_interior: ['_neuralFloor'], auto_shop: ['_torqueFloor'],
             enni_cole_interior: ['_enniFloor'], enni_cole_upper: ['_enniUpperFloor'],
             keepers_hill: ['_keeperHill', '_keeperHouse', '_keeperParlor'], keepers_parlor: ['_keeperHill', '_keeperHouse', '_keeperParlor']
         };
 
 engineMixin({
             loadMap(mapId, spawnAt) {
+                if (mapId === 'hub_949') mapId = 'sdc';            // Southern Dimensions City's old id (older saves, stored targets)
                 // 1. Initial Load (No Fade)
                 if (!this.activeMap) {
                     this._doLoadMap(mapId, spawnAt);
@@ -269,6 +270,7 @@ engineMixin({
             },
 
             _doLoadMap(mapId, spawnAt) {
+                if (mapId === 'hub_949') mapId = 'sdc';
                 this._cancelQuickDrawHold?.(); this.cancelQuickDraw();
                 const previousMapId = this.activeMap?.id;
                 if (this._bossIntro) {
@@ -321,7 +323,7 @@ engineMixin({
                 
                 this.neonSigns = [];
                 
-                if (mapId !== 'hub_949') {
+                if (mapId !== 'sdc') {
                     this.traffic.reset();
                     this.pedestrians.reset();
                 }
@@ -356,8 +358,8 @@ engineMixin({
                 // =========================================================
                 
                 // --- HUB 949 (CITYLAYOUT V2) ---
-                if (mapId === 'hub_949') {
-                    const mapData = maps['hub_949'];
+                if (mapId === 'sdc') {
+                    const mapData = maps['sdc'];
                     
                     if (this._hubCache) {
                         // =============================================================
@@ -678,7 +680,7 @@ engineMixin({
                             h: rzBlock.h - 20,
                             hostileCount: 8,
                             respawnDelay: 900, // ~15 seconds
-                            mapId: 'hub_949'
+                            mapId: 'sdc'
                         });
                         // Set block lamp color to danger crimson
                         city.setBlockLampColors({ [HUB_BLOCKS.scrapyard]: '#ff2200' });
@@ -1107,7 +1109,7 @@ engineMixin({
                 // =========================================================
                 //  PHASE 4: LOAD MAP DATA
                 // =========================================================
-                this.activeMap = maps[mapId] || maps['hub_949'];
+                this.activeMap = maps[mapId] || maps['sdc'];
                 this.uiLocation.textContent = this.activeMap.label;
 
                 // --- WEATHER: adopt this map's climate ---
@@ -1163,7 +1165,7 @@ engineMixin({
                     }
                     
                     // The Ollo test zone's door (on the city's southern edge, east of the graveyard)
-                    if (this.activeMap.id === 'hub_949') {
+                    if (this.activeMap.id === 'sdc') {
                         this.activeMap.transitions.push({
                             ...HUB_OLLO_DOOR,
                             target: 'ollo_test',
@@ -1299,7 +1301,7 @@ engineMixin({
                     if (this.activeMap.buildings) { this._staticBuildingEntities = createStaticEntitiesFromBuildings(this.activeMap.buildings); }
                 }
                 // Hub billboards are parked for now; keep their authored data for a later return.
-                this.activeMap.billboards = this.activeMap.id === 'hub_949' ? []
+                this.activeMap.billboards = this.activeMap.id === 'sdc' ? []
                     : BILLBOARDS.filter(b => b.map === this.activeMap.id).map(cfg => new Billboard(cfg));
                 if (this.useNewCollisionSystem) this._staticBillboardEntities = this.activeMap.billboards.flatMap(b => b.colliders());
                 
@@ -1309,13 +1311,13 @@ engineMixin({
                 _physicsSpatial.track(getColliders(this.activeMap));
                 
                 // Ms. Jean pays her respects at the centre of the graveyard (HUB_GRAVEYARD)
-                if (this.activeMap.id === 'hub_949' && this.questState.ambushCleared) {
+                if (this.activeMap.id === 'sdc' && this.questState.ambushCleared) {
                     const G = HUB_GRAVEYARD;
                     this.npcs.push(new NPC(G.x + G.w / 2, G.y + G.h / 2, "Ms. Jean", 'ms_jean'));
                 }
                 
                 // Spawn Grum North near the Scrapyard
-                if (this.activeMap.id === 'hub_949' && this.restrictedZone) {
+                if (this.activeMap.id === 'sdc' && this.restrictedZone) {
                     const rz = this.restrictedZone;
                     // Place Grum just south of the zone entrance, on the road
                     this.npcs.push(new NPC(rz.x + rz.w / 2 - 40, rz.y + rz.h + 60, "Grum North", 'arena_master'));
@@ -1328,7 +1330,7 @@ engineMixin({
                 
                 // Spawn bounty target on hub if active bounty mission
                 // Must re-spawn on every hub entry because enemies array is cleared on map load
-                if (this.activeMap.id === 'hub_949' && this.missions && this.missions.activeMission
+                if (this.activeMap.id === 'sdc' && this.missions && this.missions.activeMission
                     && this.missions.activeMission.type === MISSION_TYPES.BOUNTY
                     && this.missions.activeMission.status === 'active') {
                     // Clear stale entity reference (entity was destroyed on previous map unload)
@@ -1337,7 +1339,7 @@ engineMixin({
                 }
                 
                 // Spawn salvage guards on hub if active salvage mission
-                if (this.activeMap.id === 'hub_949' && this.missions && this.missions.activeMission
+                if (this.activeMap.id === 'sdc' && this.missions && this.missions.activeMission
                     && this.missions.activeMission.type === MISSION_TYPES.SALVAGE
                     && this.missions.activeMission.status === 'active'
                     && !this.missions.activeMission.crateCollected) {
@@ -1349,7 +1351,7 @@ engineMixin({
                 }
                 
                 // Show active mission guidance on hub load
-                if (this.activeMap.id === 'hub_949' && this.missions && this.missions.activeMission) {
+                if (this.activeMap.id === 'sdc' && this.missions && this.missions.activeMission) {
                     const m = this.missions.activeMission;
                     if (m.status === 'active') {
                         this.addPausableTimeout(() => {
@@ -1362,7 +1364,7 @@ engineMixin({
                 }
                 
                 // --- VELVET CAT ---
-                if (this.activeMap.id === 'hub_949') {
+                if (this.activeMap.id === 'sdc') {
                     if (this.questState.hasVelvetCat) {
                         // Owned — temp position, repositioned by placeEntitySmart in Phase 5
                         this.velvetCat = new VelvetCat(this.activeMap.spawn.x, this.activeMap.spawn.y);
@@ -1387,14 +1389,14 @@ engineMixin({
                 // CASE A: DYNAMIC RETURN (e.g. Exiting a building to the Hub)
                 // Arenas have no city doorway. Always return to today's Grum location,
                 // including a loaded or inactive run; never use the hub's default spawn.
-                if (!this._pendingGauntletLoad && mapId === 'hub_949'
+                if (!this._pendingGauntletLoad && mapId === 'sdc'
                     && GAUNTLET_MAPS.some(g => !g.locked && g.mapId === previousMapId)) {
                     const grum = this.npcs.find(n => n.role === 'arena_master');
                     if (grum) spawnAt = { x: grum.x, y: grum.y + 40 };
                 }
                 if (spawnAt && spawnAt.linkFrom) {
                     // Find the transition on the NEW map that targets the OLD map
-                    // Example: If loading 'hub_949' coming from 'apt_949', find the Hub door that points to 'apt_949'
+                    // Example: If loading 'sdc' coming from 'apt_949', find the Hub door that points to 'apt_949'
                     const returnGate = this._transitionGrid.findByTarget(spawnAt.linkFrom);
                     
                     if (returnGate && this.activeMap.type === 'indoor') {

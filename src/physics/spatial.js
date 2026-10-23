@@ -96,45 +96,127 @@
                 return true;
             }
 
+            /** The four corners of a box: centre x, y; `length` along `angle`, `width` across. */
+            static corners(b) {
+                const a = b.angle || 0, fx = Math.cos(a), fy = Math.sin(a), hl = (b.length || 0) / 2, hw = (b.width || 0) / 2;
+                return [[b.x + fx * hl - fy * hw, b.y + fy * hl + fx * hw], [b.x + fx * hl + fy * hw, b.y + fy * hl - fx * hw],
+                        [b.x - fx * hl + fy * hw, b.y - fy * hl - fx * hw], [b.x - fx * hl - fy * hw, b.y - fy * hl + fx * hw]];
+            }
+            static _inside(b, px, py, pad = 0.5) {
+                const a = b.angle || 0, dx = px - b.x, dy = py - b.y;
+                return Math.abs(dx * Math.cos(a) + dy * Math.sin(a)) <= (b.length || 0) / 2 + pad
+                    && Math.abs(-dx * Math.sin(a) + dy * Math.cos(a)) <= (b.width || 0) / 2 + pad;
+            }
+            /**
+             * Where two overlapping boxes touch, with the normal (nx, ny) pointing from b to a: the
+             * corners of each that are inside the other (a corner into a flat side, the usual
+             * crash); averaged when several are, so a flat-on hit lands mid-face and twists nothing.
+             */
+            static contactPoint(a, b, nx, ny) {
+                // Each with how deep it went (a's corners against the normal, b's along it): a fast car is
+                // well in by the time it's caught, so only the deepest (the corner that struck first) counts
+                const pts = [];
+                if (b.length) for (const [x, y] of PhysicsSystem.corners(a)) if (PhysicsSystem._inside(b, x, y)) pts.push([x, y, -(x * nx + y * ny)]);
+                if (a.length) for (const [x, y] of PhysicsSystem.corners(b)) if (PhysicsSystem._inside(a, x, y)) pts.push([x, y, x * nx + y * ny]);
+                if (pts.length > 1) {
+                    let deepest = -Infinity;
+                    for (const p of pts) if (p[2] > deepest) deepest = p[2];
+                    for (let i = pts.length - 1; i >= 0; i--) if (pts[i][2] < deepest - 2) pts.splice(i, 1);
+                }
+                if (!pts.length) {       // edge to edge: a's deepest corner along the normal
+                    let best = null, bd = Infinity;
+                    for (const c of PhysicsSystem.corners(a)) { const d = c[0] * nx + c[1] * ny; if (d < bd) { bd = d; best = c; } }
+                    return best || [(a.x + b.x) / 2, (a.y + b.y) / 2];
+                }
+                let x = 0, y = 0;
+                for (const p of pts) { x += p[0]; y += p[1]; }
+                return [x / pts.length, y / pts.length];
+            }
+
+            /** How fast a car is turning (rad/tick): the driven car's yawRate, traffic's spin from a knock */
+            static spinOf(c) { return c.controlMode === 'PLAYER' ? (c.yawRate || 0) : (c.spin || 0); }
+            static setSpin(c, w) {
+                const M = CONFIG.VEHICLE_DRIVE.YAW_SPIN_MAX;
+                w = Math.max(-M, Math.min(M, w));
+                if (c.controlMode === 'PLAYER') c.yawRate = w; else c.spin = w;
+            }
+
+            /**
+             * One rigid-body impulse at a contact point P between bodies a and b (b may be
+             * immovable: invM 0), normal n from b to a. Each body is { invM, invI, x, y, vx, vy, w }
+             * (w = turn rate, rad/tick); velocities are changed in place. Bounce e along the normal,
+             * Coulomb friction mu along the face. Because the push lands at P, not at the centre,
+             * it turns the body as well as moving it: a front corner into a wall swings the tail
+             * round to meet it, a shove on a rear quarter sends that end away.
+             * Returns the closing speed it took out (0 when they were already parting).
+             */
+            static impulseAt(a, b, px, py, nx, ny, e, mu) {
+                const r1x = px - a.x, r1y = py - a.y, r2x = px - b.x, r2y = py - b.y;
+                const vpx = (a.vx - a.w * r1y) - (b.vx - b.w * r2y), vpy = (a.vy + a.w * r1x) - (b.vy + b.w * r2x);
+                const vn = vpx * nx + vpy * ny;
+                if (vn >= 0) return 0;
+                const c1n = r1x * ny - r1y * nx, c2n = r2x * ny - r2y * nx;
+                const kn = a.invM + b.invM + a.invI * c1n * c1n + b.invI * c2n * c2n;
+                if (!(kn > 0)) return 0;
+                const jn = -(1 + e) * vn / kn;
+                const tx = -ny, ty = nx, vt = vpx * tx + vpy * ty;
+                const c1t = r1x * ty - r1y * tx, c2t = r2x * ty - r2y * tx;
+                const kt = a.invM + b.invM + a.invI * c1t * c1t + b.invI * c2t * c2t;
+                const jt = Math.max(-mu * jn, Math.min(mu * jn, kt > 0 ? -vt / kt : 0));
+                const Jx = jn * nx + jt * tx, Jy = jn * ny + jt * ty;
+                a.vx += Jx * a.invM; a.vy += Jy * a.invM; a.w += a.invI * (r1x * Jy - r1y * Jx);
+                b.vx -= Jx * b.invM; b.vy -= Jy * b.invM; b.w -= b.invI * (r2x * Jy - r2y * Jx);
+                return -(1 + e) * vn;
+            }
+
+            /** A car as a rigid body for impulseAt (live: whether it can move at all) */
+            static body(c, live) {
+                if (!live) return { invM: 0, invI: 0, x: c.x, y: c.y, vx: 0, vy: 0, w: 0 };
+                const m = c.mass || 1000, spins = !!(c.applyDrivePhysics && c.length);
+                const L = c.length || 60, W = c.width || 30;
+                const hasV = c.vx !== undefined;
+                const vx = hasV ? c.vx : Math.cos(c.angle || 0) * (c.speed || 0), vy = hasV ? c.vy : Math.sin(c.angle || 0) * (c.speed || 0);
+                return { invM: 1 / m, invI: spins ? 1 / (m * (L * L + W * W) / 12 * CONFIG.VEHICLE_DRIVE.SPIN_INERTIA) : 0,
+                         x: c.x, y: c.y, vx, vy, w: spins ? PhysicsSystem.spinOf(c) : 0 };
+            }
+            /** Write a body's new velocity and turn back onto its car */
+            static _store(c, B) {
+                if (c.vx !== undefined) {
+                    c.vx = B.vx; c.vy = B.vy;
+                    c.speed = c.vx * Math.cos(c.angle) + c.vy * Math.sin(c.angle);
+                } else if (c.speed !== undefined) c.speed = B.vx * Math.cos(c.angle || 0) + B.vy * Math.sin(c.angle || 0);
+                if (B.invI > 0) PhysicsSystem.setSpin(c, B.w);
+            }
+
             /**
              * Two cars (or a car and something immovable: mass Infinity) touching along normal (nx, ny),
-             * pointing from c2 to c1, overlapping by depth. Pushes them apart by mass, then takes the
-             * closing speed out of their real velocities (vx/vy — `speed` is only read back from those),
-             * with a little bounce and some scrub along the contact. No random spin.
+             * pointing from c2 to c1, overlapping by depth. Pushes them apart by mass, then resolves the
+             * hit as rigid bodies at the point where they meet (impulseAt): the closing speed comes out
+             * with a little bounce and some scrub, and each car turns by where it was struck.
              */
             static carContact(c1, c2, nx, ny, depth) {
                 const m1 = c1.isStatic ? Infinity : (c1.mass || 1000), m2 = c2.isStatic ? Infinity : (c2.mass || 1000);
                 const w1 = isFinite(m1) ? (isFinite(m2) ? m2 / (m1 + m2) : 1) : 0;
                 const w2 = isFinite(m2) ? (isFinite(m1) ? m1 / (m1 + m2) : 1) : 0;
+                const [px, py] = PhysicsSystem.contactPoint(c1, c2, nx, ny);
                 c1.x += nx * depth * w1; c1.y += ny * depth * w1;
                 c2.x -= nx * depth * w2; c2.y -= ny * depth * w2;
-                const vel = (c) => c.vx !== undefined ? [c.vx, c.vy] : [Math.cos(c.angle || 0) * (c.speed || 0), Math.sin(c.angle || 0) * (c.speed || 0)];
-                const [ax, ay] = w1 > 0 ? vel(c1) : [0, 0], [bx, by] = w2 > 0 ? vel(c2) : [0, 0];
-                const rvx = ax - bx, rvy = ay - by, rn = rvx * nx + rvy * ny;
                 c1._lastImpact = c2._lastImpact = 0;
-                if (rn >= 0) return;                                   // already separating
-                const e = 0.2, jn = -(1 + e) * rn;                      // normal impulse (as a velocity change)
-                const tx = -ny, ty = nx, rt = rvx * tx + rvy * ty, jt = -rt * 0.15;   // scrub along the contact
-                const apply = (c, w, sgn) => {
-                    if (w <= 0) return;
-                    const dvx = sgn * w * (jn * nx + jt * tx), dvy = sgn * w * (jn * ny + jt * ty);
-                    if (c.vx !== undefined) {
-                        c.vx += dvx; c.vy += dvy;
-                        c.speed = c.vx * Math.cos(c.angle) + c.vy * Math.sin(c.angle);
-                    } else if (c.speed !== undefined) c.speed += dvx * Math.cos(c.angle || 0) + dvy * Math.sin(c.angle || 0);
-                };
-                apply(c1, w1, 1); apply(c2, w2, -1);
+                const B1 = PhysicsSystem.body(c1, w1 > 0), B2 = PhysicsSystem.body(c2, w2 > 0);
+                const v1x = B1.vx, v1y = B1.vy, v2x = B2.vx, v2y = B2.vy;
+                const hit = PhysicsSystem.impulseAt(B1, B2, px + nx * depth * w1, py + ny * depth * w1, nx, ny, 0.2, 0.3);
+                if (!hit) return;                                      // already separating
+                // A nudge between two traffic cars (queues, merges) is driven out of; a real knock spins them
+                const soft = hit < CONFIG.VEHICLE_DRIVE.KNOCK_MIN_HIT && c1.controlMode !== 'PLAYER' && c2.controlMode !== 'PLAYER';
+                if (soft) B1.invI = B2.invI = 0;
+                if (w1 > 0) PhysicsSystem._store(c1, B1);
+                if (w2 > 0) PhysicsSystem._store(c2, B2);
                 c1._lastContact = c2; c2._lastContact = c1;
-                c1._lastImpact = c2._lastImpact = jn;
-                // The driven car feels it: a knock that twists it by where it was hit
-                for (const [c, o, w, sgn] of [[c1, c2, w1, 1], [c2, c1, w2, -1]]) {
-                    if (w <= 0 || c.controlMode !== 'PLAYER' || !c.onImpact) continue;
-                    const fx = Math.cos(c.angle), fy = Math.sin(c.angle), hl = (c.length || 60) / 2;
-                    const rf = Math.max(-hl, Math.min(hl, (o.x - c.x) * fx + (o.y - c.y) * fy));   // lever along the car
-                    const Jx = sgn * w * jn * nx, Jy = sgn * w * jn * ny;
-                    c.onImpact(w * jn, rf * (fx * Jy - fy * Jx) * CONFIG.VEHICLE_DRIVE.IMPACT_YAW / (hl * hl));
-                }
-                return jn;
+                c1._lastImpact = c2._lastImpact = hit;
+                // The driven car feels it (the spin is already in its yawRate)
+                if (w1 > 0 && c1.controlMode === 'PLAYER' && c1.onImpact) c1.onImpact(Math.hypot(B1.vx - v1x, B1.vy - v1y));
+                if (w2 > 0 && c2.controlMode === 'PLAYER' && c2.onImpact) c2.onImpact(Math.hypot(B2.vx - v2x, B2.vy - v2y));
+                return hit;
             }
             
             /**

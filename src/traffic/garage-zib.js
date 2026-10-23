@@ -13,8 +13,8 @@
                 colors: ['#050505', '#1a0b1a', '#0b1a1a', '#1a1a0b', '#2b0000'],
                 glowColor: '#ffffff', headlightColor: '#ffffff', visualStyle: 'blackmark',
                 models: { 
-                    suv: { name: 'BlackMark V1', length: 95, width: 44, speedMod: 1.0 },
-                    suv2: { name: 'BlackMark V3', length: 88, width: 42, speedMod: 1.05, noHearseCap: true, seats: 6 }
+                    suv: { name: 'BlackMark V1', length: 95, width: 44, speedMod: 1.0, spec: [100, 80, 80, 90, 100] },
+                    suv2: { name: 'BlackMark V3', length: 88, width: 42, speedMod: 1.05, noHearseCap: true, seats: 6, spec: [100, 86, 88, 78, 95] }
                 }
             },
             Zenxera: {
@@ -26,10 +26,10 @@
                 glowColor: '#00f3ff', headlightColor: '#ccddff', // Cool blue-white
                 visualStyle: 'angular',
                 models: {
-                    sedan:  { name: 'Stratos',   length: 72, width: 40, speedMod: 1.0, seats: 4 },
-                    suv:    { name: 'Apex',      length: 78, width: 46, speedMod: 0.9, seats: 6 },
-                    sports: { name: 'Bolt',      length: 63, width: 36, speedMod: 1.25, seats: 2 },
-                    truck:  { name: 'Freighter', length: 92, width: 50, speedMod: 0.75, seats: 2 }
+                    sedan:  { name: 'Stratos',   length: 72, width: 40, speedMod: 1.0, seats: 4, spec: [76, 82, 46, 52, 72] },
+                    suv:    { name: 'Apex',      length: 78, width: 46, speedMod: 0.9, seats: 6, spec: [68, 76, 40, 66, 72] },
+                    sports: { name: 'Bolt',      length: 63, width: 36, speedMod: 1.25, seats: 2, spec: [95, 90, 58, 36, 72] },
+                    truck:  { name: 'Freighter', length: 92, width: 50, speedMod: 0.75, seats: 2, spec: [57, 62, 30, 82, 72] }
                 }
             },
             Gelfash: {
@@ -39,14 +39,48 @@
                 colors: ['#fff', '#aaa', '#555', '#a469ff', '#00f3ff'],
                 glowColor: null, headlightColor: '#ffffaa', visualStyle: 'boxy',
                 models: {
-                    sedan:  { name: 'Commuter',  length: 70, width: 40, speedMod: 1.0, seats: 4 },
-                    suv:    { name: 'Ranger',    length: 75, width: 44, speedMod: 0.9, seats: 5 },
-                    sports: { name: 'Sprint',    length: 62, width: 36, speedMod: 1.15, seats: 2 },
-                    truck:  { name: 'Workhorse', length: 90, width: 50, speedMod: 0.7, seats: 2 }
+                    sedan:  { name: 'Commuter',  length: 70, width: 40, speedMod: 1.0, seats: 4, spec: [68, 64, 40, 46, 50] },
+                    suv:    { name: 'Ranger',    length: 75, width: 44, speedMod: 0.9, seats: 5, spec: [61, 60, 35, 56, 52] },
+                    sports: { name: 'Sprint',    length: 62, width: 36, speedMod: 1.15, seats: 2, spec: [78, 70, 46, 34, 50] },
+                    truck:  { name: 'Workhorse', length: 90, width: 50, speedMod: 0.7, seats: 2, spec: [48, 56, 26, 72, 50] }
                 }
             }
         };
         
+        /** The blueprint ratings, out of 100, in the order of a model's `spec`: Lady's own spec sheet for the
+            BlackMark V1 set the scale (100 / 80 / 80 / 90 / 100); the rest are rated against it. */
+        const CAR_SPEC_LABELS = ['Top speed', 'Traction rating', 'Acceleration', 'Toughness / armor', 'Lighting element'];
+
+        /** A model's ratings as [{label, v}], or null for an unknown car */
+        function carSpec(brand, model) {
+            const m = VEHICLE_BRANDS[brand]?.models[model];
+            return m && m.spec ? m.spec.map((v, i) => ({ label: CAR_SPEC_LABELS[i], v })) : null;
+        }
+
+        /** The spec sheet's bars (Car.ME, Torque Auto): a label, the rating, a ticked bar */
+        function carSpecBarsHtml(brand, model) {
+            const spec = carSpec(brand, model);
+            if (!spec) return '';
+            return `<div class="car-spec">${spec.map(s => `<div class="car-spec-row"><span>${s.label}</span><b>${s.v}</b><i style="--v:${s.v}%"></i></div>`).join('')}</div>`;
+        }
+
+        /** A model's top-down portrait as an image URL (its painted sprite, nose up), cached by look */
+        const _carPortraits = new Map();
+        function carPortraitUrl(brand, model, color, glow) {
+            const B = VEHICLE_BRANDS[brand], m = B?.models[model];
+            if (!m || typeof carSprite !== 'function') return '';
+            const key = [brand, model, color, glow].join('|');
+            if (_carPortraits.has(key)) return _carPortraits.get(key);
+            const sp = carSprite({ brand, model, visualStyle: B.visualStyle, length: m.length, width: m.width,
+                noHearseCap: !!m.noHearseCap, color: color || B.colors[0], glowColor: glow || null });
+            const cv = document.createElement('canvas'); cv.width = sp.cv.height; cv.height = sp.cv.width;
+            const c = cv.getContext('2d'); c.translate(cv.width / 2, cv.height / 2); c.rotate(-Math.PI / 2);
+            c.drawImage(sp.cv, -sp.cv.width / 2, -sp.cv.height / 2);
+            const url = cv.toDataURL();
+            _carPortraits.set(key, url);
+            return url;
+        }
+
         // Spawn weights by brand (can be adjusted per map zone later)
         const VEHICLE_SPAWN_WEIGHTS = { LADY: 0.1, Zenxera: 0.25, Gelfash: 0.65 };
         const VEHICLE_MODEL_WEIGHTS = { sedan: 0.5, suv: 0.2, suv2: 0.1, sports: 0.1, truck: 0.1 };

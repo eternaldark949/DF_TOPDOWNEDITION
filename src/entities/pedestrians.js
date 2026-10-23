@@ -1041,8 +1041,17 @@
                     }
                 }
                 for (const record of this.loose.items) hits.push(record);
-                hits.sort(_crowdPointOrder);
-                for (const record of hits) out.push(record.item);
+                // Back into source order. Most queries hit a handful: an insertion sort there skips sort()'s
+                // comparator calls (the same order, records' indices being distinct)
+                const n = hits.length;
+                if (n > 24) hits.sort(_crowdPointOrder);
+                else for (let i = 1; i < n; i++) {
+                    const r = hits[i], k = r.index;
+                    let j = i - 1;
+                    while (j >= 0 && hits[j].index > k) { hits[j + 1] = hits[j]; j--; }
+                    hits[j + 1] = r;
+                }
+                for (let i = 0; i < n; i++) out.push(hits[i].item);
                 return out;
             }
         }

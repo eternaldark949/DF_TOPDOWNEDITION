@@ -1969,7 +1969,7 @@
                 this.cleared = false;
                 this.clearCount = 0;
                 this.hostiles = [];
-                this.mapId = config.mapId || 'hub_949';
+                this.mapId = config.mapId || 'sdc';
                 this.active = false; // Only active when first entered or respawning
             }
 

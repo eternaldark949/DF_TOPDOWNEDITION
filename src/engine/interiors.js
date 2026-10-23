@@ -17,12 +17,13 @@
             keepers_hill:        { floor: (g, c) => g.drawKeeperInterior(c),  glow: (g, c) => g.drawKeeperGlow(c) },   // the prologue's fireside (engine/keeper-art.js)
             keepers_parlor:      { floor: (g, c) => g.drawKeeperInterior(c),  glow: (g, c) => g.drawKeeperGlow(c) },
             van_interior:        { floor: (g, c) => g.drawVanInterior(c),     glow: (g, c) => g.drawVanGlow(c) },     // chapter 1's ride (engine/van-art.js)
-            hub_949:             { glow: (g, c) => g.drawGraveyardGlow(c) },
+            sdc:             { glow: (g, c) => g.drawGraveyardGlow(c) },
             ethereal_plane:      { glow: (g, c) => g.drawEtherealGlow(c) },
             enni_cole_interior:  { floor: (g, c) => g.drawEnniInterior(c),    glow: (g, c) => g.drawEnniGlow(c) },
             enni_cole_upper:     { floor: (g, c) => g.drawEnniUpperInterior(c), glow: (g, c) => g.drawEnniUpperGlow(c) },
             cozy_cafe_interior:  { floor: (g, c) => g.drawCafeInterior(c),    glow: (g, c) => g.drawCafeGlow(c) },     // the hearth, candles, pendants, steam
             neural_sys_interior: { floor: (g,c) => g.drawNeuralInterior(c), glow: (g,c) => g.drawNeuralGlow(c) },
+            auto_shop:           { floor: (g, c) => g.drawTorqueInterior(c),  glow: (g, c) => g.drawTorqueGlow(c) },     // engine/torque-art.js
             demoness_palace:     { floor: (g, c) => g.drawPalaceInterior(c), glow: (g, c) => g.drawPalaceGlow(c) }   // engine/palace-art.js      // engine/reflections.js: its mirror floor gives this back
         };
 

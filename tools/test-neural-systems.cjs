@@ -5,18 +5,18 @@ function test(name,source,check){const e=runtime(join(__dirname,'..','DFAB V8.ht
 test('Entry, front counter, display bays, private suite and archive remain connected around fixtures',`
  game._doLoadMap('neural_sys_interior');const nav=NavGrid.for(game.activeMap),points=[[500,285],[215,180],[785,180],[230,400],[770,400],[330,650],[625,650],[500,710]];
  return {points:points.map(p=>({p,clear:nav.walkable(...p),route:!!nav.findPath(500,700,...p)})),prisma:game.npcs.some(n=>n.name==='Prisma'),exit:game.activeMap.transitions[0].target};`,r=>{
- assert.ok(r.points.every(p=>p.clear&&p.route),JSON.stringify(r.points));assert.equal(r.prisma,true);assert.equal(r.exit,'hub_949');});
+ assert.ok(r.points.every(p=>p.clear&&p.route),JSON.stringify(r.points));assert.equal(r.prisma,true);assert.equal(r.exit,'sdc');});
 test('Still furniture paints through the existing sprite system and remains stationary',`
  game._doLoadMap('neural_sys_interior');const props=game.props.filter(p=>p.decorType?.startsWith('ns_'));
  const before=props.map(p=>[p.x,p.y,p.angle]);for(const p of props)p.draw(game.ctx);
  return {count:props.length,cacheable:props.every(p=>PropSprites.kindOf(p)==='still'),fixed:props.every(p=>p.fixedRotation),before,after:props.map(p=>[p.x,p.y,p.angle])};`,r=>{
- assert.equal(r.count,18);assert.equal(r.cacheable,true);assert.equal(r.fixed,true);assert.deepEqual(r.after,r.before);});
+ assert.equal(r.count,22);assert.equal(r.cacheable,true);assert.equal(r.fixed,true);assert.deepEqual(r.after,r.before);});
 test('Interior floor is retained while visiting and released on exit',`
  game._doLoadMap('neural_sys_interior');game.drawNeuralInterior(game.ctx);const first=game._neuralFloor;game.drawNeuralInterior(game.ctx);const retained=game._neuralFloor===first;
  game._doLoadMap('apt_949');const released=!game._neuralFloor;game._doLoadMap('neural_sys_interior');game.drawNeuralInterior(game.ctx);
  return {retained,released,replaced:first!==game._neuralFloor,size:[game._neuralFloor.width,game._neuralFloor.height]};`,r=>assert.deepEqual(r,{retained:true,released:true,replaced:true,size:[1000,800]}));
 test('Neural exterior preserves its sections and door and retains painted planes at day and night',`
- game._doLoadMap('hub_949');const b=game.activeMap.buildings.find(b=>b.attachedTransition?.target==='neural_sys_interior');
+ game._doLoadMap('sdc');const b=game.activeMap.buildings.find(b=>b.attachedTransition?.target==='neural_sys_interior');
  game.camera.x=b.x+200;game.camera.y=b.y+380;b.drawBase(game.ctx);b.drawTop(game.ctx);b.drawEmissive(game.ctx,.6);const roof=b._lkSprites.neural_roof;
  b.drawTop(game.ctx);const same=b._lkSprites.neural_roof===roof;
  return {type:b.constructor.name,sections:b.sections.map(s=>[s.w,s.h]),door:b.attachedTransition.target,same};`,r=>{

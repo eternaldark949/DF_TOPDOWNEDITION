@@ -194,7 +194,7 @@
                         return g.activeMap.id === 'moon_city_nightclub';
         
                     case "LOC_HUB":
-                        return g.activeMap.id === 'hub_949';
+                        return g.activeMap.id === 'sdc';
         
                     case "LOC_HOTEL_LOBBY":
                         return g.activeMap.id === 'hotel_lobby';
@@ -404,28 +404,8 @@
             }
         
             triggerComms(speaker, text, duration) {
-                const bar = document.getElementById('comms-bar');
-                const sEl = document.getElementById('comms-speaker');
-                const tEl = document.getElementById('comms-text');
-                const pEl = document.getElementById('comms-portrait');
-                
-                sEl.textContent = speaker;
-                tEl.textContent = text;
-                
-                if (speaker === '747') {
-                    pEl.style.backgroundColor = '#4b0082'; pEl.style.borderColor = '#ffd700'; 
-                } else if (speaker === '949') {
-                    pEl.style.backgroundColor = '#1a1a1a'; pEl.style.borderColor = '#ff00ff'; 
-                } else if (speaker === 'LARISSA') {
-                    pEl.style.backgroundColor = '#f5f5f5'; pEl.style.borderColor = '#c0c0c0'; 
-                } else {
-                    pEl.style.backgroundColor = '#333'; pEl.style.borderColor = '#fff';
-                }
-                
-                bar.classList.add('active');
-                // Use pausable timer so the message doesn't self-dismiss during a pause.
-                if (this.commsTimer) this.game.cancelPausableTimeout(this.commsTimer);
-                this.commsTimer = this.game.addPausableTimeout(() => { bar.classList.remove('active'); }, duration);
+                // A line over the earpiece (ui/comms.js); it leaves on a pausable timer, so a pause holds it
+                Comms.say(this.game, speaker, text, duration);
             }
 
             // ── OPTIONAL QUEST SYSTEM ──

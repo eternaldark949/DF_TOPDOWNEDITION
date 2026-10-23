@@ -37,7 +37,7 @@
             }
 
             /** Only the city is baked (other maps keep their own ground). */
-            activeFor(map) { return !!(map && map.id === 'hub_949' && this.game.traffic && this.game.traffic.network && this.game.traffic.network.roads.length); }
+            activeFor(map) { return !!(map && map.id === 'sdc' && this.game.traffic && this.game.traffic.network && this.game.traffic.network.roads.length); }
 
             // Geometry/order edits must invalidate the baked pixels and their static candidates together.
             invalidate() { this.cache.clear(); this.weight = 0; this._sources = null; }

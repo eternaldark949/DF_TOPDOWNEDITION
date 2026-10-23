@@ -2001,23 +2001,48 @@
                     if (point.distance > nearest + (lane.road.laneWidth || 60) + 0.01) targets.delete(lane);
                 }
                 const distances = new Map(), previous = new Map(), settled = new Set();
+                // Moving across to the lane beside (same stretch, same way) is a link too, so a route takes its turns
+                // from the lane meant for them: it moves over on the way (`change`, done by the car when there's room,
+                // traffic/traffic-vehicle.js _routeLaneChange) rather than turning across the next lane, which the lights
+                // hold for whatever crosses it. A turn from the wrong lane stays possible, at a price.
+                const CHANGE_COST = 80, CHANGE_ROOM = 300, WRONG_LANE = 600;   // (CHANGE_ROOM: more than the car gives up at, so a replan here never asks again)
+                const mayTake = typeof TrafficVehicle !== 'undefined' && TrafficVehicle.laneMayTake;
+                const entry = new Map([[startLane, origin.along]]);            // how far along each lane we come onto it
                 const relax = (fromLane, cost, source = false) => {
                     const links = (fromLane.connections || []).map(toLane => ({ fromLane, toLane, turnPath: null }));
                     for (const turnPath of fromLane.turnPaths || []) {
                         if (turnPath.fromLane === fromLane && turnPath.toLane) links.push({ fromLane, toLane: turnPath.toLane, turnPath });
                     }
+                    const room = fromLane.length - (entry.get(fromLane) || 0);
+                    if (fromLane.segment && fromLane.road && !fromLane.road.isCurved && room >= CHANGE_ROOM) {
+                        for (const side of fromLane.segment.lanes || []) {
+                            if (side !== fromLane && side.direction === fromLane.direction && Math.abs(side.laneIndex - fromLane.laneIndex) === 1)
+                                links.push({ fromLane, toLane: side, turnPath: null, change: true });
+                        }
+                    }
                     for (const link of links) {
                         if (!targets.has(link.toLane) && !this.allLanes.includes(link.toLane)) continue;
+                        if (link.change) {                                     // reaches the lane beside where we are, not its start
+                            const nextCost = cost - fromLane.length + CHANGE_COST;
+                            if (nextCost < (distances.get(link.toLane) ?? Infinity)) {
+                                distances.set(link.toLane, nextCost);
+                                previous.set(link.toLane, { link, from: source ? null : fromLane });
+                                entry.set(link.toLane, (entry.get(fromLane) || 0) + 90);   // across once a car and a half on
+                            }
+                            continue;
+                        }
                         const cp = link.turnPath?.controlPoints;
                         const length = cp ? cp.slice(1).reduce((sum, point, i) => sum + Math.hypot(point.x - cp[i].x, point.y - cp[i].y), 0)
                             : Math.hypot(fromLane.end.x - link.toLane.start.x, fromLane.end.y - link.toLane.start.y);
-                        const nextCost = cost + length;
+                        const nextCost = cost + length + (link.turnPath && mayTake && !mayTake(fromLane, link.turnPath) ? WRONG_LANE : 0);
                         if (nextCost < (distances.get(link.toLane) ?? Infinity)) {
                             distances.set(link.toLane, nextCost);
                             previous.set(link.toLane, { link, from: source ? null : fromLane });
+                            entry.set(link.toLane, 0);
                         }
                     }
                 };
+                distances.set(startLane, -origin.along); settled.add(startLane);   // (no route back onto it from beside)
                 relax(startLane, startLane.length - origin.along, true);
                 let best = null, bestCost = Infinity;
                 const direct = targets.get(startLane);
@@ -2033,7 +2058,7 @@
                     if (!lane) break;
                     settled.add(lane);
                     const point = targets.get(lane);
-                    const finalCost = point ? cost + point.along + point.distance * 4 : Infinity;
+                    const finalCost = point && point.along >= (entry.get(lane) || 0) ? cost + point.along + point.distance * 4 : Infinity;
                     if (finalCost < bestCost) { best = { lane, point, direct: false }; bestCost = finalCost; }
                     relax(lane, cost + lane.length);
                 }
@@ -2053,6 +2078,7 @@
                     road: lane.road, roadId: lane.roadId });
                 const waypoints = [lanePoint('LANE_START', startLane, { x: startX, y: startY })];
                 for (const link of transitions) {
+                    if (link.change) continue;                                 // moving over on the way: no point of its own
                     waypoints.push(lanePoint('LANE_END', link.fromLane, link.fromLane.end));
                     const tp = link.turnPath;
                     if (tp) {

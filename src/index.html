@@ -118,13 +118,7 @@
         <div class="intro-sub">BEYOND STEEL AND SYNTHETICS</div>
     </div>
     
-    <div id="comms-bar">
-        <div id="comms-portrait"></div> 
-        <div class="comms-content">
-            <div id="comms-speaker">UNKNOWN</div>
-            <div id="comms-text">Signal Established...</div>
-        </div>
-    </div>
+    <div id="comms-bar"></div>   <!-- the earpiece: a chip per line (ui/comms.js) -->
             
     <!-- Legacy audio-input removed - MusicWidgetSystem handles all music upload -->
 
@@ -457,9 +451,9 @@
                             <div id="phone-apps">
                                 <div class="phone-app-container" id="app-contacts">
                                     <div class="phone-app-icon-circle" style="position:relative;">
-                                        👤 <div class="app-badge" id="badge-contacts"></div> 
+                                        💬 <div class="app-badge" id="badge-contacts"></div> 
                                     </div>
-                                    <div class="phone-app-name">Contacts</div>
+                                    <div class="phone-app-name">Messages</div>
                                 </div>
                                 <div class="phone-app-container" id="app-maps">
                                     <div class="phone-app-icon-circle">🗺️</div>
@@ -470,7 +464,7 @@
                                     <div class="phone-app-name">Sticky.ME</div>
                                 </div>
                                 <div class="phone-app-container" id="app-carme">
-                                    <div class="phone-app-icon-circle">🚗</div>
+                                    <div class="phone-app-icon-circle cm-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="7" y="2.5" width="10" height="19" rx="4.5"/><path d="M8.6 8.2h6.8M8.6 16.6h6.8"/><circle cx="12" cy="12.4" r="1.3" fill="currentColor" stroke="none"/></svg></div>
                                     <div class="phone-app-name">Car.ME</div>
                                 </div>
                                 <div class="phone-app-container" id="app-skyme">
@@ -484,6 +478,12 @@
                                 <div class="phone-app-container" id="app-neume">
                                     <div class="phone-app-icon-circle" style="border-color: rgba(255,0,255,0.2);">🧬</div>
                                     <div class="phone-app-name">NEU.ME</div>
+                                </div>
+                                <div class="phone-app-container" id="app-amber" style="display:none">
+                                    <div class="phone-app-icon-circle amb-icon" style="position:relative;">
+                                        📦 <div class="app-badge" id="badge-amber"></div>
+                                    </div>
+                                    <div class="phone-app-name">Amber</div>
                                 </div>
                                 <div class="phone-app-container" id="app-help">
                                     <div class="phone-app-icon-circle">❓</div>
@@ -501,30 +501,43 @@
                             </div>
                         </div>
                         
+                        <!-- Messages (ui/messages.js): the inbox rail beside the open thread on its side, one or the other upright -->
                         <div class="phone-app-screen" id="screen-contacts">
-                            <div class="phone-app-header">
-                                <button class="phone-back-btn" id="contacts-back">◀</button>
-                                <span class="phone-app-title">Contacts</span>
+                            <div class="msg-rail">
+                                <div class="msg-rail-head">
+                                    <button class="phone-back-btn" id="contacts-back">◀</button>
+                                    <span class="msg-title">Messages</span>
+                                </div>
+                                <div class="msg-tabs" id="msg-tabs">
+                                    <button data-tab="all" class="on">All</button><button data-tab="crew">Crew</button><button data-tab="unread">Unread</button>
+                                </div>
+                                <div class="msg-list" id="contacts-list"></div>
                             </div>
-                            <div class="phone-app-content" id="contacts-list"></div>
-                        </div>
-                        
-                        <div class="phone-app-screen" id="screen-contact-detail">
-                            <div class="phone-app-header">
-                                <button class="phone-back-btn" id="contact-detail-back">◀</button>
-                                <div class="thread-avatar-slot" id="contact-detail-avatar"></div>
-                                <span class="phone-app-title" id="contact-detail-name">Name</span>
-                            </div>
-                            <div class="phone-app-content contact-detail" id="contact-detail-content"></div>
-                            <div id="contact-reply-bar">
-                                <div id="contact-reply-options"></div>
-                                <div id="contact-reply-input">
-                                    <span id="contact-reply-hint">No reply needed</span>
-                                    <span id="contact-reply-send">➤</span>
+                            <div class="msg-pane" id="screen-contact-detail">
+                                <div class="msg-head">
+                                    <button class="phone-back-btn" id="contact-detail-back">◀</button>
+                                    <div class="thread-avatar-slot" id="contact-detail-avatar"></div>
+                                    <div class="msg-head-text">
+                                        <b id="contact-detail-name">Name</b>
+                                        <small id="contact-detail-sub"></small>
+                                    </div>
+                                </div>
+                                <div class="msg-feed" id="contact-detail-content"></div>
+                                <div id="contact-reply-bar">
+                                    <div id="contact-reply-options"></div>
+                                    <div id="contact-reply-input">
+                                        <button id="contact-reply-snap" title="Send a snapshot">📷</button>
+                                        <span id="contact-reply-hint">No reply needed</span>
+                                        <span id="contact-reply-send">➤</span>
+                                    </div>
+                                </div>
+                                <div class="msg-empty" id="msg-empty">
+                                    <div class="msg-empty-script">Messages</div>
+                                    <div class="msg-empty-line" id="msg-empty-line">Choose a conversation</div>
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="phone-app-screen" id="screen-maps">
                             <div class="phone-app-header">
                                 <button class="phone-back-btn" id="maps-back">◀</button>
@@ -583,25 +596,29 @@
                             <div class="phone-app-content" id="log-content"></div>
                         </div>
                         <div class="phone-app-screen" id="screen-neume">
-                            <div class="phone-app-header">
-                                <button class="phone-back-btn" id="neume-back">◀</button>
-                                <span class="phone-app-title" style="color:#ff00ff; text-shadow:0 0 10px #ff00ff;">NEU.ME</span>
+                            <!-- NEU.ME: her dressing room. The stage paints all of her (RealPortrait.figure) as you mix and match. -->
+                            <div class="nm-stage">
+                                <button class="phone-back-btn nm-back" id="neume-back">◀</button>
+                                <div class="nm-arch"></div>
+                                <canvas id="neume-figure"></canvas>
+                                <div class="nm-plinth"></div>
+                                <div class="nm-caption"><span id="neume-look"></span><span id="neume-status">Re-sequenced</span></div>
                             </div>
-                            <div class="phone-app-content" style="display:flex; flex-direction:column; align-items:center; gap:12px; padding-top:12px;">
-                                <div style="width:100px; height:100px; background:#111; border:2px solid #ff00ff; border-radius:50%; display:flex; justify-content:center; align-items:center; overflow:hidden; box-shadow:0 0 20px rgba(255,0,255,0.3);">
-                                    <div id="neume-preview" style="font-size:max(6px, 2.5rem - var(--font-trim));">🧬</div>
-                                </div>
-                                <div style="text-align:center; color:#fff; font-family:'Montserrat'; font-size:max(6px, 0.7rem - var(--font-trim));">
-                                    IDENTITY PROTOCOLS<br><span style="color:#888; font-size:max(6px, 0.6rem - var(--font-trim));">Mix & match from owned cosmetics</span>
-                                </div>
+                            <div class="nm-panel">
+                                <div class="nm-head"><span class="nm-title">Neu.me</span><span class="nm-sub">Identity protocols</span></div>
+                                <div class="nm-tabs" id="neume-tabs"></div>
+                                <div class="nm-grid" id="neume-loadout"></div>
+                            </div>
+                        </div>
 
-                                <!-- Cosmetics loadout slots -->
-                                <div id="neume-loadout" style="width:100%; padding:0 10px; display:flex; flex-direction:column; gap:6px;"></div>
-                                
-                                <div id="neume-status" style="color:#ff00ff; font-size:max(6px, 0.65rem - var(--font-trim)); margin-top:4px; opacity:0; transition:opacity 0.5s;">
-                                    RE-SEQUENCING DNA...
-                                </div>
+                        <!-- Amber Delivery (ui/amber-app.js): orders near her, tips, her rating, Premium -->
+                        <div class="phone-app-screen" id="screen-amber">
+                            <div class="amb-head">
+                                <button class="phone-back-btn" id="amber-back">◀</button>
+                                <div class="amb-brand"><b>amber</b><small>delivery · driver</small></div>
+                                <button class="amb-toggle" id="amber-online">Offline</button>
                             </div>
+                            <div class="amb-body" id="amber-body"></div>
                         </div>
 
                         <!-- Sky.ME Weather Monitor -->
@@ -617,13 +634,12 @@
 
                         <!-- Car.ME Garage Screen -->
                         <div class="phone-app-screen" id="screen-carme">
-                            <div class="phone-app-header">
+                            <div class="cm-head">
                                 <button class="phone-back-btn" id="carme-back">◀</button>
-                                <span class="phone-app-title" style="color:#ff8800; text-shadow:0 0 8px rgba(255,136,0,0.4);">Car.ME</span>
+                                <div class="cm-brand"><b>Car<i>.ME</i></b><small>key · garage · summon</small></div>
+                                <span class="cm-where" id="carme-where"></span>
                             </div>
-                            <div class="phone-app-content" id="carme-content" style="padding:10px; overflow-y:auto;">
-                                <!-- Populated dynamically -->
-                            </div>
+                            <div class="cm-body" id="carme-content"></div>
                         </div>
                     </div>
                     <div id="phone-typing-indicator" class="phone-typing-indicator">
@@ -1149,6 +1165,10 @@
                 <div class="settings-row">
                     <span class="settings-label">Prop Sprites</span>
                     <span class="settings-value val-on" id="set-propsprites" data-key="propSprites">ON</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Talk Style</span>
+                    <span class="settings-value" id="set-talkstyle" data-key="talkStyle">VEIL</span>
                 </div>
                 <div class="settings-row">
                     <span class="settings-label">Debug View</span>

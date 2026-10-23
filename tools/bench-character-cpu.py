@@ -16,7 +16,7 @@ SETUP = r'''({scenario})=>{
   lightingQuality:'high',adaptiveLighting:false,softShadows:true,bloom:false,reflections:'off',
   trafficDensity:'high',pedestrianDensity:'high',crowdQuality:'high',lampShadows:'off',
   foliageDensity:'high',rainDensity:'high',filmGrain:false,devicePreset:false});
- game.story.update=()=>{};game._doLoadMap('hub_949');
+ game.story.update=()=>{};game._doLoadMap('sdc');
  game.worldMinutes=scenario.endsWith('day')?12*60:21*60;
  game.weather.isRaining=true;game.weather.condition='rain';
  game.canvas.width=880;game.canvas.height=411;

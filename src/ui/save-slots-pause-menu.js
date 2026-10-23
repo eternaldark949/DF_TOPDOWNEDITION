@@ -1,6 +1,6 @@
         // --- PAUSE MENU SYSTEM (Phase 3) ---
         // ─── SAVE SLOT MANAGER ─────────────────────────────────────────────
-        //  Multi-slot save system with visual picker overlay.
+        //  Multi-slot save system: the imprint cards (Imprint to save, Recall to load).
         //  Supports SAVE mode (choose slot to write) and LOAD mode (choose slot to read).
         //  Migrates legacy single-key saves to slot 0 on first use.
         // ──────────────────────────────────────────────────────────────────────
@@ -16,7 +16,7 @@
                 this._modeBeforeDelete = null;
                 
                 this.MAP_NAMES = {
-                    'hub_949': 'Moon City',
+                    'sdc': 'Moon City',
                     'ethereal_plane': 'Ethereal Plane',
                     'apt_949': '949\'s Apartment',
                     'hotel_lobby': 'Double Nights Hotel',
@@ -61,7 +61,7 @@
             getSlotSummary(index) {
                 const data = this.getSlotData(index);
                 if (!data) return null;
-                const mapId = data.world?.mapId || data.mapId || 'hub_949';
+                const mapId = data.world?.mapId || data.mapId || 'sdc';
                 return {
                     timestamp: data.timestamp || 0,
                     mapName: this.MAP_NAMES[mapId] || mapId,
@@ -139,82 +139,112 @@
             }
 
 
-            _render() {
-                const title = this.mode === 'save' ? 'Save Game' : 'Load Game';
-                let html = `<div class="save-slot-panel">
-                    <div class="save-slot-title">${title}</div>`;
+            // --- KEEPSAKES: what an imprint card shows ---
+            static ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI'];
 
-                for (let i = 0; i < this.maxSlots; i++) {
-                    const summary = this.getSlotSummary(i);
-                    const isActive = (i === this.activeSlot);
-                    const isEmpty = !summary;
-                    const modeClass = this.mode === 'load' ? 'mode-load' : 'mode-save';
-                    const classes = ['save-slot-card'];
-                    if (isActive && !isEmpty) classes.push('active-slot');
-                    if (isEmpty) classes.push('empty-slot', modeClass);
-
-                    html += `<div class="${classes.join(' ')}" data-slot="${i}">`;
-
-                    if (this._confirmTarget === i) {
-                        // Inline confirmation
-                        const confirmText = this.mode === 'save'
-                            ? 'Overwrite this save?'
-                            : 'Delete this save permanently?';
-                        html += `<div class="save-slot-confirm">
-                            <div class="save-slot-confirm-text">${confirmText}</div>
-                            <div class="save-slot-confirm-btns">
-                                <button class="confirm-yes" data-confirm="yes" data-slot="${i}">Yes</button>
-                                <button data-confirm="no">Cancel</button>
-                            </div>
-                        </div>`;
+            /** A small picture of the room and 949's face, kept in the save (engine/save-load.js saveGame). */
+            keepsake() {
+                const out = {};
+                try {
+                    const src = document.getElementById('game-canvas');
+                    if (src && src.width) {
+                        const w = 360, h = Math.round(w * src.height / src.width), c = document.createElement('canvas');
+                        c.width = w; c.height = h;
+                        c.getContext('2d').drawImage(src, 0, 0, w, h);
+                        out.shot = c.toDataURL('image/jpeg', 0.72);
                     }
-
-                    html += `<div class="save-slot-header">
-                        <span class="save-slot-label">Slot ${i + 1}</span>`;
-                    if (isActive && !isEmpty) {
-                        html += `<span class="save-slot-badge badge-active">Active</span>`;
+                } catch (e) { /* no picture: the card shows the place's name on a plain ground */ }
+                try {
+                    if (game.resolvePortraitConfig && !game.resolvePortraitConfig('949').isFallback) {
+                        const c = document.createElement('canvas');
+                        c.width = c.height = 120;
+                        game.paintPortraitTo(c, '949', '#1d0e30');
+                        out.face = c.toDataURL('image/jpeg', 0.85);
                     }
-                    html += `</div>`;
+                } catch (e) { /* the medallion falls back to her live portrait */ }
+                return out;
+            }
 
-                    if (summary) {
-                        html += `<div class="save-slot-meta">
-                            <span class="meta-map">⧫ ${summary.mapName}</span>
-                            <span class="meta-currency">¤ ${summary.currency.toLocaleString()}</span>
-                            <span class="meta-story">Ch. ${summary.storyStep}</span>
-                            <span class="meta-date">${this._formatDate(summary.timestamp)}</span>
-                        </div>`;
-                        html += `<button class="save-slot-export-single" data-export="${i}" title="Export slot">⤓</button>`;
-                        html += `<button class="save-slot-delete" data-delete="${i}" title="Delete save">✕</button>`;
-                    } else {
-                        html += `<div class="save-slot-empty-text">— Empty —</div>`;
-                    }
-
-                    html += `</div>`;
+            /** Chapter name and objective for a save's story state, in title case ('The Awakening', 'Enter Double Nights'). */
+            _storyLines(data) {
+                const tc = s => String(s || '').toLowerCase().replace(/(^|\s)(\S)/g, (m, a, b) => a + b.toUpperCase())
+                    .replace(/ (Of|The|To|At|In|A|An|And|On)\b/g, m => m.toLowerCase());
+                const st = (data.story && data.story.state) || {};
+                const part = (typeof STORY_DB !== 'undefined' && STORY_DB[st.part || 1]) || null;
+                const chap = part && part.chapters && part.chapters[st.chapter || 1];
+                const mis = chap && chap.missions && chap.missions[st.mission || 1];
+                let objective = null;
+                if (mis && mis.steps) {
+                    const steps = Object.keys(mis.steps).map(Number).sort((a, b) => a - b).map(k => mis.steps[k]);
+                    let at = steps.findIndex(s => s.name === (data.story && data.story.stepName));
+                    if (at < 0) at = Math.min(st.step || 0, steps.length - 1);
+                    for (let i = at; i >= 0 && !objective; i--) objective = steps[i] && steps[i].banner;   // the last objective shown
+                    if (!objective) objective = mis.name;
                 }
+                return { chapter: chap ? tc(chap.name) : `Chapter ${st.chapter || 1}`, objective: objective ? tc(objective) : '' };
+            }
 
-                // The autosave (made when the app went to the background): load only
-                const auto = this.mode === 'load' ? this.getSlotSummary('auto') : null;
-                if (auto) html += `<div class="save-slot-card" data-slot="auto">
-                        <div class="save-slot-header"><span class="save-slot-label">Autosave</span></div>
-                        <div class="save-slot-meta">
-                            <span class="meta-map">⧫ ${auto.mapName}</span>
-                            <span class="meta-currency">¤ ${auto.currency.toLocaleString()}</span>
-                            <span class="meta-story">Ch. ${auto.storyStep}</span>
-                            <span class="meta-date">${this._formatDate(auto.timestamp)}</span>
-                        </div></div>`;
+            _clock(min) {
+                const m = ((Math.round(min) % 1440) + 1440) % 1440;
+                return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+            }
 
-                const hasAny = this.hasAnySave();
-                html += `<div class="save-slot-footer">
-                    <div class="save-slot-footer-actions">
-                        ${hasAny ? '<button class="save-slot-action-btn export-btn" id="save-slot-export-all">⤓ Export All</button>' : ''}
-                        <button class="save-slot-action-btn import-btn" id="save-slot-import">⤒ Import</button>
+            _esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+            /** One card: the room, her medallion, the chapter and objective; a confirm turns it over. */
+            _card(slot, label) {
+                const data = this.getSlotData(slot), summary = data && this.getSlotSummary(slot);
+                const saving = this.mode === 'save' || (this.mode === '_delete' && this._modeBeforeDelete === 'save');
+                const cls = ['ks-card'];
+                if (slot === 'auto') cls.push('ks-auto');
+                if (!summary) cls.push('ks-empty', saving ? 'ks-open' : 'ks-shut');
+                if (summary && slot === this.activeSlot) cls.push('ks-current');
+                if (this._confirmTarget === slot) cls.push('ks-flip');
+                let h = `<div class="${cls.join(' ')}" data-slot="${slot}" role="button" tabindex="0"><div class="ks-in">`;
+                if (this._confirmTarget === slot) {
+                    const del = this.mode === '_delete';
+                    h += `<div class="ks-back"><div class="ks-num">${label}</div>
+                        <div class="ks-q">${del ? 'Let this imprint fade?' : 'Imprint over this moment?'}</div>
+                        <button class="ks-pill" data-confirm="yes" data-slot="${slot}">${del ? 'Fade' : 'Imprint'}</button>
+                        <button class="ks-pill ks-no" data-confirm="no">Keep it</button></div></div></div>`;
+                    return h;
+                }
+                if (!summary) {
+                    h += `<div class="ks-blank"><div class="ks-moon"></div><div class="ks-num">${label}</div>
+                        <div class="ks-hint">${saving ? 'A blank card.<br>Tap to imprint this moment.' : 'A blank card.'}</div></div></div></div>`;
+                    return h;
+                }
+                const ks = data.keepsake || {}, lines = this._storyLines(data);
+                let face = ks.face;
+                if (!face) { try { face = game.getPortraitDataURL('949', 120, '#1d0e30'); } catch (e) { face = null; } }
+                h += ks.shot ? `<div class="ks-shot" style="background-image:url(${ks.shot})"></div>` : `<div class="ks-shot ks-noshot"><span>${this._esc(summary.mapName)}</span></div>`;
+                if (slot !== 'auto') h += `<div class="ks-tray"><button data-export="${slot}" title="Export this imprint" aria-label="Export">⤓</button><button data-delete="${slot}" title="Let it fade" aria-label="Delete">✕</button></div>`;
+                if (cls.includes('ks-current')) h += `<div class="ks-flag">Current</div>`;
+                h += `<div class="ks-body"><div class="ks-num">${label}</div>
+                    <div class="ks-chap">${this._esc(lines.chapter)}</div>
+                    <div class="ks-obj">${this._esc(lines.objective)}</div>
+                    <div class="ks-meta">${this._esc(summary.mapName)} · <b>${this._clock(summary.worldMinutes)}</b><br>¤ ${summary.currency.toLocaleString()} · ${this._formatDate(summary.timestamp)}</div></div></div>`;
+                h += face ? `<div class="ks-medal"><img alt="" src="${face}"></div>` : '';
+                return h + `</div>`;
+            }
+
+            _render() {
+                const saving = this.mode === 'save' || (this.mode === '_delete' && this._modeBeforeDelete === 'save');
+                const R = SaveSlotManager.ROMAN;
+                let html = `<div class="ks-panel">
+                    <div class="ks-title">${saving ? 'Imprint' : 'Recall'}<small>${saving ? 'Choose a card to hold this moment' : 'Choose an imprint to return to'}</small></div>
+                    <div class="ks-deck">`;
+                for (let i = 0; i < this.maxSlots; i++) html += this._card(i, `Imprint ${R[i] || i + 1}`);
+                if (!saving && this.getSlotData('auto')) html += this._card('auto', 'Autosave');   // made when the app went to the background: load only
+                html += `</div>
+                    <div class="ks-foot">
+                        ${this.hasAnySave() ? '<button id="save-slot-export-all">Export all</button>' : ''}
+                        <button id="save-slot-import">Import</button>
+                        <button class="ks-close" id="save-slot-close">Close</button>
                     </div>
-                    <button class="save-slot-close-btn" id="save-slot-close">Cancel</button>
-                </div>
-                <div class="save-slot-import-msg" id="save-slot-import-msg"></div>
-                <input type="file" id="save-slot-file-input" accept=".json" style="display:none;">
+                    <div class="save-slot-import-msg" id="save-slot-import-msg"></div>
+                    <input type="file" id="save-slot-file-input" accept=".json" style="display:none;">
                 </div>`;
-
                 this.overlay.innerHTML = html;
                 this._bindEvents();
             }
@@ -224,26 +254,27 @@
                 this.overlay.querySelector('#save-slot-close').addEventListener('click', () => this.close());
                 if (!this._backdropBound) {                                     // the overlay outlives each render: bind it once
                     this._backdropBound = true;
-                    this.overlay.addEventListener('click', (e) => { if (e.target === this.overlay) this.close(); });
+                    this.overlay.addEventListener('click', (e) => { if (e.target === this.overlay || e.target.classList.contains('ks-panel')) this.close(); });
                 }
 
-                // Slot cards
-                this.overlay.querySelectorAll('.save-slot-card').forEach(card => {
-                    card.addEventListener('click', (e) => {
-                        // Don't trigger if clicking delete or confirm buttons
-                        if (e.target.closest('.save-slot-delete') || e.target.closest('.save-slot-confirm')) return;
+                // Cards (tap, or Enter/Space on a focused card)
+                this.overlay.querySelectorAll('.ks-card').forEach(card => {
+                    const go = (e) => {
+                        if (e.target.closest('button')) return;
                         const slot = card.dataset.slot === 'auto' ? 'auto' : parseInt(card.dataset.slot);
+                        if (this._confirmTarget === slot) return;
                         this._onSlotClick(slot);
-                    });
+                    };
+                    card.addEventListener('click', go);
+                    card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(e); } });
                 });
 
-                // Delete buttons
-                this.overlay.querySelectorAll('.save-slot-delete').forEach(btn => {
+                // Delete: the card turns over to ask
+                this.overlay.querySelectorAll('[data-delete]').forEach(btn => {
                     btn.addEventListener('click', (e) => {
                         e.stopPropagation();
-                        const slot = parseInt(btn.dataset.delete);
-                        this._confirmTarget = slot;
-                        this._modeBeforeDelete = this.mode;
+                        this._confirmTarget = parseInt(btn.dataset.delete);
+                        if (this.mode !== '_delete') this._modeBeforeDelete = this.mode;
                         this.mode = '_delete';
                         this._render();
                     });
@@ -258,7 +289,7 @@
                             if (this.mode === '_delete') {
                                 this.deleteSlot(slot);
                                 audioSys.sfx('ui');
-                                showMessage(`SLOT ${slot + 1} DELETED.`);
+                                showMessage(`IMPRINT ${SaveSlotManager.ROMAN[slot] || slot + 1} FADED.`);
                             } else if (this.mode === 'save') {
                                 this._executeSave(slot);
                                 return; // _executeSave closes overlay
@@ -270,8 +301,8 @@
                     });
                 });
 
-                // Per-slot export
-                this.overlay.querySelectorAll('.save-slot-export-single').forEach(btn => {
+                // Per-card export
+                this.overlay.querySelectorAll('[data-export]').forEach(btn => {
                     btn.addEventListener('click', (e) => {
                         e.stopPropagation();
                         this.exportSlot(parseInt(btn.dataset.export));
@@ -353,11 +384,11 @@
                     if (data) exportData.slots[i] = data;
                 }
                 if (Object.keys(exportData.slots).length === 0) {
-                    showMessage('NO SAVE DATA TO EXPORT.');
+                    showMessage('NO IMPRINTS TO EXPORT.');
                     return;
                 }
                 this._downloadJSON(exportData, 'dfab_saves_all.json');
-                showMessage('ALL SAVES EXPORTED.');
+                showMessage('ALL IMPRINTS EXPORTED.');
                 audioSys.sfx('ui');
             }
 
@@ -373,7 +404,7 @@
                     slots: { [index]: data }
                 };
                 this._downloadJSON(exportData, `dfab_save_slot${index + 1}.json`);
-                showMessage(`SLOT ${index + 1} EXPORTED.`);
+                showMessage(`IMPRINT ${SaveSlotManager.ROMAN[index] || index + 1} EXPORTED.`);
                 audioSys.sfx('ui');
             }
 
@@ -416,8 +447,8 @@
                             if (importData.activeSlot !== undefined) {
                                 this.setActiveSlot(parseInt(importData.activeSlot));
                             }
-                            showMsg(`${imported} SLOT${imported > 1 ? 'S' : ''} IMPORTED SUCCESSFULLY.`, true);
-                            showMessage(`${imported} SAVE SLOT${imported > 1 ? 'S' : ''} IMPORTED.`);
+                            showMsg(`${imported} IMPRINT${imported > 1 ? 'S' : ''} IMPORTED.`, true);
+                            showMessage(`${imported} IMPRINT${imported > 1 ? 'S' : ''} IMPORTED.`);
                             audioSys.sfx('ui');
                             this._render(); // Refresh the UI
                         } else {
@@ -1082,6 +1113,7 @@
                 this._updateValueEl('set-baseline', GameSettings.baseline ? 'on' : 'off');
                 this._updateValueEl('set-propsprites', GameSettings.propSprites !== false ? 'on' : 'off');
                 this._updateValueEl('set-debug', game.debugMode ? 'on' : 'off');
+                this._updateValueEl('set-talkstyle', TalkStyle.get());
                 this._updateValueEl('set-weather', game.weather && game.weather.scheduleLocked ? game.weather.condition : 'auto');
                 this._updateValueEl('set-weaponmode', game.weaponMode === 'sniper' ? 'sniper' : 'normal');
                 this._updateValueEl('set-audio', GameSettings.audioEnabled ? 'on' : 'off');
@@ -1231,6 +1263,12 @@
                     GameSettings.propSprites = GameSettings.propSprites === false;
                     if (!GameSettings.propSprites && typeof PropSprites !== 'undefined') { PropSprites.clear(game.props); PlaneSprites.clear(game.activeMap && game.activeMap.buildings); }
                     this._updateValueEl(el.id, GameSettings.propSprites ? 'on' : 'off');
+
+                } else if (key === 'talkStyle') {
+                    // Veil (bust and subtitles, a thread of comms) or Ribbon (gilded panel, a comms cameo): ui/comms.js
+                    TalkStyle.set(TalkStyle.get() === 'veil' ? 'ribbon' : 'veil');
+                    this._updateValueEl(el.id, TalkStyle.get());
+                    if (game._dialogueFace) { game._dialogueFace.last = ''; game._paintDialogueFace(); }   // an open dialogue repaints its face
 
                 } else if (key === 'debugView') {
                     game.debugMode = !game.debugMode;

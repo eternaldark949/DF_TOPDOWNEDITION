@@ -80,8 +80,14 @@
                     return true;
                 };
                 const sensing = this._trafficSensing;
-                const people = sensing?.active && sensing.source === this._allVehicles
-                    ? sensing.people.query(this.x, this.y, range) : folk;
+                // Only the box the checks below keep can matter (from just behind us to `range` ahead, and within
+                // 60 px of our sides): ask the grid round its middle, not round us out to `range` every way
+                let people = folk;
+                if (sensing?.active && sensing.source === this._allVehicles) {
+                    const R = sensing.folkRad || 12, back = L / 2 + R, a = (range + back) / 2, w = half + R + 60;
+                    const mid = (range - back) / 2;
+                    people = sensing.people.query(this.x + fx * mid, this.y + fy * mid, Math.sqrt(a * a + w * w));
+                }
                 for (const p of people) {
                     if (!p || p.dead) continue;
                     const dx = p.x - this.x, dy = p.y - this.y;

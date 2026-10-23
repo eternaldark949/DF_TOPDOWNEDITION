@@ -201,7 +201,7 @@ test('Precise Stick: dead centre, gentle response curve, and steering that grows
   near(stick.classicMid, 0.5, 'Precise Stick off keeps the linear stick');
   equal(stick.released, 0, 'letting go stops');
   const car = value(env, `
-    game._doLoadMap('hub_949'); const car=game.ownedCar; GameSettings.preciseStick=true;
+    game._doLoadMap('sdc'); const car=game.ownedCar; GameSettings.preciseStick=true;
     const steer = (push, precise) => {
       GameSettings.preciseStick = precise;
       Object.assign(car,{angle:0,vx:0,vy:0,speed:0,yawRate:0,steer:0,pedal:0});
@@ -219,7 +219,7 @@ test('Precise Stick: dead centre, gentle response curve, and steering that grows
 
 test('A car turned into a wall or corner can always drive away from it', env => {
   const r = value(env, `
-    game._doLoadMap('hub_949'); const car=game.ownedCar; car._mapBounds=null; GameSettings.preciseStick=false;
+    game._doLoadMap('sdc'); const car=game.ownedCar; car._mapBounds=null; GameSettings.preciseStick=false;
     const walls=[{x:1000,y:1000,w:400,h:400},{x:300,y:300,w:2000,h:40},{x:300,y:300,w:40,h:2000},{x:2260,y:300,w:40,h:2000},{x:300,y:2260,w:2000,h:40}];
     const drive=(a)=>{ car.driverInput(Math.cos(a),Math.sin(a),true); car.updateManualDriving(walls,[],null,null); };
     const reset=(o)=>Object.assign(car,{vx:0,vy:0,speed:0,yawRate:0,steer:0,pedal:0,load:0,handbrake:false,hasDriver:true,controlMode:'PLAYER'},o);
@@ -243,7 +243,7 @@ test('A car turned into a wall or corner can always drive away from it', env => 
 
 function setupDrive(env, {taxi=false,lane='R0.S0.L2',destination='clinic',endpoint=false}={}) {
   env.run(`{
-    game._doLoadMap('hub_949'); game.story.update=()=>{}; game.running=true; game.paused=false;
+    game._doLoadMap('sdc'); game.story.update=()=>{}; game.running=true; game.paused=false;
     game.traffic.vehicles=[]; game.traffic.spawnTimer=1e9; GameSettings.getMaxTraffic=()=>0;
     game.zibSystem.passengerRide=null; game.zibSystem.activeZibs=[]; game.zibSystem.trySpawn=()=>{};
     game.keys={}; game.joystick.active=false; game.joystick.dx=game.joystick.dy=0; game.handbrakeHeld=false;
@@ -354,7 +354,7 @@ test('A map switch mid-ride ends the ride uncharged, with no ghost cab', env => 
     return {passenger:game.zibSystem.isPassenger,driving:game.isDriving,own:game.car===game.ownedCar,
             listed:game.zibSystem.activeZibs.includes(cab),currency:game.currency};`);
   equal(mid, {passenger:false,driving:false,own:true,listed:false,currency:10000});
-  const later=value(env, `game._doLoadMap('hub_949'); game.story.update=()=>{};
+  const later=value(env, `game._doLoadMap('sdc'); game.story.update=()=>{};
     for(let i=0;i<700;i++)game.update(); return {passenger:game.zibSystem.isPassenger,currency:game.currency};`);
   equal(later, {passenger:false,currency:10000}, 'no stuck-teleport fare later');
 }, {events:true,timers:true});
@@ -554,7 +554,7 @@ test('Pause → Equip opens the Weapons tab and lists the equipped gun; furnitur
 
 test('Adaptive lighting survives zoom lamp-budget steps and lightning', env => {
   const r = value(env, `
-    game._doLoadMap('hub_949'); game.running=true; game.paused=false;
+    game._doLoadMap('sdc'); game.running=true; game.paused=false;
     GameSettings.adaptiveLighting=true; GameSettings.softShadows=true; game.cutscene.active=false; game._adaptiveLighting=null;
     game._lightingAdaptiveScale(); const s=game._adaptiveLighting; s.mode='reduced'; s.factor=0.8;
     game._maxLitLamps=10; const afterZoom=game._lightingAdaptiveScale();
@@ -569,7 +569,7 @@ test('Adaptive lighting survives zoom lamp-budget steps and lightning', env => {
 
 test('Baseline layer panel: each layer gated and billed; with Baseline off nothing is gated or counted', env => {
   const r = value(env, `
-    game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=true; game.paused=false;
+    game.story.update=()=>{}; game._doLoadMap('sdc'); game.running=true; game.paused=false;
     game.showProfiler=false; GameSettings.profilerMode='off'; game.worldMinutes=22*60;
     const W=game.weather; W.triggerLightning=()=>{}; W.lockSchedule&&W.lockSchedule('storm'); W.setCondition('storm',null,true);
     const spy={}, wrap=(o,k,name)=>{const f=o[k];o[k]=function(...a){spy[name]=(spy[name]||0)+1;return f.apply(this,a);};};
@@ -754,7 +754,7 @@ test('Furniture sprites: painted runs never change over time, loops repeat per p
 
 test('A landmark just off screen still throws its beams but skips its roof pass', env => {
   const r = value(env, `
-    game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=true; game.paused=false; game.worldMinutes=22*60;
+    game.story.update=()=>{}; game._doLoadMap('sdc'); game.running=true; game.paused=false; game.worldMinutes=22*60;
     const out = [];
     for (const style of ['silver_queen', 'double_nights', 'moon_city']) {
       const b = game.activeMap.buildings.find(x => x.style === style);
@@ -779,7 +779,7 @@ test('A landmark just off screen still throws its beams but skips its roof pass'
 
 test('A landmark whose body is off screen draws only its beams in the glow pass', env => {
   const r = value(env, `
-    game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=true; game.paused=false; game.worldMinutes=22*60;
+    game.story.update=()=>{}; game._doLoadMap('sdc'); game.running=true; game.paused=false; game.worldMinutes=22*60;
     const out = [];
     for (const style of ['silver_queen', 'moon_city']) {
       const b = game.activeMap.buildings.find(x => x.style === style);
@@ -809,7 +809,7 @@ test('A landmark whose body is off screen draws only its beams in the glow pass'
 });
 
 test('Portico marquee: one stamp a bulb, from a sprite baked to the screen scale', env => {
-  env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949'); game.worldMinutes=22*60;`);
+  env.run(`game.story.update=()=>{}; game._doLoadMap('sdc'); game.worldMinutes=22*60;`);
   const r = value(env, `
     const b = game.activeMap.buildings.find(x => x.style === 'silver_queen'), g = b._sqPortico();
     game.camera.x = g.dx; game.camera.y = g.yb + 120; game.camera.zoom = 1; _zoomLOD = 0;
@@ -939,7 +939,7 @@ test('Look-out: at the veranda edge the camera leans out over the city; nowhere 
   ok(Math.abs(edge.lean - edge.want) < 1, `at the railing it leans ${Math.round(edge.lean)} px (${Math.round(edge.want)} wanted: the same on screen at any zoom)`);
   equal(Math.round(edge.camY), Math.round(Math.max(20 + edge.want, edge.top)), 'the camera is that far out past her (or as far as the city strip goes, on a tall screen)');
   ok(Math.abs(room.lean) < 0.01, 'in the rooms: none');
-  const hub = value(env, `game._doLoadMap('hub_949'); _frameTime += 16; game.draw(); return game.lookLeanY;`);
+  const hub = value(env, `game._doLoadMap('sdc'); _frameTime += 16; game.draw(); return game.lookLeanY;`);
   equal(hub, 0, 'and none at once on another map');
 }, {affine: true});
 
@@ -958,18 +958,18 @@ test('Camera edge lock: the view stays inside the map, a narrow map is centred, 
   ok(west.x === west.cx && west.y === west.cy, 'the camera everything else reads is the clamped one');
   const van = view('van_interior', 60, 400, 'game.camera.zoom = 1.6;');
   equal(van.x, 200, 'a map narrower than the view is centred');
-  const hub = view('hub_949', 10, 10);
+  const hub = view('sdc', 10, 10);
   ok(hub.l >= -e && hub.t >= -e, 'at the hub\'s corner the view stays inside the city');
-  const cut = view('hub_949', 2000, 2000, 'game.cutscene.active = true; game.camera.x = -500; game.camera.y = 20000;');
+  const cut = view('sdc', 2000, 2000, 'game.cutscene.active = true; game.camera.x = -500; game.camera.y = 20000;');
   env.run(`game.cutscene.active = false;`);
-  ok(cut.l >= -e && cut.b <= env.probe.MAPS.hub_949.height + e && cut.cx === cut.x, 'a cutscene camera outside the map is brought in, and stays in');
+  ok(cut.l >= -e && cut.b <= env.probe.MAPS.sdc.height + e && cut.cx === cut.x, 'a cutscene camera outside the map is brought in, and stays in');
   const off = view('apt_949', 20, 100, 'GameSettings.cameraEdgeLock = false;');
   env.run(`GameSettings.cameraEdgeLock = true;`);
   equal([off.x, off.y], [20, 100], 'with the lock off the camera is her own position again');
 }, {affine: true});
 
 test('Ultra reflections: lights at half size, detail at full size and only where it has something, art at the scale it is seen', env => {
-  env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=false; game.enterWorld(); game.loop=()=>{};
+  env.run(`game.story.update=()=>{}; game._doLoadMap('sdc'); game.running=false; game.enterWorld(); game.loop=()=>{};
     const W = game.weather; W.triggerLightning = () => {}; if (W.lockSchedule) W.lockSchedule('rain'); W.setCondition('rain', null, true);
     GameSettings.reflections = 'ultra'; GameSettings.adaptiveLighting = false;
     for (let i = 0; i < 3; i++) { W.wetness = 1; game.worldMinutes = 22 * 60; game.player.x = 1200; game.player.y = 2400; _frameTime += 16; game.draw(); }`);
@@ -998,7 +998,7 @@ test('Ultra reflections: lights at half size, detail at full size and only where
 }, {affine: true});
 
 test('Ultra reflections: art repaints on a cadence, crowd bakes are shared and pace-proof, puddles bake once, rects never overlap', env => {
-  env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=false; game.enterWorld(); game.loop=()=>{};
+  env.run(`game.story.update=()=>{}; game._doLoadMap('sdc'); game.running=false; game.enterWorld(); game.loop=()=>{};
     const W = game.weather; W.triggerLightning = () => {}; if (W.lockSchedule) W.lockSchedule('rain'); W.setCondition('rain', null, true);
     GameSettings.reflections = 'ultra'; GameSettings.adaptiveLighting = false;
     for (let i = 0; i < 3; i++) { W.wetness = 1; game.worldMinutes = 22 * 60; game.player.x = 1200; game.player.y = 2400; _frameTime += 16; game.draw(); }`);
@@ -1050,7 +1050,7 @@ test('Ultra reflections: art repaints on a cadence, crowd bakes are shared and p
 }, {affine: true});
 
 test('Adaptive reflections: slow frames step Ultra down to High then Medium (never Off), steady frames bring it back, the saved choice untouched', env => {
-  env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=false; game.enterWorld(); game.loop=()=>{};`);
+  env.run(`game.story.update=()=>{}; game._doLoadMap('sdc'); game.running=false; game.enterWorld(); game.loop=()=>{};`);
   const r = value(env, `
     let T = 100000; const pn = performance.now; performance.now = () => T;
     const out = [];
@@ -1107,7 +1107,7 @@ test('Device Preset: off by default; on applies this device\'s tier, a save can\
 });
 
 test('Rooftop festoons: every bulb at its own shimmer of the string, in one fill per shimmer', env => {
-  env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949');`);
+  env.run(`game.story.update=()=>{}; game._doLoadMap('sdc');`);
   const r = value(env, `
     const b = game.activeMap.buildings.find(x => x.roofFeatures && x.roofFeatures.includes('lights'));
     const saved = b.roofFeatures; b.roofFeatures = ['lights'];
@@ -1123,7 +1123,7 @@ test('Rooftop festoons: every bulb at its own shimmer of the string, in one fill
 }, {affine: true});
 
 test('Landmark roofs: every painted run draws the same at any time and in any wind', env => {
-  env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949');`);
+  env.run(`game.story.update=()=>{}; game._doLoadMap('sdc');`);
   const paint = { silver_queen: 'b._leanRoof(game.ctx, true)', moon_city: 'b._mcDrawRoof(game.ctx, false)',
     portico: "(() => { const g = b._sqPortico(); b._sqPorticoPlane(game.ctx, g, g.x1 - g.x0, SQ_PORTICO.depth, 0); })()",   // (unmarked: one whole run)
     canopy: 'b._mcCanopyPlane(game.ctx)' };
@@ -1151,7 +1151,7 @@ test('Landmark roofs: every painted run draws the same at any time and in any wi
 }, {affine: true});
 
 test('An unmarked plane (the Moon City canopy) stamps as one sprite instead of drawing its art', env => {
-  env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949');`);
+  env.run(`game.story.update=()=>{}; game._doLoadMap('sdc');`);
   const B = "game.activeMap.buildings.find(x => x.style === 'moon_city')";
   env.run(`${B}._planeSpr = { canopy: { lod: _zoomLOD, runs: [{ cv: document.createElement('canvas'), x: 1, y: 2, w: 30, h: 20 }], n: 1, done: true, never: false, whole: true, bytes: 0 } };`);
   env.setTrace(true); env.run(`${B}._mcDrawCanopy(game.ctx, false)`);
@@ -1164,7 +1164,7 @@ test('An unmarked plane (the Moon City canopy) stamps as one sprite instead of d
 // Cars (engine/cars.js): her own car, Amber's van and whatever she's taken, on the hub and off it
 function carsFixture(env) {
   env.run(`{
-    game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=true; game.paused=false;
+    game.story.update=()=>{}; game._doLoadMap('sdc'); game.running=true; game.paused=false;
     game.traffic.vehicles=[]; game.traffic.spawnTimer=1e9; GameSettings.getMaxTraffic=()=>0;
     game.zibSystem.passengerRide=null; game.zibSystem.activeZibs=[]; game.zibSystem.trySpawn=()=>{};
     game.keys={}; game.joystick.active=false; game.joystick.dx=game.joystick.dy=0;
@@ -1189,7 +1189,7 @@ test('Cars live on the hub: after a hijack nothing of hers is drawn, solid or of
     const indoors={cars:[own,van,h].map(c=>[c.visible,c.active]),
       solid:[own,van,h].some(c=>c.active&&GameEntity.registry.all.includes(c)),
       offered:game.activeInteraction&&game.activeInteraction.target||null, parked:game.parkedCars().length};
-    game._doLoadMap('hub_949');
+    game._doLoadMap('sdc');
     return {indoors:{...indoors,offered:!!indoors.offered}, linked:game.car===h, vans:GameEntity.registry.all.filter(e=>e.isDeliveryVehicle).length,
       own:[own.x,own.y], ownAt, van:[van.x,van.y], vanAt, h:[h.x,h.y], hAt,
       shown:[own,van,h].map(c=>c.visible&&c.active&&GameEntity.registry.all.includes(c)), inTraffic:game.traffic.vehicles.includes(h)};
@@ -1237,11 +1237,11 @@ test("Amber's van is sanctioned: never duplicated, parked where she leaves it, h
     const inVan={car:game.car===van, kept:game.deliveryVehicle===van, kind:game.carKind(van), chip:document.getElementById('ui-ride').querySelector('.r-chip').textContent,
       traffic:game.traffic.vehicles.includes(van)};
     van.x+=500; game.toggleVehicle(); const leftAt=[van.x,van.y];
-    game._doLoadMap('cozy_cafe_interior'); game._doLoadMap('hub_949');
+    game._doLoadMap('cozy_cafe_interior'); game._doLoadMap('sdc');
     const back={same:game.deliveryVehicle===van, vans:GameEntity.registry.all.filter(e=>e.isDeliveryVehicle).length, at:[van.x,van.y], traffic:game.traffic.vehicles.includes(van)};
     game._doLoadMap('cozy_cafe_interior'); NPC_DIALOGUE['Barista Ren'].accept(game);
     const job=game.missions.activeMission&&game.missions.activeMission.type;
-    game._doLoadMap('hub_949');
+    game._doLoadMap('sdc');
     return {pill, inVan, leftAt, back, job, home:[van.x,van.y,van.angle], homeWas:[home.x,home.y,home.angle], vans:GameEntity.registry.all.filter(e=>e.isDeliveryVehicle).length};
   `);
   equal(result.pill, 'Drive|Delivery van|E');
@@ -1631,7 +1631,7 @@ test('Junction lights: a left turn waits for what is coming the other way; nobod
 test('Pedestrians walk on: turn back only at a dead end or full crossing, never re-cross straight back, and connect block ends', env => {
   env.run(`{
     let s=4242; Math.random=()=>(s=(s*16807)%2147483647)/2147483647;
-    game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=true; game.paused=false;
+    game.story.update=()=>{}; game._doLoadMap('sdc'); game.running=true; game.paused=false;
     game.keys={}; game.joystick.active=false; globalThis.__hops=new Map();
   }`);
   for (let c = 0; c < 6; c++) env.run(`{
@@ -1763,7 +1763,7 @@ test('A busy junction moves more cars with the lights than with the old one-at-a
 test('Saves from the old city: a spot where a building stands now loads at the spawn, her car where it waits in a new game', env => {
   carsFixture(env);
   const r = value(env, `
-    game._doLoadMap('hub_949'); const b = game.activeMap.buildingColliders.find(c => c.w > 120 && c.h > 120), inside = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+    game._doLoadMap('sdc'); const b = game.activeMap.buildingColliders.find(c => c.w > 120 && c.h > 120), inside = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
     game.player.x = inside.x; game.player.y = inside.y; Object.assign(game.ownedCar, { x: inside.x, y: inside.y }); game.saveGame({ auto: true });
     game.loadGame('dfab_save_slot_auto');
     const moved = { player: [game.player.x, game.player.y], car: [game.ownedCar.x, game.ownedCar.y], spawn: [game.activeMap.spawn.x, game.activeMap.spawn.y] };
@@ -1783,7 +1783,7 @@ test('Saves: her car stays where she parked it through a save made indoors; a hi
     game._doLoadMap('cozy_cafe_interior'); game.saveGame({auto:true});
     Object.assign(own,{x:10,y:10}); game.loadGame('dfab_save_slot_auto');
     const indoors={visible:game.ownedCar.visible, active:game.ownedCar.active, linked:game.car===game.ownedCar};
-    game._doLoadMap('hub_949'); const out=[game.ownedCar.x,game.ownedCar.y,game.ownedCar.visible];
+    game._doLoadMap('sdc'); const out=[game.ownedCar.x,game.ownedCar.y,game.ownedCar.visible];
     const h=new TrafficVehicle(game.traffic.network.allLanes[3],'LADY','suv2','AI'); game.traffic.vehicles.push(h);
     game.player.x=h.x+30; game.player.y=h.y; game.hijackVehicle(h); game.saveGame({auto:true});
     const saved=JSON.parse(localStorage.getItem('dfab_save_slot_auto'));
@@ -1810,7 +1810,7 @@ test('Garage switch while out in a hijacked car keeps her in it, and the old mod
 
 test('Visibility: her halo by day, by night and in night vision (and off with Player Glow off); only hostiles burn white in night vision', env => {
   const r = value(env, `
-    game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=true; game.paused=false;
+    game.story.update=()=>{}; game._doLoadMap('sdc'); game.running=true; game.paused=false;
     const p = game.player, g = new Ganger(p.x + 80, p.y, {}), gg = new GatlingGunner(p.x - 80, p.y, 901);
     game.enemies.push(g, gg);
     const peds = game.pedestrians.pedestrians; if (peds[0]) { peds[0].x = p.x; peds[0].y = p.y + 60; }
@@ -1841,7 +1841,7 @@ test('Visibility: her halo by day, by night and in night vision (and off with Pl
 
 test('City: no building, portico, forecourt or drive in the hub reaches a pavement or road', env => {
   const r = value(env, `
-    game.story.update=()=>{}; game._doLoadMap('hub_949');
+    game.story.update=()=>{}; game._doLoadMap('sdc');
     const map = game.activeMap, net = game.traffic.network;
     const hit = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
     // an angled road and the pavements cut along it by their shapes (their boxes take in the lots beside them)
@@ -1869,7 +1869,7 @@ test('City: no building, portico, forecourt or drive in the hub reaches a paveme
 
 test('City helpers: the hand-laid block has its shop parade wall to wall on Hotel Dr., and no building overlaps another', env => {
   const r = value(env, `
-    game.story.update=()=>{}; game._doLoadMap('hub_949');
+    game.story.update=()=>{}; game._doLoadMap('sdc');
     const city = game.activeMap.cityLayout, b = city.blockMap.block_0_4;
     const row = city.placedBuildings.filter(p => p.blockName === 'block_0_4' && p.options.row === 'south').sort((a, c) => a.x - c.x);
     const issues = city.layoutIssues([...game.activeMap.pavements, ...game.traffic.network.roads]).map(i => i.placement.templateId + ' ' + i.what + (i.other ? ' ' + i.other.templateId : ''));
@@ -1890,7 +1890,7 @@ test('City helpers: the hand-laid block has its shop parade wall to wall on Hote
 
 test('Doors any side: a building faces the street it is placed on, door, sign, lights, landmark and Zib drop-off with it', env => {
   const r = value(env, `
-    game.story.update=()=>{}; game._doLoadMap('hub_949');
+    game.story.update=()=>{}; game._doLoadMap('sdc');
     const map = game.activeMap, city = map.cityLayout, b = city.blockMap.block_0_4;
     const west = map.buildings.filter((x, i) => city.placedBuildings[i].blockName === 'block_0_4' && city.placedBuildings[i].options.row === 'west');
     const front = west.map(x => { const e = x._entrance(); return [x.facing, e && e.nx, e && e.ny, e && Math.round(e.cx - x.x)]; });
@@ -1920,7 +1920,7 @@ test('Doors any side: a building faces the street it is placed on, door, sign, l
 
 test('The bigger city: four times the old area, near square, every landmark placed clear of the street and reachable by Zib and autodrive', env => {
   const r = value(env, `
-    game.story.update=()=>{}; game._doLoadMap('hub_949');
+    game.story.update=()=>{}; game._doLoadMap('sdc');
     const map = game.activeMap, city = map.cityLayout, net = game.traffic.network;
     const ids = Object.keys(game.dropOffRegistry), home = game.dropOffRegistry.parking_spot;
     const routes = ids.map(id => {
@@ -1970,7 +1970,7 @@ test('The bigger city: four times the old area, near square, every landmark plac
 
 test('Street-front fill: auto-filled blocks grow rows along the streets they front, facing the road', env => {
   const r = value(env, `
-    game.story.update=()=>{}; game._doLoadMap('hub_949');
+    game.story.update=()=>{}; game._doLoadMap('sdc');
     const map = game.activeMap, city = map.cityLayout, rows = {}, wrong = [];
     city.placedBuildings.forEach((p, i) => {
       if (!p.options.autoPlaced || p.blockName === HUB_BLOCKS.scrapyard || p.options.angled) return;   // (along an angled street: its own test)
@@ -1992,7 +1992,7 @@ test('Street-front fill: auto-filled blocks grow rows along the streets they fro
 // An angled or curved street: its junctions, lanes, pavements, crossings, walks and buildings
 const angledStreet = (env, name, mouths) => {
   const r = value(env, `
-    game.story.update=()=>{}; game._doLoadMap('hub_949'); const NAME = ${JSON.stringify(name)};
+    game.story.update=()=>{}; game._doLoadMap('sdc'); const NAME = ${JSON.stringify(name)};
     const map = game.activeMap, city = map.cityLayout, net = game.traffic.network;
     const road = net.roads.find(x => x.name === NAME), cl = city.angledRoads.find(x => x.name === NAME);
     const J = net.getIntersectionsForRoad(road);
@@ -2065,7 +2065,7 @@ test('Curved streets: Halfmoon Bend joins its roads at shaped junctions, with pa
 });
 
 test('Angled streets: cars drive Lantern Cut and turn in and out at both ends', env => {
-  env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=true; game.paused=false; game.player.x = 2300; game.player.y = 6400;
+  env.run(`game.story.update=()=>{}; game._doLoadMap('sdc'); game.running=true; game.paused=false; game.player.x = 2300; game.player.y = 6400;
     globalThis.__lc = { road: game.traffic.network.roads.find(x => x.name === 'Lantern Cut'), used: new Set(), turns: new Set() };`);
   for (let k = 0; k < 6; k++) env.run(`(() => { const S = globalThis.__lc;
     for (let i = 0; i < 400; i++) { game.update();
@@ -2080,7 +2080,7 @@ test('Angled streets: cars drive Lantern Cut and turn in and out at both ends', 
 }, {affine:true});
 
 test('Curved streets: cars slow for Halfmoon Bend, keep to their lanes round it and turn in and out at both ends', env => {
-  env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=true; game.paused=false; game.player.x = 3300; game.player.y = 5300;
+  env.run(`game.story.update=()=>{}; game._doLoadMap('sdc'); game.running=true; game.paused=false; game.player.x = 3300; game.player.y = 5300;
     globalThis.__hb = { road: game.traffic.network.roads.find(x => x.name === 'Halfmoon Bend'), used: new Set(), turns: new Set(), offs: [], fast: 0 }; __hb.bend = [__hb.road.path.bends()[0], __hb.road.path.bends().at(-1)];`);
   for (let k = 0; k < 8; k++) env.run(`(() => { const S = globalThis.__hb;
     for (let i = 0; i < 400; i++) { game.update();
@@ -2106,7 +2106,7 @@ test('Curved streets: cars slow for Halfmoon Bend, keep to their lanes round it 
 
 test('Junction turns curve straight into the lane out: no swing the other way first, on square, angled and curved streets', env => {
   const geo = value(env, `
-    game.story.update=()=>{}; game._doLoadMap('hub_949');
+    game.story.update=()=>{}; game._doLoadMap('sdc');
     let n = 0, swing = 0, inErr = 0, outErr = 0;
     for (const tp of game.traffic.network.turnPaths) {
       if (tp.turnType === 'straight' || tp.fromLane.road === tp.toLane.road) continue;

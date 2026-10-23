@@ -188,6 +188,9 @@
                 // order and update moved cars immediately for the sequential simulation.
                 const sensing = this.sensing;
                 sensing.source = sensed; sensing.cars.build(sensed); sensing.people.build(folk);
+                let folkRad = 12;                                   // the widest body on foot (traffic-people.js sizes its search by it)
+                for (const p of folk) if (p && p.radius > folkRad) folkRad = p.radius;
+                sensing.folkRad = folkRad;
                 // Traffic occupies the first slots in both source forms. Descending
                 // removal leaves every not-yet-visited index unchanged, so the loop's
                 // index is also the grid record index; no per-tick identity map needed.

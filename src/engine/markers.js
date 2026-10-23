@@ -2,8 +2,8 @@
         // GameEngine.prototype (see engineMixin in game-engine.js).
         //
         // On the street (world space, under the light; lit again after it by drawMissionGlow):
-        //   the package, by the side door of Amber's van while a delivery waits to be fetched: a parcel in amber
-        //   card with a violet ribbon, a pickup ring breathing out on the pavement round it, motes rising off it
+        //   the package, by the side door of Amber's van while a delivery waits to be fetched: a Cozy Cafe box
+        //   (drawCozyParcel), a pickup ring breathing out on the pavement round it, motes rising off it
         //   (drawDeliveryPackage). Getting into the van loads it (pickUpPackage).
         //   the drop-off: a gold ring the size of the zone she has to reach, turning, a pulse running in to its
         //   centre (drawDropZone).
@@ -38,6 +38,12 @@
                 return p;
             },
 
+            /** She's on foot in the city with a delivery in her hands: she carries it (player-draw-input.js) */
+            carryingParcel() {
+                const m = this._job();
+                return !!(m && m.type === MISSION_TYPES.DELIVERY && m.pickedUp && !this.isDriving && !this.player.inCar && this.activeMap && this.activeMap.id === 'sdc');
+            },
+
             /** She has the package: picked up by the van (the pill), or loaded with it when she drives off in the van */
             pickUpPackage(loaded = false) {
                 const m = this._job();
@@ -52,7 +58,7 @@
              *  near (within this, she's there), lift (how high the pin stands) } or null. (One reused record.) */
             jobTarget() {
                 const m = this._job();
-                if (!m || !this.activeMap || this.activeMap.id !== 'hub_949') return null;
+                if (!m || !this.activeMap || this.activeMap.id !== 'sdc') return null;
                 const t = this._jobTarget || (this._jobTarget = {});
                 if (m.type === MISSION_TYPES.DELIVERY && !m.pickedUp) {
                     const p = this.deliveryPackageSpot(); if (!p) return null;
@@ -89,20 +95,7 @@
                 ctx.fillStyle = 'rgba(8, 2, 14, 0.38)';
                 ctx.beginPath(); ctx.ellipse(1.5, 2.5, 12.5, 10, 0, 0, Math.PI * 2); ctx.fill();
                 ctx.rotate(at.angle);
-                const w = 20, h = 16;
-                ctx.fillStyle = '#8a4d14'; ctx.fillRect(-w / 2 + 1, -h / 2 + 1.5, w, h);              // its side, in shade
-                const g = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
-                g.addColorStop(0, '#f2b45a'); g.addColorStop(1, '#c47a26');
-                ctx.fillStyle = g; ctx.fillRect(-w / 2, -h / 2, w, h);                               // amber card
-                ctx.strokeStyle = 'rgba(255, 236, 196, 0.55)'; ctx.lineWidth = 0.8; ctx.strokeRect(-w / 2 + 0.4, -h / 2 + 0.4, w - 0.8, h - 0.8);
-                ctx.fillStyle = '#7c4fe0'; ctx.fillRect(-1.6, -h / 2, 3.2, h); ctx.fillRect(-w / 2, -1.6, w, 3.2);   // the violet ribbon
-                ctx.fillStyle = '#b79bff'; ctx.fillRect(-0.6, -h / 2, 1, h); ctx.fillRect(-w / 2, -0.6, w, 1);
-                ctx.fillStyle = '#9b74ff';                                                            // the bow
-                ctx.beginPath(); ctx.ellipse(-3.2, -1.2, 3.2, 2, -0.5, 0, Math.PI * 2); ctx.fill();
-                ctx.beginPath(); ctx.ellipse(3.2, -1.2, 3.2, 2, 0.5, 0, Math.PI * 2); ctx.fill();
-                ctx.fillStyle = '#ffd76a'; ctx.beginPath(); ctx.arc(0, -0.6, 1.5, 0, Math.PI * 2); ctx.fill();
-                ctx.fillStyle = '#fbf3e4'; ctx.fillRect(w / 2 - 7.5, h / 2 - 5.5, 6, 4);              // the address label
-                ctx.fillStyle = 'rgba(80, 40, 20, 0.6)'; ctx.fillRect(w / 2 - 6.5, h / 2 - 4.5, 4, 0.7); ctx.fillRect(w / 2 - 6.5, h / 2 - 3.1, 3, 0.7);
+                drawCozyParcel(ctx, 20, 17);                                                        // a Cozy Cafe box (ui/humanoid-render.js)
                 ctx.rotate(-at.angle);
                 // motes rising off it, gold
                 for (let i = 0; i < 3; i++) {
@@ -116,7 +109,7 @@
             /** The delivery's drop-off (world space, under the light): the zone she has to reach, ringed in gold */
             drawDropZone(ctx, cull) {
                 const m = this._job();
-                if (!m || m.type !== MISSION_TYPES.DELIVERY || !m.pickedUp || this.activeMap.id !== 'hub_949') return;
+                if (!m || m.type !== MISSION_TYPES.DELIVERY || !m.pickedUp || this.activeMap.id !== 'sdc') return;
                 const r = m.targetRadius || 100, x = m.targetX, y = m.targetY;
                 if (cull && (x + r < cull.left || x - r > cull.right || y + r < cull.top || y - r > cull.bottom)) return;
                 const t = _frameTime / 1000, k = (t * 0.45) % 1;
@@ -149,7 +142,7 @@
                     ctx.beginPath(); ctx.arc(p.x, p.y, 21, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
                 }
                 const m = this._job();
-                if (m && m.type === MISSION_TYPES.DELIVERY && m.pickedUp && this.activeMap.id === 'hub_949') {
+                if (m && m.type === MISSION_TYPES.DELIVERY && m.pickedUp && this.activeMap.id === 'sdc') {
                     const r = m.targetRadius || 100;
                     ctx.globalAlpha = a * 0.45; ctx.lineWidth = 2.5; ctx.strokeStyle = '#ffc248';
                     ctx.setLineDash([16, 11]); ctx.lineDashOffset = -t * 14;
@@ -165,7 +158,7 @@
             /** The pins over what's on screen and the compass round her for what isn't (see the top of the file) */
             drawMarkers(ctx) {
                 const v = this.view, p = this.player;
-                if (!this.running || !v || !p || !this.activeMap || this.activeMap.id !== 'hub_949' ||
+                if (!this.running || !v || !p || !this.activeMap || this.activeMap.id !== 'sdc' ||
                     (this.scenes && this.scenes.running) || (this.cutscene && this.cutscene.active) ||
                     this.cineCam || this.finisher || this.finCam || (this.bumperMinigame && this.bumperMinigame.active)) return;
                 const s = this._renderScale || 1, z = v.zoom, cw = this.canvas.width, ch = this.canvas.height;

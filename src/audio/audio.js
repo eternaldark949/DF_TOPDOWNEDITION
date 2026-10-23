@@ -793,7 +793,7 @@
             // The van, on the way to the job (the intro): over the rain on the roof and the road
             van_interior: { track: 'van 2', volume: 0.45 },
             // Grave Stories: the southern graveyard in Southern Dimensions City (its walls, engine/map-loading.js 11d)
-            hub_949: [
+            sdc: [
                 { track: 'grave stories (1)', volume: 0.5, area: HUB_GRAVEYARD, fade: 600 },
                 // Moon City's bass through its walls: heard as you come up to the club, low-passed to the thump; its lights keep time
                 { track: 'moon city nightclub - swig', building: 'moon_city', volume: 0.32, fade: 420, lowpass: 260, bpm: 140, beat0: 0 }

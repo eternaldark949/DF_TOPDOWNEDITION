@@ -1,6 +1,6 @@
         // ============================================================================
         //  HUB SCRIPTED NPC ANCHORS
-        //  hub_949's buildings are NOT authored — they're generated at load time by
+        //  sdc's buildings are NOT authored — they're generated at load time by
         //  city.autoFillAll(), which picks positions with Math.random(). These NPC
         //  spawns are fixed literals, so nothing reconciles the two: on some loads a
         //  filler building lands on top of Mirabel or Anavia. Map NPCs never go
@@ -54,7 +54,7 @@
             const e = { props: [], npcs: [], lamps: [] };
             switch (mapId) {
 
-                case 'hub_949':
+                case 'sdc':
                     e.props = [ new PropEntity({ x: 1900, y: 1330 }), new PropEntity({ x: 2100, y: 1330 }) ];
                     e.npcs = [
                         ...HUB_NPC_ANCHORS.map(a => new NPC(a.x, a.y, a.name, a.role)),
@@ -564,52 +564,43 @@
                     break;
                 }
 
-                case 'auto_shop':
+                case 'auto_shop': {
+                    // Torque Auto: the furniture art in drawTorqueDecorProp (ta_*), the floor in drawTorqueInterior,
+                    // the strip lights, the plinth's spots and the neon in drawTorqueGlow (engine/torque-art.js)
+                    const F = decorPropsIn('#2a2a30');
                     e.props = [
-                        // Service bay — vehicle lifts (2 bays)
-                        new PropEntity({ x: 150, y: 150, width: 200, height: 120, color: '#3a3a3a' }),
-                        new PropEntity({ x: 150, y: 380, width: 200, height: 120, color: '#3a3a3a' }),
-                        // Lift hydraulics
-                        new PropEntity({ x: 250, y: 170, width: 20, height: 80, color: '#666' }),
-                        new PropEntity({ x: 250, y: 400, width: 20, height: 80, color: '#666' }),
-                        // Tool racks (left wall)
-                        new PropEntity({ x: 60, y: 120, width: 40, height: 160, color: '#4a3020' }),
-                        new PropEntity({ x: 60, y: 350, width: 40, height: 160, color: '#4a3020' }),
-                        // Workbench (center bay)
-                        new PropEntity({ x: 500, y: 200, width: 120, height: 50, color: '#555' }),
-                        new PropEntity({ x: 500, y: 400, width: 120, height: 50, color: '#555' }),
-                        // Tire stacks
-                        new PropEntity({ x: 700, y: 100, width: 60, height: 60, color: '#222' }),
-                        new PropEntity({ x: 700, y: 500, width: 60, height: 60, color: '#222' }),
-                        // Showroom counter
-                        new PropEntity({ x: 950, y: 250, width: 200, height: 40, color: '#2a1a2a', interactionType: 'auto_shop_counter' }),
-                        // Parts shelves (backroom)
-                        new PropEntity({ x: 920, y: 730, width: 180, height: 40, color: '#333' }),
-                        new PropEntity({ x: 920, y: 820, width: 180, height: 40, color: '#333' }),
-                        new PropEntity({ x: 1150, y: 730, width: 150, height: 40, color: '#333' }),
-                        new PropEntity({ x: 1150, y: 820, width: 150, height: 40, color: '#333' }),
-                        // Oil drums
-                        new PropEntity({ x: 780, y: 300, width: 30, height: 30, color: '#1a3a1a' }),
-                        new PropEntity({ x: 780, y: 350, width: 30, height: 30, color: '#3a1a1a' }),
-                        // Vending machine
-                        new PropEntity({ x: 1280, y: 600, width: 40, height: 60, mass: 1e7, color: '#00f3ff', interactionType: 'vending_machine' }),
+                        // The bay: two cars up on lifts, Victoria's wrap bay, chests and the bench along the north wall
+                        F(110, 140, 160, 96, 'ta_lift', { variant: 0 }), F(110, 380, 160, 96, 'ta_lift', { variant: 1 }),
+                        F(410, 140, 190, 96, 'ta_wrap'),
+                        F(60, 58, 64, 32, 'ta_chest'), F(132, 58, 64, 32, 'ta_chest'),
+                        F(640, 56, 150, 40, 'ta_bench'), F(808, 58, 44, 40, 'ta_compressor'),
+                        F(58, 600, 34, 170, 'ta_rack'),
+                        F(330, 560, 44, 44, 'ta_tires'), F(378, 574, 40, 40, 'ta_tires', { variant: 1 }), F(826, 700, 44, 44, 'ta_tires'),
+                        F(836, 600, 30, 30, 'ta_drum'), F(836, 640, 30, 30, 'ta_drum', { variant: 1 }),
+                        // By the door: the waiting sofa and its table
+                        F(80, 880, 140, 44, 'ta_sofa'), F(240, 888, 30, 30, 'ta_table'),
+                        // The showroom: Torque's counter, the rim wall, the plinth, the lounge
+                        F(950, 250, 200, 40, 'ta_counter', { interactionType: 'auto_shop_counter' }),
+                        F(910, 58, 200, 30, 'ta_rims'),
+                        F(1099, 439, 132, 132, 'ta_turntable'),
+                        F(930, 470, 44, 44, 'ta_chair', { face: 'E' }), F(930, 574, 44, 44, 'ta_chair', { face: 'E' }), F(937, 528, 30, 30, 'ta_table'),
+                        F(1280, 600, 40, 60, null, { color: '#00f3ff', interactionType: 'vending_machine' }),
+                        // The parts room
+                        F(920, 730, 180, 40, 'ta_shelf'), F(920, 820, 180, 40, 'ta_shelf'),
+                        F(1150, 730, 150, 40, 'ta_shelf'), F(1150, 820, 150, 40, 'ta_shelf'),
                     ];
+                    TorqueArt.warm();                                                              // the show cars' sprites, painted before any piece is
                     e.npcs = [ new NPC(1050, 200, "Torque", 'mechanic') ];
+                    e.npcs[0].angle = Math.PI / 2;                                                 // Torque faces his counter
+                    const L = hiddenLamp;
                     e.lamps = [
-                        // Service bay — industrial amber
-                        new LampEntity({ x: 250, y: 200, lampType: 4, color: '#ffaa00', lightRadius: 350 }),
-                        new LampEntity({ x: 250, y: 450, lampType: 4, color: '#ffaa00', lightRadius: 350 }),
-                        new LampEntity({ x: 550, y: 300, lampType: 4, color: '#ffaa00', lightRadius: 300 }),
-                        new LampEntity({ x: 700, y: 300, lampType: 3, color: '#ff8800', lightRadius: 250 }),
-                        // Showroom — cooler light
-                        new LampEntity({ x: 1050, y: 200, lampType: 3, color: '#ccddff', lightRadius: 300 }),
-                        new LampEntity({ x: 1050, y: 450, lampType: 3, color: '#ccddff', lightRadius: 300 }),
-                        // Backroom — dim
-                        new LampEntity({ x: 1050, y: 800, lampType: 3, color: '#ff6600', lightRadius: 200 }),
-                        // Exit area
-                        new LampEntity({ x: 700, y: 880, lampType: 3, color: '#ffaa00', lightRadius: 250 }),
+                        L(190, 188, '#fff0dc', 300), L(190, 428, '#fff0dc', 300), L(505, 188, '#fff0dc', 300),   // over the bays
+                        L(470, 640, '#ffc890', 340), L(700, 880, '#ffd9a8', 260), L(720, 110, '#ffd9a8', 220),   // the floor, the door, the bench
+                        L(1050, 200, '#e8eeff', 300), L(1165, 505, '#f6c2ac', 280), L(950, 540, '#ffd9a0', 200),   // the counter, the plinth, the lounge
+                        L(1100, 800, '#ffb070', 230),                                                               // the parts room
                     ];
                     break;
+                }
 
                 case 'neural_sys_interior':
                     e.props = [
@@ -636,12 +627,14 @@
                         new PropEntity({x:615,y:455,width:130,height:42,decorType:'ns_sofa',mass:1e5}),
                         new PropEntity({x:65,y:450,width:32,height:32,decorType:'ns_planter',mass:1e5}),
                         new PropEntity({x:903,y:450,width:32,height:32,decorType:'ns_planter',mass:1e5}),
+                        // Artificial violet trees: slim crystal trunks, canopies drawn in the glow pass
+                        ...NEURAL_TREES.map(([x,y])=>new PropEntity({x:x-9,y:y-9,width:18,height:18,decorType:'ns_tree',mass:1e5})),
                     ];
                     e.npcs = [ new NPC(500, 170, "Prisma", 'shopkeeper') ];
                     e.lamps = [
                         // Neutral key light keeps the blue materials and identity samples readable
-                        new LampEntity({ x: 300, y: 200, lampType: 3, color: '#b5cce4', lightRadius: 350 }),
-                        new LampEntity({ x: 700, y: 200, lampType: 3, color: '#b5cce4', lightRadius: 350 }),
+                        new LampEntity({ x: 300, y: 200, lampType: 3, color: '#c8d8ee', lightRadius: 320 }),
+                        new LampEntity({ x: 700, y: 200, lampType: 3, color: '#c8d8ee', lightRadius: 320 }),
                         new LampEntity({ x: 500, y: 400, lampType: 3, color: '#89a9d2', lightRadius: 300 }),
                         // Restrained champagne counter and consultation light
                         new LampEntity({ x: 500, y: 230, lampType: 5, color: '#d8cbb6', lightRadius: 200 }),
@@ -651,6 +644,8 @@
                         new LampEntity({ x: 775, y: 650, lampType: 3, color: '#5275ad', lightRadius: 200 }),
                         // Exit area
                         new LampEntity({ x: 500, y: 700, lampType: 3, color: '#9fb9da', lightRadius: 250 }),
+                        // Violet light beneath the artificial trees
+                        ...NEURAL_TREES.map(([x,y])=>Object.assign(new LampEntity({ x, y, lampType: 4, color: '#a678ff', lightRadius: 150 }),{visible:false})),
                     ];
                     break;
 
@@ -700,12 +695,15 @@
                     const L = (x,y,color,r) => hiddenLamp(x,y,color,r);
                     e.lamps = [
                         // Warm architectural fill stays local: the galleries retain dark lanes.
-                        L(733,573,'#ffd1a0',215),L(1067,573,'#ffd1a0',215),
-                        L(733,833,'#edb399',195),L(1067,833,'#edb399',195),
-                        L(900,495,'#eab1ad',210),L(900,700,'#cf4670',155),
-                        L(450,190,'#ffe0b6',265),L(260,195,'#e4b6a5',150),L(680,190,'#efb4bd',150),
-                        L(1145,105,'#ffe2bc',225),L(1145,260,'#b25b8a',140),
-                        L(1590,175,'#ffa874',260),
+                        L(733,573,'#ffb27a',225),L(1067,573,'#ffb27a',225),
+                        L(733,833,'#ff9a6a',205),L(1067,833,'#ff9a6a',205),
+                        L(900,495,'#ff7a7e',220),L(900,700,'#e8204e',170),
+                        L(450,190,'#ffd6a6',275),L(260,195,'#f0a090',160),L(680,190,'#ff9aa8',160),
+                        L(1145,105,'#ffd2a4',230),L(1145,260,'#d0507a',150),
+                        L(1590,175,'#ff8a50',270),
+                        // Sconces and the runner: red, orange and beige pools along the walls and the carpet.
+                        ...PALACE_SCONCES.map(([x,y],i) => L(x,y,i%2?'#ff8f5a':'#ffc89a',125)),
+                        L(900,920,'#ffb488',150),L(900,1180,'#ffc49a',160),
                         L(300,520,'#a34b67',140),L(300,840,'#a34b67',140),
                         L(1500,520,'#a34b67',140),L(1500,840,'#a34b67',140),
                         L(285,1200,'#efbaa9',195),L(80,1060,'#e1b5c7',130),

@@ -365,7 +365,7 @@
                         'hotel_lobby': "DOUBLE NIGHTS HOTEL",
                         'hotel_suite': "PENTHOUSE SUITE",
                         'church_boss': "THE SANCTUM",
-                        'hub_949': "CITY SECTOR 9",
+                        'sdc': "SOUTHERN DIMENSIONS CITY",
                         'auto_shop': "TORQUE AUTO",
                         'neural_sys_interior': "NEURAL SYSTEMS",
                         'enni_cole_interior': "ENNI COLE",
@@ -555,7 +555,7 @@
                     
                     // Disable autodrive if it was following nav
                     if (this.isDriving && this.car && this.car.controlMode === 'AI') {
-                        this.car.vx = this.car.vy = this.car.speed = 0;
+                        this.car.vx = this.car.vy = this.car.speed = this.car.yawRate = this.car.spin = 0;
                         this.car.disableAutoDrive();
                         this.autodriveBtn.classList.remove('engaged');
                     }

@@ -146,9 +146,6 @@
             // ── BROWSE TAB: Purchase new vehicles ──
             _renderBrowseTab(container) {
                 const TIER = { 'ultra-luxury': ['gold', 'Ultra Luxury'], 'mid-luxury': ['mint', 'Mid Luxury'], 'economy': ['info', 'Economy'] };
-                // the fastest car on sale sets the speed bars' scale
-                let topSpeed = 0;
-                for (const b in VEHICLE_BRANDS) for (const m in VEHICLE_BRANDS[b].models) topSpeed = Math.max(topSpeed, VEHICLE_BRANDS[b].baseStats.maxSpeed * VEHICLE_BRANDS[b].models[m].speedMod);
                 let html = '';
                 for (const brandKey in VEHICLE_BRANDS) {
                     const brand = VEHICLE_BRANDS[brandKey], [tc, tl] = TIER[brand.tier] || ['info', brand.tier];
@@ -157,11 +154,11 @@
                         const model = brand.models[modelKey], price = CAR_PRICES[brandKey]?.[modelKey];
                         if (!price) continue;
                         const owned = this.garage.cars.some(c => c.brand === brandKey && c.model === modelKey), afford = this.currency >= price;
-                        const spd = brand.baseStats.maxSpeed * model.speedMod, seats = model.seats || brand.baseStats.seats || 4;
+                        const seats = model.seats || brand.baseStats.seats || 4;
                         html += `<div class="df-card${owned ? ' lit' : afford ? '' : ' unaffordable'}" data-key="${brandKey}:${modelKey}"><div class="df-head">`;
-                        html += `<div class="note-ico">${ACTION_ICONS && ACTION_ICONS.car ? `<span style="width:24px;height:24px;color:var(--df-gold);display:inline-flex">${ACTION_ICONS.car}</span>` : '🚗'}</div>`;
+                        html += `<div class="ta-portrait"><img src="${carPortraitUrl(brandKey, modelKey, brandKey === 'LADY' ? BLACKMARK_DEFAULTS.paintColor : brand.colors[0], brand.glowColor)}" alt=""></div>`;
                         html += `<div class="grow"><div class="eyebrow">${brandKey} · ${modelKey}</div><div class="title">${model.name}</div>`;
-                        html += `<div class="df-bar-label"><span>Top speed</span><span>${spd.toFixed(1)}</span></div><div class="df-bar${owned ? '' : ' gold'}" style="--v:${Math.round(spd / topSpeed * 100)}%"><i></i></div>`;
+                        html += carSpecBarsHtml(brandKey, modelKey);
                         html += `<div class="df-chips" style="margin-top:8px;"><span class="df-chip">${seats} seats</span></div></div>`;
                         html += `<div class="df-shop-side">${owned ? '<span class="df-chip active">✓ Owned</span>' : `${this._priceHtml(price, this.currency)}<button class="df-btn small auto-buy-btn" data-brand="${brandKey}" data-model="${modelKey}"${afford ? '' : ' disabled'}>Buy</button>`}</div>`;
                         html += `</div></div>`;
@@ -190,8 +187,9 @@
                 for (let i = 0; i < this.garage.count; i++) {
                     const car = this.garage.get(i), isActive = i === this.garage.activeIndex, name = this.garage.getDisplayName(i);
                     html += `<div class="df-card${isActive ? ' lit' : ''}"><div class="df-head">`;
-                    html += `<div class="df-swatch sq" style="background:${car.paintColor}"></div>`;
+                    html += `<div class="ta-portrait"><img src="${carPortraitUrl(car.brand, car.model, car.paintColor, car.underglowColor)}" alt=""></div>`;
                     html += `<div class="grow"><div class="eyebrow">${car.brand} · ${car.model}</div><div class="title">${name}</div>`;
+                    html += carSpecBarsHtml(car.brand, car.model);
                     html += `<div class="df-chips" style="margin-top:8px;">`;
                     html += `<span class="df-chip">Paint <i class="df-swatch small sq" style="background:${car.paintColor}"></i></span>`;
                     html += `<span class="df-chip">Glow <i class="df-swatch small" style="background:${car.underglowColor || 'transparent'};${car.underglowColor ? `box-shadow:0 0 5px ${car.underglowColor}` : ''}"></i></span>`;

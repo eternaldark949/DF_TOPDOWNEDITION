@@ -93,8 +93,9 @@
                     jewelry: withFieldMask(this, cosmeticConfig.jewelry),   // masked in the field (core/appearances.js)
                     pose: pushing ? 'push' : typeof phoneSystem !== 'undefined' && phoneSystem.isOpen ? 'phone' : this.sneaking ? 'sneak' : undefined,
                     poseWhileMoving: pushing || this.sneaking,
-                    // A drawn gun takes the hand; the umbrella waits
-                    held: armed && cosmeticConfig.held && cosmeticConfig.held.type === 'umbrella' ? null : (cosmeticConfig.held || outfit.held || null)
+                    // A delivery she's carrying takes both hands (engine/markers.js); a drawn gun takes the hand, the umbrella waits
+                    held: !pushing && this.carryingParcel() ? (currentStance === 'idle' ? PARCEL_HELD : PARCEL_TUCKED)
+                        : armed && cosmeticConfig.held && cosmeticConfig.held.type === 'umbrella' ? null : (cosmeticConfig.held || outfit.held || null)
                 });
                 SilhouetteFX.glow = false;
                 

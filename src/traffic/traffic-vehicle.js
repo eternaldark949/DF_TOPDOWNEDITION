@@ -1000,21 +1000,18 @@
                     const reverseSteerFactor = direction < 0 ? VD.REVERSE_STEER_FACTOR : 1.0;
                     yawTarget = (player ? st : req) * this.handling * handlingMod * direction * reverseSteerFactor * authority;
                 }
+                /* Traffic turns where its path follower says, plus any spin a knock gave it
+                   (PhysicsSystem.carContact), which its tyres scrub away; while it's spinning
+                   the driver has lost it and barely steers. The driven car's rotation is
+                   worked out from its tyres below (TYRES), so it's turned there. */
                 let yaw = this.yawRate || 0;
-                if (!player) yaw = yawTarget;
-                else {
-                    /* The body has inertia: rotation builds toward what the wheels ask
-                       (at the brand's turn-in) and settles when they straighten. Past what
-                       the tyres can hold (latAcc / speed) the nose pushes wide instead. */
-                    const wetGrip = (1 - 0.35 * rain) * (this.surfaceFriction || 1);
-                    if (absSpeed > 1 && !this.handbrake) yawTarget = clampU(yawTarget, F.latAcc * wetGrip / absSpeed);
-                    // last tick's rear/front grip imbalance: a light rear swings the tail out
-                    yaw += (yawTarget + (this._yawCouple || 0) - yaw) * F.turnIn;
-                    if (absSpeed < VD.STEER_MIN_SPEED) yaw *= 0.5;
-                    yaw = clampU(yaw, VD.YAW_MAX);
+                if (!player) {
+                    const spin = this.spin || 0;
+                    yaw = yawTarget * (1 - 0.85 * Math.min(1, Math.abs(spin) / 0.03)) + spin;
+                    this.spin = Math.abs(spin) < 0.0005 ? 0 : spin * VD.KNOCK_SPIN_DECAY;
+                    this.yawRate = yaw;
+                    this.angle += yaw;
                 }
-                this.yawRate = yaw;
-                this.angle += yaw;
 
                 /* --- PEDALS ---
                    Gas against the direction of travel is the brake (this.brake, px/tick²),
@@ -1107,23 +1104,35 @@
                 if (!player) {
                     slideVelocity *= grip;
                 } else {
-                    /* Two axles, each a tyre that holds firmly up to its limit and then
-                       slides. Weight transfer and the handbrake move those limits apart;
-                       when the rear gives first, the difference swings the tail out
-                       (applied to next tick's rotation). */
+                    /* Two axles, each a tyre pushing sideways against how fast that end of
+                       the car slides across its wheels: firmly, up to a limit, then it lets
+                       go. The front wheels point where the steering asks (the angle that
+                       would carry yawTarget round), so the front pulls the nose in. The car
+                       is one body: both pushes move it sideways, and because they act ahead
+                       of and behind the centre they also turn it (rotation inertia
+                       SPIN_INERTIA). So the car's rotation is worked out, not set: it
+                       builds as the front bites, the tail steps out when the rear lets go
+                       (braking weight forward, the handbrake), the nose pushes wide when the
+                       front does, and any spin a crash gave it carries on until the tyres
+                       scrub it off. */
                     const wetGrip = (1 - 0.35 * rain) * (this.surfaceFriction || 1);
                     const L = this.load;
                     let gF = F.gripF * (1 + VD.LOAD_FWD_GRIP * L) * wetGrip;
                     let gR = F.gripR * (1 - VD.LOAD_REAR_GRIP * L) * wetGrip;
                     if (hb) gR *= VD.HANDBRAKE_REAR_GRIP;
-                    const s = Math.abs(slideVelocity);
-                    const remF = Math.min(s * 0.22 * gF, F.latAcc * gF);
-                    const remR = Math.min(s * 0.22 * gR, F.latAcc * gR);
-                    const rem = Math.min(s, (remF + remR) / 2);
-                    slideVelocity -= Math.sign(slideVelocity) * rem;
-                    const couple = (remF - remR) * VD.OVERSTEER_COUPLE * (hb ? VD.HANDBRAKE_SWING : 1) * (70 / this.length);
-                    this._yawCouple = -Math.sign(slideVelocity) * (couple < 0 ? couple * 0.5 : couple);   // understeer only half as strong
-                    this.tyreSlip = Math.max(0, s - F.latAcc * 1.6) + (hb ? Math.abs(fwdVelocity) * 0.25 : 0)
+                    const a = this.length * VD.AXLE_FROM_CENTRE, wb = 2 * a;
+                    const iu = (this.length * this.length + this.width * this.width) / 12 * VD.SPIN_INERTIA;   // inertia per unit mass
+                    let w = this.yawRate || 0;
+                    const delta = Math.abs(fwdVelocity) > 0.3 ? clampU(yawTarget * wb / fwdVelocity, VD.WHEEL_LOCK) : 0;
+                    const sF = slideVelocity + w * a - fwdVelocity * delta, sR = slideVelocity - w * a;
+                    const kF = VD.TYRE_STIFF * (F.turnIn / VD.DEFAULT_FEEL.turnIn), kR = VD.TYRE_STIFF;
+                    const pF = -Math.sign(sF) * Math.min(Math.abs(sF) * kF * gF, F.latAcc * gF);
+                    const pR = -Math.sign(sR) * Math.min(Math.abs(sR) * kR * gR, F.latAcc * gR);
+                    slideVelocity += (pF + pR) / 2;
+                    w += a * (pF - pR) / 2 / iu;
+                    w = clampU(w, VD.YAW_SPIN_MAX);
+                    yaw = this.yawRate = w;
+                    this.tyreSlip = Math.max(0, Math.abs(slideVelocity) - F.latAcc * 1.6) + (hb ? Math.abs(fwdVelocity) * 0.25 : 0)
                         + (decel > (this.brake || 0.3) * 0.8 && Math.abs(fwdVelocity) > 4 ? 0.8 : 0);
                 }
 
@@ -1141,6 +1150,7 @@
                 // --- INTEGRATE + COLLIDE ---
                 const nextX = this.x + this.vx;
                 const nextY = this.y + this.vy;
+                if (player) this.angle += this.yawRate;
 
                 /* Report the POST-drag forward component.
                    This used to be recorded before drag was applied, which
@@ -1170,15 +1180,13 @@
                     const c = this._wallContact(w_, b_);
                     if (!c) break;
                     collided = true;
+                    // Where the car meets the wall (a corner, usually): the push lands there, so it turns the car too
+                    const [px, py] = PhysicsSystem.contactPoint(this, c.obb, c.nx, c.ny);
                     this.x += c.nx * (c.depth + 0.01);
                     this.y += c.ny * (c.depth + 0.01);
-                    const vn = this.vx * c.nx + this.vy * c.ny;
-                    if (vn < 0) {
-                        const tx = this.vx - vn * c.nx, ty = this.vy - vn * c.ny;
-                        const vnOut = vn * VA.WALL_BOUNCE_FACTOR;
-                        this.vx = tx * VA.WALL_SLIDE_FRICTION + vnOut * c.nx;
-                        this.vy = ty * VA.WALL_SLIDE_FRICTION + vnOut * c.ny;
-                    }
+                    const B = PhysicsSystem.body(this, true);
+                    if (PhysicsSystem.impulseAt(B, PhysicsSystem.body(c.obb, false), px + c.nx * c.depth, py + c.ny * c.depth,
+                                                c.nx, c.ny, -VA.WALL_BOUNCE_FACTOR, VA.WALL_MU)) PhysicsSystem._store(this, B);
                 }
                 if (collided) {
                     // Re-derive forward speed from the corrected velocity so the
@@ -1197,8 +1205,9 @@
              */
             onImpact(strength, kick = 0) {
                 if (this.controlMode !== 'PLAYER') return;
-                this.yawRate = clamp((this.yawRate || 0) + kick, -CONFIG.VEHICLE_DRIVE.YAW_MAX, CONFIG.VEHICLE_DRIVE.YAW_MAX);
+                this.yawRate = clamp((this.yawRate || 0) + kick, -CONFIG.VEHICLE_DRIVE.YAW_SPIN_MAX, CONFIG.VEHICLE_DRIVE.YAW_SPIN_MAX);
                 if (strength < 0.7 || this._crunchCd > 0) return;
+                if (typeof game !== 'undefined' && game.missions && game.missions.knock) game.missions.knock(strength);   // a package aboard feels it
                 this._crunchCd = 8;
                 audioSys.sfx('crunch', { gain: Math.min(1, strength / 5) });
                 if (typeof game !== 'undefined' && game.triggerShake) game.triggerShake(Math.min(12, 2 + strength * 1.8));
@@ -1293,17 +1302,38 @@
                     if (!candidates) continue;
                     for (let w of candidates) {
                         if (this.x + r < w.x || this.x - r > w.x + w.w || this.y + r < w.y || this.y - r > w.y + w.h) continue;
-                        const c = CollisionSystem._satCollision(obb, CollisionSystem._aabbToOBB(w));
-                        if (c && (!best || c.depth > best.depth)) best = c;
+                        const wo = CollisionSystem._aabbToOBB(w);
+                        const c = CollisionSystem._satCollision(obb, wo);
+                        if (c && (!best || c.depth > best.depth)) { best = c; c.obb = wo; }
                     }
                 }
                 return best;
             }
         
+            /** A parked car that's been hit: it slides and turns on locked wheels until it stops (out of any wall) */
+            _settle(walls, buildings) {
+                // Locked wheels grip before they slide: each tick takes a fixed bite off the speed and spin
+                // (so a brush barely moves it) and then a share of what's left
+                const VD = CONFIG.VEHICLE_DRIVE, k = VD.PARKED_SCRUB;
+                const sp = Math.hypot(this.vx || 0, this.vy || 0), keep = sp > VD.PARKED_HOLD ? (sp - VD.PARKED_HOLD) / sp * k : 0;
+                this.vx = (this.vx || 0) * keep; this.vy = (this.vy || 0) * keep;
+                const sn = this.spin || 0;
+                this.spin = Math.abs(sn) > VD.PARKED_HOLD_SPIN ? (sn - Math.sign(sn) * VD.PARKED_HOLD_SPIN) * k : 0;
+                this.x += this.vx; this.y += this.vy; this.angle += this.spin;
+                for (let pass = 0; pass < 3; pass++) {
+                    const c = this._wallContact(walls || [], buildings || []);
+                    if (!c) break;
+                    this.x += c.nx * (c.depth + 0.01); this.y += c.ny * (c.depth + 0.01);
+                    const vn = this.vx * c.nx + this.vy * c.ny;
+                    if (vn < 0) { this.vx -= vn * c.nx; this.vy -= vn * c.ny; }
+                }
+            }
+
             // --- MAIN UPDATE (AI & Logic) ---
             update(player, playerCar, allVehicles, weather, intersections = [], walls = [], buildings = [], decalSystem, folk = []) {
                 // --- CONTROL MODE BRANCHING ---
                 if (this.controlMode === 'PARKED') {
+                    if (this.vx || this.vy || this.spin) this._settle(walls, buildings);
                     this.speed = 0;
                     return;
                 }
@@ -1373,7 +1403,14 @@
                     // Squared compare — no sqrt on the hot path.
                     const _dx = this.x - player.x, _dy = this.y - player.y;
                     const _r = CONFIG.SIM.AI_NEAR_RADIUS;
-                    const _far = (_dx * _dx + _dy * _dy) > (_r * _r);
+                    let _far = (_dx * _dx + _dy * _dy) > (_r * _r);
+                    // Off the screen by a margin counts as far too: the screen is far wider than it is tall, so
+                    // within the radius most cars are out of sight above or below it (the last frame's view)
+                    const _v = _game.view, _cv = _game.canvas;
+                    if (!_far && _v && _cv && _v.zoom > 0) {
+                        const _m = CONFIG.SIM.AI_SCREEN_MARGIN;
+                        _far = Math.abs(this.x - _v.x) > _cv.width / 2 / _v.zoom + _m || Math.abs(this.y - _v.y) > _cv.height / 2 / _v.zoom + _m;
+                    }
                     if (_far && !_game.simDue(CONFIG.SIM.TRAFFIC_AI_FAR_INTERVAL, this._aiPhase)) {
                         this.aiDriveStep(weather, walls, buildings, decalSystem);
                         return;
@@ -1770,6 +1807,8 @@
                 const canPullOut = this.currentLane && !this.currentTurnPath && !(this._reverseLeft > 0) &&
                     this.laneChangeState === 'NONE' && this.state === 'DRIVING' &&
                     !approachingIntersection && !waitingForIntersection && !isPlayerAutodrive;
+                // Autodrive and Zib: a route that moves over to the lane its next turn goes from does it once there's room
+                if (isPlayerAutodrive) this._routeLaneChange();
                 if (folkMove === 'round' && canPullOut) {
                     this._goRound(folkPlan);
                 } else if (shouldOvertake && canPullOut && !(backOff && this._backUp(backOff))) {
@@ -2594,6 +2633,8 @@
                 // Onto the target lane's line; done once on it (or well past where it was meant to end)
                 const { steer, off } = this._steerOntoLane(this.targetLane, 0.6, this._pullOutLook);
                 if (off < 6 || this.laneChangeProgress >= 1.0 && off < 15 || currentDist > totalDist * 2.5) {
+                    const st = this._driveRoute?.transitions[this._driveRoute.index];
+                    if (st && st.change && st.toLane === this.targetLane) this._driveRoute.index++;   // the route's move across, made
                     this.currentLane = this.targetLane;
                     this.laneChangeState = 'NONE';
                     this.targetLane = null;
@@ -2690,6 +2731,21 @@
                 return steer;
             }
             
+            /**
+             * The route's next step is across to the lane beside (traffic/roads.js buildDrivePath `change`): move over as soon
+             * as that lane has room, anywhere along the stretch, not waiting for the junction. Too near the line to make it
+             * (lane changes give up inside 150 px of a junction), the route is marked `missed` and planned again from here,
+             * where it can't ask for the move any more (engine/update.js).
+             */
+            _routeLaneChange() {
+                const route = this._driveRoute, step = route && route.transitions[route.index];
+                if (!step || !step.change || this.currentTurnPath || this.currentLane !== step.fromLane) return;
+                if (this.laneChangeState !== 'NONE' || this._reverseLeft > 0) return;
+                const left = this.currentLane.length - this.getDistanceAlongLane();
+                if (left < 280) { route.missed = true; return; }                       // (under buildDrivePath's CHANGE_ROOM)
+                if (this.isLaneClear(step.toLane, this.length * 2)) this.initiateNormalLaneChange(step.toLane);
+            }
+
             initiateNormalLaneChange(targetLane) {
                 this.laneChangeState = 'CHANGING';
                 this._pullOutLook = Math.abs(this.speed) < 2 ? this.length * 0.75 : undefined;   // from a crawl: pulling out round something
