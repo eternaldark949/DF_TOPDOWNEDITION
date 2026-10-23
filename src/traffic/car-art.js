@@ -46,7 +46,26 @@
                 axles: [0.19, 0.745], waist: 0.84, hood: 0.49,  // the hood runs between the fender seams at ±hood
                 cap: [0.45, 0.93, 0.62],                        // the hearse cap: from, to, half-width
                 band: [0.275, 0.19, 0.375, 0.29, 0.72],           // the windshield band: leading edge at the sides, its apex; trailing edge, apex; half-width
-                shell: 0.72                                      // the cap shell's half-width
+                shell: 0.72,                                     // the cap shell's half-width
+                head: [[0.008, 0.6], [0.006, 0.74], 0.9],        // lamp pods: along the outline's run [u0, k0]→[u1, k1], f of the way
+                tail: [[[0.935, 0.84], [0.965, 0.74], 0.6], [[0.965, 0.74], [0.987, 0.58], 0.6], [[0.987, 0.58], [0.998, 0.38], 0.55]],
+                slab: true, mirror: 3.6, tyreIn: 1.3             // tyreIn: how far the front tyres' centres sit in from the flank
+            },
+            // The V3: the V1's coach body made a touch longer and sleeker, its front fenders squarer, the waist and
+            // wheel hoods drawn in; no cap: one roof in the body's paint runs back from the windshield band to a round
+            // tail, ringed by windows (the dark band of the sketch). Its tail pods spread further in (no light slab).
+            COACH3: {
+                OUTLINE: [[0.006, 0], [0.008, 0.2], [0.014, 0.34], [0.026, 0.44], [0.034, 0.5], [0.008, 0.58], [0.003, 0.74], [0.01, 0.88],
+                          [0.035, 0.96], [0.09, 0.99], [0.19, 0.995], [0.265, 0.975], [0.31, 0.9], [0.37, 0.84], [0.45, 0.83],
+                          [0.55, 0.84], [0.62, 0.88], [0.67, 0.95], [0.745, 0.975], [0.82, 0.97], [0.87, 0.93], [0.91, 0.87],
+                          [0.945, 0.8], [0.972, 0.7], [0.99, 0.55], [0.998, 0.36], [1, 0]],
+                axles: [0.19, 0.745], waist: 0.83, hood: 0.49,
+                band: [0.275, 0.19, 0.375, 0.29, 0.72],
+                shell: 0.74,                                     // the windows' half-width
+                roof: [0.955, 0.5],                              // the roof: back end, half-width (its front runs in under the band)
+                head: [[0.008, 0.58], [0.003, 0.74], 0.9],
+                tail: [[[0.945, 0.8], [0.972, 0.7], 0.45], [[0.972, 0.7], [0.99, 0.55], 0.6], [[0.99, 0.55], [0.998, 0.36], 0.65]],
+                slab: false, mirror: 5, tyreIn: 2.3
             },
             WHEEL_LOCK: 0.5,        // drawn front-wheel angle at full steer (rad)
             ROLL_PX: 1.8,           // body shift out of a turn at full lean
@@ -70,7 +89,8 @@
             const key = v.visualStyle + '|' + v.model + '|' + v.length + '|' + v.width + '|' + !!v.noHearseCap;
             if (v._carGeo && v._carGeo.key === key) return v._carGeo;
             const L = v.length, W = v.width, st = v.visualStyle;
-            const hearse = st === 'blackmark' && v.model === 'suv' && !v.noHearseCap;
+            const v3 = st === 'blackmark' && v.model === 'suv2', hearse = st === 'blackmark' && (v.model === 'suv' && !v.noHearseCap || v3);   // the coach-built V1 and V3
+            const C = hearse ? CAR_ART[v3 ? 'COACH3' : 'COACH'] : null;
             const cab = CAR_ART.CABIN[hearse ? 'hearse' : v.model] || CAR_ART.CABIN.sedan;
             const xf = f => L / 2 - f * L;
             const body = new Path2D();
@@ -78,20 +98,20 @@
                 const pts = [[L / 2, -W * 0.26], [L / 2 - 9, -W / 2], [-L / 2 + 6, -W / 2 + 1], [-L / 2, -W / 2 + 7],
                              [-L / 2, W / 2 - 7], [-L / 2 + 6, W / 2 - 1], [L / 2 - 9, W / 2], [L / 2, W * 0.26]];
                 pts.forEach((p, i) => i ? body.lineTo(p[0], p[1]) : body.moveTo(p[0], p[1])); body.closePath();
-            } else if (hearse) _coachPath(body, L, W);
+            } else if (hearse) _coachPath(body, L, W, C.OUTLINE);
             else if (st === 'blackmark') body.roundRect(-L / 2, -W / 2, L, W, [6, 11, 11, 6]);
             else body.roundRect(-L / 2, -W / 2, L, W, [4, 7, 7, 4]);
             const si = W * 0.13;                                            // glass sits this far in from the flanks
             return (v._carGeo = {
-                key, L, W, st, hearse, body, si,
+                key, L, W, st, hearse, v3, C, body, si,
                 x0: xf(cab[0]), x1: xf(cab[1]), x2: xf(cab[2]), x3: xf(cab[3]),
-                axleF: hearse ? L / 2 - L * CAR_ART.COACH.axles[0] : L / 2 - L * 0.21, axleR: hearse ? L / 2 - L * CAR_ART.COACH.axles[1] : -L / 2 + L * 0.2
+                axleF: hearse ? L / 2 - L * C.axles[0] : L / 2 - L * 0.21, axleR: hearse ? L / 2 - L * C.axles[1] : -L / 2 + L * 0.2
             });
         }
 
         /** The V1's outline from the sketch: COACH.OUTLINE round both flanks, smoothed (Catmull-Rom) into curves. */
-        function _coachPath(p, L, W) {
-            const O = CAR_ART.COACH.OUTLINE, h = W / 2, P = (u, v) => [L / 2 - u * L, v * h];
+        function _coachPath(p, L, W, O) {
+            const h = W / 2, P = (u, v) => [L / 2 - u * L, v * h];
             const pts = [...O.map(([u, v]) => P(u, -v)), ...O.slice(1, -1).reverse().map(([u, v]) => P(u, v))], n = pts.length;
             p.moveTo(pts[0][0], pts[0][1]);
             for (let i = 0; i < n; i++) {
@@ -133,11 +153,10 @@
             const out = d * 0.2;                                                // how far it stands proud of the body
             return { x: x + nx * out, y: y + ny * out, a: Math.atan2(ty, tx), w: len, d };
         };
-        const coachLamps = (L, W) => ({
-            head: _coachPod(L, W, [0.008, 0.6], [0.006, 0.74], 0.9, 4.6, 2.4),
-            tail: [[[0.935, 0.84], [0.965, 0.74], 0.6], [[0.965, 0.74], [0.987, 0.58], 0.6], [[0.987, 0.58], [0.998, 0.38], 0.55]]
-                .map(([a, b, f]) => _coachPod(L, W, a, b, f, 1.35, 1.8)),
-            slab: { x: -L / 2 - 2, d: 2.4, w: W / 2 * 0.34 } });    // the hooded slab: its back edge, depth, half-width
+        const coachLamps = ({ L, W, C }) => ({
+            head: _coachPod(L, W, ...C.head, 4.6, 2.4),
+            tail: C.tail.map(([a, b, f]) => _coachPod(L, W, a, b, f, 1.35, 1.8)),
+            slab: C.slab && { x: -L / 2 - 2, d: 2.4, w: W / 2 * 0.34 } });    // the hooded slab: its back edge, depth, half-width
         /** The V1's running turn signal: its three tail pods on the turning side light one by one from the inside out,
             hold, then go dark. Returns the side and which pods are lit ([inner, middle, outer] as tail indices), or null. */
         const SIGNAL_STEP = 6;                                              // frames per beat: 3 to fill, 2 to hold, 2 dark
@@ -178,7 +197,7 @@
             const g = carGeo(v), W = g.W, tyreL = Math.max(10, g.L * 0.16), d = (v.steer || 0) * CAR_ART.WHEEL_LOCK;
             const rim = _carRim(v);
             for (const s of [-1, 1]) {
-                ctx.save(); ctx.translate(g.axleF, s * (W / 2 - (g.hearse ? 1.3 : 0.4))); if (d) ctx.rotate(d);   // (the V1's peek out from under its fenders)
+                ctx.save(); ctx.translate(g.axleF, s * (W / 2 - (g.hearse ? g.C.tyreIn : 0.4))); if (d) ctx.rotate(d);   // (the V1's peek out from under its fenders)
                 ctx.fillStyle = '#0b0a0e'; ctx.beginPath(); ctx.roundRect(-tyreL / 2, -2.4, tyreL, 4.8, 1.6); ctx.fill();
                 if (g.hearse) {                                                 // a silver wheel face, its hub cap standing proud
                     const sv = ctx.createLinearGradient(-tyreL / 2, 0, tyreL / 2, 0);
@@ -206,11 +225,11 @@
                 c.fillStyle = rim; c.globalAlpha = 0.85; c.fillRect(ax - tyreL * 0.28, s * (W / 2 + 0.9) - 0.5, tyreL * 0.56, 1); c.globalAlpha = 1;
             }
             // Mirrors, at the windshield base
-            const mw = coach ? CAR_ART.COACH.waist * h + (1 - CAR_ART.COACH.waist) * h * 0.6 : h;   // the coach's sit on its waist
-            const mx0 = coach ? L / 2 - (CAR_ART.COACH.band[0] + CAR_ART.COACH.band[2]) / 2 * L + 1.5 : x0;   // the V1's stand off the windshield band's ends
+            const mw = coach ? g.C.waist * h + (1 - g.C.waist) * h * 0.6 : h;   // the coach's sit on its waist
+            const mx0 = coach ? L / 2 - (g.C.band[0] + g.C.band[2]) / 2 * L + 1.5 : x0;   // the V1's stand off the windshield band's ends
             for (const s of [-1, 1]) {
-                c.fillStyle = _carMix(col, -0.35); c.beginPath(); c.roundRect(mx0 - 3, s > 0 ? mw - 1 : -mw - 2.6, 4.5, 3.6, 1.2); c.fill();
-                c.fillStyle = coach ? CAR_ART.SILVER : 'rgba(210, 200, 240, 0.35)'; c.fillRect(mx0 - 2.4, s > 0 ? mw + 1.6 : -mw - 2.2, 3.2, 0.7);
+                const ml = coach ? g.C.mirror : 3.6; c.fillStyle = _carMix(col, -0.35); c.beginPath(); c.roundRect(mx0 - 3, s > 0 ? mw - 1 : -mw - ml + 1, 4.5, ml, 1.2); c.fill();
+                c.fillStyle = coach ? CAR_ART.SILVER : 'rgba(210, 200, 240, 0.35)'; c.fillRect(mx0 - 2.4, s > 0 ? mw + ml - 2 : -mw - ml + 1.4, 3.2, 0.7);
             }
             // Paint, shaded round the body's curve
             c.save(); c.clip(g.body);
@@ -239,7 +258,7 @@
                 c.fillStyle = 'rgba(0,0,0,0.14)';                          // the tail's facets
                 c.beginPath(); c.moveTo(x3, -W / 2 + si); c.lineTo(-L / 2, -W / 2 + 7); c.lineTo(-L / 2, 0); c.lineTo(x3, 0); c.closePath(); c.fill();
             } else if (coach) {
-                const C = CAR_ART.COACH, X = u => L / 2 - u * L, hv = C.hood * h;
+                const C = g.C, X = u => L / 2 - u * L, hv = C.hood * h;
                 // Height: the body rolls away at every edge (a soft inner shadow round the outline)
                 c.save(); c.filter = 'blur(2px)'; c.strokeStyle = 'rgba(0,0,0,0.55)'; c.lineWidth = 7; c.stroke(g.body); c.restore();
                 // The fender humps either side of the hood: a lit crown running their length, a seam down the inner edge,
@@ -298,7 +317,7 @@
             // The greenhouse: glass under the roof. The V1's is one narrow band arched across behind the hood; the cap's
             // black shell runs forward from the ivory top to meet it.
             if (coach) {
-                const C = CAR_ART.COACH, X = u => L / 2 - u * L, [f0, fa, b0, ba, bw] = C.band, sw = C.shell * h;
+                const C = g.C, X = u => L / 2 - u * L, [f0, fa, b0, ba, bw] = C.band, sw = C.shell * h;
                 const band = new Path2D(); band.moveTo(X(f0), -bw * h); band.quadraticCurveTo(X(fa), 0, X(f0), bw * h);
                 band.lineTo(X(b0), sw); band.quadraticCurveTo(X(ba), 0, X(b0), -sw); band.closePath();
                 const wg = c.createLinearGradient(X(fa), 0, X(ba), 0);
@@ -310,6 +329,37 @@
                 c.strokeStyle = 'rgba(0,0,0,0.7)'; c.lineWidth = 0.9; c.stroke(band);
                 c.strokeStyle = 'rgba(223,227,234,0.5)'; c.lineWidth = 0.6;          // chrome along its leading edge
                 c.beginPath(); c.moveTo(X(f0) - 0.6, -bw * h); c.quadraticCurveTo(X(fa) - 0.6, 0, X(f0) - 0.6, bw * h); c.stroke();
+                if (g.v3) {
+                    // The V3: windows ringing one long roof in the body's paint, from the band back to a round tail
+                    const gb = X(C.roof[0]) - 1.4, gr = sw * 0.95, gl = new Path2D();
+                    gl.moveTo(X(b0), -sw); gl.quadraticCurveTo(X(ba), 0, X(b0), sw);
+                    gl.lineTo(gb + gr, sw); gl.bezierCurveTo(gb + gr * 0.3, sw, gb, sw - gr * 0.45, gb, sw - gr); gl.lineTo(gb, -sw + gr); gl.bezierCurveTo(gb, -sw + gr * 0.45, gb + gr * 0.3, -sw, gb + gr, -sw); gl.closePath();
+                    const gg = c.createLinearGradient(0, -sw, 0, sw);
+                    gg.addColorStop(0, '#2c2752'); gg.addColorStop(0.3, '#0d0a1c'); gg.addColorStop(0.7, '#0d0a1c'); gg.addColorStop(1, '#221d40');
+                    c.fillStyle = gg; c.fill(gl);
+                    c.save(); c.clip(gl); c.strokeStyle = 'rgba(255, 250, 255, 0.2)'; c.lineWidth = 1;     // light sliding along the side glass
+                    for (const s of [-1, 1]) for (const u of [0.45, 0.62, 0.66]) { c.beginPath(); c.moveTo(X(u), s * sw); c.lineTo(X(u + 0.05), s * sw * 0.55); c.stroke(); }
+                    c.restore();
+                    // The roof: the body's paint, flat on top, rolling off at its sides and round its back into the glass
+                    const rw = C.roof[1] * h, rb = X(C.roof[0]) + 2.2, rr = rw * 0.95;
+                    const t = (1 + rw / sw) / 2, ex = X(b0) * (1 - 2 * t + 2 * t * t) + X(ba) * 2 * t * (1 - t) - 0.4;   // where the band's back edge meets the roof's sides
+                    const rf = new Path2D(); rf.moveTo(ex, -rw); rf.quadraticCurveTo(2 * (X(ba) - 0.4) - ex, 0, ex, rw);
+                    rf.lineTo(rb + rr, rw); rf.bezierCurveTo(rb + rr * 0.3, rw, rb, rw - rr * 0.45, rb, rw - rr); rf.lineTo(rb, -rw + rr); rf.bezierCurveTo(rb, -rw + rr * 0.45, rb + rr * 0.3, -rw, rb + rr, -rw); rf.closePath();
+                    c.save(); c.filter = 'blur(1.2px)'; c.strokeStyle = 'rgba(0,0,0,0.6)'; c.lineWidth = 2; c.stroke(rf); c.restore();
+                    c.fillStyle = `rgb(${col.join(',')})`; c.fill(rf);
+                    c.save(); c.clip(rf);
+                    const e = 2.6 / (rw * 2); let rg = c.createLinearGradient(0, -rw, 0, rw);
+                    rg.addColorStop(0, 'rgba(0,0,0,0.6)'); rg.addColorStop(e, 'rgba(0,0,0,0)'); rg.addColorStop(e * 1.6, 'rgba(255,255,255,0.08)');
+                    rg.addColorStop(1 - e * 1.6, 'rgba(255,255,255,0.08)'); rg.addColorStop(1 - e, 'rgba(0,0,0,0)'); rg.addColorStop(1, 'rgba(0,0,0,0.6)');
+                    c.fillStyle = rg; c.fill(rf);
+                    rg = c.createLinearGradient(rb, 0, rb + rr, 0); rg.addColorStop(0, 'rgba(0,0,0,0.65)'); rg.addColorStop(1, 'rgba(0,0,0,0)');
+                    c.save(); c.filter = 'blur(1.2px)'; c.strokeStyle = rg; c.lineWidth = 6; c.stroke(rf); c.restore();
+                    c.restore();
+                    c.strokeStyle = 'rgba(255,255,255,0.14)'; c.lineWidth = 0.5; c.stroke(rf);
+                    c.strokeStyle = CAR_ART.GOLD; c.lineWidth = 0.7; c.stroke(gl);       // the gold line round the glass
+                    c.save(); c.translate(rb + (ex - rb) * 0.55, 0); c.fillStyle = CAR_ART.GOLD;    // the house's crescent on the roof
+                    c.beginPath(); c.arc(0, 0, 3.2, 0, Math.PI * 2); c.arc(1.5, -0.6, 2.7, 0, Math.PI * 2, true); c.fill('evenodd'); c.restore();
+                } else {
                 // The shell: body paint, rounded over its sides, sloping down into the windshield at its front
                 const cb = X(C.cap[1]) - 1.8, r = sw * 0.85, sh = new Path2D();
                 sh.moveTo(X(b0), -sw); sh.quadraticCurveTo(X(ba), 0, X(b0), sw);
@@ -328,6 +378,7 @@
                 c.beginPath(); c.moveTo(X(b0) - 0.8, -sw); c.quadraticCurveTo(X(ba) - 0.8, 0, X(b0) - 0.8, sw); c.stroke();
                 c.restore();
                 c.strokeStyle = CAR_ART.GOLD; c.lineWidth = 0.7; c.stroke(sh);
+                }
             }
             const gw = W / 2 - si, glass = c.createLinearGradient(x0, 0, x3, 0);
             if (!coach) {
@@ -345,8 +396,8 @@
             }
             // The roof
             const rw = gw - 2.6, rx0 = x2, rx1 = x1;
-            if (g.hearse) {                                                   // the ivory hearse cap, its edge drawn twice as in the sketch
-                const [cu0, cu1, cv] = CAR_ART.COACH.cap, cw = cv * h, cf = L / 2 - cu0 * L, cb = L / 2 - cu1 * L;
+            if (g.hearse && !g.v3) {                                          // the ivory hearse cap, its edge drawn twice as in the sketch
+                const [cu0, cu1, cv] = g.C.cap, cw = cv * h, cf = L / 2 - cu0 * L, cb = L / 2 - cu1 * L;
                 const cr = cw * 0.85, cap = new Path2D(); cap.roundRect(cb, -cw, cf - cb, cw * 2, [cr, 5, 5, cr]);   // its back end well rounded
                 c.save(); c.filter = 'blur(1px)'; c.fillStyle = 'rgba(0,0,0,0.5)'; c.beginPath(); c.roundRect(cb - 0.5, -cw - 0.6, cf - cb + 1, cw * 2 + 1.2, [cr + 1, 6, 6, cr + 1]); c.fill(); c.restore();
                 // A flat top, evenly lit, with only a faint sheen across it
@@ -368,6 +419,7 @@
                 c.strokeStyle = CAR_ART.GOLD; c.lineWidth = 0.7; c.stroke(cap);
                 const mx = (cb + cf) / 2 - 4;                         // a gold crescent, the house's mark
                 c.fillStyle = CAR_ART.GOLD; c.beginPath(); c.arc(mx, 0, 3.4, 0, Math.PI * 2); c.arc(mx + 1.6, -0.6, 2.9, 0, Math.PI * 2, true); c.fill('evenodd');
+            } else if (g.v3) { /* the V3's roof is drawn with its windows */
             } else if (lady) {                                                // panoramic black glass, gold-framed
                 const pg = c.createLinearGradient(rx1, -rw, rx0, rw);
                 pg.addColorStop(0, '#2a2442'); pg.addColorStop(0.5, '#0a0812'); pg.addColorStop(1, '#1a1530');
@@ -413,19 +465,21 @@
             if (coach) {
                 _ladyBadge(c, L / 2 - L * 0.08, 3.2);
                 // The lamp pods: dark housings standing out of the body, ringed in silver (the lamps in them are live)
-                const Lp = coachLamps(L, W);
+                const Lp = coachLamps(g);
                 for (const s of [-1, 1]) for (const t of [Lp.head, ...Lp.tail]) {
                     c.save(); c.filter = 'blur(0.8px)'; c.fillStyle = 'rgba(0,0,0,0.6)'; _podPath(c, t, s, 0.7); c.fill(); c.restore();
                     c.fillStyle = '#17131f'; _podPath(c, t, s, 0.6); c.fill();
                     c.strokeStyle = t === Lp.head ? CAR_ART.SILVER : 'rgba(223,227,234,0.55)'; c.lineWidth = 0.5; c.stroke();
                 }
                 // The long light slab standing out of the tail, hooded: from above, the hood's lip over a dark housing
-                const S = coachLamps(L, W).slab;
+                const S = coachLamps(g).slab;
+                if (S) {
                 c.fillStyle = '#100c16'; c.beginPath(); c.roundRect(S.x - 0.4, -S.w - 0.4, S.d + 2.4, S.w * 2 + 0.8, 1); c.fill();
                 const lip = c.createLinearGradient(0, -S.w, 0, S.w);
                 lip.addColorStop(0, _carMix(col, -0.3)); lip.addColorStop(0.45, _carMix(col, 0.22)); lip.addColorStop(1, _carMix(col, -0.35));
                 c.fillStyle = lip; c.beginPath(); c.roundRect(S.x + 0.7, -S.w, S.d + 1.2, S.w * 2, [0.6, 1.4, 1.4, 0.6]); c.fill();
                 c.strokeStyle = CAR_ART.GOLD; c.globalAlpha = 0.7; c.lineWidth = 0.45; c.stroke(); c.globalAlpha = 1;
+                }
             }
         }
 
@@ -569,9 +623,9 @@
             const rev = v.state === 'REVERSING', brake = on && (v.speed < 0.5 || rev);
             ctx.fillStyle = rev ? '#f4f0ff' : brake ? '#ff2244' : on ? '#9a1028' : '#4a0a16';
             if (g.hearse) {
-                const Lp = coachLamps(L, W);
+                const Lp = coachLamps(g);
                 for (const s of [-1, 1]) for (const t of Lp.tail) { _podPath(ctx, t, s); ctx.fill(); }
-                ctx.beginPath(); ctx.roundRect(Lp.slab.x - 0.2, -Lp.slab.w + 0.6, 1, Lp.slab.w * 2 - 1.2, 0.5); ctx.fill();
+                if (Lp.slab) { ctx.beginPath(); ctx.roundRect(Lp.slab.x - 0.2, -Lp.slab.w + 0.6, 1, Lp.slab.w * 2 - 1.2, 0.5); ctx.fill(); }
                 const sig = _coachSignal(v);                                    // the running signal sweeps out over its side's pods
                 if (sig) {
                     ctx.fillStyle = '#ffb030';
@@ -585,7 +639,7 @@
             ctx.fillStyle = on ? hl : _carMix(_carRGB(hl), -0.55);
             for (const s of [-1, 1]) {
                 if (g.st === 'angular') { ctx.save(); ctx.translate(L / 2 - 5, s * (W / 2 - 4.5)); ctx.rotate(s * -0.75); ctx.fillRect(-3.5, -0.8, 7, 1.6); ctx.restore(); }
-                else if (g.hearse) { _podPath(ctx, coachLamps(L, W).head, s); ctx.fill(); }
+                else if (g.hearse) { _podPath(ctx, coachLamps(g).head, s); ctx.fill(); }
                 else if (g.st === 'blackmark') ctx.fillRect(L / 2 - 2, s > 0 ? W / 2 - 11 : -W / 2 + 3, 1.6, 8);
                 else { ctx.beginPath(); ctx.roundRect(L / 2 - 3.4, s > 0 ? W / 2 - 9.5 : -W / 2 + 3, 2.4, 6.5, 1); ctx.fill(); }
             }
@@ -599,10 +653,10 @@
             const rev = v.state === 'REVERSING', brake = v.speed < 0.5 || rev;
             ctx.save(); ctx.translate(v.x, v.y); ctx.rotate(v.angle); ctx.globalCompositeOperation = 'lighter';
             ctx.globalAlpha = a * (brake ? 0.8 : 0.38);
-            const Lp = g.hearse ? coachLamps(L, W) : null, T = Lp && Lp.tail[1];    // the coach's: round its pods
+            const Lp = g.hearse ? coachLamps(g) : null, T = Lp && Lp.tail[1];    // the coach's: round its pods
             const tX = Lp ? T.x : -L / 2 + 1, tY = Lp ? T.y : W / 2 - 6, hX = Lp ? Lp.head.x : L / 2 - 1, hY = Lp ? Lp.head.y : W / 2 - 6;
             for (const s of [-1, 1]) drawGlow(ctx, tX, s * tY, brake ? 15 : 10, rev ? '#fff4f8' : '#ff2848');
-            if (g.hearse) drawGlow(ctx, -L / 2 - 2.5, 0, brake ? 13 : 8, rev ? '#fff4f8' : '#ff2848');    // the hooded slab
+            if (g.hearse && g.C.slab) drawGlow(ctx, -L / 2 - 2.5, 0, brake ? 13 : 8, rev ? '#fff4f8' : '#ff2848');    // the hooded slab
             if (v._lod === 1) { ctx.restore(); return; }                   // far away: just the tail lights
             ctx.globalAlpha = a * 0.5;
             for (const s of [-1, 1]) drawGlow(ctx, hX, s * hY, 10, v.headlightColor || '#ffffaa');

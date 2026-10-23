@@ -14,7 +14,7 @@
                 glowColor: '#ffffff', headlightColor: '#ffffff', visualStyle: 'blackmark',
                 models: { 
                     suv: { name: 'BlackMark V1', length: 95, width: 44, speedMod: 1.0, spec: [100, 80, 80, 90, 100] },
-                    suv2: { name: 'BlackMark V3', length: 88, width: 42, speedMod: 1.05, noHearseCap: true, seats: 6, spec: [100, 86, 88, 78, 95] }
+                    suv2: { name: 'BlackMark V3', length: 98, width: 42, speedMod: 1.05, noHearseCap: true, seats: 6, spec: [100, 86, 88, 78, 95] }
                 }
             },
             Zenxera: {
