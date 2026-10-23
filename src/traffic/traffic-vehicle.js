@@ -131,12 +131,35 @@
                 this.manualGas = 0;
                 this.manualTurn = 0;
                 this._wallClear = null;     // wall clearance from the last empty wall check (_wallContact)
+                this._probeX0 = this._probeY0 = Infinity; this._probeX1 = this._probeY1 = -Infinity;   // route probe bounds (_routeProbe)
                 
                 // --- PARK IDLE TIMER ---
                 this.parkIdleTimer = 0; 
                 
                 // --- DRIVER STATE ---
                 this.hasDriver = (controlMode === 'AI'); 
+
+                /* Fields the driving code, the traffic manager, collisions and drawing add later, declared
+                   here in one fixed order. Added lazily, each car picked them up in its own order, so cars
+                   ended up with many different hidden classes (17 among 73 in a busy street): V8 then threw
+                   away its optimised traffic code each time a new one came through ("wrong map" deopts) and
+                   updateAIDriving kept falling back to slower tiers. Values are undefined, or 0 where every
+                   reader treats the field as `x || 0`, so nothing reads differently. */
+                this.fade = undefined; this.fading = undefined; this.isZib = undefined;
+                this._colIdx = undefined; this._collisionOrder = undefined; this._gridStamp = undefined; this._hashStamp = undefined;
+                this._tailTrail = undefined; this._lod = undefined; this._carGeo = undefined; this._beamCache = undefined;
+                this._trafficSensing = undefined; this._frozen = 0; this._aiPhase = undefined;
+                this._allVehicles = undefined; this._playerCar = undefined; this._folk = undefined;
+                this._sigDist = undefined; this._sigStop = undefined; this._sigGo = undefined; this._sigPath = undefined;
+                this._entryLane = undefined; this._entryMove = undefined;
+                this._folkPlan = undefined; this._folkWait = undefined; this._folkBacks = undefined; this._wallProbeTick = undefined;
+                this.steer = 0; this.spin = 0; this.yawRate = 0; this.load = 0; this.bodyRoll = 0; this._steerDir = 0;
+                this._routeProbePoints = undefined; this._routeProbePolyline = undefined;
+                this._splX = undefined; this._splY = undefined; this._splT = 0;
+                this._cachedCurvature = undefined; this._cachedCurvaturePath = undefined; this._pullOutLook = undefined;
+                this.laneChangeStartX = undefined; this.laneChangeStartY = undefined; this.laneChangeEndX = undefined; this.laneChangeEndY = undefined;
+                this.laneChangeDiagonalAngle = undefined; this.laneChangeTargetAngle = undefined;
+                this._lastImpact = 0; this._lastContact = undefined;
             }
             
             // Static helper methods for brand/model selection (called before super)
@@ -643,13 +666,44 @@
                     }
                     s += seg;
                 }
+                // The points' bounding box, so _probeGap can pass over cars nowhere near the route
+                let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+                for (let i = 0; i < out.length; i += 3) {
+                    const x = out[i], y = out[i + 1];
+                    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+                }
+                this._probeX0 = x0; this._probeY0 = y0; this._probeX1 = x1; this._probeY1 = y1;
                 return out;
+            }
+
+            /** Within the heading tunnel ahead (range long, ±width): { dist, lateral }, else null. */
+            _tunnel(tx, ty, range, width, cos, sin) {
+                const dx = tx - this.x;
+                const dy = ty - this.y;
+                const fwdDist = dx * cos + dy * sin;
+                const latDist = dx * (-sin) + dy * cos;
+                if (fwdDist > 0 && fwdDist < range && Math.abs(latDist) < width) {
+                    return { dist: fwdDist, lateral: latDist };
+                }
+                return null;
+            }
+
+            /** Mid lane change / overtake, a parked car is in the way only in the lane we're moving into
+                (the one we're pulling out from behind is being left; the same rule as people) */
+            _parkedInWay(c, tl, tlHalf) {
+                return !tl || Math.abs((c.x - tl.start.x) * -tl.uy + (c.y - tl.start.y) * tl.ux) < tlHalf + c.width / 2;
             }
 
             /** Bumper gap to `v` along the probe (Infinity if it isn't in the way). */
             _probeGap(v, pts) {
-                const c = Math.cos(v.angle), sn = Math.sin(v.angle);
                 const hl = v.length / 2 + 2, hw = (v.width + this.width) / 2 + 1;
+                // A point inside v's box is within its half-diagonal of v's centre: if v is further than that
+                // from the points' bounding box (always the case for most cars round about), none can be inside
+                if (pts === this._routeProbePoints) {
+                    const R = Math.sqrt(hl * hl + hw * hw);
+                    if (v.x + R < this._probeX0 || v.x - R > this._probeX1 || v.y + R < this._probeY0 || v.y - R > this._probeY1) return Infinity;
+                }
+                const c = Math.cos(v.angle), sn = Math.sin(v.angle);
                 for (let i = 0; i < pts.length; i += 3) {
                     const dx = pts[i] - v.x, dy = pts[i + 1] - v.y;
                     const lx = dx * c + dy * sn, ly = -dx * sn + dy * c;
@@ -1599,17 +1653,8 @@
                 const speedWidthBonus = currentSpeed * 1.5;
                 const dynamicTunnelWidth = baseTunnelWidth + speedWidthBonus;
 
-                // Enhanced tunnel check returns distance AND lateral offset
-                const checkTunnelEx = (tx, ty, range, width) => {
-                    const dx = tx - this.x;
-                    const dy = ty - this.y;
-                    const fwdDist = dx * cos + dy * sin;
-                    const latDist = dx * (-sin) + dy * cos;
-                    if (fwdDist > 0 && fwdDist < range && Math.abs(latDist) < width) {
-                        return { dist: fwdDist, lateral: latDist };
-                    }
-                    return null;
-                };
+                // (Sensing helpers are methods, not closures in here: a closure would put this function's
+                // locals in a heap context, read and written through memory on every line that uses them.)
 
                 // --- CATEGORIZED OBSTACLE DETECTION ---
                 // Category 1: Traffic to queue behind (AI drivers, autodriving player vehicles)
@@ -1627,31 +1672,28 @@
                 const probeRange = Math.max(this.length * 3, this.stoppingDistance() + this.length * 2 + 60);
                 // An empty stretch needs no sampled route. Build it only after a car
                 // passes the same distance test used by the original queue sensor.
+                // (The queue sensor, inlined below where it's used: within probeReach, the bumper gap along the probe.)
                 let probe = null;
                 const probeReach = (probeRange + 120) * (probeRange + 120);
-                const senseQueue = (v) => {
-                    const dx = v.x - this.x, dy = v.y - this.y;
-                    if (dx * dx + dy * dy > probeReach) return;
-                    const gap = this._probeGap(v, probe || (probe = this._routeProbe(probeRange)));
-                    if (gap < trafficObstacleDist) { trafficObstacle = v; trafficObstacleDist = gap; }
-                };
-
-                // Mid lane change / overtake, a parked car is in the way only in the lane we're moving into
-                // (the one we're pulling out from behind is being left; the same rule as people, above)
-                const parkedInWay = c => !tl || Math.abs((c.x - tl.start.x) * -tl.uy + (c.y - tl.start.y) * tl.ux) < tlHalf + c.width / 2;
 
                 // Check for player car
                 if (playerCar && playerCar !== this && (playerCar.x !== 0 || playerCar.y !== 0)) {
-                    const result = checkTunnelEx(playerCar.x, playerCar.y, lookAheadDist, dynamicTunnelWidth);
+                    const result = this._tunnel(playerCar.x, playerCar.y, lookAheadDist, dynamicTunnelWidth, cos, sin);
                     const parkedEmpty = !playerCar.hasDriver && playerCar.controlMode === 'PARKED';
-                    if (!parkedEmpty && !(this.currentTurnPath && playerCar.isWaiting && !playerCar.wasInIntersection)) senseQueue(playerCar);
+                    if (!parkedEmpty && !(this.currentTurnPath && playerCar.isWaiting && !playerCar.wasInIntersection)) {
+                        const dx = playerCar.x - this.x, dy = playerCar.y - this.y;
+                        if (dx * dx + dy * dy <= probeReach) {
+                            const gap = this._probeGap(playerCar, probe || (probe = this._routeProbe(probeRange)));
+                            if (gap < trafficObstacleDist) { trafficObstacle = playerCar; trafficObstacleDist = gap; }
+                        }
+                    }
                     if (result) {
                         // TURN PATH FILTER: Skip if we're mid-turn and player car is waiting outside
                         const playerWaiting = this.currentTurnPath && playerCar.isWaiting && !playerCar.wasInIntersection;
                         
                         if (playerWaiting) {
                             // Ignore — player car is queued at intersection entry
-                        } else if (!playerCar.hasDriver && playerCar.controlMode === 'PARKED' && parkedInWay(playerCar)) {
+                        } else if (!playerCar.hasDriver && playerCar.controlMode === 'PARKED' && this._parkedInWay(playerCar, tl, tlHalf)) {
                             // Truly parked and empty - can swerve around
                             swerveObstacles.push({
                                 type: 'vehicle',
@@ -1683,8 +1725,14 @@
                     // TURN PATH FILTER: when turning through an intersection, ignore cars queued at its other entries
                     if (this.currentTurnPath && v.isWaiting && !v.wasInIntersection) continue;
                     const parkedEmpty = !v.hasDriver && v.controlMode === 'PARKED';
-                    if (!parkedEmpty) { senseQueue(v); continue; }
-                    const result = parkedInWay(v) && checkTunnelEx(v.x, v.y, lookAheadDist, dynamicTunnelWidth);
+                    if (!parkedEmpty) {
+                        if (dvx * dvx + dvy * dvy <= probeReach) {
+                            const gap = this._probeGap(v, probe || (probe = this._routeProbe(probeRange)));
+                            if (gap < trafficObstacleDist) { trafficObstacle = v; trafficObstacleDist = gap; }
+                        }
+                        continue;
+                    }
+                    const result = this._parkedInWay(v, tl, tlHalf) && this._tunnel(v.x, v.y, lookAheadDist, dynamicTunnelWidth, cos, sin);
                     if (result) {
                         // Empty parked vehicle - can swerve
                         swerveObstacles.push({

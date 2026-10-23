@@ -101,6 +101,18 @@
                 this.quipDuration = 0;   // Frames the current quip lasts
                 this.quipCooldown = 60 + Math.floor(Math.random() * 240); // Stagger first quips so the city doesn't all speak at once on spawn
                 
+                // Fields other systems add later (collisions, traffic, crossings, drawing, hair and cloth),
+                // declared here in one fixed order and left undefined: every pedestrian keeps one hidden class,
+                // so the code that walks the crowd each tick isn't deoptimised by new shapes (see TrafficVehicle).
+                this._cvx = undefined; this._cvy = undefined; this._cpx = undefined; this._cpy = undefined; this._collisionOrder = undefined;
+                this._tvx = undefined; this._tvy = undefined; this._tpx = undefined; this._tpy = undefined; this._tpt = undefined;
+                this._queueSince = undefined; this._queueWait = undefined; this._queueNode = undefined; this._queueDetour = undefined;
+                this._gait = undefined; this._splX = undefined; this._splY = undefined; this._splT = undefined; this._hashStamp = undefined;
+                this._drawCfg = undefined; this._drawCfgFar = undefined; this._drawCfgRain = undefined; this._drawCfgLook = undefined;
+                this._wxSeed = undefined; this._wxStrike = undefined; this._lampShadowFrame = undefined;
+                this._pose = undefined; this._animState = undefined; this._hairSim = undefined; this._cloth = undefined;
+                this._blinkSeed = undefined; this._umbOpen = undefined;
+
                 // Find nearest node to start
                 this._findNearestNode();
             }
@@ -1041,8 +1053,18 @@
                     }
                 }
                 for (const record of this.loose.items) hits.push(record);
-                hits.sort(_crowdPointOrder);
-                for (const record of hits) out.push(record.item);
+                // Back into source order. Indices are unique and the cells come in nearly in order, so a plain
+                // insertion sort on the index is exact and much cheaper than sort() with a callback; very long
+                // lists keep sort().
+                const n = hits.length;
+                if (n > 64) hits.sort(_crowdPointOrder);
+                else for (let i = 1; i < n; i++) {
+                    const r = hits[i], k = r.index;
+                    let j = i - 1;
+                    while (j >= 0 && hits[j].index > k) { hits[j + 1] = hits[j]; j--; }
+                    hits[j + 1] = r;
+                }
+                for (let i = 0; i < n; i++) out.push(hits[i].item);
                 return out;
             }
         }
