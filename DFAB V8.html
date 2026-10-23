@@ -8554,6 +8554,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             baseline: false,                // Baseline's layer panel (ui/render-layers.js): each render layer on a chip, with its calls (not kept)
             countCalls: false,              // Full profiler: count canvas calls (a shim on every 2D call — it slows the frame it measures)
             propSprites: true,              // furniture painted once and stamped (entities/prop-sprites.js); off draws it as vector (not kept)
+            crowdHybrid: true,              // Crowd Quality High: far walkers' bodies from a bake, hair/cloth/rim live (ui/crowd-impostors.js); off draws them fully live (not kept)
             movingLightCache: true,         // the static dark and steady lamp holes from a world-space buffer, slid with the camera (engine/lighting.js); off redraws them every frame (not kept)
             talkStyle: (() => {             // 'veil' | 'ribbon': the dialogue and comms look (ui/comms.js TalkStyle); kept per device
                 try { if (localStorage.getItem('dfab_talk_style') === 'ribbon') return 'ribbon'; } catch (e) { /* private mode */ }
@@ -23454,7 +23455,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             },
             _context() {
                 const settings = {};
-                for (const k of ['resolutionScale','fpsLimit','baseZoom','lightingQuality','adaptiveLighting','softShadows','bloom','reflections','trafficDensity','pedestrianDensity','crowdQuality','lampShadows','foliageDensity','rainDensity','filmGrain','devicePreset','movingLightCache']) settings[k] = GameSettings[k];
+                for (const k of ['resolutionScale','fpsLimit','baseZoom','lightingQuality','adaptiveLighting','softShadows','bloom','reflections','trafficDensity','pedestrianDensity','crowdQuality','lampShadows','foliageDensity','rainDensity','filmGrain','devicePreset','movingLightCache','crowdHybrid']) settings[k] = GameSettings[k];
                 return { map: game.activeMap?.id || 'unknown', viewport: [window.innerWidth, window.innerHeight],
                     canvas: [game.canvas.width, game.canvas.height], dpr: window.devicePixelRatio || 1,
                     browser: navigator.userAgent || 'unknown', cores: navigator.hardwareConcurrency || null,
@@ -51837,9 +51838,16 @@ Object.assign(TrafficVehicle.prototype, {
 
         /** Renders "long" hair behind head, then head+face, then other hair on top. */
         const HAIR_SPILLS_FROM_HOOD = ['long', 'braids', 'dreadlocks', 'ponytail', 'demon_dancer'];
+        /** Which part of drawHeadAndHair to draw: null (all), 'head' (up to the hair) or 'hair' (the hair and all above it).
+            The crowd's hybrid bake (ui/crowd-impostors.js) bakes the head and draws the hair live over it. */
+        let _headPart = null;
         function drawHeadAndHair(ctx, headX, skinColor, faceDark, faceLight, hair, dyn, hat, jewelry) {
             dyn = dyn || {};
             const hatPiece = hat && typeof WARDROBE !== 'undefined' ? WARDROBE.hats[hat.type] : null;
+            if (_headPart !== 'hair') _drawHeadUnderHair(ctx, headX, skinColor, faceDark, faceLight, dyn, hatPiece, hat, jewelry);
+            if (_headPart !== 'head') _drawHairAndOver(ctx, headX, hair, dyn, hatPiece, hat, jewelry);
+        }
+        function _drawHeadUnderHair(ctx, headX, skinColor, faceDark, faceLight, dyn, hatPiece, hat, jewelry) {
             if (hatPiece && hatPiece.back) hatPiece.back(ctx, headX, hat, dyn);   // e.g. the back of a raised hood
             // Eyes — they blink now and then, each character on their own rhythm
             const owner = dyn.owner;
@@ -51863,6 +51871,8 @@ Object.assign(TrafficVehicle.prototype, {
                     ctx.fillStyle = faceLight; ctx.fillRect(headX + 5, 2, 2, 1);
                 }
             }
+        }
+        function _drawHairAndOver(ctx, headX, hair, dyn, hatPiece, hat, jewelry) {
             // Hair (all styles render on top of head) — strand physics via hairGeometry().
             // A raised hood hides short styles; long ones still spill out from under it.
             if (hair && !(hatPiece && hatPiece.hides === 'most' && !HAIR_SPILLS_FROM_HOOD.includes(hair.type))) {
@@ -52331,6 +52341,9 @@ Object.assign(TrafficVehicle.prototype, {
         }
 
         function _drawHumanoidBody(ctx, entity, config, S, A) {
+            // The crowd's hybrid bake (ui/crowd-impostors.js): pass 'under' bakes the legs and hips, 'over' the arms,
+            // torso and head; 'stamp' draws those two from the bake and everything that moves on its own live.
+            const HY = config._hybrid || null, bakePass = HY && HY.pass !== 'stamp' ? HY.pass : null;
             // --- 1. CONFIGURATION ---
             const skinColor = A ? A.plate : (config.skinColor || '#8d5524');
             const isDriving = config.isDriving || false;
@@ -52960,12 +52973,14 @@ Object.assign(TrafficVehicle.prototype, {
 
             // Floor-layer trains paint before the feet; waist overlays paint after the hips below.
             const groundTrain = WD && clothes.train && WD.trains[clothes.train.type];
-            if (groundTrain && !groundTrain.overWaist) {
+            if (groundTrain && !groundTrain.overWaist && !bakePass) {
                 ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(torsoRotation * 0.8);
                 groundTrain.draw(ctx, g, clothes.train);
                 ctx.restore();
             }
 
+            if (HY && HY.pass === 'stamp') HY.stamp(ctx, 'under', S);          // legs and hips, from the bake
+            else if (!bakePass || bakePass === 'under') {
             // 1. Feet
             if (shoeP) {
                 shoeP.draw(ctx, g, clothes.shoes);
@@ -53041,16 +53056,18 @@ Object.assign(TrafficVehicle.prototype, {
             // Skirts and other hip overlays (same geometry as the hips)
             if (botP && botP.hips) botP.hips(ctx, g, clothes.bottom);
             ctx.restore();
+            }
+            if (bakePass === 'under') return;
         
             // Crimson Flame attaches over the waist, before arms and the upper body.
-            if (groundTrain && groundTrain.overWaist) {
+            if (groundTrain && groundTrain.overWaist && !bakePass) {
                 ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(torsoRotation * 0.8);
                 groundTrain.draw(ctx, g, clothes.train);
                 ctx.restore();
             }
 
             // 5. Trains (Dress Train)
-            if (clothes.train) {
+            if (clothes.train && !bakePass) {
                 ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(torsoRotation * 0.8);
                 if (clothes.train.type === 'dress_train') {
                     // Two heavy panels trailing from the hips
@@ -53076,12 +53093,14 @@ Object.assign(TrafficVehicle.prototype, {
             }
         
             // 5b. Coat tails
-            if (topP && topP.tail) {
+            if (topP && topP.tail && !bakePass) {
                 ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(torsoRotation * 0.8);
                 topP.tail(ctx, g, clothes.top);
                 ctx.restore();
             }
 
+            if (HY && HY.pass === 'stamp') HY.stamp(ctx, 'over', S);           // arms, torso and head, from the bake
+            else {
             // 6. Hands, turned along the forearm: a fist round whatever they hold (a pistol's off hand stays relaxed)
             ctx.fillStyle = darken(skinColor, 0.4);
             const bothGrip = stance === 'rifle' || stance === 'sniper' || stance === 'punch';
@@ -53168,10 +53187,11 @@ Object.assign(TrafficVehicle.prototype, {
                 if (A.emblem) drawDNEmblem(ctx, BC.tf - 3.2, -BC.chest * 0.45, 2, A.glow);
             }
             ctx.restore();
+            }
         
             // 10. Head & Hair
             // In strong wind the head dips into it (toward where it's blowing from)
-            const windLocal = W ? W.dir - (entity.angle || 0) : 0, dip = W ? W.strong * 1.3 : 0;
+            const windLocal = W ? W.dir - (entity.angle || 0) : 0, dip = W && !HY ? W.strong * 1.3 : 0;   // (hybrid: the baked head doesn't dip)
             // Scoped (engine/scope.js): cheek down to the stock, head tipped toward the sight
             const scopeK = config.scopeK || 0;
             const headX = 0 + bounce - bodyRecoil + pf('head', 0) - Math.cos(windLocal) * dip + scopeK * 3.5;
@@ -53185,14 +53205,18 @@ Object.assign(TrafficVehicle.prototype, {
             const turning = headY !== 0 || headTurn !== 0;
             withHead(headX, hx => {
                 if (turning) { ctx.save(); ctx.translate(hx, headY); ctx.rotate(headTurn); ctx.translate(-hx, 0); }
-                drawHeadAndHair(ctx, hx, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, walkDyn, clothes.hat, clothes.jewelry);
-                if (SH && SH.level > 1 && (SH.lx || SH.ly)) {               // the head as a matte dome: hair gradients in its own colour, then shade away from the sun
+                const part = _headPart;
+                _headPart = bakePass === 'over' ? 'head' : HY ? 'hair' : null;
+                try { drawHeadAndHair(ctx, hx, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, walkDyn, clothes.hat, clothes.jewelry); }
+                finally { _headPart = part; }
+                if (SH && SH.level > 1 && (SH.lx || SH.ly) && !bakePass) {               // the head as a matte dome: hair gradients in its own colour, then shade away from the sun
                     const ht = clothes.hair && !clothes.hat ? _hairTone(clothes.hair.color) : null;
                     if (ht) { const s = ht.up ? 1 : -1; _softSpot(ctx, hx + s * SH.lx * 3, s * SH.ly * 3, 13, 13, ht.rgb, 0.55 * Math.hypot(SH.lx, SH.ly)); }
                     _softSpot(ctx, hx - SH.lx * 3.5, -SH.ly * 3.5, 13, 13, _SHADOW_RGB, SH.shA * (SH.body ? 1.3 : 0.9));
                 }
                 if (turning) ctx.restore();
             });
+            if (bakePass) return;                                           // (the bake ends with the head: the rest is drawn live)
             if (SH && SH.rim) {                                             // a street lamp's colour catching shoulder and head
                 const r = SH.rim.ang;
                 ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = SH.rim.style; ctx.lineWidth = 1.4; ctx.lineCap = 'round';
@@ -55291,13 +55315,115 @@ Object.assign(TrafficVehicle.prototype, {
                 return true;
             },
 
+            clear() { this.cache.clear(); if (typeof CrowdHybrid !== 'undefined') CrowdHybrid.clear(); }
+        };
+
+        /* ═══ HYBRID CROWD (Crowd Quality High) ═══
+           A walking passer-by beyond HYBRID.NEAR of her keeps everything that moves on its own live — hair
+           and its strand physics, cloth panels (trains, coat tails), the lamp rim, the head's shade, the
+           contact shadow, held items — and takes the rest from a bake: the legs and hips (under the cloth
+           panels) and the arms, torso and head (over them), each a 16-step walk cycle in the body's own
+           frame. The live draw runs as usual and stamps the two layers in place of drawing them
+           (_drawHumanoidBody's HY), so hair and cloth sit exactly where the body is. Baked parts are flat
+           shaded (they turn with the body; the light doesn't). Cells are baked as they're first needed, a
+           few a frame; until a cell exists that body is drawn fully live. Standing, posing, armed, driving,
+           hurt or near her: always live. Off: GameSettings.crowdHybrid. */
+        const HYBRID = { FRAMES: 16, R: 32, Q: 1.25, MAX: 40, CELLS_PER_FRAME: 3, NEAR: 240, MAX_ZOOM: 1.3 };   // R: body reach (world px) the bake holds; ~0.65 MB of strips each
+        const CrowdHybrid = {
+            cache: new Map(),          // owner → { sig, stride, under, over, have: Uint8Array, cell, used }
+            _frame: -1, _cells: 0,
+            /** Is this body drawn hybrid right now? */
+            eligible(ctx, e, c) {
+                if (GameSettings.crowdHybrid === false || c.isDriving || c._crowdBake || c._hybrid || e._reflectionProxy) return false;
+                if (c.pose === 'dance' || c.pose === 'die' || c.poseWhileMoving || (c.stance && c.stance !== 'idle') || (c.weapon && c.weapon.id) ||
+                    typeof c.punchTicks === 'number' || c.scopeK) return false;
+                if (e._pose && e._pose.w > 0.001) return false;                 // a pose (standing about) moves on its own
+                if (e._hitT !== undefined && _gameTimeSec - e._hitT < 0.2) return false;
+                const g = e._gait;
+                if (!g || !(g.speed > CONFIG.GAIT.STOP_SPEED)) return false;
+                const v = typeof game !== 'undefined' && game.view;
+                if (v && v.zoom > HYBRID.MAX_ZOOM) return false;                 // zoomed in (a finisher, a photo): sharp, live
+                const p = typeof game !== 'undefined' && game.player;
+                if (p) { const dx = e.x - p.x, dy = e.y - p.y; if (dx * dx + dy * dy < HYBRID.NEAR * HYBRID.NEAR) return false; }
+                return true;
+            },
+            /** Bake walk frame f (1..FRAMES) of both layers into the strips */
+            _bakeCell(e, c, b, f) {
+                const F = HYBRID.FRAMES, R = HYBRID.R, Q = HYBRID.Q, cell = b.cell;
+                const B = { x: e.x, y: e.y, angle: 0, look: e.look, walkPhase: (f - 1) / F * Math.PI * 2 };
+                syncHumanoidGait(B);
+                const G = B._gait;
+                G.speed = b.stride; G.dirX = 1; G.dirY = 0; G.tick = _simTick; G.prevX = B.x; G.prevY = B.y; G.phasePrev = B.walkPhase;
+                const wm = _worldMatrix, wc = _worldCanvas, lite = _crowdLite;
+                _crowdLite = true;                                              // flat: the bake turns with the body, the light doesn't
+                try {
+                    for (const [pass, cv] of [['under', b.under], ['over', b.over]]) {
+                        const g = cv.getContext('2d'); if (!g) return false;
+                        B._animState = null;
+                        g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(cell * (f - 1), 0, cell, cell);
+                        g.setTransform(Q, 0, 0, Q, cell * (f - 1) + R * Q, R * Q);
+                        const cfg = Object.assign({}, c, { lerpSpeed: 1, noShadow: true, poseInstant: true, pose: 'none', _crowdBake: true, _hybrid: { pass } });
+                        drawProceduralHumanoid(g, B, cfg);
+                    }
+                } catch (err) { return false; }
+                finally { _crowdLite = lite; _worldMatrix = wm; _worldCanvas = wc; }
+                b.have[f] = 1;
+                return true;
+            },
+            /** Draw this body hybrid (true), or false: the caller draws it live */
+            draw(ctx, e, c) {
+                if (!this.eligible(ctx, e, c)) return false;
+                syncHumanoidGait(e);
+                const sig = CrowdImpostors._sig(e, c, null), F = HYBRID.FRAMES;
+                let b = this.cache.get(e);
+                // A change of pace keeps the bake: only the baked legs' stride differs a little, and nothing live
+                // hangs from them (rebaking on every easing step would cost more than it saves)
+                if (!b || (b.sig !== sig && !CrowdImpostors._sameButStride(b, sig))) {
+                    if (!b && this.cache.size >= HYBRID.MAX) {                 // full: the one seen longest ago goes (never one seen this frame)
+                        let oldK = null, oldT = Infinity;
+                        for (const [k, v] of this.cache) if (v.used < oldT) { oldT = v.used; oldK = k; }
+                        if (oldK === null || oldT >= _frameTime) return false;
+                        this.cache.delete(oldK);
+                    }
+                    const parts = sig.split('|'), stride = +parts[4] || 0;
+                    if (!(stride > 0)) return false;
+                    const cell = Math.ceil(HYBRID.R * 2 * HYBRID.Q);
+                    const mk = () => { const cv = document.createElement('canvas'); cv.width = cell * F; cv.height = cell; return cv; };
+                    if (b) { b.have.fill(0); b.sig = sig; b.parts = parts; b.stride = stride; }
+                    else { b = { sig, parts, stride, under: mk(), over: mk(), have: new Uint8Array(F + 1), cell, used: _frameTime }; this.cache.set(e, b); }
+                }
+                b.used = _frameTime;
+                const ph = ((e.walkPhase || 0) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+                const f = 1 + (Math.round(ph / (Math.PI * 2) * F) % F);
+                if (!b.have[f]) {
+                    if (this._frame !== _frameTime) { this._frame = _frameTime; this._cells = 0; }
+                    if (this._cells >= HYBRID.CELLS_PER_FRAME) return false;     // a few cells a frame; live until then
+                    this._cells++;
+                    if (!this._bakeCell(e, c, b, f)) return false;
+                }
+                const R = HYBRID.R, cell = b.cell, x = cell * (f - 1);
+                const cfg = c; const prev = cfg._hybrid;
+                cfg._hybrid = { pass: 'stamp', stamp: (g, layer, S) => {
+                    // The bake already holds the build's scale: undo the live one round the stamp
+                    if (S && (S.x !== 1 || S.y !== 1)) { g.save(); g.scale(1 / S.x, 1 / S.y); }
+                    g.drawImage(layer === 'under' ? b.under : b.over, x, 0, cell, cell, -R, -R, R * 2, R * 2);
+                    if (S && (S.x !== 1 || S.y !== 1)) g.restore();
+                } };
+                try { drawProceduralHumanoid(ctx, e, cfg); }
+                finally { if (prev === undefined) delete cfg._hybrid; else cfg._hybrid = prev; }
+                RenderStats.cachedBodies++;
+                return true;
+            },
             clear() { this.cache.clear(); }
         };
 
         /** The crowd's draw: by Crowd Quality (high live, medium lighter, low baked) */
         function drawCrowdHumanoid(ctx, entity, config) {
             const q = GameSettings.crowdQuality || 'high';
-            if (q === 'high') return drawProceduralHumanoid(ctx, entity, config);
+            if (q === 'high') {
+                if (CrowdHybrid.draw(ctx, entity, config)) return;
+                return drawProceduralHumanoid(ctx, entity, config);
+            }
             if (q === 'low') {
                 if (!RenderStats.timed) { if (CrowdImpostors.draw(ctx, entity, config)) return; }
                 else {                                                              // a baked body is still a body: Entities: People

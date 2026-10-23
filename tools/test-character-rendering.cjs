@@ -116,4 +116,50 @@ test('Limb shading reuses outline geometry and preserves collapsed-joint length'
  assert.equal(r.collapsed,0);assert.equal(r.angle,0);
 });
 
+
+const crowd=`
+ game.story.update=()=>{};game._doLoadMap('sdc');GameSettings.crowdQuality='high';GameSettings.crowdHybrid=true;
+ game.view={x:0,y:0,zoom:1,shakeX:0,shakeY:0};game.player.x=0;game.player.y=0;
+ const ctx=game.ctx;ctx.setTransform(1,0,0,1,0,0);_worldCanvas=game.canvas;_worldMatrix=ctx.getTransform();
+ const look={stance:'idle',skinColor:'#c99873',hair:{type:'long',color:'#402010'},top:{type:'tank',color:'#803030'},bottom:{type:'mini_skirt',color:'#202020'},shoes:{type:'sneakers',color:'#ffffff'}};
+ const walker=(x)=>{const e={x,y:0,angle:0,facingAngle:0,look,walkPhase:0};syncHumanoidGait(e);Object.assign(e._gait,{speed:2,dirX:1,dirY:0,tick:_simTick,prevX:x,prevY:0});return e;};
+ let stamps=0,live=0;const D=drawProceduralHumanoid;
+ const passes=[];globalThis.drawProceduralHumanoid=function(c,e,cfg){if(cfg._hybrid)passes.push(cfg._hybrid.pass);else live++;return D.apply(this,arguments);};
+ const draw=(e,cfg=look)=>{passes.length=0;live=0;ctx.setTransform(1,0,0,1,0,0);drawCrowdHumanoid(ctx,e,{...cfg});return {passes:passes.slice(),live};};
+`;
+test('Hybrid crowd: far walkers bake each walk cell once, then stamp it with hair and cloth live',env=>{
+ const r=value(env,crowd+`
+  const e=walker(600);_frameTime=1;
+  const first=draw(e);                       // bakes the cell (under + over), then stamps
+  const again=draw(e);                       // the same cell: stamp only
+  e.walkPhase=Math.PI;_frameTime=2;const other=draw(e);
+  const b=CrowdHybrid.cache.get(e);
+  return {first:first.passes,again:again.passes,other:other.passes,cells:Array.from(b.have).reduce((a,v)=>a+v,0)};
+ `);
+ assert.deepEqual(r,{first:['under','over','stamp'],again:['stamp'],other:['under','over','stamp'],cells:2});
+});
+test('Hybrid crowd: near her, standing, posed, armed, zoomed in, a reflection or switched off are drawn live',env=>{
+ const r=value(env,crowd+`
+  const out={};_frameTime=1;
+  out.near=draw(walker(100)).live===1;
+  const s=walker(600);s._gait.speed=0;out.standing=draw(s).live===1;
+  const p=walker(600);p._pose={w:1};out.posed=draw(p).live===1;
+  out.armed=draw(walker(600),{...look,weapon:{id:'pistol'}}).live===1;
+  game.view.zoom=2;out.zoomed=draw(walker(600)).live===1;game.view.zoom=1;
+  const m=walker(600);m._reflectionProxy=true;out.reflection=draw(m).live===1;
+  GameSettings.crowdHybrid=false;out.off=draw(walker(600)).live===1;GameSettings.crowdHybrid=true;
+  out.far=draw(walker(600)).passes.includes('stamp');
+  return out;
+ `);
+ assert.deepEqual(r,{near:true,standing:true,posed:true,armed:true,zoomed:true,reflection:true,off:true,far:true});
+});
+test('Hybrid crowd: a few cells a frame, a change of pace keeps the bake, a new look rebakes',env=>{
+ const r=value(env,crowd+`
+  _frameTime=5;const es=[1,2,3,4,5].map(i=>walker(500+i*60));const res=es.map(e=>draw(e).passes.includes('stamp'));
+  const e=es[0];const b=CrowdHybrid.cache.get(e);e._gait.speed=2.5;draw(e);const kept=CrowdHybrid.cache.get(e)===b&&b.have.some(Boolean);
+  _frameTime=6;const hatted=draw(e,{...look,hat:{type:'beanie',color:'#000'}});
+  return {stamped:res,kept,rebaked:hatted.passes[0]==='under'};
+ `);
+ assert.deepEqual(r,{stamped:[true,true,true,false,false],kept:true,rebaked:true});
+});
 console.log(JSON.stringify({passed:results.length,results},null,2));
