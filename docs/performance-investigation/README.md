@@ -128,3 +128,22 @@ Off-screen decision thinning was also tried: off-screen cars thought every secon
 None of these desktop figures predicts phone FPS; compare a phone capture on the same route and settings.
 
 Checks: `node tools/test-traffic-efficiency.cjs`, `node tools/test-lighting-base.cjs`, `node tools/test-character-rendering.cjs`.
+
+## Deep simulation profile (October 22, evening)
+
+Method: Chromium's CPU profiler with line-level positions (`--detailed-line-info`), with the CPU throttled 4× (about this phone's simulation speed), on the city at night with High traffic and pedestrians (~72 cars, ~100 people). Equivalence is checked in the Node runner: seeded 3,000-tick runs must end with bit-identical car and pedestrian state. The Node runner's own timings were not used, because the VM context makes global lookups (`Math`, `Object.is`) 5–70× slower than in a browser and distorts the profile.
+
+**Root cause: unstable object shapes.** Cars picked up about 50 fields lazily (`fade`, `_aiPhase`, `_trafficSensing`, signal and route-probe state, physics state…), each car in its own order. That gave 17 hidden classes among 73 cars. Every hot traffic function then saw "new" maps: V8 discarded its optimised code ("wrong map" deopts, 96 in 1,500 steady-state ticks for `updateAIDriving` alone) and recompiled `updateAIDriving` 22 times in 3,000 ticks, running in slower tiers in between. Pedestrians had the same problem to a lesser degree. Both constructors now declare those fields, in a fixed order, as `undefined` (or `0` where every reader uses `x || 0`). Steady-state deopts dropped to about 20, none in `updateAIDriving`.
+
+Smaller, measured fixes:
+- The crowd grid query sorted its hits back into source order with `sort()` and a comparator callback, on every query (about 225 a tick). It now uses an insertion sort on the index, keeping `sort()` above 64 hits.
+- The queue probe (`_probeGap`, about 680 calls a tick) skips cars outside the probe points' bounding box, expanded by the car's half-diagonal. This is exact, because a point inside a car's box is within its half-diagonal of the centre.
+- `updateAIDriving` had three closures, which put its locals in a heap context. They are now methods or inline code.
+
+Result (Chromium, 4× throttle, update only): **17.1 → 9.9 ms per simulation tick**, with traffic down from 10.9 to 5.0 ms. Most of the gain came from the shape fix: 13.3 → 8.3 ms in a direct A/B.
+
+Tried and reverted for no measurable gain: allocation-free `isOnScreen`/`getOnScreen` (escape analysis already removed the allocation; the remaining cost is polymorphic calls over 953 collidables), removing `_readFolk`'s closure, and declaring lamp fields up front (lamps had 11 shapes, but frame time didn't change).
+
+Remaining simulation costs at 4× (ms per tick): traffic decisions' own work 0.7, people sensing 0.85, crowd grid queries 0.75, pedestrians 1.5, car contacts 0.9, collision system 0.8 (0.55 of it on-screen culling of collidables), weather 0.55, enemies 0.3, navigation refresh 0.26.
+
+Checks: `node tools/test-traffic-efficiency.cjs`, `node tools/test-traffic-crossings.cjs`, `node tools/test-game-regressions.cjs`.
