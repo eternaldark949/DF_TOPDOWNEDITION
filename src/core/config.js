@@ -345,7 +345,8 @@
 
                    Cars the player can see or touch now always think at full rate.
                    Only the distant fleet is thinned, where nobody can tell. */
-                AI_NEAR_RADIUS: 1400,        // Within this of the player: full 60Hz AI
+                AI_NEAR_RADIUS: 1400,        // Within this of the player: full 60Hz AI...
+                AI_SCREEN_MARGIN: 300,       // ...unless this far (world px) past the screen's edge: thinned like the far fleet
                 TRAFFIC_AI_FAR_INTERVAL: 4,  // Beyond it: think every 4th step (15Hz)
 
                 STEALTH_INTERVAL: 4,         // Player visibility solve every 4th step (15Hz)

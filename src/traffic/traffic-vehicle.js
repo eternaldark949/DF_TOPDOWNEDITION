@@ -1403,7 +1403,14 @@
                     // Squared compare — no sqrt on the hot path.
                     const _dx = this.x - player.x, _dy = this.y - player.y;
                     const _r = CONFIG.SIM.AI_NEAR_RADIUS;
-                    const _far = (_dx * _dx + _dy * _dy) > (_r * _r);
+                    let _far = (_dx * _dx + _dy * _dy) > (_r * _r);
+                    // Off the screen by a margin counts as far too: the screen is far wider than it is tall, so
+                    // within the radius most cars are out of sight above or below it (the last frame's view)
+                    const _v = _game.view, _cv = _game.canvas;
+                    if (!_far && _v && _cv && _v.zoom > 0) {
+                        const _m = CONFIG.SIM.AI_SCREEN_MARGIN;
+                        _far = Math.abs(this.x - _v.x) > _cv.width / 2 / _v.zoom + _m || Math.abs(this.y - _v.y) > _cv.height / 2 / _v.zoom + _m;
+                    }
                     if (_far && !_game.simDue(CONFIG.SIM.TRAFFIC_AI_FAR_INTERVAL, this._aiPhase)) {
                         this.aiDriveStep(weather, walls, buildings, decalSystem);
                         return;

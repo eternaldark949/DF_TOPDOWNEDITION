@@ -5253,7 +5253,8 @@
 
                    Cars the player can see or touch now always think at full rate.
                    Only the distant fleet is thinned, where nobody can tell. */
-                AI_NEAR_RADIUS: 1400,        // Within this of the player: full 60Hz AI
+                AI_NEAR_RADIUS: 1400,        // Within this of the player: full 60Hz AI...
+                AI_SCREEN_MARGIN: 300,       // ...unless this far (world px) past the screen's edge: thinned like the far fleet
                 TRAFFIC_AI_FAR_INTERVAL: 4,  // Beyond it: think every 4th step (15Hz)
 
                 STEALTH_INTERVAL: 4,         // Player visibility solve every 4th step (15Hz)
@@ -26147,8 +26148,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
                 for (const record of this.loose.items) hits.push(record);
-                hits.sort(_crowdPointOrder);
-                for (const record of hits) out.push(record.item);
+                // Back into source order. Most queries hit a handful: an insertion sort there skips sort()'s
+                // comparator calls (the same order, records' indices being distinct)
+                const n = hits.length;
+                if (n > 24) hits.sort(_crowdPointOrder);
+                else for (let i = 1; i < n; i++) {
+                    const r = hits[i], k = r.index;
+                    let j = i - 1;
+                    while (j >= 0 && hits[j].index > k) { hits[j + 1] = hits[j]; j--; }
+                    hits[j + 1] = r;
+                }
+                for (let i = 0; i < n; i++) out.push(hits[i].item);
                 return out;
             }
         }
@@ -42802,7 +42812,14 @@ class NeuralSystemsBuilding extends BuildingV2 {
                     // Squared compare — no sqrt on the hot path.
                     const _dx = this.x - player.x, _dy = this.y - player.y;
                     const _r = CONFIG.SIM.AI_NEAR_RADIUS;
-                    const _far = (_dx * _dx + _dy * _dy) > (_r * _r);
+                    let _far = (_dx * _dx + _dy * _dy) > (_r * _r);
+                    // Off the screen by a margin counts as far too: the screen is far wider than it is tall, so
+                    // within the radius most cars are out of sight above or below it (the last frame's view)
+                    const _v = _game.view, _cv = _game.canvas;
+                    if (!_far && _v && _cv && _v.zoom > 0) {
+                        const _m = CONFIG.SIM.AI_SCREEN_MARGIN;
+                        _far = Math.abs(this.x - _v.x) > _cv.width / 2 / _v.zoom + _m || Math.abs(this.y - _v.y) > _cv.height / 2 / _v.zoom + _m;
+                    }
                     if (_far && !_game.simDue(CONFIG.SIM.TRAFFIC_AI_FAR_INTERVAL, this._aiPhase)) {
                         this.aiDriveStep(weather, walls, buildings, decalSystem);
                         return;
@@ -44371,8 +44388,14 @@ Object.assign(TrafficVehicle.prototype, {
                     return true;
                 };
                 const sensing = this._trafficSensing;
-                const people = sensing?.active && sensing.source === this._allVehicles
-                    ? sensing.people.query(this.x, this.y, range) : folk;
+                // Only the box the checks below keep can matter (from just behind us to `range` ahead, and within
+                // 60 px of our sides): ask the grid round its middle, not round us out to `range` every way
+                let people = folk;
+                if (sensing?.active && sensing.source === this._allVehicles) {
+                    const R = sensing.folkRad || 12, back = L / 2 + R, a = (range + back) / 2, w = half + R + 60;
+                    const mid = (range - back) / 2;
+                    people = sensing.people.query(this.x + fx * mid, this.y + fy * mid, Math.sqrt(a * a + w * w));
+                }
                 for (const p of people) {
                     if (!p || p.dead) continue;
                     const dx = p.x - this.x, dy = p.y - this.y;
@@ -45189,6 +45212,9 @@ Object.assign(TrafficVehicle.prototype, {
                 // order and update moved cars immediately for the sequential simulation.
                 const sensing = this.sensing;
                 sensing.source = sensed; sensing.cars.build(sensed); sensing.people.build(folk);
+                let folkRad = 12;                                   // the widest body on foot (traffic-people.js sizes its search by it)
+                for (const p of folk) if (p && p.radius > folkRad) folkRad = p.radius;
+                sensing.folkRad = folkRad;
                 // Traffic occupies the first slots in both source forms. Descending
                 // removal leaves every not-yet-visited index unchanged, so the loop's
                 // index is also the grid record index; no per-tick identity map needed.
