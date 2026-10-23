@@ -13,9 +13,9 @@
                  transformed; opts.px = device px per map unit (keeps hairlines hairline).
            ===================================================================== */
         const MAP_PAL = {
-            base: '#0b0614', ground: '#120a24', block: '#170d2e', building: '#1e1138', park: '#0f0820',
-            rim: 'rgba(255, 200, 110, 0.32)', pave: 'rgba(255, 176, 80, 0.10)', cross: 'rgba(255, 222, 160, 0.30)',
-            gold: '#ffcf6a', goldHot: '#fff3cf', violet: '#8b5cf6', lavender: '#d9ccff', crimson: '#b0103a'
+            base: '#0a0414', ground: '#100420', block: '#160530', building: '#1f0846', park: '#0d031e',
+            rim: 'rgba(255, 170, 50, 0.36)', pave: 'rgba(255, 145, 30, 0.12)', cross: 'rgba(255, 196, 90, 0.32)',
+            gold: '#ffbf3a', goldHot: '#ffe2a0', violet: '#7c3aed', lavender: '#d9ccff', crimson: '#b0103a'
         };
 
         const MapIcons = {
@@ -88,10 +88,10 @@
                 /** You: a violet triangle with a lavender rim and a soft glow, pointing +x. */
                 player(c, S) {
                     const cx = S / 2, cy = S / 2;
-                    this._glow(c, cx, cy, S * 0.62, '139, 92, 246', 0.6);
+                    this._glow(c, cx, cy, S * 0.62, '124, 58, 237', 0.7);
                     c.beginPath(); c.moveTo(cx + S * 0.46, cy); c.lineTo(cx - S * 0.34, cy - S * 0.36); c.lineTo(cx - S * 0.18, cy); c.lineTo(cx - S * 0.34, cy + S * 0.36); c.closePath();
                     const g = c.createLinearGradient(cx - S * 0.3, cy - S * 0.3, cx + S * 0.4, cy + S * 0.3);
-                    g.addColorStop(0, '#b79bff'); g.addColorStop(1, '#6d3fe0');
+                    g.addColorStop(0, '#a36dff'); g.addColorStop(1, '#5517d6');
                     c.fillStyle = g; c.fill();
                     c.strokeStyle = '#efe6ff'; c.lineWidth = Math.max(1, S * 0.06); c.lineJoin = 'round'; c.stroke();
                 },
@@ -143,7 +143,7 @@
                 client(c, S) {
                     const cx = S / 2, cy = S / 2;
                     this._glow(c, cx, cy, S * 0.62, '255, 205, 100', 0.5);
-                    c.fillStyle = '#5b2bc4'; c.beginPath(); c.arc(cx, cy, S * 0.42, 0, Math.PI * 2); c.fill();
+                    c.fillStyle = '#4c16b8'; c.beginPath(); c.arc(cx, cy, S * 0.42, 0, Math.PI * 2); c.fill();
                     c.fillStyle = '#ffd76a'; c.beginPath(); c.arc(cx, cy, S * 0.27, 0, Math.PI * 2); c.fill();
                 },
                 /** A magnifier (the zoom readout). */
@@ -202,7 +202,7 @@
                 if (this._grain) return this._grain;
                 const cv = document.createElement('canvas'); cv.width = cv.height = 40;
                 const c = cv.getContext('2d'), rnd = seededRandom(949);
-                for (let i = 0; i < 46; i++) { c.fillStyle = `rgba(${rnd() < 0.5 ? '139, 92, 246' : '255, 190, 110'}, ${0.05 + rnd() * 0.08})`; c.beginPath(); c.arc(rnd() * 40, rnd() * 40, 1.2 + rnd() * 2.6, 0, Math.PI * 2); c.fill(); }
+                for (let i = 0; i < 46; i++) { c.fillStyle = `rgba(${rnd() < 0.5 ? '124, 58, 237' : '255, 160, 50'}, ${0.05 + rnd() * 0.08})`; c.beginPath(); c.arc(rnd() * 40, rnd() * 40, 1.2 + rnd() * 2.6, 0, Math.PI * 2); c.fill(); }
                 return (this._grain = cv);
             },
 
@@ -238,20 +238,20 @@
                 const stroke = (wid, style, op) => { ctx.globalCompositeOperation = op || 'lighter'; ctx.strokeStyle = style; ctx.lineWidth = wid; ctx.beginPath(); for (const r of roads) { if (r.path) r.path.points.forEach((p, k) => k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); else { ctx.moveTo(r.x1, r.y1); ctx.lineTo(r.x2, r.y2); } } ctx.stroke(); };
                 ctx.lineCap = 'round';
                 const T = roads.length ? Math.max(...roads.map(r => r.thickness || 200)) : 200;
-                stroke(T * 1.5, 'rgba(255, 140, 40, 0.07)');
-                stroke(T * 0.85, 'rgba(255, 160, 60, 0.14)');
-                stroke(Math.max(T * 0.22, 2.5 * u), 'rgba(255, 207, 106, 0.75)');
-                stroke(Math.max(T * 0.05, 1.2 * u * (opts.dpr || 1)), 'rgba(255, 243, 207, 0.95)');
+                stroke(T * 1.5, 'rgba(255, 110, 0, 0.09)');
+                stroke(T * 0.85, 'rgba(255, 135, 10, 0.18)');
+                stroke(Math.max(T * 0.22, 2.5 * u), 'rgba(255, 158, 18, 0.85)');
+                stroke(Math.max(T * 0.05, 1.2 * u * (opts.dpr || 1)), 'rgba(255, 206, 110, 0.85)');
                 if (map.crosswalks) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = MAP_PAL.cross; for (const k of map.crosswalks) if (hit(k.x, k.y, k.w, k.h)) { if (k.poly) { ctx.beginPath(); Poly.trace(ctx, k.poly); ctx.fill(); } else ctx.fillRect(k.x, k.y, k.w, k.h); } }
                 // Lamps: warm specks of light; glowing trees: violet motes
                 if (opts.lamps && opts.lamps.length && typeof glowSprite === 'function') {
-                    const spr = glowSprite('255, 200, 110', 0.2), R = Math.max(14, Math.min(6 * u * (opts.dpr || 1), 46));   // specks when zoomed out (capped in map units, so they never pile into white)
+                    const spr = glowSprite('255, 165, 45', 0.2), R = Math.max(14, Math.min(6 * u * (opts.dpr || 1), 46));   // specks when zoomed out (capped in map units, so they never pile into white)
                     ctx.globalAlpha = 0.32;
                     for (const l of opts.lamps) if (!l.candle && hit(l.x, l.y, 0, 0)) ctx.drawImage(spr, l.x - R, l.y - R, R * 2, R * 2);
                     ctx.globalAlpha = 1;
                 }
                 if (map.foliage && typeof glowSprite === 'function') {
-                    const spr = glowSprite('168, 85, 247', 0.3), R = Math.max(10, Math.min(5 * u * (opts.dpr || 1), 36));
+                    const spr = glowSprite('147, 51, 234', 0.3), R = Math.max(10, Math.min(5 * u * (opts.dpr || 1), 36));
                     ctx.globalAlpha = 0.35;
                     for (const f of map.foliage) if (f.isGlowing && hit(f.x, f.y, 0, 0)) ctx.drawImage(spr, f.x - R, f.y - R, R * 2, R * 2);
                     ctx.globalAlpha = 1;
