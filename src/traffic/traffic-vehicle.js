@@ -55,6 +55,10 @@
                 this.width = vehicleWidth;  // Override for backward compatibility with draw()
                 this.maxSpeed = brandData.baseStats.maxSpeed * modelData.speedMod + (Math.random() * 1 - 0.5);
                 this.acceleration = brandData.baseStats.acceleration;
+                // What it does with the player at the wheel (applyDrivePhysics): traffic keeps the numbers above
+                const dv = modelData.driven || {};
+                this.drivenTop = dv.top || brandData.baseStats.maxSpeed * modelData.speedMod;
+                this.drivenAccel = dv.accel || this.acceleration;
                 this.handling = brandData.baseStats.handling;
                 this.brake = brandData.baseStats.brake || 0.3;        // px/tick² at full brake
                 this.drive = brandData.drive || CONFIG.VEHICLE_DRIVE.DEFAULT_FEEL;   // handling character
@@ -929,15 +933,15 @@
                    says it should:
 
                        steady state  v = a·d/(1-d)   =>   d = v/(a+v)          */
-                const topSpeed = (typeof this.maxSpeed === 'number' && this.maxSpeed > 0)
-                    ? this.maxSpeed : 12.5;
-                const acceleration = (typeof this.acceleration === 'number' && this.acceleration > 0)
-                    ? this.acceleration : 0.5;
+                const player = steerCurve;                    // the full weighted model is the driver's
+                const ownTop = player && this.drivenTop > 0 ? this.drivenTop : this.maxSpeed;
+                const ownAccel = player && this.drivenAccel > 0 ? this.drivenAccel : this.acceleration;
+                const topSpeed = (typeof ownTop === 'number' && ownTop > 0) ? ownTop : 12.5;
+                const acceleration = (typeof ownAccel === 'number' && ownAccel > 0) ? ownAccel : 0.5;
                 const drag = topSpeed / (acceleration + topSpeed);
                 const revTop = topSpeed * VD.REVERSE_TOP_FRACTION;
                 const reverseDrag = revTop / (acceleration + revTop);
 
-                const player = steerCurve;                    // the full weighted model is the driver's
                 const F = this.drive || VD.DEFAULT_FEEL;
                 const rain = (weather && weather.isRaining)
                     ? Math.min(1, weather.getRainScale ? weather.getRainScale() : 1) : 0;
