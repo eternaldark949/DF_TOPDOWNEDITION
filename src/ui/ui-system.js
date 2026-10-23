@@ -514,7 +514,7 @@
                 
                 // Outer glow (widths in CSS px: this._u is map units per CSS px)
                 const U = this._u || 1;
-                ctx.strokeStyle = 'rgba(118, 28, 230, 0.34)';
+                ctx.strokeStyle = MAP_PAL.route[0];
                 ctx.lineWidth = 14 * U;
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
@@ -527,7 +527,7 @@
                 ctx.stroke();
                 
                 // Middle layer
-                ctx.strokeStyle = 'rgba(150, 70, 255, 0.78)';
+                ctx.strokeStyle = MAP_PAL.route[1];
                 ctx.lineWidth = 6 * U;
                 
                 ctx.beginPath();
