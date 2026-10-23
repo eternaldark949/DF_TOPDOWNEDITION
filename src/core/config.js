@@ -368,6 +368,8 @@
                 STEP_MS: 1000 / 60,   // One sim tick of GAME time — matches how everything was tuned
                 MAX_FRAME_MS: 250,    // Ignore stalls longer than this (alt-tab, GC)
                 MAX_STEPS: 5,         // Catch-up cap; beyond this, drop the backlog
+                MAX_SIM_MS: 34,       // Catch-up time budget (real ms): when ticks are this slow (a phone in a busy street),
+                                      // more of them only make the next frame later still, so the rest of the backlog is dropped
 
                 /* GAME_SPEED scales how often ticks happen in REAL time, not what a
                    tick means. 0.5 = 30 ticks/sec, so the whole world (movement, AI,

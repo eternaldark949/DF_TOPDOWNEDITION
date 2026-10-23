@@ -1089,7 +1089,7 @@ test('Device Preset: off by default; on applies this device\'s tier, a save can\
     G.deviceTier = () => 'low';
     try {
       G.setDevicePreset(true);
-      out.on = [G.devicePreset, G.lightingQuality, G.reflections, G.trafficDensity, G.bloom, JSON.parse(localStorage.getItem('dfab_device_preset')).on];
+      out.on = [G.devicePreset, G.lightingQuality, G.reflections, G.trafficDensity, G.bloom, JSON.parse(localStorage.getItem('dfab_device_preset')).on, G.crowdQuality];
       G.reflections = 'ultra'; G.lightingQuality = 'high'; G.bloom = true;      // a save's own settings, restored
       G.reapplyDevicePreset();
       out.afterSave = [G.lightingQuality, G.reflections, G.bloom];
@@ -1100,7 +1100,7 @@ test('Device Preset: off by default; on applies this device\'s tier, a save can\
     return out;`);
   equal(r.def, false, 'off by default');
   equal(r.tiers, ['low', 'low', 'medium', 'medium', 'high'], 'tiers: 2 cores, 2 GB, 4 cores, a phone, a strong desktop');
-  equal(r.on, [true, 'low', 'off', 'low', false, true], 'on: the low preset (lighting low, reflections off, traffic low, no bloom), kept on this device');
+  equal(r.on, [true, 'low', 'off', 'low', false, true, 'low'], 'on: the low preset (lighting low, reflections off, traffic low, no bloom, the crowd from baked sprites), kept on this device');
   equal(r.afterSave, ['low', 'off', false], 'a save bringing heavier settings is brought back to the preset');
   equal(r.off, [false, true, false], 'off: every setting it touched back exactly as it was');
   equal(r.offSave, 'ultra', 'and while off, a save\'s settings stand');
