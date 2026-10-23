@@ -69,4 +69,20 @@ test('The katana\'s slower swing stretches the pose and the trail follows its lo
  assert.ok(r.far>45,String(r.far));assert.deepEqual(r.edge,[50.5,-1.9]);assert.equal(r.cols,'255, 70, 100');
 });
 
+test('Blood Pact swings wide in both hands: wound back, swept across, both fists on the grip',e=>{
+ const r=value(e,setup+`wield('blood_pact');game.enemies=[];game._slashSide=-1;withRandom(.99,()=>game.meleeSlash());
+  const secs=game._slashSecs,style=game._slashStyle,at=u=>({...sampleMeleeSwing(u*secs,1,{},secs,style)});
+  const wound=at(WIDE_SWING.windup),mid=at((WIDE_SWING.windup+WIDE_SWING.cutEnd)/2),done=at(WIDE_SWING.cutEnd),rest=at(1);
+  game._slashT=_gameTimeSec-secs*(WIDE_SWING.windup+WIDE_SWING.cutEnd)/2;
+  drawProceduralHumanoid(game.ctx,game.player,{gender:'female',stance:'idle',pose:'none',noShadow:true});
+  const g=_humanoidDrawBuffer(game.player).geometry;
+  return {style,wound,mid,done,rest,fists:g.fists.map(f=>f.slice()),kukri:weaponModel('maiden_kukri').swing||null,grip:WIDE_SWING.grip,guard:WIDE_SWING.guard.a};`);
+ assert.equal(r.style,'wide');assert.equal(r.kukri,null);
+ assert.ok(Math.abs(r.wound.a-r.done.a)>3.9,'the blade sweeps a wide arc (over 220 degrees)');
+ assert.ok(r.wound.handY>12&&r.done.handY<-12&&r.mid.handX>16,'the hands travel from one side, out in front, to the other');
+ for(const p of [r.wound,r.mid,r.done])assert.ok(Math.abs(Math.hypot(p.handX-p.lHandX,p.handY-p.lHandY)-r.grip)<1e-9);
+ assert.ok(Math.hypot(r.fists[0][0]-r.fists[1][0],r.fists[0][1]-r.fists[1][1])<8,'both fists hold the grip');
+ assert.ok(Math.abs(r.rest.a-r.guard)<1e-9);
+});
+
 console.log(JSON.stringify({passed:tests.length,tests},null,2));

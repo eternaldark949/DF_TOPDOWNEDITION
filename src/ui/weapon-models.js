@@ -170,7 +170,7 @@
                 run: [5, 18, 1.4, '#fffaea']                                                    // the glint along the edge
             },
             blood_pact: {                                                                       // Blood Pact: a long blood-red katana, a black wrapped grip, a crimson tsuba
-                stance: 'knife', muzzle: [50, -1.6], rail: [8, 0], brass: null, melee: true,
+                stance: 'knife', muzzle: [50, -1.6], rail: [8, 0], brass: null, melee: true, swing: 'wide',   // a two-handed sweep (engine/status-effects.js)
                 edge: [50.5, -1.9],                                                             // the tip, where the slash trail runs (engine/status-effects.js)
                 trail: { dust: '#ff3a5c', cols: [[9, '200, 20, 50', .26], [3.4, '255, 70, 100', .6], [1.3, '255, 210, 220', .9]] },
                 parts: [

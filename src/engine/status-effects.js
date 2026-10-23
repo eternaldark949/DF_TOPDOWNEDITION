@@ -21,7 +21,51 @@
         // One game-time pose for the arm, the held blade and its trailing edge. `secs` stretches the
         // whole swing (a heavier blade); the phases keep their shares of it.
         const MELEE_SWING = { duration: .22, windup: .0264, cutEnd: .1584 };
-        function sampleMeleeSwing(age, side, out = {}, secs = MELEE_SWING.duration) {
+
+        /* A long blade's swing (a model with swing: 'wide', Blood Pact): two hands on the grip, she
+           winds the blade far back to one side, then sweeps it round in front of her in one wide arc
+           (the hands travel a half-circle about her chest), body turning with it, and settles back to
+           a two-handed guard. Phases are shares of the swing's time; the left hand rides the grip,
+           WIDE_SWING.grip model units behind the right. */
+        const WIDE_SWING = { windup: .22, cutEnd: .7, guard: { a: .3, handX: 11, handY: 3 },
+            centerX: 2, radius: 16, handArc: 1.25, bladeArc: 2.0, twist: .45, grip: 6.2 };
+        function _wideHand(theta, out) {
+            out.handX = WIDE_SWING.centerX + WIDE_SWING.radius * Math.cos(theta);
+            out.handY = WIDE_SWING.radius * Math.sin(theta);
+        }
+        function sampleWideSwing(u, sign, out) {
+            const W = WIDE_SWING, G = W.guard, smooth = x => x * x * (3 - 2 * x);
+            if (u < W.windup) {                                                     // wind back to one side
+                const w = smooth(u / W.windup);
+                _wideHand(sign * W.handArc, out);
+                out.handX = G.handX + (out.handX - G.handX) * w; out.handY = G.handY + (out.handY - G.handY) * w;
+                out.a = G.a + (sign * W.bladeArc - G.a) * w; out.twist = sign * W.twist * w;
+            } else if (u <= W.cutEnd) {                                             // the sweep across her front
+                const p = smooth((u - W.windup) / (W.cutEnd - W.windup));
+                _wideHand(sign * W.handArc * (1 - 2 * p), out);
+                out.a = sign * W.bladeArc * (1 - 2 * p); out.twist = sign * W.twist * Math.cos(p * Math.PI);
+            } else {                                                                // the follow-through settles to guard
+                const r = smooth((u - W.cutEnd) / (1 - W.cutEnd));
+                _wideHand(-sign * W.handArc, out);
+                out.handX += (G.handX - out.handX) * r; out.handY += (G.handY - out.handY) * r;
+                out.a = -sign * W.bladeArc + (G.a + sign * W.bladeArc) * r; out.twist = -sign * W.twist * (1 - r);
+            }
+            out.reach = out.handX - 8;
+            return wideGrip(out);
+        }
+        /** The left hand on a long blade's grip, behind the right (sets lHandX/lHandY on a pose) */
+        function wideGrip(pose) {
+            pose.lHandX = pose.handX - WIDE_SWING.grip * Math.cos(pose.a);
+            pose.lHandY = pose.handY - WIDE_SWING.grip * Math.sin(pose.a);
+            return pose;
+        }
+        /** A swing style's phase times, as shares of the swing */
+        function swingPhases(style) {
+            return style === 'wide' ? WIDE_SWING : { windup: MELEE_SWING.windup / MELEE_SWING.duration, cutEnd: MELEE_SWING.cutEnd / MELEE_SWING.duration };
+        }
+
+        function sampleMeleeSwing(age, side, out = {}, secs = MELEE_SWING.duration, style = 'knife') {
+            if (style === 'wide') return age < 0 || age > secs ? null : sampleWideSwing(age / secs, side || 1, out);
             age *= MELEE_SWING.duration / secs;
             if (age < 0 || age > MELEE_SWING.duration) return null;
             const smooth = x => x * x * (3 - 2 * x);
@@ -156,6 +200,7 @@
                 this.shootCooldown = st.fireRate || 16;
                 const side = this._slashSide = -(this._slashSide || 1);
                 this._slashT = _gameTimeSec; this._slashSecs = st.swingSecs || MELEE_SWING.duration;
+                this._slashStyle = weaponModel(W && W.id).swing || 'knife';
                 const ang = pl.angle, reach = st.reach || 36, arc = st.arc || 1.4;
                 const walls = this.activeMap.walls, cols = getColliders(this.activeMap);
                 // Step in only when there's someone to step in on: a slash at nothing stays where she is
@@ -190,7 +235,7 @@
                 // the arc and its sparkle, in the blade's colour (gold for the Kukri)
                 const M = weaponModel(W && W.id), trail = M.trail || DEFAULT_SLASH_TRAIL;
                 const L = this.slashes || (this.slashes = []);
-                L.push({ x: pl.x, y: pl.y, a: ang, side, t0: _gameTimeSec, reach, arc, hit: hit > 0, secs: this._slashSecs, edge: M.edge || DEFAULT_SLASH_TRAIL.edge, cols: trail.cols });
+                L.push({ x: pl.x, y: pl.y, a: ang, side, t0: _gameTimeSec, reach, arc, hit: hit > 0, secs: this._slashSecs, style: this._slashStyle, edge: M.edge || DEFAULT_SLASH_TRAIL.edge, cols: trail.cols });
                 if (L.length > 8) L.shift();
                 const fx = this.shotFx || (this.shotFx = []);
                 for (let i = 0; i < (hit ? 8 : 3); i++) {
@@ -207,7 +252,7 @@
             slashAngle() {
                 if (this._slashT === undefined) return null;
                 return sampleMeleeSwing(_gameTimeSec - this._slashT, this._slashSide,
-                    this._slashPose || (this._slashPose = {}), this._slashSecs || MELEE_SWING.duration);
+                    this._slashPose || (this._slashPose = {}), this._slashSecs || MELEE_SWING.duration, this._slashStyle);
             },
 
             /** Slash arcs: a crescent of gold light where the blade went (world space) */
@@ -217,23 +262,27 @@
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 for (let i = L.length - 1; i >= 0; i--) {
                     const s = L[i], age = now - s.t0;
-                    // Times in the Kukri's swing (q stretches them for a slower blade)
-                    const q = (s.secs || MELEE_SWING.duration) / MELEE_SWING.duration, life = .3 * q;
+                    // Times scaled from the Kukri's swing (q stretches them for a slower blade), phases by style
+                    const secs = s.secs || MELEE_SWING.duration, q = secs / MELEE_SWING.duration, life = .3 * q;
+                    const ph = swingPhases(s.style), windT = ph.windup * secs, cutT = ph.cutEnd * secs;
                     if (age > life) { L.splice(i, 1); continue; }
-                    if (age < MELEE_SWING.windup * q) continue;
+                    if (age < windT) continue;
                     // Keep the newest cut attached to the moving wielder, then let its last
                     // position fade. Recovery does not paint a second, backward slash.
                     if (s.t0 === this._slashT && age <= MELEE_SWING.duration * q && this.weaponMode === 'melee' && !this.weaponHolstered) {
                         s.drawX = this.player.x; s.drawY = this.player.y; s.drawA = this.player.angle;
                     }
                     const k = 1 - age / life;
-                    const end = Math.min(age, MELEE_SWING.cutEnd * q), start = Math.max(MELEE_SWING.windup * q, end - .065 * q);
+                    // a wide sweep leaves a longer crescent: three quarters of its cut
+                    const span = s.style === 'wide' ? (cutT - windT) * .75 : .065 * q;
+                    const end = Math.min(age, cutT), start = Math.max(windT, end - span);
                     const pose = this._slashTrailPose || (this._slashTrailPose = {});
                     const [ex, ey] = s.edge || DEFAULT_SLASH_TRAIL.edge;
                     ctx.save(); ctx.translate(s.drawX ?? s.x, s.drawY ?? s.y); ctx.rotate(s.drawA ?? s.a);
                     ctx.beginPath();
-                    for (let j = 0; j <= 8; j++) {
-                        sampleMeleeSwing(start + (end - start) * j / 8, s.side, pose, s.secs || MELEE_SWING.duration);
+                    const n = s.style === 'wide' ? 24 : 8;                      // a smooth curve round a wide sweep
+                    for (let j = 0; j <= n; j++) {
+                        sampleMeleeSwing(start + (end - start) * j / n, s.side, pose, secs, s.style);
                         const c = Math.cos(pose.a), sn = Math.sin(pose.a);
                         // The edge of the real model, held at the same hand anchor.
                         const x = pose.handX + (ex * c - ey * sn) * .95;

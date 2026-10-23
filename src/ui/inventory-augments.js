@@ -65,7 +65,7 @@
                 desc: 'A long blood-red katana. Twice the Kukri\'s reach, half its pace; its cuts bleed and crit more often.',
                 weaponMode: 'melee',
                 // the Kukri's twice-reach, half-rate cousin: a slower swing (swingSecs), harder cuts, a wider arc
-                stats: { fireRate: 32, damage: 45, reach: 76, arc: 1.7, swingSecs: 0.32, bleedDps: 8, bleedSecs: 3, critChance: 0.2, noise: 65, damageType: 'melee' }
+                stats: { fireRate: 32, damage: 45, reach: 76, arc: 2.1, swingSecs: 0.32, bleedDps: 8, bleedSecs: 3, critChance: 0.2, noise: 65, damageType: 'melee' }
             },
             'laser_sight': {
                 name: 'Laser Sight', type: 'attachment', icon: '⊕',
