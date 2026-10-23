@@ -1453,9 +1453,16 @@
 
         /** Renders "long" hair behind head, then head+face, then other hair on top. */
         const HAIR_SPILLS_FROM_HOOD = ['long', 'braids', 'dreadlocks', 'ponytail', 'demon_dancer'];
+        /** Which part of drawHeadAndHair to draw: null (all), 'head' (up to the hair) or 'hair' (the hair and all above it).
+            The crowd's hybrid bake (ui/crowd-impostors.js) bakes the head and draws the hair live over it. */
+        let _headPart = null;
         function drawHeadAndHair(ctx, headX, skinColor, faceDark, faceLight, hair, dyn, hat, jewelry) {
             dyn = dyn || {};
             const hatPiece = hat && typeof WARDROBE !== 'undefined' ? WARDROBE.hats[hat.type] : null;
+            if (_headPart !== 'hair') _drawHeadUnderHair(ctx, headX, skinColor, faceDark, faceLight, dyn, hatPiece, hat, jewelry);
+            if (_headPart !== 'head') _drawHairAndOver(ctx, headX, hair, dyn, hatPiece, hat, jewelry);
+        }
+        function _drawHeadUnderHair(ctx, headX, skinColor, faceDark, faceLight, dyn, hatPiece, hat, jewelry) {
             if (hatPiece && hatPiece.back) hatPiece.back(ctx, headX, hat, dyn);   // e.g. the back of a raised hood
             // Eyes — they blink now and then, each character on their own rhythm
             const owner = dyn.owner;
@@ -1479,6 +1486,8 @@
                     ctx.fillStyle = faceLight; ctx.fillRect(headX + 5, 2, 2, 1);
                 }
             }
+        }
+        function _drawHairAndOver(ctx, headX, hair, dyn, hatPiece, hat, jewelry) {
             // Hair (all styles render on top of head) — strand physics via hairGeometry().
             // A raised hood hides short styles; long ones still spill out from under it.
             if (hair && !(hatPiece && hatPiece.hides === 'most' && !HAIR_SPILLS_FROM_HOOD.includes(hair.type))) {
@@ -1947,6 +1956,9 @@
         }
 
         function _drawHumanoidBody(ctx, entity, config, S, A) {
+            // The crowd's hybrid bake (ui/crowd-impostors.js): pass 'under' bakes the legs and hips, 'over' the arms,
+            // torso and head; 'stamp' draws those two from the bake and everything that moves on its own live.
+            const HY = config._hybrid || null, bakePass = HY && HY.pass !== 'stamp' ? HY.pass : null;
             // --- 1. CONFIGURATION ---
             const skinColor = A ? A.plate : (config.skinColor || '#8d5524');
             const isDriving = config.isDriving || false;
@@ -2576,12 +2588,14 @@
 
             // Floor-layer trains paint before the feet; waist overlays paint after the hips below.
             const groundTrain = WD && clothes.train && WD.trains[clothes.train.type];
-            if (groundTrain && !groundTrain.overWaist) {
+            if (groundTrain && !groundTrain.overWaist && !bakePass) {
                 ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(torsoRotation * 0.8);
                 groundTrain.draw(ctx, g, clothes.train);
                 ctx.restore();
             }
 
+            if (HY && HY.pass === 'stamp') HY.stamp(ctx, 'under', S);          // legs and hips, from the bake
+            else if (!bakePass || bakePass === 'under') {
             // 1. Feet
             if (shoeP) {
                 shoeP.draw(ctx, g, clothes.shoes);
@@ -2657,16 +2671,18 @@
             // Skirts and other hip overlays (same geometry as the hips)
             if (botP && botP.hips) botP.hips(ctx, g, clothes.bottom);
             ctx.restore();
+            }
+            if (bakePass === 'under') return;
         
             // Crimson Flame attaches over the waist, before arms and the upper body.
-            if (groundTrain && groundTrain.overWaist) {
+            if (groundTrain && groundTrain.overWaist && !bakePass) {
                 ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(torsoRotation * 0.8);
                 groundTrain.draw(ctx, g, clothes.train);
                 ctx.restore();
             }
 
             // 5. Trains (Dress Train)
-            if (clothes.train) {
+            if (clothes.train && !bakePass) {
                 ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(torsoRotation * 0.8);
                 if (clothes.train.type === 'dress_train') {
                     // Two heavy panels trailing from the hips
@@ -2692,12 +2708,14 @@
             }
         
             // 5b. Coat tails
-            if (topP && topP.tail) {
+            if (topP && topP.tail && !bakePass) {
                 ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(torsoRotation * 0.8);
                 topP.tail(ctx, g, clothes.top);
                 ctx.restore();
             }
 
+            if (HY && HY.pass === 'stamp') HY.stamp(ctx, 'over', S);           // arms, torso and head, from the bake
+            else {
             // 6. Hands, turned along the forearm: a fist round whatever they hold (a pistol's off hand stays relaxed)
             ctx.fillStyle = darken(skinColor, 0.4);
             const bothGrip = stance === 'rifle' || stance === 'sniper' || stance === 'punch';
@@ -2784,10 +2802,11 @@
                 if (A.emblem) drawDNEmblem(ctx, BC.tf - 3.2, -BC.chest * 0.45, 2, A.glow);
             }
             ctx.restore();
+            }
         
             // 10. Head & Hair
             // In strong wind the head dips into it (toward where it's blowing from)
-            const windLocal = W ? W.dir - (entity.angle || 0) : 0, dip = W ? W.strong * 1.3 : 0;
+            const windLocal = W ? W.dir - (entity.angle || 0) : 0, dip = W && !HY ? W.strong * 1.3 : 0;   // (hybrid: the baked head doesn't dip)
             // Scoped (engine/scope.js): cheek down to the stock, head tipped toward the sight
             const scopeK = config.scopeK || 0;
             const headX = 0 + bounce - bodyRecoil + pf('head', 0) - Math.cos(windLocal) * dip + scopeK * 3.5;
@@ -2801,14 +2820,18 @@
             const turning = headY !== 0 || headTurn !== 0;
             withHead(headX, hx => {
                 if (turning) { ctx.save(); ctx.translate(hx, headY); ctx.rotate(headTurn); ctx.translate(-hx, 0); }
-                drawHeadAndHair(ctx, hx, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, walkDyn, clothes.hat, clothes.jewelry);
-                if (SH && SH.level > 1 && (SH.lx || SH.ly)) {               // the head as a matte dome: hair gradients in its own colour, then shade away from the sun
+                const part = _headPart;
+                _headPart = bakePass === 'over' ? 'head' : HY ? 'hair' : null;
+                try { drawHeadAndHair(ctx, hx, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, walkDyn, clothes.hat, clothes.jewelry); }
+                finally { _headPart = part; }
+                if (SH && SH.level > 1 && (SH.lx || SH.ly) && !bakePass) {               // the head as a matte dome: hair gradients in its own colour, then shade away from the sun
                     const ht = clothes.hair && !clothes.hat ? _hairTone(clothes.hair.color) : null;
                     if (ht) { const s = ht.up ? 1 : -1; _softSpot(ctx, hx + s * SH.lx * 3, s * SH.ly * 3, 13, 13, ht.rgb, 0.55 * Math.hypot(SH.lx, SH.ly)); }
                     _softSpot(ctx, hx - SH.lx * 3.5, -SH.ly * 3.5, 13, 13, _SHADOW_RGB, SH.shA * (SH.body ? 1.3 : 0.9));
                 }
                 if (turning) ctx.restore();
             });
+            if (bakePass) return;                                           // (the bake ends with the head: the rest is drawn live)
             if (SH && SH.rim) {                                             // a street lamp's colour catching shoulder and head
                 const r = SH.rim.ang;
                 ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = SH.rim.style; ctx.lineWidth = 1.4; ctx.lineCap = 'round';

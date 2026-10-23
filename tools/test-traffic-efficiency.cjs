@@ -57,4 +57,24 @@ for(const snapshot of [false,true]) test(`Reverse removals retain grid slots (${
   assert.deepEqual(r.near,snapshot?[3,99]:[]);
   assert.deepEqual(r.moved,snapshot?[0,1,2,3,4,5,6,7,8,9,10,11,99]:cars);
 });
+
+test('Wall clearance skips only provably empty checks and restarts on wall edits', `
+  _simTick=1;
+  const walls=[{x:300,y:-20,w:40,h:40}], cols=[{x:-2000,y:-2000,w:10,h:10}];
+  _physicsSpatial.track(walls); _physicsSpatial.track(cols);
+  const v=Object.create(TrafficVehicle.prototype);
+  Object.assign(v,{x:0,y:0,angle:0,length:60,width:30,_wallClear:null});
+  let queries=0; const q=_physicsSpatial.query; _physicsSpatial.query=function(){queries++;return q.apply(this,arguments);};
+  const out={};
+  out.first=v._wallContact(walls,cols); out.q1=queries;
+  v.x=20; _simTick++; out.second=v._wallContact(walls,cols); out.q2=queries;           // inside the noted room: no search
+  v.x=285; _simTick++; const hit=v._wallContact(walls,cols); out.hit=!!hit;           // reaches the wall: found
+  v.x=0; _simTick++; v._wallContact(walls,cols); const q3=queries;
+  walls[0].x=20; _simTick++; const moved=v._wallContact(walls,cols); out.moved=!!moved; out.searchedAfterEdit=queries>q3;
+  walls[0].x=600; _simTick++; v._wallContact(walls,cols); const q4=queries;
+  walls.push({x:-40,y:-10,w:20,h:20}); _simTick++; out.added=!!v._wallContact(walls,cols); out.searchedAfterAdd=queries>q4;
+  const u=[{x:20,y:-10,w:20,h:20}]; v._wallClear=null; out.untracked=!!v._wallContact(u,[]); out.untrackedNoted=v._wallClear===null;
+  _physicsSpatial.query=q;
+  return out;
+`,r=>assert.deepEqual(r,{first:null,q1:2,second:null,q2:2,hit:true,moved:true,searchedAfterEdit:true,added:true,searchedAfterAdd:true,untracked:true,untrackedNoted:true}));
 console.log(JSON.stringify({passed:results.length,results},null,2));

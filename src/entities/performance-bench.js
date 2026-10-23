@@ -26,7 +26,7 @@
             },
             _context() {
                 const settings = {};
-                for (const k of ['resolutionScale','fpsLimit','baseZoom','lightingQuality','adaptiveLighting','softShadows','bloom','reflections','trafficDensity','pedestrianDensity','crowdQuality','lampShadows','foliageDensity','rainDensity','filmGrain','devicePreset']) settings[k] = GameSettings[k];
+                for (const k of ['resolutionScale','fpsLimit','baseZoom','lightingQuality','adaptiveLighting','softShadows','bloom','reflections','trafficDensity','pedestrianDensity','crowdQuality','lampShadows','foliageDensity','rainDensity','filmGrain','devicePreset','movingLightCache','crowdHybrid']) settings[k] = GameSettings[k];
                 return { map: game.activeMap?.id || 'unknown', viewport: [window.innerWidth, window.innerHeight],
                     canvas: [game.canvas.width, game.canvas.height], dpr: window.devicePixelRatio || 1,
                     browser: navigator.userAgent || 'unknown', cores: navigator.hardwareConcurrency || null,

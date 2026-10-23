@@ -103,13 +103,115 @@
                 return true;
             },
 
+            clear() { this.cache.clear(); if (typeof CrowdHybrid !== 'undefined') CrowdHybrid.clear(); }
+        };
+
+        /* ═══ HYBRID CROWD (Crowd Quality High) ═══
+           A walking passer-by beyond HYBRID.NEAR of her keeps everything that moves on its own live — hair
+           and its strand physics, cloth panels (trains, coat tails), the lamp rim, the head's shade, the
+           contact shadow, held items — and takes the rest from a bake: the legs and hips (under the cloth
+           panels) and the arms, torso and head (over them), each a 16-step walk cycle in the body's own
+           frame. The live draw runs as usual and stamps the two layers in place of drawing them
+           (_drawHumanoidBody's HY), so hair and cloth sit exactly where the body is. Baked parts are flat
+           shaded (they turn with the body; the light doesn't). Cells are baked as they're first needed, a
+           few a frame; until a cell exists that body is drawn fully live. Standing, posing, armed, driving,
+           hurt or near her: always live. Off: GameSettings.crowdHybrid. */
+        const HYBRID = { FRAMES: 16, R: 32, Q: 1.25, MAX: 40, CELLS_PER_FRAME: 3, NEAR: 240, MAX_ZOOM: 1.3 };   // R: body reach (world px) the bake holds; ~0.65 MB of strips each
+        const CrowdHybrid = {
+            cache: new Map(),          // owner → { sig, stride, under, over, have: Uint8Array, cell, used }
+            _frame: -1, _cells: 0,
+            /** Is this body drawn hybrid right now? */
+            eligible(ctx, e, c) {
+                if (GameSettings.crowdHybrid === false || c.isDriving || c._crowdBake || c._hybrid || e._reflectionProxy) return false;
+                if (c.pose === 'dance' || c.pose === 'die' || c.poseWhileMoving || (c.stance && c.stance !== 'idle') || (c.weapon && c.weapon.id) ||
+                    typeof c.punchTicks === 'number' || c.scopeK) return false;
+                if (e._pose && e._pose.w > 0.001) return false;                 // a pose (standing about) moves on its own
+                if (e._hitT !== undefined && _gameTimeSec - e._hitT < 0.2) return false;
+                const g = e._gait;
+                if (!g || !(g.speed > CONFIG.GAIT.STOP_SPEED)) return false;
+                const v = typeof game !== 'undefined' && game.view;
+                if (v && v.zoom > HYBRID.MAX_ZOOM) return false;                 // zoomed in (a finisher, a photo): sharp, live
+                const p = typeof game !== 'undefined' && game.player;
+                if (p) { const dx = e.x - p.x, dy = e.y - p.y; if (dx * dx + dy * dy < HYBRID.NEAR * HYBRID.NEAR) return false; }
+                return true;
+            },
+            /** Bake walk frame f (1..FRAMES) of both layers into the strips */
+            _bakeCell(e, c, b, f) {
+                const F = HYBRID.FRAMES, R = HYBRID.R, Q = HYBRID.Q, cell = b.cell;
+                const B = { x: e.x, y: e.y, angle: 0, look: e.look, walkPhase: (f - 1) / F * Math.PI * 2 };
+                syncHumanoidGait(B);
+                const G = B._gait;
+                G.speed = b.stride; G.dirX = 1; G.dirY = 0; G.tick = _simTick; G.prevX = B.x; G.prevY = B.y; G.phasePrev = B.walkPhase;
+                const wm = _worldMatrix, wc = _worldCanvas, lite = _crowdLite;
+                _crowdLite = true;                                              // flat: the bake turns with the body, the light doesn't
+                try {
+                    for (const [pass, cv] of [['under', b.under], ['over', b.over]]) {
+                        const g = cv.getContext('2d'); if (!g) return false;
+                        B._animState = null;
+                        g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(cell * (f - 1), 0, cell, cell);
+                        g.setTransform(Q, 0, 0, Q, cell * (f - 1) + R * Q, R * Q);
+                        const cfg = Object.assign({}, c, { lerpSpeed: 1, noShadow: true, poseInstant: true, pose: 'none', _crowdBake: true, _hybrid: { pass } });
+                        drawProceduralHumanoid(g, B, cfg);
+                    }
+                } catch (err) { return false; }
+                finally { _crowdLite = lite; _worldMatrix = wm; _worldCanvas = wc; }
+                b.have[f] = 1;
+                return true;
+            },
+            /** Draw this body hybrid (true), or false: the caller draws it live */
+            draw(ctx, e, c) {
+                if (!this.eligible(ctx, e, c)) return false;
+                syncHumanoidGait(e);
+                const sig = CrowdImpostors._sig(e, c, null), F = HYBRID.FRAMES;
+                let b = this.cache.get(e);
+                // A change of pace keeps the bake: only the baked legs' stride differs a little, and nothing live
+                // hangs from them (rebaking on every easing step would cost more than it saves)
+                if (!b || (b.sig !== sig && !CrowdImpostors._sameButStride(b, sig))) {
+                    if (!b && this.cache.size >= HYBRID.MAX) {                 // full: the one seen longest ago goes (never one seen this frame)
+                        let oldK = null, oldT = Infinity;
+                        for (const [k, v] of this.cache) if (v.used < oldT) { oldT = v.used; oldK = k; }
+                        if (oldK === null || oldT >= _frameTime) return false;
+                        this.cache.delete(oldK);
+                    }
+                    const parts = sig.split('|'), stride = +parts[4] || 0;
+                    if (!(stride > 0)) return false;
+                    const cell = Math.ceil(HYBRID.R * 2 * HYBRID.Q);
+                    const mk = () => { const cv = document.createElement('canvas'); cv.width = cell * F; cv.height = cell; return cv; };
+                    if (b) { b.have.fill(0); b.sig = sig; b.parts = parts; b.stride = stride; }
+                    else { b = { sig, parts, stride, under: mk(), over: mk(), have: new Uint8Array(F + 1), cell, used: _frameTime }; this.cache.set(e, b); }
+                }
+                b.used = _frameTime;
+                const ph = ((e.walkPhase || 0) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+                const f = 1 + (Math.round(ph / (Math.PI * 2) * F) % F);
+                if (!b.have[f]) {
+                    if (this._frame !== _frameTime) { this._frame = _frameTime; this._cells = 0; }
+                    if (this._cells >= HYBRID.CELLS_PER_FRAME) return false;     // a few cells a frame; live until then
+                    this._cells++;
+                    if (!this._bakeCell(e, c, b, f)) return false;
+                }
+                const R = HYBRID.R, cell = b.cell, x = cell * (f - 1);
+                const cfg = c; const prev = cfg._hybrid;
+                cfg._hybrid = { pass: 'stamp', stamp: (g, layer, S) => {
+                    // The bake already holds the build's scale: undo the live one round the stamp
+                    if (S && (S.x !== 1 || S.y !== 1)) { g.save(); g.scale(1 / S.x, 1 / S.y); }
+                    g.drawImage(layer === 'under' ? b.under : b.over, x, 0, cell, cell, -R, -R, R * 2, R * 2);
+                    if (S && (S.x !== 1 || S.y !== 1)) g.restore();
+                } };
+                try { drawProceduralHumanoid(ctx, e, cfg); }
+                finally { if (prev === undefined) delete cfg._hybrid; else cfg._hybrid = prev; }
+                RenderStats.cachedBodies++;
+                return true;
+            },
             clear() { this.cache.clear(); }
         };
 
         /** The crowd's draw: by Crowd Quality (high live, medium lighter, low baked) */
         function drawCrowdHumanoid(ctx, entity, config) {
             const q = GameSettings.crowdQuality || 'high';
-            if (q === 'high') return drawProceduralHumanoid(ctx, entity, config);
+            if (q === 'high') {
+                if (CrowdHybrid.draw(ctx, entity, config)) return;
+                return drawProceduralHumanoid(ctx, entity, config);
+            }
             if (q === 'low') {
                 if (!RenderStats.timed) { if (CrowdImpostors.draw(ctx, entity, config)) return; }
                 else {                                                              // a baked body is still a body: Entities: People

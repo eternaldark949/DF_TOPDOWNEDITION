@@ -8554,6 +8554,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             baseline: false,                // Baseline's layer panel (ui/render-layers.js): each render layer on a chip, with its calls (not kept)
             countCalls: false,              // Full profiler: count canvas calls (a shim on every 2D call — it slows the frame it measures)
             propSprites: true,              // furniture painted once and stamped (entities/prop-sprites.js); off draws it as vector (not kept)
+            crowdHybrid: true,              // Crowd Quality High: far walkers' bodies from a bake, hair/cloth/rim live (ui/crowd-impostors.js); off draws them fully live (not kept)
+            movingLightCache: true,         // the static dark and steady lamp holes from a world-space buffer, slid with the camera (engine/lighting.js); off redraws them every frame (not kept)
             talkStyle: (() => {             // 'veil' | 'ribbon': the dialogue and comms look (ui/comms.js TalkStyle); kept per device
                 try { if (localStorage.getItem('dfab_talk_style') === 'ribbon') return 'ribbon'; } catch (e) { /* private mode */ }
                 return 'veil';
@@ -15703,7 +15705,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             records: new WeakMap(),
             track(items) {
                 if (!items || this.records.has(items)) return;
-                this.records.set(items, { grid: new OrderedRenderGrid(400), slots: [], geometry: [], epoch: -1, dirty: true, linear: false, entries: [], items: [], cellQueries: new Map(), cachedSlots: 0 });
+                this.records.set(items, { grid: new OrderedRenderGrid(400), slots: [], geometry: [], epoch: -1, dirty: true, linear: false, entries: [], items: [], cellQueries: new Map(), cachedSlots: 0, gen: -1 });
             },
             invalidate(items) {
                 if (!items) { this.clear(); return; }
@@ -15711,6 +15713,23 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (c) c.dirty = true;
             },
             clear() { this.records = new WeakMap(); },
+            _seq: 0,
+            /** The geometry generation of a tracked array, validated for this tick (as query does); null when
+                untracked or linear. Equal generations mean the same slots and the same x/y/w/h. */
+            generation(items) {
+                const c = items && this.records.get(items);
+                if (!c) return null;
+                if (c.dirty || c.slots.length !== items.length || c.epoch !== _simTick) this.refresh(items, c);
+                return c.linear ? null : c.gen;
+            },
+            /** How far (x, y) is from the edge of the grid cells `bounds` covers: anything a query of those
+                bounds didn't return lies wholly outside them, so at least this far away. */
+            cellEdge(items, bounds, x, y) {
+                const c = this.records.get(items), S = c.grid.cellSize;
+                const x0 = Math.floor(bounds.left / S) * S, x1 = (Math.floor(bounds.right / S) + 1) * S;
+                const y0 = Math.floor(bounds.top / S) * S, y1 = (Math.floor(bounds.bottom / S) + 1) * S;
+                return Math.min(x - x0, x1 - x, y - y0, y1 - y);
+            },
             refresh(items, c) {
                 let changed = c.dirty || c.slots.length !== items.length;
                 if (!changed && c.epoch !== _simTick) {
@@ -15720,6 +15739,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
                 if (changed) {
+                    c.gen = ++this._seq;                 // unique across records, so a cleared-and-retracked array never matches an old one
                     c.cellQueries.clear(); c.cachedSlots = 0;
                     c.slots.length = items.length; c.geometry.length = items.length * 4;
                     c.linear = false;
@@ -23435,7 +23455,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             },
             _context() {
                 const settings = {};
-                for (const k of ['resolutionScale','fpsLimit','baseZoom','lightingQuality','adaptiveLighting','softShadows','bloom','reflections','trafficDensity','pedestrianDensity','crowdQuality','lampShadows','foliageDensity','rainDensity','filmGrain','devicePreset']) settings[k] = GameSettings[k];
+                for (const k of ['resolutionScale','fpsLimit','baseZoom','lightingQuality','adaptiveLighting','softShadows','bloom','reflections','trafficDensity','pedestrianDensity','crowdQuality','lampShadows','foliageDensity','rainDensity','filmGrain','devicePreset','movingLightCache','crowdHybrid']) settings[k] = GameSettings[k];
                 return { map: game.activeMap?.id || 'unknown', viewport: [window.innerWidth, window.innerHeight],
                     canvas: [game.canvas.width, game.canvas.height], dpr: window.devicePixelRatio || 1,
                     browser: navigator.userAgent || 'unknown', cores: navigator.hardwareConcurrency || null,
@@ -41536,6 +41556,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 // --- MANUAL DRIVING STATE ---
                 this.manualGas = 0;
                 this.manualTurn = 0;
+                this._wallClear = null;     // wall clearance from the last empty wall check (_wallContact)
                 
                 // --- PARK IDLE TIMER ---
                 this.parkIdleTimer = 0; 
@@ -42698,21 +42719,46 @@ class NeuralSystemsBuilding extends BuildingV2 {
 
             /** The deepest wall or building the car overlaps where it stands: { nx, ny, depth },
              *  the normal pointing out of the wall (SAT), or null when it's clear */
+            /*  Wall clearance: a car on an open road is nowhere near a wall most ticks. When a check finds
+                nothing, it also notes how much room there was (the nearest wall's box, or the edge of the grid
+                cells it searched), and later checks return straight away while the car is still that far from
+                every box: the same answer the full check gives (no box can be within its radius), with no
+                search. Any change to the walls (a new geometry generation) or a different wall list starts over. */
             _wallContact(walls, buildings) {
-                const obb = { x: this.x, y: this.y, angle: this.angle, length: this.length, width: this.width };
-                const r = Math.hypot(this.length, this.width) / 2;
-                const bounds = { left: this.x - r, right: this.x + r, top: this.y - r, bottom: this.y + r };
-                let best = null;
+                if (walls && !walls.length) walls = null;                      // an empty list (often a fresh []) has nothing to hit
+                if (buildings && !buildings.length) buildings = null;
+                const r = Math.hypot(this.length, this.width) / 2, x = this.x, y = this.y;
+                const wc = this._wallClear;
+                if (wc && wc.w === walls && wc.b === buildings && wc.r === r) {
+                    const dx = x - wc.x, dy = y - wc.y, room = wc.d - r;
+                    if (dx * dx + dy * dy < room * room && wc.gw === _physicsSpatial.generation(walls) &&
+                        wc.gb === _physicsSpatial.generation(buildings)) return null;
+                }
+                const obb = { x, y, angle: this.angle, length: this.length, width: this.width };
+                const reach = r + TrafficVehicle.WALL_CLEAR_SLACK;
+                const bounds = { left: x - reach, right: x + reach, top: y - reach, bottom: y + reach };
+                let best = null, clear = Infinity;
                 for (const list of [walls, buildings]) {
+                    if (!list) continue;
                     const candidates = _physicsSpatial.query(list, bounds);
                     if (!candidates) continue;
+                    if (clear > 0) clear = _physicsSpatial.generation(list) === null ? 0 : Math.min(clear, _physicsSpatial.cellEdge(list, bounds, x, y));
                     for (let w of candidates) {
-                        if (this.x + r < w.x || this.x - r > w.x + w.w || this.y + r < w.y || this.y - r > w.y + w.h) continue;
+                        if (clear > 0) {
+                            const ex = Math.max(w.x - x, 0, x - (w.x + w.w)), ey = Math.max(w.y - y, 0, y - (w.y + w.h)), d = Math.sqrt(ex * ex + ey * ey);
+                            clear = d >= 0 ? Math.min(clear, d) : 0;
+                        }
+                        if (x + r < w.x || x - r > w.x + w.w || y + r < w.y || y - r > w.y + w.h) continue;
                         const wo = CollisionSystem._aabbToOBB(w);
                         const c = CollisionSystem._satCollision(obb, wo);
                         if (c && (!best || c.depth > best.depth)) { best = c; c.obb = wo; }
                     }
                 }
+                if (!best && clear > r && isFinite(clear)) {
+                    const n = wc || (this._wallClear = {});
+                    n.w = walls; n.b = buildings; n.r = r; n.x = x; n.y = y; n.d = clear;
+                    n.gw = _physicsSpatial.generation(walls); n.gb = _physicsSpatial.generation(buildings);
+                } else if (wc) wc.w = null;
                 return best;
             }
         
@@ -44190,7 +44236,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 this.turnSignalTimer = 80;
             }
         }
-
+        TrafficVehicle.WALL_CLEAR_SLACK = 96;   // extra search reach that buys ticks of no wall checks (_wallContact)
 // Seated bodies stay in the car frame. Windows, weapons and shots share these poses.
 const VEHICLE_OCCUPANT_SCALE = 0.65;
 const VEHICLE_SEAT_ARC = 85 * Math.PI / 180;
@@ -51792,9 +51838,16 @@ Object.assign(TrafficVehicle.prototype, {
 
         /** Renders "long" hair behind head, then head+face, then other hair on top. */
         const HAIR_SPILLS_FROM_HOOD = ['long', 'braids', 'dreadlocks', 'ponytail', 'demon_dancer'];
+        /** Which part of drawHeadAndHair to draw: null (all), 'head' (up to the hair) or 'hair' (the hair and all above it).
+            The crowd's hybrid bake (ui/crowd-impostors.js) bakes the head and draws the hair live over it. */
+        let _headPart = null;
         function drawHeadAndHair(ctx, headX, skinColor, faceDark, faceLight, hair, dyn, hat, jewelry) {
             dyn = dyn || {};
             const hatPiece = hat && typeof WARDROBE !== 'undefined' ? WARDROBE.hats[hat.type] : null;
+            if (_headPart !== 'hair') _drawHeadUnderHair(ctx, headX, skinColor, faceDark, faceLight, dyn, hatPiece, hat, jewelry);
+            if (_headPart !== 'head') _drawHairAndOver(ctx, headX, hair, dyn, hatPiece, hat, jewelry);
+        }
+        function _drawHeadUnderHair(ctx, headX, skinColor, faceDark, faceLight, dyn, hatPiece, hat, jewelry) {
             if (hatPiece && hatPiece.back) hatPiece.back(ctx, headX, hat, dyn);   // e.g. the back of a raised hood
             // Eyes — they blink now and then, each character on their own rhythm
             const owner = dyn.owner;
@@ -51818,6 +51871,8 @@ Object.assign(TrafficVehicle.prototype, {
                     ctx.fillStyle = faceLight; ctx.fillRect(headX + 5, 2, 2, 1);
                 }
             }
+        }
+        function _drawHairAndOver(ctx, headX, hair, dyn, hatPiece, hat, jewelry) {
             // Hair (all styles render on top of head) — strand physics via hairGeometry().
             // A raised hood hides short styles; long ones still spill out from under it.
             if (hair && !(hatPiece && hatPiece.hides === 'most' && !HAIR_SPILLS_FROM_HOOD.includes(hair.type))) {
@@ -52286,6 +52341,9 @@ Object.assign(TrafficVehicle.prototype, {
         }
 
         function _drawHumanoidBody(ctx, entity, config, S, A) {
+            // The crowd's hybrid bake (ui/crowd-impostors.js): pass 'under' bakes the legs and hips, 'over' the arms,
+            // torso and head; 'stamp' draws those two from the bake and everything that moves on its own live.
+            const HY = config._hybrid || null, bakePass = HY && HY.pass !== 'stamp' ? HY.pass : null;
             // --- 1. CONFIGURATION ---
             const skinColor = A ? A.plate : (config.skinColor || '#8d5524');
             const isDriving = config.isDriving || false;
@@ -52915,12 +52973,14 @@ Object.assign(TrafficVehicle.prototype, {
 
             // Floor-layer trains paint before the feet; waist overlays paint after the hips below.
             const groundTrain = WD && clothes.train && WD.trains[clothes.train.type];
-            if (groundTrain && !groundTrain.overWaist) {
+            if (groundTrain && !groundTrain.overWaist && !bakePass) {
                 ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(torsoRotation * 0.8);
                 groundTrain.draw(ctx, g, clothes.train);
                 ctx.restore();
             }
 
+            if (HY && HY.pass === 'stamp') HY.stamp(ctx, 'under', S);          // legs and hips, from the bake
+            else if (!bakePass || bakePass === 'under') {
             // 1. Feet
             if (shoeP) {
                 shoeP.draw(ctx, g, clothes.shoes);
@@ -52996,16 +53056,18 @@ Object.assign(TrafficVehicle.prototype, {
             // Skirts and other hip overlays (same geometry as the hips)
             if (botP && botP.hips) botP.hips(ctx, g, clothes.bottom);
             ctx.restore();
+            }
+            if (bakePass === 'under') return;
         
             // Crimson Flame attaches over the waist, before arms and the upper body.
-            if (groundTrain && groundTrain.overWaist) {
+            if (groundTrain && groundTrain.overWaist && !bakePass) {
                 ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(torsoRotation * 0.8);
                 groundTrain.draw(ctx, g, clothes.train);
                 ctx.restore();
             }
 
             // 5. Trains (Dress Train)
-            if (clothes.train) {
+            if (clothes.train && !bakePass) {
                 ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(torsoRotation * 0.8);
                 if (clothes.train.type === 'dress_train') {
                     // Two heavy panels trailing from the hips
@@ -53031,12 +53093,14 @@ Object.assign(TrafficVehicle.prototype, {
             }
         
             // 5b. Coat tails
-            if (topP && topP.tail) {
+            if (topP && topP.tail && !bakePass) {
                 ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(torsoRotation * 0.8);
                 topP.tail(ctx, g, clothes.top);
                 ctx.restore();
             }
 
+            if (HY && HY.pass === 'stamp') HY.stamp(ctx, 'over', S);           // arms, torso and head, from the bake
+            else {
             // 6. Hands, turned along the forearm: a fist round whatever they hold (a pistol's off hand stays relaxed)
             ctx.fillStyle = darken(skinColor, 0.4);
             const bothGrip = stance === 'rifle' || stance === 'sniper' || stance === 'punch';
@@ -53123,10 +53187,11 @@ Object.assign(TrafficVehicle.prototype, {
                 if (A.emblem) drawDNEmblem(ctx, BC.tf - 3.2, -BC.chest * 0.45, 2, A.glow);
             }
             ctx.restore();
+            }
         
             // 10. Head & Hair
             // In strong wind the head dips into it (toward where it's blowing from)
-            const windLocal = W ? W.dir - (entity.angle || 0) : 0, dip = W ? W.strong * 1.3 : 0;
+            const windLocal = W ? W.dir - (entity.angle || 0) : 0, dip = W && !HY ? W.strong * 1.3 : 0;   // (hybrid: the baked head doesn't dip)
             // Scoped (engine/scope.js): cheek down to the stock, head tipped toward the sight
             const scopeK = config.scopeK || 0;
             const headX = 0 + bounce - bodyRecoil + pf('head', 0) - Math.cos(windLocal) * dip + scopeK * 3.5;
@@ -53140,14 +53205,18 @@ Object.assign(TrafficVehicle.prototype, {
             const turning = headY !== 0 || headTurn !== 0;
             withHead(headX, hx => {
                 if (turning) { ctx.save(); ctx.translate(hx, headY); ctx.rotate(headTurn); ctx.translate(-hx, 0); }
-                drawHeadAndHair(ctx, hx, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, walkDyn, clothes.hat, clothes.jewelry);
-                if (SH && SH.level > 1 && (SH.lx || SH.ly)) {               // the head as a matte dome: hair gradients in its own colour, then shade away from the sun
+                const part = _headPart;
+                _headPart = bakePass === 'over' ? 'head' : HY ? 'hair' : null;
+                try { drawHeadAndHair(ctx, hx, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, walkDyn, clothes.hat, clothes.jewelry); }
+                finally { _headPart = part; }
+                if (SH && SH.level > 1 && (SH.lx || SH.ly) && !bakePass) {               // the head as a matte dome: hair gradients in its own colour, then shade away from the sun
                     const ht = clothes.hair && !clothes.hat ? _hairTone(clothes.hair.color) : null;
                     if (ht) { const s = ht.up ? 1 : -1; _softSpot(ctx, hx + s * SH.lx * 3, s * SH.ly * 3, 13, 13, ht.rgb, 0.55 * Math.hypot(SH.lx, SH.ly)); }
                     _softSpot(ctx, hx - SH.lx * 3.5, -SH.ly * 3.5, 13, 13, _SHADOW_RGB, SH.shA * (SH.body ? 1.3 : 0.9));
                 }
                 if (turning) ctx.restore();
             });
+            if (bakePass) return;                                           // (the bake ends with the head: the rest is drawn live)
             if (SH && SH.rim) {                                             // a street lamp's colour catching shoulder and head
                 const r = SH.rim.ang;
                 ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = SH.rim.style; ctx.lineWidth = 1.4; ctx.lineCap = 'round';
@@ -55246,13 +55315,115 @@ Object.assign(TrafficVehicle.prototype, {
                 return true;
             },
 
+            clear() { this.cache.clear(); if (typeof CrowdHybrid !== 'undefined') CrowdHybrid.clear(); }
+        };
+
+        /* ═══ HYBRID CROWD (Crowd Quality High) ═══
+           A walking passer-by beyond HYBRID.NEAR of her keeps everything that moves on its own live — hair
+           and its strand physics, cloth panels (trains, coat tails), the lamp rim, the head's shade, the
+           contact shadow, held items — and takes the rest from a bake: the legs and hips (under the cloth
+           panels) and the arms, torso and head (over them), each a 16-step walk cycle in the body's own
+           frame. The live draw runs as usual and stamps the two layers in place of drawing them
+           (_drawHumanoidBody's HY), so hair and cloth sit exactly where the body is. Baked parts are flat
+           shaded (they turn with the body; the light doesn't). Cells are baked as they're first needed, a
+           few a frame; until a cell exists that body is drawn fully live. Standing, posing, armed, driving,
+           hurt or near her: always live. Off: GameSettings.crowdHybrid. */
+        const HYBRID = { FRAMES: 16, R: 32, Q: 1.25, MAX: 40, CELLS_PER_FRAME: 3, NEAR: 240, MAX_ZOOM: 1.3 };   // R: body reach (world px) the bake holds; ~0.65 MB of strips each
+        const CrowdHybrid = {
+            cache: new Map(),          // owner → { sig, stride, under, over, have: Uint8Array, cell, used }
+            _frame: -1, _cells: 0,
+            /** Is this body drawn hybrid right now? */
+            eligible(ctx, e, c) {
+                if (GameSettings.crowdHybrid === false || c.isDriving || c._crowdBake || c._hybrid || e._reflectionProxy) return false;
+                if (c.pose === 'dance' || c.pose === 'die' || c.poseWhileMoving || (c.stance && c.stance !== 'idle') || (c.weapon && c.weapon.id) ||
+                    typeof c.punchTicks === 'number' || c.scopeK) return false;
+                if (e._pose && e._pose.w > 0.001) return false;                 // a pose (standing about) moves on its own
+                if (e._hitT !== undefined && _gameTimeSec - e._hitT < 0.2) return false;
+                const g = e._gait;
+                if (!g || !(g.speed > CONFIG.GAIT.STOP_SPEED)) return false;
+                const v = typeof game !== 'undefined' && game.view;
+                if (v && v.zoom > HYBRID.MAX_ZOOM) return false;                 // zoomed in (a finisher, a photo): sharp, live
+                const p = typeof game !== 'undefined' && game.player;
+                if (p) { const dx = e.x - p.x, dy = e.y - p.y; if (dx * dx + dy * dy < HYBRID.NEAR * HYBRID.NEAR) return false; }
+                return true;
+            },
+            /** Bake walk frame f (1..FRAMES) of both layers into the strips */
+            _bakeCell(e, c, b, f) {
+                const F = HYBRID.FRAMES, R = HYBRID.R, Q = HYBRID.Q, cell = b.cell;
+                const B = { x: e.x, y: e.y, angle: 0, look: e.look, walkPhase: (f - 1) / F * Math.PI * 2 };
+                syncHumanoidGait(B);
+                const G = B._gait;
+                G.speed = b.stride; G.dirX = 1; G.dirY = 0; G.tick = _simTick; G.prevX = B.x; G.prevY = B.y; G.phasePrev = B.walkPhase;
+                const wm = _worldMatrix, wc = _worldCanvas, lite = _crowdLite;
+                _crowdLite = true;                                              // flat: the bake turns with the body, the light doesn't
+                try {
+                    for (const [pass, cv] of [['under', b.under], ['over', b.over]]) {
+                        const g = cv.getContext('2d'); if (!g) return false;
+                        B._animState = null;
+                        g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(cell * (f - 1), 0, cell, cell);
+                        g.setTransform(Q, 0, 0, Q, cell * (f - 1) + R * Q, R * Q);
+                        const cfg = Object.assign({}, c, { lerpSpeed: 1, noShadow: true, poseInstant: true, pose: 'none', _crowdBake: true, _hybrid: { pass } });
+                        drawProceduralHumanoid(g, B, cfg);
+                    }
+                } catch (err) { return false; }
+                finally { _crowdLite = lite; _worldMatrix = wm; _worldCanvas = wc; }
+                b.have[f] = 1;
+                return true;
+            },
+            /** Draw this body hybrid (true), or false: the caller draws it live */
+            draw(ctx, e, c) {
+                if (!this.eligible(ctx, e, c)) return false;
+                syncHumanoidGait(e);
+                const sig = CrowdImpostors._sig(e, c, null), F = HYBRID.FRAMES;
+                let b = this.cache.get(e);
+                // A change of pace keeps the bake: only the baked legs' stride differs a little, and nothing live
+                // hangs from them (rebaking on every easing step would cost more than it saves)
+                if (!b || (b.sig !== sig && !CrowdImpostors._sameButStride(b, sig))) {
+                    if (!b && this.cache.size >= HYBRID.MAX) {                 // full: the one seen longest ago goes (never one seen this frame)
+                        let oldK = null, oldT = Infinity;
+                        for (const [k, v] of this.cache) if (v.used < oldT) { oldT = v.used; oldK = k; }
+                        if (oldK === null || oldT >= _frameTime) return false;
+                        this.cache.delete(oldK);
+                    }
+                    const parts = sig.split('|'), stride = +parts[4] || 0;
+                    if (!(stride > 0)) return false;
+                    const cell = Math.ceil(HYBRID.R * 2 * HYBRID.Q);
+                    const mk = () => { const cv = document.createElement('canvas'); cv.width = cell * F; cv.height = cell; return cv; };
+                    if (b) { b.have.fill(0); b.sig = sig; b.parts = parts; b.stride = stride; }
+                    else { b = { sig, parts, stride, under: mk(), over: mk(), have: new Uint8Array(F + 1), cell, used: _frameTime }; this.cache.set(e, b); }
+                }
+                b.used = _frameTime;
+                const ph = ((e.walkPhase || 0) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+                const f = 1 + (Math.round(ph / (Math.PI * 2) * F) % F);
+                if (!b.have[f]) {
+                    if (this._frame !== _frameTime) { this._frame = _frameTime; this._cells = 0; }
+                    if (this._cells >= HYBRID.CELLS_PER_FRAME) return false;     // a few cells a frame; live until then
+                    this._cells++;
+                    if (!this._bakeCell(e, c, b, f)) return false;
+                }
+                const R = HYBRID.R, cell = b.cell, x = cell * (f - 1);
+                const cfg = c; const prev = cfg._hybrid;
+                cfg._hybrid = { pass: 'stamp', stamp: (g, layer, S) => {
+                    // The bake already holds the build's scale: undo the live one round the stamp
+                    if (S && (S.x !== 1 || S.y !== 1)) { g.save(); g.scale(1 / S.x, 1 / S.y); }
+                    g.drawImage(layer === 'under' ? b.under : b.over, x, 0, cell, cell, -R, -R, R * 2, R * 2);
+                    if (S && (S.x !== 1 || S.y !== 1)) g.restore();
+                } };
+                try { drawProceduralHumanoid(ctx, e, cfg); }
+                finally { if (prev === undefined) delete cfg._hybrid; else cfg._hybrid = prev; }
+                RenderStats.cachedBodies++;
+                return true;
+            },
             clear() { this.cache.clear(); }
         };
 
         /** The crowd's draw: by Crowd Quality (high live, medium lighter, low baked) */
         function drawCrowdHumanoid(ctx, entity, config) {
             const q = GameSettings.crowdQuality || 'high';
-            if (q === 'high') return drawProceduralHumanoid(ctx, entity, config);
+            if (q === 'high') {
+                if (CrowdHybrid.draw(ctx, entity, config)) return;
+                return drawProceduralHumanoid(ctx, entity, config);
+            }
             if (q === 'low') {
                 if (!RenderStats.timed) { if (CrowdImpostors.draw(ctx, entity, config)) return; }
                 else {                                                              // a baked body is still a body: Entities: People
@@ -78322,6 +78493,138 @@ engineMixin({
                 if (c && c.image) c.image.close();
                 if (c && c.canvas) c.canvas.width = c.canvas.height = 1;
                 this._lightingBase = null;
+                this._releaseWorldLight();
+            },
+
+            /** A street lamp's shadow shape (Path2D) and hole gradient, made once and kept while it stays put */
+            _lampHolePaint(lamp, lc) {
+                const poly = lamp._shadowPoly;
+                if (lamp._shadowPathOf !== poly) {
+                    const path = new Path2D();
+                    path.moveTo(poly[0].x, poly[0].y);
+                    for (let i = 1; i < poly.length; i++) path.lineTo(poly[i].x, poly[i].y);
+                    path.closePath();
+                    lamp._shadowPath = path; lamp._shadowPathOf = poly;
+                }
+                if (!lamp._holeGrad || lamp._holeGradX !== lamp.x || lamp._holeGradY !== lamp.y || lamp._holeGradRadius !== lamp.radius) {
+                    const g = lc.createRadialGradient(lamp.x, lamp.y, 10, lamp.x, lamp.y, lamp.radius);
+                    g.addColorStop(0, 'rgba(255, 255, 255, 1)'); g.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    lamp._holeGrad = g; lamp._holeGradX = lamp.x; lamp._holeGradY = lamp.y; lamp._holeGradRadius = lamp.radius;
+                }
+            },
+
+            /* =====================================================================
+               MOVING-CAMERA LIGHT CACHE
+               ---------------------------------------------------------------------
+               The dark (the tint) with every steady hole cut in it — street lamps that
+               neither flicker, wake nor fade, and the interiors' baked lights — is the
+               same wherever the camera is. It is drawn once into a world-space buffer
+               at the light layer's own scale, covering the view and a margin round it,
+               and each frame that buffer is laid in under the view transform: a walk
+               or a drive slides it along and nothing is redrawn until the view nears
+               its edge. Holes are cut with destination-out (dark × (1 − a) for each),
+               which gives the same result in any order, so the lamps that do change
+               (faulty ones, waking ones, candles) and anything the buffer lacks are
+               still cut live on top, and everything after (headlights, shots, fire,
+               reflections, colour) is untouched. Off: GameSettings.movingLightCache.
+               The buffer is rebuilt when the map, its geometry, the tint, the scale
+               or a baked lamp changes; while the tint or zoom is easing frame to frame
+               (dusk, a zoom step) the live path is used, so it never rebuilds every
+               frame. Room lighting and a lamp budget smaller than the lamps in view
+               keep the original path.
+               ===================================================================== */
+            /** A lamp's light while it holds steady (its intensity), or -1 when it can change frame to frame */
+            _steadyLampK(lamp) {
+                if (lamp.candle) return -1;
+                lampFlicker(lamp);                                              // (sets lamp._flick)
+                if (lamp._flick >= 0 && this.activeMap && this.activeMap.type === 'outdoor') return -1;   // a faulty lamp stutters
+                if (lampWake(lamp) !== 1) return -1;                            // waking, or off for the day
+                return lamp.intensity ?? 1;
+            },
+
+            _releaseWorldLight() {
+                const W = this._worldLight;
+                if (W && W.cv) W.cv.width = W.cv.height = 1;
+                this._worldLight = null;
+            },
+
+            /** Lay the static light base in from the world buffer (rebuilding it if it's stale). Returns the set of
+                lamps already cut into it, or null for the original path. */
+            _worldLightBase(lc, S, camX, camY, halfW, halfH, tint, visibleCount, rsOn) {
+                if (GameSettings.movingLightCache === false || rsOn || !this.lightingBaked || !(S > 0) || !isFinite(S) ||
+                    visibleCount > this._maxLitLamps || lc.globalAlpha !== 1 || lc.globalCompositeOperation !== 'source-over' ||
+                    (lc.filter && lc.filter !== 'none')) return null;
+                const map = this.activeMap, rev = map._renderSpatialRevision || 0, epoch = this._effectSpatialEpoch || 0;
+                const P = 32, nL = Math.max(0, camX - halfW - P), nR = Math.min(map.width, camX + halfW + P);
+                const nT = Math.max(0, camY - halfH - P), nB = Math.min(map.height, camY + halfH + P);
+                let W = this._worldLight;
+                const sameKey = W && W.map === map && W.rev === rev && W.epoch === epoch && W.tint === tint && W.S === S &&
+                    W.lampsRef === this.lamps && W.lampCount === (this.lamps ? this.lamps.length : 0);
+                let fresh = sameKey && W.ok && nL >= W.x0 && nR <= W.x1 && nT >= W.y0 && nB <= W.y1;
+                if (fresh) {
+                    for (const e of W.baked) {
+                        const l = e.lamp;
+                        if (e.interior ? (!l._sprites || l._sprites.hole !== e.hole) :
+                            (l._shadowPath !== e.path || l._holeGrad !== e.grad || this._steadyLampK(l) !== e.k)) { fresh = false; break; }
+                    }
+                }
+                if (!fresh) {
+                    // Easing (the tint at dusk, a zoom step): stay live until it holds for a frame, so no rebuild per frame
+                    const key = map === (this._wlKeyMap) && tint === this._wlKeyTint && S === this._wlKeyS && rev === this._wlKeyRev;
+                    this._wlKeyMap = map; this._wlKeyTint = tint; this._wlKeyS = S; this._wlKeyRev = rev;
+                    if (!key) return null;
+                    W = this._buildWorldLight(lc, S, camX, camY, halfW, halfH, tint, map, rev, epoch);
+                    if (!W) return null;
+                }
+                lc.drawImage(W.cv, W.x0, W.y0, W.cv.width / S, W.cv.height / S);
+                return W.set;
+            },
+
+            _buildWorldLight(lc, S, camX, camY, halfW, halfH, tint, map, rev, epoch) {
+                const M = Math.max(192, 0.6 * Math.max(halfW, halfH));
+                const x0 = Math.max(0, camX - halfW - M), x1 = Math.min(map.width, camX + halfW + M);
+                const y0 = Math.max(0, camY - halfH - M), y1 = Math.min(map.height, camY + halfH + M);
+                const pw = Math.ceil((x1 - x0) * S), ph = Math.ceil((y1 - y0) * S);
+                let W = this._worldLight;
+                if (!(pw > 0 && ph > 0) || pw * ph > 4194304) { if (W) W.ok = false; return null; }
+                if (!W) W = this._worldLight = { cv: null, baked: [], set: new Set() };
+                const cv = W.cv || (W.cv = document.createElement('canvas'));
+                if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; }
+                const c = cv.getContext('2d');
+                if (!c) { W.ok = false; return null; }
+                Object.assign(W, { map, rev, epoch, tint, S, x0, y0, x1: x0 + pw / S, y1: y0 + ph / S, lampsRef: this.lamps,
+                                   lampCount: this.lamps ? this.lamps.length : 0, ok: false });
+                W.baked.length = 0; W.set.clear();
+                c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+                c.clearRect(0, 0, pw, ph);
+                c.setTransform(S, 0, 0, S, -x0 * S, -y0 * S);
+                c.fillStyle = `rgb(${tint})`;
+                c.fillRect(x0, y0, x1 - x0, y1 - y0);
+                c.globalCompositeOperation = 'destination-out';
+                const touches = (x, y, r) => x + r > x0 && x - r < x1 && y + r > y0 && y - r < y1;
+                const iLights = map._interiorLights;
+                if (iLights && iLights.length) {
+                    const segs = map._interiorShadowSegs || {};
+                    for (const lamp of iLights) {
+                        if (!touches(lamp.x, lamp.y, lamp.radius)) continue;
+                        const sp = this._interiorLightSprites(lamp, segs[lamp.level] || []);
+                        c.drawImage(sp.hole, sp.x, sp.y, sp.d, sp.d);
+                        W.baked.push({ lamp, interior: true, hole: sp.hole }); W.set.add(lamp);
+                    }
+                }
+                for (const entry of this._queryLampCandidates({ left: x0, right: x1, top: y0, bottom: y1 }, 'lampWorldLight')) {
+                    const lamp = entry.item;
+                    if (!touches(lamp.x, lamp.y, lamp.radius) || !lamp._shadowPoly || lamp._shadowPoly.length === 0) continue;
+                    const k = this._steadyLampK(lamp);
+                    if (k < 0.01) continue;                                     // changing (drawn live), or dark
+                    this._lampHolePaint(lamp, lc);
+                    c.globalAlpha = Math.min(1, k);
+                    c.fillStyle = lamp._holeGrad; c.fill(lamp._shadowPath);
+                    W.baked.push({ lamp, interior: false, path: lamp._shadowPath, grad: lamp._holeGrad, k }); W.set.add(lamp);
+                }
+                c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+                W.ok = true;
+                return W;
             },
 
             /* =====================================================================
@@ -78538,19 +78841,7 @@ engineMixin({
                     const nearest = this._selectLightingLamps(visibleLamps, this._maxLitLamps, scratch.lampHeap, scratch.nearestLamps);
                     for (const lamp of nearest) {
                         if (litLamps.length >= this._maxLitLamps) break;
-                        const poly = lamp._shadowPoly;
-                        if (lamp._shadowPathOf !== poly) {
-                            const path = new Path2D();
-                            path.moveTo(poly[0].x, poly[0].y);
-                            for (let i = 1; i < poly.length; i++) path.lineTo(poly[i].x, poly[i].y);
-                            path.closePath();
-                            lamp._shadowPath = path; lamp._shadowPathOf = poly;
-                        }
-                        if (!lamp._holeGrad || lamp._holeGradX !== lamp.x || lamp._holeGradY !== lamp.y || lamp._holeGradRadius !== lamp.radius) {
-                            const g = lc.createRadialGradient(lamp.x, lamp.y, 10, lamp.x, lamp.y, lamp.radius);
-                            g.addColorStop(0, 'rgba(255, 255, 255, 1)'); g.addColorStop(1, 'rgba(255, 255, 255, 0)');
-                            lamp._holeGrad = g; lamp._holeGradX = lamp.x; lamp._holeGradY = lamp.y; lamp._holeGradRadius = lamp.radius;
-                        }
+                        this._lampHolePaint(lamp, lc);
                         litLamps.push(lamp);
                     }
                 }
@@ -78560,15 +78851,22 @@ engineMixin({
                     lc.save(); lc.setTransform(1, 0, 0, 1, 0, 0);
                     lc.globalCompositeOperation = 'copy'; lc.drawImage(base.image, 0, 0); lc.restore();
                 } else {
-                    lc.fillStyle = `rgb(${tint})`;
-                    lc.fillRect(visLeft, visTop, visRight - visLeft, visBottom - visTop);
-                    if (rsOn) rs.carveSkyLight(lc, ambient, dc.darkness);
+                    // The moving-camera cache: the static dark and its steady holes, from a world-space buffer
+                    const baked = this._worldLightBase(lc, LS * V.zoom, camX, camY, halfW + Math.abs(V.shakeX || 0), halfH + Math.abs(V.shakeY || 0),
+                        tint, scratch.visibleLamps.length, rsOn);
+                    if (!baked) {
+                        lc.fillStyle = `rgb(${tint})`;
+                        lc.fillRect(visLeft, visTop, visRight - visLeft, visBottom - visTop);
+                        if (rsOn) rs.carveSkyLight(lc, ambient, dc.darkness);
+                    }
                     lc.globalCompositeOperation = 'destination-out';
                     for (const lamp of iVisible) {
+                        if (baked && baked.has(lamp)) continue;                // already a hole in the buffer
                         const sp = lamp._sprites;
                         lc.drawImage(sp.hole, sp.x, sp.y, sp.d, sp.d);
                     }
                     for (const lamp of litLamps) {
+                        if (baked && baked.has(lamp)) continue;
                         lc.globalAlpha = Math.min(1, lamp._litK);
                         lc.fillStyle = lamp._holeGrad; lc.fill(lamp._shadowPath);
                     }

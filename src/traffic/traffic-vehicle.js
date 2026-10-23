@@ -130,6 +130,7 @@
                 // --- MANUAL DRIVING STATE ---
                 this.manualGas = 0;
                 this.manualTurn = 0;
+                this._wallClear = null;     // wall clearance from the last empty wall check (_wallContact)
                 
                 // --- PARK IDLE TIMER ---
                 this.parkIdleTimer = 0; 
@@ -1292,21 +1293,46 @@
 
             /** The deepest wall or building the car overlaps where it stands: { nx, ny, depth },
              *  the normal pointing out of the wall (SAT), or null when it's clear */
+            /*  Wall clearance: a car on an open road is nowhere near a wall most ticks. When a check finds
+                nothing, it also notes how much room there was (the nearest wall's box, or the edge of the grid
+                cells it searched), and later checks return straight away while the car is still that far from
+                every box: the same answer the full check gives (no box can be within its radius), with no
+                search. Any change to the walls (a new geometry generation) or a different wall list starts over. */
             _wallContact(walls, buildings) {
-                const obb = { x: this.x, y: this.y, angle: this.angle, length: this.length, width: this.width };
-                const r = Math.hypot(this.length, this.width) / 2;
-                const bounds = { left: this.x - r, right: this.x + r, top: this.y - r, bottom: this.y + r };
-                let best = null;
+                if (walls && !walls.length) walls = null;                      // an empty list (often a fresh []) has nothing to hit
+                if (buildings && !buildings.length) buildings = null;
+                const r = Math.hypot(this.length, this.width) / 2, x = this.x, y = this.y;
+                const wc = this._wallClear;
+                if (wc && wc.w === walls && wc.b === buildings && wc.r === r) {
+                    const dx = x - wc.x, dy = y - wc.y, room = wc.d - r;
+                    if (dx * dx + dy * dy < room * room && wc.gw === _physicsSpatial.generation(walls) &&
+                        wc.gb === _physicsSpatial.generation(buildings)) return null;
+                }
+                const obb = { x, y, angle: this.angle, length: this.length, width: this.width };
+                const reach = r + TrafficVehicle.WALL_CLEAR_SLACK;
+                const bounds = { left: x - reach, right: x + reach, top: y - reach, bottom: y + reach };
+                let best = null, clear = Infinity;
                 for (const list of [walls, buildings]) {
+                    if (!list) continue;
                     const candidates = _physicsSpatial.query(list, bounds);
                     if (!candidates) continue;
+                    if (clear > 0) clear = _physicsSpatial.generation(list) === null ? 0 : Math.min(clear, _physicsSpatial.cellEdge(list, bounds, x, y));
                     for (let w of candidates) {
-                        if (this.x + r < w.x || this.x - r > w.x + w.w || this.y + r < w.y || this.y - r > w.y + w.h) continue;
+                        if (clear > 0) {
+                            const ex = Math.max(w.x - x, 0, x - (w.x + w.w)), ey = Math.max(w.y - y, 0, y - (w.y + w.h)), d = Math.sqrt(ex * ex + ey * ey);
+                            clear = d >= 0 ? Math.min(clear, d) : 0;
+                        }
+                        if (x + r < w.x || x - r > w.x + w.w || y + r < w.y || y - r > w.y + w.h) continue;
                         const wo = CollisionSystem._aabbToOBB(w);
                         const c = CollisionSystem._satCollision(obb, wo);
                         if (c && (!best || c.depth > best.depth)) { best = c; c.obb = wo; }
                     }
                 }
+                if (!best && clear > r && isFinite(clear)) {
+                    const n = wc || (this._wallClear = {});
+                    n.w = walls; n.b = buildings; n.r = r; n.x = x; n.y = y; n.d = clear;
+                    n.gw = _physicsSpatial.generation(walls); n.gb = _physicsSpatial.generation(buildings);
+                } else if (wc) wc.w = null;
                 return best;
             }
         
@@ -2784,4 +2810,4 @@
                 this.turnSignalTimer = 80;
             }
         }
-
+        TrafficVehicle.WALL_CLEAR_SLACK = 96;   // extra search reach that buys ticks of no wall checks (_wallContact)

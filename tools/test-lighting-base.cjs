@@ -79,4 +79,42 @@ test('Map changes and game reset release the old cache backing store',e=>{
   return {mapReleased,resetReleased:second.width===1&&second.height===1&&game._lightingBase===null};
  `);assert.deepEqual(r,{mapReleased:true,resetReleased:true});
 });
+
+const world=`
+ const g=game;g.story.update=()=>{};g._doLoadMap('sdc');g.bakeStaticLighting();g.worldMinutes=22*60;
+ const lc=g.lightCtx;lc.setTransform(1,0,0,1,0,0);lc.globalAlpha=1;lc.globalCompositeOperation='source-over';
+ let builds=0;const b=g._buildWorldLight;g._buildWorldLight=function(){builds++;return b.apply(this,arguments);};
+ const S=.5,tint='22, 10, 48';let cx=2650,cy=1100;
+ const lay=()=>g._worldLightBase(lc,S,cx,cy,440,206,tint,10,false);
+`;
+test('Moving-camera light cache: a walk slides one buffer, leaving its margin rebuilds it',e=>{
+ const r=value(e,world+`
+  const first=lay(),second=lay();const steps=[];for(let i=0;i<20;i++){cx+=6;steps.push(!!lay());}
+  const afterWalk=builds;cx+=2000;const far=!!lay();
+  return {first:first===null,second:!!second,steps:steps.every(Boolean),afterWalk,far,builds,lamps:g._worldLight.baked.length>0};
+ `);assert.deepEqual(r,{first:true,second:true,steps:true,afterWalk:1,far:true,builds:2,lamps:true});
+});
+test('Moving-camera light cache: changing lamps stay live, a baked lamp that changes rebuilds, easing inputs stay live',e=>{
+ const r=value(e,world+`
+  lay();const set=lay();const bakedLamp=g._worldLight.baked.find(x=>!x.interior).lamp;
+  const faulty=g.lamps.find(l=>{lampFlicker(l);return l._flick>=0;});const candle={candle:true};
+  const out={faultyLive:g._steadyLampK(faulty)===-1,candleLive:g._steadyLampK(candle)===-1,faultyNotBaked:!set.has(faulty)};
+  const n0=builds;bakedLamp.intensity=.5;out.changedRebuilds=!!lay()&&builds===n0+1;bakedLamp.intensity=undefined;lay();
+  const n1=builds;let t='30, 12, 50';out.easing=g._worldLightBase(lc,S,cx,cy,440,206,t,10,false)===null;
+  out.settled=!!g._worldLightBase(lc,S,cx,cy,440,206,t,10,false)&&builds===n1+1;
+  return out;
+ `);assert.deepEqual(r,{faultyLive:true,candleLive:true,faultyNotBaked:true,changedRebuilds:true,easing:true,settled:true});
+});
+test('Moving-camera light cache: off, rooms, a lamp budget below the view and unusual Canvas state use the original path',e=>{
+ const r=value(e,world+`
+  lay();lay();const cases=[];
+  GameSettings.movingLightCache=false;cases.push(lay()===null);GameSettings.movingLightCache=true;
+  cases.push(g._worldLightBase(lc,S,cx,cy,440,206,tint,10,true)===null);
+  cases.push(g._worldLightBase(lc,S,cx,cy,440,206,tint,g._maxLitLamps+1,false)===null);
+  lc.globalAlpha=.5;cases.push(lay()===null);lc.globalAlpha=1;
+  g.activeMap._renderSpatialRevision=(g.activeMap._renderSpatialRevision||0)+1;cases.push(lay()===null);cases.push(!!lay());
+  g._releaseLightingBase();cases.push(g._worldLight===null);
+  return cases;
+ `);assert.ok(r.every(Boolean),JSON.stringify(r));
+});
 console.log(JSON.stringify({passed:tests.length,results:tests},null,2));

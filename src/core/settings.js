@@ -170,6 +170,8 @@
             baseline: false,                // Baseline's layer panel (ui/render-layers.js): each render layer on a chip, with its calls (not kept)
             countCalls: false,              // Full profiler: count canvas calls (a shim on every 2D call — it slows the frame it measures)
             propSprites: true,              // furniture painted once and stamped (entities/prop-sprites.js); off draws it as vector (not kept)
+            crowdHybrid: true,              // Crowd Quality High: far walkers' bodies from a bake, hair/cloth/rim live (ui/crowd-impostors.js); off draws them fully live (not kept)
+            movingLightCache: true,         // the static dark and steady lamp holes from a world-space buffer, slid with the camera (engine/lighting.js); off redraws them every frame (not kept)
             talkStyle: (() => {             // 'veil' | 'ribbon': the dialogue and comms look (ui/comms.js TalkStyle); kept per device
                 try { if (localStorage.getItem('dfab_talk_style') === 'ribbon') return 'ribbon'; } catch (e) { /* private mode */ }
                 return 'veil';
