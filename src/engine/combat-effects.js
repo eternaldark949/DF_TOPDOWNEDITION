@@ -465,15 +465,17 @@
                     const py = this.player.y + Math.sin(punchAngle) * 20;
                     
                     this.emitNoise(this.player.x, this.player.y, CONFIG.NOISE.punch, 'punch');
+                    const punchCrit = this.rollCrit(null);                // a punch can crit too (engine/combat-fx.js)
                     this.projectiles.push(new ProjectileEntity({
                         x: px, y: py, 
                         angle: punchAngle, 
                         isEnemy: false, 
                         owner: this.player, 
                         color: 'rgba(0,0,0,0)', // Invisible hitbox
-                        radius: 15, speed: 10, life: 5, damage: Math.round(this.resonance.stat('punchDamage', 15)), mass: 50,
+                        radius: 15, speed: 10, life: 5, damage: Math.round(this.resonance.stat('punchDamage', 15) * punchCrit), mass: 50,
                         melee: true
                     }));
+                    this.projectiles[this.projectiles.length - 1].crit = punchCrit > 1;
                     this.triggerShake(2);
                     return;
                 }
@@ -506,7 +508,8 @@
                 let shotDamage = this.resonance.stat('gunDamage', stats.damage || 35);
                 if (_gameTimeSec - this.flitState.lastFlitAt <= this.resonance.stat('flitStrikeWindow', 1)) shotDamage *= 1 + 0.2 * this.resonance.rank('flit_strike');
                 if (this._drawnAt !== undefined && _gameTimeSec - this._drawnAt <= 0.8 && !this._drawShotUsed) { shotDamage *= 1 + 0.25 * this.resonance.rank('quick_draw'); this._drawShotUsed = true; }
-                shotDamage = Math.round(shotDamage);
+                const shotCrit = this.rollCrit(stats);                   // a critical hit (engine/combat-fx.js)
+                shotDamage = Math.round(shotDamage * shotCrit);
                 const shotLife   = stats.projectileLife || 60;
                 const isPenetrating = stats.penetrating || false;
                 
@@ -538,6 +541,7 @@
                     dotTicks: stats.dotTicks || 12,
                     dotInterval: stats.dotInterval || 10
                 }));
+                this.projectiles[this.projectiles.length - 1].crit = shotCrit > 1;
             
                 // Gunfire carries: gangers in earshot come to look (engine/noise.js)
                 { const N = CONFIG.NOISE, id = (this.currentWeapon && this.currentWeapon.id) || '';

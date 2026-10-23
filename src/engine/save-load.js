@@ -632,6 +632,8 @@ engineMixin({
                             this.inventory.loadItemsFromIds(invData.items);
                             // The Maiden's Kukri waits in the armory for now (GameSettings.kukriFromArmory); later only the Demoness gives it
                             if (GameSettings.kukriFromArmory !== false && !invData.items.includes('maiden_kukri')) { const k = createItemFromRegistry('maiden_kukri', this); if (k) this.inventory.items.push(k); }
+                            // Blood Pact waits beside it (older saves get it too)
+                            if (GameSettings.kukriFromArmory !== false && !invData.items.includes('blood_pact')) { const k = createItemFromRegistry('blood_pact', this); if (k) this.inventory.items.push(k); }
                             console.log(`[LOAD] Rebuilt inventory: ${invData.items.length} items (${invData.items.join(', ')})`);
                         }
                         // If save had empty items array, keep the default loadout from constructor

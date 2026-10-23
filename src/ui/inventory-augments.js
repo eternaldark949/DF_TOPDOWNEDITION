@@ -60,6 +60,13 @@
                 // a slash in an arc before her: damage, then bleeding (engine/status-effects.js); quiet, not silent
                 stats: { fireRate: 16, damage: 28, reach: 38, arc: 1.5, bleedDps: 6, bleedSecs: 3, noise: 60, damageType: 'melee' }
             },
+            'blood_pact': {
+                name: 'Blood Pact', type: 'weapon', icon: '⚔',
+                desc: 'A long blood-red katana. Twice the Kukri\'s reach, half its pace; its cuts bleed and crit more often.',
+                weaponMode: 'melee',
+                // the Kukri's twice-reach, half-rate cousin: a slower swing (swingSecs), harder cuts, a wider arc
+                stats: { fireRate: 32, damage: 45, reach: 76, arc: 1.7, swingSecs: 0.32, bleedDps: 8, bleedSecs: 3, critChance: 0.2, noise: 65, damageType: 'melee' }
+            },
             'laser_sight': {
                 name: 'Laser Sight', type: 'attachment', icon: '⊕',
                 desc: 'Faint red targeting beam when equipped.',
@@ -190,7 +197,7 @@
         }
         
         // Default loadout for new games
-        const DEFAULT_LOADOUT = ['pistol_fpx', 'sniper_sara', 'rifle_rb98', 'pistol_anavia', 'sniper_sr86', 'maiden_kukri'];
+        const DEFAULT_LOADOUT = ['pistol_fpx', 'sniper_sara', 'rifle_rb98', 'pistol_anavia', 'sniper_sr86', 'maiden_kukri', 'blood_pact'];
         
         // Factory: create a live InventoryItem from registry ID
         function createItemFromRegistry(id, game) {
