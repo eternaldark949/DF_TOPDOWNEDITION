@@ -39,7 +39,7 @@
             // OUTLINE is the near flank, nose to tail (mirrored for the far one): the fender hump round each side
             // of the nose (as wide as the rear), the waist along the cap, the wheel hood standing out over the rear wheel, the round tail.
             COACH: {
-                OUTLINE: [[0.035, 0], [0.032, 0.3], [0.036, 0.45], [0.028, 0.5], [0.008, 0.6], [0.006, 0.74], [0.022, 0.88], [0.06, 0.96],
+                OUTLINE: [[0.006, 0], [0.008, 0.2], [0.014, 0.34], [0.026, 0.44], [0.034, 0.5], [0.008, 0.6], [0.006, 0.74], [0.022, 0.88], [0.06, 0.96],
                           [0.12, 0.995], [0.19, 1], [0.26, 0.985], [0.305, 0.9], [0.36, 0.85], [0.4, 0.84], [0.52, 0.84], [0.6, 0.86], [0.635, 0.93],
                           [0.67, 0.99], [0.745, 1], [0.82, 0.99], [0.86, 0.95], [0.895, 0.9], [0.935, 0.84], [0.965, 0.74], [0.987, 0.58],
                           [0.998, 0.38], [1, 0]],
@@ -235,12 +235,12 @@
                     wall.addColorStop(0, 'rgba(0,0,0,0.42)'); wall.addColorStop(1, 'rgba(0,0,0,0)');
                     c.fillStyle = wall; c.fillRect(X(0.25), s > 0 ? hv * 0.35 : -hv, L * 0.22, hv * 0.65);
                     c.lineWidth = 0.9; c.strokeStyle = 'rgba(0,0,0,0.55)';
-                    c.beginPath(); c.moveTo(X(0.03), s * hv); c.quadraticCurveTo(X(0.15), s * hv * 1.02, X(0.245), s * hv * 1.12); c.stroke();
+                    c.beginPath(); c.moveTo(X(0.02), s * hv); c.quadraticCurveTo(X(0.15), s * hv * 1.02, X(0.245), s * hv * 1.12); c.stroke();
                     c.lineWidth = 0.6; c.strokeStyle = 'rgba(255,255,255,0.16)';
-                    c.beginPath(); c.moveTo(X(0.03), s * (hv + 0.9)); c.quadraticCurveTo(X(0.15), s * (hv * 1.02 + 0.9), X(0.245), s * (hv * 1.12 + 0.9)); c.stroke();
+                    c.beginPath(); c.moveTo(X(0.02), s * (hv + 0.9)); c.quadraticCurveTo(X(0.15), s * (hv * 1.02 + 0.9), X(0.245), s * (hv * 1.12 + 0.9)); c.stroke();
                 }
                 // The hood sunk between them: a touch darker
-                c.fillStyle = 'rgba(0,0,0,0.12)'; c.beginPath(); c.moveTo(X(0.035), -hv); c.lineTo(X(0.035), hv); c.lineTo(X(0.25), hv * 1.1); c.lineTo(X(0.25), -hv * 1.1); c.closePath(); c.fill();
+                c.fillStyle = 'rgba(0,0,0,0.12)'; c.beginPath(); c.moveTo(X(0), -hv); c.lineTo(X(0), hv); c.lineTo(X(0.25), hv * 1.1); c.lineTo(X(0.25), -hv * 1.1); c.closePath(); c.fill();
                 // The wheel hoods standing out over the rear wheels: a seam where each meets the body, light on its crown
                 for (const s of [-1, 1]) {
                     c.save(); c.translate(X(0.745), s * h * 0.88); c.scale(1, 0.24);
@@ -393,7 +393,7 @@
             // The outline
             c.strokeStyle = 'rgba(6, 3, 12, 0.7)'; c.lineWidth = 0.9; c.stroke(g.body);
             if (coach) {
-                _ladyBadge(c, L / 2 - L * 0.065, 2.3);
+                _ladyBadge(c, L / 2 - L * 0.045, 2.3);
                 // The lamp pods: dark housings standing out of the body, ringed in silver (the lamps in them are live)
                 const Lp = coachLamps(L, W);
                 for (const s of [-1, 1]) for (const t of [Lp.head, ...Lp.tail]) {
