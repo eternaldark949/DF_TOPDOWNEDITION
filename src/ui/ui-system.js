@@ -514,7 +514,7 @@
                 
                 // Outer glow (widths in CSS px: this._u is map units per CSS px)
                 const U = this._u || 1;
-                ctx.strokeStyle = 'rgba(138, 43, 226, 0.28)';
+                ctx.strokeStyle = MAP_PAL.route[0];
                 ctx.lineWidth = 14 * U;
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
@@ -527,7 +527,7 @@
                 ctx.stroke();
                 
                 // Middle layer
-                ctx.strokeStyle = 'rgba(180, 100, 255, 0.7)';
+                ctx.strokeStyle = MAP_PAL.route[1];
                 ctx.lineWidth = 6 * U;
                 
                 ctx.beginPath();
@@ -628,7 +628,7 @@
                 ctx.strokeStyle = `rgba(255, 207, 106, ${0.25 + 0.35 * (1 - pulse)})`; ctx.lineWidth = 1.5 * D;
                 ctx.beginPath(); ctx.arc(p.x, p.y, (8 + 10 * pulse) * D * k, 0, Math.PI * 2); ctx.stroke();
                 ctx.restore();
-                MapIcons.draw(ctx, 'dest', p.x, p.y, { dpr: D, css: MapIcons.SIZE.dest * k });
+                MapIcons.drawMagic(ctx, 'dest', p.x, p.y, { dpr: D, css: MapIcons.SIZE.dest * k, t: performance.now() / 1000, seed: 0.71 });
             }
             
             // --- DRAW MAP LEGEND ---
@@ -927,6 +927,7 @@
                 this._u = D / finalScale;                                   // map units per CSS px
                 this._zk = MapIcons.zoomK(this.mapView.zoom);               // icons grow a little with zoom, never with the screen
                 const S = this._toScreen, k = this._zk, on = (p, m = 40 * D) => p.x > -m && p.x < w + m && p.y > -m && p.y < h + m;
+                const T = performance.now() / 1000, mg = (mx, my) => ({ t: T, seed: ((mx * 0.0137 + my * 0.0071) % 1 + 1) % 1 });   // the icons' magic: one clock, a phase per place
 
                 // ── Areas and routes, in map space ──
                 ctx.save(); ctx.translate(ox, oy); ctx.scale(finalScale, finalScale);
@@ -961,22 +962,22 @@
                 ctx.restore();
 
                 // ── Markers, in screen space at fixed sizes ──
-                if (mapData.transitions) for (const t of mapData.transitions) { const p = S(t.x + t.w / 2, t.y + t.h / 2); if (on(p)) MapIcons.draw(ctx, 'transition', p.x, p.y, { dpr: D, css: MapIcons.SIZE.transition * k }); }
+                if (mapData.transitions) for (const t of mapData.transitions) { const p = S(t.x + t.w / 2, t.y + t.h / 2); if (on(p)) MapIcons.drawMagic(ctx, 'transition', p.x, p.y, { dpr: D, css: MapIcons.SIZE.transition * k, ...mg(t.x, t.y) }); }
                 // Points of interest from the buildings' categories
                 if (mapData.buildings) for (const b of mapData.buildings) {
                     const cat = b.mapCategory; if (!cat) continue;
                     const kind = cat === 'restaurant' ? 'pin:cup' : cat === 'medical' ? 'pin:cross' : 'pin:dot', key = cat === 'restaurant' ? 'restaurants' : null;
                     if (filterEnabled && (!key || activeFilter !== key)) continue;
-                    const p = S(b.x + b.w / 2, b.y + b.h / 2); if (on(p)) MapIcons.draw(ctx, kind, p.x, p.y, { dpr: D, css: MapIcons.SIZE.pin * k });
+                    const p = S(b.x + b.w / 2, b.y + b.h / 2); if (on(p)) MapIcons.drawMagic(ctx, kind, p.x, p.y, { dpr: D, css: MapIcons.SIZE.pin * k, ...mg(b.x, b.y) });
                 }
                 if (this.game.pedestrians && this.game.pedestrians.pedestrians && !filterEnabled) {   // the crowd: fine lavender motes
                     ctx.fillStyle = 'rgba(217, 204, 255, 0.55)'; const r = 1.6 * D;
                     ctx.beginPath(); for (const ped of this.game.pedestrians.pedestrians) { if (ped.dead) continue; const p = S(ped.x, ped.y); if (on(p, 4)) ctx.rect(p.x - r, p.y - r, r * 2, r * 2); } ctx.fill();
                 }
-                if (this.game.npcs && shouldShow('clients')) for (const n of this.game.npcs) { const p = S(n.x, n.y); if (on(p)) MapIcons.draw(ctx, 'client', p.x, p.y, { dpr: D, css: MapIcons.SIZE.client * k }); }
+                if (this.game.npcs && shouldShow('clients')) for (const n of this.game.npcs) { const p = S(n.x, n.y); if (on(p)) MapIcons.drawMagic(ctx, 'client', p.x, p.y, { dpr: D, css: MapIcons.SIZE.client * k, ...mg(n.x, n.y) }); }
                 if (shouldShow('homebases')) {
                     const L = this.game.landmarkRegistry && this.game.landmarkRegistry['parking_spot'], hx = L ? L.x : mapData.spawn && mapData.spawn.x, hy = L ? L.y : mapData.spawn && mapData.spawn.y;
-                    if (hx !== undefined) { const p = S(hx, hy); if (on(p)) MapIcons.draw(ctx, 'pin:home', p.x, p.y, { dpr: D, css: MapIcons.SIZE.pin * k }); }
+                    if (hx !== undefined) { const p = S(hx, hy); if (on(p)) MapIcons.drawMagic(ctx, 'pin:home', p.x, p.y, { dpr: D, css: MapIcons.SIZE.pin * k, ...mg(hx, hy) }); }
                 }
                 if (rz) {
                     const p = S(rz.x + rz.w / 2, rz.y + rz.h / 2), pulse = 1 + Math.sin(_frameTime / 400) * 0.05;
@@ -990,7 +991,7 @@
                         ctx.restore();
                     }
                 }
-                if (quest) { const p = S(quest.x, quest.y); if (on(p)) MapIcons.draw(ctx, 'pin:sparkle', p.x, p.y, { dpr: D, css: MapIcons.SIZE.pin * k }); }
+                if (quest) { const p = S(quest.x, quest.y); if (on(p)) MapIcons.drawMagic(ctx, 'pin:sparkle', p.x, p.y, { dpr: D, css: MapIcons.SIZE.pin * k, ...mg(quest.x, quest.y) }); }
                 if (shouldShow('missions')) {
                     this.drawObjectiveMarker(ctx);
                     const sd = this.game.story?.currentStepData;                // the story's own target
@@ -999,7 +1000,7 @@
                         if (typeof sd.target === 'string') { const l = this.game.getLandmark(sd.target); if (l) { tx = l.x; ty = l.y; } }
                         else if (sd.target) { tx = sd.target.x; ty = sd.target.y; }
                         else if (typeof sd.targetX === 'number') { tx = sd.targetX; ty = sd.targetY; }
-                        if (tx !== undefined) { const p = S(tx, ty); if (on(p)) MapIcons.draw(ctx, 'pin:star', p.x, p.y, { dpr: D, css: MapIcons.SIZE.pin * k }); }
+                        if (tx !== undefined) { const p = S(tx, ty); if (on(p)) MapIcons.drawMagic(ctx, 'pin:star', p.x, p.y, { dpr: D, css: MapIcons.SIZE.pin * k, ...mg(tx, ty) }); }
                     }
                 }
                 this.drawDistanceLine(ctx);
@@ -1007,7 +1008,7 @@
                 if (this.game.deliveryVehicle && this.game.deliveryVehicle.visible) { const c = this.game.deliveryVehicle, p = S(c.x, c.y); if (on(p)) MapIcons.draw(ctx, 'car:amber', p.x, p.y, { dpr: D, css: MapIcons.SIZE.car * k, rot: c.angle }); }   // Amber's van
                 if (this.game.ownedCar && this.game.ownedCar.visible) { const c = this.game.ownedCar, p = S(c.x, c.y); if (on(p)) MapIcons.draw(ctx, 'car', p.x, p.y, { dpr: D, css: MapIcons.SIZE.car * k, rot: c.angle }); }
                 const pl = this.game.player, pp = S(pl.x, pl.y);                // you, on top
-                MapIcons.draw(ctx, 'player', pp.x, pp.y, { dpr: D, css: MapIcons.SIZE.player * k, rot: pl.angle, scale: 0.94 + Math.sin(_frameTime / 350) * 0.06 });
+                MapIcons.drawMagic(ctx, 'player', pp.x, pp.y, { dpr: D, css: MapIcons.SIZE.player * k, rot: pl.angle, scale: 0.94 + Math.sin(_frameTime / 350) * 0.06, t: T, seed: 0 });
             }
             
             // Center the map view on the player's current position
@@ -1122,7 +1123,7 @@
                 ctx.strokeStyle = `rgba(255, 215, 106, ${0.15 + 0.35 * (1 - pulse)})`; ctx.lineWidth = 1.5 * D;
                 ctx.beginPath(); ctx.arc(p.x, p.y, (16 + 12 * pulse) * D * this._zk, 0, Math.PI * 2); ctx.stroke();
                 ctx.restore();
-                MapIcons.draw(ctx, 'objective', p.x, p.y, { dpr: D, css: MapIcons.SIZE.objective * this._zk, scale: 0.95 + 0.08 * pulse });
+                MapIcons.drawMagic(ctx, 'objective', p.x, p.y, { dpr: D, css: MapIcons.SIZE.objective * this._zk, scale: 0.95 + 0.08 * pulse, t: performance.now() / 1000, seed: 0.37 });
             }
 
         }
