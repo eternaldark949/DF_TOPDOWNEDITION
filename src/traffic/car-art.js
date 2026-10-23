@@ -131,7 +131,7 @@
         const SIGNAL_STEP = 6;                                              // frames per beat: 3 to fill, 2 to hold, 2 dark
         function _coachSignal(v) {
             if (!v.turnSignal || !(v.turnSignalTimer > 0)) return null;
-            const beat = Math.floor((1e6 - v.turnSignalTimer) / SIGNAL_STEP) % 7;
+            const beat = 6 - Math.floor((v.turnSignalTimer % (SIGNAL_STEP * 7)) / SIGNAL_STEP);   // the timer counts down
             const n = beat < 3 ? beat + 1 : beat < 5 ? 3 : 0;
             return n ? { s: v.turnSignal === 'left' ? -1 : 1, lit: [2, 1, 0].slice(0, n) } : null;
         }

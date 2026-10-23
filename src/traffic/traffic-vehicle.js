@@ -972,6 +972,7 @@
                     st += Math.abs(d) < 0.006 ? req - st : d;
                 }
                 this.steer = st;
+                if (player) this._steerSignal(req, absSpeed);
 
                 // --- STEERING → ROTATION ---
                 let yawTarget = 0;
@@ -2039,6 +2040,19 @@
                 // from the player) keep braking and steering in between rather than coasting blind
             }
             
+            /** The driver's turn signal follows the wheel: steer into a turn and it comes on for that side; let go and it
+             *  finishes the cycle it's in, then goes off. Whole cycles (C ticks) are added or cut so the
+             *  running lights never jump mid-sweep. */
+            _steerSignal(req, absSpeed) {
+                const C = 42;                                   // = car-art's 7 beats of 6 ticks
+                if (this.turnSignalTimer > 0) this.turnSignalTimer--;
+                if (Math.abs(req) > 0.3 && absSpeed > 0.5) {
+                    const side = req > 0 ? 'right' : 'left';
+                    if (this.turnSignal !== side || !(this.turnSignalTimer > 0)) { this.turnSignal = side; this.turnSignalTimer = C * 10 + C - 1; }
+                    else if (this.turnSignalTimer < C * 2) this.turnSignalTimer += C * 10;
+                } else if (this.turnSignalTimer >= C) this.turnSignalTimer %= C;
+            }
+
             // --- PHYSICS-BASED STEERING CALCULATIONS ---
             
             /** How fast a turn path can be followed from `t` on: by its tightest radius left, as round a bend
