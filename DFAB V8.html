@@ -41203,7 +41203,9 @@ class NeuralSystemsBuilding extends BuildingV2 {
                           [0.67, 0.99], [0.745, 1], [0.82, 0.99], [0.86, 0.95], [0.895, 0.9], [0.935, 0.84], [0.965, 0.74], [0.987, 0.58],
                           [0.998, 0.38], [1, 0]],
                 axles: [0.19, 0.745], waist: 0.84, hood: 0.49,  // the hood runs between the fender seams at ±hood
-                cap: [0.45, 0.935, 0.68]                         // the hearse cap: from, to, half-width
+                cap: [0.45, 0.93, 0.62],                        // the hearse cap: from, to, half-width
+                band: [0.275, 0.19, 0.375, 0.29, 0.72],           // the windshield band: leading edge at the sides, its apex; trailing edge, apex; half-width
+                shell: 0.72                                      // the cap shell's half-width
             },
             WHEEL_LOCK: 0.5,        // drawn front-wheel angle at full steer (rad)
             ROLL_PX: 1.8,           // body shift out of a turn at full lean
@@ -41321,9 +41323,10 @@ class NeuralSystemsBuilding extends BuildingV2 {
             }
             // Mirrors, at the windshield base
             const mw = coach ? CAR_ART.COACH.waist * h + (1 - CAR_ART.COACH.waist) * h * 0.6 : h;   // the coach's sit on its waist
+            const mx0 = coach ? L / 2 - (CAR_ART.COACH.band[0] + CAR_ART.COACH.band[2]) / 2 * L + 1.5 : x0;   // the V1's stand off the windshield band's ends
             for (const s of [-1, 1]) {
-                c.fillStyle = _carMix(col, -0.35); c.beginPath(); c.roundRect(x0 - 3, s > 0 ? mw - 1 : -mw - 2.6, 4.5, 3.6, 1.2); c.fill();
-                c.fillStyle = coach ? CAR_ART.SILVER : 'rgba(210, 200, 240, 0.35)'; c.fillRect(x0 - 2.4, s > 0 ? mw + 1.6 : -mw - 2.2, 3.2, 0.7);
+                c.fillStyle = _carMix(col, -0.35); c.beginPath(); c.roundRect(mx0 - 3, s > 0 ? mw - 1 : -mw - 2.6, 4.5, 3.6, 1.2); c.fill();
+                c.fillStyle = coach ? CAR_ART.SILVER : 'rgba(210, 200, 240, 0.35)'; c.fillRect(mx0 - 2.4, s > 0 ? mw + 1.6 : -mw - 2.2, 3.2, 0.7);
             }
             // Paint, shaded round the body's curve
             c.save(); c.clip(g.body);
@@ -41372,12 +41375,6 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 }
                 // The hood sunk between them: a touch darker
                 c.fillStyle = 'rgba(0,0,0,0.12)'; c.beginPath(); c.moveTo(X(0.035), -hv); c.lineTo(X(0.035), hv); c.lineTo(X(0.25), hv * 1.1); c.lineTo(X(0.25), -hv * 1.1); c.closePath(); c.fill();
-                // The cowl: two arcs bowed towards the nose, chrome between
-                for (const [e, apex, w, col] of [[0.305, 0.181, 0.7, 'rgba(0,0,0,0.6)'], [0.335, 0.235, 0.62, 'rgba(0,0,0,0.6)']]) {
-                    c.strokeStyle = col; c.lineWidth = 1; c.beginPath(); c.moveTo(X(e), -w * h); c.quadraticCurveTo(X(apex), 0, X(e), w * h); c.stroke();
-                }
-                c.strokeStyle = 'rgba(223,227,234,0.45)'; c.lineWidth = 0.6;
-                c.beginPath(); c.moveTo(X(0.32), -0.66 * h); c.quadraticCurveTo(X(0.208), 0, X(0.32), 0.66 * h); c.stroke();
                 // The wheel hoods standing out over the rear wheels: a seam where each meets the body, light on its crown
                 for (const s of [-1, 1]) {
                     c.save(); c.translate(X(0.745), s * h * 0.88); c.scale(1, 0.24);
@@ -41414,16 +41411,37 @@ class NeuralSystemsBuilding extends BuildingV2 {
                     for (const s of [-1, 1]) c.fillRect(-L / 2 + 2, s * 3.2 - 1.2, L - 4.6, 2.4);
                 }
             }
-            // The greenhouse: glass under the roof (the V1's windshield runs from the cowl's inner arc back to the cap)
+            // The greenhouse: glass under the roof. The V1's is one narrow band arched across behind the hood; the cap's
+            // black shell runs forward from the pearl top to meet it.
             if (coach) {
-                const X = u => L / 2 - u * L, wg = c.createLinearGradient(X(0.29), 0, X(0.45), 0);
-                wg.addColorStop(0, '#2a2650'); wg.addColorStop(0.35, '#0e0b1c'); wg.addColorStop(1, '#120f22');
-                const ws = new Path2D(); ws.moveTo(X(0.335), -0.62 * h); ws.quadraticCurveTo(X(0.235), 0, X(0.335), 0.62 * h);
-                ws.lineTo(X(0.455), 0.66 * h); ws.lineTo(X(0.455), -0.66 * h); ws.closePath();
-                c.fillStyle = wg; c.fill(ws);
-                c.save(); c.clip(ws); c.strokeStyle = 'rgba(255, 250, 255, 0.24)'; c.lineWidth = 1.4;
-                c.beginPath(); c.moveTo(X(0.3), -0.2 * h); c.lineTo(X(0.46), -0.55 * h); c.stroke();
-                c.lineWidth = 0.6; c.beginPath(); c.moveTo(X(0.3), 0.05 * h); c.lineTo(X(0.46), -0.3 * h); c.stroke(); c.restore();
+                const C = CAR_ART.COACH, X = u => L / 2 - u * L, [f0, fa, b0, ba, bw] = C.band, sw = C.shell * h;
+                const band = new Path2D(); band.moveTo(X(f0), -bw * h); band.quadraticCurveTo(X(fa), 0, X(f0), bw * h);
+                band.lineTo(X(b0), sw); band.quadraticCurveTo(X(ba), 0, X(b0), -sw); band.closePath();
+                const wg = c.createLinearGradient(X(fa), 0, X(ba), 0);
+                wg.addColorStop(0, '#4a4380'); wg.addColorStop(0.4, '#1d1840'); wg.addColorStop(1, '#0a0716');
+                c.fillStyle = wg; c.fill(band);
+                c.save(); c.clip(band); c.strokeStyle = 'rgba(255, 250, 255, 0.3)'; c.lineWidth = 1.2;
+                c.beginPath(); c.moveTo(X(0.2), -0.18 * h); c.lineTo(X(0.36), -0.5 * h); c.stroke();
+                c.lineWidth = 0.5; c.beginPath(); c.moveTo(X(0.2), 0.04 * h); c.lineTo(X(0.36), -0.28 * h); c.stroke(); c.restore();
+                c.strokeStyle = 'rgba(0,0,0,0.7)'; c.lineWidth = 0.9; c.stroke(band);
+                c.strokeStyle = 'rgba(223,227,234,0.5)'; c.lineWidth = 0.6;          // chrome along its leading edge
+                c.beginPath(); c.moveTo(X(f0) - 0.6, -bw * h); c.quadraticCurveTo(X(fa) - 0.6, 0, X(f0) - 0.6, bw * h); c.stroke();
+                // The shell: body paint, rounded over its sides, sloping down into the windshield at its front
+                const cb = X(C.cap[1]) - 1.8, r = 6, sh = new Path2D();
+                sh.moveTo(X(b0), -sw); sh.quadraticCurveTo(X(ba), 0, X(b0), sw);
+                sh.lineTo(cb + r, sw); sh.quadraticCurveTo(cb, sw, cb, sw - r); sh.lineTo(cb, -sw + r); sh.quadraticCurveTo(cb, -sw, cb + r, -sw); sh.closePath();
+                c.save(); c.filter = 'blur(1.6px)'; c.strokeStyle = 'rgba(0,0,0,0.65)'; c.lineWidth = 3; c.stroke(sh); c.restore();
+                c.fillStyle = `rgb(${col.join(',')})`; c.fill(sh);
+                c.save(); c.clip(sh);
+                let sg = c.createLinearGradient(0, -sw, 0, sw);
+                sg.addColorStop(0, 'rgba(0,0,0,0.5)'); sg.addColorStop(0.22, 'rgba(255,255,255,0.05)'); sg.addColorStop(0.45, 'rgba(255,255,255,0.16)');
+                sg.addColorStop(0.62, 'rgba(255,255,255,0.06)'); sg.addColorStop(0.8, 'rgba(0,0,0,0.1)'); sg.addColorStop(1, 'rgba(0,0,0,0.55)');
+                c.fillStyle = sg; c.fill(sh);
+                sg = c.createLinearGradient(X(ba), 0, X(C.cap[0]), 0);          // the slope: darkest where it drops to the glass
+                sg.addColorStop(0, 'rgba(0,0,0,0.55)'); sg.addColorStop(0.5, 'rgba(0,0,0,0.12)'); sg.addColorStop(1, 'rgba(255,255,255,0.06)');
+                c.fillStyle = sg; c.fillRect(X(C.cap[0]), -sw, X(ba) - X(C.cap[0]), sw * 2);
+                c.restore();
+                c.strokeStyle = CAR_ART.GOLD; c.lineWidth = 0.7; c.stroke(sh);
             }
             const gw = W / 2 - si, glass = c.createLinearGradient(x0, 0, x3, 0);
             if (!coach) {
@@ -41447,7 +41465,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 pr.addColorStop(0, '#8d80a6'); pr.addColorStop(0.45, '#c8bdd6'); pr.addColorStop(1, '#7c6f98');
                 const cap = new Path2D(); cap.roundRect(cb, -cw, cf - cb, cw * 2, 5.5);
                 // It stands up off the body: a soft shadow all round its foot
-                c.save(); c.filter = 'blur(1.6px)'; c.fillStyle = 'rgba(0,0,0,0.6)'; c.beginPath(); c.roundRect(cb - 1.2, -cw - 1.4, cf - cb + 2.4, cw * 2 + 2.8, 7); c.fill(); c.restore();
+                c.save(); c.filter = 'blur(1.2px)'; c.fillStyle = 'rgba(0,0,0,0.55)'; c.beginPath(); c.roundRect(cb - 0.6, -cw - 0.8, cf - cb + 1.4, cw * 2 + 1.6, 6.5); c.fill(); c.restore();
                 c.fillStyle = pr; c.fill(cap);
                 c.save(); c.clip(cap);
                 // Its rounded shoulders falling away on every side, and the ends curving down
