@@ -1,5 +1,5 @@
         // =====================================================================
-        //  SKY LAYER — ad airships and floating shards above the city
+        //  SKY LAYER — sketchbook spaceships and floating shards above the city
         // =====================================================================
         //  Everything up here is between the camera and the ground, so it's drawn
         //  with parallax k > 1 around the camera: bigger, and drifting faster than
@@ -28,7 +28,9 @@
                         x0: r(i * 7 + 1) * W, y0: r(i * 7 + 2) * H,
                         heading: (r(i * 7 + 3) < 0.5 ? 0 : Math.PI) + (r(i * 7 + 4) - 0.5) * 0.6,
                         speed: 14 + r(i * 7 + 5) * 10,                  // px per game second
-                        k: 1.3 + r(i * 7 + 6) * 0.12, ad: i % SKY_ADS.length, phase: r(i * 7 + 7) * 10
+                        k: 1.3 + r(i * 7 + 6) * 0.12, ad: i % SKY_ADS.length, phase: r(i * 7 + 7) * 10,
+                        // every map starts the sketchbook craft list at a different place
+                        craft: SkyCraft.KINDS[(i + Math.floor(r(9) * SkyCraft.KINDS.length)) % SkyCraft.KINDS.length]
                     });
                 }
                 this.shards = [];
@@ -74,44 +76,11 @@
             }
 
             _drawAirship(ctx, s, t, dark) {
-                ctx.rotate(s.heading);
-                const a0 = ctx.globalAlpha;
-                // Hull
-                const g = ctx.createLinearGradient(0, -34, 0, 34);
-                g.addColorStop(0, '#3a3548'); g.addColorStop(0.5, '#5a5470'); g.addColorStop(1, '#2a2636');
-                ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(0, 0, 110, 32, 0, 0, Math.PI * 2); ctx.fill();
-                ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1;
-                for (let i = -3; i <= 3; i++) { ctx.beginPath(); ctx.ellipse(i * 26, 0, 3, 31 * Math.sqrt(1 - Math.pow(i * 26 / 110, 2)), 0, 0, Math.PI * 2); ctx.stroke(); }
-                // Tail fins and engine pods with spinning props
-                ctx.fillStyle = '#2e2a3c';
-                ctx.beginPath(); ctx.moveTo(-92, -8); ctx.lineTo(-128, -30); ctx.lineTo(-118, 0); ctx.lineTo(-128, 30); ctx.lineTo(-92, 8); ctx.closePath(); ctx.fill();
-                for (const side of [-1, 1]) {
-                    ctx.fillStyle = '#3e3950'; ctx.beginPath(); ctx.ellipse(-25, side * 40, 16, 7, 0, 0, Math.PI * 2); ctx.fill();
-                    ctx.strokeStyle = 'rgba(200,200,220,0.5)'; ctx.lineWidth = 1.5;
-                    const pa = t * 20; ctx.beginPath(); ctx.moveTo(-42, side * 40 + Math.cos(pa) * 8); ctx.lineTo(-42, side * 40 - Math.cos(pa) * 8); ctx.stroke();
-                }
-                // LED ad screen on top (kept upright when flying left)
+                // Only the fish blimps carry the rotating ad screens now
                 const cycle = Math.floor((t + s.phase) / 10), ad = SKY_ADS[(s.ad + cycle) % SKY_ADS.length];
-                const fadeIn = Math.min(1, ((t + s.phase) % 10) / 0.6);
-                ctx.save();
-                if (Math.cos(s.heading) < 0) ctx.rotate(Math.PI);
-                ctx.shadowColor = ad.bg[1]; ctx.shadowBlur = 16 * (0.4 + dark);
-                const sg = ctx.createLinearGradient(-62, 0, 62, 0); sg.addColorStop(0, ad.bg[0]); sg.addColorStop(1, ad.bg[1]);
-                ctx.globalAlpha = a0 * (0.35 + 0.65 * fadeIn);
-                ctx.fillStyle = sg; ctx.beginPath(); ctx.roundRect(-62, -19, 124, 38, 6); ctx.fill();
-                ctx.shadowBlur = 0;
-                ctx.fillStyle = ad.fg; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.font = `bold ${ad.tag ? 15 : 18}px Montserrat, sans-serif`;
-                ctx.fillText(ad.brand, 0, ad.tag ? -5 : 0);
-                if (ad.tag) { ctx.font = '8px Montserrat, sans-serif'; ctx.fillText(ad.tag, 0, 10); }
-                ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(-62, -19, 124, 3);   // scanline sheen
-                ctx.restore();
-                ctx.globalAlpha = a0;
-                // Navigation lights: red port, green starboard, white tail strobe
-                const blink = Math.sin(t * 4 + s.phase) > 0;
-                const light = (x, y, c, on, r = 2.6) => { if (!on) return; ctx.fillStyle = c; ctx.shadowColor = c; ctx.shadowBlur = 10; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0; };
-                light(10, -31, '#ff3344', blink); light(10, 31, '#33ff77', blink);
-                light(-120, 0, '#ffffff', ((t + s.phase) % 1.6) < 0.12, 3.2);
+                const adFade = Math.min(1, ((t + s.phase) % 10) / 0.6);
+                ctx.scale(1.2, 1.2);
+                SkyCraft.draw(ctx, s.craft, s.heading, t + s.phase, { ad, adFade, fishBody: SKY_ADS[s.ad].bg[1] }, dark);
             }
 
             _drawShard(ctx, s, t) {
