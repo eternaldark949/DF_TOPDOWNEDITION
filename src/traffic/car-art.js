@@ -102,15 +102,25 @@
         }
 
         /** The round LADY badge on the V1's hood: a silver ring round black enamel, the house's gold crescent in it. */
-        function _ladyBadge(c, x, r) {                                   // a polished silver bauble, the crescent struck into it
-            c.save(); c.filter = 'blur(0.7px)'; c.fillStyle = 'rgba(4, 2, 8, 0.7)'; c.beginPath(); c.arc(x - 0.5, 0.6, r + 0.5, 0, Math.PI * 2); c.fill(); c.restore();
-            const g = c.createRadialGradient(x + r * 0.35, -r * 0.4, r * 0.05, x, 0, r);
-            g.addColorStop(0, '#ffffff'); g.addColorStop(0.3, '#f1f4f8'); g.addColorStop(0.62, '#a9b0bc'); g.addColorStop(0.85, '#5d6470'); g.addColorStop(1, '#2a2e36');
-            c.fillStyle = g; c.beginPath(); c.arc(x, 0, r, 0, Math.PI * 2); c.fill();
-            c.strokeStyle = 'rgba(255,255,255,0.55)'; c.lineWidth = 0.35; c.beginPath(); c.arc(x, 0, r - 0.3, -2.4, -0.2); c.stroke();   // the rim catching light
-            c.fillStyle = 'rgba(40, 44, 54, 0.75)';
-            c.beginPath(); c.arc(x, 0, r * 0.48, 0, Math.PI * 2); c.arc(x + r * 0.22, -r * 0.1, r * 0.4, 0, Math.PI * 2, true); c.fill('evenodd');
-            c.fillStyle = '#ffffff'; c.beginPath(); c.arc(x + r * 0.5, -r * 0.55, r * 0.14, 0, Math.PI * 2); c.fill();                // the glint
+        /** The hood ornament: a silver geometric umbrella seen from above, eight faceted panels between their ribs,
+            the edge scalloped in between the rib tips, each panel lit by how it faces the light, a glint at the tip */
+        function _ladyBadge(c, x, r) {
+            const N = 8, tip = (i) => { const a = i / N * Math.PI * 2 + Math.PI / N; return [x + Math.cos(a) * r, Math.sin(a) * r]; };
+            const edge = (p, i) => {                                     // the scallop from rib tip i to i+1, bowed in
+                const [x1, y1] = tip(i + 1), a = (i + 0.5) / N * Math.PI * 2 + Math.PI / N;
+                p.quadraticCurveTo(x + Math.cos(a) * r * 0.62, Math.sin(a) * r * 0.62, x1, y1);
+            };
+            c.save(); c.filter = 'blur(0.7px)'; c.fillStyle = 'rgba(4, 2, 8, 0.7)';
+            c.beginPath(); c.moveTo(...tip(0)); for (let i = 0; i < N; i++) edge(c, i); c.translate(-0.5, 0.6); c.fill(); c.restore();
+            for (let i = 0; i < N; i++) {
+                const a = (i + 0.5) / N * Math.PI * 2 + Math.PI / N, lit = 0.5 + 0.5 * Math.cos(a - (-0.9));   // light from up the hood
+                const v = Math.round(70 + lit * 175), sh = `rgb(${v}, ${v + 4}, ${Math.min(255, v + 12)})`;
+                c.fillStyle = sh; c.beginPath(); c.moveTo(x, 0); c.lineTo(...tip(i)); edge(c, i); c.closePath(); c.fill();
+            }
+            c.strokeStyle = 'rgba(30, 32, 40, 0.8)'; c.lineWidth = 0.25;    // the ribs
+            for (let i = 0; i < N; i++) { c.beginPath(); c.moveTo(x, 0); c.lineTo(...tip(i)); c.stroke(); }
+            c.strokeStyle = 'rgba(255,255,255,0.5)'; c.lineWidth = 0.25; c.beginPath(); c.moveTo(...tip(0)); for (let i = 0; i < N; i++) edge(c, i); c.stroke();
+            c.fillStyle = '#ffffff'; c.beginPath(); c.arc(x, 0, r * 0.16, 0, Math.PI * 2); c.fill();   // the tip catching the light
         }
         /** Where the V1's lamps sit (car frame, +y side; mirror for the other): small rounded pods standing out of the
             outline, a headlight off each fender tip and three tail lights round each back corner, and the hooded slab out
@@ -395,7 +405,7 @@
             // The outline
             c.strokeStyle = 'rgba(6, 3, 12, 0.7)'; c.lineWidth = 0.9; c.stroke(g.body);
             if (coach) {
-                _ladyBadge(c, L / 2 - L * 0.08, 2.8);
+                _ladyBadge(c, L / 2 - L * 0.08, 3.2);
                 // The lamp pods: dark housings standing out of the body, ringed in silver (the lamps in them are live)
                 const Lp = coachLamps(L, W);
                 for (const s of [-1, 1]) for (const t of [Lp.head, ...Lp.tail]) {
