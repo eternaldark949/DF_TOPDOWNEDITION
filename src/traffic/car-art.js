@@ -94,16 +94,14 @@
             const cab = CAR_ART.CABIN[hearse ? 'hearse' : v.model] || CAR_ART.CABIN.sedan;
             const xf = f => L / 2 - f * L;
             const body = new Path2D();
-            if (st === 'angular') {
-                const pts = [[L / 2, -W * 0.26], [L / 2 - 9, -W / 2], [-L / 2 + 6, -W / 2 + 1], [-L / 2, -W / 2 + 7],
-                             [-L / 2, W / 2 - 7], [-L / 2 + 6, W / 2 - 1], [L / 2 - 9, W / 2], [L / 2, W * 0.26]];
-                pts.forEach((p, i) => i ? body.lineTo(p[0], p[1]) : body.moveTo(p[0], p[1])); body.closePath();
-            } else if (hearse) _coachPath(body, L, W, C.OUTLINE);
+            const zen = ZenArt.design(v);                                   // a Zenxera: one of the jewel-cut supercars (traffic/zen-art.js)
+            if (zen) ZenArt.path(body, zen, L, W);
+            else if (hearse) _coachPath(body, L, W, C.OUTLINE);
             else if (st === 'blackmark') body.roundRect(-L / 2, -W / 2, L, W, [6, 11, 11, 6]);
             else body.roundRect(-L / 2, -W / 2, L, W, [4, 7, 7, 4]);
             const si = W * 0.13;                                            // glass sits this far in from the flanks
             return (v._carGeo = {
-                key, L, W, st, hearse, v3, C, body, si,
+                key, L, W, st, hearse, v3, C, zen, body, si,
                 x0: xf(cab[0]), x1: xf(cab[1]), x2: xf(cab[2]), x3: xf(cab[3]),
                 axleF: hearse ? L / 2 - L * C.axles[0] : L / 2 - L * 0.21, axleR: hearse ? L / 2 - L * C.axles[1] : -L / 2 + L * 0.2
             });
@@ -197,7 +195,7 @@
             const g = carGeo(v), W = g.W, tyreL = Math.max(10, g.L * 0.16), d = (v.steer || 0) * CAR_ART.WHEEL_LOCK;
             const rim = _carRim(v);
             for (const s of [-1, 1]) {
-                ctx.save(); ctx.translate(g.axleF, s * (W / 2 - (g.hearse ? g.C.tyreIn : 0.4))); if (d) ctx.rotate(d);   // (the V1's peek out from under its fenders)
+                ctx.save(); ctx.translate(g.axleF, s * (g.zen ? ZenArt.frontTyreY(g.zen, W) : W / 2 - (g.hearse ? g.C.tyreIn : 0.4))); if (d) ctx.rotate(d);   // (the V1's peek out from under its fenders)
                 ctx.fillStyle = '#0b0a0e'; ctx.beginPath(); ctx.roundRect(-tyreL / 2, -2.4, tyreL, 4.8, 1.6); ctx.fill();
                 if (g.hearse) {                                                 // a silver wheel face, its hub cap standing proud
                     const sv = ctx.createLinearGradient(-tyreL / 2, 0, tyreL / 2, 0);
@@ -224,6 +222,7 @@
                 c.fillStyle = '#0b0a0e'; c.beginPath(); c.roundRect(ax - tyreL / 2, s * W / 2 - (s > 0 ? 3.2 : -0.2) - 1.5, tyreL, 4.5, 1.5); c.fill();
                 c.fillStyle = rim; c.globalAlpha = 0.85; c.fillRect(ax - tyreL * 0.28, s * (W / 2 + 0.9) - 0.5, tyreL * 0.56, 1); c.globalAlpha = 1;
             }
+            if (g.zen) { ZenArt.paint(c, g.zen, col, L, W, truck); return; }   // the rest of a Zenxera is its own (traffic/zen-art.js)
             // Mirrors, at the windshield base
             const mw = coach ? g.C.waist * h + (1 - g.C.waist) * h * 0.6 : h;   // the coach's sit on its waist
             const mx0 = coach ? L / 2 - (g.C.band[0] + g.C.band[2]) / 2 * L + 1.5 : x0;   // the V1's stand off the windshield band's ends
@@ -249,15 +248,8 @@
                 ag.addColorStop(0, 'rgba(255,255,255,0.10)'); ag.addColorStop(1, 'rgba(255,255,255,0)');
                 c.fillStyle = ag; c.fillRect(ax - L * 0.12, s > 0 ? W / 2 - L * 0.12 : -W / 2, L * 0.24, L * 0.12);
             }
-            // Hood: creases (Gelfash, LADY) or facets (Zenxera)
-            if (zen) {
-                c.fillStyle = 'rgba(255,255,255,0.13)';
-                c.beginPath(); c.moveTo(L / 2, -W * 0.26); c.lineTo(x0, -W / 2 + si); c.lineTo(x0, 0); c.lineTo(L / 2 - 2, 0); c.closePath(); c.fill();
-                c.fillStyle = 'rgba(0,0,0,0.16)';
-                c.beginPath(); c.moveTo(L / 2, W * 0.26); c.lineTo(x0, W / 2 - si); c.lineTo(x0, 0); c.lineTo(L / 2 - 2, 0); c.closePath(); c.fill();
-                c.fillStyle = 'rgba(0,0,0,0.14)';                          // the tail's facets
-                c.beginPath(); c.moveTo(x3, -W / 2 + si); c.lineTo(-L / 2, -W / 2 + 7); c.lineTo(-L / 2, 0); c.lineTo(x3, 0); c.closePath(); c.fill();
-            } else if (coach) {
+            // Hood: creases (Gelfash, LADY)
+            if (coach) {
                 const C = g.C, X = u => L / 2 - u * L, hv = C.hood * h;
                 // Height: the body rolls away at every edge (a soft inner shadow round the outline)
                 c.save(); c.filter = 'blur(2px)'; c.strokeStyle = 'rgba(0,0,0,0.55)'; c.lineWidth = 7; c.stroke(g.body); c.restore();
@@ -299,11 +291,6 @@
             // Shoulder light and a crisp edge
             c.save(); c.scale((L - 3) / L, (W - 3) / W); c.strokeStyle = 'rgba(255,255,255,0.13)'; c.lineWidth = 0.9; c.stroke(g.body); c.restore();
             if (lady && !coach) { c.save(); c.scale((L - 6) / L, (W - 6) / W); c.strokeStyle = CAR_ART.GOLD; c.globalAlpha = 0.8; c.lineWidth = 0.7; c.stroke(g.body); c.restore(); }
-            if (zen) {                                                         // the cyan line down each flank
-                c.strokeStyle = v.glowColor || '#00f3ff'; c.globalAlpha = 0.75; c.lineWidth = 0.9;
-                for (const s of [-1, 1]) { c.beginPath(); c.moveTo(L / 2 - 10, s * (W / 2 - 1.8)); c.lineTo(-L / 2 + 8, s * (W / 2 - 2.6)); c.stroke(); }
-                c.globalAlpha = 1;
-            }
             // Bumpers (Gelfash): black plastic, nose and tail
             if (gel) {
                 c.save(); c.clip(g.body); c.fillStyle = '#16151b';
@@ -637,13 +624,14 @@
                     for (const i of sig.lit) { _podPath(ctx, Lp.tail[i], sig.s); ctx.fill(); }
                     if (!farLOD) { ctx.globalAlpha = 0.6; for (const i of sig.lit) drawGlow(ctx, Lp.tail[i].x, sig.s * Lp.tail[i].y, 6, '#ffaa00'); ctx.globalAlpha = 1; }
                 }
-            } else if (g.st === 'blackmark') ctx.fillRect(-L / 2 + 0.6, -W / 2 + 4.5, 1.8, W - 9);
+            } else if (g.zen) ZenArt.lamps(ctx, g.zen, 'tail', L, W);
+            else if (g.st === 'blackmark') ctx.fillRect(-L / 2 + 0.6, -W / 2 + 4.5, 1.8, W - 9);
             else for (const s of [-1, 1]) ctx.fillRect(-L / 2 + 0.6, s > 0 ? W / 2 - 11 : -W / 2 + 2, 2.4, 9);
             if (brake && !farLOD) { ctx.globalAlpha = 0.35; for (const s of [-1, 1]) drawGlow(ctx, -L / 2, s * (W / 2 - 6), 8, rev ? '#ffffff' : '#ff2244'); ctx.globalAlpha = 1; }
             const hl = v.headlightColor || '#ffffaa';
             ctx.fillStyle = on ? hl : _carMix(_carRGB(hl), -0.55);
             for (const s of [-1, 1]) {
-                if (g.st === 'angular') { ctx.save(); ctx.translate(L / 2 - 5, s * (W / 2 - 4.5)); ctx.rotate(s * -0.75); ctx.fillRect(-3.5, -0.8, 7, 1.6); ctx.restore(); }
+                if (g.zen) { if (s > 0) ZenArt.lamps(ctx, g.zen, 'head', L, W); }
                 else if (g.hearse) { _podPath(ctx, coachLamps(g).head, s); ctx.fill(); }
                 else if (g.st === 'blackmark') ctx.fillRect(L / 2 - 2, s > 0 ? W / 2 - 11 : -W / 2 + 3, 1.6, 8);
                 else { ctx.beginPath(); ctx.roundRect(L / 2 - 3.4, s > 0 ? W / 2 - 9.5 : -W / 2 + 3, 2.4, 6.5, 1); ctx.fill(); }
@@ -659,7 +647,8 @@
             ctx.save(); ctx.translate(v.x, v.y); ctx.rotate(v.angle); ctx.globalCompositeOperation = 'lighter';
             ctx.globalAlpha = a * (brake ? 0.8 : 0.38);
             const Lp = g.hearse ? coachLamps(g) : null, T = Lp && Lp.tail[1];    // the coach's: round its pods
-            const tX = Lp ? T.x : -L / 2 + 1, tY = Lp ? T.y : W / 2 - 6, hX = Lp ? Lp.head.x : L / 2 - 1, hY = Lp ? Lp.head.y : W / 2 - 6;
+            let tX = Lp ? T.x : -L / 2 + 1, tY = Lp ? T.y : W / 2 - 6, hX = Lp ? Lp.head.x : L / 2 - 1, hY = Lp ? Lp.head.y : W / 2 - 6;
+            if (g.zen) { [tX, tY] = ZenArt.glowAt(g.zen, 'tail', L, W); [hX, hY] = ZenArt.glowAt(g.zen, 'head', L, W); }
             for (const s of [-1, 1]) drawGlow(ctx, tX, s * tY, brake ? 15 : 10, rev ? '#fff4f8' : '#ff2848');
             if (g.hearse && g.C.slab) drawGlow(ctx, -L / 2 - 2.5, 0, brake ? 13 : 8, rev ? '#fff4f8' : '#ff2848');    // the hooded slab
             if (v._lod === 1) { ctx.restore(); return; }                   // far away: just the tail lights

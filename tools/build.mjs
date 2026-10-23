@@ -90,6 +90,7 @@ const SCRIPTS = [
     'buildings/torque-auto.js',
     'traffic/roads.js',
     'traffic/garage-zib.js',
+    'traffic/zen-art.js',
     'traffic/car-art.js',
     'traffic/traffic-vehicle.js',
     'traffic/vehicle-occupants.js',
