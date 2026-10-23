@@ -491,7 +491,7 @@
             records: new WeakMap(),
             track(items) {
                 if (!items || this.records.has(items)) return;
-                this.records.set(items, { grid: new OrderedRenderGrid(400), slots: [], geometry: [], epoch: -1, dirty: true, linear: false, entries: [], items: [], cellQueries: new Map(), cachedSlots: 0 });
+                this.records.set(items, { grid: new OrderedRenderGrid(400), slots: [], geometry: [], epoch: -1, dirty: true, linear: false, entries: [], items: [], cellQueries: new Map(), cachedSlots: 0, gen: -1 });
             },
             invalidate(items) {
                 if (!items) { this.clear(); return; }
@@ -499,6 +499,23 @@
                 if (c) c.dirty = true;
             },
             clear() { this.records = new WeakMap(); },
+            _seq: 0,
+            /** The geometry generation of a tracked array, validated for this tick (as query does); null when
+                untracked or linear. Equal generations mean the same slots and the same x/y/w/h. */
+            generation(items) {
+                const c = items && this.records.get(items);
+                if (!c) return null;
+                if (c.dirty || c.slots.length !== items.length || c.epoch !== _simTick) this.refresh(items, c);
+                return c.linear ? null : c.gen;
+            },
+            /** How far (x, y) is from the edge of the grid cells `bounds` covers: anything a query of those
+                bounds didn't return lies wholly outside them, so at least this far away. */
+            cellEdge(items, bounds, x, y) {
+                const c = this.records.get(items), S = c.grid.cellSize;
+                const x0 = Math.floor(bounds.left / S) * S, x1 = (Math.floor(bounds.right / S) + 1) * S;
+                const y0 = Math.floor(bounds.top / S) * S, y1 = (Math.floor(bounds.bottom / S) + 1) * S;
+                return Math.min(x - x0, x1 - x, y - y0, y1 - y);
+            },
             refresh(items, c) {
                 let changed = c.dirty || c.slots.length !== items.length;
                 if (!changed && c.epoch !== _simTick) {
@@ -508,6 +525,7 @@
                     }
                 }
                 if (changed) {
+                    c.gen = ++this._seq;                 // unique across records, so a cleared-and-retracked array never matches an old one
                     c.cellQueries.clear(); c.cachedSlots = 0;
                     c.slots.length = items.length; c.geometry.length = items.length * 4;
                     c.linear = false;
