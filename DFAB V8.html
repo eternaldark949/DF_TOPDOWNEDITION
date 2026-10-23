@@ -5445,6 +5445,8 @@
                 LOAD_RATE: 0.14,                // How fast the load shifts (÷ brand weight)
                 HANDBRAKE_REAR_GRIP: 0.3,       // Rear grip while the handbrake's up
                 HANDBRAKE_DECEL: 0.07,          // px/tick² scrubbed by locked rear wheels
+                POWER_OVERSTEER: 0.2,           // Rear grip lost to full throttle at full lock (0: steering alone never kicks the tail out)
+                HANDBRAKE_YAW_DAMP: 0.96,       // Rotation kept per tick while the handbrake's up (lower: less swing)
                 REVERSE_BELOW: 0.5,             // Pull-back only reverses under this speed
                 CAM_LOOK_AHEAD: { PER_SPEED: 13, TAU_MS: 700 },   // camera leads by velocity × this (engine/draw.js)
                 CAM_ZOOM: { SPAN: 0.25, FLOOR: 0.75 },              // zoom = 1 − speed ratio × SPAN, never below FLOOR (×0.9 landscape)
@@ -42889,6 +42891,8 @@ class NeuralSystemsBuilding extends BuildingV2 {
                     let gF = F.gripF * (1 + VD.LOAD_FWD_GRIP * L) * wetGrip;
                     let gR = F.gripR * (1 - VD.LOAD_REAR_GRIP * L) * wetGrip;
                     if (hb) gR *= VD.HANDBRAKE_REAR_GRIP;
+                    // Power over the rear: throttle held through a turn at speed spends the rear tyres' grip, so the tail can step out
+                    if (VD.POWER_OVERSTEER && gas > 0.5 && absSpeed > 4) gR *= 1 - VD.POWER_OVERSTEER * gas * Math.min(1, Math.abs(st));
                     const a = this.length * VD.AXLE_FROM_CENTRE, wb = 2 * a;
                     const iu = (this.length * this.length + this.width * this.width) / 12 * VD.SPIN_INERTIA;   // inertia per unit mass
                     let w = this.yawRate || 0;
@@ -42899,6 +42903,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
                     const pR = -Math.sign(sR) * Math.min(Math.abs(sR) * kR * gR, F.latAcc * gR);
                     slideVelocity += (pF + pR) / 2;
                     w += a * (pF - pR) / 2 / iu;
+                    if (hb) w *= VD.HANDBRAKE_YAW_DAMP;               // the locked rear drags the swing out of it
                     w = clampU(w, VD.YAW_SPIN_MAX);
                     yaw = this.yawRate = w;
                     this.tyreSlip = Math.max(0, Math.abs(slideVelocity) - F.latAcc * 1.6) + (hb ? Math.abs(fwdVelocity) * 0.25 : 0)

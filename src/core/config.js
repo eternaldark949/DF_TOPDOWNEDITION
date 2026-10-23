@@ -537,6 +537,8 @@
                 LOAD_RATE: 0.14,                // How fast the load shifts (÷ brand weight)
                 HANDBRAKE_REAR_GRIP: 0.3,       // Rear grip while the handbrake's up
                 HANDBRAKE_DECEL: 0.07,          // px/tick² scrubbed by locked rear wheels
+                POWER_OVERSTEER: 0.2,           // Rear grip lost to full throttle at full lock (0: steering alone never kicks the tail out)
+                HANDBRAKE_YAW_DAMP: 0.96,       // Rotation kept per tick while the handbrake's up (lower: less swing)
                 REVERSE_BELOW: 0.5,             // Pull-back only reverses under this speed
                 CAM_LOOK_AHEAD: { PER_SPEED: 13, TAU_MS: 700 },   // camera leads by velocity × this (engine/draw.js)
                 CAM_ZOOM: { SPAN: 0.25, FLOOR: 0.75 },              // zoom = 1 − speed ratio × SPAN, never below FLOOR (×0.9 landscape)

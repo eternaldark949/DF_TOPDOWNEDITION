@@ -1121,6 +1121,8 @@
                     let gF = F.gripF * (1 + VD.LOAD_FWD_GRIP * L) * wetGrip;
                     let gR = F.gripR * (1 - VD.LOAD_REAR_GRIP * L) * wetGrip;
                     if (hb) gR *= VD.HANDBRAKE_REAR_GRIP;
+                    // Power over the rear: throttle held through a turn at speed spends the rear tyres' grip, so the tail can step out
+                    if (VD.POWER_OVERSTEER && gas > 0.5 && absSpeed > 4) gR *= 1 - VD.POWER_OVERSTEER * gas * Math.min(1, Math.abs(st));
                     const a = this.length * VD.AXLE_FROM_CENTRE, wb = 2 * a;
                     const iu = (this.length * this.length + this.width * this.width) / 12 * VD.SPIN_INERTIA;   // inertia per unit mass
                     let w = this.yawRate || 0;
@@ -1131,6 +1133,7 @@
                     const pR = -Math.sign(sR) * Math.min(Math.abs(sR) * kR * gR, F.latAcc * gR);
                     slideVelocity += (pF + pR) / 2;
                     w += a * (pF - pR) / 2 / iu;
+                    if (hb) w *= VD.HANDBRAKE_YAW_DAMP;               // the locked rear drags the swing out of it
                     w = clampU(w, VD.YAW_SPIN_MAX);
                     yaw = this.yawRate = w;
                     this.tyreSlip = Math.max(0, Math.abs(slideVelocity) - F.latAcc * 1.6) + (hb ? Math.abs(fwdVelocity) * 0.25 : 0)
