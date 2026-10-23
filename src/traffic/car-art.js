@@ -274,13 +274,15 @@
                 c.save(); c.filter = 'blur(1.6px)'; c.strokeStyle = 'rgba(0,0,0,0.65)'; c.lineWidth = 3; c.stroke(sh); c.restore();
                 c.fillStyle = `rgb(${col.join(',')})`; c.fill(sh);
                 c.save(); c.clip(sh);
-                let sg = c.createLinearGradient(0, -sw, 0, sw);
-                sg.addColorStop(0, 'rgba(0,0,0,0.5)'); sg.addColorStop(0.22, 'rgba(255,255,255,0.05)'); sg.addColorStop(0.45, 'rgba(255,255,255,0.16)');
-                sg.addColorStop(0.62, 'rgba(255,255,255,0.06)'); sg.addColorStop(0.8, 'rgba(0,0,0,0.1)'); sg.addColorStop(1, 'rgba(0,0,0,0.55)');
+                // Flat on top: it only falls away down its sides and over its back, where it meets the body
+                let sg = c.createLinearGradient(0, -sw, 0, sw), e = 3.2 / (sw * 2);
+                sg.addColorStop(0, 'rgba(0,0,0,0.6)'); sg.addColorStop(e, 'rgba(0,0,0,0)'); sg.addColorStop(e * 1.6, 'rgba(255,255,255,0.07)');
+                sg.addColorStop(1 - e * 1.6, 'rgba(255,255,255,0.07)'); sg.addColorStop(1 - e, 'rgba(0,0,0,0)'); sg.addColorStop(1, 'rgba(0,0,0,0.6)');
                 c.fillStyle = sg; c.fill(sh);
-                sg = c.createLinearGradient(X(ba), 0, X(C.cap[0]), 0);          // the slope: darkest where it drops to the glass
-                sg.addColorStop(0, 'rgba(0,0,0,0.55)'); sg.addColorStop(0.5, 'rgba(0,0,0,0.12)'); sg.addColorStop(1, 'rgba(255,255,255,0.06)');
-                c.fillStyle = sg; c.fillRect(X(C.cap[0]), -sw, X(ba) - X(C.cap[0]), sw * 2);
+                sg = c.createLinearGradient(cb, 0, cb + 4, 0); sg.addColorStop(0, 'rgba(0,0,0,0.6)'); sg.addColorStop(1, 'rgba(0,0,0,0)');
+                c.fillStyle = sg; c.fillRect(cb, -sw, 4, sw * 2);
+                c.strokeStyle = 'rgba(255,255,255,0.18)'; c.lineWidth = 0.7;          // the lip where the flat roof breaks over into the glass
+                c.beginPath(); c.moveTo(X(b0) - 0.8, -sw); c.quadraticCurveTo(X(ba) - 0.8, 0, X(b0) - 0.8, sw); c.stroke();
                 c.restore();
                 c.strokeStyle = CAR_ART.GOLD; c.lineWidth = 0.7; c.stroke(sh);
             }
@@ -302,26 +304,25 @@
             const rw = gw - 2.6, rx0 = x2, rx1 = x1;
             if (g.hearse) {                                                   // the pearl hearse cap, its edge drawn twice as in the sketch
                 const [cu0, cu1, cv] = CAR_ART.COACH.cap, cw = cv * h, cf = L / 2 - cu0 * L, cb = L / 2 - cu1 * L;
-                const pr = c.createLinearGradient(0, -cw, 0, cw);
-                pr.addColorStop(0, '#8d80a6'); pr.addColorStop(0.45, '#c8bdd6'); pr.addColorStop(1, '#7c6f98');
-                const cap = new Path2D(); cap.roundRect(cb, -cw, cf - cb, cw * 2, 5.5);
-                // It stands up off the body: a soft shadow all round its foot
-                c.save(); c.filter = 'blur(1.2px)'; c.fillStyle = 'rgba(0,0,0,0.55)'; c.beginPath(); c.roundRect(cb - 0.6, -cw - 0.8, cf - cb + 1.4, cw * 2 + 1.6, 6.5); c.fill(); c.restore();
+                const cap = new Path2D(); cap.roundRect(cb, -cw, cf - cb, cw * 2, 5);
+                c.save(); c.filter = 'blur(1px)'; c.fillStyle = 'rgba(0,0,0,0.5)'; c.beginPath(); c.roundRect(cb - 0.5, -cw - 0.6, cf - cb + 1, cw * 2 + 1.2, 6); c.fill(); c.restore();
+                // A flat top, evenly lit, with only a faint sheen across it
+                const pr = c.createLinearGradient(cb, -cw, cf, cw);
+                pr.addColorStop(0, '#bdb1cd'); pr.addColorStop(0.55, '#c9bfd7'); pr.addColorStop(1, '#c3b8d2');
                 c.fillStyle = pr; c.fill(cap);
                 c.save(); c.clip(cap);
-                // Its rounded shoulders falling away on every side, and the ends curving down
-                c.save(); c.filter = 'blur(2.2px)'; c.strokeStyle = 'rgba(44, 32, 66, 0.75)'; c.lineWidth = 8; c.stroke(cap); c.restore();
-                const ends = c.createLinearGradient(cb, 0, cf, 0);
-                ends.addColorStop(0, 'rgba(40, 28, 60, 0.45)'); ends.addColorStop(0.14, 'rgba(40, 28, 60, 0)'); ends.addColorStop(0.88, 'rgba(40, 28, 60, 0)'); ends.addColorStop(1, 'rgba(40, 28, 60, 0.35)');
-                c.fillStyle = ends; c.fill(cap);
-                // The flat top catching the light: a long soft highlight down its crown, a brighter streak just off centre
-                const top = c.createLinearGradient(0, -cw, 0, cw);
-                top.addColorStop(0.18, 'rgba(255,255,255,0)'); top.addColorStop(0.4, 'rgba(255,250,255,0.32)'); top.addColorStop(0.47, 'rgba(255,255,255,0.5)');
-                top.addColorStop(0.55, 'rgba(255,250,255,0.18)'); top.addColorStop(0.8, 'rgba(255,255,255,0)');
-                c.fillStyle = top; c.fillRect(cb + 4, -cw, cf - cb - 8, cw * 2);
+                // Its edges roll off down the sides and over the back; the front stays level, running on into the roof
+                const e = 3 / (cw * 2); let fo = c.createLinearGradient(0, -cw, 0, cw);
+                fo.addColorStop(0, 'rgba(46, 34, 70, 0.75)'); fo.addColorStop(e, 'rgba(46, 34, 70, 0)');
+                fo.addColorStop(1 - e, 'rgba(46, 34, 70, 0)'); fo.addColorStop(1, 'rgba(46, 34, 70, 0.75)');
+                c.fillStyle = fo; c.fill(cap);
+                fo = c.createLinearGradient(cb, 0, cb + 4.5, 0); fo.addColorStop(0, 'rgba(46, 34, 70, 0.8)'); fo.addColorStop(1, 'rgba(46, 34, 70, 0)');
+                c.fillStyle = fo; c.fillRect(cb, -cw, 4.5, cw * 2);
                 c.restore();
+                // A thin bevel: lit where the top turns over, the front edge crisp
+                c.strokeStyle = 'rgba(255, 250, 255, 0.55)'; c.lineWidth = 0.6;
+                c.beginPath(); c.roundRect(cb + 3.2, -cw + 2.8, cf - cb - 3.6, cw * 2 - 5.6, 3); c.stroke();
                 c.strokeStyle = CAR_ART.GOLD; c.lineWidth = 0.7; c.stroke(cap);
-                c.strokeStyle = 'rgba(255, 246, 255, 0.35)'; c.lineWidth = 0.5; c.beginPath(); c.roundRect(cb + 1.8, -cw + 1.8, cf - cb - 3.6, cw * 2 - 3.6, 4); c.stroke();
                 const mx = (cb + cf) / 2 - 4;                         // a gold crescent, the house's mark
                 c.fillStyle = CAR_ART.GOLD; c.beginPath(); c.arc(mx, 0, 3.4, 0, Math.PI * 2); c.arc(mx + 1.6, -0.6, 2.9, 0, Math.PI * 2, true); c.fill('evenodd');
             } else if (lady) {                                                // panoramic black glass, gold-framed
