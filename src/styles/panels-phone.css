@@ -1238,7 +1238,7 @@
         #inventory-list .inventory-registry-readonly { cursor: default; }   /* keeps the diamond's room so QTY lines up */
         #inventory-list .inventory-empty { color: var(--df-lavender); text-align: center; margin: 50px 12px; font-size: max(6px, .75rem - var(--font-trim)); }
         #inventory-list .control-node {
-            width: 44px; height: 44px; right: 5px; padding: 0; border: 0;
+            width: 44px; height: 44px; right: 14px; padding: 0; border: 0;
             background: transparent; box-shadow: none;
             transform: translateY(-50%); border-radius: 12px;
         }
@@ -1253,24 +1253,25 @@
         #inventory-list .control-node:focus-visible { outline: 2px solid var(--df-champagne); outline-offset: 1px; }
         /* As in the mock-up: the menu drops from under the QTY chip, a small lavender pointer above it */
         #inventory-list .node-menu {
-            z-index: 101; right: 14px; top: calc(50% + 30px); min-width: 150px;
+            z-index: 101; right: 20px; top: calc(50% + 42px); min-width: 150px;   /* leaves a gap under the QTY chip for the pointer */
             transform: scaleY(0); transform-origin: center top; box-shadow: none;
         }
         #inventory-list .ui-pill.expanded .node-menu { transform: scaleY(1); }
         #inventory-list .node-menu::before {
             content: ''; position: absolute; left: 50%; top: -11px; transform: translateX(-50%);
             border: 11px solid transparent; border-top: 9px solid var(--df-lavender); border-bottom: 0;
-            margin-top: -1px; top: -10px;
+            top: -11px;
         }
         #inventory-list .node-btn { font-family: 'Raleway', var(--font-ui); font-weight: 500; font-size: max(6px, 0.72rem - var(--font-trim)); letter-spacing: 0.5px; }
         #inventory-list .node-btn { min-height: 36px; }
         @media (max-width: 700px), (max-height: 540px) {
-            #inventory-list .pill-icon { width: 42px; height: 42px; margin-right: 22px; }
-            #inventory-list .pill-icon::after { right: -12px; }
-            #inventory-list .ui-pill { padding-left: 14px; min-height: 88px; }
+            #inventory-list .pill-icon { width: 42px; height: 42px; margin-right: 36px; }
+            #inventory-list .pill-icon::after { right: -18px; }
+            #inventory-list .ui-pill { padding-left: 34px; padding-right: 56px; min-height: 88px; }
             #inventory-list .pill-name { font-size: max(6px, .7rem - var(--font-trim)); }
             #inventory-list .pill-qty { margin-left: 8px; }
             #inventory-list .pill-qty-value { min-width: 44px; padding: 3px 6px; }
+            #inventory-list .node-menu { right: 4px; top: calc(50% + 36px); }
             #inventory-list .node-btn { min-height: 40px; }
         }
 
