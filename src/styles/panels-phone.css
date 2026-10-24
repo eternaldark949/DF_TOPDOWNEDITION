@@ -454,6 +454,10 @@
             filter: drop-shadow(0 0 1px rgba(240, 228, 255, 0.7)) drop-shadow(0 0 4px rgba(170, 120, 255, 0.6)) drop-shadow(0 0 12px rgba(120, 60, 220, 0.35));
         }
         #main-menu:not(.menu-long) .title-container { top: 39%; }
+        /* the faint panel behind the title in the mock-up */
+        :is(#main-menu, #tap-to-begin) .title-container::before { content: ''; position: absolute; left: 50%; top: 50%; width: min(64vh, 40vw); height: 118%;
+            transform: translate(-50%, -50%); border-radius: 18px; background: rgba(26, 8, 28, 0.35); box-shadow: 0 0 40px 24px rgba(26, 8, 28, 0.35); pointer-events: none; z-index: -1; }
+        :is(#main-menu, #tap-to-begin) .title-container { position: relative; z-index: 0; }
         #main-menu:not(.menu-long) .menu-list-container { top: 63%; }
         #main-menu.menu-long .title-container { --title-size: min(13vh, 8vw); }
         #main-menu .menu-btn { font-family: var(--font-menu); font-weight: 400; letter-spacing: 0.42em; color: #ddd6e7; }
