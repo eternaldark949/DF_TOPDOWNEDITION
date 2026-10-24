@@ -30,6 +30,11 @@
             <path d="M55.0 50.0 Q74.5 44.8 59.8 84.1 M52.5 54.3 Q66.7 68.6 25.3 75.5 M47.5 54.3 Q42.3 73.8 15.6 41.4 M45.0 50.0 Q25.5 55.2 40.2 15.9 M47.5 45.7 Q33.3 31.4 74.7 24.5 M52.5 45.7 Q57.7 26.2 84.4 58.6" fill="none" stroke="#8a4cec" stroke-width="0.9" stroke-linecap="round"/>
             <circle cx="50" cy="50" r="9" fill="url(#ap-eye)"/>
         </symbol>
+        <!-- The sidebar portrait's rim, after ETERNAL's mock-up: two fine dashed peach lines round a
+             rounded square, split at the top and bottom centres (drawn 6px outside a 124px frame) -->
+        <symbol id="portrait-rim" viewBox="0 0 136 136">
+            <path d="M81.0 1.5 H80.5 A54.0 54.0 0 0 1 134.5 55.5 V80.5 A54.0 54.0 0 0 1 80.5 134.5 H81.0 M55.0 1.5 H55.5 A54.0 54.0 0 0 0 1.5 55.5 V80.5 A54.0 54.0 0 0 0 55.5 134.5 H55.0 M81.0 5.2 H80.5 A50.3 50.3 0 0 1 130.8 55.5 V80.5 A50.3 50.3 0 0 1 80.5 130.8 H81.0 M55.0 5.2 H55.5 A50.3 50.3 0 0 0 5.2 55.5 V80.5 A50.3 50.3 0 0 0 55.5 130.8 H55.0" fill="none" stroke="#d9a68c" stroke-width="1.2" stroke-dasharray="4.2 2.6"/>
+        </symbol>
         <!-- Control-node action. Equip: a hanger on the aperture's violet disc -->
         <symbol id="icon-node-equip" viewBox="0 0 100 100">
             <circle cx="50" cy="50" r="49" fill="#2a0b40" fill-opacity=".55"/>
@@ -728,7 +733,8 @@
         <!-- Left Sidebar (Navigation) -->
         <div class="screen-sidebar-left" id="map-sidebar-left">
             <div class="sidebar-portrait">
-                <canvas id="portrait-canvas-map" width="100" height="100" style="border-radius:50%;"></canvas>
+                <canvas id="portrait-canvas-map" width="124" height="124"></canvas>
+                <svg class="portrait-rim" aria-hidden="true"><use href="#portrait-rim"/></svg>
             </div>
             
             <nav class="sidebar-nav" data-nav-screen="map">
@@ -788,7 +794,8 @@
         <!-- Left Sidebar (Navigation) -->
         <div class="screen-sidebar-left" id="inv-sidebar-left">
             <div class="sidebar-portrait">
-                <canvas id="portrait-canvas-inv" width="100" height="100" style="border-radius:50%;"></canvas>
+                <canvas id="portrait-canvas-inv" width="124" height="124"></canvas>
+                <svg class="portrait-rim" aria-hidden="true"><use href="#portrait-rim"/></svg>
             </div>
             
             <nav class="sidebar-nav" data-nav-screen="inventory">

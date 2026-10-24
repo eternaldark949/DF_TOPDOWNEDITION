@@ -401,23 +401,29 @@
             transform: translateX(-100%);
         }
         
-        /* Portrait Circle */
+        /* Portrait, after ETERNAL's mock-up: a dark maroon rounded square with a faint plum glow,
+           the portrait filling it, ringed by the split double-dashed peach rim (#portrait-rim) */
         .sidebar-portrait {
-            width: 120px;
-            height: 120px;
-            border-radius: 38%;
-            border: 2px dotted var(--df-peach);
+            width: 124px;
+            height: 124px;
+            border-radius: 40%;
             margin-bottom: 30px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: rgba(10, 5, 15, 0.6);
+            position: relative;
+            background: #130401;
             flex-shrink: 0;
-            box-shadow: 0 0 30px rgba(120, 20, 40, 0.35), inset 0 0 20px rgba(0, 0, 0, 0.6);
+            box-shadow: 0 0 34px 4px rgba(110, 10, 50, 0.32);
         }
         
         .sidebar-portrait canvas {
-            border-radius: 50%;
+            display: block;
+            width: 100%;
+            height: 100%;
+            border-radius: 40%;
+        }
+        .sidebar-portrait .portrait-rim {
+            position: absolute; inset: -6px;
+            width: calc(100% + 12px); height: calc(100% + 12px);
+            pointer-events: none; overflow: visible;
         }
         
         /* the thin warm hairline under the portrait */
