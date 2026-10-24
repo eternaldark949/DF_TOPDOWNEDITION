@@ -756,64 +756,73 @@
         
         .filter-title-text {
             font-family: var(--font-script);
-            font-size: max(6px, 2rem - var(--font-trim));
-            color: var(--df-cream);
-            text-shadow: 0 0 10px rgba(255, 194, 72, 0.45);
+            font-size: max(6px, 2.6rem - var(--font-trim));
+            line-height: 1;
+            color: #fee9be;
+            text-shadow: 0 0 8px rgba(255, 194, 72, 0.25);
         }
         
-        /* Filter Toggle Switch */
+        /* Filter switch, after ETERNAL's mock-up: ON over OFF beside two stacked amber pills,
+           the lit one glowing, behind a fine grey divider */
         .filter-toggle {
             display: flex;
-            flex-direction: column;
             align-items: center;
-            gap: 2px;
+            gap: 12px;
+            padding-left: 16px;
+            position: relative;
             font-family: var(--font-ui);
-            font-size: max(6px, 0.5rem - var(--font-trim));
-            letter-spacing: 1px;
+            font-size: max(6px, 0.8rem - var(--font-trim));
+        }
+        .filter-toggle::before {
+            content: ''; position: absolute; left: 0; top: -6px; bottom: -6px; width: 1px;
+            background: linear-gradient(180deg, rgba(60, 60, 60, 0), #3a3a3a 25%, #3a3a3a 75%, rgba(60, 60, 60, 0));
         }
         
         .filter-toggle-labels {
             display: flex;
-            justify-content: space-between;
-            width: 100%;
-            color: #666;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 10px;
+            color: #6b4a0c;
+            line-height: 1;
         }
         
+        .filter-toggle-labels span { transition: color 0.25s ease, text-shadow 0.25s ease; }
         .filter-toggle-labels span.active {
             color: var(--df-gold);
+            text-shadow: 0 0 6px rgba(255, 194, 72, 0.4);
         }
         
         .filter-toggle-track {
-            width: 36px;
-            height: 18px;
-            background: rgba(0, 0, 0, 0.5);
-            border: 1px solid #444;
-            border-radius: 9px;
-            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
             cursor: pointer;
-            transition: all 0.25s ease;
         }
         
-        .filter-toggle-track.on {
-            border-color: var(--df-gold);
-            box-shadow: 0 0 10px rgba(255, 194, 72, 0.35);
+        .filter-pill {
+            display: block;
+            width: 38px;
+            height: 15px;
+            border-radius: 8px;
+            box-sizing: border-box;
+            background: #2a1d05;
+            border: 1.5px solid transparent;
+            transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+        }
+        .filter-toggle-track.on .filter-pill[data-state="on"],
+        .filter-toggle-track:not(.on) .filter-pill[data-state="off"] {
+            background: #ffc34b;
+            border-color: #ffac05;
+            box-shadow: 0 0 8px 1px rgba(255, 172, 5, 0.75), 0 0 18px rgba(255, 150, 0, 0.35);
         }
         
-        .filter-toggle-knob {
-            position: absolute;
-            top: 2px;
-            left: 2px;
-            width: 12px;
-            height: 12px;
-            background: #888;
-            border-radius: 50%;
-            transition: all 0.25s ease;
-        }
-        
-        .filter-toggle-track.on .filter-toggle-knob {
-            left: 20px;
-            background: var(--df-gold);
-            box-shadow: 0 0 8px var(--df-gold);
+        /* the little glint between the pills */
+        .filter-pill-dot {
+            width: 4px; height: 4px; border-radius: 50%;
+            background: #ffe7a6; border: 1px solid #c88a12;
+            box-shadow: 0 0 4px rgba(255, 194, 72, 0.9);
         }
         
         /* Filter Items */
@@ -4413,11 +4422,13 @@
                 <span class="filter-title-text">Filter</span>
                 <div class="filter-toggle">
                     <div class="filter-toggle-labels">
-                        <span>OFF</span>
                         <span class="active">ON</span>
+                        <span>OFF</span>
                     </div>
                     <div class="filter-toggle-track on" id="map-filter-toggle">
-                        <div class="filter-toggle-knob"></div>
+                        <span class="filter-pill" data-state="on"></span>
+                        <span class="filter-pill-dot"></span>
+                        <span class="filter-pill" data-state="off"></span>
                     </div>
                 </div>
             </div>
@@ -4515,11 +4526,13 @@
                 <span class="filter-title-text">Filter</span>
                 <div class="filter-toggle">
                     <div class="filter-toggle-labels">
-                        <span>OFF</span>
                         <span class="active">ON</span>
+                        <span>OFF</span>
                     </div>
                     <div class="filter-toggle-track on" id="inv-filter-toggle">
-                        <div class="filter-toggle-knob"></div>
+                        <span class="filter-pill" data-state="on"></span>
+                        <span class="filter-pill-dot"></span>
+                        <span class="filter-pill" data-state="off"></span>
                     </div>
                 </div>
             </div>
@@ -85264,7 +85277,10 @@ engineMixin({
                 // Filter toggle
                 const filterToggle = this.rightSidebar?.querySelector('.filter-toggle-track');
                 if (filterToggle) {
-                    filterToggle.addEventListener('click', () => {
+                    filterToggle.addEventListener('click', event => {
+                        // Tapping the pill that's already lit leaves the filter as it is
+                        const pill = event.target.closest('.filter-pill');
+                        if (pill && (pill.dataset.state === 'on') === filterToggle.classList.contains('on')) return;
                         filterToggle.classList.toggle('on');
                         this.filterEnabled = filterToggle.classList.contains('on');
                         const labels = this.rightSidebar.querySelectorAll('.filter-toggle-labels span');
