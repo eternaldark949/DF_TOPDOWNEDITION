@@ -30,6 +30,42 @@
             <path d="M55.0 50.0 Q74.5 44.8 59.8 84.1 M52.5 54.3 Q66.7 68.6 25.3 75.5 M47.5 54.3 Q42.3 73.8 15.6 41.4 M45.0 50.0 Q25.5 55.2 40.2 15.9 M47.5 45.7 Q33.3 31.4 74.7 24.5 M52.5 45.7 Q57.7 26.2 84.4 58.6" fill="none" stroke="#8a4cec" stroke-width="0.9" stroke-linecap="round"/>
             <circle cx="50" cy="50" r="9" fill="url(#ap-eye)"/>
         </symbol>
+        <!-- Control-node action. Equip: a hanger on the aperture's violet disc -->
+        <symbol id="icon-node-equip" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="49" fill="#2a0b40" fill-opacity=".55"/>
+            <circle cx="50" cy="50" r="46" fill="#1c0629"/>
+            <circle cx="50" cy="50" r="47" fill="none" stroke="#e1c6fe" stroke-width="2"/>
+            <circle cx="50" cy="50" r="42.5" fill="#e1c6fe"/>
+            <circle cx="50" cy="50" r="36.5" fill="url(#ap-disc)"/>
+            <g fill="none" stroke="#f6eeff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"><path d="M45 36 a5.5 5.5 0 1 1 7.5 5 c-2 1 -2.5 2.5 -2.5 4.5 L27 62 h46 L50 45.5"/></g>
+        </symbol>
+        <!-- Control-node action. Drop: an arrow set down on the ground on the aperture's violet disc -->
+        <symbol id="icon-node-drop" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="49" fill="#2a0b40" fill-opacity=".55"/>
+            <circle cx="50" cy="50" r="46" fill="#1c0629"/>
+            <circle cx="50" cy="50" r="47" fill="none" stroke="#e1c6fe" stroke-width="2"/>
+            <circle cx="50" cy="50" r="42.5" fill="#e1c6fe"/>
+            <circle cx="50" cy="50" r="36.5" fill="url(#ap-disc)"/>
+            <g fill="none" stroke="#f6eeff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"><path d="M50 29 V58 M38.5 47 L50 58.5 L61.5 47 M33 68 H67"/></g>
+        </symbol>
+        <!-- Control-node action. Consume: a steaming cup on the aperture's violet disc -->
+        <symbol id="icon-node-consume" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="49" fill="#2a0b40" fill-opacity=".55"/>
+            <circle cx="50" cy="50" r="46" fill="#1c0629"/>
+            <circle cx="50" cy="50" r="47" fill="none" stroke="#e1c6fe" stroke-width="2"/>
+            <circle cx="50" cy="50" r="42.5" fill="#e1c6fe"/>
+            <circle cx="50" cy="50" r="36.5" fill="url(#ap-disc)"/>
+            <g fill="none" stroke="#f6eeff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"><path d="M33 46 h28 v9 a12 12 0 0 1 -12 12 h-4 a12 12 0 0 1 -12 -12 Z M61 49.5 h3.5 a5.5 5.5 0 0 1 0 11 H61 M42 31 q-3.5 4 0 8 M51 31 q-3.5 4 0 8"/></g>
+        </symbol>
+        <!-- Control-node action. Inspect / read: an eye on the aperture's violet disc -->
+        <symbol id="icon-node-inspect" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="49" fill="#2a0b40" fill-opacity=".55"/>
+            <circle cx="50" cy="50" r="46" fill="#1c0629"/>
+            <circle cx="50" cy="50" r="47" fill="none" stroke="#e1c6fe" stroke-width="2"/>
+            <circle cx="50" cy="50" r="42.5" fill="#e1c6fe"/>
+            <circle cx="50" cy="50" r="36.5" fill="url(#ap-disc)"/>
+            <g fill="none" stroke="#f6eeff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"><path d="M27 50 q23 -21 46 0 q-23 21 -46 0 Z"/><circle cx="50" cy="50" r="6.5"/></g>
+        </symbol>
     </svg>
 
     <!-- AUGMENT SHOP (Dr. Yin's) and the WORKBENCH — styles/shops.css -->
@@ -951,7 +987,7 @@
                 <div class="pause-quick">
                     <div class="pause-quick-title">QUICK ACCESS</div>
                     <div class="pause-quick-item" data-action="equip" tabindex="0">EQUIP ITEMS</div>
-                    <div class="pause-quick-item" data-action="cinematic" tabindex="0">CINEMATIC VIEW <svg class="aperture-icon" aria-hidden="true"><use href="#icon-aperture"/></svg></div>
+                    <div class="pause-quick-item" data-action="cinematic" tabindex="0">CINEMATIC MODE <svg class="aperture-icon" aria-hidden="true"><use href="#icon-aperture"/></svg></div>
                     <div class="pause-quick-item" data-action="drop" tabindex="0">DROP ITEMS</div>
                 </div>
             </div>
@@ -1219,9 +1255,9 @@
             </div>
         </div>
     </div>
-    <!-- Cinematic view (pause menu → Quick Access): the HUD hidden, the world held still -->
+    <!-- Cinematic mode (pause menu → Quick Access): the HUD hidden, the world held still -->
     <div id="cinematic-hint">Drag to pan · pinch to zoom · ✕ to exit</div>
-    <div id="cine-bar" aria-label="Cinematic view" inert>
+    <div id="cine-bar" aria-label="Cinematic mode" inert>
         <button data-cine="save" title="Save picture">📷 SAVE</button>
         <button data-cine="grade" title="Colour grade">🎨</button>
         <button data-cine="out" title="Zoom out">−</button>

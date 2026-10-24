@@ -329,6 +329,7 @@
                 // --- DUAL EQUIP SLOTS ---
                 this.equippedWeaponId = null;     // Active weapon
                 this.equippedAttachmentId = null;  // Active attachment (laser sight, etc.)
+                this.entryOrder = [];             // pill order the player dragged, as 'source:id' keys (saved)
                 
                 // --- ITEM TYPE CONFIG ---
                 // Defines behavior per item type: how it equips, what slot it uses, labels
@@ -558,11 +559,15 @@
                 qty.append(qtyLabel, qtyValue);
                 el.appendChild(qty);
 
+                // Each action is an icon the control node slides out: kind picks the icon (#icon-node-*)
                 const actions = [];
                 if (entry.source === 'carried') {
                     const config = this.typeConfig[entry.type] || {};
                     if (config.slot || config.consumable || entry.item.action) {
-                        actions.push({ className: 'use-btn', label: entry.isEquipped ? config.unequipLabel : (config.equipLabel || 'USE'), run: () => {
+                        const kind = config.slot ? 'equip' : config.consumable ? 'consume' : 'inspect';
+                        const label = config.slot ? (entry.isEquipped ? config.unequipLabel : config.equipLabel)
+                            : config.consumable ? 'CONSUME' : (config.equipLabel || 'USE');
+                        actions.push({ kind, label, run: () => {
                             // Read current state at the time of the action.
                             if (!this.items.includes(entry.item)) return;
                             if (config.slot) {
@@ -574,57 +579,141 @@
                             } else if (entry.item.action) entry.item.action(entry.item);
                         }});
                     }
-                    actions.push({ className: 'drop-btn', label: 'DROP', run: () => this._dropCarriedItem(entry.item) });
+                    actions.push({ kind: 'drop', label: 'DROP', run: () => this._dropCarriedItem(entry.item) });
                 } else if (entry.source === 'cosmetic') {
                     const definition = COSMETICS_REGISTRY[entry.sourceId];
                     const optional = ['accessory', 'hat', 'jewelry', 'legwear'].includes(definition?.category);
                     if (!entry.isEquipped || optional) actions.push({
-                        className: 'use-btn', label: entry.isEquipped ? 'REMOVE' : 'EQUIP',
+                        kind: 'equip', label: entry.isEquipped ? 'REMOVE' : 'EQUIP',
                         run: () => this._cosmeticAction(entry)
                     });
                 }
 
-                if (actions.length) {
-                    const control = document.createElement('button');
-                    control.type = 'button'; control.className = 'control-node';
-                    control.setAttribute('aria-label', `Actions for ${entry.name}`);
-                    control.setAttribute('aria-expanded', 'false');
-                    el.appendChild(control);
-                    const menu = document.createElement('div');
-                    menu.className = 'node-menu';
-                    const close = () => {
-                        el.classList.remove('expanded');
-                        control.setAttribute('aria-expanded', 'false');
-                        menu.querySelectorAll('button').forEach(button => button.tabIndex = -1);
-                    };
-                    const toggle = () => {
-                        this.uiList.querySelectorAll('.ui-pill.expanded').forEach(other => {
-                            if (other === el) return;
-                            other.classList.remove('expanded');
-                            other.querySelector('.control-node')?.setAttribute('aria-expanded', 'false');
-                            other.querySelectorAll('.node-menu button').forEach(button => button.tabIndex = -1);
-                        });
-                        const expanded = el.classList.toggle('expanded');
-                        control.setAttribute('aria-expanded', String(expanded));
-                        menu.querySelectorAll('button').forEach(button => button.tabIndex = expanded ? 0 : -1);
-                    };
-                    actions.forEach(action => {
-                        const button = document.createElement('button');
-                        button.type = 'button'; button.className = `node-btn ${action.className}`;
-                        button.textContent = action.label; button.tabIndex = -1;
-                        button.addEventListener('click', event => { event.stopPropagation(); action.run(); close(); });
-                        menu.appendChild(button);
-                    });
-                    el.appendChild(menu);
-                    control.addEventListener('click', event => { event.stopPropagation(); toggle(); });
-                    el.addEventListener('click', event => { if (!event.target.closest('button')) toggle(); });
-                    el.addEventListener('keydown', event => {
-                        if (event.key === 'Escape' && el.classList.contains('expanded')) {
-                            event.stopPropagation(); close(); control.focus();
-                        }
-                    });
-                } else el.classList.add('inventory-registry-readonly');
+                if (actions.length) this._attachControlNode(el, entry, actions);
+                else el.classList.add('inventory-registry-readonly');
                 return el;
+            }
+
+            /* The control node: the gold diamond at a pill's end. A tap slides its action icons out
+               to the left (the pill's contents dim and a gold glow gathers behind the node); a drag
+               moves the pill up or down its section, and the new order is kept (entryOrder, saved). */
+            _attachControlNode(el, entry, actions) {
+                const control = document.createElement('button');
+                control.type = 'button'; control.className = 'control-node';
+                control.setAttribute('aria-label', `Actions for ${entry.name}; drag to reorder`);
+                control.setAttribute('aria-expanded', 'false');
+                el.appendChild(control);
+                const menu = document.createElement('div');
+                menu.className = 'node-menu';
+                menu.style.setProperty('--n', actions.length);
+                const caption = document.createElement('span');
+                caption.className = 'node-caption';
+                menu.appendChild(caption);
+                const showCaption = text => { caption.textContent = text; };
+                const buttons = actions.map((action, i) => {
+                    const button = document.createElement('button');
+                    button.type = 'button'; button.className = `node-btn node-btn-${action.kind}`;
+                    button.style.setProperty('--i', i);
+                    button.setAttribute('aria-label', action.label); button.title = action.label; button.tabIndex = -1;
+                    button.innerHTML = `<svg aria-hidden="true"><use href="#icon-node-${action.kind}"/></svg>`;
+                    button.addEventListener('click', event => { event.stopPropagation(); action.run(); close(); });
+                    button.addEventListener('pointerenter', () => showCaption(action.label));
+                    button.addEventListener('focus', () => showCaption(action.label));
+                    menu.appendChild(button);
+                    return button;
+                });
+                menu.addEventListener('pointerleave', () => showCaption(actions[0].label));
+                showCaption(actions[0].label);
+                el.appendChild(menu);
+
+                const setOpen = open => {
+                    el.classList.toggle('expanded', open);
+                    control.setAttribute('aria-expanded', String(open));
+                    buttons.forEach(button => button.tabIndex = open ? 0 : -1);
+                    if (open) showCaption(actions[0].label);
+                };
+                const close = () => setOpen(false);
+                const toggle = () => {
+                    this.uiList.querySelectorAll('.ui-pill.expanded').forEach(other => {
+                        if (other === el) return;
+                        other.classList.remove('expanded');
+                        other.querySelector('.control-node')?.setAttribute('aria-expanded', 'false');
+                        other.querySelectorAll('.node-menu button').forEach(button => button.tabIndex = -1);
+                    });
+                    setOpen(!el.classList.contains('expanded'));
+                };
+
+                // A press that moves past a few pixels becomes a drag; otherwise it's a tap.
+                let drag = null, swallowClick = false;
+                control.addEventListener('pointerdown', event => {
+                    if (event.button !== 0) return;
+                    drag = { id: event.pointerId, y: event.clientY, moved: false };
+                    control.setPointerCapture?.(event.pointerId);
+                });
+                control.addEventListener('pointermove', event => {
+                    if (!drag || event.pointerId !== drag.id) return;
+                    const dy = event.clientY - drag.y;
+                    if (!drag.moved && Math.abs(dy) < 6) return;
+                    if (!drag.moved) { drag.moved = true; close(); el.classList.add('dragging'); }
+                    el.style.transform = `translateY(${dy}px)`;
+                    // Swap with a neighbour once the pill passes its middle
+                    const rect = el.getBoundingClientRect(), mid = rect.top + rect.height / 2;
+                    const prev = el.previousElementSibling, next = el.nextElementSibling;
+                    if (prev?.classList.contains('ui-pill') && mid < prev.getBoundingClientRect().top + prev.offsetHeight / 2) {
+                        el.parentNode.insertBefore(el, prev); drag.y -= prev.offsetHeight + parseFloat(getComputedStyle(prev).marginBottom);
+                        el.style.transform = `translateY(${event.clientY - drag.y}px)`;
+                    } else if (next?.classList.contains('ui-pill') && mid > next.getBoundingClientRect().top + next.offsetHeight / 2) {
+                        el.parentNode.insertBefore(next, el); drag.y += next.offsetHeight + parseFloat(getComputedStyle(next).marginBottom);
+                        el.style.transform = `translateY(${event.clientY - drag.y}px)`;
+                    }
+                });
+                const endDrag = event => {
+                    if (!drag || event.pointerId !== drag.id) return;
+                    const moved = drag.moved; drag = null;
+                    if (!moved) return;
+                    swallowClick = true;
+                    el.classList.remove('dragging'); el.style.transform = '';
+                    this._keepOrder(el);
+                };
+                control.addEventListener('pointerup', endDrag);
+                control.addEventListener('pointercancel', endDrag);
+                control.addEventListener('click', event => {
+                    event.stopPropagation();
+                    if (swallowClick) { swallowClick = false; return; }
+                    toggle();
+                });
+                el.addEventListener('click', event => { if (!event.target.closest('button')) toggle(); });
+                el.addEventListener('keydown', event => {
+                    if (event.key === 'Escape' && el.classList.contains('expanded')) {
+                        event.stopPropagation(); close(); control.focus();
+                    }
+                    // Alt+Up / Alt+Down on the node moves the pill, for keyboards and controllers
+                    if (event.target === control && event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+                        event.preventDefault();
+                        const sibling = event.key === 'ArrowUp' ? el.previousElementSibling : el.nextElementSibling;
+                        if (!sibling?.classList.contains('ui-pill')) return;
+                        if (event.key === 'ArrowUp') el.parentNode.insertBefore(el, sibling); else el.parentNode.insertBefore(sibling, el);
+                        this._keepOrder(el); control.focus();
+                    }
+                });
+            }
+
+            // Record the order of the pill's section as the DOM now shows it
+            _keepOrder(el) {
+                const section = [];
+                let first = el; while (first.previousElementSibling?.classList.contains('ui-pill')) first = first.previousElementSibling;
+                for (let n = first; n?.classList.contains('ui-pill'); n = n.nextElementSibling) section.push(`${n.dataset.source}:${n.dataset.id}`);
+                const rest = this.entryOrder.filter(key => !section.includes(key));
+                // The section's keys take the place of the earliest of them, so other sections keep theirs
+                const at = Math.min(...section.map(key => this.entryOrder.indexOf(key)).filter(i => i >= 0), rest.length);
+                this.entryOrder = [...rest.slice(0, at), ...section, ...rest.slice(at)];
+            }
+
+            _ordered(entries) {
+                if (!this.entryOrder.length) return entries;
+                const rank = new Map(this.entryOrder.map((key, i) => [key, i]));
+                return entries.map((entry, i) => ({ entry, i, r: rank.get(`${entry.source}:${entry.id}`) }))
+                    .sort((a, b) => (a.r ?? Infinity) - (b.r ?? Infinity) || a.i - b.i).map(x => x.entry);
             }
 
             render() {
@@ -645,7 +734,7 @@
                 }
                 // With filtering off, each category still has its own heading.
                 for (const [category, label] of Object.entries(labels)) {
-                    const group = entries.filter(entry => entry.category === category);
+                    const group = this._ordered(entries.filter(entry => entry.category === category));
                     if (!group.length) continue;
                     const heading = document.createElement('h2');
                     heading.className = 'inventory-section-title';

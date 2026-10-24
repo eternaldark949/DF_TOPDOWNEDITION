@@ -1205,17 +1205,6 @@
         .death-text { font-family: 'Orbitron', sans-serif; font-size: max(6px, 6rem - var(--font-trim)); font-weight: 900; letter-spacing: 20px; }
         #death-screen.respawn { background: rgba(255, 255, 255, 0.5) !important; }
 
-        /* --- INVENTORY PILLS (Desktop overrides + Node Menu) --- */
-        .control-node { position: absolute; right: 22px; top: 50%; transform: translateY(-50%) rotate(45deg); width: 10px; height: 10px; background: #fffdfa; box-shadow: 0 0 8px rgba(255, 194, 72, 0.8), 0 0 18px rgba(202, 176, 250, 0.5); cursor: pointer; z-index: 100; transition: all 0.3s; }
-        .control-node:hover { transform: translateY(-50%) rotate(225deg) scale(1.3); background: #fff; }
-        /* Drop / Equip: flat lavender-violet blocks, as in the mock-up */
-        .node-menu { position: absolute; right: 44px; top: 50%; transform: translateY(-50%) scaleX(0); transform-origin: right center; display: flex; flex-direction: column; gap: 0; transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s; opacity: 0; pointer-events: none; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5); }
-        .ui-pill.expanded .node-menu { transform: translateY(-50%) scaleX(1); opacity: 1; pointer-events: auto; }
-        .ui-pill.expanded .control-node { transform: translateY(-50%) rotate(225deg) scale(1.1); }
-        .node-btn { font-family: var(--font-ui); font-size: max(6px, 0.62rem - var(--font-trim)); font-weight: 600; color: #2a1060; background: var(--df-lavender); border: none; cursor: pointer; text-transform: uppercase; padding: 6px 26px; min-width: 110px; letter-spacing: 1.5px; transition: all 0.2s; }
-        .node-btn.drop-btn { background: var(--df-violet-mid); color: #2a1060; }
-        .node-btn:hover { filter: brightness(1.15); }
-
         /* Inventory ownership views use the existing capsule design. */
         #inventory-list .inventory-section-title {
             font: 600 max(6px, 0.7rem - var(--font-trim)) var(--font-ui); letter-spacing: 2px;
@@ -1237,33 +1226,58 @@
         }
         #inventory-list .inventory-registry-readonly { cursor: default; }   /* keeps the diamond's room so QTY lines up */
         #inventory-list .inventory-empty { color: var(--df-lavender); text-align: center; margin: 50px 12px; font-size: max(6px, .75rem - var(--font-trim)); }
+        /* --- CONTROL NODE: the gold diamond at a pill's end (Inventory._attachControlNode) ---
+           Tap: the action icons slide out to its left, the pill darkens and a gold glow gathers
+           behind the node. Drag: the pill moves up or down its section. */
         #inventory-list .control-node {
-            width: 44px; height: 44px; right: 14px; padding: 0; border: 0;
-            background: transparent; box-shadow: none;
-            transform: translateY(-50%); border-radius: 12px;
+            position: absolute; top: 50%; right: 14px; z-index: 3;
+            width: 44px; height: 44px; padding: 0; border: 0; border-radius: 12px;
+            background: transparent; transform: translateY(-50%);
+            cursor: grab; touch-action: none;
         }
         #inventory-list .control-node::before {
             content: ''; position: absolute; left: 17px; top: 17px;
             width: 10px; height: 10px; background: #fff0d4;
-            transform: rotate(45deg); transition: transform .3s;
+            transform: rotate(45deg); transition: transform .3s, box-shadow .3s;
             box-shadow: 0 0 4px 1px rgba(255,170,60,.95), 0 0 12px 2px rgba(255,140,40,.45);
         }
-        #inventory-list .control-node:hover, #inventory-list .expanded .control-node { transform: translateY(-50%); }
-        #inventory-list .expanded .control-node::before { transform: rotate(225deg); }
+        #inventory-list .control-node:hover::before { transform: rotate(45deg) scale(1.2); }
+        #inventory-list .expanded .control-node::before { transform: rotate(225deg) scale(1.15);
+            box-shadow: 0 0 5px 2px rgba(255,180,70,1), 0 0 16px 4px rgba(255,150,40,.6); }
         #inventory-list .control-node:focus-visible { outline: 2px solid var(--df-champagne); outline-offset: 1px; }
-        /* As in the mock-up: the menu drops from under the QTY chip, a small lavender pointer above it */
+        /* the dimming veil over the pill's contents, and the gold glow gathered at its end */
+        #inventory-list .ui-pill::after {
+            content: ''; position: absolute; inset: 0; z-index: 1; border-radius: inherit; pointer-events: none;
+            background:
+                radial-gradient(ellipse 24% 85% at 100% 50%, rgba(255, 176, 60, 0.55) 0%, rgba(255, 140, 30, 0.18) 50%, rgba(255, 140, 30, 0) 100%),
+                rgba(8, 1, 16, 0.64);
+            opacity: 0; transition: opacity 0.3s ease;
+        }
+        #inventory-list .ui-pill.expanded::after { opacity: 1; }
+        #inventory-list .ui-pill.dragging { z-index: 10; transition: none; cursor: grabbing; filter: brightness(1.12) drop-shadow(0 10px 18px rgba(0, 0, 0, 0.6)); }
+        #inventory-list .ui-pill.dragging .control-node { cursor: grabbing; }
+        /* the action icons: each starts tucked into the node and slides out to its place */
         #inventory-list .node-menu {
-            z-index: 101; right: 20px; top: calc(50% + 42px); min-width: 150px;   /* leaves a gap under the QTY chip for the pointer */
-            transform: scaleY(0); transform-origin: center top; box-shadow: none;
+            position: absolute; right: 62px; top: 50%; z-index: 2; transform: translateY(-50%);
+            display: flex; align-items: center; gap: 12px; pointer-events: none;
         }
-        #inventory-list .ui-pill.expanded .node-menu { transform: scaleY(1); }
-        #inventory-list .node-menu::before {
-            content: ''; position: absolute; left: 50%; top: -11px; transform: translateX(-50%);
-            border: 11px solid transparent; border-top: 9px solid var(--df-lavender); border-bottom: 0;
-            top: -11px;
+        #inventory-list .node-caption {
+            font-family: var(--font-menu); font-size: max(6px, 0.92rem - var(--font-trim)); letter-spacing: 0.5px;
+            color: #dcc4ff; white-space: nowrap; margin-right: 2px;
+            opacity: 0; transform: translateX(14px); transition: opacity 0.22s ease, transform 0.3s ease;
         }
-        #inventory-list .node-btn { font-family: var(--font-menu); font-weight: 500; font-size: max(6px, 0.72rem - var(--font-trim)); letter-spacing: 0.5px; }
-        #inventory-list .node-btn { min-height: 36px; }
+        #inventory-list .node-btn {
+            width: 42px; height: 42px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; flex-shrink: 0;
+            opacity: 0; transform: translateX(calc((var(--n) - var(--i)) * 54px + 10px)) scale(0.3);
+            transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1) calc((var(--n) - 1 - var(--i)) * 50ms),
+                        opacity 0.22s ease calc((var(--n) - 1 - var(--i)) * 50ms);
+        }
+        #inventory-list .node-btn svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 0 5px rgba(164, 105, 255, 0.7)); transition: transform 0.2s; }
+        #inventory-list .node-btn:hover svg, #inventory-list .node-btn:focus-visible svg { transform: scale(1.1); }
+        #inventory-list .node-btn:focus-visible { outline: 2px solid var(--df-champagne); outline-offset: 2px; }
+        #inventory-list .ui-pill.expanded .node-menu { pointer-events: auto; }
+        #inventory-list .ui-pill.expanded .node-caption { opacity: 1; transform: none; transition-delay: calc(var(--n) * 50ms); }
+        #inventory-list .ui-pill.expanded .node-btn { opacity: 1; transform: none; }
         @media (max-width: 700px), (max-height: 540px) {
             #inventory-list .pill-icon { width: 42px; height: 42px; margin-right: 36px; }
             #inventory-list .pill-icon::after { right: -18px; }
@@ -1271,8 +1285,9 @@
             #inventory-list .pill-name { font-size: max(6px, .7rem - var(--font-trim)); }
             #inventory-list .pill-qty { margin-left: 8px; }
             #inventory-list .pill-qty-value { min-width: 44px; padding: 3px 6px; }
-            #inventory-list .node-menu { right: 4px; top: calc(50% + 36px); }
-            #inventory-list .node-btn { min-height: 40px; }
+            #inventory-list .node-menu { right: 52px; gap: 8px; }
+            #inventory-list .node-btn { width: 36px; height: 36px; transform: translateX(calc((var(--n) - var(--i)) * 44px + 8px)) scale(0.3); }
+            #inventory-list .node-caption { font-size: max(6px, 0.74rem - var(--font-trim)); }
         }
 
         /* The freelancer menu in ETERNAL's fonts: script headers in Anthropology, descriptions in Brooklyn, everything else in Feminine */

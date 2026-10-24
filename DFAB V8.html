@@ -491,15 +491,14 @@
             background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.75) 50%, rgba(255, 255, 255, 0) 100%);
         }
         
-        /* --- OPEN (expanded): the same card, a touch brighter --- */
-        .ui-pill.expanded { z-index: 5; filter: brightness(1.08); box-shadow: inset 0 0 26px 3px rgba(60, 12, 150, 0.95); }
+        /* --- OPEN (expanded): the control node's icons are out (panels-phone.css darkens the card) --- */
+        .ui-pill.expanded { z-index: 5; }
         
         /* --- EQUIPPED: pale lavender to violet, darker violet shading round the inside edge --- */
         .ui-pill.active-item {
             background: linear-gradient(90deg, #f1e8fe 0%, #efe5fe 20%, #e2d0fc 38%, #ccadfb 60%, #ad81f8 82%, #9560f6 100%);
             box-shadow: inset 0 0 20px 2px rgba(112, 66, 200, 0.75);
         }
-        .ui-pill.active-item.expanded { box-shadow: inset 0 0 24px 3px rgba(112, 66, 200, 0.85); }
         .ui-pill.active-item .pill-desc { color: #390892; }
         .ui-pill.active-item .pill-icon { background: #050103; box-shadow: 0 0 12px 6px rgba(5, 1, 3, 0.85); }
         .ui-pill.active-item .pill-icon::after { display: none; }
@@ -2790,17 +2789,6 @@
         .death-text { font-family: 'Orbitron', sans-serif; font-size: max(6px, 6rem - var(--font-trim)); font-weight: 900; letter-spacing: 20px; }
         #death-screen.respawn { background: rgba(255, 255, 255, 0.5) !important; }
 
-        /* --- INVENTORY PILLS (Desktop overrides + Node Menu) --- */
-        .control-node { position: absolute; right: 22px; top: 50%; transform: translateY(-50%) rotate(45deg); width: 10px; height: 10px; background: #fffdfa; box-shadow: 0 0 8px rgba(255, 194, 72, 0.8), 0 0 18px rgba(202, 176, 250, 0.5); cursor: pointer; z-index: 100; transition: all 0.3s; }
-        .control-node:hover { transform: translateY(-50%) rotate(225deg) scale(1.3); background: #fff; }
-        /* Drop / Equip: flat lavender-violet blocks, as in the mock-up */
-        .node-menu { position: absolute; right: 44px; top: 50%; transform: translateY(-50%) scaleX(0); transform-origin: right center; display: flex; flex-direction: column; gap: 0; transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s; opacity: 0; pointer-events: none; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5); }
-        .ui-pill.expanded .node-menu { transform: translateY(-50%) scaleX(1); opacity: 1; pointer-events: auto; }
-        .ui-pill.expanded .control-node { transform: translateY(-50%) rotate(225deg) scale(1.1); }
-        .node-btn { font-family: var(--font-ui); font-size: max(6px, 0.62rem - var(--font-trim)); font-weight: 600; color: #2a1060; background: var(--df-lavender); border: none; cursor: pointer; text-transform: uppercase; padding: 6px 26px; min-width: 110px; letter-spacing: 1.5px; transition: all 0.2s; }
-        .node-btn.drop-btn { background: var(--df-violet-mid); color: #2a1060; }
-        .node-btn:hover { filter: brightness(1.15); }
-
         /* Inventory ownership views use the existing capsule design. */
         #inventory-list .inventory-section-title {
             font: 600 max(6px, 0.7rem - var(--font-trim)) var(--font-ui); letter-spacing: 2px;
@@ -2822,33 +2810,58 @@
         }
         #inventory-list .inventory-registry-readonly { cursor: default; }   /* keeps the diamond's room so QTY lines up */
         #inventory-list .inventory-empty { color: var(--df-lavender); text-align: center; margin: 50px 12px; font-size: max(6px, .75rem - var(--font-trim)); }
+        /* --- CONTROL NODE: the gold diamond at a pill's end (Inventory._attachControlNode) ---
+           Tap: the action icons slide out to its left, the pill darkens and a gold glow gathers
+           behind the node. Drag: the pill moves up or down its section. */
         #inventory-list .control-node {
-            width: 44px; height: 44px; right: 14px; padding: 0; border: 0;
-            background: transparent; box-shadow: none;
-            transform: translateY(-50%); border-radius: 12px;
+            position: absolute; top: 50%; right: 14px; z-index: 3;
+            width: 44px; height: 44px; padding: 0; border: 0; border-radius: 12px;
+            background: transparent; transform: translateY(-50%);
+            cursor: grab; touch-action: none;
         }
         #inventory-list .control-node::before {
             content: ''; position: absolute; left: 17px; top: 17px;
             width: 10px; height: 10px; background: #fff0d4;
-            transform: rotate(45deg); transition: transform .3s;
+            transform: rotate(45deg); transition: transform .3s, box-shadow .3s;
             box-shadow: 0 0 4px 1px rgba(255,170,60,.95), 0 0 12px 2px rgba(255,140,40,.45);
         }
-        #inventory-list .control-node:hover, #inventory-list .expanded .control-node { transform: translateY(-50%); }
-        #inventory-list .expanded .control-node::before { transform: rotate(225deg); }
+        #inventory-list .control-node:hover::before { transform: rotate(45deg) scale(1.2); }
+        #inventory-list .expanded .control-node::before { transform: rotate(225deg) scale(1.15);
+            box-shadow: 0 0 5px 2px rgba(255,180,70,1), 0 0 16px 4px rgba(255,150,40,.6); }
         #inventory-list .control-node:focus-visible { outline: 2px solid var(--df-champagne); outline-offset: 1px; }
-        /* As in the mock-up: the menu drops from under the QTY chip, a small lavender pointer above it */
+        /* the dimming veil over the pill's contents, and the gold glow gathered at its end */
+        #inventory-list .ui-pill::after {
+            content: ''; position: absolute; inset: 0; z-index: 1; border-radius: inherit; pointer-events: none;
+            background:
+                radial-gradient(ellipse 24% 85% at 100% 50%, rgba(255, 176, 60, 0.55) 0%, rgba(255, 140, 30, 0.18) 50%, rgba(255, 140, 30, 0) 100%),
+                rgba(8, 1, 16, 0.64);
+            opacity: 0; transition: opacity 0.3s ease;
+        }
+        #inventory-list .ui-pill.expanded::after { opacity: 1; }
+        #inventory-list .ui-pill.dragging { z-index: 10; transition: none; cursor: grabbing; filter: brightness(1.12) drop-shadow(0 10px 18px rgba(0, 0, 0, 0.6)); }
+        #inventory-list .ui-pill.dragging .control-node { cursor: grabbing; }
+        /* the action icons: each starts tucked into the node and slides out to its place */
         #inventory-list .node-menu {
-            z-index: 101; right: 20px; top: calc(50% + 42px); min-width: 150px;   /* leaves a gap under the QTY chip for the pointer */
-            transform: scaleY(0); transform-origin: center top; box-shadow: none;
+            position: absolute; right: 62px; top: 50%; z-index: 2; transform: translateY(-50%);
+            display: flex; align-items: center; gap: 12px; pointer-events: none;
         }
-        #inventory-list .ui-pill.expanded .node-menu { transform: scaleY(1); }
-        #inventory-list .node-menu::before {
-            content: ''; position: absolute; left: 50%; top: -11px; transform: translateX(-50%);
-            border: 11px solid transparent; border-top: 9px solid var(--df-lavender); border-bottom: 0;
-            top: -11px;
+        #inventory-list .node-caption {
+            font-family: var(--font-menu); font-size: max(6px, 0.92rem - var(--font-trim)); letter-spacing: 0.5px;
+            color: #dcc4ff; white-space: nowrap; margin-right: 2px;
+            opacity: 0; transform: translateX(14px); transition: opacity 0.22s ease, transform 0.3s ease;
         }
-        #inventory-list .node-btn { font-family: var(--font-menu); font-weight: 500; font-size: max(6px, 0.72rem - var(--font-trim)); letter-spacing: 0.5px; }
-        #inventory-list .node-btn { min-height: 36px; }
+        #inventory-list .node-btn {
+            width: 42px; height: 42px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; flex-shrink: 0;
+            opacity: 0; transform: translateX(calc((var(--n) - var(--i)) * 54px + 10px)) scale(0.3);
+            transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1) calc((var(--n) - 1 - var(--i)) * 50ms),
+                        opacity 0.22s ease calc((var(--n) - 1 - var(--i)) * 50ms);
+        }
+        #inventory-list .node-btn svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 0 5px rgba(164, 105, 255, 0.7)); transition: transform 0.2s; }
+        #inventory-list .node-btn:hover svg, #inventory-list .node-btn:focus-visible svg { transform: scale(1.1); }
+        #inventory-list .node-btn:focus-visible { outline: 2px solid var(--df-champagne); outline-offset: 2px; }
+        #inventory-list .ui-pill.expanded .node-menu { pointer-events: auto; }
+        #inventory-list .ui-pill.expanded .node-caption { opacity: 1; transform: none; transition-delay: calc(var(--n) * 50ms); }
+        #inventory-list .ui-pill.expanded .node-btn { opacity: 1; transform: none; }
         @media (max-width: 700px), (max-height: 540px) {
             #inventory-list .pill-icon { width: 42px; height: 42px; margin-right: 36px; }
             #inventory-list .pill-icon::after { right: -18px; }
@@ -2856,8 +2869,9 @@
             #inventory-list .pill-name { font-size: max(6px, .7rem - var(--font-trim)); }
             #inventory-list .pill-qty { margin-left: 8px; }
             #inventory-list .pill-qty-value { min-width: 44px; padding: 3px 6px; }
-            #inventory-list .node-menu { right: 4px; top: calc(50% + 36px); }
-            #inventory-list .node-btn { min-height: 40px; }
+            #inventory-list .node-menu { right: 52px; gap: 8px; }
+            #inventory-list .node-btn { width: 36px; height: 36px; transform: translateX(calc((var(--n) - var(--i)) * 44px + 8px)) scale(0.3); }
+            #inventory-list .node-caption { font-size: max(6px, 0.74rem - var(--font-trim)); }
         }
 
         /* The freelancer menu in ETERNAL's fonts: script headers in Anthropology, descriptions in Brooklyn, everything else in Feminine */
@@ -3753,6 +3767,42 @@
             <path d="M55.0 50.0 Q74.5 44.8 59.8 84.1 M52.5 54.3 Q66.7 68.6 25.3 75.5 M47.5 54.3 Q42.3 73.8 15.6 41.4 M45.0 50.0 Q25.5 55.2 40.2 15.9 M47.5 45.7 Q33.3 31.4 74.7 24.5 M52.5 45.7 Q57.7 26.2 84.4 58.6" fill="none" stroke="#c9a6f6" stroke-width="2.8" stroke-linecap="round"/>
             <path d="M55.0 50.0 Q74.5 44.8 59.8 84.1 M52.5 54.3 Q66.7 68.6 25.3 75.5 M47.5 54.3 Q42.3 73.8 15.6 41.4 M45.0 50.0 Q25.5 55.2 40.2 15.9 M47.5 45.7 Q33.3 31.4 74.7 24.5 M52.5 45.7 Q57.7 26.2 84.4 58.6" fill="none" stroke="#8a4cec" stroke-width="0.9" stroke-linecap="round"/>
             <circle cx="50" cy="50" r="9" fill="url(#ap-eye)"/>
+        </symbol>
+        <!-- Control-node action. Equip: a hanger on the aperture's violet disc -->
+        <symbol id="icon-node-equip" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="49" fill="#2a0b40" fill-opacity=".55"/>
+            <circle cx="50" cy="50" r="46" fill="#1c0629"/>
+            <circle cx="50" cy="50" r="47" fill="none" stroke="#e1c6fe" stroke-width="2"/>
+            <circle cx="50" cy="50" r="42.5" fill="#e1c6fe"/>
+            <circle cx="50" cy="50" r="36.5" fill="url(#ap-disc)"/>
+            <g fill="none" stroke="#f6eeff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"><path d="M45 36 a5.5 5.5 0 1 1 7.5 5 c-2 1 -2.5 2.5 -2.5 4.5 L27 62 h46 L50 45.5"/></g>
+        </symbol>
+        <!-- Control-node action. Drop: an arrow set down on the ground on the aperture's violet disc -->
+        <symbol id="icon-node-drop" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="49" fill="#2a0b40" fill-opacity=".55"/>
+            <circle cx="50" cy="50" r="46" fill="#1c0629"/>
+            <circle cx="50" cy="50" r="47" fill="none" stroke="#e1c6fe" stroke-width="2"/>
+            <circle cx="50" cy="50" r="42.5" fill="#e1c6fe"/>
+            <circle cx="50" cy="50" r="36.5" fill="url(#ap-disc)"/>
+            <g fill="none" stroke="#f6eeff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"><path d="M50 29 V58 M38.5 47 L50 58.5 L61.5 47 M33 68 H67"/></g>
+        </symbol>
+        <!-- Control-node action. Consume: a steaming cup on the aperture's violet disc -->
+        <symbol id="icon-node-consume" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="49" fill="#2a0b40" fill-opacity=".55"/>
+            <circle cx="50" cy="50" r="46" fill="#1c0629"/>
+            <circle cx="50" cy="50" r="47" fill="none" stroke="#e1c6fe" stroke-width="2"/>
+            <circle cx="50" cy="50" r="42.5" fill="#e1c6fe"/>
+            <circle cx="50" cy="50" r="36.5" fill="url(#ap-disc)"/>
+            <g fill="none" stroke="#f6eeff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"><path d="M33 46 h28 v9 a12 12 0 0 1 -12 12 h-4 a12 12 0 0 1 -12 -12 Z M61 49.5 h3.5 a5.5 5.5 0 0 1 0 11 H61 M42 31 q-3.5 4 0 8 M51 31 q-3.5 4 0 8"/></g>
+        </symbol>
+        <!-- Control-node action. Inspect / read: an eye on the aperture's violet disc -->
+        <symbol id="icon-node-inspect" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="49" fill="#2a0b40" fill-opacity=".55"/>
+            <circle cx="50" cy="50" r="46" fill="#1c0629"/>
+            <circle cx="50" cy="50" r="47" fill="none" stroke="#e1c6fe" stroke-width="2"/>
+            <circle cx="50" cy="50" r="42.5" fill="#e1c6fe"/>
+            <circle cx="50" cy="50" r="36.5" fill="url(#ap-disc)"/>
+            <g fill="none" stroke="#f6eeff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"><path d="M27 50 q23 -21 46 0 q-23 21 -46 0 Z"/><circle cx="50" cy="50" r="6.5"/></g>
         </symbol>
     </svg>
 
@@ -4675,7 +4725,7 @@
                 <div class="pause-quick">
                     <div class="pause-quick-title">QUICK ACCESS</div>
                     <div class="pause-quick-item" data-action="equip" tabindex="0">EQUIP ITEMS</div>
-                    <div class="pause-quick-item" data-action="cinematic" tabindex="0">CINEMATIC VIEW <svg class="aperture-icon" aria-hidden="true"><use href="#icon-aperture"/></svg></div>
+                    <div class="pause-quick-item" data-action="cinematic" tabindex="0">CINEMATIC MODE <svg class="aperture-icon" aria-hidden="true"><use href="#icon-aperture"/></svg></div>
                     <div class="pause-quick-item" data-action="drop" tabindex="0">DROP ITEMS</div>
                 </div>
             </div>
@@ -4943,9 +4993,9 @@
             </div>
         </div>
     </div>
-    <!-- Cinematic view (pause menu → Quick Access): the HUD hidden, the world held still -->
+    <!-- Cinematic mode (pause menu → Quick Access): the HUD hidden, the world held still -->
     <div id="cinematic-hint">Drag to pan · pinch to zoom · ✕ to exit</div>
-    <div id="cine-bar" aria-label="Cinematic view" inert>
+    <div id="cine-bar" aria-label="Cinematic mode" inert>
         <button data-cine="save" title="Save picture">📷 SAVE</button>
         <button data-cine="grade" title="Colour grade">🎨</button>
         <button data-cine="out" title="Zoom out">−</button>
@@ -58487,6 +58537,7 @@ Object.assign(TrafficVehicle.prototype, {
                 // --- DUAL EQUIP SLOTS ---
                 this.equippedWeaponId = null;     // Active weapon
                 this.equippedAttachmentId = null;  // Active attachment (laser sight, etc.)
+                this.entryOrder = [];             // pill order the player dragged, as 'source:id' keys (saved)
                 
                 // --- ITEM TYPE CONFIG ---
                 // Defines behavior per item type: how it equips, what slot it uses, labels
@@ -58716,11 +58767,15 @@ Object.assign(TrafficVehicle.prototype, {
                 qty.append(qtyLabel, qtyValue);
                 el.appendChild(qty);
 
+                // Each action is an icon the control node slides out: kind picks the icon (#icon-node-*)
                 const actions = [];
                 if (entry.source === 'carried') {
                     const config = this.typeConfig[entry.type] || {};
                     if (config.slot || config.consumable || entry.item.action) {
-                        actions.push({ className: 'use-btn', label: entry.isEquipped ? config.unequipLabel : (config.equipLabel || 'USE'), run: () => {
+                        const kind = config.slot ? 'equip' : config.consumable ? 'consume' : 'inspect';
+                        const label = config.slot ? (entry.isEquipped ? config.unequipLabel : config.equipLabel)
+                            : config.consumable ? 'CONSUME' : (config.equipLabel || 'USE');
+                        actions.push({ kind, label, run: () => {
                             // Read current state at the time of the action.
                             if (!this.items.includes(entry.item)) return;
                             if (config.slot) {
@@ -58732,57 +58787,141 @@ Object.assign(TrafficVehicle.prototype, {
                             } else if (entry.item.action) entry.item.action(entry.item);
                         }});
                     }
-                    actions.push({ className: 'drop-btn', label: 'DROP', run: () => this._dropCarriedItem(entry.item) });
+                    actions.push({ kind: 'drop', label: 'DROP', run: () => this._dropCarriedItem(entry.item) });
                 } else if (entry.source === 'cosmetic') {
                     const definition = COSMETICS_REGISTRY[entry.sourceId];
                     const optional = ['accessory', 'hat', 'jewelry', 'legwear'].includes(definition?.category);
                     if (!entry.isEquipped || optional) actions.push({
-                        className: 'use-btn', label: entry.isEquipped ? 'REMOVE' : 'EQUIP',
+                        kind: 'equip', label: entry.isEquipped ? 'REMOVE' : 'EQUIP',
                         run: () => this._cosmeticAction(entry)
                     });
                 }
 
-                if (actions.length) {
-                    const control = document.createElement('button');
-                    control.type = 'button'; control.className = 'control-node';
-                    control.setAttribute('aria-label', `Actions for ${entry.name}`);
-                    control.setAttribute('aria-expanded', 'false');
-                    el.appendChild(control);
-                    const menu = document.createElement('div');
-                    menu.className = 'node-menu';
-                    const close = () => {
-                        el.classList.remove('expanded');
-                        control.setAttribute('aria-expanded', 'false');
-                        menu.querySelectorAll('button').forEach(button => button.tabIndex = -1);
-                    };
-                    const toggle = () => {
-                        this.uiList.querySelectorAll('.ui-pill.expanded').forEach(other => {
-                            if (other === el) return;
-                            other.classList.remove('expanded');
-                            other.querySelector('.control-node')?.setAttribute('aria-expanded', 'false');
-                            other.querySelectorAll('.node-menu button').forEach(button => button.tabIndex = -1);
-                        });
-                        const expanded = el.classList.toggle('expanded');
-                        control.setAttribute('aria-expanded', String(expanded));
-                        menu.querySelectorAll('button').forEach(button => button.tabIndex = expanded ? 0 : -1);
-                    };
-                    actions.forEach(action => {
-                        const button = document.createElement('button');
-                        button.type = 'button'; button.className = `node-btn ${action.className}`;
-                        button.textContent = action.label; button.tabIndex = -1;
-                        button.addEventListener('click', event => { event.stopPropagation(); action.run(); close(); });
-                        menu.appendChild(button);
-                    });
-                    el.appendChild(menu);
-                    control.addEventListener('click', event => { event.stopPropagation(); toggle(); });
-                    el.addEventListener('click', event => { if (!event.target.closest('button')) toggle(); });
-                    el.addEventListener('keydown', event => {
-                        if (event.key === 'Escape' && el.classList.contains('expanded')) {
-                            event.stopPropagation(); close(); control.focus();
-                        }
-                    });
-                } else el.classList.add('inventory-registry-readonly');
+                if (actions.length) this._attachControlNode(el, entry, actions);
+                else el.classList.add('inventory-registry-readonly');
                 return el;
+            }
+
+            /* The control node: the gold diamond at a pill's end. A tap slides its action icons out
+               to the left (the pill's contents dim and a gold glow gathers behind the node); a drag
+               moves the pill up or down its section, and the new order is kept (entryOrder, saved). */
+            _attachControlNode(el, entry, actions) {
+                const control = document.createElement('button');
+                control.type = 'button'; control.className = 'control-node';
+                control.setAttribute('aria-label', `Actions for ${entry.name}; drag to reorder`);
+                control.setAttribute('aria-expanded', 'false');
+                el.appendChild(control);
+                const menu = document.createElement('div');
+                menu.className = 'node-menu';
+                menu.style.setProperty('--n', actions.length);
+                const caption = document.createElement('span');
+                caption.className = 'node-caption';
+                menu.appendChild(caption);
+                const showCaption = text => { caption.textContent = text; };
+                const buttons = actions.map((action, i) => {
+                    const button = document.createElement('button');
+                    button.type = 'button'; button.className = `node-btn node-btn-${action.kind}`;
+                    button.style.setProperty('--i', i);
+                    button.setAttribute('aria-label', action.label); button.title = action.label; button.tabIndex = -1;
+                    button.innerHTML = `<svg aria-hidden="true"><use href="#icon-node-${action.kind}"/></svg>`;
+                    button.addEventListener('click', event => { event.stopPropagation(); action.run(); close(); });
+                    button.addEventListener('pointerenter', () => showCaption(action.label));
+                    button.addEventListener('focus', () => showCaption(action.label));
+                    menu.appendChild(button);
+                    return button;
+                });
+                menu.addEventListener('pointerleave', () => showCaption(actions[0].label));
+                showCaption(actions[0].label);
+                el.appendChild(menu);
+
+                const setOpen = open => {
+                    el.classList.toggle('expanded', open);
+                    control.setAttribute('aria-expanded', String(open));
+                    buttons.forEach(button => button.tabIndex = open ? 0 : -1);
+                    if (open) showCaption(actions[0].label);
+                };
+                const close = () => setOpen(false);
+                const toggle = () => {
+                    this.uiList.querySelectorAll('.ui-pill.expanded').forEach(other => {
+                        if (other === el) return;
+                        other.classList.remove('expanded');
+                        other.querySelector('.control-node')?.setAttribute('aria-expanded', 'false');
+                        other.querySelectorAll('.node-menu button').forEach(button => button.tabIndex = -1);
+                    });
+                    setOpen(!el.classList.contains('expanded'));
+                };
+
+                // A press that moves past a few pixels becomes a drag; otherwise it's a tap.
+                let drag = null, swallowClick = false;
+                control.addEventListener('pointerdown', event => {
+                    if (event.button !== 0) return;
+                    drag = { id: event.pointerId, y: event.clientY, moved: false };
+                    control.setPointerCapture?.(event.pointerId);
+                });
+                control.addEventListener('pointermove', event => {
+                    if (!drag || event.pointerId !== drag.id) return;
+                    const dy = event.clientY - drag.y;
+                    if (!drag.moved && Math.abs(dy) < 6) return;
+                    if (!drag.moved) { drag.moved = true; close(); el.classList.add('dragging'); }
+                    el.style.transform = `translateY(${dy}px)`;
+                    // Swap with a neighbour once the pill passes its middle
+                    const rect = el.getBoundingClientRect(), mid = rect.top + rect.height / 2;
+                    const prev = el.previousElementSibling, next = el.nextElementSibling;
+                    if (prev?.classList.contains('ui-pill') && mid < prev.getBoundingClientRect().top + prev.offsetHeight / 2) {
+                        el.parentNode.insertBefore(el, prev); drag.y -= prev.offsetHeight + parseFloat(getComputedStyle(prev).marginBottom);
+                        el.style.transform = `translateY(${event.clientY - drag.y}px)`;
+                    } else if (next?.classList.contains('ui-pill') && mid > next.getBoundingClientRect().top + next.offsetHeight / 2) {
+                        el.parentNode.insertBefore(next, el); drag.y += next.offsetHeight + parseFloat(getComputedStyle(next).marginBottom);
+                        el.style.transform = `translateY(${event.clientY - drag.y}px)`;
+                    }
+                });
+                const endDrag = event => {
+                    if (!drag || event.pointerId !== drag.id) return;
+                    const moved = drag.moved; drag = null;
+                    if (!moved) return;
+                    swallowClick = true;
+                    el.classList.remove('dragging'); el.style.transform = '';
+                    this._keepOrder(el);
+                };
+                control.addEventListener('pointerup', endDrag);
+                control.addEventListener('pointercancel', endDrag);
+                control.addEventListener('click', event => {
+                    event.stopPropagation();
+                    if (swallowClick) { swallowClick = false; return; }
+                    toggle();
+                });
+                el.addEventListener('click', event => { if (!event.target.closest('button')) toggle(); });
+                el.addEventListener('keydown', event => {
+                    if (event.key === 'Escape' && el.classList.contains('expanded')) {
+                        event.stopPropagation(); close(); control.focus();
+                    }
+                    // Alt+Up / Alt+Down on the node moves the pill, for keyboards and controllers
+                    if (event.target === control && event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+                        event.preventDefault();
+                        const sibling = event.key === 'ArrowUp' ? el.previousElementSibling : el.nextElementSibling;
+                        if (!sibling?.classList.contains('ui-pill')) return;
+                        if (event.key === 'ArrowUp') el.parentNode.insertBefore(el, sibling); else el.parentNode.insertBefore(sibling, el);
+                        this._keepOrder(el); control.focus();
+                    }
+                });
+            }
+
+            // Record the order of the pill's section as the DOM now shows it
+            _keepOrder(el) {
+                const section = [];
+                let first = el; while (first.previousElementSibling?.classList.contains('ui-pill')) first = first.previousElementSibling;
+                for (let n = first; n?.classList.contains('ui-pill'); n = n.nextElementSibling) section.push(`${n.dataset.source}:${n.dataset.id}`);
+                const rest = this.entryOrder.filter(key => !section.includes(key));
+                // The section's keys take the place of the earliest of them, so other sections keep theirs
+                const at = Math.min(...section.map(key => this.entryOrder.indexOf(key)).filter(i => i >= 0), rest.length);
+                this.entryOrder = [...rest.slice(0, at), ...section, ...rest.slice(at)];
+            }
+
+            _ordered(entries) {
+                if (!this.entryOrder.length) return entries;
+                const rank = new Map(this.entryOrder.map((key, i) => [key, i]));
+                return entries.map((entry, i) => ({ entry, i, r: rank.get(`${entry.source}:${entry.id}`) }))
+                    .sort((a, b) => (a.r ?? Infinity) - (b.r ?? Infinity) || a.i - b.i).map(x => x.entry);
             }
 
             render() {
@@ -58803,7 +58942,7 @@ Object.assign(TrafficVehicle.prototype, {
                 }
                 // With filtering off, each category still has its own heading.
                 for (const [category, label] of Object.entries(labels)) {
-                    const group = entries.filter(entry => entry.category === category);
+                    const group = this._ordered(entries.filter(entry => entry.category === category));
                     if (!group.length) continue;
                     const heading = document.createElement('h2');
                     heading.className = 'inventory-section-title';
@@ -69609,6 +69748,7 @@ engineMixin({
                         items: this.inventory?.items?.map(i => i.id) ?? [],
                         equippedWeaponId: this.inventory?.equippedWeaponId ?? null,
                         equippedAttachmentId: this.inventory?.equippedAttachmentId ?? null,
+                        order: this.inventory?.entryOrder ?? [],
                         weaponMode: this.weaponMode ?? 'normal'
                     },
                     
@@ -70172,6 +70312,7 @@ engineMixin({
                     // 8. Restore Inventory & Equipped Weapon
                     const invData = save.inventory || rawSave.inventory || defaults.inventory;
                     if (invData && this.inventory) {
+                        this.inventory.entryOrder = Array.isArray(invData.order) ? invData.order.filter(key => typeof key === 'string') : [];
                         // Restore weapon mode
                         this.weaponMode = invData.weaponMode ?? 'normal';
                         

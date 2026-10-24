@@ -61,6 +61,7 @@ engineMixin({
                         items: this.inventory?.items?.map(i => i.id) ?? [],
                         equippedWeaponId: this.inventory?.equippedWeaponId ?? null,
                         equippedAttachmentId: this.inventory?.equippedAttachmentId ?? null,
+                        order: this.inventory?.entryOrder ?? [],
                         weaponMode: this.weaponMode ?? 'normal'
                     },
                     
@@ -624,6 +625,7 @@ engineMixin({
                     // 8. Restore Inventory & Equipped Weapon
                     const invData = save.inventory || rawSave.inventory || defaults.inventory;
                     if (invData && this.inventory) {
+                        this.inventory.entryOrder = Array.isArray(invData.order) ? invData.order.filter(key => typeof key === 'string') : [];
                         // Restore weapon mode
                         this.weaponMode = invData.weaponMode ?? 'normal';
                         
