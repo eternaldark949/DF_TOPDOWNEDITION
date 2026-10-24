@@ -490,7 +490,29 @@
         .sidebar-back-container {
             margin-top: auto;
             padding-top: 20px;
+            align-self: stretch;
         }
+        /* The sidebar's Back, after ETERNAL's mock-up: a flat lilac pill in a fine white dashed rim,
+           a violet haze glowing round it, black letter-spaced caps and a small ink-blue arrow */
+        .sidebar-back-container .screen-back-btn {
+            gap: 0; height: 36px; width: 100%; min-width: 0; box-sizing: border-box;   /* the sidebar's full width, as in the mock-up */
+            background: #ccc1da;
+            border: 0; outline: 1.5px dashed rgba(255, 255, 255, 0.85); outline-offset: 1px;   /* the dashes ride just outside the fill */
+            box-shadow: 0 0 24px 6px rgba(120, 60, 225, 0.42), 0 0 60px 10px rgba(80, 25, 200, 0.28);
+            color: #0c0812;
+            font-family: var(--font-menu); font-weight: 400; letter-spacing: 6px;
+            font-size: max(6px, 0.8rem - var(--font-trim));
+            text-shadow: 0 1px 2px rgba(12, 8, 18, 0.35); -webkit-text-stroke: 0.4px #0c0812;
+        }
+        .sidebar-back-container .screen-back-btn:hover {
+            background: #dad0e8;
+            box-shadow: 0 0 28px 8px rgba(130, 70, 235, 0.5), 0 0 70px 12px rgba(90, 30, 210, 0.32);
+        }
+        .sidebar-back-container .screen-back-btn .btn-arrow {
+            color: #10253f; opacity: 1; font-size: max(6px, 0.62rem - var(--font-trim)); letter-spacing: 0;
+            margin-right: 2.6em; text-shadow: 0 0 3px rgba(16, 37, 63, 0.5);
+        }
+        .sidebar-back-container .screen-back-btn .btn-hint { opacity: 1; font-size: inherit; margin-left: 0.5em; }
         
         /* --- RIGHT SIDEBAR (Filters) --- */
         .screen-sidebar-right {
