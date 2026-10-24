@@ -8,13 +8,17 @@
                     mass: 2500, lightRange: 100, seats: 6, // SUV = 6 seats
                     brake: 0.42     // px/tick² at full brake (traffic/traffic-vehicle.js applyDrivePhysics)
                 },
+                /* A model's `driven` { top, accel } is how it goes with the player at the wheel (traffic keeps baseStats ×
+                   speedMod). The brands differ in character, not in being worth driving: no car falls under ~80% of the
+                   best top speed or ~60% of the best pull. LADY: the fastest, heavy grand tourer with the best brakes.
+                   Zenxera: the quickest off the line (the Bolt), sharpest turn-in, lively tail. Gelfash: friendly and forgiving. */
                 // Handling character (applyDrivePhysics): heavy and floaty, lazy wheel, long catchable slide
                 drive: { steerRate: 0.085, turnIn: 0.3, gripF: 1.0, gripR: 0.86, latAcc: 0.60, weight: 1.35 },
                 colors: ['#050505', '#1a0b1a', '#0b1a1a', '#1a1a0b', '#2b0000'],
                 glowColor: '#ffffff', headlightColor: '#ffffff', visualStyle: 'blackmark',
                 models: { 
-                    suv: { name: 'BlackMark V1', length: 95, width: 44, speedMod: 1.0, spec: [100, 80, 80, 90, 100] },
-                    suv2: { name: 'BlackMark V3', length: 88, width: 42, speedMod: 1.05, noHearseCap: true, seats: 6, spec: [100, 86, 88, 78, 95] }
+                    suv: { name: 'BlackMark V1', length: 95, width: 44, speedMod: 1.0, driven: { top: 12.5, accel: 0.26 }, spec: [100, 80, 80, 90, 100] },
+                    suv2: { name: 'BlackMark V3', length: 98, width: 42, speedMod: 1.05, driven: { top: 13.0, accel: 0.28 }, noHearseCap: true, seats: 6, spec: [100, 86, 88, 78, 95] }
                 }
             },
             Zenxera: {
@@ -26,23 +30,23 @@
                 glowColor: '#00f3ff', headlightColor: '#ccddff', // Cool blue-white
                 visualStyle: 'angular',
                 models: {
-                    sedan:  { name: 'Stratos',   length: 72, width: 40, speedMod: 1.0, seats: 4, spec: [76, 82, 46, 52, 72] },
-                    suv:    { name: 'Apex',      length: 78, width: 46, speedMod: 0.9, seats: 6, spec: [68, 76, 40, 66, 72] },
-                    sports: { name: 'Bolt',      length: 63, width: 36, speedMod: 1.25, seats: 2, spec: [95, 90, 58, 36, 72] },
-                    truck:  { name: 'Freighter', length: 92, width: 50, speedMod: 0.75, seats: 2, spec: [57, 62, 30, 82, 72] }
+                    sedan:  { name: 'Stratos',   length: 72, width: 40, speedMod: 1.0, driven: { top: 11.5, accel: 0.28 }, seats: 4, spec: [76, 82, 46, 52, 72] },
+                    suv:    { name: 'Apex',      length: 78, width: 46, speedMod: 0.9, driven: { top: 11.0, accel: 0.25 }, seats: 6, spec: [68, 76, 40, 66, 72] },
+                    sports: { name: 'Bolt',      length: 63, width: 36, speedMod: 1.25, driven: { top: 12.3, accel: 0.32 }, seats: 2, spec: [95, 90, 58, 36, 72] },
+                    truck:  { name: 'Freighter', length: 92, width: 50, speedMod: 0.75, driven: { top: 10.6, accel: 0.21 }, seats: 2, spec: [57, 62, 30, 82, 72] }
                 }
             },
             Gelfash: {
                 tier: 'economy',
                 baseStats: { maxSpeed: 8.5, acceleration: 0.1, handling: 0.05, friction: 0.96, mass: 1000, seats: 4, brake: 0.26 },
-                drive: { steerRate: 0.11, turnIn: 0.36, gripF: 0.88, gripR: 1.1, latAcc: 0.42, weight: 1.0 },    // soft, understeers
+                drive: { steerRate: 0.14, turnIn: 0.42, gripF: 1.0, gripR: 1.15, latAcc: 0.5, weight: 1.0 },     // friendly: quick hands, planted rear, never bites
                 colors: ['#fff', '#aaa', '#555', '#a469ff', '#00f3ff'],
                 glowColor: null, headlightColor: '#ffffaa', visualStyle: 'boxy',
                 models: {
-                    sedan:  { name: 'Commuter',  length: 70, width: 40, speedMod: 1.0, seats: 4, spec: [68, 64, 40, 46, 50] },
-                    suv:    { name: 'Ranger',    length: 75, width: 44, speedMod: 0.9, seats: 5, spec: [61, 60, 35, 56, 52] },
-                    sports: { name: 'Sprint',    length: 62, width: 36, speedMod: 1.15, seats: 2, spec: [78, 70, 46, 34, 50] },
-                    truck:  { name: 'Workhorse', length: 90, width: 50, speedMod: 0.7, seats: 2, spec: [48, 56, 26, 72, 50] }
+                    sedan:  { name: 'Commuter',  length: 70, width: 40, speedMod: 1.0, driven: { top: 10.8, accel: 0.21 }, seats: 4, spec: [68, 64, 40, 46, 50] },
+                    suv:    { name: 'Ranger',    length: 75, width: 44, speedMod: 0.9, driven: { top: 10.5, accel: 0.20 }, seats: 5, spec: [61, 60, 35, 56, 52] },
+                    sports: { name: 'Sprint',    length: 62, width: 36, speedMod: 1.15, driven: { top: 11.3, accel: 0.23 }, seats: 2, spec: [78, 70, 46, 34, 50] },
+                    truck:  { name: 'Workhorse', length: 90, width: 50, speedMod: 0.7, driven: { top: 10.4, accel: 0.19 }, seats: 2, spec: [48, 56, 26, 72, 50] }
                 }
             }
         };

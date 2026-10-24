@@ -461,7 +461,7 @@
                 const drv = !paused && game.isDriving && game.car && game.car.controlMode === 'PLAYER';
                 a.tyres(drv ? Math.min(1, (game.car.tyreSlip || 0) * 0.45) : 0);   // the driven car's tyres, however hard they're sliding
                 const car = game.car, inCar = !paused && game.isDriving && car && (car.controlMode === 'PLAYER' || car.controlMode === 'AI');
-                a.engine({ on: inCar, brand: car && car.brand, speed01: car ? Math.abs(car.speed || 0) / (car.maxSpeed || 10) : 0,
+                a.engine({ on: inCar, brand: car && car.brand, speed01: car ? Math.abs(car.speed || 0) / (car.drivenTop || car.maxSpeed || 10) : 0,
                            throttle: car ? Math.abs(car.controlMode === 'PLAYER' ? (car.pedal || 0) : (car.manualGas || 0)) : 0 });   // her motor (auto-drive too)
 
                 const busV = vol * 1.9 * (paused ? 0.25 : 1) * (1 - 0.45 * (game.scopeK || 0));

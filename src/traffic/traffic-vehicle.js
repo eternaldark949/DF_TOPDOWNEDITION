@@ -55,6 +55,10 @@
                 this.width = vehicleWidth;  // Override for backward compatibility with draw()
                 this.maxSpeed = brandData.baseStats.maxSpeed * modelData.speedMod + (Math.random() * 1 - 0.5);
                 this.acceleration = brandData.baseStats.acceleration;
+                // What it does with the player at the wheel (applyDrivePhysics): traffic keeps the numbers above
+                const dv = modelData.driven || {};
+                this.drivenTop = dv.top || brandData.baseStats.maxSpeed * modelData.speedMod;
+                this.drivenAccel = dv.accel || this.acceleration;
                 this.handling = brandData.baseStats.handling;
                 this.brake = brandData.baseStats.brake || 0.3;        // px/tick² at full brake
                 this.drive = brandData.drive || CONFIG.VEHICLE_DRIVE.DEFAULT_FEEL;   // handling character
@@ -929,15 +933,15 @@
                    says it should:
 
                        steady state  v = a·d/(1-d)   =>   d = v/(a+v)          */
-                const topSpeed = (typeof this.maxSpeed === 'number' && this.maxSpeed > 0)
-                    ? this.maxSpeed : 12.5;
-                const acceleration = (typeof this.acceleration === 'number' && this.acceleration > 0)
-                    ? this.acceleration : 0.5;
+                const player = steerCurve;                    // the full weighted model is the driver's
+                const ownTop = player && this.drivenTop > 0 ? this.drivenTop : this.maxSpeed;
+                const ownAccel = player && this.drivenAccel > 0 ? this.drivenAccel : this.acceleration;
+                const topSpeed = (typeof ownTop === 'number' && ownTop > 0) ? ownTop : 12.5;
+                const acceleration = (typeof ownAccel === 'number' && ownAccel > 0) ? ownAccel : 0.5;
                 const drag = topSpeed / (acceleration + topSpeed);
                 const revTop = topSpeed * VD.REVERSE_TOP_FRACTION;
                 const reverseDrag = revTop / (acceleration + revTop);
 
-                const player = steerCurve;                    // the full weighted model is the driver's
                 const F = this.drive || VD.DEFAULT_FEEL;
                 const rain = (weather && weather.isRaining)
                     ? Math.min(1, weather.getRainScale ? weather.getRainScale() : 1) : 0;
@@ -972,6 +976,7 @@
                     st += Math.abs(d) < 0.006 ? req - st : d;
                 }
                 this.steer = st;
+                if (player) this._steerSignal(req, absSpeed);
 
                 // --- STEERING → ROTATION ---
                 let yawTarget = 0;
@@ -1120,6 +1125,8 @@
                     let gF = F.gripF * (1 + VD.LOAD_FWD_GRIP * L) * wetGrip;
                     let gR = F.gripR * (1 - VD.LOAD_REAR_GRIP * L) * wetGrip;
                     if (hb) gR *= VD.HANDBRAKE_REAR_GRIP;
+                    // Power over the rear: throttle held through a turn at speed spends the rear tyres' grip, so the tail can step out
+                    if (VD.POWER_OVERSTEER && gas > 0.5 && absSpeed > 4) gR *= 1 - VD.POWER_OVERSTEER * gas * Math.min(1, Math.abs(st));
                     const a = this.length * VD.AXLE_FROM_CENTRE, wb = 2 * a;
                     const iu = (this.length * this.length + this.width * this.width) / 12 * VD.SPIN_INERTIA;   // inertia per unit mass
                     let w = this.yawRate || 0;
@@ -1130,6 +1137,7 @@
                     const pR = -Math.sign(sR) * Math.min(Math.abs(sR) * kR * gR, F.latAcc * gR);
                     slideVelocity += (pF + pR) / 2;
                     w += a * (pF - pR) / 2 / iu;
+                    if (hb) w *= VD.HANDBRAKE_YAW_DAMP;               // the locked rear drags the swing out of it
                     w = clampU(w, VD.YAW_SPIN_MAX);
                     yaw = this.yawRate = w;
                     this.tyreSlip = Math.max(0, Math.abs(slideVelocity) - F.latAcc * 1.6) + (hb ? Math.abs(fwdVelocity) * 0.25 : 0)
@@ -2039,6 +2047,19 @@
                 // from the player) keep braking and steering in between rather than coasting blind
             }
             
+            /** The driver's turn signal follows the wheel: steer into a turn and it comes on for that side; let go and it
+             *  finishes the cycle it's in, then goes off. Whole cycles (C ticks) are added or cut so the
+             *  running lights never jump mid-sweep. */
+            _steerSignal(req, absSpeed) {
+                const C = 42;                                   // = car-art's 7 beats of 6 ticks
+                if (this.turnSignalTimer > 0) this.turnSignalTimer--;
+                if (Math.abs(req) > 0.3 && absSpeed > 0.5) {
+                    const side = req > 0 ? 'right' : 'left';
+                    if (this.turnSignal !== side || !(this.turnSignalTimer > 0)) { this.turnSignal = side; this.turnSignalTimer = C * 10 + C - 1; }
+                    else if (this.turnSignalTimer < C * 2) this.turnSignalTimer += C * 10;
+                } else if (this.turnSignalTimer >= C) this.turnSignalTimer %= C;
+            }
+
             // --- PHYSICS-BASED STEERING CALCULATIONS ---
             
             /** How fast a turn path can be followed from `t` on: by its tightest radius left, as round a bend

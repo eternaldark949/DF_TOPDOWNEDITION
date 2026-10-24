@@ -1315,7 +1315,7 @@
                 let targetZoom = 1.0;
                 if (this.isDriving) { 
                     // Pulls back with speed, down to a floor: the look-ahead already shows the road in front
-                    const speedRatio = Math.abs(this.car.speed) / this.car.maxSpeed, CZ = CONFIG.VEHICLE_DRIVE.CAM_ZOOM;
+                    const speedRatio = Math.abs(this.car.speed) / (this.car.drivenTop || this.car.maxSpeed), CZ = CONFIG.VEHICLE_DRIVE.CAM_ZOOM;
                     targetZoom = Math.max(CZ.FLOOR, 1.0 - speedRatio * CZ.SPAN);
                 } else {
                     // On foot: in a little closer with the gun away, and again indoors; by something to use (or talking), closer still (INTERACT_ZOOM)

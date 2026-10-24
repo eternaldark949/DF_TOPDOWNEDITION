@@ -5445,6 +5445,8 @@
                 LOAD_RATE: 0.14,                // How fast the load shifts (÷ brand weight)
                 HANDBRAKE_REAR_GRIP: 0.3,       // Rear grip while the handbrake's up
                 HANDBRAKE_DECEL: 0.07,          // px/tick² scrubbed by locked rear wheels
+                POWER_OVERSTEER: 0.2,           // Rear grip lost to full throttle at full lock (0: steering alone never kicks the tail out)
+                HANDBRAKE_YAW_DAMP: 0.96,       // Rotation kept per tick while the handbrake's up (lower: less swing)
                 REVERSE_BELOW: 0.5,             // Pull-back only reverses under this speed
                 CAM_LOOK_AHEAD: { PER_SPEED: 13, TAU_MS: 700 },   // camera leads by velocity × this (engine/draw.js)
                 CAM_ZOOM: { SPAN: 0.25, FLOOR: 0.75 },              // zoom = 1 − speed ratio × SPAN, never below FLOOR (×0.9 landscape)
@@ -10092,7 +10094,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const drv = !paused && game.isDriving && game.car && game.car.controlMode === 'PLAYER';
                 a.tyres(drv ? Math.min(1, (game.car.tyreSlip || 0) * 0.45) : 0);   // the driven car's tyres, however hard they're sliding
                 const car = game.car, inCar = !paused && game.isDriving && car && (car.controlMode === 'PLAYER' || car.controlMode === 'AI');
-                a.engine({ on: inCar, brand: car && car.brand, speed01: car ? Math.abs(car.speed || 0) / (car.maxSpeed || 10) : 0,
+                a.engine({ on: inCar, brand: car && car.brand, speed01: car ? Math.abs(car.speed || 0) / (car.drivenTop || car.maxSpeed || 10) : 0,
                            throttle: car ? Math.abs(car.controlMode === 'PLAYER' ? (car.pedal || 0) : (car.manualGas || 0)) : 0 });   // her motor (auto-drive too)
 
                 const busV = vol * 1.9 * (paused ? 0.25 : 1) * (1 - 0.45 * (game.scopeK || 0));
@@ -35180,7 +35182,280 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         });
         // =====================================================================
-        //  SKY LAYER — ad airships and floating shards above the city
+        //  SKY CRAFT — hand-drawn spaceships from the sketchbook
+        // =====================================================================
+        //  Wobbly double-stroke ink, pencil hatching on the shade side and curly
+        //  smoke, coloured with the game's neon palette. Each craft is drawn around
+        //  (0,0) facing +x, about 220 px long. Used by SkyLayer._drawAirship.
+        const SkyCraft = (() => {
+            let glowK = 1;      // glows dim in daylight
+            const P = { violet: '#b58cff', cyan: '#3fe3ff', gold: '#ffcf6a', pink: '#ff6fb5', mint: '#7dffc4',
+                orange: '#ff7a1a', ink: '#3b1f6b', paper: '#fff6e6',
+                weight: 0.7 };   // violet ink at a light pen weight sits closer to the city's thin neon lines than black
+            const rgba = (h, a) => { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
+            const mix = (h, h2, k) => { const a = parseInt(h.slice(1), 16), b = parseInt(h2.slice(1), 16);
+                const c = (s) => Math.round(((a >> s) & 255) * (1 - k) + ((b >> s) & 255) * k);
+                return '#' + ((1 << 24) | (c(16) << 16) | (c(8) << 8) | c(0)).toString(16).slice(1); };
+
+            // --- shape point builders -------------------------------------------------
+            const ell = (cx, cy, rx, ry, n = 36, a0 = 0, a1 = Math.PI * 2) => {
+                const p = []; const closed = a1 - a0 >= Math.PI * 2 - 1e-6;
+                for (let i = 0; i < (closed ? n : n + 1); i++) { const a = a0 + (a1 - a0) * i / n; p.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]); }
+                return p;
+            };
+            const rrect = (x, y, w, h, r) => [...ell(x + w - r, y + r, r, r, 6, -Math.PI / 2, 0), ...ell(x + w - r, y + h - r, r, r, 6, 0, Math.PI / 2),
+                ...ell(x + r, y + h - r, r, r, 6, Math.PI / 2, Math.PI), ...ell(x + r, y + r, r, r, 6, Math.PI, Math.PI * 1.5)];
+            // subdivide so the wobble reads along long straight edges
+            const dens = (pts, closed, step = 7) => {
+                const out = []; const n = pts.length;
+                for (let i = 0; i < (closed ? n : n - 1); i++) {
+                    const a = pts[i], b = pts[(i + 1) % n], k = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / step));
+                    for (let j = 0; j < k; j++) out.push([a[0] + (b[0] - a[0]) * j / k, a[1] + (b[1] - a[1]) * j / k]);
+                }
+                if (!closed) out.push(pts[n - 1]);
+                return out;
+            };
+            const wob = (pts, amp, seed) => pts.map(([x, y], i) => [x + amp * Math.sin(i * 1.71 + seed * 3.1 + y * 0.05), y + amp * Math.cos(i * 1.33 + seed * 2.3 + x * 0.05)]);
+            const trace = (ctx, pts, closed) => { ctx.beginPath(); pts.forEach((p, i) => ctx[i ? 'lineTo' : 'moveTo'](p[0], p[1])); if (closed) ctx.closePath(); };
+
+            // --- ink primitives -------------------------------------------------------
+            function fill(ctx, pts, style) { trace(ctx, pts, true); ctx.fillStyle = style; ctx.fill(); }
+            // Two offset passes like a pen going round twice; the second is thinner and lighter.
+            function ink(ctx, pts, closed = true, w = 2.6, col = P.ink, seed = 1) {
+                const d = dens(pts, closed);
+                if (col === P.ink) w *= P.weight;
+                ctx.lineJoin = ctx.lineCap = 'round';
+                // faint paper-coloured halo under the ink so outlines still read over the dark city
+                if (w >= 2) { ctx.strokeStyle = 'rgba(255,246,230,0.22)'; ctx.lineWidth = w + 3; trace(ctx, d, closed); ctx.stroke(); }
+                ctx.strokeStyle = col; ctx.lineWidth = w; trace(ctx, wob(d, 0.9, seed), closed); ctx.stroke();
+                const a = ctx.globalAlpha; ctx.globalAlpha = a * 0.55; ctx.lineWidth = w * 0.45;
+                trace(ctx, wob(d, 1.6, seed + 7), closed); ctx.stroke(); ctx.globalAlpha = a;
+            }
+            // Diagonal pencil hatching inside a shape, only below the line y > from (the shade side)
+            function hatch(ctx, pts, from, gap = 4.5, col = rgba(P.ink, 0.55), ang = 0.9) {
+                ctx.save(); trace(ctx, pts, true); ctx.clip();
+                let x0 = 1e9, x1 = -1e9, y1 = -1e9; for (const [x, y] of pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+                ctx.beginPath(); ctx.rect(x0 - 2, from, x1 - x0 + 4, y1 - from + 2); ctx.clip();
+                ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.beginPath();
+                const h = y1 - from + 4, s = Math.tan(ang) * h;
+                for (let x = x0 - s; x < x1 + 4; x += gap) { ctx.moveTo(x, y1 + 2); ctx.lineTo(x + s + Math.sin(x) * 1.5, from - 2); }
+                ctx.stroke(); ctx.restore();
+            }
+            function glow(ctx, x, y, r, col, a = 0.8) {
+                a *= glowK;
+                const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, rgba(col, a)); g.addColorStop(1, rgba(col, 0));
+                ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+            }
+            function porthole(ctx, x, y, r, lit, t, seed) {
+                const on = lit * (0.75 + 0.25 * Math.sin(t * 2 + seed));
+                glow(ctx, x, y, r * 2.4, P.gold, 0.35 * on);
+                const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, 0, x, y, r);
+                g.addColorStop(0, mix('#3a2850', '#fffbe8', on)); g.addColorStop(1, mix('#2a1840', P.gold, on));
+                ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = P.ink; ctx.lineWidth = 1.3; ctx.stroke();
+            }
+            // Curly smoke: a trail of little loops that drift and fade behind the craft (towards -x)
+            function curls(ctx, x, y, t, col, n = 5, size = 7) {
+                ctx.lineCap = 'round';
+                for (let i = 0; i < n; i++) {
+                    const age = (i + (t * 1.2) % 1), cx = x - age * size * 2.6, cy = y + Math.sin(age * 1.7 + t) * size * 0.6, r = size * (0.5 + age * 0.22);
+                    ctx.strokeStyle = rgba(col, Math.max(0, 0.75 - age * 0.14)); ctx.lineWidth = Math.max(0.6, 2.2 - age * 0.3);
+                    ctx.beginPath();
+                    for (let k = 0; k <= 22; k++) { const a = k / 22 * Math.PI * 3.2 + i, rr = r * (1 - k / 30); ctx[k ? 'lineTo' : 'moveTo'](cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); }
+                    ctx.stroke();
+                }
+            }
+            function speedLines(ctx, x, y, len, spread, t, col = 'rgba(255,255,255,0.7)') {
+                ctx.strokeStyle = col; ctx.lineWidth = 1.4; ctx.lineCap = 'round';
+                for (let i = -1; i <= 1; i++) { const o = ((t * 60 + i * 23) % 14); ctx.beginPath(); ctx.moveTo(x - o, y + i * spread); ctx.lineTo(x - o - len * (1 - Math.abs(i) * 0.3), y + i * spread); ctx.stroke(); }
+            }
+            function eye(ctx, x, y, r, t, seed, look = 0.3) {
+                const blink = ((t + seed) % 4.2) < 0.14 ? 0.12 : 1;
+                const lid = [...ell(x, y, r, r * 0.62 * blink, 14, Math.PI, Math.PI * 2), ...ell(x, y, r, r * 0.62 * blink, 14, 0, Math.PI)];
+                fill(ctx, lid, P.paper);
+                if (blink > 0.5) {
+                    ctx.save(); trace(ctx, lid, true); ctx.clip();
+                    fill(ctx, ell(x + r * look, y, r * 0.42, r * 0.42, 14), P.cyan);
+                    fill(ctx, ell(x + r * look, y, r * 0.2, r * 0.2, 10), P.ink);
+                    fill(ctx, ell(x + r * look - r * 0.12, y - r * 0.14, r * 0.08, r * 0.08, 6), '#fff');
+                    ctx.restore();
+                }
+                ink(ctx, lid, true, 1.8, P.ink, seed);
+            }
+
+            // --- the craft ------------------------------------------------------------
+            // All drawn around (0,0) facing +x, roughly 220 px long like the old zeppelin.
+            const CRAFT = {
+                // Tin-can canister with ring collars, porthole row and a curly exhaust
+                canister(ctx, t, o) {
+                    const body = o.body || P.cyan, band = o.band || P.pink;
+                    curls(ctx, -82, 0, t, mix(body, '#ffffff', 0.5), 6, 8);
+                    glow(ctx, -76, 0, 26, P.gold, 0.7);
+                    const noz = [[-62, -12], [-80, -17], [-80, 17], [-62, 12]];
+                    fill(ctx, noz, '#3a2a48'); ink(ctx, noz, true, 2.2);
+                    const hull = rrect(-64, -24, 128, 48, 10);
+                    const g = ctx.createLinearGradient(0, -24, 0, 24); g.addColorStop(0, mix(body, '#ffffff', 0.45)); g.addColorStop(0.5, body); g.addColorStop(1, mix(body, P.ink, 0.35));
+                    fill(ctx, hull, g); hatch(ctx, hull, 8);
+                    const nose = ell(64, 0, 22, 22, 18, -Math.PI / 2, Math.PI / 2);
+                    fill(ctx, [...nose, [64, 22]], mix(body, '#ffffff', 0.2)); hatch(ctx, [...nose, [64, 22]], 6); ink(ctx, nose, false, 2.6);
+                    for (const bx of [-44, 30]) {
+                        const r = rrect(bx, -28, 14, 56, 4); fill(ctx, r, band); hatch(ctx, r, 10, 3.5); ink(ctx, r, true, 2.2, P.ink, bx);
+                        for (const s of [-1, 1]) { fill(ctx, ell(bx + 7, s * 28, 3.4, 3.4, 8), P.gold); ink(ctx, ell(bx + 7, s * 28, 3.4, 3.4, 8), true, 1.3); }
+                    }
+                    ink(ctx, hull, true, 2.8, P.ink, 2);
+                    for (let i = 0; i < 3; i++) porthole(ctx, -16 + i * 14, -4, 4.6, 1, t, i);
+                    // hand-drawn rivet dashes
+                    ctx.strokeStyle = rgba(P.ink, 0.6); ctx.lineWidth = 1.2; ctx.setLineDash([2, 5]);
+                    ctx.beginPath(); ctx.moveTo(-26, 14); ctx.lineTo(26, 14); ctx.stroke(); ctx.setLineDash([]);
+                },
+
+                // Three bean pods flying in a little V with speed lines
+                beans(ctx, t, o) {
+                    const cols = o.cols || [P.pink, P.gold, P.mint];
+                    const spots = [[34, 0], [-22, -36], [-22, 36]];
+                    spots.forEach(([x, y], i) => {
+                        const bob = Math.sin(t * 2.4 + i * 1.9) * 3;
+                        ctx.save(); ctx.translate(x, y + bob); ctx.rotate(Math.sin(t * 1.3 + i) * 0.06);
+                        speedLines(ctx, -36, 0, 22, 7, t + i * 0.3);
+                        const bean = [...ell(0, 0, 32, 15, 20, Math.PI, Math.PI * 2).map(([px, py]) => [px, py - 2 * Math.cos(px / 32 * 1.6)]),
+                            ...ell(0, 0, 32, 15, 20, 0, Math.PI).map(([px, py]) => [px, py + 3 * Math.cos(px / 32 * 1.6)])];
+                        const c = cols[i % cols.length];
+                        const g = ctx.createLinearGradient(0, -15, 0, 15); g.addColorStop(0, mix(c, '#ffffff', 0.5)); g.addColorStop(1, mix(c, P.ink, 0.3));
+                        fill(ctx, bean, g); hatch(ctx, bean, 5, 4);
+                        ctx.strokeStyle = rgba('#ffffff', 0.8); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 2, 24, -2.6, -1.9); ctx.stroke();
+                        ink(ctx, bean, true, 2.4, P.ink, i + 3);
+                        porthole(ctx, 6, -2, 3.8, 1, t, i); porthole(ctx, 18, -1, 3.2, 1, t, i + 2);
+                        glow(ctx, -32, 0, 10, c, 0.9);
+                        ctx.restore();
+                    });
+                },
+
+                // Folded paper dart with a crease, two-tone faces and a loopy flight trail
+                paperPlane(ctx, t, o) {
+                    const c = o.body || P.violet;
+                    ctx.strokeStyle = rgba('#ffffff', 0.65); ctx.lineWidth = 1.6; ctx.setLineDash([6, 6]); ctx.lineDashOffset = -t * 30;
+                    ctx.beginPath(); ctx.moveTo(-70, 0);
+                    for (let k = 0; k <= 60; k++) { const f = k / 60, a = f * Math.PI * 4; ctx.lineTo(-70 - f * 110 + Math.cos(a) * 16 - 16, Math.sin(a) * 16 + Math.sin(f * 6 + t) * 6); }
+                    ctx.stroke(); ctx.setLineDash([]);
+                    const flap = Math.sin(t * 3) * 3;
+                    const top = [[88, 0], [-70, -50 - flap], [-46, 0]], bot = [[88, 0], [-46, 0], [-70, 50 + flap]];
+                    const keel = [[88, 0], [-58, -6], [-70, 0], [-58, 6]];
+                    fill(ctx, top, mix(c, '#ffffff', 0.65)); ink(ctx, top, true, 2.6, P.ink, 4);
+                    fill(ctx, bot, mix(c, '#ffffff', 0.2)); hatch(ctx, bot, 0, 4); ink(ctx, bot, true, 2.6, P.ink, 5);
+                    fill(ctx, keel, mix(c, P.ink, 0.25)); ink(ctx, keel, true, 2, P.ink, 6);
+                    // fold lines and a tiny pilot porthole
+                    ctx.strokeStyle = rgba(P.ink, 0.5); ctx.lineWidth = 1.2;
+                    ctx.beginPath(); ctx.moveTo(60, -4); ctx.lineTo(-60, -30); ctx.moveTo(60, 4); ctx.lineTo(-60, 30); ctx.stroke();
+                    porthole(ctx, 20, -10, 4, 1, t, 1);
+                    glow(ctx, -66, 0, 16, P.pink, 0.8);
+                },
+
+                // Floating crown: a ring of spires around a glowing core, turning slowly
+                crownRing(ctx, t, o) {
+                    const c = o.body || P.gold, core = o.core || P.cyan, R = 62, r = 40, spin = t * 0.25;
+                    glow(ctx, 0, 0, 90, core, 0.35);
+                    const outer = ell(0, 0, R, R, 48), inner = ell(0, 0, r, r, 40).reverse();
+                    const pth = new Path2D(); dens(outer, true).forEach((p, i) => pth[i ? 'lineTo' : 'moveTo'](p[0], p[1])); pth.closePath();
+                    dens(inner, true).forEach((p, i) => pth[i ? 'lineTo' : 'moveTo'](p[0], p[1])); pth.closePath();
+                    const g = ctx.createRadialGradient(0, 0, r, 0, 0, R); g.addColorStop(0, mix(c, '#ffffff', 0.4)); g.addColorStop(1, mix(c, P.ink, 0.3));
+                    ctx.fillStyle = g; ctx.fill(pth, 'evenodd');
+                    // spires: little pointed towers standing on the rim, each with a lit window
+                    for (let i = 0; i < 12; i++) {
+                        const a = spin + i / 12 * Math.PI * 2, h = 20 + (i % 3) * 9, w = 7;
+                        ctx.save(); ctx.rotate(a); ctx.translate(R - 4, 0);
+                        const sp = [[0, -w], [h, 0], [0, w]];
+                        fill(ctx, sp, i % 2 ? mix(c, '#ffffff', 0.25) : P.pink); hatch(ctx, sp, 0, 3.5); ink(ctx, sp, true, 1.8, P.ink, i);
+                        fill(ctx, ell(5, 0, 1.8, 1.8, 6), P.paper);
+                        ctx.restore();
+                    }
+                    ink(ctx, outer, true, 2.8, P.ink, 8); ink(ctx, ell(0, 0, r, r, 40), true, 2.4, P.ink, 9);
+                    // windows around the band
+                    for (let i = 0; i < 10; i++) { const a = -spin * 0.5 + i / 10 * Math.PI * 2; porthole(ctx, Math.cos(a) * 51, Math.sin(a) * 51, 3.4, i % 3 ? 1 : 0.25, t, i); }
+                    // core: a little orb with an eye, like the floating eyes in the sketches
+                    glow(ctx, 0, 0, 34, core, 0.9);
+                    fill(ctx, ell(0, 0, 18, 18, 20), mix(core, '#ffffff', 0.3)); ink(ctx, ell(0, 0, 18, 18, 20), true, 2.2, P.ink, 11);
+                    eye(ctx, 0, 0, 13, t, 0.7, Math.sin(t * 0.7) * 0.35);
+                },
+
+                // Fringed lampshade / jellyfish with pleats, scalloped rim and dangling lanterns
+                lampshade(ctx, t, o) {
+                    const c = o.body || P.pink, lamp = o.lamp || P.gold;
+                    // seen from above it is a ring; drawn as a fringed dome so the silhouette reads like the sketch
+                    glow(ctx, 0, 6, 80, lamp, 0.35);
+                    for (let i = 0; i < 7; i++) {
+                        const a = i / 7 * Math.PI * 2 + 0.3, sx = Math.cos(a) * 46, sy = Math.sin(a) * 46;
+                        const L = 26 + (i % 3) * 8, ex = sx + Math.cos(a) * L + Math.sin(t * 1.8 + i) * 4, ey = sy + Math.sin(a) * L + Math.cos(t * 1.6 + i) * 4;
+                        ctx.strokeStyle = 'rgba(255,246,230,0.6)'; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(sx, sy);
+                        ctx.quadraticCurveTo((sx + ex) / 2 + Math.sin(t * 2 + i) * 6, (sy + ey) / 2, ex, ey); ctx.stroke();
+                        glow(ctx, ex, ey, 9, lamp, 0.9); fill(ctx, ell(ex, ey, 3.4, 3.4, 8), P.paper); ink(ctx, ell(ex, ey, 3.4, 3.4, 8), true, 1.3);
+                    }
+                    // scalloped skirt
+                    const sk = [];
+                    for (let k = 0; k < 72; k++) { const a = k / 72 * Math.PI * 2, rr = 52 + Math.abs(Math.sin(a * 9)) * 7 + Math.sin(t * 2 + a * 3) * 1.5; sk.push([Math.cos(a) * rr, Math.sin(a) * rr]); }
+                    const g = ctx.createRadialGradient(-10, -10, 8, 0, 0, 58); g.addColorStop(0, mix(c, '#ffffff', 0.55)); g.addColorStop(0.7, c); g.addColorStop(1, mix(c, P.ink, 0.35));
+                    fill(ctx, sk, g); hatch(ctx, sk, 14, 4.5);
+                    // pleats radiating from the top
+                    ctx.strokeStyle = rgba(P.ink, 0.55); ctx.lineWidth = 1.3; ctx.beginPath();
+                    for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2; ctx.moveTo(Math.cos(a) * 20, Math.sin(a) * 20); ctx.lineTo(Math.cos(a) * 54, Math.sin(a) * 54); }
+                    ctx.stroke();
+                    ink(ctx, sk, true, 2.6, P.ink, 12);
+                    // crown cap with a finial
+                    fill(ctx, ell(0, 0, 20, 20, 18), mix(c, '#ffffff', 0.3)); ink(ctx, ell(0, 0, 20, 20, 18), true, 2.2, P.ink, 13);
+                    fill(ctx, ell(0, 0, 8, 8, 12), lamp); ink(ctx, ell(0, 0, 8, 8, 12), true, 1.8, P.ink, 14);
+                    glow(ctx, 0, 0, 16, lamp, 0.6 + 0.3 * Math.sin(t * 3));
+                },
+
+                // Fish blimp carrying an ad on its flank, flicking tail, bubble-curl trail
+                fishBlimp(ctx, t, o) {
+                    const ad = o.ad, c = o.fishBody || ad.bg[1];
+                    curls(ctx, -118, 0, t, mix(c, '#ffffff', 0.4), 4, 6);
+                    const flick = Math.sin(t * 2.2) * 8;
+                    const tail = [[-86, 0], [-122, -30 + flick], [-110, 0], [-122, 30 + flick]];
+                    fill(ctx, tail, mix(c, P.ink, 0.15)); hatch(ctx, tail, 0, 3.5); ink(ctx, tail, true, 2.4, P.ink, 20);
+                    for (const s of [-1, 1]) { const fin = [[0, s * 32], [-28, s * 52], [-34, s * 30]]; fill(ctx, fin, mix(c, '#ffffff', 0.25)); ink(ctx, fin, true, 2, P.ink, 21 + s); }
+                    const body = [...ell(0, 0, 96, 36, 40)].map(([x, y]) => [x, y * (x > 0 ? 1 : 0.75 + 0.25 * (1 + x / 96))]);
+                    const g = ctx.createLinearGradient(0, -36, 0, 36); g.addColorStop(0, mix(c, '#ffffff', 0.45)); g.addColorStop(0.55, c); g.addColorStop(1, mix(c, P.ink, 0.4));
+                    fill(ctx, body, g); hatch(ctx, body, 14);
+                    // scales
+                    ctx.strokeStyle = rgba(P.ink, 0.4); ctx.lineWidth = 1.1;
+                    for (let x = -70; x < -20; x += 10) for (let y = -20; y <= 20; y += 10) { ctx.beginPath(); ctx.arc(x + (y / 10 % 2 ? 5 : 0), y, 5, -1.2, 1.2); ctx.stroke(); }
+                    // gill
+                    ctx.strokeStyle = P.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(52, 0, 22, -1.1, 1.1); ctx.stroke();
+                    ink(ctx, body, true, 2.8, P.ink, 23);
+                    eye(ctx, 72, -10, 9, t, 2.2, 0.35);
+                    // the ad screen, hand-framed
+                    const scr = rrect(-14, -17, 62, 34, 5);
+                    ctx.save(); ctx.shadowColor = ad.bg[1]; ctx.shadowBlur = 14;
+                    const sg = ctx.createLinearGradient(-14, 0, 48, 0); sg.addColorStop(0, ad.bg[0]); sg.addColorStop(1, ad.bg[1]);
+                    fill(ctx, scr, sg); ctx.restore(); ink(ctx, scr, true, 2, P.ink, 24);
+                    // text is un-mirrored when the fish swims left
+                    ctx.save(); ctx.translate(17, 0); if (o.flip) ctx.scale(-1, 1);
+                    ctx.globalAlpha *= o.adFade == null ? 1 : 0.35 + 0.65 * o.adFade;
+                    ctx.fillStyle = ad.fg; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.font = `bold ${ad.brand.length > 7 ? 9 : 11}px Montserrat, sans-serif`; ctx.fillText(ad.brand, 0, ad.tag ? -4 : 0);
+                    if (ad.tag) { ctx.font = '6px Montserrat, sans-serif'; ctx.fillText(ad.tag, 0, 7); }
+                    ctx.restore();
+                    // nav lights stay so it still reads as a vehicle at night
+                    const blink = Math.sin(t * 4) > 0; if (blink) { glow(ctx, 10, -36, 8, '#ff3344', 1); glow(ctx, 10, 36, 8, '#33ff77', 1); }
+                }
+            };
+
+            const KINDS = Object.keys(CRAFT);
+            return {
+                KINDS, P,
+                // Side-view craft mirror rather than turn upside down when heading left
+                draw(ctx, kind, heading, t, o, dark) {
+                    glowK = 0.5 + 0.5 * dark;
+                    const flip = Math.cos(heading) < 0, top = kind === 'crownRing' || kind === 'lampshade';
+                    if (top) ctx.rotate(heading);
+                    else if (flip) { ctx.scale(-1, 1); ctx.rotate(Math.PI - heading); }
+                    else ctx.rotate(heading);
+                    CRAFT[kind](ctx, t, { ...o, flip: flip && !top });
+                }
+            };
+        })();
+        // =====================================================================
+        //  SKY LAYER — sketchbook spaceships and floating shards above the city
         // =====================================================================
         //  Everything up here is between the camera and the ground, so it's drawn
         //  with parallax k > 1 around the camera: bigger, and drifting faster than
@@ -35209,7 +35484,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         x0: r(i * 7 + 1) * W, y0: r(i * 7 + 2) * H,
                         heading: (r(i * 7 + 3) < 0.5 ? 0 : Math.PI) + (r(i * 7 + 4) - 0.5) * 0.6,
                         speed: 14 + r(i * 7 + 5) * 10,                  // px per game second
-                        k: 1.3 + r(i * 7 + 6) * 0.12, ad: i % SKY_ADS.length, phase: r(i * 7 + 7) * 10
+                        k: 1.3 + r(i * 7 + 6) * 0.12, ad: i % SKY_ADS.length, phase: r(i * 7 + 7) * 10,
+                        // every map starts the sketchbook craft list at a different place
+                        craft: SkyCraft.KINDS[(i + Math.floor(r(9) * SkyCraft.KINDS.length)) % SkyCraft.KINDS.length]
                     });
                 }
                 this.shards = [];
@@ -35255,44 +35532,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
 
             _drawAirship(ctx, s, t, dark) {
-                ctx.rotate(s.heading);
-                const a0 = ctx.globalAlpha;
-                // Hull
-                const g = ctx.createLinearGradient(0, -34, 0, 34);
-                g.addColorStop(0, '#3a3548'); g.addColorStop(0.5, '#5a5470'); g.addColorStop(1, '#2a2636');
-                ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(0, 0, 110, 32, 0, 0, Math.PI * 2); ctx.fill();
-                ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1;
-                for (let i = -3; i <= 3; i++) { ctx.beginPath(); ctx.ellipse(i * 26, 0, 3, 31 * Math.sqrt(1 - Math.pow(i * 26 / 110, 2)), 0, 0, Math.PI * 2); ctx.stroke(); }
-                // Tail fins and engine pods with spinning props
-                ctx.fillStyle = '#2e2a3c';
-                ctx.beginPath(); ctx.moveTo(-92, -8); ctx.lineTo(-128, -30); ctx.lineTo(-118, 0); ctx.lineTo(-128, 30); ctx.lineTo(-92, 8); ctx.closePath(); ctx.fill();
-                for (const side of [-1, 1]) {
-                    ctx.fillStyle = '#3e3950'; ctx.beginPath(); ctx.ellipse(-25, side * 40, 16, 7, 0, 0, Math.PI * 2); ctx.fill();
-                    ctx.strokeStyle = 'rgba(200,200,220,0.5)'; ctx.lineWidth = 1.5;
-                    const pa = t * 20; ctx.beginPath(); ctx.moveTo(-42, side * 40 + Math.cos(pa) * 8); ctx.lineTo(-42, side * 40 - Math.cos(pa) * 8); ctx.stroke();
-                }
-                // LED ad screen on top (kept upright when flying left)
+                // Only the fish blimps carry the rotating ad screens now
                 const cycle = Math.floor((t + s.phase) / 10), ad = SKY_ADS[(s.ad + cycle) % SKY_ADS.length];
-                const fadeIn = Math.min(1, ((t + s.phase) % 10) / 0.6);
-                ctx.save();
-                if (Math.cos(s.heading) < 0) ctx.rotate(Math.PI);
-                ctx.shadowColor = ad.bg[1]; ctx.shadowBlur = 16 * (0.4 + dark);
-                const sg = ctx.createLinearGradient(-62, 0, 62, 0); sg.addColorStop(0, ad.bg[0]); sg.addColorStop(1, ad.bg[1]);
-                ctx.globalAlpha = a0 * (0.35 + 0.65 * fadeIn);
-                ctx.fillStyle = sg; ctx.beginPath(); ctx.roundRect(-62, -19, 124, 38, 6); ctx.fill();
-                ctx.shadowBlur = 0;
-                ctx.fillStyle = ad.fg; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.font = `bold ${ad.tag ? 15 : 18}px Montserrat, sans-serif`;
-                ctx.fillText(ad.brand, 0, ad.tag ? -5 : 0);
-                if (ad.tag) { ctx.font = '8px Montserrat, sans-serif'; ctx.fillText(ad.tag, 0, 10); }
-                ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(-62, -19, 124, 3);   // scanline sheen
-                ctx.restore();
-                ctx.globalAlpha = a0;
-                // Navigation lights: red port, green starboard, white tail strobe
-                const blink = Math.sin(t * 4 + s.phase) > 0;
-                const light = (x, y, c, on, r = 2.6) => { if (!on) return; ctx.fillStyle = c; ctx.shadowColor = c; ctx.shadowBlur = 10; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0; };
-                light(10, -31, '#ff3344', blink); light(10, 31, '#33ff77', blink);
-                light(-120, 0, '#ffffff', ((t + s.phase) % 1.6) < 0.12, 3.2);
+                const adFade = Math.min(1, ((t + s.phase) % 10) / 0.6);
+                ctx.scale(1.2, 1.2);
+                SkyCraft.draw(ctx, s.craft, s.heading, t + s.phase, { ad, adFade, fishBody: SKY_ADS[s.ad].bg[1] }, dark);
             }
 
             _drawShard(ctx, s, t) {
@@ -40075,13 +40319,17 @@ class NeuralSystemsBuilding extends BuildingV2 {
                     mass: 2500, lightRange: 100, seats: 6, // SUV = 6 seats
                     brake: 0.42     // px/tick² at full brake (traffic/traffic-vehicle.js applyDrivePhysics)
                 },
+                /* A model's `driven` { top, accel } is how it goes with the player at the wheel (traffic keeps baseStats ×
+                   speedMod). The brands differ in character, not in being worth driving: no car falls under ~80% of the
+                   best top speed or ~60% of the best pull. LADY: the fastest, heavy grand tourer with the best brakes.
+                   Zenxera: the quickest off the line (the Bolt), sharpest turn-in, lively tail. Gelfash: friendly and forgiving. */
                 // Handling character (applyDrivePhysics): heavy and floaty, lazy wheel, long catchable slide
                 drive: { steerRate: 0.085, turnIn: 0.3, gripF: 1.0, gripR: 0.86, latAcc: 0.60, weight: 1.35 },
                 colors: ['#050505', '#1a0b1a', '#0b1a1a', '#1a1a0b', '#2b0000'],
                 glowColor: '#ffffff', headlightColor: '#ffffff', visualStyle: 'blackmark',
                 models: { 
-                    suv: { name: 'BlackMark V1', length: 95, width: 44, speedMod: 1.0, spec: [100, 80, 80, 90, 100] },
-                    suv2: { name: 'BlackMark V3', length: 88, width: 42, speedMod: 1.05, noHearseCap: true, seats: 6, spec: [100, 86, 88, 78, 95] }
+                    suv: { name: 'BlackMark V1', length: 95, width: 44, speedMod: 1.0, driven: { top: 12.5, accel: 0.26 }, spec: [100, 80, 80, 90, 100] },
+                    suv2: { name: 'BlackMark V3', length: 98, width: 42, speedMod: 1.05, driven: { top: 13.0, accel: 0.28 }, noHearseCap: true, seats: 6, spec: [100, 86, 88, 78, 95] }
                 }
             },
             Zenxera: {
@@ -40093,23 +40341,23 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 glowColor: '#00f3ff', headlightColor: '#ccddff', // Cool blue-white
                 visualStyle: 'angular',
                 models: {
-                    sedan:  { name: 'Stratos',   length: 72, width: 40, speedMod: 1.0, seats: 4, spec: [76, 82, 46, 52, 72] },
-                    suv:    { name: 'Apex',      length: 78, width: 46, speedMod: 0.9, seats: 6, spec: [68, 76, 40, 66, 72] },
-                    sports: { name: 'Bolt',      length: 63, width: 36, speedMod: 1.25, seats: 2, spec: [95, 90, 58, 36, 72] },
-                    truck:  { name: 'Freighter', length: 92, width: 50, speedMod: 0.75, seats: 2, spec: [57, 62, 30, 82, 72] }
+                    sedan:  { name: 'Stratos',   length: 72, width: 40, speedMod: 1.0, driven: { top: 11.5, accel: 0.28 }, seats: 4, spec: [76, 82, 46, 52, 72] },
+                    suv:    { name: 'Apex',      length: 78, width: 46, speedMod: 0.9, driven: { top: 11.0, accel: 0.25 }, seats: 6, spec: [68, 76, 40, 66, 72] },
+                    sports: { name: 'Bolt',      length: 63, width: 36, speedMod: 1.25, driven: { top: 12.3, accel: 0.32 }, seats: 2, spec: [95, 90, 58, 36, 72] },
+                    truck:  { name: 'Freighter', length: 92, width: 50, speedMod: 0.75, driven: { top: 10.6, accel: 0.21 }, seats: 2, spec: [57, 62, 30, 82, 72] }
                 }
             },
             Gelfash: {
                 tier: 'economy',
                 baseStats: { maxSpeed: 8.5, acceleration: 0.1, handling: 0.05, friction: 0.96, mass: 1000, seats: 4, brake: 0.26 },
-                drive: { steerRate: 0.11, turnIn: 0.36, gripF: 0.88, gripR: 1.1, latAcc: 0.42, weight: 1.0 },    // soft, understeers
+                drive: { steerRate: 0.14, turnIn: 0.42, gripF: 1.0, gripR: 1.15, latAcc: 0.5, weight: 1.0 },     // friendly: quick hands, planted rear, never bites
                 colors: ['#fff', '#aaa', '#555', '#a469ff', '#00f3ff'],
                 glowColor: null, headlightColor: '#ffffaa', visualStyle: 'boxy',
                 models: {
-                    sedan:  { name: 'Commuter',  length: 70, width: 40, speedMod: 1.0, seats: 4, spec: [68, 64, 40, 46, 50] },
-                    suv:    { name: 'Ranger',    length: 75, width: 44, speedMod: 0.9, seats: 5, spec: [61, 60, 35, 56, 52] },
-                    sports: { name: 'Sprint',    length: 62, width: 36, speedMod: 1.15, seats: 2, spec: [78, 70, 46, 34, 50] },
-                    truck:  { name: 'Workhorse', length: 90, width: 50, speedMod: 0.7, seats: 2, spec: [48, 56, 26, 72, 50] }
+                    sedan:  { name: 'Commuter',  length: 70, width: 40, speedMod: 1.0, driven: { top: 10.8, accel: 0.21 }, seats: 4, spec: [68, 64, 40, 46, 50] },
+                    suv:    { name: 'Ranger',    length: 75, width: 44, speedMod: 0.9, driven: { top: 10.5, accel: 0.20 }, seats: 5, spec: [61, 60, 35, 56, 52] },
+                    sports: { name: 'Sprint',    length: 62, width: 36, speedMod: 1.15, driven: { top: 11.3, accel: 0.23 }, seats: 2, spec: [78, 70, 46, 34, 50] },
+                    truck:  { name: 'Workhorse', length: 90, width: 50, speedMod: 0.7, driven: { top: 10.4, accel: 0.19 }, seats: 2, spec: [48, 56, 26, 72, 50] }
                 }
             }
         };
@@ -40916,6 +41164,152 @@ class NeuralSystemsBuilding extends BuildingV2 {
         }
 
         /* =====================================================================
+           ZEN ART — the Zenxera supercars, cut like jewels (traffic/car-art.js
+           paints them into each car's sprite)
+           ---------------------------------------------------------------------
+           Three designs, one per model, every one built of flat planes, each
+           plane one shade of the paint as it faces the light (from the front
+           left), creases picked out in the brand's cyan:
+             prism   (Stratos, Freighter)  a Countach wedge: flat nose, fender
+                     crests, notched side intakes, a kite canopy, a louvred deck
+             gem     (Apex)  cut like a brilliant: a crystal table canopy with
+                     star facets, facets fanning out to an octagonal girdle,
+                     diamond jewel lamps
+             arrow   (Bolt)  a Ferrari arrowhead: pointed nose, big angular
+                     haunches, a faceted teardrop canopy, glowing side blades
+           Everything is drawn in the design's own units (63 × 36, the Bolt's
+           size, nose at +31.5, y to the right) and scaled to the car.
+           ===================================================================== */
+        const ZenArt = (() => {
+            const U = { L: 63, W: 36 }, CY = '#00f3ff';
+            const DESIGN = { sports: 'arrow', sedan: 'prism', suv: 'gem', truck: 'prism' };
+            const OUTLINE = {                                           // the +y half, nose to tail
+                prism: [[31.5, 0], [31.5, 6.5], [29, 13], [22, 17.5], [6, 18], [2, 15.5], [-7, 15.5], [-11, 18], [-27, 18], [-31.5, 14], [-31.5, 0]],
+                gem:   [[31.5, 0], [30, 7], [25, 14], [16, 18], [-14, 18], [-25, 16], [-31.5, 9], [-31.5, 0]],
+                arrow: [[31.5, 0], [30, 4.5], [21, 11], [11, 14], [2, 14.5], [-9, 18], [-24, 18], [-30, 15], [-31.5, 9], [-31.5, 0]]
+            };
+            /** Lamps (live: drawn each frame in drawCarLamps): a stroke (a, b) or a filled shape (pts), on the +y side unless whole */
+            const LAMPS = {
+                prism: { head: { a: [31.5, 3], b: [30.6, 11], w: 1.1 }, tail: { a: [-31.7, -13], b: [-31.7, 13], w: 1, whole: true } },
+                gem:   { head: { pts: [[31.4, 9], [29.6, 10.3], [27.8, 9], [29.6, 7.7]] }, tail: { pts: [[-28.8, 11.5], [-30.6, 12.8], [-32.4, 11.5], [-30.6, 10.2]] } },
+                arrow: { head: { a: [30.6, 3], b: [24, 9], w: 1.1 }, tail: { pts: [[-31.8, 2.5], [-30.4, 14], [-29.4, 13], [-30.8, 2.5]] } }
+            };
+            const mix = (P, k) => { const t = k > 0 ? 255 : 0, a = Math.min(1, Math.abs(k)); return `rgb(${P.map(v => Math.round(v + (t - v) * a)).join(',')})`; };
+            const mirror = pts => [...pts, ...pts.slice().reverse().map(([x, y]) => [x, -y])];
+            function poly(c, pts, fill, stroke, lw) {
+                c.beginPath(); pts.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath();
+                if (fill) { c.fillStyle = fill; c.fill(); }
+                if (stroke) { c.strokeStyle = stroke; c.lineWidth = lw || 0.3; c.stroke(); }
+            }
+            /** Draw f for the +y half and again mirrored (s: +1 / -1) */
+            const both = (pts, f) => { f(pts, 1); f(pts.map(([x, y]) => [x, -y]), -1); };
+            function line(c, pts) { c.beginPath(); pts.forEach((q, i) => i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1])); c.stroke(); }
+            function glass(c, pts, x0, x1) {
+                const g = c.createLinearGradient(x0, -6, x1, 6);
+                g.addColorStop(0, '#3a3f7a'); g.addColorStop(0.35, '#0c0b1e'); g.addColorStop(0.7, '#141236'); g.addColorStop(1, '#2a2160');
+                poly(c, pts, g);
+            }
+
+            const PAINT = {
+                prism(c, P, truck) {
+                    const out = mirror(OUTLINE.prism);
+                    poly(c, out, mix(P, -0.15));
+                    both([[31.5, 0], [31.5, 6.5], [13, 9], [13, 0]], (p, s) => poly(c, p, mix(P, s > 0 ? -0.05 : 0.28)));             // hood planes
+                    both([[31.5, 6.5], [29, 13], [22, 17.5], [13, 13.5], [13, 9]], (p, s) => poly(c, p, mix(P, s > 0 ? -0.22 : 0.12)));  // fender crests
+                    both([[22, 17.5], [6, 18], [2, 15.5], [-7, 15.5], [-11, 18], [-27, 18], [-20, 12], [-10, 8], [4, 9], [13, 13.5]],
+                         (p, s) => poly(c, p, mix(P, s > 0 ? -0.35 : 0)));                                                             // flanks
+                    both([[-27, 18], [-31.5, 14], [-31.5, 0], [-27, 0], [-24, 9], [-20, 12]], (p, s) => poly(c, p, mix(P, s > 0 ? -0.3 : 0.05)));   // tail planes
+                    both([[6, 18], [2, 15.5], [-7, 15.5], [-11, 18]], p => poly(c, p, '#0a0812'));                                      // intakes
+                    const can = [[13, 0], [8, 8], [-10, 8], [-14, 0], [-10, -8], [8, -8]];
+                    glass(c, can, 13, -14);
+                    poly(c, [[13, 0], [8, 8], [8, -8]], 'rgba(150,170,255,0.18)');                                                     // windscreen facet
+                    c.strokeStyle = 'rgba(255,255,255,0.25)'; c.lineWidth = 0.35; line(c, [[8, 8], [-14, 0], [8, -8]]);
+                    if (truck) {                                                                                                        // the Freighter: a faceted cab, then its bed
+                        poly(c, [[-14, 0], [-10, 9], [-30, 13], [-30, -13], [-10, -9]], '#17141d');
+                        c.strokeStyle = 'rgba(255,255,255,0.08)'; c.lineWidth = 0.6;
+                        for (let y = -10; y <= 10; y += 3.4) line(c, [[-13, y * 0.85], [-29, y * 1.15]]);
+                        poly(c, [[-14, 0], [-10, 9], [-30, 13], [-30, -13], [-10, -9]], null, mix(P, -0.2), 1.2);
+                    } else {
+                        poly(c, [[-14, 0], [-10, 8], [-24, 9], [-27, 0], [-24, -9], [-10, -8]], mix(P, -0.45));                        // engine deck…
+                        c.strokeStyle = 'rgba(0,0,0,0.6)'; c.lineWidth = 0.7; for (let x = -15; x > -25; x -= 2) line(c, [[x, -7], [x, 7]]);   // …louvred
+                    }
+                    c.strokeStyle = CY; c.globalAlpha = 0.6; c.lineWidth = 0.35;                                                        // cyan seams down the creases
+                    both([[31.5, 6.5], [13, 9], [4, 9], [-10, 8], [-24, 9], [-27, 18]], p => line(c, p)); c.globalAlpha = 1;
+                    poly(c, out, null, 'rgba(0,0,0,0.7)', 0.6);
+                    for (const s of [-1, 1]) poly(c, [[31.7, 3 * s], [30.8, 11 * s], [30, 11 * s], [30.9, 3 * s]], '#14121c');          // lamp housings
+                },
+                gem(c, P) {
+                    const out = mirror(OUTLINE.gem);
+                    poly(c, out, mix(P, -0.1));
+                    const F = [[[31.5, 0], [30, 7], [14, 0]], [[30, 7], [25, 14], [8, 7.5], [14, 0]], [[25, 14], [16, 18], [8, 7.5]], [[16, 18], [-14, 18], [-8, 7.5], [8, 7.5]],
+                               [[-14, 18], [-25, 16], [-8, 7.5]], [[-25, 16], [-31.5, 9], [-15, 0], [-8, 7.5]], [[-31.5, 9], [-31.5, 0], [-15, 0]]];
+                    const K = [0.3, 0.12, -0.05, -0.25, 0, -0.15, -0.3];
+                    F.forEach((f, i) => both(f, (p, s) => poly(c, p, mix(P, s > 0 ? K[i] - 0.25 : K[i] + 0.12), 'rgba(255,255,255,0.12)', 0.3)));
+                    const tab = mirror([[14, 0], [8, 7.5], [-8, 7.5], [-15, 0]]);                                                    // the crystal table
+                    const g = c.createLinearGradient(14, -8, -15, 8);
+                    g.addColorStop(0, '#7af7ff'); g.addColorStop(0.3, '#2b2c78'); g.addColorStop(0.6, '#120f2e'); g.addColorStop(1, '#7a4fd8');
+                    poly(c, tab, g);
+                    c.strokeStyle = 'rgba(200,250,255,0.45)'; c.lineWidth = 0.3;                                                       // its star facets
+                    for (const q of [[14, 0], [8, 7.5], [-8, 7.5], [-15, 0], [-8, -7.5], [8, -7.5]]) line(c, [[-0.5, 0], q]);
+                    poly(c, tab, null, CY, 0.45);
+                    poly(c, out, null, 'rgba(0,0,0,0.7)', 0.6);
+                    for (const d of [LAMPS.gem.head, LAMPS.gem.tail]) both(d.pts, p => poly(c, p, '#14121c', 'rgba(255,255,255,0.7)', 0.4));   // the jewel lamps' settings
+                },
+                arrow(c, P) {
+                    const out = mirror(OUTLINE.arrow);
+                    poly(c, out, mix(P, -0.12));
+                    both([[31.5, 0], [30, 4.5], [21, 11], [14, 6], [14, 0]], (p, s) => poly(c, p, mix(P, s > 0 ? -0.1 : 0.3)));           // nose planes
+                    both([[21, 11], [11, 14], [2, 14.5], [-2, 9], [9, 6.5], [14, 6]], (p, s) => poly(c, p, mix(P, s > 0 ? -0.3 : 0.05)));  // waist
+                    both([[2, 14.5], [-9, 18], [-24, 18], [-20, 10], [-2, 9]], (p, s) => poly(c, p, mix(P, s > 0 ? -0.05 : 0.32)));        // haunch tops, lit
+                    both([[-24, 18], [-30, 15], [-31.5, 9], [-31.5, 0], [-22, 0], [-20, 10]], (p, s) => poly(c, p, mix(P, s > 0 ? -0.35 : -0.05)));   // haunch backs
+                    const can = [[15, 0], [9, 6.5], [-2, 7.5], [-12, 6], [-19, 0], [-12, -6], [-2, -7.5], [9, -6.5]];
+                    glass(c, can, 15, -19);
+                    c.strokeStyle = 'rgba(255,255,255,0.22)'; c.lineWidth = 0.35;
+                    for (const x of [9, -2, -12]) { const y = x === 9 ? 6.5 : x === -2 ? 7.5 : 6; line(c, [[x, y], [x, -y]]); }
+                    poly(c, [[15, 0], [9, 6.5], [9, -6.5]], 'rgba(150,170,255,0.16)');
+                    poly(c, [[-19, 0], [-22, 4], [-30, 2], [-30, -2], [-22, -4]], mix(P, -0.5));                                       // the spine fin
+                    for (const s of [-1, 1]) {                                                                                          // the side blades, glowing
+                        const g = c.createRadialGradient(1, 15.5 * s, 0, 1, 15.5 * s, 6); g.addColorStop(0, 'rgba(0,243,255,0.5)'); g.addColorStop(1, 'rgba(0,243,255,0)');
+                        c.fillStyle = g; c.fillRect(-5, 15.5 * s - 6, 12, 12);
+                        c.strokeStyle = CY; c.lineWidth = 0.9; line(c, [[9, 13.6 * s], [-6, 16.8 * s]]);
+                    }
+                    poly(c, out, null, 'rgba(0,0,0,0.7)', 0.6);
+                    for (const s of [-1, 1]) poly(c, [[31, 2.6 * s], [24.6, 8.4 * s], [23.6, 9.4 * s], [30.2, 3.4 * s]], '#14121c');   // lamp housings
+                }
+            };
+
+            return {
+                design: v => v.visualStyle === 'angular' ? DESIGN[v.model] || 'prism' : null,
+                /** The body outline, scaled to the car */
+                path(p, d, L, W) {
+                    const kx = L / U.L, ky = W / U.W;
+                    mirror(OUTLINE[d]).forEach(([x, y], i) => i ? p.lineTo(x * kx, y * ky) : p.moveTo(x * kx, y * ky)); p.closePath();
+                },
+                paint(c, d, rgb, L, W, truck) {
+                    c.save(); c.scale(L / U.L, W / U.W); PAINT[d](c, rgb, truck); c.restore();
+                },
+                /** The lit lamps (part 'head' or 'tail'), in the current fill colour */
+                lamps(ctx, d, part, L, W) {
+                    const m = LAMPS[d][part];
+                    ctx.save(); ctx.scale(L / U.L, W / U.W); ctx.strokeStyle = ctx.fillStyle; ctx.lineCap = 'round';
+                    const sides = m.whole ? [1] : [-1, 1];
+                    for (const s of sides) {
+                        if (m.pts) poly(ctx, m.pts.map(([x, y]) => [x, y * s]), ctx.fillStyle);
+                        else { ctx.lineWidth = m.w; line(ctx, [[m.a[0], m.a[1] * s], [m.b[0], m.b[1] * s]]); }
+                    }
+                    ctx.restore();
+                },
+                /** How far out the front tyres' centres sit (the arrow's nose is narrow: they tuck in under it) */
+                frontTyreY: (d, W) => W / 2 * (d === 'arrow' ? 0.66 : 1) - 0.4,
+                /** Where the lamps glow (car frame): [x, y] of the +y side's head and tail */
+                glowAt(d, part, L, W) {
+                    const m = LAMPS[d][part], pts = m.pts || [m.a, m.b];
+                    const x = pts.reduce((a, p) => a + p[0], 0) / pts.length, y = m.whole ? 7 : pts.reduce((a, p) => a + p[1], 0) / pts.length;
+                    return [x * L / U.L, y * W / U.W];
+                }
+            };
+        })();
+        /* =====================================================================
            CAR ART — how every car looks (TrafficVehicle: traffic, your garage,
            Zib rides, the delivery van)
            ---------------------------------------------------------------------
@@ -40924,13 +41318,15 @@ class NeuralSystemsBuilding extends BuildingV2 {
            paint shaded across its curve, a glass greenhouse (windshield, side
            glass, rear glass) under the roof, mirrors, lamp housings, and each
            brand's character:
-             LADY BlackMark  deep lacquer, a gold pinstripe, gold rims; the V1 is a
-                             coach from ETERNAL's blueprint: swelling fenders over
-                             each wheel, a long hood with a spine to the silver
-                             ornament on the nose, round headlights in the fenders,
-                             chrome bumpers and grille, four round tail lights on
-                             the red bar, the pearl cap with a gold crescent; the
-                             V3's panoramic black-glass roof
+             LADY BlackMark  deep lacquer, a gold pinstripe, gold rims; the V1 is
+                             drawn from ETERNAL's sketch: two raised fenders
+                             rounding the nose with the round headlights in their
+                             tips, the hood sunk between them with a round badge,
+                             a double-curved cowl over the windshield, the long
+                             ivory hearse cap with a gold crescent, the retro wheel
+                             hoods standing out over the rear wheels, three round
+                             tail lights wrapping each corner of the rounded tail;
+                             the V3's panoramic black-glass roof
              Zenxera         a faceted wedge: lit and shaded facets on the hood,
                              a cyan line down each flank, LED slits
              Gelfash         honest boxes: black bumpers, roof rails, a pickup bed
@@ -40946,12 +41342,42 @@ class NeuralSystemsBuilding extends BuildingV2 {
             // windshield base, roof front, roof back, rear glass end
             CABIN: {
                 sedan: [0.30, 0.43, 0.70, 0.81], suv: [0.24, 0.35, 0.86, 0.94], suv2: [0.27, 0.38, 0.82, 0.91],
-                sports: [0.38, 0.52, 0.72, 0.84], truck: [0.17, 0.27, 0.41, 0.45], hearse: [0.27, 0.37, 0.88, 0.9]
+                sports: [0.38, 0.52, 0.72, 0.84], truck: [0.17, 0.27, 0.41, 0.45], hearse: [0.30, 0.45, 0.935, 0.935]
             },
             GLOSS: { blackmark: 1.5, angular: 1.1, boxy: 0.8, sleek: 1 },
             GOLD: '#d9bf86', SILVER: '#dfe3ea',
-            // The V1 coach's outline: half-widths (of W/2) at the nose, the tail and the waist between the fenders
-            COACH: { nose: 0.62, tail: 0.66, waist: 0.84 },
+            // The V1 from ETERNAL's sketch, in fractions of its length from the nose (u) and of its half-width (v).
+            // OUTLINE is the near flank, nose to tail (mirrored for the far one): the fender hump round each side
+            // of the nose (as wide as the rear), the waist along the cap, the wheel hood standing out over the rear wheel, the round tail.
+            COACH: {
+                OUTLINE: [[0.006, 0], [0.008, 0.2], [0.014, 0.34], [0.026, 0.44], [0.034, 0.5], [0.008, 0.6], [0.006, 0.74], [0.022, 0.88], [0.06, 0.96],
+                          [0.12, 0.995], [0.19, 1], [0.26, 0.985], [0.305, 0.9], [0.36, 0.85], [0.4, 0.84], [0.52, 0.84], [0.6, 0.86], [0.635, 0.93],
+                          [0.67, 0.99], [0.745, 1], [0.82, 0.99], [0.86, 0.95], [0.895, 0.9], [0.935, 0.84], [0.965, 0.74], [0.987, 0.58],
+                          [0.998, 0.38], [1, 0]],
+                axles: [0.19, 0.745], waist: 0.84, hood: 0.49,  // the hood runs between the fender seams at ±hood
+                cap: [0.45, 0.93, 0.62],                        // the hearse cap: from, to, half-width
+                band: [0.275, 0.19, 0.375, 0.29, 0.72],           // the windshield band: leading edge at the sides, its apex; trailing edge, apex; half-width
+                shell: 0.72,                                     // the cap shell's half-width
+                head: [[0.008, 0.6], [0.006, 0.74], 0.9],        // lamp pods: along the outline's run [u0, k0]→[u1, k1], f of the way
+                tail: [[[0.935, 0.84], [0.965, 0.74], 0.6], [[0.965, 0.74], [0.987, 0.58], 0.6], [[0.987, 0.58], [0.998, 0.38], 0.55]],
+                slab: true, mirror: 3.6, tyreIn: 1.3             // tyreIn: how far the front tyres' centres sit in from the flank
+            },
+            // The V3: the V1's coach body made a touch longer and sleeker, its front fenders squarer, the waist and
+            // wheel hoods drawn in; no cap: one roof in the body's paint runs back from the windshield band to a round
+            // tail, ringed by windows (the dark band of the sketch). Its tail pods spread further in (no light slab).
+            COACH3: {
+                OUTLINE: [[0.006, 0], [0.008, 0.2], [0.014, 0.34], [0.026, 0.44], [0.034, 0.5], [0.008, 0.58], [0.003, 0.74], [0.01, 0.88],
+                          [0.035, 0.96], [0.09, 0.99], [0.19, 0.995], [0.265, 0.975], [0.31, 0.9], [0.37, 0.84], [0.45, 0.83],
+                          [0.55, 0.84], [0.62, 0.88], [0.67, 0.95], [0.745, 0.975], [0.82, 0.97], [0.87, 0.93], [0.91, 0.87],
+                          [0.945, 0.8], [0.972, 0.7], [0.99, 0.55], [0.998, 0.36], [1, 0]],
+                axles: [0.19, 0.745], waist: 0.83, hood: 0.49,
+                band: [0.275, 0.19, 0.375, 0.29, 0.72],
+                shell: 0.74,                                     // the windows' half-width
+                roof: [0.955, 0.6],                              // the roof: back end, half-width (its front runs in under the band)
+                head: [[0.008, 0.58], [0.003, 0.74], 0.9],
+                tail: [[[0.945, 0.8], [0.972, 0.7], 0.45], [[0.972, 0.7], [0.99, 0.55], 0.6], [[0.99, 0.55], [0.998, 0.36], 0.65]],
+                slab: false, mirror: 5, tyreIn: 2.3
+            },
             WHEEL_LOCK: 0.5,        // drawn front-wheel angle at full steer (rad)
             ROLL_PX: 1.8,           // body shift out of a turn at full lean
             PITCH_PX: 1.1           // body shift forward under full braking
@@ -40974,59 +41400,86 @@ class NeuralSystemsBuilding extends BuildingV2 {
             const key = v.visualStyle + '|' + v.model + '|' + v.length + '|' + v.width + '|' + !!v.noHearseCap;
             if (v._carGeo && v._carGeo.key === key) return v._carGeo;
             const L = v.length, W = v.width, st = v.visualStyle;
-            const hearse = st === 'blackmark' && v.model === 'suv' && !v.noHearseCap;
+            const v3 = st === 'blackmark' && v.model === 'suv2', hearse = st === 'blackmark' && (v.model === 'suv' && !v.noHearseCap || v3);   // the coach-built V1 and V3
+            const C = hearse ? CAR_ART[v3 ? 'COACH3' : 'COACH'] : null;
             const cab = CAR_ART.CABIN[hearse ? 'hearse' : v.model] || CAR_ART.CABIN.sedan;
             const xf = f => L / 2 - f * L;
             const body = new Path2D();
-            if (st === 'angular') {
-                const pts = [[L / 2, -W * 0.26], [L / 2 - 9, -W / 2], [-L / 2 + 6, -W / 2 + 1], [-L / 2, -W / 2 + 7],
-                             [-L / 2, W / 2 - 7], [-L / 2 + 6, W / 2 - 1], [L / 2 - 9, W / 2], [L / 2, W * 0.26]];
-                pts.forEach((p, i) => i ? body.lineTo(p[0], p[1]) : body.moveTo(p[0], p[1])); body.closePath();
-            } else if (hearse) _coachPath(body, L, W);
+            const zen = ZenArt.design(v);                                   // a Zenxera: one of the jewel-cut supercars (traffic/zen-art.js)
+            if (zen) ZenArt.path(body, zen, L, W);
+            else if (hearse) _coachPath(body, L, W, C.OUTLINE);
             else if (st === 'blackmark') body.roundRect(-L / 2, -W / 2, L, W, [6, 11, 11, 6]);
             else body.roundRect(-L / 2, -W / 2, L, W, [4, 7, 7, 4]);
             const si = W * 0.13;                                            // glass sits this far in from the flanks
             return (v._carGeo = {
-                key, L, W, st, hearse, body, si,
+                key, L, W, st, hearse, v3, C, zen, body, si,
                 x0: xf(cab[0]), x1: xf(cab[1]), x2: xf(cab[2]), x3: xf(cab[3]),
-                axleF: L / 2 - L * 0.21, axleR: -L / 2 + L * 0.2
+                axleF: hearse ? L / 2 - L * C.axles[0] : L / 2 - L * 0.21, axleR: hearse ? L / 2 - L * C.axles[1] : -L / 2 + L * 0.2
             });
         }
 
-        /** The V1 coach: an oval pinched at the waist, the fenders swelling out over each axle, nose and tail rounded. */
-        function _coachPath(p, L, W) {
-            const C = CAR_ART.COACH, h = W / 2, nose = C.nose * h, tail = C.tail * h, waist = C.waist * h;
-            const fF = L / 2 - L * 0.21, fR = -L / 2 + L * 0.2;
-            p.moveTo(L / 2, 0);
-            p.bezierCurveTo(L / 2, -nose * 0.9, L / 2 - 3, -nose, fF + L * 0.12, -h * 0.94);         // the near flank, nose to tail
-            p.bezierCurveTo(fF + L * 0.04, -h, fF - L * 0.06, -h, fF - L * 0.13, -waist);
-            p.bezierCurveTo(0, -waist * 0.99, fR + L * 0.16, -waist, fR + L * 0.11, -h * 0.97);
-            p.bezierCurveTo(fR + L * 0.03, -h, fR - L * 0.08, -h, -L / 2 + 5, -tail);
-            p.bezierCurveTo(-L / 2, -tail * 0.7, -L / 2, -tail * 0.3, -L / 2, 0);
-            p.bezierCurveTo(-L / 2, tail * 0.3, -L / 2, tail * 0.7, -L / 2 + 5, tail);                // the far flank, tail to nose
-            p.bezierCurveTo(fR - L * 0.08, h, fR + L * 0.03, h, fR + L * 0.11, h * 0.97);
-            p.bezierCurveTo(fR + L * 0.16, waist, 0, waist * 0.99, fF - L * 0.13, waist);
-            p.bezierCurveTo(fF - L * 0.06, h, fF + L * 0.04, h, fF + L * 0.12, h * 0.94);
-            p.bezierCurveTo(L / 2 - 3, nose, L / 2, nose * 0.9, L / 2, 0);
+        /** The V1's outline from the sketch: COACH.OUTLINE round both flanks, smoothed (Catmull-Rom) into curves. */
+        function _coachPath(p, L, W, O) {
+            const h = W / 2, P = (u, v) => [L / 2 - u * L, v * h];
+            const pts = [...O.map(([u, v]) => P(u, -v)), ...O.slice(1, -1).reverse().map(([u, v]) => P(u, v))], n = pts.length;
+            p.moveTo(pts[0][0], pts[0][1]);
+            for (let i = 0; i < n; i++) {
+                const a = pts[(i - 1 + n) % n], b = pts[i], c = pts[(i + 1) % n], d = pts[(i + 2) % n];
+                p.bezierCurveTo(b[0] + (c[0] - a[0]) / 6, b[1] + (c[1] - a[1]) / 6, c[0] - (d[0] - b[0]) / 6, c[1] - (d[1] - b[1]) / 6, c[0], c[1]);
+            }
             p.closePath();
         }
 
-        /** The LADY ornament on the V1's nose: a silver figure seen from above, leaning into the wind, arms swept back, her dress trailing. */
-        function _ladyOrnament(c, x) {
-            c.save(); c.translate(x, 0);
-            const g = c.createLinearGradient(0, -3, 0, 3);
-            g.addColorStop(0, '#ffffff'); g.addColorStop(0.45, CAR_ART.SILVER); g.addColorStop(1, '#7d838e');
-            c.fillStyle = 'rgba(20, 18, 28, 0.45)'; c.beginPath(); c.ellipse(-1.5, 0.5, 3.6, 2.2, 0, 0, Math.PI * 2); c.fill();
-            c.fillStyle = g;
-            for (const s of [-1, 1]) { c.beginPath(); c.moveTo(1.4, s * 0.5); c.quadraticCurveTo(-0.6, s * 1.4, -2.8, s * 3.3); c.quadraticCurveTo(-1.6, s * 1.1, -0.2, s * 0.2); c.closePath(); c.fill(); }
-            c.beginPath(); c.moveTo(1.6, 0); c.quadraticCurveTo(0.6, -1.1, -1.6, -0.9); c.quadraticCurveTo(-3.6, -0.6, -4.6, -1.4); c.quadraticCurveTo(-3.8, 0, -4.6, 1.4);
-            c.quadraticCurveTo(-3.6, 0.6, -1.6, 0.9); c.quadraticCurveTo(0.6, 1.1, 1.6, 0); c.fill();
-            c.beginPath(); c.arc(2.1, 0, 0.85, 0, Math.PI * 2); c.fill();
-            c.fillStyle = '#ffffff'; c.globalAlpha = 0.9; c.beginPath(); c.arc(2.3, -0.3, 0.3, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1;
-            c.restore();
+        /** The round LADY badge on the V1's hood: a silver ring round black enamel, the house's gold crescent in it. */
+        /** The hood ornament: a silver geometric umbrella seen from above, eight faceted panels between their ribs,
+            the edge scalloped in between the rib tips, each panel lit by how it faces the light, a glint at the tip */
+        function _ladyBadge(c, x, r) {
+            const N = 8, tip = (i) => { const a = i / N * Math.PI * 2 + Math.PI / N; return [x + Math.cos(a) * r, Math.sin(a) * r]; };
+            const edge = (p, i) => {                                     // the scallop from rib tip i to i+1, bowed in
+                const [x1, y1] = tip(i + 1), a = (i + 0.5) / N * Math.PI * 2 + Math.PI / N;
+                p.quadraticCurveTo(x + Math.cos(a) * r * 0.62, Math.sin(a) * r * 0.62, x1, y1);
+            };
+            c.save(); c.filter = 'blur(0.7px)'; c.fillStyle = 'rgba(4, 2, 8, 0.7)';
+            c.beginPath(); c.moveTo(...tip(0)); for (let i = 0; i < N; i++) edge(c, i); c.translate(-0.5, 0.6); c.fill(); c.restore();
+            for (let i = 0; i < N; i++) {
+                const a = (i + 0.5) / N * Math.PI * 2 + Math.PI / N, lit = 0.5 + 0.5 * Math.cos(a - (-0.9));   // light from up the hood
+                const v = Math.round(70 + lit * 175), sh = `rgb(${v}, ${v + 4}, ${Math.min(255, v + 12)})`;
+                c.fillStyle = sh; c.beginPath(); c.moveTo(x, 0); c.lineTo(...tip(i)); edge(c, i); c.closePath(); c.fill();
+            }
+            c.strokeStyle = 'rgba(30, 32, 40, 0.8)'; c.lineWidth = 0.25;    // the ribs
+            for (let i = 0; i < N; i++) { c.beginPath(); c.moveTo(x, 0); c.lineTo(...tip(i)); c.stroke(); }
+            c.strokeStyle = 'rgba(255,255,255,0.5)'; c.lineWidth = 0.25; c.beginPath(); c.moveTo(...tip(0)); for (let i = 0; i < N; i++) edge(c, i); c.stroke();
+            c.fillStyle = '#ffffff'; c.beginPath(); c.arc(x, 0, r * 0.16, 0, Math.PI * 2); c.fill();   // the tip catching the light
         }
-        /** Where the V1's round lamps sit (car frame): headlights in the front fenders, two tail lights each side */
-        const coachLamps = (L, W) => ({ head: { x: L / 2 - L * 0.085, y: W / 2 * 0.5, r: 2.6 }, tail: [0.26, 0.5].map(k => ({ x: -L / 2 + L * 0.06, y: W / 2 * k, r: 1.9 })) });
+        /** Where the V1's lamps sit (car frame, +y side; mirror for the other): small rounded pods standing out of the
+            outline, a headlight off each fender tip and three tail lights round each back corner, and the hooded slab out
+            of the middle of the tail (from above, only its lit back edge shows under the hood). A pod is centred a little
+            outside the outline at [u, k] along the outline's run from [u0, k0] to [u1, k1], long side along it. */
+        const _coachPod = (L, W, [u0, k0], [u1, k1], f, len, d) => {
+            const u = u0 + (u1 - u0) * f, k = k0 + (k1 - k0) * f, x = L / 2 - u * L, y = W / 2 * k;
+            const tx = -(u1 - u0) * L, ty = (k1 - k0) * W / 2, tl = Math.hypot(tx, ty);
+            let nx = ty / tl, ny = -tx / tl; if (nx * x + ny * y < 0) { nx = -nx; ny = -ny; }
+            const out = d * 0.2;                                                // how far it stands proud of the body
+            return { x: x + nx * out, y: y + ny * out, a: Math.atan2(ty, tx), w: len, d };
+        };
+        const coachLamps = ({ L, W, C }) => ({
+            head: _coachPod(L, W, ...C.head, 4.6, 2.4),
+            tail: C.tail.map(([a, b, f]) => _coachPod(L, W, a, b, f, 1.35, 1.8)),
+            slab: C.slab && { x: -L / 2 - 2, d: 2.4, w: W / 2 * 0.34 } });    // the hooded slab: its back edge, depth, half-width
+        /** The V1's running turn signal: its three tail pods on the turning side light one by one from the inside out,
+            hold, then go dark. Returns the side and which pods are lit ([inner, middle, outer] as tail indices), or null. */
+        const SIGNAL_STEP = 6;                                              // frames per beat: 3 to fill, 2 to hold, 2 dark
+        function _coachSignal(v) {
+            if (!v.turnSignal || !(v.turnSignalTimer > 0)) return null;
+            const beat = 6 - Math.floor((v.turnSignalTimer % (SIGNAL_STEP * 7)) / SIGNAL_STEP);   // the timer counts down
+            const n = beat < 3 ? beat + 1 : beat < 5 ? 3 : 0;
+            return n ? { s: v.turnSignal === 'left' ? -1 : 1, lit: [2, 1, 0].slice(0, n) } : null;
+        }
+        /** Trace a lamp pod (grown by g) as the current path, on side s */
+        function _podPath(ctx, t, s, g = 0) {
+            ctx.save(); ctx.translate(t.x, s * t.y); ctx.rotate(s * t.a);
+            ctx.beginPath(); ctx.roundRect(-t.w / 2 - g, -t.d / 2 - g, t.w + g * 2, t.d + g * 2, Math.min(t.w, t.d) / 2 + g - 0.3); ctx.restore();
+        }
 
         /** The body sprite (painted once per look). */
         function carSprite(v) {
@@ -41053,9 +41506,15 @@ class NeuralSystemsBuilding extends BuildingV2 {
             const g = carGeo(v), W = g.W, tyreL = Math.max(10, g.L * 0.16), d = (v.steer || 0) * CAR_ART.WHEEL_LOCK;
             const rim = _carRim(v);
             for (const s of [-1, 1]) {
-                ctx.save(); ctx.translate(g.axleF, s * (W / 2 - 0.4)); if (d) ctx.rotate(d);
+                ctx.save(); ctx.translate(g.axleF, s * (g.zen ? ZenArt.frontTyreY(g.zen, W) : W / 2 - (g.hearse ? g.C.tyreIn : 0.4))); if (d) ctx.rotate(d);   // (the V1's peek out from under its fenders)
                 ctx.fillStyle = '#0b0a0e'; ctx.beginPath(); ctx.roundRect(-tyreL / 2, -2.4, tyreL, 4.8, 1.6); ctx.fill();
-                ctx.fillStyle = rim; ctx.globalAlpha = 0.9; ctx.fillRect(-tyreL * 0.36, s * 1.7 - 0.6, tyreL * 0.72, 1.2); ctx.globalAlpha = 1;
+                if (g.hearse) {                                                 // a silver wheel face, its hub cap standing proud
+                    const sv = ctx.createLinearGradient(-tyreL / 2, 0, tyreL / 2, 0);
+                    sv.addColorStop(0, '#6b717c'); sv.addColorStop(0.4, '#ffffff'); sv.addColorStop(0.6, CAR_ART.SILVER); sv.addColorStop(1, '#5d636d');
+                    ctx.fillStyle = sv; ctx.beginPath(); ctx.roundRect(-tyreL * 0.4, s * 1.6 - 0.7, tyreL * 0.8, 1.4, 0.7); ctx.fill();
+                    ctx.beginPath(); ctx.arc(0, s * 2.5, 1.2, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(-0.3, s * 2.5 - 0.3, 0.4, 0, Math.PI * 2); ctx.fill();
+                } else { ctx.fillStyle = rim; ctx.globalAlpha = 0.9; ctx.fillRect(-tyreL * 0.36, s * 1.7 - 0.6, tyreL * 0.72, 1.2); ctx.globalAlpha = 1; }
                 ctx.restore();
             }
         }
@@ -41070,15 +41529,17 @@ class NeuralSystemsBuilding extends BuildingV2 {
             c.beginPath(); c.roundRect(-L / 2 - 1, -W / 2 - 1, L + 2, W + 2, 8); c.fill(); c.restore();
             // Rear tyres peeking past the flanks, rims catching the light (the fronts steer: drawCarFrontTyres)
             const tyreL = Math.max(10, L * 0.16), rim = _carRim(v);
-            for (const ax of [g.axleR]) for (const s of [-1, 1]) {
+            for (const ax of coach ? [] : [g.axleR]) for (const s of [-1, 1]) {        // (the V1's are under its wheel hoods)
                 c.fillStyle = '#0b0a0e'; c.beginPath(); c.roundRect(ax - tyreL / 2, s * W / 2 - (s > 0 ? 3.2 : -0.2) - 1.5, tyreL, 4.5, 1.5); c.fill();
                 c.fillStyle = rim; c.globalAlpha = 0.85; c.fillRect(ax - tyreL * 0.28, s * (W / 2 + 0.9) - 0.5, tyreL * 0.56, 1); c.globalAlpha = 1;
             }
+            if (g.zen) { ZenArt.paint(c, g.zen, col, L, W, truck); return; }   // the rest of a Zenxera is its own (traffic/zen-art.js)
             // Mirrors, at the windshield base
-            const mw = coach ? CAR_ART.COACH.waist * h + (1 - CAR_ART.COACH.waist) * h * 0.6 : h;   // the coach's sit on its waist
+            const mw = coach ? g.C.waist * h + (1 - g.C.waist) * h * 0.6 : h;   // the coach's sit on its waist
+            const mx0 = coach ? L / 2 - (g.C.band[0] + g.C.band[2]) / 2 * L + 1.5 : x0;   // the V1's stand off the windshield band's ends
             for (const s of [-1, 1]) {
-                c.fillStyle = _carMix(col, -0.35); c.beginPath(); c.roundRect(x0 - 3, s > 0 ? mw - 1 : -mw - 2.6, 4.5, 3.6, 1.2); c.fill();
-                c.fillStyle = coach ? CAR_ART.SILVER : 'rgba(210, 200, 240, 0.35)'; c.fillRect(x0 - 2.4, s > 0 ? mw + 1.6 : -mw - 2.2, 3.2, 0.7);
+                const ml = coach ? g.C.mirror : 3.6; c.fillStyle = _carMix(col, -0.35); c.beginPath(); c.roundRect(mx0 - 3, s > 0 ? mw - 1 : -mw - ml + 1, 4.5, ml, 1.2); c.fill();
+                c.fillStyle = coach ? CAR_ART.SILVER : 'rgba(210, 200, 240, 0.35)'; c.fillRect(mx0 - 2.4, s > 0 ? mw + ml - 2 : -mw - ml + 1.4, 3.2, 0.7);
             }
             // Paint, shaded round the body's curve
             c.save(); c.clip(g.body);
@@ -41098,29 +41559,39 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 ag.addColorStop(0, 'rgba(255,255,255,0.10)'); ag.addColorStop(1, 'rgba(255,255,255,0)');
                 c.fillStyle = ag; c.fillRect(ax - L * 0.12, s > 0 ? W / 2 - L * 0.12 : -W / 2, L * 0.24, L * 0.12);
             }
-            // Hood: creases (Gelfash, LADY) or facets (Zenxera)
-            if (zen) {
-                c.fillStyle = 'rgba(255,255,255,0.13)';
-                c.beginPath(); c.moveTo(L / 2, -W * 0.26); c.lineTo(x0, -W / 2 + si); c.lineTo(x0, 0); c.lineTo(L / 2 - 2, 0); c.closePath(); c.fill();
-                c.fillStyle = 'rgba(0,0,0,0.16)';
-                c.beginPath(); c.moveTo(L / 2, W * 0.26); c.lineTo(x0, W / 2 - si); c.lineTo(x0, 0); c.lineTo(L / 2 - 2, 0); c.closePath(); c.fill();
-                c.fillStyle = 'rgba(0,0,0,0.14)';                          // the tail's facets
-                c.beginPath(); c.moveTo(x3, -W / 2 + si); c.lineTo(-L / 2, -W / 2 + 7); c.lineTo(-L / 2, 0); c.lineTo(x3, 0); c.closePath(); c.fill();
-            } else if (coach) {
-                // The fenders: light on each swell, a seam where it meets the body
-                for (const ax of [g.axleF, g.axleR]) for (const s of [-1, 1]) {
-                    const a = c.createRadialGradient(ax, s * h * 0.8, 1, ax, s * h * 0.8, 13);
-                    a.addColorStop(0, 'rgba(255,255,255,0.16)'); a.addColorStop(1, 'rgba(255,255,255,0)');
-                    c.fillStyle = a; c.fillRect(ax - 14, s * h - 14, 28, 28);
-                    c.lineWidth = 0.8;
-                    c.strokeStyle = 'rgba(0,0,0,0.5)'; c.beginPath(); c.ellipse(ax, s * h, 12.5, 0.36 * h, 0, s > 0 ? Math.PI * 1.08 : 0.08, s > 0 ? Math.PI * 1.92 : Math.PI * 0.92); c.stroke();
-                    c.strokeStyle = 'rgba(255,255,255,0.12)'; c.beginPath(); c.ellipse(ax, s * h, 12.5, 0.36 * h - 0.8, 0, s > 0 ? Math.PI * 1.1 : 0.1, s > 0 ? Math.PI * 1.9 : Math.PI * 0.9); c.stroke();
+            // Hood: creases (Gelfash, LADY)
+            if (coach) {
+                const C = g.C, X = u => L / 2 - u * L, hv = C.hood * h;
+                // Height: the body rolls away at every edge (a soft inner shadow round the outline)
+                c.save(); c.filter = 'blur(2px)'; c.strokeStyle = 'rgba(0,0,0,0.55)'; c.lineWidth = 7; c.stroke(g.body); c.restore();
+                // The fender humps either side of the hood: a lit crown running their length, a seam down the inner edge,
+                // and their walls shading the sunk hood
+                for (const s of [-1, 1]) {
+                    c.save(); c.translate(X(0.14), s * h * 0.75); c.scale(1, 0.26);
+                    const a = c.createRadialGradient(0, 0, 0, 0, 0, L * 0.15);
+                    a.addColorStop(0, 'rgba(255,255,255,0.3)'); a.addColorStop(0.5, 'rgba(255,255,255,0.1)'); a.addColorStop(1, 'rgba(255,255,255,0)');
+                    c.fillStyle = a; c.fillRect(-L * 0.15, -L * 0.15, L * 0.3, L * 0.3); c.restore();
+                    const wall = c.createLinearGradient(0, s * hv, 0, s * hv * 0.35);
+                    wall.addColorStop(0, 'rgba(0,0,0,0.42)'); wall.addColorStop(1, 'rgba(0,0,0,0)');
+                    c.fillStyle = wall; c.fillRect(X(0.25), s > 0 ? hv * 0.35 : -hv, L * 0.22, hv * 0.65);
+                    c.lineWidth = 0.9; c.strokeStyle = 'rgba(0,0,0,0.55)';
+                    c.beginPath(); c.moveTo(X(0.02), s * hv); c.quadraticCurveTo(X(0.15), s * hv * 1.02, X(0.245), s * hv * 1.12); c.stroke();
+                    c.lineWidth = 0.6; c.strokeStyle = 'rgba(255,255,255,0.16)';
+                    c.beginPath(); c.moveTo(X(0.02), s * (hv + 0.9)); c.quadraticCurveTo(X(0.15), s * (hv * 1.02 + 0.9), X(0.245), s * (hv * 1.12 + 0.9)); c.stroke();
                 }
-                // The hood: a raised spine to the ornament, the panel lines either side
-                c.strokeStyle = 'rgba(255,255,255,0.22)'; c.lineWidth = 1.1; c.beginPath(); c.moveTo(x0, 0); c.lineTo(L / 2 - 4, 0); c.stroke();
-                c.strokeStyle = CAR_ART.SILVER; c.globalAlpha = 0.75; c.lineWidth = 0.6; c.beginPath(); c.moveTo(x0, -0.6); c.lineTo(L / 2 - 4, -0.6); c.stroke(); c.globalAlpha = 1;
-                c.strokeStyle = 'rgba(0,0,0,0.25)'; c.lineWidth = 0.8;
-                for (const s of [-1, 1]) { c.beginPath(); c.moveTo(L / 2 - 6, s * h * 0.42); c.quadraticCurveTo(x0 + 8, s * h * 0.5, x0 + 1, s * h * 0.56); c.stroke(); }
+                // The hood sunk between them: a touch darker
+                c.fillStyle = 'rgba(0,0,0,0.12)'; c.beginPath(); c.moveTo(X(0), -hv); c.lineTo(X(0), hv); c.lineTo(X(0.25), hv * 1.1); c.lineTo(X(0.25), -hv * 1.1); c.closePath(); c.fill();
+                // The wheel hoods standing out over the rear wheels: a seam where each meets the body, light on its crown
+                for (const s of [-1, 1]) {
+                    c.save(); c.translate(X(0.745), s * h * 0.88); c.scale(1, 0.24);
+                    const a = c.createRadialGradient(0, 0, 0, 0, 0, L * 0.12);
+                    a.addColorStop(0, 'rgba(255,255,255,0.3)'); a.addColorStop(0.5, 'rgba(255,255,255,0.1)'); a.addColorStop(1, 'rgba(255,255,255,0)');
+                    c.fillStyle = a; c.fillRect(-L * 0.12, -L * 0.12, L * 0.24, L * 0.24); c.restore();
+                    c.lineWidth = 0.9; c.strokeStyle = 'rgba(0,0,0,0.55)';
+                    c.beginPath(); c.moveTo(X(0.625), s * h * 0.87); c.quadraticCurveTo(X(0.745), s * h * 0.72, X(0.88), s * h * 0.89); c.stroke();
+                    c.lineWidth = 0.6; c.strokeStyle = 'rgba(255,255,255,0.14)';
+                    c.beginPath(); c.moveTo(X(0.63), s * h * 0.9); c.quadraticCurveTo(X(0.745), s * h * 0.76, X(0.875), s * h * 0.92); c.stroke();
+                }
             } else if (!truck) {
                 c.strokeStyle = 'rgba(0,0,0,0.18)'; c.lineWidth = 0.8;
                 for (const s of [-1, 1]) { c.beginPath(); c.moveTo(L / 2 - 3, s * W * 0.2); c.lineTo(x0 + 1, s * W * 0.24); c.stroke(); }
@@ -41130,23 +41601,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
             c.restore();
             // Shoulder light and a crisp edge
             c.save(); c.scale((L - 3) / L, (W - 3) / W); c.strokeStyle = 'rgba(255,255,255,0.13)'; c.lineWidth = 0.9; c.stroke(g.body); c.restore();
-            if (lady) { c.save(); c.scale((L - 6) / L, (W - 6) / W); c.strokeStyle = CAR_ART.GOLD; c.globalAlpha = 0.8; c.lineWidth = 0.7; c.stroke(g.body); c.restore(); }
-            if (coach) {                                                       // chrome bumpers wrapping nose and tail, the grille between the headlights
-                c.save(); c.clip(g.body);
-                for (const [bx, d, k] of [[L / 2, 1, CAR_ART.COACH.nose], [-L / 2, -1, CAR_ART.COACH.tail]]) {
-                    const ch = c.createLinearGradient(bx - d * 3, 0, bx, 0);
-                    ch.addColorStop(0, '#6f7480'); ch.addColorStop(0.5, '#eef1f6'); ch.addColorStop(1, '#9aa0aa');
-                    c.fillStyle = ch; c.beginPath(); c.ellipse(bx, 0, 3.2, h * k * 0.98, 0, 0, Math.PI * 2); c.fill();
-                }
-                c.fillStyle = '#2a2730'; c.fillRect(L / 2 - 3.6, -5, 1.6, 10);
-                c.fillStyle = '#c9ced6'; for (let i = -4; i <= 4; i += 2) c.fillRect(L / 2 - 3.6, i - 0.3, 1.6, 0.6);
-                c.restore();
-            }
-            if (zen) {                                                         // the cyan line down each flank
-                c.strokeStyle = v.glowColor || '#00f3ff'; c.globalAlpha = 0.75; c.lineWidth = 0.9;
-                for (const s of [-1, 1]) { c.beginPath(); c.moveTo(L / 2 - 10, s * (W / 2 - 1.8)); c.lineTo(-L / 2 + 8, s * (W / 2 - 2.6)); c.stroke(); }
-                c.globalAlpha = 1;
-            }
+            if (lady && !coach) { c.save(); c.scale((L - 6) / L, (W - 6) / W); c.strokeStyle = CAR_ART.GOLD; c.globalAlpha = 0.8; c.lineWidth = 0.7; c.stroke(g.body); c.restore(); }
             // Bumpers (Gelfash): black plastic, nose and tail
             if (gel) {
                 c.save(); c.clip(g.body); c.fillStyle = '#16151b';
@@ -41157,8 +41612,79 @@ class NeuralSystemsBuilding extends BuildingV2 {
                     for (const s of [-1, 1]) c.fillRect(-L / 2 + 2, s * 3.2 - 1.2, L - 4.6, 2.4);
                 }
             }
-            // The greenhouse: glass under the roof
-            const gw = coach ? Math.min(W / 2 - si, CAR_ART.COACH.waist * h - 3.5) : W / 2 - si, glass = c.createLinearGradient(x0, 0, x3, 0);
+            // The greenhouse: glass under the roof. The V1's is one narrow band arched across behind the hood; the cap's
+            // black shell runs forward from the ivory top to meet it.
+            if (coach) {
+                const C = g.C, X = u => L / 2 - u * L, [f0, fa, b0, ba, bw] = C.band, sw = C.shell * h;
+                const band = new Path2D(); band.moveTo(X(f0), -bw * h); band.quadraticCurveTo(X(fa), 0, X(f0), bw * h);
+                band.lineTo(X(b0), sw); band.quadraticCurveTo(X(ba), 0, X(b0), -sw); band.closePath();
+                const wg = c.createLinearGradient(X(fa), 0, X(ba), 0);
+                wg.addColorStop(0, '#4a4380'); wg.addColorStop(0.4, '#1d1840'); wg.addColorStop(1, '#0a0716');
+                c.fillStyle = wg; c.fill(band);
+                c.save(); c.clip(band); c.strokeStyle = 'rgba(255, 250, 255, 0.3)'; c.lineWidth = 1.2;
+                c.beginPath(); c.moveTo(X(0.2), -0.18 * h); c.lineTo(X(0.36), -0.5 * h); c.stroke();
+                c.lineWidth = 0.5; c.beginPath(); c.moveTo(X(0.2), 0.04 * h); c.lineTo(X(0.36), -0.28 * h); c.stroke(); c.restore();
+                c.strokeStyle = 'rgba(0,0,0,0.7)'; c.lineWidth = 0.9; c.stroke(band);
+                c.strokeStyle = 'rgba(223,227,234,0.5)'; c.lineWidth = 0.6;          // chrome along its leading edge
+                c.beginPath(); c.moveTo(X(f0) - 0.6, -bw * h); c.quadraticCurveTo(X(fa) - 0.6, 0, X(f0) - 0.6, bw * h); c.stroke();
+                if (g.v3) {
+                    // The V3: windows ringing one long roof in the body's paint, from the band back to a round tail
+                    const gb = X(C.roof[0]) - 1.4, gr = sw * 0.95, gl = new Path2D();
+                    gl.moveTo(X(b0), -sw); gl.quadraticCurveTo(X(ba), 0, X(b0), sw);
+                    gl.lineTo(gb + gr, sw); gl.bezierCurveTo(gb + gr * 0.3, sw, gb, sw - gr * 0.45, gb, sw - gr); gl.lineTo(gb, -sw + gr); gl.bezierCurveTo(gb, -sw + gr * 0.45, gb + gr * 0.3, -sw, gb + gr, -sw); gl.closePath();
+                    const gg = c.createLinearGradient(0, -sw, 0, sw);
+                    gg.addColorStop(0, '#2c2752'); gg.addColorStop(0.3, '#0d0a1c'); gg.addColorStop(0.7, '#0d0a1c'); gg.addColorStop(1, '#221d40');
+                    c.fillStyle = gg; c.fill(gl);
+                    c.save(); c.clip(gl); c.strokeStyle = 'rgba(255, 250, 255, 0.2)'; c.lineWidth = 1;     // light sliding along the side glass
+                    for (const s of [-1, 1]) for (const u of [0.45, 0.62, 0.66]) { c.beginPath(); c.moveTo(X(u), s * sw); c.lineTo(X(u + 0.05), s * sw * 0.55); c.stroke(); }
+                    c.restore();
+                    // The roof: the body's paint, flat on top, rolling off at its sides and round its back into the glass
+                    const rw = C.roof[1] * h, rb = X(C.roof[0]) + 2.2, rr = rw * 0.95;
+                    const t = (1 + rw / sw) / 2, ex = X(b0) * (1 - 2 * t + 2 * t * t) + X(ba) * 2 * t * (1 - t);   // where the band's back edge meets the roof's sides
+                    const rf = new Path2D(); rf.moveTo(ex, -rw); rf.quadraticCurveTo(ex + (2 * t - 1) ** 2 * (X(ba) - X(b0)), 0, ex, rw);   // (the band's back edge, between the roof's sides)
+                    rf.lineTo(rb + rr, rw); rf.bezierCurveTo(rb + rr * 0.3, rw, rb, rw - rr * 0.45, rb, rw - rr); rf.lineTo(rb, -rw + rr); rf.bezierCurveTo(rb, -rw + rr * 0.45, rb + rr * 0.3, -rw, rb + rr, -rw); rf.closePath();
+                    c.save(); c.clip(gl); c.filter = 'blur(1.2px)'; c.strokeStyle = 'rgba(0,0,0,0.6)'; c.lineWidth = 2; c.stroke(rf); c.restore();   // (kept off the windshield)
+                    c.fillStyle = `rgb(${col.join(',')})`; c.fill(rf);
+                    c.save(); c.clip(rf);
+                    const e = 2.6 / (rw * 2); let rg = c.createLinearGradient(0, -rw, 0, rw);
+                    rg.addColorStop(0, 'rgba(0,0,0,0.6)'); rg.addColorStop(e, 'rgba(0,0,0,0)'); rg.addColorStop(e * 1.6, 'rgba(255,255,255,0.08)');
+                    rg.addColorStop(1 - e * 1.6, 'rgba(255,255,255,0.08)'); rg.addColorStop(1 - e, 'rgba(0,0,0,0)'); rg.addColorStop(1, 'rgba(0,0,0,0.6)');
+                    c.fillStyle = rg; c.fill(rf);
+                    rg = c.createLinearGradient(rb, 0, rb + rr, 0); rg.addColorStop(0, 'rgba(0,0,0,0.65)'); rg.addColorStop(1, 'rgba(0,0,0,0)');
+                    c.save(); c.filter = 'blur(1.2px)'; c.strokeStyle = rg; c.lineWidth = 6; c.stroke(rf); c.restore();
+                    c.restore();
+                    c.strokeStyle = 'rgba(255,255,255,0.14)'; c.lineWidth = 0.5; c.stroke(rf);
+                    // A crisp break where the roof meets the windshield: the glass's dark edge, then the roof's lit lip
+                    c.strokeStyle = 'rgba(0,0,0,0.85)'; c.lineWidth = 0.9;
+                    c.beginPath(); c.moveTo(X(b0), -sw); c.quadraticCurveTo(X(ba), 0, X(b0), sw); c.stroke();
+                    c.save(); c.clip(rf); c.strokeStyle = 'rgba(255,255,255,0.3)'; c.lineWidth = 0.6;
+                    c.beginPath(); c.moveTo(X(b0) - 1, -sw); c.quadraticCurveTo(X(ba) - 1, 0, X(b0) - 1, sw); c.stroke(); c.restore();
+                    c.strokeStyle = CAR_ART.GOLD; c.lineWidth = 0.7; c.stroke(gl);       // the gold line round the glass
+                    c.save(); c.translate(rb + (ex - rb) * 0.55, 0); c.fillStyle = CAR_ART.GOLD;    // the house's crescent on the roof
+                    c.beginPath(); c.arc(0, 0, 3.2, 0, Math.PI * 2); c.arc(1.5, -0.6, 2.7, 0, Math.PI * 2, true); c.fill('evenodd'); c.restore();
+                } else {
+                // The shell: body paint, rounded over its sides, sloping down into the windshield at its front
+                const cb = X(C.cap[1]) - 1.8, r = sw * 0.85, sh = new Path2D();
+                sh.moveTo(X(b0), -sw); sh.quadraticCurveTo(X(ba), 0, X(b0), sw);
+                sh.lineTo(cb + r, sw); sh.bezierCurveTo(cb + r * 0.3, sw, cb, sw - r * 0.45, cb, sw - r); sh.lineTo(cb, -sw + r); sh.bezierCurveTo(cb, -sw + r * 0.45, cb + r * 0.3, -sw, cb + r, -sw); sh.closePath();
+                c.save(); c.filter = 'blur(1.6px)'; c.strokeStyle = 'rgba(0,0,0,0.65)'; c.lineWidth = 3; c.stroke(sh); c.restore();
+                c.fillStyle = `rgb(${col.join(',')})`; c.fill(sh);
+                c.save(); c.clip(sh);
+                // Flat on top: it only falls away down its sides and over its back, where it meets the body
+                let sg = c.createLinearGradient(0, -sw, 0, sw), e = 3.2 / (sw * 2);
+                sg.addColorStop(0, 'rgba(0,0,0,0.6)'); sg.addColorStop(e, 'rgba(0,0,0,0)'); sg.addColorStop(e * 1.6, 'rgba(255,255,255,0.07)');
+                sg.addColorStop(1 - e * 1.6, 'rgba(255,255,255,0.07)'); sg.addColorStop(1 - e, 'rgba(0,0,0,0)'); sg.addColorStop(1, 'rgba(0,0,0,0.6)');
+                c.fillStyle = sg; c.fill(sh);
+                sg = c.createLinearGradient(cb, 0, cb + r, 0); sg.addColorStop(0, 'rgba(0,0,0,0.65)'); sg.addColorStop(1, 'rgba(0,0,0,0)');
+                c.save(); c.filter = 'blur(1.4px)'; c.strokeStyle = sg; c.lineWidth = 7; c.stroke(sh); c.restore();
+                c.strokeStyle = 'rgba(255,255,255,0.18)'; c.lineWidth = 0.7;          // the lip where the flat roof breaks over into the glass
+                c.beginPath(); c.moveTo(X(b0) - 0.8, -sw); c.quadraticCurveTo(X(ba) - 0.8, 0, X(b0) - 0.8, sw); c.stroke();
+                c.restore();
+                c.strokeStyle = CAR_ART.GOLD; c.lineWidth = 0.7; c.stroke(sh);
+                }
+            }
+            const gw = W / 2 - si, glass = c.createLinearGradient(x0, 0, x3, 0);
+            if (!coach) {
             glass.addColorStop(0, '#1d1a3a'); glass.addColorStop(0.2, '#0b0916'); glass.addColorStop(1, '#100d20');
             c.fillStyle = glass;
             c.beginPath(); c.moveTo(x0, -gw); c.lineTo(x1, -gw + 1); c.lineTo(x2, -gw + 1); c.lineTo(x3, -gw + 2.5);
@@ -41170,16 +41696,33 @@ class NeuralSystemsBuilding extends BuildingV2 {
             c.strokeStyle = 'rgba(255, 250, 255, 0.22)'; c.lineWidth = 1.4;
             c.beginPath(); c.moveTo(x0 - 1, -gw * 0.35); c.lineTo(x1 + 1, -gw * 0.75); c.stroke();
             c.lineWidth = 0.6; c.beginPath(); c.moveTo(x0 - 1, -gw * 0.1); c.lineTo(x1 + 1, -gw * 0.45); c.stroke();
+            }
             // The roof
             const rw = gw - 2.6, rx0 = x2, rx1 = x1;
-            if (g.hearse) {                                                   // pearl hearse cap to the tail
-                const pr = c.createLinearGradient(0, -rw, 0, rw);
-                pr.addColorStop(0, '#8d80a6'); pr.addColorStop(0.45, '#c8bdd6'); pr.addColorStop(1, '#7c6f98');
-                const cb = -L / 2 + (coach ? 9 : 4);                            // (clear of the coach's tail lights)
-                c.fillStyle = pr; c.beginPath(); c.roundRect(cb, -rw, x1 - cb, rw * 2, [4, 3, 3, 4]); c.fill();
-                c.strokeStyle = CAR_ART.GOLD; c.lineWidth = 0.7; c.stroke();
-                const mx = (cb + x1) / 2 - 6;                         // a gold crescent, the house's mark
+            if (g.hearse && !g.v3) {                                          // the ivory hearse cap, its edge drawn twice as in the sketch
+                const [cu0, cu1, cv] = g.C.cap, cw = cv * h, cf = L / 2 - cu0 * L, cb = L / 2 - cu1 * L;
+                const cr = cw * 0.85, cap = new Path2D(); cap.roundRect(cb, -cw, cf - cb, cw * 2, [cr, 5, 5, cr]);   // its back end well rounded
+                c.save(); c.filter = 'blur(1px)'; c.fillStyle = 'rgba(0,0,0,0.5)'; c.beginPath(); c.roundRect(cb - 0.5, -cw - 0.6, cf - cb + 1, cw * 2 + 1.2, [cr + 1, 6, 6, cr + 1]); c.fill(); c.restore();
+                // A flat top, evenly lit, with only a faint sheen across it
+                const pr = c.createLinearGradient(cb, -cw, cf, cw);
+                pr.addColorStop(0, '#e6dcca'); pr.addColorStop(0.55, '#f2eadc'); pr.addColorStop(1, '#ebe2d1');   // warm ivory
+                c.fillStyle = pr; c.fill(cap);
+                c.save(); c.clip(cap);
+                // Its edges roll off down the sides and over the back; the front stays level, running on into the roof
+                const e = 3 / (cw * 2); let fo = c.createLinearGradient(0, -cw, 0, cw);
+                fo.addColorStop(0, 'rgba(74, 56, 36, 0.7)'); fo.addColorStop(e, 'rgba(74, 56, 36, 0)');
+                fo.addColorStop(1 - e, 'rgba(74, 56, 36, 0)'); fo.addColorStop(1, 'rgba(74, 56, 36, 0.7)');
+                c.fillStyle = fo; c.fill(cap);
+                fo = c.createLinearGradient(cb, 0, cb + cr, 0); fo.addColorStop(0, 'rgba(74, 56, 36, 0.8)'); fo.addColorStop(1, 'rgba(74, 56, 36, 0)');
+                c.save(); c.filter = 'blur(1.4px)'; c.strokeStyle = fo; c.lineWidth = 7; c.stroke(cap); c.restore();
+                c.restore();
+                // A thin bevel: lit where the top turns over, the front edge crisp
+                c.strokeStyle = 'rgba(255, 252, 244, 0.6)'; c.lineWidth = 0.6;
+                c.beginPath(); c.roundRect(cb + 3.2, -cw + 2.8, cf - cb - 3.6, cw * 2 - 5.6, [cr - 2.8, 3, 3, cr - 2.8]); c.stroke();
+                c.strokeStyle = CAR_ART.GOLD; c.lineWidth = 0.7; c.stroke(cap);
+                const mx = (cb + cf) / 2 - 4;                         // a gold crescent, the house's mark
                 c.fillStyle = CAR_ART.GOLD; c.beginPath(); c.arc(mx, 0, 3.4, 0, Math.PI * 2); c.arc(mx + 1.6, -0.6, 2.9, 0, Math.PI * 2, true); c.fill('evenodd');
+            } else if (g.v3) { /* the V3's roof is drawn with its windows */
             } else if (lady) {                                                // panoramic black glass, gold-framed
                 const pg = c.createLinearGradient(rx1, -rw, rx0, rw);
                 pg.addColorStop(0, '#2a2442'); pg.addColorStop(0.5, '#0a0812'); pg.addColorStop(1, '#1a1530');
@@ -41210,15 +41753,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
             }
             // Lamp housings (the lamps themselves are live: drawCarLamps)
             c.fillStyle = '#17131f';
-            if (coach) {                                                      // round lamps: headlights ringed in silver, two tail lights a side
-                const Lp = coachLamps(L, W);
-                for (const s of [-1, 1]) {
-                    c.fillStyle = '#17131f'; c.beginPath(); c.arc(Lp.head.x, s * Lp.head.y, Lp.head.r + 1, 0, Math.PI * 2); c.fill();
-                    c.strokeStyle = CAR_ART.SILVER; c.lineWidth = 0.6; c.stroke();
-                    for (const t of Lp.tail) { c.fillStyle = '#17131f'; c.beginPath(); c.arc(t.x, s * t.y, t.r + 0.6, 0, Math.PI * 2); c.fill(); }
-                }
-                c.fillStyle = '#2a060e'; c.beginPath(); c.roundRect(-L / 2 + 1.4, -h * 0.36, 2, h * 0.72, 1); c.fill();
-            } else
+            if (coach) { /* the V1's lamp pods stand out of the outline: drawn after it */ } else
             for (const s of [-1, 1]) {
                 if (zen) { c.beginPath(); c.moveTo(L / 2 - 1, s * W * 0.27); c.lineTo(L / 2 - 8.5, s * (W / 2 - 0.8)); c.lineTo(L / 2 - 10, s * (W / 2 - 3)); c.lineTo(L / 2 - 3, s * W * 0.22); c.closePath(); c.fill(); }
                 else if (lady) c.fillRect(L / 2 - 2.6, s > 0 ? W / 2 - 12 : -W / 2 + 2.5, 2.2, 9.5);
@@ -41230,7 +41765,25 @@ class NeuralSystemsBuilding extends BuildingV2 {
             else for (const s of [-1, 1]) c.fillRect(-L / 2 + 0.4, s > 0 ? W / 2 - 11.5 : -W / 2 + 1.5, 3, 10);
             // The outline
             c.strokeStyle = 'rgba(6, 3, 12, 0.7)'; c.lineWidth = 0.9; c.stroke(g.body);
-            if (coach) _ladyOrnament(c, L / 2 + 1.2);
+            if (coach) {
+                _ladyBadge(c, L / 2 - L * 0.08, 3.2);
+                // The lamp pods: dark housings standing out of the body, ringed in silver (the lamps in them are live)
+                const Lp = coachLamps(g);
+                for (const s of [-1, 1]) for (const t of [Lp.head, ...Lp.tail]) {
+                    c.save(); c.filter = 'blur(0.8px)'; c.fillStyle = 'rgba(0,0,0,0.6)'; _podPath(c, t, s, 0.7); c.fill(); c.restore();
+                    c.fillStyle = '#17131f'; _podPath(c, t, s, 0.6); c.fill();
+                    c.strokeStyle = t === Lp.head ? CAR_ART.SILVER : 'rgba(223,227,234,0.55)'; c.lineWidth = 0.5; c.stroke();
+                }
+                // The long light slab standing out of the tail, hooded: from above, the hood's lip over a dark housing
+                const S = coachLamps(g).slab;
+                if (S) {
+                c.fillStyle = '#100c16'; c.beginPath(); c.roundRect(S.x - 0.4, -S.w - 0.4, S.d + 2.4, S.w * 2 + 0.8, 1); c.fill();
+                const lip = c.createLinearGradient(0, -S.w, 0, S.w);
+                lip.addColorStop(0, _carMix(col, -0.3)); lip.addColorStop(0.45, _carMix(col, 0.22)); lip.addColorStop(1, _carMix(col, -0.35));
+                c.fillStyle = lip; c.beginPath(); c.roundRect(S.x + 0.7, -S.w, S.d + 1.2, S.w * 2, [0.6, 1.4, 1.4, 0.6]); c.fill();
+                c.strokeStyle = CAR_ART.GOLD; c.globalAlpha = 0.7; c.lineWidth = 0.45; c.stroke(); c.globalAlpha = 1;
+                }
+            }
         }
 
         /** Stamp the body, then the light sliding over it. */
@@ -41364,7 +41917,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
         /** Lamps: turn signals, tail and brake lights, headlights (in the car's frame). */
         function drawCarLamps(ctx, v, farLOD) {
             const g = carGeo(v), L = g.L, W = g.W, on = carLampsOn(v);
-            if (v.turnSignal && v.turnSignalTimer > 0 && Math.floor(v.turnSignalTimer / 10) % 2 === 0) {
+            if (!g.hearse && v.turnSignal && v.turnSignalTimer > 0 && Math.floor(v.turnSignalTimer / 10) % 2 === 0) {
                 const s = v.turnSignal === 'left' ? -1 : 1;
                 ctx.fillStyle = '#ffb030';
                 ctx.fillRect(L / 2 - 5, s > 0 ? W / 2 - 3.5 : 0.5 - W / 2, 3.5, 3); ctx.fillRect(-L / 2 + 0.5, s > 0 ? W / 2 - 3.5 : 0.5 - W / 2, 3, 3);
@@ -41373,17 +41926,24 @@ class NeuralSystemsBuilding extends BuildingV2 {
             const rev = v.state === 'REVERSING', brake = on && (v.speed < 0.5 || rev);
             ctx.fillStyle = rev ? '#f4f0ff' : brake ? '#ff2244' : on ? '#9a1028' : '#4a0a16';
             if (g.hearse) {
-                const Lp = coachLamps(L, W);
-                ctx.beginPath(); ctx.roundRect(-L / 2 + 1.6, -W / 2 * 0.34, 1.6, W * 0.34, 0.8); ctx.fill();
-                for (const s of [-1, 1]) for (const t of Lp.tail) { ctx.beginPath(); ctx.arc(t.x, s * t.y, t.r, 0, Math.PI * 2); ctx.fill(); }
-            } else if (g.st === 'blackmark') ctx.fillRect(-L / 2 + 0.6, -W / 2 + 4.5, 1.8, W - 9);
+                const Lp = coachLamps(g);
+                for (const s of [-1, 1]) for (const t of Lp.tail) { _podPath(ctx, t, s); ctx.fill(); }
+                if (Lp.slab) { ctx.beginPath(); ctx.roundRect(Lp.slab.x - 0.2, -Lp.slab.w + 0.6, 1, Lp.slab.w * 2 - 1.2, 0.5); ctx.fill(); }
+                const sig = _coachSignal(v);                                    // the running signal sweeps out over its side's pods
+                if (sig) {
+                    ctx.fillStyle = '#ffb030';
+                    for (const i of sig.lit) { _podPath(ctx, Lp.tail[i], sig.s); ctx.fill(); }
+                    if (!farLOD) { ctx.globalAlpha = 0.6; for (const i of sig.lit) drawGlow(ctx, Lp.tail[i].x, sig.s * Lp.tail[i].y, 6, '#ffaa00'); ctx.globalAlpha = 1; }
+                }
+            } else if (g.zen) ZenArt.lamps(ctx, g.zen, 'tail', L, W);
+            else if (g.st === 'blackmark') ctx.fillRect(-L / 2 + 0.6, -W / 2 + 4.5, 1.8, W - 9);
             else for (const s of [-1, 1]) ctx.fillRect(-L / 2 + 0.6, s > 0 ? W / 2 - 11 : -W / 2 + 2, 2.4, 9);
             if (brake && !farLOD) { ctx.globalAlpha = 0.35; for (const s of [-1, 1]) drawGlow(ctx, -L / 2, s * (W / 2 - 6), 8, rev ? '#ffffff' : '#ff2244'); ctx.globalAlpha = 1; }
             const hl = v.headlightColor || '#ffffaa';
             ctx.fillStyle = on ? hl : _carMix(_carRGB(hl), -0.55);
             for (const s of [-1, 1]) {
-                if (g.st === 'angular') { ctx.save(); ctx.translate(L / 2 - 5, s * (W / 2 - 4.5)); ctx.rotate(s * -0.75); ctx.fillRect(-3.5, -0.8, 7, 1.6); ctx.restore(); }
-                else if (g.hearse) { const H = coachLamps(L, W).head; ctx.beginPath(); ctx.arc(H.x, s * H.y, H.r, 0, Math.PI * 2); ctx.fill(); }
+                if (g.zen) { if (s > 0) ZenArt.lamps(ctx, g.zen, 'head', L, W); }
+                else if (g.hearse) { _podPath(ctx, coachLamps(g).head, s); ctx.fill(); }
                 else if (g.st === 'blackmark') ctx.fillRect(L / 2 - 2, s > 0 ? W / 2 - 11 : -W / 2 + 3, 1.6, 8);
                 else { ctx.beginPath(); ctx.roundRect(L / 2 - 3.4, s > 0 ? W / 2 - 9.5 : -W / 2 + 3, 2.4, 6.5, 1); ctx.fill(); }
             }
@@ -41397,12 +41957,19 @@ class NeuralSystemsBuilding extends BuildingV2 {
             const rev = v.state === 'REVERSING', brake = v.speed < 0.5 || rev;
             ctx.save(); ctx.translate(v.x, v.y); ctx.rotate(v.angle); ctx.globalCompositeOperation = 'lighter';
             ctx.globalAlpha = a * (brake ? 0.8 : 0.38);
-            const tY = g.hearse ? W / 2 * 0.38 : W / 2 - 6, hY = g.hearse ? W / 2 * 0.5 : W / 2 - 6;   // the coach's lamps sit further in
-            for (const s of [-1, 1]) drawGlow(ctx, -L / 2 + 1, s * tY, brake ? 15 : 10, rev ? '#fff4f8' : '#ff2848');
+            const Lp = g.hearse ? coachLamps(g) : null, T = Lp && Lp.tail[1];    // the coach's: round its pods
+            let tX = Lp ? T.x : -L / 2 + 1, tY = Lp ? T.y : W / 2 - 6, hX = Lp ? Lp.head.x : L / 2 - 1, hY = Lp ? Lp.head.y : W / 2 - 6;
+            if (g.zen) { [tX, tY] = ZenArt.glowAt(g.zen, 'tail', L, W); [hX, hY] = ZenArt.glowAt(g.zen, 'head', L, W); }
+            for (const s of [-1, 1]) drawGlow(ctx, tX, s * tY, brake ? 15 : 10, rev ? '#fff4f8' : '#ff2848');
+            if (g.hearse && g.C.slab) drawGlow(ctx, -L / 2 - 2.5, 0, brake ? 13 : 8, rev ? '#fff4f8' : '#ff2848');    // the hooded slab
             if (v._lod === 1) { ctx.restore(); return; }                   // far away: just the tail lights
             ctx.globalAlpha = a * 0.5;
-            for (const s of [-1, 1]) drawGlow(ctx, L / 2 - (g.hearse ? L * 0.06 : 1), s * hY, 10, v.headlightColor || '#ffffaa');
-            if (v.turnSignal && v.turnSignalTimer > 0 && Math.floor(v.turnSignalTimer / 10) % 2 === 0) {
+            for (const s of [-1, 1]) drawGlow(ctx, hX, s * hY, 10, v.headlightColor || '#ffffaa');
+            const sig = g.hearse && _coachSignal(v);
+            if (sig) {
+                ctx.globalAlpha = a * 0.7;
+                for (const i of sig.lit) drawGlow(ctx, Lp.tail[i].x, sig.s * Lp.tail[i].y, 8, '#ffaa00');
+            } else if (!g.hearse && v.turnSignal && v.turnSignalTimer > 0 && Math.floor(v.turnSignalTimer / 10) % 2 === 0) {
                 const s = v.turnSignal === 'left' ? -1 : 1; ctx.globalAlpha = a * 0.8;
                 drawGlow(ctx, L / 2 - 3, s * (W / 2 - 2), 10, '#ffaa00'); drawGlow(ctx, -L / 2 + 2, s * (W / 2 - 2), 10, '#ffaa00');
             }
@@ -41474,6 +42041,10 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 this.width = vehicleWidth;  // Override for backward compatibility with draw()
                 this.maxSpeed = brandData.baseStats.maxSpeed * modelData.speedMod + (Math.random() * 1 - 0.5);
                 this.acceleration = brandData.baseStats.acceleration;
+                // What it does with the player at the wheel (applyDrivePhysics): traffic keeps the numbers above
+                const dv = modelData.driven || {};
+                this.drivenTop = dv.top || brandData.baseStats.maxSpeed * modelData.speedMod;
+                this.drivenAccel = dv.accel || this.acceleration;
                 this.handling = brandData.baseStats.handling;
                 this.brake = brandData.baseStats.brake || 0.3;        // px/tick² at full brake
                 this.drive = brandData.drive || CONFIG.VEHICLE_DRIVE.DEFAULT_FEEL;   // handling character
@@ -42348,15 +42919,15 @@ class NeuralSystemsBuilding extends BuildingV2 {
                    says it should:
 
                        steady state  v = a·d/(1-d)   =>   d = v/(a+v)          */
-                const topSpeed = (typeof this.maxSpeed === 'number' && this.maxSpeed > 0)
-                    ? this.maxSpeed : 12.5;
-                const acceleration = (typeof this.acceleration === 'number' && this.acceleration > 0)
-                    ? this.acceleration : 0.5;
+                const player = steerCurve;                    // the full weighted model is the driver's
+                const ownTop = player && this.drivenTop > 0 ? this.drivenTop : this.maxSpeed;
+                const ownAccel = player && this.drivenAccel > 0 ? this.drivenAccel : this.acceleration;
+                const topSpeed = (typeof ownTop === 'number' && ownTop > 0) ? ownTop : 12.5;
+                const acceleration = (typeof ownAccel === 'number' && ownAccel > 0) ? ownAccel : 0.5;
                 const drag = topSpeed / (acceleration + topSpeed);
                 const revTop = topSpeed * VD.REVERSE_TOP_FRACTION;
                 const reverseDrag = revTop / (acceleration + revTop);
 
-                const player = steerCurve;                    // the full weighted model is the driver's
                 const F = this.drive || VD.DEFAULT_FEEL;
                 const rain = (weather && weather.isRaining)
                     ? Math.min(1, weather.getRainScale ? weather.getRainScale() : 1) : 0;
@@ -42391,6 +42962,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
                     st += Math.abs(d) < 0.006 ? req - st : d;
                 }
                 this.steer = st;
+                if (player) this._steerSignal(req, absSpeed);
 
                 // --- STEERING → ROTATION ---
                 let yawTarget = 0;
@@ -42539,6 +43111,8 @@ class NeuralSystemsBuilding extends BuildingV2 {
                     let gF = F.gripF * (1 + VD.LOAD_FWD_GRIP * L) * wetGrip;
                     let gR = F.gripR * (1 - VD.LOAD_REAR_GRIP * L) * wetGrip;
                     if (hb) gR *= VD.HANDBRAKE_REAR_GRIP;
+                    // Power over the rear: throttle held through a turn at speed spends the rear tyres' grip, so the tail can step out
+                    if (VD.POWER_OVERSTEER && gas > 0.5 && absSpeed > 4) gR *= 1 - VD.POWER_OVERSTEER * gas * Math.min(1, Math.abs(st));
                     const a = this.length * VD.AXLE_FROM_CENTRE, wb = 2 * a;
                     const iu = (this.length * this.length + this.width * this.width) / 12 * VD.SPIN_INERTIA;   // inertia per unit mass
                     let w = this.yawRate || 0;
@@ -42549,6 +43123,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
                     const pR = -Math.sign(sR) * Math.min(Math.abs(sR) * kR * gR, F.latAcc * gR);
                     slideVelocity += (pF + pR) / 2;
                     w += a * (pF - pR) / 2 / iu;
+                    if (hb) w *= VD.HANDBRAKE_YAW_DAMP;               // the locked rear drags the swing out of it
                     w = clampU(w, VD.YAW_SPIN_MAX);
                     yaw = this.yawRate = w;
                     this.tyreSlip = Math.max(0, Math.abs(slideVelocity) - F.latAcc * 1.6) + (hb ? Math.abs(fwdVelocity) * 0.25 : 0)
@@ -43458,6 +44033,19 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 // from the player) keep braking and steering in between rather than coasting blind
             }
             
+            /** The driver's turn signal follows the wheel: steer into a turn and it comes on for that side; let go and it
+             *  finishes the cycle it's in, then goes off. Whole cycles (C ticks) are added or cut so the
+             *  running lights never jump mid-sweep. */
+            _steerSignal(req, absSpeed) {
+                const C = 42;                                   // = car-art's 7 beats of 6 ticks
+                if (this.turnSignalTimer > 0) this.turnSignalTimer--;
+                if (Math.abs(req) > 0.3 && absSpeed > 0.5) {
+                    const side = req > 0 ? 'right' : 'left';
+                    if (this.turnSignal !== side || !(this.turnSignalTimer > 0)) { this.turnSignal = side; this.turnSignalTimer = C * 10 + C - 1; }
+                    else if (this.turnSignalTimer < C * 2) this.turnSignalTimer += C * 10;
+                } else if (this.turnSignalTimer >= C) this.turnSignalTimer %= C;
+            }
+
             // --- PHYSICS-BASED STEERING CALCULATIONS ---
             
             /** How fast a turn path can be followed from `t` on: by its tightest radius left, as round a bend
@@ -45608,6 +46196,183 @@ Object.assign(TrafficVehicle.prototype, {
             c.restore();
         }
         /* =====================================================================
+           LOT GROUNDS — the open ground round the city's buildings
+           ---------------------------------------------------------------------
+           Each city block (CityLayout BLOCK) gets grounds in the Blood Garden's
+           manner instead of bare lot: moss and grass, clusters of low blooms,
+           paved courts and a stone apron round every building, wet slabs with
+           rain pools, a clipped hedge along the kerb and drifting petals.
+
+           Everything is decided per block (seeded by its name) or per point in
+           world space, so a tile paints the same ground as its neighbours
+           (world/ground-baker.js calls paintLotGround for each block in a tile).
+           A smooth noise field splits the open ground into courts, lawn and
+           flower meadow; nearness to a building turns it into apron paving.
+           ===================================================================== */
+        const LOT_STONES = {
+            ivory: { a: '#5a4d53', b: '#665860', c: '#4a3f45', seam: 'rgba(18, 10, 16, 0.6)', sheen: 'rgba(255, 228, 206, 0.07)' },
+            slate: { a: '#3c3647', b: '#463f53', c: '#332e3d', seam: 'rgba(8, 6, 12, 0.6)', sheen: 'rgba(214, 200, 255, 0.06)' },
+            rose: { a: '#5a3442', b: '#673c4c', c: '#4a2b37', seam: 'rgba(18, 6, 10, 0.6)', sheen: 'rgba(255, 190, 200, 0.07)' },
+            terracotta: { a: '#5c3a33', b: '#69433b', c: '#4d302a', seam: 'rgba(16, 8, 6, 0.6)', sheen: 'rgba(255, 210, 170, 0.07)' }
+        };
+        const LOT_BLOOMS = [
+            ['#d6163a', '#ff3a5e', '#ffb43a'],          // the Blood Garden's reds and gold
+            ['#ff6fb5', '#ffb3dc', '#fff4fa'],          // pinks
+            ['#b58cff', '#e6d8ff', '#7d5ce0'],          // violets
+            ['#ffcf6a', '#fff1c4', '#ff9a3c'],          // golds
+            ['#3fe3ff', '#bff6ff', '#b58cff']           // moon flowers
+        ];
+        const LOT_APRON = 26;                           // paving this far round a building
+
+        function lotLayout(block, buildings) {
+            if (block._lot) return block._lot;
+            const h = [...block.name].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 11);
+            const rnd = seededRandom(h);
+            const stones = Object.keys(LOT_STONES);
+            const rects = [];
+            for (const b of buildings) {
+                const w = b.w || 0, hh = b.h || 0;
+                if (!w || !hh || b.x >= block.x + block.w || b.x + w <= block.x || b.y >= block.y + block.h || b.y + hh <= block.y) continue;
+                if (b.sections && b.sections.length) for (const s of b.sections) rects.push({ x: b.x + s.x, y: b.y + s.y, w: s.w, h: s.h });
+                else rects.push({ x: b.x, y: b.y, w, h: hh });
+            }
+            return (block._lot = {
+                seed: h % 9973, rects,
+                stone: LOT_STONES[stones[Math.floor(rnd() * stones.length)]],
+                blooms: LOT_BLOOMS[Math.floor(rnd() * LOT_BLOOMS.length)],
+                court: 0.18 + rnd() * 0.24,              // below this the noise is paved court
+                meadow: 0.62 + rnd() * 0.12,             // above it, flowers
+                hedge: rnd() < 0.6
+            });
+        }
+
+        /** Smooth value noise in [0, 1], seeded, about `scale` px across a feature */
+        function lotNoise(x, y, seed, scale = 170) {
+            const hash = (i, j) => { let t = Math.imul(i * 374761393 + j * 668265263 + seed * 2246822519, 1274126177); t ^= t >>> 13; t = Math.imul(t, 1103515245); return ((t ^ (t >>> 16)) >>> 0) / 4294967296; };
+            const sm = v => v * v * (3 - 2 * v);
+            const octave = (s) => {
+                const fx = x / s, fy = y / s, i = Math.floor(fx), j = Math.floor(fy), u = sm(fx - i), v = sm(fy - j);
+                const a = hash(i, j), b = hash(i + 1, j), c = hash(i, j + 1), d = hash(i + 1, j + 1);
+                return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+            };
+            return octave(scale) * 0.7 + octave(scale * 0.37) * 0.3;
+        }
+
+        function paintLotGround(c, block, buildings, R, lod = 0) {
+            // Biggs Park and the Scrapyard keep their own forecourt and dirt
+            if (typeof HUB_BLOCKS !== 'undefined' && (block.name === HUB_BLOCKS.biggs || block.name === HUB_BLOCKS.scrapyard)) return;
+            const L = lotLayout(block, buildings), S = L.stone;
+            const x0 = Math.max(block.x, R.left), y0 = Math.max(block.y, R.top), x1 = Math.min(block.x + block.w, R.right), y1 = Math.min(block.y + block.h, R.bottom);
+            if (x1 <= x0 || y1 <= y0) return;
+            const near = (x, y) => {                     // distance to the nearest building (0 inside one)
+                let d = 1e9;
+                for (const r of L.rects) d = Math.min(d, Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.y - y, 0, y - r.y - r.h)));
+                return d;
+            };
+            // The building distance and the noise, sampled once on a 6 px grid (with a slab's margin) and looked up after
+            const G = lod ? 12 : 6, M = 30, fx0 = Math.floor((x0 - M) / G) * G, fy0 = Math.floor((y0 - M) / G) * G;
+            const fw = Math.ceil((x1 + M - fx0) / G) + 1, fh = Math.ceil((y1 + M - fy0) / G) + 1;
+            const FD = new Float32Array(fw * fh), FN = new Float32Array(fw * fh);
+            for (let j = 0; j < fh; j++) for (let i = 0; i < fw; i++) {
+                const x = fx0 + i * G + G / 2, y = fy0 + j * G + G / 2;
+                FD[j * fw + i] = near(x, y); FN[j * fw + i] = lotNoise(x, y, L.seed);
+            }
+            const at = (x, y) => Math.min(fh - 1, Math.max(0, Math.floor((y - fy0) / G))) * fw + Math.min(fw - 1, Math.max(0, Math.floor((x - fx0) / G)));
+            const paved = (x, y) => { const q = at(x, y); return FD[q] < LOT_APRON || FN[q] < L.court; };
+            const cell = (x, y, k) => _bldHash(x * 0.137 + y * 0.611 + L.seed, k);
+            const rnd = seededRandom(`${block.name}:${R.left}:${R.top}`);
+            const thin = lod ? 4 : 1;                      // a half-size tile can't show the fine grain
+            c.save(); c.beginPath(); c.rect(x0, y0, x1 - x0, y1 - y0); c.clip();
+            // 1. Rain-dark loam
+            c.fillStyle = '#211822'; c.fillRect(x0, y0, x1 - x0, y1 - y0);
+            // 2. Lawn: a moss-green field over the loam, thinning to bare earth at the courts' edges.
+            //    One pixel per field cell, scaled up smoothed, so its edges come out soft.
+            const lawn = document.createElement('canvas'); lawn.width = fw; lawn.height = fh;
+            const lc = lawn.getContext('2d'), img = lc.createImageData(fw, fh), px = img.data;
+            for (let q = 0; q < fw * fh; q++) {
+                const n = FN[q], e = FD[q] < LOT_APRON ? 0 : Math.min(1, (n - L.court) / 0.08);
+                if (e <= 0) continue;
+                const lush = Math.min(1, (n - L.court) / 0.35), v = _bldHash(q * 0.731 + L.seed, 8), o = q * 4;
+                px[o] = 28 + lush * 10 + v * 8; px[o + 1] = 54 + lush * 26 + v * 12; px[o + 2] = 34 + lush * 8; px[o + 3] = 255 * (0.45 + 0.45 * e) * (0.85 + 0.15 * v);
+            }
+            lc.putImageData(img, 0, 0);
+            c.imageSmoothingEnabled = true; c.drawImage(lawn, fx0, fy0, fw * G, fh * G);
+            // Moss, grass and blades where it isn't paved
+            const area = (x1 - x0) * (y1 - y0), MOSS = ['rgba(70, 130, 74, 0.45)', 'rgba(18, 44, 26, 0.55)', 'rgba(110, 170, 100, 0.35)', 'rgba(8, 22, 12, 0.6)'];
+            for (let k = 0; k < area / (40 * thin); k++) {
+                const x = x0 + rnd() * (x1 - x0), y = y0 + rnd() * (y1 - y0), t = rnd(), sw = rnd(), sh = rnd();
+                if (paved(x, y)) continue;
+                c.fillStyle = MOSS[t < 0.45 ? 0 : t < 0.75 ? 1 : t < 0.9 ? 2 : 3];
+                if (t < 0.9) c.fillRect(x, y, 1 + sw * 3, 1 + sh * 3);
+                else c.fillRect(x, y - 4 - sh * 2, 1, 4 + sh * 2);                              // a blade
+            }
+            // 3. Paving: slabs in running bond where it's paved, a darker kerb stone at the edge
+            const T = 24, gy0 = Math.floor(y0 / T) * T;
+            c.strokeStyle = S.seam; c.lineWidth = 1;
+            for (let gy = gy0; gy < y1; gy += T) {
+                const off = (Math.floor(gy / T) % 2) * (T / 2), gx0 = Math.floor((x0 - off) / T) * T + off;
+                for (let gx = gx0; gx < x1; gx += T) {
+                    const cx = gx + T / 2, cy = gy + T / 2, q = at(cx, cy);
+                    if (FD[q] === 0 || !paved(cx, cy)) continue;
+                    const v = cell(gx, gy, 1), edge = !paved(cx + T, cy) || !paved(cx - T, cy) || !paved(cx, cy + T) || !paved(cx, cy - T);
+                    c.fillStyle = edge ? S.c : v < 0.45 ? S.a : v < 0.85 ? S.b : S.c;
+                    c.fillRect(gx, gy, T, T);
+                    if (v > 0.9) { c.fillStyle = S.sheen; c.fillRect(gx + 2, gy + 2, T - 4, T - 4); }
+                    c.strokeRect(gx + 0.5, gy + 0.5, T - 1, T - 1);
+                    if (cell(gx, gy, 2) > 0.965) {                                     // a rain pool catching the light
+                        const rx = 10 + cell(gx, gy, 3) * 12, ry = rx * 0.4;
+                        c.fillStyle = 'rgba(20, 6, 14, 0.7)'; c.beginPath(); c.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); c.fill();
+                        c.strokeStyle = 'rgba(255, 170, 150, 0.32)'; c.beginPath(); c.ellipse(cx, cy, rx - 2, ry - 1.5, 0, 3.5, 5.6); c.stroke();
+                        c.strokeStyle = 'rgba(255, 210, 170, 0.16)'; c.beginPath(); c.ellipse(cx + 2, cy, rx * 0.5, ry * 0.45, 0, 0, Math.PI * 2); c.stroke();
+                        c.strokeStyle = S.seam;
+                    }
+                }
+            }
+            // 4. Flower clusters: leaves underneath, then five-petal blooms, in the meadow and a few in the lawn
+            const F = 34, pad = 20;
+            for (let gy = Math.floor((y0 - pad) / F) * F; gy < y1 + pad; gy += F) for (let gx = Math.floor((x0 - pad) / F) * F; gx < x1 + pad; gx += F) {
+                const cx = gx + cell(gx, gy, 4) * F, cy = gy + cell(gx, gy, 5) * F, n = lotNoise(cx, cy, L.seed);
+                if (n < L.meadow && cell(gx, gy, 6) > 0.06) continue;
+                if (cx < block.x + 8 || cx > block.x + block.w - 8 || cy < block.y + 8 || cy > block.y + block.h - 8) continue;
+                if (near(cx, cy) < LOT_APRON + 4 || paved(cx, cy)) continue;
+                const cr = seededRandom(`${L.seed}:${gx}:${gy}`), col = L.blooms[Math.floor(cr() * L.blooms.length)], n2 = 5 + Math.floor(cr() * 9);
+                c.fillStyle = 'rgba(16, 44, 24, 0.75)';
+                for (let k = 0; k < 7; k++) { c.beginPath(); c.ellipse(cx + (cr() - 0.5) * 18, cy + (cr() - 0.5) * 14, 3 + cr() * 3, 1.6 + cr() * 1.5, cr() * 3, 0, Math.PI * 2); c.fill(); }
+                for (let k = 0; k < n2; k++) {
+                    const bx = cx + (cr() - 0.5) * 20, by = cy + (cr() - 0.5) * 16, r = 1.3 + cr() * 1.5, rot = cr() * 6;
+                    c.fillStyle = cr() < 0.75 ? col : L.blooms[(L.blooms.indexOf(col) + 1) % L.blooms.length];
+                    for (let p = 0; p < 5; p++) { const a = rot + p * 1.2566; c.beginPath(); c.arc(bx + Math.cos(a) * r, by + Math.sin(a) * r, r * 0.75, 0, Math.PI * 2); c.fill(); }
+                    c.fillStyle = 'rgba(255, 236, 190, 0.9)'; c.beginPath(); c.arc(bx, by, r * 0.45, 0, Math.PI * 2); c.fill();
+                }
+            }
+            // 5. A clipped hedge along the kerb where the ground is green
+            if (L.hedge) {
+                c.lineWidth = 1;
+                const side = (ax, ay, bx, by, nx, ny) => {
+                    const len = Math.hypot(bx - ax, by - ay);
+                    for (let s = 6; s < len - 6; s += 8) {
+                        const x = ax + (bx - ax) * s / len + nx * 9, y = ay + (by - ay) * s / len + ny * 9;
+                        if (x < x0 - 12 || x > x1 + 12 || y < y0 - 12 || y > y1 + 12) continue;
+                        if (near(x, y) < LOT_APRON + 6 || paved(x, y)) continue;
+                        const r = 6 + _bldHash(x + y * 3.1, 7) * 2.5;
+                        c.fillStyle = '#163020'; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+                        c.fillStyle = 'rgba(60, 120, 70, 0.55)'; c.beginPath(); c.arc(x - r * 0.3, y - r * 0.3, r * 0.55, 0, Math.PI * 2); c.fill();
+                    }
+                };
+                const { x, y, w, h } = block;
+                side(x, y, x + w, y, 0, 1); side(x, y + h, x + w, y + h, 0, -1); side(x, y, x, y + h, 1, 0); side(x + w, y, x + w, y + h, -1, 0);
+            }
+            // 6. Petals carried across everything
+            for (let k = 0; k < area / 2600; k++) {
+                const x = x0 + rnd() * (x1 - x0), y = y0 + rnd() * (y1 - y0);
+                if (FD[at(x, y)] === 0) continue;
+                c.fillStyle = L.blooms[k % L.blooms.length]; c.globalAlpha = 0.7;
+                c.beginPath(); c.ellipse(x, y, 1.2 + rnd() * 1.4, 0.7 + rnd() * 0.6, rnd() * 3, 0, Math.PI * 2); c.fill();
+            }
+            c.globalAlpha = 1;
+            c.restore();
+        }
+        /* =====================================================================
            GROUND BAKER — the city's streets and ground, painted once per tile
            ---------------------------------------------------------------------
            The hub's ground (lots, lawns, the scrapyard), roads, intersections,
@@ -45625,7 +46390,8 @@ Object.assign(TrafficVehicle.prototype, {
 
            The look: wet asphalt with grain and repairs, champagne lane dashes and
            a lavender centre line, worn ivory crossings, paver pavements with a
-           lit kerb, drains and manholes; lawns where the ground is green.
+           lit kerb, drains and manholes; lawns where the ground is green; and
+           round the buildings, each block's own grounds (world/lot-grounds.js).
            ===================================================================== */
         const GROUND_LOOK = {
             lot: '#221e28', asphalt: '#16141b', asphaltHi: '#1e1b25', joint: '#121017',
@@ -45781,12 +46547,20 @@ Object.assign(TrafficVehicle.prototype, {
                 }
                 const sources = this._groundSources(map, g.traffic.network);
                 const query = i => sources[i].grid.query(R, sources[i].results);
-                // 2. Floor zones: green ones are lawns, the rest tint the ground
+                // 2. Floor zones tint the ground; then each block's grounds round its buildings go over the
+                //    tint (lawn, blooms, paved courts: world/lot-grounds.js); green zones are lawns, over both
                 for (const entry of query(0)) {
                     const z = entry.item;
-                    if (!hits(z.x, z.y, z.w, z.h)) continue;
-                    if (this._isGreen(z.color)) this._paintLawn(c, z, R, rnd);
-                    else { c.globalAlpha = 0.45; c.fillStyle = z.color; c.fillRect(z.x, z.y, z.w, z.h); c.globalAlpha = 1; }
+                    if (!hits(z.x, z.y, z.w, z.h) || this._isGreen(z.color)) continue;
+                    c.globalAlpha = 0.45; c.fillStyle = z.color; c.fillRect(z.x, z.y, z.w, z.h); c.globalAlpha = 1;
+                }
+                if (map.cityLayout) for (const entry of query(1)) {
+                    const b = entry.item;
+                    if (b.type === 'BLOCK' && hits(b.x, b.y, b.w, b.h)) paintLotGround(c, b, map.buildings || [], R, lod);
+                }
+                for (const entry of query(0)) {
+                    const z = entry.item;
+                    if (hits(z.x, z.y, z.w, z.h) && this._isGreen(z.color)) this._paintLawn(c, z, R, rnd);
                 }
                 // 3. Parks and plazas (city-layout zones)
                 const city = map.cityLayout;
@@ -73957,7 +74731,7 @@ engineMixin({
                 let targetZoom = 1.0;
                 if (this.isDriving) { 
                     // Pulls back with speed, down to a floor: the look-ahead already shows the road in front
-                    const speedRatio = Math.abs(this.car.speed) / this.car.maxSpeed, CZ = CONFIG.VEHICLE_DRIVE.CAM_ZOOM;
+                    const speedRatio = Math.abs(this.car.speed) / (this.car.drivenTop || this.car.maxSpeed), CZ = CONFIG.VEHICLE_DRIVE.CAM_ZOOM;
                     targetZoom = Math.max(CZ.FLOOR, 1.0 - speedRatio * CZ.SPAN);
                 } else {
                     // On foot: in a little closer with the gun away, and again indoors; by something to use (or talking), closer still (INTERACT_ZOOM)
