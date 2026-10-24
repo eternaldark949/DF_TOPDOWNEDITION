@@ -66,7 +66,10 @@
                 // Filter toggle
                 const filterToggle = this.rightSidebar?.querySelector('.filter-toggle-track');
                 if (filterToggle) {
-                    filterToggle.addEventListener('click', () => {
+                    filterToggle.addEventListener('click', event => {
+                        // Tapping the pill that's already lit leaves the filter as it is
+                        const pill = event.target.closest('.filter-pill');
+                        if (pill && (pill.dataset.state === 'on') === filterToggle.classList.contains('on')) return;
                         filterToggle.classList.toggle('on');
                         this.filterEnabled = filterToggle.classList.contains('on');
                         const labels = this.rightSidebar.querySelectorAll('.filter-toggle-labels span');

@@ -549,6 +549,15 @@
                 }
                 el.appendChild(body);
 
+                const qty = document.createElement('div');
+                qty.className = 'pill-qty';
+                const qtyLabel = document.createElement('span');
+                qtyLabel.className = 'pill-qty-label'; qtyLabel.textContent = 'QTY';
+                const qtyValue = document.createElement('span');
+                qtyValue.className = 'pill-qty-value'; qtyValue.textContent = String(entry.quantity ?? entry.item?.quantity ?? 1);
+                qty.append(qtyLabel, qtyValue);
+                el.appendChild(qty);
+
                 const actions = [];
                 if (entry.source === 'carried') {
                     const config = this.typeConfig[entry.type] || {};
