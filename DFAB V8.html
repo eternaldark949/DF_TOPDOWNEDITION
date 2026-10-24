@@ -7,7 +7,7 @@
     <title>Dimensions: Freelancer</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,500;1,600&family=Great+Vibes&family=Montserrat:wght@400;600;800;900&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,500;1,600&family=Great+Vibes&family=Montserrat:wght@400;600;800;900&family=Orbitron:wght@500;700;900&family=Raleway:wght@400;500&display=swap" rel="stylesheet">
     <style>
         /* =========================================
            1. CORE VARIABLES & SETUP
@@ -443,12 +443,13 @@
             padding-bottom: 20px;
         }
         
-        /* Item pills, after ETERNAL's mock-up: dotted capsules; electric violet when open,
-           pale lavender when equipped, a crimson dotted ring for consumables, champagne for keepsakes */
+        /* Item pills, sampled from ETERNAL's inventory mock-up (top two rows): a dashed violet capsule.
+           Unequipped: black at the icon end deepening to electric violet, a fine light divider after the icon.
+           Equipped: pale lavender at the icon end to violet, the icon on a soft-edged black tile. */
         .ui-pill {
             width: 100%; 
             min-height: 76px;
-            border: 2px dotted rgba(202, 176, 250, 0.45);
+            border: 1.5px dashed var(--df-violet-mid);
             border-radius: 44px;
             display: flex; 
             align-items: center; 
@@ -456,64 +457,66 @@
             padding-right: 60px;
             margin-bottom: 14px; 
             box-sizing: border-box;
-            position: relative;
+            position: relative; z-index: 0;   /* each pill its own layer, so an open menu sits over the next pill's diamond */
             cursor: pointer;
-            transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
-            background: linear-gradient(90deg, rgba(4, 1, 6, 0.92) 0%, rgba(24, 6, 50, 0.85) 55%, rgba(48, 14, 120, 0.7) 100%);
+            transition: filter 0.3s ease, box-shadow 0.35s ease;
+            background:
+                radial-gradient(ellipse 22% 95% at 7% 50%, #000 0%, #000 45%, rgba(0, 0, 0, 0) 100%),
+                linear-gradient(90deg, #050010 0%, #0d0222 14%, #3f0aa0 34%, #5210c9 58%, #5f14e7 80%, #6618e1 100%);
+            box-shadow: inset 0 0 22px 2px rgba(48, 8, 122, 0.9);
         }
-        .ui-pill:hover { border-color: rgba(202, 176, 250, 0.8); box-shadow: 0 0 18px rgba(142, 85, 245, 0.25); }
+        .ui-pill:hover { filter: brightness(1.08); }
         
-        /* --- ICON TILE --- */
+        /* --- ICON: bare on the black, a light divider fading out at both ends --- */
         .pill-icon {
             width: 54px; height: 54px;
             border-radius: 14px;
-            background: radial-gradient(circle at 50% 40%, rgba(60, 20, 30, 0.9), #050103 75%);
-            border: 1px solid rgba(202, 176, 250, 0.15);
+            background: transparent;
+            border: none;
             display: flex; justify-content: center; align-items: center;
             font-size: max(6px, 1.4rem - var(--font-trim));
-            margin-right: 18px;
+            margin-right: 34px;
             flex-shrink: 0;
-            box-shadow: 0 0 14px rgba(0, 0, 0, 0.7);
+            position: relative;
+        }
+        .pill-icon::after {
+            content: ''; position: absolute; right: -18px; top: -6px; bottom: -6px; width: 1px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.75) 50%, rgba(255, 255, 255, 0) 100%);
         }
         
-        /* --- OPEN (expanded): the mock-up's electric-violet card --- */
-        .ui-pill.expanded {
-            border-color: rgba(202, 176, 250, 0.75);
-            background: linear-gradient(90deg, #050103 0%, var(--df-violet-deep) 30%, #3f0a9d 60%, var(--df-violet) 100%);
-            box-shadow: 0 0 26px rgba(93, 20, 226, 0.45), inset 0 0 30px rgba(142, 85, 245, 0.15);
-        }
+        /* --- OPEN (expanded): the same card, a touch brighter --- */
+        .ui-pill.expanded { z-index: 5; filter: brightness(1.08); box-shadow: inset 0 0 26px 3px rgba(60, 12, 150, 0.95); }
         
-        /* --- EQUIPPED: the mock-up's pale lavender card --- */
+        /* --- EQUIPPED: pale lavender to violet, darker violet shading round the inside edge --- */
         .ui-pill.active-item {
-            border-color: rgba(255, 255, 255, 0.55);
-            background: radial-gradient(ellipse 80% 140% at 35% 50%, var(--df-lavender-pale) 0%, #dac1fc 55%, #b896f6 100%);
-            box-shadow: 0 0 22px rgba(202, 176, 250, 0.45);
+            background: linear-gradient(90deg, #f1e8fe 0%, #efe5fe 20%, #e2d0fc 38%, #ccadfb 60%, #ad81f8 82%, #9560f6 100%);
+            box-shadow: inset 0 0 20px 2px rgba(112, 66, 200, 0.75);
         }
-        .ui-pill.active-item .pill-name { color: #5b2fc4; }
-        .ui-pill.active-item .pill-desc { color: var(--df-violet-ink); }
-        .ui-pill.active-item .pill-icon { border: 1px solid rgba(255, 255, 255, 0.6); box-shadow: 0 0 12px rgba(93, 20, 226, 0.35); }
-        .ui-pill.active-item.expanded { background: radial-gradient(ellipse 80% 140% at 35% 50%, #fff 0%, #e4d0fd 55%, #c4a5f8 100%); }
+        .ui-pill.active-item.expanded { box-shadow: inset 0 0 24px 3px rgba(112, 66, 200, 0.85); }
+        .ui-pill.active-item .pill-desc { color: #390892; }
+        .ui-pill.active-item .pill-icon { background: #050103; box-shadow: 0 0 12px 6px rgba(5, 1, 3, 0.85); }
+        .ui-pill.active-item .pill-icon::after { display: none; }
         .ui-pill.active-item .pill-equipped-tag { display: inline; }
-        
-        /* --- TYPE ACCENTS (border only; the body follows the state above) --- */
-        .ui-pill.type-consumable { border-color: rgba(208, 16, 28, 0.7); }
-        .ui-pill.type-consumable.expanded { box-shadow: 0 0 26px rgba(208, 16, 28, 0.3), inset 0 0 30px rgba(142, 85, 245, 0.15); }
-        .ui-pill.type-collectible, .ui-pill.type-intel { border-color: rgba(216, 198, 162, 0.55); }
-        .ui-pill.type-collectible .pill-name, .ui-pill.type-intel .pill-name { color: var(--df-champagne); }
         
         /* --- PILL TEXT ELEMENTS --- */
         .pill-name {
-            font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.78rem - var(--font-trim)); font-weight: 600; letter-spacing: 1.5px;
-            text-transform: uppercase; color: var(--df-lavender); transition: color 0.3s;
-            display: inline-block; padding-bottom: 5px; margin-bottom: 4px;
-            border-bottom: 1px solid rgba(202, 176, 250, 0.3); min-width: 55%;
+            font-family: 'Raleway', 'Montserrat', sans-serif; font-size: max(6px, 0.82rem - var(--font-trim)); font-weight: 400; letter-spacing: 0.3px;
+            text-transform: uppercase; color: var(--df-violet-mid);
+            display: inline-block; padding-bottom: 6px; margin-bottom: 6px; min-width: 55%;
+            background: linear-gradient(90deg, var(--df-violet-mid) 0%, var(--df-violet-mid) 70%, rgba(142, 85, 245, 0)) left bottom / 100% 1px no-repeat;
         }
-        .ui-pill.expanded .pill-name { color: #e6d8ff; }
-        .pill-desc { color: rgba(225, 214, 245, 0.8); font-size: max(6px, 0.74rem - var(--font-trim)); line-height: 1.35; margin-top: 2px; transition: color 0.3s; }
-        .ui-pill.expanded .pill-desc { color: #fff; }
+        .pill-desc { font-family: 'Raleway', 'Montserrat', sans-serif; color: var(--df-lavender); font-size: max(6px, 0.8rem - var(--font-trim)); font-weight: 400; line-height: 1.3; margin-top: 2px; transition: color 0.3s; }
         .pill-type-badge { font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.5rem - var(--font-trim)); font-weight: 600; color: var(--df-lavender); border: 1px solid var(--df-lavender); padding: 1px 6px; border-radius: 8px; text-transform: uppercase; letter-spacing: 1px; margin-right: 8px; }
         .pill-equipped-tag { color: #5b2fc4; background: rgba(255, 255, 255, 0.55); border-radius: 8px; padding: 1px 8px; font-size: max(6px, 0.55rem - var(--font-trim)); font-weight: 700; letter-spacing: 1.5px; display: none; }
-        .pill-qty { font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.6rem - var(--font-trim)); color: var(--df-lavender); letter-spacing: 1px; }
+        
+        /* --- QTY: a small caption over a deep-violet chip with a dotted rim --- */
+        .pill-qty { flex-shrink: 0; margin-left: 18px; display: flex; flex-direction: column; align-items: center; gap: 5px;
+            font-family: 'Raleway', 'Montserrat', sans-serif; color: var(--df-lavender); }
+        .pill-qty-label { font-size: max(6px, 0.74rem - var(--font-trim)); letter-spacing: 0.5px; }
+        .pill-qty-value { min-width: 62px; padding: 4px 10px; box-sizing: border-box; text-align: center;
+            background: #24055b; border: 1.5px dotted var(--df-violet-mid); border-radius: 14px;
+            font-size: max(6px, 0.96rem - var(--font-trim)); line-height: 1.2; }
+        .ui-pill.active-item .pill-qty { color: #f2dcdb; }
         
         /* Touch-Friendly Close 'X' */
         #inventory-close-x {
@@ -2770,7 +2773,7 @@
         .ui-pill.expanded .node-menu { transform: translateY(-50%) scaleX(1); opacity: 1; pointer-events: auto; }
         .ui-pill.expanded .control-node { transform: translateY(-50%) rotate(225deg) scale(1.1); }
         .node-btn { font-family: var(--font-ui); font-size: max(6px, 0.62rem - var(--font-trim)); font-weight: 600; color: #2a1060; background: var(--df-lavender); border: none; cursor: pointer; text-transform: uppercase; padding: 6px 26px; min-width: 110px; letter-spacing: 1.5px; transition: all 0.2s; }
-        .node-btn.drop-btn { background: var(--df-violet-mid); color: #fff; }
+        .node-btn.drop-btn { background: var(--df-violet-mid); color: #2a1060; }
         .node-btn:hover { filter: brightness(1.15); }
 
         /* Inventory ownership views use the existing capsule design. */
@@ -2787,13 +2790,12 @@
             letter-spacing: 0.5px; margin-top: 5px;
         }
         #inventory-list .active-item .inventory-entry-detail { color: var(--df-violet-ink); }
-        #inventory-list .active-item.type-collectible .pill-name { color: #5b2fc4; }
         #inventory-list .inventory-registry-tag {
             color: var(--df-champagne); border: 1px solid rgba(216,198,162,.35);
             border-radius: 8px; padding: 2px 6px;
             font: 600 max(6px, 0.5rem - var(--font-trim)) var(--font-ui); letter-spacing: 1px;
         }
-        #inventory-list .inventory-registry-readonly { cursor: default; padding-right: 22px; }
+        #inventory-list .inventory-registry-readonly { cursor: default; }   /* keeps the diamond's room so QTY lines up */
         #inventory-list .inventory-empty { color: var(--df-lavender); text-align: center; margin: 50px 12px; font-size: max(6px, .75rem - var(--font-trim)); }
         #inventory-list .control-node {
             width: 44px; height: 44px; right: 5px; padding: 0; border: 0;
@@ -2802,19 +2804,33 @@
         }
         #inventory-list .control-node::before {
             content: ''; position: absolute; left: 17px; top: 17px;
-            width: 10px; height: 10px; background: #fffdfa;
+            width: 10px; height: 10px; background: #fff0d4;
             transform: rotate(45deg); transition: transform .3s;
-            box-shadow: 0 0 8px rgba(255,194,72,.8), 0 0 18px rgba(202,176,250,.5);
+            box-shadow: 0 0 4px 1px rgba(255,170,60,.95), 0 0 12px 2px rgba(255,140,40,.45);
         }
         #inventory-list .control-node:hover, #inventory-list .expanded .control-node { transform: translateY(-50%); }
         #inventory-list .expanded .control-node::before { transform: rotate(225deg); }
         #inventory-list .control-node:focus-visible { outline: 2px solid var(--df-champagne); outline-offset: 1px; }
-        #inventory-list .node-menu { z-index: 101; right: 50px; }
+        /* As in the mock-up: the menu drops from under the QTY chip, a small lavender pointer above it */
+        #inventory-list .node-menu {
+            z-index: 101; right: 14px; top: calc(50% + 30px); min-width: 150px;
+            transform: scaleY(0); transform-origin: center top; box-shadow: none;
+        }
+        #inventory-list .ui-pill.expanded .node-menu { transform: scaleY(1); }
+        #inventory-list .node-menu::before {
+            content: ''; position: absolute; left: 50%; top: -11px; transform: translateX(-50%);
+            border: 11px solid transparent; border-top: 9px solid var(--df-lavender); border-bottom: 0;
+            margin-top: -1px; top: -10px;
+        }
+        #inventory-list .node-btn { font-family: 'Raleway', var(--font-ui); font-weight: 500; font-size: max(6px, 0.72rem - var(--font-trim)); letter-spacing: 0.5px; }
         #inventory-list .node-btn { min-height: 36px; }
         @media (max-width: 700px), (max-height: 540px) {
-            #inventory-list .pill-icon { width: 42px; height: 42px; margin-right: 10px; }
+            #inventory-list .pill-icon { width: 42px; height: 42px; margin-right: 22px; }
+            #inventory-list .pill-icon::after { right: -12px; }
             #inventory-list .ui-pill { padding-left: 14px; min-height: 88px; }
-            #inventory-list .pill-name { font-size: max(6px, .7rem - var(--font-trim)); letter-spacing: 1px; }
+            #inventory-list .pill-name { font-size: max(6px, .7rem - var(--font-trim)); }
+            #inventory-list .pill-qty { margin-left: 8px; }
+            #inventory-list .pill-qty-value { min-width: 44px; padding: 3px 6px; }
             #inventory-list .node-btn { min-height: 40px; }
         }
 
@@ -58635,6 +58651,15 @@ Object.assign(TrafficVehicle.prototype, {
                     body.appendChild(detail);
                 }
                 el.appendChild(body);
+
+                const qty = document.createElement('div');
+                qty.className = 'pill-qty';
+                const qtyLabel = document.createElement('span');
+                qtyLabel.className = 'pill-qty-label'; qtyLabel.textContent = 'QTY';
+                const qtyValue = document.createElement('span');
+                qtyValue.className = 'pill-qty-value'; qtyValue.textContent = String(entry.quantity ?? entry.item?.quantity ?? 1);
+                qty.append(qtyLabel, qtyValue);
+                el.appendChild(qty);
 
                 const actions = [];
                 if (entry.source === 'carried') {
