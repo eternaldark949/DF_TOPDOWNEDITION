@@ -505,7 +505,8 @@
         .ui-pill.active-item .pill-equipped-tag { display: inline; }
 
         /* --- CATEGORY COLOURS (ETERNAL's scheme): violet weapons and gear, crimson consumables,
-           moonstone collectibles, rose-gold mounts, emerald spells. Same build as the violet pill. --- */
+           moonstone collectibles, rose-gold mounts, emerald spells,
+           rose-quartz cosmetics, amber-smoke furniture (sapphire kept on standby). Same build as the violet pill. --- */
         .ui-pill.type-consumable {
             --pill-accent: #d0141c;
             border-color: var(--pill-accent);
@@ -580,6 +581,40 @@
         .ui-pill.type-spell.active-item .pill-name { color: #0b7a42; }
         .ui-pill.type-spell.active-item .pill-desc, #inventory-list .ui-pill.type-spell.active-item .inventory-entry-detail { color: #053a20; }
         .ui-pill.type-spell.active-item .pill-equipped-tag { color: #0b7a42; }
+        /* rose quartz: cosmetics */
+        .ui-pill.type-cosmetic { border-color: #f39ac0; background: radial-gradient(ellipse 22% 95% at 7% 50%, #000 0%, #000 45%, rgba(0, 0, 0, 0) 100%), radial-gradient(ellipse 40% 120% at 78% 0%, rgba(255, 190, 220, 0.14), rgba(0, 0, 0, 0) 70%), linear-gradient(90deg, #060204 0%, #18070f 14%, #4c1630 34%, #6e2146 58%, #852b57 80%, #923060 100%); box-shadow: inset 0 0 22px 2px rgba(90, 20, 54, 0.9); }
+        .ui-pill.type-cosmetic .pill-name { color: #ffa8cc; }
+        .ui-pill.type-cosmetic .inventory-entry-head { background-image: linear-gradient(90deg, #f39ac0 0%, #f39ac0 70%, rgba(0, 0, 0, 0)); }
+        .ui-pill.type-cosmetic .pill-desc, .ui-pill.type-cosmetic .pill-qty, #inventory-list .ui-pill.type-cosmetic .inventory-entry-detail { color: #fbdbe9; }
+        .ui-pill.type-cosmetic .pill-qty-value { background: #3a0c22; border-color: #f39ac0; }
+        #inventory-list .ui-pill.type-cosmetic .inventory-registry-tag { color: #ffc6dd; border-color: rgba(245, 150, 195, 0.55); }
+        .ui-pill.type-cosmetic.active-item { background: linear-gradient(90deg, #fff0f6 0%, #fde6f0 20%, #f9cde0 38%, #f2a8c8 60%, #e47eab 82%, #d66395 100%); box-shadow: inset 0 0 20px 2px rgba(170, 60, 110, 0.6); }
+        .ui-pill.type-cosmetic.active-item .pill-name { color: #a8306a; }
+        .ui-pill.type-cosmetic.active-item .pill-desc, #inventory-list .ui-pill.type-cosmetic.active-item .inventory-entry-detail { color: #521232; }
+        .ui-pill.type-cosmetic.active-item .pill-equipped-tag { color: #a8306a; }
+        /* amber smoke: furniture */
+        .ui-pill.type-furniture { border-color: #c99a6a; background: radial-gradient(ellipse 22% 95% at 7% 50%, #000 0%, #000 45%, rgba(0, 0, 0, 0) 100%), radial-gradient(ellipse 40% 120% at 78% 0%, rgba(255, 215, 170, 0.10), rgba(0, 0, 0, 0) 70%), linear-gradient(90deg, #050302 0%, #140d08 14%, #3a2a1e 34%, #54402e 58%, #66503a 80%, #6e5740 100%); box-shadow: inset 0 0 22px 2px rgba(60, 40, 24, 0.9); }
+        .ui-pill.type-furniture .pill-name { color: #e2b98e; }
+        .ui-pill.type-furniture .inventory-entry-head { background-image: linear-gradient(90deg, #c99a6a 0%, #c99a6a 70%, rgba(0, 0, 0, 0)); }
+        .ui-pill.type-furniture .pill-desc, .ui-pill.type-furniture .pill-qty, #inventory-list .ui-pill.type-furniture .inventory-entry-detail { color: #efe2d3; }
+        .ui-pill.type-furniture .pill-qty-value { background: #2c2016; border-color: #c99a6a; }
+        #inventory-list .ui-pill.type-furniture .inventory-registry-tag { color: #ecd0b0; border-color: rgba(210, 170, 130, 0.5); }
+        .ui-pill.type-furniture.active-item { background: linear-gradient(90deg, #fbf5ee 0%, #f6ecdf 20%, #ead6bf 38%, #d8b894 60%, #c09670 82%, #ad835e 100%); box-shadow: inset 0 0 20px 2px rgba(120, 85, 55, 0.6); }
+        .ui-pill.type-furniture.active-item .pill-name { color: #7a5130; }
+        .ui-pill.type-furniture.active-item .pill-desc, #inventory-list .ui-pill.type-furniture.active-item .inventory-entry-detail { color: #3a2414; }
+        .ui-pill.type-furniture.active-item .pill-equipped-tag { color: #7a5130; }
+        /* sapphire: on standby. To give it to cosmetics, swap 'type-cosmetic' and 'type-sapphire-standby' across
+           the rose-quartz block and this one (a find-and-replace). Nothing has the type sapphire-standby, so it sits unused. */
+        .ui-pill.type-sapphire-standby { border-color: #4f8dff; background: radial-gradient(ellipse 22% 95% at 7% 50%, #000 0%, #000 45%, rgba(0, 0, 0, 0) 100%), radial-gradient(ellipse 40% 120% at 78% 0%, rgba(150, 190, 255, 0.12), rgba(0, 0, 0, 0) 70%), linear-gradient(90deg, #010208 0%, #040a20 14%, #0a2468 34%, #0f3490 58%, #1442b0 80%, #1749bf 100%); box-shadow: inset 0 0 22px 2px rgba(8, 30, 100, 0.9); }
+        .ui-pill.type-sapphire-standby .pill-name { color: #7fb0ff; }
+        .ui-pill.type-sapphire-standby .inventory-entry-head { background-image: linear-gradient(90deg, #4f8dff 0%, #4f8dff 70%, rgba(0, 0, 0, 0)); }
+        .ui-pill.type-sapphire-standby .pill-desc, .ui-pill.type-sapphire-standby .pill-qty, #inventory-list .ui-pill.type-sapphire-standby .inventory-entry-detail { color: #d6e4ff; }
+        .ui-pill.type-sapphire-standby .pill-qty-value { background: #061a4d; border-color: #4f8dff; }
+        #inventory-list .ui-pill.type-sapphire-standby .inventory-registry-tag { color: #b8d0ff; border-color: rgba(120, 160, 255, 0.55); }
+        .ui-pill.type-sapphire-standby.active-item { background: linear-gradient(90deg, #eef4ff 0%, #e4edff 20%, #c8daff 38%, #9dbcff 60%, #6a97f5 82%, #4a7de8 100%); box-shadow: inset 0 0 20px 2px rgba(40, 80, 180, 0.65); }
+        .ui-pill.type-sapphire-standby.active-item .pill-name { color: #1a46b0; }
+        .ui-pill.type-sapphire-standby.active-item .pill-desc, #inventory-list .ui-pill.type-sapphire-standby.active-item .inventory-entry-detail { color: #0a1f55; }
+        .ui-pill.type-sapphire-standby.active-item .pill-equipped-tag { color: #1a46b0; }
         
         /* --- PILL TEXT ELEMENTS --- */
         .pill-name {
