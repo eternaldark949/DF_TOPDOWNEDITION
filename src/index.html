@@ -13,6 +13,24 @@
     </style>
 </head>
 <body>
+    <!-- Shared icons, drawn with <svg><use href="#icon-…"/></svg> -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <!-- Cinematic aperture, after ETERNAL's mock-up: a violet disc of swirling blades in a lavender ring -->
+        <symbol id="icon-aperture" viewBox="0 0 100 100">
+            <defs>
+                <radialGradient id="ap-disc" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#9a5cf4"/><stop offset="1" stop-color="#7d40e6"/></radialGradient>
+                <radialGradient id="ap-eye"><stop offset="0" stop-color="#fbeee4"/><stop offset=".6" stop-color="#ecd3df"/><stop offset="1" stop-color="#d9b8f4" stop-opacity="0"/></radialGradient>
+            </defs>
+            <circle cx="50" cy="50" r="49" fill="#2a0b40" fill-opacity=".55"/>
+            <circle cx="50" cy="50" r="46" fill="#1c0629"/>
+            <circle cx="50" cy="50" r="47" fill="none" stroke="#e1c6fe" stroke-width="2"/>
+            <circle cx="50" cy="50" r="42.5" fill="#e1c6fe"/>
+            <circle cx="50" cy="50" r="36.5" fill="url(#ap-disc)"/>
+            <path d="M55.0 50.0 Q74.5 44.8 59.8 84.1 M52.5 54.3 Q66.7 68.6 25.3 75.5 M47.5 54.3 Q42.3 73.8 15.6 41.4 M45.0 50.0 Q25.5 55.2 40.2 15.9 M47.5 45.7 Q33.3 31.4 74.7 24.5 M52.5 45.7 Q57.7 26.2 84.4 58.6" fill="none" stroke="#c9a6f6" stroke-width="2.8" stroke-linecap="round"/>
+            <path d="M55.0 50.0 Q74.5 44.8 59.8 84.1 M52.5 54.3 Q66.7 68.6 25.3 75.5 M47.5 54.3 Q42.3 73.8 15.6 41.4 M45.0 50.0 Q25.5 55.2 40.2 15.9 M47.5 45.7 Q33.3 31.4 74.7 24.5 M52.5 45.7 Q57.7 26.2 84.4 58.6" fill="none" stroke="#8a4cec" stroke-width="0.9" stroke-linecap="round"/>
+            <circle cx="50" cy="50" r="9" fill="url(#ap-eye)"/>
+        </symbol>
+    </svg>
 
     <!-- AUGMENT SHOP (Dr. Yin's) and the WORKBENCH — styles/shops.css -->
     <div id="augment-shop" class="df-shop">
@@ -933,7 +951,7 @@
                 <div class="pause-quick">
                     <div class="pause-quick-title">QUICK ACCESS</div>
                     <div class="pause-quick-item" data-action="equip" tabindex="0">EQUIP ITEMS</div>
-                    <div class="pause-quick-item" data-action="cinematic" tabindex="0">CINEMATIC VIEW</div>
+                    <div class="pause-quick-item" data-action="cinematic" tabindex="0">CINEMATIC VIEW <svg class="aperture-icon" aria-hidden="true"><use href="#icon-aperture"/></svg></div>
                     <div class="pause-quick-item" data-action="drop" tabindex="0">DROP ITEMS</div>
                 </div>
             </div>

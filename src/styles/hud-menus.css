@@ -954,6 +954,11 @@
             padding: 6px 10px; cursor: pointer; position: relative; z-index: 0; outline: none; transition: color 0.2s;
         }
         .pause-quick-item:hover { color: #fff; }
+        /* The cinematic aperture (#icon-aperture in index.html), glowing violet beside its label */
+        .aperture-icon { width: 1.9em; height: 1.9em; vertical-align: middle; margin-left: 8px; flex-shrink: 0;
+            filter: drop-shadow(0 0 4px rgba(164, 105, 255, 0.65)); }
+        .pause-quick-item:has(.aperture-icon) { display: flex; align-items: center; padding-top: 2px; padding-bottom: 2px; }
+        .pause-quick-item .aperture-icon { width: 30px; height: 30px; margin-left: 12px; }
         .pause-quick-item.active { color: #1b0d2e; font-weight: 700; }
         .pause-quick-item.active::before {
             content: ''; position: absolute; inset: 0 0 0 0; z-index: -1;
@@ -1102,6 +1107,8 @@
             color: var(--df-violet-ink); font: 600 max(6px, 0.72rem - var(--font-trim)) var(--font-ui); letter-spacing: 3px; text-transform: uppercase; box-shadow: 0 0 22px rgba(202, 176, 250, 0.55);
             transition: opacity 0.35s ease, transform 0.35s ease;
         }
+        #capture-pill { display: inline-flex; align-items: center; gap: 8px; padding-left: 8px; }
+        #capture-pill .aperture-icon { margin-left: 0; width: 2.2em; height: 2.2em; }
         #capture-pill.show { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
         body.cinematic-view #capture-pill { display: none; }
         @keyframes cineHint { 0% { opacity: 0; } 15% { opacity: 0.85; } 65% { opacity: 0.85; } 100% { opacity: 0; } }
