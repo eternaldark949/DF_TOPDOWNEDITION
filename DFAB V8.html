@@ -2051,6 +2051,42 @@
         .input-prompt { font-size: max(6px, 0.65rem - var(--font-trim)); color: #fff; border: 1px solid #555; padding: 2px 10px; border-radius: 20px; background: rgba(255, 255, 255, 0.1); box-shadow: 0 0 10px var(--glow-color); white-space: nowrap; }
         .hidden { display: none !important; }
 
+        /* Title screen after ETERNAL's original menu: "Dimensions" and "Freelancer" as hollow neon script
+           (a pale tube with a lavender halo and a dark core), the options in Feminine fading off to the
+           right, and the hovered row's hint bar and key capsule. Sizes follow the screen height. */
+        :is(#main-menu, #tap-to-begin) .title-container { --title-size: min(18.5vh, 11.5vw); }
+        :is(#main-menu, #tap-to-begin) .title-script, body.landscape :is(#main-menu, #tap-to-begin) .title-script {
+            font-size: max(6px, var(--title-size) - var(--font-trim)); font-weight: 400; line-height: 1; transform: none; left: 0; opacity: 1;
+            color: transparent; -webkit-text-stroke: 1.2px #f1eaff; text-shadow: none;
+            filter: drop-shadow(0 0 1px rgba(240, 228, 255, 0.7)) drop-shadow(0 0 5px rgba(170, 120, 255, 0.6)) drop-shadow(0 0 16px rgba(120, 60, 220, 0.35));
+        }
+        :is(#main-menu, #tap-to-begin) .title-sub, body.landscape :is(#main-menu, #tap-to-begin) .title-sub {
+            font-family: var(--font-script); text-transform: none; font-weight: 400; line-height: 1;
+            font-size: max(6px, var(--title-size) * 0.6 - var(--font-trim)); letter-spacing: 0.34em; margin: 0.02em 0 0 0.34em;
+            color: transparent; -webkit-text-stroke: 1px #f1eaff; text-shadow: none;
+            filter: drop-shadow(0 0 1px rgba(240, 228, 255, 0.7)) drop-shadow(0 0 4px rgba(170, 120, 255, 0.6)) drop-shadow(0 0 12px rgba(120, 60, 220, 0.35));
+        }
+        #main-menu:not(.menu-long) .title-container { top: 39%; }
+        #main-menu:not(.menu-long) .menu-list-container { top: 63%; }
+        #main-menu.menu-long .title-container { --title-size: min(13vh, 8vw); }
+        #main-menu .menu-btn { font-family: var(--font-menu); font-weight: 400; letter-spacing: 0.42em; color: #ddd6e7; }
+        #main-menu:not(.menu-long) .menu-btn {
+            color: transparent;
+            background: linear-gradient(90deg, #e2dbec 0%, #cfc7da 52%, #6b6376 100%); -webkit-background-clip: text; background-clip: text;
+        }
+        #main-menu .menu-item-row:hover .menu-btn { background: none; color: #fff; text-shadow: 0 0 8px rgba(255, 255, 255, 0.85); transform: none; }
+        #main-menu .desc-box {
+            font-family: var(--font-menu-body); color: #e8e2f0; border-left: 0; justify-content: center; text-align: center;
+            min-width: 190px; padding: 2px 10px 2px 24px; position: relative;
+            background: linear-gradient(90deg, rgba(30, 6, 40, 0) 0%, rgba(34, 8, 46, 0.92) 18%, rgba(34, 8, 46, 0.95) 100%);
+        }
+        #main-menu .desc-box .arrow { position: absolute; right: 8px; margin: 0; color: #f4eeff; font-size: max(6px, 0.55rem - var(--font-trim)); }
+        #main-menu .input-prompt {
+            font-family: var(--font-menu-body); color: #ece6f6; min-width: 76px; text-align: center; padding: 3px 12px;
+            background: #170c20; border: 2.5px solid #9a85c8; border-radius: 20px;
+            box-shadow: 0 0 8px rgba(154, 133, 200, 0.7), inset 0 0 6px rgba(154, 133, 200, 0.35);
+        }
+
         /* --- DIALOGUE & COMMS --- */
         /* Two looks, picked in Settings → Developer → Talk Style (GameSettings.talkStyle, core/settings.js):
              Veil (default): no box. A dusk veil rises from the bottom edge, the speaker's painted bust
