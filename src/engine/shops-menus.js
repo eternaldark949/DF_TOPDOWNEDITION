@@ -353,9 +353,9 @@
                 for (const g of GAUNTLET_MAPS) {
                     const best = hg && hg.highestWaves[g.id];
                     const on = !g.locked;
-                    html += `<button class="gauntlet-map-btn" data-id="${g.id}" ${on ? '' : 'disabled'} style="display:block; width:100%; padding:12px 14px; margin-bottom:7px; text-align:left; border-radius:5px; font-family:Montserrat,sans-serif; cursor:${on ? 'pointer' : 'default'}; background:${on ? 'linear-gradient(90deg, rgba(122,77,216,0.16), rgba(138,31,53,0.14))' : 'rgba(255,255,255,0.02)'}; border:1px solid ${on ? 'rgba(232,194,122,0.35)' : 'rgba(255,255,255,0.06)'}; color:${on ? '#eee' : '#555'};">`;
+                    html += `<button class="gauntlet-map-btn" data-id="${g.id}" ${on ? '' : 'disabled'} style="display:block; width:100%; padding:12px 14px; margin-bottom:7px; text-align:left; border-radius:5px; font-family:var(--font-ui); cursor:${on ? 'pointer' : 'default'}; background:${on ? 'linear-gradient(90deg, rgba(122,77,216,0.16), rgba(138,31,53,0.14))' : 'rgba(255,255,255,0.02)'}; border:1px solid ${on ? 'rgba(232,194,122,0.35)' : 'rgba(255,255,255,0.06)'}; color:${on ? '#eee' : '#555'};">`;
                     html += `<div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px;">`;
-                    html += `<div style="font-family:Orbitron,sans-serif; font-size:max(6px, 0.78rem - var(--font-trim)); letter-spacing:1.5px; color:${on ? '#e8c27a' : '#555'};">${on ? '' : '🔒 '}${g.label.toUpperCase()}</div>`;
+                    html += `<div style="font-family:var(--font-tech); font-size:max(6px, 0.78rem - var(--font-trim)); letter-spacing:1.5px; color:${on ? '#e8c27a' : '#555'};">${on ? '' : '🔒 '}${g.label.toUpperCase()}</div>`;
                     html += on ? `<div style="font-size:max(6px, 0.55rem - var(--font-trim)); color:#b48cff; letter-spacing:1px; white-space:nowrap;">${best ? 'BEST: WAVE ' + best : 'UNPLAYED'}</div>` : '';
                     html += `</div><div style="font-size:max(6px, 0.62rem - var(--font-trim)); color:${on ? '#a99ab4' : '#444'}; margin-top:4px; line-height:1.35;">${g.blurb}</div></button>`;
                 }

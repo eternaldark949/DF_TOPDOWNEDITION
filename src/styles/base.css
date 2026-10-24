@@ -13,14 +13,14 @@
             --glow-color: #a469ff;        /* Main purple accent */
             --text-color: #e0e0e0;        /* Default text (light gray) */
             --bg-color: #030005;          /* Deep black background */
-            --font-script: 'Great Vibes', cursive;   /* Elegant script font */
-            --font-ui: 'Montserrat', sans-serif;     /* Clean UI font */
-            --font-tech: 'Orbitron', sans-serif;     /* Sci-fi tech font */
-            /* ETERNAL's own fonts (assets/fonts), for the freelancer menu: Anthropology for its script
-               headers, Feminine for names and labels, Brooklyn for descriptions */
-            --font-menu-script: 'Anthropology', 'Great Vibes', cursive;
-            --font-menu: 'Feminine', 'Raleway', 'Montserrat', sans-serif;
-            --font-menu-body: 'Brooklyn', 'Raleway', 'Montserrat', sans-serif;
+            /* FONTS: every on-screen font comes from these few lines. Change one here and every
+               screen that uses that role follows. ETERNAL's own fonts live in assets/fonts. */
+            --font-script: 'Anthropology', 'Great Vibes', cursive;   /* script headers on every screen */
+            --font-ui: 'Montserrat', sans-serif;                      /* general UI labels and text */
+            --font-tech: 'Orbitron', sans-serif;                      /* sci-fi readouts and numbers */
+            --font-menu: 'Feminine', 'Raleway', 'Montserrat', sans-serif;    /* freelancer menu names and labels */
+            --font-menu-body: 'Brooklyn', 'Raleway', 'Montserrat', sans-serif; /* freelancer menu descriptions */
+            --font-menu-script: var(--font-script);
             --gold-primary: #FFD700;      /* Bright gold */
             --gold-dim: #C5A000;          /* Muted gold */
             --purple-neon: #a469ff;       /* Neon purple */

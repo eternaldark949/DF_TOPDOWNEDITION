@@ -119,8 +119,8 @@
         /* ── The spec sheet (traffic/garage-zib.js carSpecBarsHtml): Lady's blueprint bars, on Car.ME and at Torque ── */
         .car-spec { display: grid; gap: 5px; margin: 4px 0 2px; --spec: #ff9a2a; --spec-hi: #ffd08a; }
         .car-spec-row { display: grid; grid-template-columns: 1fr auto; align-items: baseline; row-gap: 3px; }
-        .car-spec-row span { font: 600 max(6px, 0.42rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.2em; text-transform: uppercase; color: #b8aca2; }
-        .car-spec-row b { font: 700 max(6px, 0.5rem - var(--font-trim)) Orbitron, sans-serif; color: #f4efe8; font-variant-numeric: tabular-nums; }
+        .car-spec-row span { font: 600 max(6px, 0.42rem - var(--font-trim)) var(--font-ui); letter-spacing: 0.2em; text-transform: uppercase; color: #b8aca2; }
+        .car-spec-row b { font: 700 max(6px, 0.5rem - var(--font-trim)) var(--font-tech); color: #f4efe8; font-variant-numeric: tabular-nums; }
         .car-spec-row i { grid-column: 1 / -1; position: relative; height: 5px; border-radius: 1px; overflow: hidden;
                           background: linear-gradient(90deg, var(--spec), var(--spec-hi) var(--v), rgba(255, 255, 255, 0.1) var(--v)); }
         .car-spec-row i::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 2px), rgba(6, 4, 8, 0.85) calc(10% - 2px) 10%); }
