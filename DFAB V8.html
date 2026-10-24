@@ -505,7 +505,7 @@
         .ui-pill.active-item .pill-equipped-tag { display: inline; }
 
         /* --- CATEGORY COLOURS (ETERNAL's scheme): violet weapons and gear, crimson consumables,
-           silver collectibles; amber mounts and green spells to come. Same build as the violet pill. --- */
+           moonstone collectibles, rose-gold mounts, emerald spells. Same build as the violet pill. --- */
         .ui-pill.type-consumable {
             --pill-accent: #d0141c;
             border-color: var(--pill-accent);
@@ -526,6 +526,60 @@
         }
         .ui-pill.type-consumable.active-item .pill-name { color: #c0101c; }
         .ui-pill.type-consumable.active-item .pill-desc { color: #6a0614; }
+        /* moonstone silver */
+        .ui-pill.type-collectible {
+            border-color: #c9c3d6;
+            background:
+                radial-gradient(ellipse 22% 95% at 7% 50%, #000 0%, #000 45%, rgba(0, 0, 0, 0) 100%),
+                radial-gradient(ellipse 40% 120% at 78% 0%, rgba(222, 196, 245, 0.16), rgba(0, 0, 0, 0) 70%),
+                linear-gradient(90deg, #050507 0%, #101015 14%, #34333f 34%, #54525f 58%, #6e6a7a 80%, #7d7889 100%);
+            box-shadow: inset 0 0 22px 2px rgba(40, 38, 54, 0.9);
+        }
+        .ui-pill.type-collectible .pill-name { color: #e6e1f0; }
+        .ui-pill.type-collectible .inventory-entry-head { background-image: linear-gradient(90deg, #c9c3d6 0%, #c9c3d6 70%, rgba(0, 0, 0, 0)); }
+        .ui-pill.type-collectible .pill-desc, .ui-pill.type-collectible .pill-qty, #inventory-list .ui-pill.type-collectible .inventory-entry-detail { color: #ece9f2; }
+        .ui-pill.type-collectible .pill-qty-value { background: #23222b; border-color: #c9c3d6; }
+        #inventory-list .ui-pill.type-collectible .inventory-registry-tag { color: #d9d3e6; border-color: rgba(210, 204, 225, 0.55); }
+        .ui-pill.type-collectible.active-item { background: linear-gradient(90deg, #fbfaff 0%, #eeebf4 20%, #d9d4e3 38%, #bdb6cb 60%, #a39bb4 82%, #918aa3 100%); box-shadow: inset 0 0 20px 2px rgba(110, 102, 130, 0.7); }
+        .ui-pill.type-collectible.active-item .pill-name { color: #5a5468; }
+        .ui-pill.type-collectible.active-item .pill-desc, #inventory-list .ui-pill.type-collectible.active-item .inventory-entry-detail { color: #2c2838; }
+        .ui-pill.type-collectible.active-item .pill-equipped-tag { color: #5a5468; }
+        /* rose gold */
+        .ui-pill.type-mount {
+            border-color: #e8a688;
+            background:
+                radial-gradient(ellipse 22% 95% at 7% 50%, #000 0%, #000 45%, rgba(0, 0, 0, 0) 100%),
+                radial-gradient(ellipse 40% 120% at 78% 0%, rgba(255, 200, 170, 0.12), rgba(0, 0, 0, 0) 70%),
+                linear-gradient(90deg, #060302 0%, #180a08 14%, #4e2120 34%, #713230 58%, #874339 80%, #934d41 100%);
+            box-shadow: inset 0 0 22px 2px rgba(86, 38, 22, 0.9);
+        }
+        .ui-pill.type-mount .pill-name { color: #ffb89a; }
+        .ui-pill.type-mount .inventory-entry-head { background-image: linear-gradient(90deg, #e8a688 0%, #e8a688 70%, rgba(0, 0, 0, 0)); }
+        .ui-pill.type-mount .pill-desc, .ui-pill.type-mount .pill-qty, #inventory-list .ui-pill.type-mount .inventory-entry-detail { color: #f7dccf; }
+        .ui-pill.type-mount .pill-qty-value { background: #3a1a10; border-color: #e8a688; }
+        #inventory-list .ui-pill.type-mount .inventory-registry-tag { color: #ffd3c0; border-color: rgba(240, 170, 140, 0.55); }
+        .ui-pill.type-mount.active-item { background: linear-gradient(90deg, #fff1ea 0%, #fde6dc 20%, #f7cdbb 38%, #eeaa8e 60%, #dc8a6c 82%, #cc7556 100%); box-shadow: inset 0 0 20px 2px rgba(170, 90, 60, 0.65); }
+        .ui-pill.type-mount.active-item .pill-name { color: #9a4426; }
+        .ui-pill.type-mount.active-item .pill-desc, #inventory-list .ui-pill.type-mount.active-item .inventory-entry-detail { color: #4f1d0d; }
+        .ui-pill.type-mount.active-item .pill-equipped-tag { color: #9a4426; }
+        /* emerald */
+        .ui-pill.type-spell {
+            border-color: #3ee08f;
+            background:
+                radial-gradient(ellipse 22% 95% at 7% 50%, #000 0%, #000 45%, rgba(0, 0, 0, 0) 100%),
+                radial-gradient(ellipse 40% 120% at 78% 0%, rgba(140, 255, 200, 0.10), rgba(0, 0, 0, 0) 70%),
+                linear-gradient(90deg, #000503 0%, #011409 14%, #044a26 34%, #066a36 58%, #088040 80%, #0a8a46 100%);
+            box-shadow: inset 0 0 22px 2px rgba(4, 70, 36, 0.9);
+        }
+        .ui-pill.type-spell .pill-name { color: #5cf0a6; }
+        .ui-pill.type-spell .inventory-entry-head { background-image: linear-gradient(90deg, #3ee08f 0%, #3ee08f 70%, rgba(0, 0, 0, 0)); }
+        .ui-pill.type-spell .pill-desc, .ui-pill.type-spell .pill-qty, #inventory-list .ui-pill.type-spell .inventory-entry-detail { color: #cdf7e0; }
+        .ui-pill.type-spell .pill-qty-value { background: #03301a; border-color: #3ee08f; }
+        #inventory-list .ui-pill.type-spell .inventory-registry-tag { color: #a8f5cd; border-color: rgba(90, 230, 160, 0.55); }
+        .ui-pill.type-spell.active-item { background: linear-gradient(90deg, #ecfff5 0%, #e1fcee 20%, #c0f3d8 38%, #8de6b8 60%, #55d293 82%, #2fbf78 100%); box-shadow: inset 0 0 20px 2px rgba(30, 150, 90, 0.6); }
+        .ui-pill.type-spell.active-item .pill-name { color: #0b7a42; }
+        .ui-pill.type-spell.active-item .pill-desc, #inventory-list .ui-pill.type-spell.active-item .inventory-entry-detail { color: #053a20; }
+        .ui-pill.type-spell.active-item .pill-equipped-tag { color: #0b7a42; }
         
         /* --- PILL TEXT ELEMENTS --- */
         .pill-name {
