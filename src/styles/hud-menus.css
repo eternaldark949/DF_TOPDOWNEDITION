@@ -411,7 +411,8 @@
             position: relative;
             background: #130401;
             flex-shrink: 0;
-            box-shadow: 0 0 34px 4px rgba(110, 10, 50, 0.32);
+            /* the plum glow round it, fading out over about its own radius */
+            box-shadow: 0 0 16px 3px rgba(150, 10, 78, 0.32), 0 0 46px 14px rgba(120, 6, 62, 0.26), 0 0 90px 26px rgba(80, 4, 42, 0.18);
         }
         
         .sidebar-portrait canvas {
