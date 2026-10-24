@@ -1262,7 +1262,7 @@
             border: 11px solid transparent; border-top: 9px solid var(--df-lavender); border-bottom: 0;
             top: -11px;
         }
-        #inventory-list .node-btn { font-family: 'Raleway', var(--font-ui); font-weight: 500; font-size: max(6px, 0.72rem - var(--font-trim)); letter-spacing: 0.5px; }
+        #inventory-list .node-btn { font-family: var(--font-menu); font-weight: 500; font-size: max(6px, 0.72rem - var(--font-trim)); letter-spacing: 0.5px; }
         #inventory-list .node-btn { min-height: 36px; }
         @media (max-width: 700px), (max-height: 540px) {
             #inventory-list .pill-icon { width: 42px; height: 42px; margin-right: 36px; }
@@ -1274,6 +1274,12 @@
             #inventory-list .node-menu { right: 4px; top: calc(50% + 36px); }
             #inventory-list .node-btn { min-height: 40px; }
         }
+
+        /* The freelancer menu in ETERNAL's fonts: script headers in Anthropology, everything else in Feminine */
+        #freelancer-menu .screen-title, #freelancer-menu .filter-title-text { font-family: var(--font-menu-script); }
+        #freelancer-menu .sidebar-nav-item, #freelancer-menu .filter-item, #freelancer-menu .filter-toggle-labels,
+        #freelancer-menu .screen-back-btn, #freelancer-menu .screen-back-btn *,
+        #freelancer-menu #inventory-list, #freelancer-menu #inventory-list *:not(.pill-icon) { font-family: var(--font-menu); }
 
         /* The flit ring round the move stick: fill = flit charge (initJoystick / updateFlitRing) */
         #joystick-ring {

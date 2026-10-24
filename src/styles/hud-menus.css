@@ -278,20 +278,20 @@
         
         /* --- PILL TEXT ELEMENTS --- */
         .pill-name {
-            font-family: 'Raleway', 'Montserrat', sans-serif; font-size: max(6px, 0.82rem - var(--font-trim)); font-weight: 400; letter-spacing: 0.3px;
+            font-family: var(--font-menu); font-size: max(6px, 0.82rem - var(--font-trim)); font-weight: 400; letter-spacing: 0.3px;
             text-transform: uppercase; color: var(--df-violet-mid);
             display: inline-block;
         }
         /* the line under the name runs most of the text column (71% in the mock-up), fading out at its end */
         .inventory-entry-head { padding-bottom: 7px; margin-bottom: 7px;
             background: linear-gradient(90deg, var(--df-violet-mid) 0%, var(--df-violet-mid) 70%, rgba(142, 85, 245, 0)) left bottom / 71% 1px no-repeat; }
-        .pill-desc { font-family: 'Raleway', 'Montserrat', sans-serif; color: var(--df-lavender); font-size: max(6px, 0.8rem - var(--font-trim)); font-weight: 400; line-height: 1.3; margin-top: 2px; max-width: 85%; transition: color 0.3s; }
+        .pill-desc { font-family: var(--font-menu); color: var(--df-lavender); font-size: max(6px, 0.8rem - var(--font-trim)); font-weight: 400; line-height: 1.3; margin-top: 2px; max-width: 85%; transition: color 0.3s; }
         .pill-type-badge { font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.5rem - var(--font-trim)); font-weight: 600; color: var(--df-lavender); border: 1px solid var(--df-lavender); padding: 1px 6px; border-radius: 8px; text-transform: uppercase; letter-spacing: 1px; margin-right: 8px; }
         .pill-equipped-tag { color: #5b2fc4; background: rgba(255, 255, 255, 0.55); border-radius: 8px; padding: 1px 8px; font-size: max(6px, 0.55rem - var(--font-trim)); font-weight: 700; letter-spacing: 1.5px; display: none; }
         
         /* --- QTY: a small caption over a deep-violet chip with a dotted rim --- */
         .pill-qty { flex-shrink: 0; margin-left: 24px; display: flex; flex-direction: column; align-items: center; gap: 5px;
-            font-family: 'Raleway', 'Montserrat', sans-serif; color: var(--df-lavender); }
+            font-family: var(--font-menu); color: var(--df-lavender); }
         .pill-qty-label { font-size: max(6px, 0.74rem - var(--font-trim)); letter-spacing: 0.5px; }
         .pill-qty-value { min-width: 62px; padding: 4px 10px; box-sizing: border-box; text-align: center;
             background: #24055b; border: 1.5px dotted var(--df-violet-mid); border-radius: 14px;
