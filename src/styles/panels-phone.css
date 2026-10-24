@@ -1275,11 +1275,15 @@
             #inventory-list .node-btn { min-height: 40px; }
         }
 
-        /* The freelancer menu in ETERNAL's fonts: script headers in Anthropology, everything else in Feminine */
+        /* The freelancer menu in ETERNAL's fonts: script headers in Anthropology, descriptions in Luxie Thin, everything else in Feminine */
         #freelancer-menu .screen-title, #freelancer-menu .filter-title-text { font-family: var(--font-menu-script); }
         #freelancer-menu .sidebar-nav-item, #freelancer-menu .filter-item, #freelancer-menu .filter-toggle-labels,
         #freelancer-menu .screen-back-btn, #freelancer-menu .screen-back-btn *,
         #freelancer-menu #inventory-list, #freelancer-menu #inventory-list *:not(.pill-icon) { font-family: var(--font-menu); }
+        #freelancer-menu #inventory-list .pill-desc, #freelancer-menu #inventory-list .inventory-entry-detail { font-family: var(--font-menu-body); }
+        /* Luxie Thin runs small, so it gets a size up to read like the mock-up */
+        #freelancer-menu #inventory-list .pill-desc { font-size: max(6px, 0.94rem - var(--font-trim)); letter-spacing: 0.2px; }
+        #freelancer-menu #inventory-list .inventory-entry-detail { font-size: max(6px, 0.7rem - var(--font-trim)); }
 
         /* The flit ring round the move stick: fill = flit charge (initJoystick / updateFlitRing) */
         #joystick-ring {

@@ -7,3 +7,6 @@ as an `@font-face`, named after the file without its extension:
 |---|---|
 | `assets/fonts/Anthropology.ttf` | `font-family: 'Anthropology'` |
 | `assets/fonts/Feminine.ttf` | `font-family: 'Feminine'` |
+| `assets/fonts/LuxieThin.ttf` | `font-family: 'LuxieThin'` |
+| `assets/fonts/LuxieRegular.ttf` | `font-family: 'LuxieRegular'` |
+| `assets/fonts/LuxieRounded.ttf` | `font-family: 'LuxieRounded'` |

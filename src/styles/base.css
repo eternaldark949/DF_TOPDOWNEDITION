@@ -17,9 +17,10 @@
             --font-ui: 'Montserrat', sans-serif;     /* Clean UI font */
             --font-tech: 'Orbitron', sans-serif;     /* Sci-fi tech font */
             /* ETERNAL's own fonts (assets/fonts), for the freelancer menu: Anthropology for its script
-               headers, Feminine for the rest of its text */
+               headers, Feminine for names and labels, Luxie Thin for descriptions */
             --font-menu-script: 'Anthropology', 'Great Vibes', cursive;
             --font-menu: 'Feminine', 'Raleway', 'Montserrat', sans-serif;
+            --font-menu-body: 'LuxieThin', 'Raleway', 'Montserrat', sans-serif;
             --gold-primary: #FFD700;      /* Bright gold */
             --gold-dim: #C5A000;          /* Muted gold */
             --purple-neon: #a469ff;       /* Neon purple */
