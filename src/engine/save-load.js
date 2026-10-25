@@ -124,6 +124,8 @@ engineMixin({
                         filmGrain: GameSettings.filmGrain,
                         softShadows: GameSettings.softShadows,
                         bloom: GameSettings.bloom,
+                        fogGlare: GameSettings.fogGlare,
+                        starGlare: GameSettings.starGlare,
                         wetReflections: GameSettings.wetReflections,
                         atmosphereTint: GameSettings.atmosphereTint,
                         colorGrade: GameSettings.colorGrade,
@@ -769,6 +771,8 @@ engineMixin({
                         GameSettings.filmGrain = save.settings.filmGrain !== false;
                         GameSettings.softShadows = save.settings.softShadows ?? (GameSettings.lightingQuality === 'high');
                         GameSettings.bloom = save.settings.bloom !== false;
+                        GameSettings.fogGlare = save.settings.fogGlare !== false;
+                        GameSettings.starGlare = save.settings.starGlare !== false;
                         GameSettings.wetReflections = save.settings.wetReflections !== false;
                         GameSettings.atmosphereTint = save.settings.atmosphereTint ?? '';
                         GameSettings.colorGrade = save.settings.colorGrade || 'none';
