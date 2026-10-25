@@ -74,7 +74,7 @@
                 // --- MARKER PLACEMENT (Click/Tap to set destination) ---
                 const handleMarkerPlacement = (clientX, clientY) => {
                     // Only place markers on outdoor maps with road networks
-                    if (this.game.activeMap.type === 'indoor') return;
+                    if (this.game.activeMap.type === 'indoor' || !this.viewingHere()) return;   // and only on the map she's in
                     if (this.game.zibSystem?.isPassenger) return;
                     
                     const rect = canvas.getBoundingClientRect();
@@ -233,7 +233,7 @@
             
             // --- COORDINATE CONVERSION ---
             screenToWorld(screenX, screenY) {
-                const mapData = this.game.activeMap;
+                const mapData = this.mapData();
                 const w = this.mapCanvas.width;
                 const h = this.mapCanvas.height;
                 
@@ -686,7 +686,7 @@
                 // The static city, painted at a fixed zoom BAND (0.5 / 1 / 2 / 4 × the fit scale) over the view plus a
                 // margin, then stretched to the exact zoom: pinching and wheeling within a band reuse it; only a band
                 // change or panning past the margin repaints. Capped at 2560 px a side (Safari's canvas memory).
-                const mapData = this.game.activeMap;
+                const mapData = this.mapData(), view = this._viewData(mapData);
                 const bufX = visibleW * 0.3, bufY = visibleH * 0.3;
                 const bx = visibleX - bufX, by = visibleY - bufY, bw = visibleW + bufX * 2, bh = visibleH + bufY * 2;
                 const MAX = 2560;
@@ -703,8 +703,8 @@
                 ctx.fillStyle = MAP_PAL.base; ctx.fillRect(0, 0, cw, ch);
                 ctx.setTransform(eff, 0, 0, eff, -bx * eff, -by * eff);
                 MapArt.paintCity(ctx, mapData, { px: eff, dpr: this.dpr, bounds: this.cacheBoundsMap,
-                    network: mapData.type !== 'indoor' && this.game.traffic ? this.game.traffic.network : null,
-                    lamps: mapData.type !== 'indoor' ? this.game.lamps : null });
+                    network: mapData.type !== 'indoor' ? view.network : null,
+                    lamps: mapData.type !== 'indoor' ? view.lamps : null });
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
                 MapArt.bloom(this.cacheCanvas);
             }
@@ -713,7 +713,7 @@
                 const ctx = this.mapCtx;
                 const w = this.mapCanvas.width;
                 const h = this.mapCanvas.height;
-                const mapData = this.game.activeMap;
+                const mapData = this.mapData();
                 
                 // Auto-Fit Calculation
                 const scaleX = w / mapData.width;
@@ -801,10 +801,10 @@
             drawMapTextLayer(ctx, w, h, screenOriginX, screenOriginY, finalScale) {
                 // Labels in screen space at fixed CSS sizes: building names in champagne small caps, road names in
                 // gold italics; a dark violet keyline instead of a blur; nothing drawn where a label already sits.
-                const mapData = this.game.activeMap;
+                const mapData = this.mapData(), network = this._viewData(mapData).network;
                 if (!mapData || mapData.type === 'indoor') return;
                 const D = this.dpr, zoom = this.mapView.zoom;
-                const showBuildings = zoom >= 1.4 && mapData.buildings, showRoads = zoom >= 1.0;
+                const showBuildings = zoom >= 1.4 && mapData.buildings, showRoads = zoom >= 1.0 && network;
                 if (!showBuildings && !showRoads) return;
                 const sx = (mx) => screenOriginX + mx * finalScale, sy = (my) => screenOriginY + my * finalScale;
                 const placed = [];
@@ -819,7 +819,7 @@
                 if (showRoads) {
                     const fs = Math.round((9 + Math.min(3, (zoom - 1) * 1.2)) * D);
                     ctx.font = `italic 600 ${fs}px Montserrat, sans-serif`; ctx.lineWidth = 3 * D;
-                    for (const road of this.game.traffic.network.roads) {
+                    for (const road of network.roads) {
                         if (!road.name || !road.name.trim()) continue;
                         const isH = road.orientation === 'H', text = road.name.toUpperCase().split('').join(' '), tw = ctx.measureText(text).width;
                         const len = (isH ? road.w : road.h) * finalScale, n = Math.max(1, Math.floor(len / (tw + 260 * D)));
@@ -880,6 +880,8 @@
                 // across opens is safe. Dynamic content (player position, traffic,
                 // nav markers) is drawn on a separate icon canvas at 60fps.
                 if(show) {
+                    this.viewMapId = null;                                  // it opens on where she is
+                    this.renderMapHeading();
                     const currentMapId = this.game.activeMap?.id || null;
                     if (currentMapId !== this.cacheMapId) {
                         this.isCacheDirty = true;
@@ -913,8 +915,9 @@
             animateIcons() {
                 if (!this.isAnimating) return;
                 this.animationFrameId = requestAnimationFrame(() => this.animateIcons());
-                const ctx = this.iconCtx, w = this.iconCanvas.width, h = this.iconCanvas.height, mapData = this.game.activeMap, D = this.dpr;
+                const ctx = this.iconCtx, w = this.iconCanvas.width, h = this.iconCanvas.height, mapData = this.mapData(), D = this.dpr;
                 if (!mapData) return;
+                const here = this.viewingHere();                            // another place on the list: its plan and pins, nobody moving
                 let filterEnabled = false, activeFilter = null;
                 if (typeof mapSidebar !== 'undefined') { filterEnabled = mapSidebar.filterEnabled; activeFilter = mapSidebar.activeFilter; }
                 const shouldShow = (category) => !filterEnabled || activeFilter === category;
@@ -931,7 +934,7 @@
 
                 // ── Areas and routes, in map space ──
                 ctx.save(); ctx.translate(ox, oy); ctx.scale(finalScale, finalScale);
-                const rz = this.game.restrictedZone;
+                const rz = here ? this.game.restrictedZone : null;
                 if (rz) {                                                   // the danger zone: a crimson wash and a travelling pulsing edge
                     const borderNow = performance.now();
                     const t = (borderNow % (Math.PI * 2 * 400 / 1.5)) / 400; // one bounded pulse cycle
@@ -943,7 +946,7 @@
                     ctx.strokeRect(rz.x, rz.y, rz.w, rz.h); ctx.setLineDash([]);
                 }
                 let quest = null;
-                if (shouldShow('missions')) {                               // the side quest's area: a soft molten-gold pool, no outline
+                if (here && shouldShow('missions')) {                       // the side quest's area: a soft molten-gold pool, no outline
                     const m = this.game.missions?.activeMission;
                     if (m && m.status === 'active') {
                         let qx = m.targetX, qy = m.targetY;
@@ -957,8 +960,7 @@
                         }
                     }
                 }
-                this.drawRoadLevelPath(ctx);
-                this.drawCarActualPath(ctx);
+                if (here) { this.drawRoadLevelPath(ctx); this.drawCarActualPath(ctx); }
                 ctx.restore();
 
                 // ── Markers, in screen space at fixed sizes ──
@@ -970,12 +972,12 @@
                     if (filterEnabled && (!key || activeFilter !== key)) continue;
                     const p = S(b.x + b.w / 2, b.y + b.h / 2); if (on(p)) MapIcons.drawMagic(ctx, kind, p.x, p.y, { dpr: D, css: MapIcons.SIZE.pin * k, ...mg(b.x, b.y) });
                 }
-                if (this.game.pedestrians && this.game.pedestrians.pedestrians && !filterEnabled) {   // the crowd: fine lavender motes
+                if (here && this.game.pedestrians && this.game.pedestrians.pedestrians && !filterEnabled) {   // the crowd: fine lavender motes
                     ctx.fillStyle = 'rgba(217, 204, 255, 0.55)'; const r = 1.6 * D;
                     ctx.beginPath(); for (const ped of this.game.pedestrians.pedestrians) { if (ped.dead) continue; const p = S(ped.x, ped.y); if (on(p, 4)) ctx.rect(p.x - r, p.y - r, r * 2, r * 2); } ctx.fill();
                 }
-                if (this.game.npcs && shouldShow('clients')) for (const n of this.game.npcs) { const p = S(n.x, n.y); if (on(p)) MapIcons.drawMagic(ctx, 'client', p.x, p.y, { dpr: D, css: MapIcons.SIZE.client * k, ...mg(n.x, n.y) }); }
-                if (shouldShow('homebases')) {
+                if (here && this.game.npcs && shouldShow('clients')) for (const n of this.game.npcs) { const p = S(n.x, n.y); if (on(p)) MapIcons.drawMagic(ctx, 'client', p.x, p.y, { dpr: D, css: MapIcons.SIZE.client * k, ...mg(n.x, n.y) }); }
+                if (here && shouldShow('homebases')) {
                     const L = this.game.landmarkRegistry && this.game.landmarkRegistry['parking_spot'], hx = L ? L.x : mapData.spawn && mapData.spawn.x, hy = L ? L.y : mapData.spawn && mapData.spawn.y;
                     if (hx !== undefined) { const p = S(hx, hy); if (on(p)) MapIcons.drawMagic(ctx, 'pin:home', p.x, p.y, { dpr: D, css: MapIcons.SIZE.pin * k, ...mg(hx, hy) }); }
                 }
@@ -993,16 +995,17 @@
                 }
                 if (quest) { const p = S(quest.x, quest.y); if (on(p)) MapIcons.drawMagic(ctx, 'pin:sparkle', p.x, p.y, { dpr: D, css: MapIcons.SIZE.pin * k, ...mg(quest.x, quest.y) }); }
                 if (shouldShow('missions')) {
-                    this.drawObjectiveMarker(ctx);
-                    const sd = this.game.story?.currentStepData;                // the story's own target
+                    if (here) this.drawObjectiveMarker(ctx);
+                    const sd = this.game.story?.currentStepData;                // the story's own target, on whichever map it's on
                     if (sd && sd.targetMap === mapData.id) {
                         let tx, ty;
-                        if (typeof sd.target === 'string') { const l = this.game.getLandmark(sd.target); if (l) { tx = l.x; ty = l.y; } }
+                        if (typeof sd.target === 'string') { const l = here ? this.game.getLandmark(sd.target) : (mapData.landmarks || []).find(m => m.id === sd.target); if (l) { tx = l.x; ty = l.y; } }
                         else if (sd.target) { tx = sd.target.x; ty = sd.target.y; }
                         else if (typeof sd.targetX === 'number') { tx = sd.targetX; ty = sd.targetY; }
                         if (tx !== undefined) { const p = S(tx, ty); if (on(p)) MapIcons.drawMagic(ctx, 'pin:star', p.x, p.y, { dpr: D, css: MapIcons.SIZE.pin * k, ...mg(tx, ty) }); }
                     }
                 }
+                if (!here) return;
                 this.drawDistanceLine(ctx);
                 this.drawNavMarker(ctx);
                 if (this.game.deliveryVehicle && this.game.deliveryVehicle.visible) { const c = this.game.deliveryVehicle, p = S(c.x, c.y); if (on(p)) MapIcons.draw(ctx, 'car:amber', p.x, p.y, { dpr: D, css: MapIcons.SIZE.car * k, rot: c.angle }); }   // Amber's van
@@ -1012,20 +1015,120 @@
             }
             
             // Center the map view on the player's current position
+            // ── WHICH MAP IS ON SCREEN ──
+            // The map screen opens on where she is; the heading's list can show any other place she owns: every place
+            // she's been (game.visitedMaps, saved) and any a map item in her bag charts (an item with a mapId).
+            // A place she's left keeps the plan it had (game._mapSnaps); a room never seen this session draws from
+            // MAP_DATA; the city has to have been walked this session for its streets to be drawn.
+            viewingHere() { return !this.viewMapId || this.viewMapId === this.game.activeMap?.id; }
+
+            mapData() {
+                if (this.viewingHere()) return this.game.activeMap;
+                const v = this._viewData({ id: this.viewMapId });
+                return v.map || this.game.activeMap;
+            }
+
+            _viewData(map) {
+                const g = this.game, id = map && map.id;
+                if (!id || id === g.activeMap?.id) return { map: g.activeMap, network: g.traffic ? g.traffic.network : null, lamps: g.lamps };
+                const snap = g._mapSnaps && g._mapSnaps[id];
+                if (snap) return snap;
+                const d = MAP_DATA[id];
+                if (!d || d.type !== 'indoor') return {};                   // an outdoor place's streets come from walking it
+                return (this._roomViews ||= {})[id] ||= { map: { ...d }, network: null, lamps: null };
+            }
+
+            ownedMaps() {
+                const g = this.game, ids = new Set(g.visitedMaps || []);
+                if (g.activeMap) ids.add(g.activeMap.id);
+                for (const it of (g.inventory && g.inventory.items) || []) if (it && it.mapId && MAP_DATA[it.mapId]) ids.add(it.mapId);
+                ids.delete('van_interior');                                 // a ride, not a place
+                const order = Object.keys(MAP_DATA);
+                return [...ids].filter(id => MAP_DATA[id]).sort((a, b) => order.indexOf(a) - order.indexOf(b))
+                    .map(id => ({ id, label: MAP_DATA[id].label || id, here: id === g.activeMap?.id, charted: !!this._viewData({ id }).map }));
+            }
+
+            showMapOf(id) {
+                const list = this.ownedMaps(), m = list.find(e => e.id === id);
+                if (!m || !m.charted) return;
+                this.viewMapId = m.here ? null : id;
+                this.isCacheDirty = true;
+                this.renderMapHeading();
+                this.centerOnPlayer();
+                this.renderGoldenMap();
+            }
+
+            // The heading over the map: "Map" in Anthropology, the place in Feminine, a list to pick another
+            renderMapHeading() {
+                const root = document.getElementById('map-heading');
+                if (!root) return;
+                const list = this.ownedMaps(), cur = this.mapData(), split = l => String(l || '').split(/\s+[|—]\s+/);
+                const [name, sub] = split(cur && cur.label);
+                root.querySelector('.map-picker-name').textContent = name || '';
+                const subEl = root.querySelector('.map-picker-sub');
+                subEl.textContent = sub || ''; subEl.hidden = !sub;
+                root.classList.toggle('single', list.length < 2);
+                root.classList.toggle('elsewhere', !this.viewingHere());
+                const box = root.querySelector('.map-picker-list');
+                box.innerHTML = list.map(e => {
+                    const [n, s2] = split(e.label);
+                    return `<button type="button" class="map-pick${e.id === cur.id ? ' on' : ''}${e.charted ? '' : ' uncharted'}" data-map="${e.id}" role="option" aria-selected="${e.id === cur.id}"${e.charted ? '' : ' disabled'}>`
+                        + `<span class="map-pick-gem"></span><span class="map-pick-name">${n}</span>`
+                        + (s2 ? `<span class="map-pick-sub">${s2}</span>` : '')
+                        + (e.here ? '<span class="map-pick-tag">You are here</span>' : !e.charted ? '<span class="map-pick-tag">Walk it to chart it</span>' : '')
+                        + '</button>';
+                }).join('');
+                this._placeMapHeading();
+                if (this._mapHeadingWired) return;
+                this._mapHeadingWired = true;
+                const open = on => { root.classList.toggle('open', on); root.querySelector('.map-picker').setAttribute('aria-expanded', on); };
+                const step = d => {
+                    const l = this.ownedMaps().filter(e => e.charted); if (l.length < 2) return;
+                    const i = l.findIndex(e => e.id === this.mapData().id);
+                    this.showMapOf(l[(i + d + l.length) % l.length].id);
+                };
+                root.querySelector('.map-picker').addEventListener('click', e => { e.stopPropagation(); if (!root.classList.contains('single')) open(!root.classList.contains('open')); });
+                root.querySelector('.map-cycle-prev').addEventListener('click', e => { e.stopPropagation(); open(false); step(-1); });
+                root.querySelector('.map-cycle-next').addEventListener('click', e => { e.stopPropagation(); open(false); step(1); });
+                box.addEventListener('click', e => { const b = e.target.closest('.map-pick'); e.stopPropagation(); if (!b || b.disabled) return; open(false); this.showMapOf(b.dataset.map); });
+                document.getElementById('map-interface').addEventListener('pointerdown', e => { if (!root.contains(e.target)) open(false); });
+                for (const id of ['map-sidebar-left', 'map-sidebar-right']) {   // the sidebars fold away: the heading stays centred over the map
+                    const el = document.getElementById(id);
+                    if (el) new MutationObserver(() => this._placeMapHeading()).observe(el, { attributes: true, attributeFilter: ['class'] });
+                }
+            }
+
+            _placeMapHeading() {
+                const root = document.getElementById('map-heading');
+                if (!root || !root.offsetParent) return;
+                const side = id => { const e = document.getElementById(id); if (!e || e.classList.contains('collapsed') || !e.offsetParent) return 0; return e.getBoundingClientRect().width; };
+                const W = window.innerWidth, L = side('map-sidebar-left'), R = side('map-sidebar-right');
+                root.style.left = ((L + W - R) / 2) + 'px';
+            }
+
+            // Device px from the top of the map down to the heading's bottom edge (the plan fits beneath it)
+            _headingBottom() {
+                const root = document.getElementById('map-heading');
+                if (!root || !root.offsetParent) return this.mapCanvas.height * 0.1;
+                const r = root.querySelector('.map-heading-main').getBoundingClientRect();
+                return r.bottom * this.dpr;
+            }
+
             centerOnPlayer() {
-                const mapData = this.game.activeMap;
+                const mapData = this.mapData();
                 const player = this.game.player;
                 const w = this.mapCanvas.width;
                 const h = this.mapCanvas.height;
                 
-                // Indoors: show the whole floor plan, centred in the space between the sidebars
-                if (mapData.type === 'indoor') {
+                // Indoors (or anywhere she isn't): show the whole plan, centred in the space between the sidebars
+                if (mapData.type === 'indoor' || !this.viewingHere()) {
                     const side = id => { const e = document.getElementById(id); return e && !e.classList.contains('collapsed') && e.offsetParent ? e.getBoundingClientRect().width * this.dpr : 0; };
                     const L = side('map-sidebar-left'), R = side('map-sidebar-right');
                     const base = Math.min(w / mapData.width, h / mapData.height) * 0.9;
-                    const fitW = Math.max(w * 0.35, w - L - R) * 0.9, fitH = h * 0.78;   // room above for the name
-                    this.mapView.zoom = Math.max(0.5, Math.min(2, fitW / (mapData.width * base), fitH / (mapData.height * base)));
-                    this.mapView.offsetX = (L - R) / 2; this.mapView.offsetY = h * 0.03;
+                    const top = this._headingBottom(), fitW = Math.max(w * 0.35, w - L - R) * 0.9, fitH = (h - top) * 0.88;   // below the heading
+                    const zMax = mapData.type === 'indoor' ? 2 : 5;
+                    this.mapView.zoom = Math.max(0.5, Math.min(zMax, fitW / (mapData.width * base), fitH / (mapData.height * base)));
+                    this.mapView.offsetX = (L - R) / 2; this.mapView.offsetY = top / 2;
                     if (this.navMarker) this.calculateNavPath();
                     return;
                 }

@@ -67,6 +67,7 @@
                 if (typeof PropSprites !== 'undefined') { PropSprites.clear(this.props); PlaneSprites.clear(this.activeMap && this.activeMap.buildings); }
                 if (this.coach) { this.coach.dismiss(); this.coach.deserialize([]); }   // a story New Game then calls hud.startFresh()
                 if (this.hud) this.hud.revealAll();
+                this.visitedMaps = new Set(); this._mapSnaps = {};                       // a new run hasn't been anywhere yet
                 // --- PLAYER STATE ---
                 this.currency = 100;
                 this.scrap = 0;

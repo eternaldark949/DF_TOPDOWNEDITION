@@ -370,8 +370,8 @@
              * An interior as a glowing architect's plan (ETERNAL's ask: the indoor maps were bare walls on violet).
              * A faint plan grid with edge ticks; each floor zone tinted its own colour with a low-contrast texture
              * (carpet weave, tiles, marble); soft light pools; double-line walls with a glow and a dark core;
-             * landmarks as small glowing diamonds named in Feminine; exits labelled in gold; the room's name
-             * signed in Anthropology over the top. Same opts as paintCity; sizes in CSS px via u (= 1 / px).
+             * landmarks as small glowing diamonds named in Feminine; exits labelled in gold (the room's name is the
+             * map screen's heading, ui-system.js renderMapHeading). Same opts as paintCity; sizes in CSS px via u (= 1 / px).
              */
             paintInterior(ctx, map, opts) {
                 const u = 1 / opts.px, D = opts.dpr || 1, k = u * D, W = map.width, H = map.height;
@@ -430,7 +430,7 @@
                 ctx.globalCompositeOperation = 'source-over';
                 wallPath(); ctx.fillStyle = '#06020c'; ctx.fill();
                 ctx.strokeStyle = 'rgba(232, 220, 255, 0.85)'; ctx.lineWidth = 1.1 * k; ctx.stroke();
-                // Words: Feminine for the plan, Anthropology for the room's name
+                // Words: Feminine for the plan
                 const fam = "'Feminine', 'Raleway', 'Montserrat', sans-serif";
                 const label = (text, x, y, css, color, glow) => {
                     ctx.font = `${css * k}px ${fam}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -464,13 +464,6 @@
                 for (let x = 0; x <= W; x += 100) { const t = (x % 500 ? 4 : 8) * k; ctx.moveTo(x, -2 * k); ctx.lineTo(x, -2 * k - t); ctx.moveTo(x, H + 2 * k); ctx.lineTo(x, H + 2 * k + t); }
                 for (let y = 0; y <= H; y += 100) { const t = (y % 500 ? 4 : 8) * k; ctx.moveTo(-2 * k, y); ctx.lineTo(-2 * k - t, y); ctx.moveTo(W + 2 * k, y); ctx.lineTo(W + 2 * k + t, y); }
                 ctx.stroke();
-                // The room's name, signed over the top
-                if (map.label) {
-                    ctx.font = `${26 * k}px 'Anthropology', 'Great Vibes', cursive`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-                    ctx.shadowColor = 'rgba(184, 156, 255, 0.95)'; ctx.shadowBlur = 14 * k; ctx.fillStyle = '#f6efff';
-                    ctx.fillText(map.label, W / 2, -16 * k);
-                    ctx.shadowBlur = 0;
-                }
                 ctx.restore();
             },
 

@@ -36,7 +36,8 @@ engineMixin({
                         // Weather is part of world state — reloading shouldn't
                         // reset the sky. Optional field: older saves simply get
                         // the defaults below, so no schema bump is needed.
-                        weather: this.weather?.serialize() ?? null
+                        weather: this.weather?.serialize() ?? null,
+                        visitedMaps: [...(this.visitedMaps || [])]      // the places on the map screen's list (older saves: just where she is)
                     },
                     
                     // --- VEHICLE DATA ---
@@ -498,6 +499,7 @@ engineMixin({
                     // climate tag still gets the final say on the odds table,
                     // while the saved condition and its deadline carry over.
                     if (worldData.weather) this.weather.deserialize(worldData.weather);
+                    this.visitedMaps = new Set(worldData.visitedMaps || []); this._mapSnaps = {};
                     
                     // 3. Load Map & Player Position
                     // (her own car again: whatever she'd taken in this session isn't in the save)

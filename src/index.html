@@ -753,6 +753,23 @@
         
         <!-- Map Canvas (Main Content) -->
         <canvas id="golden-map-canvas"></canvas>
+
+        <!-- Heading: "Map", the place on screen, and the list of places she owns (ui-system.js renderMapHeading) -->
+        <div id="map-heading" class="map-heading">
+            <div class="map-heading-main">
+                <div class="map-heading-kicker">Map</div>
+                <div class="map-heading-row">
+                    <button type="button" class="map-cycle map-cycle-prev" aria-label="Previous map">◀</button>
+                    <button type="button" class="map-picker" aria-haspopup="listbox" aria-expanded="false">
+                        <span class="map-picker-name"></span>
+                        <span class="map-picker-caret" aria-hidden="true"></span>
+                    </button>
+                    <button type="button" class="map-cycle map-cycle-next" aria-label="Next map">▶</button>
+                </div>
+                <div class="map-picker-sub" hidden></div>
+            </div>
+            <div class="map-picker-list" role="listbox"></div>
+        </div>
         
         <!-- Right Handle (shown when sidebar collapsed) -->
         <div class="sidebar-handle sidebar-handle-right" id="map-handle-right">

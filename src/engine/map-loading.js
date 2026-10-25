@@ -273,6 +273,8 @@ engineMixin({
                 if (mapId === 'hub_949') mapId = 'sdc';
                 this._cancelQuickDrawHold?.(); this.cancelQuickDraw();
                 const previousMapId = this.activeMap?.id;
+                // The map screen can still show the place she's leaving: keep its finished plan (and the city's roads and lamps)
+                if (this.activeMap) (this._mapSnaps ||= {})[this.activeMap.id] = { map: this.activeMap, network: this.activeMap.type !== 'indoor' ? this.traffic?.network : null, lamps: this.lamps };
                 if (this._bossIntro) {
                     this.cutscene?.end();
                     if (this._bossIntroSkip) {
@@ -1110,6 +1112,7 @@ engineMixin({
                 //  PHASE 4: LOAD MAP DATA
                 // =========================================================
                 this.activeMap = maps[mapId] || maps['sdc'];
+                (this.visitedMaps ||= new Set()).add(this.activeMap.id);              // somewhere she's been joins the map screen's list
                 this.uiLocation.textContent = this.activeMap.label;
 
                 // --- WEATHER: adopt this map's climate ---
