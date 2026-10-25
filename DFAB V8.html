@@ -3771,6 +3771,65 @@
             .dc-portrait { width: 52px; height: 52px; }
             .dc-name { font-size: max(6px, 0.95rem - var(--font-trim)); }
         }
+
+        /* Skills as a tuning chamber: the level in a resonance dial (a conic ring filled to --v percent), each tree a
+           glowing line in its colour (--acc) with the skills hung on it as diamond nodes. A tapped skill lights up. */
+        .sk-head { display: flex; align-items: center; gap: 34px; margin: 8px 0 26px; padding: 6px 4px; }
+        .sk-dial { --v: 0; position: relative; flex-shrink: 0; width: 150px; height: 150px; border-radius: 50%;
+            background: conic-gradient(from 0deg, #e9dcff 0, #b89cff calc(var(--v) * 1%), rgba(184, 156, 255, 0.12) calc(var(--v) * 1%) 100%);
+            box-shadow: 0 0 22px 4px rgba(164, 105, 255, 0.35), 0 0 60px 16px rgba(120, 60, 220, 0.18); }
+        .sk-dial::before { content: ''; position: absolute; inset: 0; border-radius: 50%;
+            background: repeating-conic-gradient(from 0deg, rgba(0, 0, 0, 0.55) 0 0.6deg, transparent 0.6deg 10deg); }
+        .sk-dial-in { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .sk-level { font: 400 max(6px, 2.1rem - var(--font-trim))/1.1 var(--font-script); color: #f7f0ff; white-space: nowrap;
+            text-shadow: 0 0 10px rgba(184, 156, 255, 0.9), 0 0 24px rgba(140, 80, 240, 0.5); }
+        .sk-pct { font: 400 max(6px, 0.6rem - var(--font-trim)) var(--font-menu); letter-spacing: 0.3em; color: #cbb6f5; margin-top: 4px; }
+        .sk-meta { flex: 1; min-width: 0; }
+        .sk-next { font: 400 max(6px, 0.72rem - var(--font-trim)) var(--font-menu); letter-spacing: 0.3em; text-transform: uppercase; color: #efe6ff; }
+        .sk-caps { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+        .sk-cap { font: 400 max(6px, 0.58rem - var(--font-trim)) var(--font-menu); letter-spacing: 0.22em; text-transform: uppercase; padding: 5px 12px; border-radius: 20px;
+            background: rgba(10, 3, 14, 0.7); border: 1.5px solid var(--c); color: var(--c); box-shadow: 0 0 10px color-mix(in srgb, var(--c) 45%, transparent), inset 0 0 8px color-mix(in srgb, var(--c) 20%, transparent); }
+        .sk-cap.lav { --c: #d8c6ff; } .sk-cap.amber { --c: #ffc248; } .sk-cap.dark { --c: #9a85c8; }
+        .sk-hint { font: italic 400 max(6px, 0.7rem - var(--font-trim))/1.5 var(--font-menu-body); color: rgba(232, 222, 246, 0.6); }
+        /* the dark face inside the ring */
+        .sk-dial::after { content: ''; position: absolute; inset: 9px; border-radius: 50%; background: radial-gradient(circle at 50% 40%, #1a0a24, #07020a 72%);
+            box-shadow: inset 0 0 18px rgba(164, 105, 255, 0.35); }
+        .sk-dial-in { z-index: 1; }
+
+        .sk-trees { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 26px 30px; }
+        .sk-branch header { display: flex; align-items: baseline; justify-content: space-between; margin: 0 0 14px 2px; }
+        .sk-bname { font: 400 max(6px, 1rem - var(--font-trim)) var(--font-menu); letter-spacing: 0.4em; text-transform: uppercase; color: var(--acc);
+            text-shadow: 0 0 10px color-mix(in srgb, var(--acc) 80%, transparent), 0 0 24px color-mix(in srgb, var(--acc) 40%, transparent); }
+        .sk-count { font: 400 max(6px, 0.6rem - var(--font-trim)) var(--font-menu); letter-spacing: 0.25em; color: color-mix(in srgb, var(--acc) 70%, #fff); }
+        .sk-line { position: relative; padding-left: 30px; }
+        .sk-line::before { content: ''; position: absolute; left: 9px; top: 6px; bottom: 6px; width: 2px; border-radius: 2px;
+            background: linear-gradient(180deg, var(--acc), color-mix(in srgb, var(--acc) 35%, transparent) 85%, transparent);
+            box-shadow: 0 0 8px var(--acc), 0 0 18px color-mix(in srgb, var(--acc) 50%, transparent); }
+        .sk-node { position: relative; padding: 9px 12px 11px; margin-bottom: 4px; border-radius: 12px; cursor: pointer; outline: none; transition: background 0.3s ease, opacity 0.3s ease; }
+        .sk-gem { position: absolute; left: -26px; top: 13px; width: 11px; height: 11px; transform: rotate(45deg); box-sizing: border-box;
+            background: #0c0410; border: 1.5px solid var(--acc); box-shadow: 0 0 8px color-mix(in srgb, var(--acc) 70%, transparent); transition: background 0.3s, box-shadow 0.3s; }
+        .sk-node.on .sk-gem { background: var(--acc); box-shadow: 0 0 10px 2px var(--acc), 0 0 22px color-mix(in srgb, var(--acc) 60%, transparent); }
+        .sk-name { display: flex; align-items: center; gap: 10px; font: 400 max(6px, 0.74rem - var(--font-trim)) var(--font-menu); letter-spacing: 0.24em; text-transform: uppercase; color: #f4ecff;
+            text-shadow: 0 0 8px color-mix(in srgb, var(--acc) 45%, transparent); }
+        .sk-pips { display: inline-flex; gap: 5px; }
+        .sk-pips i { width: 5px; height: 5px; transform: rotate(45deg); border: 1px solid color-mix(in srgb, var(--acc) 70%, transparent); }
+        .sk-pips i.on { background: var(--acc); border-color: var(--acc); box-shadow: 0 0 6px var(--acc); }
+        .sk-desc { font: 400 max(6px, 0.72rem - var(--font-trim))/1.5 var(--font-menu-body); color: rgba(232, 222, 246, 0.72); margin-top: 3px; }
+        .sk-lock { font: 400 max(6px, 0.52rem - var(--font-trim)) var(--font-menu); letter-spacing: 0.25em; text-transform: uppercase; color: rgba(200, 190, 215, 0.6); margin-top: 4px; }
+        .sk-node.locked { opacity: 0.42; }
+        .sk-node.locked .sk-gem { border-style: dashed; border-color: rgba(200, 190, 215, 0.6); box-shadow: none; }
+        .sk-node:hover { background: color-mix(in srgb, var(--acc) 6%, transparent); }
+        .sk-node.lit { background: linear-gradient(90deg, color-mix(in srgb, var(--acc) 22%, transparent), color-mix(in srgb, var(--acc) 8%, transparent) 75%, transparent);
+            box-shadow: inset 0 0 18px color-mix(in srgb, var(--acc) 16%, transparent); opacity: 1; }
+        .sk-node.lit .sk-gem { animation: skPulse 1.6s ease-in-out infinite; }
+        .sk-node.lit .sk-desc { color: rgba(246, 240, 255, 0.9); }
+        @keyframes skPulse { 50% { box-shadow: 0 0 14px 5px var(--acc), 0 0 34px color-mix(in srgb, var(--acc) 70%, transparent); } }
+        @media (prefers-reduced-motion: reduce) { .sk-node.lit .sk-gem { animation: none; } }
+        @media (max-width: 700px), (max-height: 540px) {
+            .sk-head { gap: 20px; }
+            .sk-dial { width: 112px; height: 112px; }
+            .sk-level { font-size: max(6px, 1.6rem - var(--font-trim)); }
+        }
         /* =====================================================================
            SHOPS — Dr. Yin's augments, the workbench, Torque, Neural Systems and
            Zib.ME share one frame in the dossier scheme (--df-*, dossier.css cards,
@@ -67445,26 +67504,35 @@ engineMixin({
                 if (!el || !this.resonance) return;
                 const R = this.resonance, next = R.toNext();
                 const pct = next === Infinity ? 100 : Math.max(0, Math.min(100, Math.round(R.xp / next * 100)));
+                // A tuning chamber (ETERNAL's direction): the level in a glowing resonance dial, each tree a line of light
+                // with its skills hung on it as diamond nodes. Arms reads rose gold here, as gold means "touch".
+                const branchColor = { arms: '#e8a688' };
                 let html = `<div class="df-section"><span><span class="glint">◆</span>Resonance</span><span class="count">Level ${R.level}</span></div>`;
-                html += `<div class="df-card"><div class="df-head"><div class="grow"><div class="title script">Level ${R.level}</div>`;
-                html += `<div class="eyebrow" style="margin-top:2px;">${next === Infinity ? `Tuned to the limit · ${R.xp} / ${RESONANCE.POST_CAP_XP_PER_PP} saved toward the next PP` : `${R.xp} / ${next} to the next level`}</div></div>`;
-                html += `<div class="df-chips" style="justify-content:flex-end;"><span class="df-chip active">${R.points} Tuning point${R.points === 1 ? '' : 's'}</span>`;
-                html += `<span class="df-chip gold">${R.unsettled} unsettled</span><span class="df-chip info">Dark Element ◆ ${this.darkElement || 0}</span></div></div>`;
-                html += `<div class="df-bar${pct ? '' : ' zero'}" style="margin-top:12px;"><i style="--v:${pct}%"></i></div>`;
-                html += `<div class="df-hint" style="margin-top:12px;">Visit Dr. Yin at the medbay to tune. Unsettled Resonance is lost by half if you fall before you get there.</div></div>`;
-                if (R.level >= RESONANCE.CAP) html += `<div class="df-hint" style="margin-bottom:12px;">Dr. Yin exchanges surplus Resonance at ${RESONANCE.POST_CAP_XP_PER_PP} Resonance per PP. Settled remainders carry forward.</div>`;
-                html += `<div class="df-grid" style="margin-top:14px;">`;
+                html += `<div class="sk-head"><div class="sk-dial" style="--v:${pct}"><div class="sk-dial-in"><div class="sk-level">Level ${R.level}</div><div class="sk-pct">${pct}%</div></div></div>`;
+                html += `<div class="sk-meta"><div class="sk-next">${next === Infinity ? `Tuned to the limit · ${R.xp} / ${RESONANCE.POST_CAP_XP_PER_PP} saved toward the next PP` : `${R.xp} / ${next} to the next level`}</div>`;
+                html += `<div class="sk-caps"><span class="sk-cap lav">${R.points} Tuning point${R.points === 1 ? '' : 's'}</span><span class="sk-cap amber">${R.unsettled} unsettled</span><span class="sk-cap dark">Dark Element ◆ ${this.darkElement || 0}</span></div>`;
+                html += `<div class="sk-hint">Visit Dr. Yin at the medbay to tune. Unsettled Resonance is lost by half if you fall before you get there.</div>`;
+                if (R.level >= RESONANCE.CAP) html += `<div class="sk-hint">Dr. Yin exchanges surplus Resonance at ${RESONANCE.POST_CAP_XP_PER_PP} Resonance per PP. Settled remainders carry forward.</div>`;
+                html += `</div></div><div class="sk-trees">`;
                 for (const tree of RESONANCE_TREES) {
                     const spent = tree.nodes.reduce((a, n) => a + R.rank(n.id), 0);
-                    html += `<div class="df-card accent" style="--acc:${tree.color}"><div class="df-head"><div class="title" style="color:${tree.color}">${tree.name}</div><span class="count df-chip info">${spent} / ${tree.nodes.length * 3}</span></div>`;
+                    html += `<section class="sk-branch" style="--acc:${branchColor[tree.id] || tree.color}"><header><span class="sk-bname">${tree.name}</span><span class="sk-count">${spent} / ${tree.nodes.length * 3}</span></header><div class="sk-line">`;
                     for (const n of tree.nodes) {
-                        const r = R.rank(n.id);
-                        html += `<div class="df-node${r ? ' on' : ''}"><span class="df-pips">${'<i class="on"></i>'.repeat(r)}${'<i></i>'.repeat(3 - r)}</span><span><b>${n.name}</b> — ${n.desc(Math.max(1, r), R)}${n.unlockLevel && R.level < n.unlockLevel ? ` <span class="df-hint">(requires Level ${n.unlockLevel})</span>` : ''}</span></div>`;
+                        const r = R.rank(n.id), locked = n.unlockLevel && R.level < n.unlockLevel;
+                        html += `<div class="sk-node${r ? ' on' : ''}${locked ? ' locked' : ''}" tabindex="0"><span class="sk-gem"></span><div class="sk-body">`;
+                        html += `<div class="sk-name">${n.name}<span class="sk-pips">${'<i class="on"></i>'.repeat(r)}${'<i></i>'.repeat(3 - r)}</span></div>`;
+                        html += `<div class="sk-desc">${n.desc(Math.max(1, r), R)}</div>${locked ? `<div class="sk-lock">Opens at Level ${n.unlockLevel}</div>` : ''}</div></div>`;
                     }
-                    html += `</div>`;
+                    html += `</div></section>`;
                 }
                 html += `</div>`;
                 el.innerHTML = html;
+                // Tap a skill to light it; tap again to let it go
+                el.querySelectorAll('.sk-node').forEach(node => node.addEventListener('click', () => {
+                    const was = node.classList.contains('lit');
+                    el.querySelectorAll('.sk-node.lit').forEach(o => o.classList.remove('lit'));
+                    node.classList.toggle('lit', !was);
+                }));
             },
         });
         // GameEngine — Vending, garage, auto shop, Zib rides, sleep menu.
