@@ -109,25 +109,34 @@
                 if (!el || !this.resonance) return;
                 const R = this.resonance, next = R.toNext();
                 const pct = next === Infinity ? 100 : Math.max(0, Math.min(100, Math.round(R.xp / next * 100)));
+                // A tuning chamber (ETERNAL's direction): the level in a glowing resonance dial, each tree a line of light
+                // with its skills hung on it as diamond nodes. Arms reads rose gold here, as gold means "touch".
+                const branchColor = { arms: '#e8a688' };
                 let html = `<div class="df-section"><span><span class="glint">◆</span>Resonance</span><span class="count">Level ${R.level}</span></div>`;
-                html += `<div class="df-card"><div class="df-head"><div class="grow"><div class="title script">Level ${R.level}</div>`;
-                html += `<div class="eyebrow" style="margin-top:2px;">${next === Infinity ? `Tuned to the limit · ${R.xp} / ${RESONANCE.POST_CAP_XP_PER_PP} saved toward the next PP` : `${R.xp} / ${next} to the next level`}</div></div>`;
-                html += `<div class="df-chips" style="justify-content:flex-end;"><span class="df-chip active">${R.points} Tuning point${R.points === 1 ? '' : 's'}</span>`;
-                html += `<span class="df-chip gold">${R.unsettled} unsettled</span><span class="df-chip info">Dark Element ◆ ${this.darkElement || 0}</span></div></div>`;
-                html += `<div class="df-bar${pct ? '' : ' zero'}" style="margin-top:12px;"><i style="--v:${pct}%"></i></div>`;
-                html += `<div class="df-hint" style="margin-top:12px;">Visit Dr. Yin at the medbay to tune. Unsettled Resonance is lost by half if you fall before you get there.</div></div>`;
-                if (R.level >= RESONANCE.CAP) html += `<div class="df-hint" style="margin-bottom:12px;">Dr. Yin exchanges surplus Resonance at ${RESONANCE.POST_CAP_XP_PER_PP} Resonance per PP. Settled remainders carry forward.</div>`;
-                html += `<div class="df-grid" style="margin-top:14px;">`;
+                html += `<div class="sk-head"><div class="sk-dial" style="--v:${pct}"><div class="sk-dial-in"><div class="sk-level">Level ${R.level}</div><div class="sk-pct">${pct}%</div></div></div>`;
+                html += `<div class="sk-meta"><div class="sk-next">${next === Infinity ? `Tuned to the limit · ${R.xp} / ${RESONANCE.POST_CAP_XP_PER_PP} saved toward the next PP` : `${R.xp} / ${next} to the next level`}</div>`;
+                html += `<div class="sk-caps"><span class="sk-cap lav">${R.points} Tuning point${R.points === 1 ? '' : 's'}</span><span class="sk-cap amber">${R.unsettled} unsettled</span><span class="sk-cap dark">Dark Element ◆ ${this.darkElement || 0}</span></div>`;
+                html += `<div class="sk-hint">Visit Dr. Yin at the medbay to tune. Unsettled Resonance is lost by half if you fall before you get there.</div>`;
+                if (R.level >= RESONANCE.CAP) html += `<div class="sk-hint">Dr. Yin exchanges surplus Resonance at ${RESONANCE.POST_CAP_XP_PER_PP} Resonance per PP. Settled remainders carry forward.</div>`;
+                html += `</div></div><div class="sk-trees">`;
                 for (const tree of RESONANCE_TREES) {
                     const spent = tree.nodes.reduce((a, n) => a + R.rank(n.id), 0);
-                    html += `<div class="df-card accent" style="--acc:${tree.color}"><div class="df-head"><div class="title" style="color:${tree.color}">${tree.name}</div><span class="count df-chip info">${spent} / ${tree.nodes.length * 3}</span></div>`;
+                    html += `<section class="sk-branch" style="--acc:${branchColor[tree.id] || tree.color}"><header><span class="sk-bname">${tree.name}</span><span class="sk-count">${spent} / ${tree.nodes.length * 3}</span></header><div class="sk-line">`;
                     for (const n of tree.nodes) {
-                        const r = R.rank(n.id);
-                        html += `<div class="df-node${r ? ' on' : ''}"><span class="df-pips">${'<i class="on"></i>'.repeat(r)}${'<i></i>'.repeat(3 - r)}</span><span><b>${n.name}</b> — ${n.desc(Math.max(1, r), R)}${n.unlockLevel && R.level < n.unlockLevel ? ` <span class="df-hint">(requires Level ${n.unlockLevel})</span>` : ''}</span></div>`;
+                        const r = R.rank(n.id), locked = n.unlockLevel && R.level < n.unlockLevel;
+                        html += `<div class="sk-node${r ? ' on' : ''}${locked ? ' locked' : ''}" tabindex="0"><span class="sk-gem"></span><div class="sk-body">`;
+                        html += `<div class="sk-name">${n.name}<span class="sk-pips">${'<i class="on"></i>'.repeat(r)}${'<i></i>'.repeat(3 - r)}</span></div>`;
+                        html += `<div class="sk-desc">${n.desc(Math.max(1, r), R)}</div>${locked ? `<div class="sk-lock">Opens at Level ${n.unlockLevel}</div>` : ''}</div></div>`;
                     }
-                    html += `</div>`;
+                    html += `</div></section>`;
                 }
                 html += `</div>`;
                 el.innerHTML = html;
+                // Tap a skill to light it; tap again to let it go
+                el.querySelectorAll('.sk-node').forEach(node => node.addEventListener('click', () => {
+                    const was = node.classList.contains('lit');
+                    el.querySelectorAll('.sk-node.lit').forEach(o => o.classList.remove('lit'));
+                    node.classList.toggle('lit', !was);
+                }));
             },
         });

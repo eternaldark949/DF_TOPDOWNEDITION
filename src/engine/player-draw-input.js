@@ -294,8 +294,8 @@
                     const ctx = canvas.getContext('2d');
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-                    // Square backdrop here, not the dialogue box's circle — these two
-                    // canvases are already clipped to a circle by inline border-radius.
+                    // Square backdrop here, not the dialogue box's circle: CSS rounds these two
+                    // canvases into the sidebar's rounded-square frame (.sidebar-portrait).
                     ctx.fillStyle = 'rgba(40, 5, 25, 0.8)';
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
 

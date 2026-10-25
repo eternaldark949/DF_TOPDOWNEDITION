@@ -35,15 +35,15 @@
             border-color: var(--glow-color);
         }
         
-        #ui-location { position: absolute; bottom: 20px; right: 20px; font-family: 'Great Vibes', cursive; font-weight: 400; font-size: max(6px, 1.3rem - var(--font-trim)); color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,0.8), 0 0 15px rgba(164,105,255,0.3); padding: 0; border: none; background: none; z-index: 20; pointer-events: none; }
+        #ui-location { position: absolute; bottom: 20px; right: 20px; font-family: var(--font-script); font-weight: 400; font-size: max(6px, 1.3rem - var(--font-trim)); color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,0.8), 0 0 15px rgba(164,105,255,0.3); padding: 0; border: none; background: none; z-index: 20; pointer-events: none; }
         #ui-stats { position: absolute; top: 75px; right: 20px; text-align: right; }
-        #ui-time { font-family: 'Orbitron', sans-serif; font-weight: 500; font-size: max(6px, 1.2rem - var(--font-trim)); color: #fff; text-shadow: 0 0 5px #fff; letter-spacing: 2px; margin-bottom: 5px; }
+        #ui-time { font-family: var(--font-tech); font-weight: 500; font-size: max(6px, 1.2rem - var(--font-trim)); color: #fff; text-shadow: 0 0 5px #fff; letter-spacing: 2px; margin-bottom: 5px; }
         #ui-currency { font-size: max(6px, 0.9rem - var(--font-trim)); color: #ffd700; text-shadow: 0 0 5px #ffd700; }
         #ui-scrap { font-size: max(6px, 0.9rem - var(--font-trim)); color: #aaa; text-shadow: 0 0 5px #aaa; }
-        #ui-buffs { font-family: 'Orbitron', sans-serif; font-size: max(6px, 0.8rem - var(--font-trim)); color: #00f3ff; text-shadow: 0 0 5px #00f3ff; margin-top: 5px; display: none; }
+        #ui-buffs { font-family: var(--font-tech); font-size: max(6px, 0.8rem - var(--font-trim)); color: #00f3ff; text-shadow: 0 0 5px #00f3ff; margin-top: 5px; display: none; }
         
         /* Stealth Indicator */
-        #ui-stealth-indicator { position: absolute; top: 12%; left: 50%; transform: translateX(-50%); font-family: 'Montserrat', sans-serif; font-size: max(6px, 1.1rem - var(--font-trim)); font-weight: 600; letter-spacing: 4px; pointer-events: none; display: none; z-index: 20; white-space: nowrap; background: linear-gradient(180deg, #FFFFFF 0%, #C0C0C0 40%, #909090 70%, #B0B0B0 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; filter: drop-shadow(0 0 6px rgba(192, 192, 192, 0.6)) drop-shadow(0 0 15px rgba(160, 160, 160, 0.3)); }
+        #ui-stealth-indicator { position: absolute; top: 12%; left: 50%; transform: translateX(-50%); font-family: var(--font-ui); font-size: max(6px, 1.1rem - var(--font-trim)); font-weight: 600; letter-spacing: 4px; pointer-events: none; display: none; z-index: 20; white-space: nowrap; background: linear-gradient(180deg, #FFFFFF 0%, #C0C0C0 40%, #909090 70%, #B0B0B0 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; filter: drop-shadow(0 0 6px rgba(192, 192, 192, 0.6)) drop-shadow(0 0 15px rgba(160, 160, 160, 0.3)); }
         /* The gauntlet's wave readout (HordeGauntlet._hud): champagne caps over a slim draining bar; the stealth word steps down beneath it */
         #ui-wave { position: absolute; top: 12%; left: 50%; transform: translate(-50%, -6px); z-index: 20; pointer-events: none; opacity: 0; transition: opacity 0.4s ease, transform 0.4s ease;
             display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 6px 16px 7px; border-radius: 999px;
@@ -205,7 +205,7 @@
         
         /* Screen title now in main content area */
         .screen-title {
-            font-family: 'Great Vibes'; 
+            font-family: var(--font-script); 
             font-size: max(6px, 2.5rem - var(--font-trim)); 
             color: var(--df-lavender-pale); 
             margin-top: 10px;
@@ -222,77 +222,192 @@
             padding-bottom: 20px;
         }
         
-        /* Item pills, after ETERNAL's mock-up: dotted capsules; electric violet when open,
-           pale lavender when equipped, a crimson dotted ring for consumables, champagne for keepsakes */
+        /* Item pills, sampled from ETERNAL's inventory mock-up (top two rows): a dashed violet capsule.
+           Unequipped: black at the icon end deepening to electric violet, a fine light divider after the icon.
+           Equipped: pale lavender at the icon end to violet, the icon on a soft-edged black tile. */
         .ui-pill {
             width: 100%; 
             min-height: 76px;
-            border: 2px dotted rgba(202, 176, 250, 0.45);
+            border: 1.5px dashed var(--df-violet-mid);
             border-radius: 44px;
             display: flex; 
             align-items: center; 
-            padding: 10px 22px;
-            padding-right: 60px;
+            padding: 12px 66px 12px 56px;   /* mock-up spacing: the icon sits well in from the round end */
             margin-bottom: 14px; 
             box-sizing: border-box;
-            position: relative;
+            position: relative; z-index: 0;   /* each pill its own layer, so an open menu sits over the next pill's diamond */
             cursor: pointer;
-            transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
-            background: linear-gradient(90deg, rgba(4, 1, 6, 0.92) 0%, rgba(24, 6, 50, 0.85) 55%, rgba(48, 14, 120, 0.7) 100%);
+            transition: filter 0.3s ease, box-shadow 0.35s ease;
+            background:
+                radial-gradient(ellipse 22% 95% at 7% 50%, #000 0%, #000 45%, rgba(0, 0, 0, 0) 100%),
+                linear-gradient(90deg, #050010 0%, #0d0222 14%, #3f0aa0 34%, #5210c9 58%, #5f14e7 80%, #6618e1 100%);
+            box-shadow: inset 0 0 22px 2px rgba(48, 8, 122, 0.9);
         }
-        .ui-pill:hover { border-color: rgba(202, 176, 250, 0.8); box-shadow: 0 0 18px rgba(142, 85, 245, 0.25); }
+        .ui-pill:hover { filter: brightness(1.08); }
         
-        /* --- ICON TILE --- */
+        /* --- ICON: bare on the black, a light divider fading out at both ends --- */
         .pill-icon {
             width: 54px; height: 54px;
             border-radius: 14px;
-            background: radial-gradient(circle at 50% 40%, rgba(60, 20, 30, 0.9), #050103 75%);
-            border: 1px solid rgba(202, 176, 250, 0.15);
+            background: transparent;
+            border: none;
             display: flex; justify-content: center; align-items: center;
             font-size: max(6px, 1.4rem - var(--font-trim));
-            margin-right: 18px;
+            margin-right: 51px;
             flex-shrink: 0;
-            box-shadow: 0 0 14px rgba(0, 0, 0, 0.7);
+            position: relative;
+        }
+        .pill-icon::after {
+            content: ''; position: absolute; right: -24px; top: -8px; bottom: -8px; width: 1px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.75) 50%, rgba(255, 255, 255, 0) 100%);
         }
         
-        /* --- OPEN (expanded): the mock-up's electric-violet card --- */
-        .ui-pill.expanded {
-            border-color: rgba(202, 176, 250, 0.75);
-            background: linear-gradient(90deg, #050103 0%, var(--df-violet-deep) 30%, #3f0a9d 60%, var(--df-violet) 100%);
-            box-shadow: 0 0 26px rgba(93, 20, 226, 0.45), inset 0 0 30px rgba(142, 85, 245, 0.15);
-        }
+        /* --- OPEN (expanded): the control node's icons are out (panels-phone.css darkens the card) --- */
+        .ui-pill.expanded { z-index: 5; }
         
-        /* --- EQUIPPED: the mock-up's pale lavender card --- */
+        /* --- EQUIPPED: pale lavender to violet, darker violet shading round the inside edge --- */
         .ui-pill.active-item {
-            border-color: rgba(255, 255, 255, 0.55);
-            background: radial-gradient(ellipse 80% 140% at 35% 50%, var(--df-lavender-pale) 0%, #dac1fc 55%, #b896f6 100%);
-            box-shadow: 0 0 22px rgba(202, 176, 250, 0.45);
+            background: linear-gradient(90deg, #f1e8fe 0%, #efe5fe 20%, #e2d0fc 38%, #ccadfb 60%, #ad81f8 82%, #9560f6 100%);
+            box-shadow: inset 0 0 20px 2px rgba(112, 66, 200, 0.75);
         }
-        .ui-pill.active-item .pill-name { color: #5b2fc4; }
-        .ui-pill.active-item .pill-desc { color: var(--df-violet-ink); }
-        .ui-pill.active-item .pill-icon { border: 1px solid rgba(255, 255, 255, 0.6); box-shadow: 0 0 12px rgba(93, 20, 226, 0.35); }
-        .ui-pill.active-item.expanded { background: radial-gradient(ellipse 80% 140% at 35% 50%, #fff 0%, #e4d0fd 55%, #c4a5f8 100%); }
+        .ui-pill.active-item .pill-desc { color: #390892; }
+        .ui-pill.active-item .pill-icon { background: #050103; box-shadow: 0 0 12px 6px rgba(5, 1, 3, 0.85); }
+        .ui-pill.active-item .pill-icon::after { display: none; }
         .ui-pill.active-item .pill-equipped-tag { display: inline; }
-        
-        /* --- TYPE ACCENTS (border only; the body follows the state above) --- */
-        .ui-pill.type-consumable { border-color: rgba(208, 16, 28, 0.7); }
-        .ui-pill.type-consumable.expanded { box-shadow: 0 0 26px rgba(208, 16, 28, 0.3), inset 0 0 30px rgba(142, 85, 245, 0.15); }
-        .ui-pill.type-collectible, .ui-pill.type-intel { border-color: rgba(216, 198, 162, 0.55); }
-        .ui-pill.type-collectible .pill-name, .ui-pill.type-intel .pill-name { color: var(--df-champagne); }
+
+        /* --- CATEGORY COLOURS (ETERNAL's scheme): violet weapons and gear, crimson consumables,
+           moonstone collectibles, rose-gold mounts, emerald spells,
+           rose-quartz cosmetics, amber-smoke furniture (sapphire kept on standby). Same build as the violet pill. --- */
+        .ui-pill.type-consumable {
+            --pill-accent: #d0141c;
+            border-color: var(--pill-accent);
+            background:
+                radial-gradient(ellipse 22% 95% at 7% 50%, #000 0%, #000 45%, rgba(0, 0, 0, 0) 100%),
+                linear-gradient(90deg, #050000 0%, #140002 14%, #42040c 34%, #5a0712 58%, #6a0a18 80%, #740c1b 100%);
+            box-shadow: inset 0 0 22px 2px rgba(110, 4, 14, 0.9);
+        }
+        .ui-pill.type-consumable .pill-name { color: #ff4b55; }
+        .ui-pill.type-consumable .inventory-entry-head { background-image: linear-gradient(90deg, #e0252f 0%, #e0252f 70%, rgba(224, 37, 47, 0)); }
+        .ui-pill.type-consumable .pill-desc, .ui-pill.type-consumable .pill-qty { color: #f6cdd1; }
+        .ui-pill.type-consumable .pill-qty-value { background: #3d0309; border-color: #e0252f; }
+        #inventory-list .ui-pill.type-consumable .inventory-entry-detail { color: #f6cdd1; }
+        #inventory-list .ui-pill.type-consumable .inventory-registry-tag { color: #ffb3b9; border-color: rgba(255, 120, 130, 0.6); }
+        .ui-pill.type-consumable.active-item {
+            background: linear-gradient(90deg, #fee9eb 0%, #fde3e6 20%, #f9c6cc 38%, #f39aa4 60%, #e4606e 82%, #d43a4b 100%);
+            box-shadow: inset 0 0 20px 2px rgba(180, 30, 50, 0.7);
+        }
+        .ui-pill.type-consumable.active-item .pill-name { color: #c0101c; }
+        .ui-pill.type-consumable.active-item .pill-desc { color: #6a0614; }
+        /* moonstone silver */
+        .ui-pill.type-collectible {
+            border-color: #c9c3d6;
+            background:
+                radial-gradient(ellipse 22% 95% at 7% 50%, #000 0%, #000 45%, rgba(0, 0, 0, 0) 100%),
+                radial-gradient(ellipse 40% 120% at 78% 0%, rgba(222, 196, 245, 0.16), rgba(0, 0, 0, 0) 70%),
+                linear-gradient(90deg, #050507 0%, #101015 14%, #34333f 34%, #54525f 58%, #6e6a7a 80%, #7d7889 100%);
+            box-shadow: inset 0 0 22px 2px rgba(40, 38, 54, 0.9);
+        }
+        .ui-pill.type-collectible .pill-name { color: #e6e1f0; }
+        .ui-pill.type-collectible .inventory-entry-head { background-image: linear-gradient(90deg, #c9c3d6 0%, #c9c3d6 70%, rgba(0, 0, 0, 0)); }
+        .ui-pill.type-collectible .pill-desc, .ui-pill.type-collectible .pill-qty, #inventory-list .ui-pill.type-collectible .inventory-entry-detail { color: #ece9f2; }
+        .ui-pill.type-collectible .pill-qty-value { background: #23222b; border-color: #c9c3d6; }
+        #inventory-list .ui-pill.type-collectible .inventory-registry-tag { color: #d9d3e6; border-color: rgba(210, 204, 225, 0.55); }
+        .ui-pill.type-collectible.active-item { background: linear-gradient(90deg, #fbfaff 0%, #eeebf4 20%, #d9d4e3 38%, #bdb6cb 60%, #a39bb4 82%, #918aa3 100%); box-shadow: inset 0 0 20px 2px rgba(110, 102, 130, 0.7); }
+        .ui-pill.type-collectible.active-item .pill-name { color: #5a5468; }
+        .ui-pill.type-collectible.active-item .pill-desc, #inventory-list .ui-pill.type-collectible.active-item .inventory-entry-detail { color: #2c2838; }
+        .ui-pill.type-collectible.active-item .pill-equipped-tag { color: #5a5468; }
+        /* rose gold */
+        .ui-pill.type-mount {
+            border-color: #e8a688;
+            background:
+                radial-gradient(ellipse 22% 95% at 7% 50%, #000 0%, #000 45%, rgba(0, 0, 0, 0) 100%),
+                radial-gradient(ellipse 40% 120% at 78% 0%, rgba(255, 200, 170, 0.12), rgba(0, 0, 0, 0) 70%),
+                linear-gradient(90deg, #060302 0%, #180a08 14%, #4e2120 34%, #713230 58%, #874339 80%, #934d41 100%);
+            box-shadow: inset 0 0 22px 2px rgba(86, 38, 22, 0.9);
+        }
+        .ui-pill.type-mount .pill-name { color: #ffb89a; }
+        .ui-pill.type-mount .inventory-entry-head { background-image: linear-gradient(90deg, #e8a688 0%, #e8a688 70%, rgba(0, 0, 0, 0)); }
+        .ui-pill.type-mount .pill-desc, .ui-pill.type-mount .pill-qty, #inventory-list .ui-pill.type-mount .inventory-entry-detail { color: #f7dccf; }
+        .ui-pill.type-mount .pill-qty-value { background: #3a1a10; border-color: #e8a688; }
+        #inventory-list .ui-pill.type-mount .inventory-registry-tag { color: #ffd3c0; border-color: rgba(240, 170, 140, 0.55); }
+        .ui-pill.type-mount.active-item { background: linear-gradient(90deg, #fff1ea 0%, #fde6dc 20%, #f7cdbb 38%, #eeaa8e 60%, #dc8a6c 82%, #cc7556 100%); box-shadow: inset 0 0 20px 2px rgba(170, 90, 60, 0.65); }
+        .ui-pill.type-mount.active-item .pill-name { color: #9a4426; }
+        .ui-pill.type-mount.active-item .pill-desc, #inventory-list .ui-pill.type-mount.active-item .inventory-entry-detail { color: #4f1d0d; }
+        .ui-pill.type-mount.active-item .pill-equipped-tag { color: #9a4426; }
+        /* emerald */
+        .ui-pill.type-spell {
+            border-color: #3ee08f;
+            background:
+                radial-gradient(ellipse 22% 95% at 7% 50%, #000 0%, #000 45%, rgba(0, 0, 0, 0) 100%),
+                radial-gradient(ellipse 40% 120% at 78% 0%, rgba(140, 255, 200, 0.10), rgba(0, 0, 0, 0) 70%),
+                linear-gradient(90deg, #000503 0%, #011409 14%, #044a26 34%, #066a36 58%, #088040 80%, #0a8a46 100%);
+            box-shadow: inset 0 0 22px 2px rgba(4, 70, 36, 0.9);
+        }
+        .ui-pill.type-spell .pill-name { color: #5cf0a6; }
+        .ui-pill.type-spell .inventory-entry-head { background-image: linear-gradient(90deg, #3ee08f 0%, #3ee08f 70%, rgba(0, 0, 0, 0)); }
+        .ui-pill.type-spell .pill-desc, .ui-pill.type-spell .pill-qty, #inventory-list .ui-pill.type-spell .inventory-entry-detail { color: #cdf7e0; }
+        .ui-pill.type-spell .pill-qty-value { background: #03301a; border-color: #3ee08f; }
+        #inventory-list .ui-pill.type-spell .inventory-registry-tag { color: #a8f5cd; border-color: rgba(90, 230, 160, 0.55); }
+        .ui-pill.type-spell.active-item { background: linear-gradient(90deg, #ecfff5 0%, #e1fcee 20%, #c0f3d8 38%, #8de6b8 60%, #55d293 82%, #2fbf78 100%); box-shadow: inset 0 0 20px 2px rgba(30, 150, 90, 0.6); }
+        .ui-pill.type-spell.active-item .pill-name { color: #0b7a42; }
+        .ui-pill.type-spell.active-item .pill-desc, #inventory-list .ui-pill.type-spell.active-item .inventory-entry-detail { color: #053a20; }
+        .ui-pill.type-spell.active-item .pill-equipped-tag { color: #0b7a42; }
+        /* rose quartz: cosmetics */
+        .ui-pill.type-cosmetic { border-color: #f39ac0; background: radial-gradient(ellipse 22% 95% at 7% 50%, #000 0%, #000 45%, rgba(0, 0, 0, 0) 100%), radial-gradient(ellipse 40% 120% at 78% 0%, rgba(255, 190, 220, 0.14), rgba(0, 0, 0, 0) 70%), linear-gradient(90deg, #060204 0%, #18070f 14%, #4c1630 34%, #6e2146 58%, #852b57 80%, #923060 100%); box-shadow: inset 0 0 22px 2px rgba(90, 20, 54, 0.9); }
+        .ui-pill.type-cosmetic .pill-name { color: #ffa8cc; }
+        .ui-pill.type-cosmetic .inventory-entry-head { background-image: linear-gradient(90deg, #f39ac0 0%, #f39ac0 70%, rgba(0, 0, 0, 0)); }
+        .ui-pill.type-cosmetic .pill-desc, .ui-pill.type-cosmetic .pill-qty, #inventory-list .ui-pill.type-cosmetic .inventory-entry-detail { color: #fbdbe9; }
+        .ui-pill.type-cosmetic .pill-qty-value { background: #3a0c22; border-color: #f39ac0; }
+        #inventory-list .ui-pill.type-cosmetic .inventory-registry-tag { color: #ffc6dd; border-color: rgba(245, 150, 195, 0.55); }
+        .ui-pill.type-cosmetic.active-item { background: linear-gradient(90deg, #fff0f6 0%, #fde6f0 20%, #f9cde0 38%, #f2a8c8 60%, #e47eab 82%, #d66395 100%); box-shadow: inset 0 0 20px 2px rgba(170, 60, 110, 0.6); }
+        .ui-pill.type-cosmetic.active-item .pill-name { color: #a8306a; }
+        .ui-pill.type-cosmetic.active-item .pill-desc, #inventory-list .ui-pill.type-cosmetic.active-item .inventory-entry-detail { color: #521232; }
+        .ui-pill.type-cosmetic.active-item .pill-equipped-tag { color: #a8306a; }
+        /* amber smoke: furniture */
+        .ui-pill.type-furniture { border-color: #c99a6a; background: radial-gradient(ellipse 22% 95% at 7% 50%, #000 0%, #000 45%, rgba(0, 0, 0, 0) 100%), radial-gradient(ellipse 40% 120% at 78% 0%, rgba(255, 215, 170, 0.10), rgba(0, 0, 0, 0) 70%), linear-gradient(90deg, #050302 0%, #140d08 14%, #3a2a1e 34%, #54402e 58%, #66503a 80%, #6e5740 100%); box-shadow: inset 0 0 22px 2px rgba(60, 40, 24, 0.9); }
+        .ui-pill.type-furniture .pill-name { color: #e2b98e; }
+        .ui-pill.type-furniture .inventory-entry-head { background-image: linear-gradient(90deg, #c99a6a 0%, #c99a6a 70%, rgba(0, 0, 0, 0)); }
+        .ui-pill.type-furniture .pill-desc, .ui-pill.type-furniture .pill-qty, #inventory-list .ui-pill.type-furniture .inventory-entry-detail { color: #efe2d3; }
+        .ui-pill.type-furniture .pill-qty-value { background: #2c2016; border-color: #c99a6a; }
+        #inventory-list .ui-pill.type-furniture .inventory-registry-tag { color: #ecd0b0; border-color: rgba(210, 170, 130, 0.5); }
+        .ui-pill.type-furniture.active-item { background: linear-gradient(90deg, #fbf5ee 0%, #f6ecdf 20%, #ead6bf 38%, #d8b894 60%, #c09670 82%, #ad835e 100%); box-shadow: inset 0 0 20px 2px rgba(120, 85, 55, 0.6); }
+        .ui-pill.type-furniture.active-item .pill-name { color: #7a5130; }
+        .ui-pill.type-furniture.active-item .pill-desc, #inventory-list .ui-pill.type-furniture.active-item .inventory-entry-detail { color: #3a2414; }
+        .ui-pill.type-furniture.active-item .pill-equipped-tag { color: #7a5130; }
+        /* sapphire: on standby. To give it to cosmetics, swap 'type-cosmetic' and 'type-sapphire-standby' across
+           the rose-quartz block and this one (a find-and-replace). Nothing has the type sapphire-standby, so it sits unused. */
+        .ui-pill.type-sapphire-standby { border-color: #4f8dff; background: radial-gradient(ellipse 22% 95% at 7% 50%, #000 0%, #000 45%, rgba(0, 0, 0, 0) 100%), radial-gradient(ellipse 40% 120% at 78% 0%, rgba(150, 190, 255, 0.12), rgba(0, 0, 0, 0) 70%), linear-gradient(90deg, #010208 0%, #040a20 14%, #0a2468 34%, #0f3490 58%, #1442b0 80%, #1749bf 100%); box-shadow: inset 0 0 22px 2px rgba(8, 30, 100, 0.9); }
+        .ui-pill.type-sapphire-standby .pill-name { color: #7fb0ff; }
+        .ui-pill.type-sapphire-standby .inventory-entry-head { background-image: linear-gradient(90deg, #4f8dff 0%, #4f8dff 70%, rgba(0, 0, 0, 0)); }
+        .ui-pill.type-sapphire-standby .pill-desc, .ui-pill.type-sapphire-standby .pill-qty, #inventory-list .ui-pill.type-sapphire-standby .inventory-entry-detail { color: #d6e4ff; }
+        .ui-pill.type-sapphire-standby .pill-qty-value { background: #061a4d; border-color: #4f8dff; }
+        #inventory-list .ui-pill.type-sapphire-standby .inventory-registry-tag { color: #b8d0ff; border-color: rgba(120, 160, 255, 0.55); }
+        .ui-pill.type-sapphire-standby.active-item { background: linear-gradient(90deg, #eef4ff 0%, #e4edff 20%, #c8daff 38%, #9dbcff 60%, #6a97f5 82%, #4a7de8 100%); box-shadow: inset 0 0 20px 2px rgba(40, 80, 180, 0.65); }
+        .ui-pill.type-sapphire-standby.active-item .pill-name { color: #1a46b0; }
+        .ui-pill.type-sapphire-standby.active-item .pill-desc, #inventory-list .ui-pill.type-sapphire-standby.active-item .inventory-entry-detail { color: #0a1f55; }
+        .ui-pill.type-sapphire-standby.active-item .pill-equipped-tag { color: #1a46b0; }
         
         /* --- PILL TEXT ELEMENTS --- */
         .pill-name {
-            font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.78rem - var(--font-trim)); font-weight: 600; letter-spacing: 1.5px;
-            text-transform: uppercase; color: var(--df-lavender); transition: color 0.3s;
-            display: inline-block; padding-bottom: 5px; margin-bottom: 4px;
-            border-bottom: 1px solid rgba(202, 176, 250, 0.3); min-width: 55%;
+            font-family: var(--font-menu); font-size: max(6px, 0.82rem - var(--font-trim)); font-weight: 400; letter-spacing: 0.3px;
+            text-transform: uppercase; color: var(--df-violet-mid);
+            display: inline-block;
         }
-        .ui-pill.expanded .pill-name { color: #e6d8ff; }
-        .pill-desc { color: rgba(225, 214, 245, 0.8); font-size: max(6px, 0.74rem - var(--font-trim)); line-height: 1.35; margin-top: 2px; transition: color 0.3s; }
-        .ui-pill.expanded .pill-desc { color: #fff; }
-        .pill-type-badge { font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.5rem - var(--font-trim)); font-weight: 600; color: var(--df-lavender); border: 1px solid var(--df-lavender); padding: 1px 6px; border-radius: 8px; text-transform: uppercase; letter-spacing: 1px; margin-right: 8px; }
+        /* the line under the name runs most of the text column (71% in the mock-up), fading out at its end */
+        .inventory-entry-head { padding-bottom: 7px; margin-bottom: 7px;
+            background: linear-gradient(90deg, var(--df-violet-mid) 0%, var(--df-violet-mid) 70%, rgba(142, 85, 245, 0)) left bottom / 71% 1px no-repeat; }
+        .pill-desc { font-family: var(--font-menu); color: var(--df-lavender); font-size: max(6px, 0.8rem - var(--font-trim)); font-weight: 400; line-height: 1.3; margin-top: 2px; max-width: 85%; transition: color 0.3s; }
+        .pill-type-badge { font-family: var(--font-ui); font-size: max(6px, 0.5rem - var(--font-trim)); font-weight: 600; color: var(--df-lavender); border: 1px solid var(--df-lavender); padding: 1px 6px; border-radius: 8px; text-transform: uppercase; letter-spacing: 1px; margin-right: 8px; }
         .pill-equipped-tag { color: #5b2fc4; background: rgba(255, 255, 255, 0.55); border-radius: 8px; padding: 1px 8px; font-size: max(6px, 0.55rem - var(--font-trim)); font-weight: 700; letter-spacing: 1.5px; display: none; }
-        .pill-qty { font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.6rem - var(--font-trim)); color: var(--df-lavender); letter-spacing: 1px; }
+        
+        /* --- QTY: a small caption over a deep-violet chip with a dotted rim --- */
+        .pill-qty { flex-shrink: 0; margin-left: 24px; display: flex; flex-direction: column; align-items: center; gap: 5px;
+            font-family: var(--font-menu); color: var(--df-lavender); }
+        .pill-qty-label { font-size: max(6px, 0.74rem - var(--font-trim)); letter-spacing: 0.5px; }
+        .pill-qty-value { min-width: 62px; padding: 4px 10px; box-sizing: border-box; text-align: center;
+            background: #24055b; border: 1.5px dotted var(--df-violet-mid); border-radius: 14px;
+            font-size: max(6px, 0.96rem - var(--font-trim)); line-height: 1.2; }
+        .ui-pill.active-item .pill-qty { color: #f2dcdb; }
         
         /* Touch-Friendly Close 'X' */
         #inventory-close-x {
@@ -398,23 +513,30 @@
             transform: translateX(-100%);
         }
         
-        /* Portrait Circle */
+        /* Portrait, after ETERNAL's mock-up: a dark maroon rounded square with a faint plum glow,
+           the portrait filling it, ringed by the split double-dashed peach rim (#portrait-rim) */
         .sidebar-portrait {
-            width: 120px;
-            height: 120px;
-            border-radius: 38%;
-            border: 2px dotted var(--df-peach);
+            width: 124px;
+            height: 124px;
+            border-radius: 40%;
             margin-bottom: 30px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: rgba(10, 5, 15, 0.6);
+            position: relative;
+            background: #130401;
             flex-shrink: 0;
-            box-shadow: 0 0 30px rgba(120, 20, 40, 0.35), inset 0 0 20px rgba(0, 0, 0, 0.6);
+            /* the plum glow round it, fading out over about its own radius */
+            box-shadow: 0 0 16px 3px rgba(150, 10, 78, 0.32), 0 0 46px 14px rgba(120, 6, 62, 0.26), 0 0 90px 26px rgba(80, 4, 42, 0.18);
         }
         
         .sidebar-portrait canvas {
-            border-radius: 50%;
+            display: block;
+            width: 100%;
+            height: 100%;
+            border-radius: 40%;
+        }
+        .sidebar-portrait .portrait-rim {
+            position: absolute; inset: -6px;
+            width: calc(100% + 12px); height: calc(100% + 12px);
+            pointer-events: none; overflow: visible;
         }
         
         /* the thin warm hairline under the portrait */
@@ -487,7 +609,29 @@
         .sidebar-back-container {
             margin-top: auto;
             padding-top: 20px;
+            align-self: stretch;
         }
+        /* The sidebar's Back, after ETERNAL's mock-up: a flat lilac pill in a fine white dashed rim,
+           a violet haze glowing round it, black letter-spaced caps and a small ink-blue arrow */
+        .sidebar-back-container .screen-back-btn {
+            gap: 0; height: 36px; width: 100%; min-width: 0; box-sizing: border-box;   /* the sidebar's full width, as in the mock-up */
+            background: #ccc1da;
+            border: 0; outline: 1.5px dashed rgba(255, 255, 255, 0.85); outline-offset: 1px;   /* the dashes ride just outside the fill */
+            box-shadow: 0 0 24px 6px rgba(120, 60, 225, 0.42), 0 0 60px 10px rgba(80, 25, 200, 0.28);
+            color: #0c0812;
+            font-family: var(--font-menu); font-weight: 400; letter-spacing: 6px;
+            font-size: max(6px, 0.8rem - var(--font-trim));
+            text-shadow: 0 1px 2px rgba(12, 8, 18, 0.35); -webkit-text-stroke: 0.4px #0c0812;
+        }
+        .sidebar-back-container .screen-back-btn:hover {
+            background: #dad0e8;
+            box-shadow: 0 0 28px 8px rgba(130, 70, 235, 0.5), 0 0 70px 12px rgba(90, 30, 210, 0.32);
+        }
+        .sidebar-back-container .screen-back-btn .btn-arrow {
+            color: #10253f; opacity: 1; font-size: max(6px, 0.62rem - var(--font-trim)); letter-spacing: 0;
+            margin-right: 2.6em; text-shadow: 0 0 3px rgba(16, 37, 63, 0.5);
+        }
+        .sidebar-back-container .screen-back-btn .btn-hint { opacity: 1; font-size: inherit; margin-left: 0.5em; }
         
         /* --- RIGHT SIDEBAR (Filters) --- */
         .screen-sidebar-right {
@@ -523,64 +667,73 @@
         
         .filter-title-text {
             font-family: var(--font-script);
-            font-size: max(6px, 2rem - var(--font-trim));
-            color: var(--df-cream);
-            text-shadow: 0 0 10px rgba(255, 194, 72, 0.45);
+            font-size: max(6px, 2.6rem - var(--font-trim));
+            line-height: 1;
+            color: #fee9be;
+            text-shadow: 0 0 8px rgba(255, 194, 72, 0.25);
         }
         
-        /* Filter Toggle Switch */
+        /* Filter switch, after ETERNAL's mock-up: ON over OFF beside two stacked amber pills,
+           the lit one glowing, behind a fine grey divider */
         .filter-toggle {
             display: flex;
-            flex-direction: column;
             align-items: center;
-            gap: 2px;
+            gap: 12px;
+            padding-left: 16px;
+            position: relative;
             font-family: var(--font-ui);
-            font-size: max(6px, 0.5rem - var(--font-trim));
-            letter-spacing: 1px;
+            font-size: max(6px, 0.8rem - var(--font-trim));
+        }
+        .filter-toggle::before {
+            content: ''; position: absolute; left: 0; top: -6px; bottom: -6px; width: 1px;
+            background: linear-gradient(180deg, rgba(60, 60, 60, 0), #3a3a3a 25%, #3a3a3a 75%, rgba(60, 60, 60, 0));
         }
         
         .filter-toggle-labels {
             display: flex;
-            justify-content: space-between;
-            width: 100%;
-            color: #666;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 10px;
+            color: #6b4a0c;
+            line-height: 1;
         }
         
+        .filter-toggle-labels span { transition: color 0.25s ease, text-shadow 0.25s ease; }
         .filter-toggle-labels span.active {
             color: var(--df-gold);
+            text-shadow: 0 0 6px rgba(255, 194, 72, 0.4);
         }
         
         .filter-toggle-track {
-            width: 36px;
-            height: 18px;
-            background: rgba(0, 0, 0, 0.5);
-            border: 1px solid #444;
-            border-radius: 9px;
-            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
             cursor: pointer;
-            transition: all 0.25s ease;
         }
         
-        .filter-toggle-track.on {
-            border-color: var(--df-gold);
-            box-shadow: 0 0 10px rgba(255, 194, 72, 0.35);
+        .filter-pill {
+            display: block;
+            width: 38px;
+            height: 15px;
+            border-radius: 8px;
+            box-sizing: border-box;
+            background: #2a1d05;
+            border: 1.5px solid transparent;
+            transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+        }
+        .filter-toggle-track.on .filter-pill[data-state="on"],
+        .filter-toggle-track:not(.on) .filter-pill[data-state="off"] {
+            background: #ffc34b;
+            border-color: #ffac05;
+            box-shadow: 0 0 8px 1px rgba(255, 172, 5, 0.75), 0 0 18px rgba(255, 150, 0, 0.35);
         }
         
-        .filter-toggle-knob {
-            position: absolute;
-            top: 2px;
-            left: 2px;
-            width: 12px;
-            height: 12px;
-            background: #888;
-            border-radius: 50%;
-            transition: all 0.25s ease;
-        }
-        
-        .filter-toggle-track.on .filter-toggle-knob {
-            left: 20px;
-            background: var(--df-gold);
-            box-shadow: 0 0 8px var(--df-gold);
+        /* the little glint between the pills */
+        .filter-pill-dot {
+            width: 4px; height: 4px; border-radius: 50%;
+            background: #ffe7a6; border: 1px solid #c88a12;
+            box-shadow: 0 0 4px rgba(255, 194, 72, 0.9);
         }
         
         /* Filter Items */
@@ -941,6 +1094,11 @@
             padding: 6px 10px; cursor: pointer; position: relative; z-index: 0; outline: none; transition: color 0.2s;
         }
         .pause-quick-item:hover { color: #fff; }
+        /* The cinematic aperture (#icon-aperture in index.html), glowing violet beside its label */
+        .aperture-icon { width: 1.9em; height: 1.9em; vertical-align: middle; margin-left: 8px; flex-shrink: 0;
+            filter: drop-shadow(0 0 4px rgba(164, 105, 255, 0.65)); }
+        .pause-quick-item:has(.aperture-icon) { display: flex; align-items: center; padding-top: 2px; padding-bottom: 2px; }
+        .pause-quick-item .aperture-icon { width: 30px; height: 30px; margin-left: 12px; }
         .pause-quick-item.active { color: #1b0d2e; font-weight: 700; }
         .pause-quick-item.active::before {
             content: ''; position: absolute; inset: 0 0 0 0; z-index: -1;
@@ -998,7 +1156,7 @@
             padding-left: 10px;
         }
         .pause-mission-text {
-            font-family: 'Montserrat', sans-serif;
+            font-family: var(--font-ui);
             font-size: max(6px, 0.8rem - var(--font-trim));
             color: #ddd;
             line-height: 1.3;
@@ -1089,6 +1247,8 @@
             color: var(--df-violet-ink); font: 600 max(6px, 0.72rem - var(--font-trim)) var(--font-ui); letter-spacing: 3px; text-transform: uppercase; box-shadow: 0 0 22px rgba(202, 176, 250, 0.55);
             transition: opacity 0.35s ease, transform 0.35s ease;
         }
+        #capture-pill { display: inline-flex; align-items: center; gap: 8px; padding-left: 8px; }
+        #capture-pill .aperture-icon { margin-left: 0; width: 2.2em; height: 2.2em; }
         #capture-pill.show { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
         body.cinematic-view #capture-pill { display: none; }
         @keyframes cineHint { 0% { opacity: 0; } 15% { opacity: 0.85; } 65% { opacity: 0.85; } 100% { opacity: 0; } }
@@ -1100,13 +1260,13 @@
             display: none; align-items: center; justify-content: center;
             background: radial-gradient(ellipse at 50% 40%, rgba(30, 12, 48, 0.82), rgba(5, 2, 10, 0.94));
             backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-            font-family: 'Montserrat', sans-serif; color: #f1e8fe;
+            font-family: var(--font-ui); color: #f1e8fe;
         }
         #save-slot-overlay.active { display: flex; }
         .ks-panel { box-sizing: border-box; width: 100%; max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; align-items: center; gap: clamp(10px, 2.6vh, 22px);
             padding: max(14px, env(safe-area-inset-top, 0px)) 0 max(12px, env(safe-area-inset-bottom, 0px)); }
-        .ks-title { text-align: center; font: 400 clamp(2rem, 7vh, 3.4rem)/1 'Great Vibes', cursive; color: #f6dfa8; text-shadow: 0 0 18px rgba(232, 194, 122, 0.45); }
-        .ks-title small { display: block; margin-top: 6px; font: 600 max(6px, 0.62rem - var(--font-trim))/1 'Montserrat', sans-serif; letter-spacing: 0.42em; text-transform: uppercase; color: #b9aec4; }
+        .ks-title { text-align: center; font: 400 clamp(2rem, 7vh, 3.4rem)/1 var(--font-script); color: #f6dfa8; text-shadow: 0 0 18px rgba(232, 194, 122, 0.45); }
+        .ks-title small { display: block; margin-top: 6px; font: 600 max(6px, 0.62rem - var(--font-trim))/1 var(--font-ui); letter-spacing: 0.42em; text-transform: uppercase; color: #b9aec4; }
         .ks-deck { box-sizing: border-box; display: flex; gap: clamp(10px, 2.4vw, 26px); max-width: 100%; overflow-x: auto; scroll-snap-type: x mandatory; justify-content: safe center;
             padding: 12px max(16px, env(safe-area-inset-left, 0px)) 14px max(16px, env(safe-area-inset-right, 0px)); scrollbar-width: none; }
         .ks-deck::-webkit-scrollbar { display: none; }
@@ -1125,17 +1285,17 @@
             background: conic-gradient(from 210deg, #f6dfa8, #7a5a22, #e8c27a, #fff3d0, #7a5a22, #f6dfa8); box-shadow: 0 0 6cqh rgba(232, 194, 122, 0.35), 0 2cqh 5cqh rgba(0, 0, 0, 0.6); pointer-events: none; }
         .ks-medal img { width: 100%; height: 100%; border-radius: 50%; display: block; object-fit: cover; }
         .ks-body { position: absolute; left: 0; right: 0; top: 51cqh; padding: 0 5cqh; text-align: center; display: grid; gap: 1.4cqh; }
-        .ks-num { font: 600 3.1cqh/1 'Montserrat', sans-serif; letter-spacing: 0.4em; text-transform: uppercase; color: #b9aec4; }
-        .ks-chap { font: 400 9.4cqh/1 'Great Vibes', cursive; color: #f6dfa8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ks-num { font: 600 3.1cqh/1 var(--font-ui); letter-spacing: 0.4em; text-transform: uppercase; color: #b9aec4; }
+        .ks-chap { font: 400 9.4cqh/1 var(--font-script); color: #f6dfa8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .ks-obj { font: italic 500 5.2cqh/1.15 'Cormorant Garamond', Georgia, serif; color: #f1e8fe; }
-        .ks-meta { font: 500 3.5cqh/1.5 'Montserrat', sans-serif; color: #b9aec4; margin-top: 0.6cqh; }
+        .ks-meta { font: 500 3.5cqh/1.5 var(--font-ui); color: #b9aec4; margin-top: 0.6cqh; }
         .ks-meta b { color: #e8c27a; font-weight: 600; }
         .ks-tray { position: absolute; left: 3cqh; top: 3cqh; display: flex; gap: 2cqh; }
         .ks-tray button { width: 8.6cqh; height: 8.6cqh; padding: 0; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
-            font: 4cqh/1 'Montserrat', sans-serif; color: #f1e8fe; background: rgba(10, 4, 18, 0.7); border: 1px solid rgba(232, 194, 122, 0.4); transition: background 0.2s, color 0.2s; }
+            font: 4cqh/1 var(--font-ui); color: #f1e8fe; background: rgba(10, 4, 18, 0.7); border: 1px solid rgba(232, 194, 122, 0.4); transition: background 0.2s, color 0.2s; }
         .ks-tray button:hover { background: rgba(232, 194, 122, 0.25); color: #fff3d0; }
         .ks-flag { position: absolute; right: 3cqh; top: 3.6cqh; padding: 1.4cqh 2.8cqh; border-radius: 999px; background: #e8c27a; color: #0b0613;
-            font: 700 2.8cqh/1 'Montserrat', sans-serif; letter-spacing: 0.24em; text-transform: uppercase; }
+            font: 700 2.8cqh/1 var(--font-ui); letter-spacing: 0.24em; text-transform: uppercase; }
 
         /* A blank card: a crescent on a faint lattice */
         .ks-card.ks-empty { --gild: linear-gradient(160deg, rgba(232, 194, 122, 0.25), rgba(232, 194, 122, 0.05)); }
@@ -1154,13 +1314,13 @@
         .ks-back { height: 100%; display: grid; place-items: center; align-content: center; gap: 4cqh; padding: 0 8cqh; text-align: center;
             background: radial-gradient(circle at 50% 30%, #2c1646, #0c0516); }
         .ks-q { font: italic 600 7cqh/1.15 'Cormorant Garamond', Georgia, serif; color: #f1e8fe; margin-bottom: 2cqh; }
-        .ks-pill { width: 100%; padding: 3.2cqh 0; border-radius: 999px; cursor: pointer; font: 600 3.4cqh/1 'Montserrat', sans-serif; letter-spacing: 0.24em; text-transform: uppercase;
+        .ks-pill { width: 100%; padding: 3.2cqh 0; border-radius: 999px; cursor: pointer; font: 600 3.4cqh/1 var(--font-ui); letter-spacing: 0.24em; text-transform: uppercase;
             color: #f6dfa8; border: 1px solid rgba(232, 194, 122, 0.55); background: linear-gradient(180deg, rgba(232, 194, 122, 0.2), rgba(232, 194, 122, 0.04)); }
         .ks-pill.ks-no { color: #b9aec4; border-color: rgba(185, 174, 196, 0.35); background: none; }
         .ks-pill:hover { filter: brightness(1.25); }
 
         .ks-foot { display: flex; gap: clamp(18px, 4vw, 40px); }
-        .ks-foot button { background: none; border: none; padding: 6px 2px; cursor: pointer; font: 600 max(6px, 0.62rem - var(--font-trim))/1 'Montserrat', sans-serif;
+        .ks-foot button { background: none; border: none; padding: 6px 2px; cursor: pointer; font: 600 max(6px, 0.62rem - var(--font-trim))/1 var(--font-ui);
             letter-spacing: 0.28em; text-transform: uppercase; color: #b9aec4; transition: color 0.2s; }
         .ks-foot button::before { content: '◆ '; color: #e8c27a; font-size: 0.8em; }
         .ks-foot button:hover { color: #f1e8fe; }
@@ -1174,24 +1334,24 @@
 
 
 /* ── Resonance: Dr. Yin's tuning overlay (engine/tuning-ui.js) ── */
-#ui-resonance { font-family: Orbitron, sans-serif; font-size: max(6px, 0.7rem - var(--font-trim)); color: #e6dcff; letter-spacing: 1px; }
-#tuning-overlay { position: fixed; inset: 0; background: radial-gradient(ellipse at top, rgba(40, 18, 60, 0.97), rgba(8, 5, 16, 0.98)); z-index: 300; overflow-y: auto; color: #ddd; font-family: Montserrat, sans-serif; }
+#ui-resonance { font-family: var(--font-tech); font-size: max(6px, 0.7rem - var(--font-trim)); color: #e6dcff; letter-spacing: 1px; }
+#tuning-overlay { position: fixed; inset: 0; background: radial-gradient(ellipse at top, rgba(40, 18, 60, 0.97), rgba(8, 5, 16, 0.98)); z-index: 300; overflow-y: auto; color: #ddd; font-family: var(--font-ui); }
 .tun-wrap { max-width: 900px; margin: 24px auto; padding: 16px; }
-.tun-title { font-family: Orbitron, sans-serif; font-size: max(6px, 1.1rem - var(--font-trim)); letter-spacing: 4px; color: #c9a6ff; text-shadow: 0 0 14px rgba(185, 140, 255, 0.5); }
+.tun-title { font-family: var(--font-tech); font-size: max(6px, 1.1rem - var(--font-trim)); letter-spacing: 4px; color: #c9a6ff; text-shadow: 0 0 14px rgba(185, 140, 255, 0.5); }
 .tun-sub { font-size: max(6px, 0.6rem - var(--font-trim)); color: #777; letter-spacing: 2px; margin-bottom: 14px; }
 .tun-quote { font-style: italic; color: #e8d8f0; font-size: max(6px, 0.8rem - var(--font-trim)); margin: 10px 0 14px; border-left: 2px solid #c4566e; padding-left: 10px; }
 .tun-choice { border: 1px solid rgba(185, 140, 255, 0.35); border-radius: 8px; padding: 14px; margin-bottom: 10px; cursor: pointer; background: rgba(185, 140, 255, 0.06); }
-.tun-choice b { display: block; font-family: Orbitron, sans-serif; letter-spacing: 2px; color: #c9a6ff; font-size: max(6px, 0.8rem - var(--font-trim)); }
+.tun-choice b { display: block; font-family: var(--font-tech); letter-spacing: 2px; color: #c9a6ff; font-size: max(6px, 0.8rem - var(--font-trim)); }
 .tun-choice span { font-size: max(6px, 0.7rem - var(--font-trim)); color: #aaa; }
 .tun-choice:hover { background: rgba(185, 140, 255, 0.14); }
 .tun-head { margin-bottom: 6px; }
-.tun-lv { font-family: Orbitron, sans-serif; color: #c9a6ff; letter-spacing: 2px; }
+.tun-lv { font-family: var(--font-tech); color: #c9a6ff; letter-spacing: 2px; }
 .tun-bar { height: 6px; background: rgba(255, 255, 255, 0.08); border-radius: 3px; margin: 6px 0; overflow: hidden; }
 .tun-bar div { height: 100%; background: linear-gradient(90deg, #7a5cff, #c9a6ff); box-shadow: 0 0 8px #b98cff; }
 .tun-dim { font-size: max(6px, 0.66rem - var(--font-trim)); color: #999; }
 .tun-trees { display: flex; gap: 10px; flex-wrap: wrap; }
 .tun-tree { flex: 1 1 250px; border-top: 2px solid var(--c); padding-top: 8px; }
-.tun-tree-name { font-family: Orbitron, sans-serif; letter-spacing: 3px; color: var(--c); font-size: max(6px, 0.8rem - var(--font-trim)); }
+.tun-tree-name { font-family: var(--font-tech); letter-spacing: 3px; color: var(--c); font-size: max(6px, 0.8rem - var(--font-trim)); }
 .tun-node { border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 8px; margin-top: 6px; background: rgba(255, 255, 255, 0.02); }
 .tun-node.can { border-color: var(--c); cursor: pointer; box-shadow: 0 0 10px -4px var(--c); }
 .tun-node.can:hover { background: rgba(255, 255, 255, 0.06); }
@@ -1202,11 +1362,11 @@
 .tun-next { color: #777; font-style: italic; }
 .tun-foot { margin-top: 14px; text-align: right; }
 .tun-respec { font-size: max(6px, 0.65rem - var(--font-trim)); color: #ff8aa0; letter-spacing: 1px; cursor: pointer; }
-.tun-close { margin-top: 16px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.15); padding: 10px; border-radius: 6px; cursor: pointer; font-family: Orbitron, sans-serif; letter-spacing: 3px; font-size: max(6px, 0.7rem - var(--font-trim)); }
+.tun-close { margin-top: 16px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.15); padding: 10px; border-radius: 6px; cursor: pointer; font-family: var(--font-tech); letter-spacing: 3px; font-size: max(6px, 0.7rem - var(--font-trim)); }
 
         /* Tap to begin — the veil before the menu; its one tap goes fullscreen, locks landscape, wakes the sound */
         #tap-to-begin { position: fixed; inset: 0; z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; cursor: pointer; overflow: hidden;
-            background: radial-gradient(ellipse at 50% 42%, rgba(74, 44, 120, 0.55), rgba(10, 5, 20, 0.97) 70%), #07030e; transition: opacity 0.6s ease; -webkit-tap-highlight-color: transparent; user-select: none; }
+            background: radial-gradient(ellipse 75% 85% at 50% 45%, #110513 0%, #0c030d 55%, #030103 100%); transition: opacity 0.6s ease; -webkit-tap-highlight-color: transparent; user-select: none; }
         #tap-to-begin.gone { opacity: 0; }   /* still catches taps while it fades, so none fall through to the menu */
         #tap-to-begin .title-script { font-size: max(6px, min(6rem, 17vw) - var(--font-trim)); left: 0; }
         #tap-to-begin .title-sub { margin-bottom: 56px; font-size: max(6px, min(1.5rem, 4.6vw) - var(--font-trim)); letter-spacing: min(1.2rem, 3.4vw); }

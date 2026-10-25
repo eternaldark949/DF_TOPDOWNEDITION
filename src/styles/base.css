@@ -13,9 +13,14 @@
             --glow-color: #a469ff;        /* Main purple accent */
             --text-color: #e0e0e0;        /* Default text (light gray) */
             --bg-color: #030005;          /* Deep black background */
-            --font-script: 'Great Vibes', cursive;   /* Elegant script font */
-            --font-ui: 'Montserrat', sans-serif;     /* Clean UI font */
-            --font-tech: 'Orbitron', sans-serif;     /* Sci-fi tech font */
+            /* FONTS: every on-screen font comes from these few lines. Change one here and every
+               screen that uses that role follows. ETERNAL's own fonts live in assets/fonts. */
+            --font-script: 'Anthropology', 'Great Vibes', cursive;   /* script headers on every screen */
+            --font-ui: 'Montserrat', sans-serif;                      /* general UI labels and text */
+            --font-tech: 'Orbitron', sans-serif;                      /* sci-fi readouts and numbers */
+            --font-menu: 'Feminine', 'Raleway', 'Montserrat', sans-serif;    /* freelancer menu names and labels */
+            --font-menu-body: 'Brooklyn', 'Raleway', 'Montserrat', sans-serif; /* freelancer menu descriptions */
+            --font-menu-script: var(--font-script);
             --gold-primary: #FFD700;      /* Bright gold */
             --gold-dim: #C5A000;          /* Muted gold */
             --purple-neon: #a469ff;       /* Neon purple */
@@ -44,7 +49,7 @@
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
             background-color: var(--bg-color);
-            background: radial-gradient(circle at center, #1a0b2e 0%, #000000 100%);
+            background: radial-gradient(ellipse 75% 85% at 50% 45%, #0f0411 0%, #0c030d 55%, #030103 100%);   /* the menu's plum-black, after ETERNAL's mock-up */
             font-family: var(--font-ui); color: var(--text-color);
             user-select: none;                        /* Prevent text selection */
             -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile */

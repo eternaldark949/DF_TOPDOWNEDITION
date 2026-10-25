@@ -690,13 +690,16 @@
 
             /** A contact or crew avatar: their painted bust (getPortraitDataURL), else a script monogram. */
             _dfAvatar(name, acc, big) {
-                let inner;
+                return `<div class="df-avatar${big ? ' big' : ''}" style="--acc:${acc}">${this._dfFace(name, big ? 128 : 72)}${big ? '' : '<span class="dot"></span>'}</div>`;
+            },
+
+            /** The face inside an avatar: the painted bust at `size`px, else a script monogram. */
+            _dfFace(name, size) {
                 try {
                     const cfg = this.resolvePortraitConfig(name);
-                    inner = cfg && !cfg.isFallback ? `<img alt="" src="${this.getPortraitDataURL(name, big ? 128 : 72)}">` : null;
-                } catch (e) { inner = null; }
-                if (!inner) inner = `<div class="mono">${(name || '?').replace(/^(Dr\.|Barista|Chef)\s+/, '').charAt(0)}</div>`;
-                return `<div class="df-avatar${big ? ' big' : ''}" style="--acc:${acc}">${inner}${big ? '' : '<span class="dot"></span>'}</div>`;
+                    if (cfg && !cfg.isFallback) return `<img alt="" src="${this.getPortraitDataURL(name, size)}">`;
+                } catch (e) { /* no portrait: fall through to the monogram */ }
+                return `<div class="mono">${(name || '?').replace(/^(Dr\.|Barista|Chef)\s+/, '').charAt(0)}</div>`;
             },
 
             // Render contacts screen in the sidebar
@@ -747,12 +750,15 @@
                     if (contacts.length === 0) continue;
                     totalContacts += contacts.length;
                     const color = catColors[cat];
-                    html += `<div class="df-section"><span>${catLabels[cat]}</span><span class="count">${contacts.length}</span></div><div class="df-grid">`;
+                    html += `<div class="df-section"><span><span class="glint">◆</span>${catLabels[cat]}</span><span class="count">${contacts.length}</span></div><div class="dc-grid">`;
+                    // A calling card: the face in the split peach rim glowing in the role colour, the name in glowing Feminine
+                    // capitals (script was tried; handles like LUVSH4D3 read badly in it, and one face for all keeps it tidy)
                     for (const c of contacts) {
-                        html += `<div class="df-card accent" style="--acc:${color}"><div class="df-person">${this._dfAvatar(c.name, color)}<div class="who">`;
-                        html += `<div class="name">${c.name}</div><div class="role">${roleLabels[cat]}</div>`;
-                        if (c.lastMsg) html += `<div class="desc quote">“${c.lastMsg}”</div>`;
-                        html += `</div></div></div>`;
+                        html += `<div class="dc-card" style="--acc:${color}" tabindex="0">`;
+                        html += `<div class="dc-portrait">${this._dfFace(c.name, 128)}<svg class="portrait-rim" aria-hidden="true"><use href="#portrait-rim"/></svg></div>`;
+                        html += `<div class="dc-who"><div class="dc-name">${c.name}</div><div class="dc-role">${roleLabels[cat]}</div>`;
+                        if (c.lastMsg) html += `<div class="dc-quote">“${c.lastMsg}”</div>`;
+                        html += `</div><span class="dc-diamond" aria-hidden="true"></span></div>`;
                     }
                     html += `</div>`;
                 }
@@ -762,6 +768,12 @@
                 }
 
                 container.innerHTML = html;
+                // Tap a card to light it; tap it again to let it go
+                container.querySelectorAll('.dc-card').forEach(card => card.addEventListener('click', () => {
+                    const was = card.classList.contains('selected');
+                    container.querySelectorAll('.dc-card.selected').forEach(o => o.classList.remove('selected'));
+                    card.classList.toggle('selected', !was);
+                }));
             },
 
             // =========================================================

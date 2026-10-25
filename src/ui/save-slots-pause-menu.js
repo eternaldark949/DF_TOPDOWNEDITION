@@ -926,7 +926,8 @@
                 if (GameSettings.capturePrompt === false) return;
                 let pill = document.getElementById('capture-pill');
                 if (!pill) {
-                    pill = document.createElement('button'); pill.id = 'capture-pill'; pill.textContent = '📷 Capture?';
+                    pill = document.createElement('button'); pill.id = 'capture-pill';
+                    pill.innerHTML = '<svg class="aperture-icon" aria-hidden="true"><use href="#icon-aperture"/></svg>Capture?';
                     document.body.appendChild(pill);
                     pill.addEventListener('click', (e) => {
                         e.preventDefault(); e.stopPropagation();

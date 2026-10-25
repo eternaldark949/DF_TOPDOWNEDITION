@@ -216,7 +216,7 @@
         /* Top Button */
         #btn-heal { 
             position: absolute; bottom: 235px; right: 78px; /* Pulled down & left */
-            color: #00ff55; font-size: max(6px, 0.8rem - var(--font-trim)); flex-direction: column; font-family: 'Orbitron', sans-serif; font-weight: bold; 
+            color: #00ff55; font-size: max(6px, 0.8rem - var(--font-trim)); flex-direction: column; font-family: var(--font-tech); font-weight: bold; 
         }
         
         /* Top-Left Diagonal */
@@ -255,7 +255,7 @@
             display: none; justify-content: center; align-items: center; text-align: center;
             background: rgba(20, 0, 10, 0.4); border: 2px solid rgba(217, 191, 134, 0.75);
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5), inset 0 0 10px rgba(217, 191, 134, 0.15);
-            color: #d9bf86; font: bold max(6px, 0.55rem - var(--font-trim))/1.1 'Orbitron', sans-serif; letter-spacing: 0.04em;
+            color: #d9bf86; font: bold max(6px, 0.55rem - var(--font-trim))/1.1 var(--font-tech); letter-spacing: 0.04em;
             z-index: 30; pointer-events: auto; cursor: pointer; user-select: none; -webkit-user-select: none;
             touch-action: none; backdrop-filter: blur(2px); transition: transform 0.08s, background 0.08s, box-shadow 0.08s;
         }
@@ -438,6 +438,46 @@
         .input-prompt { font-size: max(6px, 0.65rem - var(--font-trim)); color: #fff; border: 1px solid #555; padding: 2px 10px; border-radius: 20px; background: rgba(255, 255, 255, 0.1); box-shadow: 0 0 10px var(--glow-color); white-space: nowrap; }
         .hidden { display: none !important; }
 
+        /* Title screen after ETERNAL's original menu: "Dimensions" and "Freelancer" as hollow neon script
+           (a pale tube with a lavender halo and a dark core), the options in Feminine fading off to the
+           right, and the hovered row's hint bar and key capsule. Sizes follow the screen height. */
+        :is(#main-menu, #tap-to-begin) .title-container { --title-size: min(18.5vh, 11.5vw); }
+        :is(#main-menu, #tap-to-begin) .title-script, body.landscape :is(#main-menu, #tap-to-begin) .title-script {
+            font-size: max(6px, var(--title-size) - var(--font-trim)); font-weight: 400; line-height: 1; transform: none; left: 0; opacity: 1;
+            color: transparent; -webkit-text-stroke: 1.2px #f1eaff; text-shadow: none;
+            filter: drop-shadow(0 0 1px rgba(240, 228, 255, 0.7)) drop-shadow(0 0 5px rgba(170, 120, 255, 0.6)) drop-shadow(0 0 16px rgba(120, 60, 220, 0.35));
+        }
+        :is(#main-menu, #tap-to-begin) .title-sub, body.landscape :is(#main-menu, #tap-to-begin) .title-sub {
+            font-family: var(--font-script); text-transform: none; font-weight: 400; line-height: 1;
+            font-size: max(6px, var(--title-size) * 0.6 - var(--font-trim)); letter-spacing: 0.34em; margin: 0.02em 0 0 0.34em;
+            color: transparent; -webkit-text-stroke: 1px #f1eaff; text-shadow: none;
+            filter: drop-shadow(0 0 1px rgba(240, 228, 255, 0.7)) drop-shadow(0 0 4px rgba(170, 120, 255, 0.6)) drop-shadow(0 0 12px rgba(120, 60, 220, 0.35));
+        }
+        #main-menu:not(.menu-long) .title-container { top: 39%; }
+        /* the faint panel behind the title in the mock-up */
+        :is(#main-menu, #tap-to-begin) .title-container::before { content: ''; position: absolute; left: 50%; top: 50%; width: min(64vh, 40vw); height: 118%;
+            transform: translate(-50%, -50%); border-radius: 18px; background: rgba(26, 8, 28, 0.35); box-shadow: 0 0 40px 24px rgba(26, 8, 28, 0.35); pointer-events: none; z-index: -1; }
+        :is(#main-menu, #tap-to-begin) .title-container { position: relative; z-index: 0; }
+        #main-menu:not(.menu-long) .menu-list-container { top: 63%; }
+        #main-menu.menu-long .title-container { --title-size: min(13vh, 8vw); }
+        #main-menu .menu-btn { font-family: var(--font-menu); font-weight: 400; letter-spacing: 0.42em; color: #ddd6e7; }
+        #main-menu:not(.menu-long) .menu-btn {
+            color: transparent;
+            background: linear-gradient(90deg, #e2dbec 0%, #cfc7da 52%, #6b6376 100%); -webkit-background-clip: text; background-clip: text;
+        }
+        #main-menu .menu-item-row:hover .menu-btn { background: none; color: #fff; text-shadow: 0 0 8px rgba(255, 255, 255, 0.85); transform: none; }
+        #main-menu .desc-box {
+            font-family: var(--font-menu-body); color: #e8e2f0; border-left: 0; justify-content: center; text-align: center;
+            min-width: 190px; padding: 2px 10px 2px 24px; position: relative;
+            background: linear-gradient(90deg, rgba(30, 6, 40, 0) 0%, rgba(34, 8, 46, 0.92) 18%, rgba(34, 8, 46, 0.95) 100%);
+        }
+        #main-menu .desc-box .arrow { position: absolute; right: 8px; margin: 0; color: #f4eeff; font-size: max(6px, 0.55rem - var(--font-trim)); }
+        #main-menu .input-prompt {
+            font-family: var(--font-menu-body); color: #ece6f6; min-width: 76px; text-align: center; padding: 3px 12px;
+            background: #170c20; border: 2.5px solid #9a85c8; border-radius: 20px;
+            box-shadow: 0 0 8px rgba(154, 133, 200, 0.7), inset 0 0 6px rgba(154, 133, 200, 0.35);
+        }
+
         /* --- DIALOGUE & COMMS --- */
         /* Two looks, picked in Settings → Developer → Talk Style (GameSettings.talkStyle, core/settings.js):
              Veil (default): no box. A dusk veil rises from the bottom edge, the speaker's painted bust
@@ -469,12 +509,12 @@
         }
         .dialogue-text-col { flex: 1; min-width: 0; max-width: 62ch; padding-bottom: 2px; }
         #npc-name {
-            font-family: 'Great Vibes', 'Cormorant Garamond', cursive; font-weight: 400; font-style: normal;
+            font-family: var(--font-script); font-weight: 400; font-style: normal;
             color: #ff0055; font-size: max(6px, 2.1rem - var(--font-trim)); line-height: 1.05; letter-spacing: 0.01em;
             margin-bottom: 4px; text-shadow: 0 0 16px color-mix(in srgb, currentColor 60%, transparent), 0 2px 4px rgba(0, 0, 0, 0.8);
         }
         #npc-text {
-            font-family: 'Montserrat', sans-serif; color: #f3ecfb;
+            font-family: var(--font-ui); color: #f3ecfb;
             font-size: max(6px, 0.95rem - var(--font-trim)); line-height: 1.55; letter-spacing: 0.01em;
             margin-bottom: 10px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 18px rgba(0, 0, 0, 0.7);
         }
@@ -482,7 +522,7 @@
         .dialogue-options { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; }
         .dialogue-btn {
             cursor: pointer; background: none; border: none; padding: 6px 0; display: inline-flex; align-items: center; gap: 8px;
-            color: #e8c27a; font-family: 'Montserrat', sans-serif; font-weight: 600; text-transform: uppercase;
+            color: #e8c27a; font-family: var(--font-ui); font-weight: 600; text-transform: uppercase;
             font-size: max(6px, 0.66rem - var(--font-trim)); letter-spacing: 0.28em; transition: color 0.25s ease, text-shadow 0.25s ease;
             text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); -webkit-tap-highlight-color: transparent;
         }
@@ -574,7 +614,7 @@
         .comm-sig { display: inline-flex; gap: 2px; align-items: flex-end; height: 9px; }
         .comm-sig i { width: 2px; background: var(--who); border-radius: 1px; animation: commBar 0.9s ease-in-out infinite alternate; }
         .comm-sig i:nth-child(1) { height: 40%; } .comm-sig i:nth-child(2) { height: 100%; animation-delay: 0.2s; } .comm-sig i:nth-child(3) { height: 65%; animation-delay: 0.4s; }
-        .comm-text { font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.76rem - var(--font-trim)); color: #f3ecfb; line-height: 1.3; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); }
+        .comm-text { font-family: var(--font-ui); font-size: max(6px, 0.76rem - var(--font-trim)); color: #f3ecfb; line-height: 1.3; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); }
         /* Ribbon: one cameo under the health bar, the line on a smoked-glass ribbon unfurling from a gold ring */
         body.talk-ribbon #comms-bar { left: 16px; top: 128px; width: min(420px, 60vw); }
         body.talk-ribbon.landscape #comms-bar { left: 16px; top: 108px; }
@@ -590,7 +630,7 @@
         /* Captions */
         #dialogue-caption { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); max-width: 80%; text-align: center; pointer-events: none; z-index: 100; opacity: 0; transition: opacity 0.3s ease-in-out; }
         #dialogue-caption.show { opacity: 1; }
-        #dialogue-caption .caption-speaker { font-family: 'Orbitron', sans-serif; font-size: max(6px, 0.7rem - var(--font-trim)); color: #ff0055; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 4px; text-shadow: 0 0 10px #ff0055; }
+        #dialogue-caption .caption-speaker { font-family: var(--font-tech); font-size: max(6px, 0.7rem - var(--font-trim)); color: #ff0055; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 4px; text-shadow: 0 0 10px #ff0055; }
         #dialogue-caption .caption-text { font-family: var(--font-ui); font-size: max(6px, 0.85rem - var(--font-trim)); color: #fff; font-style: italic; text-shadow: 0 0 8px rgba(0, 0, 0, 0.9), 0 0 20px rgba(0, 0, 0, 0.8); background: rgba(0, 0, 0, 0.6); padding: 8px 16px; border-radius: 4px; border-left: 3px solid #ff0055; }
         
         #message-modal { position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); color: var(--message-modal-color); font-family: var(--font-ui); font-size: max(6px, 0.8rem - var(--font-trim)); letter-spacing: 2px; opacity: 0; transition: opacity 0.5s; pointer-events: none; z-index: 20; text-align: center; }
@@ -611,7 +651,7 @@
         .game-btn:active { background: var(--glow-color); color: #000; }
 
         /* --- PHONE SYSTEM --- */
-        #btn-phone { position: absolute; top: 60px; left: 25px; width: 44px; height: 44px; border-radius: 4px; background: rgba(10, 8, 5, 0.7); border: 1px solid rgba(218, 165, 32, 0.15); color: #daa520; font-family: 'Orbitron', sans-serif; font-size: max(6px, 1.3rem - var(--font-trim)); font-weight: 700; display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 30; pointer-events: auto; text-shadow: 0 0 10px rgba(255, 200, 50, 0.7), 0 0 20px rgba(218, 165, 32, 0.4); animation: phoneGlowGold 2s infinite alternate; }
+        #btn-phone { position: absolute; top: 60px; left: 25px; width: 44px; height: 44px; border-radius: 4px; background: rgba(10, 8, 5, 0.7); border: 1px solid rgba(218, 165, 32, 0.15); color: #daa520; font-family: var(--font-tech); font-size: max(6px, 1.3rem - var(--font-trim)); font-weight: 700; display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 30; pointer-events: auto; text-shadow: 0 0 10px rgba(255, 200, 50, 0.7), 0 0 20px rgba(218, 165, 32, 0.4); animation: phoneGlowGold 2s infinite alternate; }
         #btn-phone:active { transform: scale(0.95); }
         @keyframes phoneGlowGold { 0% { text-shadow: 0 0 8px rgba(255, 200, 50, 0.5), 0 0 16px rgba(218, 165, 32, 0.3); } 100% { text-shadow: 0 0 14px rgba(255, 215, 0, 0.8), 0 0 28px rgba(255, 200, 50, 0.5); } }
         @keyframes phonePulseCrimson { 0% { box-shadow: 0 0 0 0 rgba(220, 20, 60, 0.7); } 70% { box-shadow: 0 0 0 20px rgba(220, 20, 60, 0); } 100% { box-shadow: 0 0 0 0 rgba(220, 20, 60, 0); } }
@@ -654,21 +694,21 @@
         }
         #phone-home-m { 
             position: absolute; top: 14px; left: 18px; 
-            font-family: 'Orbitron', sans-serif; font-size: max(6px, 1rem - var(--font-trim)); font-weight: 700; 
+            font-family: var(--font-tech); font-size: max(6px, 1rem - var(--font-trim)); font-weight: 700; 
             color: #daa520; text-shadow: 0 0 8px rgba(218,165,32,0.6); z-index: 5; 
         }
-        #phone-time { font-family: 'Great Vibes', cursive; font-size: max(6px, 3.5rem - var(--font-trim)); color: #fff; text-align: center; text-shadow: 0 0 15px rgba(255, 255, 255, 0.2); margin: 55px 0 6px 0; line-height: 0.9; font-weight: 400; }
-        #phone-time-suffix { font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.7rem - var(--font-trim)); color: rgba(255,255,255,0.5); letter-spacing: 2px; }
+        #phone-time { font-family: var(--font-script); font-size: max(6px, 3.5rem - var(--font-trim)); color: #fff; text-align: center; text-shadow: 0 0 15px rgba(255, 255, 255, 0.2); margin: 55px 0 6px 0; line-height: 0.9; font-weight: 400; }
+        #phone-time-suffix { font-family: var(--font-ui); font-size: max(6px, 0.7rem - var(--font-trim)); color: rgba(255,255,255,0.5); letter-spacing: 2px; }
         #phone-weather-widget { display: flex; flex-direction: column; align-items: center; margin-bottom: 20px; color: #ccc; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
-        .weather-line-main { display: flex; align-items: center; gap: 8px; font-family: 'Montserrat', sans-serif; font-weight: 500; font-size: max(6px, 0.8rem - var(--font-trim)); color: rgba(255,255,255,0.7); }
-        .weather-temp { font-family: 'Montserrat', sans-serif; font-weight: 300; font-size: max(6px, 0.75rem - var(--font-trim)); opacity: 0.5; }
+        .weather-line-main { display: flex; align-items: center; gap: 8px; font-family: var(--font-ui); font-weight: 500; font-size: max(6px, 0.8rem - var(--font-trim)); color: rgba(255,255,255,0.7); }
+        .weather-temp { font-family: var(--font-ui); font-weight: 300; font-size: max(6px, 0.75rem - var(--font-trim)); opacity: 0.5; }
         
         #phone-apps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 8px 20px; margin-top: auto; }
         .phone-app-container { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; transition: transform 0.2s ease; position: relative; }
         .phone-app-container:hover { transform: translateY(-3px); }
         .phone-app-icon-circle { width: 42px; height: 42px; border-radius: 12px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(5px); display: flex; justify-content: center; align-items: center; font-size: max(6px, 1.1rem - var(--font-trim)); box-shadow: 0 2px 8px rgba(0,0,0,0.3); transition: all 0.2s; position: relative; }
         .phone-app-container:hover .phone-app-icon-circle { background: rgba(140, 20, 30, 0.2); border-color: rgba(140, 20, 30, 0.5); box-shadow: 0 0 12px rgba(140, 20, 30, 0.3); }
-        .phone-app-name { font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.55rem - var(--font-trim)); color: rgba(255,255,255,0.5); text-align: center; font-weight: 400; letter-spacing: 0.3px; }
+        .phone-app-name { font-family: var(--font-ui); font-size: max(6px, 0.55rem - var(--font-trim)); color: rgba(255,255,255,0.5); text-align: center; font-weight: 400; letter-spacing: 0.3px; }
         .app-badge { position: absolute; top: -4px; right: -4px; width: 10px; height: 10px; background: #ff0000; border: 1px solid #fff; border-radius: 50%; box-shadow: 0 0 5px #ff0000; z-index: 10; display: none; }
         .app-badge.active { display: block; }
 
@@ -676,13 +716,13 @@
             padding: 10px 20px 8px; margin-bottom: 6px;
             background: rgba(0,0,0,0.3); border-top: 1px solid rgba(255,255,255,0.04);
         }
-        #phone-now-playing .np-label { font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.5rem - var(--font-trim)); color: rgba(255,255,255,0.3); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 3px; }
-        #phone-now-playing .np-title { font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.7rem - var(--font-trim)); color: rgba(255,255,255,0.6); font-weight: 500; }
+        #phone-now-playing .np-label { font-family: var(--font-ui); font-size: max(6px, 0.5rem - var(--font-trim)); color: rgba(255,255,255,0.3); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 3px; }
+        #phone-now-playing .np-title { font-family: var(--font-ui); font-size: max(6px, 0.7rem - var(--font-trim)); color: rgba(255,255,255,0.6); font-weight: 500; }
 
         /* Close: a lavender pill at the foot of the phone, on a generous transparent hit area */
         #phone-close { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 120px; height: 40px; background: transparent; border: none; color: transparent; font-size: 0; cursor: pointer; z-index: 10; }
         #phone-close::before { content: 'CLOSE  ✕'; position: absolute; left: 50%; bottom: 9px; transform: translateX(-50%); padding: 4px 16px; border-radius: 12px; white-space: nowrap;
-            font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.55rem - var(--font-trim)); font-weight: 700; letter-spacing: 2.5px; color: #1b0d2e;
+            font-family: var(--font-ui); font-size: max(6px, 0.55rem - var(--font-trim)); font-weight: 700; letter-spacing: 2.5px; color: #1b0d2e;
             background: radial-gradient(ellipse 70% 120% at 50% 50%, #ece4f6 0%, var(--df-lavender) 80%); border: 1px dotted rgba(255,255,255,0.8); box-shadow: 0 0 14px rgba(202,176,250,0.45); transition: all 0.2s; }
         #phone-close:hover::before { box-shadow: 0 0 20px rgba(202,176,250,0.75); background: #fff; }
         /* ...and a ✕ in the screen corner, outside the phone, never scaled away */
@@ -709,7 +749,7 @@
         body.phone-wide #screen-maps p { margin: 4px 0 0 !important; }
         .phone-app-header { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(140, 20, 30, 0.2); margin-bottom: 15px; }
         .phone-back-btn { width: 30px; height: 30px; border-radius: 50%; background: rgba(255, 255, 255, 0.06); border: none; color: #999; font-size: max(6px, 1rem - var(--font-trim)); cursor: pointer; margin-right: 10px; }
-        .phone-app-title { font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.9rem - var(--font-trim)); color: rgba(140, 20, 30, 0.8); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+        .phone-app-title { font-family: var(--font-ui); font-size: max(6px, 0.9rem - var(--font-trim)); color: rgba(140, 20, 30, 0.8); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
         .phone-app-content { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 5px; scrollbar-width: thin; scrollbar-color: rgba(140,20,30,0.4) rgba(255, 255, 255, 0.05); }
         
         /* Typing Indicator - Flickering Periwinkle with Bouncing Dots */
@@ -720,7 +760,7 @@
             display: none;
             align-items: center;
             gap: 6px;
-            font-family: 'Montserrat', sans-serif;
+            font-family: var(--font-ui);
             font-size: max(6px, 0.75rem - var(--font-trim));
             color: #c07878;
             animation: flickerText 0.8s ease-in-out infinite;
@@ -773,29 +813,29 @@
 
         .msg-rail-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
         .msg-rail-head .phone-back-btn { margin: 0; width: 24px; height: 24px; font-size: max(6px, 0.7rem - var(--font-trim)); flex: none; }
-        .msg-title { font: 400 max(6px, 1.7rem - var(--font-trim))/1 'Great Vibes', cursive; color: #f6dfa8; text-shadow: 0 0 14px rgba(232, 194, 122, 0.35); }
+        .msg-title { font: 400 max(6px, 1.7rem - var(--font-trim))/1 var(--font-script); color: #f6dfa8; text-shadow: 0 0 14px rgba(232, 194, 122, 0.35); }
         body.phone-wide .msg-title { font-size: max(6px, 1.45rem - var(--font-trim)); }
         .msg-tabs { display: flex; gap: 4px; margin-bottom: 6px; }
-        .msg-tabs button { font: 600 max(6px, 0.5rem - var(--font-trim))/1 'Montserrat', sans-serif; letter-spacing: 0.1em; text-transform: uppercase; padding: 5px 8px; border-radius: 999px;
+        .msg-tabs button { font: 600 max(6px, 0.5rem - var(--font-trim))/1 var(--font-ui); letter-spacing: 0.1em; text-transform: uppercase; padding: 5px 8px; border-radius: 999px;
             border: 1px dotted rgba(202, 176, 250, 0.4); background: transparent; color: var(--df-lilac-grey); cursor: pointer; }
         .msg-tabs button.on { background: var(--df-lavender-pale); color: var(--df-violet-ink); border: 1px solid #fff; }
         .msg-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column; gap: 2px; padding-bottom: 6px; }
         .msg-list::-webkit-scrollbar { display: none; }
-        .msg-sec { font: 600 max(6px, 0.45rem - var(--font-trim))/1 'Montserrat', sans-serif; letter-spacing: 0.3em; text-transform: uppercase; color: #e8c27a; margin: 6px 0 2px 4px; }
+        .msg-sec { font: 600 max(6px, 0.45rem - var(--font-trim))/1 var(--font-ui); letter-spacing: 0.3em; text-transform: uppercase; color: #e8c27a; margin: 6px 0 2px 4px; }
         .msg-none { text-align: center; margin-top: 24px; font: italic 500 max(6px, 0.85rem - var(--font-trim)) 'Cormorant Garamond', Georgia, serif; color: var(--df-lilac-grey); }
         .msg-item { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 10px; cursor: pointer; transition: background 0.18s; flex: none; }
         .msg-item:hover { background: rgba(93, 20, 226, 0.18); }
         .msg-item.on { background: linear-gradient(90deg, rgba(93, 20, 226, 0.5), rgba(35, 5, 93, 0.25)); box-shadow: inset 0 0 0 1px rgba(232, 194, 122, 0.3); }
         .msg-who { flex: 1; min-width: 0; }
-        .msg-who b { display: block; font: 600 max(6px, 0.66rem - var(--font-trim))/1.25 'Montserrat', sans-serif; color: #f1e8fe; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .msg-who b { display: block; font: 600 max(6px, 0.66rem - var(--font-trim))/1.25 var(--font-ui); color: #f1e8fe; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .msg-who i { display: block; font: italic 500 max(6px, 0.74rem - var(--font-trim))/1.2 'Cormorant Garamond', Georgia, serif; color: var(--df-lilac-grey); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .msg-who i.typing { color: #f6dfa8; animation: pulseText 1s infinite alternate; }
         .msg-item.unread .msg-who b { color: #fff; }
         .msg-item.unread .msg-who i { color: #f1e8fe; font-weight: 700; }
         .msg-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex: none; }
-        .msg-meta small { font: 500 max(6px, 0.45rem - var(--font-trim))/1 'Montserrat', sans-serif; color: var(--df-lilac-grey); white-space: nowrap; }
+        .msg-meta small { font: 500 max(6px, 0.45rem - var(--font-trim))/1 var(--font-ui); color: var(--df-lilac-grey); white-space: nowrap; }
         .msg-count { min-width: 14px; height: 14px; padding: 0 4px; box-sizing: border-box; border-radius: 7px; background: #ff3d7a; color: #fff; display: grid; place-items: center;
-            font: 700 max(6px, 0.48rem - var(--font-trim))/1 'Montserrat', sans-serif; box-shadow: 0 0 8px rgba(255, 61, 122, 0.7); }
+            font: 700 max(6px, 0.48rem - var(--font-trim))/1 var(--font-ui); box-shadow: 0 0 8px rgba(255, 61, 122, 0.7); }
 
         /* Faces: the painted bust in a circle, a gold hairline, the bond's ring for the crew */
         .mav { --ring: rgba(232, 194, 122, 0.55); width: 32px; height: 32px; border-radius: 50%; flex: none; position: relative; overflow: hidden; display: grid; place-items: center;
@@ -817,9 +857,9 @@
         .msg-head .thread-avatar-slot { display: flex; }
         .msg-head-text { min-width: 0; }
         .msg-head-text b { display: block; font: italic 600 max(6px, 1.1rem - var(--font-trim))/1 'Cormorant Garamond', Georgia, serif; color: #f6dfa8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .msg-head-text small { display: block; font: 500 max(6px, 0.48rem - var(--font-trim))/1.4 'Montserrat', sans-serif; color: var(--df-lilac-grey); letter-spacing: 0.08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .msg-head-text small { display: block; font: 500 max(6px, 0.48rem - var(--font-trim))/1.4 var(--font-ui); color: var(--df-lilac-grey); letter-spacing: 0.08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .msg-feed { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 6px 12px 8px; display: flex; flex-direction: column; scrollbar-width: thin; scrollbar-color: rgba(232, 194, 122, 0.3) transparent; }
-        .mb-day { align-self: center; margin: 10px 0 4px; font: 600 max(6px, 0.45rem - var(--font-trim))/1 'Montserrat', sans-serif; letter-spacing: 0.26em; text-transform: uppercase; color: var(--df-lilac-grey); text-align: center; }
+        .mb-day { align-self: center; margin: 10px 0 4px; font: 600 max(6px, 0.45rem - var(--font-trim))/1 var(--font-ui); letter-spacing: 0.26em; text-transform: uppercase; color: var(--df-lilac-grey); text-align: center; }
         .mb-day.call { letter-spacing: 0.12em; color: #f6dfa8; }
         .mb-row { display: flex; align-items: flex-end; gap: 6px; margin-top: 6px; }
         .mb-row.cont { margin-top: 2px; }
@@ -829,11 +869,11 @@
         .mb-av { width: 20px; height: 20px; flex: none; }
         .mb-av.blank { visibility: hidden; }
         .mb-av.mav { box-shadow: 0 0 0 1px var(--ring); font-size: max(6px, 0.6rem - var(--font-trim)); }
-        .mb-who { font: 600 max(6px, 0.48rem - var(--font-trim))/1.4 'Montserrat', sans-serif; letter-spacing: 0.1em; margin: 0 0 1px 4px; }
+        .mb-who { font: 600 max(6px, 0.48rem - var(--font-trim))/1.4 var(--font-ui); letter-spacing: 0.1em; margin: 0 0 1px 4px; }
         .mb-wrap { position: relative; max-width: 100%; display: flex; flex-direction: column; gap: 4px; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
         .mb-row.me .mb-wrap { align-items: flex-end; }
         .mb-wrap.has-pip { margin-bottom: 9px; }
-        .mb { padding: 6px 10px; border-radius: 14px; font: 500 max(6px, 0.66rem - var(--font-trim))/1.38 'Montserrat', sans-serif; color: #f1e8fe; overflow-wrap: anywhere; animation: mbIn 0.25s ease-out both; }
+        .mb { padding: 6px 10px; border-radius: 14px; font: 500 max(6px, 0.66rem - var(--font-trim))/1.38 var(--font-ui); color: #f1e8fe; overflow-wrap: anywhere; animation: mbIn 0.25s ease-out both; }
         .mb-row.them .mb { background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(202, 176, 250, 0.16); border-bottom-left-radius: 4px; }
         .mb-row.me .mb { background: linear-gradient(180deg, #6a24ea, #3e0fa6); border-bottom-right-radius: 4px; box-shadow: 0 0 12px rgba(93, 20, 226, 0.4); }
         .mb-row.cont.them .mb { border-top-left-radius: 6px; } .mb-row.cont.me .mb { border-top-right-radius: 6px; }
@@ -846,7 +886,7 @@
         .mb-picker button { background: none; border: 0; padding: 2px 4px; font-size: max(6px, 0.85rem - var(--font-trim)); line-height: 1; cursor: pointer; border-radius: 50%; transition: transform 0.12s; }
         .mb-picker button:hover { transform: scale(1.25); }
         .mb-picker button.on { background: rgba(232, 194, 122, 0.25); }
-        .mb-seen { align-self: flex-end; margin-top: 3px; font: 500 max(6px, 0.45rem - var(--font-trim))/1 'Montserrat', sans-serif; color: var(--df-lilac-grey); }
+        .mb-seen { align-self: flex-end; margin-top: 3px; font: 500 max(6px, 0.45rem - var(--font-trim))/1 var(--font-ui); color: var(--df-lilac-grey); }
         .mb-typing { align-self: flex-start; display: flex; gap: 3px; margin-top: 6px; padding: 7px 10px; border-radius: 14px; background: rgba(255, 255, 255, 0.05); }
         .mb-typing i { width: 5px; height: 5px; border-radius: 50%; background: var(--df-lilac-grey); animation: mbDot 1.2s infinite ease-in-out; }
         .mb-typing i:nth-child(2) { animation-delay: 0.15s; } .mb-typing i:nth-child(3) { animation-delay: 0.3s; }
@@ -866,24 +906,24 @@
         .mb-cap { padding: 6px 8px 7px 10px; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
         .mb-cap > div { min-width: 0; }
         .mb-cap b, .mb-brief b { display: block; font: italic 600 max(6px, 0.82rem - var(--font-trim))/1.1 'Cormorant Garamond', Georgia, serif; color: #f6dfa8; }
-        .mb-cap small { display: block; font: 500 max(6px, 0.48rem - var(--font-trim))/1.4 'Montserrat', sans-serif; color: var(--df-lilac-grey); }
-        .mb-btn { flex: none; font: 600 max(6px, 0.45rem - var(--font-trim))/1 'Montserrat', sans-serif; letter-spacing: 0.12em; text-transform: uppercase; padding: 6px 8px; border-radius: 999px;
+        .mb-cap small { display: block; font: 500 max(6px, 0.48rem - var(--font-trim))/1.4 var(--font-ui); color: var(--df-lilac-grey); }
+        .mb-btn { flex: none; font: 600 max(6px, 0.45rem - var(--font-trim))/1 var(--font-ui); letter-spacing: 0.12em; text-transform: uppercase; padding: 6px 8px; border-radius: 999px;
             border: 0; background: #ffc248; color: #2a1458; cursor: pointer; white-space: nowrap; box-shadow: 0 0 10px rgba(255, 194, 72, 0.35); }
         .mb-btn:active { transform: scale(0.95); }
         .mb-brief { padding: 8px 10px; display: grid; gap: 3px; background: linear-gradient(160deg, rgba(232, 194, 122, 0.14), rgba(93, 20, 226, 0.16)), #0d0718; }
-        .mb-brief .k { font: 600 max(6px, 0.42rem - var(--font-trim))/1 'Montserrat', sans-serif; letter-spacing: 0.3em; text-transform: uppercase; color: #e8c27a; }
-        .mb-brief p { margin: 0; font: 500 max(6px, 0.54rem - var(--font-trim))/1.35 'Montserrat', sans-serif; color: var(--df-lilac-grey); }
-        .mb-brief .row { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 2px; font: 600 max(6px, 0.52rem - var(--font-trim))/1 'Montserrat', sans-serif; color: #f1e8fe; }
+        .mb-brief .k { font: 600 max(6px, 0.42rem - var(--font-trim))/1 var(--font-ui); letter-spacing: 0.3em; text-transform: uppercase; color: #e8c27a; }
+        .mb-brief p { margin: 0; font: 500 max(6px, 0.54rem - var(--font-trim))/1.35 var(--font-ui); color: var(--df-lilac-grey); }
+        .mb-brief .row { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 2px; font: 600 max(6px, 0.52rem - var(--font-trim))/1 var(--font-ui); color: #f1e8fe; }
         .mb-brief em { font-style: normal; color: #f6dfa8; font-size: max(6px, 0.5rem - var(--font-trim)); }
         .mb-brief .mb-brief-map { height: 56px; margin: 3px -10px 1px; border-top: 1px solid rgba(232, 194, 122, 0.18); border-bottom: 1px solid rgba(232, 194, 122, 0.18); }
 
         /* ── A crew night's invite (story/crew-nights.js): the brief's card in rose and violet ── */
         .mb-plan { padding: 8px 10px; display: grid; gap: 3px; background: linear-gradient(160deg, rgba(255, 90, 160, 0.16), rgba(93, 20, 226, 0.2)), #0d0718; }
-        .mb-plan .k { font: 600 max(6px, 0.42rem - var(--font-trim))/1 'Montserrat', sans-serif; letter-spacing: 0.3em; text-transform: uppercase; color: #ff9ac8; }
+        .mb-plan .k { font: 600 max(6px, 0.42rem - var(--font-trim))/1 var(--font-ui); letter-spacing: 0.3em; text-transform: uppercase; color: #ff9ac8; }
         .mb-plan b { display: block; font: italic 600 max(6px, 0.82rem - var(--font-trim))/1.1 'Cormorant Garamond', Georgia, serif; color: #ffd6ea; }
-        .mb-plan p { margin: 0; font: 600 max(6px, 0.54rem - var(--font-trim))/1.35 'Montserrat', sans-serif; color: var(--df-lilac-grey); }
+        .mb-plan p { margin: 0; font: 600 max(6px, 0.54rem - var(--font-trim))/1.35 var(--font-ui); color: var(--df-lilac-grey); }
         .mb-plan .row { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 2px; }
-        .mb-plan .row em { margin-right: auto; font-style: normal; color: #ffd6ea; font: 600 max(6px, 0.5rem - var(--font-trim)) 'Montserrat', sans-serif; }
+        .mb-plan .row em { margin-right: auto; font-style: normal; color: #ffd6ea; font: 600 max(6px, 0.5rem - var(--font-trim)) var(--font-ui); }
         .mb-plan .mb-btn.ghost { background: transparent; border: 1px solid rgba(255, 154, 200, 0.5); color: #ff9ac8; }
         .mb-plan-faces { display: flex; margin: 2px 0 1px; }
         .mb-plan-faces .mb-plan-av { width: 22px; height: 22px; margin-right: -5px; font-size: max(6px, 0.5rem - var(--font-trim)); box-shadow: 0 0 0 1.5px #12081e; }
@@ -898,47 +938,47 @@
         .amb-head .phone-back-btn { margin: 0; width: 24px; height: 24px; font-size: max(6px, 0.7rem - var(--font-trim)); flex: none; }
         .amb-brand { flex: 1; display: flex; flex-direction: column; line-height: 1; }
         .amb-brand b { font: italic 700 max(6px, 1.05rem - var(--font-trim)) 'Cormorant Garamond', Georgia, serif; color: #ffb347; letter-spacing: 0.02em; text-shadow: 0 0 10px rgba(255, 150, 50, 0.45); }
-        .amb-brand small { font: 600 max(6px, 0.42rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.3em; text-transform: uppercase; color: #c9a27a; margin-top: 2px; }
-        .amb-toggle { font: 700 max(6px, 0.5rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.12em; text-transform: uppercase; padding: 5px 10px; border-radius: 99px; cursor: pointer;
+        .amb-brand small { font: 600 max(6px, 0.42rem - var(--font-trim)) var(--font-ui); letter-spacing: 0.3em; text-transform: uppercase; color: #c9a27a; margin-top: 2px; }
+        .amb-toggle { font: 700 max(6px, 0.5rem - var(--font-trim)) var(--font-ui); letter-spacing: 0.12em; text-transform: uppercase; padding: 5px 10px; border-radius: 99px; cursor: pointer;
                       background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); color: #a08a78; }
         .amb-toggle.on { background: rgba(120, 220, 140, 0.14); border-color: rgba(120, 220, 140, 0.5); color: #9cf0b0; box-shadow: 0 0 10px rgba(120, 220, 140, 0.25); }
         .amb-toggle.on::before { content: '● '; }
         .amb-body { flex: 1; overflow-y: auto; padding: 8px 2px 12px; display: flex; flex-direction: column; gap: 7px; }
         .amb-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
         .amb-stats div { background: rgba(255, 170, 70, 0.07); border: 1px solid rgba(255, 170, 70, 0.14); border-radius: 8px; padding: 6px 4px; text-align: center; }
-        .amb-stats b { display: block; font: 700 max(6px, 0.82rem - var(--font-trim))/1 'Montserrat', sans-serif; color: #ffe2b8; }
+        .amb-stats b { display: block; font: 700 max(6px, 0.82rem - var(--font-trim))/1 var(--font-ui); color: #ffe2b8; }
         .amb-stats b i { font-style: normal; color: #ffb347; font-size: 0.8em; margin-left: 1px; }
-        .amb-stats small { font: 600 max(6px, 0.4rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.14em; text-transform: uppercase; color: #a8876a; }
-        .amb-sec { display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px; font: 700 max(6px, 0.48rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.26em; text-transform: uppercase; color: #ffb347; }
+        .amb-stats small { font: 600 max(6px, 0.4rem - var(--font-trim)) var(--font-ui); letter-spacing: 0.14em; text-transform: uppercase; color: #a8876a; }
+        .amb-sec { display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px; font: 700 max(6px, 0.48rem - var(--font-trim)) var(--font-ui); letter-spacing: 0.26em; text-transform: uppercase; color: #ffb347; }
         .amb-sec small { letter-spacing: 0.08em; text-transform: none; color: #8f7560; font-weight: 500; }
         .amb-card { position: relative; padding: 8px 10px; border-radius: 10px; background: linear-gradient(150deg, rgba(226, 178, 122, 0.12), rgba(74, 36, 22, 0.35)); border: 1px solid rgba(226, 178, 122, 0.2); display: grid; gap: 4px; }
         .amb-card::before { content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: #c4874a; }
         .amb-card.express { border-color: rgba(255, 200, 90, 0.5); box-shadow: 0 0 14px rgba(255, 170, 60, 0.18); }
         .amb-card.express::before { background: #ffd06a; }
         .amb-card b { font: italic 600 max(6px, 0.86rem - var(--font-trim))/1.1 'Cormorant Garamond', Georgia, serif; color: #fbe6c6; }
-        .amb-k { font: 600 max(6px, 0.44rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.16em; text-transform: uppercase; color: #c9a27a; }
+        .amb-k { font: 600 max(6px, 0.44rem - var(--font-trim)) var(--font-ui); letter-spacing: 0.16em; text-transform: uppercase; color: #c9a27a; }
         .amb-card.express .amb-k { color: #ffd06a; }
-        .amb-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; font: 700 max(6px, 0.6rem - var(--font-trim)) 'Montserrat', sans-serif; color: #ffe2b8; }
+        .amb-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; font: 700 max(6px, 0.6rem - var(--font-trim)) var(--font-ui); color: #ffe2b8; }
         .amb-row small { font-weight: 500; color: #a8876a; }
-        .amb-btn { font: 700 max(6px, 0.5rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.1em; text-transform: uppercase; padding: 6px 12px; border-radius: 99px; cursor: pointer;
+        .amb-btn { font: 700 max(6px, 0.5rem - var(--font-trim)) var(--font-ui); letter-spacing: 0.1em; text-transform: uppercase; padding: 6px 12px; border-radius: 99px; cursor: pointer;
                    background: linear-gradient(180deg, #ffb347, #e0832a); border: none; color: #2a1206; box-shadow: 0 2px 8px rgba(224, 131, 42, 0.35); }
         .amb-btn:disabled { background: rgba(255, 255, 255, 0.08); color: #7a6656; box-shadow: none; cursor: default; }
         .amb-btn.ghost { justify-self: start; background: transparent; border: 1px solid rgba(255, 179, 71, 0.45); color: #ffb347; box-shadow: none; }
         .amb-btn.gold { background: linear-gradient(180deg, #ffe08a, #e8b23a); }
         .amb-live { border-color: rgba(255, 179, 71, 0.45); }
-        .amb-bars { display: flex; gap: 12px; font: 600 max(6px, 0.5rem - var(--font-trim)) 'Montserrat', sans-serif; color: #a8876a; }
+        .amb-bars { display: flex; gap: 12px; font: 600 max(6px, 0.5rem - var(--font-trim)) var(--font-ui); color: #a8876a; }
         .amb-bars em { font-style: normal; color: #ffe2b8; margin-left: 3px; }
         .amb-bars em.late { color: #ff8a7a; }
         .amb-meter { height: 4px; border-radius: 99px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
         .amb-meter i { display: block; height: 100%; background: linear-gradient(90deg, #ffd06a, #ff9a3c); }
         .amb-meter i.late { background: #ff7a6a; }
-        .amb-tip { padding: 6px 10px; border-radius: 8px; background: rgba(120, 220, 140, 0.08); border: 1px solid rgba(120, 220, 140, 0.25); font: 500 max(6px, 0.52rem - var(--font-trim)) 'Montserrat', sans-serif; color: #c9f0d2; }
+        .amb-tip { padding: 6px 10px; border-radius: 8px; background: rgba(120, 220, 140, 0.08); border: 1px solid rgba(120, 220, 140, 0.25); font: 500 max(6px, 0.52rem - var(--font-trim)) var(--font-ui); color: #c9f0d2; }
         .amb-tip b { color: #9cf0b0; }
         .amb-none { font: italic 500 max(6px, 0.6rem - var(--font-trim)) 'Cormorant Garamond', Georgia, serif; color: #8f7560; text-align: center; padding: 8px; }
         .amb-prem { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 8px; padding: 9px 10px; border-radius: 10px; margin-top: 2px;
                     background: linear-gradient(135deg, rgba(255, 208, 106, 0.16), rgba(140, 60, 220, 0.14)); border: 1px solid rgba(255, 208, 106, 0.35); }
         .amb-prem b { font: italic 700 max(6px, 0.8rem - var(--font-trim)) 'Cormorant Garamond', Georgia, serif; color: #ffe08a; }
-        .amb-prem small { grid-column: 1; font: 500 max(6px, 0.48rem - var(--font-trim))/1.3 'Montserrat', sans-serif; color: #d8c2a0; }
+        .amb-prem small { grid-column: 1; font: 500 max(6px, 0.48rem - var(--font-trim))/1.3 var(--font-ui); color: #d8c2a0; }
         .amb-prem .amb-btn { grid-column: 2; grid-row: 1 / span 2; }
         .amb-prem.on { grid-template-columns: 1fr; }
         .amb-prem.on b::after { content: ' ✓'; color: #9cf0b0; font-style: normal; }
@@ -946,7 +986,7 @@
         .mb-snap { position: relative; width: 180px; }
         .mb-snap img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: #160a26; }
         .mb-snap.gone img { aspect-ratio: 16 / 6; }
-        .mb-snap span { position: absolute; left: 6px; bottom: 6px; padding: 2px 6px; border-radius: 999px; background: rgba(13, 7, 24, 0.75); font: 500 max(6px, 0.45rem - var(--font-trim))/1.3 'Montserrat', sans-serif; color: #f1e8fe; }
+        .mb-snap span { position: absolute; left: 6px; bottom: 6px; padding: 2px 6px; border-radius: 999px; background: rgba(13, 7, 24, 0.75); font: 500 max(6px, 0.45rem - var(--font-trim))/1.3 var(--font-ui); color: #f1e8fe; }
         .mb-row.me .mb-snap { border-color: rgba(142, 85, 245, 0.7); box-shadow: 0 0 12px rgba(93, 20, 226, 0.35); }
 
         /* Voice notes: a waveform that fills as it plays, and the earpiece chip under it */
@@ -957,7 +997,7 @@
         .mb-wave { flex: 1; height: 20px; display: flex; align-items: center; gap: 1.5px; }
         .mb-wave i { flex: 1; border-radius: 2px; background: rgba(142, 85, 245, 0.55); transition: background 0.15s; }
         .mb-wave i.lit { background: #f6dfa8; }
-        .mb-voice small { font: 500 max(6px, 0.48rem - var(--font-trim))/1 'Montserrat', sans-serif; color: var(--df-lilac-grey); font-variant-numeric: tabular-nums; }
+        .mb-voice small { font: 500 max(6px, 0.48rem - var(--font-trim))/1 var(--font-ui); color: var(--df-lilac-grey); font-variant-numeric: tabular-nums; }
         .mb-sub { margin-top: 2px; padding: 3px 12px 3px 3px; max-width: 220px; animation: commIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
         .mb-sub .comm-face { width: 24px; height: 24px; }
         .mb-sub .comm-name { font-size: max(6px, 0.7rem - var(--font-trim)); }
@@ -968,12 +1008,12 @@
         #contact-reply-options { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; margin: 2px 0 5px; }
         #contact-reply-options:empty { display: none; }
         .reply-chip { max-width: 100%; padding: 5px 9px; border-radius: 999px; border: 1px solid rgba(232, 194, 122, 0.5); background: rgba(232, 194, 122, 0.06); color: #f6dfa8;
-            font: 500 max(6px, 0.58rem - var(--font-trim))/1.25 'Montserrat', sans-serif; cursor: pointer; text-align: right; transition: background 0.18s, transform 0.1s; animation: chipIn 0.22s ease-out both; }
+            font: 500 max(6px, 0.58rem - var(--font-trim))/1.25 var(--font-ui); cursor: pointer; text-align: right; transition: background 0.18s, transform 0.1s; animation: chipIn 0.22s ease-out both; }
         @keyframes chipIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
         .reply-chip:hover { background: rgba(232, 194, 122, 0.18); }
         .reply-chip:active { transform: scale(0.97); }
         #contact-reply-input { display: flex; align-items: center; gap: 7px; padding: 3px 4px 3px 3px; border-radius: 999px; background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.08); color: #6c6c7a; font: 500 max(6px, 0.56rem - var(--font-trim)) 'Montserrat', sans-serif; }
+            border: 1px solid rgba(255, 255, 255, 0.08); color: #6c6c7a; font: 500 max(6px, 0.56rem - var(--font-trim)) var(--font-ui); }
         #contact-reply-input.armed { border-color: rgba(232, 194, 122, 0.35); color: #e8c27a; }
         #contact-reply-snap { width: 22px; height: 22px; flex: none; border-radius: 50%; border: 0; padding: 0; background: rgba(202, 176, 250, 0.14); font-size: max(6px, 0.6rem - var(--font-trim)); cursor: pointer; display: grid; place-items: center; }
         #contact-reply-snap:disabled { opacity: 0.35; cursor: default; }
@@ -983,8 +1023,8 @@
 
         .msg-empty { display: none; }
         #screen-contacts:not(.has-thread) .msg-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
-        .msg-empty-script { font: 400 max(6px, 2.4rem - var(--font-trim))/1 'Great Vibes', cursive; color: rgba(246, 223, 168, 0.55); }
-        .msg-empty-line { font: 600 max(6px, 0.48rem - var(--font-trim))/1 'Montserrat', sans-serif; letter-spacing: 0.26em; text-transform: uppercase; color: var(--df-lilac-grey); }
+        .msg-empty-script { font: 400 max(6px, 2.4rem - var(--font-trim))/1 var(--font-script); color: rgba(246, 223, 168, 0.55); }
+        .msg-empty-line { font: 600 max(6px, 0.48rem - var(--font-trim))/1 var(--font-ui); letter-spacing: 0.26em; text-transform: uppercase; color: var(--df-lilac-grey); }
         
         #phone-map-canvas { width: 100%; height: 300px; background: #0b0614; border-radius: 12px; border: 1px solid rgba(217, 204, 255, 0.25); box-shadow: 0 0 18px rgba(139, 92, 246, 0.18) inset; }
         .help-section { background: rgba(255, 255, 255, 0.05); padding: 12px; border-radius: 10px; margin-bottom: 10px; }
@@ -995,10 +1035,10 @@
         .log-empty {
             text-align: center; padding: 40px 16px;
             color: rgba(255,255,255,0.35); font-size: max(6px, 0.7rem - var(--font-trim));
-            font-family: 'Montserrat', sans-serif; letter-spacing: 1px; line-height: 1.6;
+            font-family: var(--font-ui); letter-spacing: 1px; line-height: 1.6;
         }
         .log-day-header {
-            font-family: 'Orbitron', sans-serif; font-size: max(6px, 0.55rem - var(--font-trim));
+            font-family: var(--font-tech); font-size: max(6px, 0.55rem - var(--font-trim));
             color: rgba(218,165,32,0.7); letter-spacing: 2px; text-transform: uppercase;
             padding: 12px 4px 6px; border-bottom: 1px solid rgba(218,165,32,0.15);
             margin-bottom: 8px;
@@ -1015,7 +1055,7 @@
             color: #fff; letter-spacing: 1px; text-transform: uppercase; margin-top: 4px;
         }
         .sky-hero-sub {
-            font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.55rem - var(--font-trim));
+            font-family: var(--font-ui); font-size: max(6px, 0.55rem - var(--font-trim));
             color: rgba(255,255,255,0.4); letter-spacing: 1px; margin-top: 3px;
         }
         /* The headline answer: when does rain start / stop */
@@ -1030,7 +1070,7 @@
             color: #fff; letter-spacing: 0.5px;
         }
         .sky-headline-sub {
-            font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.55rem - var(--font-trim));
+            font-family: var(--font-ui); font-size: max(6px, 0.55rem - var(--font-trim));
             color: rgba(255,255,255,0.45); letter-spacing: 0.5px; margin-top: 3px;
         }
         .sky-bar-track {
@@ -1057,11 +1097,11 @@
             font-weight: 600; color: #ddd;
         }
         .sky-row-meta {
-            font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.52rem - var(--font-trim));
+            font-family: var(--font-ui); font-size: max(6px, 0.52rem - var(--font-trim));
             color: rgba(255,255,255,0.32); letter-spacing: 0.5px; margin-top: 1px;
         }
         .sky-row-dur {
-            font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.58rem - var(--font-trim));
+            font-family: var(--font-ui); font-size: max(6px, 0.58rem - var(--font-trim));
             color: rgba(255,255,255,0.5); white-space: nowrap;
         }
         /* Wind panel + compass rose */
@@ -1082,17 +1122,17 @@
             color: rgba(255,255,255,0.6); margin-top: 1px;
         }
         .sky-wind-meta {
-            font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.52rem - var(--font-trim));
+            font-family: var(--font-ui); font-size: max(6px, 0.52rem - var(--font-trim));
             color: rgba(255,255,255,0.3); letter-spacing: 0.5px; margin-top: 4px;
         }
         .sky-note {
-            font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.52rem - var(--font-trim));
+            font-family: var(--font-ui); font-size: max(6px, 0.52rem - var(--font-trim));
             color: rgba(255,255,255,0.28); letter-spacing: 0.5px;
             text-align: center; margin-top: 10px; line-height: 1.6;
         }
         .sky-badge {
             display: inline-block; padding: 2px 7px; border-radius: 3px;
-            font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.5rem - var(--font-trim));
+            font-family: var(--font-ui); font-size: max(6px, 0.5rem - var(--font-trim));
             letter-spacing: 1px; text-transform: uppercase;
         }
         .sky-badge.locked { background: rgba(255,120,60,0.15); color: #ff9a5a; border: 1px solid rgba(255,120,60,0.35); }
@@ -1112,7 +1152,7 @@
             text-transform: uppercase; letter-spacing: 1px; color: #ff0055;
         }
         .log-entry-time {
-            font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.55rem - var(--font-trim));
+            font-family: var(--font-ui); font-size: max(6px, 0.55rem - var(--font-trim));
             color: rgba(255,255,255,0.3); letter-spacing: 0.5px;
         }
         .log-entry-text {
@@ -1123,7 +1163,7 @@
             margin-left: auto; padding: 4px 10px;
             background: rgba(255,80,80,0.08); border: 1px solid rgba(255,80,80,0.3);
             color: rgba(255,150,150,0.8); border-radius: 3px;
-            font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.55rem - var(--font-trim));
+            font-family: var(--font-ui); font-size: max(6px, 0.55rem - var(--font-trim));
             letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer;
         }
         #log-clear-btn:hover { background: rgba(255,80,80,0.15); color: #fff; }
@@ -1148,6 +1188,44 @@
         #map-interface .sidebar-handle {
             z-index: 11;
         }
+        /* The heading: "Map" in Anthropology, the place in Feminine; tapping the name (gold = touch) opens the list */
+        .map-heading { position: absolute; top: 22px; left: 50%; transform: translateX(-50%); z-index: 12; display: flex; flex-direction: column; align-items: center; pointer-events: none; max-width: min(560px, 60vw); }
+        .map-heading-main { display: flex; flex-direction: column; align-items: center; padding: 6px 30px 12px; pointer-events: auto; border-radius: 16px;
+            background: linear-gradient(180deg, rgba(18, 9, 32, 0.62), rgba(8, 4, 15, 0.5)); border: 1px solid rgba(184, 156, 255, 0.18);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 24px rgba(130, 80, 230, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+        .map-heading-kicker { font-family: var(--font-script); font-size: max(6px, 2.5rem - var(--font-trim)); line-height: 1.1; color: #f6efff; padding: 0 0.2em;
+            text-shadow: 0 0 12px rgba(184, 156, 255, 0.95), 0 0 26px rgba(164, 105, 255, 0.55); }
+        .map-heading-row { display: flex; align-items: center; gap: 10px; margin-top: -2px; }
+        .map-picker { all: unset; cursor: pointer; display: flex; align-items: center; gap: 9px; padding: 4px 4px 3px; border-bottom: 1px solid rgba(255, 215, 106, 0.45); }
+        .map-picker-name { font-family: var(--font-menu); font-size: max(6px, 1rem - var(--font-trim)); letter-spacing: 0.26em; text-transform: uppercase; color: #efe6ff; text-align: center;
+            text-shadow: 0 0 10px rgba(184, 156, 255, 0.85); }
+        .map-picker-caret { width: 7px; height: 7px; border-right: 1.5px solid var(--gold-primary); border-bottom: 1.5px solid var(--gold-primary); transform: translateY(-2px) rotate(45deg); transition: transform 0.2s;
+            filter: drop-shadow(0 0 4px rgba(255, 200, 80, 0.8)); }
+        .map-heading.open .map-picker-caret { transform: translateY(2px) rotate(225deg); }
+        .map-cycle { all: unset; cursor: pointer; font-size: max(6px, 0.6rem - var(--font-trim)); color: var(--gold-primary); padding: 6px; opacity: 0.85; text-shadow: 0 0 8px rgba(255, 200, 80, 0.7); }
+        .map-cycle:hover, .map-picker:hover .map-picker-name { opacity: 1; color: #fff; }
+        .map-heading.single .map-cycle, .map-heading.single .map-picker-caret { display: none; }
+        .map-heading.single .map-picker { cursor: default; border-bottom-color: rgba(184, 156, 255, 0.3); }
+        .map-picker-sub { font-family: var(--font-menu-body); font-size: max(6px, 0.62rem - var(--font-trim)); letter-spacing: 0.2em; text-transform: uppercase; color: rgba(214, 198, 255, 0.7); margin-top: 4px; }
+        /* The list: a glowing directory of places, one row each */
+        .map-picker-list { display: none; pointer-events: auto; margin-top: 6px; min-width: 260px; max-height: 52vh; overflow-y: auto; padding: 6px;
+            background: linear-gradient(180deg, rgba(20, 10, 34, 0.96), rgba(9, 4, 16, 0.97)); border: 1px solid rgba(184, 156, 255, 0.35); border-radius: 10px;
+            box-shadow: 0 14px 40px rgba(0, 0, 0, 0.75), 0 0 22px rgba(130, 80, 230, 0.25); }
+        .map-heading.open .map-picker-list { display: block; }
+        .map-pick { all: unset; box-sizing: border-box; width: 100%; cursor: pointer; display: grid; grid-template-columns: 14px 1fr auto; grid-template-areas: "gem name tag" "gem sub tag"; align-items: center; column-gap: 10px;
+            padding: 8px 10px; border-radius: 7px; }
+        .map-pick + .map-pick { margin-top: 2px; }
+        .map-pick:hover, .map-pick:focus-visible { background: rgba(184, 156, 255, 0.1); }
+        .map-pick-gem { grid-area: gem; width: 7px; height: 7px; transform: rotate(45deg); border: 1px solid rgba(214, 198, 255, 0.7); justify-self: center; }
+        .map-pick-name { grid-area: name; font-family: var(--font-menu); font-size: max(6px, 0.78rem - var(--font-trim)); letter-spacing: 0.2em; text-transform: uppercase; color: #e6dcfa; }
+        .map-pick-sub { grid-area: sub; font-family: var(--font-menu-body); font-size: max(6px, 0.56rem - var(--font-trim)); letter-spacing: 0.16em; text-transform: uppercase; color: rgba(214, 198, 255, 0.55); margin-top: 2px; }
+        .map-pick-tag { grid-area: tag; font-family: var(--font-menu-body); font-size: max(6px, 0.5rem - var(--font-trim)); letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold-primary); white-space: nowrap; padding-left: 8px; }
+        .map-pick.on { background: rgba(184, 156, 255, 0.14); box-shadow: inset 0 0 0 1px rgba(184, 156, 255, 0.35); }
+        .map-pick.on .map-pick-gem { background: #f1eaff; border-color: #f1eaff; box-shadow: 0 0 8px rgba(184, 156, 255, 0.95); }
+        .map-pick.on .map-pick-name { color: #fff; text-shadow: 0 0 10px rgba(184, 156, 255, 0.85); }
+        .map-pick.uncharted { cursor: default; opacity: 0.45; }
+        .map-pick.uncharted .map-pick-tag { color: rgba(214, 198, 255, 0.7); }
         .filter-title { font-family: var(--font-script); font-size: max(6px, 3rem - var(--font-trim)); color: #fff; text-shadow: 0 0 10px var(--gold-primary); margin-bottom: 20px; }
 
         /* --- MAP CLOSE BUTTON - Now uses .screen-back-btn universal styling --- */
@@ -1156,14 +1234,14 @@
         #music-widget { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 350px; height: 60px; border-radius: 30px; background: rgba(8, 4, 8, 0.95); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 15px 40px rgba(0, 0, 0, 0.9), inset 0 1px 1px rgba(255, 255, 255, 0.1); display: none; align-items: center; padding-right: 20px; z-index: 45; transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), bottom 0.4s ease; pointer-events: auto; }
         #music-widget.stashed { transform: translate(-50%, 150%) !important; bottom: 30px !important; left: 50% !important; top: auto !important; pointer-events: none; }
         #mw-station-capsule { position: relative; height: 100%; width: 100px; border-radius: 30px 0 0 30px; display: flex; justify-content: center; align-items: center; z-index: 2; background: var(--station-bg, #333); box-shadow: 5px 0 15px rgba(0,0,0,0.5); cursor: pointer; overflow: hidden; }
-        #mw-brand-text { font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: max(6px, 0.75rem - var(--font-trim)); text-transform: uppercase; letter-spacing: 1px; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.5); z-index: 2; transform: rotate(-5deg); white-space: nowrap; }
+        #mw-brand-text { font-family: var(--font-ui); font-weight: 800; font-size: max(6px, 0.75rem - var(--font-trim)); text-transform: uppercase; letter-spacing: 1px; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.5); z-index: 2; transform: rotate(-5deg); white-space: nowrap; }
         #mw-play-tab { position: relative; width: 40px; height: 60px; margin-left: -8px; border-radius: 0 30px 30px 0; display: flex; justify-content: center; align-items: center; z-index: 1; background: var(--play-bg, #555); box-shadow: 5px 0 15px rgba(0,0,0,0.5); }
         #mw-play-tab::after { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%; height: 100%; border-radius: 0 30px 30px 0; box-shadow: 0 0 20px var(--play-glow, rgba(255,255,255,0.2)); opacity: 0.6; z-index: -1; }
         #mw-play-btn { font-size: max(6px, 1rem - var(--font-trim)); color: #fff; cursor: pointer; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); transition: transform 0.2s; margin-left: 5px; }
         #mw-play-btn:active { transform: scale(0.9); }
         #mw-info { flex: 1; padding-left: 15px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
-        .mw-label { font-family: 'Great Vibes', cursive; font-size: max(6px, 0.9rem - var(--font-trim)); color: #FFD700; opacity: 0.8; margin-bottom: -3px; }
-        .mw-track { font-family: 'Montserrat', sans-serif; font-weight: 600; font-size: max(6px, 0.75rem - var(--font-trim)); color: #eee; white-space: nowrap; text-overflow: ellipsis; letter-spacing: 1px; }
+        .mw-label { font-family: var(--font-script); font-size: max(6px, 0.9rem - var(--font-trim)); color: #FFD700; opacity: 0.8; margin-bottom: -3px; }
+        .mw-track { font-family: var(--font-ui); font-weight: 600; font-size: max(6px, 0.75rem - var(--font-trim)); color: #eee; white-space: nowrap; text-overflow: ellipsis; letter-spacing: 1px; }
         #mw-node { width: 6px; height: 6px; background: #fff; border: 1px solid #FFD700; transform: rotate(45deg); box-shadow: 0 0 5px #FFD700, 0 0 10px #FFD700; cursor: grab; flex-shrink: 0; transition: all 0.2s; position: relative; }
         #mw-node::after { content: ''; position: absolute; top: -10px; left: -10px; right: -10px; bottom: -10px; background: transparent; }
         #music-recall-node { position: absolute; bottom: -100px; right: 30px; width: 50px; height: 50px; z-index: 44; cursor: pointer; display: none; justify-content: center; align-items: center; pointer-events: auto; opacity: 0; transition: bottom 0.5s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease; }
@@ -1187,9 +1265,9 @@
         .mission-banner.new::after, .mission-banner::after { background: radial-gradient(ellipse at center, rgba(164, 105, 255, 0.6) 0%, transparent 70%); }
         .mission-banner.new .mission-text, .mission-banner .mission-text { color: #1a0525 !important; text-shadow: 0 1px 0 rgba(220, 220, 255, 0.5); }
         .mission-banner-content { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-        .mission-text { font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.85rem - var(--font-trim)); font-weight: 600; letter-spacing: 3px; text-transform: uppercase; }
+        .mission-text { font-family: var(--font-ui); font-size: max(6px, 0.85rem - var(--font-trim)); font-weight: 600; letter-spacing: 3px; text-transform: uppercase; }
         .mission-status { display: flex; align-items: center; gap: 6px; }
-        .mission-status-text { font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.55rem - var(--font-trim)); font-weight: 400; letter-spacing: 4px; text-transform: uppercase; opacity: 0.7; }
+        .mission-status-text { font-family: var(--font-ui); font-size: max(6px, 0.55rem - var(--font-trim)); font-weight: 400; letter-spacing: 4px; text-transform: uppercase; opacity: 0.7; }
         .mission-banner.gold .mission-status-text { color: #4a3510; }
         .mission-banner.red .mission-status-text { color: #5a1515; }
         .mission-banner.new .mission-status-text, .mission-banner .mission-status-text { color: #2a1540; }
@@ -1202,19 +1280,8 @@
 
         /* --- DEATH SCREEN --- */
         #death-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 1000; display: none; justify-content: center; align-items: center; }
-        .death-text { font-family: 'Orbitron', sans-serif; font-size: max(6px, 6rem - var(--font-trim)); font-weight: 900; letter-spacing: 20px; }
+        .death-text { font-family: var(--font-tech); font-size: max(6px, 6rem - var(--font-trim)); font-weight: 900; letter-spacing: 20px; }
         #death-screen.respawn { background: rgba(255, 255, 255, 0.5) !important; }
-
-        /* --- INVENTORY PILLS (Desktop overrides + Node Menu) --- */
-        .control-node { position: absolute; right: 22px; top: 50%; transform: translateY(-50%) rotate(45deg); width: 10px; height: 10px; background: #fffdfa; box-shadow: 0 0 8px rgba(255, 194, 72, 0.8), 0 0 18px rgba(202, 176, 250, 0.5); cursor: pointer; z-index: 100; transition: all 0.3s; }
-        .control-node:hover { transform: translateY(-50%) rotate(225deg) scale(1.3); background: #fff; }
-        /* Drop / Equip: flat lavender-violet blocks, as in the mock-up */
-        .node-menu { position: absolute; right: 44px; top: 50%; transform: translateY(-50%) scaleX(0); transform-origin: right center; display: flex; flex-direction: column; gap: 0; transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s; opacity: 0; pointer-events: none; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5); }
-        .ui-pill.expanded .node-menu { transform: translateY(-50%) scaleX(1); opacity: 1; pointer-events: auto; }
-        .ui-pill.expanded .control-node { transform: translateY(-50%) rotate(225deg) scale(1.1); }
-        .node-btn { font-family: var(--font-ui); font-size: max(6px, 0.62rem - var(--font-trim)); font-weight: 600; color: #2a1060; background: var(--df-lavender); border: none; cursor: pointer; text-transform: uppercase; padding: 6px 26px; min-width: 110px; letter-spacing: 1.5px; transition: all 0.2s; }
-        .node-btn.drop-btn { background: var(--df-violet-mid); color: #fff; }
-        .node-btn:hover { filter: brightness(1.15); }
 
         /* Inventory ownership views use the existing capsule design. */
         #inventory-list .inventory-section-title {
@@ -1230,36 +1297,102 @@
             letter-spacing: 0.5px; margin-top: 5px;
         }
         #inventory-list .active-item .inventory-entry-detail { color: var(--df-violet-ink); }
-        #inventory-list .active-item.type-collectible .pill-name { color: #5b2fc4; }
         #inventory-list .inventory-registry-tag {
             color: var(--df-champagne); border: 1px solid rgba(216,198,162,.35);
             border-radius: 8px; padding: 2px 6px;
             font: 600 max(6px, 0.5rem - var(--font-trim)) var(--font-ui); letter-spacing: 1px;
         }
-        #inventory-list .inventory-registry-readonly { cursor: default; padding-right: 22px; }
+        #inventory-list .inventory-registry-readonly { cursor: default; }   /* keeps the diamond's room so QTY lines up */
         #inventory-list .inventory-empty { color: var(--df-lavender); text-align: center; margin: 50px 12px; font-size: max(6px, .75rem - var(--font-trim)); }
+        /* --- CONTROL NODE: the gold diamond at a pill's end (Inventory._attachControlNode) ---
+           Tap: the action icons slide out to its left, the pill darkens and a gold glow gathers
+           behind the node. Drag: the pill moves up or down its section. */
         #inventory-list .control-node {
-            width: 44px; height: 44px; right: 5px; padding: 0; border: 0;
-            background: transparent; box-shadow: none;
-            transform: translateY(-50%); border-radius: 12px;
+            position: absolute; top: 50%; right: 14px; z-index: 3;
+            width: 44px; height: 44px; padding: 0; border: 0; border-radius: 12px;
+            background: transparent; transform: translateY(-50%);
+            cursor: grab; touch-action: none;
         }
         #inventory-list .control-node::before {
             content: ''; position: absolute; left: 17px; top: 17px;
-            width: 10px; height: 10px; background: #fffdfa;
-            transform: rotate(45deg); transition: transform .3s;
-            box-shadow: 0 0 8px rgba(255,194,72,.8), 0 0 18px rgba(202,176,250,.5);
+            width: 10px; height: 10px; background: #fff0d4;
+            transform: rotate(45deg); transition: transform .3s, box-shadow .3s;
+            box-shadow: 0 0 4px 1px rgba(255,170,60,.95), 0 0 12px 2px rgba(255,140,40,.45);
         }
-        #inventory-list .control-node:hover, #inventory-list .expanded .control-node { transform: translateY(-50%); }
-        #inventory-list .expanded .control-node::before { transform: rotate(225deg); }
+        #inventory-list .control-node:hover::before { transform: rotate(45deg) scale(1.2); }
+        #inventory-list .expanded .control-node::before { transform: rotate(225deg) scale(1.15);
+            box-shadow: 0 0 5px 2px rgba(255,180,70,1), 0 0 16px 4px rgba(255,150,40,.6); }
         #inventory-list .control-node:focus-visible { outline: 2px solid var(--df-champagne); outline-offset: 1px; }
-        #inventory-list .node-menu { z-index: 101; right: 50px; }
-        #inventory-list .node-btn { min-height: 36px; }
-        @media (max-width: 700px), (max-height: 540px) {
-            #inventory-list .pill-icon { width: 42px; height: 42px; margin-right: 10px; }
-            #inventory-list .ui-pill { padding-left: 14px; min-height: 88px; }
-            #inventory-list .pill-name { font-size: max(6px, .7rem - var(--font-trim)); letter-spacing: 1px; }
-            #inventory-list .node-btn { min-height: 40px; }
+        /* the dimming veil over the pill's contents, and the gold glow gathered at its end */
+        #inventory-list .ui-pill::after {
+            content: ''; position: absolute; inset: 0; z-index: 1; border-radius: inherit; pointer-events: none;
+            background:
+                radial-gradient(ellipse 24% 85% at 100% 50%, rgba(255, 176, 60, 0.55) 0%, rgba(255, 140, 30, 0.18) 50%, rgba(255, 140, 30, 0) 100%),
+                rgba(8, 1, 16, 0.64);
+            opacity: 0; transition: opacity 0.3s ease;
         }
+        #inventory-list .ui-pill.expanded::after { opacity: 1; }
+        #inventory-list .ui-pill.dragging { z-index: 10; transition: none; cursor: grabbing; filter: brightness(1.12) drop-shadow(0 10px 18px rgba(0, 0, 0, 0.6)); }
+        #inventory-list .ui-pill.dragging .control-node { cursor: grabbing; }
+        /* the action icons: each starts tucked into the node and slides out to its place */
+        #inventory-list .node-menu {
+            position: absolute; right: 62px; top: 50%; z-index: 2; transform: translateY(-50%);
+            display: flex; align-items: center; gap: 12px; pointer-events: none;
+        }
+        #inventory-list .node-caption {
+            font-family: var(--font-menu); font-size: max(6px, 0.92rem - var(--font-trim)); letter-spacing: 0.5px;
+            color: #dcc4ff; white-space: nowrap; margin-right: 2px;
+            opacity: 0; transform: translateX(14px); transition: opacity 0.22s ease, transform 0.3s ease;
+        }
+        #inventory-list .node-btn {
+            width: 42px; height: 42px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; flex-shrink: 0;
+            opacity: 0; transform: translateX(calc((var(--n) - var(--i)) * 54px + 10px)) scale(0.3);
+            transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1) calc((var(--n) - 1 - var(--i)) * 50ms),
+                        opacity 0.22s ease calc((var(--n) - 1 - var(--i)) * 50ms);
+        }
+        #inventory-list .node-btn svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 0 5px rgba(164, 105, 255, 0.7)); transition: transform 0.2s; }
+        #inventory-list .node-btn:hover svg, #inventory-list .node-btn:focus-visible svg { transform: scale(1.1); }
+        #inventory-list .node-btn:focus-visible { outline: 2px solid var(--df-champagne); outline-offset: 2px; }
+        #inventory-list .ui-pill.expanded .node-menu { pointer-events: auto; }
+        #inventory-list .ui-pill.expanded .node-caption { opacity: 1; transform: none; transition-delay: calc(var(--n) * 50ms); }
+        #inventory-list .ui-pill.expanded .node-btn { opacity: 1; transform: none; }
+        @media (max-width: 700px), (max-height: 540px) {
+            .map-heading { top: 10px; max-width: 52vw; }
+            .map-heading-main { padding: 3px 20px 7px; border-radius: 12px; }
+            .map-heading-kicker { font-size: max(6px, 1.75rem - var(--font-trim)); }
+            .map-picker-name { font-size: max(6px, 0.74rem - var(--font-trim)); letter-spacing: 0.22em; }
+            .map-picker-sub { font-size: max(6px, 0.5rem - var(--font-trim)); margin-top: 2px; }
+            .map-picker-list { min-width: 230px; max-height: 62vh; }
+            .map-pick { padding: 6px 8px; }
+            .map-pick-name { font-size: max(6px, 0.66rem - var(--font-trim)); }
+            #inventory-list .pill-icon { width: 42px; height: 42px; margin-right: 36px; }
+            #inventory-list .pill-icon::after { right: -18px; }
+            #inventory-list .ui-pill { padding-left: 34px; padding-right: 56px; min-height: 88px; }
+            #inventory-list .pill-name { font-size: max(6px, .7rem - var(--font-trim)); }
+            #inventory-list .pill-qty { margin-left: 8px; }
+            #inventory-list .pill-qty-value { min-width: 44px; padding: 3px 6px; }
+            #inventory-list .node-menu { right: 52px; gap: 8px; }
+            #inventory-list .node-btn { width: 36px; height: 36px; transform: translateX(calc((var(--n) - var(--i)) * 44px + 8px)) scale(0.3); }
+            #inventory-list .node-caption { font-size: max(6px, 0.74rem - var(--font-trim)); }
+            /* Filter sidebars (inventory and map): smaller type so "Filter" and the longer map
+               categories fit the narrow phone column without clipping or wrapping */
+            #inv-sidebar-right, #map-sidebar-right { padding: 18px 14px; }
+            :is(#inv-sidebar-right, #map-sidebar-right) .filter-header { gap: 10px; margin-bottom: 12px; padding-bottom: 8px; padding-left: 0.2em; }
+            :is(#inv-sidebar-right, #map-sidebar-right) .filter-title-text { font-size: max(6px, 1.9rem - var(--font-trim)); }
+            :is(#inv-sidebar-right, #map-sidebar-right) .filter-toggle { gap: 8px; padding-left: 10px; font-size: max(6px, 0.66rem - var(--font-trim)); }
+            :is(#inv-sidebar-right, #map-sidebar-right) .filter-toggle-labels { gap: 8px; }
+            :is(#inv-sidebar-right, #map-sidebar-right) .filter-pill { width: 30px; height: 12px; }
+            :is(#inv-sidebar-right, #map-sidebar-right) .filter-list { gap: 0; min-height: 0; overflow-y: auto; scrollbar-width: none; align-self: stretch; }
+            :is(#inv-sidebar-right, #map-sidebar-right) .filter-item { font-size: max(6px, 0.56rem - var(--font-trim)); letter-spacing: 1.4px; padding: 7px 2px; white-space: nowrap; }
+            :is(#inv-sidebar-right, #map-sidebar-right) .filter-item.active::before { height: 22px; left: -14px; right: -14px; }
+        }
+
+        /* The freelancer menu in ETERNAL's fonts: script headers in Anthropology, descriptions in Brooklyn, everything else in Feminine */
+        #freelancer-menu .screen-title, #freelancer-menu .filter-title-text { font-family: var(--font-menu-script); }
+        #freelancer-menu .sidebar-nav-item, #freelancer-menu .filter-item, #freelancer-menu .filter-toggle-labels,
+        #freelancer-menu .screen-back-btn, #freelancer-menu .screen-back-btn *,
+        #freelancer-menu #inventory-list, #freelancer-menu #inventory-list *:not(.pill-icon) { font-family: var(--font-menu); }
+        #freelancer-menu #inventory-list .pill-desc, #freelancer-menu #inventory-list .inventory-entry-detail { font-family: var(--font-menu-body); }
 
         /* The flit ring round the move stick: fill = flit charge (initJoystick / updateFlitRing) */
         #joystick-ring {
@@ -1410,19 +1543,19 @@
         .nm-caption { position: absolute; left: 0; right: 0; bottom: 2%; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 1px; pointer-events: none; }
         #neume-look { font: italic 600 max(6px, 0.78rem - var(--font-trim))/1.1 'Cormorant Garamond', Georgia, serif; color: var(--df-cream); text-shadow: 0 1px 6px #000;
             max-width: 92%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        #neume-status { font: 600 max(6px, 0.42rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 3px; text-transform: uppercase; color: var(--df-gold);
+        #neume-status { font: 600 max(6px, 0.42rem - var(--font-trim)) var(--font-ui); letter-spacing: 3px; text-transform: uppercase; color: var(--df-gold);
             opacity: 0; transition: opacity 0.4s; }
         #neume-status.on { opacity: 0.9; }
         .nm-panel { display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: 6px 10px 0; }
         .nm-head { display: flex; align-items: baseline; gap: 8px; padding: 0 2px 4px; }
-        .nm-title { font-family: 'Great Vibes', 'Cormorant Garamond', cursive; font-size: max(6px, 1.5rem - var(--font-trim)); line-height: 1; color: #f6dfa8;
+        .nm-title { font-family: var(--font-script); font-size: max(6px, 1.5rem - var(--font-trim)); line-height: 1; color: #f6dfa8;
             text-shadow: 0 0 12px rgba(255, 194, 72, 0.35); }
-        .nm-sub { font: 500 max(6px, 0.42rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 3px; text-transform: uppercase; color: var(--df-lilac-grey); }
+        .nm-sub { font: 500 max(6px, 0.42rem - var(--font-trim)) var(--font-ui); letter-spacing: 3px; text-transform: uppercase; color: var(--df-lilac-grey); }
         .nm-tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding: 2px 0 6px; flex-shrink: 0;
             -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); }
         .nm-tabs::-webkit-scrollbar { display: none; }
         .nm-tab { flex-shrink: 0; padding: 4px 10px; border-radius: 999px; border: 1px dotted rgba(202, 176, 250, 0.35); background: rgba(35, 5, 93, 0.25); cursor: pointer;
-            font: 600 max(6px, 0.5rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 1px; color: var(--df-lilac-grey); position: relative; }
+            font: 600 max(6px, 0.5rem - var(--font-trim)) var(--font-ui); letter-spacing: 1px; color: var(--df-lilac-grey); position: relative; }
         .nm-tab.worn::after { content: ''; position: absolute; top: 2px; right: 3px; width: 4px; height: 4px; border-radius: 50%; background: var(--df-gold); opacity: 0.8; }
         .nm-tab.on { background: var(--df-lavender-pale); color: var(--df-violet-ink); border: 1px solid #fff; box-shadow: 0 0 10px rgba(202, 176, 250, 0.45); }
         .nm-grid { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 5px; align-content: start;
@@ -1434,13 +1567,13 @@
         .nm-card:active { transform: scale(0.96); }
         .nm-card i { flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%; box-shadow: inset 0 -3px 5px rgba(0, 0, 0, 0.4), inset 0 2px 3px rgba(255, 255, 255, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.12); }
         .nm-card.none i { border: 1px dashed rgba(202, 176, 250, 0.5); box-shadow: none; }
-        .nm-card span { font: 500 max(6px, 0.5rem - var(--font-trim))/1.15 'Montserrat', sans-serif; color: #b6acc4; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+        .nm-card span { font: 500 max(6px, 0.5rem - var(--font-trim))/1.15 var(--font-ui); color: #b6acc4; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
         .nm-card.on { border-color: var(--df-champagne); background: linear-gradient(180deg, rgba(93, 20, 226, 0.55), rgba(35, 5, 93, 0.6)); box-shadow: 0 0 12px rgba(93, 20, 226, 0.45), inset 0 0 0 1px rgba(255, 194, 72, 0.25); }
         .nm-card.on span { color: #fff; }
         .nm-card.small { min-height: 24px; }
         .nm-card.small i { width: 12px; height: 12px; }
         .nm-note { grid-column: 1 / -1; margin: 4px 2px 0; font: italic max(6px, 0.62rem - var(--font-trim)) 'Cormorant Garamond', Georgia, serif; color: var(--df-lilac-grey); }
-        .nm-sub-head { grid-column: 1 / -1; margin: 6px 2px 0; font: 600 max(6px, 0.42rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 3px; text-transform: uppercase; color: var(--df-champagne); }
+        .nm-sub-head { grid-column: 1 / -1; margin: 6px 2px 0; font: 600 max(6px, 0.42rem - var(--font-trim)) var(--font-ui); letter-spacing: 3px; text-transform: uppercase; color: var(--df-champagne); }
 
         /* ── Car.ME (ui/phone.js showCarMe): the key, the garage, the summon. Graphite, amber, chrome ── */
         .cm-icon { color: #ffb347; border-color: rgba(255, 160, 60, 0.45) !important; background: radial-gradient(circle at 50% 30%, rgba(255, 170, 70, 0.25), rgba(24, 16, 12, 0.6)) !important; }
@@ -1448,10 +1581,10 @@
         .cm-head { display: flex; align-items: center; gap: 8px; padding: 6px 2px 8px; border-bottom: 1px solid rgba(255, 160, 60, 0.18); }
         .cm-head .phone-back-btn { margin: 0; width: 24px; height: 24px; font-size: max(6px, 0.7rem - var(--font-trim)); flex: none; }
         .cm-brand { flex: 1; display: flex; flex-direction: column; line-height: 1; }
-        .cm-brand b { font: 800 max(6px, 0.95rem - var(--font-trim)) Orbitron, sans-serif; letter-spacing: 0.06em; color: #ff9a2a; text-shadow: 0 0 10px rgba(255, 136, 0, 0.45); }
+        .cm-brand b { font: 800 max(6px, 0.95rem - var(--font-trim)) var(--font-tech); letter-spacing: 0.06em; color: #ff9a2a; text-shadow: 0 0 10px rgba(255, 136, 0, 0.45); }
         .cm-brand b i { font-style: normal; color: #dfe3ea; text-shadow: 0 0 8px rgba(223, 227, 234, 0.35); }
-        .cm-brand small { font: 600 max(6px, 0.4rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.32em; text-transform: uppercase; color: #9a8a7c; margin-top: 3px; }
-        .cm-where { font: 700 max(6px, 0.45rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.14em; text-transform: uppercase; padding: 4px 9px; border-radius: 99px;
+        .cm-brand small { font: 600 max(6px, 0.4rem - var(--font-trim)) var(--font-ui); letter-spacing: 0.32em; text-transform: uppercase; color: #9a8a7c; margin-top: 3px; }
+        .cm-where { font: 700 max(6px, 0.45rem - var(--font-trim)) var(--font-ui); letter-spacing: 0.14em; text-transform: uppercase; padding: 4px 9px; border-radius: 99px;
                     color: #9cf0b0; background: rgba(120, 220, 140, 0.1); border: 1px solid rgba(120, 220, 140, 0.4); }
         .cm-where::before { content: '● '; }
         .cm-where.off { color: #9a8a7c; background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.14); }
@@ -1465,24 +1598,24 @@
         .cm-bay::before { content: ''; position: absolute; inset: 10px; border: 1px dashed rgba(255, 154, 42, 0.25); border-radius: 50%; }
         .cm-bay img { position: relative; height: 82%; max-height: 190px; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.7)); }
         .cm-info { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-        .cm-eyebrow { font: 600 max(6px, 0.42rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.24em; text-transform: uppercase; color: #a08f80; }
+        .cm-eyebrow { font: 600 max(6px, 0.42rem - var(--font-trim)) var(--font-ui); letter-spacing: 0.24em; text-transform: uppercase; color: #a08f80; }
         .cm-eyebrow em { font-style: normal; color: #d4af37; }
-        .cm-name { font: 700 max(6px, 0.95rem - var(--font-trim))/1.1 Orbitron, sans-serif; letter-spacing: 0.06em; color: #f4efe8; }
-        .cm-dots { display: flex; flex-wrap: wrap; gap: 4px 10px; font: 600 max(6px, 0.42rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.12em; text-transform: uppercase; color: #8d8178; }
+        .cm-name { font: 700 max(6px, 0.95rem - var(--font-trim))/1.1 var(--font-tech); letter-spacing: 0.06em; color: #f4efe8; }
+        .cm-dots { display: flex; flex-wrap: wrap; gap: 4px 10px; font: 600 max(6px, 0.42rem - var(--font-trim)) var(--font-ui); letter-spacing: 0.12em; text-transform: uppercase; color: #8d8178; }
         .cm-dot i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; border: 1px solid rgba(255, 255, 255, 0.25); }
-        .cm-summon { margin-top: 4px; font: 800 max(6px, 0.56rem - var(--font-trim)) Orbitron, sans-serif; letter-spacing: 0.3em; text-transform: uppercase; padding: 9px 14px; border-radius: 99px; cursor: pointer;
+        .cm-summon { margin-top: 4px; font: 800 max(6px, 0.56rem - var(--font-trim)) var(--font-tech); letter-spacing: 0.3em; text-transform: uppercase; padding: 9px 14px; border-radius: 99px; cursor: pointer;
                      color: #1e0f02; border: none; background: linear-gradient(180deg, #ffc061, #ff8a1a); box-shadow: 0 0 0 1px rgba(255, 210, 140, 0.5) inset, 0 4px 14px rgba(255, 136, 0, 0.35); }
         .cm-summon:disabled { background: rgba(255, 255, 255, 0.06); color: #6f655d; box-shadow: none; cursor: default; }
-        .cm-note { font: italic 500 max(6px, 0.5rem - var(--font-trim)) 'Montserrat', sans-serif; color: #8d8178; text-align: center; }
-        .cm-sec { display: flex; justify-content: space-between; align-items: baseline; font: 700 max(6px, 0.46rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.28em; text-transform: uppercase; color: #ff9a2a; }
+        .cm-note { font: italic 500 max(6px, 0.5rem - var(--font-trim)) var(--font-ui); color: #8d8178; text-align: center; }
+        .cm-sec { display: flex; justify-content: space-between; align-items: baseline; font: 700 max(6px, 0.46rem - var(--font-trim)) var(--font-ui); letter-spacing: 0.28em; text-transform: uppercase; color: #ff9a2a; }
         .cm-sec small { letter-spacing: 0.08em; text-transform: none; color: #8d8178; font-weight: 500; }
         .cm-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
         .cm-tile { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 10px; background: rgba(255, 255, 255, 0.035); border: 1px solid rgba(255, 255, 255, 0.08); }
         .cm-tile.on { border-color: rgba(255, 154, 42, 0.5); background: linear-gradient(150deg, rgba(255, 154, 42, 0.12), rgba(255, 154, 42, 0.02)); }
         .cm-tile img { height: 40px; width: 22px; object-fit: contain; flex: none; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6)); }
         .cm-tile-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.15; }
-        .cm-tile-txt b { font: 700 max(6px, 0.55rem - var(--font-trim)) Orbitron, sans-serif; letter-spacing: 0.04em; color: #ece6de; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .cm-tile-txt small { font: 600 max(6px, 0.4rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.2em; text-transform: uppercase; color: #8d8178; }
-        .cm-chip { font: 700 max(6px, 0.42rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.12em; text-transform: uppercase; color: #ffb347; }
-        .cm-drive { font: 700 max(6px, 0.44rem - var(--font-trim)) 'Montserrat', sans-serif; letter-spacing: 0.16em; text-transform: uppercase; padding: 5px 10px; border-radius: 99px; cursor: pointer;
+        .cm-tile-txt b { font: 700 max(6px, 0.55rem - var(--font-trim)) var(--font-tech); letter-spacing: 0.04em; color: #ece6de; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .cm-tile-txt small { font: 600 max(6px, 0.4rem - var(--font-trim)) var(--font-ui); letter-spacing: 0.2em; text-transform: uppercase; color: #8d8178; }
+        .cm-chip { font: 700 max(6px, 0.42rem - var(--font-trim)) var(--font-ui); letter-spacing: 0.12em; text-transform: uppercase; color: #ffb347; }
+        .cm-drive { font: 700 max(6px, 0.44rem - var(--font-trim)) var(--font-ui); letter-spacing: 0.16em; text-transform: uppercase; padding: 5px 10px; border-radius: 99px; cursor: pointer;
                     background: transparent; color: #dfe3ea; border: 1px solid rgba(223, 227, 234, 0.35); }

@@ -1143,7 +1143,7 @@
                     border: 1px solid rgba(255,255,255,0.08);
                     border-radius: 12px; padding: 24px 20px 18px;
                     width: 280px; max-width: 90vw;
-                    font-family: Orbitron, monospace;
+                    font-family: var(--font-tech);
                     box-shadow: 0 0 40px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.05);
                 `;
                 
@@ -1208,7 +1208,7 @@
                 popup.innerHTML += `
                     <div style="text-align:center;">
                         <button id="bumper-results-close" style="
-                            font-family:Orbitron,monospace; font-size:max(6px, 0.55rem - var(--font-trim)); letter-spacing:3px;
+                            font-family:var(--font-tech); font-size:max(6px, 0.55rem - var(--font-trim)); letter-spacing:3px;
                             color:#d4af37; background:rgba(212,175,55,0.08);
                             border:1px solid rgba(212,175,55,0.3); border-radius:20px;
                             padding:8px 28px; cursor:pointer;
@@ -1260,7 +1260,7 @@
                 this.hudTimer.id = 'bumper-timer';
                 this.hudTimer.style.cssText = `
                     position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
-                    font-family: Orbitron, monospace; color: #d4af37; font-size: max(6px, 0.85rem - var(--font-trim));
+                    font-family: var(--font-tech); color: #d4af37; font-size: max(6px, 0.85rem - var(--font-trim));
                     letter-spacing: 3px; text-align: center; z-index: 100;
                     background: rgba(10, 5, 15, 0.75); padding: 6px 18px;
                     border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 6px;
@@ -1274,7 +1274,7 @@
                 this.hudBoard.style.cssText = `
                     position: fixed; top: 45px; right: 8px; width: 140px;
                     z-index: 100; pointer-events: none;
-                    font-family: Orbitron, monospace; font-size: max(6px, 0.55rem - var(--font-trim));
+                    font-family: var(--font-tech); font-size: max(6px, 0.55rem - var(--font-trim));
                 `;
                 document.body.appendChild(this.hudBoard);
                 

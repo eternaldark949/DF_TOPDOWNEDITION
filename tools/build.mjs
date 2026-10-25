@@ -7,6 +7,7 @@
  *
  * Files in assets/images and assets/audio are embedded as data URIs in the
  * ASSETS table (see src/core/assets.js for getImage / drawAsset / playSound).
+ * Files in assets/fonts become @font-face rules, named after the file.
  *
  * No dependencies. The game is plain classic <script> code sharing one global
  * scope, so the ORDER below matters: a file can only use, at load time, what
@@ -187,8 +188,10 @@ const SCRIPTS = [
 
 const MIME = {
     '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml',
-    '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.flac': 'audio/flac'
+    '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.flac': 'audio/flac',
+    '.ttf': 'font/ttf', '.otf': 'font/otf', '.woff': 'font/woff', '.woff2': 'font/woff2'
 };
+const FONT_FORMAT = { '.ttf': 'truetype', '.otf': 'opentype', '.woff': 'woff', '.woff2': 'woff2' };
 const WARN_BYTES = 8 * 1024 * 1024;
 const assetReport = [];
 
@@ -217,11 +220,20 @@ function assetsScript() {
     return `        const ASSETS = ${JSON.stringify(table)};\n\n`;
 }
 
+// Each font in assets/fonts as an @font-face; the family is the file name without its extension.
+function fontFaces() {
+    const fonts = scanAssets('fonts');
+    return Object.entries(fonts).map(([family, uri]) => {
+        const format = FONT_FORMAT['.' + uri.slice(5, uri.indexOf(';')).split('/')[1]];
+        return `        @font-face { font-family: '${family}'; src: url(${uri}) format('${format}'); font-display: swap; }\n`;
+    }).join('');
+}
+
 const read = (p) => p === '@assets' ? assetsScript() : readFileSync(join(ROOT, 'src', p), 'utf8');
 
 export function build() {
     let html = read('index.html');
-    const styles = STYLES.map(read).join('');
+    const styles = fontFaces() + STYLES.map(read).join('');
     const scripts = SCRIPTS.map(read).join('');
     const put = (marker, text) => {
         const tag = `<!-- @${marker} -->\n`;
