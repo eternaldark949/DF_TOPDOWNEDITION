@@ -8333,7 +8333,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             LAMP_R: 58, HEAD_R: 40,     // star reach (world units): a street lantern, a car's headlamp
             TURN: 38 * Math.PI / 180,   // the star's turn
             DIAG: 0.5, WIDTH: 1.3,      // the diagonals' length (of the long rays'), a ray's half-width at its root
-            FOG: 0.85, FOG_A: 0.55      // the fog's reach (of the star's) and strength at its heart
+            FOG: 0.85, FOG_A: 0.42      // the fog's reach (of the star's) and strength at its heart
         };
         const _lensStars = new Map(), _lensFogs = new Map();
         function _lensRGB(color) { return /^#[0-9a-f]{6}$/i.test(color || '') ? hexToRgb(color) : '255, 238, 187'; }
@@ -8356,9 +8356,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 c.beginPath(); c.moveTo(0, -w); c.lineTo(len, 0); c.lineTo(0, w); c.closePath(); c.fill();
                 c.restore();
             }
-            const core = c.createRadialGradient(0, 0, 0, 0, 0, R * 0.22);
-            core.addColorStop(0, 'rgba(255,250,238,0.9)'); core.addColorStop(0.35, `rgba(${rgb},0.35)`); core.addColorStop(1, `rgba(${rgb},0)`);
-            c.fillStyle = core; c.beginPath(); c.arc(0, 0, R * 0.22, 0, Math.PI * 2); c.fill();
+            // a small hot core: small enough that a lantern's glitter still shows through round it
+            const core = c.createRadialGradient(0, 0, 0, 0, 0, R * 0.12);
+            core.addColorStop(0, 'rgba(255,250,238,0.75)'); core.addColorStop(0.4, `rgba(${rgb},0.3)`); core.addColorStop(1, `rgba(${rgb},0)`);
+            c.fillStyle = core; c.beginPath(); c.arc(0, 0, R * 0.12, 0, Math.PI * 2); c.fill();
             _lensStars.set(key, cv);
             return cv;
         }
@@ -22073,10 +22074,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 c.fillStyle = face; c.beginPath(); c.arc(0, 0, radius, 0, Math.PI * 2); c.fill();
             } else {
                 // Light shines between the original corner ribs, leaving the iron cap opaque. The glass glows
-                // in the lamp's own colour, white-hot only at its heart, so a street of lamps reads warm, not white.
+                // in the lamp's own colour (its white sparkle is the glitter's, above), so a street of lamps reads warm, not white.
                 const face = c.createRadialGradient(0, 0, radius * .45, 0, 0, radius);
-                face.addColorStop(0, '#fff6e4'); face.addColorStop(.32, _lampTint(color, .45));
-                face.addColorStop(.70, _lampTint(color, .2)); face.addColorStop(1, color);
+                face.addColorStop(0, _lampTint(color, .6)); face.addColorStop(.32, _lampTint(color, .25));
+                face.addColorStop(.70, color); face.addColorStop(1, color);
                 c.fillStyle = face;
                 const points = Array.from({length:6}, (_, i) => {
                     const a = Math.PI / 6 + i * Math.PI / 3; return {x:Math.cos(a),y:Math.sin(a)};
@@ -22096,6 +22097,42 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
         const LAMP_STAR_BULBS = [];   // (scratch: each lantern's bulbs in world space, for its glare)
+
+        // The glass glitters, as in ETERNAL's renders: not a smooth glow but dozens of tiny points, each catching
+        // the light on its own. A few frames of scattered points are baked per colour and size; a lantern
+        // cross-fades from one to the next at its own pace, so each point fades in and out (two stamps a bulb).
+        // Now and then a bulb flashes (LAMP_GLINT), and its star glare flares with it.
+        const LAMP_GLITTER = { FRAMES: 4, POINTS: 40, RATE: 1.1 };      // frames, points a frame, frames a second
+        const LAMP_GLINT = { EDGE: 0.93, FLARE: 0.45 };                   // how rare a flash is (0..1, higher: rarer), how much the star grows
+        const _lampGlitterSprites = new Map();
+        function _lampGlitterSprite(color, radius, frame, S = 3) {
+            const key = color + '|' + radius + '|' + frame + '|' + S;
+            let cv = _lampGlitterSprites.get(key);
+            if (cv) return cv;
+            cv = document.createElement('canvas'); cv.width = cv.height = 48 * S;
+            const c = cv.getContext('2d'); c.setTransform(S, 0, 0, S, 24 * S, 24 * S);
+            let seed = 7919 * (frame + 1) + radius * 131;
+            const rnd = () => ((seed = seed * 16807 % 2147483647) - 1) / 2147483646;
+            const pale = _lampTint(/^#[0-9a-f]{6}$/i.test(color) ? color : '#ffeebb', 0.6);
+            for (let i = 0; i < LAMP_GLITTER.POINTS; i++) {
+                // over the glass (between the cap and the frame), a few spilling just past it
+                const a = rnd() * Math.PI * 2, d = radius * (0.5 + rnd() * 0.62), x = Math.cos(a) * d, y = Math.sin(a) * d;
+                const r = 0.3 + rnd() * 0.55, hot = rnd() < 0.3;
+                c.fillStyle = hot ? '#fffdf6' : pale;
+                c.globalAlpha = 0.55 + rnd() * 0.45;
+                c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+                if (hot) {                                                       // the brightest catch a tiny cross of light
+                    c.globalAlpha *= 0.6; c.fillRect(x - r * 2.6, y - 0.12, r * 5.2, 0.24); c.fillRect(x - 0.12, y - r * 2.6, 0.24, r * 5.2);
+                }
+            }
+            _lampGlitterSprites.set(key, cv);
+            return cv;
+        }
+        /** How hard a bulb is flashing now (0 mostly, rising to 1 for a moment every so often): two slow waves meeting */
+        function lampGlint(t, phase) {
+            const w = Math.sin(t * 0.53 + phase) * Math.sin(t * 1.37 + phase * 2.1);
+            return Math.max(0, (w - LAMP_GLINT.EDGE) / (1 - LAMP_GLINT.EDGE));
+        }
 
         const _lampSprites = new Map();
         /** A lamp style painted once (cropped to its `box`) per colour, lit state and size:
@@ -22125,8 +22162,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 left = box[0]; top = box[1]; right = left + box[2]; bottom = top + box[3];
                 if (on) for (const b of spec.bulbs) {
                     if (!Number.isFinite(b.x) || !Number.isFinite(b.y)) return true;
-                    // The glare's reach (beyond the 24-unit glow, every 18-unit orbit and its 1.2-unit mote), in post units
-                    const r = Math.max(24, LENS_GLARE.LAMP_R / LAMP_POST_SCALE);
+                    // The glare's reach at a flash (beyond the 24-unit glow, every 18-unit orbit and its 1.2-unit mote), in post units
+                    const r = Math.max(24, LENS_GLARE.LAMP_R * (1 + LAMP_GLINT.FLARE) / LAMP_POST_SCALE);
                     left = Math.min(left, b.x - r); right = Math.max(right, b.x + r);
                     top = Math.min(top, b.y - r); bottom = Math.max(bottom, b.y + r);
                 }
@@ -22170,26 +22207,49 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             drawEmissive(ctx, daylight = 0) {
                 const style = LAMP_TYPE_STYLE[this.lampType], k = Math.max(0, Math.min(1, this._lightK ?? 1));
                 if (!style || !this.visible || daylight >= .2 || this._forcedOff || k < .02) return;
+                const t = (_frameTime + this.animOffset) / 1000;
+                const SG = (() => { const m = ctx.getTransform(), d = Math.hypot(m.a, m.b) * LAMP_POST_SCALE; return d > 1.6 ? 3 : d > .8 ? 2 : 1; })();
+                // The lens's glare first (core/draw-helpers.js: fog under a star), breathing and flaring with the glitter's flashes;
+                // the lantern and its glitter go over it, so the points of light stay crisp in the haze, as in the renders
+                if (GameSettings.fogGlare !== false || GameSettings.starGlare !== false) {
+                    const ca = Math.cos(this.angle) * LAMP_POST_SCALE, sa = Math.sin(this.angle) * LAMP_POST_SCALE;
+                    LAMP_STAR_BULBS.length = 0;
+                    for (const b of LAMP_STYLES[style].bulbs) LAMP_STAR_BULBS.push(this.x + b.x * ca - b.y * sa, this.y + b.x * sa + b.y * ca);
+                    for (let i = 0; i < LAMP_STAR_BULBS.length; i += 2) {
+                        const breathe = 0.86 + 0.14 * Math.sin(t * 1.7 + i * 1.9), glint = lampGlint(t, (i >> 1) * 2.3 + this.animOffset * 0.001);
+                        drawLensGlare(ctx, LAMP_STAR_BULBS[i], LAMP_STAR_BULBS[i + 1], this.color,
+                            LENS_GLARE.LAMP_R * breathe * (1 + LAMP_GLINT.FLARE * glint), k * Math.min(1, 0.8 + 0.2 * breathe + 0.4 * glint), SG);
+                    }
+                }
                 ctx.save();
                 ctx.translate(this.x, this.y); ctx.rotate(this.angle); ctx.scale(LAMP_POST_SCALE, LAMP_POST_SCALE);
                 const m = ctx.getTransform(), density = Math.hypot(m.a, m.b);
                 const S = density > 1.6 ? 3 : density > .8 ? 2 : 1;
                 const radius = style === 'antique_twin' ? 7 : 6.5;
                 ctx.globalAlpha *= k;
-                for (const b of LAMP_STYLES[style].bulbs) {
+                const col = /^#[0-9a-f]{6}$/i.test(this.color) ? this.color : '#ffeebb';
+                const bulbs = LAMP_STYLES[style].bulbs, base = ctx.globalAlpha;
+                for (let i = 0; i < bulbs.length; i++) {
+                    const b = bulbs[i];
+                    ctx.globalAlpha = base;
                     ctx.drawImage(_lampBulbEmissionSprite(this.color, radius, 'lantern', S), b.x - 24, b.y - 24, 48, 48);
+                    // the glitter: this frame fading out as the next fades in
+                    const u = t * LAMP_GLITTER.RATE + i * 1.7, f = Math.floor(u), mix = u - f, n = LAMP_GLITTER.FRAMES;
+                    const f0 = ((f + i) % n + n) % n, f1 = (f0 + 1) % n;
+                    // (laid over the glass, not added: added, the points melt into one white blaze under the bloom)
+                    ctx.globalAlpha = base * (1 - mix);
+                    ctx.drawImage(_lampGlitterSprite(col, radius, f0, S), b.x - 24, b.y - 24, 48, 48);
+                    ctx.globalAlpha = base * mix;
+                    ctx.drawImage(_lampGlitterSprite(col, radius, f1, S), b.x - 24, b.y - 24, 48, 48);
+                    const glint = lampGlint(t, i * 2.3 + this.animOffset * 0.001);   // a flash: the glitter blazes for a moment
+                    if (glint > 0.01) {
+                        ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = base * glint;
+                        ctx.drawImage(_lampGlitterSprite(col, radius, f0, S), b.x - 24, b.y - 24, 48, 48);
+                        ctx.drawImage(_lampBulbEmissionSprite(this.color, radius, 'lantern', S), b.x - 24, b.y - 24, 48, 48);
+                    }
+                    ctx.globalCompositeOperation = 'source-over';
                 }
                 ctx.restore();
-                // The lens's glare over each lantern (core/draw-helpers.js: fog under a star), breathing slowly
-                if (GameSettings.fogGlare === false && GameSettings.starGlare === false) return;
-                const t = (_frameTime + this.animOffset) / 1000;
-                const ca = Math.cos(this.angle) * LAMP_POST_SCALE, sa = Math.sin(this.angle) * LAMP_POST_SCALE;
-                LAMP_STAR_BULBS.length = 0;
-                for (const b of LAMP_STYLES[style].bulbs) LAMP_STAR_BULBS.push(this.x + b.x * ca - b.y * sa, this.y + b.x * sa + b.y * ca);
-                for (let i = 0; i < LAMP_STAR_BULBS.length; i += 2) {
-                    const breathe = 0.86 + 0.14 * Math.sin(t * 1.7 + i * 1.9);
-                    drawLensGlare(ctx, LAMP_STAR_BULBS[i], LAMP_STAR_BULBS[i + 1], this.color, LENS_GLARE.LAMP_R * breathe, k * (0.8 + 0.2 * breathe), S);
-                }
             }
 
             /** This lamp's glow sprite (core/draw-helpers.js). */

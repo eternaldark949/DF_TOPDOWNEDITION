@@ -275,7 +275,7 @@
             LAMP_R: 58, HEAD_R: 40,     // star reach (world units): a street lantern, a car's headlamp
             TURN: 38 * Math.PI / 180,   // the star's turn
             DIAG: 0.5, WIDTH: 1.3,      // the diagonals' length (of the long rays'), a ray's half-width at its root
-            FOG: 0.85, FOG_A: 0.55      // the fog's reach (of the star's) and strength at its heart
+            FOG: 0.85, FOG_A: 0.42      // the fog's reach (of the star's) and strength at its heart
         };
         const _lensStars = new Map(), _lensFogs = new Map();
         function _lensRGB(color) { return /^#[0-9a-f]{6}$/i.test(color || '') ? hexToRgb(color) : '255, 238, 187'; }
@@ -298,9 +298,10 @@
                 c.beginPath(); c.moveTo(0, -w); c.lineTo(len, 0); c.lineTo(0, w); c.closePath(); c.fill();
                 c.restore();
             }
-            const core = c.createRadialGradient(0, 0, 0, 0, 0, R * 0.22);
-            core.addColorStop(0, 'rgba(255,250,238,0.9)'); core.addColorStop(0.35, `rgba(${rgb},0.35)`); core.addColorStop(1, `rgba(${rgb},0)`);
-            c.fillStyle = core; c.beginPath(); c.arc(0, 0, R * 0.22, 0, Math.PI * 2); c.fill();
+            // a small hot core: small enough that a lantern's glitter still shows through round it
+            const core = c.createRadialGradient(0, 0, 0, 0, 0, R * 0.12);
+            core.addColorStop(0, 'rgba(255,250,238,0.75)'); core.addColorStop(0.4, `rgba(${rgb},0.3)`); core.addColorStop(1, `rgba(${rgb},0)`);
+            c.fillStyle = core; c.beginPath(); c.arc(0, 0, R * 0.12, 0, Math.PI * 2); c.fill();
             _lensStars.set(key, cv);
             return cv;
         }
