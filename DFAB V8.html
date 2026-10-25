@@ -79636,7 +79636,7 @@ function drawTorqueDecorProp(c, p) {
             break;
         }
         case 'ta_turntable': {                              // the plinth: a brushed disc turning slowly, Lady's V3 on it
-            const { x: cx, y: cy, r } = TQ_TURNTABLE, a = (_frameTime / 1000) * 0.12;
+            const { x: cx, y: cy, r } = TQ_TURNTABLE, a = ((_frameTime / 1000) * 0.12) % (Math.PI * 2);   // wrapped: the canvas takes angles as 32-bit floats, and a clock-sized one only moves in 16-radian jumps
             c.fillStyle = 'rgba(0,0,0,.45)'; c.beginPath(); c.arc(cx + 3, cy + 4, r + 4, 0, Math.PI * 2); c.fill();
             const g = c.createRadialGradient(cx - 20, cy - 24, 6, cx, cy, r + 4); g.addColorStop(0, '#5a6069'); g.addColorStop(0.7, '#2c3036'); g.addColorStop(1, '#16181c');
             c.fillStyle = g; c.beginPath(); c.arc(cx, cy, r + 4, 0, Math.PI * 2); c.fill();
