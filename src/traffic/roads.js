@@ -1119,10 +1119,10 @@
                 const lines = [];
                 if (this.orientation === 'H') {
                     lines.push({ y: this.y - PAVEMENT_INSET, angle: Math.PI, color: '#ffaa00' }); 
-                    lines.push({ y: this.y + this.h + PAVEMENT_INSET, angle: 0, color: '#ffffff' }); 
+                    lines.push({ y: this.y + this.h + PAVEMENT_INSET, angle: 0, color: STREET_LAMP_ROSE }); 
                 } else {
                     lines.push({ x: this.x - PAVEMENT_INSET, angle: Math.PI / 2, color: '#ffaa00' }); 
-                    lines.push({ x: this.x + this.w + PAVEMENT_INSET, angle: -Math.PI / 2, color: '#ffffff' }); 
+                    lines.push({ x: this.x + this.w + PAVEMENT_INSET, angle: -Math.PI / 2, color: STREET_LAMP_ROSE }); 
                 }
             
                 validSegments.forEach(seg => {
@@ -1175,7 +1175,7 @@
                             // the arm faces the road: angle = the way out from the kerb, less a quarter turn (as on the H/V roads)
                             const at = run.start + step * i, f = this.frameAt(at), angle = Math.atan2(f.ny * side, f.nx * side) - Math.PI / 2;
                             const p = this.paramToWorld(at, side * (hT + 20));
-                            lamps.push(new LampEntity({ x: p.x, y: p.y, lampType: 2, color: side < 0 ? '#ffaa00' : '#ffffff', angle }));
+                            lamps.push(new LampEntity({ x: p.x, y: p.y, lampType: 2, color: side < 0 ? '#ffaa00' : STREET_LAMP_ROSE, angle }));
                         }
                     }
                 }

@@ -50,6 +50,8 @@
             }
         };
         const LAMP_TYPE_STYLE = { 1: 'antique_crook', 2: 'antique_twin' };
+        // The plain streets' second lamp colour (opposite the amber side): a warm rose-champagne, not bare white
+        const STREET_LAMP_ROSE = '#ffcfae';
         const LAMP_POST_SCALE = 1.5; // Street and entrance posts, scaled around their ground anchors.
 
         // The fluted cast-iron foot of the post, ringed in brass
@@ -87,6 +89,12 @@
             c.fillStyle = LAMP_BRASS; c.beginPath(); c.arc(x, y, r * 0.17, 0, Math.PI * 2); c.fill();
         }
 
+        /** A lamp colour lifted towards warm white by t (the glass nearer the flame) */
+        function _lampTint(hex, t) {
+            const W = [255, 246, 228];
+            return '#' + [1, 3, 5].map((i, j) => { const v = parseInt(hex.slice(i, i + 2), 16); return Math.round(v + (W[j] - v) * t).toString(16).padStart(2, '0'); }).join('');
+        }
+
         // Bulb artwork lives above the darkness layer; the old lamp bodies keep their materials.
         // Gradients and pane masks are baked once, so each lit bulb costs one sprite draw.
         const _lampBulbEmissionSprites = new Map();
@@ -100,8 +108,8 @@
             const rgb = [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16)).join(',');
             const haloRadius = shape === 'globe' ? 18 : 24;
             const halo = c.createRadialGradient(0, 0, radius * .6, 0, 0, haloRadius);
-            halo.addColorStop(0, `rgba(${rgb},0.30)`); halo.addColorStop(.25, `rgba(${rgb},0.20)`);
-            halo.addColorStop(.6, `rgba(${rgb},0.07)`); halo.addColorStop(1, `rgba(${rgb},0)`);
+            halo.addColorStop(0, `rgba(${rgb},0.42)`); halo.addColorStop(.25, `rgba(${rgb},0.28)`);
+            halo.addColorStop(.6, `rgba(${rgb},0.10)`); halo.addColorStop(1, `rgba(${rgb},0)`);
             c.fillStyle = halo; c.fillRect(-24, -24, 48, 48);
             const bloomRadius = radius * 1.65;
             const bloom = c.createRadialGradient(0, 0, radius * .45, 0, 0, bloomRadius);
@@ -114,10 +122,11 @@
                 face.addColorStop(.85, '#fff1ce'); face.addColorStop(1, color);
                 c.fillStyle = face; c.beginPath(); c.arc(0, 0, radius, 0, Math.PI * 2); c.fill();
             } else {
-                // Light shines between the original corner ribs, leaving the iron cap opaque.
+                // Light shines between the original corner ribs, leaving the iron cap opaque. The glass glows
+                // in the lamp's own colour, white-hot only at its heart, so a street of lamps reads warm, not white.
                 const face = c.createRadialGradient(0, 0, radius * .45, 0, 0, radius);
-                face.addColorStop(0, '#fff8e2'); face.addColorStop(.32, '#fffef9');
-                face.addColorStop(.70, '#fff5d9'); face.addColorStop(1, color);
+                face.addColorStop(0, '#fff6e4'); face.addColorStop(.32, _lampTint(color, .45));
+                face.addColorStop(.70, _lampTint(color, .2)); face.addColorStop(1, color);
                 c.fillStyle = face;
                 const points = Array.from({length:6}, (_, i) => {
                     const a = Math.PI / 6 + i * Math.PI / 3; return {x:Math.cos(a),y:Math.sin(a)};

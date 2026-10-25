@@ -1,6 +1,20 @@
         // Shared immutable falloff tables; softArea only reads these stops.
         const HOLE_AREA = [[0, 'rgba(255,255,255,1)'], [0.5, 'rgba(255,255,255,0.9)'], [1, 'rgba(255,255,255,0)']];
         const HOLE_AREA_SOFT = [[0, 'rgba(255,255,255,1)'], [0.3, 'rgba(255,255,255,0.85)'], [0.7, 'rgba(255,255,255,0.35)'], [1, 'rgba(255,255,255,0)']];   // long, gentle edge
+        // The city's night, deeper than the hour's darkness (visual only: stealth reads dayCycle).
+        // FROM..FULL: the ambient darkness over which it deepens; OPACITY: how much more the dark covers;
+        // TINT / TINT_MIX: the near-black violet the dark's colour moves towards; POOL: added warmth in a lamp's pool
+        const NIGHT_DEEPEN = { FROM: 0.3, FULL: 0.6, OPACITY: 0.3, TINT: [10, 4, 26], TINT_MIX: 0.6, POOL: 0.12 };
+        // A street lamp's pool (offset, how much dark it lifts): full under the lamp, half by a fifth out, nearly gone past half
+        const LAMP_POOL_HOLE = [[0, 1], [0.1, 0.92], [0.22, 0.55], [0.36, 0.2], [0.55, 0.05], [1, 0]];
+        /** A colour pulled towards a warm candle white by t (0..1): the hot heart of a lamp's light */
+        function warmHex(hex, t) {
+            if (!/^#[0-9a-f]{6}$/i.test(hex || '')) hex = '#ffeebb';
+            const W = [255, 241, 220];
+            return '#' + [1, 3, 5].map((i, j) => Math.round(parseInt(hex.slice(i, i + 2), 16) + (W[j] - parseInt(hex.slice(i, i + 2), 16)) * t)
+                .toString(16).padStart(2, '0')).join('');
+        }
+
         // One warm, wide falloff reused for the fireball and its dying flame stream.
         let _fireballLightSprite = null;
         function _getFireballLightSprite() {
@@ -388,7 +402,10 @@
                 const ambient = this.getAmbientDarkness();
                 const flash = this.weather.lightningFlash > 0 ? this.weather.lightningFlash : 0;
                 // Maintain the shadow opacity (ambient), fading it as night vision turns on; lightning lifts it
-                const finalOpacity = ambient * (1.0 - this.nvIntensity) * (1 - 0.8 * flash);
+                let finalOpacity = ambient * (1.0 - this.nvIntensity) * (1 - 0.8 * flash);
+                // Outdoors at night the dark goes deeper than the hour's darkness (which stealth reads, unchanged),
+                // so the lamps' pools stand out of real dark, as in ETERNAL's renders
+                if (this.activeMap.type === 'outdoor') finalOpacity = Math.min(0.92, finalOpacity * (1 + NIGHT_DEEPEN.OPACITY * this._nightDeepenK(ambient)));
                 
                 // Optimization: If shadows are invisible and we don't need the NV boost, stop.
                 if (finalOpacity <= 0.01 && !this.nightVision) return;
@@ -439,7 +456,8 @@
                 const visBottom = Math.min(this.activeMap.height, vB + lightViewMargin);
             
                 // 3. THE DARK — tinted: the hour's colour outdoors, night's violet-indigo indoors
-                const tint = this.activeMap.lightingTint || (this.activeMap.type === 'indoor' ? '22, 10, 48' : dc.tintRGB);
+                const outdoorNight = this.activeMap.type === 'outdoor' ? this._nightDeepenK(ambient) : 0;
+                const tint = this.activeMap.lightingTint || (this.activeMap.type === 'indoor' ? '22, 10, 48' : this._deepTintRGB(dc, outdoorNight));
             
                 // 3b. INTERIOR LIGHTS (buildings on the city map) — baked sprites, each with its own wall shadows
                 const iLights = this.activeMap._interiorLights;
@@ -480,10 +498,14 @@
                             path.closePath();
                             lamp._shadowPath = path; lamp._shadowPathOf = poly;
                         }
-                        if (!lamp._holeGrad || lamp._holeGradX !== lamp.x || lamp._holeGradY !== lamp.y || lamp._holeGradRadius !== lamp.radius) {
+                        // A street lamp outdoors lights a pool: bright under it, falling off fast, so the dark
+                        // comes back between lamps instead of one even wash down the street
+                        const pool = outdoorNight > 0 && !!LAMP_TYPE_STYLE[lamp.lampType];
+                        if (!lamp._holeGrad || lamp._holeGradX !== lamp.x || lamp._holeGradY !== lamp.y || lamp._holeGradRadius !== lamp.radius || lamp._holeGradPool !== pool) {
                             const g = lc.createRadialGradient(lamp.x, lamp.y, 10, lamp.x, lamp.y, lamp.radius);
-                            g.addColorStop(0, 'rgba(255, 255, 255, 1)'); g.addColorStop(1, 'rgba(255, 255, 255, 0)');
-                            lamp._holeGrad = g; lamp._holeGradX = lamp.x; lamp._holeGradY = lamp.y; lamp._holeGradRadius = lamp.radius;
+                            if (pool) for (const [o, a] of LAMP_POOL_HOLE) g.addColorStop(o, `rgba(255, 255, 255, ${a})`);
+                            else { g.addColorStop(0, 'rgba(255, 255, 255, 1)'); g.addColorStop(1, 'rgba(255, 255, 255, 0)'); }
+                            lamp._holeGrad = g; lamp._holeGradX = lamp.x; lamp._holeGradY = lamp.y; lamp._holeGradRadius = lamp.radius; lamp._holeGradPool = pool;
                         }
                         litLamps.push(lamp);
                     }
@@ -681,11 +703,23 @@
             
                 // Lamps — the same ones lit above
                 for (const l of litLamps) {
-                    if (!l._cachedGrad) {
+                    // Street lamps outdoors: a warm, saturated pool that fades with the hole above (the halo on the pavement)
+                    const pool = l._holeGradPool;
+                    if (!l._cachedGrad || l._cachedGradPool !== pool || l._cachedGradColor !== l.color) {
                         l._cachedGrad = lc.createRadialGradient(l.x, l.y, 0, l.x, l.y, l.radius);
-                        l._cachedGrad.addColorStop(0, '#ffffff'); l._cachedGrad.addColorStop(0.1, l.color); l._cachedGrad.addColorStop(0.6, l.color); l._cachedGrad.addColorStop(1, 'rgba(0,0,0,0)');
+                        if (pool) {
+                            // (gone by two thirds out: a lamp's colour over the whole of its reach, summed down a street
+                            // of lamps, was what lifted the night into one even violet haze)
+                            const warm = warmHex(l.color, 0.25);
+                            l._cachedGrad.addColorStop(0, warmHex(l.color, 0.55)); l._cachedGrad.addColorStop(0.1, hexToRgba(warm, 0.85));
+                            l._cachedGrad.addColorStop(0.25, hexToRgba(warm, 0.42)); l._cachedGrad.addColorStop(0.45, hexToRgba(warm, 0.1));
+                            l._cachedGrad.addColorStop(0.66, 'rgba(0,0,0,0)');
+                        } else {
+                            l._cachedGrad.addColorStop(0, '#ffffff'); l._cachedGrad.addColorStop(0.1, l.color); l._cachedGrad.addColorStop(0.6, l.color); l._cachedGrad.addColorStop(1, 'rgba(0,0,0,0)');
+                        }
+                        l._cachedGradPool = pool; l._cachedGradColor = l.color;
                     }
-                    lc.globalAlpha = baseAlpha * Math.min(1, l._litK);
+                    lc.globalAlpha = (pool ? baseAlpha + NIGHT_DEEPEN.POOL * outdoorNight : baseAlpha) * Math.min(1, l._litK);
                     lc.fillStyle = l._cachedGrad; lc.beginPath(); lc.arc(l.x, l.y, l.radius, 0, Math.PI*2); lc.fill();
                 }
             
@@ -802,6 +836,21 @@
                 ctx.restore();
             },
             
+            /** How far into the night the outdoor dark is deepened (0 by day and at dusk's start, 1 at full night) */
+            _nightDeepenK(ambient) {
+                return Math.max(0, Math.min(1, (ambient - NIGHT_DEEPEN.FROM) / (NIGHT_DEEPEN.FULL - NIGHT_DEEPEN.FROM)));
+            },
+
+            /** The hour's tint, pulled towards a near-black violet as the night deepens */
+            _deepTintRGB(dc, k) {
+                if (k <= 0) return dc.tintRGB;
+                const key = dc.tintRGB + '|' + k.toFixed(3);
+                if (this._deepTintKey === key) return this._deepTint;
+                const t = NIGHT_DEEPEN.TINT_MIX * k;
+                this._deepTintKey = key;
+                return (this._deepTint = dc.tint.map((v, i) => Math.round(v + (NIGHT_DEEPEN.TINT[i] - v) * t)).join(', '));
+            },
+
             darkenColor(hex, amount) { return darkenHex(hex, Math.floor(255 * amount)); },
 
             // ═══ WET-WORLD POST-PROCESSING ═══
