@@ -1189,9 +1189,11 @@
             z-index: 11;
         }
         /* The heading: "Map" in Anthropology, the place in Feminine; tapping the name (gold = touch) opens the list */
-        .map-heading { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 12; display: flex; flex-direction: column; align-items: center; pointer-events: none; max-width: min(560px, 60vw); }
-        .map-heading-main { display: flex; flex-direction: column; align-items: center; padding: 0 26px 8px; pointer-events: auto;
-            background: radial-gradient(ellipse 70% 80% at 50% 40%, rgba(11, 6, 20, 0.82), rgba(11, 6, 20, 0) 75%); }
+        .map-heading { position: absolute; top: 22px; left: 50%; transform: translateX(-50%); z-index: 12; display: flex; flex-direction: column; align-items: center; pointer-events: none; max-width: min(560px, 60vw); }
+        .map-heading-main { display: flex; flex-direction: column; align-items: center; padding: 6px 30px 12px; pointer-events: auto; border-radius: 16px;
+            background: linear-gradient(180deg, rgba(18, 9, 32, 0.62), rgba(8, 4, 15, 0.5)); border: 1px solid rgba(184, 156, 255, 0.18);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 24px rgba(130, 80, 230, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
         .map-heading-kicker { font-family: var(--font-script); font-size: max(6px, 2.5rem - var(--font-trim)); line-height: 1.1; color: #f6efff; padding: 0 0.2em;
             text-shadow: 0 0 12px rgba(184, 156, 255, 0.95), 0 0 26px rgba(164, 105, 255, 0.55); }
         .map-heading-row { display: flex; align-items: center; gap: 10px; margin-top: -2px; }
@@ -1355,8 +1357,8 @@
         #inventory-list .ui-pill.expanded .node-caption { opacity: 1; transform: none; transition-delay: calc(var(--n) * 50ms); }
         #inventory-list .ui-pill.expanded .node-btn { opacity: 1; transform: none; }
         @media (max-width: 700px), (max-height: 540px) {
-            .map-heading { top: 2px; max-width: 52vw; }
-            .map-heading-main { padding: 0 18px 4px; }
+            .map-heading { top: 10px; max-width: 52vw; }
+            .map-heading-main { padding: 3px 20px 7px; border-radius: 12px; }
             .map-heading-kicker { font-size: max(6px, 1.75rem - var(--font-trim)); }
             .map-picker-name { font-size: max(6px, 0.74rem - var(--font-trim)); letter-spacing: 0.22em; }
             .map-picker-sub { font-size: max(6px, 0.5rem - var(--font-trim)); margin-top: 2px; }
