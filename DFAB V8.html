@@ -3719,8 +3719,8 @@
         body.screen-menu-open #game-ui { opacity: 0 !important; transition: opacity 0.2s; }
 
         /* Contacts as calling cards in a glowing directory (after ETERNAL's direction): no box, a dark wash that
-           fades to clear, the face in the split peach rim haloed in the role colour (--acc), the name signed in
-           Anthropology, fine tech brackets at two corners. A tapped card lights up. */
+           fades to clear, the face in the split peach rim haloed in the role colour (--acc), the name in glowing
+           Feminine capitals, fine tech brackets at two corners. A tapped card lights up. */
         .dc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 6px 18px; }
         .dc-card {
             position: relative; display: flex; align-items: center; gap: 22px; min-width: 0; padding: 16px 40px 16px 14px;
@@ -3750,8 +3750,8 @@
             font: 400 max(6px, 2rem - var(--font-trim)) var(--font-script); color: var(--df-lavender-pale); }
         .dc-portrait .portrait-rim { position: absolute; left: -6px; top: -6px; width: calc(100% + 12px); height: calc(100% + 12px); pointer-events: none; overflow: visible; }
         .dc-who { flex: 1; min-width: 0; }
-        .dc-name { font: 400 max(6px, 1.9rem - var(--font-trim))/1.05 var(--font-script); color: #f7f0ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-            padding: 0.22em 0.15em 0.12em; margin: -0.22em 0 -0.12em -0.15em; text-shadow: 0 0 10px color-mix(in srgb, var(--acc) 75%, transparent), 0 0 22px color-mix(in srgb, var(--acc) 40%, transparent); }
+        .dc-name { font: 400 max(6px, 1.05rem - var(--font-trim))/1.4 var(--font-menu); letter-spacing: 0.24em; text-transform: uppercase; color: #f7f0ff;
+            padding: 0.3em 0.15em 0.2em; margin: -0.3em 0 -0.2em -0.15em; text-shadow: 0 0 10px color-mix(in srgb, var(--acc) 75%, transparent), 0 0 22px color-mix(in srgb, var(--acc) 40%, transparent); }
         .dc-role { font: 400 max(6px, 0.6rem - var(--font-trim)) var(--font-menu); letter-spacing: 0.38em; text-transform: uppercase; color: var(--acc); margin-top: 3px;
             text-shadow: 0 0 6px color-mix(in srgb, var(--acc) 60%, transparent); }
         .dc-quote { font: italic 400 max(6px, 0.74rem - var(--font-trim))/1.5 var(--font-menu-body); color: rgba(232, 222, 246, 0.62); margin-top: 6px;
@@ -3769,7 +3769,7 @@
         @media (max-width: 700px), (max-height: 540px) {
             .dc-card { gap: 16px; padding: 12px 32px 12px 10px; }
             .dc-portrait { width: 52px; height: 52px; }
-            .dc-name { font-size: max(6px, 1.6rem - var(--font-trim)); }
+            .dc-name { font-size: max(6px, 0.95rem - var(--font-trim)); }
         }
         /* =====================================================================
            SHOPS — Dr. Yin's augments, the workbench, Torque, Neural Systems and
@@ -69279,7 +69279,8 @@ engineMixin({
                     totalContacts += contacts.length;
                     const color = catColors[cat];
                     html += `<div class="df-section"><span><span class="glint">◆</span>${catLabels[cat]}</span><span class="count">${contacts.length}</span></div><div class="dc-grid">`;
-                    // A calling card: the face in the split peach rim glowing in the role colour, the name signed in script
+                    // A calling card: the face in the split peach rim glowing in the role colour, the name in glowing Feminine
+                    // capitals (script was tried; handles like LUVSH4D3 read badly in it, and one face for all keeps it tidy)
                     for (const c of contacts) {
                         html += `<div class="dc-card" style="--acc:${color}" tabindex="0">`;
                         html += `<div class="dc-portrait">${this._dfFace(c.name, 128)}<svg class="portrait-rim" aria-hidden="true"><use href="#portrait-rim"/></svg></div>`;

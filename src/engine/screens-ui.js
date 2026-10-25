@@ -751,7 +751,8 @@
                     totalContacts += contacts.length;
                     const color = catColors[cat];
                     html += `<div class="df-section"><span><span class="glint">◆</span>${catLabels[cat]}</span><span class="count">${contacts.length}</span></div><div class="dc-grid">`;
-                    // A calling card: the face in the split peach rim glowing in the role colour, the name signed in script
+                    // A calling card: the face in the split peach rim glowing in the role colour, the name in glowing Feminine
+                    // capitals (script was tried; handles like LUVSH4D3 read badly in it, and one face for all keeps it tidy)
                     for (const c of contacts) {
                         html += `<div class="dc-card" style="--acc:${color}" tabindex="0">`;
                         html += `<div class="dc-portrait">${this._dfFace(c.name, 128)}<svg class="portrait-rim" aria-hidden="true"><use href="#portrait-rim"/></svg></div>`;
