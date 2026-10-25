@@ -1018,6 +1018,17 @@
                 const w = this.mapCanvas.width;
                 const h = this.mapCanvas.height;
                 
+                // Indoors: show the whole floor plan, centred in the space between the sidebars
+                if (mapData.type === 'indoor') {
+                    const side = id => { const e = document.getElementById(id); return e && !e.classList.contains('collapsed') && e.offsetParent ? e.getBoundingClientRect().width * this.dpr : 0; };
+                    const L = side('map-sidebar-left'), R = side('map-sidebar-right');
+                    const base = Math.min(w / mapData.width, h / mapData.height) * 0.9;
+                    const fitW = Math.max(w * 0.35, w - L - R) * 0.9, fitH = h * 0.78;   // room above for the name
+                    this.mapView.zoom = Math.max(0.5, Math.min(2, fitW / (mapData.width * base), fitH / (mapData.height * base)));
+                    this.mapView.offsetX = (L - R) / 2; this.mapView.offsetY = h * 0.03;
+                    if (this.navMarker) this.calculateNavPath();
+                    return;
+                }
                 // Always set zoom to 2x when centering on player
                 this.mapView.zoom = 2.0;
                 

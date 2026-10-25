@@ -318,6 +318,7 @@
              */
             paintCity(ctx, map, opts) {
                 const px = opts.px, u = 1 / px, B = opts.bounds || { x: 0, y: 0, w: map.width, h: map.height }, P = 160;
+                if (map.type === 'indoor') return this.paintInterior(ctx, map, opts);
                 const hit = (x, y, w, h) => x + w + P >= B.x && x - P <= B.x + B.w && y + h + P >= B.y && y - P <= B.y + B.h;
                 ctx.fillStyle = MAP_PAL.ground; ctx.fillRect(0, 0, map.width, map.height);
                 // Blocks, parks and zones
@@ -363,6 +364,114 @@
                     ctx.globalAlpha = 1;
                 }
                 ctx.globalCompositeOperation = 'source-over';
+            },
+
+            /**
+             * An interior as a glowing architect's plan (ETERNAL's ask: the indoor maps were bare walls on violet).
+             * A faint plan grid with edge ticks; each floor zone tinted its own colour with a low-contrast texture
+             * (carpet weave, tiles, marble); soft light pools; double-line walls with a glow and a dark core;
+             * landmarks as small glowing diamonds named in Feminine; exits labelled in gold; the room's name
+             * signed in Anthropology over the top. Same opts as paintCity; sizes in CSS px via u (= 1 / px).
+             */
+            paintInterior(ctx, map, opts) {
+                const u = 1 / opts.px, D = opts.dpr || 1, k = u * D, W = map.width, H = map.height;
+                const rnd = seededRandom(String(map.id || 'room').split('').reduce((a, c) => a * 31 + c.charCodeAt(0) >>> 0, 7));
+                ctx.save();
+                ctx.fillStyle = '#0b0416'; ctx.fillRect(0, 0, W, H);
+                // Plan grid: fine every 50 units, stronger every 250
+                ctx.lineWidth = 1 * k;
+                for (const [step, a] of [[50, 0.035], [250, 0.075]]) {
+                    ctx.strokeStyle = `rgba(217, 204, 255, ${a})`; ctx.beginPath();
+                    for (let x = step; x < W; x += step) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+                    for (let y = step; y < H; y += step) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
+                    ctx.stroke();
+                }
+                // Floor zones: their own colour, softly, with a texture that suits them
+                const zones = map.zones || [];
+                for (const z of zones) {
+                    ctx.globalAlpha = 0.26; ctx.fillStyle = z.color || '#2a1840'; ctx.fillRect(z.x, z.y, z.w, z.h); ctx.globalAlpha = 1;
+                    const light = /^#?[89a-f]/i.test((z.color || '').replace('#', '').slice(0, 1));
+                    ctx.save(); ctx.beginPath(); ctx.rect(z.x, z.y, z.w, z.h); ctx.clip();
+                    if (z.texture === 'carpet') {   // a woven dot grain
+                        ctx.fillStyle = 'rgba(255, 190, 220, 0.06)';
+                        for (let y = z.y + 6; y < z.y + z.h; y += 12) for (let x = z.x + ((y / 12) % 2 ? 6 : 0); x < z.x + z.w; x += 12) ctx.fillRect(x, y, 2.4, 2.4);
+                    } else if (light) {             // pale floors read as marble: a few soft veins
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)'; ctx.lineWidth = 1.4 * k;
+                        for (let i = 0; i < Math.max(2, z.w * z.h / 60000); i++) {
+                            ctx.beginPath(); let x = z.x + rnd() * z.w, y = z.y + rnd() * z.h; ctx.moveTo(x, y);
+                            for (let j = 0; j < 4; j++) { x += (rnd() - 0.3) * 90; y += (rnd() - 0.5) * 60; ctx.lineTo(x, y); }
+                            ctx.stroke();
+                        }
+                    } else {                        // dark floors: a quiet tile grid
+                        ctx.strokeStyle = 'rgba(217, 204, 255, 0.05)'; ctx.lineWidth = 1 * k; ctx.beginPath();
+                        for (let x = z.x + 32; x < z.x + z.w; x += 32) { ctx.moveTo(x, z.y); ctx.lineTo(x, z.y + z.h); }
+                        for (let y = z.y + 32; y < z.y + z.h; y += 32) { ctx.moveTo(z.x, y); ctx.lineTo(z.x + z.w, y); }
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+                    ctx.strokeStyle = 'rgba(217, 204, 255, 0.12)'; ctx.lineWidth = 1 * k; ctx.strokeRect(z.x, z.y, z.w, z.h);
+                }
+                // Light pools: one in each zone big enough to be a room, plus one at each landmark
+                if (typeof glowSprite === 'function') {
+                    ctx.globalCompositeOperation = 'lighter';
+                    const pool = glowSprite('164, 105, 255', 0.25), warm = glowSprite('255, 176, 90', 0.2);
+                    ctx.globalAlpha = 0.22;
+                    for (const z of zones) if (z.w * z.h > 40000) { const R = Math.min(z.w, z.h) * 0.55; ctx.drawImage(pool, z.x + z.w / 2 - R, z.y + z.h / 2 - R, R * 2, R * 2); }
+                    ctx.globalAlpha = 0.18;
+                    for (const l of map.landmarks || []) ctx.drawImage(warm, l.x - 90, l.y - 90, 180, 180);
+                    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+                }
+                // Walls: a soft lavender glow, a dark core, a crisp pale rim
+                const walls = (map.walls || []).concat(map.buildings || []);
+                const wallPath = () => { ctx.beginPath(); for (const b of walls) ctx.rect(b.x, b.y, b.w, b.h); };
+                ctx.globalCompositeOperation = 'lighter';
+                wallPath(); ctx.strokeStyle = 'rgba(164, 105, 255, 0.16)'; ctx.lineWidth = 9 * k; ctx.stroke();
+                ctx.strokeStyle = 'rgba(190, 150, 255, 0.28)'; ctx.lineWidth = 4 * k; ctx.stroke();
+                ctx.globalCompositeOperation = 'source-over';
+                wallPath(); ctx.fillStyle = '#06020c'; ctx.fill();
+                ctx.strokeStyle = 'rgba(232, 220, 255, 0.85)'; ctx.lineWidth = 1.1 * k; ctx.stroke();
+                // Words: Feminine for the plan, Anthropology for the room's name
+                const fam = "'Feminine', 'Raleway', 'Montserrat', sans-serif";
+                const label = (text, x, y, css, color, glow) => {
+                    ctx.font = `${css * k}px ${fam}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    if (ctx.letterSpacing !== undefined) ctx.letterSpacing = `${css * 0.3 * k}px`;
+                    ctx.shadowColor = glow; ctx.shadowBlur = 8 * k; ctx.fillStyle = color; ctx.fillText(text, x, y);
+                    ctx.shadowBlur = 0; if (ctx.letterSpacing !== undefined) ctx.letterSpacing = '0px';
+                };
+                // Landmarks: a small glowing diamond, named after the part after the map's prefix (apt_bed → BED).
+                // Landmarks on one spot share a diamond and stack their names; one beside an exit leaves the words to the exit.
+                const exits = (map.transitions || []).map(t => ({ x: t.x + t.w / 2, y: t.y + t.h / 2 }));
+                const spots = [];
+                for (const l of map.landmarks || []) {
+                    const name = String(l.id || '').replace(/^[a-z0-9]+_/, '').replace(/_/g, ' ').toUpperCase();
+                    const at = spots.find(p => Math.hypot(p.x - l.x, p.y - l.y) < 40);
+                    if (at) { if (name && !at.names.includes(name)) at.names.push(name); } else spots.push({ x: l.x, y: l.y, names: name ? [name] : [] });
+                }
+                for (const p of spots) {
+                    const s = 5 * k;
+                    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(Math.PI / 4);
+                    ctx.shadowColor = 'rgba(217, 204, 255, 0.9)'; ctx.shadowBlur = 8 * k;
+                    ctx.fillStyle = '#120620'; ctx.fillRect(-s, -s, s * 2, s * 2);
+                    ctx.strokeStyle = '#e6dcff'; ctx.lineWidth = 1.2 * k; ctx.strokeRect(-s, -s, s * 2, s * 2);
+                    ctx.restore();
+                    if (exits.some(e => Math.hypot(e.x - p.x, e.y - p.y) < 110)) continue;
+                    p.names.forEach((n, i) => label(n, p.x, p.y + (15 + i * 11) * k, 8, 'rgba(232, 222, 250, 0.85)', 'rgba(164, 105, 255, 0.9)'));
+                }
+                // Exits: the way out in gold
+                for (const t of map.transitions || []) if (t.label) label(t.label.toUpperCase(), t.x + t.w / 2, t.y + t.h / 2 - 16 * k, 8, '#ffd27a', 'rgba(255, 170, 40, 0.9)');
+                // Edge ticks every 100 units, like a surveyor's plan
+                ctx.strokeStyle = 'rgba(217, 204, 255, 0.35)'; ctx.lineWidth = 1 * k; ctx.beginPath();
+                for (let x = 0; x <= W; x += 100) { const t = (x % 500 ? 4 : 8) * k; ctx.moveTo(x, -2 * k); ctx.lineTo(x, -2 * k - t); ctx.moveTo(x, H + 2 * k); ctx.lineTo(x, H + 2 * k + t); }
+                for (let y = 0; y <= H; y += 100) { const t = (y % 500 ? 4 : 8) * k; ctx.moveTo(-2 * k, y); ctx.lineTo(-2 * k - t, y); ctx.moveTo(W + 2 * k, y); ctx.lineTo(W + 2 * k + t, y); }
+                ctx.stroke();
+                // The room's name, signed over the top
+                if (map.label) {
+                    ctx.font = `${26 * k}px 'Anthropology', 'Great Vibes', cursive`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+                    ctx.shadowColor = 'rgba(184, 156, 255, 0.95)'; ctx.shadowBlur = 14 * k; ctx.fillStyle = '#f6efff';
+                    ctx.fillText(map.label, W / 2, -16 * k);
+                    ctx.shadowBlur = 0;
+                }
+                ctx.restore();
             },
 
             /** The soft gold bloom over a finished cache (device px, identity transform): light pools where streets crowd. */
