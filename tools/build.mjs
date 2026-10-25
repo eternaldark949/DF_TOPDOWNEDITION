@@ -145,6 +145,7 @@ const SCRIPTS = [
     'world/map-edge.js',
     'engine/finisher.js',
     'engine/reflections.js',
+    'engine/street-mist.js',
     'engine/footsteps.js',
     'engine/status-effects.js',
     'engine/executions.js',

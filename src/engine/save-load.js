@@ -126,6 +126,8 @@ engineMixin({
                         bloom: GameSettings.bloom,
                         fogGlare: GameSettings.fogGlare,
                         starGlare: GameSettings.starGlare,
+                        streetFog: GameSettings.streetFog,
+                        lampSparks: GameSettings.lampSparks,
                         wetReflections: GameSettings.wetReflections,
                         atmosphereTint: GameSettings.atmosphereTint,
                         colorGrade: GameSettings.colorGrade,
@@ -773,6 +775,8 @@ engineMixin({
                         GameSettings.bloom = save.settings.bloom !== false;
                         GameSettings.fogGlare = save.settings.fogGlare !== false;
                         GameSettings.starGlare = save.settings.starGlare !== false;
+                        GameSettings.streetFog = save.settings.streetFog !== false;
+                        GameSettings.lampSparks = save.settings.lampSparks !== false;
                         GameSettings.wetReflections = save.settings.wetReflections !== false;
                         GameSettings.atmosphereTint = save.settings.atmosphereTint ?? '';
                         GameSettings.colorGrade = save.settings.colorGrade || 'none';

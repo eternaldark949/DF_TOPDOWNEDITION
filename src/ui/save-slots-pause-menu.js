@@ -1099,6 +1099,8 @@
                 this._updateValueEl('set-bloom', GameSettings.bloom ? 'on' : 'off');
                 this._updateValueEl('set-fogglare', GameSettings.fogGlare ? 'on' : 'off');
                 this._updateValueEl('set-starglare', GameSettings.starGlare ? 'on' : 'off');
+                this._updateValueEl('set-streetfog', GameSettings.streetFog ? 'on' : 'off');
+                this._updateValueEl('set-lampsparks', GameSettings.lampSparks ? 'on' : 'off');
                 this._updateValueEl('set-wetreflections', GameSettings.reflections || 'high');
                 this._updateValueEl('set-lampshadows', GameSettings.lampShadows || 'low');
                 this._updateValueEl('set-atmosphere', GameSettings.atmosphereTint || 'off');
@@ -1170,7 +1172,7 @@
                     GameSettings.bloom = !GameSettings.bloom;
                     this._updateValueEl(el.id, GameSettings.bloom ? 'on' : 'off');
 
-                } else if (key === 'fogGlare' || key === 'starGlare') {
+                } else if (key === 'fogGlare' || key === 'starGlare' || key === 'streetFog' || key === 'lampSparks') {
                     GameSettings[key] = !GameSettings[key];
                     this._updateValueEl(el.id, GameSettings[key] ? 'on' : 'off');
                     
