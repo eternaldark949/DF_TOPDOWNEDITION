@@ -145,6 +145,38 @@
             return cv;
         }
 
+        // The star of a lit lantern: the streak glare a camera lens draws round a bright light (ETERNAL's renders),
+        // four long rays and four shorter diagonals over a hot core, painted once per colour and size. It stays
+        // upright on screen whichever way the lamp faces (it's the lens, not the lamp) and breathes a little.
+        const LAMP_STAR = { R: 58, CORE: 0.9, DIAG: 0.5, WIDTH: 1.3 };   // reach (world units), core alpha, diagonal length, ray half-width at the root
+        const _lampStarSprites = new Map(), LAMP_STAR_BULBS = [];
+        function _lampStarSprite(color, S = 2) {
+            color = /^#[0-9a-f]{6}$/i.test(color) ? color : '#ffeebb';
+            const key = color + '|' + S;
+            let cv = _lampStarSprites.get(key);
+            if (cv) return cv;
+            const R = LAMP_STAR.R;
+            cv = document.createElement('canvas'); cv.width = cv.height = Math.ceil(R * 2 * S);
+            const c = cv.getContext('2d'); c.setTransform(S, 0, 0, S, R * S, R * S);
+            const rgb = [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16)).join(',');
+            c.globalCompositeOperation = 'lighter';
+            for (let i = 0; i < 8; i++) {
+                const len = R * (i % 2 ? LAMP_STAR.DIAG : 1), w = LAMP_STAR.WIDTH * (i % 2 ? 0.75 : 1);
+                c.save(); c.rotate(i * Math.PI / 4);
+                const g = c.createLinearGradient(0, 0, len, 0);
+                g.addColorStop(0, 'rgba(255,250,238,1)'); g.addColorStop(0.12, 'rgba(255,244,226,0.9)'); g.addColorStop(0.3, `rgba(${rgb},0.6)`);
+                g.addColorStop(0.65, `rgba(${rgb},0.18)`); g.addColorStop(1, `rgba(${rgb},0)`);
+                c.fillStyle = g;
+                c.beginPath(); c.moveTo(0, -w); c.lineTo(len, 0); c.lineTo(0, w); c.closePath(); c.fill();
+                c.restore();
+            }
+            const core = c.createRadialGradient(0, 0, 0, 0, 0, R * 0.22);
+            core.addColorStop(0, `rgba(255,250,238,${LAMP_STAR.CORE})`); core.addColorStop(0.35, `rgba(${rgb},0.35)`); core.addColorStop(1, `rgba(${rgb},0)`);
+            c.fillStyle = core; c.beginPath(); c.arc(0, 0, R * 0.22, 0, Math.PI * 2); c.fill();
+            _lampStarSprites.set(key, cv);
+            return cv;
+        }
+
         const _lampSprites = new Map();
         /** A lamp style painted once (cropped to its `box`) per colour, lit state and size:
          *  1× when the city is seen from afar, 3× up close, so a zoomed-out street isn't shrinking big sprites. */
@@ -173,9 +205,10 @@
                 left = box[0]; top = box[1]; right = left + box[2]; bottom = top + box[3];
                 if (on) for (const b of spec.bulbs) {
                     if (!Number.isFinite(b.x) || !Number.isFinite(b.y)) return true;
-                    // The 24-unit glow also contains every 18-unit orbit plus its 1.2-unit mote.
-                    left = Math.min(left, b.x - 24); right = Math.max(right, b.x + 24);
-                    top = Math.min(top, b.y - 24); bottom = Math.max(bottom, b.y + 24);
+                    // The star's reach (beyond the 24-unit glow, every 18-unit orbit and its 1.2-unit mote), in post units
+                    const r = Math.max(24, LAMP_STAR.R / LAMP_POST_SCALE);
+                    left = Math.min(left, b.x - r); right = Math.max(right, b.x + r);
+                    top = Math.min(top, b.y - r); bottom = Math.max(bottom, b.y + r);
                 }
             } else if (lamp.lampType === 3 || lamp.lampType === 4 || lamp.lampType === 5) {
                 const r = on ? (lamp.lampType === 4 ? 34 : 24) : lamp.lampType === 4 ? 12 : 8;
@@ -225,6 +258,20 @@
                 ctx.globalAlpha *= k;
                 for (const b of LAMP_STYLES[style].bulbs) {
                     ctx.drawImage(_lampBulbEmissionSprite(this.color, radius, 'lantern', S), b.x - 24, b.y - 24, 48, 48);
+                }
+                ctx.restore();
+                // The lens's star over each lantern, upright on screen and breathing slowly (a lens effect: it goes with Bloom)
+                if (!GameSettings.bloom) return;
+                const star = _lampStarSprite(this.color, S), t = (_frameTime + this.animOffset) / 1000;
+                const ca = Math.cos(this.angle) * LAMP_POST_SCALE, sa = Math.sin(this.angle) * LAMP_POST_SCALE;
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighter';
+                LAMP_STAR_BULBS.length = 0;
+                for (const b of LAMP_STYLES[style].bulbs) LAMP_STAR_BULBS.push(this.x + b.x * ca - b.y * sa, this.y + b.x * sa + b.y * ca);
+                for (let i = 0; i < LAMP_STAR_BULBS.length; i += 2) {
+                    const breathe = 0.86 + 0.14 * Math.sin(t * 1.7 + i * 1.9), r = LAMP_STAR.R * breathe;
+                    ctx.globalAlpha = k * (0.8 + 0.2 * breathe);
+                    ctx.drawImage(star, LAMP_STAR_BULBS[i] - r, LAMP_STAR_BULBS[i + 1] - r, r * 2, r * 2);
                 }
                 ctx.restore();
             }
