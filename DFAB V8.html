@@ -3717,6 +3717,60 @@
         #collection-note-inline #note-body, #collection-note-inline #note-signature { max-width: 760px; margin-left: auto; margin-right: auto; }
         /* While the sidebar screens are up, the HUD doesn't ghost through the backdrop */
         body.screen-menu-open #game-ui { opacity: 0 !important; transition: opacity 0.2s; }
+
+        /* Contacts as calling cards in a glowing directory (after ETERNAL's direction): no box, a dark wash that
+           fades to clear, the face in the split peach rim haloed in the role colour (--acc), the name signed in
+           Anthropology, fine tech brackets at two corners. A tapped card lights up. */
+        .dc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 6px 18px; }
+        .dc-card {
+            position: relative; display: flex; align-items: center; gap: 22px; min-width: 0; padding: 16px 40px 16px 14px;
+            border-radius: 14px; cursor: pointer; outline: none;
+            background: linear-gradient(90deg, rgba(10, 3, 14, 0.85) 0%, rgba(10, 3, 14, 0.45) 65%, rgba(10, 3, 14, 0) 100%);
+            transition: background 0.35s ease, box-shadow 0.35s ease;
+        }
+        .dc-card::after {   /* hairline under the card, the role colour fading out */
+            content: ''; position: absolute; left: 14px; right: 18%; bottom: 0; height: 1px;
+            background: linear-gradient(90deg, color-mix(in srgb, var(--acc) 70%, transparent), transparent);
+            box-shadow: 0 0 6px color-mix(in srgb, var(--acc) 60%, transparent);
+        }
+        .dc-card::before {   /* tech brackets, top left and bottom right */
+            content: ''; position: absolute; inset: 6px; pointer-events: none; opacity: 0.45; transition: opacity 0.35s ease;
+            background:
+                linear-gradient(var(--acc), var(--acc)) left top / 12px 1px no-repeat,
+                linear-gradient(var(--acc), var(--acc)) left top / 1px 12px no-repeat,
+                linear-gradient(var(--acc), var(--acc)) right bottom / 12px 1px no-repeat,
+                linear-gradient(var(--acc), var(--acc)) right bottom / 1px 12px no-repeat;
+            filter: drop-shadow(0 0 3px var(--acc));
+        }
+        .dc-portrait { position: relative; flex-shrink: 0; width: 66px; height: 66px; border-radius: 50%; background: #130401;
+            box-shadow: 0 0 14px 4px color-mix(in srgb, var(--acc) 55%, transparent), 0 0 38px 12px color-mix(in srgb, var(--acc) 28%, transparent);
+            transition: box-shadow 0.35s ease; }
+        .dc-portrait img, .dc-portrait .mono { width: 100%; height: 100%; border-radius: 50%; display: block; object-fit: cover; }
+        .dc-portrait .mono { display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 40%, rgba(60, 20, 30, 0.9), #050103 75%);
+            font: 400 max(6px, 2rem - var(--font-trim)) var(--font-script); color: var(--df-lavender-pale); }
+        .dc-portrait .portrait-rim { position: absolute; left: -6px; top: -6px; width: calc(100% + 12px); height: calc(100% + 12px); pointer-events: none; overflow: visible; }
+        .dc-who { flex: 1; min-width: 0; }
+        .dc-name { font: 400 max(6px, 1.9rem - var(--font-trim))/1.05 var(--font-script); color: #f7f0ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            padding: 0.22em 0.15em 0.12em; margin: -0.22em 0 -0.12em -0.15em; text-shadow: 0 0 10px color-mix(in srgb, var(--acc) 75%, transparent), 0 0 22px color-mix(in srgb, var(--acc) 40%, transparent); }
+        .dc-role { font: 400 max(6px, 0.6rem - var(--font-trim)) var(--font-menu); letter-spacing: 0.38em; text-transform: uppercase; color: var(--acc); margin-top: 3px;
+            text-shadow: 0 0 6px color-mix(in srgb, var(--acc) 60%, transparent); }
+        .dc-quote { font: italic 400 max(6px, 0.74rem - var(--font-trim))/1.5 var(--font-menu-body); color: rgba(232, 222, 246, 0.62); margin-top: 6px;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .dc-diamond { position: absolute; right: 16px; top: 50%; width: 8px; height: 8px; transform: translateY(-50%) rotate(45deg);
+            background: #fff0d4; box-shadow: 0 0 6px 2px rgba(255, 194, 72, 0.75), 0 0 16px rgba(255, 170, 40, 0.45); }
+        .dc-card:hover::before, .dc-card:focus-visible::before { opacity: 0.8; }
+        .dc-card.selected {
+            background: linear-gradient(90deg, rgba(10, 3, 14, 0.2) 0%, color-mix(in srgb, var(--acc) 22%, transparent) 18%, color-mix(in srgb, var(--acc) 12%, transparent) 72%, transparent 100%);
+            box-shadow: inset 0 0 24px color-mix(in srgb, var(--acc) 18%, transparent);
+        }
+        .dc-card.selected::before { opacity: 1; }
+        .dc-card.selected .dc-portrait { box-shadow: 0 0 18px 5px color-mix(in srgb, var(--acc) 65%, transparent), 0 0 48px 16px color-mix(in srgb, var(--acc) 32%, transparent); }
+        .dc-card.selected .dc-quote { color: rgba(246, 240, 255, 0.85); }
+        @media (max-width: 700px), (max-height: 540px) {
+            .dc-card { gap: 16px; padding: 12px 32px 12px 10px; }
+            .dc-portrait { width: 52px; height: 52px; }
+            .dc-name { font-size: max(6px, 1.6rem - var(--font-trim)); }
+        }
         /* =====================================================================
            SHOPS — Dr. Yin's augments, the workbench, Torque, Neural Systems and
            Zib.ME share one frame in the dossier scheme (--df-*, dossier.css cards,
@@ -69164,13 +69218,16 @@ engineMixin({
 
             /** A contact or crew avatar: their painted bust (getPortraitDataURL), else a script monogram. */
             _dfAvatar(name, acc, big) {
-                let inner;
+                return `<div class="df-avatar${big ? ' big' : ''}" style="--acc:${acc}">${this._dfFace(name, big ? 128 : 72)}${big ? '' : '<span class="dot"></span>'}</div>`;
+            },
+
+            /** The face inside an avatar: the painted bust at `size`px, else a script monogram. */
+            _dfFace(name, size) {
                 try {
                     const cfg = this.resolvePortraitConfig(name);
-                    inner = cfg && !cfg.isFallback ? `<img alt="" src="${this.getPortraitDataURL(name, big ? 128 : 72)}">` : null;
-                } catch (e) { inner = null; }
-                if (!inner) inner = `<div class="mono">${(name || '?').replace(/^(Dr\.|Barista|Chef)\s+/, '').charAt(0)}</div>`;
-                return `<div class="df-avatar${big ? ' big' : ''}" style="--acc:${acc}">${inner}${big ? '' : '<span class="dot"></span>'}</div>`;
+                    if (cfg && !cfg.isFallback) return `<img alt="" src="${this.getPortraitDataURL(name, size)}">`;
+                } catch (e) { /* no portrait: fall through to the monogram */ }
+                return `<div class="mono">${(name || '?').replace(/^(Dr\.|Barista|Chef)\s+/, '').charAt(0)}</div>`;
             },
 
             // Render contacts screen in the sidebar
@@ -69221,12 +69278,14 @@ engineMixin({
                     if (contacts.length === 0) continue;
                     totalContacts += contacts.length;
                     const color = catColors[cat];
-                    html += `<div class="df-section"><span>${catLabels[cat]}</span><span class="count">${contacts.length}</span></div><div class="df-grid">`;
+                    html += `<div class="df-section"><span><span class="glint">◆</span>${catLabels[cat]}</span><span class="count">${contacts.length}</span></div><div class="dc-grid">`;
+                    // A calling card: the face in the split peach rim glowing in the role colour, the name signed in script
                     for (const c of contacts) {
-                        html += `<div class="df-card accent" style="--acc:${color}"><div class="df-person">${this._dfAvatar(c.name, color)}<div class="who">`;
-                        html += `<div class="name">${c.name}</div><div class="role">${roleLabels[cat]}</div>`;
-                        if (c.lastMsg) html += `<div class="desc quote">“${c.lastMsg}”</div>`;
-                        html += `</div></div></div>`;
+                        html += `<div class="dc-card" style="--acc:${color}" tabindex="0">`;
+                        html += `<div class="dc-portrait">${this._dfFace(c.name, 128)}<svg class="portrait-rim" aria-hidden="true"><use href="#portrait-rim"/></svg></div>`;
+                        html += `<div class="dc-who"><div class="dc-name">${c.name}</div><div class="dc-role">${roleLabels[cat]}</div>`;
+                        if (c.lastMsg) html += `<div class="dc-quote">“${c.lastMsg}”</div>`;
+                        html += `</div><span class="dc-diamond" aria-hidden="true"></span></div>`;
                     }
                     html += `</div>`;
                 }
@@ -69236,6 +69295,12 @@ engineMixin({
                 }
 
                 container.innerHTML = html;
+                // Tap a card to light it; tap it again to let it go
+                container.querySelectorAll('.dc-card').forEach(card => card.addEventListener('click', () => {
+                    const was = card.classList.contains('selected');
+                    container.querySelectorAll('.dc-card.selected').forEach(o => o.classList.remove('selected'));
+                    card.classList.toggle('selected', !was);
+                }));
             },
 
             // =========================================================
