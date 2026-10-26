@@ -14,6 +14,9 @@ const TQ_CARS = [
 ].map(c => { const B = VEHICLE_BRANDS[c.brand], m = B.models[c.model];
     return Object.assign(c, { visualStyle: B.visualStyle, length: m.length, width: m.width, noHearseCap: !!m.noHearseCap }); });
 const TQ_TURNTABLE = { x: 1165, y: 505, r: 64 };
+// Victoria's wrap bay (where world/map-entities.js puts ta_wrap) and its loop: the vinyl laid back to nose over
+// LAY of PERIOD seconds, held, then gone by the end of FADE..1 and laid again
+const TQ_WRAP = { x: 410, y: 140, w: 190, h: 96, PERIOD: 14, LAY: 0.75, FADE: 0.9 };
 const TQ_BAYS = [[90, 128, 200, 120, '01'], [90, 368, 200, 120, '02'], [400, 128, 210, 120, '03']];
 // The lifts' status lamps (the posts stand mid-car, north and south of it: ta_lift)
 const TQ_LIFT_LAMPS = [[196, 143], [196, 225], [196, 383], [196, 465]];
@@ -36,7 +39,23 @@ const TorqueArt = {
         c.restore();
     },
     /** Paint the show cars' sprites now (the map's build), so a piece's own paint never does it */
-    warm() { for (const car of TQ_CARS) car.wrapped ? TorqueArt._wrapped(car) : carSprite(car); },
+    warm() { for (const car of TQ_CARS) car.wrapped ? (TorqueArt._wrapped(car), TorqueArt._fullWrap(car)) : carSprite(car); },
+    /** Where the wrap bay's loop is now: s 0..1 through it, prog how far back to nose the vinyl is, fade its alpha, work while it's being laid */
+    wrapPhase() {
+        const s = ((_frameTime / 1000) % TQ_WRAP.PERIOD) / TQ_WRAP.PERIOD;
+        return { s, prog: Math.min(1, s / TQ_WRAP.LAY), fade: s > TQ_WRAP.FADE ? 1 - (s - TQ_WRAP.FADE) / (1 - TQ_WRAP.FADE) : 1, work: s > 0.04 && s < TQ_WRAP.LAY };
+    },
+    /** The wrap bay's car all in pink vinyl (the bay lays it up to its edge) */
+    _fullWrap(car) {
+        if (car._fullWrap) return car._fullWrap;
+        const sp = carSprite(car), cv = document.createElement('canvas'); cv.width = sp.cv.width; cv.height = sp.cv.height;
+        const c = cv.getContext('2d');
+        c.drawImage(sp.cv, 0, 0);
+        c.globalCompositeOperation = 'source-atop';
+        const g = c.createLinearGradient(0, 0, 0, cv.height); g.addColorStop(0, '#c23a7c'); g.addColorStop(0.45, TQ.wrap); g.addColorStop(1, '#a12864');
+        c.globalAlpha = 0.82; c.fillStyle = g; c.fillRect(0, 0, cv.width, cv.height);
+        return (car._fullWrap = { cv, L: sp.L, W: sp.W });
+    },
     /** The wrap bay's car: Victoria's pink vinyl laid over its back half, the edge left raw */
     _wrapped(car) {
         if (car._wrap) return car._wrap;
@@ -69,14 +88,37 @@ function drawTorqueDecorProp(c, p) {
             }
             break;
         }
-        case 'ta_wrap': {                                   // the wrap bay: a car half in pink vinyl, the roll on its stand
-            const cx = x + w / 2 - 10, cy = y + h / 2;
+        case 'ta_wrap': {                                   // the wrap bay: pink vinyl laid over a car back to nose, a squeegee on its edge, the roll feeding it
+            const cx = x + w / 2 - 10, cy = y + h / 2, car = TQ_CARS[2], t = _frameTime / 1000;
+            const sp = carSprite(car), P = CAR_ART.PAD, L = sp.L, W = sp.W, { prog, fade, work } = TorqueArt.wrapPhase();
+            const laying = fade > 0.99 && prog < 1, ex = -L / 2 + prog * L;   // the vinyl's edge, in the car's frame
             B(c, x, y + 4, w, h - 8, 'rgba(255,79,163,.05)', 'rgba(255,79,163,.4)', 6, 1);
-            TorqueArt.car(c, TQ_CARS[2], cx, cy, 0, false);
-            B(c, x + w - 22, y + 14, 16, h - 28, '#2b2b31', '#5b5e66', 3);
+            c.save(); c.translate(cx, cy);
+            c.drawImage(sp.cv, -L / 2 - P, -W / 2 - P, L + P * 2, W + P * 2);
+            c.save(); c.beginPath(); c.rect(-L / 2 - P, -W / 2 - P, ex + L / 2 + P, W + P * 2); c.clip();
+            c.globalAlpha = fade; c.drawImage(TorqueArt._fullWrap(car).cv, -L / 2 - P, -W / 2 - P, L + P * 2, W + P * 2);
+            c.restore();
+            if (laying) {
+                c.fillStyle = 'rgba(255,255,255,.6)'; c.fillRect(ex - 1, -W / 2 + 1, 1.5, W - 2);   // the raw edge
+                const sy = Math.sin(t * 5) * W * 0.28;                                                // the squeegee working up and down it
+                B(c, ex + 2, sy - 11, 6, 22, '#3a7bff', '#173b8a', 2, 1);
+                B(c, ex + 7, sy - 3, 11, 6, '#20232a', '#4d525a', 2, 0.8);
+            }
+            c.restore();
+            B(c, x + w - 22, y + 14, 16, h - 28, '#2b2b31', '#5b5e66', 3);   // the roll on its stand
             const rg = c.createLinearGradient(x + w - 20, 0, x + w - 8, 0); rg.addColorStop(0, '#8e1f55'); rg.addColorStop(0.5, '#ff7cc0'); rg.addColorStop(1, '#8e1f55');
             B(c, x + w - 20, y + 20, 12, h - 40, rg, null, 5);
-            c.fillStyle = 'rgba(255,124,192,.55)'; c.beginPath(); c.moveTo(x + w - 20, y + h / 2 - 8); c.lineTo(cx + 22, cy - 6); c.lineTo(cx + 22, cy + 6); c.lineTo(x + w - 20, y + h / 2 + 8); c.closePath(); c.fill();
+            if (work) {                                     // turning as it feeds
+                const spin = (t * 1.5) % 1;
+                c.strokeStyle = 'rgba(80,20,50,.5)'; c.lineWidth = 1; c.beginPath();
+                for (let k = 0; k < 3; k++) { const yy = y + 22 + ((spin + k / 3) % 1) * (h - 44); c.moveTo(x + w - 19, yy); c.lineTo(x + w - 9, yy); }
+                c.stroke();
+            }
+            if (laying) {                                   // the sheet off the roll to the edge
+                c.fillStyle = 'rgba(255,124,192,.5)'; c.beginPath();
+                c.moveTo(x + w - 20, y + h / 2 - 9); c.lineTo(cx + ex + 6, cy - W / 2 + 2); c.lineTo(cx + ex + 6, cy + W / 2 - 2); c.lineTo(x + w - 20, y + h / 2 + 9);
+                c.closePath(); c.fill();
+            }
             break;
         }
         case 'ta_chest': {                                  // a rolling tool chest: lacquer red, drawer pulls, a tray of spanners on top
@@ -301,6 +343,17 @@ engineMixin({
             for (const yy of [y + 24, y + h - 24]) for (let xx = x + 30; xx <= x + w - 30; xx += 34) glowA(c, xx, yy, 22, '255, 244, 226', 0.22);
         }
         glowA(c, 470, 640, 200, '255, 170, 70', 0.08);
+        // The wrap bay's pink work light, and the heat gun on the vinyl's edge now and then
+        {
+            const W = TQ_WRAP, cx = W.x + W.w / 2 - 10, cy = W.y + W.h / 2, { prog, fade, work } = TorqueArt.wrapPhase(), L = carSprite(TQ_CARS[2]).L;
+            glowA(c, cx, cy, 150, '255, 79, 163', 0.16);
+            glowA(c, cx, cy - 40, 60, '255, 140, 200', 0.12);
+            const on = 0.5 + 0.5 * Math.sin(t * 0.9);
+            if (work && fade > 0.99 && on > 0.35) {
+                const hx = cx - L / 2 + prog * L - 6, hy = cy + Math.sin(t * 2.3) * 10, fl = (on - 0.35) / 0.65 * (0.8 + 0.2 * Math.sin(t * 31));
+                glowA(c, hx, hy, 26, '255, 170, 90', 0.42 * fl); glowA(c, hx, hy, 9, '255, 230, 190', 0.5 * fl);
+            }
+        }
         // The showroom: four rose-gold spots on the plinth, the counter's amber line, the neon script on the north wall
         const { x: tx, y: ty, r: tr } = TQ_TURNTABLE;
         glowA(c, tx, ty, tr + 70, '250, 206, 188', 0.17);
