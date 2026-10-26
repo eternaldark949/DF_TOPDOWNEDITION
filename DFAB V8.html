@@ -36331,7 +36331,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         // Enni Cole: rose stone, champagne brass and warm glass. Static detail is baked once;
         // visible wall quads share the landmark camera projection and never advance simulation.
         const ENNI_EXTERIOR = {
-            stone: '#71354d', stoneLo: '#422031', steel: '#1c2028', gold: '#d0ac72',
+            stone: '#a04d72', stoneLo: '#6e2f4c', steel: '#1c2028', gold: '#d0ac72',
             goldHi: '#f3ddb0', glass: '#352d30', warm: '#ffd392', rose: '#d96896'
         };
         Object.assign(BuildingV2.prototype, {
@@ -36482,7 +36482,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     fill(glow,'rgba(255,192,108,.32)');fill(dots,'rgba(255,237,180,.85)');
                     // Deliberate rose uplight on stone piers leaves the glass warm amber.
                     for(let i=0;i<=n;i++){const u=i/n;quad(up,Math.max(0,u-.012),Math.min(1,u+.012),1,H*.50);}
-                    fill(up,'rgba(225,75,129,.16)');
+                    fill(up,'rgba(235,85,140,.26)');
                 }
                 if(entrance&&!emissive){
                     // Arched transom: use the wall's own u/z projection rather than screen-space decoration.
@@ -36537,7 +36537,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             stepping out from the middle of its front, the curved-glass showroom on top of it (as in the photo). */
         function createEnniCole(x, y, config = {}) {
             return new BuildingV2({
-                id: 'enni_cole', x, y, label: 'Enni Cole', type: 'shopping', style: 'enni_cole', floors: 6,
+                id: 'enni_cole', x, y, label: 'Enni Cole', type: 'shopping', style: 'enni_cole', floors: 12,   // two store floors, each as tall as four flats'
                 sections: [
                     { x: 0, y: 0, w: 900, h: 600 },
                     { x: 320, y: 600, w: 260, h: 100 }
@@ -37891,7 +37891,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             label: 'Enni Cole',
             type: 'shopping',
             category: 'shopping',
-            floors: 6,
+            floors: 12,                     // two store floors, each as tall as four flats' (buildings/factories.js)
             sign: { text: 'Enni Cole', color: '#f3ddb0', size: 38 },
             door: { target: 'enni_cole_interior', label: 'Enter Store', lightColor: '#ffd392' }
         });
