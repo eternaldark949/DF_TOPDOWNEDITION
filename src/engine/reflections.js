@@ -32,8 +32,9 @@
         };                                // Ultra's detail layer is laid down in at most this many rects   // the steps adaptive reflections move between (Off is only chosen)
 
         const REFLECT = {
-            ROAD: 0.45,             // how strongly wet asphalt reflects (puddles: 1)
+            ROAD: 0.45,             // how strongly wet asphalt reflects, on average (puddles: 1)
             PAVE: 0.28,             // and wet paving
+            GLITTER: 2,             // wet ground reflects through a glitter of glints, this much stronger at a glint than the flat average
             LAMP_H: 64,             // a street lamp's head, px above the ground
             SPACING: 210,           // puddle spacing along a road
             BANDS: 30,              // shimmer bands in the composite (High)
@@ -41,6 +42,26 @@
             FEATHER_SCALE: 1.08,     // a narrow damp fringe outside the water's original contour
             ULTRA_REPAINT_MS: 45     // Ultra: how often a reflected body or car repaints its art (every 3rd frame at 60 FPS); Stella's is every frame
         };
+
+        // Wet ground's glitter: the mask of the asphalt and paving, as a world-anchored tile of a dull
+        // wet film broken by sharp glints, so a lamp's smear down the street sparkles (as rain-wet stone
+        // does in ETERNAL's renders) instead of lying flat. Seeded, so it's the same tile every session.
+        let _wetGlitterTile = null;
+        function _wetGlitter() {
+            if (_wetGlitterTile) return _wetGlitterTile;
+            const N = 160, cv = document.createElement('canvas'); cv.width = cv.height = N;
+            const c = cv.getContext('2d');
+            let seed = 9491;
+            const rnd = () => ((seed = seed * 16807 % 2147483647) - 1) / 2147483646;
+            c.fillStyle = 'rgba(255,255,255,0.22)'; c.fillRect(0, 0, N, N);
+            const dot = (x, y, r, a) => {                      // wrapped, so the tile has no seams
+                c.fillStyle = `rgba(255,255,255,${a})`;
+                for (const ox of [-N, 0, N]) for (const oy of [-N, 0, N]) { c.beginPath(); c.arc(x + ox, y + oy, r, 0, Math.PI * 2); c.fill(); }
+            };
+            for (let i = 0; i < 70; i++) dot(rnd() * N, rnd() * N, 3 + rnd() * 6, 0.12 + rnd() * 0.12);   // ripples of a wetter film
+            for (let i = 0; i < 260; i++) dot(rnd() * N, rnd() * N, 1.4 + rnd() * 1.6, 0.6 + rnd() * 0.4);   // the glints (big enough to survive the half-size mask)
+            return (_wetGlitterTile = cv);
+        }
 
         // Floors that mirror, per map (stage 3): rects [x, y, w, h, strength], cut-outs (rugs and
         // runners don't shine), water [x, y, r] (always mirrors, ripples), mirror = colour reflections of
@@ -318,8 +339,13 @@
                 if (wetBox) wetBox.length = 0;
                 mc.setTransform(1, 0, 0, 1, 0, 0); mc.clearRect(0, 0, rw, rh); toView(mc);
                 const net = wet >= 0.02 && this.activeMap.id === 'sdc' && this.traffic && this.traffic.network;
+                const glitter = wet >= 0.02 && mc.createPattern ? (this._wetGlitterPat || (this._wetGlitterPat = mc.createPattern(_wetGlitter(), 'repeat'))) : null;
+                const wetFill = (k) => {                                      // the glitter at k's average strength, or flat
+                    if (glitter) { mc.globalAlpha = Math.min(1, k * REFLECT.GLITTER); mc.fillStyle = glitter; }
+                    else mc.fillStyle = `rgba(255,255,255,${k.toFixed(3)})`;
+                };
                 if (net) {
-                    mc.fillStyle = `rgba(255,255,255,${(REFLECT.ROAD * Math.min(1, wet * 1.3)).toFixed(3)})`;
+                    wetFill(REFLECT.ROAD * Math.min(1, wet * 1.3));
                     for (const road of net.roads) {
                         if (road.x > v.x + hw || road.x + road.w < v.x - hw || road.y > v.y + hh || road.y + road.h < v.y - hh) continue;
                         const c = road.getCorners();
@@ -327,12 +353,13 @@
                         if (wetBox) wetBox.push(road.x, road.y, road.x + road.w, road.y + road.h);
                     }
                 }
-                mc.fillStyle = `rgba(255,255,255,${(REFLECT.PAVE * Math.min(1, wet * 1.3)).toFixed(3)})`;
+                wetFill(REFLECT.PAVE * Math.min(1, wet * 1.3));
                 if (wet >= 0.02) for (const p of this.activeMap.pavements || []) {
                     if (p.x > v.x + hw || p.x + p.w < v.x - hw || p.y > v.y + hh || p.y + p.h < v.y - hh) continue;
                     if (p.poly) { mc.beginPath(); Poly.trace(mc, p.poly); mc.fill(); } else mc.fillRect(p.x, p.y, p.w, p.h);
                     if (wetBox) wetBox.push(p.x, p.y, p.x + p.w, p.y + p.h);
                 }
+                mc.globalAlpha = 1;
                 let any = !!net || !!(wet >= 0.02 && this.activeMap.pavements && this.activeMap.pavements.length);
                 if (surf) {                                                    // polished floors and water
                     any = true;
@@ -412,6 +439,7 @@
                         glow(l.x, l.y + height * 1.05, col, 54 * scale, 70 * scale, 1.0 * k); // the head, upside down below the lamp
                         glow(l.x, l.y + height * 1.05, '#ffffff', 16 * scale, 22 * scale, 0.8 * k); // its hot core
                         glow(l.x, l.y + height * 0.95, col, 24 * scale, height * 2.6, 0.7 * k); // the long smear down the wet street
+                        glow(l.x, l.y + height * 0.9, col, 150 * scale, height * 3, 0.38 * k);  // and the scatter round it: glints on the wet ground (the mask's glitter)
                         rc.globalAlpha = 0.18 * k; rc.strokeStyle = col; rc.lineWidth = 2 * scale; // the pole, faint
                         rc.beginPath(); rc.moveTo(l.x, l.y + 4 * scale); rc.lineTo(l.x, l.y + height * 0.9); rc.stroke();
                     }

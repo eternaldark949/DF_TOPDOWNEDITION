@@ -986,6 +986,7 @@
                     const lr = rsys.active && l._roomId ? rsys.rooms[l._roomId] : null;
                     const outdoorRoom = !!lr && lr.type === 'outdoor';
                     const lampDay = this.activeMap.type === 'outdoor' ? (wake > 0 ? 0 : 1) : outdoorRoom ? skyLampDay : daylight;
+                    l._wakeDay = lampDay; l._wakeFrame = this._renderDrawId;   // lit this frame, painted or not (engine/street-mist.js)
                     if (lampBodies && lampPaintInView(l, this.ctx, cullBounds.view, viewZoom, lampDay)) {
                         l.draw(this.ctx, lampDay);
                         l._bulbDay = lampDay; l._bulbPaintFrame = this._renderDrawId;

@@ -217,6 +217,8 @@
                 const dark = this.getAmbientDarkness();
                 const art = INTERIOR_ART[this.activeMap.id];
                 if (art && art.glow) art.glow(this, ctx);
+                // Each lit shop's light across the pavement, under the buildings' own glow (engine/shopfront-light.js)
+                this.drawShopfrontLight(ctx, dark);
                 if (CONFIG.BUILDINGS.LEAN && this.activeMap.buildings) {
                     const V = this._cullBounds && this._cullBounds.view;
                     const z = this.camera.zoom || 1;
@@ -239,13 +241,18 @@
                         }
                     }
                 }
+                // The mist drifting through the night, under the lanterns (engine/street-mist.js)
+                this.drawStreetMist(ctx, dark);
                 // Street bulbs remain luminous above the ambient darkness. Reuse the body's on/fade state.
                 if (this._cullBounds) {
                     const cb = this._cullBounds, z = this.camera.zoom || 1;
+                    const sparks = GameSettings.lampSparks !== false && this.activeMap.type === 'outdoor';
                     for (const entry of this._queryLampCandidates(cb.lamps, 'lampEmission')) {
                         const l = entry.item;
                         if (l._bulbPaintFrame !== this._renderDrawId || !LAMP_TYPE_STYLE[l.lampType] || typeof l.drawEmissive !== 'function') continue;
-                        if (lampPaintInView(l, ctx, cb.view, z, l._bulbDay)) l.drawEmissive(ctx, l._bulbDay);
+                        if (!lampPaintInView(l, ctx, cb.view, z, l._bulbDay)) continue;
+                        l.drawEmissive(ctx, l._bulbDay);
+                        if (sparks && l._bulbDay < 0.2 && !l._forcedOff) this.drawLampSparks(ctx, l, dark);   // its sparks rising (engine/street-mist.js)
                     }
                 }
                 // Motion trails and car lamps remain luminous above the ambient darkness.

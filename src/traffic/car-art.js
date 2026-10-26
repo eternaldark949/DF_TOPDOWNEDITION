@@ -663,6 +663,11 @@
                 drawGlow(ctx, L / 2 - 3, s * (W / 2 - 2), 10, '#ffaa00'); drawGlow(ctx, -L / 2 + 2, s * (W / 2 - 2), 10, '#ffaa00');
             }
             ctx.restore();
+            // The lens's glare on each headlamp, as on the street lanterns (core/draw-helpers.js), upright on screen
+            if (GameSettings.fogGlare === false && GameSettings.starGlare === false) return;
+            const ca = Math.cos(v.angle), sa = Math.sin(v.angle), hc = v.headlightColor || '#fff2d6';
+            const flick = 0.92 + 0.08 * Math.sin(_frameTime / 260 + (v.id || 0));
+            for (const s of [-1, 1]) drawLensGlare(ctx, v.x + ca * hX - sa * s * hY, v.y + sa * hX + ca * s * hY, hc, LENS_GLARE.HEAD_R * flick, a * 0.9);
         }
 
         /** Underglow: a soft pool of the brand's (or your) colour under the car. */

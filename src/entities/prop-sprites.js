@@ -45,7 +45,7 @@
             sc_altar: true, sc_candles: true, sc_brazier: true,                                                                  // flames and coals
             cc_espresso: true, cc_fireplace: true, cc_record: true, cc_stove: true,                                              // gauge, embers, arc, flame
             monitor: true,                                                                                                       // the trace
-            ta_turntable: true,                                                                                                  // the plinth turns
+            ta_turntable: true, ta_wrap: true,                                                                                   // the plinth turns; the vinyl's laid, the roll turns
             dp_pool: true, dp_pillar: true, dp_brazier: true, dp_fountain: true, dp_altar: true, dp_embers: true                 // ripples, arc, fire, jets, embers
         };
 

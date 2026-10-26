@@ -262,6 +262,74 @@
             byCore.set(core, cv);
             return cv;
         }
+        /* ---------------------------------------------------------------------
+           LENS GLARE — the bloom of ETERNAL's UPBGE renders, two stacked layers
+           over a bright light: a fog glare (a wide, soft haze round it) and a
+           star glare (four long rays and four shorter diagonals over a hot core,
+           turned 38° for drama). It's the lens, not the light, so it stays put
+           on screen whichever way the light faces. Each layer is baked once per
+           colour and density and stamped additively, and each has its own toggle
+           (Settings → Fog Glare, Star Glare) to see them alone or together.
+           --------------------------------------------------------------------- */
+        const LENS_GLARE = {
+            LAMP_R: 58, HEAD_R: 40,     // star reach (world units): a street lantern, a car's headlamp
+            TURN: 38 * Math.PI / 180,   // the star's turn
+            DIAG: 0.5, WIDTH: 1.3,      // the diagonals' length (of the long rays'), a ray's half-width at its root
+            FOG: 0.85, FOG_A: 0.42      // the fog's reach (of the star's) and strength at its heart
+        };
+        const _lensStars = new Map(), _lensFogs = new Map();
+        function _lensRGB(color) { return /^#[0-9a-f]{6}$/i.test(color || '') ? hexToRgb(color) : '255, 238, 187'; }
+        /** The star layer: drawn into a 2R box (R = 64 sprite units) */
+        function lensStarSprite(color, S = 2) {
+            const key = color + '|' + S;
+            let cv = _lensStars.get(key);
+            if (cv) return cv;
+            const R = 64, rgb = _lensRGB(color);
+            cv = document.createElement('canvas'); cv.width = cv.height = Math.ceil(R * 2 * S);
+            const c = cv.getContext('2d'); c.setTransform(S, 0, 0, S, R * S, R * S);
+            c.globalCompositeOperation = 'lighter';
+            for (let i = 0; i < 8; i++) {
+                const len = R * (i % 2 ? LENS_GLARE.DIAG : 1), w = LENS_GLARE.WIDTH * (i % 2 ? 0.75 : 1);
+                c.save(); c.rotate(LENS_GLARE.TURN + i * Math.PI / 4);
+                const g = c.createLinearGradient(0, 0, len, 0);
+                g.addColorStop(0, 'rgba(255,250,238,1)'); g.addColorStop(0.12, 'rgba(255,244,226,0.9)'); g.addColorStop(0.3, `rgba(${rgb},0.6)`);
+                g.addColorStop(0.65, `rgba(${rgb},0.18)`); g.addColorStop(1, `rgba(${rgb},0)`);
+                c.fillStyle = g;
+                c.beginPath(); c.moveTo(0, -w); c.lineTo(len, 0); c.lineTo(0, w); c.closePath(); c.fill();
+                c.restore();
+            }
+            // a small hot core: small enough that a lantern's glitter still shows through round it
+            const core = c.createRadialGradient(0, 0, 0, 0, 0, R * 0.12);
+            core.addColorStop(0, 'rgba(255,250,238,0.75)'); core.addColorStop(0.4, `rgba(${rgb},0.3)`); core.addColorStop(1, `rgba(${rgb},0)`);
+            c.fillStyle = core; c.beginPath(); c.arc(0, 0, R * 0.12, 0, Math.PI * 2); c.fill();
+            _lensStars.set(key, cv);
+            return cv;
+        }
+        /** The fog layer: a soft haze, bright at the heart and falling away like breath on glass */
+        function lensFogSprite(color) {
+            let cv = _lensFogs.get(color);
+            if (cv) return cv;
+            const rgb = _lensRGB(color), A = LENS_GLARE.FOG_A;
+            cv = document.createElement('canvas'); cv.width = cv.height = 64;
+            const c = cv.getContext('2d'), g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+            g.addColorStop(0, `rgba(${rgb},${A})`); g.addColorStop(0.1, `rgba(${rgb},${A * 0.7})`); g.addColorStop(0.28, `rgba(${rgb},${A * 0.3})`);
+            g.addColorStop(0.55, `rgba(${rgb},${A * 0.09})`); g.addColorStop(1, `rgba(${rgb},0)`);
+            c.fillStyle = g; c.fillRect(0, 0, 64, 64);
+            _lensFogs.set(color, cv);
+            return cv;
+        }
+        /** Both layers at world x, y (the context in world space, unturned): the star's reach r, at alpha a. Sets nothing it doesn't restore. */
+        function drawLensGlare(ctx, x, y, color, r, a, S = 2) {
+            const fog = GameSettings.fogGlare !== false, star = GameSettings.starGlare !== false;
+            if ((!fog && !star) || !(a > 0.01)) return;
+            const prevOp = ctx.globalCompositeOperation, prevA = ctx.globalAlpha, f = r * LENS_GLARE.FOG;
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = prevA * Math.min(1, a);
+            if (fog) ctx.drawImage(lensFogSprite(color), x - f, y - f, f * 2, f * 2);
+            if (star) ctx.drawImage(lensStarSprite(color, S), x - r, y - r, r * 2, r * 2);
+            ctx.globalCompositeOperation = prevOp; ctx.globalAlpha = prevA;
+        }
+
         /** Stamp a glow of radius r at x, y (alpha from the context's globalAlpha). */
         /** Could a world rect show this frame? Against the draw's view (the screen, with its zoom and shake): true when
             there's no view yet (a standalone draw). For set pieces drawn every frame, so they cost nothing off screen. */
