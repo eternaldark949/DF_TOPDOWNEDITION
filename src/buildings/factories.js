@@ -390,14 +390,14 @@
          * Dark magenta/neon pink aesthetic.
          */
         function createMoonCityNightclub(x, y, config = {}) {
-            return new BuildingV2({
+            const b = new BuildingV2({
                 id: 'moon_city',
                 style: 'moon_city',                    // buildings/moon-city.js: lacquer, neon fins, the skylight, the canopy
                 x: x,
                 y: y,
                 label: 'Moon City Nightclub',
                 type: 'club',
-                floors: 4,
+                floors: 7,
                 
                 // L-shape: wide main hall + side VIP lounge
                 sections: [
@@ -446,6 +446,11 @@
                 
                 ...config
             });
+            // One tall club floor (floors: 7 is its height), leaning MCX.HERO times as hard as the street so its deco
+            // walls show; culling (_hullK) and the roof follow _leanScale, so they lean with it.
+            const lean = b._leanScale;
+            b._leanScale = function (extra = 0) { return lean.call(this, extra) * MCX.HERO; };
+            return b;
         }
 
         /**
