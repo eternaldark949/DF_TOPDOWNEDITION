@@ -535,7 +535,7 @@
             label: 'Enni Cole',
             type: 'shopping',
             category: 'shopping',
-            floors: 6,
+            floors: 12,                     // two store floors, each as tall as four flats' (buildings/factories.js)
             sign: { text: 'Enni Cole', color: '#f3ddb0', size: 38 },
             door: { target: 'enni_cole_interior', label: 'Enter Store', lightColor: '#ffd392' }
         });
