@@ -34386,23 +34386,32 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const store = this._mcTex || (this._mcTex = {}), key = `${f.x1 | 0},${f.y1 | 0},${f.x2 | 0},${f.y2 | 0}`;
                 let art = store[key];
                 if (!art || (art.fontless && !(art.fontless = !_mcFontReady()))) art = store[key] = this._mcFaceArt(f, len, n);
-                const tex = emissive ? art.lit : art.day, W = art.L, H = art.H;
-                // texture (0..W, 0..H) → the face: x along the base, y down from the top edge (D→A)
-                ctx.save();
-                ctx.transform((bx - ax) / W, (by - ay) / W, (ax - dx) / H, (ay - dy) / H, dx, dy);
-                ctx.scale(1 / MCX.S, 1 / MCX.S);
-                if (!emissive) { ctx.drawImage(tex, 0, 0); ctx.restore(); return; }
-                const B = this._mcBeat(), op = ctx.globalCompositeOperation;
-                ctx.globalCompositeOperation = 'lighter';
-                ctx.globalAlpha *= 0.62 + 0.38 * B.kick; ctx.drawImage(tex, 0, 0);
-                ctx.restore();
-                // the fins breathe violet and lavender, each on its own, pumping on the kick
+                const tex = emissive ? art.lit : art.day, W = art.L, H = art.H, S = MCX.S;
+                // (u along the base, v up from the street): the top edge is the base leaned, k times as long, so the
+                // face is a trapezoid, not a parallelogram; it's laid in tiles, each one affine about its centre
                 const at = (u, v) => { const x0 = ax + (bx - ax) * u, y0 = ay + (by - ay) * u, x1 = dx + (cx - dx) * u, y1 = dy + (cy - dy) * u; return [x0 + (x1 - x0) * v, y0 + (y1 - y0) * v]; };
+                const nu = Math.max(1, Math.ceil(Math.hypot(cx - dx, cy - dy) / 40)), nv = 4;
+                const B = emissive ? this._mcBeat() : null, op = ctx.globalCompositeOperation, ga = ctx.globalAlpha;
+                if (emissive) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = ga * (0.62 + 0.38 * B.kick); }
+                for (let i = 0; i < nu; i++) for (let j = 0; j < nv; j++) {
+                    const u0 = i / nu, u1 = (i + 1) / nu, v0 = j / nv, v1 = (j + 1) / nv, um = (u0 + u1) / 2, vm = (v0 + v1) / 2;
+                    const L0 = at(u0, vm), L1 = at(u1, vm), T0 = at(um, v1), B0 = at(um, v0), M = at(um, vm);
+                    const sw = (u1 - u0) * W, sh = (v1 - v0) * H;
+                    const xa = (L1[0] - L0[0]) / sw, xb = (L1[1] - L0[1]) / sw, ya = (B0[0] - T0[0]) / sh, yb = (B0[1] - T0[1]) / sh;
+                    // texture y runs down from the parapet: this tile is y (1 - v1)H .. (1 - v0)H
+                    ctx.save();
+                    ctx.transform(xa, xb, ya, yb, M[0] - xa * sw / 2 - ya * sh / 2, M[1] - xb * sw / 2 - yb * sh / 2);
+                    ctx.drawImage(tex, u0 * W * S, (1 - v1) * H * S, sw * S, sh * S, 0, 0, sw, sh);
+                    ctx.restore();
+                }
+                ctx.globalCompositeOperation = op; ctx.globalAlpha = ga;
+                if (!emissive) return;
+                // the fins breathe violet and lavender, each on its own, pumping on the kick
                 const t = _gameTimeSec;
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 for (let i = 0; i <= n; i++) {
                     if (!(i % 3) || (i === n && n % 3)) continue;
-                    const a = 0.32 + 0.22 * Math.sin(t * 0.9 + i * 0.8) + 0.35 * B.kick, p0 = at(i / n, 0.1), p1 = at(i / n, 0.72);
+                    const a = 0.32 + 0.22 * Math.sin(t * 0.9 + i * 0.8) + 0.35 * B.kick, p0 = at(i / n, 0.08), p1 = at(i / n, 0.82);
                     ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.lineTo(p1[0], p1[1]);
                     ctx.lineWidth = 2.6; ctx.strokeStyle = `rgba(138, 92, 255, ${Math.max(0, a) * 0.6})`; ctx.stroke();
                     ctx.lineWidth = 1; ctx.strokeStyle = `rgba(232, 216, 255, ${Math.max(0, a)})`; ctx.stroke();
@@ -76545,6 +76554,24 @@ engineMixin({
                 return { x: v.x + (sx - this.canvas.width / 2) / v.zoom, y: v.y + (sy - this.canvas.height / 2) / v.zoom };
             },
 
+            /** The roof pass's buildings, farthest from the camera first, so a nearer building's walls and roof draw
+                over a farther one's (a ray from the camera meets the nearer one first): a tall tower beside a low shop
+                covers it when the tower is nearer, and the shop's wall shows over the tower's foot when you stand by
+                the shop. Distance is to the footprint (0 inside it); ties go lower first, then map order. Reuses one
+                array; the list it's given keeps its order. */
+            _depthSortTops(list, cam) {
+                const out = this._topOrder || (this._topOrder = []);
+                out.length = 0;
+                if (!CONFIG.BUILDINGS.LEAN || list.length < 2) { for (const e of list) out.push(e); return out; }
+                for (const e of list) {
+                    const b = e.item, w = b.w || 200, h = b.h || 200;
+                    const dx = Math.max(b.x - cam.x, 0, cam.x - (b.x + w)), dy = Math.max(b.y - cam.y, 0, cam.y - (b.y + h));
+                    e.topDist = dx * dx + dy * dy; e.topHeight = Math.max(b.floors || 0, (b.crownZ || 0) / CONFIG.BUILDINGS.FLOOR_HEIGHT);
+                    out.push(e);
+                }
+                return out.sort((a, b) => (b.topDist - a.topDist) || (a.topHeight - b.topHeight) || (a.index - b.index));
+            },
+
             /* =====================================================================
                MAIN RENDER LOOP (DRAW)
                ---------------------------------------------------------------------
@@ -77345,7 +77372,7 @@ engineMixin({
                 const roofs = RL.at('roofs');
                 if (roofs && this.activeMap.buildings) {
                     const V = cullBounds.view, cam = this.camera;
-                    for (const entry of renderBuildings.v2) {
+                    for (const entry of this._depthSortTops(renderBuildings.v2, cam)) {
                         const b = entry.item;
                         if (b.isV2 && b.drawTop) {
                             if (entry.standardV2 ? !entry.topIn : !b.inView(V, cam)) continue;
