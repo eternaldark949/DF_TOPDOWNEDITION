@@ -2153,6 +2153,18 @@ test('Overhead: a tall thing hides whoever stands behind it, and draws under who
   equal(r.left, 0, 'nothing carries into the next frame');
 });
 
+test('Overhead: a shelf right beside her draws again over its own footprint, so her arms go behind it', env => {
+  const r = value(env, `
+    const order = [], clips = [], ctx = { save() {}, restore() {}, clip() { clips.push(order.length); }, beginPath() {}, rect(x, y, w, h) { this._r = [x, y, w, h]; } };
+    const game = { view: { x: 0, y: 0, zoom: 1 }, canvas: { width: 1280, height: 800 }, player: { x: 0, y: 0 }, npcs: [], enemies: [], teammates: [], roomSystem: null };
+    Overhead.add({ x: 14, y: -50, w: 40, h: 100 }, () => order.push('shelf'), { hull: Overhead.leanHull(14, -50, 40, 100, 0, 0, 1.1) });
+    Overhead.drawUnder(ctx, game); order.push('her'); Overhead.flush(ctx, game);
+    return { order, clips, rect: ctx._r };`);
+  equal(r.order, ['shelf', 'her', 'shelf'], 'under her, then again over her');
+  equal(r.clips, [2], 'the second time clipped');
+  equal(r.rect, [14, -50, 40, 100], 'to its footprint');
+});
+
 test('Every bundled map loads, updates and draws without runtime errors', env => {
   const maps = Object.keys(env.probe.MAPS);
   ok(maps.length >= 20, 'all bundled maps are present');

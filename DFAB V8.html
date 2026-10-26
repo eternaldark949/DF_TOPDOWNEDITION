@@ -76470,7 +76470,9 @@ engineMixin({
         // its draw is queued during the frame (Overhead.add) and run farthest from the camera first, so nearer tall
         // things cover farther ones. One that stands between the camera and someone (they're farther out, under its
         // lean) draws after the people (Overhead.flush) and hides them; the rest draw before them (drawUnder), so
-        // whoever stands in front of a shelf shows over its foot. Both are called from draw.js.
+        // whoever stands in front of a shelf shows over its foot; with someone right beside it, it's drawn once more
+        // after them over its own footprint only, so an arm or a glass that reaches into the shelf goes behind it.
+        // Both are called from draw.js.
         //   · a prop: give it `tall: true` (map-entities.js) and the props pass hands its draw here
         //   · bespoke art (interiors.js): Overhead.add({ x, y, w, h }, ctx => …) from the floor hook
         //   · above every head (hanging signs, chandeliers): Overhead.add(rect, draw, { above: true }), always after
@@ -76478,6 +76480,7 @@ engineMixin({
 
         const OVERHEAD = {
             REACH: 14,                  // world px past a person's feet their body reaches (what a tall thing can hide)
+            ARMS: 30,                   // ...and their arms and what they hold (into a shelf beside them)
         };
 
         const Overhead = {
@@ -76534,6 +76537,15 @@ engineMixin({
                 return false;
             },
 
+            /** Is anyone close enough that their arms, or what they hold, could reach into its footprint? */
+            _touches(it, people) {
+                for (const c of people) {
+                    const r = OVERHEAD.ARMS + (c.radius || 0);
+                    if (c.x > it.x - r && c.x < it.x + it.w + r && c.y > it.y - r && c.y < it.y + it.h + r) return true;
+                }
+                return false;
+            },
+
             /** After the props, before the people: what hides no one draws now, under them (farthest first), so
                 whoever stands in front of it shows over its foot. The rest waits for flush. */
             drawUnder(ctx, game) {
@@ -76546,6 +76558,9 @@ engineMixin({
                 for (const it of items) {
                     if (it.above || this._hides(it, people, cx, cy)) { items[keep++] = it; continue; }
                     ctx.save(); it.draw(ctx); ctx.restore();
+                    // someone right beside it: their arms or what they hold may reach into it; flush draws it again
+                    // over them, but only over its footprint (inside the shelf), so what's in front of it still shows
+                    if (this._touches(it, people)) { it.cap = true; items[keep++] = it; }
                 }
                 items.length = keep;
             },
@@ -76559,10 +76574,13 @@ engineMixin({
                 const veil = game.roomSystem && game.roomSystem.active && game.getAmbientDarkness() < 0.5;
                 let veilPath = null;
                 for (const it of items) {
-                    ctx.save(); it.draw(ctx); ctx.restore();
+                    ctx.save();
+                    if (it.cap) { ctx.beginPath(); ctx.rect(it.x, it.y, it.w, it.h); ctx.clip(); }
+                    it.draw(ctx); ctx.restore();
                     if (veil && !it.above) {
                         veilPath = veilPath || new Path2D();
-                        if (it.hull) { veilPath.moveTo(it.hull[0][0], it.hull[0][1]); for (let i = 1; i < it.hull.length; i++) veilPath.lineTo(it.hull[i][0], it.hull[i][1]); veilPath.closePath(); }
+                        if (it.cap) veilPath.rect(it.x, it.y, it.w, it.h);
+                        else if (it.hull) { veilPath.moveTo(it.hull[0][0], it.hull[0][1]); for (let i = 1; i < it.hull.length; i++) veilPath.lineTo(it.hull[i][0], it.hull[i][1]); veilPath.closePath(); }
                         else veilPath.rect(it.x, it.y, it.w, it.h);
                     }
                 }
