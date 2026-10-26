@@ -147,6 +147,7 @@ const SCRIPTS = [
     'engine/reflections.js',
     'engine/street-mist.js',
     'engine/shopfront-light.js',
+    'engine/paving-inlays.js',
     'engine/footsteps.js',
     'engine/status-effects.js',
     'engine/executions.js',

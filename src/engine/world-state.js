@@ -219,6 +219,8 @@
                 if (art && art.glow) art.glow(this, ctx);
                 // Each lit shop's light across the pavement, under the buildings' own glow (engine/shopfront-light.js)
                 this.drawShopfrontLight(ctx, dark);
+                // The paving inlays' grooves, lit (engine/paving-inlays.js)
+                this.drawPavingGlow(ctx, dark);
                 if (CONFIG.BUILDINGS.LEAN && this.activeMap.buildings) {
                     const V = this._cullBounds && this._cullBounds.view;
                     const z = this.camera.zoom || 1;
