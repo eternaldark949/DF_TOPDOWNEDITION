@@ -2216,6 +2216,7 @@
                 this.headSide = config.headSide || null;
                 this.decor = Object.assign({ face: config.face, vertical: !!config.vertical, candles: !!config.candles, variant: config.variant | 0 }, config.decor);   // House pieces: facing, wall run, lit
                 this.noNav = !!config.noNav;                     // thin wall pieces paths needn't route round
+                this.tall = !!config.tall;                       // taller than a person: drawn over the people (engine/overhead.js)
                 this.patient = !!config.patient;
                 this.noteId = config.noteId || null;
                 if (config.label) this.label = config.label;                   // what the action pill names it

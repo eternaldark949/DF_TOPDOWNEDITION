@@ -743,46 +743,45 @@
             /**
              * The Emporium's tall wooden aisles (ec_tall_aisle props carry their collision, drawn here instead):
              * each a mahogany gondola whose crown is the base scaled about the camera, so the nearer faces rise
-             * into view as she walks. Drawn after the floor, farthest first; each face painted once, then mapped
-             * on in thin slices (the face is a trapezoid; each slice near enough a parallelogram).
+             * into view as she walks. Their shadows draw with the floor; the aisles and their hanging signs are handed
+             * to Overhead (engine/overhead.js), which draws them over the people, farthest first. Each face painted
+             * once, then mapped on in thin slices (the face is a trapezoid; each slice near enough a parallelogram).
              */
             _drawEnniAisles(ctx) {
                 const V=this.view;if(!V)return;
                 const K=0.11,cx=V.x,cy=V.y,z=V.zoom||1,hw=this.canvas.width/2/z+80,hh=this.canvas.height/2/z+80;
                 const list=[];for(const p of this.props)if(p.decorType==='ec_tall_aisle'&&p.x<cx+hw&&p.x+p.width>cx-hw&&p.y<cy+hh&&p.y+p.height>cy-hh)list.push(p);
-                const far=p=>{const X=Math.max(p.x,Math.min(cx,p.x+p.width)),Y=Math.max(p.y,Math.min(cy,p.y+p.height));return (X-cx)**2+(Y-cy)**2;};
-                list.sort((a,b)=>far(b)-far(a));
                 const P=(x,y,k=K)=>[cx+(x-cx)*(1+k),cy+(y-cy)*(1+k)];
-                ctx.save();
-                for(const p of list){
-                    const A=p._wa||(p._wa=this._enniAisleArt(p)),x=p.x,y=p.y,w=p.width,h=p.height;
-                    ctx.globalAlpha=1;ctx.fillStyle='rgba(0,0,0,.32)';ctx.fillRect(x-4,y-3,w+8,h+6);                   // its shadow on the stone
-                    // one face: base edge B0→B1 on the floor, the texture's left at B0, its foot on the floor
-                    const face=(img,B0,B1,n)=>{const S=img.width/n;
-                        for(let i=0;i<n;i++){const b0=[B0[0]+(B1[0]-B0[0])*i/n,B0[1]+(B1[1]-B0[1])*i/n],b1=[B0[0]+(B1[0]-B0[0])*(i+1)/n,B0[1]+(B1[1]-B0[1])*(i+1)/n],t0=P(b0[0],b0[1]);
-                            const vx=t0[0]-b0[0],vy=t0[1]-b0[1],H=img.height,sw=Math.min(S+1,img.width-i*S);
-                            ctx.restore();ctx.save();
-                            ctx.transform((b1[0]-b0[0])/S,(b1[1]-b0[1])/S,-vx/H,-vy/H,b0[0]+vx,b0[1]+vy);
-                            ctx.drawImage(img,i*S,0,sw,H,0,0,sw,H);}
-                        ctx.restore();ctx.save();};
-                    const n=Math.max(2,Math.ceil(h/30));
-                    if(cx<x)face(A.side,[x,y],[x,y+h],n);
-                    if(cx>x+w)face(A.side2,[x+w,y+h],[x+w,y],n);
-                    if(cy<y)face(A.end,[x+w,y],[x,y],1);
-                    if(cy>y+h)face(A.end,[x,y+h],[x+w,y+h],1);
-                    const a=P(x,y),b=P(x+w,y+h);ctx.drawImage(A.top,a[0],a[1],b[0]-a[0],b[1]-a[1]);
-                }
-                // the hanging aisle markers over the cross-aisle, higher still
+                // one face: base edge B0→B1 on the floor, the texture's left at B0, its foot on the floor
+                const face=(c,img,B0,B1,n)=>{const S=img.width/n;
+                    for(let i=0;i<n;i++){const b0=[B0[0]+(B1[0]-B0[0])*i/n,B0[1]+(B1[1]-B0[1])*i/n],b1=[B0[0]+(B1[0]-B0[0])*(i+1)/n,B0[1]+(B1[1]-B0[1])*(i+1)/n],t0=P(b0[0],b0[1]);
+                        const vx=t0[0]-b0[0],vy=t0[1]-b0[1],H=img.height,sw=Math.min(S+1,img.width-i*S);
+                        c.save();c.transform((b1[0]-b0[0])/S,(b1[1]-b0[1])/S,-vx/H,-vy/H,b0[0]+vx,b0[1]+vy);
+                        c.drawImage(img,i*S,0,sw,H,0,0,sw,H);c.restore();}};
+                // the shadows on the stone now; the aisles themselves stand over the people (engine/overhead.js)
+                ctx.fillStyle='rgba(0,0,0,.32)';
+                for(const p of list)ctx.fillRect(p.x-4,p.y-3,p.width+8,p.height+6);
+                for(const p of list)Overhead.add(p,c=>{
+                    const A=p._wa||(p._wa=this._enniAisleArt(p)),x=p.x,y=p.y,w=p.width,h=p.height,n=Math.max(2,Math.ceil(h/30));
+                    if(cx<x)face(c,A.side,[x,y],[x,y+h],n);
+                    if(cx>x+w)face(c,A.side2,[x+w,y+h],[x+w,y],n);
+                    if(cy<y)face(c,A.end,[x+w,y],[x,y],1);
+                    if(cy>y+h)face(c,A.end,[x,y+h],[x+w,y+h],1);
+                    const a=P(x,y),b=P(x+w,y+h);c.drawImage(A.top,a[0],a[1],b[0]-a[0],b[1]-a[1]);
+                },{hull:Overhead.leanHull(p.x,p.y,p.width,p.height,cx,cy,1+K)});
+                // the hanging aisle markers over the cross-aisle, higher still: over every head
                 for(const p of list){const d=p.decor||{};if(!d.sign)continue;
-                    const sx=p.x+p.width/2,sy=d.sign,[X,Y]=P(sx,sy,K*1.5),s=1+K*1.5;
-                    ctx.strokeStyle='rgba(176,132,76,.6)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(X-20*s,Y);ctx.lineTo(...P(sx-20,sy-30,K*1.5));ctx.moveTo(X+20*s,Y);ctx.lineTo(...P(sx+20,sy-30,K*1.5));ctx.stroke();
-                    ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.roundRect(sx-30+5,sy-14+7,60,28,4);ctx.fill();
-                    ctx.fillStyle='#3a1d12';ctx.strokeStyle='#b0844c';ctx.lineWidth=1.5;ctx.beginPath();ctx.roundRect(X-31*s,Y-15*s,62*s,30*s,5);ctx.fill();ctx.stroke();
-                    ctx.strokeStyle='rgba(234,206,152,.45)';ctx.lineWidth=.7;ctx.beginPath();ctx.roundRect(X-27*s,Y-11*s,54*s,22*s,3);ctx.stroke();
-                    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#ecd29c';ctx.font=`bold ${13*s}px Georgia, serif`;ctx.fillText(String(d.aisle),X,Y-3*s);
-                    ctx.font=`${5.2*s}px Georgia, serif`;ctx.fillStyle='#d6bb88';ctx.fillText(d.cat,X,Y+7.5*s);
+                    const sx=p.x+p.width/2,sy=d.sign;
+                    ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.roundRect(sx-30+5,sy-14+7,60,28,4);ctx.fill();   // its shadow, on the floor
+                    Overhead.add({x:sx-31,y:sy-15,w:62,h:30},c=>{
+                        const [X,Y]=P(sx,sy,K*1.5),s=1+K*1.5;
+                        c.strokeStyle='rgba(176,132,76,.6)';c.lineWidth=1;c.beginPath();c.moveTo(X-20*s,Y);c.lineTo(...P(sx-20,sy-30,K*1.5));c.moveTo(X+20*s,Y);c.lineTo(...P(sx+20,sy-30,K*1.5));c.stroke();
+                        c.fillStyle='#3a1d12';c.strokeStyle='#b0844c';c.lineWidth=1.5;c.beginPath();c.roundRect(X-31*s,Y-15*s,62*s,30*s,5);c.fill();c.stroke();
+                        c.strokeStyle='rgba(234,206,152,.45)';c.lineWidth=.7;c.beginPath();c.roundRect(X-27*s,Y-11*s,54*s,22*s,3);c.stroke();
+                        c.textAlign='center';c.textBaseline='middle';c.fillStyle='#ecd29c';c.font=`bold ${13*s}px Georgia, serif`;c.fillText(String(d.aisle),X,Y-3*s);
+                        c.font=`${5.2*s}px Georgia, serif`;c.fillStyle='#d6bb88';c.fillText(d.cat,X,Y+7.5*s);
+                    },{above:true});
                 }
-                ctx.restore();
             },
 
             /** One tall aisle's art: its two long faces, an end face and its crown, painted once. */

@@ -165,6 +165,7 @@ const SCRIPTS = [
     'engine/cars.js',
     'engine/markers.js',
     'engine/update.js',
+    'engine/overhead.js',
     'engine/draw.js',
     'engine/interiors.js',
     'engine/biggs-art.js',

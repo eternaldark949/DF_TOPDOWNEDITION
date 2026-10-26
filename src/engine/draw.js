@@ -118,6 +118,7 @@
                 if (!this.running || (this.paused && !this.cineCam)) return;   // (Cinematic View keeps drawing the held world: ui/save-slots-pause-menu.js)
             
                 this._renderDrawId = (this._renderDrawId || 0) + 1;
+                Overhead.clear();                                   // (a frame cut short leaves nothing queued for the next)
                 // Baseline's layer panel (ui/render-layers.js): RL.at(layer) says whether a layer draws, and
                 // bills the canvas calls since the last ask to the layer before. Outside Baseline it's always true.
                 const RL = RenderLayers;
@@ -633,10 +634,11 @@
                         const px = p.x + (p.w || 0) / 2;
                         const py = p.y + (p.h || 0) / 2;
                         if (px < cbP.left || px > cbP.right || py < cbP.top || py > cbP.bottom) return;
-                        p.draw(this.ctx);
+                        if (p.tall) Overhead.add(p, c => p.draw(c)); else p.draw(this.ctx);   // taller than a person: over the people (engine/overhead.js)
                     });
                 }
                 
+                if (RL.at('props')) Overhead.drawUnder(this.ctx, this);   // tall things that hide no one: under the people
                 if (RenderStats.timed) this._entLap('Entities: Props');
                 // Draw Traffic Cars
                 // PERFORMANCE: AABB viewport culling + distance LOD
@@ -896,6 +898,8 @@
                 }
                 
                 if (RenderStats.timed) this._entLap('Entities: Vehicles');
+                // Tall things (aisles, hanging signs, tall props) over the people, farthest first (engine/overhead.js)
+                if (RL.at('props')) Overhead.flush(this.ctx, this);
                 if (RenderStats.timed) WorldRenderProfiler.begin('World tops', this.profiler, 'Entities: World tops');
                 // Ferris Wheel BASE (legs/shadow — under building roofs)
                 if (RL.at('roofs') && this.activeMap.ferrisWheel && ferrisPaintInView(this.activeMap.ferrisWheel, this.ctx, cullBounds.view, viewZoom, false)) {
