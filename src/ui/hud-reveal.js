@@ -10,7 +10,7 @@
         const HUD_PARTS = {
             phone:     ['btn-phone'],
             health:    ['ui-health', 'ui-shield-bar', 'ui-flit-bar-container'],
-            move:      ['input-zone-left'],
+            move:      ['input-zone-left', 'input-zone-look'],
             fire:      ['btn-fire'],
             holster:   ['btn-holster', 'btn-emote', 'btn-sneak'],
             heal:      ['btn-heal'],

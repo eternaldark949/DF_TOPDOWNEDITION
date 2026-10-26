@@ -384,6 +384,15 @@
             touch-action: none; 
         }
 
+        /* Drag-to-look (engine/player-draw-input.js initLookZone): the empty right-hand screen above the
+           cat's paw. Under the buttons, the dock and the pause button, so they still take their taps.
+           Touch only: with a mouse this is where she aims, so clicks go through to the canvas. */
+        #input-zone-look {
+            position: absolute; top: 0; right: 0; width: 50%; bottom: 285px;
+            z-index: 24; pointer-events: none; touch-action: none;
+        }
+        @media (pointer: coarse) { #input-zone-look { pointer-events: auto; } }
+
         /* 4. Movement Joystick Visuals */
         #joystick-zone { 
             position: absolute; 
