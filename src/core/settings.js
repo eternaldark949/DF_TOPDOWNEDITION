@@ -155,6 +155,7 @@
             starGlare: true,                // Lens glare, layer two: the 38°-turned star over each lantern and headlamp
             streetFog: true,                // After dark, a violet mist drifting through the city on the wind (engine/street-mist.js)
             lampSparks: true,               // Warm motes rising off each lit lantern (engine/street-mist.js)
+            shopLight: true,                // After dark each shop's light spills across the pavement, pane by pane (engine/shopfront-light.js)
             wetReflections: true,           // (old saves) false → reflections 'off'
             reflections: 'high',            // 'ultra' | 'high' | 'medium' | 'off': puddles and the wet street mirror the lights (engine/reflections.js)
             photoReflections: true,         // Cinematic View's own toggle
@@ -257,7 +258,7 @@
             // after a save's settings load (app/boot.js, engine/save-load.js) while it's on.
             devicePreset: (() => { try { return !!(JSON.parse(localStorage.getItem('dfab_device_preset') || '{}') || {}).on; } catch (e) { return false; } })(),
             _PRESET_KEYS: ['lightingQuality', 'trafficDensity', 'pedestrianDensity', 'foliageDensity', 'rainDensity',
-                           'filmGrain', 'softShadows', 'bloom', 'fogGlare', 'starGlare', 'streetFog', 'lampSparks', 'wetReflections', 'reflections', 'soundRings'],
+                           'filmGrain', 'softShadows', 'bloom', 'fogGlare', 'starGlare', 'streetFog', 'lampSparks', 'shopLight', 'wetReflections', 'reflections', 'soundRings'],
             /** This device's tier, from what the browser says of it: 'low' | 'medium' | 'high' */
             deviceTier() {
                 const nav = typeof navigator !== 'undefined' ? navigator : {}, mem = nav.deviceMemory, cores = nav.hardwareConcurrency || 0;
@@ -299,6 +300,7 @@
                     this.starGlare = false;
                     this.streetFog = false;
                     this.lampSparks = false;
+                    this.shopLight = false;
                     this.wetReflections = false;
                     this.reflections = 'off';
                     this.soundRings = 'simple';

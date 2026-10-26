@@ -217,6 +217,8 @@
                 const dark = this.getAmbientDarkness();
                 const art = INTERIOR_ART[this.activeMap.id];
                 if (art && art.glow) art.glow(this, ctx);
+                // Each lit shop's light across the pavement, under the buildings' own glow (engine/shopfront-light.js)
+                this.drawShopfrontLight(ctx, dark);
                 if (CONFIG.BUILDINGS.LEAN && this.activeMap.buildings) {
                     const V = this._cullBounds && this._cullBounds.view;
                     const z = this.camera.zoom || 1;

@@ -146,6 +146,7 @@ const SCRIPTS = [
     'engine/finisher.js',
     'engine/reflections.js',
     'engine/street-mist.js',
+    'engine/shopfront-light.js',
     'engine/footsteps.js',
     'engine/status-effects.js',
     'engine/executions.js',
