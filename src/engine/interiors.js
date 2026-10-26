@@ -733,15 +733,120 @@
             drawEnniInterior(ctx) {
                 if (!this._enniFloor) this._enniFloor = this._paintEnniFloor();
                 ctx.drawImage(this._enniFloor, 0, 0);
+                this._drawEnniAisles(ctx);
             },
             drawEnniUpperInterior(ctx) {
                 if (!this._enniUpperFloor) this._enniUpperFloor = this._paintEnniUpperFloor();
                 ctx.drawImage(this._enniUpperFloor, 0, 0);
             },
 
+            /**
+             * The Emporium's tall wooden aisles (ec_tall_aisle props carry their collision, drawn here instead):
+             * each a mahogany gondola whose crown is the base scaled about the camera, so the nearer faces rise
+             * into view as she walks. Drawn after the floor, farthest first; each face painted once, then mapped
+             * on in thin slices (the face is a trapezoid; each slice near enough a parallelogram).
+             */
+            _drawEnniAisles(ctx) {
+                const V=this.view;if(!V)return;
+                const K=0.11,cx=V.x,cy=V.y,z=V.zoom||1,hw=this.canvas.width/2/z+80,hh=this.canvas.height/2/z+80;
+                const list=[];for(const p of this.props)if(p.decorType==='ec_tall_aisle'&&p.x<cx+hw&&p.x+p.width>cx-hw&&p.y<cy+hh&&p.y+p.height>cy-hh)list.push(p);
+                const far=p=>{const X=Math.max(p.x,Math.min(cx,p.x+p.width)),Y=Math.max(p.y,Math.min(cy,p.y+p.height));return (X-cx)**2+(Y-cy)**2;};
+                list.sort((a,b)=>far(b)-far(a));
+                const P=(x,y,k=K)=>[cx+(x-cx)*(1+k),cy+(y-cy)*(1+k)];
+                ctx.save();
+                for(const p of list){
+                    const A=p._wa||(p._wa=this._enniAisleArt(p)),x=p.x,y=p.y,w=p.width,h=p.height;
+                    ctx.globalAlpha=1;ctx.fillStyle='rgba(0,0,0,.32)';ctx.fillRect(x-4,y-3,w+8,h+6);                   // its shadow on the stone
+                    // one face: base edge B0→B1 on the floor, the texture's left at B0, its foot on the floor
+                    const face=(img,B0,B1,n)=>{const S=img.width/n;
+                        for(let i=0;i<n;i++){const b0=[B0[0]+(B1[0]-B0[0])*i/n,B0[1]+(B1[1]-B0[1])*i/n],b1=[B0[0]+(B1[0]-B0[0])*(i+1)/n,B0[1]+(B1[1]-B0[1])*(i+1)/n],t0=P(b0[0],b0[1]);
+                            const vx=t0[0]-b0[0],vy=t0[1]-b0[1],H=img.height,sw=Math.min(S+1,img.width-i*S);
+                            ctx.restore();ctx.save();
+                            ctx.transform((b1[0]-b0[0])/S,(b1[1]-b0[1])/S,-vx/H,-vy/H,b0[0]+vx,b0[1]+vy);
+                            ctx.drawImage(img,i*S,0,sw,H,0,0,sw,H);}
+                        ctx.restore();ctx.save();};
+                    const n=Math.max(2,Math.ceil(h/30));
+                    if(cx<x)face(A.side,[x,y],[x,y+h],n);
+                    if(cx>x+w)face(A.side2,[x+w,y+h],[x+w,y],n);
+                    if(cy<y)face(A.end,[x+w,y],[x,y],1);
+                    if(cy>y+h)face(A.end,[x,y+h],[x+w,y+h],1);
+                    const a=P(x,y),b=P(x+w,y+h);ctx.drawImage(A.top,a[0],a[1],b[0]-a[0],b[1]-a[1]);
+                }
+                // the hanging aisle markers over the cross-aisle, higher still
+                for(const p of list){const d=p.decor||{};if(!d.sign)continue;
+                    const sx=p.x+p.width/2,sy=d.sign,[X,Y]=P(sx,sy,K*1.5),s=1+K*1.5;
+                    ctx.strokeStyle='rgba(176,132,76,.6)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(X-20*s,Y);ctx.lineTo(...P(sx-20,sy-30,K*1.5));ctx.moveTo(X+20*s,Y);ctx.lineTo(...P(sx+20,sy-30,K*1.5));ctx.stroke();
+                    ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.roundRect(sx-30+5,sy-14+7,60,28,4);ctx.fill();
+                    ctx.fillStyle='#3a1d12';ctx.strokeStyle='#b0844c';ctx.lineWidth=1.5;ctx.beginPath();ctx.roundRect(X-31*s,Y-15*s,62*s,30*s,5);ctx.fill();ctx.stroke();
+                    ctx.strokeStyle='rgba(234,206,152,.45)';ctx.lineWidth=.7;ctx.beginPath();ctx.roundRect(X-27*s,Y-11*s,54*s,22*s,3);ctx.stroke();
+                    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#ecd29c';ctx.font=`bold ${13*s}px Georgia, serif`;ctx.fillText(String(d.aisle),X,Y-3*s);
+                    ctx.font=`${5.2*s}px Georgia, serif`;ctx.fillStyle='#d6bb88';ctx.fillText(d.cat,X,Y+7.5*s);
+                }
+                ctx.restore();
+            },
+
+            /** One tall aisle's art: its two long faces, an end face and its crown, painted once. */
+            _enniAisleArt(p) {
+                const d=p.decor||{},L=p.height,D=p.width,HH=60,S=1.6,r=seededRandom(4000+(d.aisle|0)*31+(d.run|0)*7);
+                const WOOD='#5b331d',DARK='#2a140a',MID='#7d4727',LIGHT='#b07443',BRASS='#b98b4e';
+                const mk=(W,H)=>{const cv=document.createElement('canvas');cv.width=Math.ceil(W*S);cv.height=Math.ceil(H*S);const c=cv.getContext('2d');c.scale(S,S);return [cv,c];};
+                const pick=a=>a[r()*a.length|0];
+                // goods on one shelf, front view: x0..x1, the shelf top at y (goods stand on it), h tall at most
+                const goods=(c,kind,x0,x1,y,h)=>{let X=x0+1;
+                    while(X<x1-3){const k=r();
+                        if(kind==='box'){const bw=5+k*5,bh=h*(.65+r()*.3),col=pick(['#b0475f','#e9d3a6','#2f5a4d','#c58f6a','#1d2a4a','#f3ece0','#8a5a2a','#d5aa40','#7a1f2a']);c.fillStyle=col;c.fillRect(X,y-bh,bw-.6,bh);c.fillStyle='rgba(255,250,235,.55)';c.fillRect(X+.8,y-bh*.62,bw-2.2,bh*.22);c.fillStyle='rgba(0,0,0,.25)';c.fillRect(X+bw-1.4,y-bh,.8,bh);X+=bw;}
+                        else if(kind==='can'){const bw=4.2,bh=h*.55,col=pick(['#b74840','#d5aa40','#3a6a4a','#e8994e','#2a3a6a']);for(let t=0;t<(h>12?2:1);t++){c.fillStyle=col;c.fillRect(X,y-bh*(t+1),bw-.5,bh-.4);c.fillStyle='#e8dcc4';c.fillRect(X,y-bh*(t+1)+bh*.3,bw-.5,bh*.3);c.fillStyle='rgba(255,255,255,.3)';c.fillRect(X+.6,y-bh*(t+1),.6,bh-.4);}X+=bw;}
+                        else if(kind==='jar'){const bw=5,bh=h*.6,col=pick(['#c84a3a','#d5aa40','#7a4a2a','#e8994e','#6a8a3a','#a03a5a']);c.fillStyle=col;c.fillRect(X,y-bh,bw-.8,bh);c.fillStyle=pick(['#c6a365','#e8e0d0','#2a2428']);c.fillRect(X-.2,y-bh-1.4,bw-.4,1.6);c.fillStyle='#efe2c4';c.fillRect(X+.6,y-bh*.65,bw-2.2,bh*.3);X+=bw+.3;}
+                        else if(kind==='bottle'){const col=pick(['#3c2a3a','#2f4a2f','#6a3a2a','#c9b06a','#1f2a3a','#5a1a2a']),bh=h*.92;c.fillStyle=col;c.fillRect(X,y-bh*.62,3.6,bh*.62);c.fillRect(X+1.1,y-bh,1.4,bh*.4);c.fillStyle='#e8dcc4';c.fillRect(X+.3,y-bh*.42,3,bh*.16);c.fillStyle='rgba(255,255,255,.25)';c.fillRect(X+.4,y-bh*.6,.5,bh*.5);X+=4.4;}
+                        else if(kind==='book'){const bw=1.6+k*1.8,bh=h*(.7+r()*.25),col=pick(['#5a1a2a','#1d2a4a','#2f5a4d','#c9b06a','#3a2a20','#8a3a2a','#e9d3a6','#1c1a1f']);c.fillStyle=col;c.fillRect(X,y-bh,bw-.3,bh);c.fillStyle='rgba(234,206,152,.7)';c.fillRect(X,y-bh*.8,bw-.3,.5);X+=bw;}
+                        else if(kind==='linen'){const bw=11,col=pick(['#f3ece0','#e9d3a6','#cdb48a','#b8c4c8','#d7b7c0','#9aa38a']);for(let t=0;t<4&&t*2.6<h-2;t++){c.fillStyle=col;c.fillRect(X,y-2.6*(t+1),bw-1,2.4);c.fillStyle='rgba(0,0,0,.15)';c.fillRect(X,y-2.6*(t+1)+2,bw-1,.4);}X+=bw;}
+                        else if(kind==='fold'){const bw=10,col=pick(['#f3ece0','#cdb48a','#a3815a','#3a3540','#1c1a1f','#5a1a2a','#2f5a4d','#1d2a4a','#6e5440']);for(let t=0;t<4&&t*3<h-2;t++){c.fillStyle=col;c.fillRect(X,y-3*(t+1),bw-1,2.8);c.fillStyle='rgba(255,255,255,.12)';c.fillRect(X,y-3*(t+1),bw-1,.5);}X+=bw;}
+                        else if(kind==='beauty'){const bw=3+k*2.5,bh=h*(.4+r()*.45),col=pick(['#f2d6dc','#d79bb1','#e9d3a6','#ffffff','#b0475f','#c6a365']);c.fillStyle=col;c.fillRect(X,y-bh,bw-.5,bh);c.fillStyle=pick(['#c6a365','#1c1a1f','#e8e0d0']);c.fillRect(X,y-bh-1.2,bw-.5,1.3);X+=bw+.4;}
+                        else if(kind==='toy'){const bw=7+k*6,bh=h*(.6+r()*.35),col=pick(['#c84a3a','#3a6ab0','#d5aa40','#5a9a4a','#e8994e','#8a4ab0']);c.fillStyle=col;c.fillRect(X,y-bh,bw-.8,bh);c.fillStyle='rgba(255,255,255,.6)';c.beginPath();c.arc(X+bw/2-.4,y-bh/2,Math.min(bw,bh)*.25,0,Math.PI*2);c.fill();X+=bw;}
+                        else X+=4;
+                        if(r()<.05)X+=3;}
+                };
+                const kinds=d.kinds||['box','jar','can','bottle'];
+                // a long face: carved pilasters every so often, shelves of goods between, a crown with dentils, a kick plate
+                const side=(seedShift)=>{const [cv,c]=mk(L,HH);
+                    c.fillStyle=DARK;c.fillRect(0,0,L,HH);c.fillStyle=WOOD;c.fillRect(0,6,L,HH-12);
+                    const bays=Math.max(1,Math.round(L/90)),bw=L/bays,shelves=4,top=9,bot=HH-8,sh=(bot-top)/shelves;
+                    for(let s=0;s<shelves;s++){const yy=top+(s+1)*sh;c.fillStyle='#1a0b05';c.fillRect(0,yy-sh+.5,L,sh-1.5);
+                        for(let b=0;b<bays;b++)goods(c,kinds[(s+b+seedShift)%kinds.length],b*bw+4,(b+1)*bw-4,yy-1.4,sh-3);
+                        c.fillStyle=LIGHT;c.fillRect(0,yy-1.6,L,1.6);c.fillStyle='#ead5a6';for(let t=8;t<L;t+=21)c.fillRect(t,yy-1.5,3,1.2);}
+                    for(let b=0;b<=bays;b++){const X=Math.min(L-4,Math.max(0,b*bw-2));c.fillStyle=MID;c.fillRect(X,6,4,HH-12);c.fillStyle=LIGHT;c.fillRect(X+.6,6,.8,HH-12);c.fillStyle=DARK;c.fillRect(X+3.2,6,.8,HH-12);
+                        c.fillStyle=BRASS;c.beginPath();c.arc(X+2,top-1,1.6,0,Math.PI*2);c.fill();c.beginPath();c.arc(X+2,bot+1.5,1.2,0,Math.PI*2);c.fill();}
+                    // the crown: a moulded cornice and its dentils; the kick plate with a brass rail
+                    c.fillStyle=MID;c.fillRect(0,0,L,6);c.fillStyle=LIGHT;c.fillRect(0,5,L,1);c.fillStyle=DARK;for(let t=1;t<L;t+=3)c.fillRect(t,2.2,1.4,2.2);
+                    c.fillStyle=DARK;c.fillRect(0,HH-6,L,6);c.fillStyle=BRASS;c.fillRect(0,HH-6,L,.9);
+                    return cv;};
+                // the end: a carved panel under an arch, the aisle's number on a brass oval
+                const end=()=>{const [cv,c]=mk(D,HH);c.fillStyle=DARK;c.fillRect(0,0,D,HH);c.fillStyle=MID;c.fillRect(2,6,D-4,HH-12);
+                    c.fillStyle=WOOD;c.beginPath();c.moveTo(6,HH-10);c.lineTo(6,20);c.quadraticCurveTo(D/2,6,D-6,20);c.lineTo(D-6,HH-10);c.closePath();c.fill();
+                    c.strokeStyle=LIGHT;c.lineWidth=.8;c.stroke();c.fillStyle=BRASS;c.beginPath();c.ellipse(D/2,24,7,5,0,0,Math.PI*2);c.fill();
+                    c.fillStyle=DARK;c.font='bold 7px Georgia, serif';c.textAlign='center';c.textBaseline='middle';c.fillText(String(d.aisle||''),D/2,24.5);
+                    c.strokeStyle='rgba(234,206,152,.5)';c.lineWidth=.6;for(let t=0;t<3;t++){c.beginPath();c.moveTo(10,34+t*6);c.quadraticCurveTo(D/2,30+t*6,D-10,34+t*6);c.stroke();}
+                    c.fillStyle=MID;c.fillRect(0,0,D,6);c.fillStyle=DARK;for(let t=1;t<D;t+=3)c.fillRect(t,2.2,1.4,2.2);c.fillStyle=BRASS;c.fillRect(0,HH-6,D,.9);
+                    return cv;};
+                // the crown seen from above: a raised panel inside a moulded rim, rosettes, finials at the corners
+                const top=()=>{const [cv,c]=mk(D,L);c.fillStyle=DARK;c.fillRect(0,0,D,L);c.fillStyle=MID;c.fillRect(1.5,1.5,D-3,L-3);
+                    c.fillStyle=WOOD;c.fillRect(6,6,D-12,L-12);
+                    for(let t=0;t<40;t++){c.strokeStyle=`rgba(${r()<.5?20:170},${r()<.5?8:100},4,${.08+r()*.1})`;c.lineWidth=.5+r();c.beginPath();const X=7+r()*(D-14);c.moveTo(X,6);c.bezierCurveTo(X+r()*4-2,L*.3,X+r()*4-2,L*.7,X+r()*4-2,L-6);c.stroke();}
+                    c.strokeStyle=LIGHT;c.lineWidth=.8;c.strokeRect(4,4,D-8,L-8);c.strokeStyle='rgba(0,0,0,.5)';c.strokeRect(6.5,6.5,D-13,L-13);
+                    // raised panels, one per bay, bevelled
+                    const bays=Math.max(1,Math.round(L/90)),bl=(L-12)/bays;
+                    for(let b=0;b<bays;b++){const Y=6+b*bl+5,H=bl-10;c.fillStyle='rgba(255,214,170,.07)';c.fillRect(10,Y,D-20,H);c.strokeStyle=LIGHT;c.lineWidth=.7;c.strokeRect(10,Y,D-20,H);c.strokeStyle='rgba(0,0,0,.45)';c.strokeRect(11.2,Y+1.2,D-22.4,H-2.4);}
+                    for(let t=6+bl;t<L-12;t+=bl){c.fillStyle=BRASS;c.beginPath();c.arc(D/2,t,3.2,0,Math.PI*2);c.fill();c.fillStyle=DARK;for(let q=0;q<8;q++){const a=q*Math.PI/4;c.beginPath();c.arc(D/2+Math.cos(a)*2.2,t+Math.sin(a)*2.2,.6,0,Math.PI*2);c.fill();}}
+                    for(const [X,Y] of [[3.5,3.5],[D-3.5,3.5],[3.5,L-3.5],[D-3.5,L-3.5]]){c.fillStyle=BRASS;c.beginPath();c.arc(X,Y,3,0,Math.PI*2);c.fill();c.fillStyle='#f1dfb6';c.beginPath();c.arc(X-.8,Y-.8,1,0,Math.PI*2);c.fill();}
+                    c.strokeStyle=BRASS;c.lineWidth=.8;c.strokeRect(1,1,D-2,L-2);
+                    const g=c.createLinearGradient(0,0,D,0);g.addColorStop(0,'rgba(255,220,180,.1)');g.addColorStop(.5,'rgba(255,220,180,0)');g.addColorStop(1,'rgba(0,0,0,.15)');c.fillStyle=g;c.fillRect(0,0,D,L);
+                    return cv;};
+                return { side: side(0), side2: side(2), end: end(), top: top() };
+            },
+
             /** The painting kit both floors share: slabs, parquet, tiles, rugs, titles, thresholds and stairs. */
             _enniKit(c, r) {
-                const GOLD = '#c6a365';
+                const GOLD = '#a97b45';
                 const rr = (x,y,w,h,rad,col,stroke,lw=1)=>{c.beginPath();c.roundRect(x,y,w,h,rad);if(col){c.fillStyle=col;c.fill();}if(stroke){c.strokeStyle=stroke;c.lineWidth=lw;c.stroke();}};
                 const clip = (x,y,w,h,fn)=>{c.save();c.beginPath();c.rect(x,y,w,h);c.clip();fn();c.restore();};
                 // Honed marble slabs with soft veins; `tone` the base colour
@@ -750,6 +855,22 @@
                         c.strokeStyle='rgba(104,84,69,.18)';c.lineWidth=.7;c.strokeRect(X+.5,Y+.5,size-1,size-1);}
                     if(veins)for(let i=0;i<w*h/22000;i++){let X=x+r()*w,Y=y+r()*h;c.strokeStyle=`rgba(117,88,84,${.045+r()*.08})`;c.lineWidth=.5+r()*1.6;c.beginPath();c.moveTo(X,Y);
                         for(let k=0;k<4;k++){const nx=X+(r()-.45)*130,ny=Y+(r()-.55)*100;c.quadraticCurveTo(X+30,Y-22,nx,ny);X=nx;Y=ny;}c.stroke();}
+                });
+                // Polished granite slabs: a base tone, flecks of crystal and mica, a sheen, bronze-lined seams
+                const OBSIDIAN={base:[27,25,30],var:5,dens:30,flecks:['#3a363d','#2f2b31','#45404a','#0b0a0c','#121014','#4f4a54','#6b5c48'],glint:'#b8996a'};
+                const CHAMPAGNE={base:[141,121,93],var:10,dens:16,flecks:['#5e4f3d','#c6ae86','#3a3128','#ddc9a4','#7c6650','#a48c6c'],glint:'#efe0bf'};
+                const granite = (x,y,w,h,stone=OBSIDIAN,size=100,seam=GOLD,alt=null)=>clip(x,y,w,h,()=>{
+                    for(let Y=y,j=0;Y<y+h;Y+=size,j++)for(let X=x,i=0;X<x+w;X+=size,i++){
+                        const S=alt&&(i+j)%2?alt:stone,v=(r()-.5)*S.var|0;
+                        c.fillStyle=`rgb(${S.base[0]+v},${S.base[1]+v},${S.base[2]+v})`;c.fillRect(X,Y,size,size);
+                        for(let k=0;k<size*size/S.dens;k++){c.globalAlpha=.2+r()*.5;c.fillStyle=S.flecks[r()*S.flecks.length|0];const q=.6+r()*1.5;c.fillRect(X+r()*size,Y+r()*size,q,q*(.6+r()*.8));}
+                        for(let k=0;k<size*size/900;k++){c.globalAlpha=.5+r()*.4;c.fillStyle=S.flecks[r()*S.flecks.length|0];c.beginPath();c.ellipse(X+r()*size,Y+r()*size,1+r()*2.6,.8+r()*1.8,r()*3,0,Math.PI*2);c.fill();}
+                        c.fillStyle=S.glint;for(let k=0;k<size*size/1400;k++){c.globalAlpha=.35+r()*.45;c.fillRect(X+r()*size,Y+r()*size,.9,.9);}
+                        c.globalAlpha=1;const g=c.createLinearGradient(X,Y,X+size,Y+size);g.addColorStop(0,'rgba(255,246,226,.07)');g.addColorStop(.45,'rgba(255,246,226,0)');g.addColorStop(.75,'rgba(255,246,226,.035)');g.addColorStop(1,'rgba(0,0,0,.06)');c.fillStyle=g;c.fillRect(X,Y,size,size);
+                    }
+                    // the seams: a hairline of shadow, then the bronze strip
+                    c.fillStyle='rgba(0,0,0,.45)';for(let X=x;X<=x+w;X+=size)c.fillRect(X-1,y,1,h);for(let Y=y;Y<=y+h;Y+=size)c.fillRect(x,Y-1,w,1);
+                    if(seam){c.fillStyle=seam;for(let X=x;X<=x+w;X+=size)c.fillRect(X,y,1.3,h);for(let Y=y;Y<=y+h;Y+=size)c.fillRect(x,Y,w,1.3);}
                 });
                 // Oak or walnut herringbone
                 const parquet = (x,y,w,h,base,dark)=>clip(x,y,w,h,()=>{
@@ -776,15 +897,15 @@
                 const title = (str,x,y,sub,size=20,col='#694450')=>{c.textAlign='center';c.textBaseline='middle';c.font=`${size}px Georgia, serif`;c.fillStyle=col;c.fillText(str,x,y);
                     if(sub){c.font='9px Georgia, serif';c.fillStyle='#816d56';c.fillText(sub,x,y+size*.9+4);}};
                 // A marble threshold under an arch, brass at both edges
-                const threshold = d=>{const v=d.h>d.w;c.fillStyle='#e4d8c6';c.fillRect(d.x-(v?6:0),d.y-(v?0:6),d.w+(v?12:0),d.h+(v?0:12));c.fillStyle=GOLD;
+                const threshold = d=>{const v=d.h>d.w;c.fillStyle='#8f7a5d';c.fillRect(d.x-(v?6:0),d.y-(v?0:6),d.w+(v?12:0),d.h+(v?0:12));c.fillStyle=GOLD;
                     if(v){c.fillRect(d.x-6,d.y,1.5,d.h);c.fillRect(d.x+d.w+4.5,d.y,1.5,d.h);}else{c.fillRect(d.x,d.y-6,d.w,1.5);c.fillRect(d.x,d.y+d.h+4.5,d.w,1.5);}};
                 // A flight of stairs: `n` treads from y0 to y1, lit from `lightTop` (going up) or darker as they fall
                 const stairs = (x,y0,w,y1,up)=>{
                     const n=Math.round((y1-y0)/16);
-                    for(let i=0;i<n;i++){const Y=y0+i*(y1-y0)/n,H=(y1-y0)/n,k=up?i/n:1-i/n,v=168+70*k|0;
-                        c.fillStyle=`rgb(${v},${v-10|0},${v-22|0})`;c.fillRect(x,Y,w,H);c.fillStyle='rgba(60,36,40,.45)';c.fillRect(x,Y+H-2,w,2);c.fillStyle='rgba(255,246,225,.35)';c.fillRect(x,Y,w,1);}
+                    for(let i=0;i<n;i++){const Y=y0+i*(y1-y0)/n,H=(y1-y0)/n,k=up?i/n:1-i/n;
+                        c.fillStyle=`rgb(${92+62*k|0},${78+54*k|0},${60+42*k|0})`;c.fillRect(x,Y,w,H);c.fillStyle='rgba(60,36,40,.45)';c.fillRect(x,Y+H-2,w,2);c.fillStyle='rgba(255,246,225,.35)';c.fillRect(x,Y,w,1);}
                     // the rose runner and its brass rods
-                    const rx=x+w*.27,rw=w*.46;c.fillStyle='#7a3a52';c.fillRect(rx,y0,rw,y1-y0);c.fillStyle='rgba(0,0,0,.18)';for(let i=0;i<n;i++)c.fillRect(rx,y0+i*(y1-y0)/n+(y1-y0)/n-2,rw,2);
+                    const rx=x+w*.27,rw=w*.46;c.fillStyle='#1c191d';c.fillRect(rx,y0,rw,y1-y0);c.fillStyle='rgba(0,0,0,.18)';for(let i=0;i<n;i++)c.fillRect(rx,y0+i*(y1-y0)/n+(y1-y0)/n-2,rw,2);
                     c.fillStyle=GOLD;for(let i=0;i<n;i++){const Y=y0+i*(y1-y0)/n+(y1-y0)/n-3;c.fillRect(rx-3,Y,rw+6,1.2);}
                     c.fillStyle='rgba(224,191,130,.6)';c.fillRect(rx+3,y0,1,y1-y0);c.fillRect(rx+rw-4,y0,1,y1-y0);
                 };
@@ -792,55 +913,71 @@
                 const shopGlass = (x0,x1,Y)=>{for(let x=x0;x+94<=x1;x+=100){
                     rr(x,Y,94,28,1,'#31333a',GOLD,.8);const g=c.createLinearGradient(x,Y+1,x+90,Y+23);g.addColorStop(0,'#6b6267');g.addColorStop(.6,'#aa8f77');g.addColorStop(1,'#4c464f');rr(x+4,Y+3,86,22,1,g);
                     c.fillStyle='rgba(249,226,180,.4)';c.fillRect(x+8,Y+4,2,19);c.fillStyle='#302c32';c.fillRect(x+46,Y+3,3,22);}};
-                return { GOLD, rr, clip, marble, parquet, checker, border, rug, title, threshold, stairs, shopGlass };
+                // A champagne granite band just inside a room, bronze at both its edges
+                const band = (x,y,w,h,lw=26)=>{const i=10;for(const [X,Y,W,H] of [[x+i,y+i,w-2*i,lw],[x+i,y+h-i-lw,w-2*i,lw],[x+i,y+i,lw,h-2*i],[x+w-i-lw,y+i,lw,h-2*i]])granite(X,Y,W,H,CHAMPAGNE,lw*4,null);
+                    c.strokeStyle=GOLD;c.lineWidth=2;c.strokeRect(x+i,y+i,w-2*i,h-2*i);c.strokeRect(x+i+lw,y+i+lw,w-2*i-2*lw,h-2*i-2*lw);
+                    c.strokeStyle='rgba(234,206,152,.5)';c.lineWidth=.8;c.strokeRect(x+i+lw/2,y+i+lw/2,w-2*i-lw,h-2*i-lw);};
+                return { GOLD, rr, clip, marble, granite, OBSIDIAN, CHAMPAGNE, band, parquet, checker, border, rug, title, threshold, stairs, shopGlass };
             },
 
             _paintEnniFloor() {
-                const cv = document.createElement('canvas'); cv.width=2000; cv.height=1400;
-                const c=cv.getContext('2d'),r=seededRandom(1849),K=this._enniKit(c,r),GOLD=K.GOLD;
-                c.fillStyle='#432630';c.fillRect(0,0,2000,1400);
-                // The lobby: cream marble, a rose border, the medallion under the chandelier
-                K.marble(640,50,720,1300,[210,199,185]);
-                K.border(640,50,720,1300);
+                const cv = document.createElement('canvas'); cv.width=3250; cv.height=1400;
+                const c=cv.getContext('2d'),r=seededRandom(1849),K=this._enniKit(c,r),GOLD=K.GOLD,CH='#cdb48a';
+                c.fillStyle='#121014';c.fillRect(0,0,2000,1400);
+                // The lobby: obsidian granite in bronze-lined slabs, a champagne band, the medallion under the chandelier
+                K.granite(640,50,720,1300,K.OBSIDIAN,120);
+                K.band(640,50,720,1300);
                 const mx=1000,my=820;
-                c.fillStyle='#40353c';c.beginPath();c.arc(mx,my,196,0,Math.PI*2);c.fill();
-                const mg=c.createRadialGradient(mx-55,my-65,10,mx,my,187);mg.addColorStop(0,'#eee4d3');mg.addColorStop(1,'#c7b49d');
-                c.fillStyle=mg;c.beginPath();c.arc(mx,my,187,0,Math.PI*2);c.fill();
-                for(const [rad,lw,col]of[[194,2,GOLD],[179,2,GOLD],[166,1,'#ac8b5c']]){c.strokeStyle=col;c.lineWidth=lw;c.beginPath();c.arc(mx,my,rad,0,Math.PI*2);c.stroke();}
-                for(let i=0;i<48;i++){const a=i*Math.PI/24;c.strokeStyle=i%4?'#b29565':'#755161';c.lineWidth=i%4?1:2;c.beginPath();c.moveTo(mx+Math.cos(a)*170,my+Math.sin(a)*170);c.lineTo(mx+Math.cos(a)*177,my+Math.sin(a)*177);c.stroke();}
-                c.textAlign='center';c.textBaseline='middle';c.font='italic 100px Georgia, serif';c.fillStyle='#895965';c.fillText('EC',mx,my+2);
-                c.font='13px Georgia, serif';c.fillStyle='#725238';c.fillText('ENNI COLE',mx,my+83);
-                c.font='10px Georgia, serif';c.fillText('LIVING EXCEPTIONALLY',mx,my+103);
-                // The rose runner from the door to the medallion
-                K.rr(870,1030,260,320,6,'#71364d','#b89a66',2);c.strokeStyle='rgba(235,209,165,.7)';c.lineWidth=1;c.strokeRect(879,1040,242,300);
-                c.fillStyle='rgba(207,161,165,.14)';for(let y=1048;y<1340;y+=17)for(let x=889;x<1115;x+=17){c.beginPath();c.arc(x,y,1,0,Math.PI*2);c.fill();}
-                c.font='italic 40px Georgia, serif';c.fillStyle='#ead4a5';c.fillText('Enni Cole',1000,1265);
+                c.fillStyle='#0c0b0d';c.beginPath();c.arc(mx,my,198,0,Math.PI*2);c.fill();
+                c.save();c.beginPath();c.arc(mx,my,187,0,Math.PI*2);c.clip();K.granite(mx-190,my-190,380,380,K.CHAMPAGNE,380,null);
+                const mg=c.createRadialGradient(mx-60,my-70,10,mx,my,187);mg.addColorStop(0,'rgba(255,240,210,.18)');mg.addColorStop(1,'rgba(30,20,10,.25)');c.fillStyle=mg;c.fillRect(mx-190,my-190,380,380);
+                // an obsidian compass star inlaid in the champagne, bronze-edged
+                for(let i=0;i<16;i++){const a=i*Math.PI/8,L=i%2?120:165,wd=i%2?.09:.12;c.fillStyle=i%2?'#2a2529':'#17141a';c.beginPath();c.moveTo(mx,my);c.lineTo(mx+Math.cos(a-wd)*58,my+Math.sin(a-wd)*58);c.lineTo(mx+Math.cos(a)*L,my+Math.sin(a)*L);c.lineTo(mx+Math.cos(a+wd)*58,my+Math.sin(a+wd)*58);c.closePath();c.fill();c.strokeStyle='rgba(169,123,69,.8)';c.lineWidth=.8;c.stroke();}
+                c.restore();
+                for(const [rad,lw,col]of[[194,3,GOLD],[187,1,'#e2c28e'],[176,1.5,GOLD],[62,2,GOLD]]){c.strokeStyle=col;c.lineWidth=lw;c.beginPath();c.arc(mx,my,rad,0,Math.PI*2);c.stroke();}
+                c.fillStyle='#141116';c.beginPath();c.arc(mx,my,61,0,Math.PI*2);c.fill();
+                c.textAlign='center';c.textBaseline='middle';c.font='italic 62px Georgia, serif';c.fillStyle=CH;c.fillText('EC',mx,my+2);
+                c.font='12px Georgia, serif';c.fillStyle='#e6cf9f';c.fillText('ENNI COLE',mx,my+225);
+                c.font='9px Georgia, serif';c.fillText('LIVING EXCEPTIONALLY',mx,my+241);
+                // The obsidian runner from the door to the medallion, bronze-edged
+                K.rr(870,1030,260,320,4,'#19161a',GOLD,2.5);c.strokeStyle='rgba(226,194,142,.55)';c.lineWidth=1;c.strokeRect(880,1040,240,300);
+                c.fillStyle='rgba(205,180,138,.09)';for(let y=1048;y<1340;y+=17)for(let x=889;x<1115;x+=17){c.beginPath();c.arc(x,y,1,0,Math.PI*2);c.fill();}
+                c.font='italic 40px Georgia, serif';c.fillStyle='#d8bd8a';c.fillText('Enni Cole',1000,1265);
                 c.font='10px Georgia, serif';c.fillText('FASHION  •  FOOD  •  HOME  •  TECHNOLOGY',1000,1300);
                 // The grand staircase: treads rising north to the salons, a flared first step, the newels' shadows
-                c.fillStyle='rgba(40,22,28,.35)';c.fillRect(856,50,288,370);
+                c.fillStyle='rgba(0,0,0,.4)';c.fillRect(856,50,288,370);
                 K.stairs(862,50,276,410,false);
-                c.fillStyle='#e9dfcf';c.beginPath();c.moveTo(838,410);c.quadraticCurveTo(1000,452,1162,410);c.lineTo(1162,404);c.lineTo(838,404);c.fill();
-                c.strokeStyle=GOLD;c.lineWidth=1.5;c.beginPath();c.moveTo(838,410);c.quadraticCurveTo(1000,452,1162,410);c.stroke();
-                c.fillStyle='#7a3a52';c.beginPath();c.moveTo(937,404);c.lineTo(1063,404);c.lineTo(1063,428);c.quadraticCurveTo(1000,436,937,428);c.fill();
-                c.font='9px Georgia, serif';c.fillStyle='#816d56';c.fillText('THE SALONS  •  COUTURE  •  CUISINE',1000,462);
-                // The Food Hall: cream and rose-grey tiles
-                K.checker(50,50,570,630,'#d9cdbd','#c9b7a8');K.border(50,50,570,630,'#8a5966',8);
-                K.title('THE FOOD HALL',535,230,null,17);c.font='9px Georgia, serif';c.fillStyle='#816d56';c.fillText('FRESH  •  FINE FOODS',535,252);c.fillText('CELLAR  •  LA CUISINE',535,266);
-                // Fashion: pale oak herringbone, the window stage along the glass
-                K.parquet(50,700,570,650,'#cdb294','rgba(110,80,52,.35)');K.border(50,700,570,650,'#8a5966',8);
-                K.rr(68,1246,540,84,4,'#5b2f40',GOLD,1.5);K.rr(74,1252,528,72,3,'#6e3a4e');
-                K.title('FASHION',520,1000,'WOMEN  •  MEN  •  KNITWEAR',20);
+                c.fillStyle='#a48c6a';c.beginPath();c.moveTo(838,410);c.quadraticCurveTo(1000,452,1162,410);c.lineTo(1162,404);c.lineTo(838,404);c.fill();
+                c.strokeStyle=GOLD;c.lineWidth=2;c.beginPath();c.moveTo(838,410);c.quadraticCurveTo(1000,452,1162,410);c.stroke();
+                c.fillStyle='#1c191d';c.beginPath();c.moveTo(937,404);c.lineTo(1063,404);c.lineTo(1063,428);c.quadraticCurveTo(1000,436,937,428);c.fill();
+                c.font='9px Georgia, serif';c.fillStyle='#b59c74';c.fillText('THE SALONS  •  COUTURE  •  CUISINE',1000,462);
+                // The Food Hall: darker champagne granite, the aisles' lanes marked in obsidian strips
+                K.granite(50,50,570,630,K.CHAMPAGNE,90);K.band(50,50,570,630,16);
+                K.title('THE FOOD HALL',540,226,null,16,'#221c18');c.font='9px Georgia, serif';c.fillStyle='#3a3026';c.fillText('FRESH  •  FINE FOODS',540,246);c.fillText('CELLAR  •  LA CUISINE',540,260);
+                // Fashion: obsidian and champagne granite, laid on the diagonal feel of a checker
+                K.granite(50,700,570,650,K.OBSIDIAN,110,GOLD,K.CHAMPAGNE);K.band(50,700,570,650,16);
+                K.rr(68,1246,540,84,4,'#141116',GOLD,1.5);K.rr(74,1252,528,72,3,'#221d22');
+                K.rr(452,1030,136,46,3,'rgba(14,12,15,.72)',GOLD,1);K.title('FASHION',520,1046,null,17,'#e2c792');c.font='8px Georgia, serif';c.fillStyle='#bfa57a';c.fillText('WOMEN  •  MEN  •  KNITWEAR',520,1066);
                 // Furniture: walnut herringbone and the room sets' rugs
-                K.parquet(1380,50,570,630,'#8d6a4f','rgba(50,30,20,.4)');K.border(1380,50,570,630,'#6e4a52',8);
-                K.rug(1400,80,326,276,'#8c796b');K.rug(1706,86,226,268,'#684552');K.rug(1620,448,296,206,'#9b8973');
+                K.parquet(1380,50,570,630,'#5e4535','rgba(20,12,8,.5)');K.band(1380,50,570,630,14);
+                K.rug(1400,80,326,276,'#6e6052');K.rug(1706,86,226,268,'#3b3237');K.rug(1620,448,296,206,'#7a6b58');
                 K.title('FURNITURE',1490,440,'LIVING  •  SLEEP  •  DINING',19,'#f0dcc0');
-                // Electronics: dark polished stone with a cool inlay line
-                K.marble(1380,700,570,650,[58,54,62],80,false);
+                // Electronics: obsidian granite with a cool inlay line
+                K.granite(1380,700,570,650,K.OBSIDIAN,95,'#5c6a78');
                 c.strokeStyle='rgba(150,190,230,.35)';c.lineWidth=1.5;c.strokeRect(1400,720,530,610);
                 K.title('ELECTRONICS',1470,806,'SCREENS  •  SOUND  •  HOME',17,'#d9e4f0');
                 // Thresholds under the arches, the shopfront glass either side of the door
                 for(const d of [{x:620,y:300,w:20,h:160},{x:620,y:950,w:20,h:160},{x:1360,y:300,w:20,h:160},{x:1360,y:950,w:20,h:160},{x:440,y:680,w:160,h:20},{x:1400,y:680,w:160,h:20}])K.threshold(d);
                 for(const [a,b] of [[70,610],[650,846],[1156,1350],[1390,1930]])K.shopGlass(a,b,1317);
+                // The Emporium: champagne granite, obsidian walks between the wooden aisles, a medallion by the tills
+                K.granite(1970,50,1230,1300,K.CHAMPAGNE,100);
+                for(let i=0;i<12;i++){const X=2070+i*90;c.fillStyle='rgba(20,17,22,.85)';c.fillRect(X-8,170,56,820);c.fillStyle=GOLD;c.fillRect(X-8,170,1.2,820);c.fillRect(X+47,170,1.2,820);}
+                K.granite(1990,548,1190,64,K.OBSIDIAN,64,GOLD);
+                K.band(1970,50,1230,1300,18);
+                c.textAlign='center';c.textBaseline='middle';c.font='italic 34px Georgia, serif';c.fillStyle='#2a201a';c.fillText('The Emporium',2585,1110);
+                c.font='9px Georgia, serif';c.fillStyle='#3a3026';c.fillText('PANTRY  •  CELLAR  •  HOME  •  BOOKS  •  TOYS  •  APPAREL',2585,1138);
+                for(const d of [{x:1950,y:300,w:20,h:160},{x:1950,y:950,w:20,h:160}])K.threshold(d);
+                K.shopGlass(1990,3180,1317);
                 return cv;
             },
 
@@ -922,6 +1059,8 @@
                 const t=_frameTime/1000;
                 ctx.save();
                 for(const [X,Y,R]of[[155,230,0],[375,230,0],[220,612,0],[205,915,0],[205,1085,0],[1520,240,12],[1767,548,12],[1840,215,10],[755,1180,9],[1245,1180,9]])this._enniPendant(ctx,X,Y,R);
+                for(let i=0;i<7;i++){this._enniPendant(ctx,2115+i*180,120,10);this._enniPendant(ctx,2115+i*180,1060,10);}
+                for(let i=0;i<13;i++)this._enniPendant(ctx,2070-25+i*90,580,0);
                 ctx.globalCompositeOperation='lighter';
                 for(const [X,Y] of [[853,419],[1147,419]])glowA(ctx,X,Y,46,'255,236,200',.16);
                 for(let i=0;i<5;i++)glowA(ctx,118+i*100,1288,34,'255,214,170',.12);       // the window stage's spotlights

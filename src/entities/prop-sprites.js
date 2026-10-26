@@ -43,7 +43,8 @@
             ps_fireplace: true, ps_tub: true, ps_pool: true,                                                                     // embers, petal ring, ripples
             sc_altar: true, sc_candles: true, sc_brazier: true,                                                                  // flames and coals
             cc_espresso: true, cc_fireplace: true, cc_record: true, cc_stove: true,                                              // gauge, embers, arc, flame
-            monitor: true,                                                                                                       // the trace
+            monitor: true,
+            ec_tall_aisle: true,                                                                                                 // drawn with the floor (_drawEnniAisles)                                                                                                       // the trace
             ta_turntable: true,                                                                                                  // the plinth turns
             dp_pool: true, dp_pillar: true, dp_brazier: true, dp_fountain: true, dp_altar: true, dp_embers: true                 // ripples, arc, fire, jets, embers
         };

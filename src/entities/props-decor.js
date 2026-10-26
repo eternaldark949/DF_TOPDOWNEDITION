@@ -1683,7 +1683,7 @@
         // deterministic product arrangements make its normal and reflection passes identical.
         function drawEnniDecorProp(ctx, p) {
             const x = p.x, y = p.y, w = p.width, h = p.height, d = p.decor || {}, variant = d.variant | 0;
-            const C = { brass: '#c6a365', bright: '#ead5a6', rose: '#713f52', dark: '#262328',
+            const C = { brass: '#b0844c', bright: '#ead5a6', rose: '#2b2328', dark: '#262328',
                 walnut: '#493428', cream: '#e8ddd0', ivory: '#f4eadc', glass: '#9faeb2' };
             const rr = (X,Y,W,H,r,col,stroke,lw=1) => {
                 ctx.beginPath(); ctx.roundRect(X,Y,W,H,r);
@@ -1859,7 +1859,7 @@
                 }
                 case 'ec_mannequin': {                                 // a dressed form on a marble plinth, seen from above
                     const dress=['#e9d3a6','#1c1a1f','#b0475f','#f3ece0','#2f5a4d','#7b3fa0'][variant%6],cx=x+w/2,cy=y+h/2,s=w/40;
-                    dot(cx,cy,w/2,'#5b3341',C.brass);dot(cx,cy,w/2-3,'#7d4b5a');
+                    dot(cx,cy,w/2,'#141116',C.brass);dot(cx,cy,w/2-3,'#2a252c');
                     // the gown's skirt, scalloped into folds, then the bodice and shoulders, the head turned to the room
                     ctx.fillStyle=dress;ctx.beginPath();
                     for(let i=0;i<=24;i++){const a=i*Math.PI/12,R=(14+(i%2?1.6:0))*s;ctx.lineTo(cx+Math.cos(a)*R,cy+2*s+Math.sin(a)*R*.92);}
@@ -1881,12 +1881,82 @@
                     for(let i=0;i<n;i++){const X=x+7+i*9;rr(X,y+4,7,h-8,2,cols[(i*3+variant)%7],'rgba(0,0,0,.25)',.5);ctx.fillStyle='rgba(255,245,225,.18)';ctx.fillRect(X+1,y+5,1,h-10);}
                     break;
                 }
-                case 'ec_round_rack': {                                // a round rack of dresses
-                    dot(x+w/2,y+h/2,w/2,'rgba(42,35,40,.5)',C.brass);
-                    const cols=['#e9d3a6','#b0475f','#f3ece0','#1c1a1f','#d79bb1','#7b3fa0'];
-                    for(let i=0;i<16;i++){const a=i*Math.PI/8,X=x+w/2+Math.cos(a)*w*.36,Y=y+h/2+Math.sin(a)*w*.36;ctx.save();ctx.translate(X,Y);ctx.rotate(a);rr(-7,-3.5,14,7,2,cols[(i+variant)%6],'rgba(0,0,0,.25)',.5);ctx.restore();}
-                    ctx.strokeStyle=C.brass;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x+w/2,y+h/2,w*.36,0,Math.PI*2);ctx.stroke();
-                    dot(x+w/2,y+h/2,5,C.brass,C.dark);break;
+                case 'ec_round_rack': {                                // a two-tier round rack: bronze rails on an obsidian plinth, garments hung by colour
+                    const cx=x+w/2,cy=y+h/2,R=w/2,pal=[['#e9dcc4','#cdb48a','#a3815a','#6e5440','#2a2428','#f4ede0'],['#16301f','#2f5a4d','#5a1a2a','#8c2b3e','#1d2a4a','#0f0e12'],['#f2d6dc','#d79bb1','#b0475f','#e9d3a6','#f4ede0','#c9a3b8'],['#0f0e12','#2a2830','#55525c','#9a98a2','#d8d6dc','#1c1a1f'],['#3a2a1f','#7a5a3a','#c58f6a','#e2c79a','#5a1a2a','#1c1a1f']][variant%5];
+                    const hash=i=>{const s=Math.sin(i*91.7+variant*13.1)*4375.5;return s-Math.floor(s);};
+                    dot(cx+2,cy+3,R,'rgba(0,0,0,.28)');dot(cx,cy,R,'#141116',C.brass);dot(cx,cy,R-3,'#1f1b20');
+                    ctx.strokeStyle='rgba(255,240,215,.08)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(cx,cy,R-6,Math.PI*1.05,Math.PI*1.6);ctx.stroke();
+                    // garments on a tier: hangers on the rail, each piece a narrow shape falling outward, the colours graded round
+                    const tier=(rad,n,len,wid)=>{
+                        for(let i=0;i<n;i++){const a=i*Math.PI*2/n+.08,col=pal[Math.floor(i/n*pal.length*2)%pal.length],L=len*(.8+hash(i+rad)*.35);
+                            ctx.save();ctx.translate(cx+Math.cos(a)*rad,cy+Math.sin(a)*rad);ctx.rotate(a);
+                            // seen from above a hung piece is its shoulders edge-on: a slim shape, wider at the shoulder, the hem falling away
+                            ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(-1.5,-wid*.5);ctx.lineTo(L*.3,-wid*.62);ctx.lineTo(L,-wid*.36);ctx.quadraticCurveTo(L+1.2,0,L,wid*.36);ctx.lineTo(L*.3,wid*.62);ctx.lineTo(-1.5,wid*.5);ctx.closePath();ctx.fill();
+                            ctx.strokeStyle='rgba(0,0,0,.45)';ctx.lineWidth=.5;ctx.stroke();ctx.fillStyle='rgba(255,245,225,.2)';ctx.fillRect(0,-wid*.4,L*.7,.7);
+                            ctx.restore();}
+                        ctx.strokeStyle='#4a3420';ctx.lineWidth=3;ctx.beginPath();ctx.arc(cx,cy,rad,0,Math.PI*2);ctx.stroke();
+                        ctx.strokeStyle=C.brass;ctx.lineWidth=1.6;ctx.beginPath();ctx.arc(cx,cy,rad,0,Math.PI*2);ctx.stroke();
+                        ctx.strokeStyle='rgba(240,214,160,.7)';ctx.lineWidth=.6;ctx.beginPath();ctx.arc(cx,cy,rad-.6,Math.PI*1.1,Math.PI*1.7);ctx.stroke();
+                        for(let i=0;i<n;i++){const a=i*Math.PI*2/n+.08;dot(cx+Math.cos(a)*rad,cy+Math.sin(a)*rad,.8,'#e8cf9c');}
+                    };
+                    tier(R*.56,Math.round(R*2*Math.PI*.56/3.6),R*.38,4.2);
+                    tier(R*.27,Math.round(R*2*Math.PI*.27/3.8),R*.2,3.8);
+                    // the crown: a champagne post with a bronze finial and its little sign
+                    for(let i=0;i<4;i++){const a=i*Math.PI/2+Math.PI/4;ctx.strokeStyle=C.brass;ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(cx+Math.cos(a)*5,cy+Math.sin(a)*5);ctx.lineTo(cx+Math.cos(a)*R*.27,cy+Math.sin(a)*R*.27);ctx.stroke();}
+                    dot(cx,cy,6,'#cdb48a','#5c4128');dot(cx,cy,3,'#f1dfb6');dot(cx-1,cy-1,1,'#fffaf0');
+                    break;
+                }
+                // ── The aisles: obsidian gondolas, bronze price rails, goods seen from above on both faces ──
+                case 'ec_gondola': case 'ec_cloth_aisle': {
+                    const v=h>w,L=v?h:w,D=v?w:h,food=p.decorType==='ec_gondola';
+                    const hash=i=>{const s=Math.sin(i*127.1+variant*311.7+x*.13)*43758.5;return s-Math.floor(s);};
+                    ctx.save();ctx.translate(x,y);if(v){ctx.translate(w,0);ctx.rotate(Math.PI/2);}
+                    rr(2,3,L,D,4,'rgba(0,0,0,.3)');rr(0,0,L,D,4,'#161317','#5c4128',1);
+                    const cap=Math.min(26,D*.62);                                                  // the end caps
+                    rr(1,1,L-2,D-2,3,null,C.brass,1.2);
+                    ctx.fillStyle='#0d0b0e';ctx.fillRect(cap,D/2-1.5,L-2*cap,3);ctx.fillStyle='rgba(201,154,91,.5)';ctx.fillRect(cap,D/2-.4,L-2*cap,.8);   // the spine
+                    const half=(D-3)/2-4;
+                    // one face: goods in a row from cap to cap, `top` true for the north face (goods' fronts at its outer edge)
+                    const face=(top,kind,seed)=>{
+                        const Y0=top?3:D/2+1.5,H=half,run=L-2*cap-4;let X=cap+2,i=0;
+                        ctx.save();ctx.beginPath();ctx.rect(cap+1,Y0,run+2,H+1);ctx.clip();
+                        while(X<cap+2+run){const k=hash(seed+i*7.3),k2=hash(seed+i*3.1+9);
+                            if(kind==='box'){const bw=7+k*7,col=['#b0475f','#e9d3a6','#2f5a4d','#c58f6a','#1d2a4a','#f3ece0','#8a5a2a','#d5aa40'][(seed+i)%8];
+                                for(let s=0;s<2;s++){rr(X,Y0+1+s*(H/2),bw-1,H/2-1.5,.8,col,'rgba(0,0,0,.35)',.5);ctx.fillStyle='rgba(255,250,235,.45)';ctx.fillRect(X+1.5,Y0+2.5+s*(H/2),bw-4,1.6);}X+=bw;}
+                            else if(kind==='jar'){const R=2.6+k*1.4,col=['#c84a3a','#d5aa40','#7a4a2a','#e8994e','#6a8a3a','#a03a5a'][(seed+i)%6];
+                                for(let s=0;s<Math.max(1,Math.floor(H/(R*2+1)));s++){const yy=Y0+R+1+s*(R*2+1);dot(X+R,yy,R,col,'rgba(0,0,0,.4)');dot(X+R,yy,R*.62,['#c6a365','#e8e0d0','#2a2428'][(seed+i)%3]);dot(X+R-.8,yy-.8,.6,'rgba(255,255,255,.6)');}X+=R*2+1;}
+                            else if(kind==='bottle'){const col=['#3c2a3a','#2f4a2f','#6a3a2a','#c9b06a','#1f2a3a'][(seed+i)%5];
+                                for(let s=0;s<Math.max(1,Math.floor(H/7.5));s++){const yy=Y0+4+s*7.5;dot(X+3.2,yy,3.2,col,'rgba(0,0,0,.4)');dot(X+3.2,yy,1.2,'#c6a365');}X+=7;}
+                            else if(kind==='produce'){const bw=18+k*6,col=['#b74840','#d5aa40','#85a84e','#e8994e','#6b3a6a','#c8d86a'][(seed+i)%6];
+                                rr(X,Y0+1,bw-2,H-1,1.5,'#4a3424','#8a6844',.6);for(let q=0;q<bw*H/22;q++){const fx=X+3+hash(seed+i*5+q)*(bw-8),fy=Y0+3.5+hash(seed+i*9+q*2)*(H-6);dot(fx,fy,2.4,col);dot(fx-.7,fy-.7,.6,'rgba(255,250,210,.4)');}X+=bw;}
+                            else if(kind==='fold'){const bw=13,col=['#f3ece0','#e9d3a6','#cdb48a','#a3815a','#6e5440','#3a3540','#1c1a1f','#5a1a2a','#2f5a4d','#1d2a4a'][Math.floor(i/2+seed)%10];
+                                rr(X,Y0+1.5,bw-2,H-2,1.2,col,'rgba(0,0,0,.35)',.5);ctx.fillStyle='rgba(0,0,0,.16)';for(let f=1;f<4;f++)ctx.fillRect(X+1,Y0+1.5+f*(H-2)/4,bw-4,.7);ctx.fillStyle='rgba(255,250,235,.2)';ctx.fillRect(X+1,Y0+2,1,H-4);X+=bw;}
+                            else if(kind==='hang'){const col=['#e9dcc4','#cdb48a','#a3815a','#2a2428','#5a1a2a','#8c2b3e','#2f5a4d','#1d2a4a','#f2d6dc','#16141a'][Math.floor(i/3+seed)%10],Lg=H*(.82+k2*.2);
+                                ctx.fillStyle=col;ctx.beginPath();const y0=top?Y0+H:Y0,dir=top?-1:1;ctx.moveTo(X,y0);ctx.lineTo(X+5,y0);ctx.lineTo(X+5.6,y0+dir*Lg*.7);ctx.quadraticCurveTo(X+2.5,y0+dir*Lg,X-.6,y0+dir*Lg*.7);ctx.closePath();ctx.fill();ctx.strokeStyle='rgba(0,0,0,.4)';ctx.lineWidth=.5;ctx.stroke();X+=4.2;}
+                            i++;}
+                        ctx.restore();
+                        // the face's bronze price rail at its outer edge, a champagne tag every so often
+                        const ry=top?1.5:D-3;ctx.fillStyle=C.brass;ctx.fillRect(cap,ry,L-2*cap,1.5);
+                        if(kind!=='hang')for(let t=cap+10;t<L-cap-6;t+=26){ctx.fillStyle='#ead5a6';ctx.fillRect(t,top?ry-.5:ry,5,2.5);}
+                    };
+                    const kinds=food?[['box','jar'],['bottle','box'],['produce','produce'],['jar','bottle']][variant%4]:[['fold','fold'],['hang','hang'],['fold','hang']][variant%3];
+                    if(kinds[1]==='hang'&&kinds[0]==='hang'){ctx.fillStyle='rgba(0,0,0,.35)';ctx.fillRect(cap,D/2-2,L-2*cap,4);}
+                    face(true,kinds[0],variant*17+1);face(false,kinds[1],variant*17+40);
+                    if(kinds.includes('hang')){ctx.fillStyle=C.brass;ctx.fillRect(cap,D/2-1,L-2*cap,2);ctx.fillStyle='rgba(255,238,200,.6)';ctx.fillRect(cap,D/2-1,L-2*cap,.6);}
+                    // end caps: a featured stack each end on champagne stone
+                    for(const ex of [0,L-cap]){rr(ex+2,2,cap-4,D-4,3,'#8d795d',C.brass,1);rr(ex+5,5,cap-10,D-10,2,'#a48e6c');
+                        const ccx=ex+cap/2,ccy=D/2;
+                        if(food){const col=[['#e8994e','#d5aa40'],['#6a2a3a','#2f4a2f'],['#b74840','#85a84e'],['#d6ac6c','#a36b42']][variant%4];for(let q=0;q<7;q++){const a=q*Math.PI*2/6;dot(q?ccx+Math.cos(a)*4.6:ccx,q?ccy+Math.sin(a)*4.6:ccy,2.6,col[q%2],'rgba(0,0,0,.35)');}}
+                        else{for(let q=0;q<3;q++)rr(ccx-6+q*.6,ccy-7+q*4.4,12,5,1,['#e9dcc4','#2a2428','#cdb48a','#5a1a2a'][(q+variant)%4],'rgba(0,0,0,.3)',.5);}
+                    }
+                    ctx.restore();
+                    // the hanging sign over the aisle: an obsidian plate on bronze, its shadow on the goods
+                    const label=d.label||(food?['PANTRY','CELLAR & OILS','THE GREENGROCER','PRESERVES'][variant%4]:['KNITWEAR','EVENING','DENIM & SHIRTS'][variant%3]);
+                    const sx=v?x+w/2:x+(d.signAt||.5)*w,sy=v?y+(d.signAt||.5)*h:y+h/2;
+                    ctx.save();ctx.font='7px Georgia, serif';const tw=ctx.measureText(label).width+16;
+                    rr(sx-tw/2+4,sy-6+6,tw,13,2,'rgba(0,0,0,.28)');rr(sx-tw/2,sy-7,tw,13,2,'#141116',C.brass,1);
+                    ctx.fillStyle='#d9bf8c';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText((d.aisle?d.aisle+'  •  ':'')+label,sx,sy);ctx.restore();
+                    break;
                 }
                 case 'ec_shelfwall': {                                 // cubbies of folded knits along the wall
                     plinth();const v=h>w,n=Math.floor(((v?h:w)-12)/26),cols=['#e8ddd0','#c9a98c','#7b2f45','#3a3540','#d7b7c0','#9aa38a'];
@@ -2144,7 +2214,7 @@
                 this.decorType = config.decorType || null;       // custom furniture art (clinic)
                 this.light = config.light || null;               // soft light that follows the prop: { radius, color, intensity, dx, dy }
                 this.headSide = config.headSide || null;
-                this.decor = { face: config.face, vertical: !!config.vertical, candles: !!config.candles, variant: config.variant | 0 };   // House pieces: facing, wall run, lit
+                this.decor = Object.assign({ face: config.face, vertical: !!config.vertical, candles: !!config.candles, variant: config.variant | 0 }, config.decor);   // House pieces: facing, wall run, lit
                 this.noNav = !!config.noNav;                     // thin wall pieces paths needn't route round
                 this.patient = !!config.patient;
                 this.noteId = config.noteId || null;

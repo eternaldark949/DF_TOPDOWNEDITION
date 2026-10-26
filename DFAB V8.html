@@ -14166,7 +14166,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     food:        { x: 50,   y: 50,  w: 570, h: 630,  type: 'indoor', label: 'Food Hall' },
                     fashion:     { x: 50,   y: 700, w: 570, h: 650,  type: 'indoor', label: 'Fashion' },
                     furniture:   { x: 1380, y: 50,  w: 570, h: 630,  type: 'indoor', label: 'Furniture' },
-                    electronics: { x: 1380, y: 700, w: 570, h: 650,  type: 'indoor', label: 'Electronics' }
+                    electronics: { x: 1380, y: 700, w: 570, h: 650,  type: 'indoor', label: 'Electronics' },
+                    emporium:    { x: 1970, y: 50,  w: 1230, h: 1300, type: 'indoor', label: 'The Emporium' }
                 },
                 doors: [
                     { x: 620,  y: 300, w: 20,  h: 160, type: 'arch', orientation: 'V', rooms: ['lobby', 'food'] },
@@ -14174,11 +14175,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     { x: 1360, y: 300, w: 20,  h: 160, type: 'arch', orientation: 'V', rooms: ['lobby', 'furniture'] },
                     { x: 1360, y: 950, w: 20,  h: 160, type: 'arch', orientation: 'V', rooms: ['lobby', 'electronics'] },
                     { x: 440,  y: 680, w: 160, h: 20,  type: 'arch', orientation: 'H', rooms: ['food', 'fashion'] },
-                    { x: 1400, y: 680, w: 160, h: 20,  type: 'arch', orientation: 'H', rooms: ['furniture', 'electronics'] }
+                    { x: 1400, y: 680, w: 160, h: 20,  type: 'arch', orientation: 'H', rooms: ['furniture', 'electronics'] },
+                    { x: 1950, y: 300, w: 20,  h: 160, type: 'arch', orientation: 'V', rooms: ['furniture', 'emporium'] },
+                    { x: 1950, y: 950, w: 20,  h: 160, type: 'arch', orientation: 'V', rooms: ['electronics', 'emporium'] }
                 ],
                 windows: [
                     { x: 80, y: 1334, w: 520, h: 16, facing: 'N', projectionLength: 160, tint: '255, 216, 164' },
-                    { x: 1400, y: 1334, w: 520, h: 16, facing: 'N', projectionLength: 160, tint: '255, 216, 164' }
+                    { x: 1400, y: 1334, w: 520, h: 16, facing: 'N', projectionLength: 160, tint: '255, 216, 164' },
+                    { x: 1990, y: 1334, w: 1190, h: 16, facing: 'N', projectionLength: 160, tint: '255, 216, 164' }
                 ]
             },
             'enni_cole_upper': {
@@ -14557,14 +14561,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             //   -----------|  Lobby + staircase  |-----------
             //   Fashion    |   (chandelier)      | Electronics
             'enni_cole_interior': {
-                id: 'enni_cole_interior', width: 2000, height: 1400, type: 'indoor',
-                label: 'Enni Cole', floorColor: '#c7bcae', ambientDarkness: 0.36,
-                navProps: 'all', wallStyle: { fill: '#44232f', stroke: 'rgba(229,192,131,0.65)' },
+                id: 'enni_cole_interior', width: 3250, height: 1400, type: 'indoor',
+                label: 'Enni Cole', floorColor: '#2a2528', ambientDarkness: 0.36,
+                navProps: 'all', wallStyle: { fill: '#151217', stroke: 'rgba(176,132,76,0.85)' },
                 spawn: { x: 1000, y: 1300 }, zones: [],
                 walls: [
-                    { x: 0, y: 0, w: 2000, h: 50 }, { x: 0, y: 1350, w: 850, h: 50 },
-                    { x: 1150, y: 1350, w: 850, h: 50 }, { x: 0, y: 0, w: 50, h: 1400 },
-                    { x: 1950, y: 0, w: 50, h: 1400 },
+                    { x: 0, y: 0, w: 3250, h: 50 }, { x: 0, y: 1350, w: 850, h: 50 },
+                    { x: 1150, y: 1350, w: 2100, h: 50 }, { x: 0, y: 0, w: 50, h: 1400 },
+                    { x: 3200, y: 0, w: 50, h: 1400 },
+                    // The Emporium behind Furniture and Electronics, an arch from each
+                    { x: 1950, y: 50, w: 20, h: 1300 },
                     // The wings: a wall down each side of the lobby, each wing split in two
                     { x: 620, y: 50, w: 20, h: 1300 }, { x: 1360, y: 50, w: 20, h: 1300 },
                     { x: 50, y: 680, w: 570, h: 20 }, { x: 1380, y: 680, w: 570, h: 20 }
@@ -14581,7 +14587,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     { id: 'enni_cole_couture', x: 330, y: 1000 }, { id: 'enni_cole_accessories', x: 1665, y: 1000 },
                     { id: 'enni_cole_checkout', x: 1000, y: 1150 }, { id: 'enni_cole_gallery', x: 1000, y: 470 },
                     { id: 'enni_cole_groceries', x: 540, y: 600 }, { id: 'enni_cole_electronics', x: 1665, y: 1000 },
-                    { id: 'enni_cole_furniture', x: 1665, y: 360 }
+                    { id: 'enni_cole_furniture', x: 1665, y: 360 }, { id: 'enni_cole_emporium', x: 2585, y: 1180 }
                 ]
             },
             // Enni Cole, upper floor: the gallery round the lobby's void (the chandelier hangs in it), the
@@ -14898,6 +14904,21 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         // ============================================================================
         /* Map-building shorthands (each map's case aliases them as F, S, A, L) */
         /** Decor that doesn't move (mass 1e7), drawn by its decorType; `color` is only the fallback fill. */
+        // The Emporium's aisles (Enni Cole): each one's sign and what its shelves carry, front view (_enniAisleArt)
+        const EMPORIUM_AISLES = [
+            ['BAKERY & CEREAL', ['box', 'box', 'can']],
+            ['PANTRY', ['can', 'box', 'jar']],
+            ['TEA & COFFEE', ['box', 'jar', 'can']],
+            ['PRESERVES', ['jar', 'jar', 'box']],
+            ['CONFECTIONERY', ['box', 'jar', 'toy']],
+            ['WINE & SPIRITS', ['bottle', 'bottle', 'box']],
+            ['HOME & LINEN', ['linen', 'linen', 'box']],
+            ['BATH & BEAUTY', ['beauty', 'beauty', 'jar']],
+            ['BOOKS & STATIONERY', ['book', 'book', 'box']],
+            ['TOYS & GAMES', ['toy', 'toy', 'box']],
+            ['MENSWEAR', ['fold', 'fold', 'box']],
+            ['WOMENSWEAR', ['fold', 'beauty', 'fold']]
+        ];
         const decorPropsIn = color => (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color, decorType }, extra));
         /** A round soft light (light pass only). */
         const softLight = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
@@ -15280,17 +15301,20 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         // The Food Hall: the cellar and the bakery on the north wall, produce and pantry islands,
                         // the chilled cases, and La Cuisine's counter of prepared dishes
                         F(70, 66, 300, 62, 'ec_wine'), F(392, 66, 210, 72, 'ec_bakery'),
-                        F(80, 180, 150, 100, 'ec_produce'), F(300, 180, 150, 100, 'ec_produce', { variant: 1 }),
-                        F(80, 330, 150, 60, 'ec_grocery'), F(300, 330, 150, 60, 'ec_grocery', { variant: 1 }),
-                        F(70, 440, 330, 76, 'ec_cold'), F(70, 572, 300, 80, 'ec_deli'),
+                        F(84, 166, 384, 46, 'ec_gondola', { variant: 2, decor: { aisle: 1 } }),
+                        F(84, 262, 384, 46, 'ec_gondola', { variant: 0, decor: { aisle: 2 } }),
+                        F(84, 358, 384, 46, 'ec_gondola', { variant: 1, decor: { aisle: 3 } }),
+                        F(70, 456, 330, 76, 'ec_cold'), F(70, 572, 300, 80, 'ec_deli'),
                         F(470, 456, 50, 50, 'ec_plant'),
-                        // Fashion: rails along the north wall, knitwear cubbies, folded tables and round rails,
+                        // Fashion: rails along the north wall, knitwear cubbies, clothing aisles, two-tier round rails,
                         // and dressed forms in the street windows
                         F(80, 726, 170, 36, 'ec_rack'), F(266, 726, 150, 36, 'ec_rack', { variant: 2 }),
                         F(56, 820, 32, 290, 'ec_shelfwall'),
-                        F(140, 880, 130, 70, 'ec_fashion_table'), F(140, 1050, 130, 70, 'ec_fashion_table', { variant: 2 }),
-                        F(340, 860, 80, 80, 'ec_round_rack'), F(340, 1040, 80, 80, 'ec_round_rack', { variant: 3 }),
-                        F(470, 1150, 80, 80, 'ec_round_rack', { variant: 4 }),
+                        F(124, 812, 300, 50, 'ec_cloth_aisle', { variant: 0, decor: { aisle: 'A' } }),
+                        F(124, 912, 300, 50, 'ec_cloth_aisle', { variant: 1, decor: { aisle: 'B' } }),
+                        F(470, 800, 104, 104, 'ec_round_rack', { variant: 0 }), F(470, 924, 104, 104, 'ec_round_rack', { variant: 1 }),
+                        F(140, 1030, 110, 110, 'ec_round_rack', { variant: 2 }), F(300, 1050, 96, 96, 'ec_round_rack', { variant: 3 }),
+                        F(462, 1110, 96, 96, 'ec_round_rack', { variant: 4 }),
                         ...[0, 1, 2, 3, 4].map(i => F(98 + i * 100, 1268, 40, 40, 'ec_mannequin', { variant: i })),
                         // Furniture: a living room, a dressed bedroom, a dining room, each on its rug
                         F(1420, 100, 200, 64, 'ec_sofa'), F(1636, 176, 64, 64, 'ec_armchair', { face: 'W' }),
@@ -15302,7 +15326,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         F(1480, 860, 175, 88, 'ec_laptop'), F(1730, 860, 130, 88, 'ec_tablet'),
                         F(1480, 1030, 175, 88, 'ec_audio'), F(1730, 1030, 130, 88, 'ec_tablet', { variant: 1 }),
                         F(1450, 1196, 380, 78, 'ec_appliances'),
-                        F(1890, 1100, 44, 64, 'ec_vending', { interactionType: 'vending_machine' })
+                        F(1890, 1100, 44, 64, 'ec_vending', { interactionType: 'vending_machine' }),
+                        // The Emporium: a dozen tall wooden aisles in two runs about a cross-aisle (art: _drawEnniAisles),
+                        // the tills along the windows
+                        ...EMPORIUM_AISLES.flatMap(([cat, kinds], i) => [0, 1].map(run => F(2070 + i * 90, run ? 620 : 180, 40, 360, 'ec_tall_aisle',
+                            { decor: { aisle: i + 1, cat, kinds, run, sign: run ? undefined : 580 }, visible: false }))),
+                        F(2120, 1150, 170, 60, 'ec_checkout'), F(2880, 1150, 170, 60, 'ec_checkout', { variant: 1 }),
+                        F(2000, 1260, 40, 40, 'ec_topiary'), F(3130, 1260, 40, 40, 'ec_topiary')
                     ];
                     e.npcs = [ new NPC(755, 1238, "Valentina", 'vip'), new NPC(330, 1180, "Model Kira", 'dancer'),
                         new NPC(1665, 975, "Concierge Lux", 'robot_gold') ];
@@ -15317,7 +15347,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         S(330, 300, 260, '#ffe3b2', 0.28), S(330, 560, 220, '#ffe6c2', 0.26),
                         S(330, 1000, 280, '#ffe6c2', 0.28), S(330, 1290, 200, '#ffdcae', 0.32),
                         S(1665, 360, 280, '#ffe2b2', 0.26), S(1665, 1000, 280, '#e1eaff', 0.24),
-                        S(755, 1180, 150, '#ffdaa0', 0.36), S(1245, 1180, 150, '#ffdaa0', 0.36)
+                        S(755, 1180, 150, '#ffdaa0', 0.36), S(1245, 1180, 150, '#ffdaa0', 0.36),
+                        A(2585, 700, 1200, 1260, '#ffdcb3', 0.1), ...[0, 1, 2, 3, 4, 5, 6].flatMap(i => [S(2115 + i * 180, 120, 200, '#ffe2b2', 0.26), S(2115 + i * 180, 1060, 200, '#ffe2b2', 0.26)]),
+                        ...[0, 1, 2, 3].map(i => S(2160 + i * 285, 580, 230, '#ffe6c2', 0.24))
                     ];
                     break;
                 }
@@ -19365,7 +19397,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         // deterministic product arrangements make its normal and reflection passes identical.
         function drawEnniDecorProp(ctx, p) {
             const x = p.x, y = p.y, w = p.width, h = p.height, d = p.decor || {}, variant = d.variant | 0;
-            const C = { brass: '#c6a365', bright: '#ead5a6', rose: '#713f52', dark: '#262328',
+            const C = { brass: '#b0844c', bright: '#ead5a6', rose: '#2b2328', dark: '#262328',
                 walnut: '#493428', cream: '#e8ddd0', ivory: '#f4eadc', glass: '#9faeb2' };
             const rr = (X,Y,W,H,r,col,stroke,lw=1) => {
                 ctx.beginPath(); ctx.roundRect(X,Y,W,H,r);
@@ -19541,7 +19573,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'ec_mannequin': {                                 // a dressed form on a marble plinth, seen from above
                     const dress=['#e9d3a6','#1c1a1f','#b0475f','#f3ece0','#2f5a4d','#7b3fa0'][variant%6],cx=x+w/2,cy=y+h/2,s=w/40;
-                    dot(cx,cy,w/2,'#5b3341',C.brass);dot(cx,cy,w/2-3,'#7d4b5a');
+                    dot(cx,cy,w/2,'#141116',C.brass);dot(cx,cy,w/2-3,'#2a252c');
                     // the gown's skirt, scalloped into folds, then the bodice and shoulders, the head turned to the room
                     ctx.fillStyle=dress;ctx.beginPath();
                     for(let i=0;i<=24;i++){const a=i*Math.PI/12,R=(14+(i%2?1.6:0))*s;ctx.lineTo(cx+Math.cos(a)*R,cy+2*s+Math.sin(a)*R*.92);}
@@ -19563,12 +19595,82 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     for(let i=0;i<n;i++){const X=x+7+i*9;rr(X,y+4,7,h-8,2,cols[(i*3+variant)%7],'rgba(0,0,0,.25)',.5);ctx.fillStyle='rgba(255,245,225,.18)';ctx.fillRect(X+1,y+5,1,h-10);}
                     break;
                 }
-                case 'ec_round_rack': {                                // a round rack of dresses
-                    dot(x+w/2,y+h/2,w/2,'rgba(42,35,40,.5)',C.brass);
-                    const cols=['#e9d3a6','#b0475f','#f3ece0','#1c1a1f','#d79bb1','#7b3fa0'];
-                    for(let i=0;i<16;i++){const a=i*Math.PI/8,X=x+w/2+Math.cos(a)*w*.36,Y=y+h/2+Math.sin(a)*w*.36;ctx.save();ctx.translate(X,Y);ctx.rotate(a);rr(-7,-3.5,14,7,2,cols[(i+variant)%6],'rgba(0,0,0,.25)',.5);ctx.restore();}
-                    ctx.strokeStyle=C.brass;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x+w/2,y+h/2,w*.36,0,Math.PI*2);ctx.stroke();
-                    dot(x+w/2,y+h/2,5,C.brass,C.dark);break;
+                case 'ec_round_rack': {                                // a two-tier round rack: bronze rails on an obsidian plinth, garments hung by colour
+                    const cx=x+w/2,cy=y+h/2,R=w/2,pal=[['#e9dcc4','#cdb48a','#a3815a','#6e5440','#2a2428','#f4ede0'],['#16301f','#2f5a4d','#5a1a2a','#8c2b3e','#1d2a4a','#0f0e12'],['#f2d6dc','#d79bb1','#b0475f','#e9d3a6','#f4ede0','#c9a3b8'],['#0f0e12','#2a2830','#55525c','#9a98a2','#d8d6dc','#1c1a1f'],['#3a2a1f','#7a5a3a','#c58f6a','#e2c79a','#5a1a2a','#1c1a1f']][variant%5];
+                    const hash=i=>{const s=Math.sin(i*91.7+variant*13.1)*4375.5;return s-Math.floor(s);};
+                    dot(cx+2,cy+3,R,'rgba(0,0,0,.28)');dot(cx,cy,R,'#141116',C.brass);dot(cx,cy,R-3,'#1f1b20');
+                    ctx.strokeStyle='rgba(255,240,215,.08)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(cx,cy,R-6,Math.PI*1.05,Math.PI*1.6);ctx.stroke();
+                    // garments on a tier: hangers on the rail, each piece a narrow shape falling outward, the colours graded round
+                    const tier=(rad,n,len,wid)=>{
+                        for(let i=0;i<n;i++){const a=i*Math.PI*2/n+.08,col=pal[Math.floor(i/n*pal.length*2)%pal.length],L=len*(.8+hash(i+rad)*.35);
+                            ctx.save();ctx.translate(cx+Math.cos(a)*rad,cy+Math.sin(a)*rad);ctx.rotate(a);
+                            // seen from above a hung piece is its shoulders edge-on: a slim shape, wider at the shoulder, the hem falling away
+                            ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(-1.5,-wid*.5);ctx.lineTo(L*.3,-wid*.62);ctx.lineTo(L,-wid*.36);ctx.quadraticCurveTo(L+1.2,0,L,wid*.36);ctx.lineTo(L*.3,wid*.62);ctx.lineTo(-1.5,wid*.5);ctx.closePath();ctx.fill();
+                            ctx.strokeStyle='rgba(0,0,0,.45)';ctx.lineWidth=.5;ctx.stroke();ctx.fillStyle='rgba(255,245,225,.2)';ctx.fillRect(0,-wid*.4,L*.7,.7);
+                            ctx.restore();}
+                        ctx.strokeStyle='#4a3420';ctx.lineWidth=3;ctx.beginPath();ctx.arc(cx,cy,rad,0,Math.PI*2);ctx.stroke();
+                        ctx.strokeStyle=C.brass;ctx.lineWidth=1.6;ctx.beginPath();ctx.arc(cx,cy,rad,0,Math.PI*2);ctx.stroke();
+                        ctx.strokeStyle='rgba(240,214,160,.7)';ctx.lineWidth=.6;ctx.beginPath();ctx.arc(cx,cy,rad-.6,Math.PI*1.1,Math.PI*1.7);ctx.stroke();
+                        for(let i=0;i<n;i++){const a=i*Math.PI*2/n+.08;dot(cx+Math.cos(a)*rad,cy+Math.sin(a)*rad,.8,'#e8cf9c');}
+                    };
+                    tier(R*.56,Math.round(R*2*Math.PI*.56/3.6),R*.38,4.2);
+                    tier(R*.27,Math.round(R*2*Math.PI*.27/3.8),R*.2,3.8);
+                    // the crown: a champagne post with a bronze finial and its little sign
+                    for(let i=0;i<4;i++){const a=i*Math.PI/2+Math.PI/4;ctx.strokeStyle=C.brass;ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(cx+Math.cos(a)*5,cy+Math.sin(a)*5);ctx.lineTo(cx+Math.cos(a)*R*.27,cy+Math.sin(a)*R*.27);ctx.stroke();}
+                    dot(cx,cy,6,'#cdb48a','#5c4128');dot(cx,cy,3,'#f1dfb6');dot(cx-1,cy-1,1,'#fffaf0');
+                    break;
+                }
+                // ── The aisles: obsidian gondolas, bronze price rails, goods seen from above on both faces ──
+                case 'ec_gondola': case 'ec_cloth_aisle': {
+                    const v=h>w,L=v?h:w,D=v?w:h,food=p.decorType==='ec_gondola';
+                    const hash=i=>{const s=Math.sin(i*127.1+variant*311.7+x*.13)*43758.5;return s-Math.floor(s);};
+                    ctx.save();ctx.translate(x,y);if(v){ctx.translate(w,0);ctx.rotate(Math.PI/2);}
+                    rr(2,3,L,D,4,'rgba(0,0,0,.3)');rr(0,0,L,D,4,'#161317','#5c4128',1);
+                    const cap=Math.min(26,D*.62);                                                  // the end caps
+                    rr(1,1,L-2,D-2,3,null,C.brass,1.2);
+                    ctx.fillStyle='#0d0b0e';ctx.fillRect(cap,D/2-1.5,L-2*cap,3);ctx.fillStyle='rgba(201,154,91,.5)';ctx.fillRect(cap,D/2-.4,L-2*cap,.8);   // the spine
+                    const half=(D-3)/2-4;
+                    // one face: goods in a row from cap to cap, `top` true for the north face (goods' fronts at its outer edge)
+                    const face=(top,kind,seed)=>{
+                        const Y0=top?3:D/2+1.5,H=half,run=L-2*cap-4;let X=cap+2,i=0;
+                        ctx.save();ctx.beginPath();ctx.rect(cap+1,Y0,run+2,H+1);ctx.clip();
+                        while(X<cap+2+run){const k=hash(seed+i*7.3),k2=hash(seed+i*3.1+9);
+                            if(kind==='box'){const bw=7+k*7,col=['#b0475f','#e9d3a6','#2f5a4d','#c58f6a','#1d2a4a','#f3ece0','#8a5a2a','#d5aa40'][(seed+i)%8];
+                                for(let s=0;s<2;s++){rr(X,Y0+1+s*(H/2),bw-1,H/2-1.5,.8,col,'rgba(0,0,0,.35)',.5);ctx.fillStyle='rgba(255,250,235,.45)';ctx.fillRect(X+1.5,Y0+2.5+s*(H/2),bw-4,1.6);}X+=bw;}
+                            else if(kind==='jar'){const R=2.6+k*1.4,col=['#c84a3a','#d5aa40','#7a4a2a','#e8994e','#6a8a3a','#a03a5a'][(seed+i)%6];
+                                for(let s=0;s<Math.max(1,Math.floor(H/(R*2+1)));s++){const yy=Y0+R+1+s*(R*2+1);dot(X+R,yy,R,col,'rgba(0,0,0,.4)');dot(X+R,yy,R*.62,['#c6a365','#e8e0d0','#2a2428'][(seed+i)%3]);dot(X+R-.8,yy-.8,.6,'rgba(255,255,255,.6)');}X+=R*2+1;}
+                            else if(kind==='bottle'){const col=['#3c2a3a','#2f4a2f','#6a3a2a','#c9b06a','#1f2a3a'][(seed+i)%5];
+                                for(let s=0;s<Math.max(1,Math.floor(H/7.5));s++){const yy=Y0+4+s*7.5;dot(X+3.2,yy,3.2,col,'rgba(0,0,0,.4)');dot(X+3.2,yy,1.2,'#c6a365');}X+=7;}
+                            else if(kind==='produce'){const bw=18+k*6,col=['#b74840','#d5aa40','#85a84e','#e8994e','#6b3a6a','#c8d86a'][(seed+i)%6];
+                                rr(X,Y0+1,bw-2,H-1,1.5,'#4a3424','#8a6844',.6);for(let q=0;q<bw*H/22;q++){const fx=X+3+hash(seed+i*5+q)*(bw-8),fy=Y0+3.5+hash(seed+i*9+q*2)*(H-6);dot(fx,fy,2.4,col);dot(fx-.7,fy-.7,.6,'rgba(255,250,210,.4)');}X+=bw;}
+                            else if(kind==='fold'){const bw=13,col=['#f3ece0','#e9d3a6','#cdb48a','#a3815a','#6e5440','#3a3540','#1c1a1f','#5a1a2a','#2f5a4d','#1d2a4a'][Math.floor(i/2+seed)%10];
+                                rr(X,Y0+1.5,bw-2,H-2,1.2,col,'rgba(0,0,0,.35)',.5);ctx.fillStyle='rgba(0,0,0,.16)';for(let f=1;f<4;f++)ctx.fillRect(X+1,Y0+1.5+f*(H-2)/4,bw-4,.7);ctx.fillStyle='rgba(255,250,235,.2)';ctx.fillRect(X+1,Y0+2,1,H-4);X+=bw;}
+                            else if(kind==='hang'){const col=['#e9dcc4','#cdb48a','#a3815a','#2a2428','#5a1a2a','#8c2b3e','#2f5a4d','#1d2a4a','#f2d6dc','#16141a'][Math.floor(i/3+seed)%10],Lg=H*(.82+k2*.2);
+                                ctx.fillStyle=col;ctx.beginPath();const y0=top?Y0+H:Y0,dir=top?-1:1;ctx.moveTo(X,y0);ctx.lineTo(X+5,y0);ctx.lineTo(X+5.6,y0+dir*Lg*.7);ctx.quadraticCurveTo(X+2.5,y0+dir*Lg,X-.6,y0+dir*Lg*.7);ctx.closePath();ctx.fill();ctx.strokeStyle='rgba(0,0,0,.4)';ctx.lineWidth=.5;ctx.stroke();X+=4.2;}
+                            i++;}
+                        ctx.restore();
+                        // the face's bronze price rail at its outer edge, a champagne tag every so often
+                        const ry=top?1.5:D-3;ctx.fillStyle=C.brass;ctx.fillRect(cap,ry,L-2*cap,1.5);
+                        if(kind!=='hang')for(let t=cap+10;t<L-cap-6;t+=26){ctx.fillStyle='#ead5a6';ctx.fillRect(t,top?ry-.5:ry,5,2.5);}
+                    };
+                    const kinds=food?[['box','jar'],['bottle','box'],['produce','produce'],['jar','bottle']][variant%4]:[['fold','fold'],['hang','hang'],['fold','hang']][variant%3];
+                    if(kinds[1]==='hang'&&kinds[0]==='hang'){ctx.fillStyle='rgba(0,0,0,.35)';ctx.fillRect(cap,D/2-2,L-2*cap,4);}
+                    face(true,kinds[0],variant*17+1);face(false,kinds[1],variant*17+40);
+                    if(kinds.includes('hang')){ctx.fillStyle=C.brass;ctx.fillRect(cap,D/2-1,L-2*cap,2);ctx.fillStyle='rgba(255,238,200,.6)';ctx.fillRect(cap,D/2-1,L-2*cap,.6);}
+                    // end caps: a featured stack each end on champagne stone
+                    for(const ex of [0,L-cap]){rr(ex+2,2,cap-4,D-4,3,'#8d795d',C.brass,1);rr(ex+5,5,cap-10,D-10,2,'#a48e6c');
+                        const ccx=ex+cap/2,ccy=D/2;
+                        if(food){const col=[['#e8994e','#d5aa40'],['#6a2a3a','#2f4a2f'],['#b74840','#85a84e'],['#d6ac6c','#a36b42']][variant%4];for(let q=0;q<7;q++){const a=q*Math.PI*2/6;dot(q?ccx+Math.cos(a)*4.6:ccx,q?ccy+Math.sin(a)*4.6:ccy,2.6,col[q%2],'rgba(0,0,0,.35)');}}
+                        else{for(let q=0;q<3;q++)rr(ccx-6+q*.6,ccy-7+q*4.4,12,5,1,['#e9dcc4','#2a2428','#cdb48a','#5a1a2a'][(q+variant)%4],'rgba(0,0,0,.3)',.5);}
+                    }
+                    ctx.restore();
+                    // the hanging sign over the aisle: an obsidian plate on bronze, its shadow on the goods
+                    const label=d.label||(food?['PANTRY','CELLAR & OILS','THE GREENGROCER','PRESERVES'][variant%4]:['KNITWEAR','EVENING','DENIM & SHIRTS'][variant%3]);
+                    const sx=v?x+w/2:x+(d.signAt||.5)*w,sy=v?y+(d.signAt||.5)*h:y+h/2;
+                    ctx.save();ctx.font='7px Georgia, serif';const tw=ctx.measureText(label).width+16;
+                    rr(sx-tw/2+4,sy-6+6,tw,13,2,'rgba(0,0,0,.28)');rr(sx-tw/2,sy-7,tw,13,2,'#141116',C.brass,1);
+                    ctx.fillStyle='#d9bf8c';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText((d.aisle?d.aisle+'  •  ':'')+label,sx,sy);ctx.restore();
+                    break;
                 }
                 case 'ec_shelfwall': {                                 // cubbies of folded knits along the wall
                     plinth();const v=h>w,n=Math.floor(((v?h:w)-12)/26),cols=['#e8ddd0','#c9a98c','#7b2f45','#3a3540','#d7b7c0','#9aa38a'];
@@ -19826,7 +19928,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.decorType = config.decorType || null;       // custom furniture art (clinic)
                 this.light = config.light || null;               // soft light that follows the prop: { radius, color, intensity, dx, dy }
                 this.headSide = config.headSide || null;
-                this.decor = { face: config.face, vertical: !!config.vertical, candles: !!config.candles, variant: config.variant | 0 };   // House pieces: facing, wall run, lit
+                this.decor = Object.assign({ face: config.face, vertical: !!config.vertical, candles: !!config.candles, variant: config.variant | 0 }, config.decor);   // House pieces: facing, wall run, lit
                 this.noNav = !!config.noNav;                     // thin wall pieces paths needn't route round
                 this.patient = !!config.patient;
                 this.noteId = config.noteId || null;
@@ -20212,7 +20314,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             ps_fireplace: true, ps_tub: true, ps_pool: true,                                                                     // embers, petal ring, ripples
             sc_altar: true, sc_candles: true, sc_brazier: true,                                                                  // flames and coals
             cc_espresso: true, cc_fireplace: true, cc_record: true, cc_stove: true,                                              // gauge, embers, arc, flame
-            monitor: true,                                                                                                       // the trace
+            monitor: true,
+            ec_tall_aisle: true,                                                                                                 // drawn with the floor (_drawEnniAisles)                                                                                                       // the trace
             ta_turntable: true,                                                                                                  // the plinth turns
             dp_pool: true, dp_pillar: true, dp_brazier: true, dp_fountain: true, dp_altar: true, dp_embers: true                 // ripples, arc, fire, jets, embers
         };
@@ -77875,15 +77978,120 @@ engineMixin({
             drawEnniInterior(ctx) {
                 if (!this._enniFloor) this._enniFloor = this._paintEnniFloor();
                 ctx.drawImage(this._enniFloor, 0, 0);
+                this._drawEnniAisles(ctx);
             },
             drawEnniUpperInterior(ctx) {
                 if (!this._enniUpperFloor) this._enniUpperFloor = this._paintEnniUpperFloor();
                 ctx.drawImage(this._enniUpperFloor, 0, 0);
             },
 
+            /**
+             * The Emporium's tall wooden aisles (ec_tall_aisle props carry their collision, drawn here instead):
+             * each a mahogany gondola whose crown is the base scaled about the camera, so the nearer faces rise
+             * into view as she walks. Drawn after the floor, farthest first; each face painted once, then mapped
+             * on in thin slices (the face is a trapezoid; each slice near enough a parallelogram).
+             */
+            _drawEnniAisles(ctx) {
+                const V=this.view;if(!V)return;
+                const K=0.11,cx=V.x,cy=V.y,z=V.zoom||1,hw=this.canvas.width/2/z+80,hh=this.canvas.height/2/z+80;
+                const list=[];for(const p of this.props)if(p.decorType==='ec_tall_aisle'&&p.x<cx+hw&&p.x+p.width>cx-hw&&p.y<cy+hh&&p.y+p.height>cy-hh)list.push(p);
+                const far=p=>{const X=Math.max(p.x,Math.min(cx,p.x+p.width)),Y=Math.max(p.y,Math.min(cy,p.y+p.height));return (X-cx)**2+(Y-cy)**2;};
+                list.sort((a,b)=>far(b)-far(a));
+                const P=(x,y,k=K)=>[cx+(x-cx)*(1+k),cy+(y-cy)*(1+k)];
+                ctx.save();
+                for(const p of list){
+                    const A=p._wa||(p._wa=this._enniAisleArt(p)),x=p.x,y=p.y,w=p.width,h=p.height;
+                    ctx.globalAlpha=1;ctx.fillStyle='rgba(0,0,0,.32)';ctx.fillRect(x-4,y-3,w+8,h+6);                   // its shadow on the stone
+                    // one face: base edge B0→B1 on the floor, the texture's left at B0, its foot on the floor
+                    const face=(img,B0,B1,n)=>{const S=img.width/n;
+                        for(let i=0;i<n;i++){const b0=[B0[0]+(B1[0]-B0[0])*i/n,B0[1]+(B1[1]-B0[1])*i/n],b1=[B0[0]+(B1[0]-B0[0])*(i+1)/n,B0[1]+(B1[1]-B0[1])*(i+1)/n],t0=P(b0[0],b0[1]);
+                            const vx=t0[0]-b0[0],vy=t0[1]-b0[1],H=img.height,sw=Math.min(S+1,img.width-i*S);
+                            ctx.restore();ctx.save();
+                            ctx.transform((b1[0]-b0[0])/S,(b1[1]-b0[1])/S,-vx/H,-vy/H,b0[0]+vx,b0[1]+vy);
+                            ctx.drawImage(img,i*S,0,sw,H,0,0,sw,H);}
+                        ctx.restore();ctx.save();};
+                    const n=Math.max(2,Math.ceil(h/30));
+                    if(cx<x)face(A.side,[x,y],[x,y+h],n);
+                    if(cx>x+w)face(A.side2,[x+w,y+h],[x+w,y],n);
+                    if(cy<y)face(A.end,[x+w,y],[x,y],1);
+                    if(cy>y+h)face(A.end,[x,y+h],[x+w,y+h],1);
+                    const a=P(x,y),b=P(x+w,y+h);ctx.drawImage(A.top,a[0],a[1],b[0]-a[0],b[1]-a[1]);
+                }
+                // the hanging aisle markers over the cross-aisle, higher still
+                for(const p of list){const d=p.decor||{};if(!d.sign)continue;
+                    const sx=p.x+p.width/2,sy=d.sign,[X,Y]=P(sx,sy,K*1.5),s=1+K*1.5;
+                    ctx.strokeStyle='rgba(176,132,76,.6)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(X-20*s,Y);ctx.lineTo(...P(sx-20,sy-30,K*1.5));ctx.moveTo(X+20*s,Y);ctx.lineTo(...P(sx+20,sy-30,K*1.5));ctx.stroke();
+                    ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.roundRect(sx-30+5,sy-14+7,60,28,4);ctx.fill();
+                    ctx.fillStyle='#3a1d12';ctx.strokeStyle='#b0844c';ctx.lineWidth=1.5;ctx.beginPath();ctx.roundRect(X-31*s,Y-15*s,62*s,30*s,5);ctx.fill();ctx.stroke();
+                    ctx.strokeStyle='rgba(234,206,152,.45)';ctx.lineWidth=.7;ctx.beginPath();ctx.roundRect(X-27*s,Y-11*s,54*s,22*s,3);ctx.stroke();
+                    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#ecd29c';ctx.font=`bold ${13*s}px Georgia, serif`;ctx.fillText(String(d.aisle),X,Y-3*s);
+                    ctx.font=`${5.2*s}px Georgia, serif`;ctx.fillStyle='#d6bb88';ctx.fillText(d.cat,X,Y+7.5*s);
+                }
+                ctx.restore();
+            },
+
+            /** One tall aisle's art: its two long faces, an end face and its crown, painted once. */
+            _enniAisleArt(p) {
+                const d=p.decor||{},L=p.height,D=p.width,HH=60,S=1.6,r=seededRandom(4000+(d.aisle|0)*31+(d.run|0)*7);
+                const WOOD='#5b331d',DARK='#2a140a',MID='#7d4727',LIGHT='#b07443',BRASS='#b98b4e';
+                const mk=(W,H)=>{const cv=document.createElement('canvas');cv.width=Math.ceil(W*S);cv.height=Math.ceil(H*S);const c=cv.getContext('2d');c.scale(S,S);return [cv,c];};
+                const pick=a=>a[r()*a.length|0];
+                // goods on one shelf, front view: x0..x1, the shelf top at y (goods stand on it), h tall at most
+                const goods=(c,kind,x0,x1,y,h)=>{let X=x0+1;
+                    while(X<x1-3){const k=r();
+                        if(kind==='box'){const bw=5+k*5,bh=h*(.65+r()*.3),col=pick(['#b0475f','#e9d3a6','#2f5a4d','#c58f6a','#1d2a4a','#f3ece0','#8a5a2a','#d5aa40','#7a1f2a']);c.fillStyle=col;c.fillRect(X,y-bh,bw-.6,bh);c.fillStyle='rgba(255,250,235,.55)';c.fillRect(X+.8,y-bh*.62,bw-2.2,bh*.22);c.fillStyle='rgba(0,0,0,.25)';c.fillRect(X+bw-1.4,y-bh,.8,bh);X+=bw;}
+                        else if(kind==='can'){const bw=4.2,bh=h*.55,col=pick(['#b74840','#d5aa40','#3a6a4a','#e8994e','#2a3a6a']);for(let t=0;t<(h>12?2:1);t++){c.fillStyle=col;c.fillRect(X,y-bh*(t+1),bw-.5,bh-.4);c.fillStyle='#e8dcc4';c.fillRect(X,y-bh*(t+1)+bh*.3,bw-.5,bh*.3);c.fillStyle='rgba(255,255,255,.3)';c.fillRect(X+.6,y-bh*(t+1),.6,bh-.4);}X+=bw;}
+                        else if(kind==='jar'){const bw=5,bh=h*.6,col=pick(['#c84a3a','#d5aa40','#7a4a2a','#e8994e','#6a8a3a','#a03a5a']);c.fillStyle=col;c.fillRect(X,y-bh,bw-.8,bh);c.fillStyle=pick(['#c6a365','#e8e0d0','#2a2428']);c.fillRect(X-.2,y-bh-1.4,bw-.4,1.6);c.fillStyle='#efe2c4';c.fillRect(X+.6,y-bh*.65,bw-2.2,bh*.3);X+=bw+.3;}
+                        else if(kind==='bottle'){const col=pick(['#3c2a3a','#2f4a2f','#6a3a2a','#c9b06a','#1f2a3a','#5a1a2a']),bh=h*.92;c.fillStyle=col;c.fillRect(X,y-bh*.62,3.6,bh*.62);c.fillRect(X+1.1,y-bh,1.4,bh*.4);c.fillStyle='#e8dcc4';c.fillRect(X+.3,y-bh*.42,3,bh*.16);c.fillStyle='rgba(255,255,255,.25)';c.fillRect(X+.4,y-bh*.6,.5,bh*.5);X+=4.4;}
+                        else if(kind==='book'){const bw=1.6+k*1.8,bh=h*(.7+r()*.25),col=pick(['#5a1a2a','#1d2a4a','#2f5a4d','#c9b06a','#3a2a20','#8a3a2a','#e9d3a6','#1c1a1f']);c.fillStyle=col;c.fillRect(X,y-bh,bw-.3,bh);c.fillStyle='rgba(234,206,152,.7)';c.fillRect(X,y-bh*.8,bw-.3,.5);X+=bw;}
+                        else if(kind==='linen'){const bw=11,col=pick(['#f3ece0','#e9d3a6','#cdb48a','#b8c4c8','#d7b7c0','#9aa38a']);for(let t=0;t<4&&t*2.6<h-2;t++){c.fillStyle=col;c.fillRect(X,y-2.6*(t+1),bw-1,2.4);c.fillStyle='rgba(0,0,0,.15)';c.fillRect(X,y-2.6*(t+1)+2,bw-1,.4);}X+=bw;}
+                        else if(kind==='fold'){const bw=10,col=pick(['#f3ece0','#cdb48a','#a3815a','#3a3540','#1c1a1f','#5a1a2a','#2f5a4d','#1d2a4a','#6e5440']);for(let t=0;t<4&&t*3<h-2;t++){c.fillStyle=col;c.fillRect(X,y-3*(t+1),bw-1,2.8);c.fillStyle='rgba(255,255,255,.12)';c.fillRect(X,y-3*(t+1),bw-1,.5);}X+=bw;}
+                        else if(kind==='beauty'){const bw=3+k*2.5,bh=h*(.4+r()*.45),col=pick(['#f2d6dc','#d79bb1','#e9d3a6','#ffffff','#b0475f','#c6a365']);c.fillStyle=col;c.fillRect(X,y-bh,bw-.5,bh);c.fillStyle=pick(['#c6a365','#1c1a1f','#e8e0d0']);c.fillRect(X,y-bh-1.2,bw-.5,1.3);X+=bw+.4;}
+                        else if(kind==='toy'){const bw=7+k*6,bh=h*(.6+r()*.35),col=pick(['#c84a3a','#3a6ab0','#d5aa40','#5a9a4a','#e8994e','#8a4ab0']);c.fillStyle=col;c.fillRect(X,y-bh,bw-.8,bh);c.fillStyle='rgba(255,255,255,.6)';c.beginPath();c.arc(X+bw/2-.4,y-bh/2,Math.min(bw,bh)*.25,0,Math.PI*2);c.fill();X+=bw;}
+                        else X+=4;
+                        if(r()<.05)X+=3;}
+                };
+                const kinds=d.kinds||['box','jar','can','bottle'];
+                // a long face: carved pilasters every so often, shelves of goods between, a crown with dentils, a kick plate
+                const side=(seedShift)=>{const [cv,c]=mk(L,HH);
+                    c.fillStyle=DARK;c.fillRect(0,0,L,HH);c.fillStyle=WOOD;c.fillRect(0,6,L,HH-12);
+                    const bays=Math.max(1,Math.round(L/90)),bw=L/bays,shelves=4,top=9,bot=HH-8,sh=(bot-top)/shelves;
+                    for(let s=0;s<shelves;s++){const yy=top+(s+1)*sh;c.fillStyle='#1a0b05';c.fillRect(0,yy-sh+.5,L,sh-1.5);
+                        for(let b=0;b<bays;b++)goods(c,kinds[(s+b+seedShift)%kinds.length],b*bw+4,(b+1)*bw-4,yy-1.4,sh-3);
+                        c.fillStyle=LIGHT;c.fillRect(0,yy-1.6,L,1.6);c.fillStyle='#ead5a6';for(let t=8;t<L;t+=21)c.fillRect(t,yy-1.5,3,1.2);}
+                    for(let b=0;b<=bays;b++){const X=Math.min(L-4,Math.max(0,b*bw-2));c.fillStyle=MID;c.fillRect(X,6,4,HH-12);c.fillStyle=LIGHT;c.fillRect(X+.6,6,.8,HH-12);c.fillStyle=DARK;c.fillRect(X+3.2,6,.8,HH-12);
+                        c.fillStyle=BRASS;c.beginPath();c.arc(X+2,top-1,1.6,0,Math.PI*2);c.fill();c.beginPath();c.arc(X+2,bot+1.5,1.2,0,Math.PI*2);c.fill();}
+                    // the crown: a moulded cornice and its dentils; the kick plate with a brass rail
+                    c.fillStyle=MID;c.fillRect(0,0,L,6);c.fillStyle=LIGHT;c.fillRect(0,5,L,1);c.fillStyle=DARK;for(let t=1;t<L;t+=3)c.fillRect(t,2.2,1.4,2.2);
+                    c.fillStyle=DARK;c.fillRect(0,HH-6,L,6);c.fillStyle=BRASS;c.fillRect(0,HH-6,L,.9);
+                    return cv;};
+                // the end: a carved panel under an arch, the aisle's number on a brass oval
+                const end=()=>{const [cv,c]=mk(D,HH);c.fillStyle=DARK;c.fillRect(0,0,D,HH);c.fillStyle=MID;c.fillRect(2,6,D-4,HH-12);
+                    c.fillStyle=WOOD;c.beginPath();c.moveTo(6,HH-10);c.lineTo(6,20);c.quadraticCurveTo(D/2,6,D-6,20);c.lineTo(D-6,HH-10);c.closePath();c.fill();
+                    c.strokeStyle=LIGHT;c.lineWidth=.8;c.stroke();c.fillStyle=BRASS;c.beginPath();c.ellipse(D/2,24,7,5,0,0,Math.PI*2);c.fill();
+                    c.fillStyle=DARK;c.font='bold 7px Georgia, serif';c.textAlign='center';c.textBaseline='middle';c.fillText(String(d.aisle||''),D/2,24.5);
+                    c.strokeStyle='rgba(234,206,152,.5)';c.lineWidth=.6;for(let t=0;t<3;t++){c.beginPath();c.moveTo(10,34+t*6);c.quadraticCurveTo(D/2,30+t*6,D-10,34+t*6);c.stroke();}
+                    c.fillStyle=MID;c.fillRect(0,0,D,6);c.fillStyle=DARK;for(let t=1;t<D;t+=3)c.fillRect(t,2.2,1.4,2.2);c.fillStyle=BRASS;c.fillRect(0,HH-6,D,.9);
+                    return cv;};
+                // the crown seen from above: a raised panel inside a moulded rim, rosettes, finials at the corners
+                const top=()=>{const [cv,c]=mk(D,L);c.fillStyle=DARK;c.fillRect(0,0,D,L);c.fillStyle=MID;c.fillRect(1.5,1.5,D-3,L-3);
+                    c.fillStyle=WOOD;c.fillRect(6,6,D-12,L-12);
+                    for(let t=0;t<40;t++){c.strokeStyle=`rgba(${r()<.5?20:170},${r()<.5?8:100},4,${.08+r()*.1})`;c.lineWidth=.5+r();c.beginPath();const X=7+r()*(D-14);c.moveTo(X,6);c.bezierCurveTo(X+r()*4-2,L*.3,X+r()*4-2,L*.7,X+r()*4-2,L-6);c.stroke();}
+                    c.strokeStyle=LIGHT;c.lineWidth=.8;c.strokeRect(4,4,D-8,L-8);c.strokeStyle='rgba(0,0,0,.5)';c.strokeRect(6.5,6.5,D-13,L-13);
+                    // raised panels, one per bay, bevelled
+                    const bays=Math.max(1,Math.round(L/90)),bl=(L-12)/bays;
+                    for(let b=0;b<bays;b++){const Y=6+b*bl+5,H=bl-10;c.fillStyle='rgba(255,214,170,.07)';c.fillRect(10,Y,D-20,H);c.strokeStyle=LIGHT;c.lineWidth=.7;c.strokeRect(10,Y,D-20,H);c.strokeStyle='rgba(0,0,0,.45)';c.strokeRect(11.2,Y+1.2,D-22.4,H-2.4);}
+                    for(let t=6+bl;t<L-12;t+=bl){c.fillStyle=BRASS;c.beginPath();c.arc(D/2,t,3.2,0,Math.PI*2);c.fill();c.fillStyle=DARK;for(let q=0;q<8;q++){const a=q*Math.PI/4;c.beginPath();c.arc(D/2+Math.cos(a)*2.2,t+Math.sin(a)*2.2,.6,0,Math.PI*2);c.fill();}}
+                    for(const [X,Y] of [[3.5,3.5],[D-3.5,3.5],[3.5,L-3.5],[D-3.5,L-3.5]]){c.fillStyle=BRASS;c.beginPath();c.arc(X,Y,3,0,Math.PI*2);c.fill();c.fillStyle='#f1dfb6';c.beginPath();c.arc(X-.8,Y-.8,1,0,Math.PI*2);c.fill();}
+                    c.strokeStyle=BRASS;c.lineWidth=.8;c.strokeRect(1,1,D-2,L-2);
+                    const g=c.createLinearGradient(0,0,D,0);g.addColorStop(0,'rgba(255,220,180,.1)');g.addColorStop(.5,'rgba(255,220,180,0)');g.addColorStop(1,'rgba(0,0,0,.15)');c.fillStyle=g;c.fillRect(0,0,D,L);
+                    return cv;};
+                return { side: side(0), side2: side(2), end: end(), top: top() };
+            },
+
             /** The painting kit both floors share: slabs, parquet, tiles, rugs, titles, thresholds and stairs. */
             _enniKit(c, r) {
-                const GOLD = '#c6a365';
+                const GOLD = '#a97b45';
                 const rr = (x,y,w,h,rad,col,stroke,lw=1)=>{c.beginPath();c.roundRect(x,y,w,h,rad);if(col){c.fillStyle=col;c.fill();}if(stroke){c.strokeStyle=stroke;c.lineWidth=lw;c.stroke();}};
                 const clip = (x,y,w,h,fn)=>{c.save();c.beginPath();c.rect(x,y,w,h);c.clip();fn();c.restore();};
                 // Honed marble slabs with soft veins; `tone` the base colour
@@ -77892,6 +78100,22 @@ engineMixin({
                         c.strokeStyle='rgba(104,84,69,.18)';c.lineWidth=.7;c.strokeRect(X+.5,Y+.5,size-1,size-1);}
                     if(veins)for(let i=0;i<w*h/22000;i++){let X=x+r()*w,Y=y+r()*h;c.strokeStyle=`rgba(117,88,84,${.045+r()*.08})`;c.lineWidth=.5+r()*1.6;c.beginPath();c.moveTo(X,Y);
                         for(let k=0;k<4;k++){const nx=X+(r()-.45)*130,ny=Y+(r()-.55)*100;c.quadraticCurveTo(X+30,Y-22,nx,ny);X=nx;Y=ny;}c.stroke();}
+                });
+                // Polished granite slabs: a base tone, flecks of crystal and mica, a sheen, bronze-lined seams
+                const OBSIDIAN={base:[27,25,30],var:5,dens:30,flecks:['#3a363d','#2f2b31','#45404a','#0b0a0c','#121014','#4f4a54','#6b5c48'],glint:'#b8996a'};
+                const CHAMPAGNE={base:[141,121,93],var:10,dens:16,flecks:['#5e4f3d','#c6ae86','#3a3128','#ddc9a4','#7c6650','#a48c6c'],glint:'#efe0bf'};
+                const granite = (x,y,w,h,stone=OBSIDIAN,size=100,seam=GOLD,alt=null)=>clip(x,y,w,h,()=>{
+                    for(let Y=y,j=0;Y<y+h;Y+=size,j++)for(let X=x,i=0;X<x+w;X+=size,i++){
+                        const S=alt&&(i+j)%2?alt:stone,v=(r()-.5)*S.var|0;
+                        c.fillStyle=`rgb(${S.base[0]+v},${S.base[1]+v},${S.base[2]+v})`;c.fillRect(X,Y,size,size);
+                        for(let k=0;k<size*size/S.dens;k++){c.globalAlpha=.2+r()*.5;c.fillStyle=S.flecks[r()*S.flecks.length|0];const q=.6+r()*1.5;c.fillRect(X+r()*size,Y+r()*size,q,q*(.6+r()*.8));}
+                        for(let k=0;k<size*size/900;k++){c.globalAlpha=.5+r()*.4;c.fillStyle=S.flecks[r()*S.flecks.length|0];c.beginPath();c.ellipse(X+r()*size,Y+r()*size,1+r()*2.6,.8+r()*1.8,r()*3,0,Math.PI*2);c.fill();}
+                        c.fillStyle=S.glint;for(let k=0;k<size*size/1400;k++){c.globalAlpha=.35+r()*.45;c.fillRect(X+r()*size,Y+r()*size,.9,.9);}
+                        c.globalAlpha=1;const g=c.createLinearGradient(X,Y,X+size,Y+size);g.addColorStop(0,'rgba(255,246,226,.07)');g.addColorStop(.45,'rgba(255,246,226,0)');g.addColorStop(.75,'rgba(255,246,226,.035)');g.addColorStop(1,'rgba(0,0,0,.06)');c.fillStyle=g;c.fillRect(X,Y,size,size);
+                    }
+                    // the seams: a hairline of shadow, then the bronze strip
+                    c.fillStyle='rgba(0,0,0,.45)';for(let X=x;X<=x+w;X+=size)c.fillRect(X-1,y,1,h);for(let Y=y;Y<=y+h;Y+=size)c.fillRect(x,Y-1,w,1);
+                    if(seam){c.fillStyle=seam;for(let X=x;X<=x+w;X+=size)c.fillRect(X,y,1.3,h);for(let Y=y;Y<=y+h;Y+=size)c.fillRect(x,Y,w,1.3);}
                 });
                 // Oak or walnut herringbone
                 const parquet = (x,y,w,h,base,dark)=>clip(x,y,w,h,()=>{
@@ -77918,15 +78142,15 @@ engineMixin({
                 const title = (str,x,y,sub,size=20,col='#694450')=>{c.textAlign='center';c.textBaseline='middle';c.font=`${size}px Georgia, serif`;c.fillStyle=col;c.fillText(str,x,y);
                     if(sub){c.font='9px Georgia, serif';c.fillStyle='#816d56';c.fillText(sub,x,y+size*.9+4);}};
                 // A marble threshold under an arch, brass at both edges
-                const threshold = d=>{const v=d.h>d.w;c.fillStyle='#e4d8c6';c.fillRect(d.x-(v?6:0),d.y-(v?0:6),d.w+(v?12:0),d.h+(v?0:12));c.fillStyle=GOLD;
+                const threshold = d=>{const v=d.h>d.w;c.fillStyle='#8f7a5d';c.fillRect(d.x-(v?6:0),d.y-(v?0:6),d.w+(v?12:0),d.h+(v?0:12));c.fillStyle=GOLD;
                     if(v){c.fillRect(d.x-6,d.y,1.5,d.h);c.fillRect(d.x+d.w+4.5,d.y,1.5,d.h);}else{c.fillRect(d.x,d.y-6,d.w,1.5);c.fillRect(d.x,d.y+d.h+4.5,d.w,1.5);}};
                 // A flight of stairs: `n` treads from y0 to y1, lit from `lightTop` (going up) or darker as they fall
                 const stairs = (x,y0,w,y1,up)=>{
                     const n=Math.round((y1-y0)/16);
-                    for(let i=0;i<n;i++){const Y=y0+i*(y1-y0)/n,H=(y1-y0)/n,k=up?i/n:1-i/n,v=168+70*k|0;
-                        c.fillStyle=`rgb(${v},${v-10|0},${v-22|0})`;c.fillRect(x,Y,w,H);c.fillStyle='rgba(60,36,40,.45)';c.fillRect(x,Y+H-2,w,2);c.fillStyle='rgba(255,246,225,.35)';c.fillRect(x,Y,w,1);}
+                    for(let i=0;i<n;i++){const Y=y0+i*(y1-y0)/n,H=(y1-y0)/n,k=up?i/n:1-i/n;
+                        c.fillStyle=`rgb(${92+62*k|0},${78+54*k|0},${60+42*k|0})`;c.fillRect(x,Y,w,H);c.fillStyle='rgba(60,36,40,.45)';c.fillRect(x,Y+H-2,w,2);c.fillStyle='rgba(255,246,225,.35)';c.fillRect(x,Y,w,1);}
                     // the rose runner and its brass rods
-                    const rx=x+w*.27,rw=w*.46;c.fillStyle='#7a3a52';c.fillRect(rx,y0,rw,y1-y0);c.fillStyle='rgba(0,0,0,.18)';for(let i=0;i<n;i++)c.fillRect(rx,y0+i*(y1-y0)/n+(y1-y0)/n-2,rw,2);
+                    const rx=x+w*.27,rw=w*.46;c.fillStyle='#1c191d';c.fillRect(rx,y0,rw,y1-y0);c.fillStyle='rgba(0,0,0,.18)';for(let i=0;i<n;i++)c.fillRect(rx,y0+i*(y1-y0)/n+(y1-y0)/n-2,rw,2);
                     c.fillStyle=GOLD;for(let i=0;i<n;i++){const Y=y0+i*(y1-y0)/n+(y1-y0)/n-3;c.fillRect(rx-3,Y,rw+6,1.2);}
                     c.fillStyle='rgba(224,191,130,.6)';c.fillRect(rx+3,y0,1,y1-y0);c.fillRect(rx+rw-4,y0,1,y1-y0);
                 };
@@ -77934,55 +78158,71 @@ engineMixin({
                 const shopGlass = (x0,x1,Y)=>{for(let x=x0;x+94<=x1;x+=100){
                     rr(x,Y,94,28,1,'#31333a',GOLD,.8);const g=c.createLinearGradient(x,Y+1,x+90,Y+23);g.addColorStop(0,'#6b6267');g.addColorStop(.6,'#aa8f77');g.addColorStop(1,'#4c464f');rr(x+4,Y+3,86,22,1,g);
                     c.fillStyle='rgba(249,226,180,.4)';c.fillRect(x+8,Y+4,2,19);c.fillStyle='#302c32';c.fillRect(x+46,Y+3,3,22);}};
-                return { GOLD, rr, clip, marble, parquet, checker, border, rug, title, threshold, stairs, shopGlass };
+                // A champagne granite band just inside a room, bronze at both its edges
+                const band = (x,y,w,h,lw=26)=>{const i=10;for(const [X,Y,W,H] of [[x+i,y+i,w-2*i,lw],[x+i,y+h-i-lw,w-2*i,lw],[x+i,y+i,lw,h-2*i],[x+w-i-lw,y+i,lw,h-2*i]])granite(X,Y,W,H,CHAMPAGNE,lw*4,null);
+                    c.strokeStyle=GOLD;c.lineWidth=2;c.strokeRect(x+i,y+i,w-2*i,h-2*i);c.strokeRect(x+i+lw,y+i+lw,w-2*i-2*lw,h-2*i-2*lw);
+                    c.strokeStyle='rgba(234,206,152,.5)';c.lineWidth=.8;c.strokeRect(x+i+lw/2,y+i+lw/2,w-2*i-lw,h-2*i-lw);};
+                return { GOLD, rr, clip, marble, granite, OBSIDIAN, CHAMPAGNE, band, parquet, checker, border, rug, title, threshold, stairs, shopGlass };
             },
 
             _paintEnniFloor() {
-                const cv = document.createElement('canvas'); cv.width=2000; cv.height=1400;
-                const c=cv.getContext('2d'),r=seededRandom(1849),K=this._enniKit(c,r),GOLD=K.GOLD;
-                c.fillStyle='#432630';c.fillRect(0,0,2000,1400);
-                // The lobby: cream marble, a rose border, the medallion under the chandelier
-                K.marble(640,50,720,1300,[210,199,185]);
-                K.border(640,50,720,1300);
+                const cv = document.createElement('canvas'); cv.width=3250; cv.height=1400;
+                const c=cv.getContext('2d'),r=seededRandom(1849),K=this._enniKit(c,r),GOLD=K.GOLD,CH='#cdb48a';
+                c.fillStyle='#121014';c.fillRect(0,0,2000,1400);
+                // The lobby: obsidian granite in bronze-lined slabs, a champagne band, the medallion under the chandelier
+                K.granite(640,50,720,1300,K.OBSIDIAN,120);
+                K.band(640,50,720,1300);
                 const mx=1000,my=820;
-                c.fillStyle='#40353c';c.beginPath();c.arc(mx,my,196,0,Math.PI*2);c.fill();
-                const mg=c.createRadialGradient(mx-55,my-65,10,mx,my,187);mg.addColorStop(0,'#eee4d3');mg.addColorStop(1,'#c7b49d');
-                c.fillStyle=mg;c.beginPath();c.arc(mx,my,187,0,Math.PI*2);c.fill();
-                for(const [rad,lw,col]of[[194,2,GOLD],[179,2,GOLD],[166,1,'#ac8b5c']]){c.strokeStyle=col;c.lineWidth=lw;c.beginPath();c.arc(mx,my,rad,0,Math.PI*2);c.stroke();}
-                for(let i=0;i<48;i++){const a=i*Math.PI/24;c.strokeStyle=i%4?'#b29565':'#755161';c.lineWidth=i%4?1:2;c.beginPath();c.moveTo(mx+Math.cos(a)*170,my+Math.sin(a)*170);c.lineTo(mx+Math.cos(a)*177,my+Math.sin(a)*177);c.stroke();}
-                c.textAlign='center';c.textBaseline='middle';c.font='italic 100px Georgia, serif';c.fillStyle='#895965';c.fillText('EC',mx,my+2);
-                c.font='13px Georgia, serif';c.fillStyle='#725238';c.fillText('ENNI COLE',mx,my+83);
-                c.font='10px Georgia, serif';c.fillText('LIVING EXCEPTIONALLY',mx,my+103);
-                // The rose runner from the door to the medallion
-                K.rr(870,1030,260,320,6,'#71364d','#b89a66',2);c.strokeStyle='rgba(235,209,165,.7)';c.lineWidth=1;c.strokeRect(879,1040,242,300);
-                c.fillStyle='rgba(207,161,165,.14)';for(let y=1048;y<1340;y+=17)for(let x=889;x<1115;x+=17){c.beginPath();c.arc(x,y,1,0,Math.PI*2);c.fill();}
-                c.font='italic 40px Georgia, serif';c.fillStyle='#ead4a5';c.fillText('Enni Cole',1000,1265);
+                c.fillStyle='#0c0b0d';c.beginPath();c.arc(mx,my,198,0,Math.PI*2);c.fill();
+                c.save();c.beginPath();c.arc(mx,my,187,0,Math.PI*2);c.clip();K.granite(mx-190,my-190,380,380,K.CHAMPAGNE,380,null);
+                const mg=c.createRadialGradient(mx-60,my-70,10,mx,my,187);mg.addColorStop(0,'rgba(255,240,210,.18)');mg.addColorStop(1,'rgba(30,20,10,.25)');c.fillStyle=mg;c.fillRect(mx-190,my-190,380,380);
+                // an obsidian compass star inlaid in the champagne, bronze-edged
+                for(let i=0;i<16;i++){const a=i*Math.PI/8,L=i%2?120:165,wd=i%2?.09:.12;c.fillStyle=i%2?'#2a2529':'#17141a';c.beginPath();c.moveTo(mx,my);c.lineTo(mx+Math.cos(a-wd)*58,my+Math.sin(a-wd)*58);c.lineTo(mx+Math.cos(a)*L,my+Math.sin(a)*L);c.lineTo(mx+Math.cos(a+wd)*58,my+Math.sin(a+wd)*58);c.closePath();c.fill();c.strokeStyle='rgba(169,123,69,.8)';c.lineWidth=.8;c.stroke();}
+                c.restore();
+                for(const [rad,lw,col]of[[194,3,GOLD],[187,1,'#e2c28e'],[176,1.5,GOLD],[62,2,GOLD]]){c.strokeStyle=col;c.lineWidth=lw;c.beginPath();c.arc(mx,my,rad,0,Math.PI*2);c.stroke();}
+                c.fillStyle='#141116';c.beginPath();c.arc(mx,my,61,0,Math.PI*2);c.fill();
+                c.textAlign='center';c.textBaseline='middle';c.font='italic 62px Georgia, serif';c.fillStyle=CH;c.fillText('EC',mx,my+2);
+                c.font='12px Georgia, serif';c.fillStyle='#e6cf9f';c.fillText('ENNI COLE',mx,my+225);
+                c.font='9px Georgia, serif';c.fillText('LIVING EXCEPTIONALLY',mx,my+241);
+                // The obsidian runner from the door to the medallion, bronze-edged
+                K.rr(870,1030,260,320,4,'#19161a',GOLD,2.5);c.strokeStyle='rgba(226,194,142,.55)';c.lineWidth=1;c.strokeRect(880,1040,240,300);
+                c.fillStyle='rgba(205,180,138,.09)';for(let y=1048;y<1340;y+=17)for(let x=889;x<1115;x+=17){c.beginPath();c.arc(x,y,1,0,Math.PI*2);c.fill();}
+                c.font='italic 40px Georgia, serif';c.fillStyle='#d8bd8a';c.fillText('Enni Cole',1000,1265);
                 c.font='10px Georgia, serif';c.fillText('FASHION  •  FOOD  •  HOME  •  TECHNOLOGY',1000,1300);
                 // The grand staircase: treads rising north to the salons, a flared first step, the newels' shadows
-                c.fillStyle='rgba(40,22,28,.35)';c.fillRect(856,50,288,370);
+                c.fillStyle='rgba(0,0,0,.4)';c.fillRect(856,50,288,370);
                 K.stairs(862,50,276,410,false);
-                c.fillStyle='#e9dfcf';c.beginPath();c.moveTo(838,410);c.quadraticCurveTo(1000,452,1162,410);c.lineTo(1162,404);c.lineTo(838,404);c.fill();
-                c.strokeStyle=GOLD;c.lineWidth=1.5;c.beginPath();c.moveTo(838,410);c.quadraticCurveTo(1000,452,1162,410);c.stroke();
-                c.fillStyle='#7a3a52';c.beginPath();c.moveTo(937,404);c.lineTo(1063,404);c.lineTo(1063,428);c.quadraticCurveTo(1000,436,937,428);c.fill();
-                c.font='9px Georgia, serif';c.fillStyle='#816d56';c.fillText('THE SALONS  •  COUTURE  •  CUISINE',1000,462);
-                // The Food Hall: cream and rose-grey tiles
-                K.checker(50,50,570,630,'#d9cdbd','#c9b7a8');K.border(50,50,570,630,'#8a5966',8);
-                K.title('THE FOOD HALL',535,230,null,17);c.font='9px Georgia, serif';c.fillStyle='#816d56';c.fillText('FRESH  •  FINE FOODS',535,252);c.fillText('CELLAR  •  LA CUISINE',535,266);
-                // Fashion: pale oak herringbone, the window stage along the glass
-                K.parquet(50,700,570,650,'#cdb294','rgba(110,80,52,.35)');K.border(50,700,570,650,'#8a5966',8);
-                K.rr(68,1246,540,84,4,'#5b2f40',GOLD,1.5);K.rr(74,1252,528,72,3,'#6e3a4e');
-                K.title('FASHION',520,1000,'WOMEN  •  MEN  •  KNITWEAR',20);
+                c.fillStyle='#a48c6a';c.beginPath();c.moveTo(838,410);c.quadraticCurveTo(1000,452,1162,410);c.lineTo(1162,404);c.lineTo(838,404);c.fill();
+                c.strokeStyle=GOLD;c.lineWidth=2;c.beginPath();c.moveTo(838,410);c.quadraticCurveTo(1000,452,1162,410);c.stroke();
+                c.fillStyle='#1c191d';c.beginPath();c.moveTo(937,404);c.lineTo(1063,404);c.lineTo(1063,428);c.quadraticCurveTo(1000,436,937,428);c.fill();
+                c.font='9px Georgia, serif';c.fillStyle='#b59c74';c.fillText('THE SALONS  •  COUTURE  •  CUISINE',1000,462);
+                // The Food Hall: darker champagne granite, the aisles' lanes marked in obsidian strips
+                K.granite(50,50,570,630,K.CHAMPAGNE,90);K.band(50,50,570,630,16);
+                K.title('THE FOOD HALL',540,226,null,16,'#221c18');c.font='9px Georgia, serif';c.fillStyle='#3a3026';c.fillText('FRESH  •  FINE FOODS',540,246);c.fillText('CELLAR  •  LA CUISINE',540,260);
+                // Fashion: obsidian and champagne granite, laid on the diagonal feel of a checker
+                K.granite(50,700,570,650,K.OBSIDIAN,110,GOLD,K.CHAMPAGNE);K.band(50,700,570,650,16);
+                K.rr(68,1246,540,84,4,'#141116',GOLD,1.5);K.rr(74,1252,528,72,3,'#221d22');
+                K.rr(452,1030,136,46,3,'rgba(14,12,15,.72)',GOLD,1);K.title('FASHION',520,1046,null,17,'#e2c792');c.font='8px Georgia, serif';c.fillStyle='#bfa57a';c.fillText('WOMEN  •  MEN  •  KNITWEAR',520,1066);
                 // Furniture: walnut herringbone and the room sets' rugs
-                K.parquet(1380,50,570,630,'#8d6a4f','rgba(50,30,20,.4)');K.border(1380,50,570,630,'#6e4a52',8);
-                K.rug(1400,80,326,276,'#8c796b');K.rug(1706,86,226,268,'#684552');K.rug(1620,448,296,206,'#9b8973');
+                K.parquet(1380,50,570,630,'#5e4535','rgba(20,12,8,.5)');K.band(1380,50,570,630,14);
+                K.rug(1400,80,326,276,'#6e6052');K.rug(1706,86,226,268,'#3b3237');K.rug(1620,448,296,206,'#7a6b58');
                 K.title('FURNITURE',1490,440,'LIVING  •  SLEEP  •  DINING',19,'#f0dcc0');
-                // Electronics: dark polished stone with a cool inlay line
-                K.marble(1380,700,570,650,[58,54,62],80,false);
+                // Electronics: obsidian granite with a cool inlay line
+                K.granite(1380,700,570,650,K.OBSIDIAN,95,'#5c6a78');
                 c.strokeStyle='rgba(150,190,230,.35)';c.lineWidth=1.5;c.strokeRect(1400,720,530,610);
                 K.title('ELECTRONICS',1470,806,'SCREENS  •  SOUND  •  HOME',17,'#d9e4f0');
                 // Thresholds under the arches, the shopfront glass either side of the door
                 for(const d of [{x:620,y:300,w:20,h:160},{x:620,y:950,w:20,h:160},{x:1360,y:300,w:20,h:160},{x:1360,y:950,w:20,h:160},{x:440,y:680,w:160,h:20},{x:1400,y:680,w:160,h:20}])K.threshold(d);
                 for(const [a,b] of [[70,610],[650,846],[1156,1350],[1390,1930]])K.shopGlass(a,b,1317);
+                // The Emporium: champagne granite, obsidian walks between the wooden aisles, a medallion by the tills
+                K.granite(1970,50,1230,1300,K.CHAMPAGNE,100);
+                for(let i=0;i<12;i++){const X=2070+i*90;c.fillStyle='rgba(20,17,22,.85)';c.fillRect(X-8,170,56,820);c.fillStyle=GOLD;c.fillRect(X-8,170,1.2,820);c.fillRect(X+47,170,1.2,820);}
+                K.granite(1990,548,1190,64,K.OBSIDIAN,64,GOLD);
+                K.band(1970,50,1230,1300,18);
+                c.textAlign='center';c.textBaseline='middle';c.font='italic 34px Georgia, serif';c.fillStyle='#2a201a';c.fillText('The Emporium',2585,1110);
+                c.font='9px Georgia, serif';c.fillStyle='#3a3026';c.fillText('PANTRY  •  CELLAR  •  HOME  •  BOOKS  •  TOYS  •  APPAREL',2585,1138);
+                for(const d of [{x:1950,y:300,w:20,h:160},{x:1950,y:950,w:20,h:160}])K.threshold(d);
+                K.shopGlass(1990,3180,1317);
                 return cv;
             },
 
@@ -78064,6 +78304,8 @@ engineMixin({
                 const t=_frameTime/1000;
                 ctx.save();
                 for(const [X,Y,R]of[[155,230,0],[375,230,0],[220,612,0],[205,915,0],[205,1085,0],[1520,240,12],[1767,548,12],[1840,215,10],[755,1180,9],[1245,1180,9]])this._enniPendant(ctx,X,Y,R);
+                for(let i=0;i<7;i++){this._enniPendant(ctx,2115+i*180,120,10);this._enniPendant(ctx,2115+i*180,1060,10);}
+                for(let i=0;i<13;i++)this._enniPendant(ctx,2070-25+i*90,580,0);
                 ctx.globalCompositeOperation='lighter';
                 for(const [X,Y] of [[853,419],[1147,419]])glowA(ctx,X,Y,46,'255,236,200',.16);
                 for(let i=0;i<5;i++)glowA(ctx,118+i*100,1288,34,'255,214,170',.12);       // the window stage's spotlights
