@@ -1172,6 +1172,146 @@
             return cv;
         }
 
+        /* The hub graveyard's walls (gy_wall) and their pillars (gy_pillar), drawn by the walls pass (engine/draw.js).
+           Seen like the stones, a little from the front: a low wall of grey brick under a pale stone coping, a black
+           iron fence of spear-topped pickets along its top, and every so often a brick pillar under a stone cap,
+           a lantern on each (map-loading.js puts a LampEntity, lampType 6, on every cap). The bricks, coping and
+           fence are pattern tiles painted once; a pillar is one sprite. The walls keep their 30 px footprint. */
+        const GY_WALL = { T: 30, COPE: 14, FENCE: 27, PILLAR: 44 };
+        const GY_IRON = '#0b0a0f', GY_IRON_HI = 'rgba(170, 160, 205, 0.45)';
+        const _gyTiles = {};
+        function _gyTile(name, w, h, paint) {
+            if (_gyTiles[name]) return _gyTiles[name];
+            const S = 2, cv = document.createElement('canvas'); cv.width = w * S; cv.height = h * S;
+            const c = cv.getContext('2d'); c.scale(S, S); paint(c, w, h);
+            const pat = c.createPattern(cv, 'repeat'); pat.setTransform(new DOMMatrix().scale(1 / S));
+            return (_gyTiles[name] = pat);
+        }
+        // Running-bond grey brick, courses along x (a wall's face, a pillar's)
+        function _gyBrickPaint(c, w, h) {
+            let s = 7;
+            const r = () => (s = (s * 9301 + 49297) % 233280) / 233280;
+            const GREYS = ['#7e7b86', '#716e7a', '#88858f', '#666370', '#7a7884', '#6c6b78', '#8d8a92'];
+            c.fillStyle = '#34313b'; c.fillRect(0, 0, w, h);                 // the mortar
+            for (let row = 0, y = 0; y < h; row++, y += 5.5) {
+                for (let x = row % 2 ? -6.5 : 0; x < w; x += 13) {
+                    c.fillStyle = GREYS[Math.floor(r() * GREYS.length)];
+                    c.fillRect(x + 0.6, y + 0.6, 12, 4.4);
+                    c.fillStyle = 'rgba(255, 255, 255, 0.10)'; c.fillRect(x + 0.6, y + 0.6, 12, 0.8);   // each brick's upper lip catches the light
+                    c.fillStyle = 'rgba(0, 0, 0, 0.16)'; c.fillRect(x + 0.6, y + 4.2, 12, 0.8);
+                    for (let k = 0; k < 4; k++) { c.fillStyle = r() < 0.5 ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.12)'; c.fillRect(x + 1 + r() * 11, y + 1 + r() * 3, 0.9, 0.9); }
+                }
+            }
+        }
+        // The same brick laid north-south, its courses along y (seen from above on a wall running that way)
+        function _gyBrickPaintV(c, w, h) { c.translate(w, 0); c.rotate(Math.PI / 2); _gyBrickPaint(c, h, w); }
+        // The coping: pale stone slabs with their joints, along x or (vertical) along y
+        function _gyCopePaint(vertical) {
+            return (c, w, h) => {
+                let s = vertical ? 31 : 13;
+                const r = () => (s = (s * 9301 + 49297) % 233280) / 233280;
+                const len = vertical ? h : w, across = vertical ? w : h, slab = 32;
+                for (let a = 0; a < len; a += slab) {
+                    const tone = 132 + Math.floor(r() * 20), col = `rgb(${tone - 6}, ${tone - 8}, ${tone + 4})`;
+                    c.fillStyle = col;
+                    if (vertical) c.fillRect(0, a, across, slab); else c.fillRect(a, 0, slab, across);
+                    for (let k = 0; k < 40; k++) { c.fillStyle = r() < 0.5 ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.12)'; const u = a + r() * slab, v = r() * across; if (vertical) c.fillRect(v, u, 1, 1); else c.fillRect(u, v, 1, 1); }
+                    c.fillStyle = 'rgba(30, 26, 36, 0.75)';                    // the joint
+                    if (vertical) c.fillRect(0, a, across, 1); else c.fillRect(a, 0, 1, across);
+                }
+            };
+        }
+        // One spear-topped picket between the two rails, 10 px a picket (the tile's foot is the coping's middle)
+        function _gyFencePaint(c, w, h) {
+            const x = w / 2;
+            c.fillStyle = GY_IRON;
+            c.fillRect(0, 6.2, w, 1.6); c.fillRect(0, h - 5, w, 1.6);         // the top and bottom rails
+            c.fillRect(x - 0.8, 3, 1.6, h - 3);                               // the picket
+            c.beginPath(); c.moveTo(x, 0); c.lineTo(x + 1.9, 3.4); c.lineTo(x, 4.6); c.lineTo(x - 1.9, 3.4); c.closePath(); c.fill();   // its spear
+            c.beginPath(); c.arc(x, 9.5, 1.3, 0, Math.PI * 2); c.fill();      // a collar under the top rail
+            c.fillStyle = GY_IRON_HI;                                         // moonlight down the left of the iron
+            c.fillRect(x - 0.8, 4.6, 0.5, h - 6); c.fillRect(0, 6.2, w, 0.4);
+            c.beginPath(); c.moveTo(x, 0.2); c.lineTo(x - 1.6, 3.3); c.lineTo(x - 0.9, 3.5); c.closePath(); c.fill();
+        }
+        // The fence seen end-on (a wall running north-south): spears along the rail, 10 px apart
+        function _gyFenceEndPaint(c, w, h) {
+            const x = w / 2;
+            c.fillStyle = GY_IRON;
+            c.beginPath(); c.moveTo(x, 2); c.lineTo(x + 2.2, 5); c.lineTo(x, 8); c.lineTo(x - 2.2, 5); c.closePath(); c.fill();
+            c.fillStyle = GY_IRON_HI; c.beginPath(); c.moveTo(x, 2.3); c.lineTo(x - 1.8, 5); c.lineTo(x - 1, 5.2); c.closePath(); c.fill();
+        }
+
+        function drawGraveyardWall(ctx, w) {
+            const { T, COPE, FENCE } = GY_WALL, vertical = w.h > w.w;
+            const brick = _gyTile('brick', 78, 22, _gyBrickPaint);
+            ctx.save(); ctx.translate(w.x, w.y);
+            if (!vertical) {
+                const L = w.w, face = T - COPE;
+                ctx.fillStyle = 'rgba(6, 4, 10, 0.4)'; ctx.fillRect(2, T, L, 6);                 // its shadow on the ground
+                ctx.fillStyle = brick; ctx.fillRect(0, COPE, L, face);                           // the brick face
+                const g = ctx.createLinearGradient(0, COPE, 0, T);                               // darker at its foot
+                g.addColorStop(0, 'rgba(0,0,0,0.25)'); g.addColorStop(0.3, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(10,6,16,0.35)');
+                ctx.fillStyle = g; ctx.fillRect(0, COPE, L, face);
+                ctx.fillStyle = _gyTile('copeH', 96, COPE, _gyCopePaint(false)); ctx.fillRect(0, 0, L, COPE);   // the coping
+                ctx.fillStyle = 'rgba(225, 218, 240, 0.35)'; ctx.fillRect(0, COPE - 2, L, 1.2);  // its front lip
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.35)'; ctx.fillRect(0, 0, L, 1); ctx.fillRect(0, COPE, L, 1.2);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)'; ctx.fillRect(0, COPE / 2 + 1, L, 2);       // the fence's shadow on the coping
+                ctx.translate(0, COPE / 2 - FENCE);
+                ctx.fillStyle = _gyTile('fence', 10, FENCE, _gyFencePaint); ctx.fillRect(0, 0, L, FENCE);
+            } else {
+                const L = w.h;
+                ctx.fillStyle = 'rgba(6, 4, 10, 0.4)'; ctx.fillRect(T, 4, 5, L);                  // its shadow, to the east
+                // Its top: brick between two narrow kerbs of coping
+                const kerb = 5;
+                ctx.fillStyle = _gyTile('brickV', 22, 78, _gyBrickPaintV); ctx.fillRect(kerb, 0, T - kerb * 2, L);
+                ctx.fillStyle = _gyTile('copeV', T, 96, _gyCopePaint(true)); ctx.fillRect(0, 0, kerb, L); ctx.fillRect(T - kerb, 0, kerb, L);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)'; ctx.fillRect(kerb, 0, 1, L); ctx.fillRect(T - kerb - 1, 0, 1, L);
+                ctx.fillStyle = 'rgba(225, 218, 240, 0.3)'; ctx.fillRect(1, 0, 1.2, L);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.35)'; ctx.fillRect(T - 1.2, 0, 1.2, L);
+                // The fence end-on: its rails a black bar down the middle (rising the fence's height at the north end), spears along it
+                const cx = T / 2;
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)'; ctx.fillRect(cx + 2, 0, 3, L);             // its shadow on the coping
+                ctx.fillStyle = GY_IRON; ctx.fillRect(cx - 1.5, COPE / 2 - FENCE + 6, 3, L - COPE / 2 + FENCE - 6);
+                ctx.fillStyle = GY_IRON_HI; ctx.fillRect(cx - 1.5, COPE / 2 - FENCE + 6, 0.6, L - COPE / 2 + FENCE - 6);
+                ctx.translate(cx - 5, 0);
+                ctx.fillStyle = _gyTile('fenceEnd', 10, 10, _gyFenceEndPaint); ctx.fillRect(0, 0, 10, L);
+            }
+            ctx.restore();
+        }
+
+        // A brick pillar under a stone cap (its lantern is a LampEntity on the cap)
+        let _gyPillarSprite = null;
+        const GY_PILLAR_PAD = 10;
+        function drawGraveyardPillar(ctx, p) {
+            const P = GY_WALL.PILLAR, pad = GY_PILLAR_PAD;
+            if (!_gyPillarSprite) {
+                const S = 3, cv = document.createElement('canvas'); cv.width = cv.height = (P + pad * 2) * S;
+                const c = cv.getContext('2d'); c.scale(S, S); c.translate(pad, pad);
+                const capH = 20;
+                c.fillStyle = 'rgba(6, 4, 10, 0.45)'; c.beginPath(); c.roundRect(5, 6, P + 2, P + 1, 3); c.fill();   // its shadow
+                c.fillStyle = _gyTile('brick', 78, 22, _gyBrickPaint); c.fillRect(0, capH - 2, P, P - capH + 2);      // the brick face
+                const g = c.createLinearGradient(0, 0, P, 0);                    // rounder: lit on the left, dark on the right
+                g.addColorStop(0, 'rgba(210,200,240,0.12)'); g.addColorStop(0.5, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.3)');
+                c.fillStyle = g; c.fillRect(0, capH - 2, P, P - capH + 2);
+                const f = c.createLinearGradient(0, capH, 0, P);
+                f.addColorStop(0, 'rgba(0,0,0,0.35)'); f.addColorStop(0.25, 'rgba(0,0,0,0)'); f.addColorStop(1, 'rgba(10,6,16,0.35)');
+                c.fillStyle = f; c.fillRect(0, capH - 2, P, P - capH + 2);
+                c.strokeStyle = 'rgba(0,0,0,0.4)'; c.lineWidth = 1; c.strokeRect(0.5, capH - 1.5, P - 1, P - capH + 1);
+                // The cap: a stone slab overhanging the brick, its front edge, a raised plinth for the lantern
+                c.fillStyle = '#5c5966'; c.fillRect(-3, capH - 6, P + 6, 5);
+                const cg = c.createLinearGradient(0, -3, 0, capH - 6);
+                cg.addColorStop(0, '#a8a4b2'); cg.addColorStop(1, '#827e8c');
+                c.fillStyle = cg; c.fillRect(-3, -3, P + 6, capH - 3);
+                c.fillStyle = 'rgba(240, 234, 255, 0.45)'; c.fillRect(-3, capH - 7, P + 6, 1);
+                c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(-3, -3, P + 6, 0.8);
+                c.fillStyle = '#7e7a88'; c.fillRect(8, 0, P - 16, capH - 8);
+                c.fillStyle = '#9894a2'; c.fillRect(10, 1, P - 20, capH - 11);
+                c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(8, capH - 9, P - 16, 1);
+                _gyPillarSprite = cv;
+            }
+            ctx.drawImage(_gyPillarSprite, p.x - pad, p.y - pad, P + pad * 2, P + pad * 2);
+        }
+
         /* The Double Nights penthouse (ps_*): the Dark Maker's stay, in the hotel's black marble, gold,
            silver and crimson. Things are left as he left them: the bed unmade, one glass drunk, the
            chess game unfinished, the wardrobe open, a card propped on the desk rating his stay. */

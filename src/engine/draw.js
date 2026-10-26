@@ -625,12 +625,17 @@
                 if (RL.at('walls')) {
                     const visibleWalls = this._renderGridWalls.query(cullBounds.world, this._renderGridWalls._drawResults || (this._renderGridWalls._drawResults = new Set()));
                     const ws = this.activeMap.wallStyle;                 // a map may dress its walls (the House: black marble, gold)
+                    const pillars = this._gyPillars || (this._gyPillars = []); pillars.length = 0;
                     for (const w of visibleWalls) {
-                        this.ctx.fillStyle = ws ? ws.fill : '#222'; 
+                        // the graveyard's brick and iron (entities/props-decor.js); its pillars over the walls' ends
+                        if (w.style === 'gy_wall') { drawGraveyardWall(this.ctx, w); continue; }
+                        if (w.style === 'gy_pillar') { pillars.push(w); continue; }
+                        this.ctx.fillStyle = ws ? ws.fill : '#222';
                         this.ctx.fillRect(w.x, w.y, w.w, w.h); 
                         this.ctx.strokeStyle = ws ? ws.stroke : 'rgba(0, 243, 255, 0.3)'; 
-                        this.ctx.strokeRect(w.x, w.y, w.w, w.h); 
+                        this.ctx.strokeRect(w.x, w.y, w.w, w.h);
                     }
+                    for (const p of pillars) drawGraveyardPillar(this.ctx, p);
                 }
             
                 // Indoor V2: Doors (drawn OVER walls so they're visible in wall gaps)
