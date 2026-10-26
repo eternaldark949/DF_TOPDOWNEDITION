@@ -63,9 +63,13 @@
             stone: '#a04d72', stoneLo: '#6e2f4c', steel: '#1c2028', gold: '#d0ac72',
             goldHi: '#f3ddb0', glass: '#352d30', warm: '#ffd392', rose: '#d96896'
         };
+        const ENNI_HERO = 2;
+        const ENNI_FONT_READY = () => { try { return !document.fonts || document.fonts.check('12px Anthropology'); } catch (e) { return true; } };
         Object.assign(BuildingV2.prototype, {
             _ecH() { return Math.min(this.floors, CONFIG.BUILDINGS.MAX_FLOORS) * CONFIG.BUILDINGS.FLOOR_HEIGHT; },
-            _ecK(z) { return CONFIG.BUILDINGS.LEAN ? LandmarkKit.k(z) : 1; },
+            // Enni Cole leans twice as hard as the street (ENNI_HERO), so its storefronts show as tall as a real
+            // store's; its hull (culling) leans with it.
+            _ecK(z) { return CONFIG.BUILDINGS.LEAN ? 1 + (LandmarkKit.k(z) - 1) * ENNI_HERO : 1; },
             _ecP(x, y, z) {
                 const k = this._ecK(z), cam = game.camera;
                 return [cam.x + (x - cam.x) * k, cam.y + (y - cam.y) * k];
@@ -166,61 +170,111 @@
                     }
                 });
             },
-            /** One face of the curtain wall. Each style's shapes on a face are gathered into one path and filled
-                once (in the order they layer: stone, steel, frames, glass glow, mullions, transoms, glints, piers,
-                cornice, cap); shapes of one style never overlap on a face, so it draws exactly as quad by quad did. */
+            /**
+             * One face of the store, as in the photo: rose stone to the cornice (rusticated, pilasters, tall display
+             * windows, script panels), black steel and glass over it, the portal on the entrance bay. Each face is
+             * painted once at full detail (lit and unlit) and mapped onto its leaning quad in tiles, so the detail
+             * costs a few dozen drawImages a frame however fine it is (the lean is perspective in z, so tiles in z too).
+             */
             _ecFace(ctx, f, emissive=false) {
-                const T=ENNI_EXTERIOR,H=this._ecH(),L=Math.hypot(f.x2-f.x1,f.y2-f.y1);
+                const H=this._ecH(),L=Math.hypot(f.x2-f.x1,f.y2-f.y1),S=2;
+                const key=`${f.x1|0},${f.y1|0},${f.x2|0},${f.y2|0}`,store=this._ecTex||(this._ecTex={});
+                // (the script signs wait for their webfont: until it's in, the face is painted again rather than kept)
+                let art=store[key];if(!art||art.fontless&&!(art.fontless=!ENNI_FONT_READY()))art=store[key]=this._ecFaceArt(f,L,H,S);
+                const tex=art[emissive?'lit':'day'];
                 const P=(u,z)=>this._ecP(f.x1+(f.x2-f.x1)*u,f.y1+(f.y2-f.y1)*u,z);
-                const quad=(path,u0,u1,z0,z1)=>{
-                    const a=P(u0,z0),b=P(u1,z0),d=P(u0,z1),e=P(u1,z1);
-                    path.moveTo(a[0],a[1]);path.lineTo(b[0],b[1]);path.lineTo(e[0],e[1]);path.lineTo(d[0],d[1]);path.closePath();
-                    return path;
-                };
-                const fill=(path,style)=>{ctx.fillStyle=style;ctx.fill(path);};
-                const stroke=(path,style,width)=>{ctx.strokeStyle=style;ctx.lineWidth=width;ctx.stroke(path);};
-                const entrance=f.side==='S'&&Math.abs(f.y1-(this.y+700))<1;
-                const n=Math.max(2,Math.round(L/77)),pad=8/L,bands=[[4,H*.48],[H*.59,H-4]];
-                if(!emissive){
-                    fill(quad(new Path2D(),0,1,0,H*.55),T.stoneLo);fill(quad(new Path2D(),0,1,H*.55,H),T.steel);
-                    const frames=new Path2D(),inner=new Path2D(),mull=new Path2D(),tran=new Path2D(),glint=new Path2D(),pierLo=new Path2D(),pierHi=new Path2D();
-                    for(let i=0;i<n;i++){
-                        const u0=i/n+pad,u1=(i+1)/n-pad;
-                        for(const [z0,z1] of bands){
-                            quad(frames,u0,u1,z0,z1);quad(inner,u0+.018,u1-.018,z0+1,z1-1);
-                            quad(mull,(u0+u1)/2-.002,(u0+u1)/2+.002,z0,z1);
-                            quad(tran,u0,u1,z0+(z1-z0)*.44,z0+(z1-z0)*.44+.65);
-                            quad(glint,u0+.025,u0+.039,z0+2,z1-1);
-                        }
-                        quad(pierLo,i/n,i/n+pad*.58,0,H*.54);quad(pierHi,i/n,i/n+pad*.35,H*.56,H);
-                    }
-                    fill(frames,'#6b4733');stroke(frames,'rgba(204,158,101,.62)',1.4);fill(inner,'rgba(244,179,96,.12)');
-                    fill(mull,T.steel);fill(tran,'#252127');fill(glint,'rgba(221,231,237,.19)');
-                    fill(pierLo,T.stone);fill(pierHi,'#24272f');
-                    const cornice=quad(new Path2D(),0,1,H*.51,H*.57);fill(cornice,'#5d303e');stroke(cornice,'rgba(211,166,112,.45)',1);
-                    const cap=quad(new Path2D(),0,1,H-2,H);fill(cap,'#303039');stroke(cap,'rgba(211,175,118,.55)',.9);
-                }else{
-                    const glow=new Path2D(),dots=new Path2D(),up=new Path2D();
-                    for(let i=0;i<n;i++){
-                        const u0=i/n+pad,u1=(i+1)/n-pad;
-                        for(const [z0,z1] of bands){
-                            quad(glow,u0+.006,u1-.006,z0+1,z1-1);
-                            const a=P((u0+u1)/2,z0+(z1-z0)*.57);dots.moveTo(a[0]+1.35,a[1]);dots.arc(a[0],a[1],1.35,0,Math.PI*2);
-                        }
-                    }
-                    fill(glow,'rgba(255,192,108,.32)');fill(dots,'rgba(255,237,180,.85)');
-                    // Deliberate rose uplight on stone piers leaves the glass warm amber.
-                    for(let i=0;i<=n;i++){const u=i/n;quad(up,Math.max(0,u-.012),Math.min(1,u+.012),1,H*.50);}
-                    fill(up,'rgba(235,85,140,.26)');
+                const nu=Math.max(2,Math.ceil(L/70)),ZS=[0,H*.18,H*.36,H*.55,H*.72,H*.86,H];
+                for(let j=0;j<ZS.length-1;j++)for(let i=0;i<nu;i++){
+                    const u0=i/nu,u1=(i+1)/nu,z0=ZS[j],z1=ZS[j+1];
+                    const a=P(u0,z0),b=P(u1,z0),d=P(u0,z1);
+                    const sx=u0*L*S,sw=Math.min(tex.width-sx,(u1-u0)*L*S+1),sy=(H-z1)*S,sh=Math.min(tex.height-sy,(z1-z0)*S+1);
+                    ctx.save();ctx.transform((b[0]-a[0])/((u1-u0)*L*S),(b[1]-a[1])/((u1-u0)*L*S),(a[0]-d[0])/((z1-z0)*S),(a[1]-d[1])/((z1-z0)*S),d[0],d[1]);
+                    ctx.drawImage(tex,sx,sy,sw,sh,0,0,sw,sh);ctx.restore();
                 }
-                if(entrance&&!emissive){
-                    // Arched transom: use the wall's own u/z projection rather than screen-space decoration.
-                    const mid=.5,wide=.3,zbase=5,zspring=H*.26,zpeak=H*.48;
-                    ctx.beginPath();ctx.moveTo(...P(mid-wide,zbase));ctx.lineTo(...P(mid+wide,zbase));ctx.lineTo(...P(mid+wide,zspring));
-                    for(let i=0;i<=16;i++){const a=i*Math.PI/16;ctx.lineTo(...P(mid+Math.cos(a)*wide,zspring+Math.sin(a)*(zpeak-zspring)));}ctx.closePath();
-                    ctx.fillStyle='#8b5737';ctx.fill();ctx.strokeStyle=T.gold;ctx.lineWidth=2;ctx.stroke();
-                    const a=P(.5,zbase),b=P(.5,zpeak);ctx.strokeStyle='#201c22';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke();
+            },
+            /** A face's art, unlit and lit: x along the face (0..L), y down from the roof (0) to the street (H). */
+            _ecFaceArt(f,L,H,S) {
+                const T=ENNI_EXTERIOR,entrance=f.side==='S'&&Math.abs(f.y1-(this.y+700))<1;
+                const bay=this.sections[1],bayFace=!entrance&&(f.side==='E'||f.side==='W')&&f.y1>=this.y+600-1&&f.y2>=this.y+600-1;
+                const r=seededRandom(((f.x1*7+f.y1*13)|0)+911);
+                const mk=()=>{const cv=document.createElement('canvas');cv.width=Math.ceil(L*S);cv.height=Math.ceil(H*S);const c=cv.getContext('2d');c.scale(S,S);return [cv,c];};
+                const [dcv,d]=mk(),[lcv,l]=mk();
+                const portal=entrance||bayFace,G=portal?H*.22:H*.45;                                 // the cornice's line (y): the portal rises higher
+                const script=(c,str,x,y,size,col)=>{c.save();c.textAlign='center';c.textBaseline='middle';c.font=`${size}px Anthropology, "Great Vibes", "URW Chancery L", "Z003", cursive`;c.fillStyle=col;c.fillText(str,x,y);c.restore();};
+                // ── over the cornice: black steel and glass (the portal's crown: the curved showroom's glass) ──
+                {const g=d.createLinearGradient(0,0,0,G);g.addColorStop(0,'#15161c');g.addColorStop(1,'#20212a');d.fillStyle=g;d.fillRect(0,0,L,G);
+                    const n=Math.max(1,Math.round(L/30)),pw=L/n;
+                    for(let i=0;i<n;i++){const X=i*pw+2.2,W=pw-4.4,Y=4,Hh=G-7;
+                        const gg=d.createLinearGradient(X,Y,X+W,Y+Hh);gg.addColorStop(0,'#2b2a33');gg.addColorStop(.5,'#3a3036');gg.addColorStop(1,'#24252d');d.fillStyle=gg;d.fillRect(X,Y,W,Hh);
+                        d.fillStyle='rgba(214,160,104,.13)';d.fillRect(X,Y+Hh*.55,W,Hh*.45);                        // the warm floor inside
+                        d.fillStyle='rgba(205,222,236,.10)';d.beginPath();d.moveTo(X,Y);d.lineTo(X+W*.45,Y);d.lineTo(X,Y+Hh*.7);d.fill();
+                        for(let k=0;k<2;k++){const mx=X+W*(.3+k*.42),my=Y+Hh*.62;if(r()<.6){d.fillStyle='rgba(20,16,20,.7)';d.beginPath();d.ellipse(mx,my,1.6,4.2,0,0,Math.PI*2);d.fill();d.beginPath();d.arc(mx,my-5,1.1,0,Math.PI*2);d.fill();}}
+                        // lit: the glass glows amber, a ceiling of tiny lights, the forms in silhouette against it
+                        const lg=l.createLinearGradient(X,Y,X,Y+Hh);lg.addColorStop(0,'rgba(255,196,118,.30)');lg.addColorStop(1,'rgba(255,170,92,.55)');l.fillStyle=lg;l.fillRect(X,Y,W,Hh);
+                        for(let k=0;k<5;k++){const px=X+1+r()*(W-2),py=Y+1+r()*Hh*.45;l.fillStyle='rgba(255,236,190,.95)';l.fillRect(px,py,.7,.7);l.fillStyle='rgba(255,220,160,.25)';l.beginPath();l.arc(px+.35,py+.35,1.8,0,Math.PI*2);l.fill();}
+                    }
+                    // the steel fins, a champagne edge on each; a transom at the floor line; the parapet
+                    for(let i=0;i<=n;i++){const X=i*pw;d.fillStyle='#0f1015';d.fillRect(X-2.2,0,4.4,G);d.fillStyle='rgba(208,172,114,.55)';d.fillRect(X-2.2,0,.6,G);}
+                    d.fillStyle='#0f1015';d.fillRect(0,G*.48,L,1.6);d.fillStyle='rgba(208,172,114,.35)';d.fillRect(0,G*.48,L,.4);
+                    d.fillStyle='#0c0d11';d.fillRect(0,0,L,3.5);d.fillStyle=T.gold;d.fillRect(0,3.2,L,.6);
                 }
+                // ── the stone: rose, rusticated, lit from below ──
+                {const g=d.createLinearGradient(0,G,0,H);g.addColorStop(0,'#b25a82');g.addColorStop(1,'#93456a');d.fillStyle=g;d.fillRect(0,G,L,H-G);
+                    d.strokeStyle='rgba(70,22,44,.28)';d.lineWidth=.35;
+                    for(let y=G+8,k=0;y<H-3;y+=4.2,k++){d.beginPath();d.moveTo(0,y);d.lineTo(L,y);d.stroke();for(let x=(k%2)*6;x<L;x+=12){d.beginPath();d.moveTo(x,y);d.lineTo(x,y+4.2);d.stroke();}}
+                    d.fillStyle='rgba(255,220,235,.05)';for(let i=0;i<L*(H-G)/30;i++)d.fillRect(r()*L,G+r()*(H-G),.6,.6);
+                    d.fillStyle='#5a2440';d.fillRect(0,H-3.5,L,3.5);d.fillStyle='rgba(208,172,114,.6)';d.fillRect(0,H-3.5,L,.4);   // the plinth
+                }
+                // the bays: pilasters, and between them tall display windows or a script panel
+                const n=entrance?1:Math.max(1,Math.round(L/(portal?34:42))),bw=L/n,pier=Math.min(7,bw*.16);
+                for(let i=0;i<n;i++){
+                    const X0=i*bw+pier,X1=(i+1)*bw-pier,W=X1-X0,top=G+9,bot=H-4;
+                    if(entrance){                                                                               // the portal's arch over the doors
+                        const cx=L/2,aw=Math.min(L*.3,30),spring=G+(H-G)*.58,rad=aw;
+                        script(d,'Enni Cole',cx,G+9,14,T.goldHi);script(l,'Enni Cole',cx,G+9,14,'rgba(255,226,170,1)');
+                        for(const c of [d,l]){c.save();c.beginPath();c.moveTo(cx-aw,bot);c.lineTo(cx-aw,spring);c.arc(cx,spring,rad,Math.PI,0);c.lineTo(cx+aw,bot);c.closePath();
+                            if(c===d){c.fillStyle='#3a2a26';c.fill();c.lineWidth=2.2;c.strokeStyle='#d7a7bb';c.stroke();c.lineWidth=.8;c.strokeStyle=T.gold;c.stroke();}
+                            else{const lg=c.createLinearGradient(0,spring-rad,0,bot);lg.addColorStop(0,'rgba(255,214,140,.65)');lg.addColorStop(1,'rgba(255,186,104,.9)');c.fillStyle=lg;c.fill();}
+                            c.clip();c.strokeStyle=c===d?'#1b1a20':'rgba(60,30,20,.6)';c.lineWidth=1;c.beginPath();
+                            for(let k=-3;k<=3;k++){c.moveTo(cx+k*aw/3.5,spring-rad);c.lineTo(cx+k*aw/3.5,bot);}c.moveTo(cx-aw,spring);c.lineTo(cx+aw,spring);c.moveTo(cx-aw,bot-14);c.lineTo(cx+aw,bot-14);c.stroke();
+                            c.restore();}
+                        // the chandelier glimpsed through it; the keystone
+                        for(let k=0;k<9;k++){const a=k/8*Math.PI,px=L/2+Math.cos(a)*10,py=spring+4+Math.sin(a)*3;l.fillStyle='#fff2cf';l.fillRect(px-.4,py-.4,.9,.9);d.fillStyle='#d9b77a';d.fillRect(px-.3,py-.3,.6,.6);}
+                        d.fillStyle='#c97ea0';d.fillRect(L/2-2.5,spring-rad-3,5,5);
+                        continue;
+                    }
+                    const panel=!portal&&n>=5&&(i===1||i===n-2);
+                    if(panel){                                                                                  // a recessed panel with the name in script
+                        d.fillStyle='#8a3d62';d.fillRect(X0+2,top+2,W-4,bot-top-6);d.strokeStyle='rgba(230,180,205,.5)';d.lineWidth=.6;d.strokeRect(X0+3.5,top+3.5,W-7,bot-top-9);
+                        const cy=(top+bot)/2;script(d,'Enni',(X0+X1)/2,cy-6,11,T.goldHi);script(d,'Cole',(X0+X1)/2,cy+7,11,T.goldHi);
+                        script(l,'Enni',(X0+X1)/2,cy-6,11,'rgba(255,226,170,1)');script(l,'Cole',(X0+X1)/2,cy+7,11,'rgba(255,226,170,1)');
+                        continue;
+                    }
+                    // the window: bronze frame, a transom, forms and a lamp inside
+                    d.fillStyle='#6b4733';d.fillRect(X0,top,W,bot-top);
+                    const gg=d.createLinearGradient(X0,top,X1,bot);gg.addColorStop(0,'#3c3234');gg.addColorStop(1,'#4b3a30');d.fillStyle=gg;d.fillRect(X0+1.2,top+1.2,W-2.4,bot-top-2.4);
+                    const tr=top+(bot-top)*.28;d.fillStyle='#2a2226';d.fillRect(X0,tr,W,1.2);d.fillRect((X0+X1)/2-.5,tr,1,bot-tr);
+                    d.fillStyle='rgba(221,231,237,.16)';d.fillRect(X0+2,top+2,1.2,bot-top-4);
+                    const lg=l.createLinearGradient(0,top,0,bot);lg.addColorStop(0,'rgba(255,214,140,.55)');lg.addColorStop(1,'rgba(255,184,100,.85)');l.fillStyle=lg;l.fillRect(X0+1.2,top+1.2,W-2.4,bot-top-2.4);
+                    for(let k=0;k<2;k++){const mx=X0+W*(.3+k*.4),my=bot-9;for(const c of [d,l]){c.fillStyle=c===d?'rgba(25,18,22,.75)':'rgba(70,30,30,.55)';c.beginPath();c.ellipse(mx,my,2.2,6,0,0,Math.PI*2);c.fill();c.beginPath();c.arc(mx,my-7.5,1.4,0,Math.PI*2);c.fill();}}
+                    l.fillStyle='#fff2cf';l.beginPath();l.arc((X0+X1)/2,top+(tr-top)*.5,1,0,Math.PI*2);l.fill();
+                    // the hood over it, bronze
+                    d.fillStyle='#c27097';d.fillRect(X0-1.5,top-3,W+3,2.4);d.fillStyle=T.gold;d.fillRect(X0-1.5,top-.8,W+3,.5);
+                }
+                // pilasters with capitals and bases; rose uplight washing each, a sconce glow
+                for(let i=0;i<=n;i++){const X=Math.max(0,Math.min(L-pier*2,i*bw-pier));
+                    if(entrance&&i>0&&i<n)continue;
+                    d.fillStyle='#b8648b';d.fillRect(X,G+4,pier*2,H-G-7);d.fillStyle='rgba(255,235,245,.12)';d.fillRect(X+.6,G+4,1,H-G-7);d.fillStyle='rgba(60,15,35,.3)';d.fillRect(X+pier*2-1,G+4,1,H-G-7);
+                    d.fillStyle='#cf86a8';d.fillRect(X-1,G+4,pier*2+2,2.6);d.fillStyle='#7a3256';d.fillRect(X-1,H-7,pier*2+2,3);
+                    const ug=l.createLinearGradient(0,H,0,G+4);ug.addColorStop(0,'rgba(255,120,175,.85)');ug.addColorStop(.6,'rgba(240,90,150,.28)');ug.addColorStop(1,'rgba(240,90,150,0)');
+                    l.fillStyle=ug;l.beginPath();l.moveTo(X+pier-2,H);l.lineTo(X-6,G+4);l.lineTo(X+pier*2+6,G+4);l.lineTo(X+pier+2,H);l.closePath();l.fill();
+                    l.fillStyle='rgba(255,250,240,.9)';l.fillRect(X+pier-1,H-4,2,1.2);
+                }
+                // the cornice: a moulded band, dentils, bronze
+                {const Y=G;d.fillStyle='#c97ea0';d.fillRect(0,Y,L,4.5);d.fillStyle='#e0a2bd';d.fillRect(0,Y,L,1);d.fillStyle='#7a3256';for(let x=1;x<L;x+=2.6)d.fillRect(x,Y+2.6,1.3,1.3);
+                    d.fillStyle=T.gold;d.fillRect(0,Y+4.5,L,.6);d.fillStyle='rgba(40,8,24,.4)';d.fillRect(0,Y+5.1,L,2);
+                    l.fillStyle='rgba(255,170,205,.35)';l.fillRect(0,Y,L,4.5);}
+                return { day: dcv, lit: lcv, fontless: !ENNI_FONT_READY() };
             },
             _ecWordmark(ctx, emissive=false) {
                 LandmarkKit.flat(ctx,this._ecK(this._ecH()),c=>{
@@ -265,7 +319,7 @@
         /** Enni Cole luxury department store: one block of rose stone and dark glass, the arched entrance bay
             stepping out from the middle of its front, the curved-glass showroom on top of it (as in the photo). */
         function createEnniCole(x, y, config = {}) {
-            return new BuildingV2({
+            const b = new BuildingV2({
                 id: 'enni_cole', x, y, label: 'Enni Cole', type: 'shopping', style: 'enni_cole', floors: 12,   // two store floors, each as tall as four flats'
                 sections: [
                     { x: 0, y: 0, w: 900, h: 600 },
@@ -280,6 +334,9 @@
                 door: { target: config.doorTarget || 'enni_cole_interior', label: 'Enter Store', lightColor: null },
                 ...config
             });
+            const hull = b._hullK;
+            b._hullK = function () { return Math.max(hull.call(this), this._ecK(this._ecH() + CONFIG.CULLING.LEAN_EXTRA * CONFIG.BUILDINGS.FLOOR_HEIGHT)); };
+            return b;
         }
 
         /** The Cozy Cafe: a brick corner house with a shingled hip roof, the hearth's chimney, a roof terrace with
