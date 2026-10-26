@@ -445,6 +445,9 @@
                     }
                 }
 
+                // Inlaid medallions in the paving, where a map lists them (engine/paving-inlays.js); the puddles go over them
+                this.drawPavingInlays(this.ctx);
+
                 // Reflections (engine/reflections.js): the puddles, and the mirrored lights in them and
                 // the wet asphalt, on the ground and the floors (after the painted interiors) before buildings and people so they walk over it
                 if (RL.at('reflections')) {
