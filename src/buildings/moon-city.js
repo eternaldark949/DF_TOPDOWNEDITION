@@ -94,7 +94,6 @@
         const MCX = {
             CANOPY_Z: 12, SIGN_Z: 24, FIN: 46, CANOPY_R: 60,
             S: 2,                       // facade art px per world unit (_mcFaceArt)
-            HERO: 2,                    // the walls lean twice as hard as the street's, so the facade shows (createMoonCityNightclub)
             C: {
                 lacquer: '#0b0810', plum: '#1a1022', wall: '#140c1a', fin: '#2a1a36',
                 violet: '#8a5cff', lavender: '#c8a8ff', lilac: '#e8d8ff',
@@ -280,11 +279,11 @@
                 }
                 // the portal: stepped gold frames round a rose velvet door, a sunburst over it
                 if (door) {
-                    const u = Math.abs(G.door.x - f.x1) / L, cx = (f.x2 > f.x1 ? u : 1 - u) * L, top = GL0 + 2, bot = H - 4;
+                    const u = Math.abs(G.door.x - f.x1) / L, cx = (f.x2 > f.x1 ? u : 1 - u) * L, top = GL0 + 2, bot = H - 4, dt = Math.max(top + 16, bot - 46);
                     d.fillStyle = '#0b0810'; d.fillRect(cx - 34, FR1, 68, bot - FR1);
-                    for (let k = 0; k < 3; k++) { const w = 30 - k * 7, y0 = top + k * 4; d.strokeStyle = k % 2 ? C.goldDk : C.gold; d.lineWidth = 1.1;
+                    for (let k = 0; k < 3; k++) { const w = 30 - k * 7, y0 = dt - 16 + k * 4; d.strokeStyle = k % 2 ? C.goldDk : C.gold; d.lineWidth = 1.1;
                         d.beginPath(); d.moveTo(cx - w, bot); d.lineTo(cx - w, y0 + 6); d.lineTo(cx - w + 3, y0 + 6); d.lineTo(cx - w + 3, y0 + 3); d.lineTo(cx - w + 6, y0 + 3); d.lineTo(cx - w + 6, y0); d.lineTo(cx + w - 6, y0); d.lineTo(cx + w - 6, y0 + 3); d.lineTo(cx + w - 3, y0 + 3); d.lineTo(cx + w - 3, y0 + 6); d.lineTo(cx + w, y0 + 6); d.lineTo(cx + w, bot); d.stroke(); }
-                    const dt = top + 16; d.fillStyle = C.velvet; d.fillRect(cx - 9, dt, 18, bot - dt); d.fillStyle = C.velvetLt; d.fillRect(cx - .4, dt, .8, bot - dt);
+                    d.fillStyle = C.velvet; d.fillRect(cx - 9, dt, 18, bot - dt); d.fillStyle = C.velvetLt; d.fillRect(cx - .4, dt, .8, bot - dt);
                     l.fillStyle = 'rgba(255, 58, 106, .7)'; l.fillRect(cx - 9, dt, 18, bot - dt);
                     for (let k = 0; k < 13; k++) { const a = Math.PI + k * Math.PI / 12; for (const [c, col] of [[d, 'rgba(232, 194, 122, .8)'], [l, 'rgba(255, 150, 190, .9)']]) { c.strokeStyle = col; c.lineWidth = .5; c.beginPath(); c.moveTo(cx + Math.cos(a) * 3, dt - 1 + Math.sin(a) * 3); c.lineTo(cx + Math.cos(a) * 12, dt - 1 + Math.sin(a) * 9); c.stroke(); } }
                     d.fillStyle = C.gold; d.beginPath(); d.arc(cx, dt - 1, 2.4, Math.PI, 0); d.fill();

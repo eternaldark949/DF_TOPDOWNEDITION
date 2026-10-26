@@ -578,7 +578,7 @@
             label: 'Moon City Nightclub',
             type: 'club',
             category: 'entertainment',
-            floors: 7,                      // one tall club floor (buildings/factories.js)
+            floors: 13,                     // one grand club floor, raised so its deco walls show (buildings/factories.js)
             sign: { text: 'CLUB', color: '#c8a8ff', size: 40 },
             door: { target: 'moon_city_nightclub', label: 'Enter Club', lightColor: '#ff3a6a' },
             apron: { x: 0, y: 490, w: 280, h: 194 }     // the court, the queue and the carpet's end: _mcForecourt (buildings/moon-city.js)
