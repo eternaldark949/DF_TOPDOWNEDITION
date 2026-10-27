@@ -47,9 +47,19 @@
                     c.beginPath(); c.moveTo(1, -1.5); c.bezierCurveTo(8, -11, 19, -12, 23, -7.5); c.stroke();
                     for (const b of this.bulbs) _lampLantern(c, b.x, b.y, 6.5, lit, color);
                 }
+            },
+            // A lantern standing on a pillar's cap, no post (the graveyard's walls: drawGraveyardPillar)
+            pillar_lantern: {
+                bulbs: [{ x: 0, y: 0 }],
+                box: [-9, -9, 18, 18],
+                paint(c, lit, color) {
+                    c.fillStyle = LAMP_IRON; c.fillRect(-6, -6, 12, 12);            // its iron foot
+                    c.strokeStyle = LAMP_BRASS; c.lineWidth = 0.8; c.strokeRect(-5.5, -5.5, 11, 11);
+                    for (const b of this.bulbs) _lampLantern(c, b.x, b.y, 6.5, lit, color);
+                }
             }
         };
-        const LAMP_TYPE_STYLE = { 1: 'antique_crook', 2: 'antique_twin' };
+        const LAMP_TYPE_STYLE = { 1: 'antique_crook', 2: 'antique_twin', 6: 'pillar_lantern' };
         // The plain streets' second lamp colour (opposite the amber side): a warm rose-champagne, not bare white
         const STREET_LAMP_ROSE = '#ffcfae';
         const LAMP_POST_SCALE = 1.5; // Street and entrance posts, scaled around their ground anchors.
@@ -205,7 +215,7 @@
             if (view && lamp.x >= view.left && lamp.x <= view.right && lamp.y >= view.top && lamp.y <= view.bottom) return true;
             const style = LAMP_TYPE_STYLE[lamp.lampType], on = daylight < 0.2 && !lamp._forcedOff;
             let left, top, right, bottom;
-            if (style === 'antique_crook' || style === 'antique_twin') {
+            if (style) {
                 const spec = LAMP_STYLES[style], box = spec.box;
                 if (!box || box.length !== 4 || !box.every(Number.isFinite) || box[2] <= 0 || box[3] <= 0 || !Array.isArray(spec.bulbs)) return true;
                 left = box[0]; top = box[1]; right = left + box[2]; bottom = top + box[3];

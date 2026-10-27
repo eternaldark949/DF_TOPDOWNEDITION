@@ -963,14 +963,15 @@ engineMixin({
                     
                     // 11d. SOUTHERN GRAVEYARD
                     // Large cemetery in the wide block on the city's southern edge (HUB_GRAVEYARD), its gate onto
-                    // Southern Pkwy, with stone walls, warm lamps, gravestones, and Ms. Jean's spawn point at center.
+                    // Southern Pkwy, with brick walls and iron fencing, lanterns on its pillars, warm lamps, gravestones, and Ms. Jean's spawn point at center.
                     {
                         const { x: gx, y: gy, w: gw, h: gh } = HUB_GRAVEYARD;
                         const wallT = 30;         // Wall thickness
                         const gateW = 300;        // North entrance gap width
                         const gateCX = gx + gw / 2; // Gate center X
                         
-                        // Stone walls (added directly as StaticEntities)
+                        // Grey brick walls under an iron fence (drawGraveyardWall, entities/props-decor.js), with a brick
+                        // pillar at each corner, either side of the gate and every ~320 px between, a lantern on each
                         const graveyardWalls = [
                             // North wall - left of gate
                             { x: gx, y: gy, w: gateCX - gateW / 2 - gx, h: wallT },
@@ -982,7 +983,26 @@ engineMixin({
                             { x: gx, y: gy, w: wallT, h: gh },
                             // East wall
                             { x: gx + gw - wallT, y: gy, w: wallT, h: gh }
-                        ];
+                        ].map(w => ({ ...w, style: 'gy_wall' }));
+                        const P = GY_WALL.PILLAR, pillarAt = [];
+                        const run = (x0, y0, x1, y1) => {             // pillar centres along one wall's middle line, ends included
+                            const n = Math.max(1, Math.round(Math.hypot(x1 - x0, y1 - y0) / 320));
+                            for (let i = 0; i <= n; i++) pillarAt.push([x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n]);
+                        };
+                        const mx0 = gx + wallT / 2, mx1 = gx + gw - wallT / 2, my0 = gy + wallT / 2, my1 = gy + gh - wallT / 2;
+                        run(mx0, my0, gateCX - gateW / 2 - P / 2, my0);                     // north, west of the gate
+                        run(gateCX + gateW / 2 + P / 2, my0, mx1, my0);                     // north, east of the gate
+                        run(mx0, my1, mx1, my1);                                            // south
+                        run(mx0, my0, mx0, my1); run(mx1, my0, mx1, my1);                   // west, east
+                        const seen = new Set();
+                        for (const [cx, cy] of pillarAt) {
+                            const key = Math.round(cx) + ',' + Math.round(cy);
+                            if (seen.has(key)) continue;                                    // the corners come twice
+                            seen.add(key);
+                            graveyardWalls.push({ x: cx - P / 2, y: cy - P / 2, w: P, h: P, style: 'gy_pillar' });
+                            const gate = Math.abs(cy - my0) < 1 && Math.abs(Math.abs(cx - gateCX) - (gateW + P) / 2) < 1;
+                            mapData.lamps.push(new LampEntity({ x: cx, y: cy - P / 2 + 9, lampType: 6, color: '#ffaa55', lightRadius: gate ? 350 : 230 }));
+                        }
                         
                         graveyardWalls.forEach(w => {
                             this._staticWallEntities.push(new GameEntity({
@@ -1049,10 +1069,6 @@ engineMixin({
                                 }));
                             }
                         }
-                        
-                        // Gate lamps - flanking the north entrance
-                        mapData.lamps.push(new LampEntity({ x: gateCX - gateW / 2 - 15, y: gy, lampType: 1, color: '#ffaa55', lightRadius: 350 }));
-                        mapData.lamps.push(new LampEntity({ x: gateCX + gateW / 2 + 15, y: gy, lampType: 1, color: '#ffaa55', lightRadius: 350 }));
                         
                         // Register graveyard landmark (for Ms. Jean spawn)
                         this.landmarkRegistry['graveyard_center'] = { x: gateCX, y: gy + gh / 2 };
