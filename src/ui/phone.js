@@ -1183,7 +1183,6 @@
                     ['cosmetics-shop-overlay', () => document.getElementById('cosmetics-shop-close').click()],
                     ['auto-shop-overlay', () => game.closeAutoShop()],
                     ['augment-shop', () => document.getElementById('aug-shop-close').click()],
-                    ['craft-shop', () => document.getElementById('craft-shop-close').click()],
                     ['zib-menu', () => game.closeZibMenu()],
                     ['gauntlet-menu', () => game.closeGauntletMenu()],
                     ['tuning-overlay', () => game.closeTuning()],

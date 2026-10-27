@@ -593,7 +593,7 @@
                 cosmetic: true,           // a COSMETICS_REGISTRY accessory, not an item: it's worn, and takes no attachment slot
                 requires: 'acc_glass',    // silvered from the Crystal Glass
                 name: 'MIRRORED GLASS',
-                icon: '🥂',
+                icon: '◎',
                 desc: 'Silver the Crystal Glass. All damage +35%, and it turns up to 90 damage of shots back before it recharges (3 s).',
                 scrapCost: 650,
             },

@@ -455,7 +455,9 @@
             }
         
             addItem(item) {
-                if (this.items.length >= this.capacity) {
+                // Attachments ride in their own case: craft as many as you like (two are worn at a time);
+                // the capacity counts everything else
+                if (item.type !== 'attachment' && this.items.filter(i => i.type !== 'attachment').length >= this.capacity) {
                     showMessage("INVENTORY FULL");
                     return false;
                 }

@@ -51,6 +51,15 @@ test('Crafting spends scrap, a cosmetic schematic grants the piece, and the glas
  assert.equal(r.scrap,2000-200-275-650);
 });
 
+test('Every attachment can be crafted even with a full bag; only two are worn',e=>{
+ const r=value(e,setup+`game.scrap=5000;for(let i=0;i<game.inventory.capacity;i++)give('pistol_fpx');
+  const made=['laser_sight','mirror_blade','blood_muzzle'].map(id=>game.craftSchematic(id));
+  const gun=game.craftSchematic('golden_child');
+  for(const id of ['laser_sight','mirror_blade','blood_muzzle'])game.inventory.equipItem(id);
+  return {made,gun,worn:game.inventory.equippedAttachments.length};`);
+ assert.deepEqual(r.made,[true,true,true]);assert.equal(r.gun,false);assert.equal(r.worn,2);
+});
+
 test('The Muzzle: bullets ×1.75; the Mirrored Glass: all damage ×1.35, stacking',e=>{
  const r=value(e,setup+`game.player._muzzleLocal={x:20,y:3};game.player._muzzleReady=true;
   const fire=()=>{game.shootCooldown=0;withRandom(.99,()=>game.fireWeapon());return game.projectiles.at(-1).damage;};

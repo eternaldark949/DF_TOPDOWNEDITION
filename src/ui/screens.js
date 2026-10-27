@@ -19,6 +19,7 @@
                 team:       ['team-screen',       'Team',       () => game.renderTeamScreen()],
                 contacts:   ['contacts-screen',   'Contacts',   () => game.renderContactsScreen()],
                 skills:     ['skills-screen',     'Skills',     () => game.renderSkillsScreen()],
+                crafting:   ['crafting-screen',   'Crafting',   () => game.renderCraftingScreen()],   // the workbench at home (not in the nav)
                 collection: ['collection-screen', 'Collection', () => game.renderCollectionScreen()]
             },
             FILTERED: { inventory: true, equipped: true },   // screens the item filter applies to

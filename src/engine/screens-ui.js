@@ -1374,50 +1374,70 @@
             },
 
             // --- CRAFTING SYSTEM ---
-            openCraftingTable() {
-                this.pauseSystem.acquire('crafting');
-                this._shopShow('craft-shop', true);
-                this._shopBalance('craft-shop-balance', this.scrap, 'Scrap');
-                const grid = document.getElementById('craft-shop-grid');
-                let html = `<div class="df-section"><span><span class="glint">◆</span>Schematics</span><span class="count">${SCHEMATICS.length}</span></div>`;
-                const ownsSch = sch => this.schematicOwned(sch), missing = sch => this.schematicNeeds(sch);
-                for (const sch of SCHEMATICS) {
-                    const owned = ownsSch(sch), needs = missing(sch), canAfford = this.scrap >= sch.scrapCost && !needs;
-                    const reg = (typeof ITEM_REGISTRY !== 'undefined' && ITEM_REGISTRY[sch.id]) || {};
-                    // What it is: its registry stats, as label / value rows
-                    const stats = [], st = reg.stats || {};
-                    if (reg.type) stats.push(['Type', reg.type]);
-                    if (sch.cosmetic) stats.push(['Type', 'accessory']);
-                    if (sch.requires) stats.push(['Needs', COSMETICS_REGISTRY[sch.requires]?.name || sch.requires]);
-                    if (st.gunDamageMult) stats.push(['Bullet damage', `×${st.gunDamageMult}`]);
-                    if (st.damage) stats.push(['Damage', st.damage]);
-                    if (st.fireRate) stats.push(['Fire delay', st.fireRate + '<span class="unit">ticks</span>']);
-                    if (st.recoil) stats.push(['Recoil', st.recoil]);
-                    if (st.dotDamage) stats.push(['Burn', `${st.dotDamage} × ${st.dotTicks || 1}`]);
-                    if (st.sticky) stats.push(['Orbs', 'Stick to targets']);
-                    if (st.effect === 'laser_sight') stats.push(['Effect', 'Targeting beam']);
-                    if (st.effect === 'mirror_blade') stats.push(['Effect', 'Blade cuts deflect bullets']);
-                    html += `<div class="df-card${owned ? ' lit' : ''}" data-key="${sch.id}"><div class="df-head">`;
-                    html += `<div class="note-ico">${sch.icon || '⊕'}</div><div class="grow"><div class="eyebrow">Schematic</div><div class="title">${sch.name}</div><div class="desc">${sch.desc}</div></div>`;
-                    html += `<div class="df-shop-side">${owned ? '<span class="df-chip active">✓ Crafted</span>' : `${this._priceHtml(sch.scrapCost, this.scrap, 'Scrap')}<button class="df-btn small" data-craft="${sch.id}"${canAfford ? '' : ' disabled'}>Craft</button>`}</div></div>`;
-                    if (stats.length) html += `<div class="df-rows" style="margin-top:8px;">${stats.map(([k, v]) => `<div class="df-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('')}</div>`;
-                    if (!owned) {
-                        const pct = Math.min(100, Math.round(this.scrap / sch.scrapCost * 100));
-                        html += `<div class="df-bar-label"><span>Scrap</span><span>${Math.min(this.scrap, sch.scrapCost)} / ${sch.scrapCost}</span></div><div class="df-bar ${canAfford ? 'gold' : ''}${pct ? '' : ' zero'}" style="--v:${pct}%"><i></i></div>`;
+            // The workbench opens the Crafting screen, laid out like Skills and Contacts: the scrap in a dial up top,
+            // then the schematics as calling cards under Attachments, Weapons and Accessories.
+            openCraftingTable() { Screens.open('crafting'); },
+
+            renderCraftingScreen() {
+                const el = document.getElementById('crafting-screen-content');
+                if (!el) return;
+                const esc = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+                const kindOf = sch => sch.cosmetic ? 'accessory' : (ITEM_REGISTRY[sch.id]?.type === 'attachment' ? 'attachment' : 'weapon');
+                // Kinds, in the screens' palette: lavender, rose gold, gold
+                const KINDS = [['attachment', 'Attachments', 'Attachment', '#cab0fa'], ['weapon', 'Weapons', 'Weapon', '#e8a688'], ['accessory', 'Accessories', 'Accessory', '#ffc248']];
+                const made = SCHEMATICS.filter(s => this.schematicOwned(s)).length;
+                const pct = SCHEMATICS.length ? Math.round(made / SCHEMATICS.length * 100) : 0;
+                const worn = this.inventory ? this.inventory.equippedAttachments.length : 0, maxWorn = this.inventory ? this.inventory.maxAttachments : 2;
+                let html = `<div class="df-section"><span><span class="glint">◆</span>Workbench</span><span class="count">${made} / ${SCHEMATICS.length} crafted</span></div>`;
+                html += `<div class="sk-head cr-head"><div class="sk-dial cr-dial" style="--v:${pct}"><div class="sk-dial-in"><div class="sk-level">${this.scrap}</div><div class="sk-pct">Scrap</div></div></div>`;
+                html += `<div class="sk-meta"><div class="sk-next">${made} of ${SCHEMATICS.length} schematics crafted</div>`;
+                html += `<div class="sk-caps"><span class="sk-cap amber">${this.scrap} Scrap</span><span class="sk-cap lav">Attachments ${worn} / ${maxWorn} worn</span></div>`;
+                html += `<div class="sk-hint">Craft as many attachments as you like; two can be worn at once. Wear them from your Inventory, and the Mirrored Glass from Neu.Me.</div></div></div>`;
+                for (const [kind, label, role, acc] of KINDS) {
+                    const list = SCHEMATICS.filter(s => kindOf(s) === kind);
+                    if (!list.length) continue;
+                    html += `<div class="df-section"><span><span class="glint">◆</span>${label}</span><span class="count">${list.filter(s => this.schematicOwned(s)).length} / ${list.length}</span></div><div class="dc-grid cr-grid">`;
+                    for (const sch of list) {
+                        const owned = this.schematicOwned(sch), needs = this.schematicNeeds(sch), afford = this.scrap >= sch.scrapCost;
+                        const reg = ITEM_REGISTRY[sch.id] || {}, st = reg.stats || {}, cos = sch.cosmetic ? COSMETICS_REGISTRY[sch.id] : null;
+                        const name = reg.name || cos?.name || sch.name;
+                        // What it does, as small chips
+                        const chips = [];
+                        if (st.damage) chips.push(`Damage ${st.damage}`);
+                        if (st.fireRate) chips.push(`Fire delay ${st.fireRate}`);
+                        if (st.dotDamage) chips.push(`Burn ${st.dotDamage} × ${st.dotTicks || 1}`);
+                        if (st.sticky) chips.push('Sticks to targets');
+                        if (st.effect === 'laser_sight') chips.push('Targeting beam');
+                        if (st.effect === 'mirror_blade') chips.push('Cuts deflect bullets');
+                        if (st.gunDamageMult) chips.push(`Bullets ×${st.gunDamageMult}`);
+                        if (sch.id === 'acc_mirror_glass') chips.push('All damage ×1.35', 'Shield 90 · 3 s recharge');
+                        const status = owned ? 'Crafted' : needs ? `Needs the ${needs}` : role;
+                        html += `<div class="dc-card cr-card${owned ? ' owned' : ''}${!owned && (needs || !afford) ? ' short' : ''}" style="--acc:${acc}" tabindex="0" data-key="${sch.id}">`;
+                        html += `<div class="dc-portrait cr-icon"><div class="mono">${sch.icon || '⊕'}</div><svg class="portrait-rim" aria-hidden="true"><use href="#portrait-rim"/></svg></div>`;
+                        html += `<div class="dc-who"><div class="dc-name">${esc(name)}</div><div class="dc-role">${esc(status)}</div><div class="dc-quote">${esc(sch.desc)}</div>`;
+                        if (chips.length) html += `<div class="cr-chips">${chips.map(c => `<span>${esc(c)}</span>`).join('')}</div>`;
+                        html += `</div><div class="cr-side">`;
+                        if (owned) html += `<span class="dc-diamond" aria-hidden="true"></span>`;
+                        else {
+                            html += `<div class="cr-cost${afford ? '' : ' low'}">${sch.scrapCost}<span>Scrap</span></div>`;
+                            if (!afford) html += `<div class="cr-bar" style="--v:${Math.min(100, Math.round(this.scrap / sch.scrapCost * 100))}%"><i></i></div>`;
+                            html += `<button class="df-btn small" data-craft="${sch.id}"${afford && !needs ? '' : ' disabled'}>Craft</button>`;
+                        }
+                        html += `</div></div>`;
                     }
                     html += `</div>`;
                 }
-                grid.innerHTML = html;
-                this._shopFlash(grid);
-                grid.querySelectorAll('button[data-craft]').forEach(b => b.addEventListener('click', () => {
-                    if (!this.craftSchematic(b.dataset.craft)) return;
-                    this._shopJust = b.dataset.craft;
-                    this.openCraftingTable();
+                el.innerHTML = html;
+                // Tap a card to light it (as Contacts and Skills do); Craft makes it
+                el.querySelectorAll('.cr-card').forEach(card => card.addEventListener('click', e => {
+                    if (e.target.closest('button')) return;
+                    const was = card.classList.contains('selected');
+                    el.querySelectorAll('.cr-card.selected').forEach(o => o.classList.remove('selected'));
+                    card.classList.toggle('selected', !was);
                 }));
-                document.getElementById('craft-shop-close').onclick = () => {
-                    this._shopShow('craft-shop', false);
-                    this.pauseSystem.release('crafting');
-                };
+                el.querySelectorAll('button[data-craft]').forEach(b => b.addEventListener('click', () => {
+                    if (this.craftSchematic(b.dataset.craft)) this.renderCraftingScreen();
+                }));
             },
 
             /** A schematic is made: an item carried, or (cosmetic) a piece owned to wear */
