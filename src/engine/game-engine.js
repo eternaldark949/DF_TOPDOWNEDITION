@@ -259,7 +259,7 @@
                 ];
                 this.activeInteraction = null;
 
-                this.initEvents(); this.initJoystick(); this.initFireJoystick();
+                this.initEvents(); this.initJoystick(); this.initFireJoystick(); this.initLookZone();
             }
 
             // ── UNIFIED COMPANION HELPERS ──

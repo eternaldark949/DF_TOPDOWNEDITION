@@ -21,6 +21,7 @@
             g._releaseShot = null; g._releaseWait = 0; g._aimMemory = null;
             clearTimeout(g._healHoldTimer); g._healHoldTimer = null; g._healHeld = false; g._healPressed = false;
             g._cancelGrabHold?.();
+            g._cancelLookDrag?.();
             g.handbrakeHeld = false; if (g.car) g.car.handbrake = false;
             document.getElementById('btn-handbrake')?.classList.remove('held');
             if (g.emoteJoystick) Object.assign(g.emoteJoystick, { active: false, touchId: null, highlighted: null });
@@ -182,6 +183,7 @@
                 INTERACT_ZOOM: 1.05 * 1.15,     // by something to use, or talking: ~21% closer than that (was 5%, raised 15%)
                 BASE_ZOOMS: [1, 0.9, 0.75, 0.6],  // Settings → Base Zoom steps (GameSettings.baseZoom), multiplying every camera zoom above
                 CINE_PAN: 450, CINE_ZOOM: [0.5, 2.5],       // Cinematic View: pan radius (world px) and zoom limits
+                LOOK: { REACH: 0.7, FOLLOW_MS: 70, RETURN_MS: 260 },   // drag-to-look (engine/player-draw-input.js initLookZone): how far, as a share of the half-screen, the view can go from her; easing while dragged and home after
                 SHAKE_DECAY: 0.9,
                 SHAKE_MIN_THRESHOLD: 0.5
             },

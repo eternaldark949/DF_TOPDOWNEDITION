@@ -31,6 +31,7 @@
         body.landscape #btn-holster, body.landscape #emote-frown { bottom: calc(210px - var(--paw-drop)); }
         body.landscape #btn-sneak { bottom: calc(232px - var(--paw-drop)); }
         body.landscape #action-dock { bottom: calc(300px - var(--paw-drop)); }
+        body.landscape #input-zone-look { bottom: calc((285px - var(--paw-drop)) * var(--hud, 1)); }   /* not zoomed itself (it's half the screen): its edge follows the paw */
 
         /* (Dialogue and comms in landscape: styles/panels-phone.css, beside each talk style) */
         body.landscape #dialogue-caption { bottom: 70px; }

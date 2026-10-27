@@ -505,6 +505,40 @@
                 fireZone.addEventListener('touchend', endHandler); fireZone.addEventListener('touchcancel', endHandler);
             },
 
+            /* Drag-to-look: the empty screen above the cat's paw (#input-zone-look). Drag there and the
+               view slides with the thumb, up to CONFIG.CAMERA.LOOK.REACH of the half-screen from her, so
+               she stays in sight; let go and it glides home. engine/draw.js turns lookDrag into the pan. */
+            initLookZone() {
+                const zone = document.getElementById('input-zone-look'); if (!zone) return;
+                const L = this.lookDrag = { active: false, id: null, landX: 0, landY: 0, dx: 0, dy: 0, sx: 1, sy: 1 };
+                const end = () => { L.active = false; L.id = null; L.dx = 0; L.dy = 0; };
+                this._cancelLookDrag = end;
+                zone.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    if (L.active || !this.running || this.paused || hudInputBlocked()) return;
+                    const t = e.changedTouches[0], rect = this.canvas.getBoundingClientRect();
+                    L.sx = rect.width ? this.canvas.width / rect.width : 1; L.sy = rect.height ? this.canvas.height / rect.height : 1;
+                    // Choosing a side of the furniture she holds: a tap here still picks the handle under it (engine/events.js)
+                    if (this.furniture && this.furniture.state === 'choose') {
+                        const w = this.viewToWorld((t.clientX - rect.left) * L.sx, (t.clientY - rect.top) * L.sy);
+                        if (this.furniture.tap(w.x, w.y)) return;
+                    }
+                    if (GameSettings.flitTwoFinger && this.fireJoystick.active) return;   // that tap is a Two-Finger Flit (initJoystick)
+                    L.active = true; L.id = t.identifier; L.landX = t.clientX; L.landY = t.clientY; L.dx = 0; L.dy = 0;
+                }, { passive: false });
+                zone.addEventListener('touchmove', (e) => {
+                    e.preventDefault(); if (!L.active) return;
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        const t = e.changedTouches[i];
+                        if (t.identifier !== L.id) continue;
+                        L.dx = t.clientX - L.landX; L.dy = t.clientY - L.landY;
+                        break;
+                    }
+                }, { passive: false });
+                const endHandler = (e) => { e.preventDefault(); for (let i = 0; i < e.changedTouches.length; i++) if (e.changedTouches[i].identifier === L.id) { end(); break; } };
+                zone.addEventListener('touchend', endHandler); zone.addEventListener('touchcancel', endHandler);
+            },
+
             /** The flit ring's charge (fill, ready pulse, dim when unaffordable) — only touched when it changes. */
             updateFlitRing() {
                 const el = this.flitRingEl; if (!el) return;

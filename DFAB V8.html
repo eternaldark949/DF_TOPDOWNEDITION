@@ -2109,6 +2109,15 @@
             touch-action: none; 
         }
 
+        /* Drag-to-look (engine/player-draw-input.js initLookZone): the empty right-hand screen above the
+           cat's paw. Under the buttons, the dock and the pause button, so they still take their taps.
+           Touch only: with a mouse this is where she aims, so clicks go through to the canvas. */
+        #input-zone-look {
+            position: absolute; top: 0; right: 0; width: 50%; bottom: 285px;
+            z-index: 24; pointer-events: none; touch-action: none;
+        }
+        @media (pointer: coarse) { #input-zone-look { pointer-events: auto; } }
+
         /* 4. Movement Joystick Visuals */
         #joystick-zone { 
             position: absolute; 
@@ -4047,6 +4056,7 @@
         body.landscape #btn-holster, body.landscape #emote-frown { bottom: calc(210px - var(--paw-drop)); }
         body.landscape #btn-sneak { bottom: calc(232px - var(--paw-drop)); }
         body.landscape #action-dock { bottom: calc(300px - var(--paw-drop)); }
+        body.landscape #input-zone-look { bottom: calc((285px - var(--paw-drop)) * var(--hud, 1)); }   /* not zoomed itself (it's half the screen): its edge follows the paw */
 
         /* (Dialogue and comms in landscape: styles/panels-phone.css, beside each talk style) */
         body.landscape #dialogue-caption { bottom: 70px; }
@@ -4574,6 +4584,7 @@
             <div id="btn-nv">👁️</div>
 
             <div id="input-zone-left"></div> 
+            <div id="input-zone-look"></div>
             <div id="joystick-zone">
                 <div id="joystick-ring"></div>
                 <div id="joystick-knob"></div>
@@ -5445,6 +5456,7 @@
             g._releaseShot = null; g._releaseWait = 0; g._aimMemory = null;
             clearTimeout(g._healHoldTimer); g._healHoldTimer = null; g._healHeld = false; g._healPressed = false;
             g._cancelGrabHold?.();
+            g._cancelLookDrag?.();
             g.handbrakeHeld = false; if (g.car) g.car.handbrake = false;
             document.getElementById('btn-handbrake')?.classList.remove('held');
             if (g.emoteJoystick) Object.assign(g.emoteJoystick, { active: false, touchId: null, highlighted: null });
@@ -5606,6 +5618,7 @@
                 INTERACT_ZOOM: 1.05 * 1.15,     // by something to use, or talking: ~21% closer than that (was 5%, raised 15%)
                 BASE_ZOOMS: [1, 0.9, 0.75, 0.6],  // Settings → Base Zoom steps (GameSettings.baseZoom), multiplying every camera zoom above
                 CINE_PAN: 450, CINE_ZOOM: [0.5, 2.5],       // Cinematic View: pan radius (world px) and zoom limits
+                LOOK: { REACH: 0.7, FOLLOW_MS: 70, RETURN_MS: 260 },   // drag-to-look (engine/player-draw-input.js initLookZone): how far, as a share of the half-screen, the view can go from her; easing while dragged and home after
                 SHAKE_DECAY: 0.9,
                 SHAKE_MIN_THRESHOLD: 0.5
             },
@@ -62003,7 +62016,7 @@ Object.assign(TrafficVehicle.prototype, {
         const HUD_PARTS = {
             phone:     ['btn-phone'],
             health:    ['ui-health', 'ui-shield-bar', 'ui-flit-bar-container'],
-            move:      ['input-zone-left'],
+            move:      ['input-zone-left', 'input-zone-look'],
             fire:      ['btn-fire'],
             holster:   ['btn-holster', 'btn-emote', 'btn-sneak'],
             heal:      ['btn-heal'],
@@ -63283,7 +63296,7 @@ Object.assign(TrafficVehicle.prototype, {
                 ];
                 this.activeInteraction = null;
 
-                this.initEvents(); this.initJoystick(); this.initFireJoystick();
+                this.initEvents(); this.initJoystick(); this.initFireJoystick(); this.initLookZone();
             }
 
             // ── UNIFIED COMPANION HELPERS ──
@@ -76934,6 +76947,7 @@ engineMixin({
                     const c = this._clampView(this.camera.x, this.camera.y, viewZoom);   // pans and cuts stop at the map's edge
                     camX = this.camera.x = c.x;
                     camY = this.camera.y = c.y;
+                    this.lookPanX = this.lookPanY = 0;
                 } else {
                     /* Behind the wheel the camera looks a little down the road, easing after the
                        car's velocity (per frame, so it glides between ticks); on foot it drifts home. */
@@ -76946,8 +76960,21 @@ engineMixin({
                     // At a window's edge the camera leans out over the city beyond it (a CityView's lookout: buildings/city-view.js)
                     const cityV = this._cityView, look = cityV && !drv ? cityV.lookoutLean(this.player, this.camera.zoom) : 0;
                     this.lookLeanY = cityV ? (this.lookLeanY || 0) + (look - (this.lookLeanY || 0)) * (1 - Math.exp(-dtCam / 450)) : 0;
+                    // Drag-to-look (engine/player-draw-input.js initLookZone): the view follows the thumb within reach of her, and glides home on release
+                    const LK = CONFIG.CAMERA.LOOK, ld = this.lookDrag;
+                    if (this._lookMap !== this.activeMap) { this._lookMap = this.activeMap; this.lookPanX = this.lookPanY = 0; }
+                    let lx = 0, ly = 0;
+                    if (ld && ld.active) {
+                        const rx = LK.REACH * this.canvas.width / 2 / viewZoom, ry = LK.REACH * this.canvas.height / 2 / viewZoom;
+                        lx = -ld.dx * ld.sx / viewZoom; ly = -ld.dy * ld.sy / viewZoom;   // the world moves with the finger
+                        const e = Math.hypot(lx / rx, ly / ry); if (e > 1) { lx /= e; ly /= e; }
+                    }
+                    const kLook = 1 - Math.exp(-dtCam / (ld && ld.active ? LK.FOLLOW_MS : LK.RETURN_MS));
+                    this.lookPanX = (this.lookPanX || 0) + (lx - (this.lookPanX || 0)) * kLook;
+                    this.lookPanY = (this.lookPanY || 0) + (ly - (this.lookPanY || 0)) * kLook;
+                    if (!(ld && ld.active) && Math.abs(this.lookPanX) < 0.05 && Math.abs(this.lookPanY) < 0.05) this.lookPanX = this.lookPanY = 0;
                     // Scoped with a sniper, the camera leans down her line (engine/scope.js)
-                    const c = this._clampView(this.player.x + (this.scopeLeanX || 0) + this.driveLeanX, this.player.y + (this.scopeLeanY || 0) + this.driveLeanY + this.lookLeanY, viewZoom);
+                    const c = this._clampView(this.player.x + (this.scopeLeanX || 0) + this.driveLeanX + this.lookPanX, this.player.y + (this.scopeLeanY || 0) + this.driveLeanY + this.lookLeanY + this.lookPanY, viewZoom);
                     camX = c.x; camY = c.y;
                     this.camera.x = camX; // Sync for smooth handoff
                     this.camera.y = camY;
@@ -82856,6 +82883,40 @@ engineMixin({
                     }
                 };
                 fireZone.addEventListener('touchend', endHandler); fireZone.addEventListener('touchcancel', endHandler);
+            },
+
+            /* Drag-to-look: the empty screen above the cat's paw (#input-zone-look). Drag there and the
+               view slides with the thumb, up to CONFIG.CAMERA.LOOK.REACH of the half-screen from her, so
+               she stays in sight; let go and it glides home. engine/draw.js turns lookDrag into the pan. */
+            initLookZone() {
+                const zone = document.getElementById('input-zone-look'); if (!zone) return;
+                const L = this.lookDrag = { active: false, id: null, landX: 0, landY: 0, dx: 0, dy: 0, sx: 1, sy: 1 };
+                const end = () => { L.active = false; L.id = null; L.dx = 0; L.dy = 0; };
+                this._cancelLookDrag = end;
+                zone.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    if (L.active || !this.running || this.paused || hudInputBlocked()) return;
+                    const t = e.changedTouches[0], rect = this.canvas.getBoundingClientRect();
+                    L.sx = rect.width ? this.canvas.width / rect.width : 1; L.sy = rect.height ? this.canvas.height / rect.height : 1;
+                    // Choosing a side of the furniture she holds: a tap here still picks the handle under it (engine/events.js)
+                    if (this.furniture && this.furniture.state === 'choose') {
+                        const w = this.viewToWorld((t.clientX - rect.left) * L.sx, (t.clientY - rect.top) * L.sy);
+                        if (this.furniture.tap(w.x, w.y)) return;
+                    }
+                    if (GameSettings.flitTwoFinger && this.fireJoystick.active) return;   // that tap is a Two-Finger Flit (initJoystick)
+                    L.active = true; L.id = t.identifier; L.landX = t.clientX; L.landY = t.clientY; L.dx = 0; L.dy = 0;
+                }, { passive: false });
+                zone.addEventListener('touchmove', (e) => {
+                    e.preventDefault(); if (!L.active) return;
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        const t = e.changedTouches[i];
+                        if (t.identifier !== L.id) continue;
+                        L.dx = t.clientX - L.landX; L.dy = t.clientY - L.landY;
+                        break;
+                    }
+                }, { passive: false });
+                const endHandler = (e) => { e.preventDefault(); for (let i = 0; i < e.changedTouches.length; i++) if (e.changedTouches[i].identifier === L.id) { end(); break; } };
+                zone.addEventListener('touchend', endHandler); zone.addEventListener('touchcancel', endHandler);
             },
 
             /** The flit ring's charge (fill, ready pulse, dim when unaffordable) — only touched when it changes. */

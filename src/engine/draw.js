@@ -156,6 +156,7 @@
                     const c = this._clampView(this.camera.x, this.camera.y, viewZoom);   // pans and cuts stop at the map's edge
                     camX = this.camera.x = c.x;
                     camY = this.camera.y = c.y;
+                    this.lookPanX = this.lookPanY = 0;
                 } else {
                     /* Behind the wheel the camera looks a little down the road, easing after the
                        car's velocity (per frame, so it glides between ticks); on foot it drifts home. */
@@ -168,8 +169,21 @@
                     // At a window's edge the camera leans out over the city beyond it (a CityView's lookout: buildings/city-view.js)
                     const cityV = this._cityView, look = cityV && !drv ? cityV.lookoutLean(this.player, this.camera.zoom) : 0;
                     this.lookLeanY = cityV ? (this.lookLeanY || 0) + (look - (this.lookLeanY || 0)) * (1 - Math.exp(-dtCam / 450)) : 0;
+                    // Drag-to-look (engine/player-draw-input.js initLookZone): the view follows the thumb within reach of her, and glides home on release
+                    const LK = CONFIG.CAMERA.LOOK, ld = this.lookDrag;
+                    if (this._lookMap !== this.activeMap) { this._lookMap = this.activeMap; this.lookPanX = this.lookPanY = 0; }
+                    let lx = 0, ly = 0;
+                    if (ld && ld.active) {
+                        const rx = LK.REACH * this.canvas.width / 2 / viewZoom, ry = LK.REACH * this.canvas.height / 2 / viewZoom;
+                        lx = -ld.dx * ld.sx / viewZoom; ly = -ld.dy * ld.sy / viewZoom;   // the world moves with the finger
+                        const e = Math.hypot(lx / rx, ly / ry); if (e > 1) { lx /= e; ly /= e; }
+                    }
+                    const kLook = 1 - Math.exp(-dtCam / (ld && ld.active ? LK.FOLLOW_MS : LK.RETURN_MS));
+                    this.lookPanX = (this.lookPanX || 0) + (lx - (this.lookPanX || 0)) * kLook;
+                    this.lookPanY = (this.lookPanY || 0) + (ly - (this.lookPanY || 0)) * kLook;
+                    if (!(ld && ld.active) && Math.abs(this.lookPanX) < 0.05 && Math.abs(this.lookPanY) < 0.05) this.lookPanX = this.lookPanY = 0;
                     // Scoped with a sniper, the camera leans down her line (engine/scope.js)
-                    const c = this._clampView(this.player.x + (this.scopeLeanX || 0) + this.driveLeanX, this.player.y + (this.scopeLeanY || 0) + this.driveLeanY + this.lookLeanY, viewZoom);
+                    const c = this._clampView(this.player.x + (this.scopeLeanX || 0) + this.driveLeanX + this.lookPanX, this.player.y + (this.scopeLeanY || 0) + this.driveLeanY + this.lookLeanY + this.lookPanY, viewZoom);
                     camX = c.x; camY = c.y;
                     this.camera.x = camX; // Sync for smooth handoff
                     this.camera.y = camY;
