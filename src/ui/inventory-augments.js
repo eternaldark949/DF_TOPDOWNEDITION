@@ -78,6 +78,12 @@
                 // engine/status-effects.js deflectShots: the Kukri's and Blood Pact's cut turns enemy shots
                 stats: { effect: 'mirror_blade' }
             },
+            'crimson_edge': {
+                name: 'Crimson Edge', type: 'attachment', icon: '❖',
+                desc: 'A blood-red whetted edge. Blades cut 50% harder, and wounds bleed up to five deep.',
+                // engine/status-effects.js meleeSlash / applyStatus: blade damage × bladeDamageMult, bleed up to bleedMax stacks
+                stats: { effect: 'crimson_edge', bladeDamageMult: 1.5, bleedMax: 5 }
+            },
             'blood_muzzle': {
                 name: 'Bloodthirsty Muzzle', type: 'attachment', icon: '♆',
                 desc: 'A crimson muzzle brake that drinks the shot. Bullets deal 75% more damage.',
@@ -88,7 +94,7 @@
                 name: 'Golden Child', type: 'weapon', icon: '✦',
                 desc: 'Fires golden orbs that stick to targets and burn away.',
                 weaponMode: 'normal',
-                stats: { fireRate: 38, recoil: 6, damage: 18, projectileColor: '#FFD700', projectileSpeed: 18, flashRadius: 45, sticky: true, dotDamage: 10, dotTicks: 12, dotInterval: 10 }
+                stats: { fireRate: 38, recoil: 6, damage: 18, projectileColor: '#FFD700', projectileSpeed: 18, flashRadius: 45, sticky: true, dotDamage: 8, dotTicks: 12, dotInterval: 10, maxOrbs: 4 }
             },
         };
         

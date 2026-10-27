@@ -102,4 +102,47 @@ test('Mirrored Glass is crafted, not sold, and draws as a silvered glass',e=>{
  assert.equal(r.before,false);assert.equal(r.held.type,'glass');assert.equal(r.held.mirror,true);
 });
 
+test('Golden Child: burn 8 a tick, scaled with the shot and its crit; burn ticks pass i-frames, so orbs stack',e=>{
+ const r=value(e,setup+`game.player._muzzleLocal={x:20,y:3};game.player._muzzleReady=true;
+  const fire=v=>{game.shootCooldown=0;withRandom(v,()=>game.fireWeapon());return game.projectiles.at(-1);};
+  wield('golden_child');const base=fire(.99).dotDamage;
+  give('blood_muzzle');game.inventory.equipItem('blood_muzzle');const muzzle=fire(.99).dotDamage,crit=fire(.01).dotDamage;
+  const g=ganger(1300,1000);g.invincibleTimer=20;const hp=g.hp;
+  const a=g.takeDamage(8,0,0,{type:'burn'}),b=g.takeDamage(8,0,0,{type:'burn'});
+  return {base,muzzle,crit,landed:[a,b],lost:hp-g.hp,frames:g.invincibleTimer,maxOrbs:game.projectiles.at(-1).maxOrbs};`);
+ assert.deepEqual(r,{base:8,muzzle:14,crit:28,landed:[true,true],lost:16,frames:20,maxOrbs:4});
+});
+
+test('Golden Child orbs: up to four live on one target, a fifth replaces the oldest',e=>{
+ const r=value(e,setup+`const g=ganger(1300,1000),h=ganger(1400,1000);game.stickyOrbs=[];
+  for(let i=0;i<5;i++)game.stickOrb(g,{maxOrbs:4,dotTicks:12,dotInterval:10,dotDamage:8+i});game.stickOrb(h,{maxOrbs:4,dotTicks:12,dotInterval:10,dotDamage:8});
+  const on=game.stickyOrbs.filter(o=>o.target===g);return {n:on.length,dmg:on.map(o=>o.dotDamage),other:game.stickyOrbs.filter(o=>o.target===h).length};`);
+ assert.deepEqual(r.dmg,[9,10,11,12]);assert.equal(r.other,1);
+ assert.equal(r.n,4);
+});
+
+test('Blades: Crimson Edge cuts ×1.5 and bleeds five deep; Quick Hands and Reflex Sync quicken the swing',e=>{
+ const r=value(e,setup+`const g=ganger(1030,1000);wield('maiden_kukri');
+  const swing=()=>{const s=withRandom(.99,()=>game.meleeSlash());const cd=game.shootCooldown;while(game._swing===s)tick();return cd;};
+  const hp0=g.hp;const cd0=swing();const plain=hp0-g.hp;
+  give('crimson_edge');game.inventory.equipItem('crimson_edge');const hp1=g.hp;swing();const edged=hp1-g.hp;
+  for(let i=0;i<6;i++){game.shootCooldown=0;swing();}
+  game.resonance.ranks.quick_hands=3;game.augments.equipped.push('fast_reload');const cd1=swing();
+  return {plain,edged,stacks:g._status.bleed.stacks,cd0,cd1};`);
+ assert.equal(r.plain,28);assert.equal(r.edged,42);assert.equal(r.stacks,5);
+ assert.equal(r.cd0,16);assert.equal(r.cd1,Math.max(2,Math.round(16*(1-0.24)*0.8)));
+});
+
+test('Blades: a cut heals 4% of its damage; mid-swing she takes 25% less; a Flit-cut always crits',e=>{
+ const r=value(e,setup+`const g=ganger(1030,1000);wield('blood_pact');
+  game.playerHealth=50;game.player.hp=50;game.player.maxHp=game.maxPlayerHealth=100;
+  const s=withRandom(.99,()=>game.meleeSlash());
+  const before=game.player.hp;game.player.invincibleTimer=0;game.player.takeDamage(20);const guarded=before-game.player.hp;
+  while(game._swing===s)tick();const healedTo=game.player.hp;
+  _gameTimeSec+=2;game.player.invincibleTimer=0;const b2=game.player.hp;game.player.takeDamage(20);const open=b2-game.player.hp;
+  game.flitState.lastFlitAt=_gameTimeSec;const hp=g.hp;game.shootCooldown=0;const s2=withRandom(.99,()=>game.meleeSlash());while(game._swing===s2)tick();
+  return {guarded,healed:healedTo-(before-guarded),open,flit:hp-g.hp};`);
+ assert.equal(r.guarded,15);assert.equal(r.healed,2);assert.equal(r.open,20);assert.equal(r.flit,90);
+});
+
 console.log(JSON.stringify({passed:tests.length,tests},null,2));

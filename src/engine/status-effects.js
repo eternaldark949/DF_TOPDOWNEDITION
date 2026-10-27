@@ -35,6 +35,9 @@
         // been turned; then it's spent and refills over RECHARGE_SECS. A part-spent shield refills at the
         // same rate once REGEN_DELAY passes without a hit. The Mirror Blade (an attachment): a blade's cut
         // turns the shots it meets (within the blade's width + BLADE_PAD of their path).
+        // Blades (ETERNAL's melee pass): each cut heals her LIFESTEAL of its damage; mid-swing she takes GUARD of
+        // what would hit her; a swing inside the Flit-Strike window always crits
+        const BLADE_PERKS = { LIFESTEAL: 0.04, GUARD: 0.75 };
         const MIRROR = { GLASS_ID: 'acc_mirror_glass', GLASS_DAMAGE: 1.35, SHIELD: 90, RECHARGE_SECS: 3, REGEN_DELAY: 1.5, BLADE_PAD: 6 };
 
         /** Squared distance between segments ab and cd */
@@ -122,7 +125,7 @@
                 const S = actor._status || (actor._status = {}), now = _gameTimeSec;
                 if (kind === 'bleed') {
                     const b = S.bleed;
-                    if (b && now < b.until) { b.stacks = Math.min(STATUS.BLEED_MAX, b.stacks + 1); b.until = now + (o.secs || 3); b.dps = Math.max(b.dps, o.dps || 5); b.by = o.by || b.by; }
+                    if (b && now < b.until) { b.stacks = Math.min(o.max || STATUS.BLEED_MAX, b.stacks + 1); b.until = now + (o.secs || 3); b.dps = Math.max(b.dps, o.dps || 5); b.by = o.by || b.by; }
                     else S.bleed = { stacks: 1, dps: o.dps || 5, until: now + (o.secs || 3), next: now + STATUS.BLEED_TICK, by: o.by || null };
                 }
             },
@@ -223,18 +226,22 @@
              */
             meleeSlash() {
                 const W = this.currentWeapon, st = (W && W.stats) || {}, pl = this.player;
-                this.shootCooldown = st.fireRate || 16;
+                // Quick Hands and Reflex Sync quicken a blade as they do a gun
+                const fast = this.augments && this.augments.isEquipped('fast_reload') ? 0.8 : 1;
+                this.shootCooldown = Math.max(2, Math.round((this.resonance ? this.resonance.stat('fireCooldown', st.fireRate || 16) : st.fireRate || 16) * fast));
                 const side = this._slashSide = -(this._slashSide || 1);
                 this._slashT = _gameTimeSec; this._slashSecs = st.swingSecs || MELEE_SWING.duration;
                 const M = weaponModel(W && W.id);
                 this._slashStyle = M.swing || 'knife';
                 const ang = pl.angle, reach = st.reach || 36, arc = st.arc || 1.4;
-                let bladeDamage = (st.damage || 25) * this.playerDamageMult();
-                if (this.resonance && this.flitState && _gameTimeSec - this.flitState.lastFlitAt <= this.resonance.stat('flitStrikeWindow', 1)) {
-                    bladeDamage *= 1 + 0.2 * this.resonance.rank('flit_strike');
-                }
+                const edge = this.inventory && this.inventory.hasAttachment('crimson_edge') ? ITEM_REGISTRY.crimson_edge.stats : null;
+                let bladeDamage = (st.damage || 25) * this.playerDamageMult() * (edge ? edge.bladeDamageMult : 1);
+                // A Flit-cut: a swing inside the Flit-Strike window always crits (and Flit-Strike adds its share)
+                const flitCut = !!(this.resonance && this.flitState && _gameTimeSec - this.flitState.lastFlitAt <= this.resonance.stat('flitStrikeWindow', 1));
+                if (flitCut) bladeDamage *= 1 + 0.2 * this.resonance.rank('flit_strike');
                 const swing = this._swing = { t0: this._slashT, secs: this._slashSecs, style: this._slashStyle, side, weapon: W, st,
-                    damage: bladeDamage, edge: M.edge || DEFAULT_SLASH_TRAIL.edge, k: 0, struck: new Set(), hits: 0 };
+                    damage: bladeDamage, flitCut, bleedMax: edge ? edge.bleedMax : STATUS.BLEED_MAX,
+                    edge: M.edge || DEFAULT_SLASH_TRAIL.edge, k: 0, struck: new Set(), hits: 0 };
                 // Step in only when the blade will meet someone: a slash at nothing stays where she is
                 // (held, it used to creep her ~30 px/s into zones and lamplight)
                 const walls = this.activeMap.walls, cols = getColliders(this.activeMap);
@@ -312,10 +319,12 @@
                 const dx = e.x - pl.x, dy = e.y - pl.y, d = Math.hypot(dx, dy);
                 e.lastHitBy = pl; e.lastHitMelee = true;
                 const kx = dx / (d || 1) * 3, ky = dy / (d || 1) * 3;
-                const crit = this.rollCrit(st), dmg = Math.round(S.damage * crit);
+                const roll = this.rollCrit(st), crit = S.flitCut ? Math.max(roll, st.critMult || CRIT.mult) : roll;
+                const dmg = Math.round(S.damage * crit);
                 if (!e.takeDamage(dmg, kx, ky, { type: st.damageType || 'melee', crit: crit > 1, cut: true })) return;
+                if (pl.heal) pl.heal(Math.max(1, Math.round(dmg * BLADE_PERKS.LIFESTEAL)));                 // a sip of what the blade drew
                 if (!e.dead && e.interruptMelee) e.interruptMelee();
-                if (st.bleedDps) this.applyStatus(e, 'bleed', { dps: st.bleedDps, secs: st.bleedSecs || 3, by: pl });
+                if (st.bleedDps) this.applyStatus(e, 'bleed', { dps: st.bleedDps * this.playerDamageMult(), secs: st.bleedSecs || 3, by: pl, max: S.bleedMax });
                 if (!e.dead && typeof Ganger !== 'undefined' && e instanceof Ganger) { e.suspicion = 100; e.state = 'ALERT'; e.angle = Math.atan2(-dy, -dx); }
                 const fx = this.shotFx || (this.shotFx = []);
                 for (let i = 0; i < 5; i++) {
@@ -327,6 +336,23 @@
                     if (typeof ambience !== 'undefined' && ambience.cut) ambience.cut();
                     this.triggerShake(2);
                 }
+            },
+
+            /** A Golden Child orb sticks to `e` from shot `p`: up to its maxOrbs live on one target, another replaces the oldest */
+            stickOrb(e, p) {
+                const orbs = this.stickyOrbs || (this.stickyOrbs = []);
+                const on = orbs.filter(o => o.target === e);
+                if (on.length >= (p.maxOrbs || 4)) orbs.splice(orbs.indexOf(on[0]), 1);
+                const spread = (e.radius || 10) * 0.5;                              // scattered across the target
+                orbs.push({ target: e, offsetX: (Math.random() - 0.5) * spread, offsetY: (Math.random() - 0.5) * spread, maxRadius: 7,
+                    ticksLeft: p.dotTicks, maxTicks: p.dotTicks, tickInterval: p.dotInterval, tickTimer: 0, dotDamage: p.dotDamage, owner: p.owner });
+            },
+
+            /** Damage that reaches her mid-swing (a blade drawn and moving) is cut to BLADE_PERKS.GUARD of itself */
+            swingGuard(amount) {
+                const swinging = this.weaponMode === 'melee' && !this.weaponHolstered && this._slashT !== undefined
+                    && _gameTimeSec - this._slashT <= (this._slashSecs || MELEE_SWING.duration);
+                return swinging ? amount * BLADE_PERKS.GUARD : amount;
             },
 
             /** The Mirrored Glass is in her hand */

@@ -98,10 +98,10 @@
             takeDamage(amount, knockbackX = 0, knockbackY = 0, opts = null) {
                 // A bullet always lands: i-frames guard against a swing or a bump hitting twice, not against rapid fire
                 // (a fast gun used to lose ~4 of every 5 bullets to them). Bullets don't start i-frames either.
-                // Nor do a blade's cuts (opts.cut: each swing cuts a body once, so quick cuts all land) or bleed ticks
-                // (a tick used to start them, and the next cut inside them was lost).
+                // Nor do a blade's cuts (opts.cut: each swing cuts a body once, so quick cuts all land), bleed ticks or
+                // a Golden Child orb's burn ticks (a tick used to start them, and the next cut or orb inside them was lost).
                 const shot = !!(opts && (opts.shot || opts.cut));
-                const bleed = !!(opts && opts.type === 'bleed');
+                const bleed = !!(opts && (opts.type === 'bleed' || opts.type === 'burn'));
                 if (this.dead || (this.invincibleTimer > 0 && !(bleed || shot))) return false;
                 
                 this.hp -= amount;
@@ -454,6 +454,7 @@
                     return false;
                 }
                 const g = this._game;
+                if (g && g.swingGuard) amount = g.swingGuard(amount);             // mid-swing, a blade takes the edge off (engine/status-effects.js)
                 let lastStood = false;
                 if (g && g.resonance && !(this.invincibleTimer > 0) && !this.dead) {
                     amount = g.resonance.stat('damageTaken', amount);                 // Frame: Plating

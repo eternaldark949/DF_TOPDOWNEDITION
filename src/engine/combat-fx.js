@@ -85,8 +85,15 @@
                 if (!(amount > 0) || !actor) return;
                 const now = _gameTimeSec, type = opts && opts.type;
                 const texts = this.floatingTexts || (this.floatingTexts = []);
+                if (type === 'burn') {                                   // a Golden Child orb: small amber numbers, gathered, no flinch
+                    const recent = texts.find(t => t.target === actor && t.burn && now - t.t0 < 0.6);
+                    if (recent) { recent.value += amount; recent.t0 = now; }
+                    else { texts.push({ target: actor, x: actor.x, y: actor.y - 8, value: amount, color: '#ffb347', t0: now, pop: now, drift: (Math.random() - 0.5) * 1.6, bleed: true, burn: true }); if (texts.length > 40) texts.shift(); }
+                    actor._hpShowT = now;
+                    return;
+                }
                 if (type === 'bleed') {
-                    const recent = texts.find(t => t.target === actor && t.bleed && now - t.t0 < 0.6);
+                    const recent = texts.find(t => t.target === actor && t.bleed && !t.burn && now - t.t0 < 0.6);
                     if (recent) { recent.value += amount; recent.t0 = now; }
                     else { texts.push({ target: actor, x: actor.x, y: actor.y - 8, value: amount, color: '#ff3a5c', t0: now, pop: now, drift: (Math.random() - 0.5) * 1.6, bleed: true }); if (texts.length > 40) texts.shift(); }
                     actor._hpShowT = now;

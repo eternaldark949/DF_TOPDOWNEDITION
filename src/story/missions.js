@@ -589,6 +589,13 @@
                 scrapCost: 275,
             },
             {
+                id: 'crimson_edge',
+                name: 'CRIMSON EDGE',
+                icon: '❖',
+                desc: 'Whet the blade blood-red. Cuts land 50% harder and wounds bleed up to five deep.',
+                scrapCost: 300,
+            },
+            {
                 id: 'acc_mirror_glass',
                 cosmetic: true,           // a COSMETICS_REGISTRY accessory, not an item: it's worn, and takes no attachment slot
                 requires: 'acc_glass',    // silvered from the Crystal Glass

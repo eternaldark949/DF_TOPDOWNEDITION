@@ -22790,10 +22790,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             takeDamage(amount, knockbackX = 0, knockbackY = 0, opts = null) {
                 // A bullet always lands: i-frames guard against a swing or a bump hitting twice, not against rapid fire
                 // (a fast gun used to lose ~4 of every 5 bullets to them). Bullets don't start i-frames either.
-                // Nor do a blade's cuts (opts.cut: each swing cuts a body once, so quick cuts all land) or bleed ticks
-                // (a tick used to start them, and the next cut inside them was lost).
+                // Nor do a blade's cuts (opts.cut: each swing cuts a body once, so quick cuts all land), bleed ticks or
+                // a Golden Child orb's burn ticks (a tick used to start them, and the next cut or orb inside them was lost).
                 const shot = !!(opts && (opts.shot || opts.cut));
-                const bleed = !!(opts && opts.type === 'bleed');
+                const bleed = !!(opts && (opts.type === 'bleed' || opts.type === 'burn'));
                 if (this.dead || (this.invincibleTimer > 0 && !(bleed || shot))) return false;
                 
                 this.hp -= amount;
@@ -23146,6 +23146,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     return false;
                 }
                 const g = this._game;
+                if (g && g.swingGuard) amount = g.swingGuard(amount);             // mid-swing, a blade takes the edge off (engine/status-effects.js)
                 let lastStood = false;
                 if (g && g.resonance && !(this.invincibleTimer > 0) && !this.dead) {
                     amount = g.resonance.stat('damageTaken', amount);                 // Frame: Plating
@@ -59512,6 +59513,12 @@ Object.assign(TrafficVehicle.prototype, {
                 // engine/status-effects.js deflectShots: the Kukri's and Blood Pact's cut turns enemy shots
                 stats: { effect: 'mirror_blade' }
             },
+            'crimson_edge': {
+                name: 'Crimson Edge', type: 'attachment', icon: '❖',
+                desc: 'A blood-red whetted edge. Blades cut 50% harder, and wounds bleed up to five deep.',
+                // engine/status-effects.js meleeSlash / applyStatus: blade damage × bladeDamageMult, bleed up to bleedMax stacks
+                stats: { effect: 'crimson_edge', bladeDamageMult: 1.5, bleedMax: 5 }
+            },
             'blood_muzzle': {
                 name: 'Bloodthirsty Muzzle', type: 'attachment', icon: '♆',
                 desc: 'A crimson muzzle brake that drinks the shot. Bullets deal 75% more damage.',
@@ -59522,7 +59529,7 @@ Object.assign(TrafficVehicle.prototype, {
                 name: 'Golden Child', type: 'weapon', icon: '✦',
                 desc: 'Fires golden orbs that stick to targets and burn away.',
                 weaponMode: 'normal',
-                stats: { fireRate: 38, recoil: 6, damage: 18, projectileColor: '#FFD700', projectileSpeed: 18, flashRadius: 45, sticky: true, dotDamage: 10, dotTicks: 12, dotInterval: 10 }
+                stats: { fireRate: 38, recoil: 6, damage: 18, projectileColor: '#FFD700', projectileSpeed: 18, flashRadius: 45, sticky: true, dotDamage: 8, dotTicks: 12, dotInterval: 10, maxOrbs: 4 }
             },
         };
         
@@ -61034,6 +61041,13 @@ Object.assign(TrafficVehicle.prototype, {
                 icon: '♆',
                 desc: 'A crimson muzzle brake. Every bullet hits 75% harder.',
                 scrapCost: 275,
+            },
+            {
+                id: 'crimson_edge',
+                name: 'CRIMSON EDGE',
+                icon: '❖',
+                desc: 'Whet the blade blood-red. Cuts land 50% harder and wounds bleed up to five deep.',
+                scrapCost: 300,
             },
             {
                 id: 'acc_mirror_glass',
@@ -64635,6 +64649,9 @@ Object.assign(TrafficVehicle.prototype, {
                 if (this._drawnAt !== undefined && _gameTimeSec - this._drawnAt <= 0.8 && !this._drawShotUsed) { shotDamage *= 1 + 0.25 * this.resonance.rank('quick_draw'); this._drawShotUsed = true; }
                 shotDamage *= this.gunDamageMult();                      // the Bloodthirsty Muzzle, the Mirrored Glass (engine/status-effects.js)
                 const shotCrit = this.rollCrit(stats);                   // a critical hit (engine/combat-fx.js)
+                // A Golden Child orb burns with the shot: its every boost (Hollow Points, Flit-Strike, Quick-Draw, the
+                // Muzzle and the Glass) and its crit, snapshot now
+                const shotBoost = shotDamage * shotCrit / (stats.damage || 35);
                 shotDamage = Math.round(shotDamage * shotCrit);
                 const shotLife   = stats.projectileLife || 60;
                 const isPenetrating = stats.penetrating || false;
@@ -64663,11 +64680,12 @@ Object.assign(TrafficVehicle.prototype, {
                     
                     // Sticky DOT (Golden Child)
                     sticky: stats.sticky || false,
-                    dotDamage: stats.dotDamage || 5,
+                    dotDamage: Math.round((stats.dotDamage || 5) * shotBoost),
                     dotTicks: stats.dotTicks || 12,
                     dotInterval: stats.dotInterval || 10
                 }));
                 this.projectiles[this.projectiles.length - 1].crit = shotCrit > 1;
+                this.projectiles[this.projectiles.length - 1].maxOrbs = stats.maxOrbs || 4;
             
                 // Gunfire carries: gangers in earshot come to look (engine/noise.js)
                 { const N = CONFIG.NOISE, id = (this.currentWeapon && this.currentWeapon.id) || '';
@@ -65127,8 +65145,15 @@ engineMixin({
                 if (!(amount > 0) || !actor) return;
                 const now = _gameTimeSec, type = opts && opts.type;
                 const texts = this.floatingTexts || (this.floatingTexts = []);
+                if (type === 'burn') {                                   // a Golden Child orb: small amber numbers, gathered, no flinch
+                    const recent = texts.find(t => t.target === actor && t.burn && now - t.t0 < 0.6);
+                    if (recent) { recent.value += amount; recent.t0 = now; }
+                    else { texts.push({ target: actor, x: actor.x, y: actor.y - 8, value: amount, color: '#ffb347', t0: now, pop: now, drift: (Math.random() - 0.5) * 1.6, bleed: true, burn: true }); if (texts.length > 40) texts.shift(); }
+                    actor._hpShowT = now;
+                    return;
+                }
                 if (type === 'bleed') {
-                    const recent = texts.find(t => t.target === actor && t.bleed && now - t.t0 < 0.6);
+                    const recent = texts.find(t => t.target === actor && t.bleed && !t.burn && now - t.t0 < 0.6);
                     if (recent) { recent.value += amount; recent.t0 = now; }
                     else { texts.push({ target: actor, x: actor.x, y: actor.y - 8, value: amount, color: '#ff3a5c', t0: now, pop: now, drift: (Math.random() - 0.5) * 1.6, bleed: true }); if (texts.length > 40) texts.shift(); }
                     actor._hpShowT = now;
@@ -67700,6 +67725,9 @@ engineMixin({
         // been turned; then it's spent and refills over RECHARGE_SECS. A part-spent shield refills at the
         // same rate once REGEN_DELAY passes without a hit. The Mirror Blade (an attachment): a blade's cut
         // turns the shots it meets (within the blade's width + BLADE_PAD of their path).
+        // Blades (ETERNAL's melee pass): each cut heals her LIFESTEAL of its damage; mid-swing she takes GUARD of
+        // what would hit her; a swing inside the Flit-Strike window always crits
+        const BLADE_PERKS = { LIFESTEAL: 0.04, GUARD: 0.75 };
         const MIRROR = { GLASS_ID: 'acc_mirror_glass', GLASS_DAMAGE: 1.35, SHIELD: 90, RECHARGE_SECS: 3, REGEN_DELAY: 1.5, BLADE_PAD: 6 };
 
         /** Squared distance between segments ab and cd */
@@ -67787,7 +67815,7 @@ engineMixin({
                 const S = actor._status || (actor._status = {}), now = _gameTimeSec;
                 if (kind === 'bleed') {
                     const b = S.bleed;
-                    if (b && now < b.until) { b.stacks = Math.min(STATUS.BLEED_MAX, b.stacks + 1); b.until = now + (o.secs || 3); b.dps = Math.max(b.dps, o.dps || 5); b.by = o.by || b.by; }
+                    if (b && now < b.until) { b.stacks = Math.min(o.max || STATUS.BLEED_MAX, b.stacks + 1); b.until = now + (o.secs || 3); b.dps = Math.max(b.dps, o.dps || 5); b.by = o.by || b.by; }
                     else S.bleed = { stacks: 1, dps: o.dps || 5, until: now + (o.secs || 3), next: now + STATUS.BLEED_TICK, by: o.by || null };
                 }
             },
@@ -67888,18 +67916,22 @@ engineMixin({
              */
             meleeSlash() {
                 const W = this.currentWeapon, st = (W && W.stats) || {}, pl = this.player;
-                this.shootCooldown = st.fireRate || 16;
+                // Quick Hands and Reflex Sync quicken a blade as they do a gun
+                const fast = this.augments && this.augments.isEquipped('fast_reload') ? 0.8 : 1;
+                this.shootCooldown = Math.max(2, Math.round((this.resonance ? this.resonance.stat('fireCooldown', st.fireRate || 16) : st.fireRate || 16) * fast));
                 const side = this._slashSide = -(this._slashSide || 1);
                 this._slashT = _gameTimeSec; this._slashSecs = st.swingSecs || MELEE_SWING.duration;
                 const M = weaponModel(W && W.id);
                 this._slashStyle = M.swing || 'knife';
                 const ang = pl.angle, reach = st.reach || 36, arc = st.arc || 1.4;
-                let bladeDamage = (st.damage || 25) * this.playerDamageMult();
-                if (this.resonance && this.flitState && _gameTimeSec - this.flitState.lastFlitAt <= this.resonance.stat('flitStrikeWindow', 1)) {
-                    bladeDamage *= 1 + 0.2 * this.resonance.rank('flit_strike');
-                }
+                const edge = this.inventory && this.inventory.hasAttachment('crimson_edge') ? ITEM_REGISTRY.crimson_edge.stats : null;
+                let bladeDamage = (st.damage || 25) * this.playerDamageMult() * (edge ? edge.bladeDamageMult : 1);
+                // A Flit-cut: a swing inside the Flit-Strike window always crits (and Flit-Strike adds its share)
+                const flitCut = !!(this.resonance && this.flitState && _gameTimeSec - this.flitState.lastFlitAt <= this.resonance.stat('flitStrikeWindow', 1));
+                if (flitCut) bladeDamage *= 1 + 0.2 * this.resonance.rank('flit_strike');
                 const swing = this._swing = { t0: this._slashT, secs: this._slashSecs, style: this._slashStyle, side, weapon: W, st,
-                    damage: bladeDamage, edge: M.edge || DEFAULT_SLASH_TRAIL.edge, k: 0, struck: new Set(), hits: 0 };
+                    damage: bladeDamage, flitCut, bleedMax: edge ? edge.bleedMax : STATUS.BLEED_MAX,
+                    edge: M.edge || DEFAULT_SLASH_TRAIL.edge, k: 0, struck: new Set(), hits: 0 };
                 // Step in only when the blade will meet someone: a slash at nothing stays where she is
                 // (held, it used to creep her ~30 px/s into zones and lamplight)
                 const walls = this.activeMap.walls, cols = getColliders(this.activeMap);
@@ -67977,10 +68009,12 @@ engineMixin({
                 const dx = e.x - pl.x, dy = e.y - pl.y, d = Math.hypot(dx, dy);
                 e.lastHitBy = pl; e.lastHitMelee = true;
                 const kx = dx / (d || 1) * 3, ky = dy / (d || 1) * 3;
-                const crit = this.rollCrit(st), dmg = Math.round(S.damage * crit);
+                const roll = this.rollCrit(st), crit = S.flitCut ? Math.max(roll, st.critMult || CRIT.mult) : roll;
+                const dmg = Math.round(S.damage * crit);
                 if (!e.takeDamage(dmg, kx, ky, { type: st.damageType || 'melee', crit: crit > 1, cut: true })) return;
+                if (pl.heal) pl.heal(Math.max(1, Math.round(dmg * BLADE_PERKS.LIFESTEAL)));                 // a sip of what the blade drew
                 if (!e.dead && e.interruptMelee) e.interruptMelee();
-                if (st.bleedDps) this.applyStatus(e, 'bleed', { dps: st.bleedDps, secs: st.bleedSecs || 3, by: pl });
+                if (st.bleedDps) this.applyStatus(e, 'bleed', { dps: st.bleedDps * this.playerDamageMult(), secs: st.bleedSecs || 3, by: pl, max: S.bleedMax });
                 if (!e.dead && typeof Ganger !== 'undefined' && e instanceof Ganger) { e.suspicion = 100; e.state = 'ALERT'; e.angle = Math.atan2(-dy, -dx); }
                 const fx = this.shotFx || (this.shotFx = []);
                 for (let i = 0; i < 5; i++) {
@@ -67992,6 +68026,23 @@ engineMixin({
                     if (typeof ambience !== 'undefined' && ambience.cut) ambience.cut();
                     this.triggerShake(2);
                 }
+            },
+
+            /** A Golden Child orb sticks to `e` from shot `p`: up to its maxOrbs live on one target, another replaces the oldest */
+            stickOrb(e, p) {
+                const orbs = this.stickyOrbs || (this.stickyOrbs = []);
+                const on = orbs.filter(o => o.target === e);
+                if (on.length >= (p.maxOrbs || 4)) orbs.splice(orbs.indexOf(on[0]), 1);
+                const spread = (e.radius || 10) * 0.5;                              // scattered across the target
+                orbs.push({ target: e, offsetX: (Math.random() - 0.5) * spread, offsetY: (Math.random() - 0.5) * spread, maxRadius: 7,
+                    ticksLeft: p.dotTicks, maxTicks: p.dotTicks, tickInterval: p.dotInterval, tickTimer: 0, dotDamage: p.dotDamage, owner: p.owner });
+            },
+
+            /** Damage that reaches her mid-swing (a blade drawn and moving) is cut to BLADE_PERKS.GUARD of itself */
+            swingGuard(amount) {
+                const swinging = this.weaponMode === 'melee' && !this.weaponHolstered && this._slashT !== undefined
+                    && _gameTimeSec - this._slashT <= (this._slashSecs || MELEE_SWING.duration);
+                return swinging ? amount * BLADE_PERKS.GUARD : amount;
             },
 
             /** The Mirrored Glass is in her hand */
@@ -76560,21 +76611,7 @@ engineMixin({
                                 if (e.takeDamage(p.damage, kbX, kbY, p.melee ? (p.crit ? { crit: true } : null) : { shot: true, crit: !!p.crit }) && p.melee && e.interruptMelee) e.interruptMelee();
                                 
                                 // Spawn sticky DOT orb (Golden Child)
-                                if (p.sticky && !e.dead) {
-                                    // Random offset so multiple orbs scatter across the target
-                                    const orbOffset = (e.radius || 10) * 0.5;
-                                    this.stickyOrbs.push({
-                                        target: e,
-                                        offsetX: (Math.random() - 0.5) * orbOffset,
-                                        offsetY: (Math.random() - 0.5) * orbOffset,
-                                        maxRadius: 7,
-                                        ticksLeft: p.dotTicks,
-                                        maxTicks: p.dotTicks,
-                                        tickInterval: p.dotInterval,
-                                        tickTimer: 0,
-                                        dotDamage: p.dotDamage,
-                                    });
-                                }
+                                if (p.sticky && !e.dead) this.stickOrb(e, p);
                                 
                                 if (p.penetrating) {
                                     p.hitTargets.add(e);
@@ -76703,7 +76740,9 @@ engineMixin({
                     if (orb.tickTimer >= orb.tickInterval) {
                         orb.tickTimer = 0;
                         orb.ticksLeft--;
-                        orb.target.takeDamage(orb.dotDamage);
+                        // A burn tick passes i-frames and starts none, so every orb's ticks land (entities/actors.js)
+                        if (orb.owner) { orb.target.lastHitBy = orb.owner; orb.target.lastHitMelee = false; }
+                        orb.target.takeDamage(orb.dotDamage, 0, 0, { type: 'burn' });
                         
                         // Small golden spark on each tick
                         if (this.weather) {

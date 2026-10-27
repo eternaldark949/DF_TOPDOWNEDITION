@@ -859,21 +859,7 @@
                                 if (e.takeDamage(p.damage, kbX, kbY, p.melee ? (p.crit ? { crit: true } : null) : { shot: true, crit: !!p.crit }) && p.melee && e.interruptMelee) e.interruptMelee();
                                 
                                 // Spawn sticky DOT orb (Golden Child)
-                                if (p.sticky && !e.dead) {
-                                    // Random offset so multiple orbs scatter across the target
-                                    const orbOffset = (e.radius || 10) * 0.5;
-                                    this.stickyOrbs.push({
-                                        target: e,
-                                        offsetX: (Math.random() - 0.5) * orbOffset,
-                                        offsetY: (Math.random() - 0.5) * orbOffset,
-                                        maxRadius: 7,
-                                        ticksLeft: p.dotTicks,
-                                        maxTicks: p.dotTicks,
-                                        tickInterval: p.dotInterval,
-                                        tickTimer: 0,
-                                        dotDamage: p.dotDamage,
-                                    });
-                                }
+                                if (p.sticky && !e.dead) this.stickOrb(e, p);
                                 
                                 if (p.penetrating) {
                                     p.hitTargets.add(e);
@@ -1002,7 +988,9 @@
                     if (orb.tickTimer >= orb.tickInterval) {
                         orb.tickTimer = 0;
                         orb.ticksLeft--;
-                        orb.target.takeDamage(orb.dotDamage);
+                        // A burn tick passes i-frames and starts none, so every orb's ticks land (entities/actors.js)
+                        if (orb.owner) { orb.target.lastHitBy = orb.owner; orb.target.lastHitMelee = false; }
+                        orb.target.takeDamage(orb.dotDamage, 0, 0, { type: 'burn' });
                         
                         // Small golden spark on each tick
                         if (this.weather) {
