@@ -3827,7 +3827,7 @@
             .dc-name { font-size: max(6px, 0.95rem - var(--font-trim)); }
         }
 
-        /* Crafting at the workbench (ETERNAL's direction: like Skills and Contacts): the scrap in the resonance dial
+        /* Crafting at the workbench, in its own window (ETERNAL's direction: styled like Skills and Contacts): the scrap in the resonance dial
            (filled to the share of schematics crafted, in gold), then each schematic as a calling card in its kind's
            colour (--acc), its glyph in the peach rim; the cost, a scrap bar when short, and Craft at the right. */
         .cr-dial { background: conic-gradient(from 0deg, #fff0d4 0, #ffc248 calc(var(--v) * 1%), rgba(255, 194, 72, 0.12) calc(var(--v) * 1%) 100%);
@@ -3836,6 +3836,11 @@
         .cr-dial .sk-level { text-shadow: 0 0 10px rgba(255, 194, 72, 0.85), 0 0 24px rgba(220, 140, 40, 0.5); }
         .cr-dial .sk-pct { color: #f3d9a4; text-transform: uppercase; }
         .cr-grid { grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr)); }
+        .cr-head { margin: 10px 0 18px; gap: 26px; }
+        .sk-dial.cr-dial { width: 118px; height: 118px; }
+        .sk-dial.cr-dial .sk-level { font-size: max(6px, 1.7rem - var(--font-trim)); }
+        .cr-card.bought { animation: crBought 1.2s ease-out; }
+        @keyframes crBought { 0% { box-shadow: inset 0 0 40px rgba(255, 194, 72, 0.55); } 100% { box-shadow: none; } }
         .cr-card { padding-right: 18px; }
         .cr-card .dc-quote { -webkit-line-clamp: 3; }
         .cr-icon .mono { font: 400 max(6px, 1.7rem - var(--font-trim)) var(--font-menu); color: color-mix(in srgb, var(--acc) 65%, #fff);
@@ -4209,6 +4214,16 @@
             </div>
             <div class="df-shop-body" id="aug-shop-grid"></div>
             <div class="df-shop-foot"><button class="screen-back-btn df-shop-close" id="aug-shop-close"><span class="btn-arrow">◀</span> Back</button></div>
+        </div>
+    </div>
+    <div id="craft-shop" class="df-shop">
+        <div class="df-shop-panel">
+            <div class="df-shop-head">
+                <div class="df-shop-titles"><div class="df-shop-title">Workbench</div><div class="df-shop-sub">Apt 949 · Main Room</div></div>
+                <div class="df-shop-balance" id="craft-shop-balance"></div>
+            </div>
+            <div class="df-shop-body" id="craft-shop-grid"></div>
+            <div class="df-shop-foot"><button class="screen-back-btn df-shop-close" id="craft-shop-close"><span class="btn-arrow">◀</span> Back</button></div>
         </div>
     </div>
 
@@ -4961,10 +4976,6 @@
                 <div id="augments-screen-content">
                     <!-- Populated dynamically -->
                 </div>
-            </div>
-            <!-- CRAFTING SCREEN: the workbench at home (hidden by default) -->
-            <div id="crafting-screen" class="df-screen" style="display:none;">
-                <div id="crafting-screen-content"></div>
             </div>
             <!-- CONTACTS SCREEN (hidden by default) -->
             <div id="contacts-screen" class="df-screen" style="display:none;">
@@ -71586,13 +71597,22 @@ engineMixin({
             },
 
             // --- CRAFTING SYSTEM ---
-            // The workbench opens the Crafting screen, laid out like Skills and Contacts: the scrap in a dial up top,
-            // then the schematics as calling cards under Attachments, Weapons and Accessories.
-            openCraftingTable() { Screens.open('crafting'); },
+            // The workbench's window, in the style of Skills and Contacts: the scrap in a dial up top, then the
+            // schematics as calling cards under Attachments, Weapons and Accessories.
+            openCraftingTable() {
+                this.pauseSystem.acquire('crafting');
+                this._shopShow('craft-shop', true);
+                this.renderCraftingScreen();
+                document.getElementById('craft-shop-close').onclick = () => {
+                    this._shopShow('craft-shop', false);
+                    this.pauseSystem.release('crafting');
+                };
+            },
 
             renderCraftingScreen() {
-                const el = document.getElementById('crafting-screen-content');
+                const el = document.getElementById('craft-shop-grid');
                 if (!el) return;
+                this._shopBalance('craft-shop-balance', this.scrap, 'Scrap');
                 const esc = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
                 const kindOf = sch => sch.cosmetic ? 'accessory' : (ITEM_REGISTRY[sch.id]?.type === 'attachment' ? 'attachment' : 'weapon');
                 // Kinds, in the screens' palette: lavender, rose gold, gold
@@ -71600,10 +71620,9 @@ engineMixin({
                 const made = SCHEMATICS.filter(s => this.schematicOwned(s)).length;
                 const pct = SCHEMATICS.length ? Math.round(made / SCHEMATICS.length * 100) : 0;
                 const worn = this.inventory ? this.inventory.equippedAttachments.length : 0, maxWorn = this.inventory ? this.inventory.maxAttachments : 2;
-                let html = `<div class="df-section"><span><span class="glint">◆</span>Workbench</span><span class="count">${made} / ${SCHEMATICS.length} crafted</span></div>`;
-                html += `<div class="sk-head cr-head"><div class="sk-dial cr-dial" style="--v:${pct}"><div class="sk-dial-in"><div class="sk-level">${this.scrap}</div><div class="sk-pct">Scrap</div></div></div>`;
+                let html = `<div class="sk-head cr-head"><div class="sk-dial cr-dial" style="--v:${pct}"><div class="sk-dial-in"><div class="sk-level">${this.scrap}</div><div class="sk-pct">Scrap</div></div></div>`;
                 html += `<div class="sk-meta"><div class="sk-next">${made} of ${SCHEMATICS.length} schematics crafted</div>`;
-                html += `<div class="sk-caps"><span class="sk-cap amber">${this.scrap} Scrap</span><span class="sk-cap lav">Attachments ${worn} / ${maxWorn} worn</span></div>`;
+                html += `<div class="sk-caps"><span class="sk-cap lav">Attachments ${worn} / ${maxWorn} worn</span></div>`;
                 html += `<div class="sk-hint">Craft as many attachments as you like; two can be worn at once. Wear them from your Inventory, and the Mirrored Glass from Neu.Me.</div></div></div>`;
                 for (const [kind, label, role, acc] of KINDS) {
                     const list = SCHEMATICS.filter(s => kindOf(s) === kind);
@@ -71648,7 +71667,10 @@ engineMixin({
                     card.classList.toggle('selected', !was);
                 }));
                 el.querySelectorAll('button[data-craft]').forEach(b => b.addEventListener('click', () => {
-                    if (this.craftSchematic(b.dataset.craft)) this.renderCraftingScreen();
+                    if (!this.craftSchematic(b.dataset.craft)) return;
+                    this._shopJust = b.dataset.craft;
+                    this.renderCraftingScreen();
+                    this._shopFlash(el);
                 }));
             },
 
@@ -85047,6 +85069,7 @@ engineMixin({
                     ['cosmetics-shop-overlay', () => document.getElementById('cosmetics-shop-close').click()],
                     ['auto-shop-overlay', () => game.closeAutoShop()],
                     ['augment-shop', () => document.getElementById('aug-shop-close').click()],
+                    ['craft-shop', () => document.getElementById('craft-shop-close').click()],
                     ['zib-menu', () => game.closeZibMenu()],
                     ['gauntlet-menu', () => game.closeGauntletMenu()],
                     ['tuning-overlay', () => game.closeTuning()],
@@ -87809,7 +87832,6 @@ engineMixin({
                 team:       ['team-screen',       'Team',       () => game.renderTeamScreen()],
                 contacts:   ['contacts-screen',   'Contacts',   () => game.renderContactsScreen()],
                 skills:     ['skills-screen',     'Skills',     () => game.renderSkillsScreen()],
-                crafting:   ['crafting-screen',   'Crafting',   () => game.renderCraftingScreen()],   // the workbench at home (not in the nav)
                 collection: ['collection-screen', 'Collection', () => game.renderCollectionScreen()]
             },
             FILTERED: { inventory: true, equipped: true },   // screens the item filter applies to

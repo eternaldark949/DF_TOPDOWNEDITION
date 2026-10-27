@@ -1374,13 +1374,22 @@
             },
 
             // --- CRAFTING SYSTEM ---
-            // The workbench opens the Crafting screen, laid out like Skills and Contacts: the scrap in a dial up top,
-            // then the schematics as calling cards under Attachments, Weapons and Accessories.
-            openCraftingTable() { Screens.open('crafting'); },
+            // The workbench's window, in the style of Skills and Contacts: the scrap in a dial up top, then the
+            // schematics as calling cards under Attachments, Weapons and Accessories.
+            openCraftingTable() {
+                this.pauseSystem.acquire('crafting');
+                this._shopShow('craft-shop', true);
+                this.renderCraftingScreen();
+                document.getElementById('craft-shop-close').onclick = () => {
+                    this._shopShow('craft-shop', false);
+                    this.pauseSystem.release('crafting');
+                };
+            },
 
             renderCraftingScreen() {
-                const el = document.getElementById('crafting-screen-content');
+                const el = document.getElementById('craft-shop-grid');
                 if (!el) return;
+                this._shopBalance('craft-shop-balance', this.scrap, 'Scrap');
                 const esc = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
                 const kindOf = sch => sch.cosmetic ? 'accessory' : (ITEM_REGISTRY[sch.id]?.type === 'attachment' ? 'attachment' : 'weapon');
                 // Kinds, in the screens' palette: lavender, rose gold, gold
@@ -1388,10 +1397,9 @@
                 const made = SCHEMATICS.filter(s => this.schematicOwned(s)).length;
                 const pct = SCHEMATICS.length ? Math.round(made / SCHEMATICS.length * 100) : 0;
                 const worn = this.inventory ? this.inventory.equippedAttachments.length : 0, maxWorn = this.inventory ? this.inventory.maxAttachments : 2;
-                let html = `<div class="df-section"><span><span class="glint">◆</span>Workbench</span><span class="count">${made} / ${SCHEMATICS.length} crafted</span></div>`;
-                html += `<div class="sk-head cr-head"><div class="sk-dial cr-dial" style="--v:${pct}"><div class="sk-dial-in"><div class="sk-level">${this.scrap}</div><div class="sk-pct">Scrap</div></div></div>`;
+                let html = `<div class="sk-head cr-head"><div class="sk-dial cr-dial" style="--v:${pct}"><div class="sk-dial-in"><div class="sk-level">${this.scrap}</div><div class="sk-pct">Scrap</div></div></div>`;
                 html += `<div class="sk-meta"><div class="sk-next">${made} of ${SCHEMATICS.length} schematics crafted</div>`;
-                html += `<div class="sk-caps"><span class="sk-cap amber">${this.scrap} Scrap</span><span class="sk-cap lav">Attachments ${worn} / ${maxWorn} worn</span></div>`;
+                html += `<div class="sk-caps"><span class="sk-cap lav">Attachments ${worn} / ${maxWorn} worn</span></div>`;
                 html += `<div class="sk-hint">Craft as many attachments as you like; two can be worn at once. Wear them from your Inventory, and the Mirrored Glass from Neu.Me.</div></div></div>`;
                 for (const [kind, label, role, acc] of KINDS) {
                     const list = SCHEMATICS.filter(s => kindOf(s) === kind);
@@ -1436,7 +1444,10 @@
                     card.classList.toggle('selected', !was);
                 }));
                 el.querySelectorAll('button[data-craft]').forEach(b => b.addEventListener('click', () => {
-                    if (this.craftSchematic(b.dataset.craft)) this.renderCraftingScreen();
+                    if (!this.craftSchematic(b.dataset.craft)) return;
+                    this._shopJust = b.dataset.craft;
+                    this.renderCraftingScreen();
+                    this._shopFlash(el);
                 }));
             },
 
