@@ -98,8 +98,11 @@
             takeDamage(amount, knockbackX = 0, knockbackY = 0, opts = null) {
                 // A bullet always lands: i-frames guard against a swing or a bump hitting twice, not against rapid fire
                 // (a fast gun used to lose ~4 of every 5 bullets to them). Bullets don't start i-frames either.
-                const shot = !!(opts && opts.shot);
-                if (this.dead || (this.invincibleTimer > 0 && !(opts && (opts.type === 'bleed' || shot)))) return false;
+                // Nor do a blade's cuts (opts.cut: each swing cuts a body once, so quick cuts all land) or bleed ticks
+                // (a tick used to start them, and the next cut inside them was lost).
+                const shot = !!(opts && (opts.shot || opts.cut));
+                const bleed = !!(opts && opts.type === 'bleed');
+                if (this.dead || (this.invincibleTimer > 0 && !(bleed || shot))) return false;
                 
                 this.hp -= amount;
                 // Damage number, health bar, blood, flinch (engine/combat-fx.js); opts.type: the kind of damage
@@ -112,7 +115,7 @@
                 }
                 
                 // Trigger invincibility frames
-                if (this.invincibleDuration > 0 && !shot) {
+                if (this.invincibleDuration > 0 && !shot && !bleed) {
                     this.invincibleTimer = this.invincibleDuration;
                 }
                 

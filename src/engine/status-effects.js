@@ -8,7 +8,9 @@
         //
         // Melee weapons (weaponMode 'melee': the Maiden's Kukri, Blood Pact) slash in an arc before her:
         // no projectile, nothing through walls, damage and bleeding, an arc in the blade's colour, a
-        // quiet noise. Each cut rolls its own crit per target (engine/combat-fx.js). A blade's stats
+        // quiet noise. The hitbox is the blade as drawn: a body is cut when the swinging blade passes
+        // through it, at that moment, once a swing (updateMeleeSwing). Each cut rolls its own crit per
+        // target (engine/combat-fx.js). A blade's stats
         // can slow its swing (swingSecs, the Kukri's 0.22 s by default); its model names the edge
         // the trail follows and the trail's colours (ui/weapon-models.js).
 
@@ -21,6 +23,12 @@
         // One game-time pose for the arm, the held blade and its trailing edge. `secs` stretches the
         // whole swing (a heavier blade); the phases keep their shares of it.
         const MELEE_SWING = { duration: .22, windup: .0264, cutEnd: .1584 };
+
+        // A swing's hitbox is its drawn blade (fist to edge tip), swept through the cut in CUT_STEPS
+        // samples: a body is cut when the blade passes within its radius + HALF_WIDTH. MAX_HAND bounds
+        // the fist's distance from her centre (a quick reject); STEP_PAD is how near a body must be for
+        // her to step in on the cut.
+        const BLADE = { CUT_STEPS: 24, HALF_WIDTH: 2, MAX_HAND: 26, STEP_PAD: 8 };
 
         /* A long blade's swing (a model with swing: 'wide', Blood Pact): two hands on the grip, she
            winds the blade far back to one side, then sweeps it round in front of her in one wide arc
@@ -192,60 +200,116 @@
             },
 
             /**
-             * A melee weapon's slash: everyone in the arc before her within reach (and not behind a
-             * wall) takes the blade's damage and starts to bleed. A gold arc, a swish, a quiet noise.
+             * A melee weapon's slash: the swing starts now, and the cut lands as the drawn blade
+             * passes through someone (updateMeleeSwing), not at the press. A gold arc, a swish, a
+             * quiet noise.
              */
             meleeSlash() {
                 const W = this.currentWeapon, st = (W && W.stats) || {}, pl = this.player;
                 this.shootCooldown = st.fireRate || 16;
                 const side = this._slashSide = -(this._slashSide || 1);
                 this._slashT = _gameTimeSec; this._slashSecs = st.swingSecs || MELEE_SWING.duration;
-                this._slashStyle = weaponModel(W && W.id).swing || 'knife';
+                const M = weaponModel(W && W.id);
+                this._slashStyle = M.swing || 'knife';
                 const ang = pl.angle, reach = st.reach || 36, arc = st.arc || 1.4;
-                const walls = this.activeMap.walls, cols = getColliders(this.activeMap);
-                // Step in only when there's someone to step in on: a slash at nothing stays where she is
-                // (held, it used to creep her ~30 px/s into zones and lamplight)
-                const inReach = e => {
-                    if (!e || e.dead) return false;
-                    const dx = e.x - pl.x, dy = e.y - pl.y, d = Math.hypot(dx, dy);
-                    return d <= reach + 8 + (e.radius || 14) && Math.abs(normalizeAngle(Math.atan2(dy, dx) - ang)) <= arc / 2 + (d < 26 ? 0.6 : 0)
-                        && !isLineBlocked(pl.x, pl.y, e.x, e.y, walls, cols);
-                };
-                if (this.enemies.some(inReach)) this.meleeStepIn(ang);
                 let bladeDamage = st.damage || 25;
                 if (this.resonance && this.flitState && _gameTimeSec - this.flitState.lastFlitAt <= this.resonance.stat('flitStrikeWindow', 1)) {
                     bladeDamage *= 1 + 0.2 * this.resonance.rank('flit_strike');
                 }
-                let hit = 0;
-                for (const e of this.enemies) {
-                    if (!e || e.dead) continue;
-                    const dx = e.x - pl.x, dy = e.y - pl.y, d = Math.hypot(dx, dy);
-                    if (d > reach + (e.radius || 14)) continue;
-                    if (Math.abs(normalizeAngle(Math.atan2(dy, dx) - ang)) > arc / 2 + (d < 18 ? 0.6 : 0)) continue;
-                    if (isLineBlocked(pl.x, pl.y, e.x, e.y, walls, cols)) continue;
-                    e.lastHitBy = pl; e.lastHitMelee = true;
-                    const kx = dx / (d || 1) * 3, ky = dy / (d || 1) * 3;
-                    const crit = this.rollCrit(st), dmg = Math.round(bladeDamage * crit);
-                    if (!e.takeDamage(dmg, kx, ky, { type: st.damageType || 'melee', crit: crit > 1 })) continue;
-                    if (!e.dead && e.interruptMelee) e.interruptMelee();
-                    if (st.bleedDps) this.applyStatus(e, 'bleed', { dps: st.bleedDps, secs: st.bleedSecs || 3, by: pl });
-                    if (!e.dead && typeof Ganger !== 'undefined' && e instanceof Ganger) { e.suspicion = 100; e.state = 'ALERT'; e.angle = Math.atan2(-dy, -dx); }
-                    hit++;
-                }
-                // the arc and its sparkle, in the blade's colour (gold for the Kukri)
-                const M = weaponModel(W && W.id), trail = M.trail || DEFAULT_SLASH_TRAIL;
+                const swing = this._swing = { t0: this._slashT, secs: this._slashSecs, style: this._slashStyle, side, weapon: W, st,
+                    damage: bladeDamage, edge: M.edge || DEFAULT_SLASH_TRAIL.edge, k: 0, struck: new Set(), hits: 0 };
+                // Step in only when the blade will meet someone: a slash at nothing stays where she is
+                // (held, it used to creep her ~30 px/s into zones and lamplight)
+                const walls = this.activeMap.walls, cols = getColliders(this.activeMap);
+                if (this.enemies.some(e => e && !e.dead && this._bladeMeets(swing, e, BLADE.STEP_PAD) && !isLineBlocked(pl.x, pl.y, e.x, e.y, walls, cols))) this.meleeStepIn(ang);
+                // the arc and its sparkle, in the blade's colour (gold for the Kukri); a hit adds more where it lands
+                const trail = M.trail || DEFAULT_SLASH_TRAIL;
                 const L = this.slashes || (this.slashes = []);
-                L.push({ x: pl.x, y: pl.y, a: ang, side, t0: _gameTimeSec, reach, arc, hit: hit > 0, secs: this._slashSecs, style: this._slashStyle, edge: M.edge || DEFAULT_SLASH_TRAIL.edge, cols: trail.cols });
+                L.push(swing.slash = { x: pl.x, y: pl.y, a: ang, side, t0: _gameTimeSec, reach, arc, hit: false, secs: this._slashSecs, style: this._slashStyle, edge: swing.edge, cols: trail.cols });
                 if (L.length > 8) L.shift();
+                swing.dust = trail.dust;
                 const fx = this.shotFx || (this.shotFx = []);
-                for (let i = 0; i < (hit ? 8 : 3); i++) {
+                for (let i = 0; i < 3; i++) {
                     const a = ang + (Math.random() - 0.5) * arc, r = reach * (0.5 + Math.random() * 0.5);
                     fx.push({ k: 'dust', x: pl.x + Math.cos(a) * r, y: pl.y + Math.sin(a) * r, vx: Math.cos(a) * 0.4, vy: Math.sin(a) * 0.4, t: -i, life: 30, col: trail.dust, ph: Math.random() * 6.28 });
                 }
-                if (typeof ambience !== 'undefined' && ambience.slash) ambience.slash(hit > 0);
+                if (typeof ambience !== 'undefined' && ambience.slash) ambience.slash(false);
                 this.emitNoise(pl.x, pl.y, st.noise || 60, 'slash');
-                if (hit) this.triggerShake(2);
-                return hit;
+                return swing;
+            },
+
+            /**
+             * Would this swing's blade, as drawn, pass through `e` (its body circle grown by `pad`)?
+             * Checked in her frame at her current place and facing, over the whole cut.
+             */
+            _bladeMeets(swing, e, pad = 0) {
+                for (let k = 0; k <= BLADE.CUT_STEPS; k++) if (this._bladeAt(swing, k, e, pad)) return true;
+                return false;
+            },
+
+            /** Is `e` on the blade at the cut's k-th sample (of BLADE.CUT_STEPS)? */
+            _bladeAt(swing, k, e, pad = 0) {
+                const pl = this.player, dx = e.x - pl.x, dy = e.y - pl.y, r = (e.radius || 14) + BLADE.HALF_WIDTH + pad;
+                const ca = Math.cos(pl.angle), sa = Math.sin(pl.angle);
+                const lx = dx * ca + dy * sa, ly = dy * ca - dx * sa;                    // into her frame (x ahead)
+                const [ex, ey] = swing.edge;
+                if (Math.hypot(lx, ly) > BLADE.MAX_HAND + Math.hypot(ex, ey) + r) return false;
+                const ph = swingPhases(swing.style), u = ph.windup + (ph.cutEnd - ph.windup) * k / BLADE.CUT_STEPS;
+                const pose = sampleMeleeSwing(u * swing.secs, swing.side, this._bladePose || (this._bladePose = {}), swing.secs, swing.style);
+                if (!pose) return false;
+                // The blade as it's drawn: from the fist to the edge the trail follows (drawSlashes)
+                const c = Math.cos(pose.a), s = Math.sin(pose.a);
+                const ax = pose.handX, ay = pose.handY;
+                const bx = ax + (ex * c - ey * s) * .95, by = ay + (ex * s + ey * c) * .95;
+                const vx = bx - ax, vy = by - ay, t = Math.max(0, Math.min(1, ((lx - ax) * vx + (ly - ay) * vy) / (vx * vx + vy * vy)));
+                return (lx - ax - vx * t) ** 2 + (ly - ay - vy * t) ** 2 <= r * r;
+            },
+
+            /**
+             * Once per tick: the swing in progress cuts whoever its blade passes through, as it passes
+             * (the samples of the cut it has reached, the same at any tick rate). Each body is cut at most
+             * once a swing; a cut ignores, and doesn't start, the target's i-frames, so quick cuts all land.
+             */
+            updateMeleeSwing() {
+                const S = this._swing; if (!S) return;
+                const pl = this.player;
+                if (!pl || this.weaponMode !== 'melee' || this.weaponHolstered || this.isDriving || this.currentWeapon !== S.weapon || this._slashT !== S.t0) { this._swing = null; return; }
+                const ph = swingPhases(S.style), u = (_gameTimeSec - S.t0) / S.secs;
+                const p = (u - ph.windup) / (ph.cutEnd - ph.windup);
+                if (p < 0) return;
+                const walls = this.activeMap.walls, cols = getColliders(this.activeMap);
+                for (; S.k <= BLADE.CUT_STEPS && S.k <= p * BLADE.CUT_STEPS + 1e-9; S.k++) {
+                    for (const e of this.enemies) {
+                        if (!e || e.dead || S.struck.has(e) || !this._bladeAt(S, S.k, e)) continue;
+                        if (isLineBlocked(pl.x, pl.y, e.x, e.y, walls, cols)) continue;       // no cutting through walls
+                        S.struck.add(e);
+                        this._bladeCut(S, e);
+                    }
+                }
+                if (S.k > BLADE.CUT_STEPS) this._swing = null;
+            },
+
+            /** One body cut by a swing: damage (its own crit roll), bleeding, a flinch and, on the first, the impact */
+            _bladeCut(S, e) {
+                const pl = this.player, st = S.st;
+                const dx = e.x - pl.x, dy = e.y - pl.y, d = Math.hypot(dx, dy);
+                e.lastHitBy = pl; e.lastHitMelee = true;
+                const kx = dx / (d || 1) * 3, ky = dy / (d || 1) * 3;
+                const crit = this.rollCrit(st), dmg = Math.round(S.damage * crit);
+                if (!e.takeDamage(dmg, kx, ky, { type: st.damageType || 'melee', crit: crit > 1, cut: true })) return;
+                if (!e.dead && e.interruptMelee) e.interruptMelee();
+                if (st.bleedDps) this.applyStatus(e, 'bleed', { dps: st.bleedDps, secs: st.bleedSecs || 3, by: pl });
+                if (!e.dead && typeof Ganger !== 'undefined' && e instanceof Ganger) { e.suspicion = 100; e.state = 'ALERT'; e.angle = Math.atan2(-dy, -dx); }
+                const fx = this.shotFx || (this.shotFx = []);
+                for (let i = 0; i < 5; i++) {
+                    const a = Math.atan2(dy, dx) + (Math.random() - 0.5) * 1.2;
+                    fx.push({ k: 'dust', x: e.x - Math.cos(a) * 6, y: e.y - Math.sin(a) * 6, vx: Math.cos(a) * 0.5, vy: Math.sin(a) * 0.5, t: -i, life: 30, col: S.dust, ph: Math.random() * 6.28 });
+                }
+                if (!S.hits++) {
+                    if (S.slash) S.slash.hit = true;
+                    if (typeof ambience !== 'undefined' && ambience.cut) ambience.cut();
+                    this.triggerShake(2);
+                }
             },
 
             /** The blade's swing for the renderer: angle across the slash, and how far it reaches out (null at rest) */
