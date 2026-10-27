@@ -72,6 +72,18 @@
                 desc: 'Faint red targeting beam when equipped.',
                 stats: { effect: 'laser_sight' }
             },
+            'mirror_blade': {
+                name: 'Mirror Blade', type: 'attachment', icon: '◈',
+                desc: 'A mirror-polished edge. Bullets your blade meets mid-cut fly back at whoever fired them.',
+                // engine/status-effects.js deflectShots: the Kukri's and Blood Pact's cut turns enemy shots
+                stats: { effect: 'mirror_blade' }
+            },
+            'blood_muzzle': {
+                name: 'Bloodthirsty Muzzle', type: 'attachment', icon: '♆',
+                desc: 'A crimson muzzle brake that drinks the shot. Bullets deal 75% more damage.',
+                // engine/combat-effects.js fireWeapon: the shot's damage × gunDamageMult
+                stats: { effect: 'blood_muzzle', gunDamageMult: 1.75 }
+            },
             'golden_child': {
                 name: 'Golden Child', type: 'weapon', icon: '✦',
                 desc: 'Fires golden orbs that stick to targets and burn away.',
@@ -328,7 +340,8 @@
                 
                 // --- DUAL EQUIP SLOTS ---
                 this.equippedWeaponId = null;     // Active weapon
-                this.equippedAttachmentId = null;  // Active attachment (laser sight, etc.)
+                this.equippedAttachments = [];    // Active attachments (laser sight, muzzle…), up to maxAttachments
+                this.maxAttachments = 2;
                 this.entryOrder = [];             // pill order the player dragged, as 'source:id' keys (saved)
                 
                 // --- ITEM TYPE CONFIG ---
@@ -383,19 +396,25 @@
                     this.equippedWeaponId = id;
                     if (item.action) item.action(item);
                 } else if (config.slot === 'attachment') {
-                    this.equippedAttachmentId = id;
+                    if (this.equippedAttachments.includes(id)) return;
+                    if (this.equippedAttachments.length >= this.maxAttachments) {
+                        showMessage(`MAX ${this.maxAttachments} ATTACHMENTS EQUIPPED. UNEQUIP ONE FIRST.`);
+                        return;
+                    }
+                    this.equippedAttachments.push(id);
                     showMessage(`${item.name.toUpperCase()} EQUIPPED`);
                 }
                 this.render();
             }
         
-            unequipSlot(slot) {
+            unequipSlot(slot, id = null) {
                 if (slot === 'weapon') {
                     this.equippedWeaponId = null;
                     this.game.weaponMode = 'none';
                     showMessage("WEAPON HOLSTERED");
                 } else if (slot === 'attachment') {
-                    this.equippedAttachmentId = null;
+                    // One attachment by id, or all of them
+                    this.equippedAttachments = id ? this.equippedAttachments.filter(a => a !== id) : [];
                     showMessage("ATTACHMENT REMOVED");
                 }
                 this.render();
@@ -407,19 +426,32 @@
                     const item = this.items.find(i => i.id === itemId);
                     if (item) {
                         const config = this.typeConfig[item.type];
-                        if (config?.slot) { this.unequipSlot(config.slot); return; }
+                        if (config?.slot) { this.unequipSlot(config.slot, itemId); return; }
                     }
                 }
                 this.unequipSlot('weapon');
             }
             
             isItemEquipped(id) {
-                return this.equippedWeaponId === id || this.equippedAttachmentId === id;
+                return this.equippedWeaponId === id || this.equippedAttachments.includes(id);
             }
-            
-            
+
+            /** The first equipped attachment (older saves and callers knew only one); setting it equips just that one */
+            get equippedAttachmentId() { return this.equippedAttachments[0] || null; }
+            set equippedAttachmentId(id) { this.equippedAttachments = id ? [id] : []; }
+
             getEquippedAttachment() {
                 return this.equippedAttachmentId ? this.items.find(i => i.id === this.equippedAttachmentId) : null;
+            }
+
+            /** The equipped attachments, as items */
+            getEquippedAttachments() {
+                return this.equippedAttachments.map(id => this.items.find(i => i.id === id)).filter(Boolean);
+            }
+
+            /** Is an attachment with this effect equipped? ('laser_sight', 'mirror_blade', 'blood_muzzle') */
+            hasAttachment(effect) {
+                return this.equippedAttachments.some(id => this.items.find(i => i.id === id)?.effect === effect);
             }
         
             addItem(item) {
@@ -571,7 +603,7 @@
                             // Read current state at the time of the action.
                             if (!this.items.includes(entry.item)) return;
                             if (config.slot) {
-                                if (this.isItemEquipped(entry.id)) this.unequipSlot(config.slot);
+                                if (this.isItemEquipped(entry.id)) this.unequipSlot(config.slot, entry.id);
                                 else this.equipItem(entry.id);
                             } else if (config.consumable) {
                                 if (entry.item.action) entry.item.action(entry.item);

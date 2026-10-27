@@ -61,7 +61,8 @@ engineMixin({
                     inventory: {
                         items: this.inventory?.items?.map(i => i.id) ?? [],
                         equippedWeaponId: this.inventory?.equippedWeaponId ?? null,
-                        equippedAttachmentId: this.inventory?.equippedAttachmentId ?? null,
+                        equippedAttachmentId: this.inventory?.equippedAttachmentId ?? null,   // (the first, for older builds)
+                        equippedAttachments: this.inventory?.equippedAttachments?.slice() ?? [],
                         order: this.inventory?.entryOrder ?? [],
                         weaponMode: this.weaponMode ?? 'normal'
                     },
@@ -337,6 +338,13 @@ engineMixin({
                     if (save.inventory.equippedAttachmentId && !ITEM_REGISTRY[save.inventory.equippedAttachmentId]) {
                         warnings.push(`inventory: cleared unknown equipped attachment "${save.inventory.equippedAttachmentId}"`);
                         save.inventory.equippedAttachmentId = null;
+                    }
+                    if (Array.isArray(save.inventory.equippedAttachments)) {
+                        save.inventory.equippedAttachments = save.inventory.equippedAttachments.filter(id => {
+                            if (ITEM_REGISTRY[id]) return true;
+                            warnings.push(`inventory: cleared unknown equipped attachment "${id}"`);
+                            return false;
+                        });
                     }
                 }
 
@@ -659,14 +667,12 @@ engineMixin({
                             }
                         }
                         
-                        // Restore equipped attachment
-                        if (invData.equippedAttachmentId) {
-                            const attachItem = this.inventory.items.find(i => i.id === invData.equippedAttachmentId);
-                            if (attachItem) {
-                                this.inventory.equippedAttachmentId = invData.equippedAttachmentId;
-                                console.log(`[LOAD] Equipped attachment: ${attachItem.name}`);
-                            }
-                        }
+                        // Restore equipped attachments (up to two; older saves name one)
+                        const attachIds = Array.isArray(invData.equippedAttachments) ? invData.equippedAttachments
+                            : invData.equippedAttachmentId ? [invData.equippedAttachmentId] : [];
+                        this.inventory.equippedAttachments = [...new Set(attachIds)]
+                            .filter(id => this.inventory.items.some(i => i.id === id && i.type === 'attachment'))
+                            .slice(0, this.inventory.maxAttachments);
                         
                         // Render once after cosmetics and all ownership data restore below.
                     }

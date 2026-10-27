@@ -30,6 +30,23 @@
         // her to step in on the cut.
         const BLADE = { CUT_STEPS: 24, HALF_WIDTH: 2, MAX_HAND: 26, STEP_PAD: 8 };
 
+        // Crafted gear (ui/inventory-augments.js, core/registries.js). The Mirrored Glass (an accessory):
+        // all her damage × GLASS_DAMAGE, and a shield that turns enemy shots back until SHIELD damage has
+        // been turned; then it's spent and refills over RECHARGE_SECS. A part-spent shield refills at the
+        // same rate once REGEN_DELAY passes without a hit. The Mirror Blade (an attachment): a blade's cut
+        // turns the shots it meets (within the blade's width + BLADE_PAD of their path).
+        const MIRROR = { GLASS_ID: 'acc_mirror_glass', GLASS_DAMAGE: 1.35, SHIELD: 90, RECHARGE_SECS: 3, REGEN_DELAY: 1.5, BLADE_PAD: 6 };
+
+        /** Squared distance between segments ab and cd */
+        function _segSegDist2(ax, ay, bx, by, cx, cy, dx, dy) {
+            const cross = (px, py, qx, qy, rx, ry) => (qx - px) * (ry - py) - (qy - py) * (rx - px);
+            const d1 = cross(cx, cy, dx, dy, ax, ay), d2 = cross(cx, cy, dx, dy, bx, by);
+            const d3 = cross(ax, ay, bx, by, cx, cy), d4 = cross(ax, ay, bx, by, dx, dy);
+            if (((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0)) && d1 && d2 && d3 && d4) return 0;   // they cross
+            const D = CollisionSystem.distToSegmentSquared;
+            return Math.min(D(ax, ay, cx, cy, dx, dy), D(bx, by, cx, cy, dx, dy), D(cx, cy, ax, ay, bx, by), D(dx, dy, ax, ay, bx, by));
+        }
+
         /* A long blade's swing (a model with swing: 'wide', Blood Pact): two hands on the grip, she
            winds the blade far back to one side, then sweeps it round in front of her in one wide arc
            (the hands travel a half-circle about her chest), body turning with it, and settles back to
@@ -212,7 +229,7 @@
                 const M = weaponModel(W && W.id);
                 this._slashStyle = M.swing || 'knife';
                 const ang = pl.angle, reach = st.reach || 36, arc = st.arc || 1.4;
-                let bladeDamage = st.damage || 25;
+                let bladeDamage = (st.damage || 25) * this.playerDamageMult();
                 if (this.resonance && this.flitState && _gameTimeSec - this.flitState.lastFlitAt <= this.resonance.stat('flitStrikeWindow', 1)) {
                     bladeDamage *= 1 + 0.2 * this.resonance.rank('flit_strike');
                 }
@@ -310,6 +327,104 @@
                     if (typeof ambience !== 'undefined' && ambience.cut) ambience.cut();
                     this.triggerShake(2);
                 }
+            },
+
+            /** The Mirrored Glass is in her hand */
+            mirrorGlassOn() { return !!(this.cosmetics && this.cosmetics.equippedAccessory === MIRROR.GLASS_ID); },
+            /** Her damage multiplier on everything she deals (the Mirrored Glass) */
+            playerDamageMult() { return this.mirrorGlassOn() ? MIRROR.GLASS_DAMAGE : 1; },
+            /** …and on her bullets (the Bloodthirsty Muzzle on top) */
+            gunDamageMult() {
+                const muzzle = this.inventory && this.inventory.hasAttachment('blood_muzzle') ? ITEM_REGISTRY.blood_muzzle.stats.gunDamageMult : 1;
+                return muzzle * this.playerDamageMult();
+            },
+
+            /** The Mirrored Glass's shield: { charge, spent, hitTick } (full when first asked) */
+            mirrorShield() {
+                return this._mirrorShield || (this._mirrorShield = { charge: MIRROR.SHIELD, spent: false, hitTick: -1e9 });
+            },
+
+            /** The blade as drawn at a swing's age, in the world: [hand x, y, tip x, y] */
+            _bladeWorld(S, age, out) {
+                const pose = sampleMeleeSwing(age, S.side, this._bladePose || (this._bladePose = {}), S.secs, S.style);
+                if (!pose) return null;
+                const pl = this.player, ca = Math.cos(pl.angle), sa = Math.sin(pl.angle), [ex, ey] = S.edge;
+                const c = Math.cos(pose.a), s = Math.sin(pose.a);
+                const ax = pose.handX, ay = pose.handY, bx = ax + (ex * c - ey * s) * .95, by = ay + (ex * s + ey * c) * .95;
+                out[0] = pl.x + ax * ca - ay * sa; out[1] = pl.y + ax * sa + ay * ca;
+                out[2] = pl.x + bx * ca - by * sa; out[3] = pl.y + bx * sa + by * ca;
+                return out;
+            },
+
+            /**
+             * Once per tick, before the shots move: the Mirror Blade's cut and the Mirrored Glass's shield
+             * turn enemy shots that would meet them this tick back at whoever fired them.
+             */
+            deflectShots() {
+                const pl = this.player, step = CONFIG.LOOP.STEP_MS / 1000;
+                const glass = this.mirrorGlassOn() && !this.isDriving;
+                if (glass) {                                                            // the shield refills
+                    const G = this.mirrorShield(), rate = MIRROR.SHIELD / MIRROR.RECHARGE_SECS * step;
+                    if (G.spent || (_simTick - G.hitTick) * step >= MIRROR.REGEN_DELAY) G.charge = Math.min(MIRROR.SHIELD, G.charge + rate);
+                    if (G.spent && G.charge >= MIRROR.SHIELD) { G.spent = false; showMessage('MIRRORED GLASS — RESTORED'); }
+                }
+                const S = this._swing;
+                let blade = null;
+                if (S && this.inventory && this.inventory.hasAttachment('mirror_blade')) {
+                    // The blade this tick: from a tick ago to now, in a few steps, during the cut only
+                    const ph = swingPhases(S.style), age = _gameTimeSec - S.t0, from = Math.max(ph.windup * S.secs, age - step), to = Math.min(ph.cutEnd * S.secs, age);
+                    if (to >= from) {
+                        blade = [];
+                        for (let j = 0; j <= 3; j++) { const b = this._bladeWorld(S, from + (to - from) * j / 3, [0, 0, 0, 0]); if (b) blade.push(b); }
+                    }
+                }
+                if (!blade && !glass) return;
+                if (!pl || !pl.visible || pl.dead) return;
+                const G = glass ? this.mirrorShield() : null;
+                for (const p of this.projectiles) {
+                    if (!p.isEnemy || !p.active || p.markedForDestroy) continue;
+                    // its path: where it was, through where it is, to where it will be
+                    const x0 = p.lastX ?? p.x, y0 = p.lastY ?? p.y, x1 = p.x + p.vx, y1 = p.y + p.vy, r = p.radius || 5;
+                    if (blade) {
+                        const reach = (r + BLADE.HALF_WIDTH + MIRROR.BLADE_PAD) ** 2;
+                        if (blade.some(b => _segSegDist2(x0, y0, x1, y1, b[0], b[1], b[2], b[3]) <= reach)) { this.reflectShot(p, 'blade'); continue; }
+                    }
+                    if (G && !G.spent && CollisionSystem.distToSegmentSquared(pl.x, pl.y, x0, y0, x1, y1) < (pl.radius + 5) ** 2) {
+                        G.charge -= p.damage; G.hitTick = _simTick;
+                        if (G.charge <= 0) { G.charge = 0; G.spent = true; showMessage('MIRRORED GLASS — RECHARGING'); }
+                        this.reflectShot(p, 'glass');
+                    }
+                }
+            },
+
+            /** Turn an enemy shot: it flies back at whoever fired it (or the way it came), now hers */
+            reflectShot(p, by) {
+                const pl = this.player, speed = Math.hypot(p.vx, p.vy) || 20;
+                const src = p.owner && !p.owner.dead && Number.isFinite(p.owner.x) ? p.owner : null;
+                const a = src ? Math.atan2(src.y - p.y, src.x - p.x) : Math.atan2(-p.vy, -p.vx);
+                p.vx = Math.cos(a) * speed; p.vy = Math.sin(a) * speed; p.angle = a;
+                p.isEnemy = false; p.alliance = 'friendly'; p.ownerType = 'player'; p.owner = pl;
+                p.hitTargets = new Set(); p.penetrateCount = 0; p.life = Math.max(p.life, 45); p.spawnTime = _gameTimeMs();
+                if (!p.isFireball) p.color = '#e6f6ff';
+                p.deflected = by;
+                if (this.weather) this.weather.spawnSparks(p.x, p.y, 8);
+                if (typeof ambience !== 'undefined' && ambience.cut) ambience.cut();
+                if (by === 'glass') this._mirrorFlashT = _gameTimeSec;
+                this.triggerShake(1.5);
+            },
+
+            /** The Mirrored Glass's flash: a silver ring round her when it turns a shot (world space) */
+            drawMirrorShield(ctx) {
+                if (this._mirrorFlashT === undefined || !this.mirrorGlassOn()) return;
+                const k = 1 - (_gameTimeSec - this._mirrorFlashT) / .3;
+                if (k <= 0) return;
+                const pl = this.player, r = (pl.radius || 12) + 9;
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                ctx.strokeStyle = `rgba(220, 240, 255, ${.7 * k})`; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(pl.x, pl.y, r + (1 - k) * 6, 0, Math.PI * 2); ctx.stroke();
+                ctx.strokeStyle = `rgba(160, 200, 255, ${.3 * k})`; ctx.lineWidth = 5;
+                ctx.beginPath(); ctx.arc(pl.x, pl.y, r + (1 - k) * 6, 0, Math.PI * 2); ctx.stroke();
+                ctx.restore();
             },
 
             /** The blade's swing for the renderer: angle across the slash, and how far it reaches out (null at rest) */

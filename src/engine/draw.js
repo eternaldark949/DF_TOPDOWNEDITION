@@ -842,6 +842,7 @@
                     this.drawMuzzleStars(this.ctx);                          // the flash's star at each muzzle
                     this.drawShotFx(this.ctx, cullBounds.world);             // barrel smoke, embers, golden wisps (engine/combat-effects.js)
                     this.drawSlashes(this.ctx);                              // a blade's gold arc (engine/status-effects.js)
+                    this.drawMirrorShield(this.ctx);                         // the Mirrored Glass turning a shot
                 }
 
                 if (RenderStats.timed) this._entLap('Entities: Effects');

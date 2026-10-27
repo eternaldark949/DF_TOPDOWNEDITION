@@ -689,6 +689,7 @@
                 // Wall/building/prop collisions handled by CollisionSystem.
                 // Actor collisions (player/enemies) use onProjectileHit() callbacks.
                 this.profiler.start('Physics:Proj');
+                this.deflectShots();                                   // the Mirror Blade's cut, the Mirrored Glass's shield (engine/status-effects.js)
                 
                 // ── ORPHAN SWEEP ──
                 // Catch any ProjectileEntity stuck in the GameEntity registry that isn't 

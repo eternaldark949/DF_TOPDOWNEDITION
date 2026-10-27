@@ -574,5 +574,28 @@
                 desc: 'Golden orbs that stick to enemies and burn away. Attrition warfare.',
                 scrapCost: 500,
             },
+            {
+                id: 'mirror_blade',
+                name: 'MIRROR BLADE',
+                icon: '◈',
+                desc: 'Polish the edge to a mirror. Bullets your blade meets mid-cut fly back at the shooter.',
+                scrapCost: 200,
+            },
+            {
+                id: 'blood_muzzle',
+                name: 'BLOODTHIRSTY MUZZLE',
+                icon: '♆',
+                desc: 'A crimson muzzle brake. Every bullet hits 75% harder.',
+                scrapCost: 275,
+            },
+            {
+                id: 'acc_mirror_glass',
+                cosmetic: true,           // a COSMETICS_REGISTRY accessory, not an item: it's worn, and takes no attachment slot
+                requires: 'acc_glass',    // silvered from the Crystal Glass
+                name: 'MIRRORED GLASS',
+                icon: '🥂',
+                desc: 'Silver the Crystal Glass. All damage +35%, and it turns up to 90 damage of shots back before it recharges (3 s).',
+                scrapCost: 650,
+            },
         ];
 

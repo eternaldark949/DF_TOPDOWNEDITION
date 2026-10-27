@@ -6231,6 +6231,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // ─── A.C.C.E.S.S.O.R.I.E.S (held items; optional slot; may have options) ───
             'acc_umbrella':        { id: 'acc_umbrella',        category: 'accessory', name: 'Moonlit Umbrella', desc: 'Lavender canopy, gold tips. Opens itself when it rains.', price: 250, data: { held: 'umbrella', hand: 'right', color: '#9d8cc8', trim: '#e8c27a' } },
             'acc_glass':           { id: 'acc_glass',           category: 'accessory', name: 'Crystal Glass',  desc: 'Something to sip on. Choose your pour.',                price: 0,    data: { held: 'glass', hand: 'right' }, options: { drink: 'champagne' }, default: true },
+            // Crafted at the workbench from the Crystal Glass (story/missions.js SCHEMATICS), never sold: all her damage
+            // ×1.35, and a shield that turns enemy shots back (engine/status-effects.js MIRROR)
+            'acc_mirror_glass':    { id: 'acc_mirror_glass',    category: 'accessory', name: 'Mirrored Glass', desc: 'The Crystal Glass, silvered. All damage +35%; turns 90 damage of shots back, then recharges.', price: 0, crafted: true, data: { held: 'glass', hand: 'right', mirror: true }, options: { drink: 'champagne' } },
 
             // ─── S.K.I.N.s (skin tone / look) ───
             'skin_caramel':        { id: 'skin_caramel',        category: 'skin',  name: 'Radiant Caramel',     desc: 'Warm caramel. 949\'s natural tone.',                  price: 0,    data: { skinColor: '#c68e63' }, default: true },
@@ -6366,7 +6369,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             /** Purchase a cosmetic. Returns true on success. */
             buy(id, game) {
                 const entry = COSMETICS_REGISTRY[id];
-                if (!entry || this.isOwned(id)) return false;
+                if (!entry || this.isOwned(id) || entry.crafted) return false;      // crafted pieces come from the workbench
                 if (game.currency < entry.price) return false;
                 game.currency -= entry.price;
                 this.owned.push(id);
@@ -6445,7 +6448,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const acc = this.equippedAccessory ? COSMETICS_REGISTRY[this.equippedAccessory] : null;
                 let held = null;
                 if (acc && acc.data.held === 'glass') {
-                    held = { type: 'glass', hand: acc.data.hand || 'right', drink: this.getAccessoryOption(acc.id, 'drink') || 'champagne' };
+                    held = { type: 'glass', hand: acc.data.hand || 'right', drink: this.getAccessoryOption(acc.id, 'drink') || 'champagne', mirror: !!acc.data.mirror };
                 } else if (acc && acc.data.held === 'umbrella') {
                     held = { type: 'umbrella', hand: acc.data.hand || 'right', color: acc.data.color, trim: acc.data.trim };
                 }
@@ -54950,7 +54953,7 @@ Object.assign(TrafficVehicle.prototype, {
                     // the retract). Sniper models sit 2px lower in the hand, matching NPCs.
                     if (game.weaponMode === 'normal' || game.weaponMode === 'sniper') {
                         const wy = wyBase + (weaponId.includes('sniper') ? 2 : 0);
-                        const laser = game.inventory && game.inventory.getEquippedAttachment()?.effect === 'laser_sight';
+                        const laser = !!(game.inventory && game.inventory.hasAttachment('laser_sight'));
                         // the finisher's twirl (engine/finisher.js): the gun spins round her trigger finger
                         const tw = game.twirlAngle ? game.twirlAngle() : 0;
                         drawWeapon(ctx, weaponId, wx, wy, tw, scale, laser && !tw);
@@ -55416,7 +55419,7 @@ Object.assign(TrafficVehicle.prototype, {
                 if (held.hand === 'left') { hX = lFistX; hY = lFistY; } else { hX = rFistX; hY = rFistY; }
                 // 'champagne_glass' is the legacy id (NPC configs); it's the glass with champagne
                 if (held.type === 'glass' || held.type === 'champagne_glass') {
-                    drawHeldGlass(ctx, hX, hY, held.drink || 'champagne', entity, held.hand);
+                    drawHeldGlass(ctx, hX, hY, held.drink || 'champagne', entity, held.hand, held.mirror);
                 } else if (held.type === 'parcel' && held.tucked && !isDrivingCfg(config)) {
                     ctx.save(); ctx.translate(-1.5, -12.5); ctx.rotate(0.12);           // against her left side, under the arm
                     drawCozyParcel(ctx, 10, 6.5, 0.6);
@@ -55495,7 +55498,7 @@ Object.assign(TrafficVehicle.prototype, {
             ctx.beginPath(); ctx.moveTo(hx - hs * 0.6, -hs * 1.1); ctx.lineTo(hx + hs * 1.1, 0); ctx.lineTo(hx - hs * 0.6, hs * 1.1); ctx.closePath(); ctx.fill();
         }
 
-        function drawHeldGlass(ctx, hX, hY, drinkId, owner, hand) {
+        function drawHeldGlass(ctx, hX, hY, drinkId, owner, hand, mirror = false) {
             const D = GLASS_DRINKS[drinkId] || GLASS_DRINKS.champagne;
             const TAU = Math.PI * 2, R = D.rim;
             const side = hand === 'left' ? -1 : 1;
@@ -55628,6 +55631,14 @@ Object.assign(TrafficVehicle.prototype, {
             if (D.glass === 'tumbler' || D.glass === 'soda') {  // thick glass: second inner ring
                 ctx.strokeStyle = 'rgba(245,252,255,0.35)'; ctx.lineWidth = 0.4;
                 ctx.beginPath(); ctx.arc(0, 0, R * 0.84, 0, TAU); ctx.stroke();
+            }
+            if (mirror) {                                       // the Mirrored Glass: a silvered band round the rim, a bright arc of it toward the light
+                ctx.strokeStyle = '#8f9aa8'; ctx.lineWidth = 1.1;
+                ctx.beginPath(); ctx.arc(0, 0, R + 0.5, 0, TAU); ctx.stroke();
+                ctx.strokeStyle = '#f4f8ff'; ctx.lineWidth = 0.8;
+                ctx.beginPath(); ctx.arc(0, 0, R + 0.5, light - 0.9, light + 0.9); ctx.stroke();
+                ctx.strokeStyle = 'rgba(40,48,64,0.6)'; ctx.lineWidth = 0.6;
+                ctx.beginPath(); ctx.arc(0, 0, R + 0.5, light + Math.PI - 0.6, light + Math.PI + 0.6); ctx.stroke();
             }
             // Specular crescent + pin highlight on the lit side
             ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = 0.7; ctx.lineCap = 'round';
@@ -59462,6 +59473,18 @@ Object.assign(TrafficVehicle.prototype, {
                 desc: 'Faint red targeting beam when equipped.',
                 stats: { effect: 'laser_sight' }
             },
+            'mirror_blade': {
+                name: 'Mirror Blade', type: 'attachment', icon: '◈',
+                desc: 'A mirror-polished edge. Bullets your blade meets mid-cut fly back at whoever fired them.',
+                // engine/status-effects.js deflectShots: the Kukri's and Blood Pact's cut turns enemy shots
+                stats: { effect: 'mirror_blade' }
+            },
+            'blood_muzzle': {
+                name: 'Bloodthirsty Muzzle', type: 'attachment', icon: '♆',
+                desc: 'A crimson muzzle brake that drinks the shot. Bullets deal 75% more damage.',
+                // engine/combat-effects.js fireWeapon: the shot's damage × gunDamageMult
+                stats: { effect: 'blood_muzzle', gunDamageMult: 1.75 }
+            },
             'golden_child': {
                 name: 'Golden Child', type: 'weapon', icon: '✦',
                 desc: 'Fires golden orbs that stick to targets and burn away.',
@@ -59718,7 +59741,8 @@ Object.assign(TrafficVehicle.prototype, {
                 
                 // --- DUAL EQUIP SLOTS ---
                 this.equippedWeaponId = null;     // Active weapon
-                this.equippedAttachmentId = null;  // Active attachment (laser sight, etc.)
+                this.equippedAttachments = [];    // Active attachments (laser sight, muzzle…), up to maxAttachments
+                this.maxAttachments = 2;
                 this.entryOrder = [];             // pill order the player dragged, as 'source:id' keys (saved)
                 
                 // --- ITEM TYPE CONFIG ---
@@ -59773,19 +59797,25 @@ Object.assign(TrafficVehicle.prototype, {
                     this.equippedWeaponId = id;
                     if (item.action) item.action(item);
                 } else if (config.slot === 'attachment') {
-                    this.equippedAttachmentId = id;
+                    if (this.equippedAttachments.includes(id)) return;
+                    if (this.equippedAttachments.length >= this.maxAttachments) {
+                        showMessage(`MAX ${this.maxAttachments} ATTACHMENTS EQUIPPED. UNEQUIP ONE FIRST.`);
+                        return;
+                    }
+                    this.equippedAttachments.push(id);
                     showMessage(`${item.name.toUpperCase()} EQUIPPED`);
                 }
                 this.render();
             }
         
-            unequipSlot(slot) {
+            unequipSlot(slot, id = null) {
                 if (slot === 'weapon') {
                     this.equippedWeaponId = null;
                     this.game.weaponMode = 'none';
                     showMessage("WEAPON HOLSTERED");
                 } else if (slot === 'attachment') {
-                    this.equippedAttachmentId = null;
+                    // One attachment by id, or all of them
+                    this.equippedAttachments = id ? this.equippedAttachments.filter(a => a !== id) : [];
                     showMessage("ATTACHMENT REMOVED");
                 }
                 this.render();
@@ -59797,19 +59827,32 @@ Object.assign(TrafficVehicle.prototype, {
                     const item = this.items.find(i => i.id === itemId);
                     if (item) {
                         const config = this.typeConfig[item.type];
-                        if (config?.slot) { this.unequipSlot(config.slot); return; }
+                        if (config?.slot) { this.unequipSlot(config.slot, itemId); return; }
                     }
                 }
                 this.unequipSlot('weapon');
             }
             
             isItemEquipped(id) {
-                return this.equippedWeaponId === id || this.equippedAttachmentId === id;
+                return this.equippedWeaponId === id || this.equippedAttachments.includes(id);
             }
-            
-            
+
+            /** The first equipped attachment (older saves and callers knew only one); setting it equips just that one */
+            get equippedAttachmentId() { return this.equippedAttachments[0] || null; }
+            set equippedAttachmentId(id) { this.equippedAttachments = id ? [id] : []; }
+
             getEquippedAttachment() {
                 return this.equippedAttachmentId ? this.items.find(i => i.id === this.equippedAttachmentId) : null;
+            }
+
+            /** The equipped attachments, as items */
+            getEquippedAttachments() {
+                return this.equippedAttachments.map(id => this.items.find(i => i.id === id)).filter(Boolean);
+            }
+
+            /** Is an attachment with this effect equipped? ('laser_sight', 'mirror_blade', 'blood_muzzle') */
+            hasAttachment(effect) {
+                return this.equippedAttachments.some(id => this.items.find(i => i.id === id)?.effect === effect);
             }
         
             addItem(item) {
@@ -59961,7 +60004,7 @@ Object.assign(TrafficVehicle.prototype, {
                             // Read current state at the time of the action.
                             if (!this.items.includes(entry.item)) return;
                             if (config.slot) {
-                                if (this.isItemEquipped(entry.id)) this.unequipSlot(config.slot);
+                                if (this.isItemEquipped(entry.id)) this.unequipSlot(config.slot, entry.id);
                                 else this.equipItem(entry.id);
                             } else if (config.consumable) {
                                 if (entry.item.action) entry.item.action(entry.item);
@@ -60942,6 +60985,29 @@ Object.assign(TrafficVehicle.prototype, {
                 icon: '✦',
                 desc: 'Golden orbs that stick to enemies and burn away. Attrition warfare.',
                 scrapCost: 500,
+            },
+            {
+                id: 'mirror_blade',
+                name: 'MIRROR BLADE',
+                icon: '◈',
+                desc: 'Polish the edge to a mirror. Bullets your blade meets mid-cut fly back at the shooter.',
+                scrapCost: 200,
+            },
+            {
+                id: 'blood_muzzle',
+                name: 'BLOODTHIRSTY MUZZLE',
+                icon: '♆',
+                desc: 'A crimson muzzle brake. Every bullet hits 75% harder.',
+                scrapCost: 275,
+            },
+            {
+                id: 'acc_mirror_glass',
+                cosmetic: true,           // a COSMETICS_REGISTRY accessory, not an item: it's worn, and takes no attachment slot
+                requires: 'acc_glass',    // silvered from the Crystal Glass
+                name: 'MIRRORED GLASS',
+                icon: '🥂',
+                desc: 'Silver the Crystal Glass. All damage +35%, and it turns up to 90 damage of shots back before it recharges (3 s).',
+                scrapCost: 650,
             },
         ];
 
@@ -64496,7 +64562,7 @@ Object.assign(TrafficVehicle.prototype, {
                         isEnemy: false, 
                         owner: this.player, 
                         color: 'rgba(0,0,0,0)', // Invisible hitbox
-                        radius: 15, speed: 10, life: 5, damage: Math.round(this.resonance.stat('punchDamage', 15) * punchCrit), mass: 50,
+                        radius: 15, speed: 10, life: 5, damage: Math.round(this.resonance.stat('punchDamage', 15) * punchCrit * this.playerDamageMult()), mass: 50,
                         melee: true
                     }));
                     this.projectiles[this.projectiles.length - 1].crit = punchCrit > 1;
@@ -64532,6 +64598,7 @@ Object.assign(TrafficVehicle.prototype, {
                 let shotDamage = this.resonance.stat('gunDamage', stats.damage || 35);
                 if (_gameTimeSec - this.flitState.lastFlitAt <= this.resonance.stat('flitStrikeWindow', 1)) shotDamage *= 1 + 0.2 * this.resonance.rank('flit_strike');
                 if (this._drawnAt !== undefined && _gameTimeSec - this._drawnAt <= 0.8 && !this._drawShotUsed) { shotDamage *= 1 + 0.25 * this.resonance.rank('quick_draw'); this._drawShotUsed = true; }
+                shotDamage *= this.gunDamageMult();                      // the Bloodthirsty Muzzle, the Mirrored Glass (engine/status-effects.js)
                 const shotCrit = this.rollCrit(stats);                   // a critical hit (engine/combat-fx.js)
                 shotDamage = Math.round(shotDamage * shotCrit);
                 const shotLife   = stats.projectileLife || 60;
@@ -67593,6 +67660,23 @@ engineMixin({
         // her to step in on the cut.
         const BLADE = { CUT_STEPS: 24, HALF_WIDTH: 2, MAX_HAND: 26, STEP_PAD: 8 };
 
+        // Crafted gear (ui/inventory-augments.js, core/registries.js). The Mirrored Glass (an accessory):
+        // all her damage × GLASS_DAMAGE, and a shield that turns enemy shots back until SHIELD damage has
+        // been turned; then it's spent and refills over RECHARGE_SECS. A part-spent shield refills at the
+        // same rate once REGEN_DELAY passes without a hit. The Mirror Blade (an attachment): a blade's cut
+        // turns the shots it meets (within the blade's width + BLADE_PAD of their path).
+        const MIRROR = { GLASS_ID: 'acc_mirror_glass', GLASS_DAMAGE: 1.35, SHIELD: 90, RECHARGE_SECS: 3, REGEN_DELAY: 1.5, BLADE_PAD: 6 };
+
+        /** Squared distance between segments ab and cd */
+        function _segSegDist2(ax, ay, bx, by, cx, cy, dx, dy) {
+            const cross = (px, py, qx, qy, rx, ry) => (qx - px) * (ry - py) - (qy - py) * (rx - px);
+            const d1 = cross(cx, cy, dx, dy, ax, ay), d2 = cross(cx, cy, dx, dy, bx, by);
+            const d3 = cross(ax, ay, bx, by, cx, cy), d4 = cross(ax, ay, bx, by, dx, dy);
+            if (((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0)) && d1 && d2 && d3 && d4) return 0;   // they cross
+            const D = CollisionSystem.distToSegmentSquared;
+            return Math.min(D(ax, ay, cx, cy, dx, dy), D(bx, by, cx, cy, dx, dy), D(cx, cy, ax, ay, bx, by), D(dx, dy, ax, ay, bx, by));
+        }
+
         /* A long blade's swing (a model with swing: 'wide', Blood Pact): two hands on the grip, she
            winds the blade far back to one side, then sweeps it round in front of her in one wide arc
            (the hands travel a half-circle about her chest), body turning with it, and settles back to
@@ -67775,7 +67859,7 @@ engineMixin({
                 const M = weaponModel(W && W.id);
                 this._slashStyle = M.swing || 'knife';
                 const ang = pl.angle, reach = st.reach || 36, arc = st.arc || 1.4;
-                let bladeDamage = st.damage || 25;
+                let bladeDamage = (st.damage || 25) * this.playerDamageMult();
                 if (this.resonance && this.flitState && _gameTimeSec - this.flitState.lastFlitAt <= this.resonance.stat('flitStrikeWindow', 1)) {
                     bladeDamage *= 1 + 0.2 * this.resonance.rank('flit_strike');
                 }
@@ -67873,6 +67957,104 @@ engineMixin({
                     if (typeof ambience !== 'undefined' && ambience.cut) ambience.cut();
                     this.triggerShake(2);
                 }
+            },
+
+            /** The Mirrored Glass is in her hand */
+            mirrorGlassOn() { return !!(this.cosmetics && this.cosmetics.equippedAccessory === MIRROR.GLASS_ID); },
+            /** Her damage multiplier on everything she deals (the Mirrored Glass) */
+            playerDamageMult() { return this.mirrorGlassOn() ? MIRROR.GLASS_DAMAGE : 1; },
+            /** …and on her bullets (the Bloodthirsty Muzzle on top) */
+            gunDamageMult() {
+                const muzzle = this.inventory && this.inventory.hasAttachment('blood_muzzle') ? ITEM_REGISTRY.blood_muzzle.stats.gunDamageMult : 1;
+                return muzzle * this.playerDamageMult();
+            },
+
+            /** The Mirrored Glass's shield: { charge, spent, hitTick } (full when first asked) */
+            mirrorShield() {
+                return this._mirrorShield || (this._mirrorShield = { charge: MIRROR.SHIELD, spent: false, hitTick: -1e9 });
+            },
+
+            /** The blade as drawn at a swing's age, in the world: [hand x, y, tip x, y] */
+            _bladeWorld(S, age, out) {
+                const pose = sampleMeleeSwing(age, S.side, this._bladePose || (this._bladePose = {}), S.secs, S.style);
+                if (!pose) return null;
+                const pl = this.player, ca = Math.cos(pl.angle), sa = Math.sin(pl.angle), [ex, ey] = S.edge;
+                const c = Math.cos(pose.a), s = Math.sin(pose.a);
+                const ax = pose.handX, ay = pose.handY, bx = ax + (ex * c - ey * s) * .95, by = ay + (ex * s + ey * c) * .95;
+                out[0] = pl.x + ax * ca - ay * sa; out[1] = pl.y + ax * sa + ay * ca;
+                out[2] = pl.x + bx * ca - by * sa; out[3] = pl.y + bx * sa + by * ca;
+                return out;
+            },
+
+            /**
+             * Once per tick, before the shots move: the Mirror Blade's cut and the Mirrored Glass's shield
+             * turn enemy shots that would meet them this tick back at whoever fired them.
+             */
+            deflectShots() {
+                const pl = this.player, step = CONFIG.LOOP.STEP_MS / 1000;
+                const glass = this.mirrorGlassOn() && !this.isDriving;
+                if (glass) {                                                            // the shield refills
+                    const G = this.mirrorShield(), rate = MIRROR.SHIELD / MIRROR.RECHARGE_SECS * step;
+                    if (G.spent || (_simTick - G.hitTick) * step >= MIRROR.REGEN_DELAY) G.charge = Math.min(MIRROR.SHIELD, G.charge + rate);
+                    if (G.spent && G.charge >= MIRROR.SHIELD) { G.spent = false; showMessage('MIRRORED GLASS — RESTORED'); }
+                }
+                const S = this._swing;
+                let blade = null;
+                if (S && this.inventory && this.inventory.hasAttachment('mirror_blade')) {
+                    // The blade this tick: from a tick ago to now, in a few steps, during the cut only
+                    const ph = swingPhases(S.style), age = _gameTimeSec - S.t0, from = Math.max(ph.windup * S.secs, age - step), to = Math.min(ph.cutEnd * S.secs, age);
+                    if (to >= from) {
+                        blade = [];
+                        for (let j = 0; j <= 3; j++) { const b = this._bladeWorld(S, from + (to - from) * j / 3, [0, 0, 0, 0]); if (b) blade.push(b); }
+                    }
+                }
+                if (!blade && !glass) return;
+                if (!pl || !pl.visible || pl.dead) return;
+                const G = glass ? this.mirrorShield() : null;
+                for (const p of this.projectiles) {
+                    if (!p.isEnemy || !p.active || p.markedForDestroy) continue;
+                    // its path: where it was, through where it is, to where it will be
+                    const x0 = p.lastX ?? p.x, y0 = p.lastY ?? p.y, x1 = p.x + p.vx, y1 = p.y + p.vy, r = p.radius || 5;
+                    if (blade) {
+                        const reach = (r + BLADE.HALF_WIDTH + MIRROR.BLADE_PAD) ** 2;
+                        if (blade.some(b => _segSegDist2(x0, y0, x1, y1, b[0], b[1], b[2], b[3]) <= reach)) { this.reflectShot(p, 'blade'); continue; }
+                    }
+                    if (G && !G.spent && CollisionSystem.distToSegmentSquared(pl.x, pl.y, x0, y0, x1, y1) < (pl.radius + 5) ** 2) {
+                        G.charge -= p.damage; G.hitTick = _simTick;
+                        if (G.charge <= 0) { G.charge = 0; G.spent = true; showMessage('MIRRORED GLASS — RECHARGING'); }
+                        this.reflectShot(p, 'glass');
+                    }
+                }
+            },
+
+            /** Turn an enemy shot: it flies back at whoever fired it (or the way it came), now hers */
+            reflectShot(p, by) {
+                const pl = this.player, speed = Math.hypot(p.vx, p.vy) || 20;
+                const src = p.owner && !p.owner.dead && Number.isFinite(p.owner.x) ? p.owner : null;
+                const a = src ? Math.atan2(src.y - p.y, src.x - p.x) : Math.atan2(-p.vy, -p.vx);
+                p.vx = Math.cos(a) * speed; p.vy = Math.sin(a) * speed; p.angle = a;
+                p.isEnemy = false; p.alliance = 'friendly'; p.ownerType = 'player'; p.owner = pl;
+                p.hitTargets = new Set(); p.penetrateCount = 0; p.life = Math.max(p.life, 45); p.spawnTime = _gameTimeMs();
+                if (!p.isFireball) p.color = '#e6f6ff';
+                p.deflected = by;
+                if (this.weather) this.weather.spawnSparks(p.x, p.y, 8);
+                if (typeof ambience !== 'undefined' && ambience.cut) ambience.cut();
+                if (by === 'glass') this._mirrorFlashT = _gameTimeSec;
+                this.triggerShake(1.5);
+            },
+
+            /** The Mirrored Glass's flash: a silver ring round her when it turns a shot (world space) */
+            drawMirrorShield(ctx) {
+                if (this._mirrorFlashT === undefined || !this.mirrorGlassOn()) return;
+                const k = 1 - (_gameTimeSec - this._mirrorFlashT) / .3;
+                if (k <= 0) return;
+                const pl = this.player, r = (pl.radius || 12) + 9;
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                ctx.strokeStyle = `rgba(220, 240, 255, ${.7 * k})`; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(pl.x, pl.y, r + (1 - k) * 6, 0, Math.PI * 2); ctx.stroke();
+                ctx.strokeStyle = `rgba(160, 200, 255, ${.3 * k})`; ctx.lineWidth = 5;
+                ctx.beginPath(); ctx.arc(pl.x, pl.y, r + (1 - k) * 6, 0, Math.PI * 2); ctx.stroke();
+                ctx.restore();
             },
 
             /** The blade's swing for the renderer: angle across the slash, and how far it reaches out (null at rest) */
@@ -70594,7 +70776,8 @@ engineMixin({
                         html += `<div class="df-swatch" style="${swatchOf(item, category)}"></div>`;
                         html += `<div class="grow"><div class="title">${item.name}</div><div class="desc">${item.desc}</div></div>`;
                         html += `<div class="df-shop-side">`;
-                        if (!owned) html += `${this._priceHtml(item.price, this.currency)}<button class="df-btn small" data-act="buy"${afford ? '' : ' disabled'}>Buy</button>`;
+                        if (!owned && item.crafted) html += `<span class="df-chip">Crafted at home</span>`;
+                        else if (!owned) html += `${this._priceHtml(item.price, this.currency)}<button class="df-btn small" data-act="buy"${afford ? '' : ' disabled'}>Buy</button>`;
                         else if (!equipped) html += `<span class="df-chip">Owned</span><button class="df-btn small ghost" data-act="equip">Equip</button>`;
                         else html += `<span class="df-chip active">● Active</span>${optional ? '<button class="df-btn small danger" data-act="remove">Remove</button>' : ''}`;
                         html += `</div></div>`;
@@ -70992,8 +71175,8 @@ engineMixin({
 
                 const weapId = this.inventory?.equippedWeaponId;
                 const weapName = weapId && typeof ITEM_REGISTRY !== 'undefined' && ITEM_REGISTRY[weapId] ? ITEM_REGISTRY[weapId].name : 'Unarmed';
-                const attId = this.inventory?.equippedAttachmentId;
-                const attName = attId && typeof ITEM_REGISTRY !== 'undefined' && ITEM_REGISTRY[attId] ? ITEM_REGISTRY[attId].name : 'None';
+                const attIds = this.inventory?.equippedAttachments || [];
+                const attName = attIds.map(id => typeof ITEM_REGISTRY !== 'undefined' && ITEM_REGISTRY[id] ? ITEM_REGISTRY[id].name : null).filter(Boolean).join(', ') || 'None';
 
                 html += `<div class="df-rows" style="margin-top:8px;">`;
                 html += statRow('Speed', baseSpeed, finalSpeed, '', false);
@@ -71001,7 +71184,7 @@ engineMixin({
                 html += statRow('Flit Cost', baseFlitCost, finalFlitCost, '/ 120', true);
                 html += statRow('Detection', baseDetect, finalDetect, '×', true);
                 html += row('Weapon', weapName);
-                html += row('Attachment', attName);
+                html += row(attIds.length > 1 ? 'Attachments' : 'Attachment', attName);
                 html += row('Stims', `${this.boosterCount ?? 0} / ${this.getEffectiveMaxBoosters?.() ?? 4}`);
                 html += row('Currency', `${this.currency ?? 0}<span class="unit">PP</span>`);
                 html += row('Scrap', `${this.scrap ?? 0}`);
@@ -71385,18 +71568,23 @@ engineMixin({
                 this._shopBalance('craft-shop-balance', this.scrap, 'Scrap');
                 const grid = document.getElementById('craft-shop-grid');
                 let html = `<div class="df-section"><span><span class="glint">◆</span>Schematics</span><span class="count">${SCHEMATICS.length}</span></div>`;
+                const ownsSch = sch => this.schematicOwned(sch), missing = sch => this.schematicNeeds(sch);
                 for (const sch of SCHEMATICS) {
-                    const owned = this.inventory.items.some(i => i.id === sch.id), canAfford = this.scrap >= sch.scrapCost;
+                    const owned = ownsSch(sch), needs = missing(sch), canAfford = this.scrap >= sch.scrapCost && !needs;
                     const reg = (typeof ITEM_REGISTRY !== 'undefined' && ITEM_REGISTRY[sch.id]) || {};
                     // What it is: its registry stats, as label / value rows
                     const stats = [], st = reg.stats || {};
                     if (reg.type) stats.push(['Type', reg.type]);
+                    if (sch.cosmetic) stats.push(['Type', 'accessory']);
+                    if (sch.requires) stats.push(['Needs', COSMETICS_REGISTRY[sch.requires]?.name || sch.requires]);
+                    if (st.gunDamageMult) stats.push(['Bullet damage', `×${st.gunDamageMult}`]);
                     if (st.damage) stats.push(['Damage', st.damage]);
                     if (st.fireRate) stats.push(['Fire delay', st.fireRate + '<span class="unit">ticks</span>']);
                     if (st.recoil) stats.push(['Recoil', st.recoil]);
                     if (st.dotDamage) stats.push(['Burn', `${st.dotDamage} × ${st.dotTicks || 1}`]);
                     if (st.sticky) stats.push(['Orbs', 'Stick to targets']);
                     if (st.effect === 'laser_sight') stats.push(['Effect', 'Targeting beam']);
+                    if (st.effect === 'mirror_blade') stats.push(['Effect', 'Blade cuts deflect bullets']);
                     html += `<div class="df-card${owned ? ' lit' : ''}" data-key="${sch.id}"><div class="df-head">`;
                     html += `<div class="note-ico">${sch.icon || '⊕'}</div><div class="grow"><div class="eyebrow">Schematic</div><div class="title">${sch.name}</div><div class="desc">${sch.desc}</div></div>`;
                     html += `<div class="df-shop-side">${owned ? '<span class="df-chip active">✓ Crafted</span>' : `${this._priceHtml(sch.scrapCost, this.scrap, 'Scrap')}<button class="df-btn small" data-craft="${sch.id}"${canAfford ? '' : ' disabled'}>Craft</button>`}</div></div>`;
@@ -71410,21 +71598,43 @@ engineMixin({
                 grid.innerHTML = html;
                 this._shopFlash(grid);
                 grid.querySelectorAll('button[data-craft]').forEach(b => b.addEventListener('click', () => {
-                    const sch = SCHEMATICS.find(x => x.id === b.dataset.craft);
-                    if (!sch || this.scrap < sch.scrapCost) return;
-                    this.scrap -= sch.scrapCost;
-                    const craftedItem = createItemFromRegistry(sch.id, this);
-                    if (craftedItem) this.inventory.addItem(craftedItem);
-                    this.updateUI();
-                    showMessage(`CRAFTED: ${sch.name}`);
-                    audioSys.sfx('ui');
-                    this._shopJust = sch.id;
+                    if (!this.craftSchematic(b.dataset.craft)) return;
+                    this._shopJust = b.dataset.craft;
                     this.openCraftingTable();
                 }));
                 document.getElementById('craft-shop-close').onclick = () => {
                     this._shopShow('craft-shop', false);
                     this.pauseSystem.release('crafting');
                 };
+            },
+
+            /** A schematic is made: an item carried, or (cosmetic) a piece owned to wear */
+            schematicOwned(sch) {
+                return sch.cosmetic ? !!(this.cosmetics && this.cosmetics.isOwned(sch.id)) : this.inventory.items.some(i => i.id === sch.id);
+            },
+
+            /** What a schematic still needs first (its `requires`, by name), or null */
+            schematicNeeds(sch) {
+                if (!sch.requires || (this.cosmetics && this.cosmetics.isOwned(sch.requires))) return null;
+                return COSMETICS_REGISTRY[sch.requires]?.name || sch.requires;
+            },
+
+            /** Craft a schematic by id: spends its scrap and gives the item or piece. False if it can't be made */
+            craftSchematic(id) {
+                const sch = SCHEMATICS.find(x => x.id === id);
+                if (!sch || this.scrap < sch.scrapCost || this.schematicOwned(sch) || this.schematicNeeds(sch)) return false;
+                if (sch.cosmetic) {
+                    if (!this.cosmetics || !COSMETICS_REGISTRY[sch.id]) return false;
+                    this.cosmetics.owned.push(sch.id);
+                } else {
+                    const craftedItem = createItemFromRegistry(sch.id, this);
+                    if (!craftedItem || !this.inventory.addItem(craftedItem)) return false;   // (inventory full: the scrap stays)
+                }
+                this.scrap -= sch.scrapCost;
+                this.updateUI();
+                showMessage(`CRAFTED: ${sch.name}`);
+                audioSys.sfx('ui');
+                return true;
             },
 
         });
@@ -71491,7 +71701,8 @@ engineMixin({
                     inventory: {
                         items: this.inventory?.items?.map(i => i.id) ?? [],
                         equippedWeaponId: this.inventory?.equippedWeaponId ?? null,
-                        equippedAttachmentId: this.inventory?.equippedAttachmentId ?? null,
+                        equippedAttachmentId: this.inventory?.equippedAttachmentId ?? null,   // (the first, for older builds)
+                        equippedAttachments: this.inventory?.equippedAttachments?.slice() ?? [],
                         order: this.inventory?.entryOrder ?? [],
                         weaponMode: this.weaponMode ?? 'normal'
                     },
@@ -71767,6 +71978,13 @@ engineMixin({
                     if (save.inventory.equippedAttachmentId && !ITEM_REGISTRY[save.inventory.equippedAttachmentId]) {
                         warnings.push(`inventory: cleared unknown equipped attachment "${save.inventory.equippedAttachmentId}"`);
                         save.inventory.equippedAttachmentId = null;
+                    }
+                    if (Array.isArray(save.inventory.equippedAttachments)) {
+                        save.inventory.equippedAttachments = save.inventory.equippedAttachments.filter(id => {
+                            if (ITEM_REGISTRY[id]) return true;
+                            warnings.push(`inventory: cleared unknown equipped attachment "${id}"`);
+                            return false;
+                        });
                     }
                 }
 
@@ -72089,14 +72307,12 @@ engineMixin({
                             }
                         }
                         
-                        // Restore equipped attachment
-                        if (invData.equippedAttachmentId) {
-                            const attachItem = this.inventory.items.find(i => i.id === invData.equippedAttachmentId);
-                            if (attachItem) {
-                                this.inventory.equippedAttachmentId = invData.equippedAttachmentId;
-                                console.log(`[LOAD] Equipped attachment: ${attachItem.name}`);
-                            }
-                        }
+                        // Restore equipped attachments (up to two; older saves name one)
+                        const attachIds = Array.isArray(invData.equippedAttachments) ? invData.equippedAttachments
+                            : invData.equippedAttachmentId ? [invData.equippedAttachmentId] : [];
+                        this.inventory.equippedAttachments = [...new Set(attachIds)]
+                            .filter(id => this.inventory.items.some(i => i.id === id && i.type === 'attachment'))
+                            .slice(0, this.inventory.maxAttachments);
                         
                         // Render once after cosmetics and all ownership data restore below.
                     }
@@ -73977,8 +74193,7 @@ engineMixin({
                 if (this._laserKey === key) return this._laserGeom;
                 this._laserKey = key;
                 this._laserGeom = null;
-                const attach = this.inventory.getEquippedAttachment();
-                if (attach?.effect !== 'laser_sight' || !this.player.visible) return null;
+                if (!this.inventory.hasAttachment('laser_sight') || !this.player.visible) return null;
                 if (!(this.weaponMode === 'normal' || this.weaponMode === 'sniper') || (this.weaponHolstered && !this._quickDraw && !this.isDriving)) return null;
                 if (!this.isDriving && (!this.player._muzzleLocal || !this.player._muzzleReady)) return null;
                 const shot = this.getPlayerShotGeometry();
@@ -76109,6 +76324,7 @@ engineMixin({
                 // Wall/building/prop collisions handled by CollisionSystem.
                 // Actor collisions (player/enemies) use onProjectileHit() callbacks.
                 this.profiler.start('Physics:Proj');
+                this.deflectShots();                                   // the Mirror Blade's cut, the Mirrored Glass's shield (engine/status-effects.js)
                 
                 // ── ORPHAN SWEEP ──
                 // Catch any ProjectileEntity stuck in the GameEntity registry that isn't 
@@ -77873,6 +78089,7 @@ engineMixin({
                     this.drawMuzzleStars(this.ctx);                          // the flash's star at each muzzle
                     this.drawShotFx(this.ctx, cullBounds.world);             // barrel smoke, embers, golden wisps (engine/combat-effects.js)
                     this.drawSlashes(this.ctx);                              // a blade's gold arc (engine/status-effects.js)
+                    this.drawMirrorShield(this.ctx);                         // the Mirrored Glass turning a shot
                 }
 
                 if (RenderStats.timed) this._entLap('Entities: Effects');

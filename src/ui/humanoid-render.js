@@ -2379,7 +2379,7 @@
                     // the retract). Sniper models sit 2px lower in the hand, matching NPCs.
                     if (game.weaponMode === 'normal' || game.weaponMode === 'sniper') {
                         const wy = wyBase + (weaponId.includes('sniper') ? 2 : 0);
-                        const laser = game.inventory && game.inventory.getEquippedAttachment()?.effect === 'laser_sight';
+                        const laser = !!(game.inventory && game.inventory.hasAttachment('laser_sight'));
                         // the finisher's twirl (engine/finisher.js): the gun spins round her trigger finger
                         const tw = game.twirlAngle ? game.twirlAngle() : 0;
                         drawWeapon(ctx, weaponId, wx, wy, tw, scale, laser && !tw);
@@ -2845,7 +2845,7 @@
                 if (held.hand === 'left') { hX = lFistX; hY = lFistY; } else { hX = rFistX; hY = rFistY; }
                 // 'champagne_glass' is the legacy id (NPC configs); it's the glass with champagne
                 if (held.type === 'glass' || held.type === 'champagne_glass') {
-                    drawHeldGlass(ctx, hX, hY, held.drink || 'champagne', entity, held.hand);
+                    drawHeldGlass(ctx, hX, hY, held.drink || 'champagne', entity, held.hand, held.mirror);
                 } else if (held.type === 'parcel' && held.tucked && !isDrivingCfg(config)) {
                     ctx.save(); ctx.translate(-1.5, -12.5); ctx.rotate(0.12);           // against her left side, under the arm
                     drawCozyParcel(ctx, 10, 6.5, 0.6);
@@ -2924,7 +2924,7 @@
             ctx.beginPath(); ctx.moveTo(hx - hs * 0.6, -hs * 1.1); ctx.lineTo(hx + hs * 1.1, 0); ctx.lineTo(hx - hs * 0.6, hs * 1.1); ctx.closePath(); ctx.fill();
         }
 
-        function drawHeldGlass(ctx, hX, hY, drinkId, owner, hand) {
+        function drawHeldGlass(ctx, hX, hY, drinkId, owner, hand, mirror = false) {
             const D = GLASS_DRINKS[drinkId] || GLASS_DRINKS.champagne;
             const TAU = Math.PI * 2, R = D.rim;
             const side = hand === 'left' ? -1 : 1;
@@ -3057,6 +3057,14 @@
             if (D.glass === 'tumbler' || D.glass === 'soda') {  // thick glass: second inner ring
                 ctx.strokeStyle = 'rgba(245,252,255,0.35)'; ctx.lineWidth = 0.4;
                 ctx.beginPath(); ctx.arc(0, 0, R * 0.84, 0, TAU); ctx.stroke();
+            }
+            if (mirror) {                                       // the Mirrored Glass: a silvered band round the rim, a bright arc of it toward the light
+                ctx.strokeStyle = '#8f9aa8'; ctx.lineWidth = 1.1;
+                ctx.beginPath(); ctx.arc(0, 0, R + 0.5, 0, TAU); ctx.stroke();
+                ctx.strokeStyle = '#f4f8ff'; ctx.lineWidth = 0.8;
+                ctx.beginPath(); ctx.arc(0, 0, R + 0.5, light - 0.9, light + 0.9); ctx.stroke();
+                ctx.strokeStyle = 'rgba(40,48,64,0.6)'; ctx.lineWidth = 0.6;
+                ctx.beginPath(); ctx.arc(0, 0, R + 0.5, light + Math.PI - 0.6, light + Math.PI + 0.6); ctx.stroke();
             }
             // Specular crescent + pin highlight on the lit side
             ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = 0.7; ctx.lineCap = 'round';

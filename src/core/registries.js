@@ -157,6 +157,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // ─── A.C.C.E.S.S.O.R.I.E.S (held items; optional slot; may have options) ───
             'acc_umbrella':        { id: 'acc_umbrella',        category: 'accessory', name: 'Moonlit Umbrella', desc: 'Lavender canopy, gold tips. Opens itself when it rains.', price: 250, data: { held: 'umbrella', hand: 'right', color: '#9d8cc8', trim: '#e8c27a' } },
             'acc_glass':           { id: 'acc_glass',           category: 'accessory', name: 'Crystal Glass',  desc: 'Something to sip on. Choose your pour.',                price: 0,    data: { held: 'glass', hand: 'right' }, options: { drink: 'champagne' }, default: true },
+            // Crafted at the workbench from the Crystal Glass (story/missions.js SCHEMATICS), never sold: all her damage
+            // ×1.35, and a shield that turns enemy shots back (engine/status-effects.js MIRROR)
+            'acc_mirror_glass':    { id: 'acc_mirror_glass',    category: 'accessory', name: 'Mirrored Glass', desc: 'The Crystal Glass, silvered. All damage +35%; turns 90 damage of shots back, then recharges.', price: 0, crafted: true, data: { held: 'glass', hand: 'right', mirror: true }, options: { drink: 'champagne' } },
 
             // ─── S.K.I.N.s (skin tone / look) ───
             'skin_caramel':        { id: 'skin_caramel',        category: 'skin',  name: 'Radiant Caramel',     desc: 'Warm caramel. 949\'s natural tone.',                  price: 0,    data: { skinColor: '#c68e63' }, default: true },
@@ -292,7 +295,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             /** Purchase a cosmetic. Returns true on success. */
             buy(id, game) {
                 const entry = COSMETICS_REGISTRY[id];
-                if (!entry || this.isOwned(id)) return false;
+                if (!entry || this.isOwned(id) || entry.crafted) return false;      // crafted pieces come from the workbench
                 if (game.currency < entry.price) return false;
                 game.currency -= entry.price;
                 this.owned.push(id);
@@ -371,7 +374,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const acc = this.equippedAccessory ? COSMETICS_REGISTRY[this.equippedAccessory] : null;
                 let held = null;
                 if (acc && acc.data.held === 'glass') {
-                    held = { type: 'glass', hand: acc.data.hand || 'right', drink: this.getAccessoryOption(acc.id, 'drink') || 'champagne' };
+                    held = { type: 'glass', hand: acc.data.hand || 'right', drink: this.getAccessoryOption(acc.id, 'drink') || 'champagne', mirror: !!acc.data.mirror };
                 } else if (acc && acc.data.held === 'umbrella') {
                     held = { type: 'umbrella', hand: acc.data.hand || 'right', color: acc.data.color, trim: acc.data.trim };
                 }

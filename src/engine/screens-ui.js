@@ -588,7 +588,8 @@
                         html += `<div class="df-swatch" style="${swatchOf(item, category)}"></div>`;
                         html += `<div class="grow"><div class="title">${item.name}</div><div class="desc">${item.desc}</div></div>`;
                         html += `<div class="df-shop-side">`;
-                        if (!owned) html += `${this._priceHtml(item.price, this.currency)}<button class="df-btn small" data-act="buy"${afford ? '' : ' disabled'}>Buy</button>`;
+                        if (!owned && item.crafted) html += `<span class="df-chip">Crafted at home</span>`;
+                        else if (!owned) html += `${this._priceHtml(item.price, this.currency)}<button class="df-btn small" data-act="buy"${afford ? '' : ' disabled'}>Buy</button>`;
                         else if (!equipped) html += `<span class="df-chip">Owned</span><button class="df-btn small ghost" data-act="equip">Equip</button>`;
                         else html += `<span class="df-chip active">● Active</span>${optional ? '<button class="df-btn small danger" data-act="remove">Remove</button>' : ''}`;
                         html += `</div></div>`;
@@ -986,8 +987,8 @@
 
                 const weapId = this.inventory?.equippedWeaponId;
                 const weapName = weapId && typeof ITEM_REGISTRY !== 'undefined' && ITEM_REGISTRY[weapId] ? ITEM_REGISTRY[weapId].name : 'Unarmed';
-                const attId = this.inventory?.equippedAttachmentId;
-                const attName = attId && typeof ITEM_REGISTRY !== 'undefined' && ITEM_REGISTRY[attId] ? ITEM_REGISTRY[attId].name : 'None';
+                const attIds = this.inventory?.equippedAttachments || [];
+                const attName = attIds.map(id => typeof ITEM_REGISTRY !== 'undefined' && ITEM_REGISTRY[id] ? ITEM_REGISTRY[id].name : null).filter(Boolean).join(', ') || 'None';
 
                 html += `<div class="df-rows" style="margin-top:8px;">`;
                 html += statRow('Speed', baseSpeed, finalSpeed, '', false);
@@ -995,7 +996,7 @@
                 html += statRow('Flit Cost', baseFlitCost, finalFlitCost, '/ 120', true);
                 html += statRow('Detection', baseDetect, finalDetect, '×', true);
                 html += row('Weapon', weapName);
-                html += row('Attachment', attName);
+                html += row(attIds.length > 1 ? 'Attachments' : 'Attachment', attName);
                 html += row('Stims', `${this.boosterCount ?? 0} / ${this.getEffectiveMaxBoosters?.() ?? 4}`);
                 html += row('Currency', `${this.currency ?? 0}<span class="unit">PP</span>`);
                 html += row('Scrap', `${this.scrap ?? 0}`);
@@ -1379,18 +1380,23 @@
                 this._shopBalance('craft-shop-balance', this.scrap, 'Scrap');
                 const grid = document.getElementById('craft-shop-grid');
                 let html = `<div class="df-section"><span><span class="glint">◆</span>Schematics</span><span class="count">${SCHEMATICS.length}</span></div>`;
+                const ownsSch = sch => this.schematicOwned(sch), missing = sch => this.schematicNeeds(sch);
                 for (const sch of SCHEMATICS) {
-                    const owned = this.inventory.items.some(i => i.id === sch.id), canAfford = this.scrap >= sch.scrapCost;
+                    const owned = ownsSch(sch), needs = missing(sch), canAfford = this.scrap >= sch.scrapCost && !needs;
                     const reg = (typeof ITEM_REGISTRY !== 'undefined' && ITEM_REGISTRY[sch.id]) || {};
                     // What it is: its registry stats, as label / value rows
                     const stats = [], st = reg.stats || {};
                     if (reg.type) stats.push(['Type', reg.type]);
+                    if (sch.cosmetic) stats.push(['Type', 'accessory']);
+                    if (sch.requires) stats.push(['Needs', COSMETICS_REGISTRY[sch.requires]?.name || sch.requires]);
+                    if (st.gunDamageMult) stats.push(['Bullet damage', `×${st.gunDamageMult}`]);
                     if (st.damage) stats.push(['Damage', st.damage]);
                     if (st.fireRate) stats.push(['Fire delay', st.fireRate + '<span class="unit">ticks</span>']);
                     if (st.recoil) stats.push(['Recoil', st.recoil]);
                     if (st.dotDamage) stats.push(['Burn', `${st.dotDamage} × ${st.dotTicks || 1}`]);
                     if (st.sticky) stats.push(['Orbs', 'Stick to targets']);
                     if (st.effect === 'laser_sight') stats.push(['Effect', 'Targeting beam']);
+                    if (st.effect === 'mirror_blade') stats.push(['Effect', 'Blade cuts deflect bullets']);
                     html += `<div class="df-card${owned ? ' lit' : ''}" data-key="${sch.id}"><div class="df-head">`;
                     html += `<div class="note-ico">${sch.icon || '⊕'}</div><div class="grow"><div class="eyebrow">Schematic</div><div class="title">${sch.name}</div><div class="desc">${sch.desc}</div></div>`;
                     html += `<div class="df-shop-side">${owned ? '<span class="df-chip active">✓ Crafted</span>' : `${this._priceHtml(sch.scrapCost, this.scrap, 'Scrap')}<button class="df-btn small" data-craft="${sch.id}"${canAfford ? '' : ' disabled'}>Craft</button>`}</div></div>`;
@@ -1404,21 +1410,43 @@
                 grid.innerHTML = html;
                 this._shopFlash(grid);
                 grid.querySelectorAll('button[data-craft]').forEach(b => b.addEventListener('click', () => {
-                    const sch = SCHEMATICS.find(x => x.id === b.dataset.craft);
-                    if (!sch || this.scrap < sch.scrapCost) return;
-                    this.scrap -= sch.scrapCost;
-                    const craftedItem = createItemFromRegistry(sch.id, this);
-                    if (craftedItem) this.inventory.addItem(craftedItem);
-                    this.updateUI();
-                    showMessage(`CRAFTED: ${sch.name}`);
-                    audioSys.sfx('ui');
-                    this._shopJust = sch.id;
+                    if (!this.craftSchematic(b.dataset.craft)) return;
+                    this._shopJust = b.dataset.craft;
                     this.openCraftingTable();
                 }));
                 document.getElementById('craft-shop-close').onclick = () => {
                     this._shopShow('craft-shop', false);
                     this.pauseSystem.release('crafting');
                 };
+            },
+
+            /** A schematic is made: an item carried, or (cosmetic) a piece owned to wear */
+            schematicOwned(sch) {
+                return sch.cosmetic ? !!(this.cosmetics && this.cosmetics.isOwned(sch.id)) : this.inventory.items.some(i => i.id === sch.id);
+            },
+
+            /** What a schematic still needs first (its `requires`, by name), or null */
+            schematicNeeds(sch) {
+                if (!sch.requires || (this.cosmetics && this.cosmetics.isOwned(sch.requires))) return null;
+                return COSMETICS_REGISTRY[sch.requires]?.name || sch.requires;
+            },
+
+            /** Craft a schematic by id: spends its scrap and gives the item or piece. False if it can't be made */
+            craftSchematic(id) {
+                const sch = SCHEMATICS.find(x => x.id === id);
+                if (!sch || this.scrap < sch.scrapCost || this.schematicOwned(sch) || this.schematicNeeds(sch)) return false;
+                if (sch.cosmetic) {
+                    if (!this.cosmetics || !COSMETICS_REGISTRY[sch.id]) return false;
+                    this.cosmetics.owned.push(sch.id);
+                } else {
+                    const craftedItem = createItemFromRegistry(sch.id, this);
+                    if (!craftedItem || !this.inventory.addItem(craftedItem)) return false;   // (inventory full: the scrap stays)
+                }
+                this.scrap -= sch.scrapCost;
+                this.updateUI();
+                showMessage(`CRAFTED: ${sch.name}`);
+                audioSys.sfx('ui');
+                return true;
             },
 
         });

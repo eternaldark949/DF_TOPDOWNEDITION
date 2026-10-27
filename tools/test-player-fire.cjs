@@ -36,7 +36,7 @@ test('Scope engages while driving, even if the on-foot gun was holstered',`
  assert.equal(r.on,true);assert.ok(r.k>0);assert.equal(r.off,false);
 });
 test('Laser sight uses the same vehicle muzzle and direction as a projectile',`
- game.isDriving=true;game.inventory.getEquippedAttachment=()=>({effect:'laser_sight'});game._laserKey=null;
+ game.isDriving=true;game.inventory.hasAttachment=e=>e==='laser_sight';game._laserKey=null;
  const g=game.getPlayerShotGeometry(),laser=game.getLaserSight();return {g,laser};`,r=>{
  assert.equal(r.laser.x0,r.g.x);assert.equal(r.laser.y0,r.g.y);assert.equal(r.laser.angle,r.g.angle);
 });
