@@ -1097,6 +1097,11 @@
                     this._updateValueEl(id, GameSettings[key] ? 'on' : 'off');
                 this._updateValueEl('set-softshadows', GameSettings.softShadows ? 'on' : 'off');
                 this._updateValueEl('set-bloom', GameSettings.bloom ? 'on' : 'off');
+                this._updateValueEl('set-fogglare', GameSettings.fogGlare ? 'on' : 'off');
+                this._updateValueEl('set-starglare', GameSettings.starGlare ? 'on' : 'off');
+                this._updateValueEl('set-streetfog', GameSettings.streetFog ? 'on' : 'off');
+                this._updateValueEl('set-lampsparks', GameSettings.lampSparks ? 'on' : 'off');
+                this._updateValueEl('set-shoplight', GameSettings.shopLight ? 'on' : 'off');
                 this._updateValueEl('set-wetreflections', GameSettings.reflections || 'high');
                 this._updateValueEl('set-lampshadows', GameSettings.lampShadows || 'low');
                 this._updateValueEl('set-atmosphere', GameSettings.atmosphereTint || 'off');
@@ -1167,6 +1172,10 @@
                 } else if (key === 'bloom') {
                     GameSettings.bloom = !GameSettings.bloom;
                     this._updateValueEl(el.id, GameSettings.bloom ? 'on' : 'off');
+
+                } else if (key === 'fogGlare' || key === 'starGlare' || key === 'streetFog' || key === 'lampSparks' || key === 'shopLight') {
+                    GameSettings[key] = !GameSettings[key];
+                    this._updateValueEl(el.id, GameSettings[key] ? 'on' : 'off');
                     
                 } else if (key === 'reflections') {
                     const order = ['ultra', 'high', 'medium', 'off'];
