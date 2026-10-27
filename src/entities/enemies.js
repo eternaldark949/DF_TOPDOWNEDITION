@@ -1491,6 +1491,7 @@
                     this.knockbackVx *= this.knockbackFriction;
                     this.knockbackVy *= this.knockbackFriction;
                 }
+                if (this._slipUntil && _gameTimeSec < this._slipUntil) return null;   // slipped in a spill (engine/spills.js): no step, no shot
                 
                 const distToPlayer = Math.hypot(player.x - this.x, player.y - this.y);
                 const isVisible = player.visible && !player.isHidden;

@@ -57,7 +57,8 @@
                 const byPlayer = by === this.player, byTeammate = !!(by && by.role === 'teammate');
                 const { amount, tags } = this.resonance.scoreKill(enemy, {
                     byPlayer, byTeammate, melee: !!enemy.lastHitMelee, now: _gameTimeSec,
-                    lastFlitAt: this.flitState.lastFlitAt ?? -99, lastHurtAt: this.lastHurtAt ?? -99 });
+                    lastFlitAt: this.flitState.lastFlitAt ?? -99, lastHurtAt: this.lastHurtAt ?? -99,
+                    drinkLevel: this.heldDrink() ? this.cosmetics.drinkLevel : -1 });
                 if (amount > 0) this.earnResonance(amount, tags.join(' '), enemy.x, enemy.y - 26);
                 // Dark Element: rare shards from the toughest foes
                 const tough = (typeof GatlingGunner !== 'undefined' && enemy instanceof GatlingGunner) ? 0.25 : (enemy._restrictedZoneId ? 0.04 : 0);

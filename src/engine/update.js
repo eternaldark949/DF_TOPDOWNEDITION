@@ -288,6 +288,7 @@
                 this.cafeLife.update(this);
                 Walker.update(this);               // everyone else on a goTo walk (world/walker.js)
                 this.updateNpcPosts();             // shoved off their post: back they go (engine/npc-posts.js)
+                this.updateSpillSlips();           // Grounded: gangers slip in her spills (engine/spills.js)
                 if (_simTick % 60 === 0) {                                // lost things (lobby, club) refill daily
                     if (this._lostMap !== this.activeMap) { this._lostMap = this.activeMap; this._hasLost = this.props.some(p => p.interactionType === 'lost_luggage'); }
                     if (this._hasLost) this.refreshLostLuggage();

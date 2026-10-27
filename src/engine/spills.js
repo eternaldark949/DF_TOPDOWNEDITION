@@ -5,6 +5,8 @@
         // puddle the colour of the drink (red wine pools dark, champagne gold) with a few drops thrown ahead.
         // The puddles splash underfoot like rain water (engine/footsteps.js), so a trail of rosé gives a
         // sneak away, then dry out. The bar cart at home tops the glass back up (refillGlass).
+        // Skills: Arms' Steady spills less; Frame's Grounded makes gangers slip in her spills; a kill with the
+        // glass still three-quarters full earns POISE Resonance (core/resonance.js scoreKill).
 
         const SPILL = {
             JOLT: 8.5,          // px/tick her step changes in a tick before it slops (a stop is 5.2, a hard turn past ~110°, a reversal 10.4)
@@ -17,7 +19,10 @@
             MAX: 36,            // puddles on a map at once (the oldest dry first)
             LIFE: 75,           // s a puddle lasts…
             FADE: 20,           // …the last of them drying
-            MERGE: 0.8          // a spill landing inside a fresh puddle of the same drink feeds it instead
+            MERGE: 0.8,         // a spill landing inside a fresh puddle of the same drink feeds it instead
+            SLIP_SECS: 0.4,     // Frame: Grounded — a ganger who steps in one slips (+0.2 s a rank)…
+            SLIP_AGAIN: 3,      // …and keeps their footing a while after
+            SLIP_SKID: 2.5
         };
 
         engineMixin({
@@ -57,7 +62,7 @@
                 const now = _gameTimeSec;
                 if (now - (this._lastSpillAt ?? -1e9) < SPILL.COOLDOWN) return 0;
                 this._lastSpillAt = now;
-                const lost = Math.min(C.drinkLevel, amount);
+                const lost = Math.min(C.drinkLevel, this.resonance ? this.resonance.stat('spill', amount) : amount);   // Arms: Steady
                 C.drinkLevel = Math.max(0, C.drinkLevel - lost);
                 const ox = (x ?? this.player.x), oy = (y ?? this.player.y);
                 const r = 4 + Math.sqrt(lost) * 34;                                // 2.5% ≈ 9 px, 7% ≈ 13 px
@@ -87,6 +92,22 @@
                 const now = _gameTimeSec;
                 for (const s of this.spills) if (now - s.born < SPILL.LIFE - SPILL.FADE * 0.5 && Math.hypot(x - s.x, y - s.y) < s.r * 0.9) return true;
                 return false;
+            },
+
+            /** Once a sim tick: with Grounded, a ganger who steps in a spill loses their footing (Ganger.update skips while _slipUntil) */
+            updateSpillSlips() {
+                if (!this.spills || !this.spills.length || !this.resonance || !this.enemies) return;
+                const secs = this.resonance.stat('slipSecs', SPILL.SLIP_SECS); if (!secs) return;
+                const now = _gameTimeSec;
+                for (const e of this.enemies) {
+                    if (e.dead || !(e instanceof Ganger)) continue;
+                    const px = e._slipPX ?? e.x, py = e._slipPY ?? e.y; e._slipPX = e.x; e._slipPY = e.y;
+                    if (now < (e._slipUntil || 0) + SPILL.SLIP_AGAIN || !this._inSpill(e.x, e.y)) continue;
+                    e._slipUntil = now + secs;
+                    const m = Math.hypot(e.x - px, e.y - py);                   // they skid on the way they were going
+                    if (m > 0.05) { e.knockbackVx += (e.x - px) / m * SPILL.SLIP_SKID; e.knockbackVy += (e.y - py) / m * SPILL.SLIP_SKID; }
+                    (this.floatingTexts || (this.floatingTexts = [])).push({ target: null, x: e.x, y: e.y - 24, value: 0, text: 'SLIP!', color: '#f2d57e', t0: now, pop: now, drift: 0 });
+                }
             },
 
             /** The bar cart: top the glass back up */
