@@ -255,6 +255,21 @@
                     rr(x + w * 0.62, y + 8, 14, 9, 2, A.wineLt); circ(x + w * 0.4, y + 12, 4, '#f3e3ea');                     // fruit bowl, glasses
                     break;
                 }
+                case 'apt_bar_cart': {                                     // brass and smoked glass on two wheels: bottles, a decanter, the ice bucket, two coupes
+                    circ(x + 3, y + 2, 3.2, '#1a1416', A.brass, 0.8); circ(x + 3, y + h - 2, 3.2, '#1a1416', A.brass, 0.8);   // wheels, west end
+                    ctx.strokeStyle = A.brass; ctx.lineWidth = 1.6; ctx.lineCap = 'round';                                     // handle, east end
+                    ctx.beginPath(); ctx.moveTo(x + w - 3, y + 2); ctx.quadraticCurveTo(x + w + 5, y + h / 2, x + w - 3, y + h - 2); ctx.stroke(); ctx.lineCap = 'butt';
+                    rr(x, y, w, h, 3, 'rgba(40,30,36,0.92)', A.brass, 1.4);                                                     // smoked-glass tray in its frame
+                    ctx.fillStyle = 'rgba(255,240,220,0.08)'; ctx.fillRect(x + 2, y + 2, w - 4, 2.5);
+                    const bottle = (bx, by, liq) => { circ(bx, by, 3.4, '#14100f', 'rgba(255,255,255,0.18)', 0.6); circ(bx, by, 2.3, liq); circ(bx, by, 1.2, '#c8a27a'); circ(bx - 1.1, by - 1.1, 0.6, 'rgba(255,255,255,0.6)'); };
+                    bottle(x + 7, y + 6, GLASS_DRINKS.red_wine.liquid); bottle(x + 7, y + h - 6, '#2c4a2a'); bottle(x + 14, y + h / 2, GLASS_DRINKS.whiskey.liquid);
+                    circ(x + 22, y + 7, 3.6, 'rgba(225,240,255,0.25)', 'rgba(240,250,255,0.75)', 0.6); circ(x + 22, y + 7, 2.4, GLASS_DRINKS.whiskey.liquid);   // crystal decanter
+                    circ(x + 22, y + 7, 1.1, 'rgba(240,250,255,0.85)');
+                    circ(x + 23, y + h - 7, 4, '#b8bcc8', '#e6e8f0', 0.8); circ(x + 23, y + h - 7, 3, '#dfe9f2');               // ice bucket
+                    ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(x + 21.5, y + h - 8.5, 1.6, 1.6); ctx.fillRect(x + 23.5, y + h - 7, 1.4, 1.4);
+                    for (const gy of [y + 6, y + h - 6]) { circ(x + w - 8, gy, 2.6, 'rgba(220,240,255,0.2)', 'rgba(245,252,255,0.8)', 0.5); }   // two coupes, waiting
+                    break;
+                }
                 case 'apt_stool': {
                     const cx = x + w / 2, cy = y + h / 2;
                     circ(cx, cy, w / 2, A.brass); circ(cx, cy, w / 2 - 2.5, A.wine);

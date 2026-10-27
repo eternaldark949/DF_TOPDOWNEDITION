@@ -6379,6 +6379,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.equippedJewelry = [];          // any number at once
                 this.equippedLegwear = [];          // any number at once (thigh bands, thigh-high heels)
                 this.accessoryOptions = {};         // per-accessory choices, e.g. { acc_glass: { drink: 'red_wine' } }
+                this.drinkLevel = 1;                // how full her glass is (1 full, 0 dry): spills drain it, the bar cart tops it up (engine/spills.js)
                 this.maskMode = 'auto';             // 949's field mask (Neu.Me): 'auto' (in the field, off at home) | 'on' | 'off'
                 // Grant defaults
                 this._grantDefaults();
@@ -6481,7 +6482,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const acc = this.equippedAccessory ? COSMETICS_REGISTRY[this.equippedAccessory] : null;
                 let held = null;
                 if (acc && acc.data.held === 'glass') {
-                    held = { type: 'glass', hand: acc.data.hand || 'right', drink: this.getAccessoryOption(acc.id, 'drink') || 'champagne', mirror: !!acc.data.mirror };
+                    held = { type: 'glass', hand: acc.data.hand || 'right', drink: this.getAccessoryOption(acc.id, 'drink') || 'champagne', mirror: !!acc.data.mirror, level: this.drinkLevel };
                 } else if (acc && acc.data.held === 'umbrella') {
                     held = { type: 'umbrella', hand: acc.data.hand || 'right', color: acc.data.color, trim: acc.data.trim };
                 }
@@ -6524,7 +6525,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     equippedJewelry: [...this.equippedJewelry],
                     equippedLegwear: [...this.equippedLegwear],
                     accessoryOptions: JSON.parse(JSON.stringify(this.accessoryOptions)),
-                    maskMode: this.maskMode
+                    maskMode: this.maskMode,
+                    drinkLevel: this.drinkLevel
                 };
             }
 
@@ -6537,6 +6539,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.equippedOutfit = data.equippedOutfit || null;
                 this.accessoryOptions = data.accessoryOptions || {};
                 this.maskMode = ['auto', 'on', 'off'].includes(data.maskMode) ? data.maskMode : 'auto';
+                this.drinkLevel = Number.isFinite(data.drinkLevel) ? Math.max(0, Math.min(1, data.drinkLevel)) : 1;   // older saves: a full glass
                 // Saves from before hats and jewelry simply have none on
                 this.equippedHat = COSMETICS_REGISTRY[data.equippedHat] ? data.equippedHat : null;
                 this.equippedJewelry = (data.equippedJewelry || []).filter(id => COSMETICS_REGISTRY[id]);
@@ -15120,6 +15123,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         new PropEntity({ x: 30, y: 730, width: 40, height: 60, mass: 1e7, color: '#0f0', interactionType: 'medbay_refill' }),
                         new PropEntity({ x: 1010, y: 216, width: 90, height: 110, color: '#334466', interactionType: 'bed_sleep', decorType: 'apt_bed', mass: 1e7 }),
                         new PropEntity({ x: 750, y: 750, width: 60, height: 35, mass: 1e7, color: '#2a2a3a', interactionType: 'crafting_table', decorType: 'apt_craft' }),
+                        new PropEntity({ x: 600, y: 770, width: 38, height: 22, mass: 1e7, color: '#2a1e24', interactionType: 'bar_cart', decorType: 'apt_bar_cart' }),   // tops up her glass (engine/spills.js)
                         // Living room: lounge
                         F(438, 452, 64, 30, 'apt_coffee'), F(600, 505, 40, 40, 'apt_chair'),
                         F(300, 212, 180, 20, 'apt_bookshelf'), F(640, 212, 140, 22, 'apt_console'),
@@ -18121,6 +18125,21 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.fillStyle = A.walnut; ctx.fillRect(x + 6, y + h - 4, w - 12, 4);
                     for (const u of [0.17, 0.5, 0.83]) { circ(x + w * u, y + h / 2, 7, A.brass, '#9a7c4a', 1); circ(x + w * u, y + h / 2, 3, '#ffe6c4'); }   // pendant shades above
                     rr(x + w * 0.62, y + 8, 14, 9, 2, A.wineLt); circ(x + w * 0.4, y + 12, 4, '#f3e3ea');                     // fruit bowl, glasses
+                    break;
+                }
+                case 'apt_bar_cart': {                                     // brass and smoked glass on two wheels: bottles, a decanter, the ice bucket, two coupes
+                    circ(x + 3, y + 2, 3.2, '#1a1416', A.brass, 0.8); circ(x + 3, y + h - 2, 3.2, '#1a1416', A.brass, 0.8);   // wheels, west end
+                    ctx.strokeStyle = A.brass; ctx.lineWidth = 1.6; ctx.lineCap = 'round';                                     // handle, east end
+                    ctx.beginPath(); ctx.moveTo(x + w - 3, y + 2); ctx.quadraticCurveTo(x + w + 5, y + h / 2, x + w - 3, y + h - 2); ctx.stroke(); ctx.lineCap = 'butt';
+                    rr(x, y, w, h, 3, 'rgba(40,30,36,0.92)', A.brass, 1.4);                                                     // smoked-glass tray in its frame
+                    ctx.fillStyle = 'rgba(255,240,220,0.08)'; ctx.fillRect(x + 2, y + 2, w - 4, 2.5);
+                    const bottle = (bx, by, liq) => { circ(bx, by, 3.4, '#14100f', 'rgba(255,255,255,0.18)', 0.6); circ(bx, by, 2.3, liq); circ(bx, by, 1.2, '#c8a27a'); circ(bx - 1.1, by - 1.1, 0.6, 'rgba(255,255,255,0.6)'); };
+                    bottle(x + 7, y + 6, GLASS_DRINKS.red_wine.liquid); bottle(x + 7, y + h - 6, '#2c4a2a'); bottle(x + 14, y + h / 2, GLASS_DRINKS.whiskey.liquid);
+                    circ(x + 22, y + 7, 3.6, 'rgba(225,240,255,0.25)', 'rgba(240,250,255,0.75)', 0.6); circ(x + 22, y + 7, 2.4, GLASS_DRINKS.whiskey.liquid);   // crystal decanter
+                    circ(x + 22, y + 7, 1.1, 'rgba(240,250,255,0.85)');
+                    circ(x + 23, y + h - 7, 4, '#b8bcc8', '#e6e8f0', 0.8); circ(x + 23, y + h - 7, 3, '#dfe9f2');               // ice bucket
+                    ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(x + 21.5, y + h - 8.5, 1.6, 1.6); ctx.fillRect(x + 23.5, y + h - 7, 1.4, 1.4);
+                    for (const gy of [y + 6, y + h - 6]) { circ(x + w - 8, gy, 2.6, 'rgba(220,240,255,0.2)', 'rgba(245,252,255,0.8)', 0.5); }   // two coupes, waiting
                     break;
                 }
                 case 'apt_stool': {
@@ -23167,6 +23186,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (lastStood) this.invincibleTimer = 60;                 // a moment's grace after Last Stand
                 
                 if (damaged && this._game) {
+                    if (this._game.spillOnHit) this._game.spillOnHit(amount, knockbackX, knockbackY);   // a hit slops her drink (engine/spills.js)
                     // Sync with legacy health system
                     this._game.playerHealth = this.hp;
                     this._game.healthRegenTimer = 0;
@@ -55454,7 +55474,7 @@ Object.assign(TrafficVehicle.prototype, {
                 if (held.hand === 'left') { hX = lFistX; hY = lFistY; } else { hX = rFistX; hY = rFistY; }
                 // 'champagne_glass' is the legacy id (NPC configs); it's the glass with champagne
                 if (held.type === 'glass' || held.type === 'champagne_glass') {
-                    drawHeldGlass(ctx, hX, hY, held.drink || 'champagne', entity, held.hand, held.mirror);
+                    drawHeldGlass(ctx, hX, hY, held.drink || 'champagne', entity, held.hand, held.mirror, held.level ?? 1);
                 } else if (held.type === 'parcel' && held.tucked && !isDrivingCfg(config)) {
                     ctx.save(); ctx.translate(-1.5, -12.5); ctx.rotate(0.12);           // against her left side, under the arm
                     drawCozyParcel(ctx, 10, 6.5, 0.6);
@@ -55533,7 +55553,7 @@ Object.assign(TrafficVehicle.prototype, {
             ctx.beginPath(); ctx.moveTo(hx - hs * 0.6, -hs * 1.1); ctx.lineTo(hx + hs * 1.1, 0); ctx.lineTo(hx - hs * 0.6, hs * 1.1); ctx.closePath(); ctx.fill();
         }
 
-        function drawHeldGlass(ctx, hX, hY, drinkId, owner, hand, mirror = false) {
+        function drawHeldGlass(ctx, hX, hY, drinkId, owner, hand, mirror = false, level = 1) {
             const D = GLASS_DRINKS[drinkId] || GLASS_DRINKS.champagne;
             const TAU = Math.PI * 2, R = D.rim;
             const side = hand === 'left' ? -1 : 1;
@@ -55593,45 +55613,48 @@ Object.assign(TrafficVehicle.prototype, {
             ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
 
             // Liquid — darker at the edge, brighter toward the light (depth)
-            const lr = R * (D.glass === 'martini' ? 0.8 : (D.glass === 'tumbler' || D.glass === 'soda') ? 0.78 : D.glass === 'flute' ? 0.7 : 0.74);
-            const g = ctx.createRadialGradient(sx + lx * lr * 0.35, sy + ly * lr * 0.35, 0, sx, sy, lr);
-            g.addColorStop(0, D.liquid2 ? '#ffffff' : lightenHex(D.liquid, 70));
-            g.addColorStop(0.35, D.liquid);
-            g.addColorStop(1, D.liquid2 || darkenHex(D.liquid, 40));
-            if (D.glow) { ctx.shadowColor = D.liquid; ctx.shadowBlur = 6; }
-            ctx.fillStyle = g;
-            ctx.beginPath(); ctx.arc(sx, sy, lr, 0, TAU); ctx.fill();
-            ctx.shadowBlur = 0;
-            // Meniscus: a bright hairline where liquid meets glass
-            ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 0.35;
-            ctx.beginPath(); ctx.arc(sx, sy, lr, 0, TAU); ctx.stroke();
+            const lr = R * (D.glass === 'martini' ? 0.8 : (D.glass === 'tumbler' || D.glass === 'soda') ? 0.78 : D.glass === 'flute' ? 0.7 : 0.74)
+                     * (0.4 + 0.6 * Math.min(1, level));             // a lower pour sits deeper in the bowl: a smaller round seen from above
+            if (level > 0.02) {                                 // (a dry glass: just the glass)
+                const g = ctx.createRadialGradient(sx + lx * lr * 0.35, sy + ly * lr * 0.35, 0, sx, sy, lr);
+                g.addColorStop(0, D.liquid2 ? '#ffffff' : lightenHex(D.liquid, 70));
+                g.addColorStop(0.35, D.liquid);
+                g.addColorStop(1, D.liquid2 || darkenHex(D.liquid, 40));
+                if (D.glow) { ctx.shadowColor = D.liquid; ctx.shadowBlur = 6; }
+                ctx.fillStyle = g;
+                ctx.beginPath(); ctx.arc(sx, sy, lr, 0, TAU); ctx.fill();
+                ctx.shadowBlur = 0;
+                // Meniscus: a bright hairline where liquid meets glass
+                ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 0.35;
+                ctx.beginPath(); ctx.arc(sx, sy, lr, 0, TAU); ctx.stroke();
 
-            const t = _gameTimeSec;
-            if (D.foam) {                                       // creamy head around the edge
-                ctx.fillStyle = 'rgba(255,246,240,0.9)';
-                for (let i = 0; i < 10; i++) {
-                    const a = (i / 10) * Math.PI * 2 + 0.3;
-                    ctx.beginPath(); ctx.arc(sx + Math.cos(a) * lr * 0.82, sy + Math.sin(a) * lr * 0.82, lr * (0.2 + (i % 3) * 0.04), 0, Math.PI * 2); ctx.fill();
+                const t = _gameTimeSec;
+                if (D.foam) {                                       // creamy head around the edge
+                    ctx.fillStyle = 'rgba(255,246,240,0.9)';
+                    for (let i = 0; i < 10; i++) {
+                        const a = (i / 10) * Math.PI * 2 + 0.3;
+                        ctx.beginPath(); ctx.arc(sx + Math.cos(a) * lr * 0.82, sy + Math.sin(a) * lr * 0.82, lr * (0.2 + (i % 3) * 0.04), 0, Math.PI * 2); ctx.fill();
+                    }
                 }
-            }
-            if (D.bubbles) {                                   // rising bubbles
-                ctx.fillStyle = 'rgba(255,255,255,0.85)';
-                for (let i = 0; i < 4; i++) {
-                    const ph = (t * 0.8 + i * 0.27) % 1;
-                    const ang = i * 2.1 + t * 0.6;
-                    const rr = lr * (0.15 + 0.55 * ph);
-                    ctx.globalAlpha = a0 * (1 - ph) * 0.9;
-                    ctx.beginPath(); ctx.arc(sx + Math.cos(ang) * rr, sy + Math.sin(ang) * rr, 0.35, 0, TAU); ctx.fill();
+                if (D.bubbles) {                                   // rising bubbles
+                    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+                    for (let i = 0; i < 4; i++) {
+                        const ph = (t * 0.8 + i * 0.27) % 1;
+                        const ang = i * 2.1 + t * 0.6;
+                        const rr = lr * (0.15 + 0.55 * ph);
+                        ctx.globalAlpha = a0 * (1 - ph) * 0.9;
+                        ctx.beginPath(); ctx.arc(sx + Math.cos(ang) * rr, sy + Math.sin(ang) * rr, 0.35, 0, TAU); ctx.fill();
+                    }
+                    ctx.globalAlpha = a0;
                 }
-                ctx.globalAlpha = a0;
-            }
-            if (D.ice) {                                        // two cubes, drifting slowly
-                for (let i = 0; i < 2; i++) {
-                    const ang = t * 0.5 + i * Math.PI, rr = lr * 0.35;
-                    ctx.save(); ctx.translate(sx + Math.cos(ang) * rr, sy + Math.sin(ang) * rr); ctx.rotate(ang * 0.7 + i);
-                    ctx.fillStyle = 'rgba(235,248,255,0.55)'; ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 0.3;
-                    ctx.beginPath(); ctx.roundRect(-1.1, -1.1, 2.2, 2.2, 0.5); ctx.fill(); ctx.stroke();
-                    ctx.restore();
+                if (D.ice) {                                        // two cubes, drifting slowly
+                    for (let i = 0; i < 2; i++) {
+                        const ang = t * 0.5 + i * Math.PI, rr = lr * 0.35;
+                        ctx.save(); ctx.translate(sx + Math.cos(ang) * rr, sy + Math.sin(ang) * rr); ctx.rotate(ang * 0.7 + i);
+                        ctx.fillStyle = 'rgba(235,248,255,0.55)'; ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 0.3;
+                        ctx.beginPath(); ctx.roundRect(-1.1, -1.1, 2.2, 2.2, 0.5); ctx.fill(); ctx.stroke();
+                        ctx.restore();
+                    }
                 }
             }
             if (D.garnish === 'olive') {                        // olive on a pick
@@ -59688,6 +59711,7 @@ Object.assign(TrafficVehicle.prototype, {
             { id: 'apt_fireplace', name: 'Fireplace', quantity: 1, icon: '♨', description: 'Linear glass fireplace set into a stone surround.' },
             { id: 'apt_floor_lamp', name: 'Floor Lamp', quantity: 3, icon: '◉', description: 'Cream floor lamps with brass trim.' },
             { id: 'apt_plant', name: 'Plant', quantity: 6, icon: '♣', description: 'Potted foliage throughout the living room, bedroom and bathroom.' },
+            { id: 'apt_bar_cart', name: 'Bar Cart', quantity: 1, icon: '◍', description: 'Brass and smoked-glass bar cart with bottles, a decanter and an ice bucket. Tops up her glass.' },
             { id: 'apt_craft', name: 'Crafting Table', quantity: 1, icon: '⚒', description: 'Walnut and steel workbench with tools, a vise and a schematic tablet.' },
             { id: 'apt_fridge', name: 'Refrigerator', quantity: 1, icon: '▣', description: 'Metal-finished refrigerator with brass trim.' },
             { id: 'apt_sink', name: 'Kitchen Sink', quantity: 1, icon: '◡', description: 'Kitchen sink set into cream quartz with a brass tap.' },
@@ -63642,6 +63666,8 @@ Object.assign(TrafficVehicle.prototype, {
                         this.openSleepMenu();
                     } else if(this.activeInteraction.interactionType === 'crafting_table') {
                         this.openCraftingTable();
+                    } else if(this.activeInteraction.interactionType === 'bar_cart') {
+                        this.refillGlass();                            // (engine/spills.js)
                     } else if(this.activeInteraction.interactionType === 'armory') {
                         // Open the menu straight on the inventory
                         Screens.open('inventory');
@@ -67620,6 +67646,7 @@ engineMixin({
             materialAt(x, y) {
                 const map = this.activeMap; if (!map) return 'concrete';
                 if (this._inPuddle && this._inPuddle(x, y) > 0.2) return 'water';
+                if (this._inSpill(x, y)) return 'water';                          // spilt drink (engine/spills.js)
                 const surf = this._surfaces && this._surfaces();
                 if (surf) for (const [wx, wy, r] of surf.water) if (Math.hypot(x - wx, y - wy) < r) return 'water';
                 const F = FLOOR_MATERIALS[map.id];
@@ -68381,6 +68408,155 @@ engineMixin({
                         onArrive: () => { n._postReturn = null; n._postLX = n.x; n._postLY = n.y; },
                         onFail: () => { n._postReturn = null; n._postRetry = _gameTimeSec + NPC_POST.RETRY; n._postLX = n.x; n._postLY = n.y; }
                     });
+                }
+            }
+        });
+        // GameEngine — Spills. Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        //
+        // Her glass (the Crystal Glass, the Mirrored Glass) holds a pour: cosmetics.drinkLevel, 1 full, 0 dry.
+        // A hard turn or a reversal, a Flit, a hit: it slops over the rim, a little each time, and lands as a
+        // puddle the colour of the drink (red wine pools dark, champagne gold) with a few drops thrown ahead.
+        // The puddles splash underfoot like rain water (engine/footsteps.js), so a trail of rosé gives a
+        // sneak away, then dry out. The bar cart at home tops the glass back up (refillGlass).
+
+        const SPILL = {
+            JOLT: 8.5,          // px/tick her step changes in a tick before it slops (a stop is 5.2, a hard turn past ~110°, a reversal 10.4)
+            JOLT_COST: 0.025,   // of a full glass, at the threshold; up to twice that for a full reversal
+            FLIT_COST: 0.035,
+            HIT_COST: 0.02,     // + per point of damage (HIT_PER), capped at HIT_MAX
+            HIT_PER: 0.0012,
+            HIT_MAX: 0.07,
+            COOLDOWN: 0.35,     // s between spills
+            MAX: 36,            // puddles on a map at once (the oldest dry first)
+            LIFE: 75,           // s a puddle lasts…
+            FADE: 20,           // …the last of them drying
+            MERGE: 0.8          // a spill landing inside a fresh puddle of the same drink feeds it instead
+        };
+
+        engineMixin({
+            /** The drink in her hand, or null (no glass, in a car, hidden) */
+            heldDrink() {
+                const C = this.cosmetics, acc = C && C.equippedAccessory ? COSMETICS_REGISTRY[C.equippedAccessory] : null;
+                if (!acc || acc.data.held !== 'glass' || this.isDriving || !this.player || !this.player.visible) return null;
+                return GLASS_DRINKS[C.getAccessoryOption(acc.id, 'drink')] || GLASS_DRINKS.champagne;
+            },
+
+            /** Once a sim tick, after her step: a sharp change of direction slops the glass */
+            updateSpills() {
+                const pl = this.player; if (!pl) return;
+                const sp = pl.getCurrentSpeed() * (pl.moveMul ?? 1) * (this.sneaking ? SNEAK.SPEED : 1);
+                const ux = (pl.velX || 0) * sp, uy = (pl.velY || 0) * sp;
+                const prev = this._spillStep;
+                this._spillStep = { x: ux, y: uy, tick: _simTick };
+                if (!prev || _simTick - prev.tick > 1) return;
+                const jolt = Math.hypot(ux - prev.x, uy - prev.y);
+                if (jolt < SPILL.JOLT) return;
+                const pm = Math.hypot(prev.x, prev.y) || 1;
+                // The drink keeps going the way she was going
+                this.spillDrink(SPILL.JOLT_COST * Math.min(2, 1 + (jolt - SPILL.JOLT) / 2), prev.x / pm, prev.y / pm);
+            },
+
+            /** She took a hit: the harder, the more goes over (knockback, if any, sets the way it flies) */
+            spillOnHit(amount, kx = 0, ky = 0) {
+                if (!(amount > 0)) return;
+                const k = Math.hypot(kx, ky), a = k > 0.01 ? Math.atan2(ky, kx) : Math.random() * Math.PI * 2;
+                this.spillDrink(Math.min(SPILL.HIT_MAX, SPILL.HIT_COST + amount * SPILL.HIT_PER + k * 0.004), Math.cos(a), Math.sin(a));
+            },
+
+            /** Slop `amount` of a full glass the way (dx, dy), from where she stood (or (x, y)). Returns what went over. */
+            spillDrink(amount, dx, dy, x, y) {
+                const D = this.heldDrink(), C = this.cosmetics;
+                if (!D || !(C.drinkLevel > 0)) return 0;
+                const now = _gameTimeSec;
+                if (now - (this._lastSpillAt ?? -1e9) < SPILL.COOLDOWN) return 0;
+                this._lastSpillAt = now;
+                const lost = Math.min(C.drinkLevel, amount);
+                C.drinkLevel = Math.max(0, C.drinkLevel - lost);
+                const ox = (x ?? this.player.x), oy = (y ?? this.player.y);
+                const r = 4 + Math.sqrt(lost) * 34;                                // 2.5% ≈ 9 px, 7% ≈ 13 px
+                const px = ox + dx * (10 + r * 0.6), py = oy + dy * (10 + r * 0.6);
+                const spills = this.spills || (this.spills = []);
+                const merge = spills.find(s => s.color === D.liquid && now - s.born < SPILL.LIFE - SPILL.FADE && Math.hypot(s.x - px, s.y - py) < s.r * SPILL.MERGE);
+                const drops = [];
+                const n = 2 + Math.floor(Math.random() * 3);
+                for (let i = 0; i < n; i++) {
+                    const a = Math.atan2(dy, dx) + (Math.random() - 0.5) * 0.9, d = r * (1.1 + Math.random() * 1.3);
+                    drops.push({ x: px + Math.cos(a) * d, y: py + Math.sin(a) * d, r: 0.9 + Math.random() * 1.4 });
+                }
+                if (merge) {
+                    merge.r = Math.min(30, Math.hypot(merge.r, r * 0.8)); merge.born = now; merge.drops.push(...drops.slice(0, 2));
+                    merge.ox = ox; merge.oy = oy; merge.splash = now;
+                } else {
+                    if (spills.length >= SPILL.MAX) spills.shift();
+                    spills.push({ x: px, y: py, r, color: D.liquid, color2: D.liquid2 || null, glow: !!D.glow, born: now, splash: now, ox, oy,
+                                  seed: Math.random() * 1000, a: Math.atan2(dy, dx), drops, map: this.activeMap ? this.activeMap.id : null });
+                }
+                return lost;
+            },
+
+            /** How wet (x, y) is with spilt drink: true inside a puddle that hasn't dried (footsteps splash) */
+            _inSpill(x, y) {
+                if (!this.spills || !this.spills.length) return false;
+                const now = _gameTimeSec;
+                for (const s of this.spills) if (now - s.born < SPILL.LIFE - SPILL.FADE * 0.5 && Math.hypot(x - s.x, y - s.y) < s.r * 0.9) return true;
+                return false;
+            },
+
+            /** The bar cart: top the glass back up */
+            refillGlass() {
+                const D = this.heldDrink();
+                if (!D) { showMessage(this.cosmetics.equippedAccessory ? 'NOTHING TO POUR INTO' : 'HOLD A GLASS TO POUR (NEU.ME)'); audioSys.sfx('ui'); return false; }
+                if (this.cosmetics.drinkLevel >= 0.999) { showMessage(`${D.name.toUpperCase()}: ALREADY FULL`); return false; }
+                this.cosmetics.drinkLevel = 1;
+                showMessage(`${D.name.toUpperCase()}: TOPPED UP`);
+                audioSys.sfx('ui');
+                return true;
+            },
+
+            /** The puddles, on the floor under everyone (after the decals) */
+            drawSpills(ctx, cb) {
+                const S = this.spills; if (!S || !S.length) return;
+                const now = _gameTimeSec, TAU = Math.PI * 2, mapId = this.activeMap ? this.activeMap.id : null;
+                for (let i = S.length - 1; i >= 0; i--) {
+                    const s = S[i], age = now - s.born;
+                    if (age > SPILL.LIFE || s.map !== mapId) { S.splice(i, 1); continue; }
+                    if (cb && (s.x + 40 < cb.left || s.x - 40 > cb.right || s.y + 40 < cb.top || s.y - 40 > cb.bottom)) continue;
+                    const dry = age > SPILL.LIFE - SPILL.FADE ? 1 - (age - (SPILL.LIFE - SPILL.FADE)) / SPILL.FADE : 1;
+                    const fly = Math.min(1, (now - s.splash) / 0.2);                // the splash: the drink flies out, then lands
+                    const grow = Math.min(1, (now - s.splash) / 0.3), ease = 1 - (1 - grow) * (1 - grow);
+                    const r = s.r * (0.35 + 0.65 * ease) * (0.75 + 0.25 * dry);  // and shrinks a little as it dries
+                    const rgb = hexToRgb(s.color);
+                    ctx.save();
+                    ctx.globalAlpha = 0.6 * dry;
+                    // The pool: thrown out along the way it flew, a few lobes from its seed so no two are the same shape
+                    ctx.fillStyle = `rgb(${rgb})`;
+                    if (s.glow) { ctx.shadowColor = s.color; ctx.shadowBlur = 8; }
+                    ctx.beginPath();
+                    ctx.ellipse(s.x, s.y, r, r * 0.62, s.a || 0, 0, TAU);
+                    for (let k = 0; k < 4; k++) {
+                        const a = (s.a || 0) + (k - 1.5) * 1.1 + Math.sin(s.seed + k) * 0.4, d = r * (0.5 + ((s.seed * (k + 3)) % 1) * 0.25);
+                        const lr = r * (0.22 + ((s.seed * (k + 7)) % 1) * 0.18), cx = s.x + Math.cos(a) * d, cy = s.y + Math.sin(a) * d * 0.7;
+                        ctx.moveTo(cx + lr, cy); ctx.arc(cx, cy, lr, 0, TAU);
+                    }
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                    ctx.globalAlpha = 0.3 * dry; ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 0.8;   // the edge, darker where it's thin
+                    ctx.beginPath(); ctx.ellipse(s.x, s.y, r, r * 0.62, s.a || 0, 0, TAU); ctx.stroke();
+                    ctx.shadowBlur = 0;
+                    if (s.color2) {                                              // a layered cocktail keeps its second colour in the middle
+                        ctx.globalAlpha = 0.5 * dry; ctx.fillStyle = s.color2;
+                        ctx.beginPath(); ctx.arc(s.x, s.y, r * 0.4, 0, TAU); ctx.fill();
+                    }
+                    // Sheen: the room's light caught on the wet surface
+                    ctx.globalAlpha = 0.35 * dry; ctx.fillStyle = '#ffffff';
+                    ctx.beginPath(); ctx.ellipse(s.x - r * 0.3, s.y - r * 0.2, r * 0.26, r * 0.09, -0.6, 0, TAU); ctx.fill();
+                    // The drops thrown ahead (in flight for the first moment)
+                    ctx.globalAlpha = 0.8 * dry; ctx.fillStyle = `rgb(${rgb})`;
+                    for (const d of s.drops) {
+                        const dx = s.ox + (d.x - s.ox) * fly, dy = s.oy + (d.y - s.oy) * fly;
+                        ctx.beginPath(); ctx.arc(dx, dy, d.r * (fly < 1 ? 0.8 : 1), 0, TAU); ctx.fill();
+                    }
+                    ctx.restore();
                 }
             }
         });
@@ -69894,6 +70070,7 @@ engineMixin({
                 const ai = this.resonance ? this.resonance.rank('afterimage') : 0;
                 this._afterimage = ai ? { x: startX, y: startY, until: _gameTimeSec + 0.5 * ai } : null;
 
+                if (traveled > 1) this.spillDrink(SPILL.FLIT_COST, (startX - targetX) / traveled, (startY - targetY) / traveled, startX, startY);   // the drink stays behind a moment (engine/spills.js)
                 this.player.x = targetX; this.player.y = targetY; resetHumanoidAnim(this.player); showMessage("FLIT!"); this.triggerShake(4);
 
                 // --- Spawn Flit VFX ---
@@ -73897,7 +74074,7 @@ engineMixin({
                     this.roomSystem.tagLamps(this.lamps);
                 } 
                 
-                this.decals.clear(); 
+                this.decals.clear(); this.spills = [];
                 this.corpses = [];
                 
                 // Deactivate current map entities (non-target maps have empty arrays from lazy creation)
@@ -75763,6 +75940,7 @@ engineMixin({
             vending_machine:   ['Buy', 'MiniSpree'],
             bed_sleep:         ['Rest', 'Bed'],
             crafting_table:    ['Craft', 'Workbench'],
+            bar_cart:          ['Pour', 'Bar cart'],
             auto_shop_counter: ['Shop', 'Counter'],
             armory:            ['Loadout', 'Armory'],
             read_note:         ['Read', 'Note', true],
@@ -76894,6 +77072,7 @@ engineMixin({
                     // Apply movement via PlayerEntity (collision resolution via CollisionSystem). Cars, hers included,
                     // push her out along their side in resolveTrafficCollisions, so she slides along them
                     this.player.applyMovement(inputX, inputY);
+                    this.updateSpills();                     // a hard turn slops her drink (engine/spills.js)
                     
                     // Clamp player within map bounds
                     const boundsMargin = 15;
@@ -77841,6 +78020,7 @@ engineMixin({
                 }
                 if (RL.at('decals')) {
                     this.decals.draw(this.ctx, cullBounds.world);
+                    this.drawSpills(this.ctx, cullBounds.world);              // spilt drinks (engine/spills.js)
                     this.drawCasings(this.ctx, cullBounds.world);             // spent brass (engine/combat-effects.js)
                 }
                 // The sun's shadows (engine/daylight.js): buildings and trees thrown across the ground by day

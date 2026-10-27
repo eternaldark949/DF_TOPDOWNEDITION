@@ -474,6 +474,7 @@
                 if (lastStood) this.invincibleTimer = 60;                 // a moment's grace after Last Stand
                 
                 if (damaged && this._game) {
+                    if (this._game.spillOnHit) this._game.spillOnHit(amount, knockbackX, knockbackY);   // a hit slops her drink (engine/spills.js)
                     // Sync with legacy health system
                     this._game.playerHealth = this.hp;
                     this._game.healthRegenTimer = 0;

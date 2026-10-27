@@ -10,6 +10,7 @@
             vending_machine:   ['Buy', 'MiniSpree'],
             bed_sleep:         ['Rest', 'Bed'],
             crafting_table:    ['Craft', 'Workbench'],
+            bar_cart:          ['Pour', 'Bar cart'],
             auto_shop_counter: ['Shop', 'Counter'],
             armory:            ['Loadout', 'Armory'],
             read_note:         ['Read', 'Note', true],
@@ -1141,6 +1142,7 @@
                     // Apply movement via PlayerEntity (collision resolution via CollisionSystem). Cars, hers included,
                     // push her out along their side in resolveTrafficCollisions, so she slides along them
                     this.player.applyMovement(inputX, inputY);
+                    this.updateSpills();                     // a hard turn slops her drink (engine/spills.js)
                     
                     // Clamp player within map bounds
                     const boundsMargin = 15;

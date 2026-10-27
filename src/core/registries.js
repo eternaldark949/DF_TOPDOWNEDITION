@@ -272,6 +272,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.equippedJewelry = [];          // any number at once
                 this.equippedLegwear = [];          // any number at once (thigh bands, thigh-high heels)
                 this.accessoryOptions = {};         // per-accessory choices, e.g. { acc_glass: { drink: 'red_wine' } }
+                this.drinkLevel = 1;                // how full her glass is (1 full, 0 dry): spills drain it, the bar cart tops it up (engine/spills.js)
                 this.maskMode = 'auto';             // 949's field mask (Neu.Me): 'auto' (in the field, off at home) | 'on' | 'off'
                 // Grant defaults
                 this._grantDefaults();
@@ -374,7 +375,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const acc = this.equippedAccessory ? COSMETICS_REGISTRY[this.equippedAccessory] : null;
                 let held = null;
                 if (acc && acc.data.held === 'glass') {
-                    held = { type: 'glass', hand: acc.data.hand || 'right', drink: this.getAccessoryOption(acc.id, 'drink') || 'champagne', mirror: !!acc.data.mirror };
+                    held = { type: 'glass', hand: acc.data.hand || 'right', drink: this.getAccessoryOption(acc.id, 'drink') || 'champagne', mirror: !!acc.data.mirror, level: this.drinkLevel };
                 } else if (acc && acc.data.held === 'umbrella') {
                     held = { type: 'umbrella', hand: acc.data.hand || 'right', color: acc.data.color, trim: acc.data.trim };
                 }
@@ -417,7 +418,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     equippedJewelry: [...this.equippedJewelry],
                     equippedLegwear: [...this.equippedLegwear],
                     accessoryOptions: JSON.parse(JSON.stringify(this.accessoryOptions)),
-                    maskMode: this.maskMode
+                    maskMode: this.maskMode,
+                    drinkLevel: this.drinkLevel
                 };
             }
 
@@ -430,6 +432,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.equippedOutfit = data.equippedOutfit || null;
                 this.accessoryOptions = data.accessoryOptions || {};
                 this.maskMode = ['auto', 'on', 'off'].includes(data.maskMode) ? data.maskMode : 'auto';
+                this.drinkLevel = Number.isFinite(data.drinkLevel) ? Math.max(0, Math.min(1, data.drinkLevel)) : 1;   // older saves: a full glass
                 // Saves from before hats and jewelry simply have none on
                 this.equippedHat = COSMETICS_REGISTRY[data.equippedHat] ? data.equippedHat : null;
                 this.equippedJewelry = (data.equippedJewelry || []).filter(id => COSMETICS_REGISTRY[id]);

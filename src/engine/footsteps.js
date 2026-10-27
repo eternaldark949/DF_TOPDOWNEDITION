@@ -30,6 +30,7 @@
             materialAt(x, y) {
                 const map = this.activeMap; if (!map) return 'concrete';
                 if (this._inPuddle && this._inPuddle(x, y) > 0.2) return 'water';
+                if (this._inSpill(x, y)) return 'water';                          // spilt drink (engine/spills.js)
                 const surf = this._surfaces && this._surfaces();
                 if (surf) for (const [wx, wy, r] of surf.water) if (Math.hypot(x - wx, y - wy) < r) return 'water';
                 const F = FLOOR_MATERIALS[map.id];

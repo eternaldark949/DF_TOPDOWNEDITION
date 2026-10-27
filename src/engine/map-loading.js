@@ -1295,7 +1295,7 @@ engineMixin({
                     this.roomSystem.tagLamps(this.lamps);
                 } 
                 
-                this.decals.clear(); 
+                this.decals.clear(); this.spills = [];
                 this.corpses = [];
                 
                 // Deactivate current map entities (non-target maps have empty arrays from lazy creation)

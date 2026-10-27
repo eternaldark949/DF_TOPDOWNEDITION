@@ -19,6 +19,8 @@
                         this.openSleepMenu();
                     } else if(this.activeInteraction.interactionType === 'crafting_table') {
                         this.openCraftingTable();
+                    } else if(this.activeInteraction.interactionType === 'bar_cart') {
+                        this.refillGlass();                            // (engine/spills.js)
                     } else if(this.activeInteraction.interactionType === 'armory') {
                         // Open the menu straight on the inventory
                         Screens.open('inventory');
