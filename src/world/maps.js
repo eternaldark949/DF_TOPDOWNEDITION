@@ -185,14 +185,16 @@
             //   -----------|  Lobby + staircase  |-----------
             //   Fashion    |   (chandelier)      | Electronics
             'enni_cole_interior': {
-                id: 'enni_cole_interior', width: 2000, height: 1400, type: 'indoor',
-                label: 'Enni Cole', floorColor: '#c7bcae', ambientDarkness: 0.36,
-                navProps: 'all', wallStyle: { fill: '#44232f', stroke: 'rgba(229,192,131,0.65)' },
+                id: 'enni_cole_interior', width: 3250, height: 1400, type: 'indoor',
+                label: 'Enni Cole', floorColor: '#2a2528', ambientDarkness: 0.36,
+                navProps: 'all', wallStyle: { fill: '#151217', stroke: 'rgba(176,132,76,0.85)' },
                 spawn: { x: 1000, y: 1300 }, zones: [],
                 walls: [
-                    { x: 0, y: 0, w: 2000, h: 50 }, { x: 0, y: 1350, w: 850, h: 50 },
-                    { x: 1150, y: 1350, w: 850, h: 50 }, { x: 0, y: 0, w: 50, h: 1400 },
-                    { x: 1950, y: 0, w: 50, h: 1400 },
+                    { x: 0, y: 0, w: 3250, h: 50 }, { x: 0, y: 1350, w: 850, h: 50 },
+                    { x: 1150, y: 1350, w: 2100, h: 50 }, { x: 0, y: 0, w: 50, h: 1400 },
+                    { x: 3200, y: 0, w: 50, h: 1400 },
+                    // The Emporium behind Furniture and Electronics, an arch from each
+                    { x: 1950, y: 50, w: 20, h: 1300 },
                     // The wings: a wall down each side of the lobby, each wing split in two
                     { x: 620, y: 50, w: 20, h: 1300 }, { x: 1360, y: 50, w: 20, h: 1300 },
                     { x: 50, y: 680, w: 570, h: 20 }, { x: 1380, y: 680, w: 570, h: 20 }
@@ -209,7 +211,7 @@
                     { id: 'enni_cole_couture', x: 330, y: 1000 }, { id: 'enni_cole_accessories', x: 1665, y: 1000 },
                     { id: 'enni_cole_checkout', x: 1000, y: 1150 }, { id: 'enni_cole_gallery', x: 1000, y: 470 },
                     { id: 'enni_cole_groceries', x: 540, y: 600 }, { id: 'enni_cole_electronics', x: 1665, y: 1000 },
-                    { id: 'enni_cole_furniture', x: 1665, y: 360 }
+                    { id: 'enni_cole_furniture', x: 1665, y: 360 }, { id: 'enni_cole_emporium', x: 2585, y: 1180 }
                 ]
             },
             // Enni Cole, upper floor: the gallery round the lobby's void (the chandelier hangs in it), the

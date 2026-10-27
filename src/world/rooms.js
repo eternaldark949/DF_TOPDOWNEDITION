@@ -1218,7 +1218,8 @@
                     food:        { x: 50,   y: 50,  w: 570, h: 630,  type: 'indoor', label: 'Food Hall' },
                     fashion:     { x: 50,   y: 700, w: 570, h: 650,  type: 'indoor', label: 'Fashion' },
                     furniture:   { x: 1380, y: 50,  w: 570, h: 630,  type: 'indoor', label: 'Furniture' },
-                    electronics: { x: 1380, y: 700, w: 570, h: 650,  type: 'indoor', label: 'Electronics' }
+                    electronics: { x: 1380, y: 700, w: 570, h: 650,  type: 'indoor', label: 'Electronics' },
+                    emporium:    { x: 1970, y: 50,  w: 1230, h: 1300, type: 'indoor', label: 'The Emporium' }
                 },
                 doors: [
                     { x: 620,  y: 300, w: 20,  h: 160, type: 'arch', orientation: 'V', rooms: ['lobby', 'food'] },
@@ -1226,11 +1227,14 @@
                     { x: 1360, y: 300, w: 20,  h: 160, type: 'arch', orientation: 'V', rooms: ['lobby', 'furniture'] },
                     { x: 1360, y: 950, w: 20,  h: 160, type: 'arch', orientation: 'V', rooms: ['lobby', 'electronics'] },
                     { x: 440,  y: 680, w: 160, h: 20,  type: 'arch', orientation: 'H', rooms: ['food', 'fashion'] },
-                    { x: 1400, y: 680, w: 160, h: 20,  type: 'arch', orientation: 'H', rooms: ['furniture', 'electronics'] }
+                    { x: 1400, y: 680, w: 160, h: 20,  type: 'arch', orientation: 'H', rooms: ['furniture', 'electronics'] },
+                    { x: 1950, y: 300, w: 20,  h: 160, type: 'arch', orientation: 'V', rooms: ['furniture', 'emporium'] },
+                    { x: 1950, y: 950, w: 20,  h: 160, type: 'arch', orientation: 'V', rooms: ['electronics', 'emporium'] }
                 ],
                 windows: [
                     { x: 80, y: 1334, w: 520, h: 16, facing: 'N', projectionLength: 160, tint: '255, 216, 164' },
-                    { x: 1400, y: 1334, w: 520, h: 16, facing: 'N', projectionLength: 160, tint: '255, 216, 164' }
+                    { x: 1400, y: 1334, w: 520, h: 16, facing: 'N', projectionLength: 160, tint: '255, 216, 164' },
+                    { x: 1990, y: 1334, w: 1190, h: 16, facing: 'N', projectionLength: 160, tint: '255, 216, 164' }
                 ]
             },
             'enni_cole_upper': {

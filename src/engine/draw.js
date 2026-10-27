@@ -89,6 +89,24 @@
                 return { x: v.x + (sx - this.canvas.width / 2) / v.zoom, y: v.y + (sy - this.canvas.height / 2) / v.zoom };
             },
 
+            /** The roof pass's buildings, farthest from the camera first, so a nearer building's walls and roof draw
+                over a farther one's (a ray from the camera meets the nearer one first): a tall tower beside a low shop
+                covers it when the tower is nearer, and the shop's wall shows over the tower's foot when you stand by
+                the shop. Distance is to the footprint (0 inside it); ties go lower first, then map order. Reuses one
+                array; the list it's given keeps its order. */
+            _depthSortTops(list, cam) {
+                const out = this._topOrder || (this._topOrder = []);
+                out.length = 0;
+                if (!CONFIG.BUILDINGS.LEAN || list.length < 2) { for (const e of list) out.push(e); return out; }
+                for (const e of list) {
+                    const b = e.item, w = b.w || 200, h = b.h || 200;
+                    const dx = Math.max(b.x - cam.x, 0, cam.x - (b.x + w)), dy = Math.max(b.y - cam.y, 0, cam.y - (b.y + h));
+                    e.topDist = dx * dx + dy * dy; e.topHeight = Math.max(b.floors || 0, (b.crownZ || 0) / CONFIG.BUILDINGS.FLOOR_HEIGHT);
+                    out.push(e);
+                }
+                return out.sort((a, b) => (b.topDist - a.topDist) || (a.topHeight - b.topHeight) || (a.index - b.index));
+            },
+
             /* =====================================================================
                MAIN RENDER LOOP (DRAW)
                ---------------------------------------------------------------------
@@ -100,6 +118,7 @@
                 if (!this.running || (this.paused && !this.cineCam)) return;   // (Cinematic View keeps drawing the held world: ui/save-slots-pause-menu.js)
             
                 this._renderDrawId = (this._renderDrawId || 0) + 1;
+                Overhead.clear();                                   // (a frame cut short leaves nothing queued for the next)
                 // Baseline's layer panel (ui/render-layers.js): RL.at(layer) says whether a layer draws, and
                 // bills the canvas calls since the last ask to the layer before. Outside Baseline it's always true.
                 const RL = RenderLayers;
@@ -618,10 +637,11 @@
                         const px = p.x + (p.w || 0) / 2;
                         const py = p.y + (p.h || 0) / 2;
                         if (px < cbP.left || px > cbP.right || py < cbP.top || py > cbP.bottom) return;
-                        p.draw(this.ctx);
+                        if (p.tall) Overhead.add(p, c => p.draw(c)); else p.draw(this.ctx);   // taller than a person: over the people (engine/overhead.js)
                     });
                 }
                 
+                if (RL.at('props')) Overhead.drawUnder(this.ctx, this);   // tall things that hide no one: under the people
                 if (RenderStats.timed) this._entLap('Entities: Props');
                 // Draw Traffic Cars
                 // PERFORMANCE: AABB viewport culling + distance LOD
@@ -881,6 +901,8 @@
                 }
                 
                 if (RenderStats.timed) this._entLap('Entities: Vehicles');
+                // Tall things (aisles, hanging signs, tall props) over the people, farthest first (engine/overhead.js)
+                if (RL.at('props')) Overhead.flush(this.ctx, this);
                 if (RenderStats.timed) WorldRenderProfiler.begin('World tops', this.profiler, 'Entities: World tops');
                 // Ferris Wheel BASE (legs/shadow — under building roofs)
                 if (RL.at('roofs') && this.activeMap.ferrisWheel && ferrisPaintInView(this.activeMap.ferrisWheel, this.ctx, cullBounds.view, viewZoom, false)) {
@@ -892,7 +914,7 @@
                 const roofs = RL.at('roofs');
                 if (roofs && this.activeMap.buildings) {
                     const V = cullBounds.view, cam = this.camera;
-                    for (const entry of renderBuildings.v2) {
+                    for (const entry of this._depthSortTops(renderBuildings.v2, cam)) {
                         const b = entry.item;
                         if (b.isV2 && b.drawTop) {
                             if (entry.standardV2 ? !entry.topIn : !b.inView(V, cam)) continue;

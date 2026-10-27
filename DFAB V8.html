@@ -14264,7 +14264,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     food:        { x: 50,   y: 50,  w: 570, h: 630,  type: 'indoor', label: 'Food Hall' },
                     fashion:     { x: 50,   y: 700, w: 570, h: 650,  type: 'indoor', label: 'Fashion' },
                     furniture:   { x: 1380, y: 50,  w: 570, h: 630,  type: 'indoor', label: 'Furniture' },
-                    electronics: { x: 1380, y: 700, w: 570, h: 650,  type: 'indoor', label: 'Electronics' }
+                    electronics: { x: 1380, y: 700, w: 570, h: 650,  type: 'indoor', label: 'Electronics' },
+                    emporium:    { x: 1970, y: 50,  w: 1230, h: 1300, type: 'indoor', label: 'The Emporium' }
                 },
                 doors: [
                     { x: 620,  y: 300, w: 20,  h: 160, type: 'arch', orientation: 'V', rooms: ['lobby', 'food'] },
@@ -14272,11 +14273,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     { x: 1360, y: 300, w: 20,  h: 160, type: 'arch', orientation: 'V', rooms: ['lobby', 'furniture'] },
                     { x: 1360, y: 950, w: 20,  h: 160, type: 'arch', orientation: 'V', rooms: ['lobby', 'electronics'] },
                     { x: 440,  y: 680, w: 160, h: 20,  type: 'arch', orientation: 'H', rooms: ['food', 'fashion'] },
-                    { x: 1400, y: 680, w: 160, h: 20,  type: 'arch', orientation: 'H', rooms: ['furniture', 'electronics'] }
+                    { x: 1400, y: 680, w: 160, h: 20,  type: 'arch', orientation: 'H', rooms: ['furniture', 'electronics'] },
+                    { x: 1950, y: 300, w: 20,  h: 160, type: 'arch', orientation: 'V', rooms: ['furniture', 'emporium'] },
+                    { x: 1950, y: 950, w: 20,  h: 160, type: 'arch', orientation: 'V', rooms: ['electronics', 'emporium'] }
                 ],
                 windows: [
                     { x: 80, y: 1334, w: 520, h: 16, facing: 'N', projectionLength: 160, tint: '255, 216, 164' },
-                    { x: 1400, y: 1334, w: 520, h: 16, facing: 'N', projectionLength: 160, tint: '255, 216, 164' }
+                    { x: 1400, y: 1334, w: 520, h: 16, facing: 'N', projectionLength: 160, tint: '255, 216, 164' },
+                    { x: 1990, y: 1334, w: 1190, h: 16, facing: 'N', projectionLength: 160, tint: '255, 216, 164' }
                 ]
             },
             'enni_cole_upper': {
@@ -14655,14 +14659,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             //   -----------|  Lobby + staircase  |-----------
             //   Fashion    |   (chandelier)      | Electronics
             'enni_cole_interior': {
-                id: 'enni_cole_interior', width: 2000, height: 1400, type: 'indoor',
-                label: 'Enni Cole', floorColor: '#c7bcae', ambientDarkness: 0.36,
-                navProps: 'all', wallStyle: { fill: '#44232f', stroke: 'rgba(229,192,131,0.65)' },
+                id: 'enni_cole_interior', width: 3250, height: 1400, type: 'indoor',
+                label: 'Enni Cole', floorColor: '#2a2528', ambientDarkness: 0.36,
+                navProps: 'all', wallStyle: { fill: '#151217', stroke: 'rgba(176,132,76,0.85)' },
                 spawn: { x: 1000, y: 1300 }, zones: [],
                 walls: [
-                    { x: 0, y: 0, w: 2000, h: 50 }, { x: 0, y: 1350, w: 850, h: 50 },
-                    { x: 1150, y: 1350, w: 850, h: 50 }, { x: 0, y: 0, w: 50, h: 1400 },
-                    { x: 1950, y: 0, w: 50, h: 1400 },
+                    { x: 0, y: 0, w: 3250, h: 50 }, { x: 0, y: 1350, w: 850, h: 50 },
+                    { x: 1150, y: 1350, w: 2100, h: 50 }, { x: 0, y: 0, w: 50, h: 1400 },
+                    { x: 3200, y: 0, w: 50, h: 1400 },
+                    // The Emporium behind Furniture and Electronics, an arch from each
+                    { x: 1950, y: 50, w: 20, h: 1300 },
                     // The wings: a wall down each side of the lobby, each wing split in two
                     { x: 620, y: 50, w: 20, h: 1300 }, { x: 1360, y: 50, w: 20, h: 1300 },
                     { x: 50, y: 680, w: 570, h: 20 }, { x: 1380, y: 680, w: 570, h: 20 }
@@ -14679,7 +14685,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     { id: 'enni_cole_couture', x: 330, y: 1000 }, { id: 'enni_cole_accessories', x: 1665, y: 1000 },
                     { id: 'enni_cole_checkout', x: 1000, y: 1150 }, { id: 'enni_cole_gallery', x: 1000, y: 470 },
                     { id: 'enni_cole_groceries', x: 540, y: 600 }, { id: 'enni_cole_electronics', x: 1665, y: 1000 },
-                    { id: 'enni_cole_furniture', x: 1665, y: 360 }
+                    { id: 'enni_cole_furniture', x: 1665, y: 360 }, { id: 'enni_cole_emporium', x: 2585, y: 1180 }
                 ]
             },
             // Enni Cole, upper floor: the gallery round the lobby's void (the chandelier hangs in it), the
@@ -14996,6 +15002,21 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         // ============================================================================
         /* Map-building shorthands (each map's case aliases them as F, S, A, L) */
         /** Decor that doesn't move (mass 1e7), drawn by its decorType; `color` is only the fallback fill. */
+        // The Emporium's aisles (Enni Cole): each one's sign and what its shelves carry, front view (_enniAisleArt)
+        const EMPORIUM_AISLES = [
+            ['BAKERY & CEREAL', ['box', 'box', 'can']],
+            ['PANTRY', ['can', 'box', 'jar']],
+            ['TEA & COFFEE', ['box', 'jar', 'can']],
+            ['PRESERVES', ['jar', 'jar', 'box']],
+            ['CONFECTIONERY', ['box', 'jar', 'toy']],
+            ['WINE & SPIRITS', ['bottle', 'bottle', 'box']],
+            ['HOME & LINEN', ['linen', 'linen', 'box']],
+            ['BATH & BEAUTY', ['beauty', 'beauty', 'jar']],
+            ['BOOKS & STATIONERY', ['book', 'book', 'box']],
+            ['TOYS & GAMES', ['toy', 'toy', 'box']],
+            ['MENSWEAR', ['fold', 'fold', 'box']],
+            ['WOMENSWEAR', ['fold', 'beauty', 'fold']]
+        ];
         const decorPropsIn = color => (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color, decorType }, extra));
         /** A round soft light (light pass only). */
         const softLight = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
@@ -15378,17 +15399,20 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         // The Food Hall: the cellar and the bakery on the north wall, produce and pantry islands,
                         // the chilled cases, and La Cuisine's counter of prepared dishes
                         F(70, 66, 300, 62, 'ec_wine'), F(392, 66, 210, 72, 'ec_bakery'),
-                        F(80, 180, 150, 100, 'ec_produce'), F(300, 180, 150, 100, 'ec_produce', { variant: 1 }),
-                        F(80, 330, 150, 60, 'ec_grocery'), F(300, 330, 150, 60, 'ec_grocery', { variant: 1 }),
-                        F(70, 440, 330, 76, 'ec_cold'), F(70, 572, 300, 80, 'ec_deli'),
+                        F(84, 166, 384, 46, 'ec_gondola', { variant: 2, decor: { aisle: 1 } }),
+                        F(84, 262, 384, 46, 'ec_gondola', { variant: 0, decor: { aisle: 2 } }),
+                        F(84, 358, 384, 46, 'ec_gondola', { variant: 1, decor: { aisle: 3 } }),
+                        F(70, 456, 330, 76, 'ec_cold'), F(70, 572, 300, 80, 'ec_deli'),
                         F(470, 456, 50, 50, 'ec_plant'),
-                        // Fashion: rails along the north wall, knitwear cubbies, folded tables and round rails,
+                        // Fashion: rails along the north wall, knitwear cubbies, clothing aisles, two-tier round rails,
                         // and dressed forms in the street windows
                         F(80, 726, 170, 36, 'ec_rack'), F(266, 726, 150, 36, 'ec_rack', { variant: 2 }),
                         F(56, 820, 32, 290, 'ec_shelfwall'),
-                        F(140, 880, 130, 70, 'ec_fashion_table'), F(140, 1050, 130, 70, 'ec_fashion_table', { variant: 2 }),
-                        F(340, 860, 80, 80, 'ec_round_rack'), F(340, 1040, 80, 80, 'ec_round_rack', { variant: 3 }),
-                        F(470, 1150, 80, 80, 'ec_round_rack', { variant: 4 }),
+                        F(124, 812, 300, 50, 'ec_cloth_aisle', { variant: 0, decor: { aisle: 'A' } }),
+                        F(124, 912, 300, 50, 'ec_cloth_aisle', { variant: 1, decor: { aisle: 'B' } }),
+                        F(470, 800, 104, 104, 'ec_round_rack', { variant: 0 }), F(470, 924, 104, 104, 'ec_round_rack', { variant: 1 }),
+                        F(140, 1030, 110, 110, 'ec_round_rack', { variant: 2 }), F(300, 1050, 96, 96, 'ec_round_rack', { variant: 3 }),
+                        F(462, 1110, 96, 96, 'ec_round_rack', { variant: 4 }),
                         ...[0, 1, 2, 3, 4].map(i => F(98 + i * 100, 1268, 40, 40, 'ec_mannequin', { variant: i })),
                         // Furniture: a living room, a dressed bedroom, a dining room, each on its rug
                         F(1420, 100, 200, 64, 'ec_sofa'), F(1636, 176, 64, 64, 'ec_armchair', { face: 'W' }),
@@ -15400,7 +15424,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         F(1480, 860, 175, 88, 'ec_laptop'), F(1730, 860, 130, 88, 'ec_tablet'),
                         F(1480, 1030, 175, 88, 'ec_audio'), F(1730, 1030, 130, 88, 'ec_tablet', { variant: 1 }),
                         F(1450, 1196, 380, 78, 'ec_appliances'),
-                        F(1890, 1100, 44, 64, 'ec_vending', { interactionType: 'vending_machine' })
+                        F(1890, 1100, 44, 64, 'ec_vending', { interactionType: 'vending_machine' }),
+                        // The Emporium: a dozen tall wooden aisles in two runs about a cross-aisle (art: _drawEnniAisles),
+                        // the tills along the windows
+                        ...EMPORIUM_AISLES.flatMap(([cat, kinds], i) => [0, 1].map(run => F(2070 + i * 90, run ? 620 : 180, 40, 360, 'ec_tall_aisle',
+                            { decor: { aisle: i + 1, cat, kinds, run, sign: run ? undefined : 580 }, visible: false }))),
+                        F(2120, 1150, 170, 60, 'ec_checkout'), F(2880, 1150, 170, 60, 'ec_checkout', { variant: 1 }),
+                        F(2000, 1260, 40, 40, 'ec_topiary'), F(3130, 1260, 40, 40, 'ec_topiary')
                     ];
                     e.npcs = [ new NPC(755, 1238, "Valentina", 'vip'), new NPC(330, 1180, "Model Kira", 'dancer'),
                         new NPC(1665, 975, "Concierge Lux", 'robot_gold') ];
@@ -15415,7 +15445,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         S(330, 300, 260, '#ffe3b2', 0.28), S(330, 560, 220, '#ffe6c2', 0.26),
                         S(330, 1000, 280, '#ffe6c2', 0.28), S(330, 1290, 200, '#ffdcae', 0.32),
                         S(1665, 360, 280, '#ffe2b2', 0.26), S(1665, 1000, 280, '#e1eaff', 0.24),
-                        S(755, 1180, 150, '#ffdaa0', 0.36), S(1245, 1180, 150, '#ffdaa0', 0.36)
+                        S(755, 1180, 150, '#ffdaa0', 0.36), S(1245, 1180, 150, '#ffdaa0', 0.36),
+                        A(2585, 700, 1200, 1260, '#ffdcb3', 0.1), ...[0, 1, 2, 3, 4, 5, 6].flatMap(i => [S(2115 + i * 180, 120, 200, '#ffe2b2', 0.26), S(2115 + i * 180, 1060, 200, '#ffe2b2', 0.26)]),
+                        ...[0, 1, 2, 3].map(i => S(2160 + i * 285, 580, 230, '#ffe6c2', 0.24))
                     ];
                     break;
                 }
@@ -19463,7 +19495,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         // deterministic product arrangements make its normal and reflection passes identical.
         function drawEnniDecorProp(ctx, p) {
             const x = p.x, y = p.y, w = p.width, h = p.height, d = p.decor || {}, variant = d.variant | 0;
-            const C = { brass: '#c6a365', bright: '#ead5a6', rose: '#713f52', dark: '#262328',
+            const C = { brass: '#b0844c', bright: '#ead5a6', rose: '#2b2328', dark: '#262328',
                 walnut: '#493428', cream: '#e8ddd0', ivory: '#f4eadc', glass: '#9faeb2' };
             const rr = (X,Y,W,H,r,col,stroke,lw=1) => {
                 ctx.beginPath(); ctx.roundRect(X,Y,W,H,r);
@@ -19639,7 +19671,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'ec_mannequin': {                                 // a dressed form on a marble plinth, seen from above
                     const dress=['#e9d3a6','#1c1a1f','#b0475f','#f3ece0','#2f5a4d','#7b3fa0'][variant%6],cx=x+w/2,cy=y+h/2,s=w/40;
-                    dot(cx,cy,w/2,'#5b3341',C.brass);dot(cx,cy,w/2-3,'#7d4b5a');
+                    dot(cx,cy,w/2,'#141116',C.brass);dot(cx,cy,w/2-3,'#2a252c');
                     // the gown's skirt, scalloped into folds, then the bodice and shoulders, the head turned to the room
                     ctx.fillStyle=dress;ctx.beginPath();
                     for(let i=0;i<=24;i++){const a=i*Math.PI/12,R=(14+(i%2?1.6:0))*s;ctx.lineTo(cx+Math.cos(a)*R,cy+2*s+Math.sin(a)*R*.92);}
@@ -19661,12 +19693,82 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     for(let i=0;i<n;i++){const X=x+7+i*9;rr(X,y+4,7,h-8,2,cols[(i*3+variant)%7],'rgba(0,0,0,.25)',.5);ctx.fillStyle='rgba(255,245,225,.18)';ctx.fillRect(X+1,y+5,1,h-10);}
                     break;
                 }
-                case 'ec_round_rack': {                                // a round rack of dresses
-                    dot(x+w/2,y+h/2,w/2,'rgba(42,35,40,.5)',C.brass);
-                    const cols=['#e9d3a6','#b0475f','#f3ece0','#1c1a1f','#d79bb1','#7b3fa0'];
-                    for(let i=0;i<16;i++){const a=i*Math.PI/8,X=x+w/2+Math.cos(a)*w*.36,Y=y+h/2+Math.sin(a)*w*.36;ctx.save();ctx.translate(X,Y);ctx.rotate(a);rr(-7,-3.5,14,7,2,cols[(i+variant)%6],'rgba(0,0,0,.25)',.5);ctx.restore();}
-                    ctx.strokeStyle=C.brass;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x+w/2,y+h/2,w*.36,0,Math.PI*2);ctx.stroke();
-                    dot(x+w/2,y+h/2,5,C.brass,C.dark);break;
+                case 'ec_round_rack': {                                // a two-tier round rack: bronze rails on an obsidian plinth, garments hung by colour
+                    const cx=x+w/2,cy=y+h/2,R=w/2,pal=[['#e9dcc4','#cdb48a','#a3815a','#6e5440','#2a2428','#f4ede0'],['#16301f','#2f5a4d','#5a1a2a','#8c2b3e','#1d2a4a','#0f0e12'],['#f2d6dc','#d79bb1','#b0475f','#e9d3a6','#f4ede0','#c9a3b8'],['#0f0e12','#2a2830','#55525c','#9a98a2','#d8d6dc','#1c1a1f'],['#3a2a1f','#7a5a3a','#c58f6a','#e2c79a','#5a1a2a','#1c1a1f']][variant%5];
+                    const hash=i=>{const s=Math.sin(i*91.7+variant*13.1)*4375.5;return s-Math.floor(s);};
+                    dot(cx+2,cy+3,R,'rgba(0,0,0,.28)');dot(cx,cy,R,'#141116',C.brass);dot(cx,cy,R-3,'#1f1b20');
+                    ctx.strokeStyle='rgba(255,240,215,.08)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(cx,cy,R-6,Math.PI*1.05,Math.PI*1.6);ctx.stroke();
+                    // garments on a tier: hangers on the rail, each piece a narrow shape falling outward, the colours graded round
+                    const tier=(rad,n,len,wid)=>{
+                        for(let i=0;i<n;i++){const a=i*Math.PI*2/n+.08,col=pal[Math.floor(i/n*pal.length*2)%pal.length],L=len*(.8+hash(i+rad)*.35);
+                            ctx.save();ctx.translate(cx+Math.cos(a)*rad,cy+Math.sin(a)*rad);ctx.rotate(a);
+                            // seen from above a hung piece is its shoulders edge-on: a slim shape, wider at the shoulder, the hem falling away
+                            ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(-1.5,-wid*.5);ctx.lineTo(L*.3,-wid*.62);ctx.lineTo(L,-wid*.36);ctx.quadraticCurveTo(L+1.2,0,L,wid*.36);ctx.lineTo(L*.3,wid*.62);ctx.lineTo(-1.5,wid*.5);ctx.closePath();ctx.fill();
+                            ctx.strokeStyle='rgba(0,0,0,.45)';ctx.lineWidth=.5;ctx.stroke();ctx.fillStyle='rgba(255,245,225,.2)';ctx.fillRect(0,-wid*.4,L*.7,.7);
+                            ctx.restore();}
+                        ctx.strokeStyle='#4a3420';ctx.lineWidth=3;ctx.beginPath();ctx.arc(cx,cy,rad,0,Math.PI*2);ctx.stroke();
+                        ctx.strokeStyle=C.brass;ctx.lineWidth=1.6;ctx.beginPath();ctx.arc(cx,cy,rad,0,Math.PI*2);ctx.stroke();
+                        ctx.strokeStyle='rgba(240,214,160,.7)';ctx.lineWidth=.6;ctx.beginPath();ctx.arc(cx,cy,rad-.6,Math.PI*1.1,Math.PI*1.7);ctx.stroke();
+                        for(let i=0;i<n;i++){const a=i*Math.PI*2/n+.08;dot(cx+Math.cos(a)*rad,cy+Math.sin(a)*rad,.8,'#e8cf9c');}
+                    };
+                    tier(R*.56,Math.round(R*2*Math.PI*.56/3.6),R*.38,4.2);
+                    tier(R*.27,Math.round(R*2*Math.PI*.27/3.8),R*.2,3.8);
+                    // the crown: a champagne post with a bronze finial and its little sign
+                    for(let i=0;i<4;i++){const a=i*Math.PI/2+Math.PI/4;ctx.strokeStyle=C.brass;ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(cx+Math.cos(a)*5,cy+Math.sin(a)*5);ctx.lineTo(cx+Math.cos(a)*R*.27,cy+Math.sin(a)*R*.27);ctx.stroke();}
+                    dot(cx,cy,6,'#cdb48a','#5c4128');dot(cx,cy,3,'#f1dfb6');dot(cx-1,cy-1,1,'#fffaf0');
+                    break;
+                }
+                // ── The aisles: obsidian gondolas, bronze price rails, goods seen from above on both faces ──
+                case 'ec_gondola': case 'ec_cloth_aisle': {
+                    const v=h>w,L=v?h:w,D=v?w:h,food=p.decorType==='ec_gondola';
+                    const hash=i=>{const s=Math.sin(i*127.1+variant*311.7+x*.13)*43758.5;return s-Math.floor(s);};
+                    ctx.save();ctx.translate(x,y);if(v){ctx.translate(w,0);ctx.rotate(Math.PI/2);}
+                    rr(2,3,L,D,4,'rgba(0,0,0,.3)');rr(0,0,L,D,4,'#161317','#5c4128',1);
+                    const cap=Math.min(26,D*.62);                                                  // the end caps
+                    rr(1,1,L-2,D-2,3,null,C.brass,1.2);
+                    ctx.fillStyle='#0d0b0e';ctx.fillRect(cap,D/2-1.5,L-2*cap,3);ctx.fillStyle='rgba(201,154,91,.5)';ctx.fillRect(cap,D/2-.4,L-2*cap,.8);   // the spine
+                    const half=(D-3)/2-4;
+                    // one face: goods in a row from cap to cap, `top` true for the north face (goods' fronts at its outer edge)
+                    const face=(top,kind,seed)=>{
+                        const Y0=top?3:D/2+1.5,H=half,run=L-2*cap-4;let X=cap+2,i=0;
+                        ctx.save();ctx.beginPath();ctx.rect(cap+1,Y0,run+2,H+1);ctx.clip();
+                        while(X<cap+2+run){const k=hash(seed+i*7.3),k2=hash(seed+i*3.1+9);
+                            if(kind==='box'){const bw=7+k*7,col=['#b0475f','#e9d3a6','#2f5a4d','#c58f6a','#1d2a4a','#f3ece0','#8a5a2a','#d5aa40'][(seed+i)%8];
+                                for(let s=0;s<2;s++){rr(X,Y0+1+s*(H/2),bw-1,H/2-1.5,.8,col,'rgba(0,0,0,.35)',.5);ctx.fillStyle='rgba(255,250,235,.45)';ctx.fillRect(X+1.5,Y0+2.5+s*(H/2),bw-4,1.6);}X+=bw;}
+                            else if(kind==='jar'){const R=2.6+k*1.4,col=['#c84a3a','#d5aa40','#7a4a2a','#e8994e','#6a8a3a','#a03a5a'][(seed+i)%6];
+                                for(let s=0;s<Math.max(1,Math.floor(H/(R*2+1)));s++){const yy=Y0+R+1+s*(R*2+1);dot(X+R,yy,R,col,'rgba(0,0,0,.4)');dot(X+R,yy,R*.62,['#c6a365','#e8e0d0','#2a2428'][(seed+i)%3]);dot(X+R-.8,yy-.8,.6,'rgba(255,255,255,.6)');}X+=R*2+1;}
+                            else if(kind==='bottle'){const col=['#3c2a3a','#2f4a2f','#6a3a2a','#c9b06a','#1f2a3a'][(seed+i)%5];
+                                for(let s=0;s<Math.max(1,Math.floor(H/7.5));s++){const yy=Y0+4+s*7.5;dot(X+3.2,yy,3.2,col,'rgba(0,0,0,.4)');dot(X+3.2,yy,1.2,'#c6a365');}X+=7;}
+                            else if(kind==='produce'){const bw=18+k*6,col=['#b74840','#d5aa40','#85a84e','#e8994e','#6b3a6a','#c8d86a'][(seed+i)%6];
+                                rr(X,Y0+1,bw-2,H-1,1.5,'#4a3424','#8a6844',.6);for(let q=0;q<bw*H/22;q++){const fx=X+3+hash(seed+i*5+q)*(bw-8),fy=Y0+3.5+hash(seed+i*9+q*2)*(H-6);dot(fx,fy,2.4,col);dot(fx-.7,fy-.7,.6,'rgba(255,250,210,.4)');}X+=bw;}
+                            else if(kind==='fold'){const bw=13,col=['#f3ece0','#e9d3a6','#cdb48a','#a3815a','#6e5440','#3a3540','#1c1a1f','#5a1a2a','#2f5a4d','#1d2a4a'][Math.floor(i/2+seed)%10];
+                                rr(X,Y0+1.5,bw-2,H-2,1.2,col,'rgba(0,0,0,.35)',.5);ctx.fillStyle='rgba(0,0,0,.16)';for(let f=1;f<4;f++)ctx.fillRect(X+1,Y0+1.5+f*(H-2)/4,bw-4,.7);ctx.fillStyle='rgba(255,250,235,.2)';ctx.fillRect(X+1,Y0+2,1,H-4);X+=bw;}
+                            else if(kind==='hang'){const col=['#e9dcc4','#cdb48a','#a3815a','#2a2428','#5a1a2a','#8c2b3e','#2f5a4d','#1d2a4a','#f2d6dc','#16141a'][Math.floor(i/3+seed)%10],Lg=H*(.82+k2*.2);
+                                ctx.fillStyle=col;ctx.beginPath();const y0=top?Y0+H:Y0,dir=top?-1:1;ctx.moveTo(X,y0);ctx.lineTo(X+5,y0);ctx.lineTo(X+5.6,y0+dir*Lg*.7);ctx.quadraticCurveTo(X+2.5,y0+dir*Lg,X-.6,y0+dir*Lg*.7);ctx.closePath();ctx.fill();ctx.strokeStyle='rgba(0,0,0,.4)';ctx.lineWidth=.5;ctx.stroke();X+=4.2;}
+                            i++;}
+                        ctx.restore();
+                        // the face's bronze price rail at its outer edge, a champagne tag every so often
+                        const ry=top?1.5:D-3;ctx.fillStyle=C.brass;ctx.fillRect(cap,ry,L-2*cap,1.5);
+                        if(kind!=='hang')for(let t=cap+10;t<L-cap-6;t+=26){ctx.fillStyle='#ead5a6';ctx.fillRect(t,top?ry-.5:ry,5,2.5);}
+                    };
+                    const kinds=food?[['box','jar'],['bottle','box'],['produce','produce'],['jar','bottle']][variant%4]:[['fold','fold'],['hang','hang'],['fold','hang']][variant%3];
+                    if(kinds[1]==='hang'&&kinds[0]==='hang'){ctx.fillStyle='rgba(0,0,0,.35)';ctx.fillRect(cap,D/2-2,L-2*cap,4);}
+                    face(true,kinds[0],variant*17+1);face(false,kinds[1],variant*17+40);
+                    if(kinds.includes('hang')){ctx.fillStyle=C.brass;ctx.fillRect(cap,D/2-1,L-2*cap,2);ctx.fillStyle='rgba(255,238,200,.6)';ctx.fillRect(cap,D/2-1,L-2*cap,.6);}
+                    // end caps: a featured stack each end on champagne stone
+                    for(const ex of [0,L-cap]){rr(ex+2,2,cap-4,D-4,3,'#8d795d',C.brass,1);rr(ex+5,5,cap-10,D-10,2,'#a48e6c');
+                        const ccx=ex+cap/2,ccy=D/2;
+                        if(food){const col=[['#e8994e','#d5aa40'],['#6a2a3a','#2f4a2f'],['#b74840','#85a84e'],['#d6ac6c','#a36b42']][variant%4];for(let q=0;q<7;q++){const a=q*Math.PI*2/6;dot(q?ccx+Math.cos(a)*4.6:ccx,q?ccy+Math.sin(a)*4.6:ccy,2.6,col[q%2],'rgba(0,0,0,.35)');}}
+                        else{for(let q=0;q<3;q++)rr(ccx-6+q*.6,ccy-7+q*4.4,12,5,1,['#e9dcc4','#2a2428','#cdb48a','#5a1a2a'][(q+variant)%4],'rgba(0,0,0,.3)',.5);}
+                    }
+                    ctx.restore();
+                    // the hanging sign over the aisle: an obsidian plate on bronze, its shadow on the goods
+                    const label=d.label||(food?['PANTRY','CELLAR & OILS','THE GREENGROCER','PRESERVES'][variant%4]:['KNITWEAR','EVENING','DENIM & SHIRTS'][variant%3]);
+                    const sx=v?x+w/2:x+(d.signAt||.5)*w,sy=v?y+(d.signAt||.5)*h:y+h/2;
+                    ctx.save();ctx.font='7px Georgia, serif';const tw=ctx.measureText(label).width+16;
+                    rr(sx-tw/2+4,sy-6+6,tw,13,2,'rgba(0,0,0,.28)');rr(sx-tw/2,sy-7,tw,13,2,'#141116',C.brass,1);
+                    ctx.fillStyle='#d9bf8c';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText((d.aisle?d.aisle+'  •  ':'')+label,sx,sy);ctx.restore();
+                    break;
                 }
                 case 'ec_shelfwall': {                                 // cubbies of folded knits along the wall
                     plinth();const v=h>w,n=Math.floor(((v?h:w)-12)/26),cols=['#e8ddd0','#c9a98c','#7b2f45','#3a3540','#d7b7c0','#9aa38a'];
@@ -19924,8 +20026,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.decorType = config.decorType || null;       // custom furniture art (clinic)
                 this.light = config.light || null;               // soft light that follows the prop: { radius, color, intensity, dx, dy }
                 this.headSide = config.headSide || null;
-                this.decor = { face: config.face, vertical: !!config.vertical, candles: !!config.candles, variant: config.variant | 0 };   // House pieces: facing, wall run, lit
+                this.decor = Object.assign({ face: config.face, vertical: !!config.vertical, candles: !!config.candles, variant: config.variant | 0 }, config.decor);   // House pieces: facing, wall run, lit
                 this.noNav = !!config.noNav;                     // thin wall pieces paths needn't route round
+                this.tall = !!config.tall;                       // taller than a person: drawn over the people (engine/overhead.js)
                 this.patient = !!config.patient;
                 this.noteId = config.noteId || null;
                 if (config.label) this.label = config.label;                   // what the action pill names it
@@ -20301,6 +20404,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         };
         // Animated pieces left as vector art (true, or true while the test holds); the comment says what moves
         const PROP_LIVE = {
+            ec_tall_aisle: true,                                                                                                 // drawn with the floor (_drawEnniAisles)
             hod_candelabra: true, hod_altar: true, hod_console: true, hod_fountain: true, hod_coffin: true, hod_reliquary: true,   // flames, crystal, ripples, glow, bob
             hod_table: p => !!(p.decor && p.decor.candles),                                                                      // candle flames
             dn_float_chaise: true, dn_float_chair: true, dn_fountain: true,                                                      // hover bob, rings and rift
@@ -34181,6 +34285,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         const MCX = {
             CANOPY_Z: 12, SIGN_Z: 24, FIN: 46, CANOPY_R: 60,
+            S: 2,                       // facade art px per world unit (_mcFaceArt)
             C: {
                 lacquer: '#0b0810', plum: '#1a1022', wall: '#140c1a', fin: '#2a1a36',
                 violet: '#8a5cff', lavender: '#c8a8ff', lilac: '#e8d8ff',
@@ -34189,6 +34294,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 water: '#1c1240'
             }
         };
+
+        const _mcFontReady = () => { try { return !document.fonts || document.fonts.check('bold 8px Montserrat'); } catch (e) { return true; } };
 
         /** A crescent moon at (x, y), radius r, horns turned by `rot`. */
         function _mcCrescent(ctx, x, y, r, rot = -0.5) {
@@ -34264,54 +34371,125 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return { n, beat, bar, kick: Math.pow(1 - beat, 3) };
             },
 
-            /** A wall: lacquer between violet neon fins, gold pilasters every third, smoked-glass bands, a deco chevron
-                frieze under the gold cornice. Each kind on a face goes out as one path (panes, fins, pilasters, the
-                frieze; nothing of one kind touches), the fins at night one stroke a fin (each breathes on its own). */
+            /**
+             * A wall, art deco: black lacquer between violet neon fins, fluted gold pilasters every third, tall smoked
+             * glass with crescent portholes, a marquee of bulbs and a chevron frieze under a stepped gold parapet, the
+             * name in gold capitals on the long walls, and a stepped sunburst portal round the door. Painted once
+             * (unlit and lit) and laid on the face in one affine draw (the walls lean linearly); at night the lit
+             * twin pumps on the kick and the fins still breathe one by one, live.
+             */
             _mcFace(ctx, f, P, emissive) {
                 if (f.side === 'C') return;
                 const [ax, ay] = [f.x1, f.y1], [bx, by] = [f.x2, f.y2];
                 const [cx, cy] = P(bx, by), [dx, dy] = P(ax, ay);
                 if (Math.hypot(dx - ax, dy - ay) < 4) return;
+                const len = Math.hypot(bx - ax, by - ay), n = Math.max(2, Math.round(len / MCX.FIN));
+                const store = this._mcTex || (this._mcTex = {}), key = `${f.x1 | 0},${f.y1 | 0},${f.x2 | 0},${f.y2 | 0}`;
+                let art = store[key];
+                if (!art || (art.fontless && !(art.fontless = !_mcFontReady()))) art = store[key] = this._mcFaceArt(f, len, n);
+                const tex = emissive ? art.lit : art.day, W = art.L, H = art.H, S = MCX.S;
+                // (u along the base, v up from the street): the top edge is the base leaned, k times as long, so the
+                // face is a trapezoid, not a parallelogram; it's laid in tiles, each one affine about its centre
                 const at = (u, v) => { const x0 = ax + (bx - ax) * u, y0 = ay + (by - ay) * u, x1 = dx + (cx - dx) * u, y1 = dy + (cy - dy) * u; return [x0 + (x1 - x0) * v, y0 + (y1 - y0) * v]; };
-                const len = Math.hypot(bx - ax, by - ay), n = Math.max(2, Math.round(len / MCX.FIN)), C = MCX.C;
-                const quad = (path, u0, u1, v0, v1) => { const a = at(u0, v0), b = at(u1, v0), c = at(u1, v1), d = at(u0, v1); path.moveTo(a[0], a[1]); path.lineTo(b[0], b[1]); path.lineTo(c[0], c[1]); path.lineTo(d[0], d[1]); path.closePath(); return path; };
-                const seg = (path, u0, v0, u1, v1) => { const a = at(u0, v0), b = at(u1, v1); path.moveTo(a[0], a[1]); path.lineTo(b[0], b[1]); return path; };
-                const panes = new Path2D(), frieze = new Path2D(), pil = new Path2D();
-                for (let i = 0; i < n; i++) quad(panes, (i + 0.18) / n, (i + 0.82) / n, 0.3, 0.74);
-                for (let j = 0, m = n * 3; j <= m; j++) { const p = at(j / m, j % 2 ? 0.83 : 0.91); if (j) frieze.lineTo(p[0], p[1]); else frieze.moveTo(p[0], p[1]); }   // the chevrons
-                for (let i = 0; i <= n; i += 3) seg(pil, i / n, 0.04, i / n, 0.98);
-                if (n % 3) seg(pil, 1, 0.04, 1, 0.98);                                                                      // (a pilaster at each corner)
-                if (!emissive) {
-                    // smoked glass between the fins
-                    const sun = sunNow(), day = sun ? sun.day : 0;
-                    ctx.fillStyle = 'rgba(12, 6, 20, 0.92)'; ctx.fill(panes);
-                    if (day > 0.05) { ctx.fillStyle = `rgba(168, 160, 220, ${0.22 * day})`; ctx.fill(panes); }
-                    ctx.lineWidth = 0.8; ctx.strokeStyle = 'rgba(232, 194, 122, 0.3)'; ctx.stroke(panes);                // a hairline of gold round each pane
-                    const fins = new Path2D();
-                    for (let i = 0; i <= n; i++) if (i % 3) seg(fins, i / n, 0.06, i / n, 0.96);
-                    ctx.lineWidth = 2.2; ctx.strokeStyle = C.fin; ctx.stroke(fins);                                   // the fins
-                    ctx.lineWidth = 3.4; ctx.strokeStyle = C.goldDk; ctx.stroke(pil);                                 // gold pilasters
-                    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255, 241, 194, 0.35)'; ctx.stroke(pil);
-                    ctx.lineWidth = 1.4; ctx.strokeStyle = C.goldDk; ctx.stroke(seg(new Path2D(), 0, 0.97, 1, 0.97));   // gold cornice and plinth
-                    ctx.lineWidth = 0.8; ctx.stroke(seg(new Path2D(), 0, 0.06, 1, 0.06));
-                    ctx.strokeStyle = 'rgba(232, 194, 122, 0.25)'; ctx.stroke(seg(new Path2D(), 0, 0.8, 1, 0.8));
-                    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(232, 194, 122, 0.55)'; ctx.stroke(frieze);              // the chevron frieze
-                    return;
+                const nu = Math.max(1, Math.ceil(Math.hypot(cx - dx, cy - dy) / 40)), nv = 4;
+                const B = emissive ? this._mcBeat() : null, op = ctx.globalCompositeOperation, ga = ctx.globalAlpha;
+                if (emissive) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = ga * (0.62 + 0.38 * B.kick); }
+                for (let i = 0; i < nu; i++) for (let j = 0; j < nv; j++) {
+                    const u0 = i / nu, u1 = (i + 1) / nu, v0 = j / nv, v1 = (j + 1) / nv, um = (u0 + u1) / 2, vm = (v0 + v1) / 2;
+                    const L0 = at(u0, vm), L1 = at(u1, vm), T0 = at(um, v1), B0 = at(um, v0), M = at(um, vm);
+                    const sw = (u1 - u0) * W, sh = (v1 - v0) * H;
+                    const xa = (L1[0] - L0[0]) / sw, xb = (L1[1] - L0[1]) / sw, ya = (B0[0] - T0[0]) / sh, yb = (B0[1] - T0[1]) / sh;
+                    // texture y runs down from the parapet: this tile is y (1 - v1)H .. (1 - v0)H
+                    ctx.save();
+                    ctx.transform(xa, xb, ya, yb, M[0] - xa * sw / 2 - ya * sh / 2, M[1] - xb * sw / 2 - yb * sh / 2);
+                    ctx.drawImage(tex, u0 * W * S, (1 - v1) * H * S, sw * S, sh * S, 0, 0, sw, sh);
+                    ctx.restore();
                 }
-                // At night: the fins breathe violet and lavender, pumping on the kick; the chevrons run rose
-                const B = this._mcBeat(), t = _gameTimeSec, op = ctx.globalCompositeOperation;
-                ctx.globalCompositeOperation = 'lighter';
-                ctx.fillStyle = `rgba(200, 168, 255, ${0.07 + 0.05 * B.kick})`; ctx.fill(panes);                    // a lavender glow behind the glass
+                ctx.globalCompositeOperation = op; ctx.globalAlpha = ga;
+                if (!emissive) return;
+                // the fins breathe violet and lavender, each on its own, pumping on the kick
+                const t = _gameTimeSec;
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 for (let i = 0; i <= n; i++) {
                     if (!(i % 3) || (i === n && n % 3)) continue;
-                    const a = 0.32 + 0.22 * Math.sin(t * 0.9 + i * 0.8) + 0.35 * B.kick, fin = seg(new Path2D(), i / n, 0.08, i / n, 0.94);
-                    ctx.lineWidth = 2.6; ctx.strokeStyle = `rgba(138, 92, 255, ${Math.max(0, a) * 0.7})`; ctx.stroke(fin);
-                    ctx.lineWidth = 1; ctx.strokeStyle = `rgba(232, 216, 255, ${Math.max(0, a)})`; ctx.stroke(fin);
+                    const a = 0.32 + 0.22 * Math.sin(t * 0.9 + i * 0.8) + 0.35 * B.kick, p0 = at(i / n, 0.08), p1 = at(i / n, 0.82);
+                    ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.lineTo(p1[0], p1[1]);
+                    ctx.lineWidth = 2.6; ctx.strokeStyle = `rgba(138, 92, 255, ${Math.max(0, a) * 0.6})`; ctx.stroke();
+                    ctx.lineWidth = 1; ctx.strokeStyle = `rgba(232, 216, 255, ${Math.max(0, a)})`; ctx.stroke();
                 }
-                ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255, 241, 194, 0.4)'; ctx.stroke(pil);                      // the pilasters catch gold
-                ctx.lineWidth = 1.6; ctx.strokeStyle = `rgba(255, 90, 138, ${0.3 + 0.3 * B.kick})`; ctx.stroke(frieze);
-                ctx.lineWidth = 1; ctx.strokeStyle = `rgba(255, 241, 194, 0.55)`; ctx.stroke(seg(new Path2D(), 0, 0.97, 1, 0.97));   // the cornice catches gold
-                ctx.globalCompositeOperation = op;
+                ctx.restore(); ctx.globalCompositeOperation = op;
+            },
+
+            /** A wall's art (unlit, lit) at MCX.S px a unit: x along the wall, y down from the parapet (0) to the street (H). */
+            _mcFaceArt(f, L, n) {
+                const C = MCX.C, S = MCX.S, H = Math.min(this.floors, CONFIG.BUILDINGS.MAX_FLOORS) * CONFIG.BUILDINGS.FLOOR_HEIGHT;
+                const G = this._mcGeo(), door = f.side === 'S' && Math.abs(f.y1 - G.door.y) < 1 && G.door.x > Math.min(f.x1, f.x2) && G.door.x < Math.max(f.x1, f.x2);
+                const mk = () => { const cv = document.createElement('canvas'); cv.width = Math.ceil(L * S); cv.height = Math.ceil(H * S); const c = cv.getContext('2d'); c.scale(S, S); return [cv, c]; };
+                const [dcv, d] = mk(), [lcv, l] = mk(), bw = L / n;
+                const PAR = 5, BULB = 7.5, FR0 = 9.5, FR1 = 14, GL0 = 17, GL1 = H - 7;
+                // lacquer, a breath of plum low down; the black marble plinth
+                { const g = d.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#0b0810'); g.addColorStop(1, '#170d1f'); d.fillStyle = g; d.fillRect(0, 0, L, H);
+                  d.fillStyle = C.marble; d.fillRect(0, H - 4, L, 4); d.fillStyle = C.goldDk; d.fillRect(0, H - 4, L, .6); }
+                // the bays: tall smoked glass, a crescent porthole high in every other one
+                for (let i = 0; i < n; i++) {
+                    const X0 = i * bw + bw * .2, X1 = (i + 1) * bw - bw * .2, W = X1 - X0;
+                    d.fillStyle = 'rgba(12, 6, 20, 0.95)'; d.fillRect(X0, GL0, W, GL1 - GL0);
+                    d.fillStyle = 'rgba(168, 160, 220, 0.08)'; d.beginPath(); d.moveTo(X0, GL0); d.lineTo(X0 + W * .5, GL0); d.lineTo(X0, GL0 + (GL1 - GL0) * .6); d.fill();
+                    d.strokeStyle = 'rgba(232, 194, 122, 0.45)'; d.lineWidth = .4; d.strokeRect(X0, GL0, W, GL1 - GL0);
+                    for (let k = 1; k < 4; k++) { d.fillStyle = 'rgba(232, 194, 122, 0.18)'; d.fillRect(X0, GL0 + (GL1 - GL0) * k / 4, W, .3); }
+                    l.fillStyle = 'rgba(200, 168, 255, 0.22)'; l.fillRect(X0, GL0, W, GL1 - GL0);
+                    if (i % 2 === 0) { const px = (X0 + X1) / 2, py = GL0 + 7, r = Math.min(4.2, W * .32);
+                        d.fillStyle = '#0a0610'; d.beginPath(); d.arc(px, py, r, 0, Math.PI * 2); d.fill(); d.strokeStyle = C.gold; d.lineWidth = .8; d.stroke();
+                        for (const c of [d, l]) { c.fillStyle = c === d ? '#8f7bb0' : 'rgba(240, 225, 255, 1)'; _mcCrescent(c, px, py, r * .7, -0.5); c.fill(); }
+                        l.fillStyle = 'rgba(200, 160, 255, .35)'; l.beginPath(); l.arc(px, py, r + 2, 0, Math.PI * 2); l.fill(); }
+                }
+                // fins (violet neon tubes on lacquer) and fluted gold pilasters every third, a stepped deco capital each
+                for (let i = 0; i <= n; i++) {
+                    const X = Math.max(1.5, Math.min(L - 1.5, i * bw));
+                    if (i % 3 && !(i === n && n % 3)) {
+                        d.fillStyle = C.fin; d.fillRect(X - 1.5, FR1, 3, H - FR1 - 4); d.fillStyle = 'rgba(138, 92, 255, .55)'; d.fillRect(X - .4, FR1 + 2, .8, H - FR1 - 8);
+                        l.fillStyle = 'rgba(138, 92, 255, .5)'; l.fillRect(X - 1.6, FR1 + 2, 3.2, H - FR1 - 8); l.fillStyle = 'rgba(232, 216, 255, .9)'; l.fillRect(X - .45, FR1 + 2, .9, H - FR1 - 8);
+                        continue;
+                    }
+                    const pw = 4.2, x0 = Math.max(0, Math.min(L - pw, X - pw / 2));
+                    d.fillStyle = C.goldDk; d.fillRect(x0, FR1, pw, H - FR1 - 4);
+                    d.fillStyle = 'rgba(255, 241, 194, .55)'; for (let k = 0; k < 3; k++) d.fillRect(x0 + .7 + k * 1.2, FR1 + 3, .45, H - FR1 - 10);
+                    d.fillStyle = C.gold; d.fillRect(x0 - 1, FR1, pw + 2, 1.6); d.fillRect(x0 - .5, FR1 + 1.6, pw + 1, 1.2); d.fillRect(x0 - 1, H - 6, pw + 2, 2);
+                    l.fillStyle = 'rgba(255, 220, 160, .28)'; l.fillRect(x0, FR1, pw, H - FR1 - 4);
+                }
+                // the stepped parapet and its gold edge
+                d.fillStyle = '#07050a'; d.fillRect(0, 0, L, PAR);
+                for (let i = 0; i <= n; i += 3) { const X = Math.min(L, i * bw); d.fillStyle = '#07050a'; d.fillRect(X - 7, -1, 14, 2); d.fillStyle = C.gold; d.fillRect(X - 7, 0, 14, .5); d.fillRect(X - 4, -1, 8, .5); }
+                d.fillStyle = C.gold; d.fillRect(0, PAR - .8, L, .8);
+                // the marquee: a row of bulbs
+                for (let x = 2; x < L - 1; x += 3.2) { d.fillStyle = '#6a5530'; d.beginPath(); d.arc(x, BULB, .75, 0, Math.PI * 2); d.fill();
+                    l.fillStyle = 'rgba(255, 236, 190, 1)'; l.beginPath(); l.arc(x, BULB, .8, 0, Math.PI * 2); l.fill(); l.fillStyle = 'rgba(255, 200, 140, .3)'; l.beginPath(); l.arc(x, BULB, 2.2, 0, Math.PI * 2); l.fill(); }
+                // the chevron frieze, running rose at night
+                d.fillStyle = C.plum; d.fillRect(0, FR0, L, FR1 - FR0);
+                for (const [c, col, w] of [[d, 'rgba(232, 194, 122, .75)', .6], [l, 'rgba(255, 90, 138, .8)', .8]]) { c.strokeStyle = col; c.lineWidth = w; c.beginPath(); for (let x = 0, k = 0; x <= L; x += 3, k++) c.lineTo(x, k % 2 ? FR0 + 1 : FR1 - 1); c.stroke(); }
+                d.fillStyle = C.goldDk; d.fillRect(0, FR0, L, .5); d.fillRect(0, FR1 - .5, L, .5);
+                // the name in gold capitals on the long walls, crescents either side
+                if (L > 260 && !door) {
+                    const cx = L / 2, cy = GL0 + 14;
+                    d.fillStyle = '#0b0810'; d.fillRect(cx - 44, cy - 6, 88, 12);
+                    for (const [c, col] of [[d, C.gold], [l, 'rgba(240, 220, 255, 1)']]) {
+                        c.save(); c.font = 'bold 7.5px Montserrat, "Poiret One", sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = col;
+                        const txt = 'M O O N   C I T Y'; c.fillText(txt, cx, cy + .3); c.restore();
+                        c.fillStyle = col; _mcCrescent(c, cx - 38, cy, 3, -0.5); c.fill(); _mcCrescent(c, cx + 38, cy, 3, Math.PI + 0.5); c.fill(); }
+                    d.strokeStyle = C.goldDk; d.lineWidth = .5; d.strokeRect(cx - 44, cy - 6, 88, 12);
+                }
+                // the portal: stepped gold frames round a rose velvet door, a sunburst over it
+                if (door) {
+                    const u = Math.abs(G.door.x - f.x1) / L, cx = (f.x2 > f.x1 ? u : 1 - u) * L, top = GL0 + 2, bot = H - 4, dt = Math.max(top + 16, bot - 46);
+                    d.fillStyle = '#0b0810'; d.fillRect(cx - 34, FR1, 68, bot - FR1);
+                    for (let k = 0; k < 3; k++) { const w = 30 - k * 7, y0 = dt - 16 + k * 4; d.strokeStyle = k % 2 ? C.goldDk : C.gold; d.lineWidth = 1.1;
+                        d.beginPath(); d.moveTo(cx - w, bot); d.lineTo(cx - w, y0 + 6); d.lineTo(cx - w + 3, y0 + 6); d.lineTo(cx - w + 3, y0 + 3); d.lineTo(cx - w + 6, y0 + 3); d.lineTo(cx - w + 6, y0); d.lineTo(cx + w - 6, y0); d.lineTo(cx + w - 6, y0 + 3); d.lineTo(cx + w - 3, y0 + 3); d.lineTo(cx + w - 3, y0 + 6); d.lineTo(cx + w, y0 + 6); d.lineTo(cx + w, bot); d.stroke(); }
+                    d.fillStyle = C.velvet; d.fillRect(cx - 9, dt, 18, bot - dt); d.fillStyle = C.velvetLt; d.fillRect(cx - .4, dt, .8, bot - dt);
+                    l.fillStyle = 'rgba(255, 58, 106, .7)'; l.fillRect(cx - 9, dt, 18, bot - dt);
+                    for (let k = 0; k < 13; k++) { const a = Math.PI + k * Math.PI / 12; for (const [c, col] of [[d, 'rgba(232, 194, 122, .8)'], [l, 'rgba(255, 150, 190, .9)']]) { c.strokeStyle = col; c.lineWidth = .5; c.beginPath(); c.moveTo(cx + Math.cos(a) * 3, dt - 1 + Math.sin(a) * 3); c.lineTo(cx + Math.cos(a) * 12, dt - 1 + Math.sin(a) * 9); c.stroke(); } }
+                    d.fillStyle = C.gold; d.beginPath(); d.arc(cx, dt - 1, 2.4, Math.PI, 0); d.fill();
+                }
+                return { day: dcv, lit: lcv, L, H, fontless: !_mcFontReady() };
             },
 
             /** The roof (drawn in the roof plane): stepped lacquer decks in gold parapets; on the hall the moon dome over
@@ -36334,9 +36512,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             stone: '#a04d72', stoneLo: '#6e2f4c', steel: '#1c2028', gold: '#d0ac72',
             goldHi: '#f3ddb0', glass: '#352d30', warm: '#ffd392', rose: '#d96896'
         };
+        const ENNI_HERO = 2;
+        const ENNI_FONT_READY = () => { try { return !document.fonts || document.fonts.check('12px Anthropology'); } catch (e) { return true; } };
         Object.assign(BuildingV2.prototype, {
             _ecH() { return Math.min(this.floors, CONFIG.BUILDINGS.MAX_FLOORS) * CONFIG.BUILDINGS.FLOOR_HEIGHT; },
-            _ecK(z) { return CONFIG.BUILDINGS.LEAN ? LandmarkKit.k(z) : 1; },
+            // Enni Cole leans twice as hard as the street (ENNI_HERO), so its storefronts show as tall as a real
+            // store's; its hull (culling) leans with it.
+            _ecK(z) { return CONFIG.BUILDINGS.LEAN ? 1 + (LandmarkKit.k(z) - 1) * ENNI_HERO : 1; },
             _ecP(x, y, z) {
                 const k = this._ecK(z), cam = game.camera;
                 return [cam.x + (x - cam.x) * k, cam.y + (y - cam.y) * k];
@@ -36437,61 +36619,111 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 });
             },
-            /** One face of the curtain wall. Each style's shapes on a face are gathered into one path and filled
-                once (in the order they layer: stone, steel, frames, glass glow, mullions, transoms, glints, piers,
-                cornice, cap); shapes of one style never overlap on a face, so it draws exactly as quad by quad did. */
+            /**
+             * One face of the store, as in the photo: rose stone to the cornice (rusticated, pilasters, tall display
+             * windows, script panels), black steel and glass over it, the portal on the entrance bay. Each face is
+             * painted once at full detail (lit and unlit) and mapped onto its leaning quad in tiles, so the detail
+             * costs a few dozen drawImages a frame however fine it is (the lean is perspective in z, so tiles in z too).
+             */
             _ecFace(ctx, f, emissive=false) {
-                const T=ENNI_EXTERIOR,H=this._ecH(),L=Math.hypot(f.x2-f.x1,f.y2-f.y1);
+                const H=this._ecH(),L=Math.hypot(f.x2-f.x1,f.y2-f.y1),S=2;
+                const key=`${f.x1|0},${f.y1|0},${f.x2|0},${f.y2|0}`,store=this._ecTex||(this._ecTex={});
+                // (the script signs wait for their webfont: until it's in, the face is painted again rather than kept)
+                let art=store[key];if(!art||art.fontless&&!(art.fontless=!ENNI_FONT_READY()))art=store[key]=this._ecFaceArt(f,L,H,S);
+                const tex=art[emissive?'lit':'day'];
                 const P=(u,z)=>this._ecP(f.x1+(f.x2-f.x1)*u,f.y1+(f.y2-f.y1)*u,z);
-                const quad=(path,u0,u1,z0,z1)=>{
-                    const a=P(u0,z0),b=P(u1,z0),d=P(u0,z1),e=P(u1,z1);
-                    path.moveTo(a[0],a[1]);path.lineTo(b[0],b[1]);path.lineTo(e[0],e[1]);path.lineTo(d[0],d[1]);path.closePath();
-                    return path;
-                };
-                const fill=(path,style)=>{ctx.fillStyle=style;ctx.fill(path);};
-                const stroke=(path,style,width)=>{ctx.strokeStyle=style;ctx.lineWidth=width;ctx.stroke(path);};
-                const entrance=f.side==='S'&&Math.abs(f.y1-(this.y+700))<1;
-                const n=Math.max(2,Math.round(L/77)),pad=8/L,bands=[[4,H*.48],[H*.59,H-4]];
-                if(!emissive){
-                    fill(quad(new Path2D(),0,1,0,H*.55),T.stoneLo);fill(quad(new Path2D(),0,1,H*.55,H),T.steel);
-                    const frames=new Path2D(),inner=new Path2D(),mull=new Path2D(),tran=new Path2D(),glint=new Path2D(),pierLo=new Path2D(),pierHi=new Path2D();
-                    for(let i=0;i<n;i++){
-                        const u0=i/n+pad,u1=(i+1)/n-pad;
-                        for(const [z0,z1] of bands){
-                            quad(frames,u0,u1,z0,z1);quad(inner,u0+.018,u1-.018,z0+1,z1-1);
-                            quad(mull,(u0+u1)/2-.002,(u0+u1)/2+.002,z0,z1);
-                            quad(tran,u0,u1,z0+(z1-z0)*.44,z0+(z1-z0)*.44+.65);
-                            quad(glint,u0+.025,u0+.039,z0+2,z1-1);
-                        }
-                        quad(pierLo,i/n,i/n+pad*.58,0,H*.54);quad(pierHi,i/n,i/n+pad*.35,H*.56,H);
-                    }
-                    fill(frames,'#6b4733');stroke(frames,'rgba(204,158,101,.62)',1.4);fill(inner,'rgba(244,179,96,.12)');
-                    fill(mull,T.steel);fill(tran,'#252127');fill(glint,'rgba(221,231,237,.19)');
-                    fill(pierLo,T.stone);fill(pierHi,'#24272f');
-                    const cornice=quad(new Path2D(),0,1,H*.51,H*.57);fill(cornice,'#5d303e');stroke(cornice,'rgba(211,166,112,.45)',1);
-                    const cap=quad(new Path2D(),0,1,H-2,H);fill(cap,'#303039');stroke(cap,'rgba(211,175,118,.55)',.9);
-                }else{
-                    const glow=new Path2D(),dots=new Path2D(),up=new Path2D();
-                    for(let i=0;i<n;i++){
-                        const u0=i/n+pad,u1=(i+1)/n-pad;
-                        for(const [z0,z1] of bands){
-                            quad(glow,u0+.006,u1-.006,z0+1,z1-1);
-                            const a=P((u0+u1)/2,z0+(z1-z0)*.57);dots.moveTo(a[0]+1.35,a[1]);dots.arc(a[0],a[1],1.35,0,Math.PI*2);
-                        }
-                    }
-                    fill(glow,'rgba(255,192,108,.32)');fill(dots,'rgba(255,237,180,.85)');
-                    // Deliberate rose uplight on stone piers leaves the glass warm amber.
-                    for(let i=0;i<=n;i++){const u=i/n;quad(up,Math.max(0,u-.012),Math.min(1,u+.012),1,H*.50);}
-                    fill(up,'rgba(235,85,140,.26)');
+                const nu=Math.max(2,Math.ceil(L/70)),ZS=[0,H*.18,H*.36,H*.55,H*.72,H*.86,H];
+                for(let j=0;j<ZS.length-1;j++)for(let i=0;i<nu;i++){
+                    const u0=i/nu,u1=(i+1)/nu,z0=ZS[j],z1=ZS[j+1];
+                    const a=P(u0,z0),b=P(u1,z0),d=P(u0,z1);
+                    const sx=u0*L*S,sw=Math.min(tex.width-sx,(u1-u0)*L*S+1),sy=(H-z1)*S,sh=Math.min(tex.height-sy,(z1-z0)*S+1);
+                    ctx.save();ctx.transform((b[0]-a[0])/((u1-u0)*L*S),(b[1]-a[1])/((u1-u0)*L*S),(a[0]-d[0])/((z1-z0)*S),(a[1]-d[1])/((z1-z0)*S),d[0],d[1]);
+                    ctx.drawImage(tex,sx,sy,sw,sh,0,0,sw,sh);ctx.restore();
                 }
-                if(entrance&&!emissive){
-                    // Arched transom: use the wall's own u/z projection rather than screen-space decoration.
-                    const mid=.5,wide=.3,zbase=5,zspring=H*.26,zpeak=H*.48;
-                    ctx.beginPath();ctx.moveTo(...P(mid-wide,zbase));ctx.lineTo(...P(mid+wide,zbase));ctx.lineTo(...P(mid+wide,zspring));
-                    for(let i=0;i<=16;i++){const a=i*Math.PI/16;ctx.lineTo(...P(mid+Math.cos(a)*wide,zspring+Math.sin(a)*(zpeak-zspring)));}ctx.closePath();
-                    ctx.fillStyle='#8b5737';ctx.fill();ctx.strokeStyle=T.gold;ctx.lineWidth=2;ctx.stroke();
-                    const a=P(.5,zbase),b=P(.5,zpeak);ctx.strokeStyle='#201c22';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke();
+            },
+            /** A face's art, unlit and lit: x along the face (0..L), y down from the roof (0) to the street (H). */
+            _ecFaceArt(f,L,H,S) {
+                const T=ENNI_EXTERIOR,entrance=f.side==='S'&&Math.abs(f.y1-(this.y+700))<1;
+                const bay=this.sections[1],bayFace=!entrance&&(f.side==='E'||f.side==='W')&&f.y1>=this.y+600-1&&f.y2>=this.y+600-1;
+                const r=seededRandom(((f.x1*7+f.y1*13)|0)+911);
+                const mk=()=>{const cv=document.createElement('canvas');cv.width=Math.ceil(L*S);cv.height=Math.ceil(H*S);const c=cv.getContext('2d');c.scale(S,S);return [cv,c];};
+                const [dcv,d]=mk(),[lcv,l]=mk();
+                const portal=entrance||bayFace,G=portal?H*.22:H*.45;                                 // the cornice's line (y): the portal rises higher
+                const script=(c,str,x,y,size,col)=>{c.save();c.textAlign='center';c.textBaseline='middle';c.font=`${size}px Anthropology, "Great Vibes", "URW Chancery L", "Z003", cursive`;c.fillStyle=col;c.fillText(str,x,y);c.restore();};
+                // ── over the cornice: black steel and glass (the portal's crown: the curved showroom's glass) ──
+                {const g=d.createLinearGradient(0,0,0,G);g.addColorStop(0,'#15161c');g.addColorStop(1,'#20212a');d.fillStyle=g;d.fillRect(0,0,L,G);
+                    const n=Math.max(1,Math.round(L/30)),pw=L/n;
+                    for(let i=0;i<n;i++){const X=i*pw+2.2,W=pw-4.4,Y=4,Hh=G-7;
+                        const gg=d.createLinearGradient(X,Y,X+W,Y+Hh);gg.addColorStop(0,'#2b2a33');gg.addColorStop(.5,'#3a3036');gg.addColorStop(1,'#24252d');d.fillStyle=gg;d.fillRect(X,Y,W,Hh);
+                        d.fillStyle='rgba(214,160,104,.13)';d.fillRect(X,Y+Hh*.55,W,Hh*.45);                        // the warm floor inside
+                        d.fillStyle='rgba(205,222,236,.10)';d.beginPath();d.moveTo(X,Y);d.lineTo(X+W*.45,Y);d.lineTo(X,Y+Hh*.7);d.fill();
+                        for(let k=0;k<2;k++){const mx=X+W*(.3+k*.42),my=Y+Hh*.62;if(r()<.6){d.fillStyle='rgba(20,16,20,.7)';d.beginPath();d.ellipse(mx,my,1.6,4.2,0,0,Math.PI*2);d.fill();d.beginPath();d.arc(mx,my-5,1.1,0,Math.PI*2);d.fill();}}
+                        // lit: the glass glows amber, a ceiling of tiny lights, the forms in silhouette against it
+                        const lg=l.createLinearGradient(X,Y,X,Y+Hh);lg.addColorStop(0,'rgba(255,196,118,.30)');lg.addColorStop(1,'rgba(255,170,92,.55)');l.fillStyle=lg;l.fillRect(X,Y,W,Hh);
+                        for(let k=0;k<5;k++){const px=X+1+r()*(W-2),py=Y+1+r()*Hh*.45;l.fillStyle='rgba(255,236,190,.95)';l.fillRect(px,py,.7,.7);l.fillStyle='rgba(255,220,160,.25)';l.beginPath();l.arc(px+.35,py+.35,1.8,0,Math.PI*2);l.fill();}
+                    }
+                    // the steel fins, a champagne edge on each; a transom at the floor line; the parapet
+                    for(let i=0;i<=n;i++){const X=i*pw;d.fillStyle='#0f1015';d.fillRect(X-2.2,0,4.4,G);d.fillStyle='rgba(208,172,114,.55)';d.fillRect(X-2.2,0,.6,G);}
+                    d.fillStyle='#0f1015';d.fillRect(0,G*.48,L,1.6);d.fillStyle='rgba(208,172,114,.35)';d.fillRect(0,G*.48,L,.4);
+                    d.fillStyle='#0c0d11';d.fillRect(0,0,L,3.5);d.fillStyle=T.gold;d.fillRect(0,3.2,L,.6);
                 }
+                // ── the stone: rose, rusticated, lit from below ──
+                {const g=d.createLinearGradient(0,G,0,H);g.addColorStop(0,'#b25a82');g.addColorStop(1,'#93456a');d.fillStyle=g;d.fillRect(0,G,L,H-G);
+                    d.strokeStyle='rgba(70,22,44,.28)';d.lineWidth=.35;
+                    for(let y=G+8,k=0;y<H-3;y+=4.2,k++){d.beginPath();d.moveTo(0,y);d.lineTo(L,y);d.stroke();for(let x=(k%2)*6;x<L;x+=12){d.beginPath();d.moveTo(x,y);d.lineTo(x,y+4.2);d.stroke();}}
+                    d.fillStyle='rgba(255,220,235,.05)';for(let i=0;i<L*(H-G)/30;i++)d.fillRect(r()*L,G+r()*(H-G),.6,.6);
+                    d.fillStyle='#5a2440';d.fillRect(0,H-3.5,L,3.5);d.fillStyle='rgba(208,172,114,.6)';d.fillRect(0,H-3.5,L,.4);   // the plinth
+                }
+                // the bays: pilasters, and between them tall display windows or a script panel
+                const n=entrance?1:Math.max(1,Math.round(L/(portal?34:42))),bw=L/n,pier=Math.min(7,bw*.16);
+                for(let i=0;i<n;i++){
+                    const X0=i*bw+pier,X1=(i+1)*bw-pier,W=X1-X0,top=G+9,bot=H-4;
+                    if(entrance){                                                                               // the portal's arch over the doors
+                        const cx=L/2,aw=Math.min(L*.3,30),spring=G+(H-G)*.58,rad=aw;
+                        script(d,'Enni Cole',cx,G+9,14,T.goldHi);script(l,'Enni Cole',cx,G+9,14,'rgba(255,226,170,1)');
+                        for(const c of [d,l]){c.save();c.beginPath();c.moveTo(cx-aw,bot);c.lineTo(cx-aw,spring);c.arc(cx,spring,rad,Math.PI,0);c.lineTo(cx+aw,bot);c.closePath();
+                            if(c===d){c.fillStyle='#3a2a26';c.fill();c.lineWidth=2.2;c.strokeStyle='#d7a7bb';c.stroke();c.lineWidth=.8;c.strokeStyle=T.gold;c.stroke();}
+                            else{const lg=c.createLinearGradient(0,spring-rad,0,bot);lg.addColorStop(0,'rgba(255,214,140,.65)');lg.addColorStop(1,'rgba(255,186,104,.9)');c.fillStyle=lg;c.fill();}
+                            c.clip();c.strokeStyle=c===d?'#1b1a20':'rgba(60,30,20,.6)';c.lineWidth=1;c.beginPath();
+                            for(let k=-3;k<=3;k++){c.moveTo(cx+k*aw/3.5,spring-rad);c.lineTo(cx+k*aw/3.5,bot);}c.moveTo(cx-aw,spring);c.lineTo(cx+aw,spring);c.moveTo(cx-aw,bot-14);c.lineTo(cx+aw,bot-14);c.stroke();
+                            c.restore();}
+                        // the chandelier glimpsed through it; the keystone
+                        for(let k=0;k<9;k++){const a=k/8*Math.PI,px=L/2+Math.cos(a)*10,py=spring+4+Math.sin(a)*3;l.fillStyle='#fff2cf';l.fillRect(px-.4,py-.4,.9,.9);d.fillStyle='#d9b77a';d.fillRect(px-.3,py-.3,.6,.6);}
+                        d.fillStyle='#c97ea0';d.fillRect(L/2-2.5,spring-rad-3,5,5);
+                        continue;
+                    }
+                    const panel=!portal&&n>=5&&(i===1||i===n-2);
+                    if(panel){                                                                                  // a recessed panel with the name in script
+                        d.fillStyle='#8a3d62';d.fillRect(X0+2,top+2,W-4,bot-top-6);d.strokeStyle='rgba(230,180,205,.5)';d.lineWidth=.6;d.strokeRect(X0+3.5,top+3.5,W-7,bot-top-9);
+                        const cy=(top+bot)/2;script(d,'Enni',(X0+X1)/2,cy-6,11,T.goldHi);script(d,'Cole',(X0+X1)/2,cy+7,11,T.goldHi);
+                        script(l,'Enni',(X0+X1)/2,cy-6,11,'rgba(255,226,170,1)');script(l,'Cole',(X0+X1)/2,cy+7,11,'rgba(255,226,170,1)');
+                        continue;
+                    }
+                    // the window: bronze frame, a transom, forms and a lamp inside
+                    d.fillStyle='#6b4733';d.fillRect(X0,top,W,bot-top);
+                    const gg=d.createLinearGradient(X0,top,X1,bot);gg.addColorStop(0,'#3c3234');gg.addColorStop(1,'#4b3a30');d.fillStyle=gg;d.fillRect(X0+1.2,top+1.2,W-2.4,bot-top-2.4);
+                    const tr=top+(bot-top)*.28;d.fillStyle='#2a2226';d.fillRect(X0,tr,W,1.2);d.fillRect((X0+X1)/2-.5,tr,1,bot-tr);
+                    d.fillStyle='rgba(221,231,237,.16)';d.fillRect(X0+2,top+2,1.2,bot-top-4);
+                    const lg=l.createLinearGradient(0,top,0,bot);lg.addColorStop(0,'rgba(255,214,140,.55)');lg.addColorStop(1,'rgba(255,184,100,.85)');l.fillStyle=lg;l.fillRect(X0+1.2,top+1.2,W-2.4,bot-top-2.4);
+                    for(let k=0;k<2;k++){const mx=X0+W*(.3+k*.4),my=bot-9;for(const c of [d,l]){c.fillStyle=c===d?'rgba(25,18,22,.75)':'rgba(70,30,30,.55)';c.beginPath();c.ellipse(mx,my,2.2,6,0,0,Math.PI*2);c.fill();c.beginPath();c.arc(mx,my-7.5,1.4,0,Math.PI*2);c.fill();}}
+                    l.fillStyle='#fff2cf';l.beginPath();l.arc((X0+X1)/2,top+(tr-top)*.5,1,0,Math.PI*2);l.fill();
+                    // the hood over it, bronze
+                    d.fillStyle='#c27097';d.fillRect(X0-1.5,top-3,W+3,2.4);d.fillStyle=T.gold;d.fillRect(X0-1.5,top-.8,W+3,.5);
+                }
+                // pilasters with capitals and bases; rose uplight washing each, a sconce glow
+                for(let i=0;i<=n;i++){const X=Math.max(0,Math.min(L-pier*2,i*bw-pier));
+                    if(entrance&&i>0&&i<n)continue;
+                    d.fillStyle='#b8648b';d.fillRect(X,G+4,pier*2,H-G-7);d.fillStyle='rgba(255,235,245,.12)';d.fillRect(X+.6,G+4,1,H-G-7);d.fillStyle='rgba(60,15,35,.3)';d.fillRect(X+pier*2-1,G+4,1,H-G-7);
+                    d.fillStyle='#cf86a8';d.fillRect(X-1,G+4,pier*2+2,2.6);d.fillStyle='#7a3256';d.fillRect(X-1,H-7,pier*2+2,3);
+                    const ug=l.createLinearGradient(0,H,0,G+4);ug.addColorStop(0,'rgba(255,120,175,.85)');ug.addColorStop(.6,'rgba(240,90,150,.28)');ug.addColorStop(1,'rgba(240,90,150,0)');
+                    l.fillStyle=ug;l.beginPath();l.moveTo(X+pier-2,H);l.lineTo(X-6,G+4);l.lineTo(X+pier*2+6,G+4);l.lineTo(X+pier+2,H);l.closePath();l.fill();
+                    l.fillStyle='rgba(255,250,240,.9)';l.fillRect(X+pier-1,H-4,2,1.2);
+                }
+                // the cornice: a moulded band, dentils, bronze
+                {const Y=G;d.fillStyle='#c97ea0';d.fillRect(0,Y,L,4.5);d.fillStyle='#e0a2bd';d.fillRect(0,Y,L,1);d.fillStyle='#7a3256';for(let x=1;x<L;x+=2.6)d.fillRect(x,Y+2.6,1.3,1.3);
+                    d.fillStyle=T.gold;d.fillRect(0,Y+4.5,L,.6);d.fillStyle='rgba(40,8,24,.4)';d.fillRect(0,Y+5.1,L,2);
+                    l.fillStyle='rgba(255,170,205,.35)';l.fillRect(0,Y,L,4.5);}
+                return { day: dcv, lit: lcv, fontless: !ENNI_FONT_READY() };
             },
             _ecWordmark(ctx, emissive=false) {
                 LandmarkKit.flat(ctx,this._ecK(this._ecH()),c=>{
@@ -36536,7 +36768,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         /** Enni Cole luxury department store: one block of rose stone and dark glass, the arched entrance bay
             stepping out from the middle of its front, the curved-glass showroom on top of it (as in the photo). */
         function createEnniCole(x, y, config = {}) {
-            return new BuildingV2({
+            const b = new BuildingV2({
                 id: 'enni_cole', x, y, label: 'Enni Cole', type: 'shopping', style: 'enni_cole', floors: 12,   // two store floors, each as tall as four flats'
                 sections: [
                     { x: 0, y: 0, w: 900, h: 600 },
@@ -36551,6 +36783,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 door: { target: config.doorTarget || 'enni_cole_interior', label: 'Enter Store', lightColor: null },
                 ...config
             });
+            const hull = b._hullK;
+            b._hullK = function () { return Math.max(hull.call(this), this._ecK(this._ecH() + CONFIG.CULLING.LEAN_EXTRA * CONFIG.BUILDINGS.FLOOR_HEIGHT)); };
+            return b;
         }
 
         /** The Cozy Cafe: a brick corner house with a shingled hip roof, the hearth's chimney, a roof terrace with
@@ -36611,7 +36846,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 y: y,
                 label: 'Moon City Nightclub',
                 type: 'club',
-                floors: 4,
+                floors: 13,                         // one grand club floor, raised so its deco walls show
                 
                 // L-shape: wide main hall + side VIP lounge
                 sections: [
@@ -37934,7 +38169,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             label: 'Moon City Nightclub',
             type: 'club',
             category: 'entertainment',
-            floors: 4,
+            floors: 13,                     // one grand club floor, raised so its deco walls show (buildings/factories.js)
             sign: { text: 'CLUB', color: '#c8a8ff', size: 40 },
             door: { target: 'moon_city_nightclub', label: 'Enter Club', lightColor: '#ff3a6a' },
             apron: { x: 0, y: 490, w: 280, h: 194 }     // the court, the queue and the carpet's end: _mcForecourt (buildings/moon-city.js)
@@ -76414,6 +76649,133 @@ engineMixin({
 
         });
 
+        // ═══ OVERHEAD — tall things that stand over the people ═══
+        // The scene draws in layers (floor, props, people, the player, then roofs), so on their own a tall shelf or
+        // a sign hung from the ceiling would sit under everyone. Anything taller than a person goes here instead:
+        // its draw is queued during the frame (Overhead.add) and run farthest from the camera first, so nearer tall
+        // things cover farther ones. One that stands between the camera and someone (they're farther out, under its
+        // lean) draws after the people (Overhead.flush) and hides them; the rest draw before them (drawUnder), so
+        // whoever stands in front of a shelf shows over its foot; with someone right beside it, it's drawn once more
+        // after them over its own footprint only, so an arm or a glass that reaches into the shelf goes behind it.
+        // Both are called from draw.js.
+        //   · a prop: give it `tall: true` (map-entities.js) and the props pass hands its draw here
+        //   · bespoke art (interiors.js): Overhead.add({ x, y, w, h }, ctx => …) from the floor hook
+        //   · above every head (hanging signs, chandeliers): Overhead.add(rect, draw, { above: true }), always after
+        // The roof pass sorts buildings the same way (draw.js _depthSortTops).
+
+        const OVERHEAD = {
+            REACH: 14,                  // world px past a person's feet their body reaches (what a tall thing can hide)
+            ARMS: 30,                   // ...and their arms and what they hold (into a shelf beside them)
+        };
+
+        const Overhead = {
+            items: [],
+            _people: [],
+
+            /** Queue a tall thing for this frame: its footprint (x, y, w, h) and its draw(ctx). opts.hull: the outline
+                it covers on screen (world points), if it leans past its footprint (leanHull). */
+            add(rect, draw, opts) {
+                const w = rect.w ?? rect.width ?? 0, h = rect.h ?? rect.height ?? 0;
+                this.items.push({ x: rect.x, y: rect.y, w, h, draw, above: !!(opts && opts.above), hull: (opts && opts.hull) || null, d: 0 });
+            },
+
+            /** The outline of a box (x, y, w, h) leaning away from (cx, cy): its foot and its top, k times as far out. */
+            leanHull(x, y, w, h, cx, cy, k) {
+                const pts = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+                for (let i = 0; i < 4; i++) pts.push([cx + (pts[i][0] - cx) * k, cy + (pts[i][1] - cy) * k]);
+                pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+                const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+                const lo = [], hi = [];
+                for (const p of pts) { while (lo.length > 1 && cross(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+                for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (hi.length > 1 && cross(hi[hi.length - 2], hi[hi.length - 1], p) <= 0) hi.pop(); hi.push(p); }
+                lo.pop(); hi.pop();
+                return lo.concat(hi);
+            },
+
+            /** Squared distance from (cx, cy) to a footprint (0 inside it). */
+            _dist(r, cx, cy) {
+                const dx = Math.max(r.x - cx, 0, cx - (r.x + r.w)), dy = Math.max(r.y - cy, 0, cy - (r.y + r.h));
+                return dx * dx + dy * dy;
+            },
+
+            /** Whoever's in view (the player, people, enemies, the crew). */
+            _gather(game, cx, cy) {
+                const people = this._people; people.length = 0;
+                const V = game.view || game.camera, z = V.zoom || 1, hw = game.canvas.width / 2 / z + 60, hh = game.canvas.height / 2 / z + 60;
+                const take = c => { if (c && c.visible !== false && !c.dead && Math.abs(c.x - cx) < hw && Math.abs(c.y - cy) < hh) people.push(c); };
+                take(game.player);
+                for (const n of game.npcs || []) take(n);
+                for (const e of game.enemies || []) take(e);
+                for (const t of game.teammates || []) take(t);
+                return people;
+            },
+
+            /** Does it stand between the camera and anyone (someone farther out than it, under what it covers)? */
+            _hides(it, people, cx, cy) {
+                let x0 = it.x, y0 = it.y, x1 = it.x + it.w, y1 = it.y + it.h;
+                if (it.hull) for (const [x, y] of it.hull) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+                for (const c of people) {
+                    const r = OVERHEAD.REACH + (c.radius || 0);
+                    if (c.x < x0 - r || c.x > x1 + r || c.y < y0 - r || c.y > y1 + r) continue;
+                    if ((c.x - cx) ** 2 + (c.y - cy) ** 2 > it.d) return true;
+                }
+                return false;
+            },
+
+            /** Is anyone close enough that their arms, or what they hold, could reach into its footprint? */
+            _touches(it, people) {
+                for (const c of people) {
+                    const r = OVERHEAD.ARMS + (c.radius || 0);
+                    if (c.x > it.x - r && c.x < it.x + it.w + r && c.y > it.y - r && c.y < it.y + it.h + r) return true;
+                }
+                return false;
+            },
+
+            /** After the props, before the people: what hides no one draws now, under them (farthest first), so
+                whoever stands in front of it shows over its foot. The rest waits for flush. */
+            drawUnder(ctx, game) {
+                const items = this.items;
+                if (!items.length) return;
+                const V = game.view || game.camera, cx = V.x, cy = V.y, people = this._gather(game, cx, cy);
+                for (const it of items) it.d = it.above ? -1 : this._dist(it, cx, cy);
+                items.sort((a, b) => b.d - a.d);
+                let keep = 0;
+                for (const it of items) {
+                    if (it.above || this._hides(it, people, cx, cy)) { items[keep++] = it; continue; }
+                    ctx.save(); it.draw(ctx); ctx.restore();
+                    // someone right beside it: their arms or what they hold may reach into it; flush draws it again
+                    // over them, but only over its footprint (inside the shelf), so what's in front of it still shows
+                    if (this._touches(it, people)) { it.cap = true; items[keep++] = it; }
+                }
+                items.length = keep;
+            },
+
+            /** After the people: the rest, farthest first, over them; then forget it. */
+            flush(ctx, game) {
+                const items = this.items;
+                if (!items.length) return;
+                // The rooms she isn't in wear a violet veil, laid before the player (rooms.js drawVeil); what's drawn
+                // here comes after it, so it's veiled again where it stands
+                const veil = game.roomSystem && game.roomSystem.active && game.getAmbientDarkness() < 0.5;
+                let veilPath = null;
+                for (const it of items) {
+                    ctx.save();
+                    if (it.cap) { ctx.beginPath(); ctx.rect(it.x, it.y, it.w, it.h); ctx.clip(); }
+                    it.draw(ctx); ctx.restore();
+                    if (veil && !it.above) {
+                        veilPath = veilPath || new Path2D();
+                        if (it.cap) veilPath.rect(it.x, it.y, it.w, it.h);
+                        else if (it.hull) { veilPath.moveTo(it.hull[0][0], it.hull[0][1]); for (let i = 1; i < it.hull.length; i++) veilPath.lineTo(it.hull[i][0], it.hull[i][1]); veilPath.closePath(); }
+                        else veilPath.rect(it.x, it.y, it.w, it.h);
+                    }
+                }
+                if (veilPath) { ctx.save(); ctx.clip(veilPath); game.roomSystem.drawVeil(ctx); ctx.restore(); }
+                items.length = 0;
+            },
+
+            /** A map change: drop anything queued. */
+            clear() { this.items.length = 0; }
+        };
         // GameEngine — The frame renderer (draw).
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -76505,6 +76867,24 @@ engineMixin({
                 return { x: v.x + (sx - this.canvas.width / 2) / v.zoom, y: v.y + (sy - this.canvas.height / 2) / v.zoom };
             },
 
+            /** The roof pass's buildings, farthest from the camera first, so a nearer building's walls and roof draw
+                over a farther one's (a ray from the camera meets the nearer one first): a tall tower beside a low shop
+                covers it when the tower is nearer, and the shop's wall shows over the tower's foot when you stand by
+                the shop. Distance is to the footprint (0 inside it); ties go lower first, then map order. Reuses one
+                array; the list it's given keeps its order. */
+            _depthSortTops(list, cam) {
+                const out = this._topOrder || (this._topOrder = []);
+                out.length = 0;
+                if (!CONFIG.BUILDINGS.LEAN || list.length < 2) { for (const e of list) out.push(e); return out; }
+                for (const e of list) {
+                    const b = e.item, w = b.w || 200, h = b.h || 200;
+                    const dx = Math.max(b.x - cam.x, 0, cam.x - (b.x + w)), dy = Math.max(b.y - cam.y, 0, cam.y - (b.y + h));
+                    e.topDist = dx * dx + dy * dy; e.topHeight = Math.max(b.floors || 0, (b.crownZ || 0) / CONFIG.BUILDINGS.FLOOR_HEIGHT);
+                    out.push(e);
+                }
+                return out.sort((a, b) => (b.topDist - a.topDist) || (a.topHeight - b.topHeight) || (a.index - b.index));
+            },
+
             /* =====================================================================
                MAIN RENDER LOOP (DRAW)
                ---------------------------------------------------------------------
@@ -76516,6 +76896,7 @@ engineMixin({
                 if (!this.running || (this.paused && !this.cineCam)) return;   // (Cinematic View keeps drawing the held world: ui/save-slots-pause-menu.js)
             
                 this._renderDrawId = (this._renderDrawId || 0) + 1;
+                Overhead.clear();                                   // (a frame cut short leaves nothing queued for the next)
                 // Baseline's layer panel (ui/render-layers.js): RL.at(layer) says whether a layer draws, and
                 // bills the canvas calls since the last ask to the layer before. Outside Baseline it's always true.
                 const RL = RenderLayers;
@@ -77034,10 +77415,11 @@ engineMixin({
                         const px = p.x + (p.w || 0) / 2;
                         const py = p.y + (p.h || 0) / 2;
                         if (px < cbP.left || px > cbP.right || py < cbP.top || py > cbP.bottom) return;
-                        p.draw(this.ctx);
+                        if (p.tall) Overhead.add(p, c => p.draw(c)); else p.draw(this.ctx);   // taller than a person: over the people (engine/overhead.js)
                     });
                 }
                 
+                if (RL.at('props')) Overhead.drawUnder(this.ctx, this);   // tall things that hide no one: under the people
                 if (RenderStats.timed) this._entLap('Entities: Props');
                 // Draw Traffic Cars
                 // PERFORMANCE: AABB viewport culling + distance LOD
@@ -77297,6 +77679,8 @@ engineMixin({
                 }
                 
                 if (RenderStats.timed) this._entLap('Entities: Vehicles');
+                // Tall things (aisles, hanging signs, tall props) over the people, farthest first (engine/overhead.js)
+                if (RL.at('props')) Overhead.flush(this.ctx, this);
                 if (RenderStats.timed) WorldRenderProfiler.begin('World tops', this.profiler, 'Entities: World tops');
                 // Ferris Wheel BASE (legs/shadow — under building roofs)
                 if (RL.at('roofs') && this.activeMap.ferrisWheel && ferrisPaintInView(this.activeMap.ferrisWheel, this.ctx, cullBounds.view, viewZoom, false)) {
@@ -77308,7 +77692,7 @@ engineMixin({
                 const roofs = RL.at('roofs');
                 if (roofs && this.activeMap.buildings) {
                     const V = cullBounds.view, cam = this.camera;
-                    for (const entry of renderBuildings.v2) {
+                    for (const entry of this._depthSortTops(renderBuildings.v2, cam)) {
                         const b = entry.item;
                         if (b.isV2 && b.drawTop) {
                             if (entry.standardV2 ? !entry.topIn : !b.inView(V, cam)) continue;
@@ -78558,15 +78942,119 @@ engineMixin({
             drawEnniInterior(ctx) {
                 if (!this._enniFloor) this._enniFloor = this._paintEnniFloor();
                 ctx.drawImage(this._enniFloor, 0, 0);
+                this._drawEnniAisles(ctx);
             },
             drawEnniUpperInterior(ctx) {
                 if (!this._enniUpperFloor) this._enniUpperFloor = this._paintEnniUpperFloor();
                 ctx.drawImage(this._enniUpperFloor, 0, 0);
             },
 
+            /**
+             * The Emporium's tall wooden aisles (ec_tall_aisle props carry their collision, drawn here instead):
+             * each a mahogany gondola whose crown is the base scaled about the camera, so the nearer faces rise
+             * into view as she walks. Their shadows draw with the floor; the aisles and their hanging signs are handed
+             * to Overhead (engine/overhead.js), which draws them over the people, farthest first. Each face painted
+             * once, then mapped on in thin slices (the face is a trapezoid; each slice near enough a parallelogram).
+             */
+            _drawEnniAisles(ctx) {
+                const V=this.view;if(!V)return;
+                const K=0.11,cx=V.x,cy=V.y,z=V.zoom||1,hw=this.canvas.width/2/z+80,hh=this.canvas.height/2/z+80;
+                const list=[];for(const p of this.props)if(p.decorType==='ec_tall_aisle'&&p.x<cx+hw&&p.x+p.width>cx-hw&&p.y<cy+hh&&p.y+p.height>cy-hh)list.push(p);
+                const P=(x,y,k=K)=>[cx+(x-cx)*(1+k),cy+(y-cy)*(1+k)];
+                // one face: base edge B0→B1 on the floor, the texture's left at B0, its foot on the floor
+                const face=(c,img,B0,B1,n)=>{const S=img.width/n;
+                    for(let i=0;i<n;i++){const b0=[B0[0]+(B1[0]-B0[0])*i/n,B0[1]+(B1[1]-B0[1])*i/n],b1=[B0[0]+(B1[0]-B0[0])*(i+1)/n,B0[1]+(B1[1]-B0[1])*(i+1)/n],t0=P(b0[0],b0[1]);
+                        const vx=t0[0]-b0[0],vy=t0[1]-b0[1],H=img.height,sw=Math.min(S+1,img.width-i*S);
+                        c.save();c.transform((b1[0]-b0[0])/S,(b1[1]-b0[1])/S,-vx/H,-vy/H,b0[0]+vx,b0[1]+vy);
+                        c.drawImage(img,i*S,0,sw,H,0,0,sw,H);c.restore();}};
+                // the shadows on the stone now; the aisles themselves stand over the people (engine/overhead.js)
+                ctx.fillStyle='rgba(0,0,0,.32)';
+                for(const p of list)ctx.fillRect(p.x-4,p.y-3,p.width+8,p.height+6);
+                for(const p of list)Overhead.add(p,c=>{
+                    const A=p._wa||(p._wa=this._enniAisleArt(p)),x=p.x,y=p.y,w=p.width,h=p.height,n=Math.max(2,Math.ceil(h/30));
+                    if(cx<x)face(c,A.side,[x,y],[x,y+h],n);
+                    if(cx>x+w)face(c,A.side2,[x+w,y+h],[x+w,y],n);
+                    if(cy<y)face(c,A.end,[x+w,y],[x,y],1);
+                    if(cy>y+h)face(c,A.end,[x,y+h],[x+w,y+h],1);
+                    const a=P(x,y),b=P(x+w,y+h);c.drawImage(A.top,a[0],a[1],b[0]-a[0],b[1]-a[1]);
+                },{hull:Overhead.leanHull(p.x,p.y,p.width,p.height,cx,cy,1+K)});
+                // the hanging aisle markers over the cross-aisle, higher still: over every head
+                for(const p of list){const d=p.decor||{};if(!d.sign)continue;
+                    const sx=p.x+p.width/2,sy=d.sign;
+                    ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.roundRect(sx-30+5,sy-14+7,60,28,4);ctx.fill();   // its shadow, on the floor
+                    Overhead.add({x:sx-31,y:sy-15,w:62,h:30},c=>{
+                        const [X,Y]=P(sx,sy,K*1.5),s=1+K*1.5;
+                        c.strokeStyle='rgba(176,132,76,.6)';c.lineWidth=1;c.beginPath();c.moveTo(X-20*s,Y);c.lineTo(...P(sx-20,sy-30,K*1.5));c.moveTo(X+20*s,Y);c.lineTo(...P(sx+20,sy-30,K*1.5));c.stroke();
+                        c.fillStyle='#3a1d12';c.strokeStyle='#b0844c';c.lineWidth=1.5;c.beginPath();c.roundRect(X-31*s,Y-15*s,62*s,30*s,5);c.fill();c.stroke();
+                        c.strokeStyle='rgba(234,206,152,.45)';c.lineWidth=.7;c.beginPath();c.roundRect(X-27*s,Y-11*s,54*s,22*s,3);c.stroke();
+                        c.textAlign='center';c.textBaseline='middle';c.fillStyle='#ecd29c';c.font=`bold ${13*s}px Georgia, serif`;c.fillText(String(d.aisle),X,Y-3*s);
+                        c.font=`${5.2*s}px Georgia, serif`;c.fillStyle='#d6bb88';c.fillText(d.cat,X,Y+7.5*s);
+                    },{above:true});
+                }
+            },
+
+            /** One tall aisle's art: its two long faces, an end face and its crown, painted once. */
+            _enniAisleArt(p) {
+                const d=p.decor||{},L=p.height,D=p.width,HH=60,S=1.6,r=seededRandom(4000+(d.aisle|0)*31+(d.run|0)*7);
+                const WOOD='#5b331d',DARK='#2a140a',MID='#7d4727',LIGHT='#b07443',BRASS='#b98b4e';
+                const mk=(W,H)=>{const cv=document.createElement('canvas');cv.width=Math.ceil(W*S);cv.height=Math.ceil(H*S);const c=cv.getContext('2d');c.scale(S,S);return [cv,c];};
+                const pick=a=>a[r()*a.length|0];
+                // goods on one shelf, front view: x0..x1, the shelf top at y (goods stand on it), h tall at most
+                const goods=(c,kind,x0,x1,y,h)=>{let X=x0+1;
+                    while(X<x1-3){const k=r();
+                        if(kind==='box'){const bw=5+k*5,bh=h*(.65+r()*.3),col=pick(['#b0475f','#e9d3a6','#2f5a4d','#c58f6a','#1d2a4a','#f3ece0','#8a5a2a','#d5aa40','#7a1f2a']);c.fillStyle=col;c.fillRect(X,y-bh,bw-.6,bh);c.fillStyle='rgba(255,250,235,.55)';c.fillRect(X+.8,y-bh*.62,bw-2.2,bh*.22);c.fillStyle='rgba(0,0,0,.25)';c.fillRect(X+bw-1.4,y-bh,.8,bh);X+=bw;}
+                        else if(kind==='can'){const bw=4.2,bh=h*.55,col=pick(['#b74840','#d5aa40','#3a6a4a','#e8994e','#2a3a6a']);for(let t=0;t<(h>12?2:1);t++){c.fillStyle=col;c.fillRect(X,y-bh*(t+1),bw-.5,bh-.4);c.fillStyle='#e8dcc4';c.fillRect(X,y-bh*(t+1)+bh*.3,bw-.5,bh*.3);c.fillStyle='rgba(255,255,255,.3)';c.fillRect(X+.6,y-bh*(t+1),.6,bh-.4);}X+=bw;}
+                        else if(kind==='jar'){const bw=5,bh=h*.6,col=pick(['#c84a3a','#d5aa40','#7a4a2a','#e8994e','#6a8a3a','#a03a5a']);c.fillStyle=col;c.fillRect(X,y-bh,bw-.8,bh);c.fillStyle=pick(['#c6a365','#e8e0d0','#2a2428']);c.fillRect(X-.2,y-bh-1.4,bw-.4,1.6);c.fillStyle='#efe2c4';c.fillRect(X+.6,y-bh*.65,bw-2.2,bh*.3);X+=bw+.3;}
+                        else if(kind==='bottle'){const col=pick(['#3c2a3a','#2f4a2f','#6a3a2a','#c9b06a','#1f2a3a','#5a1a2a']),bh=h*.92;c.fillStyle=col;c.fillRect(X,y-bh*.62,3.6,bh*.62);c.fillRect(X+1.1,y-bh,1.4,bh*.4);c.fillStyle='#e8dcc4';c.fillRect(X+.3,y-bh*.42,3,bh*.16);c.fillStyle='rgba(255,255,255,.25)';c.fillRect(X+.4,y-bh*.6,.5,bh*.5);X+=4.4;}
+                        else if(kind==='book'){const bw=1.6+k*1.8,bh=h*(.7+r()*.25),col=pick(['#5a1a2a','#1d2a4a','#2f5a4d','#c9b06a','#3a2a20','#8a3a2a','#e9d3a6','#1c1a1f']);c.fillStyle=col;c.fillRect(X,y-bh,bw-.3,bh);c.fillStyle='rgba(234,206,152,.7)';c.fillRect(X,y-bh*.8,bw-.3,.5);X+=bw;}
+                        else if(kind==='linen'){const bw=11,col=pick(['#f3ece0','#e9d3a6','#cdb48a','#b8c4c8','#d7b7c0','#9aa38a']);for(let t=0;t<4&&t*2.6<h-2;t++){c.fillStyle=col;c.fillRect(X,y-2.6*(t+1),bw-1,2.4);c.fillStyle='rgba(0,0,0,.15)';c.fillRect(X,y-2.6*(t+1)+2,bw-1,.4);}X+=bw;}
+                        else if(kind==='fold'){const bw=10,col=pick(['#f3ece0','#cdb48a','#a3815a','#3a3540','#1c1a1f','#5a1a2a','#2f5a4d','#1d2a4a','#6e5440']);for(let t=0;t<4&&t*3<h-2;t++){c.fillStyle=col;c.fillRect(X,y-3*(t+1),bw-1,2.8);c.fillStyle='rgba(255,255,255,.12)';c.fillRect(X,y-3*(t+1),bw-1,.5);}X+=bw;}
+                        else if(kind==='beauty'){const bw=3+k*2.5,bh=h*(.4+r()*.45),col=pick(['#f2d6dc','#d79bb1','#e9d3a6','#ffffff','#b0475f','#c6a365']);c.fillStyle=col;c.fillRect(X,y-bh,bw-.5,bh);c.fillStyle=pick(['#c6a365','#1c1a1f','#e8e0d0']);c.fillRect(X,y-bh-1.2,bw-.5,1.3);X+=bw+.4;}
+                        else if(kind==='toy'){const bw=7+k*6,bh=h*(.6+r()*.35),col=pick(['#c84a3a','#3a6ab0','#d5aa40','#5a9a4a','#e8994e','#8a4ab0']);c.fillStyle=col;c.fillRect(X,y-bh,bw-.8,bh);c.fillStyle='rgba(255,255,255,.6)';c.beginPath();c.arc(X+bw/2-.4,y-bh/2,Math.min(bw,bh)*.25,0,Math.PI*2);c.fill();X+=bw;}
+                        else X+=4;
+                        if(r()<.05)X+=3;}
+                };
+                const kinds=d.kinds||['box','jar','can','bottle'];
+                // a long face: carved pilasters every so often, shelves of goods between, a crown with dentils, a kick plate
+                const side=(seedShift)=>{const [cv,c]=mk(L,HH);
+                    c.fillStyle=DARK;c.fillRect(0,0,L,HH);c.fillStyle=WOOD;c.fillRect(0,6,L,HH-12);
+                    const bays=Math.max(1,Math.round(L/90)),bw=L/bays,shelves=4,top=9,bot=HH-8,sh=(bot-top)/shelves;
+                    for(let s=0;s<shelves;s++){const yy=top+(s+1)*sh;c.fillStyle='#1a0b05';c.fillRect(0,yy-sh+.5,L,sh-1.5);
+                        for(let b=0;b<bays;b++)goods(c,kinds[(s+b+seedShift)%kinds.length],b*bw+4,(b+1)*bw-4,yy-1.4,sh-3);
+                        c.fillStyle=LIGHT;c.fillRect(0,yy-1.6,L,1.6);c.fillStyle='#ead5a6';for(let t=8;t<L;t+=21)c.fillRect(t,yy-1.5,3,1.2);}
+                    for(let b=0;b<=bays;b++){const X=Math.min(L-4,Math.max(0,b*bw-2));c.fillStyle=MID;c.fillRect(X,6,4,HH-12);c.fillStyle=LIGHT;c.fillRect(X+.6,6,.8,HH-12);c.fillStyle=DARK;c.fillRect(X+3.2,6,.8,HH-12);
+                        c.fillStyle=BRASS;c.beginPath();c.arc(X+2,top-1,1.6,0,Math.PI*2);c.fill();c.beginPath();c.arc(X+2,bot+1.5,1.2,0,Math.PI*2);c.fill();}
+                    // the crown: a moulded cornice and its dentils; the kick plate with a brass rail
+                    c.fillStyle=MID;c.fillRect(0,0,L,6);c.fillStyle=LIGHT;c.fillRect(0,5,L,1);c.fillStyle=DARK;for(let t=1;t<L;t+=3)c.fillRect(t,2.2,1.4,2.2);
+                    c.fillStyle=DARK;c.fillRect(0,HH-6,L,6);c.fillStyle=BRASS;c.fillRect(0,HH-6,L,.9);
+                    return cv;};
+                // the end: a carved panel under an arch, the aisle's number on a brass oval
+                const end=()=>{const [cv,c]=mk(D,HH);c.fillStyle=DARK;c.fillRect(0,0,D,HH);c.fillStyle=MID;c.fillRect(2,6,D-4,HH-12);
+                    c.fillStyle=WOOD;c.beginPath();c.moveTo(6,HH-10);c.lineTo(6,20);c.quadraticCurveTo(D/2,6,D-6,20);c.lineTo(D-6,HH-10);c.closePath();c.fill();
+                    c.strokeStyle=LIGHT;c.lineWidth=.8;c.stroke();c.fillStyle=BRASS;c.beginPath();c.ellipse(D/2,24,7,5,0,0,Math.PI*2);c.fill();
+                    c.fillStyle=DARK;c.font='bold 7px Georgia, serif';c.textAlign='center';c.textBaseline='middle';c.fillText(String(d.aisle||''),D/2,24.5);
+                    c.strokeStyle='rgba(234,206,152,.5)';c.lineWidth=.6;for(let t=0;t<3;t++){c.beginPath();c.moveTo(10,34+t*6);c.quadraticCurveTo(D/2,30+t*6,D-10,34+t*6);c.stroke();}
+                    c.fillStyle=MID;c.fillRect(0,0,D,6);c.fillStyle=DARK;for(let t=1;t<D;t+=3)c.fillRect(t,2.2,1.4,2.2);c.fillStyle=BRASS;c.fillRect(0,HH-6,D,.9);
+                    return cv;};
+                // the crown seen from above: a raised panel inside a moulded rim, rosettes, finials at the corners
+                const top=()=>{const [cv,c]=mk(D,L);c.fillStyle=DARK;c.fillRect(0,0,D,L);c.fillStyle=MID;c.fillRect(1.5,1.5,D-3,L-3);
+                    c.fillStyle=WOOD;c.fillRect(6,6,D-12,L-12);
+                    for(let t=0;t<40;t++){c.strokeStyle=`rgba(${r()<.5?20:170},${r()<.5?8:100},4,${.08+r()*.1})`;c.lineWidth=.5+r();c.beginPath();const X=7+r()*(D-14);c.moveTo(X,6);c.bezierCurveTo(X+r()*4-2,L*.3,X+r()*4-2,L*.7,X+r()*4-2,L-6);c.stroke();}
+                    c.strokeStyle=LIGHT;c.lineWidth=.8;c.strokeRect(4,4,D-8,L-8);c.strokeStyle='rgba(0,0,0,.5)';c.strokeRect(6.5,6.5,D-13,L-13);
+                    // raised panels, one per bay, bevelled
+                    const bays=Math.max(1,Math.round(L/90)),bl=(L-12)/bays;
+                    for(let b=0;b<bays;b++){const Y=6+b*bl+5,H=bl-10;c.fillStyle='rgba(255,214,170,.07)';c.fillRect(10,Y,D-20,H);c.strokeStyle=LIGHT;c.lineWidth=.7;c.strokeRect(10,Y,D-20,H);c.strokeStyle='rgba(0,0,0,.45)';c.strokeRect(11.2,Y+1.2,D-22.4,H-2.4);}
+                    for(let t=6+bl;t<L-12;t+=bl){c.fillStyle=BRASS;c.beginPath();c.arc(D/2,t,3.2,0,Math.PI*2);c.fill();c.fillStyle=DARK;for(let q=0;q<8;q++){const a=q*Math.PI/4;c.beginPath();c.arc(D/2+Math.cos(a)*2.2,t+Math.sin(a)*2.2,.6,0,Math.PI*2);c.fill();}}
+                    for(const [X,Y] of [[3.5,3.5],[D-3.5,3.5],[3.5,L-3.5],[D-3.5,L-3.5]]){c.fillStyle=BRASS;c.beginPath();c.arc(X,Y,3,0,Math.PI*2);c.fill();c.fillStyle='#f1dfb6';c.beginPath();c.arc(X-.8,Y-.8,1,0,Math.PI*2);c.fill();}
+                    c.strokeStyle=BRASS;c.lineWidth=.8;c.strokeRect(1,1,D-2,L-2);
+                    const g=c.createLinearGradient(0,0,D,0);g.addColorStop(0,'rgba(255,220,180,.1)');g.addColorStop(.5,'rgba(255,220,180,0)');g.addColorStop(1,'rgba(0,0,0,.15)');c.fillStyle=g;c.fillRect(0,0,D,L);
+                    return cv;};
+                return { side: side(0), side2: side(2), end: end(), top: top() };
+            },
+
             /** The painting kit both floors share: slabs, parquet, tiles, rugs, titles, thresholds and stairs. */
             _enniKit(c, r) {
-                const GOLD = '#c6a365';
+                const GOLD = '#a97b45';
                 const rr = (x,y,w,h,rad,col,stroke,lw=1)=>{c.beginPath();c.roundRect(x,y,w,h,rad);if(col){c.fillStyle=col;c.fill();}if(stroke){c.strokeStyle=stroke;c.lineWidth=lw;c.stroke();}};
                 const clip = (x,y,w,h,fn)=>{c.save();c.beginPath();c.rect(x,y,w,h);c.clip();fn();c.restore();};
                 // Honed marble slabs with soft veins; `tone` the base colour
@@ -78575,6 +79063,22 @@ engineMixin({
                         c.strokeStyle='rgba(104,84,69,.18)';c.lineWidth=.7;c.strokeRect(X+.5,Y+.5,size-1,size-1);}
                     if(veins)for(let i=0;i<w*h/22000;i++){let X=x+r()*w,Y=y+r()*h;c.strokeStyle=`rgba(117,88,84,${.045+r()*.08})`;c.lineWidth=.5+r()*1.6;c.beginPath();c.moveTo(X,Y);
                         for(let k=0;k<4;k++){const nx=X+(r()-.45)*130,ny=Y+(r()-.55)*100;c.quadraticCurveTo(X+30,Y-22,nx,ny);X=nx;Y=ny;}c.stroke();}
+                });
+                // Polished granite slabs: a base tone, flecks of crystal and mica, a sheen, bronze-lined seams
+                const OBSIDIAN={base:[27,25,30],var:5,dens:30,flecks:['#3a363d','#2f2b31','#45404a','#0b0a0c','#121014','#4f4a54','#6b5c48'],glint:'#b8996a'};
+                const CHAMPAGNE={base:[141,121,93],var:10,dens:16,flecks:['#5e4f3d','#c6ae86','#3a3128','#ddc9a4','#7c6650','#a48c6c'],glint:'#efe0bf'};
+                const granite = (x,y,w,h,stone=OBSIDIAN,size=100,seam=GOLD,alt=null)=>clip(x,y,w,h,()=>{
+                    for(let Y=y,j=0;Y<y+h;Y+=size,j++)for(let X=x,i=0;X<x+w;X+=size,i++){
+                        const S=alt&&(i+j)%2?alt:stone,v=(r()-.5)*S.var|0;
+                        c.fillStyle=`rgb(${S.base[0]+v},${S.base[1]+v},${S.base[2]+v})`;c.fillRect(X,Y,size,size);
+                        for(let k=0;k<size*size/S.dens;k++){c.globalAlpha=.2+r()*.5;c.fillStyle=S.flecks[r()*S.flecks.length|0];const q=.6+r()*1.5;c.fillRect(X+r()*size,Y+r()*size,q,q*(.6+r()*.8));}
+                        for(let k=0;k<size*size/900;k++){c.globalAlpha=.5+r()*.4;c.fillStyle=S.flecks[r()*S.flecks.length|0];c.beginPath();c.ellipse(X+r()*size,Y+r()*size,1+r()*2.6,.8+r()*1.8,r()*3,0,Math.PI*2);c.fill();}
+                        c.fillStyle=S.glint;for(let k=0;k<size*size/1400;k++){c.globalAlpha=.35+r()*.45;c.fillRect(X+r()*size,Y+r()*size,.9,.9);}
+                        c.globalAlpha=1;const g=c.createLinearGradient(X,Y,X+size,Y+size);g.addColorStop(0,'rgba(255,246,226,.07)');g.addColorStop(.45,'rgba(255,246,226,0)');g.addColorStop(.75,'rgba(255,246,226,.035)');g.addColorStop(1,'rgba(0,0,0,.06)');c.fillStyle=g;c.fillRect(X,Y,size,size);
+                    }
+                    // the seams: a hairline of shadow, then the bronze strip
+                    c.fillStyle='rgba(0,0,0,.45)';for(let X=x;X<=x+w;X+=size)c.fillRect(X-1,y,1,h);for(let Y=y;Y<=y+h;Y+=size)c.fillRect(x,Y-1,w,1);
+                    if(seam){c.fillStyle=seam;for(let X=x;X<=x+w;X+=size)c.fillRect(X,y,1.3,h);for(let Y=y;Y<=y+h;Y+=size)c.fillRect(x,Y,w,1.3);}
                 });
                 // Oak or walnut herringbone
                 const parquet = (x,y,w,h,base,dark)=>clip(x,y,w,h,()=>{
@@ -78601,15 +79105,15 @@ engineMixin({
                 const title = (str,x,y,sub,size=20,col='#694450')=>{c.textAlign='center';c.textBaseline='middle';c.font=`${size}px Georgia, serif`;c.fillStyle=col;c.fillText(str,x,y);
                     if(sub){c.font='9px Georgia, serif';c.fillStyle='#816d56';c.fillText(sub,x,y+size*.9+4);}};
                 // A marble threshold under an arch, brass at both edges
-                const threshold = d=>{const v=d.h>d.w;c.fillStyle='#e4d8c6';c.fillRect(d.x-(v?6:0),d.y-(v?0:6),d.w+(v?12:0),d.h+(v?0:12));c.fillStyle=GOLD;
+                const threshold = d=>{const v=d.h>d.w;c.fillStyle='#8f7a5d';c.fillRect(d.x-(v?6:0),d.y-(v?0:6),d.w+(v?12:0),d.h+(v?0:12));c.fillStyle=GOLD;
                     if(v){c.fillRect(d.x-6,d.y,1.5,d.h);c.fillRect(d.x+d.w+4.5,d.y,1.5,d.h);}else{c.fillRect(d.x,d.y-6,d.w,1.5);c.fillRect(d.x,d.y+d.h+4.5,d.w,1.5);}};
                 // A flight of stairs: `n` treads from y0 to y1, lit from `lightTop` (going up) or darker as they fall
                 const stairs = (x,y0,w,y1,up)=>{
                     const n=Math.round((y1-y0)/16);
-                    for(let i=0;i<n;i++){const Y=y0+i*(y1-y0)/n,H=(y1-y0)/n,k=up?i/n:1-i/n,v=168+70*k|0;
-                        c.fillStyle=`rgb(${v},${v-10|0},${v-22|0})`;c.fillRect(x,Y,w,H);c.fillStyle='rgba(60,36,40,.45)';c.fillRect(x,Y+H-2,w,2);c.fillStyle='rgba(255,246,225,.35)';c.fillRect(x,Y,w,1);}
+                    for(let i=0;i<n;i++){const Y=y0+i*(y1-y0)/n,H=(y1-y0)/n,k=up?i/n:1-i/n;
+                        c.fillStyle=`rgb(${92+62*k|0},${78+54*k|0},${60+42*k|0})`;c.fillRect(x,Y,w,H);c.fillStyle='rgba(60,36,40,.45)';c.fillRect(x,Y+H-2,w,2);c.fillStyle='rgba(255,246,225,.35)';c.fillRect(x,Y,w,1);}
                     // the rose runner and its brass rods
-                    const rx=x+w*.27,rw=w*.46;c.fillStyle='#7a3a52';c.fillRect(rx,y0,rw,y1-y0);c.fillStyle='rgba(0,0,0,.18)';for(let i=0;i<n;i++)c.fillRect(rx,y0+i*(y1-y0)/n+(y1-y0)/n-2,rw,2);
+                    const rx=x+w*.27,rw=w*.46;c.fillStyle='#1c191d';c.fillRect(rx,y0,rw,y1-y0);c.fillStyle='rgba(0,0,0,.18)';for(let i=0;i<n;i++)c.fillRect(rx,y0+i*(y1-y0)/n+(y1-y0)/n-2,rw,2);
                     c.fillStyle=GOLD;for(let i=0;i<n;i++){const Y=y0+i*(y1-y0)/n+(y1-y0)/n-3;c.fillRect(rx-3,Y,rw+6,1.2);}
                     c.fillStyle='rgba(224,191,130,.6)';c.fillRect(rx+3,y0,1,y1-y0);c.fillRect(rx+rw-4,y0,1,y1-y0);
                 };
@@ -78617,55 +79121,71 @@ engineMixin({
                 const shopGlass = (x0,x1,Y)=>{for(let x=x0;x+94<=x1;x+=100){
                     rr(x,Y,94,28,1,'#31333a',GOLD,.8);const g=c.createLinearGradient(x,Y+1,x+90,Y+23);g.addColorStop(0,'#6b6267');g.addColorStop(.6,'#aa8f77');g.addColorStop(1,'#4c464f');rr(x+4,Y+3,86,22,1,g);
                     c.fillStyle='rgba(249,226,180,.4)';c.fillRect(x+8,Y+4,2,19);c.fillStyle='#302c32';c.fillRect(x+46,Y+3,3,22);}};
-                return { GOLD, rr, clip, marble, parquet, checker, border, rug, title, threshold, stairs, shopGlass };
+                // A champagne granite band just inside a room, bronze at both its edges
+                const band = (x,y,w,h,lw=26)=>{const i=10;for(const [X,Y,W,H] of [[x+i,y+i,w-2*i,lw],[x+i,y+h-i-lw,w-2*i,lw],[x+i,y+i,lw,h-2*i],[x+w-i-lw,y+i,lw,h-2*i]])granite(X,Y,W,H,CHAMPAGNE,lw*4,null);
+                    c.strokeStyle=GOLD;c.lineWidth=2;c.strokeRect(x+i,y+i,w-2*i,h-2*i);c.strokeRect(x+i+lw,y+i+lw,w-2*i-2*lw,h-2*i-2*lw);
+                    c.strokeStyle='rgba(234,206,152,.5)';c.lineWidth=.8;c.strokeRect(x+i+lw/2,y+i+lw/2,w-2*i-lw,h-2*i-lw);};
+                return { GOLD, rr, clip, marble, granite, OBSIDIAN, CHAMPAGNE, band, parquet, checker, border, rug, title, threshold, stairs, shopGlass };
             },
 
             _paintEnniFloor() {
-                const cv = document.createElement('canvas'); cv.width=2000; cv.height=1400;
-                const c=cv.getContext('2d'),r=seededRandom(1849),K=this._enniKit(c,r),GOLD=K.GOLD;
-                c.fillStyle='#432630';c.fillRect(0,0,2000,1400);
-                // The lobby: cream marble, a rose border, the medallion under the chandelier
-                K.marble(640,50,720,1300,[210,199,185]);
-                K.border(640,50,720,1300);
+                const cv = document.createElement('canvas'); cv.width=3250; cv.height=1400;
+                const c=cv.getContext('2d'),r=seededRandom(1849),K=this._enniKit(c,r),GOLD=K.GOLD,CH='#cdb48a';
+                c.fillStyle='#121014';c.fillRect(0,0,2000,1400);
+                // The lobby: obsidian granite in bronze-lined slabs, a champagne band, the medallion under the chandelier
+                K.granite(640,50,720,1300,K.OBSIDIAN,120);
+                K.band(640,50,720,1300);
                 const mx=1000,my=820;
-                c.fillStyle='#40353c';c.beginPath();c.arc(mx,my,196,0,Math.PI*2);c.fill();
-                const mg=c.createRadialGradient(mx-55,my-65,10,mx,my,187);mg.addColorStop(0,'#eee4d3');mg.addColorStop(1,'#c7b49d');
-                c.fillStyle=mg;c.beginPath();c.arc(mx,my,187,0,Math.PI*2);c.fill();
-                for(const [rad,lw,col]of[[194,2,GOLD],[179,2,GOLD],[166,1,'#ac8b5c']]){c.strokeStyle=col;c.lineWidth=lw;c.beginPath();c.arc(mx,my,rad,0,Math.PI*2);c.stroke();}
-                for(let i=0;i<48;i++){const a=i*Math.PI/24;c.strokeStyle=i%4?'#b29565':'#755161';c.lineWidth=i%4?1:2;c.beginPath();c.moveTo(mx+Math.cos(a)*170,my+Math.sin(a)*170);c.lineTo(mx+Math.cos(a)*177,my+Math.sin(a)*177);c.stroke();}
-                c.textAlign='center';c.textBaseline='middle';c.font='italic 100px Georgia, serif';c.fillStyle='#895965';c.fillText('EC',mx,my+2);
-                c.font='13px Georgia, serif';c.fillStyle='#725238';c.fillText('ENNI COLE',mx,my+83);
-                c.font='10px Georgia, serif';c.fillText('LIVING EXCEPTIONALLY',mx,my+103);
-                // The rose runner from the door to the medallion
-                K.rr(870,1030,260,320,6,'#71364d','#b89a66',2);c.strokeStyle='rgba(235,209,165,.7)';c.lineWidth=1;c.strokeRect(879,1040,242,300);
-                c.fillStyle='rgba(207,161,165,.14)';for(let y=1048;y<1340;y+=17)for(let x=889;x<1115;x+=17){c.beginPath();c.arc(x,y,1,0,Math.PI*2);c.fill();}
-                c.font='italic 40px Georgia, serif';c.fillStyle='#ead4a5';c.fillText('Enni Cole',1000,1265);
+                c.fillStyle='#0c0b0d';c.beginPath();c.arc(mx,my,198,0,Math.PI*2);c.fill();
+                c.save();c.beginPath();c.arc(mx,my,187,0,Math.PI*2);c.clip();K.granite(mx-190,my-190,380,380,K.CHAMPAGNE,380,null);
+                const mg=c.createRadialGradient(mx-60,my-70,10,mx,my,187);mg.addColorStop(0,'rgba(255,240,210,.18)');mg.addColorStop(1,'rgba(30,20,10,.25)');c.fillStyle=mg;c.fillRect(mx-190,my-190,380,380);
+                // an obsidian compass star inlaid in the champagne, bronze-edged
+                for(let i=0;i<16;i++){const a=i*Math.PI/8,L=i%2?120:165,wd=i%2?.09:.12;c.fillStyle=i%2?'#2a2529':'#17141a';c.beginPath();c.moveTo(mx,my);c.lineTo(mx+Math.cos(a-wd)*58,my+Math.sin(a-wd)*58);c.lineTo(mx+Math.cos(a)*L,my+Math.sin(a)*L);c.lineTo(mx+Math.cos(a+wd)*58,my+Math.sin(a+wd)*58);c.closePath();c.fill();c.strokeStyle='rgba(169,123,69,.8)';c.lineWidth=.8;c.stroke();}
+                c.restore();
+                for(const [rad,lw,col]of[[194,3,GOLD],[187,1,'#e2c28e'],[176,1.5,GOLD],[62,2,GOLD]]){c.strokeStyle=col;c.lineWidth=lw;c.beginPath();c.arc(mx,my,rad,0,Math.PI*2);c.stroke();}
+                c.fillStyle='#141116';c.beginPath();c.arc(mx,my,61,0,Math.PI*2);c.fill();
+                c.textAlign='center';c.textBaseline='middle';c.font='italic 62px Georgia, serif';c.fillStyle=CH;c.fillText('EC',mx,my+2);
+                c.font='12px Georgia, serif';c.fillStyle='#e6cf9f';c.fillText('ENNI COLE',mx,my+225);
+                c.font='9px Georgia, serif';c.fillText('LIVING EXCEPTIONALLY',mx,my+241);
+                // The obsidian runner from the door to the medallion, bronze-edged
+                K.rr(870,1030,260,320,4,'#19161a',GOLD,2.5);c.strokeStyle='rgba(226,194,142,.55)';c.lineWidth=1;c.strokeRect(880,1040,240,300);
+                c.fillStyle='rgba(205,180,138,.09)';for(let y=1048;y<1340;y+=17)for(let x=889;x<1115;x+=17){c.beginPath();c.arc(x,y,1,0,Math.PI*2);c.fill();}
+                c.font='italic 40px Georgia, serif';c.fillStyle='#d8bd8a';c.fillText('Enni Cole',1000,1265);
                 c.font='10px Georgia, serif';c.fillText('FASHION  •  FOOD  •  HOME  •  TECHNOLOGY',1000,1300);
                 // The grand staircase: treads rising north to the salons, a flared first step, the newels' shadows
-                c.fillStyle='rgba(40,22,28,.35)';c.fillRect(856,50,288,370);
+                c.fillStyle='rgba(0,0,0,.4)';c.fillRect(856,50,288,370);
                 K.stairs(862,50,276,410,false);
-                c.fillStyle='#e9dfcf';c.beginPath();c.moveTo(838,410);c.quadraticCurveTo(1000,452,1162,410);c.lineTo(1162,404);c.lineTo(838,404);c.fill();
-                c.strokeStyle=GOLD;c.lineWidth=1.5;c.beginPath();c.moveTo(838,410);c.quadraticCurveTo(1000,452,1162,410);c.stroke();
-                c.fillStyle='#7a3a52';c.beginPath();c.moveTo(937,404);c.lineTo(1063,404);c.lineTo(1063,428);c.quadraticCurveTo(1000,436,937,428);c.fill();
-                c.font='9px Georgia, serif';c.fillStyle='#816d56';c.fillText('THE SALONS  •  COUTURE  •  CUISINE',1000,462);
-                // The Food Hall: cream and rose-grey tiles
-                K.checker(50,50,570,630,'#d9cdbd','#c9b7a8');K.border(50,50,570,630,'#8a5966',8);
-                K.title('THE FOOD HALL',535,230,null,17);c.font='9px Georgia, serif';c.fillStyle='#816d56';c.fillText('FRESH  •  FINE FOODS',535,252);c.fillText('CELLAR  •  LA CUISINE',535,266);
-                // Fashion: pale oak herringbone, the window stage along the glass
-                K.parquet(50,700,570,650,'#cdb294','rgba(110,80,52,.35)');K.border(50,700,570,650,'#8a5966',8);
-                K.rr(68,1246,540,84,4,'#5b2f40',GOLD,1.5);K.rr(74,1252,528,72,3,'#6e3a4e');
-                K.title('FASHION',520,1000,'WOMEN  •  MEN  •  KNITWEAR',20);
+                c.fillStyle='#a48c6a';c.beginPath();c.moveTo(838,410);c.quadraticCurveTo(1000,452,1162,410);c.lineTo(1162,404);c.lineTo(838,404);c.fill();
+                c.strokeStyle=GOLD;c.lineWidth=2;c.beginPath();c.moveTo(838,410);c.quadraticCurveTo(1000,452,1162,410);c.stroke();
+                c.fillStyle='#1c191d';c.beginPath();c.moveTo(937,404);c.lineTo(1063,404);c.lineTo(1063,428);c.quadraticCurveTo(1000,436,937,428);c.fill();
+                c.font='9px Georgia, serif';c.fillStyle='#b59c74';c.fillText('THE SALONS  •  COUTURE  •  CUISINE',1000,462);
+                // The Food Hall: darker champagne granite, the aisles' lanes marked in obsidian strips
+                K.granite(50,50,570,630,K.CHAMPAGNE,90);K.band(50,50,570,630,16);
+                K.title('THE FOOD HALL',540,226,null,16,'#221c18');c.font='9px Georgia, serif';c.fillStyle='#3a3026';c.fillText('FRESH  •  FINE FOODS',540,246);c.fillText('CELLAR  •  LA CUISINE',540,260);
+                // Fashion: obsidian and champagne granite, laid on the diagonal feel of a checker
+                K.granite(50,700,570,650,K.OBSIDIAN,110,GOLD,K.CHAMPAGNE);K.band(50,700,570,650,16);
+                K.rr(68,1246,540,84,4,'#141116',GOLD,1.5);K.rr(74,1252,528,72,3,'#221d22');
+                K.rr(452,1030,136,46,3,'rgba(14,12,15,.72)',GOLD,1);K.title('FASHION',520,1046,null,17,'#e2c792');c.font='8px Georgia, serif';c.fillStyle='#bfa57a';c.fillText('WOMEN  •  MEN  •  KNITWEAR',520,1066);
                 // Furniture: walnut herringbone and the room sets' rugs
-                K.parquet(1380,50,570,630,'#8d6a4f','rgba(50,30,20,.4)');K.border(1380,50,570,630,'#6e4a52',8);
-                K.rug(1400,80,326,276,'#8c796b');K.rug(1706,86,226,268,'#684552');K.rug(1620,448,296,206,'#9b8973');
+                K.parquet(1380,50,570,630,'#5e4535','rgba(20,12,8,.5)');K.band(1380,50,570,630,14);
+                K.rug(1400,80,326,276,'#6e6052');K.rug(1706,86,226,268,'#3b3237');K.rug(1620,448,296,206,'#7a6b58');
                 K.title('FURNITURE',1490,440,'LIVING  •  SLEEP  •  DINING',19,'#f0dcc0');
-                // Electronics: dark polished stone with a cool inlay line
-                K.marble(1380,700,570,650,[58,54,62],80,false);
+                // Electronics: obsidian granite with a cool inlay line
+                K.granite(1380,700,570,650,K.OBSIDIAN,95,'#5c6a78');
                 c.strokeStyle='rgba(150,190,230,.35)';c.lineWidth=1.5;c.strokeRect(1400,720,530,610);
                 K.title('ELECTRONICS',1470,806,'SCREENS  •  SOUND  •  HOME',17,'#d9e4f0');
                 // Thresholds under the arches, the shopfront glass either side of the door
                 for(const d of [{x:620,y:300,w:20,h:160},{x:620,y:950,w:20,h:160},{x:1360,y:300,w:20,h:160},{x:1360,y:950,w:20,h:160},{x:440,y:680,w:160,h:20},{x:1400,y:680,w:160,h:20}])K.threshold(d);
                 for(const [a,b] of [[70,610],[650,846],[1156,1350],[1390,1930]])K.shopGlass(a,b,1317);
+                // The Emporium: champagne granite, obsidian walks between the wooden aisles, a medallion by the tills
+                K.granite(1970,50,1230,1300,K.CHAMPAGNE,100);
+                for(let i=0;i<12;i++){const X=2070+i*90;c.fillStyle='rgba(20,17,22,.85)';c.fillRect(X-8,170,56,820);c.fillStyle=GOLD;c.fillRect(X-8,170,1.2,820);c.fillRect(X+47,170,1.2,820);}
+                K.granite(1990,548,1190,64,K.OBSIDIAN,64,GOLD);
+                K.band(1970,50,1230,1300,18);
+                c.textAlign='center';c.textBaseline='middle';c.font='italic 34px Georgia, serif';c.fillStyle='#2a201a';c.fillText('The Emporium',2585,1110);
+                c.font='9px Georgia, serif';c.fillStyle='#3a3026';c.fillText('PANTRY  •  CELLAR  •  HOME  •  BOOKS  •  TOYS  •  APPAREL',2585,1138);
+                for(const d of [{x:1950,y:300,w:20,h:160},{x:1950,y:950,w:20,h:160}])K.threshold(d);
+                K.shopGlass(1990,3180,1317);
                 return cv;
             },
 
@@ -78747,6 +79267,8 @@ engineMixin({
                 const t=_frameTime/1000;
                 ctx.save();
                 for(const [X,Y,R]of[[155,230,0],[375,230,0],[220,612,0],[205,915,0],[205,1085,0],[1520,240,12],[1767,548,12],[1840,215,10],[755,1180,9],[1245,1180,9]])this._enniPendant(ctx,X,Y,R);
+                for(let i=0;i<7;i++){this._enniPendant(ctx,2115+i*180,120,10);this._enniPendant(ctx,2115+i*180,1060,10);}
+                for(let i=0;i<13;i++)this._enniPendant(ctx,2070-25+i*90,580,0);
                 ctx.globalCompositeOperation='lighter';
                 for(const [X,Y] of [[853,419],[1147,419]])glowA(ctx,X,Y,46,'255,236,200',.16);
                 for(let i=0;i<5;i++)glowA(ctx,118+i*100,1288,34,'255,214,170',.12);       // the window stage's spotlights

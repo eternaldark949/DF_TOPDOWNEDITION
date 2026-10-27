@@ -35,6 +35,21 @@
         // ============================================================================
         /* Map-building shorthands (each map's case aliases them as F, S, A, L) */
         /** Decor that doesn't move (mass 1e7), drawn by its decorType; `color` is only the fallback fill. */
+        // The Emporium's aisles (Enni Cole): each one's sign and what its shelves carry, front view (_enniAisleArt)
+        const EMPORIUM_AISLES = [
+            ['BAKERY & CEREAL', ['box', 'box', 'can']],
+            ['PANTRY', ['can', 'box', 'jar']],
+            ['TEA & COFFEE', ['box', 'jar', 'can']],
+            ['PRESERVES', ['jar', 'jar', 'box']],
+            ['CONFECTIONERY', ['box', 'jar', 'toy']],
+            ['WINE & SPIRITS', ['bottle', 'bottle', 'box']],
+            ['HOME & LINEN', ['linen', 'linen', 'box']],
+            ['BATH & BEAUTY', ['beauty', 'beauty', 'jar']],
+            ['BOOKS & STATIONERY', ['book', 'book', 'box']],
+            ['TOYS & GAMES', ['toy', 'toy', 'box']],
+            ['MENSWEAR', ['fold', 'fold', 'box']],
+            ['WOMENSWEAR', ['fold', 'beauty', 'fold']]
+        ];
         const decorPropsIn = color => (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color, decorType }, extra));
         /** A round soft light (light pass only). */
         const softLight = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
@@ -417,17 +432,20 @@
                         // The Food Hall: the cellar and the bakery on the north wall, produce and pantry islands,
                         // the chilled cases, and La Cuisine's counter of prepared dishes
                         F(70, 66, 300, 62, 'ec_wine'), F(392, 66, 210, 72, 'ec_bakery'),
-                        F(80, 180, 150, 100, 'ec_produce'), F(300, 180, 150, 100, 'ec_produce', { variant: 1 }),
-                        F(80, 330, 150, 60, 'ec_grocery'), F(300, 330, 150, 60, 'ec_grocery', { variant: 1 }),
-                        F(70, 440, 330, 76, 'ec_cold'), F(70, 572, 300, 80, 'ec_deli'),
+                        F(84, 166, 384, 46, 'ec_gondola', { variant: 2, decor: { aisle: 1 } }),
+                        F(84, 262, 384, 46, 'ec_gondola', { variant: 0, decor: { aisle: 2 } }),
+                        F(84, 358, 384, 46, 'ec_gondola', { variant: 1, decor: { aisle: 3 } }),
+                        F(70, 456, 330, 76, 'ec_cold'), F(70, 572, 300, 80, 'ec_deli'),
                         F(470, 456, 50, 50, 'ec_plant'),
-                        // Fashion: rails along the north wall, knitwear cubbies, folded tables and round rails,
+                        // Fashion: rails along the north wall, knitwear cubbies, clothing aisles, two-tier round rails,
                         // and dressed forms in the street windows
                         F(80, 726, 170, 36, 'ec_rack'), F(266, 726, 150, 36, 'ec_rack', { variant: 2 }),
                         F(56, 820, 32, 290, 'ec_shelfwall'),
-                        F(140, 880, 130, 70, 'ec_fashion_table'), F(140, 1050, 130, 70, 'ec_fashion_table', { variant: 2 }),
-                        F(340, 860, 80, 80, 'ec_round_rack'), F(340, 1040, 80, 80, 'ec_round_rack', { variant: 3 }),
-                        F(470, 1150, 80, 80, 'ec_round_rack', { variant: 4 }),
+                        F(124, 812, 300, 50, 'ec_cloth_aisle', { variant: 0, decor: { aisle: 'A' } }),
+                        F(124, 912, 300, 50, 'ec_cloth_aisle', { variant: 1, decor: { aisle: 'B' } }),
+                        F(470, 800, 104, 104, 'ec_round_rack', { variant: 0 }), F(470, 924, 104, 104, 'ec_round_rack', { variant: 1 }),
+                        F(140, 1030, 110, 110, 'ec_round_rack', { variant: 2 }), F(300, 1050, 96, 96, 'ec_round_rack', { variant: 3 }),
+                        F(462, 1110, 96, 96, 'ec_round_rack', { variant: 4 }),
                         ...[0, 1, 2, 3, 4].map(i => F(98 + i * 100, 1268, 40, 40, 'ec_mannequin', { variant: i })),
                         // Furniture: a living room, a dressed bedroom, a dining room, each on its rug
                         F(1420, 100, 200, 64, 'ec_sofa'), F(1636, 176, 64, 64, 'ec_armchair', { face: 'W' }),
@@ -439,7 +457,13 @@
                         F(1480, 860, 175, 88, 'ec_laptop'), F(1730, 860, 130, 88, 'ec_tablet'),
                         F(1480, 1030, 175, 88, 'ec_audio'), F(1730, 1030, 130, 88, 'ec_tablet', { variant: 1 }),
                         F(1450, 1196, 380, 78, 'ec_appliances'),
-                        F(1890, 1100, 44, 64, 'ec_vending', { interactionType: 'vending_machine' })
+                        F(1890, 1100, 44, 64, 'ec_vending', { interactionType: 'vending_machine' }),
+                        // The Emporium: a dozen tall wooden aisles in two runs about a cross-aisle (art: _drawEnniAisles),
+                        // the tills along the windows
+                        ...EMPORIUM_AISLES.flatMap(([cat, kinds], i) => [0, 1].map(run => F(2070 + i * 90, run ? 620 : 180, 40, 360, 'ec_tall_aisle',
+                            { decor: { aisle: i + 1, cat, kinds, run, sign: run ? undefined : 580 }, visible: false }))),
+                        F(2120, 1150, 170, 60, 'ec_checkout'), F(2880, 1150, 170, 60, 'ec_checkout', { variant: 1 }),
+                        F(2000, 1260, 40, 40, 'ec_topiary'), F(3130, 1260, 40, 40, 'ec_topiary')
                     ];
                     e.npcs = [ new NPC(755, 1238, "Valentina", 'vip'), new NPC(330, 1180, "Model Kira", 'dancer'),
                         new NPC(1665, 975, "Concierge Lux", 'robot_gold') ];
@@ -454,7 +478,9 @@
                         S(330, 300, 260, '#ffe3b2', 0.28), S(330, 560, 220, '#ffe6c2', 0.26),
                         S(330, 1000, 280, '#ffe6c2', 0.28), S(330, 1290, 200, '#ffdcae', 0.32),
                         S(1665, 360, 280, '#ffe2b2', 0.26), S(1665, 1000, 280, '#e1eaff', 0.24),
-                        S(755, 1180, 150, '#ffdaa0', 0.36), S(1245, 1180, 150, '#ffdaa0', 0.36)
+                        S(755, 1180, 150, '#ffdaa0', 0.36), S(1245, 1180, 150, '#ffdaa0', 0.36),
+                        A(2585, 700, 1200, 1260, '#ffdcb3', 0.1), ...[0, 1, 2, 3, 4, 5, 6].flatMap(i => [S(2115 + i * 180, 120, 200, '#ffe2b2', 0.26), S(2115 + i * 180, 1060, 200, '#ffe2b2', 0.26)]),
+                        ...[0, 1, 2, 3].map(i => S(2160 + i * 285, 580, 230, '#ffe6c2', 0.24))
                     ];
                     break;
                 }

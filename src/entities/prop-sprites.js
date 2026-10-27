@@ -34,6 +34,7 @@
         };
         // Animated pieces left as vector art (true, or true while the test holds); the comment says what moves
         const PROP_LIVE = {
+            ec_tall_aisle: true,                                                                                                 // drawn with the floor (_drawEnniAisles)
             hod_candelabra: true, hod_altar: true, hod_console: true, hod_fountain: true, hod_coffin: true, hod_reliquary: true,   // flames, crystal, ripples, glow, bob
             hod_table: p => !!(p.decor && p.decor.candles),                                                                      // candle flames
             dn_float_chaise: true, dn_float_chair: true, dn_fountain: true,                                                      // hover bob, rings and rift

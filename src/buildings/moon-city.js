@@ -93,6 +93,7 @@
 
         const MCX = {
             CANOPY_Z: 12, SIGN_Z: 24, FIN: 46, CANOPY_R: 60,
+            S: 2,                       // facade art px per world unit (_mcFaceArt)
             C: {
                 lacquer: '#0b0810', plum: '#1a1022', wall: '#140c1a', fin: '#2a1a36',
                 violet: '#8a5cff', lavender: '#c8a8ff', lilac: '#e8d8ff',
@@ -101,6 +102,8 @@
                 water: '#1c1240'
             }
         };
+
+        const _mcFontReady = () => { try { return !document.fonts || document.fonts.check('bold 8px Montserrat'); } catch (e) { return true; } };
 
         /** A crescent moon at (x, y), radius r, horns turned by `rot`. */
         function _mcCrescent(ctx, x, y, r, rot = -0.5) {
@@ -176,54 +179,125 @@
                 return { n, beat, bar, kick: Math.pow(1 - beat, 3) };
             },
 
-            /** A wall: lacquer between violet neon fins, gold pilasters every third, smoked-glass bands, a deco chevron
-                frieze under the gold cornice. Each kind on a face goes out as one path (panes, fins, pilasters, the
-                frieze; nothing of one kind touches), the fins at night one stroke a fin (each breathes on its own). */
+            /**
+             * A wall, art deco: black lacquer between violet neon fins, fluted gold pilasters every third, tall smoked
+             * glass with crescent portholes, a marquee of bulbs and a chevron frieze under a stepped gold parapet, the
+             * name in gold capitals on the long walls, and a stepped sunburst portal round the door. Painted once
+             * (unlit and lit) and laid on the face in one affine draw (the walls lean linearly); at night the lit
+             * twin pumps on the kick and the fins still breathe one by one, live.
+             */
             _mcFace(ctx, f, P, emissive) {
                 if (f.side === 'C') return;
                 const [ax, ay] = [f.x1, f.y1], [bx, by] = [f.x2, f.y2];
                 const [cx, cy] = P(bx, by), [dx, dy] = P(ax, ay);
                 if (Math.hypot(dx - ax, dy - ay) < 4) return;
+                const len = Math.hypot(bx - ax, by - ay), n = Math.max(2, Math.round(len / MCX.FIN));
+                const store = this._mcTex || (this._mcTex = {}), key = `${f.x1 | 0},${f.y1 | 0},${f.x2 | 0},${f.y2 | 0}`;
+                let art = store[key];
+                if (!art || (art.fontless && !(art.fontless = !_mcFontReady()))) art = store[key] = this._mcFaceArt(f, len, n);
+                const tex = emissive ? art.lit : art.day, W = art.L, H = art.H, S = MCX.S;
+                // (u along the base, v up from the street): the top edge is the base leaned, k times as long, so the
+                // face is a trapezoid, not a parallelogram; it's laid in tiles, each one affine about its centre
                 const at = (u, v) => { const x0 = ax + (bx - ax) * u, y0 = ay + (by - ay) * u, x1 = dx + (cx - dx) * u, y1 = dy + (cy - dy) * u; return [x0 + (x1 - x0) * v, y0 + (y1 - y0) * v]; };
-                const len = Math.hypot(bx - ax, by - ay), n = Math.max(2, Math.round(len / MCX.FIN)), C = MCX.C;
-                const quad = (path, u0, u1, v0, v1) => { const a = at(u0, v0), b = at(u1, v0), c = at(u1, v1), d = at(u0, v1); path.moveTo(a[0], a[1]); path.lineTo(b[0], b[1]); path.lineTo(c[0], c[1]); path.lineTo(d[0], d[1]); path.closePath(); return path; };
-                const seg = (path, u0, v0, u1, v1) => { const a = at(u0, v0), b = at(u1, v1); path.moveTo(a[0], a[1]); path.lineTo(b[0], b[1]); return path; };
-                const panes = new Path2D(), frieze = new Path2D(), pil = new Path2D();
-                for (let i = 0; i < n; i++) quad(panes, (i + 0.18) / n, (i + 0.82) / n, 0.3, 0.74);
-                for (let j = 0, m = n * 3; j <= m; j++) { const p = at(j / m, j % 2 ? 0.83 : 0.91); if (j) frieze.lineTo(p[0], p[1]); else frieze.moveTo(p[0], p[1]); }   // the chevrons
-                for (let i = 0; i <= n; i += 3) seg(pil, i / n, 0.04, i / n, 0.98);
-                if (n % 3) seg(pil, 1, 0.04, 1, 0.98);                                                                      // (a pilaster at each corner)
-                if (!emissive) {
-                    // smoked glass between the fins
-                    const sun = sunNow(), day = sun ? sun.day : 0;
-                    ctx.fillStyle = 'rgba(12, 6, 20, 0.92)'; ctx.fill(panes);
-                    if (day > 0.05) { ctx.fillStyle = `rgba(168, 160, 220, ${0.22 * day})`; ctx.fill(panes); }
-                    ctx.lineWidth = 0.8; ctx.strokeStyle = 'rgba(232, 194, 122, 0.3)'; ctx.stroke(panes);                // a hairline of gold round each pane
-                    const fins = new Path2D();
-                    for (let i = 0; i <= n; i++) if (i % 3) seg(fins, i / n, 0.06, i / n, 0.96);
-                    ctx.lineWidth = 2.2; ctx.strokeStyle = C.fin; ctx.stroke(fins);                                   // the fins
-                    ctx.lineWidth = 3.4; ctx.strokeStyle = C.goldDk; ctx.stroke(pil);                                 // gold pilasters
-                    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255, 241, 194, 0.35)'; ctx.stroke(pil);
-                    ctx.lineWidth = 1.4; ctx.strokeStyle = C.goldDk; ctx.stroke(seg(new Path2D(), 0, 0.97, 1, 0.97));   // gold cornice and plinth
-                    ctx.lineWidth = 0.8; ctx.stroke(seg(new Path2D(), 0, 0.06, 1, 0.06));
-                    ctx.strokeStyle = 'rgba(232, 194, 122, 0.25)'; ctx.stroke(seg(new Path2D(), 0, 0.8, 1, 0.8));
-                    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(232, 194, 122, 0.55)'; ctx.stroke(frieze);              // the chevron frieze
-                    return;
+                const nu = Math.max(1, Math.ceil(Math.hypot(cx - dx, cy - dy) / 40)), nv = 4;
+                const B = emissive ? this._mcBeat() : null, op = ctx.globalCompositeOperation, ga = ctx.globalAlpha;
+                if (emissive) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = ga * (0.62 + 0.38 * B.kick); }
+                for (let i = 0; i < nu; i++) for (let j = 0; j < nv; j++) {
+                    const u0 = i / nu, u1 = (i + 1) / nu, v0 = j / nv, v1 = (j + 1) / nv, um = (u0 + u1) / 2, vm = (v0 + v1) / 2;
+                    const L0 = at(u0, vm), L1 = at(u1, vm), T0 = at(um, v1), B0 = at(um, v0), M = at(um, vm);
+                    const sw = (u1 - u0) * W, sh = (v1 - v0) * H;
+                    const xa = (L1[0] - L0[0]) / sw, xb = (L1[1] - L0[1]) / sw, ya = (B0[0] - T0[0]) / sh, yb = (B0[1] - T0[1]) / sh;
+                    // texture y runs down from the parapet: this tile is y (1 - v1)H .. (1 - v0)H
+                    ctx.save();
+                    ctx.transform(xa, xb, ya, yb, M[0] - xa * sw / 2 - ya * sh / 2, M[1] - xb * sw / 2 - yb * sh / 2);
+                    ctx.drawImage(tex, u0 * W * S, (1 - v1) * H * S, sw * S, sh * S, 0, 0, sw, sh);
+                    ctx.restore();
                 }
-                // At night: the fins breathe violet and lavender, pumping on the kick; the chevrons run rose
-                const B = this._mcBeat(), t = _gameTimeSec, op = ctx.globalCompositeOperation;
-                ctx.globalCompositeOperation = 'lighter';
-                ctx.fillStyle = `rgba(200, 168, 255, ${0.07 + 0.05 * B.kick})`; ctx.fill(panes);                    // a lavender glow behind the glass
+                ctx.globalCompositeOperation = op; ctx.globalAlpha = ga;
+                if (!emissive) return;
+                // the fins breathe violet and lavender, each on its own, pumping on the kick
+                const t = _gameTimeSec;
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 for (let i = 0; i <= n; i++) {
                     if (!(i % 3) || (i === n && n % 3)) continue;
-                    const a = 0.32 + 0.22 * Math.sin(t * 0.9 + i * 0.8) + 0.35 * B.kick, fin = seg(new Path2D(), i / n, 0.08, i / n, 0.94);
-                    ctx.lineWidth = 2.6; ctx.strokeStyle = `rgba(138, 92, 255, ${Math.max(0, a) * 0.7})`; ctx.stroke(fin);
-                    ctx.lineWidth = 1; ctx.strokeStyle = `rgba(232, 216, 255, ${Math.max(0, a)})`; ctx.stroke(fin);
+                    const a = 0.32 + 0.22 * Math.sin(t * 0.9 + i * 0.8) + 0.35 * B.kick, p0 = at(i / n, 0.08), p1 = at(i / n, 0.82);
+                    ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.lineTo(p1[0], p1[1]);
+                    ctx.lineWidth = 2.6; ctx.strokeStyle = `rgba(138, 92, 255, ${Math.max(0, a) * 0.6})`; ctx.stroke();
+                    ctx.lineWidth = 1; ctx.strokeStyle = `rgba(232, 216, 255, ${Math.max(0, a)})`; ctx.stroke();
                 }
-                ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255, 241, 194, 0.4)'; ctx.stroke(pil);                      // the pilasters catch gold
-                ctx.lineWidth = 1.6; ctx.strokeStyle = `rgba(255, 90, 138, ${0.3 + 0.3 * B.kick})`; ctx.stroke(frieze);
-                ctx.lineWidth = 1; ctx.strokeStyle = `rgba(255, 241, 194, 0.55)`; ctx.stroke(seg(new Path2D(), 0, 0.97, 1, 0.97));   // the cornice catches gold
-                ctx.globalCompositeOperation = op;
+                ctx.restore(); ctx.globalCompositeOperation = op;
+            },
+
+            /** A wall's art (unlit, lit) at MCX.S px a unit: x along the wall, y down from the parapet (0) to the street (H). */
+            _mcFaceArt(f, L, n) {
+                const C = MCX.C, S = MCX.S, H = Math.min(this.floors, CONFIG.BUILDINGS.MAX_FLOORS) * CONFIG.BUILDINGS.FLOOR_HEIGHT;
+                const G = this._mcGeo(), door = f.side === 'S' && Math.abs(f.y1 - G.door.y) < 1 && G.door.x > Math.min(f.x1, f.x2) && G.door.x < Math.max(f.x1, f.x2);
+                const mk = () => { const cv = document.createElement('canvas'); cv.width = Math.ceil(L * S); cv.height = Math.ceil(H * S); const c = cv.getContext('2d'); c.scale(S, S); return [cv, c]; };
+                const [dcv, d] = mk(), [lcv, l] = mk(), bw = L / n;
+                const PAR = 5, BULB = 7.5, FR0 = 9.5, FR1 = 14, GL0 = 17, GL1 = H - 7;
+                // lacquer, a breath of plum low down; the black marble plinth
+                { const g = d.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#0b0810'); g.addColorStop(1, '#170d1f'); d.fillStyle = g; d.fillRect(0, 0, L, H);
+                  d.fillStyle = C.marble; d.fillRect(0, H - 4, L, 4); d.fillStyle = C.goldDk; d.fillRect(0, H - 4, L, .6); }
+                // the bays: tall smoked glass, a crescent porthole high in every other one
+                for (let i = 0; i < n; i++) {
+                    const X0 = i * bw + bw * .2, X1 = (i + 1) * bw - bw * .2, W = X1 - X0;
+                    d.fillStyle = 'rgba(12, 6, 20, 0.95)'; d.fillRect(X0, GL0, W, GL1 - GL0);
+                    d.fillStyle = 'rgba(168, 160, 220, 0.08)'; d.beginPath(); d.moveTo(X0, GL0); d.lineTo(X0 + W * .5, GL0); d.lineTo(X0, GL0 + (GL1 - GL0) * .6); d.fill();
+                    d.strokeStyle = 'rgba(232, 194, 122, 0.45)'; d.lineWidth = .4; d.strokeRect(X0, GL0, W, GL1 - GL0);
+                    for (let k = 1; k < 4; k++) { d.fillStyle = 'rgba(232, 194, 122, 0.18)'; d.fillRect(X0, GL0 + (GL1 - GL0) * k / 4, W, .3); }
+                    l.fillStyle = 'rgba(200, 168, 255, 0.22)'; l.fillRect(X0, GL0, W, GL1 - GL0);
+                    if (i % 2 === 0) { const px = (X0 + X1) / 2, py = GL0 + 7, r = Math.min(4.2, W * .32);
+                        d.fillStyle = '#0a0610'; d.beginPath(); d.arc(px, py, r, 0, Math.PI * 2); d.fill(); d.strokeStyle = C.gold; d.lineWidth = .8; d.stroke();
+                        for (const c of [d, l]) { c.fillStyle = c === d ? '#8f7bb0' : 'rgba(240, 225, 255, 1)'; _mcCrescent(c, px, py, r * .7, -0.5); c.fill(); }
+                        l.fillStyle = 'rgba(200, 160, 255, .35)'; l.beginPath(); l.arc(px, py, r + 2, 0, Math.PI * 2); l.fill(); }
+                }
+                // fins (violet neon tubes on lacquer) and fluted gold pilasters every third, a stepped deco capital each
+                for (let i = 0; i <= n; i++) {
+                    const X = Math.max(1.5, Math.min(L - 1.5, i * bw));
+                    if (i % 3 && !(i === n && n % 3)) {
+                        d.fillStyle = C.fin; d.fillRect(X - 1.5, FR1, 3, H - FR1 - 4); d.fillStyle = 'rgba(138, 92, 255, .55)'; d.fillRect(X - .4, FR1 + 2, .8, H - FR1 - 8);
+                        l.fillStyle = 'rgba(138, 92, 255, .5)'; l.fillRect(X - 1.6, FR1 + 2, 3.2, H - FR1 - 8); l.fillStyle = 'rgba(232, 216, 255, .9)'; l.fillRect(X - .45, FR1 + 2, .9, H - FR1 - 8);
+                        continue;
+                    }
+                    const pw = 4.2, x0 = Math.max(0, Math.min(L - pw, X - pw / 2));
+                    d.fillStyle = C.goldDk; d.fillRect(x0, FR1, pw, H - FR1 - 4);
+                    d.fillStyle = 'rgba(255, 241, 194, .55)'; for (let k = 0; k < 3; k++) d.fillRect(x0 + .7 + k * 1.2, FR1 + 3, .45, H - FR1 - 10);
+                    d.fillStyle = C.gold; d.fillRect(x0 - 1, FR1, pw + 2, 1.6); d.fillRect(x0 - .5, FR1 + 1.6, pw + 1, 1.2); d.fillRect(x0 - 1, H - 6, pw + 2, 2);
+                    l.fillStyle = 'rgba(255, 220, 160, .28)'; l.fillRect(x0, FR1, pw, H - FR1 - 4);
+                }
+                // the stepped parapet and its gold edge
+                d.fillStyle = '#07050a'; d.fillRect(0, 0, L, PAR);
+                for (let i = 0; i <= n; i += 3) { const X = Math.min(L, i * bw); d.fillStyle = '#07050a'; d.fillRect(X - 7, -1, 14, 2); d.fillStyle = C.gold; d.fillRect(X - 7, 0, 14, .5); d.fillRect(X - 4, -1, 8, .5); }
+                d.fillStyle = C.gold; d.fillRect(0, PAR - .8, L, .8);
+                // the marquee: a row of bulbs
+                for (let x = 2; x < L - 1; x += 3.2) { d.fillStyle = '#6a5530'; d.beginPath(); d.arc(x, BULB, .75, 0, Math.PI * 2); d.fill();
+                    l.fillStyle = 'rgba(255, 236, 190, 1)'; l.beginPath(); l.arc(x, BULB, .8, 0, Math.PI * 2); l.fill(); l.fillStyle = 'rgba(255, 200, 140, .3)'; l.beginPath(); l.arc(x, BULB, 2.2, 0, Math.PI * 2); l.fill(); }
+                // the chevron frieze, running rose at night
+                d.fillStyle = C.plum; d.fillRect(0, FR0, L, FR1 - FR0);
+                for (const [c, col, w] of [[d, 'rgba(232, 194, 122, .75)', .6], [l, 'rgba(255, 90, 138, .8)', .8]]) { c.strokeStyle = col; c.lineWidth = w; c.beginPath(); for (let x = 0, k = 0; x <= L; x += 3, k++) c.lineTo(x, k % 2 ? FR0 + 1 : FR1 - 1); c.stroke(); }
+                d.fillStyle = C.goldDk; d.fillRect(0, FR0, L, .5); d.fillRect(0, FR1 - .5, L, .5);
+                // the name in gold capitals on the long walls, crescents either side
+                if (L > 260 && !door) {
+                    const cx = L / 2, cy = GL0 + 14;
+                    d.fillStyle = '#0b0810'; d.fillRect(cx - 44, cy - 6, 88, 12);
+                    for (const [c, col] of [[d, C.gold], [l, 'rgba(240, 220, 255, 1)']]) {
+                        c.save(); c.font = 'bold 7.5px Montserrat, "Poiret One", sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = col;
+                        const txt = 'M O O N   C I T Y'; c.fillText(txt, cx, cy + .3); c.restore();
+                        c.fillStyle = col; _mcCrescent(c, cx - 38, cy, 3, -0.5); c.fill(); _mcCrescent(c, cx + 38, cy, 3, Math.PI + 0.5); c.fill(); }
+                    d.strokeStyle = C.goldDk; d.lineWidth = .5; d.strokeRect(cx - 44, cy - 6, 88, 12);
+                }
+                // the portal: stepped gold frames round a rose velvet door, a sunburst over it
+                if (door) {
+                    const u = Math.abs(G.door.x - f.x1) / L, cx = (f.x2 > f.x1 ? u : 1 - u) * L, top = GL0 + 2, bot = H - 4, dt = Math.max(top + 16, bot - 46);
+                    d.fillStyle = '#0b0810'; d.fillRect(cx - 34, FR1, 68, bot - FR1);
+                    for (let k = 0; k < 3; k++) { const w = 30 - k * 7, y0 = dt - 16 + k * 4; d.strokeStyle = k % 2 ? C.goldDk : C.gold; d.lineWidth = 1.1;
+                        d.beginPath(); d.moveTo(cx - w, bot); d.lineTo(cx - w, y0 + 6); d.lineTo(cx - w + 3, y0 + 6); d.lineTo(cx - w + 3, y0 + 3); d.lineTo(cx - w + 6, y0 + 3); d.lineTo(cx - w + 6, y0); d.lineTo(cx + w - 6, y0); d.lineTo(cx + w - 6, y0 + 3); d.lineTo(cx + w - 3, y0 + 3); d.lineTo(cx + w - 3, y0 + 6); d.lineTo(cx + w, y0 + 6); d.lineTo(cx + w, bot); d.stroke(); }
+                    d.fillStyle = C.velvet; d.fillRect(cx - 9, dt, 18, bot - dt); d.fillStyle = C.velvetLt; d.fillRect(cx - .4, dt, .8, bot - dt);
+                    l.fillStyle = 'rgba(255, 58, 106, .7)'; l.fillRect(cx - 9, dt, 18, bot - dt);
+                    for (let k = 0; k < 13; k++) { const a = Math.PI + k * Math.PI / 12; for (const [c, col] of [[d, 'rgba(232, 194, 122, .8)'], [l, 'rgba(255, 150, 190, .9)']]) { c.strokeStyle = col; c.lineWidth = .5; c.beginPath(); c.moveTo(cx + Math.cos(a) * 3, dt - 1 + Math.sin(a) * 3); c.lineTo(cx + Math.cos(a) * 12, dt - 1 + Math.sin(a) * 9); c.stroke(); } }
+                    d.fillStyle = C.gold; d.beginPath(); d.arc(cx, dt - 1, 2.4, Math.PI, 0); d.fill();
+                }
+                return { day: dcv, lit: lcv, L, H, fontless: !_mcFontReady() };
             },
 
             /** The roof (drawn in the roof plane): stepped lacquer decks in gold parapets; on the hall the moon dome over

@@ -2139,6 +2139,32 @@ test('Junction turns curve straight into the lane out: no swing the other way fi
   ok(r.p90 < 4, `cars turn in from their lane without swinging out first (90% within ${r.p90.toFixed(1)} px)`);
 }, {affine:true});
 
+test('Overhead: a tall thing hides whoever stands behind it, and draws under whoever stands in front', env => {
+  const r = value(env, `
+    const order = [], ctx = { save() {}, restore() {}, clip() {} };
+    const game = { view: { x: 0, y: 0, zoom: 1 }, canvas: { width: 1280, height: 800 }, player: { x: 0, y: 0 }, npcs: [{ x: 160, y: 0 }], enemies: [], teammates: [], roomSystem: null };
+    // a shelf at x 100–120 between the camera and the NPC (x 160, under its lean); one at x -220 with no one behind it
+    Overhead.add({ x: 100, y: -50, w: 20, h: 100 }, () => order.push('near'), { hull: Overhead.leanHull(100, -50, 20, 100, 0, 0, 1.6) });
+    Overhead.add({ x: -220, y: -50, w: 20, h: 100 }, () => order.push('far'), { hull: Overhead.leanHull(-220, -50, 20, 100, 0, 0, 1.6) });
+    Overhead.add({ x: 300, y: 0, w: 10, h: 10 }, () => order.push('sign'), { above: true });
+    Overhead.drawUnder(ctx, game); order.push('people'); Overhead.flush(ctx, game);
+    return { order, left: Overhead.items.length };`);
+  equal(r.order, ['far', 'people', 'near', 'sign'], 'the free shelf under the people; the hiding one and the sign over them');
+  equal(r.left, 0, 'nothing carries into the next frame');
+});
+
+test('Overhead: a shelf right beside her draws again over its own footprint, so her arms go behind it', env => {
+  const r = value(env, `
+    const order = [], clips = [], ctx = { save() {}, restore() {}, clip() { clips.push(order.length); }, beginPath() {}, rect(x, y, w, h) { this._r = [x, y, w, h]; } };
+    const game = { view: { x: 0, y: 0, zoom: 1 }, canvas: { width: 1280, height: 800 }, player: { x: 0, y: 0 }, npcs: [], enemies: [], teammates: [], roomSystem: null };
+    Overhead.add({ x: 14, y: -50, w: 40, h: 100 }, () => order.push('shelf'), { hull: Overhead.leanHull(14, -50, 40, 100, 0, 0, 1.1) });
+    Overhead.drawUnder(ctx, game); order.push('her'); Overhead.flush(ctx, game);
+    return { order, clips, rect: ctx._r };`);
+  equal(r.order, ['shelf', 'her', 'shelf'], 'under her, then again over her');
+  equal(r.clips, [2], 'the second time clipped');
+  equal(r.rect, [14, -50, 40, 100], 'to its footprint');
+});
+
 test('Every bundled map loads, updates and draws without runtime errors', env => {
   const maps = Object.keys(env.probe.MAPS);
   ok(maps.length >= 20, 'all bundled maps are present');
