@@ -3918,6 +3918,26 @@
             .sk-dial { width: 112px; height: 112px; }
             .sk-level { font-size: max(6px, 1.6rem - var(--font-trim)); }
         }
+
+        /* The Clothing Dyer (engine/dyer.js): her in the window, the pieces, the palette */
+        .dy-head { margin: 10px 0 18px; gap: 22px; align-items: center; }
+        .dy-stage { flex-shrink: 0; width: 150px; height: 150px; border-radius: 50%; border: 1px solid rgba(202, 176, 250, 0.35);
+            background: radial-gradient(circle, rgba(58, 29, 120, 0.45), rgba(14, 7, 24, 0.85)); box-shadow: inset 0 0 22px rgba(202, 176, 250, 0.18); overflow: hidden; }
+        .dy-stage canvas { width: 100%; height: 100%; display: block; }
+        .dy-outfits, .dy-slots { margin-bottom: 14px; }
+        .dy-outfits .dot, .dy-slots .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35); }
+        .dy-palette { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 9px; margin: 4px 0 16px; }
+        .dy-swatch { position: relative; aspect-ratio: 1; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.25); background: var(--c); cursor: pointer; padding: 0;
+            box-shadow: inset 0 -4px 8px rgba(0, 0, 0, 0.35), inset 0 3px 6px rgba(255, 255, 255, 0.2); transition: transform 0.12s; }
+        .dy-swatch:hover { transform: scale(1.08); }
+        .dy-swatch.on { border: 2px solid #fff; box-shadow: 0 0 12px color-mix(in srgb, var(--c) 70%, #fff), inset 0 -4px 8px rgba(0, 0, 0, 0.3); }
+        .dy-custom { display: flex; align-items: center; justify-content: center; background: conic-gradient(#dc143c, #e8c27a, #00b39b, #2a5cff, #8a2be2, #e000c8, #dc143c); }
+        .dy-custom input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+        .dy-custom span { font: 600 1.1rem var(--font-ui); color: #fff; text-shadow: 0 0 4px rgba(0, 0, 0, 0.8); pointer-events: none; }
+        .dy-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 4px; }
+        .dy-actions .df-btn:disabled { opacity: 0.38; box-shadow: none; cursor: default; transform: none; }
+        .dy-slots .df-chip.active.gold { color: var(--df-violet-ink); border-color: var(--df-gold); box-shadow: 0 0 10px rgba(255, 194, 72, 0.45); }
+        @media (max-height: 520px) { .dy-stage { width: 96px; height: 96px; } .dy-head { margin: 4px 0 10px; } .dy-palette { grid-template-columns: repeat(auto-fill, minmax(32px, 1fr)); } }
         /* =====================================================================
            SHOPS — Dr. Yin's augments, the workbench, Torque, Neural Systems and
            Zib.ME share one frame in the dossier scheme (--df-*, dossier.css cards,
@@ -4214,6 +4234,16 @@
             </div>
             <div class="df-shop-body" id="aug-shop-grid"></div>
             <div class="df-shop-foot"><button class="screen-back-btn df-shop-close" id="aug-shop-close"><span class="btn-arrow">◀</span> Back</button></div>
+        </div>
+    </div>
+    <div id="dye-shop" class="df-shop">
+        <div class="df-shop-panel">
+            <div class="df-shop-head">
+                <div class="df-shop-titles"><div class="df-shop-title">Clothing Dyer</div><div class="df-shop-sub">Apt 949 · Bedroom</div></div>
+                <div class="df-shop-balance" id="dye-shop-balance"></div>
+            </div>
+            <div class="df-shop-body" id="dye-shop-grid"></div>
+            <div class="df-shop-foot"><button class="screen-back-btn df-shop-close" id="dye-shop-close"><span class="btn-arrow">◀</span> Back</button></div>
         </div>
     </div>
     <div id="craft-shop" class="df-shop">
@@ -6240,6 +6270,26 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             espresso:   { name: 'Espresso',      glass: 'mug', rim: 3.2, liquid: '#3a2214', cup: '#f3ead8', crema: true, cafe: true }
         };
 
+        /** The parts of an outfit the Clothing Dyer can colour: ['top.color', 'top.trim', …], in wearing order */
+        const DYE_KEYS = ['color', 'trim', 'inner', 'accent', 'stripe'];
+        function dyeSlots(data) {
+            const out = [];
+            for (const piece of ['top', 'bottom', 'shoes']) for (const k of DYE_KEYS) if (data && data[piece] && typeof data[piece][k] === 'string') out.push(piece + '.' + k);
+            return out;
+        }
+        /** An outfit's data with its dyes laid over it (a copy; the registry is left alone) */
+        function dyedOutfit(data, dyes) {
+            if (!dyes || !data) return data;
+            const out = { ...data };
+            for (const [slot, hex] of Object.entries(dyes)) {
+                const [piece, k] = slot.split('.');
+                if (!out[piece] || typeof data[piece][k] !== 'string' || !/^#[0-9a-f]{6}$/i.test(hex)) continue;
+                if (out[piece] === data[piece]) out[piece] = { ...data[piece] };
+                out[piece][k] = hex;
+            }
+            return out;
+        }
+
         const COSMETICS_REGISTRY = {
             // ─── W.I.G.s (hair type + color) ───
             'wig_afro_black':      { id: 'wig_afro_black',      category: 'wig',   name: 'Midnight Afro',       desc: 'Classic volume. Jet black.',                          price: 0,    data: { type: 'afro',  color: '#1a1a1a' }, default: true },
@@ -6379,6 +6429,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.equippedJewelry = [];          // any number at once
                 this.equippedLegwear = [];          // any number at once (thigh bands, thigh-high heels)
                 this.accessoryOptions = {};         // per-accessory choices, e.g. { acc_glass: { drink: 'red_wine' } }
+                this.dyes = {};                     // the Clothing Dyer's colours, per outfit: { outfit_noir: { 'top.color': '#…', 'shoes.color': '#…' } } (engine/dyer.js)
                 this.drinkLevel = 1;                // how full her glass is (1 full, 0 dry): spills drain it, the bar cart tops it up (engine/spills.js)
                 this.maskMode = 'auto';             // 949's field mask (Neu.Me): 'auto' (in the field, off at home) | 'on' | 'off'
                 // Grant defaults
@@ -6489,7 +6540,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const hat = this.equippedHat ? COSMETICS_REGISTRY[this.equippedHat] : null;
                 const jewelry = this.equippedJewelry.map(id => COSMETICS_REGISTRY[id]).filter(Boolean).map(e => e.data);
                 // Legwear: shoes take the outfit's place; bands and the like ride along with the jewelry
-                let outfitData = outfit ? outfit.data : COSMETICS_REGISTRY.outfit_casual.data;
+                let outfitData = dyedOutfit(outfit ? outfit.data : COSMETICS_REGISTRY.outfit_casual.data, this.dyes[outfit ? outfit.id : 'outfit_casual']);
                 for (const id of this.equippedLegwear) {
                     const leg = COSMETICS_REGISTRY[id];
                     if (!leg) continue;
@@ -6526,7 +6577,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     equippedLegwear: [...this.equippedLegwear],
                     accessoryOptions: JSON.parse(JSON.stringify(this.accessoryOptions)),
                     maskMode: this.maskMode,
-                    drinkLevel: this.drinkLevel
+                    drinkLevel: this.drinkLevel,
+                    dyes: JSON.parse(JSON.stringify(this.dyes))
                 };
             }
 
@@ -6539,6 +6591,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.equippedOutfit = data.equippedOutfit || null;
                 this.accessoryOptions = data.accessoryOptions || {};
                 this.maskMode = ['auto', 'on', 'off'].includes(data.maskMode) ? data.maskMode : 'auto';
+                this.dyes = data.dyes && typeof data.dyes === 'object' ? data.dyes : {};
                 this.drinkLevel = Number.isFinite(data.drinkLevel) ? Math.max(0, Math.min(1, data.drinkLevel)) : 1;   // older saves: a full glass
                 // Saves from before hats and jewelry simply have none on
                 this.equippedHat = COSMETICS_REGISTRY[data.equippedHat] ? data.equippedHat : null;
@@ -15127,7 +15180,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         new PropEntity({ x: 30, y: 730, width: 40, height: 60, mass: 1e7, color: '#0f0', interactionType: 'medbay_refill' }),
                         new PropEntity({ x: 1010, y: 216, width: 90, height: 110, color: '#334466', interactionType: 'bed_sleep', decorType: 'apt_bed', mass: 1e7 }),
                         new PropEntity({ x: 750, y: 750, width: 60, height: 35, mass: 1e7, color: '#2a2a3a', interactionType: 'crafting_table', decorType: 'apt_craft' }),
-                        new PropEntity({ x: 600, y: 770, width: 38, height: 22, mass: 1e7, color: '#2a1e24', interactionType: 'bar_cart', decorType: 'apt_bar_cart' }),   // tops up her glass (engine/spills.js)
                         // Living room: lounge
                         F(438, 452, 64, 30, 'apt_coffee'), F(600, 505, 40, 40, 'apt_chair'),
                         F(300, 212, 180, 20, 'apt_bookshelf'), F(640, 212, 140, 22, 'apt_console'),
@@ -15155,6 +15207,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         new PropEntity({ x: 275, y: 210, width: 10, height: 14, color: '#2a2a2a', interactionType: 'light_switch', roomId: 'main_room', mass: 999999 }),
                         new PropEntity({ x: 912, y: 296, width: 10, height: 14, color: '#2a2a2a', interactionType: 'light_switch', roomId: 'bedroom', mass: 999999 }),
                         new PropEntity({ x: 1010, y: 555, width: 10, height: 14, color: '#2a2a2a', interactionType: 'light_switch', roomId: 'bathroom', mass: 999999 }),
+                        // Added later: kept at the end, so a saved layout (questState.aptLayout, by index) still fits the pieces before them
+                        new PropEntity({ x: 600, y: 770, width: 38, height: 22, mass: 1e7, color: '#2a1e24', interactionType: 'bar_cart', decorType: 'apt_bar_cart' }),   // tops up her glass (engine/spills.js)
                     ];
                     e.lamps = [
                         new LampEntity({ x: 16, y: 100, lampType: 5, color: '#ffaa88', lightRadius: 400, angle: 0 }),
@@ -18129,6 +18183,24 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.fillStyle = A.walnut; ctx.fillRect(x + 6, y + h - 4, w - 12, 4);
                     for (const u of [0.17, 0.5, 0.83]) { circ(x + w * u, y + h / 2, 7, A.brass, '#9a7c4a', 1); circ(x + w * u, y + h / 2, 3, '#ffe6c4'); }   // pendant shades above
                     rr(x + w * 0.62, y + 8, 14, 9, 2, A.wineLt); circ(x + w * 0.4, y + 12, 4, '#f3e3ea');                     // fruit bowl, glasses
+                    break;
+                }
+                case 'apt_dyer': {                                         // the Clothing Dyer: walnut cabinet, three dye vats, a bolt of cloth, a swatch fan, the steamer
+                    rr(x, y, w, h, 3, A.walnut, '#2a201a', 1);
+                    ctx.fillStyle = 'rgba(255,220,180,0.08)'; ctx.fillRect(x + 2, y + 2, w - 4, 2);
+                    rr(x, y + h - 3, w, 3, 1, A.brass);
+                    for (const [vx, col] of [[x + 8, '#f19ab0'], [x + 19, '#17b8c8'], [x + 30, '#e8c27a']]) {          // vats, the dye in each
+                        circ(vx, y + h / 2, 5, '#1a1416', '#b8bcc8', 0.9); circ(vx, y + h / 2, 3.7, col);
+                        circ(vx - 1.2, y + h / 2 - 1.2, 1, 'rgba(255,255,255,0.45)');
+                    }
+                    rr(x + 37, y + 4, 9, h - 8, 2, A.blush, A.wineLt, 0.6);                                               // a bolt of cloth, rolled
+                    ctx.strokeStyle = 'rgba(122,46,60,0.5)'; ctx.lineWidth = 0.5; ctx.beginPath();
+                    for (let yy = y + 7; yy < y + h - 5; yy += 3) { ctx.moveTo(x + 38, yy); ctx.lineTo(x + 45, yy); }
+                    ctx.stroke();
+                    ctx.save(); ctx.translate(x + w - 6, y + h - 7);                                                     // the swatch fan
+                    for (const [i, col] of ['#8a2be2', '#dc143c', '#00b39b', '#e8c27a'].entries()) { ctx.rotate(0.28); rr(-1, -9, 2.6, 9, 0.8, col); }
+                    ctx.restore();
+                    circ(x + w - 6, y + 6, 2.6, '#d8cbbd', '#8a8e9a', 0.6);                                              // the steamer's head
                     break;
                 }
                 case 'apt_bar_cart': {                                     // brass and smoked glass on two wheels: bottles, a decanter, the ice bucket, two coupes
@@ -61088,6 +61160,14 @@ Object.assign(TrafficVehicle.prototype, {
                 desc: 'Silver the Crystal Glass. All damage +35%, and it turns up to 90 damage of shots back before it recharges (3 s).',
                 scrapCost: 650,
             },
+            {
+                id: 'clothing_dyer',
+                furniture: 'hasClothingDyer',   // not carried or worn: it stands in the apartment once made (questState flag; engine/dyer.js)
+                name: 'CLOTHING DYER',
+                icon: '✿',
+                desc: 'Vats, a steamer and a rack of swatches for the bedroom. Recolour any outfit you own, piece by piece.',
+                scrapCost: 1000,
+            },
         ];
 
         // ─── BONDING SYSTEM ──────────────────────────────────────────────────
@@ -63673,6 +63753,8 @@ Object.assign(TrafficVehicle.prototype, {
                         this.openCraftingTable();
                     } else if(this.activeInteraction.interactionType === 'bar_cart') {
                         this.refillGlass();                            // (engine/spills.js)
+                    } else if(this.activeInteraction.interactionType === 'clothing_dyer') {
+                        this.openDyer();                               // (engine/dyer.js)
                     } else if(this.activeInteraction.interactionType === 'armory') {
                         // Open the menu straight on the inventory
                         Screens.open('inventory');
@@ -68587,6 +68669,174 @@ engineMixin({
                 }
             }
         });
+        // GameEngine — the Clothing Dyer. Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        //
+        // Crafted at the workbench (SCHEMATICS clothing_dyer, story/missions.js) for 1,000 scrap, it stands in the
+        // bedroom (questState.hasClothingDyer; ensureDyeStation). Its window (#dye-shop) recolours any outfit she
+        // owns piece by piece — top, bottom, shoes, and a trim, lining, accent or stripe where the outfit has one —
+        // from a palette or a custom colour, with her in the window as she'd look. Each piece dyed costs
+        // DYER.FEE scrap; putting an outfit back to its own colours is free. The colours live in
+        // cosmetics.dyes (core/registries.js dyedOutfit lays them over the outfit), saved, per outfit.
+
+        const DYER = {
+            FEE: 20,
+            STATION: { x: 1176, y: 214, width: 58, height: 30 },       // apt_949: the bedroom wall between the nightstand and the wardrobe
+            PALETTE: [
+                ['#0c0c0e', 'Onyx'], ['#3a3a44', 'Slate'], ['#c9ccd8', 'Silver'], ['#f6f3ee', 'Pearl'], ['#efe6dc', 'Cream'], ['#e8c27a', 'Gold'],
+                ['#cc7722', 'Amber'], ['#8b4a2b', 'Rust'], ['#4a2e22', 'Cocoa'], ['#6a0c20', 'Bordeaux'], ['#dc143c', 'Crimson'], ['#ff6f61', 'Coral'],
+                ['#f19ab0', 'Rose'], ['#f3d6e4', 'Blush'], ['#e000c8', 'Magenta'], ['#8a2be2', 'Violet'], ['#b9a8e6', 'Lavender'], ['#ccccff', 'Periwinkle'],
+                ['#1a1440', 'Midnight'], ['#2a5cff', 'Cobalt'], ['#17dcff', 'Neon Cyan'], ['#00b39b', 'Teal'], ['#9be8c0', 'Mint'], ['#2f5a3e', 'Emerald']
+            ]
+        };
+        const DYE_PIECES = { top: 'Top', bottom: 'Bottom', shoes: 'Shoes' };
+        const DYE_PARTS = { color: '', trim: 'trim', inner: 'lining', accent: 'accent', stripe: 'stripe' };
+
+        engineMixin({
+            hasDyer() { return !!(this.questState && this.questState.hasClothingDyer); },
+
+            /** At home with the dyer made: its station stands in the bedroom (added last, after the saved layout's pieces) */
+            ensureDyeStation() {
+                if (!this.hasDyer() || !this.activeMap || this.activeMap.id !== 'apt_949') return;
+                const props = this.activeMap.props || (this.activeMap.props = []);
+                if (props.some(p => p.interactionType === 'clothing_dyer')) return;
+                const p = new PropEntity({ ...DYER.STATION, mass: 1e7, color: '#3a2430', interactionType: 'clothing_dyer', decorType: 'apt_dyer' });
+                props.push(p);
+                if (this.props !== props) this.props = props;
+            },
+
+            /** What a piece is called in the window: "Top", "Bottom accent", "Shoes" */
+            dyeSlotLabel(slot) { const [piece, k] = slot.split('.'); return (DYE_PIECES[piece] + ' ' + DYE_PARTS[k]).trim(); },
+
+            /** The colour a slot wears now (its dye, else the outfit's own), and with this visit's unapplied choices */
+            dyeColorOf(outfitId, slot, pending) {
+                if (pending && pending[slot]) return pending[slot];
+                const own = this.cosmetics.dyes[outfitId] && this.cosmetics.dyes[outfitId][slot];
+                if (own) return own;
+                const [piece, k] = slot.split('.');
+                return COSMETICS_REGISTRY[outfitId].data[piece][k];
+            },
+
+            /** The pieces whose pending colour differs from what they wear now */
+            dyeChanges(outfitId, pending) {
+                return Object.keys(pending || {}).filter(slot => pending[slot].toLowerCase() !== String(this.dyeColorOf(outfitId, slot, null)).toLowerCase());
+            },
+
+            /** Dye the changed pieces: DYER.FEE scrap each. False if there's nothing to dye or not enough scrap */
+            applyDyes(outfitId, pending) {
+                const changed = this.dyeChanges(outfitId, pending), cost = changed.length * DYER.FEE;
+                if (!changed.length || this.scrap < cost || !COSMETICS_REGISTRY[outfitId]) return false;
+                const D = this.cosmetics.dyes[outfitId] || (this.cosmetics.dyes[outfitId] = {});
+                const data = COSMETICS_REGISTRY[outfitId].data;
+                for (const slot of changed) {
+                    const [piece, k] = slot.split('.');
+                    if (pending[slot].toLowerCase() === String(data[piece][k]).toLowerCase()) delete D[slot];   // dyed back to its own colour
+                    else D[slot] = pending[slot].toLowerCase();
+                }
+                if (!Object.keys(D).length) delete this.cosmetics.dyes[outfitId];
+                this.scrap -= cost;
+                this.updateUI();
+                return true;
+            },
+
+            /** Back to the outfit's own colours (free) */
+            resetDyes(outfitId) { delete this.cosmetics.dyes[outfitId]; },
+
+            openDyer() {
+                const C = this.cosmetics;
+                this.pauseSystem.acquire('dyer');
+                const outfit = C.equippedOutfit && C.isOwned(C.equippedOutfit) ? C.equippedOutfit : 'outfit_casual';
+                this._dye = { outfit, slot: dyeSlots(COSMETICS_REGISTRY[outfit].data)[0], pending: {} };
+                this._shopShow('dye-shop', true);
+                this.renderDyer();
+                document.getElementById('dye-shop-close').onclick = () => {
+                    this._dye = null;
+                    this._shopShow('dye-shop', false);
+                    this.pauseSystem.release('dyer');
+                };
+            },
+
+            renderDyer() {
+                const el = document.getElementById('dye-shop-grid'), S = this._dye;
+                if (!el || !S) return;
+                const C = this.cosmetics, esc = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+                this._shopBalance('dye-shop-balance', this.scrap, 'Scrap');
+                const entry = COSMETICS_REGISTRY[S.outfit], slots = dyeSlots(entry.data);
+                if (!slots.includes(S.slot)) S.slot = slots[0];
+                const changed = this.dyeChanges(S.outfit, S.pending), cost = changed.length * DYER.FEE;
+                const dyedNow = Object.keys(C.dyes[S.outfit] || {}).length;
+                const cur = this.dyeColorOf(S.outfit, S.slot, S.pending);
+                let html = `<div class="sk-head dy-head"><div class="dy-stage"><canvas id="dye-preview" width="220" height="220"></canvas></div>`;
+                html += `<div class="sk-meta"><div class="sk-next">${esc(entry.name)}</div>`;
+                html += `<div class="sk-caps"><span class="sk-cap lav">${dyedNow ? `${dyedNow} piece${dyedNow > 1 ? 's' : ''} dyed` : 'Its own colours'}</span><span class="sk-cap">${DYER.FEE} scrap a piece</span></div>`;
+                html += `<div class="sk-hint">Pick a piece, then a colour. She's shown as she'll look; nothing is dyed until you apply it. Back to its own colours is free.</div></div></div>`;
+                // The outfits she owns
+                const owned = Object.values(COSMETICS_REGISTRY).filter(c => c.category === 'outfit' && C.isOwned(c.id));
+                html += `<div class="df-section"><span><span class="glint">◆</span>Outfit</span><span class="count">${owned.length}</span></div><div class="df-chips dy-outfits">`;
+                for (const o of owned) {
+                    const d = dyedOutfit(o.data, C.dyes[o.id]);
+                    html += `<span class="df-chip pick${o.id === S.outfit ? ' active' : ''}" data-outfit="${o.id}"><i class="dot" style="background:linear-gradient(135deg, ${d.top.color} 0 50%, ${(d.bottom || d.top).color} 50% 100%)"></i>${esc(o.name)}</span>`;
+                }
+                html += `</div>`;
+                // Its pieces
+                html += `<div class="df-section"><span><span class="glint">◆</span>Pieces</span><span class="count">${changed.length ? `${changed.length} to dye` : slots.length}</span></div><div class="df-chips dy-slots">`;
+                for (const slot of slots) {
+                    const col = this.dyeColorOf(S.outfit, slot, S.pending);
+                    html += `<span class="df-chip pick${slot === S.slot ? ' active' : ''}${changed.includes(slot) ? ' gold' : ''}" data-slot="${slot}"><i class="dot" style="background:${col}"></i>${esc(this.dyeSlotLabel(slot))}</span>`;
+                }
+                html += `</div>`;
+                // The colours
+                html += `<div class="df-section"><span><span class="glint">◆</span>Dye · ${esc(this.dyeSlotLabel(S.slot))}</span><span class="count">${esc(cur)}</span></div><div class="dy-palette">`;
+                for (const [hex, name] of DYER.PALETTE) html += `<button class="dy-swatch${hex.toLowerCase() === String(cur).toLowerCase() ? ' on' : ''}" data-hex="${hex}" title="${esc(name)}" aria-label="${esc(name)}" style="--c:${hex}"></button>`;
+                html += `<label class="dy-swatch dy-custom" title="Custom colour" style="--c:${cur}"><input type="color" id="dye-custom" value="${/^#[0-9a-f]{6}$/i.test(cur) ? cur : '#ffffff'}"><span>+</span></label></div>`;
+                // Apply / undo
+                html += `<div class="dy-actions"><button class="df-btn" id="dye-apply"${changed.length && this.scrap >= cost ? '' : ' disabled'}>Dye ${changed.length || ''} · ${cost} Scrap</button>`;
+                html += `<button class="df-btn small ghost" id="dye-discard"${changed.length ? '' : ' disabled'}>Undo choices</button>`;
+                html += `<button class="df-btn small ghost" id="dye-reset"${dyedNow ? '' : ' disabled'}>Original colours</button></div>`;
+                el.innerHTML = html;
+                this.drawDyePreview(document.getElementById('dye-preview'), S.outfit, S.pending);
+
+                const pick = hex => { S.pending[S.slot] = hex.toLowerCase(); audioSys.sfx('ui'); this.renderDyer(); };
+                el.querySelectorAll('[data-outfit]').forEach(c => c.addEventListener('click', () => { S.outfit = c.dataset.outfit; S.pending = {}; audioSys.sfx('ui'); this.renderDyer(); }));
+                el.querySelectorAll('[data-slot]').forEach(c => c.addEventListener('click', () => { S.slot = c.dataset.slot; audioSys.sfx('ui'); this.renderDyer(); }));
+                el.querySelectorAll('button[data-hex]').forEach(b => b.addEventListener('click', () => pick(b.dataset.hex)));
+                const custom = document.getElementById('dye-custom');
+                if (custom) {
+                    custom.addEventListener('input', () => { S.pending[S.slot] = custom.value.toLowerCase(); this.drawDyePreview(document.getElementById('dye-preview'), S.outfit, S.pending); });
+                    custom.addEventListener('change', () => pick(custom.value));
+                }
+                document.getElementById('dye-apply').addEventListener('click', () => {
+                    if (!this.applyDyes(S.outfit, S.pending)) return;
+                    S.pending = {};
+                    showMessage(`${entry.name.toUpperCase()}: DYED`);
+                    audioSys.sfx('ui');
+                    this.renderDyer();
+                });
+                document.getElementById('dye-discard').addEventListener('click', () => { S.pending = {}; this.renderDyer(); });
+                const reset = document.getElementById('dye-reset');
+                reset.addEventListener('click', () => this._confirmTap(reset, 'Confirm?', () => { this.resetDyes(S.outfit); S.pending = {}; this.renderDyer(); }));
+            },
+
+            /** Her, from above as in the world, in the outfit as it would be dyed */
+            drawDyePreview(cv, outfitId, pending) {
+                if (!cv || !cv.getContext) return;
+                const ctx = cv.getContext('2d'), C = this.cosmetics, cfg = C.getRenderConfig();
+                const dyes = { ...(C.dyes[outfitId] || {}), ...(pending || {}) };
+                const o = dyedOutfit(COSMETICS_REGISTRY[outfitId].data, dyes);
+                ctx.clearRect(0, 0, cv.width, cv.height);
+                const g = ctx.createRadialGradient(cv.width / 2, cv.height / 2, 10, cv.width / 2, cv.height / 2, cv.width / 2);
+                g.addColorStop(0, 'rgba(202,176,250,0.22)'); g.addColorStop(1, 'rgba(202,176,250,0)');
+                ctx.fillStyle = g; ctx.fillRect(0, 0, cv.width, cv.height);
+                const body = this._dyeBody || (this._dyeBody = { x: 0, y: 0, angle: Math.PI / 2, walkPhase: 0, radius: 12, _reflectionProxy: true });
+                ctx.save();
+                ctx.translate(cv.width / 2, cv.height / 2 + 6); ctx.scale(4.2, 4.2); ctx.rotate(Math.PI / 2);   // facing down the window, toward you
+                try {
+                    drawProceduralHumanoid(ctx, body, {
+                        skinColor: cfg.skinColor, hair: cfg.hair, gender: APPEARANCES['949'].gender, stance: 'idle',
+                        top: o.top, bottom: o.bottom, shoes: o.shoes, train: o.train || null, hat: cfg.hat, jewelry: cfg.jewelry, held: cfg.held
+                    });
+                } finally { ctx.restore(); }
+            }
+        });
         // ═══ DEV OVERLAY — the profiler pill and the debug layers ═══
         // Both are DOM, so the colour grade and post-FX never tint them, and they cost
         // next to nothing: the pill's numbers change a few times a second, its breakdown
@@ -71870,9 +72120,9 @@ engineMixin({
                 if (!el) return;
                 this._shopBalance('craft-shop-balance', this.scrap, 'Scrap');
                 const esc = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-                const kindOf = sch => sch.cosmetic ? 'accessory' : (ITEM_REGISTRY[sch.id]?.type === 'attachment' ? 'attachment' : 'weapon');
+                const kindOf = sch => sch.furniture ? 'home' : sch.cosmetic ? 'accessory' : (ITEM_REGISTRY[sch.id]?.type === 'attachment' ? 'attachment' : 'weapon');
                 // Kinds, in the screens' palette: lavender, rose gold, gold
-                const KINDS = [['attachment', 'Attachments', 'Attachment', '#cab0fa'], ['weapon', 'Weapons', 'Weapon', '#e8a688'], ['accessory', 'Accessories', 'Accessory', '#ffc248']];
+                const KINDS = [['attachment', 'Attachments', 'Attachment', '#cab0fa'], ['weapon', 'Weapons', 'Weapon', '#e8a688'], ['accessory', 'Accessories', 'Accessory', '#ffc248'], ['home', 'For the Apartment', 'Furniture', '#f19ab0']];
                 const made = SCHEMATICS.filter(s => this.schematicOwned(s)).length;
                 const pct = SCHEMATICS.length ? Math.round(made / SCHEMATICS.length * 100) : 0;
                 const worn = this.inventory ? this.inventory.equippedAttachments.length : 0, maxWorn = this.inventory ? this.inventory.maxAttachments : 2;
@@ -71898,6 +72148,7 @@ engineMixin({
                         if (st.effect === 'mirror_blade') chips.push('Cuts deflect bullets');
                         if (st.gunDamageMult) chips.push(`Bullets ×${st.gunDamageMult}`);
                         if (sch.id === 'acc_mirror_glass') chips.push('All damage ×1.35', 'Shield 90 · 3 s recharge');
+                        if (sch.id === 'clothing_dyer') chips.push('Recolour outfits', `${DYER.FEE} scrap a piece`);
                         const status = owned ? 'Crafted' : needs ? `Needs the ${needs}` : role;
                         html += `<div class="dc-card cr-card${owned ? ' owned' : ''}${!owned && (needs || !afford) ? ' short' : ''}" style="--acc:${acc}" tabindex="0" data-key="${sch.id}">`;
                         html += `<div class="dc-portrait cr-icon"><div class="mono">${sch.icon || '⊕'}</div><svg class="portrait-rim" aria-hidden="true"><use href="#portrait-rim"/></svg></div>`;
@@ -71932,6 +72183,7 @@ engineMixin({
 
             /** A schematic is made: an item carried, or (cosmetic) a piece owned to wear */
             schematicOwned(sch) {
+                if (sch.furniture) return !!(this.questState && this.questState[sch.furniture]);
                 return sch.cosmetic ? !!(this.cosmetics && this.cosmetics.isOwned(sch.id)) : this.inventory.items.some(i => i.id === sch.id);
             },
 
@@ -71945,7 +72197,10 @@ engineMixin({
             craftSchematic(id) {
                 const sch = SCHEMATICS.find(x => x.id === id);
                 if (!sch || this.scrap < sch.scrapCost || this.schematicOwned(sch) || this.schematicNeeds(sch)) return false;
-                if (sch.cosmetic) {
+                if (sch.furniture) {
+                    (this.questState || (this.questState = {}))[sch.furniture] = true;
+                    this.ensureDyeStation();
+                } else if (sch.cosmetic) {
                     if (!this.cosmetics || !COSMETICS_REGISTRY[sch.id]) return false;
                     this.cosmetics.owned.push(sch.id);
                 } else {
@@ -74087,6 +74342,7 @@ engineMixin({
                 // -------------------------------------------------------
 
                 this.props = this.activeMap.props || [];
+                this.ensureDyeStation();                                // crafted: the Clothing Dyer stands in her bedroom (engine/dyer.js)
                 if (this.furniture) this.furniture.onMapLoaded(this);   // the apartment's layout as she left it (engine/furniture.js)
                 this.npcs = this.activeMap.npcs || [];
                 this.lamps = this.activeMap.lamps || [];
@@ -75968,6 +76224,7 @@ engineMixin({
             bed_sleep:         ['Rest', 'Bed'],
             crafting_table:    ['Craft', 'Workbench'],
             bar_cart:          ['Pour', 'Bar cart'],
+            clothing_dyer:     ['Dye', 'Clothing dyer'],
             auto_shop_counter: ['Shop', 'Counter'],
             armory:            ['Loadout', 'Armory'],
             read_note:         ['Read', 'Note', true],
@@ -85186,7 +85443,7 @@ engineMixin({
 
         /** The colour a card shows for a piece. */
         function neumeSwatch(item) {
-            const d = item.data || {};
+            const d = (item.category === 'outfit' ? dyedOutfit(item.data, game.cosmetics.dyes[item.id]) : item.data) || {};   // (an outfit as she's dyed it)
             switch (item.category) {
                 case 'outfit': return `linear-gradient(160deg, ${d.top.color} 0 46%, ${d.bottom ? d.bottom.color : d.top.color} 54% 100%)`;
                 case 'wig': return d.color;
@@ -85318,6 +85575,7 @@ engineMixin({
                     ['auto-shop-overlay', () => game.closeAutoShop()],
                     ['augment-shop', () => document.getElementById('aug-shop-close').click()],
                     ['craft-shop', () => document.getElementById('craft-shop-close').click()],
+                    ['dye-shop', () => document.getElementById('dye-shop-close').click()],
                     ['zib-menu', () => game.closeZibMenu()],
                     ['gauntlet-menu', () => game.closeGauntletMenu()],
                     ['tuning-overlay', () => game.closeTuning()],

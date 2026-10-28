@@ -255,6 +255,24 @@
                     rr(x + w * 0.62, y + 8, 14, 9, 2, A.wineLt); circ(x + w * 0.4, y + 12, 4, '#f3e3ea');                     // fruit bowl, glasses
                     break;
                 }
+                case 'apt_dyer': {                                         // the Clothing Dyer: walnut cabinet, three dye vats, a bolt of cloth, a swatch fan, the steamer
+                    rr(x, y, w, h, 3, A.walnut, '#2a201a', 1);
+                    ctx.fillStyle = 'rgba(255,220,180,0.08)'; ctx.fillRect(x + 2, y + 2, w - 4, 2);
+                    rr(x, y + h - 3, w, 3, 1, A.brass);
+                    for (const [vx, col] of [[x + 8, '#f19ab0'], [x + 19, '#17b8c8'], [x + 30, '#e8c27a']]) {          // vats, the dye in each
+                        circ(vx, y + h / 2, 5, '#1a1416', '#b8bcc8', 0.9); circ(vx, y + h / 2, 3.7, col);
+                        circ(vx - 1.2, y + h / 2 - 1.2, 1, 'rgba(255,255,255,0.45)');
+                    }
+                    rr(x + 37, y + 4, 9, h - 8, 2, A.blush, A.wineLt, 0.6);                                               // a bolt of cloth, rolled
+                    ctx.strokeStyle = 'rgba(122,46,60,0.5)'; ctx.lineWidth = 0.5; ctx.beginPath();
+                    for (let yy = y + 7; yy < y + h - 5; yy += 3) { ctx.moveTo(x + 38, yy); ctx.lineTo(x + 45, yy); }
+                    ctx.stroke();
+                    ctx.save(); ctx.translate(x + w - 6, y + h - 7);                                                     // the swatch fan
+                    for (const [i, col] of ['#8a2be2', '#dc143c', '#00b39b', '#e8c27a'].entries()) { ctx.rotate(0.28); rr(-1, -9, 2.6, 9, 0.8, col); }
+                    ctx.restore();
+                    circ(x + w - 6, y + 6, 2.6, '#d8cbbd', '#8a8e9a', 0.6);                                              // the steamer's head
+                    break;
+                }
                 case 'apt_bar_cart': {                                     // brass and smoked glass on two wheels: bottles, a decanter, the ice bucket, two coupes
                     circ(x + 3, y + 2, 3.2, '#1a1416', A.brass, 0.8); circ(x + 3, y + h - 2, 3.2, '#1a1416', A.brass, 0.8);   // wheels, west end
                     ctx.strokeStyle = A.brass; ctx.lineWidth = 1.6; ctx.lineCap = 'round';                                     // handle, east end

@@ -154,6 +154,7 @@ const SCRIPTS = [
     'engine/sneak.js',
     'engine/npc-posts.js',
     'engine/spills.js',
+    'engine/dyer.js',
     'ui/dev-overlay.js',
     'ui/render-layers.js',
     'engine/scope.js',

@@ -1391,9 +1391,9 @@
                 if (!el) return;
                 this._shopBalance('craft-shop-balance', this.scrap, 'Scrap');
                 const esc = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-                const kindOf = sch => sch.cosmetic ? 'accessory' : (ITEM_REGISTRY[sch.id]?.type === 'attachment' ? 'attachment' : 'weapon');
+                const kindOf = sch => sch.furniture ? 'home' : sch.cosmetic ? 'accessory' : (ITEM_REGISTRY[sch.id]?.type === 'attachment' ? 'attachment' : 'weapon');
                 // Kinds, in the screens' palette: lavender, rose gold, gold
-                const KINDS = [['attachment', 'Attachments', 'Attachment', '#cab0fa'], ['weapon', 'Weapons', 'Weapon', '#e8a688'], ['accessory', 'Accessories', 'Accessory', '#ffc248']];
+                const KINDS = [['attachment', 'Attachments', 'Attachment', '#cab0fa'], ['weapon', 'Weapons', 'Weapon', '#e8a688'], ['accessory', 'Accessories', 'Accessory', '#ffc248'], ['home', 'For the Apartment', 'Furniture', '#f19ab0']];
                 const made = SCHEMATICS.filter(s => this.schematicOwned(s)).length;
                 const pct = SCHEMATICS.length ? Math.round(made / SCHEMATICS.length * 100) : 0;
                 const worn = this.inventory ? this.inventory.equippedAttachments.length : 0, maxWorn = this.inventory ? this.inventory.maxAttachments : 2;
@@ -1419,6 +1419,7 @@
                         if (st.effect === 'mirror_blade') chips.push('Cuts deflect bullets');
                         if (st.gunDamageMult) chips.push(`Bullets ×${st.gunDamageMult}`);
                         if (sch.id === 'acc_mirror_glass') chips.push('All damage ×1.35', 'Shield 90 · 3 s recharge');
+                        if (sch.id === 'clothing_dyer') chips.push('Recolour outfits', `${DYER.FEE} scrap a piece`);
                         const status = owned ? 'Crafted' : needs ? `Needs the ${needs}` : role;
                         html += `<div class="dc-card cr-card${owned ? ' owned' : ''}${!owned && (needs || !afford) ? ' short' : ''}" style="--acc:${acc}" tabindex="0" data-key="${sch.id}">`;
                         html += `<div class="dc-portrait cr-icon"><div class="mono">${sch.icon || '⊕'}</div><svg class="portrait-rim" aria-hidden="true"><use href="#portrait-rim"/></svg></div>`;
@@ -1453,6 +1454,7 @@
 
             /** A schematic is made: an item carried, or (cosmetic) a piece owned to wear */
             schematicOwned(sch) {
+                if (sch.furniture) return !!(this.questState && this.questState[sch.furniture]);
                 return sch.cosmetic ? !!(this.cosmetics && this.cosmetics.isOwned(sch.id)) : this.inventory.items.some(i => i.id === sch.id);
             },
 
@@ -1466,7 +1468,10 @@
             craftSchematic(id) {
                 const sch = SCHEMATICS.find(x => x.id === id);
                 if (!sch || this.scrap < sch.scrapCost || this.schematicOwned(sch) || this.schematicNeeds(sch)) return false;
-                if (sch.cosmetic) {
+                if (sch.furniture) {
+                    (this.questState || (this.questState = {}))[sch.furniture] = true;
+                    this.ensureDyeStation();
+                } else if (sch.cosmetic) {
                     if (!this.cosmetics || !COSMETICS_REGISTRY[sch.id]) return false;
                     this.cosmetics.owned.push(sch.id);
                 } else {

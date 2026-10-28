@@ -97,7 +97,6 @@
                         new PropEntity({ x: 30, y: 730, width: 40, height: 60, mass: 1e7, color: '#0f0', interactionType: 'medbay_refill' }),
                         new PropEntity({ x: 1010, y: 216, width: 90, height: 110, color: '#334466', interactionType: 'bed_sleep', decorType: 'apt_bed', mass: 1e7 }),
                         new PropEntity({ x: 750, y: 750, width: 60, height: 35, mass: 1e7, color: '#2a2a3a', interactionType: 'crafting_table', decorType: 'apt_craft' }),
-                        new PropEntity({ x: 600, y: 770, width: 38, height: 22, mass: 1e7, color: '#2a1e24', interactionType: 'bar_cart', decorType: 'apt_bar_cart' }),   // tops up her glass (engine/spills.js)
                         // Living room: lounge
                         F(438, 452, 64, 30, 'apt_coffee'), F(600, 505, 40, 40, 'apt_chair'),
                         F(300, 212, 180, 20, 'apt_bookshelf'), F(640, 212, 140, 22, 'apt_console'),
@@ -125,6 +124,8 @@
                         new PropEntity({ x: 275, y: 210, width: 10, height: 14, color: '#2a2a2a', interactionType: 'light_switch', roomId: 'main_room', mass: 999999 }),
                         new PropEntity({ x: 912, y: 296, width: 10, height: 14, color: '#2a2a2a', interactionType: 'light_switch', roomId: 'bedroom', mass: 999999 }),
                         new PropEntity({ x: 1010, y: 555, width: 10, height: 14, color: '#2a2a2a', interactionType: 'light_switch', roomId: 'bathroom', mass: 999999 }),
+                        // Added later: kept at the end, so a saved layout (questState.aptLayout, by index) still fits the pieces before them
+                        new PropEntity({ x: 600, y: 770, width: 38, height: 22, mass: 1e7, color: '#2a1e24', interactionType: 'bar_cart', decorType: 'apt_bar_cart' }),   // tops up her glass (engine/spills.js)
                     ];
                     e.lamps = [
                         new LampEntity({ x: 16, y: 100, lampType: 5, color: '#ffaa88', lightRadius: 400, angle: 0 }),

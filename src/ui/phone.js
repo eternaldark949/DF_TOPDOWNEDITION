@@ -1052,7 +1052,7 @@
 
         /** The colour a card shows for a piece. */
         function neumeSwatch(item) {
-            const d = item.data || {};
+            const d = (item.category === 'outfit' ? dyedOutfit(item.data, game.cosmetics.dyes[item.id]) : item.data) || {};   // (an outfit as she's dyed it)
             switch (item.category) {
                 case 'outfit': return `linear-gradient(160deg, ${d.top.color} 0 46%, ${d.bottom ? d.bottom.color : d.top.color} 54% 100%)`;
                 case 'wig': return d.color;
@@ -1184,6 +1184,7 @@
                     ['auto-shop-overlay', () => game.closeAutoShop()],
                     ['augment-shop', () => document.getElementById('aug-shop-close').click()],
                     ['craft-shop', () => document.getElementById('craft-shop-close').click()],
+                    ['dye-shop', () => document.getElementById('dye-shop-close').click()],
                     ['zib-menu', () => game.closeZibMenu()],
                     ['gauntlet-menu', () => game.closeGauntletMenu()],
                     ['tuning-overlay', () => game.closeTuning()],

@@ -604,5 +604,13 @@
                 desc: 'Silver the Crystal Glass. All damage +35%, and it turns up to 90 damage of shots back before it recharges (3 s).',
                 scrapCost: 650,
             },
+            {
+                id: 'clothing_dyer',
+                furniture: 'hasClothingDyer',   // not carried or worn: it stands in the apartment once made (questState flag; engine/dyer.js)
+                name: 'CLOTHING DYER',
+                icon: '✿',
+                desc: 'Vats, a steamer and a rack of swatches for the bedroom. Recolour any outfit you own, piece by piece.',
+                scrapCost: 1000,
+            },
         ];
 

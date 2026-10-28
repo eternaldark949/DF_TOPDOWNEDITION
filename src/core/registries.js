@@ -133,6 +133,26 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             espresso:   { name: 'Espresso',      glass: 'mug', rim: 3.2, liquid: '#3a2214', cup: '#f3ead8', crema: true, cafe: true }
         };
 
+        /** The parts of an outfit the Clothing Dyer can colour: ['top.color', 'top.trim', …], in wearing order */
+        const DYE_KEYS = ['color', 'trim', 'inner', 'accent', 'stripe'];
+        function dyeSlots(data) {
+            const out = [];
+            for (const piece of ['top', 'bottom', 'shoes']) for (const k of DYE_KEYS) if (data && data[piece] && typeof data[piece][k] === 'string') out.push(piece + '.' + k);
+            return out;
+        }
+        /** An outfit's data with its dyes laid over it (a copy; the registry is left alone) */
+        function dyedOutfit(data, dyes) {
+            if (!dyes || !data) return data;
+            const out = { ...data };
+            for (const [slot, hex] of Object.entries(dyes)) {
+                const [piece, k] = slot.split('.');
+                if (!out[piece] || typeof data[piece][k] !== 'string' || !/^#[0-9a-f]{6}$/i.test(hex)) continue;
+                if (out[piece] === data[piece]) out[piece] = { ...data[piece] };
+                out[piece][k] = hex;
+            }
+            return out;
+        }
+
         const COSMETICS_REGISTRY = {
             // ─── W.I.G.s (hair type + color) ───
             'wig_afro_black':      { id: 'wig_afro_black',      category: 'wig',   name: 'Midnight Afro',       desc: 'Classic volume. Jet black.',                          price: 0,    data: { type: 'afro',  color: '#1a1a1a' }, default: true },
@@ -272,6 +292,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.equippedJewelry = [];          // any number at once
                 this.equippedLegwear = [];          // any number at once (thigh bands, thigh-high heels)
                 this.accessoryOptions = {};         // per-accessory choices, e.g. { acc_glass: { drink: 'red_wine' } }
+                this.dyes = {};                     // the Clothing Dyer's colours, per outfit: { outfit_noir: { 'top.color': '#…', 'shoes.color': '#…' } } (engine/dyer.js)
                 this.drinkLevel = 1;                // how full her glass is (1 full, 0 dry): spills drain it, the bar cart tops it up (engine/spills.js)
                 this.maskMode = 'auto';             // 949's field mask (Neu.Me): 'auto' (in the field, off at home) | 'on' | 'off'
                 // Grant defaults
@@ -382,7 +403,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const hat = this.equippedHat ? COSMETICS_REGISTRY[this.equippedHat] : null;
                 const jewelry = this.equippedJewelry.map(id => COSMETICS_REGISTRY[id]).filter(Boolean).map(e => e.data);
                 // Legwear: shoes take the outfit's place; bands and the like ride along with the jewelry
-                let outfitData = outfit ? outfit.data : COSMETICS_REGISTRY.outfit_casual.data;
+                let outfitData = dyedOutfit(outfit ? outfit.data : COSMETICS_REGISTRY.outfit_casual.data, this.dyes[outfit ? outfit.id : 'outfit_casual']);
                 for (const id of this.equippedLegwear) {
                     const leg = COSMETICS_REGISTRY[id];
                     if (!leg) continue;
@@ -419,7 +440,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     equippedLegwear: [...this.equippedLegwear],
                     accessoryOptions: JSON.parse(JSON.stringify(this.accessoryOptions)),
                     maskMode: this.maskMode,
-                    drinkLevel: this.drinkLevel
+                    drinkLevel: this.drinkLevel,
+                    dyes: JSON.parse(JSON.stringify(this.dyes))
                 };
             }
 
@@ -432,6 +454,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.equippedOutfit = data.equippedOutfit || null;
                 this.accessoryOptions = data.accessoryOptions || {};
                 this.maskMode = ['auto', 'on', 'off'].includes(data.maskMode) ? data.maskMode : 'auto';
+                this.dyes = data.dyes && typeof data.dyes === 'object' ? data.dyes : {};
                 this.drinkLevel = Number.isFinite(data.drinkLevel) ? Math.max(0, Math.min(1, data.drinkLevel)) : 1;   // older saves: a full glass
                 // Saves from before hats and jewelry simply have none on
                 this.equippedHat = COSMETICS_REGISTRY[data.equippedHat] ? data.equippedHat : null;

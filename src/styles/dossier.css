@@ -346,3 +346,23 @@
             .sk-dial { width: 112px; height: 112px; }
             .sk-level { font-size: max(6px, 1.6rem - var(--font-trim)); }
         }
+
+        /* The Clothing Dyer (engine/dyer.js): her in the window, the pieces, the palette */
+        .dy-head { margin: 10px 0 18px; gap: 22px; align-items: center; }
+        .dy-stage { flex-shrink: 0; width: 150px; height: 150px; border-radius: 50%; border: 1px solid rgba(202, 176, 250, 0.35);
+            background: radial-gradient(circle, rgba(58, 29, 120, 0.45), rgba(14, 7, 24, 0.85)); box-shadow: inset 0 0 22px rgba(202, 176, 250, 0.18); overflow: hidden; }
+        .dy-stage canvas { width: 100%; height: 100%; display: block; }
+        .dy-outfits, .dy-slots { margin-bottom: 14px; }
+        .dy-outfits .dot, .dy-slots .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35); }
+        .dy-palette { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 9px; margin: 4px 0 16px; }
+        .dy-swatch { position: relative; aspect-ratio: 1; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.25); background: var(--c); cursor: pointer; padding: 0;
+            box-shadow: inset 0 -4px 8px rgba(0, 0, 0, 0.35), inset 0 3px 6px rgba(255, 255, 255, 0.2); transition: transform 0.12s; }
+        .dy-swatch:hover { transform: scale(1.08); }
+        .dy-swatch.on { border: 2px solid #fff; box-shadow: 0 0 12px color-mix(in srgb, var(--c) 70%, #fff), inset 0 -4px 8px rgba(0, 0, 0, 0.3); }
+        .dy-custom { display: flex; align-items: center; justify-content: center; background: conic-gradient(#dc143c, #e8c27a, #00b39b, #2a5cff, #8a2be2, #e000c8, #dc143c); }
+        .dy-custom input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+        .dy-custom span { font: 600 1.1rem var(--font-ui); color: #fff; text-shadow: 0 0 4px rgba(0, 0, 0, 0.8); pointer-events: none; }
+        .dy-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 4px; }
+        .dy-actions .df-btn:disabled { opacity: 0.38; box-shadow: none; cursor: default; transform: none; }
+        .dy-slots .df-chip.active.gold { color: var(--df-violet-ink); border-color: var(--df-gold); box-shadow: 0 0 10px rgba(255, 194, 72, 0.45); }
+        @media (max-height: 520px) { .dy-stage { width: 96px; height: 96px; } .dy-head { margin: 4px 0 10px; } .dy-palette { grid-template-columns: repeat(auto-fill, minmax(32px, 1fr)); } }

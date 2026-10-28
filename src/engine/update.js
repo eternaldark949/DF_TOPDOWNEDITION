@@ -11,6 +11,7 @@
             bed_sleep:         ['Rest', 'Bed'],
             crafting_table:    ['Craft', 'Workbench'],
             bar_cart:          ['Pour', 'Bar cart'],
+            clothing_dyer:     ['Dye', 'Clothing dyer'],
             auto_shop_counter: ['Shop', 'Counter'],
             armory:            ['Loadout', 'Armory'],
             read_note:         ['Read', 'Note', true],

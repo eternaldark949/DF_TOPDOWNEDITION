@@ -1281,6 +1281,7 @@ engineMixin({
                 // -------------------------------------------------------
 
                 this.props = this.activeMap.props || [];
+                this.ensureDyeStation();                                // crafted: the Clothing Dyer stands in her bedroom (engine/dyer.js)
                 if (this.furniture) this.furniture.onMapLoaded(this);   // the apartment's layout as she left it (engine/furniture.js)
                 this.npcs = this.activeMap.npcs || [];
                 this.lamps = this.activeMap.lamps || [];
