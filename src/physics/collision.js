@@ -152,125 +152,209 @@
             //  LAYER PROCESSORS
             // =====================
             
-            static _processProjectiles(onScreen, game, candidates = null) {
-                const projectiles = candidates ? this._activeLayer(candidates) : onScreen.filter(e =>
-                    e.collisionLayer === GameEntity.LAYER.PROJECTILE && e.active
-                );
-                
-                for (let proj of projectiles) {
-                    // Skip if destroyed between frames or by prior collision
-                    if (!proj.active || proj.markedForDestroy) continue;
-                    
-                    // Skip ghost projectiles (zero velocity, not sticky)
-                    if (!proj.sticky && proj.vx === 0 && proj.vy === 0) {
-                        proj.destroy();
-                        continue;
+            // Projectile hits are resolved once, after actors have moved, along the full tick path.
+            static beginProjectileStep(game) {
+                const remember = a => {
+                    if (!a) return;
+                    a._projectileStartTick = _simTick;
+                    a._projectileStartX = a.x; a._projectileStartY = a.y;
+                };
+                for (const a of GameEntity.getByLayer('ACTOR')) remember(a);
+                for (const a of game.enemies) remember(a);
+                remember(game.player);
+            }
+
+            static _sweepCircle(ax, ay, bx, by, cx, cy, radius) {
+                if (Math.max(ax, bx) < cx - radius || Math.min(ax, bx) > cx + radius ||
+                    Math.max(ay, by) < cy - radius || Math.min(ay, by) > cy + radius) return null;
+                const ox = ax - cx, oy = ay - cy, dx = bx - ax, dy = by - ay;
+                const c = ox * ox + oy * oy - radius * radius;
+                if (c <= 0) return 0;
+                const a = dx * dx + dy * dy;
+                if (!a) return null;
+                const b = ox * dx + oy * dy, disc = b * b - a * c;
+                if (disc < 0) return null;
+                const t = (-b - Math.sqrt(disc)) / a;
+                return t >= 0 && t <= 1 ? t : null;
+            }
+
+            static _sweepRect(ax, ay, bx, by, left, top, right, bottom) {
+                let lo = 0, hi = 1;
+                for (const [v, step, min, max] of [[ax, bx - ax, left, right], [ay, by - ay, top, bottom]]) {
+                    if (!step) { if (v < min || v > max) return null; continue; }
+                    const a = (min - v) / step, b = (max - v) / step;
+                    lo = Math.max(lo, Math.min(a, b)); hi = Math.min(hi, Math.max(a, b));
+                    if (lo > hi) return null;
+                }
+                return lo;
+            }
+
+            // Exact circle-vs-box sweep: two strips plus round corners, avoiding false corner hits.
+            static _sweepRoundedBox(ax, ay, bx, by, hw, hh, radius) {
+                if (Math.max(ax, bx) < -hw - radius || Math.min(ax, bx) > hw + radius ||
+                    Math.max(ay, by) < -hh - radius || Math.min(ay, by) > hh + radius) return null;
+                let best = null;
+                const keep = t => { if (t !== null && (best === null || t < best)) best = t; };
+                keep(this._sweepRect(ax, ay, bx, by, -hw - radius, -hh, hw + radius, hh));
+                keep(this._sweepRect(ax, ay, bx, by, -hw, -hh - radius, hw, hh + radius));
+                for (const x of [-hw, hw]) for (const y of [-hh, hh]) keep(this._sweepCircle(ax, ay, bx, by, x, y, radius));
+                return best;
+            }
+
+            static projectileHitTime(p, target, actor = false) {
+                const ax = p.lastX ?? p.x, ay = p.lastY ?? p.y, r = p.radius ?? 5;
+                if (target.collisionShape === GameEntity.SHAPE.CIRCLE) {
+                    const moving = actor && p.lastX !== undefined && target._projectileStartTick === _simTick;
+                    const sx = moving ? target._projectileStartX : target.x, sy = moving ? target._projectileStartY : target.y;
+                    return this._sweepCircle(ax - sx, ay - sy, p.x - target.x, p.y - target.y, 0, 0, r + target.radius);
+                }
+                let cx, cy, hw, hh, angle = 0;
+                if (target.collisionShape === GameEntity.SHAPE.OBB || target.length !== undefined) {
+                    const b = target.getOBB ? target.getOBB() : target;
+                    cx = b.x; cy = b.y; hw = b.length / 2; hh = b.width / 2; angle = b.angle || 0;
+                } else {
+                    hw = (target.width ?? target.w) / 2; hh = (target.height ?? target.h) / 2;
+                    cx = target.x + hw; cy = target.y + hh;
+                }
+                if (![cx, cy, hw, hh].every(Number.isFinite)) return null;
+                const c = Math.cos(angle), s = Math.sin(angle);
+                return this._sweepRoundedBox((ax - cx) * c + (ay - cy) * s, (ay - cy) * c - (ax - cx) * s,
+                    (p.x - cx) * c + (p.y - cy) * s, (p.y - cy) * c - (p.x - cx) * s, hw, hh, r);
+            }
+
+            static _projectileContacts(p, game) {
+                const hits = [], seen = new Set(), mask = p.collisionMask;
+                const add = (target, kind) => {
+                    if (!target || seen.has(target) || target === p.owner || target.active === false || target.dead || target.markedForDestroy || target.hasCollision === false) return;
+                    if (game.isDriving && p.owner === game.player && target === game.car) return;
+                    const actor = kind === 'enemy' || kind === 'actor';
+                    if (actor && (target.alliance === 'neutral' || (p.alliance && p.alliance === target.alliance))) return;
+                    if (target === game.player && (!p.isEnemy || !target.visible)) return;
+                    const layer = target.collisionLayer ?? (kind === 'wall' ? GameEntity.LAYER.STATIC : GameEntity.LAYER.VEHICLE);
+                    if (!(mask & layer) || p.hitTargets.has(target)) return;
+                    seen.add(target);
+                    const t = this.projectileHitTime(p, target, actor);
+                    if (t !== null) hits.push({ target, kind, t });
+                };
+                if (!p.isEnemy) for (const e of game.enemies) add(e, 'enemy');
+                add(game.player, 'actor');
+                for (const a of GameEntity.getByLayer('ACTOR')) add(a, 'actor');
+                for (const prop of GameEntity.getByLayer('DYNAMIC')) add(prop, 'entity');
+                for (const car of game.traffic?.vehicles || []) add(car, 'traffic');
+                if (game.ownedCar?.visible) add(game.ownedCar, 'traffic');
+                for (const car of GameEntity.getByLayer('VEHICLE')) add(car, 'entity');
+
+                // Authored walls use their existing spatial index, independent of camera culling.
+                const map = game.activeMap, r = p.radius ?? 5;
+                if (map) {
+                    const bounds = { left: Math.min(p.lastX ?? p.x, p.x) - r, right: Math.max(p.lastX ?? p.x, p.x) + r,
+                        top: Math.min(p.lastY ?? p.y, p.y) - r, bottom: Math.max(p.lastY ?? p.y, p.y) + r };
+                    for (const list of [map.walls || [], getColliders(map)]) for (const wall of _physicsSpatial.query(list, bounds)) add(wall, 'wall');
+                }
+                // Other registered statics (e.g. billboard posts); avoid duplicate map-wall proxies.
+                const statics = GameEntity.getByLayer('STATIC');
+                let extra = game._projectileStaticExtras;
+                if (!extra || extra.walls !== game._staticWallEntities || extra.buildings !== game._staticBuildingEntities) {
+                    extra = game._projectileStaticExtras = { walls: game._staticWallEntities, buildings: game._staticBuildingEntities,
+                        mapped: new Set([...(game._staticWallEntities || []), ...(game._staticBuildingEntities || [])]) };
+                }
+                if (extra.tick !== _simTick || extra.source !== statics || extra.length !== statics.length) {
+                    extra.source = statics; extra.length = statics.length; extra.tick = _simTick;
+                    extra.items = statics.filter(s => !extra.mapped.has(s));
+                }
+                for (const wall of extra.items) add(wall, 'wall');
+
+                const room = game.roomSystem;
+                if (room?.active) {
+                    for (const win of room.windows) if (!win.shattered) {
+                        const t = this.projectileHitTime(p, win);
+                        if (t !== null) hits.push({ target: win, kind: 'window', t });
                     }
-                    
-                    // Skip aged-out projectiles (hard 5s cap)
-                    if (proj.spawnTime != null && _gameTimeMs() - proj.spawnTime > 5000) {
-                        proj.destroy();
-                        continue;
-                    }
-                    
-                    const nearby = this.spatialGrid.getNearby(proj);
-                    this.stats.totalChecks += nearby.length;
-                    
-                    for (let target of nearby) {
-                        // Bail if this projectile was destroyed by a collision earlier in this loop
-                        if (!proj.active || proj.markedForDestroy) break;
-                        
-                        if (!target.active || proj === target) continue;
-                        if ((proj.collisionMask & target.collisionLayer) === 0) continue;
-                        
-                        // Skip collision with the projectile's owner (prevent self-hits)
-                        if (proj.owner && target === proj.owner) continue;
-                        
-                        // Skip same-alliance targets (friendly fire prevention)
-                        if (proj.alliance && target.alliance && proj.alliance === target.alliance) continue;
-                        
-                        // Skip neutral entities (civilians)
-                        if (target.alliance === 'neutral') continue;
-                        
-                        // Skip targets already hit by penetrating projectiles
-                        if (proj.penetrating && proj.hitTargets.has(target)) continue;
-                        
-                        if (this._checkCollision(proj, target)) {
-                            this.stats.narrowChecks++;
-                            
-                            if (proj.speed > 20) {
-                                // High impact dust!
-                                game.createImpactDust(proj.x, proj.y);
-                            }
-                            
-                            if (target.collisionLayer === GameEntity.LAYER.ACTOR && target.onProjectileHit) {
-                                target.onProjectileHit(proj, game);
-                            }
-                            
-                            if (proj.onHit) proj.onHit(target, game);
-                            
-                            // Penetrating projectiles don't stop - they keep going
-                            if (proj.penetrating) {
-                                proj.hitTargets.add(target);
-                                proj.penetrateCount++;
-                                // Check if we've exceeded max penetrations
-                                if (proj.penetrateCount >= proj.maxPenetrations) {
-                                    proj.destroy();
-                                    break;
-                                }
-                                // Continue checking other targets
-                            } else {
-                                proj.destroy();
-                                this.stats.collisionsResolved++;
-                                break;
-                            }
+                    for (const door of room.doors) {
+                        if (door.type === 'arch' || p._doorHits?.has(door)) continue;
+                        let t = null;
+                        for (const [ax, ay, bx, by] of door.leaves()) {
+                            const cx = (ax + bx) / 2, cy = (ay + by) / 2, a = Math.atan2(by - ay, bx - ax), c = Math.cos(a), s = Math.sin(a);
+                            const x0 = (p.lastX ?? p.x) - cx, y0 = (p.lastY ?? p.y) - cy, x1 = p.x - cx, y1 = p.y - cy;
+                            const at = this._sweepRoundedBox(x0 * c + y0 * s, y0 * c - x0 * s, x1 * c + y1 * s, y1 * c - x1 * s,
+                                Math.hypot(bx - ax, by - ay) / 2, 0, r + (door.halfThick || 0));
+                            if (at !== null && (t === null || at < t)) t = at;
                         }
-                        
-                        // NEW: Fallback for high-speed tunneling (Sniper Fix)
-                        else if (proj.speed > 20 && target.collisionShape === GameEntity.SHAPE.CIRCLE
-                                && !(proj.alliance && target.alliance && proj.alliance === target.alliance)
-                                && target.alliance !== 'neutral') {
-                            // If the bullet didn't hit directly, check if it passed through
-                            // We check the distance from the target center to the line segment (lastX, lastY) -> (x, y)
-                            
-                            // Only check if we actually have a previous position
-                            if (proj.lastX !== undefined) {
-                                const distSq = CollisionSystem.distToSegmentSquared(
-                                    target.x, target.y, 
-                                    proj.lastX, proj.lastY, 
-                                    proj.x, proj.y
-                                );
-                        
-                                // If the line passed within the target's radius
-                                if (distSq < (target.radius + proj.radius) ** 2) {
-                                    
-                                    game.createImpactDust(target.x, target.y);
-                                    
-                                    // Execute the hit logic (copying from your existing hit block)
-                                    if (target.collisionLayer === GameEntity.LAYER.ACTOR && target.onProjectileHit) {
-                                        target.onProjectileHit(proj, game);
-                                    }
-                                    if (proj.onHit) proj.onHit(target, game);
-                        
-                                    if (proj.penetrating) {
-                                        proj.hitTargets.add(target);
-                                        proj.penetrateCount++;
-                                        if (proj.penetrateCount >= proj.maxPenetrations) {
-                                            proj.destroy();
-                                            break;
-                                        }
-                                    } else {
-                                        proj.destroy();
-                                        this.stats.collisionsResolved++;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
+                        if (t !== null) hits.push({ target: door, kind: 'door', t });
                     }
                 }
+                // Resolve front-to-back, never by enemy-array or spatial-cell insertion order.
+                const priority = hit => hit.kind === 'window' ? 0 : (hit.kind === 'enemy' || hit.kind === 'actor') ? 2 : 1;
+                hits.sort((a, b) => a.t - b.t || priority(a) - priority(b));
+                return hits;
             }
-            
+
+            static resolveProjectile(p, game) {
+                if (!p.active || p.markedForDestroy || p._projectileCollisionTick === _simTick) return;
+                p._projectileCollisionTick = _simTick;
+                const x0 = p.lastX ?? p.x, y0 = p.lastY ?? p.y, x1 = p.x, y1 = p.y;
+                for (const hit of this._projectileContacts(p, game)) {
+                    if (!p.active || p.markedForDestroy) break;
+                    const e = hit.target;
+                    if (e.active === false || e.dead || e.markedForDestroy || p.hitTargets.has(e)) continue;
+                    p.x = x0 + (x1 - x0) * hit.t; p.y = y0 + (y1 - y0) * hit.t;
+                    if (hit.kind === 'window') {
+                        if (e.tryShatter(p.x, p.y, (p.radius ?? 5) + 1e-6)) {
+                            game.weather.spawnSparks(p.x, p.y, 8); audioSys.sfx('explode');
+                            game.emitNoise(p.x, p.y, CONFIG.NOISE.glass, 'glass', !p.isEnemy);
+                        }
+                        continue;
+                    }
+                    if (hit.kind === 'door') {
+                        e.strike(p, p.x, p.y); (p._doorHits || (p._doorHits = new Set())).add(e);
+                        const glass = e.type === 'sliding';
+                        game.weather.spawnSparks(p.x, p.y, glass ? 6 : 4);
+                        if (!glass) game.createImpactDust(p.x, p.y);
+                        if (typeof ambience !== 'undefined') ambience.doorEvent(glass ? 'tink' : 'thud', e);
+                        game.emitNoise(p.x, p.y, CONFIG.NOISE.door, 'door', !p.isEnemy);
+                        if (p.penetrating && !p.melee) p.damage *= 0.5;
+                        else { p.destroy(); break; }
+                        continue;
+                    }
+                    if (hit.kind === 'enemy') {
+                        const speed = Math.hypot(p.vx, p.vy), strength = Math.min((p.damage * speed * 0.02) / ((e.mass || 20) * 0.1), 50);
+                        e.lastHitBy = p.owner; e.lastHitMelee = !!p.melee;
+                        const landed = e.takeDamage(p.damage, speed ? p.vx / speed * strength : 0, speed ? p.vy / speed * strength : 0,
+                            { shot: !p.melee, punch: !!p.melee, crit: !!p.crit });
+                        if (landed && p.melee && e.interruptMelee) e.interruptMelee();
+                        if (landed && p.sticky && !e.dead) game.stickOrb(e, p);
+                    } else if (hit.kind === 'actor') e.onProjectileHit(p, game);
+                    else if (hit.kind === 'traffic') {
+                        const speed = Math.hypot(p.vx, p.vy), push = (p.damage * speed * 0.005) / 5;
+                        if (speed) { e.x += p.vx / speed * push; e.y += p.vy / speed * push; }
+                        game.weather.spawnSparks(p.x, p.y, 8);
+                    }
+                    if (p.onHit) p.onHit(e, game, hit.kind !== 'traffic');
+                    if (p.isSniper) game.weather.spawnSparks(p.x, p.y, 15);
+                    p.hitTargets.add(e);
+                    if (!p.penetrating || ++p.penetrateCount >= p.maxPenetrations) { p.destroy(); break; }
+                }
+                if (p.active && !p.markedForDestroy) { p.x = x1; p.y = y1; }
+            }
+
+            static resolveProjectiles(game) {
+                for (let i = game.projectiles.length - 1; i >= 0; i--) {
+                    const p = game.projectiles[i];
+                    this.resolveProjectile(p, game);
+                    if (p.life <= 0 && p.active) p.destroy();
+                    if (!p.active || p.markedForDestroy) game.projectiles.splice(i, 1);
+                }
+            }
+
+            static _processProjectiles(onScreen, game, candidates = null) {
+                if (!game) return;
+                for (const p of candidates || onScreen.filter(e => e.collisionLayer === GameEntity.LAYER.PROJECTILE)) {
+                    if (!p.active || p.markedForDestroy) continue;
+                    if ((!p.sticky && !p.vx && !p.vy) || (p.spawnTime != null && _gameTimeMs() - p.spawnTime > 5000)) { p.destroy(); continue; }
+                    this.resolveProjectile(p, game);
+                }
+            }
+
             static _processVehicles(onScreen, game, candidates = null) {
                 const vehicles = candidates ? this._activeLayer(candidates) : onScreen.filter(e =>
                     e.collisionLayer === GameEntity.LAYER.VEHICLE && e.active

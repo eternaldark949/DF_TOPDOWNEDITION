@@ -656,7 +656,7 @@
                 // Only take damage from player projectiles
                 if (projectile.isEnemy) return;
                 this.lastHitBy = projectile.owner; this.lastHitMelee = !!projectile.melee;   // who gets the Resonance
-                const opts = { punch: !!projectile.melee, crit: !!projectile.crit };
+                const opts = { shot: !projectile.melee, punch: !!projectile.melee, crit: !!projectile.crit };
                 
                 const speed = Math.hypot(projectile.vx, projectile.vy);
                 if (speed > 0) {
@@ -1113,7 +1113,7 @@
                 // Only take damage from player projectiles
                 if (projectile.isEnemy) return;
                 this.lastHitBy = projectile.owner; this.lastHitMelee = !!projectile.melee;   // who gets the Resonance
-                const opts = { punch: !!projectile.melee, crit: !!projectile.crit };
+                const opts = { shot: !projectile.melee, punch: !!projectile.melee, crit: !!projectile.crit };
                 
                 const speed = Math.hypot(projectile.vx, projectile.vy);
                 if (speed > 0) {
@@ -1851,7 +1851,7 @@
             onProjectileHit(projectile, game) {
                 if (projectile.isEnemy) return;
                 this.lastHitBy = projectile.owner; this.lastHitMelee = !!projectile.melee;   // who gets the Resonance
-                const opts = { punch: !!projectile.melee, crit: !!projectile.crit };
+                const opts = { shot: !projectile.melee, punch: !!projectile.melee, crit: !!projectile.crit };
                 this.suspicion = 100;
                 this.state = 'ALERT';
                 

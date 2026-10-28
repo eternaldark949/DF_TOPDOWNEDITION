@@ -32,6 +32,7 @@
                 // Gait clock — advances only when the world actually steps, so
                 // walk animation freezes with everything else while paused.
                 _simTick++;
+                CollisionSystem.beginProjectileStep(this);
                 
                 // Pausable systems — must tick before any logic that might
                 // schedule new timers or read playerEmote state.
@@ -723,7 +724,7 @@
                         continue;
                     }
                     
-                    p.update();
+                    p.update(1, true);
                     
                     // ── NEURAL LOCK AIM ASSIST ──
                     // Steer friendly projectiles toward nearest enemy on trajectory path
@@ -795,190 +796,8 @@
                         continue;
                     }
                     
-                    let hit = false;
-                    let shouldDestroy = false;
-                    
-                    // Indoor V2: Check window shatter
-                    if (this.roomSystem.active) {
-                        for (const win of this.roomSystem.windows) {
-                            if (win.tryShatter(p.x, p.y, 6)) {
-                                this.weather.spawnSparks(p.x, p.y, 8);
-                                audioSys.sfx('explode');
-                                this.emitNoise(p.x, p.y, CONFIG.NOISE.glass, 'glass', !p.isEnemy);
-                                break;
-                            }
-                        }
-                        // Doors take bullets: the leaf swings (or the glass jolts) with the round's force
-                        const dh = this.roomSystem.hitDoors(p);
-                        if (dh) {
-                            const glass = dh.door.type === 'sliding';
-                            this.weather.spawnSparks(dh.x, dh.y, glass ? 6 : 4);
-                            if (!glass && this.createImpactDust) this.createImpactDust(dh.x, dh.y);
-                            if (typeof ambience !== 'undefined') ambience.doorEvent(glass ? 'tink' : 'thud', dh.door);
-                            this.emitNoise(dh.x, dh.y, CONFIG.NOISE.door, 'door', !p.isEnemy);
-                            if (p.penetrating && !p.melee) p.damage *= 0.5;          // a sniper round punches through, spent
-                            else { p.destroy(); this.projectiles.splice(i, 1); continue; }
-                        }
-                    }
-                    
-                    // Check Player (Enemy Projectiles Only) - uses PlayerEntity
-                    if (p.isEnemy && this.player.visible && !this.player.dead) {
-                        // Skip if penetrating and already hit this target
-                        if (!p.penetrating || !p.hitTargets.has(this.player)) {
-                            const d = Math.hypot(p.x - this.player.x, p.y - this.player.y);
-                            if (d < this.player.radius + 5) {
-                                hit = true;
-                                this.player.onProjectileHit(p, this);
-                                if (p.penetrating) {
-                                    p.hitTargets.add(this.player);
-                                    p.penetrateCount++;
-                                    if (p.penetrateCount >= p.maxPenetrations) shouldDestroy = true;
-                                } else {
-                                    shouldDestroy = true;
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Check Enemies (Player Projectiles Only)
-                    if (!p.isEnemy) {
-                        for (let e of this.enemies) {
-                            if (e.dead) continue;
-                            // Skip if penetrating and already hit this target
-                            if (p.penetrating && p.hitTargets.has(e)) continue;
-                            
-                            const d = Math.hypot(p.x - e.x, p.y - e.y);
-                            if (d < e.radius + 5) {
-                                hit = true;
-                                const angle = Math.atan2(p.vy, p.vx);
-                                // Knockback scales with damage AND speed (powerful sniper = huge knockback)
-                                // Formula: (damage * speed) / target_mass, capped for sanity
-                                const projSpeed = Math.hypot(p.vx, p.vy);
-                                const targetMass = e.mass || 20;
-                                const knockbackStrength = Math.min((p.damage * projSpeed * 0.02) / (targetMass * 0.1), 50);
-                                const kbX = Math.cos(angle) * knockbackStrength;
-                                const kbY = Math.sin(angle) * knockbackStrength;
-                                e.lastHitBy = p.owner; e.lastHitMelee = !!p.melee;       // who gets the Resonance
-                                if (e.takeDamage(p.damage, kbX, kbY, p.melee ? { punch: true, crit: !!p.crit } : { shot: true, crit: !!p.crit }) && p.melee && e.interruptMelee) e.interruptMelee();
-                                
-                                // Spawn sticky DOT orb (Golden Child)
-                                if (p.sticky && !e.dead) this.stickOrb(e, p);
-                                
-                                if (p.penetrating) {
-                                    p.hitTargets.add(e);
-                                    p.penetrateCount++;
-                                    if (p.penetrateCount >= p.maxPenetrations) {
-                                        shouldDestroy = true;
-                                        break;
-                                    }
-                                    // Continue to next enemy for penetrating shots
-                                } else {
-                                    shouldDestroy = true;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Check Traffic Vehicles (penetrating shots go through)
-                    if (this.traffic && this.traffic.vehicles) {
-                        for (let car of this.traffic.vehicles) {
-                            // Skip if penetrating and already hit this target
-                            if (p.penetrating && p.hitTargets.has(car)) continue;
-                            
-                            if (Math.hypot(p.x - car.x, p.y - car.y) < 35) {
-                                hit = true;
-                                this.weather.spawnSparks(p.x, p.y, 8);
-                                const angle = Math.atan2(p.vy, p.vx);
-                                // Push cars based on damage and speed - sniper sends them flying!
-                                const projSpeed = Math.hypot(p.vx, p.vy);
-                                const carMass = 500; // Cars are heavy
-                                const pushStrength = (p.damage * projSpeed * 0.005) / (carMass * 0.01);
-                                car.x += Math.cos(angle) * pushStrength;
-                                car.y += Math.sin(angle) * pushStrength;
-                                
-                                if (p.penetrating) {
-                                    p.hitTargets.add(car);
-                                    p.penetrateCount++;
-                                    if (p.penetrateCount >= p.maxPenetrations) {
-                                        shouldDestroy = true;
-                                        break;
-                                    }
-                                } else {
-                                    shouldDestroy = true;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Check Owned Car (penetrating shots go through)
-                    if (this.ownedCar && this.ownedCar.visible) {
-                        if (!p.penetrating || !p.hitTargets.has(this.ownedCar)) {
-                            if (Math.hypot(p.x - this.ownedCar.x, p.y - this.ownedCar.y) < 35) {
-                                hit = true;
-                                this.weather.spawnSparks(p.x, p.y, 8);
-                                // Push owned car based on damage - sniper sends it flying!
-                                const angle = Math.atan2(p.vy, p.vx);
-                                const projSpeed = Math.hypot(p.vx, p.vy);
-                                const carMass = 500;
-                                const pushStrength = (p.damage * projSpeed * 0.005) / (carMass * 0.01);
-                                this.ownedCar.x += Math.cos(angle) * pushStrength;
-                                this.ownedCar.y += Math.sin(angle) * pushStrength;
-                                
-                                if (p.penetrating) {
-                                    p.hitTargets.add(this.ownedCar);
-                                    p.penetrateCount++;
-                                    if (p.penetrateCount >= p.maxPenetrations) shouldDestroy = true;
-                                } else {
-                                    shouldDestroy = true;
-                                }
-                            }
-                        }
-                    }
-                    
-                    // HIT RESOLUTION (Audio/Visual Effects)
-                    if (hit) {
-                        const distToPlayer = Math.hypot(p.x - this.player.x, p.y - this.player.y);
-                        
-                        if (distToPlayer < 800) {
-                            audioSys.sfx('explode');
-                            
-                            // Camera shake: Sniper > Fireballs > Enemy Shots > Player Shots
-                            let shakeAmt = p.isSniper ? 15 : (p.color === '#ff3300' ? 12 : (p.isEnemy ? 8 : 4));
-                            shakeAmt *= (1 - (distToPlayer / 800));
-                            if (shakeAmt > 0.5) this.triggerShake(shakeAmt);
-                        }
-                        
-                        // Visual explosion
-                        if (p.color === '#ff3300') {
-                            this.weather.spawnExplosion(p.x, p.y, '#ff3300');
-                            this.weather.spawnSparks(p.x, p.y, 25);
-                        } else {
-                            this.weather.spawnExplosion(p.x, p.y, p.color);
-                            // Extra sparks for sniper hits
-                            if (p.isSniper) {
-                                this.weather.spawnSparks(p.x, p.y, 15);
-                            }
-                        }
-                        
-                        // Destroy if not penetrating or exceeded max
-                        if (shouldDestroy) {
-                            p.destroy();
-                            this.projectiles.splice(i, 1);
-                        }
-                    }
-                    
-                    // Remove if expired (entity handles this, but sync arrays)
-                    if (!p.active || p.markedForDestroy) {
-                        if (!p.markedForDestroy) p.destroy();
-                        this.projectiles.splice(i, 1);
-                    }
                 }
-                
-                // ── STICKY ORBS (Golden Child DOT) ──
-                this.updateStickyOrbs();
-            
+
                 // Loot Collection
                 for(let i=this.loot.length-1; i>=0; i--) {
                     let l = this.loot[i];
@@ -1179,6 +998,9 @@
                     this.resolveTrafficCollisions();
                 }
                 
+                CollisionSystem.resolveProjectiles(this);
+                this.updateStickyOrbs();
+
                 // Unified Entity System collision pass (spatial grid optimization)
                 if (this.useNewCollisionSystem) {
                     CollisionSystem.update(this.camera, this.canvas, this);

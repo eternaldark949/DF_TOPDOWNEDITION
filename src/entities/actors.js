@@ -799,6 +799,8 @@
                 this.dotTicks = config.dotTicks || 12;
                 this.dotInterval = config.dotInterval || 10;
                 this.spawnTime = _gameTimeMs();                     // game time: a pause doesn't age it
+                this.lastX = this.lastY = undefined;
+                this._projectileCollisionTick = -1; this._doorHits = null;
                 this.fxTrail = null; this.trail = null; this._wispN = 0;
                 this._fireTrailStarted = false; this._fireTrailGap = 0;
             }
@@ -892,7 +894,7 @@
              * @param {GameEntity} target - The entity that was hit
              * @param {GameEngine} game - Reference to the game engine
              */
-            onHit(target, game) {
+            onHit(target, game, applyImpulse = true) {
                 if (!game) return;
                 
                 // Use current position (at impact) for effects
@@ -910,6 +912,7 @@
                     let shakeAmt = 0;
                     if (this.isFireball) shakeAmt = 12;
                     else if (this.isEnemy) shakeAmt = 8;
+                    else if (this.isSniper) shakeAmt = 15;
                     else shakeAmt = 4;
                     
                     // Falloff based on distance (shake less if far away)
@@ -926,7 +929,7 @@
                 }
                 
                 // Handle specific target types with mass-based impulse
-                if (target) {
+                if (target && applyImpulse) {
                     // If hit a DYNAMIC entity (prop), apply damage-scaled impulse
                     if (target.collisionLayer === GameEntity.LAYER.DYNAMIC) {
                         if (target.vx !== undefined) {
@@ -989,7 +992,7 @@
                 }
             }
             
-            update(dt = 1) {
+            update(dt = 1, deferExpiry = false) {
                 // SAVE PREVIOUS POSITION
                 this.lastX = this.x;
                 this.lastY = this.y;
@@ -1002,7 +1005,8 @@
                     const T = this.trail; T.push(this.x, this.y); if (T.length > 16) T.splice(0, 2);
                     if (this.fxTrail.trail === 'wisp' && (this._wispN = (this._wispN || 0) + 1) % 2 === 0 && typeof game !== 'undefined') game.spawnWisp(this.x, this.y, this.fxTrail);
                 }
-                if (this.life <= 0) {
+                // The engine resolves the final traveled segment before expiring the shot.
+                if (this.life <= 0 && !deferExpiry) {
                     this.vx = 0;
                     this.vy = 0;
                     this.destroy();
