@@ -52,4 +52,49 @@ test('A barrel against a wall cannot spawn a drive-by shot on the far side',`
  game.isDriving=true;game.player.angle=0;game.activeMap.walls=[{x:1020,y:960,w:10,h:80}];const g=game.getPlayerShotGeometry();game.fireWeapon();const p=game.projectiles[0];return {g,x:p.x,y:p.y,seat:game.car.getSeatWorldPos(0)};`,r=>{
  assert.equal(r.x,r.seat.x);assert.equal(r.y,r.seat.y);assert.equal(r.g.x,r.seat.x);assert.equal(r.g.y,r.seat.y);
 });
+test('Consecutive punches land at their normal cadence and each hitbox hits only once',`
+ game.story.update=()=>{};
+ game.weaponMode='none';game.currentWeapon=null;game.isDriving=false;game.player.angle=0;game._execTarget=null;
+ game.mouseDown=false;game._releaseShot=null;game.fireJoystick.active=false;game.enemies=[];
+ const target=new Ganger(1040,1000,{hp:5000});game.enemies.push(target);
+ target.update=()=>{if(target.invincibleTimer>0)target.invincibleTimer--;};
+ let interrupts=0;target.interruptMelee=()=>interrupts++;
+ const remaining=[];
+ for(let i=0;i<60;i++){
+  game.player.x=game.player.y=1000;game.player.angle=0;target.x=1040;target.y=1000;
+  target.knockbackVx=target.knockbackVy=0;
+  if(i%CONFIG.PUNCH.DURATION_TICKS===0)game.fireWeapon();
+  game.update();
+  if(i%CONFIG.PUNCH.DURATION_TICKS===5)remaining.push(target.hp);
+ }
+ return {remaining,interrupts,frames:target.invincibleTimer,projectiles:game.projectiles.length};`,r=>{
+ assert.deepEqual(r.remaining,[4985,4970,4955,4940]);assert.equal(r.interrupts,4);
+ assert.equal(r.frames,0);assert.equal(r.projectiles,0);
+});
+test('Enemy projectile callbacks accept normal and critical punches inside existing i-frames',`
+ game.weaponMode='none';game.currentWeapon=null;game.isDriving=false;game.player.angle=0;
+ const out=[];
+ for(const Enemy of [Ganger,Drone,GatlingGunner])for(const speed of [0,10]){
+  const target=new Enemy(1300,1000);target.hp=target.maxHp=5000;target.invincibleTimer=20;
+  let interrupts=0;target.interruptMelee=()=>interrupts++;
+  for(const crit of [1,2]){
+   game.rollCrit=()=>crit;game.fireWeapon();const p=game.projectiles.pop();p.vx=speed;p.vy=0;
+   target.onProjectileHit(p,game);p.destroy();
+  }
+  out.push({lost:5000-target.hp,frames:target.invincibleTimer,melee:target.lastHitMelee,by:target.lastHitBy===game.player,interrupts});
+ }
+ return out;`,r=>{
+ assert.equal(r.length,6);
+ for(const result of r){assert.equal(result.lost,45);assert.equal(result.frames,20);assert.equal(result.melee,true);assert.equal(result.by,true);}
+ assert.equal(r[0].interrupts,2);assert.equal(r[1].interrupts,2);
+});
+test('Punches preserve existing i-frames while repeated contact damage is still blocked',`
+ const target=new Ganger(1300,1000,{hp:500});
+ const contact=target.takeDamage(10),blocked=target.takeDamage(10);
+ const punch=target.takeDamage(15,0,0,{punch:true});
+ const stillBlocked=target.takeDamage(10),frames=target.invincibleTimer;
+ target.invincibleTimer=0;target.takeDamage(15,0,0,{punch:true});
+ return {contact,blocked,punch,stillBlocked,frames,after:target.invincibleTimer,hp:target.hp};`,r=>{
+ assert.deepEqual(r,{contact:true,blocked:false,punch:true,stillBlocked:false,frames:20,after:0,hp:460});
+});
 console.log(JSON.stringify({passed:tests.length,tests},null,2));

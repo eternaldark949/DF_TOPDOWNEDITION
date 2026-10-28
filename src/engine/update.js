@@ -859,7 +859,7 @@
                                 const kbX = Math.cos(angle) * knockbackStrength;
                                 const kbY = Math.sin(angle) * knockbackStrength;
                                 e.lastHitBy = p.owner; e.lastHitMelee = !!p.melee;       // who gets the Resonance
-                                if (e.takeDamage(p.damage, kbX, kbY, p.melee ? (p.crit ? { crit: true } : null) : { shot: true, crit: !!p.crit }) && p.melee && e.interruptMelee) e.interruptMelee();
+                                if (e.takeDamage(p.damage, kbX, kbY, p.melee ? { punch: true, crit: !!p.crit } : { shot: true, crit: !!p.crit }) && p.melee && e.interruptMelee) e.interruptMelee();
                                 
                                 // Spawn sticky DOT orb (Golden Child)
                                 if (p.sticky && !e.dead) this.stickOrb(e, p);
@@ -977,34 +977,7 @@
                 }
                 
                 // ── STICKY ORBS (Golden Child DOT) ──
-                for (let i = this.stickyOrbs.length - 1; i >= 0; i--) {
-                    const orb = this.stickyOrbs[i];
-                    
-                    // Remove if target dead or ticks exhausted
-                    if (!orb.target || orb.target.dead || orb.ticksLeft <= 0) {
-                        this.stickyOrbs.splice(i, 1);
-                        continue;
-                    }
-                    
-                    // Tick damage timer
-                    orb.tickTimer++;
-                    if (orb.tickTimer >= orb.tickInterval) {
-                        orb.tickTimer = 0;
-                        orb.ticksLeft--;
-                        // A burn tick passes i-frames and starts none, so every orb's ticks land (entities/actors.js)
-                        if (orb.owner) { orb.target.lastHitBy = orb.owner; orb.target.lastHitMelee = false; }
-                        orb.target.takeDamage(orb.dotDamage, 0, 0, { type: 'burn' });
-                        
-                        // Small golden spark on each tick
-                        if (this.weather) {
-                            this.weather.spawnExplosion(
-                                orb.target.x + orb.offsetX, 
-                                orb.target.y + orb.offsetY, 
-                                '#FFD700'
-                            );
-                        }
-                    }
-                }
+                this.updateStickyOrbs();
             
                 // Loot Collection
                 for(let i=this.loot.length-1; i>=0; i--) {

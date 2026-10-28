@@ -342,10 +342,45 @@
             stickOrb(e, p) {
                 const orbs = this.stickyOrbs || (this.stickyOrbs = []);
                 const on = orbs.filter(o => o.target === e);
-                if (on.length >= (p.maxOrbs || 4)) orbs.splice(orbs.indexOf(on[0]), 1);
+                let tickTimer = 0;
+                if (on.length >= (p.maxOrbs || 4)) {
+                    const oldest = on[0];
+                    // Keep progress toward the next burn when refreshing a full target. Resetting
+                    // it on each replacement made faster shots postpone burns and lower DPS.
+                    tickTimer = oldest.tickTimer / oldest.tickInterval * p.dotInterval;
+                    orbs.splice(orbs.indexOf(oldest), 1);
+                }
                 const spread = (e.radius || 10) * 0.5;                              // scattered across the target
                 orbs.push({ target: e, offsetX: (Math.random() - 0.5) * spread, offsetY: (Math.random() - 0.5) * spread, maxRadius: 7,
-                    ticksLeft: p.dotTicks, maxTicks: p.dotTicks, tickInterval: p.dotInterval, tickTimer: 0, dotDamage: p.dotDamage, owner: p.owner });
+                    ticksLeft: p.dotTicks, maxTicks: p.dotTicks, tickInterval: p.dotInterval, tickTimer, dotDamage: p.dotDamage, owner: p.owner });
+            },
+
+            /** Golden Child burns once per simulation tick, after projectile hits attach or refresh orbs. */
+            updateStickyOrbs() {
+                for (let i = this.stickyOrbs.length - 1; i >= 0; i--) {
+                    const orb = this.stickyOrbs[i];
+
+                    if (!orb.target || orb.target.dead || orb.ticksLeft <= 0) {
+                        this.stickyOrbs.splice(i, 1);
+                        continue;
+                    }
+
+                    orb.tickTimer++;
+                    if (orb.tickTimer >= orb.tickInterval) {
+                        orb.tickTimer = 0;
+                        orb.ticksLeft--;
+                        if (orb.owner) { orb.target.lastHitBy = orb.owner; orb.target.lastHitMelee = false; }
+                        orb.target.takeDamage(orb.dotDamage, 0, 0, { type: 'burn' });
+
+                        if (this.weather) {
+                            this.weather.spawnExplosion(
+                                orb.target.x + orb.offsetX,
+                                orb.target.y + orb.offsetY,
+                                '#FFD700'
+                            );
+                        }
+                    }
+                }
             },
 
             /** Damage that reaches her mid-swing (a blade drawn and moving) is cut to BLADE_PERKS.GUARD of itself */

@@ -22886,9 +22886,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             takeDamage(amount, knockbackX = 0, knockbackY = 0, opts = null) {
                 // A bullet always lands: i-frames guard against a swing or a bump hitting twice, not against rapid fire
                 // (a fast gun used to lose ~4 of every 5 bullets to them). Bullets don't start i-frames either.
-                // Nor do a blade's cuts (opts.cut: each swing cuts a body once, so quick cuts all land), bleed ticks or
+                // Nor do punches (their hitbox is consumed on contact), a blade's cuts (each swing cuts a body once), bleed ticks or
                 // a Golden Child orb's burn ticks (a tick used to start them, and the next cut or orb inside them was lost).
-                const shot = !!(opts && (opts.shot || opts.cut));
+                const shot = !!(opts && (opts.shot || opts.cut || opts.punch));
                 const bleed = !!(opts && (opts.type === 'bleed' || opts.type === 'burn'));
                 if (this.dead || (this.invincibleTimer > 0 && !(bleed || shot))) return false;
                 
@@ -28987,6 +28987,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Only take damage from player projectiles
                 if (projectile.isEnemy) return;
                 this.lastHitBy = projectile.owner; this.lastHitMelee = !!projectile.melee;   // who gets the Resonance
+                const opts = { punch: !!projectile.melee, crit: !!projectile.crit };
                 
                 const speed = Math.hypot(projectile.vx, projectile.vy);
                 if (speed > 0) {
@@ -28997,9 +28998,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     
                     const kbX = (projectile.vx / speed) * knockbackStrength;
                     const kbY = (projectile.vy / speed) * knockbackStrength;
-                    this.takeDamage(projectile.damage, kbX, kbY, projectile.crit ? { crit: true } : null);
+                    this.takeDamage(projectile.damage, kbX, kbY, opts);
                 } else {
-                    this.takeDamage(projectile.damage, 0, 0, projectile.crit ? { crit: true } : null);
+                    this.takeDamage(projectile.damage, 0, 0, opts);
                 }
             }
             
@@ -29443,6 +29444,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Only take damage from player projectiles
                 if (projectile.isEnemy) return;
                 this.lastHitBy = projectile.owner; this.lastHitMelee = !!projectile.melee;   // who gets the Resonance
+                const opts = { punch: !!projectile.melee, crit: !!projectile.crit };
                 
                 const speed = Math.hypot(projectile.vx, projectile.vy);
                 if (speed > 0) {
@@ -29453,9 +29455,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     
                     const kbX = (projectile.vx / speed) * knockbackStrength;
                     const kbY = (projectile.vy / speed) * knockbackStrength;
-                    this.takeDamage(projectile.damage, kbX, kbY, projectile.crit ? { crit: true } : null);
+                    this.takeDamage(projectile.damage, kbX, kbY, opts);
                 } else {
-                    this.takeDamage(projectile.damage, 0, 0, projectile.crit ? { crit: true } : null);
+                    this.takeDamage(projectile.damage, 0, 0, opts);
                 }
             }
 
@@ -30180,6 +30182,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             onProjectileHit(projectile, game) {
                 if (projectile.isEnemy) return;
                 this.lastHitBy = projectile.owner; this.lastHitMelee = !!projectile.melee;   // who gets the Resonance
+                const opts = { punch: !!projectile.melee, crit: !!projectile.crit };
                 this.suspicion = 100;
                 this.state = 'ALERT';
                 
@@ -30199,8 +30202,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const knockbackStrength = projectile.damage * 0.3;
                     const kbX = (projectile.vx / speed) * knockbackStrength;
                     const kbY = (projectile.vy / speed) * knockbackStrength;
-                    if (this.takeDamage(projectile.damage, kbX, kbY, projectile.crit ? { crit: true } : null) && projectile.melee) this.interruptMelee();
-                } else if (this.takeDamage(projectile.damage, 0, 0, projectile.crit ? { crit: true } : null) && projectile.melee) { this.interruptMelee(); }
+                    if (this.takeDamage(projectile.damage, kbX, kbY, opts) && projectile.melee) this.interruptMelee();
+                } else if (this.takeDamage(projectile.damage, 0, 0, opts) && projectile.melee) { this.interruptMelee(); }
             }
 
             /** The vision cone's outline in world space, cast against the map's walls and buildings (cached). */
@@ -68148,10 +68151,45 @@ engineMixin({
             stickOrb(e, p) {
                 const orbs = this.stickyOrbs || (this.stickyOrbs = []);
                 const on = orbs.filter(o => o.target === e);
-                if (on.length >= (p.maxOrbs || 4)) orbs.splice(orbs.indexOf(on[0]), 1);
+                let tickTimer = 0;
+                if (on.length >= (p.maxOrbs || 4)) {
+                    const oldest = on[0];
+                    // Keep progress toward the next burn when refreshing a full target. Resetting
+                    // it on each replacement made faster shots postpone burns and lower DPS.
+                    tickTimer = oldest.tickTimer / oldest.tickInterval * p.dotInterval;
+                    orbs.splice(orbs.indexOf(oldest), 1);
+                }
                 const spread = (e.radius || 10) * 0.5;                              // scattered across the target
                 orbs.push({ target: e, offsetX: (Math.random() - 0.5) * spread, offsetY: (Math.random() - 0.5) * spread, maxRadius: 7,
-                    ticksLeft: p.dotTicks, maxTicks: p.dotTicks, tickInterval: p.dotInterval, tickTimer: 0, dotDamage: p.dotDamage, owner: p.owner });
+                    ticksLeft: p.dotTicks, maxTicks: p.dotTicks, tickInterval: p.dotInterval, tickTimer, dotDamage: p.dotDamage, owner: p.owner });
+            },
+
+            /** Golden Child burns once per simulation tick, after projectile hits attach or refresh orbs. */
+            updateStickyOrbs() {
+                for (let i = this.stickyOrbs.length - 1; i >= 0; i--) {
+                    const orb = this.stickyOrbs[i];
+
+                    if (!orb.target || orb.target.dead || orb.ticksLeft <= 0) {
+                        this.stickyOrbs.splice(i, 1);
+                        continue;
+                    }
+
+                    orb.tickTimer++;
+                    if (orb.tickTimer >= orb.tickInterval) {
+                        orb.tickTimer = 0;
+                        orb.ticksLeft--;
+                        if (orb.owner) { orb.target.lastHitBy = orb.owner; orb.target.lastHitMelee = false; }
+                        orb.target.takeDamage(orb.dotDamage, 0, 0, { type: 'burn' });
+
+                        if (this.weather) {
+                            this.weather.spawnExplosion(
+                                orb.target.x + orb.offsetX,
+                                orb.target.y + orb.offsetY,
+                                '#FFD700'
+                            );
+                        }
+                    }
+                }
             },
 
             /** Damage that reaches her mid-swing (a blade drawn and moving) is cut to BLADE_PERKS.GUARD of itself */
@@ -77072,7 +77110,7 @@ engineMixin({
                                 const kbX = Math.cos(angle) * knockbackStrength;
                                 const kbY = Math.sin(angle) * knockbackStrength;
                                 e.lastHitBy = p.owner; e.lastHitMelee = !!p.melee;       // who gets the Resonance
-                                if (e.takeDamage(p.damage, kbX, kbY, p.melee ? (p.crit ? { crit: true } : null) : { shot: true, crit: !!p.crit }) && p.melee && e.interruptMelee) e.interruptMelee();
+                                if (e.takeDamage(p.damage, kbX, kbY, p.melee ? { punch: true, crit: !!p.crit } : { shot: true, crit: !!p.crit }) && p.melee && e.interruptMelee) e.interruptMelee();
                                 
                                 // Spawn sticky DOT orb (Golden Child)
                                 if (p.sticky && !e.dead) this.stickOrb(e, p);
@@ -77190,34 +77228,7 @@ engineMixin({
                 }
                 
                 // ── STICKY ORBS (Golden Child DOT) ──
-                for (let i = this.stickyOrbs.length - 1; i >= 0; i--) {
-                    const orb = this.stickyOrbs[i];
-                    
-                    // Remove if target dead or ticks exhausted
-                    if (!orb.target || orb.target.dead || orb.ticksLeft <= 0) {
-                        this.stickyOrbs.splice(i, 1);
-                        continue;
-                    }
-                    
-                    // Tick damage timer
-                    orb.tickTimer++;
-                    if (orb.tickTimer >= orb.tickInterval) {
-                        orb.tickTimer = 0;
-                        orb.ticksLeft--;
-                        // A burn tick passes i-frames and starts none, so every orb's ticks land (entities/actors.js)
-                        if (orb.owner) { orb.target.lastHitBy = orb.owner; orb.target.lastHitMelee = false; }
-                        orb.target.takeDamage(orb.dotDamage, 0, 0, { type: 'burn' });
-                        
-                        // Small golden spark on each tick
-                        if (this.weather) {
-                            this.weather.spawnExplosion(
-                                orb.target.x + orb.offsetX, 
-                                orb.target.y + orb.offsetY, 
-                                '#FFD700'
-                            );
-                        }
-                    }
-                }
+                this.updateStickyOrbs();
             
                 // Loot Collection
                 for(let i=this.loot.length-1; i>=0; i--) {

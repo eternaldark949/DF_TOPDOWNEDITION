@@ -656,6 +656,7 @@
                 // Only take damage from player projectiles
                 if (projectile.isEnemy) return;
                 this.lastHitBy = projectile.owner; this.lastHitMelee = !!projectile.melee;   // who gets the Resonance
+                const opts = { punch: !!projectile.melee, crit: !!projectile.crit };
                 
                 const speed = Math.hypot(projectile.vx, projectile.vy);
                 if (speed > 0) {
@@ -666,9 +667,9 @@
                     
                     const kbX = (projectile.vx / speed) * knockbackStrength;
                     const kbY = (projectile.vy / speed) * knockbackStrength;
-                    this.takeDamage(projectile.damage, kbX, kbY, projectile.crit ? { crit: true } : null);
+                    this.takeDamage(projectile.damage, kbX, kbY, opts);
                 } else {
-                    this.takeDamage(projectile.damage, 0, 0, projectile.crit ? { crit: true } : null);
+                    this.takeDamage(projectile.damage, 0, 0, opts);
                 }
             }
             
@@ -1112,6 +1113,7 @@
                 // Only take damage from player projectiles
                 if (projectile.isEnemy) return;
                 this.lastHitBy = projectile.owner; this.lastHitMelee = !!projectile.melee;   // who gets the Resonance
+                const opts = { punch: !!projectile.melee, crit: !!projectile.crit };
                 
                 const speed = Math.hypot(projectile.vx, projectile.vy);
                 if (speed > 0) {
@@ -1122,9 +1124,9 @@
                     
                     const kbX = (projectile.vx / speed) * knockbackStrength;
                     const kbY = (projectile.vy / speed) * knockbackStrength;
-                    this.takeDamage(projectile.damage, kbX, kbY, projectile.crit ? { crit: true } : null);
+                    this.takeDamage(projectile.damage, kbX, kbY, opts);
                 } else {
-                    this.takeDamage(projectile.damage, 0, 0, projectile.crit ? { crit: true } : null);
+                    this.takeDamage(projectile.damage, 0, 0, opts);
                 }
             }
 
@@ -1849,6 +1851,7 @@
             onProjectileHit(projectile, game) {
                 if (projectile.isEnemy) return;
                 this.lastHitBy = projectile.owner; this.lastHitMelee = !!projectile.melee;   // who gets the Resonance
+                const opts = { punch: !!projectile.melee, crit: !!projectile.crit };
                 this.suspicion = 100;
                 this.state = 'ALERT';
                 
@@ -1868,8 +1871,8 @@
                     const knockbackStrength = projectile.damage * 0.3;
                     const kbX = (projectile.vx / speed) * knockbackStrength;
                     const kbY = (projectile.vy / speed) * knockbackStrength;
-                    if (this.takeDamage(projectile.damage, kbX, kbY, projectile.crit ? { crit: true } : null) && projectile.melee) this.interruptMelee();
-                } else if (this.takeDamage(projectile.damage, 0, 0, projectile.crit ? { crit: true } : null) && projectile.melee) { this.interruptMelee(); }
+                    if (this.takeDamage(projectile.damage, kbX, kbY, opts) && projectile.melee) this.interruptMelee();
+                } else if (this.takeDamage(projectile.damage, 0, 0, opts) && projectile.melee) { this.interruptMelee(); }
             }
 
             /** The vision cone's outline in world space, cast against the map's walls and buildings (cached). */

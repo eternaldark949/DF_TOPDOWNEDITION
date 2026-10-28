@@ -121,6 +121,63 @@ test('Golden Child orbs: up to four live on one target, a fifth replaces the old
  assert.equal(r.n,4);
 });
 
+test('Golden Child refresh keeps the next burn due without sharing progress between targets',e=>{
+ const r=value(e,setup+`game.story.update=()=>{};game.onActorHit=()=>{};game.stickyOrbs=[];
+  const g=ganger(1300,1000),h=ganger(1400,1000);
+  g.update=h.update=()=>{};
+  const orb={maxOrbs:4,dotTicks:12,dotInterval:10,dotDamage:8,owner:game.player};
+  for(let i=0;i<4;i++)game.stickOrb(g,orb);
+  for(let i=0;i<9;i++)game.update();
+  game.stickOrb(g,{...orb,dotDamage:28});game.stickOrb(h,orb);
+  const before=[g.hp,h.hp];game.update();
+  const refreshed=game.stickyOrbs.find(o=>o.target===g&&o.dotDamage===28);
+  const out={before,after:[g.hp,h.hp],left:refreshed.ticksLeft,by:g.lastHitBy===game.player,
+   count:game.stickyOrbs.filter(o=>o.target===g).length};
+  for(let i=0;i<121;i++)game.update();
+  out.finished=[g.hp,h.hp];out.remaining=game.stickyOrbs.length;
+  return out;`);
+ assert.deepEqual(r.before,[5000,5000]);assert.deepEqual(r.after,[4948,5000]);
+ assert.equal(r.left,11);assert.equal(r.by,true);assert.equal(r.count,4);
+ assert.deepEqual(r.finished,[5000-12*(3*8+28),5000-12*8]);assert.equal(r.remaining,0);
+});
+
+test('Golden Child: every Quick Hands rank and Reflex Sync improve sustained DPS with and without damage boosts',e=>{
+ const r=value(e,setup+`game.weather=null;game.stickyOrbs=[];
+  game.player._muzzleLocal={x:20,y:3};game.player._muzzleReady=true;wield('golden_child');
+  const rows=[];
+  for(const boost of [false,true])for(const crit of [1,2])for(const reflex of [false,true])for(let rank=0;rank<=3;rank++){
+   game.resonance.ranks={quick_hands:rank,hollow_points:boost?3:0};
+   game.augments.equipped=reflex?['fast_reload']:[];game.rollCrit=()=>crit;
+   game.inventory.items=boost?[createItemFromRegistry('blood_muzzle',game)]:[];
+   game.inventory.equippedAttachments=boost?['blood_muzzle']:[];
+   game.cosmetics.equippedAccessory=boost?'acc_mirror_glass':null;
+   game.stickyOrbs=[];game.projectiles=[];game.shootCooldown=0;game._drawnAt=undefined;
+   let damage=0,maxOrbs=0;
+   const target={x:1300,y:1000,radius:14,dead:false,takeDamage(d){damage+=d;return true;}};
+   game.fireWeapon();const cooldown=game.shootCooldown;game.projectiles.pop().destroy();
+   const warmup=1200,duration=24000;
+   for(let tick=0;tick<warmup+duration;tick++){
+    if(tick===warmup)damage=0;
+    if(tick%cooldown===0){
+     game.shootCooldown=0;game.fireWeapon();const p=game.projectiles.pop();
+     target.takeDamage(p.damage);game.stickOrb(target,p);p.destroy();
+     game.muzzleFlashes=[];game.shotFx=[];game.casings=[];game.noiseRipples=[];
+    }
+    maxOrbs=Math.max(maxOrbs,game.stickyOrbs.length);game.updateStickyOrbs();
+   }
+   rows.push({boost,crit,reflex,rank,cooldown,maxOrbs,dps:damage*30/duration});
+  }
+  return rows;`);
+ assert.equal(r.length,32);
+ for(const row of r){
+  assert.ok(row.maxOrbs<=4);
+  if(row.rank>0){const prev=r.find(x=>x.boost===row.boost&&x.crit===row.crit&&x.reflex===row.reflex&&x.rank===row.rank-1);
+   assert.ok(row.dps>prev.dps,JSON.stringify({previous:prev,current:row}));}
+  if(row.reflex){const prev=r.find(x=>x.boost===row.boost&&x.crit===row.crit&&!x.reflex&&x.rank===row.rank);
+   assert.ok(row.dps>prev.dps,JSON.stringify({previous:prev,current:row}));}
+ }
+});
+
 test('Blades: Crimson Edge cuts ×1.5 and bleeds five deep; Quick Hands and Reflex Sync quicken the swing',e=>{
  const r=value(e,setup+`const g=ganger(1030,1000);wield('maiden_kukri');
   const swing=()=>{const s=withRandom(.99,()=>game.meleeSlash());const cd=game.shootCooldown;while(game._swing===s)tick();return cd;};
