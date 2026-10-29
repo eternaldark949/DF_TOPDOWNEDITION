@@ -137,6 +137,18 @@ function run(){
    for(let i=0;i<8;i++){clock+=frameMs;game.loop();}
    out.push({frameMs,hp:g.hp});
   }return out;`,r=>{for(const row of r)assert.equal(row.hp,4900,JSON.stringify(row));});
+ test('Props are found by cell: a far crate, a moved crate and a turned one still stop a shot',`
+  const out=[];
+  const prop=(x,y,w,h,angle=0)=>{const q=new PropEntity({x,y,width:w,height:h,mass:50,color:'#555'});q.angle=angle;return q;};
+  for(const s of [[3000,980,40,40],[4600,990,10,20],[1500,960,6,80,0.7]]){
+   clear();const q=prop(...s);const p=bullet(s[0]-100);
+   for(let i=0;i<3&&p.active;i++){_simTick++;p.update(1,true);CollisionSystem.resolveProjectiles(game);}
+   out.push({at:s[0],stopped:!p.active});q.destroy();GameEntity.cleanup();
+  }
+  clear();const q=prop(2000,980,40,40);const p=bullet(1800);_simTick++;p.update(1,true);CollisionSystem.resolveProjectiles(game);   // bucketed this tick at 2000
+  _simTick++;q.x=1900;p.update(1,true);CollisionSystem.resolveProjectiles(game);                                        // pushed into the path next tick
+  out.push({at:'moved',stopped:!p.active});
+  return out;`,r=>{for(const row of r)assert.equal(row.stopped,true,JSON.stringify(row));});
  return results;
 }
 module.exports={run};

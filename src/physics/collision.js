@@ -201,6 +201,36 @@
                 return best;
             }
 
+            /** Entities of `list` bucketed by cell, for the projectile sweep: only those near the path get tested.
+             *  `moving`: rebuilt each sim tick (props get pushed); otherwise only when the list changes. */
+            static _near(slot, list, moving, left, top, right, bottom) {
+                const C = 128, PAD = 16;                                   // (PAD: a prop nudged after the bucketing still counts)
+                const grids = this._nearGrids || (this._nearGrids = {});
+                let g = grids[slot];
+                if (!g || (moving && g.tick !== _simTick) || g.list !== list || g.n !== list.length) {
+                    g = grids[slot] = { tick: _simTick, list, n: list.length, cells: new Map(), out: [], mark: 0 };
+                    for (const e of list) {
+                        let cx, cy, h;
+                        if (e.width !== undefined && e.height !== undefined) { cx = e.x + e.width / 2; cy = e.y + e.height / 2; h = Math.hypot(e.width, e.height); }   // (the full diagonal: right whether x, y is its corner or its centre, at any turn)
+                        else { cx = e.x; cy = e.y; h = e.radius || Math.max(e.length || 0, e.vehicleWidth || 0) || 40; }
+                        if (!Number.isFinite(cx) || !Number.isFinite(cy)) continue;
+                        h += PAD;
+                        const x0 = Math.floor((cx - h) / C), x1 = Math.floor((cx + h) / C), y0 = Math.floor((cy - h) / C), y1 = Math.floor((cy + h) / C);
+                        for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
+                            const k = x * 73856093 ^ y * 19349663;
+                            const b = g.cells.get(k); if (b) b.push(e); else g.cells.set(k, [e]);
+                        }
+                    }
+                }
+                const out = g.out; out.length = 0; const mark = ++g.mark;
+                for (let x = Math.floor(left / C), x1 = Math.floor(right / C); x <= x1; x++)
+                    for (let y = Math.floor(top / C), y1 = Math.floor(bottom / C); y <= y1; y++) {
+                        const b = g.cells.get(x * 73856093 ^ y * 19349663); if (!b) continue;
+                        for (const e of b) if (e._nearMark !== mark || e._nearGrid !== g) { e._nearMark = mark; e._nearGrid = g; out.push(e); }
+                    }
+                return out;
+            }
+
             static projectileHitTime(p, target, actor = false) {
                 const ax = p.lastX ?? p.x, ay = p.lastY ?? p.y, r = p.radius ?? 5;
                 if (target.collisionShape === GameEntity.SHAPE.CIRCLE) {
@@ -239,7 +269,9 @@
                 if (!p.isEnemy) for (const e of game.enemies) add(e, 'enemy');
                 add(game.player, 'actor');
                 for (const a of GameEntity.getByLayer('ACTOR')) add(a, 'actor');
-                for (const prop of GameEntity.getByLayer('DYNAMIC')) add(prop, 'entity');
+                // Props: only those whose cell the path crosses (a map can hold hundreds; testing each against every shot cost ~3 ms a tick)
+                const r0 = p.radius ?? 5, px0 = p.lastX ?? p.x, py0 = p.lastY ?? p.y;
+                for (const prop of this._near('dynamic', GameEntity.getByLayer('DYNAMIC'), true, Math.min(px0, p.x) - r0, Math.min(py0, p.y) - r0, Math.max(px0, p.x) + r0, Math.max(py0, p.y) + r0)) add(prop, 'entity');
                 for (const car of game.traffic?.vehicles || []) add(car, 'traffic');
                 if (game.ownedCar?.visible) add(game.ownedCar, 'traffic');
                 for (const car of GameEntity.getByLayer('VEHICLE')) add(car, 'entity');
@@ -262,7 +294,7 @@
                     extra.source = statics; extra.length = statics.length; extra.tick = _simTick;
                     extra.items = statics.filter(s => !extra.mapped.has(s));
                 }
-                for (const wall of extra.items) add(wall, 'wall');
+                for (const wall of this._near('statics', extra.items, false, Math.min(px0, p.x) - r0, Math.min(py0, p.y) - r0, Math.max(px0, p.x) + r0, Math.max(py0, p.y) + r0)) add(wall, 'wall');
 
                 const room = game.roomSystem;
                 if (room?.active) {
