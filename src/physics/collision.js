@@ -349,12 +349,14 @@
                         continue;
                     }
                     if (hit.kind === 'enemy') {
-                        const speed = Math.hypot(p.vx, p.vy), strength = Math.min((p.damage * speed * 0.02) / ((e.mass || 20) * 0.1), 50);
+                        // p.knock (Golden Retribution): a set multiple of a jab's shove, whatever the hit's damage
+                        const speed = Math.hypot(p.vx, p.vy), strength = Math.min(((p.knock ? p.knockDmg * p.knock : p.damage) * speed * 0.02) / ((e.mass || 20) * 0.1), 50);
                         e.lastHitBy = p.owner; e.lastHitMelee = !!p.melee;
                         const landed = e.takeDamage(p.damage, speed ? p.vx / speed * strength : 0, speed ? p.vy / speed * strength : 0,
                             { shot: !p.melee, punch: !!p.melee, crit: !!p.crit });
                         if (landed && p.melee && e.interruptMelee) e.interruptMelee();
                         if (landed && p.sticky && !e.dead) game.stickOrb(e, p);
+                        if (landed && p.knuckles && game.onKnuckleHit) game.onKnuckleHit(e, p);
                     } else if (hit.kind === 'actor') e.onProjectileHit(p, game);
                     else if (hit.kind === 'traffic') {
                         const speed = Math.hypot(p.vx, p.vy), push = (p.damage * speed * 0.005) / 5;

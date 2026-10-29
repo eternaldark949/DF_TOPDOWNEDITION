@@ -68,8 +68,8 @@ test('Steady spills less; Grounded makes a ganger slip in a spill; a kill with a
  const r=value(e,setup+`game.spillDrink(0.05,1,0);const plain=1-game.cosmetics.drinkLevel;
   game.resonance.ranks.steady=3;game.cosmetics.drinkLevel=1;_gameTimeSec+=1;game.spillDrink(0.05,1,0);const steady=1-game.cosmetics.drinkLevel;
   const s=game.spills[0];const g=new Ganger(s.x-6,s.y,{hp:100});game.enemies=[g];
-  game.updateSpillSlips();g.x=s.x;game.updateSpillSlips();const noSkill=!!g._slipUntil;
-  game.resonance.ranks.grounded=2;g.x=s.x-60;game.updateSpillSlips();g.x=s.x;game.updateSpillSlips();const slipFor=g._slipUntil-_gameTimeSec;
+  game.updateSpillSlips();g.x=s.x;game.updateSpillSlips();const noSkill=!!g._staggerUntil;
+  game.resonance.ranks.grounded=2;g.x=s.x-60;game.updateSpillSlips();g.x=s.x;game.updateSpillSlips();const slipFor=g._staggerUntil-_gameTimeSec;
   game.cosmetics.drinkLevel=0.9;const full=game.resonance.scoreKill(g,{byPlayer:true,now:100,lastFlitAt:-99,lastHurtAt:99,drinkLevel:0.9});
   const half=game.resonance.scoreKill(g,{byPlayer:true,now:200,lastFlitAt:-99,lastHurtAt:199,drinkLevel:0.5});
   return {plain,steady,noSkill,slipFor,full,half,skid:Math.hypot(g.knockbackVx,g.knockbackVy)};`);

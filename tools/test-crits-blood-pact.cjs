@@ -24,9 +24,9 @@ test('Blood Pact: twice the Kukri\'s reach, half its swing rate, in every new lo
  assert.deepEqual(r,{reach:2,rate:2,name:'Blood Pact',mode:'melee',loadout:true,model:true});
 });
 
-test('A cut at 70 px lands with Blood Pact but not with the Kukri; the katana waits twice as long',e=>{
+test('A cut at 90 px (she steps in up to 16) lands with Blood Pact but not with the Kukri; the katana waits twice as long',e=>{
  const r=value(e,setup+`const out={};
-  for(const id of ['maiden_kukri','blood_pact']){game.enemies=[];const g=ganger(1070,1000);wield(id);
+  for(const id of ['maiden_kukri','blood_pact']){game.enemies=[];const g=ganger(1090,1000);wield(id);
    const hit=withRandom(.99,swing);out[id]={hit,hp:g.hp,cooldown:game.shootCooldown};}
   return out;`);
  assert.equal(r.maiden_kukri.hit,0);assert.equal(r.maiden_kukri.hp,500);
@@ -40,9 +40,9 @@ test('A blade crit doubles the cut and shows a gold number with a bang',e=>{
  assert.deepEqual(r,{crit:true,value:90,color:'#ffd23a'});
 });
 
-test('The hitbox is the drawn blade: Blood Pact cuts beside her, not past its tip',e=>{
+test('The hitbox is the drawn blade: Blood Pact cuts beside her, not past its tip (and her 16 px step in)',e=>{
  const r=value(e,setup+`wield('blood_pact');const out={};
-  for(const [k,x,y] of [['side',1000,1052],['otherSide',1000,948],['ahead',1062,1000],['pastTip',1096,1000],['behind',948,1000]]){
+  for(const [k,x,y] of [['side',1000,1052],['otherSide',1000,948],['ahead',1062,1000],['pastTip',1112,1000],['behind',948,1000]]){
    game.enemies=[];game.player.x=game.player.y=1000;const g=ganger(x,y);game.shootCooldown=0;out[k]=withRandom(.99,swing);}
   return out;`);
  assert.deepEqual(r,{side:1,otherSide:1,ahead:1,pastTip:0,behind:0});

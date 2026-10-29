@@ -728,6 +728,24 @@
                 o.start(t); o.stop(t + 0.37);
             }
 
+            /** Brass on bone: a knuckle-duster's haymaker lands — a dull knock and two bright metal partials */
+            clink() {
+                if (!this.ready) return;
+                const ctx = this.audio.ctx, t = ctx.currentTime;
+                if (!this.foley) { this.foley = ctx.createGain(); this.foley.gain.value = 0.9; this.foley.connect(this.audio.masterGain); }
+                const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 500;
+                const s2 = ctx.createBufferSource(); s2.buffer = this.brown; const g2 = ctx.createGain();
+                s2.connect(lp); lp.connect(g2); g2.connect(this.foley);
+                g2.gain.setValueAtTime(0.0001, t); g2.gain.exponentialRampToValueAtTime(0.34, t + 0.008); g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+                s2.start(t, _sndRand() * 2.5, 0.15);
+                for (const [f, v, d] of [[2350, 0.07, 0.42], [3920, 0.04, 0.3]]) {
+                    const o = ctx.createOscillator(), g3 = ctx.createGain(); o.type = 'triangle';
+                    o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 0.985, t + d);
+                    o.connect(g3); g3.connect(this.foley); softStart(g3.gain, t, v); g3.gain.exponentialRampToValueAtTime(0.0001, t + d);
+                    o.start(t); o.stop(t + d + 0.02);
+                }
+            }
+
             /** A car's tyres through a puddle: a long hiss-splash, quieter with distance */
             splash(near, pan, big) {
                 if (!this.ready || GameSettings.footsteps === false || near <= 0.03) return;

@@ -56,7 +56,7 @@
                 this._exec = { e, t0: _gameTimeSec, blade, from: { x: pl.x, y: pl.y }, to: { x: bx, y: by }, struck: false };
                 e._execBy = pl;                                                     // frozen (Ganger.update)
                 pl.angle = e.angle;
-                if (!blade && this.weaponMode === 'none') this.shootCooldown = CONFIG.PUNCH.DURATION_TICKS;
+                if (!blade && (this.weaponMode === 'none' || this.weaponMode === 'fists')) this.shootCooldown = this._punchDur = CONFIG.PUNCH.DURATION_TICKS;
                 this.activeInteraction = null;
             },
 

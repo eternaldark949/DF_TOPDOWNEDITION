@@ -596,6 +596,13 @@
                 scrapCost: 300,
             },
             {
+                id: 'golden_retribution',
+                name: 'GOLDEN RETRIBUTION',
+                icon: '✊',
+                desc: 'Gild a pair of brass knuckles. Fast jabs that can crit; every third punch is a haymaker that staggers, and drives them into walls.',
+                scrapCost: 400,
+            },
+            {
                 id: 'acc_mirror_glass',
                 cosmetic: true,           // a COSMETICS_REGISTRY accessory, not an item: it's worn, and takes no attachment slot
                 requires: 'acc_glass',    // silvered from the Crystal Glass

@@ -2732,6 +2732,12 @@
                 ctx.stroke();
             }
         
+            // 7b. Golden Retribution: a gilded knuckle bar across each fist (engine/knuckles.js)
+            if (config.knuckles && typeof drawKnuckleDuster === 'function' && !isDriving) {
+                drawKnuckleDuster(ctx, lFistX, lFistY, Math.atan2(lFistY - lElbowY, lFistX - lElbowX));
+                drawKnuckleDuster(ctx, rFistX, rFistY, Math.atan2(rFistY - rElbowY, rFistX - rElbowX));
+            }
+
             // 8. Upper Arms (fabric under short or long sleeves). They hang from the shoulders, so their
             // roots turn with the torso: forward with the opposite leg on a step, into the blow in a punch.
             const upperColor = sleeve !== 'none' ? darken(sleeveCol, 0.15) : darken(skinColor, 0.15);

@@ -77,6 +77,9 @@
                         // Reuse the in-game weapon sprite, including its approved material finishes.
                         const sp = bakeWeapon(weaponModel(id), false), scale = Math.min(120 / sp.w, 104 / sp.h);
                         c.drawImage(sp.cv, (size - sp.w * scale) / 2, (size - sp.h * scale) / 2, sp.w * scale, sp.h * scale);
+                    } else if (W && W.stats && W.stats.haymakerEvery) {
+                        // Golden Retribution: the knuckle bar, large
+                        drawKnuckleDuster(c, size / 2 - 18, size / 2, 0, 7);
                     } else {
                         c.fillStyle = '#bcb0a6'; c.font = '32px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
                         c.fillText('—', size / 2, size / 2);
@@ -84,7 +87,7 @@
                     U.root.setAttribute('aria-label', W ? `Equipped item: ${W.name}` : 'Unarmed');
                     U.root.title = W ? W.name : 'Unarmed';
                 }
-                const applicable = !!W && this.weaponMode !== 'melee';
+                const applicable = !!W && this.weaponMode !== 'melee' && this.weaponMode !== 'fists';
                 // Presentation only: no ammo is consumed and no reload rules are introduced in this build.
                 // Future magazine data can provide ammoLoaded and stats.magazineCapacity to this readout.
                 const capacity = W && W.stats && W.stats.magazineCapacity;
@@ -1412,12 +1415,13 @@
                         // What it does, as small chips
                         const chips = [];
                         if (st.damage) chips.push(`Damage ${st.damage}`);
-                        if (st.fireRate) chips.push(`Fire delay ${st.fireRate}`);
+                        if (st.fireRate) chips.push(`${st.haymakerEvery ? 'Jab' : 'Fire'} delay ${st.fireRate}`);
                         if (st.dotDamage) chips.push(`Burn ${st.dotDamage} × ${st.dotTicks || 1}`);
                         if (st.sticky) chips.push('Sticks to targets');
                         if (st.effect === 'laser_sight') chips.push('Targeting beam');
                         if (st.effect === 'mirror_blade') chips.push('Cuts deflect bullets');
                         if (st.gunDamageMult) chips.push(`Bullets ×${st.gunDamageMult}`);
+                        if (st.haymakerEvery) chips.push(`Every ${st.haymakerEvery === 3 ? '3rd' : st.haymakerEvery + 'th'}: haymaker ×${st.haymakerMult}`, 'Staggers · wall slam');
                         if (sch.id === 'acc_mirror_glass') chips.push('All damage ×1.35', 'Shield 90 · 3 s recharge');
                         if (sch.id === 'clothing_dyer') chips.push('Recolour outfits', `${DYER.FEE} scrap a piece`);
                         const status = owned ? 'Crafted' : needs ? `Needs the ${needs}` : role;

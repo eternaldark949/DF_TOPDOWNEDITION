@@ -26,9 +26,10 @@
 
         // A swing's hitbox is its drawn blade (fist to edge tip), swept through the cut in CUT_STEPS
         // samples: a body is cut when the blade passes within its radius + HALF_WIDTH. MAX_HAND bounds
-        // the fist's distance from her centre (a quick reject); STEP_PAD is how near a body must be for
-        // her to step in on the cut.
-        const BLADE = { CUT_STEPS: 24, HALF_WIDTH: 2, MAX_HAND: 26, STEP_PAD: 8 };
+        // the fist's distance from her centre (a quick reject). She steps in on a swing (STEP_MAX px at most,
+        // stopping at contact) when a body it would cut is within its reach + STEP_PAD; a cut only nudges
+        // the body KNOCK (it used to push ~20 px, and gunmen slid out of reach after two or three cuts).
+        const BLADE = { CUT_STEPS: 24, HALF_WIDTH: 2, MAX_HAND: 26, STEP_PAD: 16, STEP_MAX: 16, KNOCK: 1 };
 
         // Crafted gear (ui/inventory-augments.js, core/registries.js). The Mirrored Glass (an accessory):
         // all her damage × GLASS_DAMAGE, and a shield that turns enemy shots back until SHIELD damage has
@@ -167,11 +168,11 @@
                 }
             },
 
-            /** A small committed blade step, stopped by bodies and solids along the entire path. */
+            /** A small committed melee step (up to BLADE.STEP_MAX), stopped by bodies and solids along the entire path. */
             meleeStepIn(angle, distance = 8) {
                 const pl = this.player, map = this.activeMap;
                 if (!pl || !map || this.isDriving || !Number.isFinite(angle) || !(distance > 0)) return 0;
-                distance = Math.min(8, distance);
+                distance = Math.min(BLADE.STEP_MAX, distance);
                 const sx = pl.x, sy = pl.y, ux = Math.cos(angle), uy = Math.sin(angle), r = pl.radius || 12;
                 const rects = [...(map.walls || []), ...getColliders(map)];
                 const left = Math.min(sx, sx + ux * distance) - r, right = Math.max(sx, sx + ux * distance) + r;
@@ -245,7 +246,8 @@
                 // Step in only when the blade will meet someone: a slash at nothing stays where she is
                 // (held, it used to creep her ~30 px/s into zones and lamplight)
                 const walls = this.activeMap.walls, cols = getColliders(this.activeMap);
-                if (this.enemies.some(e => e && !e.dead && this._bladeMeets(swing, e, BLADE.STEP_PAD) && !isLineBlocked(pl.x, pl.y, e.x, e.y, walls, cols))) this.meleeStepIn(ang);
+                const near = this.enemies.filter(e => e && !e.dead && this._bladeMeets(swing, e, BLADE.STEP_PAD) && !isLineBlocked(pl.x, pl.y, e.x, e.y, walls, cols));
+                if (near.length) this.meleeStepIn(ang, this._meleeGap(near));
                 // the arc and its sparkle, in the blade's colour (gold for the Kukri); a hit adds more where it lands
                 const trail = M.trail || DEFAULT_SLASH_TRAIL;
                 const L = this.slashes || (this.slashes = []);
@@ -260,6 +262,14 @@
                 if (typeof ambience !== 'undefined' && ambience.slash) ambience.slash(false);
                 this.emitNoise(pl.x, pl.y, st.noise || 60, 'slash');
                 return swing;
+            },
+
+            /** How far she can step toward the nearest of `targets` before touching it (BLADE.STEP_MAX at most) */
+            _meleeGap(targets) {
+                const pl = this.player, r = pl.radius || 12;
+                let gap = Infinity;
+                for (const e of targets) gap = Math.min(gap, Math.hypot(e.x - pl.x, e.y - pl.y) - r - (e.radius || 14));
+                return Math.max(0, Math.min(BLADE.STEP_MAX, gap));
             },
 
             /**
@@ -318,7 +328,7 @@
                 const pl = this.player, st = S.st;
                 const dx = e.x - pl.x, dy = e.y - pl.y, d = Math.hypot(dx, dy);
                 e.lastHitBy = pl; e.lastHitMelee = true;
-                const kx = dx / (d || 1) * 3, ky = dy / (d || 1) * 3;
+                const kx = dx / (d || 1) * BLADE.KNOCK, ky = dy / (d || 1) * BLADE.KNOCK;
                 const roll = this.rollCrit(st), crit = S.flitCut ? Math.max(roll, st.critMult || CRIT.mult) : roll;
                 const dmg = Math.round(S.damage * crit);
                 if (!e.takeDamage(dmg, kx, ky, { type: st.damageType || 'melee', crit: crit > 1, cut: true })) return;

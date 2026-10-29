@@ -155,6 +155,7 @@ const SCRIPTS = [
     'engine/npc-posts.js',
     'engine/spills.js',
     'engine/dyer.js',
+    'engine/knuckles.js',
     'ui/dev-overlay.js',
     'ui/render-layers.js',
     'engine/scope.js',

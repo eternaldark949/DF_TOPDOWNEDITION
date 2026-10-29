@@ -67,6 +67,13 @@
                 // the Kukri's twice-reach, half-rate cousin: a slower swing (swingSecs), harder cuts, a wider arc
                 stats: { fireRate: 32, damage: 45, reach: 76, arc: 2.1, swingSecs: 0.32, bleedDps: 8, bleedSecs: 3, critChance: 0.2, noise: 65, damageType: 'melee' }
             },
+            'golden_retribution': {
+                name: 'Golden Retribution', type: 'weapon', icon: '✊',
+                desc: 'Gilded brass knuckles. Quick jabs, and every third punch a haymaker that staggers and slams.',
+                weaponMode: 'fists',
+                // jabs on the bare-fist hitbox, every haymakerEvery-th a haymaker (engine/knuckles.js)
+                stats: { fireRate: 15, damage: 16, haymakerEvery: 3, haymakerMult: 2.5, damageType: 'melee' }
+            },
             'laser_sight': {
                 name: 'Laser Sight', type: 'attachment', icon: '⊕',
                 desc: 'Faint red targeting beam when equipped.',

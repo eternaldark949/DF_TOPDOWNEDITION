@@ -448,15 +448,16 @@
                 if (!this.player.visible && !this.isDriving) return;
                 if (this.paused) return;
                 if (this.furniture && this.furniture.busy()) return;   // her hands are on the furniture
-                if (!this.currentWeapon && this.weaponMode !== 'none') return;
+                if (!this.currentWeapon && this.weaponMode !== 'none' && this.weaponMode !== 'fists') return;
                 // Fists or a blade at an unaware back: the strike is an execution (engine/executions.js)
-                if ((this.weaponMode === 'none' || this.weaponMode === 'melee') && this._execTarget && !this.isDriving) { this.execute(this._execTarget); return; }
+                if ((this.weaponMode === 'none' || this.weaponMode === 'fists' || this.weaponMode === 'melee') && this._execTarget && !this.isDriving) { this.execute(this._execTarget); return; }
                 this.shotsFired = (this.shotsFired || 0) + 1;             // (a finisher steps aside when she fires again)
                 if (this.weaponMode === 'melee') { if (!this.isDriving) this.meleeSlash(); return; }   // a blade (engine/status-effects.js)
+                if (this.weaponMode === 'fists') { this.knucklePunch(); return; }                       // Golden Retribution (engine/knuckles.js)
             
                 // --- MELEE / PUNCH LOGIC (Unchanged) ---
                 if (this.weaponMode === 'none') {
-                    this.shootCooldown = CONFIG.PUNCH.DURATION_TICKS;
+                    this.shootCooldown = this._punchDur = CONFIG.PUNCH.DURATION_TICKS;
                     // Toggle Punch Side
                     this.player.punchSide = (this.player.punchSide === 'right') ? 'left' : 'right';
                     const punchAngle = this.player.angle;

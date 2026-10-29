@@ -28,7 +28,7 @@ function run(){
  };
  test('Every registered gun hits across muzzle distances and spatial-cell boundaries',`
   const rows=[];
-  for(const [id,w]of Object.entries(ITEM_REGISTRY).filter(([,w])=>w.type==='weapon'&&w.weaponMode!=='melee'))
+  for(const [id,w]of Object.entries(ITEM_REGISTRY).filter(([,w])=>w.type==='weapon'&&w.weaponMode!=='melee'&&w.weaponMode!=='fists'))
    for(const offset of [0,110,150,190,210])for(const fraction of [.25,.5,.9]){
     clear();game.weaponHolstered=false;game.currentWeapon=createItemFromRegistry(id,game);game.weaponMode=w.weaponMode;
     game.shootCooldown=0;game._drawnAt=undefined;game.fireWeapon();game.weaponHolstered=true;

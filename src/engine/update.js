@@ -204,7 +204,7 @@
                 // Who the crowds make way for: 949 and her crew on foot (pedestrians, the lobby's and the club's walkers)
                 this._makeWay = [this.player];
                 for (const t of this.teammates) if (t && (t.recruited || t.hired) && !t.inCar && !t.downed && !t.dead) this._makeWay.push(t);
-                this.pedestrians.update(this.player, this.activeMap, reactionVehicles, this.weaponMode !== 'none' && !this.weaponHolstered, this.enemies);
+                this.pedestrians.update(this.player, this.activeMap, reactionVehicles, this.weaponMode !== 'none' && this.weaponMode !== 'fists' && !this.weaponHolstered, this.enemies);
                 this.profiler.stop('AI:Pedestrians');
                 
                 // Velvet Cat AI
@@ -291,6 +291,7 @@
                 Walker.update(this);               // everyone else on a goTo walk (world/walker.js)
                 this.updateNpcPosts();             // shoved off their post: back they go (engine/npc-posts.js)
                 this.updateSpillSlips();           // Grounded: gangers slip in her spills (engine/spills.js)
+                this.updateKnuckleSlams();         // Golden Retribution: a haymaker's body driven into a wall (engine/knuckles.js)
                 if (_simTick % 60 === 0) {                                // lost things (lobby, club) refill daily
                     if (this._lostMap !== this.activeMap) { this._lostMap = this.activeMap; this._hasLost = this.props.some(p => p.interactionType === 'lost_luggage'); }
                     if (this._hasLost) this.refreshLostLuggage();
@@ -1108,7 +1109,7 @@
                     targetZoom = Math.max(CZ.FLOOR, 1.0 - speedRatio * CZ.SPAN);
                 } else {
                     // On foot: in a little closer with the gun away, and again indoors; by something to use (or talking), closer still (INTERACT_ZOOM)
-                    const C = CONFIG.CAMERA, holstered = (this.weaponHolstered && !this._quickDraw) || this.weaponMode === 'none';
+                    const C = CONFIG.CAMERA, holstered = (this.weaponHolstered && !this._quickDraw) || this.weaponMode === 'none' || this.weaponMode === 'fists';
                     let base = 1.0;
                     if (holstered) base *= C.HOLSTER_ZOOM;
                     if (this.activeMap && this.activeMap.type === 'indoor') base *= C.INDOOR_ZOOM;

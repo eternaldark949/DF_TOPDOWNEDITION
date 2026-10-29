@@ -94,7 +94,7 @@
                 return false;
             },
 
-            /** Once a sim tick: with Grounded, a ganger who steps in a spill loses their footing (Ganger.update skips while _slipUntil) */
+            /** Once a sim tick: with Grounded, a ganger who steps in a spill loses their footing (Ganger.update skips while _staggerUntil) */
             updateSpillSlips() {
                 if (!this.spills || !this.spills.length || !this.resonance || !this.enemies) return;
                 const secs = this.resonance.stat('slipSecs', SPILL.SLIP_SECS); if (!secs) return;
@@ -102,8 +102,8 @@
                 for (const e of this.enemies) {
                     if (e.dead || !(e instanceof Ganger)) continue;
                     const px = e._slipPX ?? e.x, py = e._slipPY ?? e.y; e._slipPX = e.x; e._slipPY = e.y;
-                    if (now < (e._slipUntil || 0) + SPILL.SLIP_AGAIN || !this._inSpill(e.x, e.y)) continue;
-                    e._slipUntil = now + secs;
+                    if (now < (e._staggerUntil || 0) + SPILL.SLIP_AGAIN || !this._inSpill(e.x, e.y)) continue;
+                    e._staggerUntil = now + secs;
                     const m = Math.hypot(e.x - px, e.y - py);                   // they skid on the way they were going
                     if (m > 0.05) { e.knockbackVx += (e.x - px) / m * SPILL.SLIP_SKID; e.knockbackVy += (e.y - py) / m * SPILL.SLIP_SKID; }
                     (this.floatingTexts || (this.floatingTexts = [])).push({ target: null, x: e.x, y: e.y - 24, value: 0, text: 'SLIP!', color: '#f2d57e', t0: now, pop: now, drift: 0 });
