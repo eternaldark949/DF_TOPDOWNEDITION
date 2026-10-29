@@ -36,7 +36,7 @@
             /** Once a sim tick, after her step: a sharp change of direction slops the glass */
             updateSpills() {
                 const pl = this.player; if (!pl) return;
-                const sp = pl.getCurrentSpeed() * (pl.moveMul ?? 1) * (this.sneaking ? SNEAK.SPEED : 1);
+                const sp = pl.getCurrentSpeed() * (pl.moveMul ?? 1) * (this.sneaking ? SNEAK.SPEED : 1) * this.wadeMul(pl);
                 const ux = (pl.velX || 0) * sp, uy = (pl.velY || 0) * sp;
                 const prev = this._spillStep;
                 this._spillStep = { x: ux, y: uy, tick: _simTick };

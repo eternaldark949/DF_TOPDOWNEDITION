@@ -23398,7 +23398,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             applyMovement(dx, dy) {
                 if (!this.visible) return;
                 
-                const speed = this.getCurrentSpeed() * (this.moveMul ?? 1) * (this._game && this._game.sneaking ? SNEAK.SPEED : 1);   // (moveMul: slowed, e.g. moving furniture; sneaking: engine/sneak.js)
+                const speed = this.getCurrentSpeed() * (this.moveMul ?? 1) * (this._game && this._game.sneaking ? SNEAK.SPEED : 1) * (this._game && this._game.wadeMul ? this._game.wadeMul(this) : 1);   // (wading: a park's pool, engine/pools.js)   // (moveMul: slowed, e.g. moving furniture; sneaking: engine/sneak.js)
                 gaitCommand(this, dx * speed, dy * speed);
                 this.x += dx * speed;
                 this.y += dy * speed;
@@ -68050,6 +68050,7 @@ engineMixin({
                 const map = this.activeMap; if (!map) return 'concrete';
                 if (this._inPuddle && this._inPuddle(x, y) > 0.2) return 'water';
                 if (this._inSpill(x, y)) return 'water';                          // spilt drink (engine/spills.js)
+                if (this.poolAt && this.poolAt(x, y)) return 'water';             // a park's moon pool (engine/pools.js)
                 const surf = this._surfaces && this._surfaces();
                 if (surf) for (const [wx, wy, r] of surf.water) if (Math.hypot(x - wx, y - wy) < r) return 'water';
                 const F = FLOOR_MATERIALS[map.id];
@@ -68107,6 +68108,7 @@ engineMixin({
                     // her steps carry: shoe × floor × pace; a puddle gives her away (with a small ring)
                     const N = CONFIG.NOISE;
                     const sneak = this.sneaking;
+                    if (mat === 'water' && this.poolAt(e.x, e.y)) this.poolRipple(e.x, e.y, sneak ? 0.5 : 1);   // a step rings the pool
                     if (mat === 'water') { this.emitNoise(e.x, e.y, Math.round(N.puddleStep * (sneak ? SNEAK.PUDDLE_NOISE : 1)), 'puddle', true, { ring: true }); return; }
                     let reach = shoe === 'heels' ? N.stepHeels : shoe === 'boots' ? N.stepBoots : N.stepSoft;
                     reach *= mat === 'carpet' || mat === 'grass' ? 0.5 : mat === 'marble' ? 1.3 : mat === 'metal' ? 1.4 : 1;
@@ -68897,7 +68899,7 @@ engineMixin({
             /** Once a sim tick, after her step: a sharp change of direction slops the glass */
             updateSpills() {
                 const pl = this.player; if (!pl) return;
-                const sp = pl.getCurrentSpeed() * (pl.moveMul ?? 1) * (this.sneaking ? SNEAK.SPEED : 1);
+                const sp = pl.getCurrentSpeed() * (pl.moveMul ?? 1) * (this.sneaking ? SNEAK.SPEED : 1) * this.wadeMul(pl);
                 const ux = (pl.velX || 0) * sp, uy = (pl.velY || 0) * sp;
                 const prev = this._spillStep;
                 this._spillStep = { x: ux, y: uy, tick: _simTick };
@@ -69369,6 +69371,93 @@ engineMixin({
             for (const y of [-2.4, -0.8, 0.8, 2.4]) { ctx.beginPath(); ctx.arc(3.3, y, 0.55, 0, Math.PI * 2); ctx.fill(); }   // a stud over each knuckle
             ctx.restore();
         }
+        // GameEngine — the parks' moon pools as water (world/parks.js paints them; engine/map-loading.js lists them in
+        // map.pools). Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        //
+        // A pool is shallow: she wades through it at POOL.WADE pace; her steps splash (materialAt
+        // → 'water', engine/footsteps.js: the puddle sound and noise, hushed when she sneaks) and each one rings
+        // the water round her feet; walking leaves a wake. Its surface stirs on its own, a slow ring now and
+        // then. Cars stop at the rim: each pool adds a square collider for driving only (carColliders).
+
+        const POOL = {
+            WADE: 0.7,               // pace in the water
+            RIM: 10,                 // px of stone round the water (parks.js)
+            WAKE_SECS: 0.22,         // a wake ring at most this often while she moves
+            RING_LIFE: 1.4, RING_MAX: 24,
+            IDLE_SECS: 1.6           // about this often, a ring stirs on each pool in view
+        };
+
+        engineMixin({
+            /** The pool (x, y, r) this point is in the water of, or null */
+            poolAt(x, y) {
+                const L = this.activeMap && this.activeMap.pools; if (!L) return null;
+                for (const p of L) { const dx = x - p.x, dy = y - p.y; if (dx * dx + dy * dy < p.r * p.r) return p; }
+                return null;
+            },
+
+            /** Pace for a walker standing here: slower in a pool */
+            wadeMul(e) { return e && this.poolAt(e.x, e.y) ? POOL.WADE : 1; },
+
+            /** The map's colliders plus a square at each pool, for cars (built once per collider list) */
+            carColliders() {
+                const map = this.activeMap, base = getColliders(map);
+                if (!map.pools || !map.pools.length) return base;
+                const C = map._carCols;
+                if (C && C.base === base && C.n === base.length) return C.list;
+                const list = base.slice();
+                for (const p of map.pools) { const h = (p.r + POOL.RIM) * 0.86; list.push({ x: p.x - h, y: p.y - h, w: h * 2, h: h * 2, pool: true }); }
+                map._carCols = { base, n: base.length, list };
+                return list;
+            },
+
+            /** A ring on the water (a step, a wake, the surface stirring) */
+            poolRipple(x, y, size = 1) {
+                const L = this.poolRings || (this.poolRings = []);
+                L.push({ x, y, t0: _gameTimeSec, size });
+                if (L.length > POOL.RING_MAX) L.shift();
+            },
+
+            /** Once a tick: her wake while she moves in the water, and the pools stirring on their own */
+            updatePools() {
+                const map = this.activeMap; if (!map || !map.pools || !map.pools.length) return;
+                const now = _gameTimeSec, pl = this.player;
+                if (pl && !this.isDriving && this.poolAt(pl.x, pl.y)) {
+                    const g = pl._gait, moving = g ? g.speed > 0.4 : false;
+                    if (moving && now - (this._wakeAt || -9) > POOL.WAKE_SECS) { this._wakeAt = now; this.poolRipple(pl.x, pl.y, this.sneaking ? 0.6 : 0.9); }
+                }
+                if (now - (this._poolStirAt || -9) > POOL.IDLE_SECS * (0.6 + Math.random() * 0.8)) {
+                    this._poolStirAt = now;
+                    const v = this.view;
+                    for (const p of map.pools) {
+                        if (v && (p.x + p.r < v.left || p.x - p.r > v.right || p.y + p.r < v.top || p.y - p.r > v.bottom)) continue;
+                        const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * p.r * 0.7;
+                        this.poolRipple(p.x + Math.cos(a) * d, p.y + Math.sin(a) * d, 0.55);
+                    }
+                }
+            },
+
+            /** The rings, on the water only (after the decals) */
+            drawPoolRipples(ctx, cull) {
+                const L = this.poolRings; if (!L || !L.length) return;
+                const map = this.activeMap, now = _gameTimeSec;
+                for (let i = L.length - 1; i >= 0; i--) if (now - L[i].t0 > POOL.RING_LIFE) L.splice(i, 1);
+                ctx.save();
+                ctx.lineWidth = 1.1;
+                for (const f of L) {
+                    if (cull && (f.x < cull.left - 40 || f.x > cull.right + 40 || f.y < cull.top - 40 || f.y > cull.bottom + 40)) continue;
+                    const p = this.poolAt(f.x, f.y) || (map.pools || []).find(q => Math.hypot(f.x - q.x, f.y - q.y) < q.r + 4);
+                    if (!p) continue;
+                    const u = (now - f.t0) / POOL.RING_LIFE, r = (4 + u * 26) * f.size, a = (1 - u) * (1 - u) * 0.7;
+                    ctx.save();
+                    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.clip();       // never over the rim
+                    ctx.strokeStyle = `rgba(214, 206, 255, ${a})`;
+                    ctx.beginPath(); ctx.ellipse(f.x, f.y, r, r * 0.86, 0, 0, Math.PI * 2); ctx.stroke();
+                    if (u < 0.6) { ctx.strokeStyle = `rgba(255, 236, 200, ${a * 0.5})`; ctx.beginPath(); ctx.ellipse(f.x, f.y, r * 0.55, r * 0.47, 0, 0, Math.PI * 2); ctx.stroke(); }
+                    ctx.restore();
+                }
+                ctx.restore();
+            }
+        });
         // ═══ DEV OVERLAY — the profiler pill and the debug layers ═══
         // Both are DOM, so the colour grade and post-FX never tint them, and they cost
         // next to nothing: the pill's numbers change a few times a second, its breakdown
@@ -74580,6 +74669,7 @@ engineMixin({
                         const P = parkLayout(b);
                         for (const t of P.trees) mapData.foliage.push(new Foliage(t.x, t.y, t.type, t.size));
                         for (const l of P.lamps) mapData.lamps.push(new LampEntity({ x: l.x, y: l.y, lampType: 1, color: '#ffd9a8', lightRadius: 170 }));
+                        (mapData.pools || (mapData.pools = [])).push({ x: P.cx, y: P.cy, r: P.pondR, park: P.name });   // its moon pool, wadeable (engine/pools.js)
                     }
                     console.log(`Generated ${mapData.foliage.length} foliage elements (including glowing trees)`);
                     
@@ -77070,7 +77160,8 @@ engineMixin({
                 Walker.update(this);               // everyone else on a goTo walk (world/walker.js)
                 this.updateNpcPosts();             // shoved off their post: back they go (engine/npc-posts.js)
                 this.updateSpillSlips();           // Grounded: gangers slip in her spills (engine/spills.js)
-                this.updateKnuckleSlams();         // Golden Retribution: a haymaker's body driven into a wall (engine/knuckles.js)
+                this.updateKnuckleSlams();
+                this.updatePools();                // a wake behind her in a park's pool, the water stirring (engine/pools.js)         // Golden Retribution: a haymaker's body driven into a wall (engine/knuckles.js)
                 if (_simTick % 60 === 0) {                                // lost things (lobby, club) refill daily
                     if (this._lostMap !== this.activeMap) { this._lostMap = this.activeMap; this._hasLost = this.props.some(p => p.interactionType === 'lost_luggage'); }
                     if (this._hasLost) this.refreshLostLuggage();
@@ -77685,7 +77776,7 @@ engineMixin({
                                 }
                             }
                         }
-                        this.car.update(this.player, this.car, this.traffic.vehicles, this.weather, this.traffic.network.intersections, this.activeMap.walls, getColliders(this.activeMap), this.decals, this.traffic.folk);
+                        this.car.update(this.player, this.car, this.traffic.vehicles, this.weather, this.traffic.network.intersections, this.activeMap.walls, this.carColliders(), this.decals, this.traffic.folk);
                         if (!(this.zibSystem && this.zibSystem.isPassenger) &&
                             (inputX !== 0 || inputY !== 0 || this.keys[' '] || this.handbrakeHeld)) {
                             this.car.disableAutoDrive(); this.car.clearNavWaypoints(); this.autodriveBtn.classList.remove('engaged'); showMessage("AUTO-DRIVE DISENGAGED");
@@ -77693,7 +77784,7 @@ engineMixin({
                     } else {
                         this.car.driverInput(inputX, inputY, this.joystick.active);
                         this.car.handbrake = !!(this.keys[' '] || this.handbrakeHeld);
-                        this.car.updateManualDriving(this.activeMap.walls, getColliders(this.activeMap), this.weather, this.decals);
+                        this.car.updateManualDriving(this.activeMap.walls, this.carColliders(), this.weather, this.decals);   // (pools stop her car: engine/pools.js)
                     }
                     // Player sits at seat 0, not car center
                     const driverSeatPos = this.car.getSeatWorldPos(0);
@@ -78668,6 +78759,7 @@ engineMixin({
                 if (RL.at('decals')) {
                     this.decals.draw(this.ctx, cullBounds.world);
                     this.drawSpills(this.ctx, cullBounds.world);              // spilt drinks (engine/spills.js)
+                    this.drawPoolRipples(this.ctx, cullBounds.world);         // rings on the parks' pools (engine/pools.js)
                     this.drawCasings(this.ctx, cullBounds.world);             // spent brass (engine/combat-effects.js)
                 }
                 // The sun's shadows (engine/daylight.js): buildings and trees thrown across the ground by day

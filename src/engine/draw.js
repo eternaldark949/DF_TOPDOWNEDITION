@@ -489,6 +489,7 @@
                 if (RL.at('decals')) {
                     this.decals.draw(this.ctx, cullBounds.world);
                     this.drawSpills(this.ctx, cullBounds.world);              // spilt drinks (engine/spills.js)
+                    this.drawPoolRipples(this.ctx, cullBounds.world);         // rings on the parks' pools (engine/pools.js)
                     this.drawCasings(this.ctx, cullBounds.world);             // spent brass (engine/combat-effects.js)
                 }
                 // The sun's shadows (engine/daylight.js): buildings and trees thrown across the ground by day

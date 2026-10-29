@@ -157,6 +157,7 @@ const SCRIPTS = [
     'engine/spills.js',
     'engine/dyer.js',
     'engine/knuckles.js',
+    'engine/pools.js',
     'ui/dev-overlay.js',
     'ui/render-layers.js',
     'engine/scope.js',

@@ -296,7 +296,8 @@
                 Walker.update(this);               // everyone else on a goTo walk (world/walker.js)
                 this.updateNpcPosts();             // shoved off their post: back they go (engine/npc-posts.js)
                 this.updateSpillSlips();           // Grounded: gangers slip in her spills (engine/spills.js)
-                this.updateKnuckleSlams();         // Golden Retribution: a haymaker's body driven into a wall (engine/knuckles.js)
+                this.updateKnuckleSlams();
+                this.updatePools();                // a wake behind her in a park's pool, the water stirring (engine/pools.js)         // Golden Retribution: a haymaker's body driven into a wall (engine/knuckles.js)
                 if (_simTick % 60 === 0) {                                // lost things (lobby, club) refill daily
                     if (this._lostMap !== this.activeMap) { this._lostMap = this.activeMap; this._hasLost = this.props.some(p => p.interactionType === 'lost_luggage'); }
                     if (this._hasLost) this.refreshLostLuggage();
@@ -911,7 +912,7 @@
                                 }
                             }
                         }
-                        this.car.update(this.player, this.car, this.traffic.vehicles, this.weather, this.traffic.network.intersections, this.activeMap.walls, getColliders(this.activeMap), this.decals, this.traffic.folk);
+                        this.car.update(this.player, this.car, this.traffic.vehicles, this.weather, this.traffic.network.intersections, this.activeMap.walls, this.carColliders(), this.decals, this.traffic.folk);
                         if (!(this.zibSystem && this.zibSystem.isPassenger) &&
                             (inputX !== 0 || inputY !== 0 || this.keys[' '] || this.handbrakeHeld)) {
                             this.car.disableAutoDrive(); this.car.clearNavWaypoints(); this.autodriveBtn.classList.remove('engaged'); showMessage("AUTO-DRIVE DISENGAGED");
@@ -919,7 +920,7 @@
                     } else {
                         this.car.driverInput(inputX, inputY, this.joystick.active);
                         this.car.handbrake = !!(this.keys[' '] || this.handbrakeHeld);
-                        this.car.updateManualDriving(this.activeMap.walls, getColliders(this.activeMap), this.weather, this.decals);
+                        this.car.updateManualDriving(this.activeMap.walls, this.carColliders(), this.weather, this.decals);   // (pools stop her car: engine/pools.js)
                     }
                     // Player sits at seat 0, not car center
                     const driverSeatPos = this.car.getSeatWorldPos(0);

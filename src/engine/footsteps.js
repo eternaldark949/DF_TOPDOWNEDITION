@@ -31,6 +31,7 @@
                 const map = this.activeMap; if (!map) return 'concrete';
                 if (this._inPuddle && this._inPuddle(x, y) > 0.2) return 'water';
                 if (this._inSpill(x, y)) return 'water';                          // spilt drink (engine/spills.js)
+                if (this.poolAt && this.poolAt(x, y)) return 'water';             // a park's moon pool (engine/pools.js)
                 const surf = this._surfaces && this._surfaces();
                 if (surf) for (const [wx, wy, r] of surf.water) if (Math.hypot(x - wx, y - wy) < r) return 'water';
                 const F = FLOOR_MATERIALS[map.id];
@@ -88,6 +89,7 @@
                     // her steps carry: shoe × floor × pace; a puddle gives her away (with a small ring)
                     const N = CONFIG.NOISE;
                     const sneak = this.sneaking;
+                    if (mat === 'water' && this.poolAt(e.x, e.y)) this.poolRipple(e.x, e.y, sneak ? 0.5 : 1);   // a step rings the pool
                     if (mat === 'water') { this.emitNoise(e.x, e.y, Math.round(N.puddleStep * (sneak ? SNEAK.PUDDLE_NOISE : 1)), 'puddle', true, { ring: true }); return; }
                     let reach = shoe === 'heels' ? N.stepHeels : shoe === 'boots' ? N.stepBoots : N.stepSoft;
                     reach *= mat === 'carpet' || mat === 'grass' ? 0.5 : mat === 'marble' ? 1.3 : mat === 'metal' ? 1.4 : 1;
