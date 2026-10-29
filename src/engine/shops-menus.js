@@ -259,7 +259,7 @@
                 html += `<div class="df-section"><span>Paint</span><span class="count">${CUSTOM_PRICES.paint} PP${pending.paintColor !== orig.paintColor ? ' · <b style="color:var(--df-gold)">changed</b>' : ''}</span></div>${picks('auto-paint-btn', allPaintColors, pending.paintColor, true, false, 'paintColor')}`;
                 html += `<div class="df-section"><span>Underglow</span><span class="count">${CUSTOM_PRICES.underglow} PP${pending.underglowColor !== orig.underglowColor ? ' · <b style="color:var(--df-gold)">changed</b>' : ''}</span></div>${picks('auto-glow-btn', glowOptions, pending.underglowColor, false, true, 'underglowColor')}`;
                 html += `<div class="df-section"><span>Headlights</span><span class="count">${CUSTOM_PRICES.headlights} PP${pending.headlightColor !== orig.headlightColor ? ' · <b style="color:var(--df-gold)">changed</b>' : ''}</span></div>${picks('auto-headlight-btn', headlightOptions, pending.headlightColor, false, true, 'headlightColor')}`;
-                html += `<div class="df-btn-row" style="justify-content:center;margin-top:14px;">`;
+                html += `<div class="df-btn-row df-sticky-actions" style="justify-content:center;margin-top:14px;">`;   // stays in view however far it's scrolled
                 if (changeCount > 0) {
                     html += `<button class="df-btn" id="auto-custom-apply"${canAfford ? '' : ' disabled'}>Apply ${changeCount} change${changeCount > 1 ? 's' : ''} · ${totalCost} PP</button>`;
                     html += `<button class="df-btn ghost" id="auto-custom-revert">Revert</button>`;

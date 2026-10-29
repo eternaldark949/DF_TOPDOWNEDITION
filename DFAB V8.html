@@ -1856,6 +1856,9 @@
             text-align: right;
             transition: color 0.2s ease;
             margin-top: 14px;
+            /* stays in view at the panel's foot however far the settings are scrolled */
+            position: sticky; bottom: 0; z-index: 2;
+            background: rgb(10, 2, 8); box-shadow: 0 -10px 10px -6px rgb(10, 2, 8);
         }
         .settings-back-btn:hover {
             color: #fff;
@@ -1984,6 +1987,9 @@
             z-index: 30; pointer-events: auto; cursor: pointer; user-select: none; -webkit-user-select: none;
             touch-action: none; backdrop-filter: blur(2px); transition: transform 0.08s, background 0.08s, box-shadow 0.08s;
         }
+        /* At the wheel (#game-ui.driving, engine/update.js) Flit goes, and the handbrake sits where it was, centred on it */
+        #game-ui.driving #btn-flit { display: none !important; }
+        #game-ui.driving #btn-handbrake { bottom: 146px; right: 141px; }
         #btn-handbrake.held {
             transform: scale(0.93); background: rgba(217, 191, 134, 0.28);
             box-shadow: 0 0 16px rgba(217, 191, 134, 0.55), inset 0 0 12px rgba(217, 191, 134, 0.35); color: #fff4d8;
@@ -3986,9 +3992,13 @@
         .df-shop-tabs-scroll::-webkit-scrollbar { display: none; }
         .df-shop-tabs-scroll .df-tab { flex-shrink: 0; }
 
-        .df-shop-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 22px 14px; scrollbar-width: thin; scrollbar-color: rgba(202, 176, 250, 0.35) transparent; }
+        .df-shop-body { --body-pb: 14px; --body-px: 22px; flex: 1; min-height: 0; overflow-y: auto; padding: 8px var(--body-px) var(--body-pb); scrollbar-width: thin; scrollbar-color: rgba(202, 176, 250, 0.35) transparent; }
         .df-shop-body::-webkit-scrollbar { width: 6px; }
         .df-shop-body::-webkit-scrollbar-thumb { background: rgba(202, 176, 250, 0.3); border-radius: 3px; }
+        /* A window's apply/pay row stays at the foot of the scrolling body, the list fading out under it */
+        .df-sticky-actions { position: sticky; bottom: calc(-1 * var(--body-pb, 14px)); z-index: 3; margin: 14px calc(-1 * var(--body-px, 22px)) calc(-1 * var(--body-pb, 14px)) !important;
+            padding: 18px var(--body-px, 22px) var(--body-pb, 14px);
+            background: linear-gradient(to bottom, rgba(18, 9, 28, 0), rgba(18, 9, 28, 0.94) 16px, rgba(18, 9, 28, 0.98)); }
         .df-shop-foot { flex-shrink: 0; display: flex; justify-content: center; padding: 10px 16px 16px; }
         .df-shop-foot .screen-back-btn { min-width: 160px; }
 
@@ -4034,7 +4044,7 @@
             .df-shop-panel { border-radius: 22px; }
             .df-shop-head { padding: 12px 16px 8px; flex-wrap: wrap; }
             .df-shop-title { font-size: max(6px, 1.9rem - var(--font-trim)); }
-            .df-shop-body { padding: 6px 10px 12px; }
+            .df-shop-body { --body-pb: 12px; --body-px: 10px; padding: 6px 10px 12px; }
             .df-shop .df-card { padding: 11px 13px; }
             .df-shop .df-card .df-head { flex-wrap: nowrap; }
             .df-shop .df-card .df-head > .grow { min-width: 0; }
@@ -4050,7 +4060,7 @@
         body.landscape .df-shop-head { padding-right: 150px; align-items: center; }                     /* room for the back pill, up here */
         body.landscape .df-shop-foot { position: absolute; top: 12px; right: 16px; padding: 0; z-index: 2; }
         body.landscape .df-shop-foot .screen-back-btn { height: 32px; min-width: 118px; padding: 0 16px; font-size: max(6px, 0.62rem - var(--font-trim)); letter-spacing: 2px; }
-        body.landscape .df-shop-body { padding-bottom: 10px; }
+        body.landscape .df-shop-body { --body-pb: 10px; padding-bottom: 10px; }
         body.landscape .df-shop .df-card { padding: 10px 16px; }
         body.landscape .df-shop .df-section { margin: 12px 0 8px; }
         body.landscape .df-shop .df-section:first-child { margin-top: 4px; }
@@ -4129,6 +4139,7 @@
         body.landscape #btn-nv, body.landscape #emote-zany { bottom: calc(215px - var(--paw-drop)); }
         body.landscape #btn-flit, body.landscape #emote-cry { bottom: calc(155px - var(--paw-drop)); }
         body.landscape #btn-handbrake { bottom: calc(72px - var(--paw-drop)); }
+        body.landscape #game-ui.driving #btn-handbrake { bottom: calc(146px - var(--paw-drop)); }
         body.landscape #btn-autodrive, body.landscape #btn-zib-skip,
         body.landscape #btn-holster, body.landscape #emote-frown { bottom: calc(210px - var(--paw-drop)); }
         body.landscape #btn-sneak { bottom: calc(232px - var(--paw-drop)); }
@@ -69140,7 +69151,7 @@ engineMixin({
                 html += `<button class="dy-swatch dy-custom${S.custom ? ' open' : ''}${!inPalette && S.pending[S.slot] ? ' on' : ''}" id="dye-custom" title="Custom colour" aria-label="Custom colour" aria-expanded="${!!S.custom}" style="--c:${cur}"><span>${S.custom ? '×' : '+'}</span></button></div>`;
                 if (S.custom) html += `<div id="dye-picker">${ColorPicker.html(cur)}</div>`;   // ui/color-picker.js
                 // Apply / undo
-                html += `<div class="dy-actions"><button class="df-btn" id="dye-apply"${changed.length && this.scrap >= cost ? '' : ' disabled'}>Dye ${changed.length || ''} · ${cost} Scrap</button>`;
+                html += `<div class="dy-actions df-sticky-actions"><button class="df-btn" id="dye-apply"${changed.length && this.scrap >= cost ? '' : ' disabled'}>Dye ${changed.length || ''} · ${cost} Scrap</button>`;
                 html += `<button class="df-btn small ghost" id="dye-discard"${changed.length ? '' : ' disabled'}>Undo choices</button>`;
                 html += `<button class="df-btn small ghost" id="dye-reset"${dyedNow ? '' : ' disabled'}>Original colours</button></div>`;
                 el.innerHTML = html;
@@ -70449,7 +70460,7 @@ engineMixin({
                 html += `<div class="df-section"><span>Paint</span><span class="count">${CUSTOM_PRICES.paint} PP${pending.paintColor !== orig.paintColor ? ' · <b style="color:var(--df-gold)">changed</b>' : ''}</span></div>${picks('auto-paint-btn', allPaintColors, pending.paintColor, true, false, 'paintColor')}`;
                 html += `<div class="df-section"><span>Underglow</span><span class="count">${CUSTOM_PRICES.underglow} PP${pending.underglowColor !== orig.underglowColor ? ' · <b style="color:var(--df-gold)">changed</b>' : ''}</span></div>${picks('auto-glow-btn', glowOptions, pending.underglowColor, false, true, 'underglowColor')}`;
                 html += `<div class="df-section"><span>Headlights</span><span class="count">${CUSTOM_PRICES.headlights} PP${pending.headlightColor !== orig.headlightColor ? ' · <b style="color:var(--df-gold)">changed</b>' : ''}</span></div>${picks('auto-headlight-btn', headlightOptions, pending.headlightColor, false, true, 'headlightColor')}`;
-                html += `<div class="df-btn-row" style="justify-content:center;margin-top:14px;">`;
+                html += `<div class="df-btn-row df-sticky-actions" style="justify-content:center;margin-top:14px;">`;   // stays in view however far it's scrolled
                 if (changeCount > 0) {
                     html += `<button class="df-btn" id="auto-custom-apply"${canAfford ? '' : ' disabled'}>Apply ${changeCount} change${changeCount > 1 ? 's' : ''} · ${totalCost} PP</button>`;
                     html += `<button class="df-btn ghost" id="auto-custom-revert">Revert</button>`;
@@ -76910,6 +76921,11 @@ engineMixin({
                         this.flitState.maxAttunement
                     );
                     if (this.flitState.attunement >= this.flitCost()) this.flitBtn.classList.remove('cooldown');
+                }
+                // At the wheel the Flit button goes and the handbrake takes its place (styles/panels-phone.css)
+                if (this._uiDriving !== !!this.isDriving) {
+                    this._uiDriving = !!this.isDriving;
+                    const ui = document.getElementById('game-ui'); if (ui) ui.classList.toggle('driving', this._uiDriving);
                 }
                 this.updateFlitRing();
                 this.updateNoiseRipples();

@@ -148,6 +148,11 @@
                     );
                     if (this.flitState.attunement >= this.flitCost()) this.flitBtn.classList.remove('cooldown');
                 }
+                // At the wheel the Flit button goes and the handbrake takes its place (styles/panels-phone.css)
+                if (this._uiDriving !== !!this.isDriving) {
+                    this._uiDriving = !!this.isDriving;
+                    const ui = document.getElementById('game-ui'); if (ui) ui.classList.toggle('driving', this._uiDriving);
+                }
                 this.updateFlitRing();
                 this.updateNoiseRipples();
                 this.updateScope();

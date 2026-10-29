@@ -120,7 +120,7 @@
                 html += `<button class="dy-swatch dy-custom${S.custom ? ' open' : ''}${!inPalette && S.pending[S.slot] ? ' on' : ''}" id="dye-custom" title="Custom colour" aria-label="Custom colour" aria-expanded="${!!S.custom}" style="--c:${cur}"><span>${S.custom ? '×' : '+'}</span></button></div>`;
                 if (S.custom) html += `<div id="dye-picker">${ColorPicker.html(cur)}</div>`;   // ui/color-picker.js
                 // Apply / undo
-                html += `<div class="dy-actions"><button class="df-btn" id="dye-apply"${changed.length && this.scrap >= cost ? '' : ' disabled'}>Dye ${changed.length || ''} · ${cost} Scrap</button>`;
+                html += `<div class="dy-actions df-sticky-actions"><button class="df-btn" id="dye-apply"${changed.length && this.scrap >= cost ? '' : ' disabled'}>Dye ${changed.length || ''} · ${cost} Scrap</button>`;
                 html += `<button class="df-btn small ghost" id="dye-discard"${changed.length ? '' : ' disabled'}>Undo choices</button>`;
                 html += `<button class="df-btn small ghost" id="dye-reset"${dyedNow ? '' : ' disabled'}>Original colours</button></div>`;
                 el.innerHTML = html;
