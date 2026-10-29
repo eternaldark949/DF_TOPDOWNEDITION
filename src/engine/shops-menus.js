@@ -120,7 +120,7 @@
             closeAutoShop() {
                 this._shopShow('auto-shop-overlay', false);
                 this._customizeOriginal = null;
-                this._customizePending = null;
+                this._customizePending = null; this._customizePicker = null;
                 this.pauseSystem.release('auto_shop');
             },
 
@@ -131,7 +131,7 @@
                 // Clear customize preview state when leaving that tab
                 if (this._autoShopTab !== 'customize') {
                     this._customizeOriginal = null;
-                    this._customizePending = null;
+                    this._customizePending = null; this._customizePicker = null;
                 }
 
                 document.querySelectorAll('#auto-shop-overlay .auto-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === this._autoShopTab));
@@ -244,14 +244,21 @@
                 if (pending.underglowColor !== orig.underglowColor) { totalCost += CUSTOM_PRICES.underglow; changeCount++; }
                 if (pending.headlightColor !== orig.headlightColor) { totalCost += CUSTOM_PRICES.headlights; changeCount++; }
                 const canAfford = this.currency >= totalCost;
-                const picks = (cls, list, cur, sq, glow) => `<div class="df-swatches">${list.map(c => `<button class="df-swatch-pick${sq ? ' sq' : ''} ${cls}${c === cur ? ' on' : ''}" data-color="${c === null ? 'null' : c}" style="background:${c || 'transparent'};${glow && c ? `box-shadow:0 0 7px ${c};` : ''}">${c === null ? '✕' : ''}</button>`).join('')}</div>`;
+                // Each row ends in a Custom swatch that opens the colour picker under it (ui/color-picker.js)
+                const open = this._customizePicker;
+                const picks = (cls, list, cur, sq, glow, prop) => {
+                    const custom = !!cur && !list.some(c => c && c.toLowerCase() === String(cur).toLowerCase());
+                    let row = `<div class="df-swatches">${list.map(c => `<button class="df-swatch-pick${sq ? ' sq' : ''} ${cls}${c === cur ? ' on' : ''}" data-color="${c === null ? 'null' : c}" style="background:${c || 'transparent'};${glow && c ? `box-shadow:0 0 7px ${c};` : ''}">${c === null ? '✕' : ''}</button>`).join('')}`;
+                    row += `<button class="df-swatch-pick${sq ? ' sq' : ''} cp-toggle${open === prop || custom ? ' on' : ''}" data-picker="${prop}" title="Custom colour" aria-label="Custom colour" aria-expanded="${open === prop}">${open === prop ? '×' : '+'}</button></div>`;
+                    return row + (open === prop ? `<div class="auto-picker" data-for="${prop}">${ColorPicker.html(cur || '#ffffff')}</div>` : '');
+                };
                 const lamp = (top) => `<i class="lamp" style="top:${top}px;background:${pending.headlightColor};box-shadow:0 0 9px ${pending.headlightColor}"></i>`;
                 let html = `<div class="df-card"><div class="df-car-preview">`;
                 html += `<div class="df-car" style="background:${pending.paintColor}">${pending.underglowColor ? `<i class="glow" style="background:${pending.underglowColor};box-shadow:0 0 10px ${pending.underglowColor},0 3px 14px ${pending.underglowColor}"></i>` : ''}${lamp(9)}${lamp(33)}</div>`;
                 html += `<div class="grow"><div class="eyebrow">Customizing</div><div class="title">${name}</div><div class="desc">Preview freely — you're only charged when you apply.</div></div></div></div>`;
-                html += `<div class="df-section"><span>Paint</span><span class="count">${CUSTOM_PRICES.paint} PP${pending.paintColor !== orig.paintColor ? ' · <b style="color:var(--df-gold)">changed</b>' : ''}</span></div>${picks('auto-paint-btn', allPaintColors, pending.paintColor, true)}`;
-                html += `<div class="df-section"><span>Underglow</span><span class="count">${CUSTOM_PRICES.underglow} PP${pending.underglowColor !== orig.underglowColor ? ' · <b style="color:var(--df-gold)">changed</b>' : ''}</span></div>${picks('auto-glow-btn', glowOptions, pending.underglowColor, false, true)}`;
-                html += `<div class="df-section"><span>Headlights</span><span class="count">${CUSTOM_PRICES.headlights} PP${pending.headlightColor !== orig.headlightColor ? ' · <b style="color:var(--df-gold)">changed</b>' : ''}</span></div>${picks('auto-headlight-btn', headlightOptions, pending.headlightColor, false, true)}`;
+                html += `<div class="df-section"><span>Paint</span><span class="count">${CUSTOM_PRICES.paint} PP${pending.paintColor !== orig.paintColor ? ' · <b style="color:var(--df-gold)">changed</b>' : ''}</span></div>${picks('auto-paint-btn', allPaintColors, pending.paintColor, true, false, 'paintColor')}`;
+                html += `<div class="df-section"><span>Underglow</span><span class="count">${CUSTOM_PRICES.underglow} PP${pending.underglowColor !== orig.underglowColor ? ' · <b style="color:var(--df-gold)">changed</b>' : ''}</span></div>${picks('auto-glow-btn', glowOptions, pending.underglowColor, false, true, 'underglowColor')}`;
+                html += `<div class="df-section"><span>Headlights</span><span class="count">${CUSTOM_PRICES.headlights} PP${pending.headlightColor !== orig.headlightColor ? ' · <b style="color:var(--df-gold)">changed</b>' : ''}</span></div>${picks('auto-headlight-btn', headlightOptions, pending.headlightColor, false, true, 'headlightColor')}`;
                 html += `<div class="df-btn-row" style="justify-content:center;margin-top:14px;">`;
                 if (changeCount > 0) {
                     html += `<button class="df-btn" id="auto-custom-apply"${canAfford ? '' : ' disabled'}>Apply ${changeCount} change${changeCount > 1 ? 's' : ''} · ${totalCost} PP</button>`;
@@ -263,6 +270,24 @@
                 container.querySelectorAll('.auto-paint-btn').forEach(b => b.addEventListener('click', () => updatePending('paintColor', b.dataset.color)));
                 container.querySelectorAll('.auto-glow-btn').forEach(b => b.addEventListener('click', () => updatePending('underglowColor', b.dataset.color === 'null' ? null : b.dataset.color)));
                 container.querySelectorAll('.auto-headlight-btn').forEach(b => b.addEventListener('click', () => updatePending('headlightColor', b.dataset.color)));
+                container.querySelectorAll('[data-picker]').forEach(b => b.addEventListener('click', () => {
+                    this._customizePicker = this._customizePicker === b.dataset.picker ? null : b.dataset.picker;
+                    audioSys.sfx('ui'); this._renderCustomizeTab(container);
+                }));
+                // While a picker thumb is dragged, only the preview car changes; letting go prices it like a swatch
+                const preview = () => {
+                    const carEl = container.querySelector('.df-car'); if (!carEl) return;
+                    carEl.style.background = pending.paintColor;
+                    let glow = carEl.querySelector('.glow');
+                    if (!glow && pending.underglowColor) { glow = document.createElement('i'); glow.className = 'glow'; carEl.prepend(glow); }
+                    if (glow && pending.underglowColor) { glow.style.background = pending.underglowColor; glow.style.boxShadow = `0 0 10px ${pending.underglowColor},0 3px 14px ${pending.underglowColor}`; }
+                    carEl.querySelectorAll('.lamp').forEach(l => { l.style.background = pending.headlightColor; l.style.boxShadow = `0 0 9px ${pending.headlightColor}`; });
+                };
+                const pickerEl = container.querySelector('.auto-picker');
+                if (pickerEl) {
+                    const prop = pickerEl.dataset.for;
+                    ColorPicker.bind(pickerEl, pending[prop] || '#ffffff', { onInput: hex => { pending[prop] = hex; preview(); }, onPick: hex => updatePending(prop, hex) });
+                }
                 const applyBtn = document.getElementById('auto-custom-apply');
                 if (applyBtn) applyBtn.addEventListener('click', () => {
                     if (!canAfford) { showMessage(`INSUFFICIENT FUNDS (${totalCost} PERSONICS REQUIRED).`); return; }

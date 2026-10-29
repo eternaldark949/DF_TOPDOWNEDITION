@@ -116,7 +116,9 @@
                 // The colours
                 html += `<div class="df-section"><span><span class="glint">◆</span>Dye · ${esc(this.dyeSlotLabel(S.slot))}</span><span class="count">${esc(cur)}</span></div><div class="dy-palette">`;
                 for (const [hex, name] of DYER.PALETTE) html += `<button class="dy-swatch${hex.toLowerCase() === String(cur).toLowerCase() ? ' on' : ''}" data-hex="${hex}" title="${esc(name)}" aria-label="${esc(name)}" style="--c:${hex}"></button>`;
-                html += `<label class="dy-swatch dy-custom" title="Custom colour" style="--c:${cur}"><input type="color" id="dye-custom" value="${/^#[0-9a-f]{6}$/i.test(cur) ? cur : '#ffffff'}"><span>+</span></label></div>`;
+                const inPalette = DYER.PALETTE.some(([hex]) => hex.toLowerCase() === String(cur).toLowerCase());
+                html += `<button class="dy-swatch dy-custom${S.custom ? ' open' : ''}${!inPalette && S.pending[S.slot] ? ' on' : ''}" id="dye-custom" title="Custom colour" aria-label="Custom colour" aria-expanded="${!!S.custom}" style="--c:${cur}"><span>${S.custom ? '×' : '+'}</span></button></div>`;
+                if (S.custom) html += `<div id="dye-picker">${ColorPicker.html(cur)}</div>`;   // ui/color-picker.js
                 // Apply / undo
                 html += `<div class="dy-actions"><button class="df-btn" id="dye-apply"${changed.length && this.scrap >= cost ? '' : ' disabled'}>Dye ${changed.length || ''} · ${cost} Scrap</button>`;
                 html += `<button class="df-btn small ghost" id="dye-discard"${changed.length ? '' : ' disabled'}>Undo choices</button>`;
@@ -128,11 +130,11 @@
                 el.querySelectorAll('[data-outfit]').forEach(c => c.addEventListener('click', () => { S.outfit = c.dataset.outfit; S.pending = {}; audioSys.sfx('ui'); this.renderDyer(); }));
                 el.querySelectorAll('[data-slot]').forEach(c => c.addEventListener('click', () => { S.slot = c.dataset.slot; audioSys.sfx('ui'); this.renderDyer(); }));
                 el.querySelectorAll('button[data-hex]').forEach(b => b.addEventListener('click', () => pick(b.dataset.hex)));
-                const custom = document.getElementById('dye-custom');
-                if (custom) {
-                    custom.addEventListener('input', () => { S.pending[S.slot] = custom.value.toLowerCase(); this.drawDyePreview(document.getElementById('dye-preview'), S.outfit, S.pending); });
-                    custom.addEventListener('change', () => pick(custom.value));
-                }
+                document.getElementById('dye-custom').addEventListener('click', () => { S.custom = !S.custom; audioSys.sfx('ui'); this.renderDyer(); });
+                if (S.custom) ColorPicker.bind(document.getElementById('dye-picker'), cur, {
+                    onInput: hex => { S.pending[S.slot] = hex; this.drawDyePreview(document.getElementById('dye-preview'), S.outfit, S.pending); },
+                    onPick: pick
+                });
                 document.getElementById('dye-apply').addEventListener('click', () => {
                     if (!this.applyDyes(S.outfit, S.pending)) return;
                     S.pending = {};

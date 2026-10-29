@@ -3932,7 +3932,7 @@
         .dy-swatch:hover { transform: scale(1.08); }
         .dy-swatch.on { border: 2px solid #fff; box-shadow: 0 0 12px color-mix(in srgb, var(--c) 70%, #fff), inset 0 -4px 8px rgba(0, 0, 0, 0.3); }
         .dy-custom { display: flex; align-items: center; justify-content: center; background: conic-gradient(#dc143c, #e8c27a, #00b39b, #2a5cff, #8a2be2, #e000c8, #dc143c); }
-        .dy-custom input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+        .dy-custom.open { border: 2px solid var(--df-gold); box-shadow: 0 0 12px rgba(255, 194, 72, 0.55); }
         .dy-custom span { font: 600 1.1rem var(--font-ui); color: #fff; text-shadow: 0 0 4px rgba(0, 0, 0, 0.8); pointer-events: none; }
         .dy-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 4px; }
         .dy-actions .df-btn:disabled { opacity: 0.38; box-shadow: none; cursor: default; transform: none; }
@@ -4076,6 +4076,30 @@
                        background: radial-gradient(closest-side, rgba(255, 154, 42, 0.28), transparent 75%), repeating-radial-gradient(circle, transparent 0 11px, rgba(223, 227, 234, 0.08) 11px 12px), #0d0a10;
                        border: 1px solid rgba(255, 154, 42, 0.3); }
         .ta-portrait img { max-height: 92px; max-width: 54px; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.7)); }
+
+        /* The custom colour picker (ui/color-picker.js): the Clothing Dyer and Torque's Customize tab */
+        .cp { display: grid; gap: 10px; margin: 10px 0 4px; padding: 12px; border-radius: 14px; border: 1px solid rgba(202, 176, 250, 0.35);
+            background: linear-gradient(160deg, rgba(40, 24, 58, 0.92), rgba(22, 14, 34, 0.92)); box-shadow: 0 0 18px rgba(202, 176, 250, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.06); }
+        .cp-sv { position: relative; height: 140px; border-radius: 10px; cursor: crosshair; touch-action: none; outline: none;
+            background: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(var(--hue), 100%, 50%));
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); }
+        .cp-hue { position: relative; height: 16px; border-radius: 8px; cursor: pointer; touch-action: none; outline: none;
+            background: linear-gradient(to right, #f00, #ff0 16.7%, #0f0 33.3%, #0ff 50%, #00f 66.7%, #f0f 83.3%, #f00); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); }
+        .cp-thumb { position: absolute; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; pointer-events: none;
+            border: 2px solid #fff; background: var(--c); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45), 0 0 10px rgba(255, 194, 72, 0.55); }
+        .cp-sv:focus-visible, .cp-hue:focus-visible { box-shadow: 0 0 0 2px var(--df-gold, #ffc248); }
+        .cp-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .cp-chip { width: 30px; height: 30px; border-radius: 9px; background: var(--c); border: 1px solid rgba(255, 255, 255, 0.35); box-shadow: 0 0 12px color-mix(in srgb, var(--c) 60%, transparent); }
+        .cp-hex { width: 6.6em; padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(202, 176, 250, 0.4); background: rgba(0, 0, 0, 0.35); color: #f4ecff;
+            font: 600 0.85rem ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0.04em; text-transform: lowercase; }
+        .cp-hex:focus { outline: none; border-color: var(--df-gold, #ffc248); }
+        .cp-recent { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+        .cp-dot { width: 22px; height: 22px; border-radius: 50%; padding: 0; cursor: pointer; background: var(--c); border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: inset 0 -3px 5px rgba(0, 0, 0, 0.3); transition: transform 0.12s; }
+        .cp-dot:hover { transform: scale(1.12); }
+        .df-swatch-pick.cp-toggle { background: conic-gradient(#dc143c, #e8c27a, #00b39b, #2a5cff, #8a2be2, #e000c8, #dc143c) !important; color: #fff; text-shadow: 0 0 4px rgba(0, 0, 0, 0.8); font-size: 1rem; }
+        .df-swatch-pick.cp-toggle.on { box-shadow: 0 0 0 3px rgba(255, 194, 72, 0.6), 0 0 14px rgba(255, 194, 72, 0.6); }
+        @media (max-height: 520px) { .cp-sv { height: 96px; } .cp { padding: 8px; gap: 7px; } }
         /* =========================================
            LANDSCAPE (a phone on its side)
            body.landscape is set by resize() (engine/combat-effects.js) when the window is wider
@@ -52531,6 +52555,110 @@ Object.assign(TrafficVehicle.prototype, {
             return top.color || (piece && piece.color) || null;
         }
 
+        // ColorPicker — the in-game custom colour picker, shared by the Clothing Dyer (engine/dyer.js) and Torque's
+        // Customize tab (engine/shops-menus.js), in place of the browser's own colour dialog.
+        //
+        // ColorPicker.html(hex) is the panel's markup: a saturation/brightness square on the hue, a hue strip,
+        // a swatch of the colour, its hex (typed, or pasted), and the last RECENT colours picked anywhere.
+        // ColorPicker.bind(root, hex, { onInput, onPick }) wires it: onInput(hex) while a thumb is dragged
+        // (for a live preview, without re-rendering the screen), onPick(hex) once it's let go, a hex is
+        // entered, or a recent colour is tapped (and that colour goes to the front of the recents).
+        // Pointer events, so a finger drags it as a mouse does. Recents live in this browser only.
+
+        const ColorPicker = {
+            RECENT: 8,
+            KEY: 'dfab_recent_colors',
+
+            /** '#rrggbb' → { h 0..360, s 0..1, v 0..1 } */
+            toHsv(hex) {
+                const n = parseInt(String(hex).slice(1), 16) || 0, r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+                const mx = Math.max(r, g, b), d = mx - Math.min(r, g, b);
+                let h = 0;
+                if (d) h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+                return { h: (h * 60 + 360) % 360, s: mx ? d / mx : 0, v: mx };
+            },
+
+            /** { h, s, v } → '#rrggbb' */
+            toHex({ h, s, v }) {
+                const f = k => { const x = (k + h / 60) % 6; return v - v * s * Math.max(0, Math.min(x, 4 - x, 1)); };
+                return '#' + [f(5), f(3), f(1)].map(c => Math.round(c * 255).toString(16).padStart(2, '0')).join('');
+            },
+
+            /** A hex as typed ('#abc', 'abc', '#AABBCC') → '#aabbcc', or null */
+            parse(text) {
+                let t = String(text || '').trim().replace(/^#/, '').toLowerCase();
+                if (/^[0-9a-f]{3}$/.test(t)) t = t.replace(/./g, c => c + c);
+                return /^[0-9a-f]{6}$/.test(t) ? '#' + t : null;
+            },
+
+            /** The hsv to show for a hex: the one last dragged to it if it's that colour (a hue picked on white or
+             *  black isn't in its hex, and would snap back to red on the next render), else its own */
+            hsvOf(hex) {
+                const L = this._last;
+                return L && L.hex === hex ? { ...L.hsv } : this.toHsv(hex);
+            },
+
+            recent() {
+                try { const L = JSON.parse(localStorage.getItem(this.KEY)); return Array.isArray(L) ? L.filter(c => this.parse(c)).slice(0, this.RECENT) : []; }
+                catch (e) { return []; }
+            },
+
+            remember(hex) {
+                const L = [hex, ...this.recent().filter(c => c !== hex)].slice(0, this.RECENT);
+                try { localStorage.setItem(this.KEY, JSON.stringify(L)); } catch (e) { /* private mode */ }
+            },
+
+            html(hex) {
+                hex = this.parse(hex) || '#ffffff';
+                const { h, s, v } = this.hsvOf(hex), rec = this.recent();
+                let out = `<div class="cp" style="--hue:${Math.round(h)};--c:${hex}">`;
+                out += `<div class="cp-sv" role="slider" aria-label="Saturation and brightness" tabindex="0"><i class="cp-thumb" style="left:${(s * 100).toFixed(1)}%;top:${((1 - v) * 100).toFixed(1)}%"></i></div>`;
+                out += `<div class="cp-hue" role="slider" aria-label="Hue" tabindex="0" aria-valuemin="0" aria-valuemax="360" aria-valuenow="${Math.round(h)}"><i class="cp-thumb" style="left:${(h / 3.6).toFixed(1)}%"></i></div>`;
+                out += `<div class="cp-row"><span class="cp-chip"></span><input class="cp-hex" type="text" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Hex colour" value="${hex}">`;
+                out += `<span class="cp-recent">${rec.map(c => `<button class="cp-dot" data-hex="${c}" style="--c:${c}" title="${c}" aria-label="Recent ${c}"></button>`).join('')}</span></div>`;
+                return out + `</div>`;
+            },
+
+            bind(root, hex, { onInput, onPick } = {}) {
+                const el = root && root.querySelector('.cp'); if (!el) return;
+                const hsv = this.hsvOf(this.parse(hex) || '#ffffff');
+                const sv = el.querySelector('.cp-sv'), hue = el.querySelector('.cp-hue'), field = el.querySelector('.cp-hex');
+                const svThumb = sv.querySelector('.cp-thumb'), hueThumb = hue.querySelector('.cp-thumb');
+                const show = () => {
+                    const c = this.toHex(hsv);
+                    el.style.setProperty('--hue', Math.round(hsv.h)); el.style.setProperty('--c', c);
+                    svThumb.style.left = `${hsv.s * 100}%`; svThumb.style.top = `${(1 - hsv.v) * 100}%`;
+                    hueThumb.style.left = `${hsv.h / 3.6}%`; hue.setAttribute('aria-valuenow', Math.round(hsv.h));
+                    if (document.activeElement !== field) field.value = c;
+                    this._last = { hex: c, hsv: { ...hsv } };
+                    return c;
+                };
+                const done = c => { this.remember(c); if (onPick) onPick(c); };
+                const drag = (target, set) => {
+                    target.addEventListener('pointerdown', ev => {
+                        ev.preventDefault();
+                        try { target.setPointerCapture(ev.pointerId); } catch (e) { /* synthetic */ }
+                        const move = e => { const r = target.getBoundingClientRect(); set(Math.max(0, Math.min(1, (e.clientX - r.left) / (r.width || 1))), Math.max(0, Math.min(1, (e.clientY - r.top) / (r.height || 1)))); const c = show(); if (onInput) onInput(c); };
+                        const up = () => { target.removeEventListener('pointermove', move); target.removeEventListener('pointerup', up); target.removeEventListener('pointercancel', up); done(this.toHex(hsv)); };
+                        target.addEventListener('pointermove', move); target.addEventListener('pointerup', up); target.addEventListener('pointercancel', up);
+                        move(ev);
+                    });
+                };
+                drag(sv, (x, y) => { hsv.s = x; hsv.v = 1 - y; });
+                drag(hue, x => { hsv.h = Math.min(359.9, x * 360); });
+                // Arrow keys nudge a slider; letting go of the key picks it
+                const keys = (target, step) => {
+                    target.addEventListener('keydown', e => { if (step(e.key)) { e.preventDefault(); const c = show(); if (onInput) onInput(c); } });
+                    target.addEventListener('keyup', e => { if (/^Arrow/.test(e.key)) done(this.toHex(hsv)); });
+                };
+                keys(sv, k => { const d = 0.04; if (k === 'ArrowLeft') hsv.s = Math.max(0, hsv.s - d); else if (k === 'ArrowRight') hsv.s = Math.min(1, hsv.s + d); else if (k === 'ArrowUp') hsv.v = Math.min(1, hsv.v + d); else if (k === 'ArrowDown') hsv.v = Math.max(0, hsv.v - d); else return false; return true; });
+                keys(hue, k => { if (k === 'ArrowLeft') hsv.h = (hsv.h + 355) % 360; else if (k === 'ArrowRight') hsv.h = (hsv.h + 5) % 360; else return false; return true; });
+                field.addEventListener('input', () => { const c = this.parse(field.value); if (!c) return; Object.assign(hsv, this.toHsv(c)); show(); if (onInput) onInput(c); });
+                field.addEventListener('change', () => { const c = this.parse(field.value); if (c) done(c); else field.value = this.toHex(hsv); });
+                field.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') field.blur(); });   // typing never moves her
+                el.querySelectorAll('.cp-dot').forEach(b => b.addEventListener('click', () => { Object.assign(hsv, this.toHsv(b.dataset.hex)); show(); done(b.dataset.hex); }));
+            }
+        };
         /* =====================================================================
            WEAPON MODELS — every gun as data: parts in the gun's own frame (+x down
            the barrel, the grip hand near 0,0, +y to the holder's right), each in a
@@ -69008,7 +69136,9 @@ engineMixin({
                 // The colours
                 html += `<div class="df-section"><span><span class="glint">◆</span>Dye · ${esc(this.dyeSlotLabel(S.slot))}</span><span class="count">${esc(cur)}</span></div><div class="dy-palette">`;
                 for (const [hex, name] of DYER.PALETTE) html += `<button class="dy-swatch${hex.toLowerCase() === String(cur).toLowerCase() ? ' on' : ''}" data-hex="${hex}" title="${esc(name)}" aria-label="${esc(name)}" style="--c:${hex}"></button>`;
-                html += `<label class="dy-swatch dy-custom" title="Custom colour" style="--c:${cur}"><input type="color" id="dye-custom" value="${/^#[0-9a-f]{6}$/i.test(cur) ? cur : '#ffffff'}"><span>+</span></label></div>`;
+                const inPalette = DYER.PALETTE.some(([hex]) => hex.toLowerCase() === String(cur).toLowerCase());
+                html += `<button class="dy-swatch dy-custom${S.custom ? ' open' : ''}${!inPalette && S.pending[S.slot] ? ' on' : ''}" id="dye-custom" title="Custom colour" aria-label="Custom colour" aria-expanded="${!!S.custom}" style="--c:${cur}"><span>${S.custom ? '×' : '+'}</span></button></div>`;
+                if (S.custom) html += `<div id="dye-picker">${ColorPicker.html(cur)}</div>`;   // ui/color-picker.js
                 // Apply / undo
                 html += `<div class="dy-actions"><button class="df-btn" id="dye-apply"${changed.length && this.scrap >= cost ? '' : ' disabled'}>Dye ${changed.length || ''} · ${cost} Scrap</button>`;
                 html += `<button class="df-btn small ghost" id="dye-discard"${changed.length ? '' : ' disabled'}>Undo choices</button>`;
@@ -69020,11 +69150,11 @@ engineMixin({
                 el.querySelectorAll('[data-outfit]').forEach(c => c.addEventListener('click', () => { S.outfit = c.dataset.outfit; S.pending = {}; audioSys.sfx('ui'); this.renderDyer(); }));
                 el.querySelectorAll('[data-slot]').forEach(c => c.addEventListener('click', () => { S.slot = c.dataset.slot; audioSys.sfx('ui'); this.renderDyer(); }));
                 el.querySelectorAll('button[data-hex]').forEach(b => b.addEventListener('click', () => pick(b.dataset.hex)));
-                const custom = document.getElementById('dye-custom');
-                if (custom) {
-                    custom.addEventListener('input', () => { S.pending[S.slot] = custom.value.toLowerCase(); this.drawDyePreview(document.getElementById('dye-preview'), S.outfit, S.pending); });
-                    custom.addEventListener('change', () => pick(custom.value));
-                }
+                document.getElementById('dye-custom').addEventListener('click', () => { S.custom = !S.custom; audioSys.sfx('ui'); this.renderDyer(); });
+                if (S.custom) ColorPicker.bind(document.getElementById('dye-picker'), cur, {
+                    onInput: hex => { S.pending[S.slot] = hex; this.drawDyePreview(document.getElementById('dye-preview'), S.outfit, S.pending); },
+                    onPick: pick
+                });
                 document.getElementById('dye-apply').addEventListener('click', () => {
                     if (!this.applyDyes(S.outfit, S.pending)) return;
                     S.pending = {};
@@ -70180,7 +70310,7 @@ engineMixin({
             closeAutoShop() {
                 this._shopShow('auto-shop-overlay', false);
                 this._customizeOriginal = null;
-                this._customizePending = null;
+                this._customizePending = null; this._customizePicker = null;
                 this.pauseSystem.release('auto_shop');
             },
 
@@ -70191,7 +70321,7 @@ engineMixin({
                 // Clear customize preview state when leaving that tab
                 if (this._autoShopTab !== 'customize') {
                     this._customizeOriginal = null;
-                    this._customizePending = null;
+                    this._customizePending = null; this._customizePicker = null;
                 }
 
                 document.querySelectorAll('#auto-shop-overlay .auto-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === this._autoShopTab));
@@ -70304,14 +70434,21 @@ engineMixin({
                 if (pending.underglowColor !== orig.underglowColor) { totalCost += CUSTOM_PRICES.underglow; changeCount++; }
                 if (pending.headlightColor !== orig.headlightColor) { totalCost += CUSTOM_PRICES.headlights; changeCount++; }
                 const canAfford = this.currency >= totalCost;
-                const picks = (cls, list, cur, sq, glow) => `<div class="df-swatches">${list.map(c => `<button class="df-swatch-pick${sq ? ' sq' : ''} ${cls}${c === cur ? ' on' : ''}" data-color="${c === null ? 'null' : c}" style="background:${c || 'transparent'};${glow && c ? `box-shadow:0 0 7px ${c};` : ''}">${c === null ? '✕' : ''}</button>`).join('')}</div>`;
+                // Each row ends in a Custom swatch that opens the colour picker under it (ui/color-picker.js)
+                const open = this._customizePicker;
+                const picks = (cls, list, cur, sq, glow, prop) => {
+                    const custom = !!cur && !list.some(c => c && c.toLowerCase() === String(cur).toLowerCase());
+                    let row = `<div class="df-swatches">${list.map(c => `<button class="df-swatch-pick${sq ? ' sq' : ''} ${cls}${c === cur ? ' on' : ''}" data-color="${c === null ? 'null' : c}" style="background:${c || 'transparent'};${glow && c ? `box-shadow:0 0 7px ${c};` : ''}">${c === null ? '✕' : ''}</button>`).join('')}`;
+                    row += `<button class="df-swatch-pick${sq ? ' sq' : ''} cp-toggle${open === prop || custom ? ' on' : ''}" data-picker="${prop}" title="Custom colour" aria-label="Custom colour" aria-expanded="${open === prop}">${open === prop ? '×' : '+'}</button></div>`;
+                    return row + (open === prop ? `<div class="auto-picker" data-for="${prop}">${ColorPicker.html(cur || '#ffffff')}</div>` : '');
+                };
                 const lamp = (top) => `<i class="lamp" style="top:${top}px;background:${pending.headlightColor};box-shadow:0 0 9px ${pending.headlightColor}"></i>`;
                 let html = `<div class="df-card"><div class="df-car-preview">`;
                 html += `<div class="df-car" style="background:${pending.paintColor}">${pending.underglowColor ? `<i class="glow" style="background:${pending.underglowColor};box-shadow:0 0 10px ${pending.underglowColor},0 3px 14px ${pending.underglowColor}"></i>` : ''}${lamp(9)}${lamp(33)}</div>`;
                 html += `<div class="grow"><div class="eyebrow">Customizing</div><div class="title">${name}</div><div class="desc">Preview freely — you're only charged when you apply.</div></div></div></div>`;
-                html += `<div class="df-section"><span>Paint</span><span class="count">${CUSTOM_PRICES.paint} PP${pending.paintColor !== orig.paintColor ? ' · <b style="color:var(--df-gold)">changed</b>' : ''}</span></div>${picks('auto-paint-btn', allPaintColors, pending.paintColor, true)}`;
-                html += `<div class="df-section"><span>Underglow</span><span class="count">${CUSTOM_PRICES.underglow} PP${pending.underglowColor !== orig.underglowColor ? ' · <b style="color:var(--df-gold)">changed</b>' : ''}</span></div>${picks('auto-glow-btn', glowOptions, pending.underglowColor, false, true)}`;
-                html += `<div class="df-section"><span>Headlights</span><span class="count">${CUSTOM_PRICES.headlights} PP${pending.headlightColor !== orig.headlightColor ? ' · <b style="color:var(--df-gold)">changed</b>' : ''}</span></div>${picks('auto-headlight-btn', headlightOptions, pending.headlightColor, false, true)}`;
+                html += `<div class="df-section"><span>Paint</span><span class="count">${CUSTOM_PRICES.paint} PP${pending.paintColor !== orig.paintColor ? ' · <b style="color:var(--df-gold)">changed</b>' : ''}</span></div>${picks('auto-paint-btn', allPaintColors, pending.paintColor, true, false, 'paintColor')}`;
+                html += `<div class="df-section"><span>Underglow</span><span class="count">${CUSTOM_PRICES.underglow} PP${pending.underglowColor !== orig.underglowColor ? ' · <b style="color:var(--df-gold)">changed</b>' : ''}</span></div>${picks('auto-glow-btn', glowOptions, pending.underglowColor, false, true, 'underglowColor')}`;
+                html += `<div class="df-section"><span>Headlights</span><span class="count">${CUSTOM_PRICES.headlights} PP${pending.headlightColor !== orig.headlightColor ? ' · <b style="color:var(--df-gold)">changed</b>' : ''}</span></div>${picks('auto-headlight-btn', headlightOptions, pending.headlightColor, false, true, 'headlightColor')}`;
                 html += `<div class="df-btn-row" style="justify-content:center;margin-top:14px;">`;
                 if (changeCount > 0) {
                     html += `<button class="df-btn" id="auto-custom-apply"${canAfford ? '' : ' disabled'}>Apply ${changeCount} change${changeCount > 1 ? 's' : ''} · ${totalCost} PP</button>`;
@@ -70323,6 +70460,24 @@ engineMixin({
                 container.querySelectorAll('.auto-paint-btn').forEach(b => b.addEventListener('click', () => updatePending('paintColor', b.dataset.color)));
                 container.querySelectorAll('.auto-glow-btn').forEach(b => b.addEventListener('click', () => updatePending('underglowColor', b.dataset.color === 'null' ? null : b.dataset.color)));
                 container.querySelectorAll('.auto-headlight-btn').forEach(b => b.addEventListener('click', () => updatePending('headlightColor', b.dataset.color)));
+                container.querySelectorAll('[data-picker]').forEach(b => b.addEventListener('click', () => {
+                    this._customizePicker = this._customizePicker === b.dataset.picker ? null : b.dataset.picker;
+                    audioSys.sfx('ui'); this._renderCustomizeTab(container);
+                }));
+                // While a picker thumb is dragged, only the preview car changes; letting go prices it like a swatch
+                const preview = () => {
+                    const carEl = container.querySelector('.df-car'); if (!carEl) return;
+                    carEl.style.background = pending.paintColor;
+                    let glow = carEl.querySelector('.glow');
+                    if (!glow && pending.underglowColor) { glow = document.createElement('i'); glow.className = 'glow'; carEl.prepend(glow); }
+                    if (glow && pending.underglowColor) { glow.style.background = pending.underglowColor; glow.style.boxShadow = `0 0 10px ${pending.underglowColor},0 3px 14px ${pending.underglowColor}`; }
+                    carEl.querySelectorAll('.lamp').forEach(l => { l.style.background = pending.headlightColor; l.style.boxShadow = `0 0 9px ${pending.headlightColor}`; });
+                };
+                const pickerEl = container.querySelector('.auto-picker');
+                if (pickerEl) {
+                    const prop = pickerEl.dataset.for;
+                    ColorPicker.bind(pickerEl, pending[prop] || '#ffffff', { onInput: hex => { pending[prop] = hex; preview(); }, onPick: hex => updatePending(prop, hex) });
+                }
                 const applyBtn = document.getElementById('auto-custom-apply');
                 if (applyBtn) applyBtn.addEventListener('click', () => {
                     if (!canAfford) { showMessage(`INSUFFICIENT FUNDS (${totalCost} PERSONICS REQUIRED).`); return; }

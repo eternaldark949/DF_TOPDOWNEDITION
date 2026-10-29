@@ -111,6 +111,7 @@ const SCRIPTS = [
     'ui/bodies.js',
     'ui/cloth.js',
     'ui/wardrobe.js',
+    'ui/color-picker.js',
     'ui/weapon-models.js',
     'ui/humanoid-render.js',
     'ui/portrait-real.js',

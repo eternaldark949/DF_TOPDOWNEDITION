@@ -58,4 +58,27 @@ test('The dye window lists her outfits, the pieces and the palette, and previews
  assert.equal(r.closed,null);
 });
 
+test('The custom colour picker: hex and hsv round-trip, typed hexes parse, a hue on white is kept, recents cap at 8',e=>{
+ const r=value(e,`const P=ColorPicker;const trip=['#dc143c','#00b39b','#7b2cbf','#ffffff','#000000','#e8c27a'].map(h=>P.toHex(P.toHsv(h))===h);
+  const parsed=['abc','#AABBCC',' 12ab9f ','#12','zzzzzz'].map(t=>P.parse(t));
+  P._last={hex:'#ffffff',hsv:{h:280,s:0,v:1}};const kept=P.hsvOf('#ffffff').h,other=P.hsvOf('#ff0000').h;
+  for(let i=0;i<12;i++)P.remember('#0000'+(10+i));P.remember('#000011');const rec=P.recent();
+  const html=P.html('#7b2cbf');
+  return {trip,parsed,kept,other,n:rec.length,front:rec[0],dupes:new Set(rec).size===rec.length,html:/cp-sv/.test(html)&&/cp-hue/.test(html)&&/value="#7b2cbf"/.test(html)};`);
+ assert.ok(r.trip.every(Boolean),String(r.trip));
+ assert.deepEqual(r.parsed,['#aabbcc','#aabbcc','#12ab9f',null,null]);
+ assert.equal(r.kept,280);assert.equal(r.other,0);
+ assert.equal(r.n,8);assert.equal(r.front,'#000011');assert.ok(r.dupes);assert.ok(r.html);
+});
+
+test('The dyer and the car Customize tab open the picker in place of the browser colour dialog',e=>{
+ const r=value(e,`game.scrap=50;game.openDyer();game._dye.custom=true;game.renderDyer();
+  const dye=document.getElementById('dye-shop-grid').innerHTML;document.getElementById('dye-shop-close').onclick();
+  const box=document.getElementById('auto-shop-content');let car=null;
+  if(box&&game.garage&&game.garage.getActive()){game._autoShopTab='customize';game._customizePicker='paintColor';game._renderCustomizeTab(box);car=box.innerHTML;}
+  return {dye:dye.includes('class="cp"')&&!dye.includes('type="color"'),car:car===null?'no car':car.includes('class="cp"')&&car.includes('data-picker="headlightColor"')};`);
+ assert.equal(r.dye,true);
+ assert.equal(r.car,true);
+});
+
 console.log(`test-clothing-dyer: ${tests.length} passed`);
