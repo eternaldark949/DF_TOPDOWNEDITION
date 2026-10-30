@@ -2208,6 +2208,7 @@ test('Thigh-high finishes buy, replace footwear and persist alongside thigh band
   equal(result.legacy, {type:'thigh_heels',color:'#141016'}, 'existing saves keep their original black boots');
 });
 
+results.push(...require('./test-projectile-collisions.cjs').run());
 const failures = results.filter(r => r.status === 'failed');
 console.log(JSON.stringify({file:gameFile,passed:results.length-failures.length,failed:failures.length,assertions,results},null,2));
 if (failures.length) process.exitCode = 1;

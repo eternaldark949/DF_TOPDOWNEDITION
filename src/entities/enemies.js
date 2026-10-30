@@ -966,6 +966,7 @@
                 // Only take damage from player projectiles
                 if (projectile.isEnemy) return;
                 this.lastHitBy = projectile.owner; this.lastHitMelee = !!projectile.melee;   // who gets the Resonance
+                const opts = { shot: !projectile.melee, punch: !!projectile.melee, crit: !!projectile.crit };
                 
                 const speed = Math.hypot(projectile.vx, projectile.vy);
                 if (speed > 0) {
@@ -976,9 +977,9 @@
                     
                     const kbX = (projectile.vx / speed) * knockbackStrength;
                     const kbY = (projectile.vy / speed) * knockbackStrength;
-                    this.takeDamage(projectile.damage, kbX, kbY, projectile.crit ? { crit: true } : null);
+                    this.takeDamage(projectile.damage, kbX, kbY, opts);
                 } else {
-                    this.takeDamage(projectile.damage, 0, 0, projectile.crit ? { crit: true } : null);
+                    this.takeDamage(projectile.damage, 0, 0, opts);
                 }
             }
 
@@ -1345,6 +1346,7 @@
                     this.knockbackVx *= this.knockbackFriction;
                     this.knockbackVy *= this.knockbackFriction;
                 }
+                if (this._staggerUntil && _gameTimeSec < this._staggerUntil) return null;   // slipped in a spill (engine/spills.js): no step, no shot
                 
                 const distToPlayer = Math.hypot(player.x - this.x, player.y - this.y);
                 const isVisible = player.visible && !player.isHidden;
@@ -1704,6 +1706,7 @@
                 if (this.decoy) { this.takeDamage(this.hp, 0, 0, { shot: true }); return; }                 // one of Lilitu's Blood Mirror decoys: any hit
                 if (this.elite && eliteWardTurns(this, projectile)) return;                  // a warded elite turns it
                 this.lastHitBy = projectile.owner; this.lastHitMelee = !!projectile.melee;   // who gets the Resonance
+                const opts = { shot: !projectile.melee, punch: !!projectile.melee, crit: !!projectile.crit };
                 this.suspicion = 100;
                 this.state = 'ALERT';
                 
@@ -1723,8 +1726,8 @@
                     const knockbackStrength = projectile.damage * 0.3;
                     const kbX = (projectile.vx / speed) * knockbackStrength;
                     const kbY = (projectile.vy / speed) * knockbackStrength;
-                    if (this.takeDamage(projectile.damage, kbX, kbY, projectile.crit ? { crit: true } : null) && projectile.melee) this.interruptMelee();
-                } else if (this.takeDamage(projectile.damage, 0, 0, projectile.crit ? { crit: true } : null) && projectile.melee) { this.interruptMelee(); }
+                    if (this.takeDamage(projectile.damage, kbX, kbY, opts) && projectile.melee) this.interruptMelee();
+                } else if (this.takeDamage(projectile.damage, 0, 0, opts) && projectile.melee) { this.interruptMelee(); }
             }
 
             /** An armored elite takes half from burn and bleed */

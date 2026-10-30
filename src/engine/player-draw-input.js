@@ -47,7 +47,7 @@
                 let currentStance = 'idle';
                 const armed = (this.weaponMode === 'normal' || this.weaponMode === 'sniper') && !this.weaponHolstered;
                 if (armed) currentStance = this.currentWeapon ? stanceForWeapon(this.currentWeapon.id) : (this.weaponMode === 'sniper' ? 'sniper' : 'pistol');
-                else if (this.weaponMode === 'none' && this.shootCooldown > 0) currentStance = 'punch';
+                else if ((this.weaponMode === 'none' || this.weaponMode === 'fists' && !this.weaponHolstered) && this.shootCooldown > 0) currentStance = 'punch';
                 const pushing = this.furniture && this.furniture.holding;
                 if (pushing) currentStance = 'idle';                                   // both hands on the furniture
 
@@ -81,9 +81,8 @@
                     recoil: currentStance === 'punch' && this.shootCooldown > 0 ? (this.shootCooldown / 10) : 0,
                     kick: gunKick,
                     // Ticks since the punch was thrown, blended between ticks like everything else
-                    punchTicks: currentStance === 'punch'
-                        ? Math.max(0, CONFIG.PUNCH.DURATION_TICKS - this.shootCooldown - 1 + RenderInterp.alpha)
-                        : undefined,
+                    punchTicks: currentStance === 'punch' ? this.punchStanceTicks() : undefined,
+                    knuckles: this.weaponMode === 'fists' && !this.weaponHolstered,   // Golden Retribution across her fists
                     top: outfit.top,
                     bottom: outfit.bottom,
                     shoes: outfit.shoes,

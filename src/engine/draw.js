@@ -488,6 +488,8 @@
                 }
                 if (RL.at('decals')) {
                     this.decals.draw(this.ctx, cullBounds.world);
+                    this.drawSpills(this.ctx, cullBounds.world);              // spilt drinks (engine/spills.js)
+                    this.drawPoolRipples(this.ctx, cullBounds.world);         // rings on the parks' pools (engine/pools.js)
                     this.drawCasings(this.ctx, cullBounds.world);             // spent brass (engine/combat-effects.js)
                 }
                 // The sun's shadows (engine/daylight.js): buildings and trees thrown across the ground by day
@@ -842,6 +844,8 @@
                     this.drawMuzzleStars(this.ctx);                          // the flash's star at each muzzle
                     this.drawShotFx(this.ctx, cullBounds.world);             // barrel smoke, embers, golden wisps (engine/combat-effects.js)
                     this.drawSlashes(this.ctx);                              // a blade's gold arc (engine/status-effects.js)
+                    this.drawKnuckleFx(this.ctx);                            // Golden Retribution's gold afterimages and rings (engine/knuckles.js)
+                    this.drawMirrorShield(this.ctx);                         // the Mirrored Glass turning a shot
                 }
 
                 if (RenderStats.timed) this._entLap('Entities: Effects');

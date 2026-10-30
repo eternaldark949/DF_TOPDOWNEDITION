@@ -2379,7 +2379,7 @@
                     // the retract). Sniper models sit 2px lower in the hand, matching NPCs.
                     if (game.weaponMode === 'normal' || game.weaponMode === 'sniper') {
                         const wy = wyBase + (weaponId.includes('sniper') ? 2 : 0);
-                        const laser = game.inventory && game.inventory.getEquippedAttachment()?.effect === 'laser_sight';
+                        const laser = !!(game.inventory && game.inventory.hasAttachment('laser_sight'));
                         // the finisher's twirl (engine/finisher.js): the gun spins round her trigger finger
                         const tw = game.twirlAngle ? game.twirlAngle() : 0;
                         drawWeapon(ctx, weaponId, wx, wy, tw, scale, laser && !tw);
@@ -2732,6 +2732,12 @@
                 ctx.stroke();
             }
         
+            // 7b. Golden Retribution: a gilded knuckle bar across each fist (engine/knuckles.js)
+            if (config.knuckles && typeof drawKnuckleDuster === 'function' && !isDriving) {
+                drawKnuckleDuster(ctx, lFistX, lFistY, Math.atan2(lFistY - lElbowY, lFistX - lElbowX));
+                drawKnuckleDuster(ctx, rFistX, rFistY, Math.atan2(rFistY - rElbowY, rFistX - rElbowX));
+            }
+
             // 8. Upper Arms (fabric under short or long sleeves). They hang from the shoulders, so their
             // roots turn with the torso: forward with the opposite leg on a step, into the blow in a punch.
             const upperColor = sleeve !== 'none' ? darken(sleeveCol, 0.15) : darken(skinColor, 0.15);
@@ -2845,7 +2851,7 @@
                 if (held.hand === 'left') { hX = lFistX; hY = lFistY; } else { hX = rFistX; hY = rFistY; }
                 // 'champagne_glass' is the legacy id (NPC configs); it's the glass with champagne
                 if (held.type === 'glass' || held.type === 'champagne_glass') {
-                    drawHeldGlass(ctx, hX, hY, held.drink || 'champagne', entity, held.hand);
+                    drawHeldGlass(ctx, hX, hY, held.drink || 'champagne', entity, held.hand, held.mirror, held.level ?? 1);
                 } else if (held.type === 'parcel' && held.tucked && !isDrivingCfg(config)) {
                     ctx.save(); ctx.translate(-1.5, -12.5); ctx.rotate(0.12);           // against her left side, under the arm
                     drawCozyParcel(ctx, 10, 6.5, 0.6);
@@ -2924,7 +2930,7 @@
             ctx.beginPath(); ctx.moveTo(hx - hs * 0.6, -hs * 1.1); ctx.lineTo(hx + hs * 1.1, 0); ctx.lineTo(hx - hs * 0.6, hs * 1.1); ctx.closePath(); ctx.fill();
         }
 
-        function drawHeldGlass(ctx, hX, hY, drinkId, owner, hand) {
+        function drawHeldGlass(ctx, hX, hY, drinkId, owner, hand, mirror = false, level = 1) {
             const D = GLASS_DRINKS[drinkId] || GLASS_DRINKS.champagne;
             const TAU = Math.PI * 2, R = D.rim;
             const side = hand === 'left' ? -1 : 1;
@@ -2984,45 +2990,48 @@
             ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
 
             // Liquid — darker at the edge, brighter toward the light (depth)
-            const lr = R * (D.glass === 'martini' ? 0.8 : (D.glass === 'tumbler' || D.glass === 'soda') ? 0.78 : D.glass === 'flute' ? 0.7 : 0.74);
-            const g = ctx.createRadialGradient(sx + lx * lr * 0.35, sy + ly * lr * 0.35, 0, sx, sy, lr);
-            g.addColorStop(0, D.liquid2 ? '#ffffff' : lightenHex(D.liquid, 70));
-            g.addColorStop(0.35, D.liquid);
-            g.addColorStop(1, D.liquid2 || darkenHex(D.liquid, 40));
-            if (D.glow) { ctx.shadowColor = D.liquid; ctx.shadowBlur = 6; }
-            ctx.fillStyle = g;
-            ctx.beginPath(); ctx.arc(sx, sy, lr, 0, TAU); ctx.fill();
-            ctx.shadowBlur = 0;
-            // Meniscus: a bright hairline where liquid meets glass
-            ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 0.35;
-            ctx.beginPath(); ctx.arc(sx, sy, lr, 0, TAU); ctx.stroke();
+            const lr = R * (D.glass === 'martini' ? 0.8 : (D.glass === 'tumbler' || D.glass === 'soda') ? 0.78 : D.glass === 'flute' ? 0.7 : 0.74)
+                     * (0.4 + 0.6 * Math.min(1, level));             // a lower pour sits deeper in the bowl: a smaller round seen from above
+            if (level > 0.02) {                                 // (a dry glass: just the glass)
+                const g = ctx.createRadialGradient(sx + lx * lr * 0.35, sy + ly * lr * 0.35, 0, sx, sy, lr);
+                g.addColorStop(0, D.liquid2 ? '#ffffff' : lightenHex(D.liquid, 70));
+                g.addColorStop(0.35, D.liquid);
+                g.addColorStop(1, D.liquid2 || darkenHex(D.liquid, 40));
+                if (D.glow) { ctx.shadowColor = D.liquid; ctx.shadowBlur = 6; }
+                ctx.fillStyle = g;
+                ctx.beginPath(); ctx.arc(sx, sy, lr, 0, TAU); ctx.fill();
+                ctx.shadowBlur = 0;
+                // Meniscus: a bright hairline where liquid meets glass
+                ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 0.35;
+                ctx.beginPath(); ctx.arc(sx, sy, lr, 0, TAU); ctx.stroke();
 
-            const t = _gameTimeSec;
-            if (D.foam) {                                       // creamy head around the edge
-                ctx.fillStyle = 'rgba(255,246,240,0.9)';
-                for (let i = 0; i < 10; i++) {
-                    const a = (i / 10) * Math.PI * 2 + 0.3;
-                    ctx.beginPath(); ctx.arc(sx + Math.cos(a) * lr * 0.82, sy + Math.sin(a) * lr * 0.82, lr * (0.2 + (i % 3) * 0.04), 0, Math.PI * 2); ctx.fill();
+                const t = _gameTimeSec;
+                if (D.foam) {                                       // creamy head around the edge
+                    ctx.fillStyle = 'rgba(255,246,240,0.9)';
+                    for (let i = 0; i < 10; i++) {
+                        const a = (i / 10) * Math.PI * 2 + 0.3;
+                        ctx.beginPath(); ctx.arc(sx + Math.cos(a) * lr * 0.82, sy + Math.sin(a) * lr * 0.82, lr * (0.2 + (i % 3) * 0.04), 0, Math.PI * 2); ctx.fill();
+                    }
                 }
-            }
-            if (D.bubbles) {                                   // rising bubbles
-                ctx.fillStyle = 'rgba(255,255,255,0.85)';
-                for (let i = 0; i < 4; i++) {
-                    const ph = (t * 0.8 + i * 0.27) % 1;
-                    const ang = i * 2.1 + t * 0.6;
-                    const rr = lr * (0.15 + 0.55 * ph);
-                    ctx.globalAlpha = a0 * (1 - ph) * 0.9;
-                    ctx.beginPath(); ctx.arc(sx + Math.cos(ang) * rr, sy + Math.sin(ang) * rr, 0.35, 0, TAU); ctx.fill();
+                if (D.bubbles) {                                   // rising bubbles
+                    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+                    for (let i = 0; i < 4; i++) {
+                        const ph = (t * 0.8 + i * 0.27) % 1;
+                        const ang = i * 2.1 + t * 0.6;
+                        const rr = lr * (0.15 + 0.55 * ph);
+                        ctx.globalAlpha = a0 * (1 - ph) * 0.9;
+                        ctx.beginPath(); ctx.arc(sx + Math.cos(ang) * rr, sy + Math.sin(ang) * rr, 0.35, 0, TAU); ctx.fill();
+                    }
+                    ctx.globalAlpha = a0;
                 }
-                ctx.globalAlpha = a0;
-            }
-            if (D.ice) {                                        // two cubes, drifting slowly
-                for (let i = 0; i < 2; i++) {
-                    const ang = t * 0.5 + i * Math.PI, rr = lr * 0.35;
-                    ctx.save(); ctx.translate(sx + Math.cos(ang) * rr, sy + Math.sin(ang) * rr); ctx.rotate(ang * 0.7 + i);
-                    ctx.fillStyle = 'rgba(235,248,255,0.55)'; ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 0.3;
-                    ctx.beginPath(); ctx.roundRect(-1.1, -1.1, 2.2, 2.2, 0.5); ctx.fill(); ctx.stroke();
-                    ctx.restore();
+                if (D.ice) {                                        // two cubes, drifting slowly
+                    for (let i = 0; i < 2; i++) {
+                        const ang = t * 0.5 + i * Math.PI, rr = lr * 0.35;
+                        ctx.save(); ctx.translate(sx + Math.cos(ang) * rr, sy + Math.sin(ang) * rr); ctx.rotate(ang * 0.7 + i);
+                        ctx.fillStyle = 'rgba(235,248,255,0.55)'; ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 0.3;
+                        ctx.beginPath(); ctx.roundRect(-1.1, -1.1, 2.2, 2.2, 0.5); ctx.fill(); ctx.stroke();
+                        ctx.restore();
+                    }
                 }
             }
             if (D.garnish === 'olive') {                        // olive on a pick
@@ -3057,6 +3066,14 @@
             if (D.glass === 'tumbler' || D.glass === 'soda') {  // thick glass: second inner ring
                 ctx.strokeStyle = 'rgba(245,252,255,0.35)'; ctx.lineWidth = 0.4;
                 ctx.beginPath(); ctx.arc(0, 0, R * 0.84, 0, TAU); ctx.stroke();
+            }
+            if (mirror) {                                       // the Mirrored Glass: a silvered band round the rim, a bright arc of it toward the light
+                ctx.strokeStyle = '#8f9aa8'; ctx.lineWidth = 1.1;
+                ctx.beginPath(); ctx.arc(0, 0, R + 0.5, 0, TAU); ctx.stroke();
+                ctx.strokeStyle = '#f4f8ff'; ctx.lineWidth = 0.8;
+                ctx.beginPath(); ctx.arc(0, 0, R + 0.5, light - 0.9, light + 0.9); ctx.stroke();
+                ctx.strokeStyle = 'rgba(40,48,64,0.6)'; ctx.lineWidth = 0.6;
+                ctx.beginPath(); ctx.arc(0, 0, R + 0.5, light + Math.PI - 0.6, light + Math.PI + 0.6); ctx.stroke();
             }
             // Specular crescent + pin highlight on the lit side
             ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = 0.7; ctx.lineCap = 'round';

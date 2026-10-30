@@ -251,7 +251,7 @@
                 const speed = Math.hypot(projectile.vx, projectile.vy);
                 const kb = speed ? Math.min(((projectile.mass || 1) * speed * projectile.damage / 20) / this.mass, 30) : 0;
                 const kbX = speed ? projectile.vx / speed * kb : 0, kbY = speed ? projectile.vy / speed * kb : 0;
-                const opts = { shot: !projectile.melee, crit: !!projectile.crit, eye };
+                const opts = { shot: !projectile.melee, punch: !!projectile.melee, crit: !!projectile.crit, eye };
                 if (game && game.weather) game.weather.spawnExplosion(projectile.x, projectile.y, eye ? '#d8b8ff' : '#8a8f9a', eye ? 4 : 2, eye ? 1.2 : 0.6);
                 this.takeDamage(eye ? projectile.damage * DRONE.EYE_MULT : projectile.damage, kbX, kbY, opts);
                 if (eye) this._eyeHitT = _gameTimeSec;

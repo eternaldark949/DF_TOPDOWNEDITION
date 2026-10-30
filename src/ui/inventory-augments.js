@@ -67,16 +67,41 @@
                 // the Kukri's twice-reach, half-rate cousin: a slower swing (swingSecs), harder cuts, a wider arc
                 stats: { fireRate: 32, damage: 45, reach: 76, arc: 2.1, swingSecs: 0.32, bleedDps: 8, bleedSecs: 3, critChance: 0.2, noise: 65, damageType: 'melee' }
             },
+            'golden_retribution': {
+                name: 'Golden Retribution', type: 'weapon', icon: '✊',
+                desc: 'Gilded brass knuckles. Quick jabs, and every third punch a haymaker that staggers and slams.',
+                weaponMode: 'fists',
+                // jabs on the bare-fist hitbox, every haymakerEvery-th a haymaker (engine/knuckles.js)
+                stats: { fireRate: 15, damage: 16, haymakerEvery: 3, haymakerMult: 2.5, damageType: 'melee' }
+            },
             'laser_sight': {
                 name: 'Laser Sight', type: 'attachment', icon: '⊕',
                 desc: 'Faint red targeting beam when equipped.',
                 stats: { effect: 'laser_sight' }
             },
+            'mirror_blade': {
+                name: 'Mirror Blade', type: 'attachment', icon: '◈',
+                desc: 'A mirror-polished edge. Bullets your blade meets mid-cut fly back at whoever fired them.',
+                // engine/status-effects.js deflectShots: the Kukri's and Blood Pact's cut turns enemy shots
+                stats: { effect: 'mirror_blade' }
+            },
+            'crimson_edge': {
+                name: 'Crimson Edge', type: 'attachment', icon: '❖',
+                desc: 'A blood-red whetted edge. Blades cut 50% harder, and wounds bleed up to five deep.',
+                // engine/status-effects.js meleeSlash / applyStatus: blade damage × bladeDamageMult, bleed up to bleedMax stacks
+                stats: { effect: 'crimson_edge', bladeDamageMult: 1.5, bleedMax: 5 }
+            },
+            'blood_muzzle': {
+                name: 'Bloodthirsty Muzzle', type: 'attachment', icon: '♆',
+                desc: 'A crimson muzzle brake that drinks the shot. Bullets deal 75% more damage.',
+                // engine/combat-effects.js fireWeapon: the shot's damage × gunDamageMult
+                stats: { effect: 'blood_muzzle', gunDamageMult: 1.75 }
+            },
             'golden_child': {
                 name: 'Golden Child', type: 'weapon', icon: '✦',
                 desc: 'Fires golden orbs that stick to targets and burn away.',
                 weaponMode: 'normal',
-                stats: { fireRate: 38, recoil: 6, damage: 18, projectileColor: '#FFD700', projectileSpeed: 18, flashRadius: 45, sticky: true, dotDamage: 10, dotTicks: 12, dotInterval: 10 }
+                stats: { fireRate: 38, recoil: 6, damage: 18, projectileColor: '#FFD700', projectileSpeed: 18, flashRadius: 45, sticky: true, dotDamage: 8, dotTicks: 12, dotInterval: 10, maxOrbs: 4 }
             },
         };
         
@@ -234,6 +259,7 @@
             { id: 'apt_fireplace', name: 'Fireplace', quantity: 1, icon: '♨', description: 'Linear glass fireplace set into a stone surround.' },
             { id: 'apt_floor_lamp', name: 'Floor Lamp', quantity: 3, icon: '◉', description: 'Cream floor lamps with brass trim.' },
             { id: 'apt_plant', name: 'Plant', quantity: 6, icon: '♣', description: 'Potted foliage throughout the living room, bedroom and bathroom.' },
+            { id: 'apt_bar_cart', name: 'Bar Cart', quantity: 1, icon: '◍', description: 'Brass and smoked-glass bar cart with bottles, a decanter and an ice bucket. Tops up her glass.' },
             { id: 'apt_craft', name: 'Crafting Table', quantity: 1, icon: '⚒', description: 'Walnut and steel workbench with tools, a vise and a schematic tablet.' },
             { id: 'apt_fridge', name: 'Refrigerator', quantity: 1, icon: '▣', description: 'Metal-finished refrigerator with brass trim.' },
             { id: 'apt_sink', name: 'Kitchen Sink', quantity: 1, icon: '◡', description: 'Kitchen sink set into cream quartz with a brass tap.' },
@@ -328,7 +354,8 @@
                 
                 // --- DUAL EQUIP SLOTS ---
                 this.equippedWeaponId = null;     // Active weapon
-                this.equippedAttachmentId = null;  // Active attachment (laser sight, etc.)
+                this.equippedAttachments = [];    // Active attachments (laser sight, muzzle…), up to maxAttachments
+                this.maxAttachments = 2;
                 this.entryOrder = [];             // pill order the player dragged, as 'source:id' keys (saved)
                 
                 // --- ITEM TYPE CONFIG ---
@@ -383,19 +410,25 @@
                     this.equippedWeaponId = id;
                     if (item.action) item.action(item);
                 } else if (config.slot === 'attachment') {
-                    this.equippedAttachmentId = id;
+                    if (this.equippedAttachments.includes(id)) return;
+                    if (this.equippedAttachments.length >= this.maxAttachments) {
+                        showMessage(`MAX ${this.maxAttachments} ATTACHMENTS EQUIPPED. UNEQUIP ONE FIRST.`);
+                        return;
+                    }
+                    this.equippedAttachments.push(id);
                     showMessage(`${item.name.toUpperCase()} EQUIPPED`);
                 }
                 this.render();
             }
         
-            unequipSlot(slot) {
+            unequipSlot(slot, id = null) {
                 if (slot === 'weapon') {
                     this.equippedWeaponId = null;
                     this.game.weaponMode = 'none';
                     showMessage("WEAPON HOLSTERED");
                 } else if (slot === 'attachment') {
-                    this.equippedAttachmentId = null;
+                    // One attachment by id, or all of them
+                    this.equippedAttachments = id ? this.equippedAttachments.filter(a => a !== id) : [];
                     showMessage("ATTACHMENT REMOVED");
                 }
                 this.render();
@@ -407,23 +440,38 @@
                     const item = this.items.find(i => i.id === itemId);
                     if (item) {
                         const config = this.typeConfig[item.type];
-                        if (config?.slot) { this.unequipSlot(config.slot); return; }
+                        if (config?.slot) { this.unequipSlot(config.slot, itemId); return; }
                     }
                 }
                 this.unequipSlot('weapon');
             }
             
             isItemEquipped(id) {
-                return this.equippedWeaponId === id || this.equippedAttachmentId === id;
+                return this.equippedWeaponId === id || this.equippedAttachments.includes(id);
             }
-            
-            
+
+            /** The first equipped attachment (older saves and callers knew only one); setting it equips just that one */
+            get equippedAttachmentId() { return this.equippedAttachments[0] || null; }
+            set equippedAttachmentId(id) { this.equippedAttachments = id ? [id] : []; }
+
             getEquippedAttachment() {
                 return this.equippedAttachmentId ? this.items.find(i => i.id === this.equippedAttachmentId) : null;
             }
+
+            /** The equipped attachments, as items */
+            getEquippedAttachments() {
+                return this.equippedAttachments.map(id => this.items.find(i => i.id === id)).filter(Boolean);
+            }
+
+            /** Is an attachment with this effect equipped? ('laser_sight', 'mirror_blade', 'blood_muzzle') */
+            hasAttachment(effect) {
+                return this.equippedAttachments.some(id => this.items.find(i => i.id === id)?.effect === effect);
+            }
         
             addItem(item) {
-                if (this.items.length >= this.capacity) {
+                // Attachments ride in their own case: craft as many as you like (two are worn at a time);
+                // the capacity counts everything else
+                if (item.type !== 'attachment' && this.items.filter(i => i.type !== 'attachment').length >= this.capacity) {
                     showMessage("INVENTORY FULL");
                     return false;
                 }
@@ -571,7 +619,7 @@
                             // Read current state at the time of the action.
                             if (!this.items.includes(entry.item)) return;
                             if (config.slot) {
-                                if (this.isItemEquipped(entry.id)) this.unequipSlot(config.slot);
+                                if (this.isItemEquipped(entry.id)) this.unequipSlot(config.slot, entry.id);
                                 else this.equipItem(entry.id);
                             } else if (config.consumable) {
                                 if (entry.item.action) entry.item.action(entry.item);

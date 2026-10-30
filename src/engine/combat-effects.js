@@ -448,15 +448,16 @@
                 if (!this.player.visible && !this.isDriving) return;
                 if (this.paused) return;
                 if (this.furniture && this.furniture.busy()) return;   // her hands are on the furniture
-                if (!this.currentWeapon && this.weaponMode !== 'none') return;
+                if (!this.currentWeapon && this.weaponMode !== 'none' && this.weaponMode !== 'fists') return;
                 // Fists or a blade at an unaware back: the strike is an execution (engine/executions.js)
-                if ((this.weaponMode === 'none' || this.weaponMode === 'melee') && this._execTarget && !this.isDriving) { this.execute(this._execTarget); return; }
+                if ((this.weaponMode === 'none' || this.weaponMode === 'fists' || this.weaponMode === 'melee') && this._execTarget && !this.isDriving) { this.execute(this._execTarget); return; }
                 this.shotsFired = (this.shotsFired || 0) + 1;             // (a finisher steps aside when she fires again)
                 if (this.weaponMode === 'melee') { if (!this.isDriving) this.meleeSlash(); return; }   // a blade (engine/status-effects.js)
+                if (this.weaponMode === 'fists') { this.knucklePunch(); return; }                       // Golden Retribution (engine/knuckles.js)
             
                 // --- MELEE / PUNCH LOGIC (Unchanged) ---
                 if (this.weaponMode === 'none') {
-                    this.shootCooldown = CONFIG.PUNCH.DURATION_TICKS;
+                    this.shootCooldown = this._punchDur = CONFIG.PUNCH.DURATION_TICKS;
                     // Toggle Punch Side
                     this.player.punchSide = (this.player.punchSide === 'right') ? 'left' : 'right';
                     const punchAngle = this.player.angle;
@@ -472,7 +473,7 @@
                         isEnemy: false, 
                         owner: this.player, 
                         color: 'rgba(0,0,0,0)', // Invisible hitbox
-                        radius: 15, speed: 10, life: 5, damage: Math.round(this.resonance.stat('punchDamage', 15) * punchCrit), mass: 50,
+                        radius: 15, speed: 10, life: 5, damage: Math.round(this.resonance.stat('punchDamage', 15) * punchCrit * this.playerDamageMult()), mass: 50,
                         melee: true
                     }));
                     this.projectiles[this.projectiles.length - 1].crit = punchCrit > 1;
@@ -508,7 +509,11 @@
                 let shotDamage = this.resonance.stat('gunDamage', stats.damage || 35);
                 if (_gameTimeSec - this.flitState.lastFlitAt <= this.resonance.stat('flitStrikeWindow', 1)) shotDamage *= 1 + 0.2 * this.resonance.rank('flit_strike');
                 if (this._drawnAt !== undefined && _gameTimeSec - this._drawnAt <= 0.8 && !this._drawShotUsed) { shotDamage *= 1 + 0.25 * this.resonance.rank('quick_draw'); this._drawShotUsed = true; }
+                shotDamage *= this.gunDamageMult();                      // the Bloodthirsty Muzzle, the Mirrored Glass (engine/status-effects.js)
                 const shotCrit = this.rollCrit(stats);                   // a critical hit (engine/combat-fx.js)
+                // A Golden Child orb burns with the shot: its every boost (Hollow Points, Flit-Strike, Quick-Draw, the
+                // Muzzle and the Glass) and its crit, snapshot now
+                const shotBoost = shotDamage * shotCrit / (stats.damage || 35);
                 shotDamage = Math.round(shotDamage * shotCrit);
                 const shotLife   = stats.projectileLife || 60;
                 const isPenetrating = stats.penetrating || false;
@@ -537,11 +542,12 @@
                     
                     // Sticky DOT (Golden Child)
                     sticky: stats.sticky || false,
-                    dotDamage: stats.dotDamage || 5,
+                    dotDamage: Math.round((stats.dotDamage || 5) * shotBoost),
                     dotTicks: stats.dotTicks || 12,
                     dotInterval: stats.dotInterval || 10
                 }));
                 this.projectiles[this.projectiles.length - 1].crit = shotCrit > 1;
+                this.projectiles[this.projectiles.length - 1].maxOrbs = stats.maxOrbs || 4;
             
                 // Gunfire carries: gangers in earshot come to look (engine/noise.js)
                 { const N = CONFIG.NOISE, id = (this.currentWeapon && this.currentWeapon.id) || '';

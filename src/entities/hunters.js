@@ -67,6 +67,7 @@
                 seen.isHidden = false; seen.visibility = Math.max(player.visibility ?? 0, 0.55);
                 let res = super.update(seen, walls, buildings, markers, traffic, map, enemies);
                 if (this.dead || typeof game === 'undefined') return res;
+                if (this._staggerUntil && _gameTimeSec < this._staggerUntil) return null;   // staggered (a haymaker, a spill): no dash, no claw
                 const g = game, dx = player.x - this.x, dy = player.y - this.y, d = Math.hypot(dx, dy);
                 this.dashCD--; this.clawCD--;
                 const engaged = this.state === 'ALERT' || this.state === 'SUPPRESSING';
@@ -160,6 +161,7 @@
                 // She hunts by sound: lose her and she goes still, listening, then she's gone to the noise
                 let res = super.update(player, walls, buildings, markers, traffic, map, enemies);
                 if (this.dead || typeof game === 'undefined') return res;
+                if (this._staggerUntil && _gameTimeSec < this._staggerUntil) return null;   // staggered: no whip
                 const dx = player.x - this.x, dy = player.y - this.y, d = Math.hypot(dx, dy);
                 this.whipCD--;
                 if ((this.state === 'ALERT' || this.state === 'SUPPRESSING') && this.whipCD <= 0 && d > 55 && d < 120 && !isLineBlocked(this.x, this.y, player.x, player.y, walls, buildings)) {

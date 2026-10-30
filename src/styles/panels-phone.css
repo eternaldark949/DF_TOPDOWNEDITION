@@ -131,6 +131,9 @@
             text-align: right;
             transition: color 0.2s ease;
             margin-top: 14px;
+            /* stays in view at the panel's foot however far the settings are scrolled */
+            position: sticky; bottom: 0; z-index: 2;
+            background: rgb(10, 2, 8); box-shadow: 0 -10px 10px -6px rgb(10, 2, 8);
         }
         .settings-back-btn:hover {
             color: #fff;
@@ -259,6 +262,9 @@
             z-index: 30; pointer-events: auto; cursor: pointer; user-select: none; -webkit-user-select: none;
             touch-action: none; backdrop-filter: blur(2px); transition: transform 0.08s, background 0.08s, box-shadow 0.08s;
         }
+        /* At the wheel (#game-ui.driving, engine/update.js) Flit goes, and the handbrake sits where it was, centred on it */
+        #game-ui.driving #btn-flit { display: none !important; }
+        #game-ui.driving #btn-handbrake { bottom: 146px; right: 141px; }
         #btn-handbrake.held {
             transform: scale(0.93); background: rgba(217, 191, 134, 0.28);
             box-shadow: 0 0 16px rgba(217, 191, 134, 0.55), inset 0 0 12px rgba(217, 191, 134, 0.35); color: #fff4d8;

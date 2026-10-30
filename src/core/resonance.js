@@ -23,6 +23,7 @@
             USUAL_HP: { Ganger: 40, Drone: 60, GatlingGunner: 200 },
             FLIT_KILL: 1.5, PUNCH: 1.4, CHAIN_STEP: 0.25, CHAIN_MAX: 2, UNTOUCHED: 1.3,
             FLIT_WINDOW: 1.0, CHAIN_WINDOW: 2.5, UNTOUCHED_SECS: 20, TEAMMATE_SHARE: 0.3,
+            POISE: 1.25, POISE_LEVEL: 0.75,                     // a kill with her glass still three-quarters full (engine/spills.js)
         };
 
         const RESONANCE_TREES = [
@@ -40,10 +41,10 @@
                 { id: 'stim_potency', name: 'Stim Potency', desc: r => `Stims heal +${15 * r}` },
                 { id: 'idle_mend',    name: 'Idle Mend',    desc: r => `Regen starts ${2 * r} s sooner, +${r} HP/s` },
                 { id: 'last_stand',   name: 'Last Stand',   desc: r => `Survive a lethal hit at 1 HP (every ${[0, 120, 90, 60][r]} s)` },
-                { id: 'grounded',     name: 'Grounded',     unlockLevel: 30, desc: r => `−${15 * r}% knockback from damage` },
+                { id: 'grounded',     name: 'Grounded',     unlockLevel: 30, desc: r => `−${15 * r}% knockback from damage; gangers who step in your spills slip for ${(0.4 + 0.2 * r).toFixed(1)} s` },
             ] },
             { id: 'arms', name: 'Arms', color: '#e8c27a', blurb: 'Steadier hands, heavier hits.', nodes: [
-                { id: 'steady',       name: 'Steady',       desc: r => `−${12 * r}% spread` },
+                { id: 'steady',       name: 'Steady',       desc: r => `−${12 * r}% spread, −${15 * r}% drink spilt` },
                 { id: 'quick_hands',  name: 'Quick Hands',  desc: r => `−${8 * r}% time between shots` },
                 { id: 'hollow_points',name: 'Hollow Points',desc: r => `+${8 * r}% gun damage` },
                 { id: 'heavy_hands',  name: 'Heavy Hands',  desc: r => `+${25 * r}% punch damage and knockback` },
@@ -77,6 +78,8 @@
                     case 'regenDelay':     return Math.max(60, base - 120 * r('idle_mend'));   // frames
                     case 'regenAmount':    return base + r('idle_mend');                        // HP per second
                     case 'spread':         return base * (1 - 0.12 * r('steady'));
+                    case 'spill':          return base * (1 - 0.15 * r('steady'));             // engine/spills.js
+                    case 'slipSecs':       return r('grounded') ? base + 0.2 * r('grounded') : 0;
                     case 'fireCooldown':   return base * (1 - 0.08 * r('quick_hands'));
                     case 'gunDamage':      return base * (1 + 0.08 * r('hollow_points'));
                     case 'gunNoise':       return base * (1 - 0.10 * r('low_signature'));
@@ -109,6 +112,7 @@
                 this.chain.t = ctx.now;
                 if (this.chain.n > 0) { m *= Math.min(R.CHAIN_MAX, 1 + R.CHAIN_STEP * this.chain.n); tags.push('CHAIN ×' + (this.chain.n + 1)); }
                 if (ctx.now - ctx.lastHurtAt >= R.UNTOUCHED_SECS) { m *= R.UNTOUCHED; tags.push('UNTOUCHED'); }
+                if (ctx.drinkLevel >= R.POISE_LEVEL) { m *= R.POISE; tags.push('POISE'); }
                 return { amount: Math.round(base * m), tags };
             }
 

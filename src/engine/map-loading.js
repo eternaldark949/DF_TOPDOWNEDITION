@@ -958,6 +958,7 @@ engineMixin({
                         const P = parkLayout(b);
                         for (const t of P.trees) mapData.foliage.push(new Foliage(t.x, t.y, t.type, t.size));
                         for (const l of P.lamps) mapData.lamps.push(new LampEntity({ x: l.x, y: l.y, lampType: 1, color: '#ffd9a8', lightRadius: 170 }));
+                        (mapData.pools || (mapData.pools = [])).push({ x: P.cx, y: P.cy, r: P.pondR, park: P.name });   // its moon pool, wadeable (engine/pools.js)
                     }
                     console.log(`Generated ${mapData.foliage.length} foliage elements (including glowing trees)`);
                     
@@ -1281,6 +1282,7 @@ engineMixin({
                 // -------------------------------------------------------
 
                 this.props = this.activeMap.props || [];
+                this.ensureDyeStation();                                // crafted: the Clothing Dyer stands in her bedroom (engine/dyer.js)
                 if (this.furniture) this.furniture.onMapLoaded(this);   // the apartment's layout as she left it (engine/furniture.js)
                 this.npcs = this.activeMap.npcs || [];
                 this.lamps = this.activeMap.lamps || [];
@@ -1295,7 +1297,7 @@ engineMixin({
                     this.roomSystem.tagLamps(this.lamps);
                 } 
                 
-                this.decals.clear(); 
+                this.decals.clear(); this.spills = [];
                 this.corpses = [];
                 
                 // Deactivate current map entities (non-target maps have empty arrays from lazy creation)

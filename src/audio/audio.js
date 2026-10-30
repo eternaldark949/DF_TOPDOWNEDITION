@@ -709,16 +709,40 @@
                 const g = ctx.createGain(); src.connect(bf); bf.connect(g); g.connect(this.foley);
                 g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(0.22, now + 0.05); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.17);
                 src.start(now, _sndRand() * 2.5, 0.2);
-                if (hit) {                                                    // the cut: a wet thud and a bright ring off the blade
-                    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700;
-                    const s2 = ctx.createBufferSource(); s2.buffer = this.brown; const g2 = ctx.createGain();
-                    s2.connect(lp); lp.connect(g2); g2.connect(this.foley);
-                    g2.gain.setValueAtTime(0.0001, now + 0.05); g2.gain.exponentialRampToValueAtTime(0.3, now + 0.06); g2.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
-                    s2.start(now + 0.05, _sndRand() * 2.5, 0.15);
-                    const o = ctx.createOscillator(), g3 = ctx.createGain(); o.type = 'sine';
-                    o.frequency.setValueAtTime(3400, now + 0.05); o.frequency.exponentialRampToValueAtTime(3100, now + 0.4);
-                    o.connect(g3); g3.connect(this.foley); softStart(g3.gain, now + 0.05, 0.025); g3.gain.exponentialRampToValueAtTime(0.0001, now + 0.4);
-                    o.start(now + 0.05); o.stop(now + 0.42);
+                if (hit) this.cut(0.05);
+            }
+
+            /** The cut: a wet thud and a bright ring off the blade, `delay` seconds from now */
+            cut(delay = 0) {
+                if (!this.ready) return;
+                const ctx = this.audio.ctx, t = ctx.currentTime + delay;
+                if (!this.foley) { this.foley = ctx.createGain(); this.foley.gain.value = 0.9; this.foley.connect(this.audio.masterGain); }
+                const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700;
+                const s2 = ctx.createBufferSource(); s2.buffer = this.brown; const g2 = ctx.createGain();
+                s2.connect(lp); lp.connect(g2); g2.connect(this.foley);
+                g2.gain.setValueAtTime(0.0001, t); g2.gain.exponentialRampToValueAtTime(0.3, t + 0.01); g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.11);
+                s2.start(t, _sndRand() * 2.5, 0.15);
+                const o = ctx.createOscillator(), g3 = ctx.createGain(); o.type = 'sine';
+                o.frequency.setValueAtTime(3400, t); o.frequency.exponentialRampToValueAtTime(3100, t + 0.35);
+                o.connect(g3); g3.connect(this.foley); softStart(g3.gain, t, 0.025); g3.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+                o.start(t); o.stop(t + 0.37);
+            }
+
+            /** Brass on bone: a knuckle-duster's haymaker lands — a dull knock and two bright metal partials */
+            clink() {
+                if (!this.ready) return;
+                const ctx = this.audio.ctx, t = ctx.currentTime;
+                if (!this.foley) { this.foley = ctx.createGain(); this.foley.gain.value = 0.9; this.foley.connect(this.audio.masterGain); }
+                const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 500;
+                const s2 = ctx.createBufferSource(); s2.buffer = this.brown; const g2 = ctx.createGain();
+                s2.connect(lp); lp.connect(g2); g2.connect(this.foley);
+                g2.gain.setValueAtTime(0.0001, t); g2.gain.exponentialRampToValueAtTime(0.34, t + 0.008); g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+                s2.start(t, _sndRand() * 2.5, 0.15);
+                for (const [f, v, d] of [[2350, 0.07, 0.42], [3920, 0.04, 0.3]]) {
+                    const o = ctx.createOscillator(), g3 = ctx.createGain(); o.type = 'triangle';
+                    o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 0.985, t + d);
+                    o.connect(g3); g3.connect(this.foley); softStart(g3.gain, t, v); g3.gain.exponentialRampToValueAtTime(0.0001, t + d);
+                    o.start(t); o.stop(t + d + 0.02);
                 }
             }
 

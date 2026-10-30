@@ -6,11 +6,21 @@ engineMixin({
     },
     getPlayerShotGeometry() {
         const p = this.player, angle = this.clampPlayerFireAngle(p.angle);
-        if (this.isDriving && this.car) {
-            return this.car.occupantShot(0, angle, this.player._vehicleLean || 0, this.currentWeapon?.id);
+        const driving = this.isDriving && this.car, ap = p._aimPoint;
+        const shot = driving ? this.car.occupantShot(0, angle, p._vehicleLean || 0, this.currentWeapon?.id)
+            : aimFromMuzzle(p, angle, ap?.x, ap?.y, p._muzzleLocal || { x: 15, y: 5 });
+        const origin = driving ? this.car.getSeatWorldPos(0) : p;
+        // A long barrel can also poke past a close enemy or prop. Start before that
+        // obstruction, just as the wall guard does, instead of spawning beyond it.
+        const barrel = { lastX: origin.x, lastY: origin.y, x: shot.x, y: shot.y, radius: 5 };
+        for (const list of [this.enemies, GameEntity.getByLayer('DYNAMIC')]) for (const target of list) {
+            if (target.dead || target.active === false || target.hasCollision === false || target.markedForDestroy) continue;
+            if (CollisionSystem.projectileHitTime(barrel, target) !== null) {
+                return driving ? { x: origin.x, y: origin.y, angle: shot.angle }
+                    : aimFromMuzzle(p, angle, ap?.x, ap?.y, { x: 0, y: 0 });
+            }
         }
-        const ap = p._aimPoint;
-        return aimFromMuzzle(p, angle, ap?.x, ap?.y, p._muzzleLocal || { x: 15, y: 5 });
+        return shot;
     },
     /** Returns whether aim was supplied, so walking can otherwise face movement. */
     updatePlayerFireInput() {
