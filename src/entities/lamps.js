@@ -324,44 +324,32 @@
                     }
                     _fxBrass(c, 0, 0, 2); c.fillStyle = FX_BRONZE; c.beginPath(); c.arc(0, 0, 0.8, 0, Math.PI * 2); c.fill();
                 } },
-            // ETERNAL's twin sconce: two opal glass cylinders, one up and one down, on a round brushed-brass plate.
-            // Drawn face-on, laid along its wall (angle 0: up the screen, a west or east wall; π/2 for a north or south one).
-            twin_sconce: { box: [-11, -20, 22, 40], halo: 30,
+            // ETERNAL's twin sconce from above: the round brass plate seen edge-on against the wall, the collar standing
+            // out from it, and the open top of the upper opal cylinder with its bulb's dome inside (the lower one is hidden
+            // beneath). The wall runs along y at x = 0, the room towards +x (angle 0: a west wall, π east, π/2 north, -π/2 south).
+            twin_sconce: { box: [-4, -12, 16, 24], halo: 26,
                 paint(c, lit, color) {
-                    _fxShadow(c, 0, 0, 9);
-                    const g = c.createLinearGradient(-8, -8, 8, 8);                // the brushed brass plate
-                    g.addColorStop(0, '#e8cf94'); g.addColorStop(0.45, '#c09a5a'); g.addColorStop(1, '#7d5c2a');
-                    c.fillStyle = g; c.beginPath(); c.arc(0, 0, 8.6, 0, Math.PI * 2); c.fill();
-                    c.strokeStyle = 'rgba(255, 240, 200, 0.18)'; c.lineWidth = 0.35;
-                    for (let r = 2.5; r < 8.4; r += 1.1) { c.beginPath(); c.arc(0, 0, r, Math.PI * 1.1, Math.PI * 1.5); c.stroke(); }
-                    c.strokeStyle = 'rgba(60, 40, 15, 0.55)'; c.lineWidth = 0.5; c.beginPath(); c.arc(0, 0, 8.6, 0, Math.PI * 2); c.stroke();
-                    c.fillStyle = FX_BRASS[0]; for (const s of [-1, 1]) { c.beginPath(); c.arc(s * 8.6, 2.6, 0.55, 0, Math.PI * 2); c.fill(); }   // its screws
-                    const W = 4.4;
-                    for (const s of [-1, 1]) {
-                        // the bulb's dome, peeping out of the open end
-                        c.fillStyle = lit ? '#ffffff' : '#ddd6cb';
-                        c.beginPath(); c.ellipse(0, s * 16.4, W * 0.72, 2.3, 0, s < 0 ? Math.PI : 0, s < 0 ? Math.PI * 2 : Math.PI); c.fill();
-                        // the opal glass: a straight tube from the open end, round where it meets the collar
-                        const gl = c.createLinearGradient(-W, 0, W, 0);
-                        if (lit) {
-                            gl.addColorStop(0, _fxShade(color, 0.72)); gl.addColorStop(0.32, _lampTint(color, 0.4)); gl.addColorStop(0.62, _fxShade(color, 0.92));
-                            gl.addColorStop(1, _fxShade(color, 0.6));
-                        } else { gl.addColorStop(0, '#f1ece4'); gl.addColorStop(0.35, '#fbf8f3'); gl.addColorStop(1, '#bfb7ab'); }
-                        c.fillStyle = gl; c.beginPath();
-                        c.moveTo(-W, s * 16.4); c.lineTo(-W, s * (1.6 + W)); c.arc(0, s * (1.6 + W), W, Math.PI, 0, s < 0);
-                        c.lineTo(W, s * 16.4); c.closePath(); c.fill();
-                        if (lit) {                                                // warmest down by the collar, as in the photo
-                            const w = c.createLinearGradient(0, s * 1.6, 0, s * 16.4);
-                            w.addColorStop(0, `rgba(255, 170, 70, 0.45)`); w.addColorStop(0.5, 'rgba(255, 200, 120, 0.12)'); w.addColorStop(1, 'rgba(255, 255, 255, 0)');
-                            c.fillStyle = w; c.fill();
-                        }
-                        c.strokeStyle = lit ? 'rgba(255, 255, 255, 0.5)' : 'rgba(150, 140, 125, 0.6)'; c.lineWidth = 0.35; c.stroke();
-                        c.strokeStyle = lit ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.55)'; c.lineWidth = 0.4;   // the rim of the open end
-                        c.beginPath(); c.moveTo(-W, s * 16.4); c.lineTo(W, s * 16.4); c.stroke();
-                    }
-                    const cg = c.createLinearGradient(-1.7, 0, 1.7, 0);            // the brass collar between them
-                    cg.addColorStop(0, FX_BRASS[2]); cg.addColorStop(0.4, FX_BRASS[0]); cg.addColorStop(1, FX_BRASS[2]);
-                    c.fillStyle = cg; c.fillRect(-1.7, -1.8, 3.4, 3.6);
+                    const X = 6.4, R = 4.6;                                            // the cylinder: its centre out from the wall, its radius
+                    c.fillStyle = 'rgba(0, 0, 0, 0.26)'; c.beginPath(); c.ellipse(X + 1.4, 1.8, R + 0.4, R + 0.3, 0, 0, Math.PI * 2); c.fill();
+                    const p = c.createLinearGradient(-1.4, 0, 1.6, 0);                   // the plate, edge-on
+                    p.addColorStop(0, '#7d5c2a'); p.addColorStop(0.5, '#e8cf94'); p.addColorStop(1, '#a3803f');
+                    c.fillStyle = p; c.beginPath(); c.roundRect(-1.4, -9, 3, 18, 1.2); c.fill();
+                    c.fillStyle = FX_BRASS[0]; for (const s of [-1, 1]) { c.beginPath(); c.arc(0.1, s * 7.6, 0.45, 0, Math.PI * 2); c.fill(); }   // its screws
+                    const cg = c.createLinearGradient(0, -1.6, 0, 1.6);                  // the collar out to the glass
+                    cg.addColorStop(0, FX_BRASS[0]); cg.addColorStop(0.5, FX_BRASS[1]); cg.addColorStop(1, FX_BRASS[2]);
+                    c.fillStyle = cg; c.fillRect(1.4, -1.6, X - R + 0.4, 3.2);
+                    // the opal glass: a ring seen end-on, lit through its frosting
+                    const g = c.createRadialGradient(X, 0, R * 0.55, X, 0, R);
+                    if (lit) { g.addColorStop(0, _lampTint(color, 0.45)); g.addColorStop(0.6, _fxShade(color, 0.95)); g.addColorStop(1, _fxShade(color, 0.62)); }
+                    else { g.addColorStop(0, '#fbf8f3'); g.addColorStop(0.7, '#e6e0d6'); g.addColorStop(1, '#b8b0a4'); }
+                    c.fillStyle = g; c.beginPath(); c.arc(X, 0, R, 0, Math.PI * 2); c.fill();
+                    c.strokeStyle = lit ? 'rgba(255, 255, 255, 0.55)' : 'rgba(150, 140, 125, 0.6)'; c.lineWidth = 0.4; c.stroke();
+                    // the bulb's dome inside the open end
+                    const b = c.createRadialGradient(X - 0.7, -0.8, 0, X, 0, R * 0.62);
+                    if (lit) { b.addColorStop(0, '#ffffff'); b.addColorStop(0.6, '#fff6e2'); b.addColorStop(1, _lampTint(color, 0.5)); }
+                    else { b.addColorStop(0, '#f2eee8'); b.addColorStop(1, '#c9c2b6'); }
+                    c.fillStyle = b; c.beginPath(); c.arc(X, 0, R * 0.62, 0, Math.PI * 2); c.fill();
+                    c.strokeStyle = lit ? 'rgba(200, 120, 50, 0.35)' : 'rgba(120, 110, 95, 0.4)'; c.lineWidth = 0.35; c.stroke();
                 } },
             // A frosted alabaster dome on a brass ring, etched with petals (lampType 3's default: ceilings and doorways)
             dome: { box: [-10, -10, 22, 22], halo: 28,

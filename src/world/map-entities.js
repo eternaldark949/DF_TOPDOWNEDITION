@@ -139,7 +139,7 @@
                         new LampEntity({ x: 16, y: 800, lampType: 5, fixture: 'twin_sconce', color: '#ffbb88', lightRadius: 450, angle: 0 }),
                         new LampEntity({ x: 450, y: 214, lampType: 5, fixture: 'twin_sconce', color: '#ffccaa', lightRadius: 500, angle: Math.PI / 2 }),
                         new LampEntity({ x: 750, y: 214, lampType: 5, fixture: 'twin_sconce', color: '#ffccaa', lightRadius: 500, angle: Math.PI / 2 }),
-                        new LampEntity({ x: 450, y: 884, lampType: 5, fixture: 'twin_sconce', color: '#ff9977', lightRadius: 400, angle: Math.PI / 2 }),
+                        new LampEntity({ x: 450, y: 884, lampType: 5, fixture: 'twin_sconce', color: '#ff9977', lightRadius: 400, angle: -Math.PI / 2 }),
                         hiddenLamp(307, 439, '#ff8866', 500),   // light only: the floor lamps and the bar's pendants paint themselves (drawApartmentDecorProp)
                         hiddenLamp(700, 700, '#ffaa88', 450),
                         hiddenLamp(109, 463, '#ffbb99', 400),
@@ -150,10 +150,10 @@
                         new LampEntity({ x: 1100, y: 400, lampType: 4, fixture: 'shade_rose', color: '#ff99bb', lightRadius: 400 }),
                         new LampEntity({ x: 1250, y: 562, lampType: 5, fixture: 'twin_sconce', color: '#e8e4f0', lightRadius: 300, angle: Math.PI / 2 }),   // clear of the bathroom door
                         new LampEntity({ x: 1384, y: 700, lampType: 5, fixture: 'twin_sconce', color: '#e8e4f0', lightRadius: 320, angle: Math.PI }),
-                        new LampEntity({ x: 1027, y: 884, lampType: 5, fixture: 'twin_sconce', color: '#ffe0cc', lightRadius: 260, angle: Math.PI / 2 }),   // vanity mirror light
+                        new LampEntity({ x: 1027, y: 884, lampType: 5, fixture: 'twin_sconce', color: '#ffe0cc', lightRadius: 260, angle: -Math.PI / 2 }),   // vanity mirror light
                         new LampEntity({ x: 916, y: 770, lampType: 5, fixture: 'twin_sconce', color: '#ffe8dc', lightRadius: 320, angle: 0 }),   // bathroom west wall, by the towels
-                        new LampEntity({ x: 600, y: 884, lampType: 5, fixture: 'twin_sconce', color: '#ffaa55', lightRadius: 300, angle: Math.PI / 2 }),   // beside the exit, not in it
-                        new LampEntity({ x: 800, y: 884, lampType: 5, fixture: 'twin_sconce', color: '#ffaa55', lightRadius: 300, angle: Math.PI / 2 }),
+                        new LampEntity({ x: 600, y: 884, lampType: 5, fixture: 'twin_sconce', color: '#ffaa55', lightRadius: 300, angle: -Math.PI / 2 }),   // beside the exit, not in it
+                        new LampEntity({ x: 800, y: 884, lampType: 5, fixture: 'twin_sconce', color: '#ffaa55', lightRadius: 300, angle: -Math.PI / 2 }),
                     ];
                     // Shadowless soft lights: the light the decor casts on the floor around it.
                     // Round ones take a radius; area lights take w, h (optional `round` = corner size, `soft` = gentler edge).
@@ -689,7 +689,7 @@
                         hiddenLamp(640, 590, '#dfcbd1', 400),
                         // Practical brass wall lights, matching the perimeter's incandescent trim.
                         ...[[81,180],[819,180],[81,650],[819,650]].map(([x,y]) =>
-                            new LampEntity({x,y,lampType:3,fixture:'twin_sconce',color:'#e8b989',lightRadius:190})),
+                            new LampEntity({x,y,lampType:3,fixture:'twin_sconce',angle:x>450?Math.PI:0,color:'#e8b989',lightRadius:190})),
                         hiddenLamp(450, 810, '#f6d4a2', 190)
                     ];
                     break;
