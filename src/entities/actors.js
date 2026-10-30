@@ -98,8 +98,11 @@
             takeDamage(amount, knockbackX = 0, knockbackY = 0, opts = null) {
                 // A bullet always lands: i-frames guard against a swing or a bump hitting twice, not against rapid fire
                 // (a fast gun used to lose ~4 of every 5 bullets to them). Bullets don't start i-frames either.
-                const shot = !!(opts && opts.shot);
-                if (this.dead || (this.invincibleTimer > 0 && !(opts && (opts.type === 'bleed' || shot)))) return false;
+                // Nor do punches (their hitbox is consumed on contact), a blade's cuts (each swing cuts a body once), bleed ticks or
+                // a Golden Child orb's burn ticks (a tick used to start them, and the next cut or orb inside them was lost).
+                const shot = !!(opts && (opts.shot || opts.cut || opts.punch));
+                const bleed = !!(opts && (opts.type === 'bleed' || opts.type === 'burn'));
+                if (this.dead || (this.invincibleTimer > 0 && !(bleed || shot))) return false;
                 
                 this.hp -= amount;
                 // Damage number, health bar, blood, flinch (engine/combat-fx.js); opts.type: the kind of damage
@@ -112,7 +115,7 @@
                 }
                 
                 // Trigger invincibility frames
-                if (this.invincibleDuration > 0 && !shot) {
+                if (this.invincibleDuration > 0 && !shot && !bleed) {
                     this.invincibleTimer = this.invincibleDuration;
                 }
                 
@@ -436,7 +439,7 @@
             applyMovement(dx, dy) {
                 if (!this.visible) return;
                 
-                const speed = this.getCurrentSpeed() * (this.moveMul ?? 1) * (this._game && this._game.sneaking ? SNEAK.SPEED : 1);   // (moveMul: slowed, e.g. moving furniture; sneaking: engine/sneak.js)
+                const speed = this.getCurrentSpeed() * (this.moveMul ?? 1) * (this._game && this._game.sneaking ? SNEAK.SPEED : 1) * (this._game && this._game.wadeMul ? this._game.wadeMul(this) : 1);   // (wading: a park's pool, engine/pools.js)   // (moveMul: slowed, e.g. moving furniture; sneaking: engine/sneak.js)
                 gaitCommand(this, dx * speed, dy * speed);
                 this.x += dx * speed;
                 this.y += dy * speed;
@@ -451,6 +454,7 @@
                     return false;
                 }
                 const g = this._game;
+                if (g && g.swingGuard) amount = g.swingGuard(amount);             // mid-swing, a blade takes the edge off (engine/status-effects.js)
                 let lastStood = false;
                 if (g && g.resonance && !(this.invincibleTimer > 0) && !this.dead) {
                     amount = g.resonance.stat('damageTaken', amount);                 // Frame: Plating
@@ -470,6 +474,7 @@
                 if (lastStood) this.invincibleTimer = 60;                 // a moment's grace after Last Stand
                 
                 if (damaged && this._game) {
+                    if (this._game.spillOnHit) this._game.spillOnHit(amount, knockbackX, knockbackY);   // a hit slops her drink (engine/spills.js)
                     // Sync with legacy health system
                     this._game.playerHealth = this.hp;
                     this._game.healthRegenTimer = 0;
@@ -794,6 +799,8 @@
                 this.dotTicks = config.dotTicks || 12;
                 this.dotInterval = config.dotInterval || 10;
                 this.spawnTime = _gameTimeMs();                     // game time: a pause doesn't age it
+                this.lastX = this.lastY = undefined;
+                this._projectileCollisionTick = -1; this._doorHits = null;
                 this.fxTrail = null; this.trail = null; this._wispN = 0;
                 this._fireTrailStarted = false; this._fireTrailGap = 0;
             }
@@ -887,7 +894,7 @@
              * @param {GameEntity} target - The entity that was hit
              * @param {GameEngine} game - Reference to the game engine
              */
-            onHit(target, game) {
+            onHit(target, game, applyImpulse = true) {
                 if (!game) return;
                 
                 // Use current position (at impact) for effects
@@ -905,6 +912,7 @@
                     let shakeAmt = 0;
                     if (this.isFireball) shakeAmt = 12;
                     else if (this.isEnemy) shakeAmt = 8;
+                    else if (this.isSniper) shakeAmt = 15;
                     else shakeAmt = 4;
                     
                     // Falloff based on distance (shake less if far away)
@@ -921,7 +929,7 @@
                 }
                 
                 // Handle specific target types with mass-based impulse
-                if (target) {
+                if (target && applyImpulse) {
                     // If hit a DYNAMIC entity (prop), apply damage-scaled impulse
                     if (target.collisionLayer === GameEntity.LAYER.DYNAMIC) {
                         if (target.vx !== undefined) {
@@ -984,7 +992,7 @@
                 }
             }
             
-            update(dt = 1) {
+            update(dt = 1, deferExpiry = false) {
                 // SAVE PREVIOUS POSITION
                 this.lastX = this.x;
                 this.lastY = this.y;
@@ -997,7 +1005,8 @@
                     const T = this.trail; T.push(this.x, this.y); if (T.length > 16) T.splice(0, 2);
                     if (this.fxTrail.trail === 'wisp' && (this._wispN = (this._wispN || 0) + 1) % 2 === 0 && typeof game !== 'undefined') game.spawnWisp(this.x, this.y, this.fxTrail);
                 }
-                if (this.life <= 0) {
+                // The engine resolves the final traveled segment before expiring the shot.
+                if (this.life <= 0 && !deferExpiry) {
                     this.vx = 0;
                     this.vy = 0;
                     this.destroy();

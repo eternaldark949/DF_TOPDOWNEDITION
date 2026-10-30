@@ -201,6 +201,7 @@
 
             g.prevX = entity.x; g.prevY = entity.y;
             g.cmdX = 0; g.cmdY = 0;
+            g.driven = false;            // commands count for the ticks they came in; a walk that's over leaves a shove to animate from real motion
             g.tick = _simTick;
             return g;
         }

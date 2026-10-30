@@ -57,7 +57,8 @@
                 const byPlayer = by === this.player, byTeammate = !!(by && by.role === 'teammate');
                 const { amount, tags } = this.resonance.scoreKill(enemy, {
                     byPlayer, byTeammate, melee: !!enemy.lastHitMelee, now: _gameTimeSec,
-                    lastFlitAt: this.flitState.lastFlitAt ?? -99, lastHurtAt: this.lastHurtAt ?? -99 });
+                    lastFlitAt: this.flitState.lastFlitAt ?? -99, lastHurtAt: this.lastHurtAt ?? -99,
+                    drinkLevel: this.heldDrink() ? this.cosmetics.drinkLevel : -1 });
                 if (amount > 0) this.earnResonance(amount, tags.join(' '), enemy.x, enemy.y - 26);
                 // Dark Element: rare shards from the toughest foes
                 const tough = (typeof GatlingGunner !== 'undefined' && enemy instanceof GatlingGunner) ? 0.25 : (enemy._restrictedZoneId ? 0.04 : 0);
@@ -85,8 +86,15 @@
                 if (!(amount > 0) || !actor) return;
                 const now = _gameTimeSec, type = opts && opts.type;
                 const texts = this.floatingTexts || (this.floatingTexts = []);
+                if (type === 'burn') {                                   // a Golden Child orb: small amber numbers, gathered, no flinch
+                    const recent = texts.find(t => t.target === actor && t.burn && now - t.t0 < 0.6);
+                    if (recent) { recent.value += amount; recent.t0 = now; }
+                    else { texts.push({ target: actor, x: actor.x, y: actor.y - 8, value: amount, color: '#ffb347', t0: now, pop: now, drift: (Math.random() - 0.5) * 1.6, bleed: true, burn: true }); if (texts.length > 40) texts.shift(); }
+                    actor._hpShowT = now;
+                    return;
+                }
                 if (type === 'bleed') {
-                    const recent = texts.find(t => t.target === actor && t.bleed && now - t.t0 < 0.6);
+                    const recent = texts.find(t => t.target === actor && t.bleed && !t.burn && now - t.t0 < 0.6);
                     if (recent) { recent.value += amount; recent.t0 = now; }
                     else { texts.push({ target: actor, x: actor.x, y: actor.y - 8, value: amount, color: '#ff3a5c', t0: now, pop: now, drift: (Math.random() - 0.5) * 1.6, bleed: true }); if (texts.length > 40) texts.shift(); }
                     actor._hpShowT = now;

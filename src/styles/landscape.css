@@ -27,6 +27,7 @@
         body.landscape #btn-nv, body.landscape #emote-zany { bottom: calc(215px - var(--paw-drop)); }
         body.landscape #btn-flit, body.landscape #emote-cry { bottom: calc(155px - var(--paw-drop)); }
         body.landscape #btn-handbrake { bottom: calc(72px - var(--paw-drop)); }
+        body.landscape #game-ui.driving #btn-handbrake { bottom: calc(146px - var(--paw-drop)); }
         body.landscape #btn-autodrive, body.landscape #btn-zib-skip,
         body.landscape #btn-holster, body.landscape #emote-frown { bottom: calc(210px - var(--paw-drop)); }
         body.landscape #btn-sneak { bottom: calc(232px - var(--paw-drop)); }

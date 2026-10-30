@@ -776,7 +776,7 @@
                     const armed = (this.weaponMode === 'normal' || this.weaponMode === 'sniper') && !this.weaponHolstered;
                     let stance = armed
                         ? (this.currentWeapon ? stanceForWeapon(this.currentWeapon.id) : (this.weaponMode === 'sniper' ? 'sniper' : 'pistol'))
-                        : this.weaponMode === 'none' && this.shootCooldown > 0 ? 'punch' : 'idle';
+                        : (this.weaponMode === 'none' || this.weaponMode === 'fists' && !this.weaponHolstered) && this.shootCooldown > 0 ? 'punch' : 'idle';
                     const pushing = this.furniture && this.furniture.holding;
                     if (pushing) stance = 'idle';
                     let kick = 0;
@@ -793,8 +793,8 @@
                         stance, scopeK: stance === 'sniper' ? (this.scopeK || 0) : 0,
                         isDriving: false, isShootingFromCar: false, carAngle: this.car ? this.car.angle : 0,
                         recoil: stance === 'punch' && this.shootCooldown > 0 ? this.shootCooldown / 10 : 0,
-                        kick, punchTicks: stance === 'punch'
-                            ? Math.max(0, CONFIG.PUNCH.DURATION_TICKS - this.shootCooldown - 1 + RenderInterp.alpha) : undefined,
+                        kick, punchTicks: stance === 'punch' ? this.punchStanceTicks() : undefined,
+                        knuckles: this.weaponMode === 'fists' && !this.weaponHolstered,
                         top: outfit.top, bottom: outfit.bottom, shoes: outfit.shoes, train: outfit.train || null,
                         hat: cosmetic.hat || (rainOn && outfit.top && outfit.top.type === 'hoodie'
                             ? { type: 'hood_up', color: outfit.top.color } : null),

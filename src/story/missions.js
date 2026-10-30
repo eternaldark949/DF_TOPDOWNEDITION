@@ -574,5 +574,52 @@
                 desc: 'Golden orbs that stick to enemies and burn away. Attrition warfare.',
                 scrapCost: 500,
             },
+            {
+                id: 'mirror_blade',
+                name: 'MIRROR BLADE',
+                icon: '◈',
+                desc: 'Polish the edge to a mirror. Bullets your blade meets mid-cut fly back at the shooter.',
+                scrapCost: 200,
+            },
+            {
+                id: 'blood_muzzle',
+                name: 'BLOODTHIRSTY MUZZLE',
+                icon: '♆',
+                desc: 'A crimson muzzle brake. Every bullet hits 75% harder.',
+                scrapCost: 275,
+            },
+            {
+                id: 'crimson_edge',
+                name: 'CRIMSON EDGE',
+                icon: '❖',
+                desc: 'Whet the blade blood-red. Cuts land 50% harder and wounds bleed up to five deep.',
+                scrapCost: 300,
+            },
+            {
+                id: 'golden_retribution',
+                unlock: 'goldenRetributionUnlocked',   // a questState flag: set by Lilitu's first solo defeat (the gauntlet)
+                unlockHint: 'Defeat Lilitu alone in the palace',
+                name: 'GOLDEN RETRIBUTION',
+                icon: '✊',
+                desc: 'Gild a pair of brass knuckles. Fast jabs that can crit; every third punch is a haymaker that staggers, and drives them into walls.',
+                scrapCost: 400,
+            },
+            {
+                id: 'acc_mirror_glass',
+                cosmetic: true,           // a COSMETICS_REGISTRY accessory, not an item: it's worn, and takes no attachment slot
+                requires: 'acc_glass',    // silvered from the Crystal Glass
+                name: 'MIRRORED GLASS',
+                icon: '◎',
+                desc: 'Silver the Crystal Glass. All damage +35%, and it turns up to 90 damage of shots back before it recharges (3 s).',
+                scrapCost: 650,
+            },
+            {
+                id: 'clothing_dyer',
+                furniture: 'hasClothingDyer',   // not carried or worn: it stands in the apartment once made (questState flag; engine/dyer.js)
+                name: 'CLOTHING DYER',
+                icon: '✿',
+                desc: 'Vats, a steamer and a rack of swatches for the bedroom. Recolour any outfit you own, piece by piece.',
+                scrapCost: 1000,
+            },
         ];
 
