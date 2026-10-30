@@ -21,7 +21,7 @@
            overhangs. It leans harder than the street (EC.HERO).
            ===================================================================== */
         const EC = {
-            HERO: 1.6,
+            HERO: 2,
             PLAN: { W: 900, D: 700 },
             STONE: { stone: '#b8698a', stoneMid: '#a85d7e', stoneLo: '#8a4566', stoneDk: '#55223c', stoneHi: '#e6b0c6', stoneLt: '#c97c9c' },
             STEEL: '#15161c', STEEL_HI: '#2b2c35', BRONZE: '#7d5c3c', GOLD: '#d6b277', GOLD_HI: '#f5dfb2', NEON: 'rgba(255, 234, 196, 1)',
@@ -310,6 +310,16 @@
                 if (t.script && this._lkSprites && !this._ecRoofFont && _ecFontReady()) { this._ecRoofFont = true; for (const k of Object.keys(this._lkSprites)) if (k.endsWith('_' + t.i)) delete this._lkSprites[k]; }
                 return super._tkRoof(t, emissive);
             }
+            /** The kit orders groups by the distance to each one's plan, so from out along the street (past an end of the
+                pavilion, nearer the podium than it) the podium and its glass floor drew after the pavilion and the
+                glass roof covered the showroom with the name. Seen from anywhere in front of the podium's middle, the
+                pavilion and what stands on it (and the cypresses) are in front: they draw last. */
+            _tkOrder() {
+                const order = super._tkOrder();
+                if (game.camera.y < this.y + 400) return order;
+                const front = (t) => t.root.id !== 'podium';
+                return order.filter(t => !front(t)).concat(order.filter(front));
+            }
             /** Under the player: the shadows, then the entry steps down to the pavement. */
             drawBase(ctx) {
                 super.drawBase(ctx);
@@ -357,7 +367,6 @@
             }
             b.topReach = 80; b.glowReach = 80;
             b.viewDrift = true;   // out in front of it, the view drifts toward it (engine/draw.js _landmarkDriftTarget)
-            b.driftShift = 0.8;   // further than most: its name is up on the showroom's roof, and the view keeps it in sight from across the street
             return b;
         }
 
