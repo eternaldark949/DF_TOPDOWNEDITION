@@ -32912,7 +32912,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             _leanScale(extraFloors = 0) {
                 const B = CONFIG.BUILDINGS;
                 const h = (Math.min(this.floors, B.MAX_FLOORS) + extraFloors) * B.FLOOR_HEIGHT;
-                return h / (leanCamHeight() - h);          // roof = cam + (p - cam) * (1 + s)
+                return h / (leanCamHeight() - h) * (this.leanHero || 1);          // roof = cam + (p - cam) * (1 + s); leanHero: a building that leans harder than the street
             },
 
             /** Faces the camera can see (outward side toward the camera). */
@@ -36989,7 +36989,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
            look; `variant: '<id>'` asks for one.
            ===================================================================== */
         const STREET_SHOPS = [
-            { id: 'arcade', weight: 18, floors: [4, 5], wall: '#ddd2b8', roof: '#3b4450', material: 'limestone',
+            { id: 'arcade', weight: 18, floors: [7, 8, 9], wall: '#ddd2b8', roof: '#3b4450', material: 'limestone',
               trim: '#f6efdc', frame: '#28241f', mull: '#17181c', glass: '#28241f', ink: '#e9cf8e', glow: 'rgba(255,214,150,.95)',
               awnings: [['#16171b', '#2c2d33'], ['#1d3a2c', '#2e5641'], ['#4a1a1f', '#6c2c32'], ['#1b2236', '#2e3854'], ['#3a2619', '#57402c']],
               neons: ['#ffb45a'],
@@ -37703,7 +37703,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
            STREET ARCADES — the shopping streets in limestone
            ---------------------------------------------------------------------
            The street variant most generic shops take (buildings/street-variants.js,
-           id 'arcade'): a limestone house of four or five storeys, built from a
+           id 'arcade'): a limestone house of seven to nine storeys, built from a
            few shared parts so a row of them reads as one shopping street.
 
              · the arcade: tall arched shopfronts the width of the front, one
@@ -37720,8 +37720,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                and back, chimney stacks on the party walls, a zinc flat;
              · on the pavement: a stone step at each arch, clipped cone
                topiaries in iron planters at the piers.
+           It leans ARCADE.HERO times as hard as the street (leanHero), as the
+           landmarks do, so its front reads from across the street.
            Variation per shop (from its seed): the stone's tone (cream, honey,
-           pearl), the awning colour, four or five storeys, the name.
+           pearl), the awning colour, seven to nine storeys, the name.
 
            Everything is drawn the way the other variants are: the walls are a
            few projected fills a face (_vArcUnder, _vArcFace), the ledges and
@@ -37731,7 +37733,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
            lights are unchanged.
            ===================================================================== */
         const ARCADE = {
-            A: 14,          // the arcade's height: the ground floor's arches stand this tall
+            A: 18,          // the arcade's height: the ground floor's arches stand this tall (a double-height shop floor)
+            HERO: 3.5,      // it leans this many times as hard as the street (the Ashgrove leans 2.1)
             BAY: 32,        // an arch (and the windows over it) every this far along the front
             AW: 20,         // an arch's width
             M: 8,           // the mansard storey
@@ -37750,6 +37753,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 v.tone = ARCADE.TONES[Math.floor(r(6) * ARCADE.TONES.length)];
                 this.colors.wall = v.tone.stone;
                 this.facadeFeature = null;
+                this.leanHero = ARCADE.HERO;                                       // BuildingV2._leanScale
+                this.crownZ = this._vH() * ARCADE.HERO;                             // the render query's reach (perspective at crownZ ≥ the hero lean at the roof)
+            },
+
+            /** Run fn with the landmark kit leaning as hard as this building does (ledges, balconies, awnings, the board) */
+            _vLean(fn) {
+                const h = this.leanHero;
+                return LandmarkKit.using((z) => { const C = leanCamHeight(); return 1 + (C / (C - Math.min(z, C * 0.86)) - 1) * h; }, fn);
             },
 
             /** The bays along the front (frame x of each arch's middle), laid out from the door, and the door's frame x */
@@ -37820,13 +37831,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     return poly(p, pts);
                 };
                 const lit = (i, p) => _bldHash(seed, 520 + i * 7 + f.side.charCodeAt(0) * 3) < p;
-                const hw = 5 / L, glass = new Path2D(), warm = new Path2D(), dorm = new Path2D();
+                const hw = 6.5 / L, glass = new Path2D(), warm = new Path2D(), dorm = new Path2D();
                 if (emissive) {
                     if (front) for (const b of bays) {
                         const a = A.AW / 2 / L;
                         arch(b.door ? warm : glass, b.u, a, R, b.door ? 0.6 : z0);
                     }
-                    bays.forEach((b, i) => storeys.forEach(([s0, s1], j) => { if (lit(i * 5 + j, 0.42)) rect(glass, b.u - hw, b.u + hw, s0 + 1.4, s1 - 1.6); }));
+                    bays.forEach((b, i) => storeys.forEach(([s0, s1], j) => { if (lit(i * 5 + j, 0.6)) rect(glass, b.u - hw, b.u + hw, s0 + 1.4, s1 - 1.6); }));
                     bays.forEach((b, i) => { if (lit(i + 40, 0.35)) rect(dorm, b.u - 3.2 / L, b.u + 3.2 / L, top + 1.8, H - 2.2); });
                     ctx.fillStyle = 'rgba(255,186,104,.62)'; ctx.fill(glass);
                     ctx.fillStyle = 'rgba(255,214,150,.9)'; ctx.fill(warm);
@@ -37875,15 +37886,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             /** Over the windows on all faces: the openings, then the cornices, the balcony and balconettes, the zinc cap */
             _vArcOver(ctx, faces, P) {
+                if (this.leanHero && !LandmarkKit._lean) return this._vLean(() => this._vArcOver(ctx, faces, P));
                 const A = ARCADE, T = this.variant.tone, H = this._vH(), K = LandmarkKit, top = H - A.M, storeys = this._vArcStoreys(H);
-                const edges = [], fronts = [], ettes = [];
+                const edges = [], fronts = [], ettes = [], last = storeys.length - 1;
                 for (const f of faces) {
                     if (f.side === 'C') continue;
                     const G = this._vFaceAt(f, P), L = G.L, ux = (f.x2 - f.x1) / L, uy = (f.y2 - f.y1) / L;
                     edges.push({ a: [f.x1 - ux * 2, f.y1 - uy * 2], b: [f.x2 + ux * 2, f.y2 + uy * 2], nx: f.nx, ny: f.ny });
                     if (f.side === this.facing) {
                         fronts.push({ a: [f.x1 + ux * 6, f.y1 + uy * 6], b: [f.x2 - ux * 6, f.y2 - uy * 6], nx: f.nx, ny: f.ny });
-                        if (storeys.length > 1) for (const b of this._vArcU(f, G)) {
+                        for (const b of this._vArcU(f, G)) {
                             const x = f.x1 + (f.x2 - f.x1) * b.u, y = f.y1 + (f.y2 - f.y1) * b.u;
                             ettes.push({ a: [x - ux * 8, y - uy * 8], b: [x + ux * 8, y + uy * 8], nx: f.nx, ny: f.ny });
                         }
@@ -37893,8 +37905,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const lip = hexToRgba(T.hi, 0.85);
                 K.ledge(ctx, edges, A.A + 2, 1.8, 2, T.hi, T.lo, lip);                              // the arcade's cornice
                 if (_zoomLOD < 2) {
-                    if (fronts.length) K.veranda(ctx, fronts, storeys[0][0] + 0.6, 4.5, 2.4, 3.2, T.stone, T.lo, A.IRON);   // the balcony
-                    if (ettes.length) K.veranda(ctx, ettes, storeys[1][0] + 0.6, 2.4, 2, 2.6, T.stone, T.lo, A.IRON);       // balconettes
+                    // a balcony the length of the front on the first storey and the top one, balconettes on every other storey between
+                    storeys.forEach(([z0], i) => {
+                        if (i === 0 || (i === last && last > 1)) { if (fronts.length) K.veranda(ctx, fronts, z0 + 0.6, 4.5, 2.4, 3.2, T.stone, T.lo, A.IRON); }
+                        else if (i % 2 && ettes.length) K.veranda(ctx, ettes, z0 + 0.6, 2.4, 2, 2.6, T.stone, T.lo, A.IRON);
+                    });
                 }
                 K.ledge(ctx, edges, top, 3, 2.4, T.hi, T.lo, lip);                                  // the main cornice
                 K.ledge(ctx, edges, H, 1.2, 1, A.SLATE.hi, A.SLATE.lo, null);                       // the mansard's zinc cap
@@ -37903,6 +37918,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             /* ---------------- the street front: awnings, the canopy with the name, wall lanterns ---------------- */
 
             _vArcFront(ctx, emissive) {
+                if (this.leanHero && !LandmarkKit._lean) return this._vLean(() => this._vArcFront(ctx, emissive));
                 const A = ARCADE, v = this.variant, S = v.spec, g = this._frontGeo(), K = LandmarkKit, B = this._vArcBays(), F = B.F;
                 const sOf = (x) => (x - F.fw / 2) * B.side, sd = sOf(B.door), cw = A.BAY * 3 - 4, [ca, cb] = v.awning, zc = A.A + 0.4, oc = 15;
                 // the name, sized to the canopy
@@ -38033,6 +38049,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             /** The night: arches, windows and dormers lit, lanterns, the name, the balcony and cornices in the lamps' colour */
             _vArcGlow(ctx, faces, P, dark) {
+                if (this.leanHero && !LandmarkKit._lean) return this._vLean(() => this._vArcGlow(ctx, faces, P, dark));
                 const A = ARCADE, H = this._vH(), K = LandmarkKit, edges = [];
                 for (const f of faces) {
                     if (f.side === 'C') continue;

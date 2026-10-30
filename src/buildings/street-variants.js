@@ -26,7 +26,7 @@
            look; `variant: '<id>'` asks for one.
            ===================================================================== */
         const STREET_SHOPS = [
-            { id: 'arcade', weight: 18, floors: [4, 5], wall: '#ddd2b8', roof: '#3b4450', material: 'limestone',
+            { id: 'arcade', weight: 18, floors: [7, 8, 9], wall: '#ddd2b8', roof: '#3b4450', material: 'limestone',
               trim: '#f6efdc', frame: '#28241f', mull: '#17181c', glass: '#28241f', ink: '#e9cf8e', glow: 'rgba(255,214,150,.95)',
               awnings: [['#16171b', '#2c2d33'], ['#1d3a2c', '#2e5641'], ['#4a1a1f', '#6c2c32'], ['#1b2236', '#2e3854'], ['#3a2619', '#57402c']],
               neons: ['#ffb45a'],

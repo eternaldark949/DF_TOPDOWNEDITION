@@ -889,7 +889,7 @@
             _leanScale(extraFloors = 0) {
                 const B = CONFIG.BUILDINGS;
                 const h = (Math.min(this.floors, B.MAX_FLOORS) + extraFloors) * B.FLOOR_HEIGHT;
-                return h / (leanCamHeight() - h);          // roof = cam + (p - cam) * (1 + s)
+                return h / (leanCamHeight() - h) * (this.leanHero || 1);          // roof = cam + (p - cam) * (1 + s); leanHero: a building that leans harder than the street
             },
 
             /** Faces the camera can see (outward side toward the camera). */
