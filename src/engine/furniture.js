@@ -15,7 +15,8 @@
             // What can be moved, and what it's called on the pill
             NAMES: { apt_sofa: 'Sofa', apt_coffee: 'Coffee Table', apt_chair: 'Armchair', apt_console: 'Console', apt_plant: 'Plant',
                      apt_planter: 'Planter', apt_stool: 'Stool', apt_bed: 'Bed', apt_side: 'Side Table', apt_lounger: 'Lounger',
-                     apt_bistro: 'Bistro Set', apt_telescope: 'Telescope' }
+                     apt_bistro: 'Bistro Set', apt_telescope: 'Telescope', apt_dining: 'Dining Table', apt_bench: 'Bench',
+                     apt_chaise: 'Chaise', apt_patio_sofa: 'Patio Sofa' }
         };
 
         class FurnitureSystem {

@@ -697,6 +697,7 @@
                         label: roomDef.label || id,
                         floorColor: roomDef.floorColor || null,
                         floorTexture: roomDef.floorTexture || null,
+                        fill: roomDef.fill,               // with its lights on, the room's darkness (carveSkyLight); undefined: lamps only
                         lightsOff: false, // Stealth: toggled by light switches
                         lightK: 1,        // eased 0…1 light level (switches fade)
                         vis: 1            // eased 0…1 how seen the room is (1 = no veil)
@@ -1038,15 +1039,21 @@
             /**
              * Outdoor rooms carry the sky's light: on the light layer (darkness `ambient`),
              * thin the darkness over each outdoor room down to the outdoor sky's `skyDark`.
+             * An indoor room with a `fill` is lit through: with its lights on, its darkness thins
+             * to `fill`, and fades back to the lamps alone with its switch.
              */
             carveSkyLight(lightCtx, ambient, skyDark) {
                 if (!this.active || ambient <= 0) return;
-                const a = 1 - Math.min(1, skyDark / ambient);
-                if (a < 0.01) return;
+                const sky = 1 - Math.min(1, skyDark / ambient);
                 lightCtx.save();
                 lightCtx.globalCompositeOperation = 'destination-out';
-                lightCtx.fillStyle = `rgba(255,255,255,${a.toFixed(3)})`;
-                for (const id in this.rooms) { const r = this.rooms[id]; if (r.type === 'outdoor') for (const q of r.rects) lightCtx.fillRect(q.x, q.y, q.w, q.h); }
+                for (const id in this.rooms) {
+                    const r = this.rooms[id];
+                    const a = r.type === 'outdoor' ? sky : r.fill !== undefined ? (1 - Math.min(1, r.fill / ambient)) * r.lightK : 0;
+                    if (a < 0.01) continue;
+                    lightCtx.fillStyle = `rgba(255,255,255,${a.toFixed(3)})`;
+                    for (const q of r.rects) lightCtx.fillRect(q.x, q.y, q.w, q.h);
+                }
                 lightCtx.restore();
             }
             
@@ -1120,9 +1127,10 @@
             'apt_949': {
                 rooms: {
                     veranda:    { x: 0,   y: 0,   w: 1400, h: 200, type: 'outdoor', label: 'Veranda' },
-                    main_room:  { x: 8,   y: 208, w: 892,  h: 684, type: 'indoor',  label: 'Living Room' },
-                    bedroom:    { x: 908,  y: 208, w: 484,  h: 340, type: 'indoor',  label: 'Bedroom' },
-                    bathroom:   { x: 908,  y: 556, w: 484,  h: 336, type: 'indoor',  label: 'Bathroom' }
+                    // fill: lit, the suite reads warm and lamp-lit like the cafe; a switch puts the room back in the dark
+                    main_room:  { x: 8,   y: 208, w: 892,  h: 684, type: 'indoor',  label: 'Living Room', fill: 0.5 },
+                    bedroom:    { x: 908,  y: 208, w: 484,  h: 340, type: 'indoor',  label: 'Bedroom', fill: 0.56 },
+                    bathroom:   { x: 908,  y: 556, w: 484,  h: 336, type: 'indoor',  label: 'Bathroom', fill: 0.5 }
                 },
                 doors: [
                     // Veranda → Main room: 3 sliding glass doors across the veranda wall (y:200)

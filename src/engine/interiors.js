@@ -48,34 +48,160 @@
                 return cv;
             },
 
+            /** The suite's floors, in the Silver Queen's own deco (plum, silver, gold) over the apartment's wine and walnut:
+             *  a teak veranda edged in travertine; Versailles parquet in the living room, a walnut border round it, the deco fan
+             *  rug in the lounge, a round rug under the dining table, harlequin marble in the kitchen, the SQ crest inlaid at the
+             *  door; a mauve trellis carpet and a big cream rug in the bedroom; veined marble in the bathroom. Shadow along
+             *  every wall. Painted once (`_paintAptFloor`). */
             _drawAptFloorArt(ctx) {
-                const lines = (x0, y0, x1, y1, step, vertical, color, lw = 1) => {
-                    ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.beginPath();
-                    if (vertical) for (let x = x0 + step; x < x1; x += step) { ctx.moveTo(x, y0); ctx.lineTo(x, y1); }
-                    else for (let y = y0 + step; y < y1; y += step) { ctx.moveTo(x0, y); ctx.lineTo(x1, y); }
-                    ctx.stroke();
+                const c = ctx, r = seededRandom(949), A = APT;
+                const GOLD = '#c9a46a', GOLD_HI = '#ead1a0', SILVER = '#cfc8e2', PLUM = '#2d1d59', PLUM_DK = '#1d1240';
+                const rr = (x, y, w, h, rad, fill, stroke, lw = 1) => { c.beginPath(); c.roundRect(x, y, w, h, rad); if (fill) { c.fillStyle = fill; c.fill(); } if (stroke) { c.strokeStyle = stroke; c.lineWidth = lw; c.stroke(); } };
+                const ring = (x, y, rad, col, lw) => { c.strokeStyle = col; c.lineWidth = lw; c.beginPath(); c.arc(x, y, rad, 0, Math.PI * 2); c.stroke(); };
+                const shade = (base, v) => { const n = parseInt(base.slice(1), 16), k = 1 + v; return `rgb(${Math.min(255, (n >> 16) * k) | 0},${Math.min(255, (n >> 8 & 255) * k) | 0},${Math.min(255, (n & 255) * k) | 0})`; };
+                const veins = (x0, y0, w, h, n, col, lw = 0.8) => {
+                    c.save(); c.beginPath(); c.rect(x0, y0, w, h); c.clip(); c.strokeStyle = col; c.lineWidth = lw;
+                    for (let i = 0; i < n; i++) {
+                        let x = x0 + r() * w, y = y0 + r() * h; c.beginPath(); c.moveTo(x, y);
+                        for (let k = 0; k < 5; k++) { const nx = x + (r() - 0.35) * 70, ny = y + (r() - 0.5) * 40; c.quadraticCurveTo((x + nx) / 2 + (r() - 0.5) * 20, (y + ny) / 2 + (r() - 0.5) * 20, nx, ny); x = nx; y = ny; }
+                        c.stroke();
+                    }
+                    c.restore();
                 };
-                const rug = (x, y, w, h, base, border, inner) => {
-                    ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.beginPath(); ctx.roundRect(x + 3, y + 3, w, h, 8); ctx.fill();
-                    ctx.fillStyle = base; ctx.beginPath(); ctx.roundRect(x, y, w, h, 8); ctx.fill();
-                    ctx.strokeStyle = border; ctx.lineWidth = 3; ctx.beginPath(); ctx.roundRect(x + 7, y + 7, w - 14, h - 14, 5); ctx.stroke();
-                    if (inner) { ctx.strokeStyle = inner; ctx.lineWidth = 1; ctx.beginPath(); ctx.roundRect(x + 14, y + 14, w - 28, h - 28, 4); ctx.stroke(); }
+                const wallShadow = (x, y, w, h, d = 14, a = 0.4) => {                        // ambient shadow along a room's walls
+                    for (const [gx0, gy0, gx1, gy1, fx, fy, fw, fh] of [[x, y, x, y + d, x, y, w, d], [x, y + h, x, y + h - d, x, y + h - d, w, d], [x, y, x + d, y, x, y, d, h], [x + w, y, x + w - d, y, x + w - d, y, d, h]]) {
+                        const g = c.createLinearGradient(gx0, gy0, gx1, gy1); g.addColorStop(0, `rgba(8,4,12,${a})`); g.addColorStop(1, 'rgba(8,4,12,0)');
+                        c.fillStyle = g; c.fillRect(fx, fy, fw, fh);
+                    }
                 };
-                ctx.save();
-                lines(8, 8, 1392, 200, 14, false, 'rgba(0,0,0,0.16)');                                   // veranda deck boards
-                lines(8, 208, 900, 892, 28, true, 'rgba(0,0,0,0.14)');                                   // living-room planks
-                ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath();                                   // staggered plank joints
-                for (let i = 0, x = 8; x < 900; x += 28, i++) for (let y = 208 + (i % 3) * 70; y < 892; y += 210) { ctx.moveTo(x, y); ctx.lineTo(x + 28, y); }
-                ctx.stroke();
-                ctx.fillStyle = '#4a2a2c'; ctx.fillRect(84, 690, 520, 202);                              // kitchen stone tiles
-                lines(84, 690, 604, 892, 40, true, 'rgba(0,0,0,0.2)'); lines(84, 690, 604, 892, 40, false, 'rgba(0,0,0,0.2)');
-                ctx.strokeStyle = 'rgba(239,230,220,0.12)'; ctx.lineWidth = 1; ctx.strokeRect(84.5, 690.5, 520, 202);
-                rug(320, 396, 334, 214, APT.wineLt, APT.blush, 'rgba(239,230,220,0.35)');                  // lounge rug
-                lines(908, 208, 1392, 548, 24, true, 'rgba(255,255,255,0.05)');                          // bedroom boards
-                rug(975, 270, 160, 130, '#8a5560', APT.blushLt, null);                                   // bedroom rug under the bed foot
-                lines(908, 556, 1392, 892, 32, true, 'rgba(0,0,0,0.09)'); lines(908, 556, 1392, 892, 32, false, 'rgba(0,0,0,0.09)');   // bathroom tiles
-                ctx.fillStyle = APT.blushLt; ctx.beginPath(); ctx.roundRect(1270, 672, 76, 30, 8); ctx.fill();   // bath mat
-                ctx.restore();
+                c.save();
+
+                // The veranda: teak boards, each its own shade, staggered joints, the travertine edge along the glass
+                for (let y = 8, row = 0; y < 184; y += 11, row++) for (let x = 8 - (row * 37) % 120; x < 1392; ) {
+                    const L = 90 + r() * 70, v = (r() - 0.5) * 0.22, x0 = Math.max(8, x), x1 = Math.min(1392, x + L);
+                    if (x1 > x0) { c.fillStyle = shade('#4a3024', v); c.fillRect(x0, y, x1 - x0, 10); c.fillStyle = 'rgba(255,230,200,0.05)'; c.fillRect(x0, y, x1 - x0, 1.2); }
+                    c.fillStyle = 'rgba(20,10,6,0.55)'; c.fillRect(x0, y + 10, x1 - x0, 1); if (x1 < 1392) c.fillRect(x1 - 0.5, y, 1, 10);
+                    x += L;
+                }
+                for (let x = 8; x < 1392; x += 48) { const v = (r() - 0.5) * 0.08; c.fillStyle = shade('#cdbfae', v); c.fillRect(x, 184, 47, 16); }
+                c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(8, 184, 1384, 1.5);
+                c.fillStyle = GOLD; c.globalAlpha = 0.5; c.fillRect(8, 186.5, 1384, 1); c.globalAlpha = 1;
+
+                // Living room: Versailles parquet (panels framed in long boards, basket weave in each quarter)
+                const P = 64, Q = P / 2, wood = ['#6b4a36', '#634532', '#71503a', '#674834'];
+                c.save(); c.beginPath(); c.rect(8, 208, 892, 684); c.clip();
+                for (let py = 208 - 20; py < 892; py += P) for (let px = 8 - 26; px < 900; px += P) {
+                    const pv = (r() - 0.5) * 0.12;
+                    for (let qy = 0; qy < 2; qy++) for (let qx = 0; qx < 2; qx++) {
+                        const ox = px + qx * Q, oy = py + qy * Q, horiz = (qx + qy) % 2 === 0;
+                        for (let k = 0; k < 4; k++) {
+                            c.fillStyle = shade(wood[(k + qx + qy * 2) % 4], pv + (r() - 0.5) * 0.07);
+                            if (horiz) c.fillRect(ox + 2, oy + 2 + k * 7, Q - 4, 6.4); else c.fillRect(ox + 2 + k * 7, oy + 2, 6.4, Q - 4);
+                        }
+                    }
+                    c.strokeStyle = 'rgba(30,16,10,0.38)'; c.lineWidth = 1.2; c.strokeRect(px + 0.6, py + 0.6, P - 1.2, P - 1.2);
+                    c.strokeStyle = 'rgba(255,220,180,0.08)'; c.lineWidth = 1; c.strokeRect(px + 2.5, py + 2.5, P - 5, P - 5);
+                }
+                c.restore();
+                // the walnut border round the room, a brass line inside it
+                c.fillStyle = '#3e2a20'; for (const [x, y, w, h] of [[8, 208, 892, 18], [8, 874, 892, 18], [8, 208, 18, 684], [882, 208, 18, 684]]) c.fillRect(x, y, w, h);
+                c.strokeStyle = GOLD; c.globalAlpha = 0.55; c.lineWidth = 1.2; c.strokeRect(26.5, 226.5, 855, 647); c.globalAlpha = 1;
+                // a soft sheen where the lamps would catch the varnish, and the worn path from the door
+                for (const [x, y, rad] of [[307, 439, 160], [109, 463, 130], [700, 700, 160], [460, 650, 260]]) { const g = c.createRadialGradient(x, y, 0, x, y, rad); g.addColorStop(0, 'rgba(255,214,170,0.07)'); g.addColorStop(1, 'rgba(255,214,170,0)'); c.fillStyle = g; c.fillRect(x - rad, y - rad, rad * 2, rad * 2); }
+
+                // The lounge rug: plum with silver and gold, a deco sunburst fanning from the fireplace side, fans in the corners
+                {
+                    const x = 316, y = 392, w = 342, h = 222, cx = x + w / 2, cy = y + 6;
+                    rr(x + 4, y + 5, w, h, 6, 'rgba(0,0,0,0.35)');
+                    rr(x, y, w, h, 6, PLUM_DK);
+                    rr(x + 8, y + 8, w - 16, h - 16, 4, PLUM);
+                    c.save(); c.beginPath(); c.rect(x + 8, y + 8, w - 16, h - 16); c.clip();
+                    for (let i = 0; i < 13; i++) {                                              // the sunburst's rays
+                        const a0 = Math.PI * (i / 13), a1 = Math.PI * ((i + 0.5) / 13);
+                        c.fillStyle = i % 2 ? 'rgba(207,200,226,0.10)' : 'rgba(201,164,106,0.13)';
+                        c.beginPath(); c.moveTo(cx, cy); c.arc(cx, cy, h * 1.2, a0, a1); c.closePath(); c.fill();
+                    }
+                    for (const [rad, col, lw] of [[64, GOLD, 2], [74, SILVER, 0.8], [128, GOLD, 1.2], [140, 'rgba(207,200,226,0.5)', 0.8], [196, GOLD, 1]]) { c.strokeStyle = col; c.lineWidth = lw; c.beginPath(); c.arc(cx, cy, rad, 0, Math.PI); c.stroke(); }
+                    c.fillStyle = GOLD; c.beginPath(); c.arc(cx, cy, 30, 0, Math.PI); c.fill();
+                    c.fillStyle = PLUM_DK; c.beginPath(); c.arc(cx, cy, 22, 0, Math.PI); c.fill();
+                    for (const [fx, fy, a0] of [[x + 8, y + h - 8, -Math.PI / 2], [x + w - 8, y + h - 8, Math.PI]]) {   // corner fans
+                        for (let k = 0; k < 4; k++) { c.strokeStyle = k % 2 ? SILVER : GOLD; c.lineWidth = 1; c.beginPath(); c.arc(fx, fy, 14 + k * 9, a0, a0 + Math.PI / 2); c.stroke(); }
+                        for (let k = 0; k <= 4; k++) { const a = a0 + k * Math.PI / 8; c.beginPath(); c.moveTo(fx, fy); c.lineTo(fx + Math.cos(a) * 41, fy + Math.sin(a) * 41); c.stroke(); }
+                    }
+                    c.restore();
+                    rr(x + 8, y + 8, w - 16, h - 16, 4, null, GOLD, 2);
+                    rr(x + 14, y + 14, w - 28, h - 28, 3, null, 'rgba(207,200,226,0.55)', 0.8);
+                    c.fillStyle = 'rgba(207,200,226,0.6)'; for (let fx = x + 6; fx < x + w - 4; fx += 5) { c.fillRect(fx, y - 3, 1.2, 3); c.fillRect(fx, y + h, 1.2, 3); }   // fringe
+                }
+                // Dining: a round rug in wine and blush under the table, a gold ring round it
+                {
+                    const cx = 176, cy = 330;
+                    c.fillStyle = 'rgba(0,0,0,0.3)'; c.beginPath(); c.arc(cx + 3, cy + 4, 92, 0, Math.PI * 2); c.fill();
+                    for (const [rad, col] of [[92, A.wineDk], [86, A.wineLt], [74, A.wine], [40, A.wineLt]]) { c.fillStyle = col; c.beginPath(); c.arc(cx, cy, rad, 0, Math.PI * 2); c.fill(); }
+                    ring(cx, cy, 88, GOLD, 1.5); ring(cx, cy, 76, 'rgba(232,180,184,0.6)', 1); ring(cx, cy, 42, GOLD, 1);
+                    c.fillStyle = 'rgba(232,180,184,0.5)'; for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2; c.beginPath(); c.arc(cx + Math.cos(a) * 81, cy + Math.sin(a) * 81, 1.6, 0, Math.PI * 2); c.fill(); }
+                }
+                // The kitchen: harlequin marble (cream and wine) in a brass-edged field
+                {
+                    const x0 = 84, y0 = 690, w = 520, h = 202, D = 26;
+                    c.save(); c.beginPath(); c.rect(x0, y0, w, h); c.clip();
+                    c.fillStyle = '#e8ddd0'; c.fillRect(x0, y0, w, h);
+                    for (let j = -1; j * D / 2 < h + D; j++) for (let i = -1; i * D < w + D; i++) {
+                        if (j % 2) continue;                                                          // (the cream rows between are the ground)
+                        const mx = x0 + i * D + (j % 4 ? D / 2 : 0), my = y0 + j * D / 2;
+                        c.fillStyle = shade('#5a2230', (r() - 0.5) * 0.18);
+                        c.beginPath(); c.moveTo(mx, my - D / 2); c.lineTo(mx + D / 2, my); c.lineTo(mx, my + D / 2); c.lineTo(mx - D / 2, my); c.closePath(); c.fill();
+                    }
+                    veins(x0, y0, w, h, 16, 'rgba(255,255,255,0.10)');
+                    veins(x0, y0, w, h, 10, 'rgba(90,60,70,0.12)');
+                    c.restore();
+                    c.strokeStyle = GOLD; c.lineWidth = 2; c.strokeRect(x0 + 1, y0 + 1, w - 2, h - 2);
+                }
+                // At the door: the Silver Queen's crest in marble and brass
+                {
+                    const cx = 700, cy = 838;
+                    c.fillStyle = '#e9e3ec'; c.beginPath(); c.arc(cx, cy, 36, 0, Math.PI * 2); c.fill();
+                    c.save(); c.beginPath(); c.arc(cx, cy, 36, 0, Math.PI * 2); c.clip(); veins(cx - 36, cy - 36, 72, 72, 4, 'rgba(120,100,150,0.2)'); c.restore();
+                    ring(cx, cy, 36, GOLD, 2.5); ring(cx, cy, 30, 'rgba(201,164,106,0.7)', 0.8);
+                    c.fillStyle = PLUM; for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 + Math.PI / 8; c.beginPath(); c.moveTo(cx + Math.cos(a) * 30, cy + Math.sin(a) * 30); c.lineTo(cx + Math.cos(a + 0.1) * 24, cy + Math.sin(a + 0.1) * 24); c.lineTo(cx + Math.cos(a - 0.1) * 24, cy + Math.sin(a - 0.1) * 24); c.closePath(); c.fill(); }
+                    c.fillStyle = GOLD; c.beginPath();                                              // the crown over the monogram
+                    c.moveTo(cx - 11, cy - 9); c.lineTo(cx - 11, cy - 17); c.lineTo(cx - 6, cy - 12); c.lineTo(cx, cy - 20); c.lineTo(cx + 6, cy - 12); c.lineTo(cx + 11, cy - 17); c.lineTo(cx + 11, cy - 9); c.closePath(); c.fill();
+                    c.font = 'italic bold 19px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = PLUM; c.fillText('SQ', cx, cy + 6);
+                    c.font = '7px Georgia, serif'; c.fillStyle = 'rgba(234,209,160,0.85)'; c.fillText('SILVER  QUEEN', cx, cy + 46);
+                }
+                wallShadow(8, 208, 892, 684);
+
+                // The bedroom: mauve carpet with a trellis woven in, a big cream rug under the bed
+                c.fillStyle = '#4a2c3e'; c.fillRect(908, 208, 484, 340);
+                c.save(); c.beginPath(); c.rect(908, 208, 484, 340); c.clip();
+                c.strokeStyle = 'rgba(232,180,184,0.07)'; c.lineWidth = 1; c.beginPath();
+                for (let k = -400; k < 500; k += 24) { c.moveTo(908 + k, 208); c.lineTo(908 + k + 340, 548); c.moveTo(908 + k + 340, 208); c.lineTo(908 + k, 548); }
+                c.stroke();
+                c.fillStyle = 'rgba(232,180,184,0.06)'; for (let y = 220; y < 548; y += 12) for (let x = 920 + (y / 12 % 2) * 12; x < 1392; x += 24) c.fillRect(x, y, 1.5, 1.5);
+                c.restore();
+                rr(957, 262, 196, 176, 6, 'rgba(0,0,0,0.3)');
+                rr(954, 258, 196, 176, 6, '#e9ddd0');
+                rr(962, 266, 180, 160, 4, null, A.blush, 3); rr(970, 274, 164, 144, 3, null, 'rgba(201,164,106,0.6)', 1);
+                c.strokeStyle = 'rgba(201,143,149,0.35)'; c.lineWidth = 1; c.beginPath();
+                for (let x = 980; x < 1130; x += 16) for (let y = 284; y < 412; y += 16) { c.moveTo(x, y - 4); c.lineTo(x + 4, y); c.lineTo(x, y + 4); c.lineTo(x - 4, y); c.closePath(); }
+                c.stroke();
+                rr(1186, 432, 120, 70, 35, '#6a3f55', 'rgba(232,180,184,0.5)', 1.5);         // a soft oval rug by the reading chair
+                wallShadow(908, 208, 484, 340);
+
+                // The bathroom: big white marble tiles, grey and lilac veins, a darker band round the walls
+                c.fillStyle = '#ece8ee'; c.fillRect(908, 556, 484, 336);
+                for (let y = 556; y < 892; y += 48) for (let x = 908; x < 1392; x += 48) { c.fillStyle = shade('#ece8ee', (r() - 0.5) * 0.05); c.fillRect(x + 0.5, y + 0.5, 47, 47); }
+                veins(908, 556, 484, 336, 26, 'rgba(110,100,130,0.16)');
+                veins(908, 556, 484, 336, 12, 'rgba(160,130,200,0.12)', 1.4);
+                c.strokeStyle = 'rgba(140,130,150,0.35)'; c.lineWidth = 0.8; c.beginPath();
+                for (let x = 908; x <= 1392; x += 48) { c.moveTo(x, 556); c.lineTo(x, 892); } for (let y = 556; y <= 892; y += 48) { c.moveTo(908, y); c.lineTo(1392, y); }
+                c.stroke();
+                c.strokeStyle = '#8f87a0'; c.lineWidth = 10; c.strokeRect(913, 561, 474, 326);
+                c.strokeStyle = GOLD; c.lineWidth = 1; c.globalAlpha = 0.6; c.strokeRect(918.5, 566.5, 463, 315); c.globalAlpha = 1;
+                rr(1150, 700, 90, 54, 27, A.blushLt, A.blush, 2);                               // round bath mat by the tub
+                rr(1270, 672, 76, 30, 8, A.blushLt);
+                wallShadow(908, 556, 484, 336, 12, 0.3);
+                c.restore();
             },
 
             /** The House of Death's floors, painted once into a cached canvas: checkered marble, parquet,
@@ -1259,6 +1385,17 @@
                 for (const p of this.props) if (p.decorType === 'apt_craft') {
                     glow(p.x + p.width * 0.59, p.y + 11 + p.height * 0.21, 22, '180, 130, 255', 0.3 + 0.06 * Math.sin(t * 2.4));
                     glow(p.x + p.width - 29, p.y + p.height - 14.5, 7, '255, 150, 70', 0.5 + 0.2 * Math.sin(t * 7));
+                }
+                // The veranda's fire bowl and the candles on the dining table (they go where the pieces go)
+                for (const p of this.props) {
+                    if (p.decorType === 'apt_firepit') {
+                        const cx = p.x + p.width / 2, cy = p.y + p.height / 2, f = 0.8 + 0.12 * Math.sin(t * 6.1) + 0.08 * Math.sin(t * 11.3);
+                        glow(cx, cy, 120, '255, 130, 50', 0.22 * f); glow(cx, cy, 30, '255, 190, 90', 0.5 * f);
+                    } else if (p.decorType === 'apt_dining') {
+                        const cx = p.x + p.width / 2, cy = p.y + p.height / 2, k = lightAt(cx, cy);
+                        for (const s of [-1, 1]) { const f = 0.75 + 0.25 * Math.sin(t * 8 + s * 2); glow(cx + s * 13, cy - s * 6, 16, '255, 200, 130', 0.55 * f); }
+                        glow(cx, cy, 90, '255, 196, 140', 0.08 + 0.06 * k);
+                    }
                 }
                 // Festoon string lights swagged along the veranda railing (glow and bulb in one stamp)
                 const bulb = bulbSprite(ctx, '255,240,215', 0.9, 1.6, '255,214,160', 0.45, 9, true);
