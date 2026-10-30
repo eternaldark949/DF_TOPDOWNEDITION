@@ -525,20 +525,6 @@
             apron: { x: -40, y: 880, w: 430, h: 150 }   // the portico, steps and carpet: _sqForecourt (buildings/silver-queen.js)
         });
         
-        BuildingV2Registry.register('enni_cole', {
-            factory: createEnniCole,
-            sections: [
-                { x: 0, y: 0, w: 900, h: 600 },
-                { x: 320, y: 600, w: 260, h: 100 }
-            ],
-            accentColor: '#d0ac72',
-            label: 'Enni Cole',
-            type: 'shopping',
-            category: 'shopping',
-            floors: 12,                     // two store floors, each as tall as four flats' (buildings/factories.js)
-            sign: { text: 'Enni Cole', color: '#f3ddb0', size: 38 },
-            door: { target: 'enni_cole_interior', label: 'Enter Store', lightColor: '#ffd392' }
-        });
         
         BuildingV2Registry.register('cozy_cafe', {
             factory: createCozyCafe,
