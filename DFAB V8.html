@@ -5728,7 +5728,11 @@
                 INTERACT_ZOOM: 1.05 * 1.15,     // by something to use, or talking: ~21% closer than that (was 5%, raised 15%)
                 BASE_ZOOMS: [1, 0.9, 0.75, 0.6],  // Settings → Base Zoom steps (GameSettings.baseZoom), multiplying every camera zoom above
                 CINE_PAN: 450, CINE_ZOOM: [0.5, 2.5],       // Cinematic View: pan radius (world px) and zoom limits
-                LOOK: { REACH: 0.7, FOLLOW_MS: 70, RETURN_MS: 260 },   // drag-to-look (engine/player-draw-input.js initLookZone): how far, as a share of the half-screen, the view can go from her; easing while dragged and home after
+                LOOK: { REACH: 0.7, FOLLOW_MS: 70, RETURN_MS: 260 },
+                // A landmark with viewDrift (engine/draw.js _landmarkDriftTarget): out in front of it, within REACH px of its facade
+                // and no more than SIDE px past its ends (fading over the last FADE), the view moves toward it by SHIFT of the
+                // half-screen, easing over TAU_MS; INSIDE: how far behind the facade line she can be (under a bay) and still count
+                LANDMARK_DRIFT: { REACH: 560, SIDE: 160, FADE: 160, INSIDE: 40, SHIFT: 0.55, TAU_MS: 700 },   // drag-to-look (engine/player-draw-input.js initLookZone): how far, as a share of the half-screen, the view can go from her; easing while dragged and home after
                 SHAKE_DECAY: 0.9,
                 SHAKE_MIN_THRESHOLD: 0.5
             },
@@ -40811,6 +40815,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 const [wx, wy] = at(lx, ly), lamp = new LampEntity({ x: wx, y: wy, lampType: 3, color, lightRadius: r }); lamp.keepColor = true; lamp.visible = false; b.attachedLights.push(lamp);   // (light only: no fixture on the pavement)
             }
             b.topReach = 80; b.glowReach = 80;
+            b.viewDrift = true;   // out in front of it, the view drifts toward it (engine/draw.js _landmarkDriftTarget)
             return b;
         }
 
@@ -80379,6 +80384,33 @@ engineMixin({
                 return out;
             },
 
+            /** The view's drift toward a landmark (a building with `viewDrift`, e.g. the Ashgrove) when she's out in front
+                of it: how far, in world px, to move the view toward its facade so the building fills the top of the
+                screen. Fades with her distance from the facade and past its ends. The lean's vantage (this.camera)
+                stays on her, so the building leans just as it would. CONFIG.CAMERA.LANDMARK_DRIFT. */
+            _landmarkDriftTarget(viewZoom) {
+                const D = CONFIG.CAMERA.LANDMARK_DRIFT, out = this._lmOut || (this._lmOut = { x: 0, y: 0 }), map = this.activeMap, p = this.player;
+                out.x = out.y = 0;
+                if (!D || !map || !p || map.type !== 'outdoor') return out;
+                if (this._lmMap !== map) { this._lmMap = map; this._lmList = (map.buildings || []).filter(b => b.viewDrift); }
+                const hw = this.canvas.width / 2 / viewZoom, hh = this.canvas.height / 2 / viewZoom;
+                let best = 0;
+                for (const b of this._lmList) {
+                    const f = b.facing || 'S', n = f === 'N' ? [0, -1] : f === 'E' ? [1, 0] : f === 'W' ? [-1, 0] : [0, 1];
+                    // her distance out from the facade, and how far past its ends she is
+                    const d = n[1] ? (n[1] > 0 ? p.y - (b.y + b.h) : b.y - p.y) : (n[0] > 0 ? p.x - (b.x + b.w) : b.x - p.x);
+                    const along = n[1] ? Math.max(b.x - p.x, p.x - (b.x + b.w), 0) : Math.max(b.y - p.y, p.y - (b.y + b.h), 0);
+                    if (d < -D.INSIDE || d > D.REACH || along > D.SIDE) continue;
+                    const sm = (t) => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
+                    const w = sm((D.REACH - d) / D.FADE) * sm((D.SIDE - along) / D.FADE);
+                    if (w <= best) continue;
+                    best = w;
+                    const half = n[1] ? hh : hw;
+                    out.x = -n[0] * half * D.SHIFT * w; out.y = -n[1] * half * D.SHIFT * w;   // toward the building, against its facing
+                }
+                return out;
+            },
+
             /* THE VIEW — where the camera actually is this frame (draw() resolves it once:
                the cutscene camera, or her position plus the scope lean and the drive
                look-ahead). Everything that maps world <-> screen reads it — the world, both
@@ -80505,6 +80537,7 @@ engineMixin({
                     camX = this.camera.x = c.x;
                     camY = this.camera.y = c.y;
                     this.lookPanX = this.lookPanY = 0;
+                    this.lmDriftX = this.lmDriftY = 0;
                 } else {
                     /* Behind the wheel the camera looks a little down the road, easing after the
                        car's velocity (per frame, so it glides between ticks); on foot it drifts home. */
@@ -80535,6 +80568,12 @@ engineMixin({
                     camX = c.x; camY = c.y;
                     this.camera.x = camX; // Sync for smooth handoff
                     this.camera.y = camY;
+                    // Near a landmark the view drifts toward it (_landmarkDriftTarget); the lean still looks from her
+                    const lm = this._landmarkDriftTarget(viewZoom), kLm = 1 - Math.exp(-dtCam / CONFIG.CAMERA.LANDMARK_DRIFT.TAU_MS);
+                    this.lmDriftX = (this.lmDriftX || 0) + (lm.x - (this.lmDriftX || 0)) * kLm;
+                    this.lmDriftY = (this.lmDriftY || 0) + (lm.y - (this.lmDriftY || 0)) * kLm;
+                    if (Math.abs(this.lmDriftX) < 0.05 && Math.abs(this.lmDriftY) < 0.05) this.lmDriftX = this.lmDriftY = 0;
+                    if (this.lmDriftX || this.lmDriftY) { const c2 = this._clampView(camX + this.lmDriftX, camY + this.lmDriftY, viewZoom); camX = c2.x; camY = c2.y; }
                 }
                 if (this.cineCam) { camX += this.cineCam.dx; camY += this.cineCam.dy; }   // Cinematic View's pan
                 if (fc) { camX += fc.dx; camY += fc.dy; }

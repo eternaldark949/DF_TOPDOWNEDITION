@@ -183,7 +183,11 @@
                 INTERACT_ZOOM: 1.05 * 1.15,     // by something to use, or talking: ~21% closer than that (was 5%, raised 15%)
                 BASE_ZOOMS: [1, 0.9, 0.75, 0.6],  // Settings → Base Zoom steps (GameSettings.baseZoom), multiplying every camera zoom above
                 CINE_PAN: 450, CINE_ZOOM: [0.5, 2.5],       // Cinematic View: pan radius (world px) and zoom limits
-                LOOK: { REACH: 0.7, FOLLOW_MS: 70, RETURN_MS: 260 },   // drag-to-look (engine/player-draw-input.js initLookZone): how far, as a share of the half-screen, the view can go from her; easing while dragged and home after
+                LOOK: { REACH: 0.7, FOLLOW_MS: 70, RETURN_MS: 260 },
+                // A landmark with viewDrift (engine/draw.js _landmarkDriftTarget): out in front of it, within REACH px of its facade
+                // and no more than SIDE px past its ends (fading over the last FADE), the view moves toward it by SHIFT of the
+                // half-screen, easing over TAU_MS; INSIDE: how far behind the facade line she can be (under a bay) and still count
+                LANDMARK_DRIFT: { REACH: 560, SIDE: 160, FADE: 160, INSIDE: 40, SHIFT: 0.55, TAU_MS: 700 },   // drag-to-look (engine/player-draw-input.js initLookZone): how far, as a share of the half-screen, the view can go from her; easing while dragged and home after
                 SHAKE_DECAY: 0.9,
                 SHAKE_MIN_THRESHOLD: 0.5
             },

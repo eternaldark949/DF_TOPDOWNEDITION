@@ -405,6 +405,7 @@
                 const [wx, wy] = at(lx, ly), lamp = new LampEntity({ x: wx, y: wy, lampType: 3, color, lightRadius: r }); lamp.keepColor = true; lamp.visible = false; b.attachedLights.push(lamp);   // (light only: no fixture on the pavement)
             }
             b.topReach = 80; b.glowReach = 80;
+            b.viewDrift = true;   // out in front of it, the view drifts toward it (engine/draw.js _landmarkDriftTarget)
             return b;
         }
 
