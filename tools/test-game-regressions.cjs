@@ -717,6 +717,7 @@ test('Furniture sprites: painted runs never change over time, loops repeat per p
         equal(runTrace(i, 0, 5000), runTrace(i, 0, 5000 + P), `${id} ${type}: one period on, the same frame`); loops++;
         return;
       }
+      runTrace(i, 0, 5000);   // (a first paint may bake shared sprites, such as a lamp fixture's: once, not over time)
       const first = runTrace(i, 0, 5000), runs = value(env, 'return PropPass.idx + 1;') || 1;
       equal(first, runTrace(i, 0, 987654.321), `${id} ${type}: its painted art never changes over time`);
       for (let r = 1; r < runs; r++) equal(runTrace(i, r, 5000), runTrace(i, r, 987654.321), `${id} ${type} run ${r}`);

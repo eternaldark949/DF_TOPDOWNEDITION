@@ -69,6 +69,7 @@
             cream: '#efe6dc', creamDk: '#d8cbbd', walnut: '#4a3a30', walnutLt: '#6b5444', brass: '#c9a46a',
             ink: '#1b1718', leaf: '#2f5a3e', leafLt: '#3f7a52', stone: '#e9e6e3'
         };
+        const APT_PENDANTS = [0.17, 0.5, 0.83];   // where the bar island's pendants hang along it
 
         function drawApartmentDecorProp(ctx, p) {
             const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000, A = APT;
@@ -83,7 +84,7 @@
                 if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
             };
 
-            const lampShade = (cx, cy, r) => { circ(cx, cy, r, A.cream, A.creamDk, 1); circ(cx, cy, r * 0.35, '#ffd9b0'); };
+            const lampShade = (cx, cy, r) => drawLampFixture(ctx, 'shade_table', cx, cy, { scale: r / 9, color: '#ffd9b0' });   // (the lamp library, entities/lamps.js; lit by drawApartmentGlow)
             const counterTop = (X, Y, W, H) => {                          // cream quartz with a walnut front edge (north side)
                 rr(X, Y, W, H, 2, A.cream);
                 ctx.strokeStyle = 'rgba(160,140,125,0.25)'; ctx.lineWidth = 0.7; ctx.beginPath();
@@ -213,7 +214,7 @@
                 }
                 case 'apt_floor_lamp': {
                     const cx = x + w / 2, cy = y + h / 2;
-                    circ(cx, cy, w / 2, A.cream, A.brass, 1.5); circ(cx, cy, w / 5, '#ffd9b0');
+                    drawLampFixture(ctx, 'shade_floor', cx, cy, { scale: w / 26, color: '#ffd9b0' });   // lit by drawApartmentGlow
                     break;
                 }
                 case 'apt_fridge': {
@@ -251,7 +252,7 @@
                     counterTop(x, y, w, h);
                     ctx.fillStyle = A.creamDk; ctx.fillRect(x, y, 6, h); ctx.fillRect(x + w - 6, y, 6, h);                   // waterfall edges
                     ctx.fillStyle = A.walnut; ctx.fillRect(x + 6, y + h - 4, w - 12, 4);
-                    for (const u of [0.17, 0.5, 0.83]) { circ(x + w * u, y + h / 2, 7, A.brass, '#9a7c4a', 1); circ(x + w * u, y + h / 2, 3, '#ffe6c4'); }   // pendant shades above
+                    for (const u of APT_PENDANTS) drawLampFixture(ctx, 'pendant', x + w * u, y + h / 2, { scale: 1, color: '#ffd9b0' });   // brass pendants above (lit by drawApartmentGlow)
                     rr(x + w * 0.62, y + 8, 14, 9, 2, A.wineLt); circ(x + w * 0.4, y + 12, 4, '#f3e3ea');                     // fruit bowl, glasses
                     break;
                 }
@@ -665,7 +666,7 @@
                 }
                 case 'dn_lamp': {                                          // a champagne-gold floor lamp
                     const cx = x + w / 2, cy = y + h / 2;
-                    circ(cx, cy, w / 2, C.cream, C.gold, 1.5); circ(cx, cy, w * 0.18, '#fff0c8');
+                    drawLampFixture(ctx, 'shade_floor', cx, cy, { scale: w / 26, lit: true, color: '#fff0c8' });   // (the lobby's lamps always burn)
                     break;
                 }
                 case 'dn_palm': {                                          // a potted palm in a gold urn
