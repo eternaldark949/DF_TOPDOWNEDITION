@@ -48,4 +48,11 @@ test('A car stops at the rim: each pool is a collider for driving, not for walki
  assert.deepEqual(r,{n:6,hit:true,plain:false,walk:false});
 });
 
+test('After dark the pools shine (sheen, wavering light, moons); by day nothing is added',e=>{
+ const r=value(e,setup+`game._cullBounds={view:{left:p.x-300,right:p.x+300,top:p.y-300,bottom:p.y+300}};let fills=0;
+  const ctx=new Proxy({},{get:(t,k)=>/Gradient$/.test(k)?()=>({addColorStop(){}}):k==='fill'?()=>{fills++;}:t[k]??(()=>{}),set:(t,k,v)=>(t[k]=v,true)});
+  game.drawPoolGlow(ctx,0.05);const day=fills;game.drawPoolGlow(ctx,0.8);return {day,night:fills};`);
+ assert.equal(r.day,0);assert.ok(r.night>=10,String(r.night));
+});
+
 console.log(`test-park-pools: ${tests.length} passed`);

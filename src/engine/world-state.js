@@ -220,6 +220,8 @@
                 this.drawShopfrontLight(ctx, dark);
                 // The paving inlays' grooves, lit (engine/paving-inlays.js)
                 this.drawPavingGlow(ctx, dark);
+                // The parks' moon pools, shining after dark (engine/pools.js)
+                this.drawPoolGlow(ctx, dark);
                 if (CONFIG.BUILDINGS.LEAN && this.activeMap.buildings) {
                     const V = this._cullBounds && this._cullBounds.view;
                     const z = this.camera.zoom || 1;
