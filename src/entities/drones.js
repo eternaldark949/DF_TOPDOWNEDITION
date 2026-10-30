@@ -240,7 +240,7 @@
             /** The shell's share of a hit (the eye's hits say so) */
             takeDamage(amount, knockbackX = 0, knockbackY = 0, opts = null) {
                 if (this.alt > 0.15) return false;                                 // still up there
-                if (!(opts && opts.eye)) amount *= opts && opts.type === 'melee' ? DRONE.BLADE : this.state === 'recover' ? DRONE.OPEN : DRONE.ARMOR;
+                if (!(opts && opts.eye)) amount *= opts && (opts.cut || opts.punch || opts.type === 'melee') ? DRONE.BLADE : this.state === 'recover' ? DRONE.OPEN : DRONE.ARMOR;
                 return super.takeDamage(Math.max(1, Math.round(amount)), knockbackX, knockbackY, opts);
             }
 
