@@ -179,7 +179,7 @@
             }
             
             _setupSign(signConfig) {
-                if (this.style === 'double_nights' || this.style === 'moon_city' || this.style === 'enni_cole' || this.style === 'cozy_cafe') { this.attachedSign = null; return; }   // these landmarks draw their own script signs
+                if (this.style === 'double_nights' || this.style === 'moon_city' || this.style === 'cozy_cafe') { this.attachedSign = null; return; }   // these landmarks draw their own script signs
                 const mainSection = this.sections[0];
                 const titleCase = (str) => str.replace(/\w\S*/g, (txt) => 
                     txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
@@ -308,7 +308,6 @@
              */
             drawBase(ctx) {
                 if (this.style === 'double_nights') { this._dnDrawBase(ctx); return; }   // buildings/double-nights.js
-                if (this.style === 'enni_cole') { this._ecDrawBase(ctx); return; }
                 if (this.style === 'cozy_cafe') { this._ccDrawBase(ctx); return; }   // buildings/cozy-cafe.js
                 ctx.save();
                 
@@ -341,7 +340,6 @@
              */
             drawTop(ctx, worldMinutes = 1260) {
                 if (this.style === 'double_nights' && typeof game !== 'undefined' && game.camera) { this._dnDrawTop(ctx); return; }
-                if (this.style === 'enni_cole' && typeof game !== 'undefined' && game.camera) { this._ecDrawTop(ctx); return; }
                 if (this.style === 'cozy_cafe' && typeof game !== 'undefined' && game.camera) { this._ccDrawTop(ctx); return; }
                 if (CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera) { this._drawLeanTop(ctx); return; }
                 ctx.save();
@@ -709,7 +707,6 @@
                 if (this.style === 'silver_queen' && t) { this._sqLights(); return; }
                 if (this.style === 'double_nights') { this._dnLights(); return; }
                 if (this.style === 'moon_city') { this._mcLights(); return; }
-                if (this.style === 'enni_cole') { this._ecLights(); return; }
                 if (this.style === 'cozy_cafe') { this._ccLights(); return; }
                 const E = this._entrance();
                 if (E) {
@@ -1006,7 +1003,6 @@
 
             /** Emissive layer (after lighting): lit windows, neon trim, rooftop lights. dark = ambient darkness 0..1 */
             drawEmissive(ctx, dark, beamsOnly) {
-                if (this.style === 'enni_cole' && typeof game !== 'undefined' && game.camera) { this._ecDrawEmissive(ctx, dark); return; }
                 if (this.style === 'cozy_cafe' && typeof game !== 'undefined' && game.camera) { this._ccDrawEmissive(ctx, dark); return; }
                 if (!(CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera)) return;
                 if (this.style === 'double_nights') { this._dnDrawEmissive(ctx, dark); return; }
