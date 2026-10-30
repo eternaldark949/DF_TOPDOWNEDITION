@@ -274,10 +274,10 @@
                     const sparks = GameSettings.lampSparks !== false && this.activeMap.type === 'outdoor';
                     for (const entry of this._queryLampCandidates(cb.lamps, 'lampEmission')) {
                         const l = entry.item;
-                        if (l._bulbPaintFrame !== this._renderDrawId || !LAMP_TYPE_STYLE[l.lampType] || typeof l.drawEmissive !== 'function') continue;
+                        if (l._bulbPaintFrame !== this._renderDrawId || !(LAMP_TYPE_STYLE[l.lampType] || l.fixture) || typeof l.drawEmissive !== 'function') continue;
                         if (!lampPaintInView(l, ctx, cb.view, z, l._bulbDay)) continue;
                         l.drawEmissive(ctx, l._bulbDay);
-                        if (sparks && l._bulbDay < 0.2 && !l._forcedOff) this.drawLampSparks(ctx, l, dark);   // its sparks rising (engine/street-mist.js)
+                        if (sparks && !l.fixture && l._bulbDay < 0.2 && !l._forcedOff) this.drawLampSparks(ctx, l, dark);   // its sparks rising (engine/street-mist.js)
                     }
                 }
                 // Motion trails and car lamps remain luminous above the ambient darkness.

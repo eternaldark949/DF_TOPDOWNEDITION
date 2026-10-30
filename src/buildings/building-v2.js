@@ -713,11 +713,13 @@
                     const cx = E.cx, cy = E.cy, at = (u, n) => ({ x: cx + E.ux * u + E.nx * n, y: cy + E.uy * u + E.ny * n });
                     // Entrance pair, warm pool at the door — purposeful light instead of a bulb grid (a street-front
                     // filler keeps just the pool: a whole row of them lit in pairs cost too much frame)
-                    if (this._shopfront !== 'pool') {
-                        this.attachedLights.push(new LampEntity({ ...at(-46, 0), lampType: 3, color: accent, lightRadius: 120 }));
-                        this.attachedLights.push(new LampEntity({ ...at(46, 0), lampType: 3, color: accent, lightRadius: 120 }));
+                    if (this._shopfront !== 'pool') {                     // carriage lanterns either side of the door (entities/lamps.js)
+                        const angle = Math.atan2(E.ny, E.nx) - Math.PI / 2;
+                        this.attachedLights.push(new LampEntity({ ...at(-46, 0), lampType: 3, fixture: 'carriage', angle, color: accent, lightRadius: 120 }));
+                        this.attachedLights.push(new LampEntity({ ...at(46, 0), lampType: 3, fixture: 'carriage', angle, color: accent, lightRadius: 120 }));
                     }
-                    this.attachedLights.push(new LampEntity({ ...at(0, 26), lampType: 4, color: '#ffe2b8', lightRadius: this.style === 'silver_queen' ? 260 : 170 }));
+                    // (the pool itself is light only: no fixture standing on the pavement)
+                    this.attachedLights.push(Object.assign(new LampEntity({ ...at(0, 26), lampType: 4, color: '#ffe2b8', lightRadius: this.style === 'silver_queen' ? 260 : 170 }), { visible: false }));
                     if (this.style === 'silver_queen') {   // the hexagon wing lamps
                         this.attachedLights.push(new LampEntity({ x: cx - 150, y: cy, lampType: 3, color: '#c8a8ff', lightRadius: 190 }));
                         this.attachedLights.push(new LampEntity({ x: cx + 150, y: cy, lampType: 3, color: '#c8a8ff', lightRadius: 190 }));

@@ -209,6 +209,260 @@
             return cv;
         }
 
+        /* Indoor light fixtures, seen from above: the lamp library. Like the street styles, each is painted once
+           per light colour, lit state and size, and stamped. A LampEntity wears one by `fixture` (or its lampType's
+           default, LAMP_TYPE_FIXTURE); furniture paints one with drawLampFixture, and a glow pass lights one with
+           drawLampFixtureLit (its halo and lit glass, after the darkness). `box` is the sprite's extent, `halo`
+           the radius of its light round it. To add a lamp, add a fixture here and name it where it stands. */
+        const FX_BRASS = ['#f0d79a', '#c9a46a', '#8d6a32'], FX_BRONZE = '#2a211c';
+        /** A hex colour darkened (f < 1) or lifted towards white (f > 1, by f - 1) */
+        function _fxShade(hex, f) {
+            return '#' + [1, 3, 5].map(i => { const v = parseInt(hex.slice(i, i + 2), 16); return Math.round(f <= 1 ? v * f : v + (255 - v) * (f - 1)).toString(16).padStart(2, '0'); }).join('');
+        }
+        /** Hex colours a and b mixed, t of the way to b */
+        function _fxMix(a, b, t) {
+            return '#' + [1, 3, 5].map(i => { const u = parseInt(a.slice(i, i + 2), 16), v = parseInt(b.slice(i, i + 2), 16); return Math.round(u + (v - u) * t).toString(16).padStart(2, '0'); }).join('');
+        }
+        /** A brass disc with its highlight up and to the left */
+        function _fxBrass(c, x, y, r) {
+            const g = c.createRadialGradient(x - r * 0.4, y - r * 0.45, r * 0.05, x, y, r);
+            g.addColorStop(0, FX_BRASS[0]); g.addColorStop(0.5, FX_BRASS[1]); g.addColorStop(1, FX_BRASS[2]);
+            c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+        }
+        function _fxShadow(c, x, y, r) {
+            c.fillStyle = 'rgba(0, 0, 0, 0.26)'; c.beginPath(); c.ellipse(x + 1.6, y + 2.2, r, r * 0.94, 0, 0, Math.PI * 2); c.fill();
+        }
+
+        // A pleated fabric shade from above: the fabric falling away from the top ring to a trimmed rim, the bulb
+        // and the harp's spider seen down through the top. Lit, the cloth glows in the light's colour, hottest by the bulb.
+        function _fxShade_(c, lit, color, o) {
+            const { R, r0, pleats, fabric, trim } = o;
+            _fxShadow(c, 0, 0, R + 0.6);
+            const g = c.createRadialGradient(0, 0, r0, 0, 0, R);
+            if (lit) {                                                           // the cloth's own colour, steeped in the light
+                const cloth = _fxMix(fabric[0], color, 0.6);
+                g.addColorStop(0, _fxShade(_fxMix(cloth, '#f0a050', 0.15), 0.97)); g.addColorStop(0.35, _fxShade(_fxMix(cloth, '#e08840', 0.22), 0.82)); g.addColorStop(1, _fxShade(_fxMix(cloth, '#b85a24', 0.3), 0.56));
+            }
+            else { g.addColorStop(0, fabric[0]); g.addColorStop(1, fabric[1]); }
+            c.fillStyle = g;
+            // the rim, scalloped between the pleats' ribs
+            c.beginPath();
+            for (let i = 0; i <= pleats * 4; i++) {
+                const a = i / (pleats * 4) * Math.PI * 2, r = R - 0.55 * (1 - Math.abs(Math.cos(a * pleats / 2)));
+                c[i ? 'lineTo' : 'moveTo'](Math.cos(a) * r, Math.sin(a) * r);
+            }
+            c.closePath(); c.fill();
+            // the pleats: every other fold in shadow (wedges, so they still read when the lamp is small), a crest of light between
+            const step = Math.PI * 2 / pleats;
+            c.fillStyle = lit ? 'rgba(110, 40, 8, 0.3)' : 'rgba(90, 60, 40, 0.16)';
+            c.beginPath();
+            for (let i = 0; i < pleats; i++) { const a = i * step; c.moveTo(Math.cos(a) * r0, Math.sin(a) * r0); c.arc(0, 0, R - 0.5, a, a + step * 0.5); c.arc(0, 0, r0, a + step * 0.5, a, true); c.closePath(); }
+            c.fill();
+            c.strokeStyle = lit ? 'rgba(255, 236, 200, 0.4)' : 'rgba(255, 255, 255, 0.22)'; c.lineWidth = 0.45;
+            c.beginPath();
+            for (let i = 0; i < pleats; i++) { const b = (i + 0.75) * step; c.moveTo(Math.cos(b) * (r0 + 0.8), Math.sin(b) * (r0 + 0.8)); c.lineTo(Math.cos(b) * (R - 0.9), Math.sin(b) * (R - 0.9)); }
+            c.stroke();
+            if (!lit) {                                                          // daylight on the shade's far slope
+                const s = c.createLinearGradient(-R, -R, R, R);
+                s.addColorStop(0, 'rgba(255, 255, 255, 0.16)'); s.addColorStop(0.55, 'rgba(255, 255, 255, 0)'); s.addColorStop(1, 'rgba(40, 20, 10, 0.18)');
+                c.fillStyle = s; c.beginPath(); c.arc(0, 0, R - 0.4, 0, Math.PI * 2); c.fill();
+            }
+            c.strokeStyle = trim; c.lineWidth = 1.3;                             // the braid round the rim
+            c.beginPath(); c.arc(0, 0, R - 1, 0, Math.PI * 2); c.stroke();
+            c.strokeStyle = 'rgba(255, 240, 200, 0.35)'; c.lineWidth = 0.4;
+            c.beginPath(); c.arc(0, 0, R - 1.2, Math.PI * 1.05, Math.PI * 1.65); c.stroke();
+            // down through the top: the bulb (or its dark socket), the brass ring and the harp's spider
+            if (lit) {
+                const b = c.createRadialGradient(0, 0, 0, 0, 0, r0);
+                b.addColorStop(0, '#ffffff'); b.addColorStop(0.55, '#fff6e0'); b.addColorStop(1, _lampTint(color, 0.5));
+                c.fillStyle = b;
+            } else c.fillStyle = '#3a2e28';
+            c.beginPath(); c.arc(0, 0, r0, 0, Math.PI * 2); c.fill();
+            c.strokeStyle = FX_BRASS[1]; c.lineWidth = 0.9; c.stroke();
+            c.strokeStyle = FX_BRASS[2]; c.lineWidth = 0.6;
+            c.beginPath(); c.moveTo(-r0, 0); c.lineTo(r0, 0); c.moveTo(0, -r0); c.lineTo(0, r0); c.stroke();
+            _fxBrass(c, 0, 0, Math.max(1.2, r0 * 0.3));                          // the finial
+            c.fillStyle = 'rgba(255, 250, 230, 0.8)'; c.beginPath(); c.arc(-0.4, -0.45, 0.4, 0, Math.PI * 2); c.fill();
+        }
+
+        const LAMP_FIXTURES = {
+            // An empire floor lamp: ivory pleats under a bronze braid (lampType 4's default)
+            shade_floor: { box: [-15, -15, 32, 32], halo: 40,
+                paint(c, lit, color) { _fxShade_(c, lit, color, { R: 13, r0: 5, pleats: 26, fabric: ['#f4ead8', '#cdb89a'], trim: '#6e4a22' }); } },
+            // A bell-shaded table lamp in cream silk, banded in wine velvet
+            shade_table: { box: [-11, -11, 24, 24], halo: 30,
+                paint(c, lit, color) { _fxShade_(c, lit, color, { R: 9, r0: 3.6, pleats: 16, fabric: ['#f6ecdc', '#d6c2a4'], trim: '#7a2e3c' }); } },
+            // …and in rose silk
+            shade_rose: { box: [-13, -13, 28, 28], halo: 34,
+                paint(c, lit, color) { _fxShade_(c, lit, color, { R: 11, r0: 4.2, pleats: 20, fabric: ['#ecc4c4', '#b58489'], trim: '#7a2e3c' }); } },
+            // A Tiffany dome: leaded jewel glass, a band of amber, a ring of leaves, a crown of honey, rubies at the hem
+            tiffany: { box: [-14, -14, 30, 30], halo: 36,
+                paint(c, lit, color) {
+                    const R = 12, f = lit ? 1.1 : 0.62, seg = 14;
+                    _fxShadow(c, 0, 0, R + 0.5);
+                    const wedge = (r1, r2, a1, a2, fill) => { c.fillStyle = fill; c.beginPath(); c.arc(0, 0, r2, a1, a2); c.arc(0, 0, r1, a2, a1, true); c.closePath(); c.fill(); };
+                    for (let i = 0; i < seg; i++) {
+                        const a1 = i / seg * Math.PI * 2, a2 = (i + 1) / seg * Math.PI * 2;
+                        wedge(8.4, R, a1, a2, _fxShade(i % 2 ? '#d9892c' : '#e3a83c', f));          // amber band
+                        wedge(4.6, 8.4, a1, a2, _fxShade(i % 3 ? '#4f7f3c' : '#6d9a48', f));        // leaves
+                        wedge(0, 4.6, a1, a2, _fxShade(i % 2 ? '#e8c35a' : '#d9b04a', f));          // honey crown
+                    }
+                    if (lit) {                                                    // the light through the glass, brightest at the crown
+                        const g = c.createRadialGradient(0, 0, 0, 0, 0, R);
+                        g.addColorStop(0, 'rgba(255, 250, 230, 0.6)'); g.addColorStop(0.4, 'rgba(255, 230, 170, 0.12)'); g.addColorStop(1, 'rgba(255, 220, 160, 0)');
+                        c.fillStyle = g; c.beginPath(); c.arc(0, 0, R, 0, Math.PI * 2); c.fill();
+                    }
+                    c.strokeStyle = '#2a1e14'; c.lineWidth = 0.6;                 // the leading
+                    c.beginPath();
+                    for (let i = 0; i < seg; i++) { const a = i / seg * Math.PI * 2; c.moveTo(Math.cos(a) * 4.6, Math.sin(a) * 4.6); c.lineTo(Math.cos(a) * R, Math.sin(a) * R); }
+                    c.stroke();
+                    for (const r of [4.6, 8.4]) { c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.stroke(); }
+                    c.strokeStyle = FX_BRASS[2]; c.lineWidth = 1.1; c.beginPath(); c.arc(0, 0, R - 0.4, 0, Math.PI * 2); c.stroke();
+                    for (let i = 0; i < seg; i++) {                               // rubies at the hem
+                        const a = (i + 0.5) / seg * Math.PI * 2;
+                        c.fillStyle = _fxShade('#b0243a', lit ? 1.2 : 0.7); c.beginPath(); c.arc(Math.cos(a) * 10.2, Math.sin(a) * 10.2, 0.9, 0, Math.PI * 2); c.fill();
+                    }
+                    _fxBrass(c, 0, 0, 2); c.fillStyle = FX_BRONZE; c.beginPath(); c.arc(0, 0, 0.8, 0, Math.PI * 2); c.fill();
+                } },
+            // ETERNAL's twin sconce from above: the round brass plate seen edge-on against the wall, the collar standing
+            // out from it, and the open top of the upper opal cylinder with its bulb's dome inside (the lower one is hidden
+            // beneath). The wall runs along y at x = 0, the room towards +x (angle 0: a west wall, π east, π/2 north, -π/2 south).
+            twin_sconce: { box: [-4, -12, 16, 24], halo: 26,
+                paint(c, lit, color) {
+                    const X = 6.4, R = 4.6;                                            // the cylinder: its centre out from the wall, its radius
+                    c.fillStyle = 'rgba(0, 0, 0, 0.26)'; c.beginPath(); c.ellipse(X + 1.4, 1.8, R + 0.4, R + 0.3, 0, 0, Math.PI * 2); c.fill();
+                    const p = c.createLinearGradient(-1.4, 0, 1.6, 0);                   // the plate, edge-on
+                    p.addColorStop(0, '#7d5c2a'); p.addColorStop(0.5, '#e8cf94'); p.addColorStop(1, '#a3803f');
+                    c.fillStyle = p; c.beginPath(); c.roundRect(-1.4, -9, 3, 18, 1.2); c.fill();
+                    c.fillStyle = FX_BRASS[0]; for (const s of [-1, 1]) { c.beginPath(); c.arc(0.1, s * 7.6, 0.45, 0, Math.PI * 2); c.fill(); }   // its screws
+                    const cg = c.createLinearGradient(0, -1.6, 0, 1.6);                  // the collar out to the glass
+                    cg.addColorStop(0, FX_BRASS[0]); cg.addColorStop(0.5, FX_BRASS[1]); cg.addColorStop(1, FX_BRASS[2]);
+                    c.fillStyle = cg; c.fillRect(1.4, -1.6, X - R + 0.4, 3.2);
+                    // the opal glass: a ring seen end-on, lit through its frosting
+                    const g = c.createRadialGradient(X, 0, R * 0.55, X, 0, R);
+                    if (lit) { g.addColorStop(0, _lampTint(color, 0.45)); g.addColorStop(0.6, _fxShade(color, 0.95)); g.addColorStop(1, _fxShade(color, 0.62)); }
+                    else { g.addColorStop(0, '#fbf8f3'); g.addColorStop(0.7, '#e6e0d6'); g.addColorStop(1, '#b8b0a4'); }
+                    c.fillStyle = g; c.beginPath(); c.arc(X, 0, R, 0, Math.PI * 2); c.fill();
+                    c.strokeStyle = lit ? 'rgba(255, 255, 255, 0.55)' : 'rgba(150, 140, 125, 0.6)'; c.lineWidth = 0.4; c.stroke();
+                    // the bulb's dome inside the open end
+                    const b = c.createRadialGradient(X - 0.7, -0.8, 0, X, 0, R * 0.62);
+                    if (lit) { b.addColorStop(0, '#ffffff'); b.addColorStop(0.6, '#fff6e2'); b.addColorStop(1, _lampTint(color, 0.5)); }
+                    else { b.addColorStop(0, '#f2eee8'); b.addColorStop(1, '#c9c2b6'); }
+                    c.fillStyle = b; c.beginPath(); c.arc(X, 0, R * 0.62, 0, Math.PI * 2); c.fill();
+                    c.strokeStyle = lit ? 'rgba(200, 120, 50, 0.35)' : 'rgba(120, 110, 95, 0.4)'; c.lineWidth = 0.35; c.stroke();
+                } },
+            // A frosted alabaster dome on a brass ring, etched with petals (lampType 3's default: ceilings and doorways)
+            dome: { box: [-10, -10, 22, 22], halo: 28,
+                paint(c, lit, color) {
+                    const R = 8;
+                    _fxShadow(c, 0, 0, R);
+                    _fxBrass(c, 0, 0, R);
+                    const g = c.createRadialGradient(-1.2, -1.4, 0, 0, 0, R - 1.5);
+                    if (lit) { g.addColorStop(0, '#ffffff'); g.addColorStop(0.45, _lampTint(color, 0.7)); g.addColorStop(1, color); }
+                    else { g.addColorStop(0, '#f4efe6'); g.addColorStop(0.6, '#d8cfc2'); g.addColorStop(1, '#a89d8e'); }
+                    c.fillStyle = g; c.beginPath(); c.arc(0, 0, R - 1.5, 0, Math.PI * 2); c.fill();
+                    c.strokeStyle = lit ? 'rgba(255, 255, 255, 0.45)' : 'rgba(120, 100, 80, 0.3)'; c.lineWidth = 0.45;
+                    for (let i = 0; i < 8; i++) {                                 // the etched petals
+                        const a = i / 8 * Math.PI * 2;
+                        c.beginPath(); c.ellipse(Math.cos(a) * 3.4, Math.sin(a) * 3.4, 2.6, 1.2, a, 0, Math.PI * 2); c.stroke();
+                    }
+                    _fxBrass(c, 0, 0, 1.3);
+                } },
+            // A spun-brass bell pendant: from above, its dome, and the light spilling out under the rim
+            pendant: { box: [-12, -12, 26, 26], halo: 30,
+                paint(c, lit, color) {
+                    const R = 8.5;
+                    if (lit) {
+                        const s = c.createRadialGradient(0, 0, R - 1, 0, 0, R + 3);
+                        s.addColorStop(0, '#fffaf0'); s.addColorStop(0.4, _lampTint(color, 0.4)); s.addColorStop(1, 'rgba(255, 200, 140, 0)');
+                        c.fillStyle = s; c.beginPath(); c.arc(0, 0, R + 3, 0, Math.PI * 2); c.fill();
+                    } else _fxShadow(c, 0, 0, R);
+                    _fxBrass(c, 0, 0, R);
+                    c.strokeStyle = 'rgba(90, 60, 20, 0.45)'; c.lineWidth = 0.5;    // its spun rings
+                    for (const r of [3, 5.4, 7.6]) { c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.stroke(); }
+                    c.strokeStyle = 'rgba(255, 245, 210, 0.55)'; c.lineWidth = 0.6;
+                    c.beginPath(); c.arc(0, 0, 6.4, Math.PI * 1.1, Math.PI * 1.55); c.stroke();
+                    c.fillStyle = FX_BRONZE; c.beginPath(); c.arc(0, 0, 1.5, 0, Math.PI * 2); c.fill();   // the cord's cap
+                } },
+            // A frosted bar in a bronze frame with brass caps (lampType 5's default: clinics, halls)
+            wall_bar: { box: [-6, -16, 12, 32], halo: 26,
+                paint(c, lit, color) {
+                    c.fillStyle = 'rgba(0, 0, 0, 0.26)'; c.beginPath(); c.roundRect(-2.2, -11.8, 6.4, 26, 2.5); c.fill();
+                    c.fillStyle = FX_BRONZE; c.beginPath(); c.roundRect(-3.4, -13, 6.8, 26, 2.6); c.fill();
+                    const g = c.createLinearGradient(-2.2, 0, 2.2, 0);
+                    if (lit) { g.addColorStop(0, color); g.addColorStop(0.45, '#ffffff'); g.addColorStop(1, _lampTint(color, 0.4)); }
+                    else { g.addColorStop(0, '#9e978e'); g.addColorStop(0.45, '#e2ddd5'); g.addColorStop(1, '#b4ada3'); }
+                    c.fillStyle = g; c.beginPath(); c.roundRect(-2.2, -10.5, 4.4, 21, 1.8); c.fill();
+                    c.strokeStyle = lit ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.25)'; c.lineWidth = 0.3;   // the frosting's ribs
+                    for (let y = -9; y <= 9; y += 2) { c.beginPath(); c.moveTo(-2, y); c.lineTo(2, y); c.stroke(); }
+                    for (const s of [-1, 1]) _fxBrass(c, 0, s * 12, 2.1);
+                } }
+        };
+        // An iron carriage lantern out on a scrolled bracket, its plate on the wall at (0, 0), the street towards +y (shop doors)
+        LAMP_FIXTURES.carriage = { box: [-8, -3, 16, 19], halo: 26,
+            paint(c, lit, color) {
+                _fxShadow(c, 0, 9, 5.5);
+                c.fillStyle = LAMP_IRON; c.fillRect(-3.4, -1.6, 6.8, 3.2);
+                c.strokeStyle = LAMP_BRASS; c.lineWidth = 0.5; c.strokeRect(-3, -1.2, 6, 2.4);
+                c.strokeStyle = LAMP_IRON; c.lineCap = 'round'; c.lineWidth = 1.8;
+                c.beginPath(); c.moveTo(0, 0); c.lineTo(0, 5); c.stroke();
+                c.lineWidth = 1;                                                     // the scrolls under the arm
+                for (const s of [-1, 1]) { c.beginPath(); c.moveTo(0, 1); c.quadraticCurveTo(s * 3.5, 1.5, s * 3, 4); c.arc(s * 2.2, 4, 0.8, 0, Math.PI * 2); c.stroke(); }
+                _lampLantern(c, 0, 9.5, 5, lit, color);
+            } };
+        const LAMP_TYPE_FIXTURE = { 3: 'dome', 4: 'shade_floor', 5: 'wall_bar' };
+
+        const _lampFixtureSprites = new Map();
+        /** A fixture painted once (cropped to its `box`) per colour, lit state and size, as lampSprite */
+        function lampFixtureSprite(name, color, lit, S = 3) {
+            const key = name + '|' + color + '|' + (lit ? 1 : 0) + '|' + S;
+            let cv = _lampFixtureSprites.get(key);
+            if (!cv) {
+                const [bx, by, bw, bh] = LAMP_FIXTURES[name].box;
+                cv = document.createElement('canvas'); cv.width = Math.ceil(bw * S); cv.height = Math.ceil(bh * S);
+                const c = cv.getContext('2d'); c.setTransform(S, 0, 0, S, -bx * S, -by * S);
+                LAMP_FIXTURES[name].paint(c, lit, color);
+                _lampFixtureSprites.set(key, cv);
+            }
+            return cv;
+        }
+        /** A fixture's glass colour: the lamp's own, or warm white when that's missing or a dull grey (a building's plain accent) */
+        function _fxColor(color) {
+            if (!/^#[0-9a-f]{6}$/i.test(color || '')) return '#ffeebb';
+            const v = [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16));
+            return Math.max(...v) - Math.min(...v) < 24 && Math.max(...v) < 200 ? '#ffe2b8' : color;
+        }
+        /** The sprite size for ctx's current scale (times `scale`): 1×, 2× or 3× */
+        function _fxSize(ctx, scale = 1) { const m = ctx.getTransform(), d = Math.hypot(m.a, m.b) * scale; return d > 1.6 ? 3 : d > 0.8 ? 2 : 1; }
+
+        /** Paint fixture `name` at (x, y): o.lit, o.color (the light's), o.angle, o.scale */
+        function drawLampFixture(ctx, name, x, y, o = {}) {
+            const spec = LAMP_FIXTURES[name];
+            if (!spec) return;
+            const scale = o.scale || 1, [bx, by, bw, bh] = spec.box;
+            ctx.save(); ctx.translate(x, y);
+            if (o.angle) ctx.rotate(o.angle);
+            if (scale !== 1) ctx.scale(scale, scale);
+            ctx.drawImage(lampFixtureSprite(name, _fxColor(o.color), !!o.lit, _fxSize(ctx)), bx, by, bw, bh);
+            ctx.restore();
+        }
+        /** After the darkness: fixture `name` lit at (x, y), its halo round it, at strength k (o.angle, o.scale) */
+        function drawLampFixtureLit(ctx, name, x, y, color, k = 1, o = {}) {
+            const spec = LAMP_FIXTURES[name];
+            if (!spec || k < 0.01) return;
+            const scale = o.scale || 1, [bx, by, bw, bh] = spec.box, col = _fxColor(color), a = ctx.globalAlpha, op = ctx.globalCompositeOperation;
+            ctx.save(); ctx.translate(x, y);
+            if (o.angle) ctx.rotate(o.angle);
+            if (scale !== 1) ctx.scale(scale, scale);
+            const h = spec.halo;
+            ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = a * Math.min(1, k) * 0.22;
+            ctx.drawImage(glowSprite(col, 0.18), -h, -h, h * 2, h * 2);
+            ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = a * Math.min(1, k);
+            ctx.drawImage(lampFixtureSprite(name, col, true, _fxSize(ctx)), bx, by, bw, bh);
+            ctx.restore();
+            ctx.globalAlpha = a; ctx.globalCompositeOperation = op;
+        }
+
         function lampPaintInView(lamp, ctx, view, zoom, daylight) {
             if (!lamp || lamp.draw !== LampEntity.prototype.draw || lamp._glow !== LampEntity.prototype._glow ||
                 !Number.isFinite(daylight) || !Number.isFinite(lamp._lightK ?? 1)) return true;
@@ -226,6 +480,9 @@
                     left = Math.min(left, b.x - r); right = Math.max(right, b.x + r);
                     top = Math.min(top, b.y - r); bottom = Math.max(bottom, b.y + r);
                 }
+            } else if (lamp.fixture && LAMP_FIXTURES[lamp.fixture]) {
+                const [bx, by, bw, bh] = LAMP_FIXTURES[lamp.fixture].box, r = on ? Math.max(LAMP_FIXTURES[lamp.fixture].halo, lamp.lampType === 4 ? 34 : 24) : 0;
+                left = Math.min(bx, -r); top = Math.min(by, -r); right = Math.max(bx + bw, r); bottom = Math.max(by + bh, r);
             } else if (lamp.lampType === 3 || lamp.lampType === 4 || lamp.lampType === 5) {
                 const r = on ? (lamp.lampType === 4 ? 34 : 24) : lamp.lampType === 4 ? 12 : 8;
                 left = -r; right = r; top = lamp.lampType === 5 ? Math.min(-12, -r) : -r;
@@ -246,6 +503,9 @@
                 
                 this.lampType = config.lampType || 2;
                 this.angle = config.angle || 0; // Orientation in radians
+                // Indoor lamps wear a fixture from the library (LAMP_FIXTURES); 'orb' keeps the old bare glow
+                const fx = config.fixture || LAMP_TYPE_FIXTURE[this.lampType];
+                this.fixture = fx && LAMP_FIXTURES[fx] && !LAMP_TYPE_STYLE[this.lampType] ? fx : null;
                 
                 // Use color/radius from config or defaults
                 this.color = config.color || (this.lampType === 1 ? '#ffaa55' : '#ffeebb');
@@ -265,6 +525,10 @@
             /** Only the luminous panes and bloom: drawn after the world's darkness, never the post. */
             drawEmissive(ctx, daylight = 0) {
                 const style = LAMP_TYPE_STYLE[this.lampType], k = Math.max(0, Math.min(1, this._lightK ?? 1));
+                if (this.fixture) {                                              // an indoor fixture: its lit glass and halo
+                    if (this.visible && daylight < .2 && !this._forcedOff) drawLampFixtureLit(ctx, this.fixture, this.x, this.y, this.color, k, { angle: this.angle });
+                    return;
+                }
                 if (!style || !this.visible || daylight >= .2 || this._forcedOff || k < .02) return;
                 const t = (_frameTime + this.animOffset) / 1000;
                 const SG = (() => { const m = ctx.getTransform(), d = Math.hypot(m.a, m.b) * LAMP_POST_SCALE; return d > 1.6 ? 3 : d > .8 ? 2 : 1; })();
@@ -327,6 +591,19 @@
                 let bulbs = [];
                 
                 const style = LAMP_TYPE_STYLE[this.lampType];
+                if (this.fixture) {                                              // an indoor fixture (LAMP_FIXTURES): its light on the floor, its body
+                    const spec = LAMP_FIXTURES[this.fixture], [bx, by, bw, bh] = spec.box, k = this._lightK ?? 1, S = _fxSize(ctx), col = _fxColor(this.color);
+                    if (isOn) {
+                        const gr = this.lampType === 4 ? 34 : 24;
+                        ctx.globalAlpha = 0.7 * k; ctx.drawImage(this._glow(), -gr, -gr, gr * 2, gr * 2); ctx.globalAlpha = 1;
+                        if (k < 1) ctx.drawImage(lampFixtureSprite(this.fixture, col, false, S), bx, by, bw, bh);
+                        ctx.globalAlpha = k;
+                    }
+                    ctx.drawImage(lampFixtureSprite(this.fixture, col, isOn, S), bx, by, bw, bh);
+                    ctx.globalAlpha = 1;
+                    ctx.restore();
+                    return;
+                }
                 if (style) ctx.scale(LAMP_POST_SCALE, LAMP_POST_SCALE);
                 if (style) { // A street lamp: its antique style, a baked sprite (LAMP_STYLES)
                     bulbs = LAMP_STYLES[style].bulbs;

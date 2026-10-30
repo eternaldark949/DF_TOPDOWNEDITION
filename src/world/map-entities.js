@@ -133,31 +133,31 @@
                         F(606, 72, 48, 48, 'apt_firepit'), F(546, 58, 34, 80, 'apt_patio_sofa'), F(680, 58, 34, 80, 'apt_patio_sofa', { face: 'W' }),
                     ];
                     e.lamps = [
-                        new LampEntity({ x: 16, y: 100, lampType: 5, color: '#ffaa88', lightRadius: 400, angle: 0 }),
-                        new LampEntity({ x: 350, y: 194, lampType: 5, color: '#ff8899', lightRadius: 400, angle: Math.PI / 2 }),
-                        new LampEntity({ x: 700, y: 194, lampType: 5, color: '#ff8899', lightRadius: 400, angle: Math.PI / 2 }),
-                        new LampEntity({ x: 1050, y: 194, lampType: 5, color: '#ff8899', lightRadius: 400, angle: Math.PI / 2 }),
-                        new LampEntity({ x: 1384, y: 100, lampType: 5, color: '#ffaa88', lightRadius: 400, angle: Math.PI }),
-                        new LampEntity({ x: 16, y: 350, lampType: 5, color: '#ffbb88', lightRadius: 500, angle: 0 }),
-                        new LampEntity({ x: 16, y: 600, lampType: 5, color: '#ffaa77', lightRadius: 500, angle: 0 }),
-                        new LampEntity({ x: 16, y: 800, lampType: 5, color: '#ffbb88', lightRadius: 450, angle: 0 }),
-                        new LampEntity({ x: 450, y: 214, lampType: 5, color: '#ffccaa', lightRadius: 500, angle: Math.PI / 2 }),
-                        new LampEntity({ x: 750, y: 214, lampType: 5, color: '#ffccaa', lightRadius: 500, angle: Math.PI / 2 }),
-                        new LampEntity({ x: 450, y: 884, lampType: 5, color: '#ff9977', lightRadius: 400, angle: Math.PI / 2 }),
-                        new LampEntity({ x: 307, y: 439, lampType: 4, color: '#ff8866', lightRadius: 500 }),
-                        new LampEntity({ x: 700, y: 700, lampType: 4, color: '#ffaa88', lightRadius: 450 }),
-                        new LampEntity({ x: 109, y: 463, lampType: 4, color: '#ffbb99', lightRadius: 400 }),
-                        new LampEntity({ x: 290, y: 759, lampType: 4, color: '#ffb880', lightRadius: 170 }),   // bar pendants
-                        new LampEntity({ x: 410, y: 759, lampType: 4, color: '#ffb880', lightRadius: 170 }),
-                        new LampEntity({ x: 1100, y: 214, lampType: 5, color: '#ffaabb', lightRadius: 450, angle: Math.PI / 2 }),
-                        new LampEntity({ x: 1384, y: 350, lampType: 5, color: '#ff99aa', lightRadius: 450, angle: Math.PI }),
-                        new LampEntity({ x: 1100, y: 400, lampType: 4, color: '#ff99bb', lightRadius: 400 }),
-                        new LampEntity({ x: 1250, y: 562, lampType: 5, color: '#e8e4f0', lightRadius: 300, angle: Math.PI / 2 }),   // clear of the bathroom door
-                        new LampEntity({ x: 1384, y: 700, lampType: 5, color: '#e8e4f0', lightRadius: 320, angle: Math.PI }),
-                        new LampEntity({ x: 1027, y: 884, lampType: 5, color: '#ffe0cc', lightRadius: 260, angle: Math.PI / 2 }),   // vanity mirror light
-                        new LampEntity({ x: 916, y: 770, lampType: 5, color: '#ffe8dc', lightRadius: 320, angle: 0 }),   // bathroom west wall, by the towels
-                        new LampEntity({ x: 600, y: 884, lampType: 5, color: '#ffaa55', lightRadius: 300, angle: Math.PI / 2 }),   // beside the exit, not in it
-                        new LampEntity({ x: 800, y: 884, lampType: 5, color: '#ffaa55', lightRadius: 300, angle: Math.PI / 2 }),
+                        new LampEntity({ x: 16, y: 100, lampType: 5, fixture: 'twin_sconce', color: '#ffaa88', lightRadius: 400, angle: 0 }),
+                        new LampEntity({ x: 350, y: 194, lampType: 5, fixture: 'twin_sconce', color: '#ff8899', lightRadius: 400, angle: Math.PI / 2 }),
+                        new LampEntity({ x: 700, y: 194, lampType: 5, fixture: 'twin_sconce', color: '#ff8899', lightRadius: 400, angle: Math.PI / 2 }),
+                        new LampEntity({ x: 1050, y: 194, lampType: 5, fixture: 'twin_sconce', color: '#ff8899', lightRadius: 400, angle: Math.PI / 2 }),
+                        new LampEntity({ x: 1384, y: 100, lampType: 5, fixture: 'twin_sconce', color: '#ffaa88', lightRadius: 400, angle: Math.PI }),
+                        new LampEntity({ x: 16, y: 350, lampType: 5, fixture: 'twin_sconce', color: '#ffbb88', lightRadius: 500, angle: 0 }),
+                        new LampEntity({ x: 16, y: 600, lampType: 5, fixture: 'twin_sconce', color: '#ffaa77', lightRadius: 500, angle: 0 }),
+                        new LampEntity({ x: 16, y: 800, lampType: 5, fixture: 'twin_sconce', color: '#ffbb88', lightRadius: 450, angle: 0 }),
+                        new LampEntity({ x: 450, y: 214, lampType: 5, fixture: 'twin_sconce', color: '#ffccaa', lightRadius: 500, angle: Math.PI / 2 }),
+                        new LampEntity({ x: 750, y: 214, lampType: 5, fixture: 'twin_sconce', color: '#ffccaa', lightRadius: 500, angle: Math.PI / 2 }),
+                        new LampEntity({ x: 450, y: 884, lampType: 5, fixture: 'twin_sconce', color: '#ff9977', lightRadius: 400, angle: -Math.PI / 2 }),
+                        hiddenLamp(307, 439, '#ff8866', 500),   // light only: the floor lamps and the bar's pendants paint themselves (drawApartmentDecorProp)
+                        hiddenLamp(700, 700, '#ffaa88', 450),
+                        hiddenLamp(109, 463, '#ffbb99', 400),
+                        hiddenLamp(290, 759, '#ffb880', 170),   // bar pendants
+                        hiddenLamp(410, 759, '#ffb880', 170),
+                        new LampEntity({ x: 1100, y: 214, lampType: 5, fixture: 'twin_sconce', color: '#ffaabb', lightRadius: 450, angle: Math.PI / 2 }),
+                        new LampEntity({ x: 1384, y: 350, lampType: 5, fixture: 'twin_sconce', color: '#ff99aa', lightRadius: 450, angle: Math.PI }),
+                        new LampEntity({ x: 1100, y: 400, lampType: 4, fixture: 'shade_rose', color: '#ff99bb', lightRadius: 400 }),
+                        new LampEntity({ x: 1250, y: 562, lampType: 5, fixture: 'twin_sconce', color: '#e8e4f0', lightRadius: 300, angle: Math.PI / 2 }),   // clear of the bathroom door
+                        new LampEntity({ x: 1384, y: 700, lampType: 5, fixture: 'twin_sconce', color: '#e8e4f0', lightRadius: 320, angle: Math.PI }),
+                        new LampEntity({ x: 1027, y: 884, lampType: 5, fixture: 'twin_sconce', color: '#ffe0cc', lightRadius: 260, angle: -Math.PI / 2 }),   // vanity mirror light
+                        new LampEntity({ x: 916, y: 770, lampType: 5, fixture: 'twin_sconce', color: '#ffe8dc', lightRadius: 320, angle: 0 }),   // bathroom west wall, by the towels
+                        new LampEntity({ x: 600, y: 884, lampType: 5, fixture: 'twin_sconce', color: '#ffaa55', lightRadius: 300, angle: -Math.PI / 2 }),   // beside the exit, not in it
+                        new LampEntity({ x: 800, y: 884, lampType: 5, fixture: 'twin_sconce', color: '#ffaa55', lightRadius: 300, angle: -Math.PI / 2 }),
                     ];
                     // Shadowless soft lights: the light the decor casts on the floor around it.
                     // Round ones take a radius; area lights take w, h (optional `round` = corner size, `soft` = gentler edge).
@@ -205,9 +205,10 @@
                     e.npcs = [ new NPC(500, 540, "LUVSH4D3", 'robot_crimson'), new NPC(150, 320, "Guard Unit Alpha", 'robot_gold'), new NPC(850, 320, "Guard Unit Beta", 'robot_gold') ];
                     const L = (x, y, color, lightRadius, lampType = 4, angle = 0) => new LampEntity({ x, y, lampType, color, lightRadius, angle });
                     e.lamps = [
-                        L(500, 850, '#ffd49a', 640), L(500, 236, '#ffcf8a', 420, 5, Math.PI / 2), L(500, 612, '#ffb060', 300),
-                        // Lounge lamps and the doors (the pillar sconces are soft lights: glow without the cost of shadows)
-                        L(341, 771, '#ffcc88', 300), L(659, 771, '#ffcc88', 300),
+                        hiddenLamp(500, 850, '#ffd49a', 640), L(500, 236, '#ffcf8a', 420, 5, Math.PI / 2),                 // (the chandelier is the floor art's)
+                        Object.assign(L(500, 612, '#ffb060', 300), { fixture: 'tiffany' }),                                 // a Tiffany lamp at the head of the carpet
+                        // Lounge lamps (their floor lamps, dn_lamp, paint themselves) and the doors (the pillar sconces are soft lights: glow without the cost of shadows)
+                        hiddenLamp(341, 771, '#ffcc88', 300), hiddenLamp(659, 771, '#ffcc88', 300),
                         L(500, 1146, '#ffd29a', 380, 5, -Math.PI / 2),
                     ];
                     const S = softLight;
@@ -300,7 +301,7 @@
                         new LampEntity({ x: 250, y: 747, lampType: 5, angle: Math.PI / 2, color: '#dff4ff', lightRadius: 220 }),
                         new LampEntity({ x: 550, y: 747, lampType: 5, angle: Math.PI / 2, color: '#dff4ff', lightRadius: 220 }),
                         // Accent: the scanner's cyan core
-                        new LampEntity({ x: 400, y: 480, lampType: 4, color: '#3fe3ff', lightRadius: 200 })
+                        new LampEntity({ x: 400, y: 480, lampType: 4, fixture: 'orb', color: '#3fe3ff', lightRadius: 200 })
                     ];
                     break;
                 }
@@ -692,7 +693,7 @@
                         hiddenLamp(640, 590, '#dfcbd1', 400),
                         // Practical brass wall lights, matching the perimeter's incandescent trim.
                         ...[[81,180],[819,180],[81,650],[819,650]].map(([x,y]) =>
-                            new LampEntity({x,y,lampType:3,color:'#e8b989',lightRadius:190})),
+                            new LampEntity({x,y,lampType:3,fixture:'twin_sconce',angle:x>450?Math.PI:0,color:'#e8b989',lightRadius:190})),
                         hiddenLamp(450, 810, '#f6d4a2', 190)
                     ];
                     break;

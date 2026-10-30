@@ -1354,17 +1354,19 @@
                 const lightAt = (x, y) => rs && rs.active ? rs.lightAt(x, y) : 1;   // room switches fade these
                 // A glow sprite (core/draw-helpers.js) of colour `rgb`, alpha `a`
                 const glow = (x, y, r, rgb, a) => glowA(ctx, x, y, r, rgb, a);
-                ctx.save(); ctx.globalCompositeOperation = 'lighter';
-                // Lamp shades and bar pendants (they follow the room switches)
-                const shades = [[991, 232, 28], [1115, 232, 28], [307, 439, 34], [700, 700, 34], [109, 463, 34], [231, 759, 22], [350, 759, 22], [469, 759, 22]];
-                for (const p of this.props) if (p.light && p.decorType === 'apt_side') {   // table lamps travel with their tables
-                    const c = p.getCenter(); shades.push([c.x - 2, c.y - 1, 30]);
+                // Lamp shades and bar pendants, lit (the lamp library, entities/lamps.js; they follow the room switches)
+                const shades = [[991, 232, 'shade_table'], [1115, 232, 'shade_table']];             // the bedside lamps
+                for (const p of this.props) {                                                      // the rest travel with their furniture
+                    const x = p.x, y = p.y, w = p.width, h = p.height;
+                    if (p.decorType === 'apt_floor_lamp') shades.push([x + w / 2, y + h / 2, 'shade_floor', w / 26]);
+                    else if (p.light && p.decorType === 'apt_side') shades.push([x + w * 0.42, y + h * 0.45, 'shade_table', Math.min(w, h) / 30]);
+                    else if (p.decorType === 'apt_island') for (const u of APT_PENDANTS) shades.push([x + w * u, y + h / 2, 'pendant', 1]);
                 }
-                for (const [x, y, r] of shades) {                                                  // (glow and bulb in one stamp)
+                for (const [x, y, fx, scale] of shades) {
                     const k = lightAt(x, y);
-                    if (k < 0.01) continue;
-                    drawBulb(ctx, bulbSprite(ctx, '255,236,210', 0.8, 2.5, '255,210,160', 0.26, r, true), x, y, k);
+                    if (k >= 0.01) drawLampFixtureLit(ctx, fx, x, y, '#ffd9b0', k, { scale });
                 }
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 // Fireplace
                 const ff = 0.8 + 0.2 * Math.sin(t * 6.3) * Math.sin(t * 2.1);
                 glow(HEARTHS.apt_949.x, HEARTHS.apt_949.y, 60, '255, 140, 60', 0.35 * ff);
