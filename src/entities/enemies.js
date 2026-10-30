@@ -464,271 +464,8 @@
             }
         }
 
-        /**
-         * =====================================================================
-         *  DRONE (Flying Combat Enemy - extends ActorEntity)
-         * =====================================================================
-         * Hovering combat drones with LOS-based targeting.
-         * Now part of the unified collision system.
-         * 
-         * Features:
-         * - Circle collision for prop/wall interactions
-         * - HP system with knockback support
-         * - Hover animation effect
-         * - Line-of-sight checking
-         * - Strafe AI when blocked
-         */
-        class Drone extends ActorEntity {
-            constructor(x, y) {
-                // Initialize ActorEntity with circle collision
-                super({
-                    x: x,
-                    y: y,
-                    radius: 15,
-                    type: 'drone',
-                    alliance: 'hostile',
-                    hp: 60,
-                    mass: 8,          // Light (flying)
-                    friction: 0.9,
-                    speed: 3,
-                    hasCollision: true,
-                    invincibleDuration: 15
-                });
-                
-                // Combat
-                this.cooldown = Math.random() * 100;
-                
-                // Telegraph
-                this.telegraphThreshold = 8; // ~0.13s window
-                this.telegraphAngle = 0;
-                this.isTelegraphing = false;
-                this._prevPlayerX = 0;
-                this._prevPlayerY = 0;
-                
-                // Animation
-                this.hoverOffset = Math.random() * Math.PI * 2;
-                
-                // AI
-                this.strafeDir = Math.random() > 0.5 ? 1 : -1;
-                this.strafeTimer = 0;
-            }
-            
-            /**
-             * Check if there's line of sight to target.
-             */
-            hasLineOfSight(targetX, targetY, walls) {
-                const dx = targetX - this.x;
-                const dy = targetY - this.y;
-                const dist = Math.hypot(dx, dy);
-                const steps = Math.ceil(dist / 20);
-                
-                for (let i = 1; i < steps; i++) {
-                    const t = i / steps;
-                    const checkX = this.x + dx * t;
-                    const checkY = this.y + dy * t;
-                    
-                    for (let w of walls) {
-                        if (checkX > w.x && checkX < w.x + w.w && 
-                            checkY > w.y && checkY < w.y + w.h) {
-                            return false;
-                        }
-                    }
-                }
-                return true;
-            }
-            
-            /**
-             * Override ActorEntity update for drone AI.
-             */
-            update(playerX, playerY, walls) {
-                if (this.dead) return null;
-                
-                // Hover animation
-                this.hoverOffset += 0.1;
-                
-                // Decrement invincibility
-                if (this.invincibleTimer > 0) {
-                    this.invincibleTimer--;
-                }
-                
-                // Apply knockback physics
-                if (this.knockbackVx || this.knockbackVy) {
-                    this.vx += this.knockbackVx;
-                    this.vy += this.knockbackVy;
-                    this.knockbackVx *= this.knockbackFriction;
-                    this.knockbackVy *= this.knockbackFriction;
-                    if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
-                    if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
-                }
-                
-                const dx = playerX - this.x; 
-                const dy = playerY - this.y;
-                const dist = Math.hypot(dx, dy); 
-                const angle = Math.atan2(dy, dx);
-                const targetDist = 200;
-                
-                // Check line of sight to player
-                const hasLOS = this.hasLineOfSight(playerX, playerY, walls);
-                
-                if (!hasLOS) {
-                    // No LOS - strafe to find a better angle
-                    this.strafeTimer++;
-                    if (this.strafeTimer > 60) {
-                        this.strafeDir *= -1;
-                        this.strafeTimer = 0;
-                    }
-                    
-                    // Move perpendicular to player direction + slightly toward player
-                    const strafeAngle = angle + (Math.PI / 2) * this.strafeDir;
-                    this.vx += Math.cos(strafeAngle) * 0.3;
-                    this.vy += Math.sin(strafeAngle) * 0.3;
-                    
-                    // Also move toward player slowly
-                    this.vx += Math.cos(angle) * 0.1;
-                    this.vy += Math.sin(angle) * 0.1;
-                } else {
-                    // Has LOS - normal behavior
-                    this.strafeTimer = 0;
-                    if (dist > targetDist) { 
-                        this.vx += Math.cos(angle) * 0.2; 
-                        this.vy += Math.sin(angle) * 0.2; 
-                    } else { 
-                        this.vx -= Math.cos(angle) * 0.1; 
-                        this.vy -= Math.sin(angle) * 0.1; 
-                    }
-                }
-                
-                // Apply velocity with friction
-                this.vx *= 0.9; 
-                this.vy *= 0.9; 
-                this.x += this.vx; 
-                this.y += this.vy;
-                
-                // Wall collision (bounce off walls) - CollisionSystem handles separation
-                // but we still want bounce behavior for drones
-                for(let w of walls) {
-                    if (this.x + this.radius > w.x && this.x - this.radius < w.x + w.w && 
-                        this.y + this.radius > w.y && this.y - this.radius < w.y + w.h) {
-                        this.vx *= -1; 
-                        this.vy *= -1; 
-                        this.x += this.vx * 2; 
-                        this.y += this.vy * 2; 
-                    }
-                }
-                
-                // Shooting
-                this.cooldown--;
-                // Estimate player velocity from frame-to-frame delta
-                const playerVelX = playerX - this._prevPlayerX;
-                const playerVelY = playerY - this._prevPlayerY;
-                this._prevPlayerX = playerX;
-                this._prevPlayerY = playerY;
-                
-                // Telegraph: track player with predictive aim
-                if (this.cooldown > 0 && this.cooldown <= this.telegraphThreshold && dist < 500 && hasLOS) {
-                    this.isTelegraphing = true;
-                    const projSpeed = 24;
-                    const travelTime = dist / projSpeed;
-                    const predX = playerX + playerVelX * travelTime;
-                    const predY = playerY + playerVelY * travelTime;
-                    this.telegraphAngle = Math.atan2(predY - this.y, predX - this.x);
-                } else if (this.cooldown > this.telegraphThreshold || !hasLOS) {
-                    this.isTelegraphing = false;
-                }
-                if (this.cooldown <= 0 && dist < 500 && hasLOS) { 
-                    this.isTelegraphing = false;
-                    this.cooldown = 80 + Math.random() * 40; 
-                    return new ProjectileEntity({ 
-                        x: this.x, 
-                        y: this.y, 
-                        angle: this.telegraphAngle, 
-                        isEnemy: true,
-                        owner: this
-                    }); 
-                }
-                return null;
-            }
-            
-            /**
-             * Override onProjectileHit to only take damage from player projectiles.
-             */
-            onProjectileHit(projectile, game) {
-                // Only take damage from player projectiles
-                if (projectile.isEnemy) return;
-                this.lastHitBy = projectile.owner; this.lastHitMelee = !!projectile.melee;   // who gets the Resonance
-                
-                const speed = Math.hypot(projectile.vx, projectile.vy);
-                if (speed > 0) {
-                    // Drones are light (mass 8) - sniper shots send them FLYING
-                    const projMomentum = (projectile.mass || 1) * speed;
-                    const damageMultiplier = projectile.damage / 20;
-                    const knockbackStrength = Math.min((projMomentum * damageMultiplier) / (this.mass || 8), 80);
-                    
-                    const kbX = (projectile.vx / speed) * knockbackStrength;
-                    const kbY = (projectile.vy / speed) * knockbackStrength;
-                    this.takeDamage(projectile.damage, kbX, kbY, projectile.crit ? { crit: true } : null);
-                } else {
-                    this.takeDamage(projectile.damage, 0, 0, projectile.crit ? { crit: true } : null);
-                }
-            }
-            
-            /**
-             * Legacy takeDamage for non-projectile damage (e.g., vehicle hits).
-             */
-            takeDamageOld(amount, bulletAngle) { 
-                const kbX = Math.cos(bulletAngle) * 8;
-                const kbY = Math.sin(bulletAngle) * 8;
-                this.takeDamage(amount, kbX, kbY);
-            }
-            
-            draw(ctx) {
-                if (this.dead) return;
-                
-                // Flash if invincible
-                if (this.invincibleTimer > 0 && this.invincibleTimer % 6 < 3) {
-                    return;
-                }
-                
-                ctx.save(); 
-                ctx.translate(this.x, this.y + Math.sin(this.hoverOffset) * 3);
-                
-                // Body
-                ctx.fillStyle = '#444'; 
-                ctx.beginPath(); 
-                ctx.arc(0, 0, 15, 0, Math.PI*2); 
-                ctx.fill();
-                
-                // Eye (glowing) — flashes crimson during telegraph
-                const eyeColor = this.isTelegraphing ? '#ff2244' : '#a469ff';
-                ctx.fillStyle = eyeColor; 
-                ctx.shadowColor = eyeColor; 
-                ctx.shadowBlur = this.isTelegraphing ? 18 : 10; 
-                ctx.beginPath(); 
-                ctx.arc(0, 0, 6, 0, Math.PI*2); 
-                ctx.fill();
-                ctx.shadowBlur = 0; 
-                
-                // Rotating wings
-                ctx.fillStyle = '#666'; 
-                const rOffset = _frameTime / 50;
-                ctx.beginPath(); 
-                ctx.arc(Math.cos(rOffset)*20, Math.sin(rOffset)*20, 4, 0, Math.PI*2); 
-                ctx.fill();
-                ctx.beginPath(); 
-                ctx.arc(Math.cos(rOffset + 2)*20, Math.sin(rOffset + 2)*20, 4, 0, Math.PI*2); 
-                ctx.fill();
-                
-                // (Health bar: drawn with the other combat overlays once hit — engine/combat-fx.js)
-                ctx.restore();
+        // (The Double Nights drones: entities/drones.js)
 
-                // Telegraph aim line (world space)
-                if (this.isTelegraphing && this.cooldown > 0) {
-                    drawEnemyTelegraph(ctx, this.x, this.y, this.telegraphAngle,
-                        this.cooldown, this.telegraphThreshold, '#a469ff');
-                }
-            }
-        }
-        
         /* --- TRAFFIC & GANGERS --- */
         /**
          * =====================================================================
@@ -751,6 +488,17 @@
             matins:   { name: 'Matins, the Choir',      accent: '#e8c27a', trim: '#fff1c2', mantle: '#1a1216', eye: '255, 190, 80' },
             compline: { name: 'Compline, the Penitent', accent: '#8a5cff', trim: '#e6ddd0', mantle: '#24163a', eye: '200, 120, 255' }
         };
+        /* How the Triumvirate fights (a persona; times in seconds unless noted):
+             HP each; RELOAD frames between bursts, and they stagger them (STAGGER frames apart on waking, and a
+             warden whose burst ends while the others reload fires EXTEND more, so all three never go quiet);
+             lose her and a burst goes on into her cover for COVER_FIRE; hidden past FLANK_AFTER, one of them
+             walks to a firing spot (findShotSpot); a fall makes the others fire faster (enrage).
+             Vesper lobs a burning censer over cover (CENSER_EVERY, a WIND tell); Matins sings through walls
+             (HYMN_EVERY, a CHARGE tell); Compline throws its chain hook past cover (HOOK_EVERY, a HOOK_TELL),
+             within HOOK_RANGE (engine/boss-hazards.js does the rest). */
+        const WARDEN = { HP: 1500, RELOAD: 120, STAGGER: 40, EXTEND: 4, COVER_FIRE: 0.5, FLANK_AFTER: 2,
+            CENSER_EVERY: 7, CENSER_WIND: 0.5, CENSER_RANGE: 640, HYMN_EVERY: 6, HYMN_CHARGE: 0.6,
+            HOOK_EVERY: 8, HOOK_TELL: 0.7, HOOK_RANGE: 420 };
 
         class GatlingGunner extends ActorEntity {
             constructor(x, y, id, opts = {}) {
@@ -806,6 +554,9 @@
                     this.sightGated = true;
                     this.telegraphThreshold = 30;                 // ~0.5 s: dodgeable on reaction
                     this.bossName = WARDENS[this.persona].name;
+                    this.hp = this.maxHp = WARDEN.HP;
+                    this.reloadTime = WARDEN.RELOAD;
+                    this._move = { at: 0, tell: null };          // its own move (censer, hymn, hook): next due, wind-up
                 }
                 this._heat = 0;           // the Wardens' original barrel heat
                 // Ordinary gunner visual momentum: advanced by simulation, never by draw().
@@ -818,7 +569,93 @@
             makeDormant() { this.dormant = true; this._eyeK = 0; this._riseK = 0; this.burstCooldown = 0; this.burstCount = 0; this.angle = Math.PI / 2; }
 
             /** Wake: move now, but the first burst waits `hold` frames (and still telegraphs). */
-            awaken(hold = 60) { this.dormant = false; this._eyeK = 1; this._riseK = 1; this._holdFire = hold; }
+            awaken(hold = 60) {
+                this.dormant = false; this._eyeK = 1; this._riseK = 1; this._holdFire = hold;
+                if (this.persona) {                                       // staggered: their first bursts (and so their reloads) fall apart
+                    this._holdFire += this.id * WARDEN.STAGGER;
+                    const every = { vesper: WARDEN.CENSER_EVERY, matins: WARDEN.HYMN_EVERY, compline: WARDEN.HOOK_EVERY }[this.persona];
+                    this._move.at = _gameTimeSec + 2 + every * (0.3 + 0.25 * this.id);
+                }
+            }
+
+            /** A warden falls: the survivors fire faster */
+            enrage() {
+                this.burstDelay = Math.max(3, this.burstDelay - 1);
+                this.reloadTime = Math.max(60, Math.round(this.reloadTime * 0.75));
+                this.maxBurstCount += 3;
+                this._igniteFlash = 1;
+            }
+
+            /**
+             * What a warden knows of her this tick: sight (a clear line, and no censer smoke between), the last
+             * place it saw her, Matins' reveal; and so where to aim — her, or (cover fire) where she went.
+             */
+            _wardenSense(px, py) {
+                const now = _gameTimeSec, g = typeof game !== 'undefined' ? game : null;
+                const sight = this._hasSight(px, py) && !(g && g.smokeBlocks && g.smokeBlocks(this.x, this.y, px, py));
+                const revealed = !!(g && g._revealedUntil > now);
+                if (sight || revealed) this._seen = { x: px, y: py, t: now };
+                const seen = this._seen;
+                // a burst in flight keeps going at her cover a moment; revealed, they open on her through it
+                const cover = !sight && !!seen && (revealed || (this.burstCount > 0 && now - seen.t < WARDEN.COVER_FIRE));
+                const S = this._sense || (this._sense = {});
+                S.sight = sight; S.revealed = revealed; S.cover = cover; S.seen = seen;
+                S.hiddenFor = seen ? now - seen.t : 0;
+                return S;
+            }
+
+            /** Hidden too long: one warden (only one) goes to a spot with a line on where she was */
+            _wardenFlank(squad, S) {
+                const now = _gameTimeSec, map = this.navMap;
+                let lead = GatlingGunner._flanker;
+                if (lead && (lead.dead || !squad.includes(lead))) lead = GatlingGunner._flanker = null;
+                const lastAny = Math.max(...squad.map(w => (w._seen ? w._seen.t : 0)));
+                if (now - lastAny < WARDEN.FLANK_AFTER || !S.seen || !map) {
+                    if (lead === this) GatlingGunner._flanker = null;
+                    this._flankTo = null; return;
+                }
+                if (!lead) lead = GatlingGunner._flanker = this;
+                if (lead !== this) { this._flankTo = null; return; }
+                if (!this._flankTo || now > (this._flankAt || 0)) {
+                    this._flankAt = now + 1;
+                    const spot = findShotSpot(map, this.x, this.y, S.seen.x, S.seen.y, { searchDist: 900, maxDist: 420, minDist: 140, stride: 2, maxChecks: 60,
+                        avoid: squad.filter(w => w !== this), spacing: 90 });
+                    this._flankTo = spot ? { x: spot.x, y: spot.y } : null;
+                }
+            }
+
+            /** Its own move, one at a time: a wind-up that reads, then the censer, the hymn or the hook */
+            _wardenMove(px, py, S) {
+                const g = typeof game !== 'undefined' ? game : null; if (!g || !g.addHazard) return;
+                const now = _gameTimeSec, M = this._move, d = Math.hypot(px - this.x, py - this.y);
+                if (M.tell) {
+                    if (this.persona === 'compline' && (S.sight || S.revealed)) M.tell.a = Math.atan2(py - this.y, px - this.x);   // it tracks her while it winds
+                    if (now < M.tell.at) return;
+                    const T = M.tell; M.tell = null;
+                    if (this.persona === 'vesper') {
+                        const to = S.sight || S.revealed ? { x: px, y: py } : S.seen;
+                        if (to) g.addHazard({ kind: 'censer', x0: this.x, y0: this.y, x1: to.x, y1: to.y, flight: 0.9, owner: this });
+                    } else if (this.persona === 'matins') {
+                        g.addHazard({ kind: 'hymn', x: this.x, y: this.y, owner: this });
+                        audioSys.sfx('explode');
+                    } else if (this.persona === 'compline') {
+                        g.addHazard({ kind: 'hook', x: this.x, y: this.y, x0: this.x, y0: this.y, a: T.a, state: 'out', owner: this });
+                    }
+                    return;
+                }
+                if (now < M.at || this._holdFire > 0) return;
+                if (this.persona === 'vesper') {
+                    const to = S.sight || S.revealed ? { x: px, y: py } : S.hiddenFor < 4 ? S.seen : null;
+                    if (!to || Math.hypot(to.x - this.x, to.y - this.y) > WARDEN.CENSER_RANGE) return;
+                    M.at = now + WARDEN.CENSER_EVERY; M.tell = { at: now + WARDEN.CENSER_WIND, from: now };
+                } else if (this.persona === 'matins') {
+                    M.at = now + WARDEN.HYMN_EVERY; M.tell = { at: now + WARDEN.HYMN_CHARGE, from: now };
+                } else if (this.persona === 'compline') {
+                    if (d > WARDEN.HOOK_RANGE || !(S.sight || S.revealed || S.hiddenFor < 2)) return;
+                    const to = S.sight || S.revealed ? { x: px, y: py } : S.seen;
+                    M.at = now + WARDEN.HOOK_EVERY; M.tell = { at: now + WARDEN.HOOK_TELL, from: now, a: Math.atan2(to.y - this.y, to.x - this.x) };
+                }
+            }
 
             /** Has she a clear line from here (walls, props, shut doors)? Checked every few frames. */
             _hasSight(px, py) {
@@ -874,6 +711,13 @@
                     this.knockbackVy *= this.knockbackFriction;
                     if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
                     if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
+                }
+
+                // A warden: what it knows of her, its own move; out of sight, its burst goes on into her cover
+                const S = this.persona ? this._wardenSense(playerX, playerY) : null;
+                if (S) {
+                    this._wardenMove(playerX, playerY, S);
+                    if (S.cover && !S.sight && !S.revealed) { playerX = S.seen.x; playerY = S.seen.y; }
                 }
                 
                 const dx = playerX - this.x;
@@ -939,6 +783,11 @@
                     const st = actorSteer(this, playerX, playerY, 2, this.navMap);
                     moveX = st.x; moveY = st.y;
                 }
+                // She's been hidden a while: one warden walks to a firing spot on where she went
+                if (S) {
+                    this._wardenFlank(squad, S);
+                    if (this._flankTo) { const st = actorSteer(this, this._flankTo.x, this._flankTo.y, 2.4, this.navMap); moveX = st.x; moveY = st.y; }
+                }
 
                 // SEPARATION FORCE (Prevent Overlap)
                 const separationDist = this.persona ? 90 : 60;
@@ -978,7 +827,9 @@
                 this._heat = Math.max(0, Math.min(1, this._heat + (firingNow ? 0.05 : -0.012)));
                 // Boss mode: no burst begins (or goes on) without a clear line on her, nor in the grace after waking
                 if (this._holdFire > 0) this._holdFire--;
-                if (this.sightGated && (this._holdFire > 0 || !this._hasSight(playerX, playerY))) {
+                const blind = S ? !(S.sight || S.cover || S.revealed) : this.sightGated && !this._hasSight(playerX, playerY);
+                const winding = S && this.persona === 'compline' && this._move.tell;      // the hook takes both its hands
+                if (this.sightGated && (this._holdFire > 0 || blind || winding)) {
                     this.isTelegraphing = false;
                     if (this.burstCount > 0) { this.burstCount = 0; this.burstTimer = 0; }
                     this.burstCooldown = Math.max(this.burstCooldown, this.telegraphThreshold + 1);   // it'll telegraph again first
@@ -1000,7 +851,7 @@
                 } else if (this.burstCount < this.maxBurstCount) {
                     this.isTelegraphing = false;
                     this.burstTimer--;
-                    if (this.burstTimer <= 0 && this.sightGated && !(this._sight = hasShotLine(this.x, this.y, playerX, playerY, game.activeMap))) {
+                    if (this.burstTimer <= 0 && this.sightGated && !(S ? S.sight || S.cover || S.revealed : (this._sight = hasShotLine(this.x, this.y, playerX, playerY, game.activeMap)))) {
                         this.burstCount = 0; this.burstTimer = 0; this.burstCooldown = this.telegraphThreshold + 1;   // she slipped behind cover mid-burst
                     } else if (this.burstTimer <= 0) {
                         const spread = (Math.random() - 0.5) * 0.15;
@@ -1019,10 +870,13 @@
                         this.burstCount++;
                         this.burstTimer = this.burstDelay;
                     }
+                } else if (S && squad.length > 1 && (this._extended || 0) < 2 && squad.every(o => o === this || o.burstCooldown > o.telegraphThreshold)) {
+                    this.burstCount -= WARDEN.EXTEND; this._extended = (this._extended || 0) + 1;   // the others are reloading: keep the line hot
                 } else {
                     this.burstCooldown = this.reloadTime;
                     this.burstCount = 0;
                     this.burstTimer = 0;
+                    this._extended = 0;
                 }
                 this._updateBarrelVisuals();
                 return shots;
@@ -1847,6 +1701,8 @@
 
             onProjectileHit(projectile, game) {
                 if (projectile.isEnemy) return;
+                if (this.decoy) { this.takeDamage(this.hp, 0, 0, { shot: true }); return; }                 // one of Lilitu's Blood Mirror decoys: any hit
+                if (this.elite && eliteWardTurns(this, projectile)) return;                  // a warded elite turns it
                 this.lastHitBy = projectile.owner; this.lastHitMelee = !!projectile.melee;   // who gets the Resonance
                 this.suspicion = 100;
                 this.state = 'ALERT';
@@ -1869,6 +1725,12 @@
                     const kbY = (projectile.vy / speed) * knockbackStrength;
                     if (this.takeDamage(projectile.damage, kbX, kbY, projectile.crit ? { crit: true } : null) && projectile.melee) this.interruptMelee();
                 } else if (this.takeDamage(projectile.damage, 0, 0, projectile.crit ? { crit: true } : null) && projectile.melee) { this.interruptMelee(); }
+            }
+
+            /** An armored elite takes half from burn and bleed */
+            takeDamage(amount, knockbackX = 0, knockbackY = 0, opts = null) {
+                if (this.elite === 'armored' && opts && (opts.type === 'bleed' || opts.type === 'burn')) amount *= 0.5;
+                return super.takeDamage(amount, knockbackX, knockbackY, opts);
             }
 
             /** The vision cone's outline in world space, cast against the map's walls and buildings (cached). */
@@ -2094,14 +1956,91 @@
                     [690, 490], [1110, 960], [420, 1300], [120, 1250], [1300, 1300], [1700, 1300]   // throne hall, dressing room, kennels
                 ],
                 gunnerSpawns: [],
-                // Waves of hunters (night vision, dashes); an alpha from wave 3; the Demoness every fifth wave
-                waves: (w) => ({ hunters: Math.min(3 + w, 10), alphas: w >= 3 ? 1 + Math.floor((w - 3) / 4) : 0, demoness: w % 5 === 0,
-                                 hp: 55 + w * 8, speed: 2.6 + Math.min(w * 0.08, 1) })
+                // Waves of hunters (night vision, dashes); an alpha from wave 3; the Demoness every fifth wave —
+                // with her hunters on 5, 15, 25…, and alone (Lilitu's duel, `solo`) on 10, 20, 30…
+                waves: (w) => {
+                    const solo = w % 10 === 0;
+                    return { hunters: solo ? 0 : Math.min(3 + w, 10), alphas: solo || w < 3 ? 0 : 1 + Math.floor((w - 3) / 4), demoness: w % 5 === 0, solo,
+                             hp: 55 + w * 8, speed: 2.6 + Math.min(w * 0.08, 1) };
+                }
             },
             { id: 'sealed_2', label: 'Sealed', locked: true, blurb: 'Coming soon.' },
             { id: 'sealed_3', label: 'Sealed', locked: true, blurb: 'Coming soon.' }
         ];
         const GAUNTLET_SPAWN_MIN_DIST = 350;
+        /* Past the early waves (both maps): from wave FROM every hostile's HP grows ×HP_GROWTH a wave and its
+           damage +DMG_STEP a wave (claws too); from ELITE_FROM about one in ELITE_EVERY is an elite (Armored,
+           Swift or Warded: ELITES). A cleared wave pays SCRAP × wave, and BONUS_SCRAP more every BONUS_EVERY-th.
+           The Demoness: DEMONESS_HP + DEMONESS_HP_W × wave with her hunters; alone, SOLO_HP + SOLO_HP_W × wave. */
+        const GAUNTLET_SCALE = { FROM: 15, HP_GROWTH: 1.04, DMG_STEP: 0.02, ELITE_FROM: 12, ELITE_EVERY: 6,
+            SCRAP: 5, BONUS_EVERY: 5, BONUS_SCRAP: 100, DEMONESS_HP: 1000, DEMONESS_HP_W: 80, SOLO_HP: 3000, SOLO_HP_W: 100 };
+        /* The elites (a gauntlet's rank and file, from ELITE_FROM): each wears its mark — a ring and a word
+           under it in its colour — and fights its own way.
+             armored  steel plates: burn and bleed do half, and it shrugs off shoves
+             swift    quicker on its feet (a hunter dashes sooner)
+             warded   a gold ward before it turns shots from the front (WARD_ARC either side) until it
+                      has turned WARD_HP × its health in them; then it shatters. Blades and burns go through */
+        const ELITES = {
+            armored: { label: 'ARMORED', col: '180, 196, 214' },
+            swift:   { label: 'SWIFT',   col: '110, 230, 255' },
+            warded:  { label: 'WARDED',  col: '255, 214, 110' }
+        };
+        const ELITE_WARD = { ARC: 1.05, HP: 0.6 };
+        /** Make a hostile an elite (restore: from a save, its numbers are already in place) */
+        function applyElite(h, kind, restore) {
+            if (!ELITES[kind]) return;
+            h.elite = kind;
+            if (kind === 'armored') h.mass = (h.mass || 10) * 2.5;
+            if (restore) return;
+            if (kind === 'swift') {
+                h.speed *= 1.3; if (h.huntSpeed) h.huntSpeed *= 1.3;
+                if (h.dashCDBase) { h.dashCDBase *= 0.7; h.dashCD = Math.min(h.dashCD, h.dashCDBase); }
+            }
+            if (kind === 'warded') h.ward = h.wardMax = Math.round((h.maxHp || h.hp) * ELITE_WARD.HP);
+        }
+        /** A warded elite turns a shot from in front of it: true if it did (the ward takes it) */
+        function eliteWardTurns(h, p) {
+            if (h.elite !== 'warded' || !(h.ward > 0) || p.melee) return false;
+            const sp = Math.hypot(p.vx, p.vy); if (!sp) return false;
+            const from = Math.atan2(-p.vy, -p.vx);                                  // where the shot came from
+            if (Math.abs(normalizeAngle(from - h.angle)) > ELITE_WARD.ARC) return false;
+            h.ward = Math.max(0, h.ward - p.damage); h._wardHitT = _gameTimeSec;
+            if (typeof game !== 'undefined' && game.weather) game.weather.spawnExplosion(p.x, p.y, '#ffd66e', 3, 0.8);
+            if (h.ward <= 0) h._wardBrokeT = _gameTimeSec;
+            return true;
+        }
+        /** The elite's mark (above the darkness, engine/boss-hazards.js): a ring at its feet, its word beneath, the ward's arc while it holds */
+        function drawEliteMark(ctx, h) {
+            const E = ELITES[h.elite]; if (!E) return;
+            const t = _frameTime / 1000;
+            ctx.save();
+            ctx.strokeStyle = `rgba(${E.col}, ${0.55 + 0.2 * Math.sin(t * 4)})`; ctx.lineWidth = 1.5;
+            ctx.setLineDash(h.elite === 'swift' ? [4, 4] : []);
+            ctx.beginPath(); ctx.arc(h.x, h.y, 21, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+            if (h.elite === 'armored') {                                              // studs round the ring
+                ctx.fillStyle = `rgba(${E.col}, 0.9)`;
+                for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; ctx.fillRect(h.x + Math.cos(a) * 21 - 1.5, h.y + Math.sin(a) * 21 - 1.5, 3, 3); }
+            }
+            if (h.elite === 'warded' && h.ward > 0) {
+                const hit = h._wardHitT ? Math.max(0, 1 - (_gameTimeSec - h._wardHitT) / 0.25) : 0, k = h.ward / (h.wardMax || 1);
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.strokeStyle = `rgba(${E.col}, ${0.35 + 0.35 * k + 0.3 * hit})`; ctx.lineWidth = 2.5 + 2 * hit;
+                ctx.beginPath(); ctx.arc(h.x, h.y, 27, h.angle - ELITE_WARD.ARC, h.angle + ELITE_WARD.ARC); ctx.stroke();
+                ctx.globalCompositeOperation = 'source-over';
+            } else if (h._wardBrokeT && _gameTimeSec - h._wardBrokeT < 0.5) {
+                const u = (_gameTimeSec - h._wardBrokeT) / 0.5;
+                ctx.globalAlpha = 1 - u; ctx.strokeStyle = `rgb(${E.col})`; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(h.x, h.y, 27 + 20 * u, h.angle - ELITE_WARD.ARC, h.angle + ELITE_WARD.ARC); ctx.stroke(); ctx.globalAlpha = 1;
+            }
+            ctx.font = '600 7px Orbitron'; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(${E.col}, 0.9)`;
+            ctx.fillText(E.label, h.x, h.y + 34);
+            ctx.restore();
+        }
+        /** A wave's HP and damage multipliers */
+        function gauntletScale(w) {
+            const n = Math.max(0, w - GAUNTLET_SCALE.FROM);
+            return { hp: Math.pow(GAUNTLET_SCALE.HP_GROWTH, n), dmg: 1 + GAUNTLET_SCALE.DMG_STEP * n };
+        }
         const GAUNTLET_LEAD_ERR = 300;           // a wave arrives knowing only her rough area (px off)
         const GAUNTLET_STALL_SECS = 20;          // no one has seen or heard her this long → a vague lead…
         const GAUNTLET_STALL_ERR = 220;          // …this far off: enough to sweep the right rooms
@@ -2109,7 +2048,7 @@
         const GAUNTLET_HOSTILE_NUMBERS = ['x', 'y', 'angle', 'hp', 'maxHp', 'speed', 'huntSpeed', 'visionRange',
             'suspicion', 'cooldown', 'telegraphAngle', 'telegraphThreshold', 'dashMax', 'dashCDBase', 'dashCD',
             'clawCD', 'clawDmg', 'clawReach', '_chain', 'whipCD', 'burstCooldown', 'burstCount', 'burstTimer',
-            'moveTimer', 'strafeDirection'];
+            'moveTimer', 'strafeDirection', 'dmgMul', 'ward', 'wardMax'];
 
         class HordeGauntlet {
             constructor() {
@@ -2159,7 +2098,7 @@
             serialize(game) {
                 const data = { highestWave: this.highestWave, highestWaves: { ...this.highestWaves }, run: null };
                 if (!this.active || game.activeMap.id !== this.mapId) return data;
-                const living = this.hostiles.filter(h => !h.dead && game.enemies.includes(h));
+                const living = this.hostiles.filter(h => !h.dead && !h.decoy && game.enemies.includes(h));
                 data.run = {
                     id: this.entry.id, wave: this.wave, waveDelay: this.waveDelay,
                     totalKills: this.totalKills + this.hostiles.length - living.length,
@@ -2167,7 +2106,7 @@
                     hostiles: living.map(h => {
                         const row = { kind: h instanceof Demoness ? 'demoness' : h instanceof Hunter ? 'hunter'
                             : h instanceof GatlingGunner ? 'gunner' : 'ganger', alpha: !!h.alpha,
-                            weaponId: h.equippedWeaponId || null, look: h.look,
+                            weaponId: h.equippedWeaponId || null, look: h.look, elite: h.elite || null, solo: !!h.solo,
                             state: h.state, isTelegraphing: !!h.isTelegraphing,
                             investigateTarget: h.investigateTarget && { ...h.investigateTarget } };
                         for (const key of GAUNTLET_HOSTILE_NUMBERS) if (Number.isFinite(h[key])) row[key] = h[key];
@@ -2201,7 +2140,7 @@
                 for (const row of run.hostiles) {
                     if (!Number.isFinite(row.x) || !Number.isFinite(row.y) || !(row.hp > 0)) continue;
                     const cfg = { hp: row.maxHp || row.hp, speed: row.speed, visionRange: row.visionRange,
-                        weaponId: row.weaponId, alpha: row.alpha, look: row.look };
+                        weaponId: row.weaponId, alpha: row.alpha, look: row.look, solo: !!row.solo };
                     let h;
                     if (row.kind === 'demoness') h = new Demoness(row.x, row.y, cfg);
                     else if (row.kind === 'hunter') h = new Hunter(row.x, row.y, cfg);
@@ -2210,6 +2149,7 @@
                     else continue;
                     for (const key of GAUNTLET_HOSTILE_NUMBERS) if (Number.isFinite(row[key])) h[key] = row[key];
                     if (row.look) h.look = row.look;
+                    if (ELITES[row.elite]) applyElite(h, row.elite, true);
                     if (['IDLE', 'SUSPICIOUS', 'SEARCHING', 'ALERT', 'SUPPRESSING'].includes(row.state)) h.state = row.state;
                     if (Number.isFinite(row.investigateTarget?.x) && Number.isFinite(row.investigateTarget?.y))
                         h.investigateTarget = { x: row.investigateTarget.x, y: row.investigateTarget.y };
@@ -2263,60 +2203,82 @@
                 const cfg = this.getWaveConfig(this.wave);
                 const nav = game.activeMap;
 
+                const S = gauntletScale(this.wave);
                 for (const pt of this._spawnPoints(game, this.entry.spawns, cfg.gangerCount)) {
                     const ganger = new Ganger(pt.x, pt.y, {
-                        hp: cfg.hp, speed: cfg.speed, visionRange: 450, weaponId: cfg.weaponId
+                        hp: Math.round(cfg.hp * S.hp), speed: cfg.speed, visionRange: 450, weaponId: cfg.weaponId
                     });
-                    ganger._gauntletWave = this.wave;
+                    ganger._gauntletWave = this.wave; ganger.dmgMul = S.dmg;
                     ganger.huntSpeed = Math.min(2.6, cfg.speed * 0.8);
                     this._lead(ganger, game, GAUNTLET_LEAD_ERR);
                     this.hostiles.push(ganger);
                     game.enemies.push(ganger);
                 }
+                const elites = this._makeElites(this.hostiles);
 
                 const gSpots = this._spawnPoints(game, this.entry.gunnerSpawns, cfg.gunnerCount);
                 for (let i = 0; i < cfg.gunnerCount; i++) {
                     const gunner = new GatlingGunner(gSpots[i].x, gSpots[i].y, i);
                     gunner._gauntletWave = this.wave;
                     gunner.navMap = nav;                     // indoors: routes round walls to find a line on her
-                    gunner.hp = 150 + this.wave * 15;
-                    gunner.maxHp = gunner.hp;
+                    gunner.hp = Math.round((150 + this.wave * 15) * S.hp);
+                    gunner.maxHp = gunner.hp; gunner.dmgMul = S.dmg;
                     this.hostiles.push(gunner);
                     game.enemies.push(gunner);
                 }
 
                 const gunnerText = cfg.gunnerCount > 0 ? ` + ${cfg.gunnerCount} GUNNER${cfg.gunnerCount > 1 ? 'S' : ''}` : '';
-                showMessage(`WAVE ${this.wave} — ${cfg.gangerCount} GANGERS${gunnerText}`);
+                showMessage(`WAVE ${this.wave} — ${cfg.gangerCount} GANGERS${gunnerText}` + (elites ? ` (${elites} ELITE${elites > 1 ? 'S' : ''})` : ''));
                 game.triggerShake(8);
                 this._waveSize = this.hostiles.length;
             }
 
             /** A palace wave: hunters, an alpha or two, and every fifth wave the Demoness with her intro */
             _spawnHunters(game, W) {
+                const S = gauntletScale(this.wave);
                 for (const pt of this._spawnPoints(game, this.entry.spawns, W.hunters)) {
-                    const h = new Hunter(pt.x, pt.y, { hp: W.hp, speed: W.speed });
-                    h._gauntletWave = this.wave; h.navMap = game.activeMap;
+                    const h = new Hunter(pt.x, pt.y, { hp: Math.round(W.hp * S.hp), speed: W.speed });
+                    h._gauntletWave = this.wave; h.navMap = game.activeMap; h.dmgMul = S.dmg;
                     this._lead(h, game, GAUNTLET_LEAD_ERR);
                     this.hostiles.push(h); game.enemies.push(h);
                 }
                 for (const pt of this._spawnPoints(game, this.entry.spawns, W.alphas)) {
-                    const a = new Hunter(pt.x, pt.y, { hp: Math.round(W.hp * 1.9), speed: W.speed + 0.2, alpha: true, dashes: 2, dashCD: 180, claw: 18 });
-                    a._gauntletWave = this.wave; a.navMap = game.activeMap;
+                    const a = new Hunter(pt.x, pt.y, { hp: Math.round(W.hp * 1.9 * S.hp), speed: W.speed + 0.2, alpha: true, dashes: 2, dashCD: 180, claw: 18 });
+                    a._gauntletWave = this.wave; a.navMap = game.activeMap; a.dmgMul = S.dmg;
                     this._lead(a, game, GAUNTLET_LEAD_ERR);
                     this.hostiles.push(a); game.enemies.push(a);
                 }
-                let text = `WAVE ${this.wave} — ${W.hunters} HUNTERS` + (W.alphas ? ` + ${W.alphas} ALPHA${W.alphas > 1 ? 'S' : ''}` : '');
+                const elites = this._makeElites(this.hostiles);
+                let text = `WAVE ${this.wave} — ${W.hunters} HUNTERS` + (W.alphas ? ` + ${W.alphas} ALPHA${W.alphas > 1 ? 'S' : ''}` : '')
+                         + (elites ? ` (${elites} ELITE${elites > 1 ? 'S' : ''})` : '');
                 if (W.demoness) {
+                    const G = GAUNTLET_SCALE;
                     for (const h of this.hostiles) h.dormant = true;               // her hunters hold still while she makes her entrance
-                    const d = new Demoness(900, 480, { hp: 700 + this.wave * 40 });
-                    d._gauntletWave = this.wave;
+                    const d = new Demoness(900, 480, { hp: W.solo ? G.SOLO_HP + G.SOLO_HP_W * this.wave : G.DEMONESS_HP + G.DEMONESS_HP_W * this.wave, solo: W.solo });
+                    d._gauntletWave = this.wave; d.dmgMul = S.dmg;
                     this.hostiles.push(d);
-                    game.bossIntro([d], { title: 'THE DEMONESS', seenFlag: 'demonessIntroSeen' });   // (bossIntro adds her to the enemies)
-                    text += ' — AND SHE COMES';
+                    // (bossIntro adds her to the enemies); alone, the palace dims and she has her own entrance
+                    if (W.solo) game.bossIntro([d], { title: 'LILITU', subtitle: 'She hunts you alone', seenFlag: 'lilituDuelSeen' });
+                    else game.bossIntro([d], { title: 'THE DEMONESS', seenFlag: 'demonessIntroSeen' });
+                    text = W.solo ? `WAVE ${this.wave} — LILITU HUNTS YOU ALONE` : text + ' — AND SHE COMES';
                 }
                 showMessage(text);
                 game.triggerShake(8);
                 this._waveSize = this.hostiles.length;
+            }
+
+            /** From ELITE_FROM: about one in ELITE_EVERY of a wave's rank and file becomes an elite (never a gunner or a boss) */
+            _makeElites(list) {
+                if (this.wave < GAUNTLET_SCALE.ELITE_FROM) return 0;
+                const pool = list.filter(h => h instanceof Ganger && !h.bossName && !h.elite);
+                const n = Math.min(pool.length, Math.max(1, Math.round(pool.length / GAUNTLET_SCALE.ELITE_EVERY)));
+                const kinds = Object.keys(ELITES);
+                for (let i = 0; i < n; i++) {
+                    const j = i + Math.floor(Math.random() * (pool.length - i));
+                    [pool[i], pool[j]] = [pool[j], pool[i]];
+                    applyElite(pool[i], kinds[Math.floor(Math.random() * kinds.length)]);
+                }
+                return n;
             }
 
             /**
@@ -2342,12 +2304,13 @@
                         : `<span class="w-title">Wave 1</span><span class="w-sep">◆</span><span class="w-sub">In ${n}</span>`;
                 } else {
                     const left = this.hostiles.length, gun = this.hostiles.filter(h => h instanceof GatlingGunner).length;
-                    const her = typeof Demoness !== 'undefined' && this.hostiles.some(h => h instanceof Demoness && !h.dead);
+                    const herE = typeof Demoness !== 'undefined' && this.hostiles.find(h => h instanceof Demoness && !h.dead);
+                    const her = herE ? (herE.solo ? 'Lilitu' + (herE.phase > 1 ? ' · ' + ['', 'I', 'II', 'III'][herE.phase] : '') : 'The Demoness') : '';
                     key = 'w' + this.wave + ':' + left + ':' + gun + ':' + her;
                     frac = this._waveSize ? left / this._waveSize : 0;
                     html = `<span class="w-title">Wave ${this.wave}</span><span class="w-sep">◆</span><span class="w-sub">${left} left</span>`
                          + (gun ? `<span class="w-chip">${gun > 1 ? gun + ' gunners' : 'Gunner'}</span>` : '')
-                         + (her ? `<span class="w-chip">The Demoness</span>` : '');
+                         + (her ? `<span class="w-chip">${her}</span>` : '');
                 }
                 if (key === this._hudKey) return;
                 this._hudKey = key;
@@ -2393,7 +2356,7 @@
                 // Wave cleared
                 if (this.hostiles.length === 0 && this.wave > 0) {
                     const reward = 40 + this.wave * 20;
-                    const scrapReward = Math.floor(this.wave * 2);
+                    const scrapReward = GAUNTLET_SCALE.SCRAP * this.wave + (this.wave % GAUNTLET_SCALE.BONUS_EVERY === 0 ? GAUNTLET_SCALE.BONUS_SCRAP : 0);
                     game.currency += reward;
                     game.scrap += scrapReward;
                     if (game.resonance) game.earnResonance(40 * this.wave, `WAVE ${this.wave}`);

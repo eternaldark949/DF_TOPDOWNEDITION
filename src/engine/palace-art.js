@@ -329,7 +329,7 @@
             /** After the darkness: hunters' eyes burn ember (night vision's tell) */
             drawHunterEyes(ctx) {
                 for (const e of this.enemies || []) {
-                    if (!e || e.dead || !e.hunter) continue;
+                    if (!e || e.dead || !e.hunter || e.decoy) continue;          // (a Blood Mirror decoy's eyes are dead)
                     const k = e.bossName ? (e._eyeK ?? 1) : 1; if (k < 0.05) continue;
                     const fx = Math.cos(e.angle), fy = Math.sin(e.angle), S = e.bossName ? 1.15 : 1;
                     ctx.save(); ctx.globalCompositeOperation = 'lighter';
