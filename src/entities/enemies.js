@@ -163,9 +163,10 @@
                 this._dash = false;         // a sprint to catch up, held until she's close again
                 this.angle = 0;
 
-                // Body: spine bend into turns, gait blend (0 walk .. 2 gallop), pose weights eased in update()
+                // Body: spine bend into turns, gait blend (0 walk .. 2 gallop; not `_gait`, which marks a humanoid for
+                // RenderInterp), pose weights eased in update()
                 this._bend = 0;
-                this._gait = 0;
+                this._gaitMix = 0;
                 this._poses = { sit: 0, loaf: 0, sleep: 0, stretch: 0, groom: 0 };
                 this._curlSide = this._random() < 0.5 ? -1 : 1;
                 this._breath = 0;
@@ -288,7 +289,7 @@
                 const turned = Math.atan2(Math.sin(this.angle - prevAngle), Math.cos(this.angle - prevAngle));
                 // Gait: walk under 3 px/tick, trot to 5, gallop above; the stride sets how far a cycle carries her.
                 const gaitTarget = spd > 5 ? 2 : spd > 3 ? 1 : 0;
-                if (moved) this._gait += (gaitTarget - this._gait) * k(0.08);
+                if (moved) this._gaitMix += (gaitTarget - this._gaitMix) * k(0.08);
                 const g = this._gaitParams();
                 // Phase follows distance actually travelled: blocked cats never run in place.
                 this.walkPhase += moved * Math.PI * 2 * g.duty / g.stride;
@@ -309,8 +310,8 @@
 
                 // Tail: a happy walk carries it high with the tip hooked; a run streams it level; sitting and
                 // sleeping wrap it round her; a blocked route lashes it. Turns kick it the other way (follow-through).
-                const walking = spd > 0.05 && this._gait < 1.5;
-                const liftTarget = blocked ? 0.25 : spd > 0.05 ? (walking ? 0.78 - this._gait * 0.35 : 0.08) : 0.3 * (1 - P.sleep - P.loaf);
+                const walking = spd > 0.05 && this._gaitMix < 1.5;
+                const liftTarget = blocked ? 0.25 : spd > 0.05 ? (walking ? 0.78 - this._gaitMix * 0.35 : 0.08) : 0.3 * (1 - P.sleep - P.loaf);
                 this._tailLift += (liftTarget - this._tailLift) * k(0.05);
                 if (this._flick > 0) this._flick = Math.max(0, this._flick - dt * 0.04);
                 else if (!moved && this._random() < 0.006 * dt) this._flick = 1;
@@ -389,7 +390,7 @@
 
             /** The gait's offsets, duty and stride, blended between walk, trot and gallop. */
             _gaitParams() {
-                const gi = Math.max(0, Math.min(2, this._gait || 0)), i0 = Math.min(1, Math.floor(gi)), u = gi - i0;
+                const gi = Math.max(0, Math.min(2, this._gaitMix || 0)), i0 = Math.min(1, Math.floor(gi)), u = gi - i0;
                 const a = VELVET_GAITS[i0], b = VELVET_GAITS[i0 + 1], mix = (p, q) => p + (q - p) * u;
                 return { off: a.off.map((o, i) => mix(o, b.off[i])), duty: mix(a.duty, b.duty), stride: mix(a.stride, b.stride), gallop: Math.max(0, gi - 1) };
             }
