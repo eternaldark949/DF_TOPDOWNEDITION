@@ -386,6 +386,87 @@
                     rr(-3, -3.5, 26, 7, 3, A.brass); rr(20, -4.5, 6, 9, 2, '#9a7c4a'); ctx.restore();
                     break;
                 }
+                case 'apt_dining': {                                       // round walnut table for six: blush chairs tucked in, flowers and two candles
+                    const cx = x + w / 2, cy = y + h / 2, R = Math.min(w, h) * 0.27;
+                    for (let i = 0; i < 6; i++) {
+                        const a = i * Math.PI / 3 + Math.PI / 6, chx = cx + Math.cos(a) * (R + 13), chy = cy + Math.sin(a) * (R + 13);
+                        ctx.save(); ctx.translate(chx, chy); ctx.rotate(a + Math.PI / 2);
+                        rr(-9, -8, 18, 17, 5, A.blush, '#b27a82', 1); rr(-9, 5, 18, 5, 2.5, A.wine);   // seat, the back away from the table
+                        ctx.restore();
+                    }
+                    circ(cx + 2, cy + 3, R, 'rgba(0,0,0,0.35)');
+                    circ(cx, cy, R, A.walnut, A.brass, 1.5); circ(cx, cy, R - 5, A.walnutLt);
+                    ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 0.6; for (let k = 6; k < R - 5; k += 5) { ctx.beginPath(); ctx.arc(cx, cy, k, 0, Math.PI * 2); ctx.stroke(); }
+                    circ(cx, cy, 8, '#e9e3ec', A.brass, 1);                                                      // a marble lazy susan, a posy on it
+                    for (let i = 0; i < 6; i++) circ(cx + Math.cos(i * 1.05) * 4, cy + Math.sin(i * 1.05) * 4, 2.2, i % 2 ? A.blushLt : '#f3e3ea');
+                    circ(cx, cy, 1.8, A.leafLt);
+                    for (const s of [-1, 1]) { circ(cx + s * 13, cy - s * 6, 2.4, A.brass); circ(cx + s * 13, cy - s * 6, 1.2, '#fff1d6'); }   // candlesticks
+                    for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 + Math.PI / 6; circ(cx + Math.cos(a) * (R - 9), cy + Math.sin(a) * (R - 9), 4, '#f4f0ea', 'rgba(201,164,106,0.8)', 0.6); }   // places set
+                    break;
+                }
+                case 'apt_piano': {                                        // a baby grand in black lacquer, lid up: the gold harp and strings, keys to the south
+                    const body = new Path2D();
+                    body.moveTo(x + 4, y + h - 14); body.lineTo(x + 4, y + 10);
+                    body.quadraticCurveTo(x + 4, y + 2, x + 16, y + 2); body.lineTo(x + w * 0.5, y + 2);
+                    body.bezierCurveTo(x + w * 0.72, y + 2, x + w * 0.62, y + h * 0.42, x + w * 0.86, y + h * 0.48);
+                    body.quadraticCurveTo(x + w - 2, y + h * 0.54, x + w - 2, y + h - 14); body.closePath();
+                    ctx.save(); ctx.translate(2, 3); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fill(body); ctx.restore();
+                    ctx.fillStyle = '#121014'; ctx.fill(body); ctx.strokeStyle = '#3a3440'; ctx.lineWidth = 1.2; ctx.stroke(body);
+                    ctx.save(); ctx.clip(body);
+                    ctx.fillStyle = '#7a5a2a'; ctx.fillRect(x + 10, y + 8, w * 0.62, h - 26);                            // the harp
+                    ctx.strokeStyle = 'rgba(255,230,180,0.55)'; ctx.lineWidth = 0.5; ctx.beginPath();
+                    for (let sx = x + 13; sx < x + w * 0.7; sx += 2.6) { ctx.moveTo(sx, y + h - 18); ctx.lineTo(sx + (sx - x) * 0.12, y + 8); }
+                    ctx.stroke();
+                    ctx.strokeStyle = A.brass; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.ellipse(x + w * 0.3, y + h * 0.42, 9, 12, 0, 0, Math.PI * 2); ctx.stroke();
+                    const g = ctx.createLinearGradient(x, y, x + w, y + h); g.addColorStop(0, 'rgba(255,255,255,0.10)'); g.addColorStop(0.5, 'rgba(255,255,255,0)'); ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+                    ctx.restore();
+                    ctx.strokeStyle = 'rgba(30,26,34,0.95)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + 6, y + 6); ctx.lineTo(x + w * 0.8, y + h * 0.5); ctx.stroke();   // the prop stick and lid edge
+                    rr(x + 2, y + h - 16, w - 2, 12, 1.5, '#1a1720', '#3a3440', 1);                                          // keyboard
+                    rr(x + 5, y + h - 14, w - 8, 8, 1, '#f4f1ea');
+                    ctx.fillStyle = '#141018'; for (let k = 0, kx = x + 7; kx < x + w - 6; kx += 3.4, k++) if (k % 7 !== 2 && k % 7 !== 6) ctx.fillRect(kx, y + h - 14, 1.8, 4.6);
+                    rr(x + w * 0.3, y + h - 3, w * 0.4, 7, 2, A.wine, A.brass, 0.8);                                       // the bench
+                    break;
+                }
+                case 'apt_bench': {                                        // tufted bench at the foot of the bed, brass legs
+                    for (const [lx, ly] of [[x + 2, y + 2], [x + w - 4, y + 2], [x + 2, y + h - 4], [x + w - 4, y + h - 4]]) circ(lx + 1, ly + 1, 1.8, A.brass);
+                    rr(x, y, w, h, 5, A.blush, '#b27a82', 1);
+                    for (let i = 1; i < 6; i++) circ(x + w * i / 6, y + h / 2, 1.2, '#b27a82');
+                    rr(x + w - 30, y + 2, 22, h - 4, 3, '#e9dcc8');                                                     // a folded throw
+                    break;
+                }
+                case 'apt_chaise': {                                       // velvet chaise longue in Silver Queen plum, a silver bolster
+                    rr(x, y, w, h, 10, '#2d1d59', '#4c3a94', 1.2);
+                    rr(x + 3, y + 4, w - 6, 22, 8, '#3a2a6e');                                                          // raised back end
+                    ctx.strokeStyle = 'rgba(207,200,226,0.18)'; ctx.lineWidth = 1; ctx.beginPath();
+                    for (let ty = y + 34; ty < y + h - 8; ty += 14) { ctx.moveTo(x + 6, ty); ctx.lineTo(x + w - 6, ty); }
+                    ctx.stroke();
+                    rr(x + 5, y + 26, w - 10, 8, 4, '#cfc8e2');                                                         // bolster
+                    rr(x + 8, y + h - 30, w - 14, 18, 3, '#e9dcc8');                                                    // an open book and a throw
+                    ctx.fillStyle = '#f4f0ea'; ctx.fillRect(x + w / 2 - 7, y + 46, 14, 9); ctx.fillStyle = A.wine; ctx.fillRect(x + w / 2 - 0.5, y + 46, 1, 9);
+                    break;
+                }
+                case 'apt_firepit': {                                      // the veranda's fire bowl: travertine ring, bronze bowl, a bed of embers
+                    const cx = x + w / 2, cy = y + h / 2, R = Math.min(w, h) / 2;
+                    if (PropPass.seg(false)) {
+                        circ(cx + 2, cy + 3, R, 'rgba(0,0,0,0.35)');
+                        circ(cx, cy, R, '#cdbfae', '#a99a88', 1.5); circ(cx, cy, R - 6, '#6a4a2a', A.brass, 1.5); circ(cx, cy, R - 10, '#1a0f0a');
+                        for (let i = 0; i < 9; i++) circ(cx + Math.cos(i * 2.4) * (R - 15) * ((i * 37 % 10) / 10), cy + Math.sin(i * 2.4) * (R - 15) * ((i * 37 % 10) / 10), 2.4, '#2e1a12');
+                    }
+                    if (PropPass.seg(true)) for (let i = 0; i < 7; i++) {
+                        const a = i * 0.9 + t * 0.4, d = (R - 14) * (0.2 + 0.6 * ((i * 0.37) % 1)), f = 0.6 + 0.4 * Math.sin(t * 6 + i * 2.1);
+                        ctx.fillStyle = `rgba(255,${120 + 90 * f | 0},50,${0.6 + 0.35 * f})`;
+                        ctx.beginPath(); ctx.ellipse(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 3.2 * f + 1, 2.6 * f + 1, a, 0, Math.PI * 2); ctx.fill();
+                    }
+                    break;
+                }
+                case 'apt_patio_sofa': {                                   // outdoor sofa: teak frame, cream cushions, a blush pillow; back along the outer side
+                    const east = p.decor.face === 'W';                                                 // (faces west: back on the east side)
+                    rr(x, y, w, h, 5, '#6e5040', '#4a3428', 1);
+                    rr(east ? x + w - 9 : x + 1, y + 1, 8, h - 2, 3, '#b9ab98');                                         // back cushion
+                    rr(east ? x + 2 : x + 10, y + 3, w - 12, h / 2 - 4, 3, '#cfc2b0'); rr(east ? x + 2 : x + 10, y + h / 2 + 1, w - 12, h / 2 - 4, 3, '#cfc2b0');
+                    rr(east ? x + w - 18 : x + 9, y + h / 2 - 8, 9, 16, 3, A.blush);
+                    break;
+                }
                 case 'apt_planter': {
                     rr(x, y, w, h, 3, '#8c7f76', '#a79a90', 1); rr(x + 3, y + 3, w - 6, h - 6, 2, '#3a2a24');
                     for (let i = 0; i < 6; i++) {

@@ -1,5 +1,5 @@
         function createSilverQueenApartments(x, y, config = {}) {
-            return new BuildingV2({
+            const b = new BuildingV2({
                 id: 'silver_queen',
                 x: x,
                 y: y,
@@ -55,6 +55,8 @@
                 
                 ...config
             });
+            b.viewDrift = true;   // out in front of it, the view drifts toward it (engine/draw.js _landmarkDriftTarget)
+            return b;
         }
         
 

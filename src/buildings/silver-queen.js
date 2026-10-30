@@ -69,6 +69,8 @@
                 add(g.dx - 71, g.yc + 9, '#c8a8ff', 85); add(g.dx + 71, g.yc + 9, '#c8a8ff', 85);
                 add(g.dx - 156, g.yc + 9, '#a469ff', 95); add(g.dx + 156, g.yc + 9, '#a469ff', 95);
                 add(g.dx - 56, g.yf + 114, '#ffd9a0', 110); add(g.dx + 56, g.yf + 114, '#ffd9a0', 110);   // the globe lamps along the carpet
+                const C = this._sqCourt();
+                if (C) { add(C.fx, C.fy, '#b9a4ff', 170); add(C.x + 60, C.y + C.h * 0.45, '#ffe2b8', 160); }   // the motor court: the fountain, the bays (the bollards only glow)
             },
 
             /** Pilaster positions (u along the face) and width. The entrance face aligns with the portico columns. */
@@ -397,8 +399,125 @@
                 ctx.restore();
             },
 
-            /** Ground layer: marble portico floor, steps and the violet carpet to the curb. */
+            /** The motor court in the L between the tower and the south wing (world rect), where her car waits. */
+            _sqCourt() {
+                if (this._sqCourtR !== undefined) return this._sqCourtR;
+                const m = this.sections[0], wg = this.sections[1];
+                if (!wg) return (this._sqCourtR = null);
+                const x0 = this.x + wg.x + wg.w, x1 = this.x + m.x + m.w, y0 = this.y + m.y + m.h, y1 = this.y + wg.y + wg.h;
+                if (x1 - x0 <= 120 || y1 - y0 <= 120) return (this._sqCourtR = null);
+                // the drive: from the court's open front down to the pavement (the first one below it), clear of the bays
+                // (only once the hub is up and holds it: while the city is being laid out, the default, uncached)
+                const map = typeof game !== 'undefined' && game.activeMap, live = !!(map && map.buildings && map.buildings.includes(this));
+                const pv = (live && map.pavements || []).filter(p => p.y >= y1 && p.x < x0 + 200 && p.x + p.w > x0 + 114).sort((a, b) => a.y - b.y)[0];
+                const dl = pv && pv.y - y1 < 400 ? pv.y - y1 : 170;
+                const court = { x: x0, y: y0, w: x1 - x0, h: y1 - y0, fx: x0 + (x1 - x0) * 0.75, fy: y0 + (y1 - y0) * 0.52, fr: 50,
+                    drive: { x: x0 + 114, y: y1, w: 86, h: dl } };
+                if (live) this._sqCourtR = court;
+                return court;
+            },
+
+            /** The court painted once (2 px a world unit): fan-laid granite setts, a plum and gold border, three bays
+                along the wing (hers, 949, in the middle), parterres of violets in clipped box, the fountain's basin. */
+            _sqPaintCourt(C) {
+                const D = C.drive, H = C.h + D.h, S2 = 2, cv = document.createElement('canvas'); cv.width = Math.ceil(C.w * S2); cv.height = Math.ceil(H * S2);
+                const c = cv.getContext('2d'), T = SQ_THEME, r = seededRandom('sq-court'); c.scale(S2, S2);
+                const fx = C.fx - C.x, fy = C.fy - C.y, R = C.fr, dx = D.x - C.x;
+                c.save(); c.beginPath(); c.rect(0, 0, C.w, C.h); c.rect(dx, C.h - 1, D.w, D.h + 1); c.clip();
+                c.fillStyle = '#3c3852'; c.fillRect(0, 0, C.w, H);
+                const F = 40, tones = ['#57516f', '#4f4967', '#5f5979'];                                       // fan setts, back rows first
+                for (let j = -1; j * F / 2 < H + F; j++) for (let i = -1; i * F < C.w + F; i++) {
+                    const cx = i * F + (j % 2 ? F / 2 : 0), cy = j * F / 2;
+                    for (let b = 3; b >= 1; b--) {
+                        c.fillStyle = tones[(b + i + j) % 3]; c.beginPath(); c.arc(cx, cy, F * 0.5 * b / 3 + 0.5, Math.PI, 0); c.closePath(); c.fill();
+                        c.strokeStyle = 'rgba(30,24,48,0.55)'; c.lineWidth = 0.7; c.beginPath(); c.arc(cx, cy, F * 0.5 * b / 3, Math.PI, 0); c.stroke();
+                    }
+                    c.strokeStyle = 'rgba(30,24,48,0.35)'; c.lineWidth = 0.5; c.beginPath();
+                    for (let k = 1; k < 6; k++) { const a = Math.PI + k * Math.PI / 6; c.moveTo(cx + Math.cos(a) * F * 0.17, cy + Math.sin(a) * F * 0.17); c.lineTo(cx + Math.cos(a) * F * 0.5, cy + Math.sin(a) * F * 0.5); }
+                    c.stroke();
+                }
+                c.fillStyle = 'rgba(255,255,255,0.04)'; for (let i = 0; i < 300; i++) c.fillRect(r() * C.w, r() * H, 1, 1);
+                c.restore();
+                for (const ex of [dx, dx + D.w - 3]) { c.fillStyle = T.plum; c.fillRect(ex, C.h, 3, D.h); c.fillStyle = T.gold; c.globalAlpha = 0.7; c.fillRect(ex + 1, C.h, 1, D.h); c.globalAlpha = 1; }   // the drive's kerbs
+                for (const [bx2, by2] of [[dx - 6, C.h + 14], [dx + D.w + 6, C.h + 14], [dx - 6, C.h + D.h - 16], [dx + D.w + 6, C.h + D.h - 16]]) {   // lantern bollards
+                    c.fillStyle = 'rgba(0,0,0,0.35)'; c.beginPath(); c.arc(bx2 + 1.5, by2 + 2, 5, 0, Math.PI * 2); c.fill();
+                    c.fillStyle = T.bay; c.beginPath(); c.arc(bx2, by2, 5, 0, Math.PI * 2); c.fill(); c.strokeStyle = T.gold; c.lineWidth = 1.2; c.stroke();
+                    c.fillStyle = '#f4ecff'; c.beginPath(); c.arc(bx2, by2, 2, 0, Math.PI * 2); c.fill();
+                }
+                // the border: plum stone and a gold line, round the open sides
+                c.fillStyle = T.plum; c.fillRect(0, 0, C.w, 9); c.fillRect(C.w - 9, 0, 9, C.h); c.fillRect(dx + D.w, C.h - 7, C.w - dx - D.w, 7); c.fillRect(0, C.h - 7, dx, 7);
+                c.strokeStyle = T.gold; c.lineWidth = 1; c.globalAlpha = 0.7; c.beginPath(); c.moveTo(0, 9.5); c.lineTo(C.w - 9.5, 9.5); c.lineTo(C.w - 9.5, C.h - 7.5); c.lineTo(dx + D.w, C.h - 7.5);
+                c.moveTo(dx, C.h - 7.5); c.lineTo(0, C.h - 7.5); c.stroke(); c.globalAlpha = 1;
+                // the bays along the wing, nose to the wall: guests either side of hers
+                const bx = 6, bw = 108, bh = 68;
+                [21, 89, 157].forEach((by, i) => {
+                    c.fillStyle = i === 1 ? 'rgba(45,29,89,0.55)' : 'rgba(45,29,89,0.25)'; c.fillRect(bx, by, bw, bh);
+                    c.strokeStyle = T.gold; c.lineWidth = 2; c.beginPath(); c.moveTo(bx + bw, by); c.lineTo(bx, by); c.lineTo(bx, by + bh); c.lineTo(bx + bw, by + bh); c.stroke();
+                    c.save(); c.translate(bx + bw - 22, by + bh / 2); c.rotate(-Math.PI / 2);
+                    c.font = i === 1 ? 'italic bold 15px Georgia, serif' : '9px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+                    c.fillStyle = i === 1 ? 'rgba(232,194,122,0.85)' : 'rgba(207,200,226,0.55)'; c.fillText(i === 1 ? '949' : 'GUEST', 0, 0); c.restore();
+                });
+                // parterres: box hedging round beds of violets and silver leaves (north wall, east side, south front)
+                const bed = (x, y, w, h) => {
+                    c.fillStyle = 'rgba(0,0,0,0.3)'; c.beginPath(); c.roundRect(x + 2, y + 3, w, h, 6); c.fill();
+                    c.fillStyle = '#2c4a2e'; c.beginPath(); c.roundRect(x, y, w, h, 6); c.fill();
+                    c.fillStyle = '#3d2a24'; c.beginPath(); c.roundRect(x + 5, y + 5, w - 10, h - 10, 3); c.fill();
+                    for (let k = 0; k < w * h / 60; k++) {
+                        const px = x + 7 + r() * (w - 14), py = y + 7 + r() * (h - 14), v = r();
+                        c.fillStyle = v < 0.45 ? '#8b5cf6' : v < 0.7 ? '#c4b5fd' : v < 0.85 ? '#cfd6d0' : '#e8c27a';
+                        c.beginPath(); c.arc(px, py, 1.4 + r() * 1.2, 0, Math.PI * 2); c.fill();
+                    }
+                    c.strokeStyle = 'rgba(120,170,110,0.45)'; c.lineWidth = 1; c.beginPath(); c.roundRect(x + 1, y + 1, w - 2, h - 2, 5); c.stroke();
+                };
+                bed(128, 14, C.w - 150, 20);
+                bed(C.w - 40, 46, 26, C.h * 0.66);
+                bed(dx + D.w + 10, C.h - 40, C.w - dx - D.w - 26, 24);
+                for (const [tx, ty] of [[dx - 16, C.h - 26], [C.w - 26, 30]]) {                                // topiary balls in gold-banded planters
+                    c.fillStyle = 'rgba(0,0,0,0.35)'; c.beginPath(); c.arc(tx + 2, ty + 3, 12, 0, Math.PI * 2); c.fill();
+                    c.fillStyle = T.bay; c.beginPath(); c.arc(tx, ty, 12, 0, Math.PI * 2); c.fill(); c.strokeStyle = T.gold; c.lineWidth = 1.5; c.stroke();
+                    for (const [k, col] of [[9, '#2f5a36'], [6, '#3f7a4a'], [3, '#5a9a62']]) { c.fillStyle = col; c.beginPath(); c.arc(tx - (9 - k) * 0.3, ty - (9 - k) * 0.3, k, 0, Math.PI * 2); c.fill(); }
+                }
+                // the fountain: a travertine rim, a plum mosaic band, the basin; the tiered bowl and the crown are drawn live
+                c.fillStyle = 'rgba(0,0,0,0.35)'; c.beginPath(); c.arc(fx + 3, fy + 4, R + 4, 0, Math.PI * 2); c.fill();
+                c.fillStyle = '#d8cfc2'; c.beginPath(); c.arc(fx, fy, R + 4, 0, Math.PI * 2); c.fill();
+                c.strokeStyle = 'rgba(120,100,80,0.5)'; c.lineWidth = 0.8; c.beginPath();
+                for (let k = 0; k < 24; k++) { const a = k / 24 * Math.PI * 2; c.moveTo(fx + Math.cos(a) * (R - 3), fy + Math.sin(a) * (R - 3)); c.lineTo(fx + Math.cos(a) * (R + 4), fy + Math.sin(a) * (R + 4)); }
+                c.stroke();
+                c.fillStyle = T.plum; c.beginPath(); c.arc(fx, fy, R - 3, 0, Math.PI * 2); c.fill();
+                const wg = c.createRadialGradient(fx - 10, fy - 12, 4, fx, fy, R - 7); wg.addColorStop(0, '#6f8fd8'); wg.addColorStop(1, '#2c2a78');
+                c.fillStyle = wg; c.beginPath(); c.arc(fx, fy, R - 7, 0, Math.PI * 2); c.fill();
+                c.strokeStyle = T.gold; c.lineWidth = 1; c.beginPath(); c.arc(fx, fy, R - 3, 0, Math.PI * 2); c.stroke();
+                for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; c.fillStyle = T.gold; c.beginPath(); c.arc(fx + Math.cos(a) * (R - 5), fy + Math.sin(a) * (R - 5), 1.6, 0, Math.PI * 2); c.fill(); }
+                return cv;
+            },
+
+            /** The court: its painted ground, then the fountain's water live (rings, the tiered bowl, the crown finial). */
+            _sqDrawCourt(ctx) {
+                const C = this._sqCourt();
+                if (!C) return;
+                if (!this._sqCourtSpr) this._sqCourtSpr = this._sqPaintCourt(C);
+                ctx.drawImage(this._sqCourtSpr, C.x, C.y, C.w, C.h + C.drive.h);
+                if (_zoomLOD >= 2) return;
+                const t = _gameTimeSec, T = SQ_THEME, fx = C.fx, fy = C.fy;
+                ctx.save();
+                ctx.strokeStyle = 'rgba(220,230,255,0.35)'; ctx.lineWidth = 1; ctx.beginPath();
+                for (let k = 0; k < 3; k++) { const ph = (t * 0.35 + k / 3) % 1, rad = 16 + ph * (C.fr - 24); ctx.moveTo(fx + rad, fy); ctx.arc(fx, fy, rad, 0, Math.PI * 2); }
+                ctx.globalAlpha = 0.9; ctx.stroke(); ctx.globalAlpha = 1;
+                ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(fx + 2, fy + 3, 15, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#d8cfc2'; ctx.beginPath(); ctx.arc(fx, fy, 15, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#4a5cb0'; ctx.beginPath(); ctx.arc(fx, fy, 12, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = 'rgba(230,240,255,0.55)'; ctx.beginPath();                                      // the spill over the bowl's lip
+                for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2 + t * 0.6; ctx.moveTo(fx + Math.cos(a) * 15, fy + Math.sin(a) * 15); ctx.arc(fx + Math.cos(a) * 15, fy + Math.sin(a) * 15, 1.1 + 0.5 * Math.sin(t * 5 + k), 0, Math.PI * 2); }
+                ctx.fill();
+                ctx.fillStyle = T.gold; ctx.beginPath();                                                       // the crown finial
+                ctx.moveTo(fx - 6, fy + 3); ctx.lineTo(fx - 6, fy - 4); ctx.lineTo(fx - 3, fy - 1); ctx.lineTo(fx, fy - 7); ctx.lineTo(fx + 3, fy - 1); ctx.lineTo(fx + 6, fy - 4); ctx.lineTo(fx + 6, fy + 3); ctx.closePath(); ctx.fill();
+                ctx.fillStyle = T.goldHi; ctx.beginPath(); ctx.arc(fx, fy - 7, 1.4, 0, Math.PI * 2); ctx.fill();
+                ctx.restore();
+            },
+
+            /** Ground layer: the motor court, the marble portico floor, steps and the violet carpet to the curb. */
             _sqDrawGround(ctx) {
+                this._sqDrawCourt(ctx);
                 const g = this._sqPortico();
                 if (!g) return;
                 const w = g.x1 - g.x0, d = SQ_PORTICO.colLine + 8;
@@ -458,6 +577,17 @@
             _sqDrawPorticoGlow(ctx, dark, glow) {
                 const g = this._sqPortico();
                 if (!g || dark < 0.05) return;
+                const C = this._sqCourt();
+                if (C) {                                                                                        // the fountain's uplights
+                    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                    glowA(ctx, C.fx, C.fy, C.fr + 40, '150, 130, 255', 0.32 * glow);
+                    glowA(ctx, C.fx, C.fy, 22, '230, 220, 255', 0.45 * glow);
+                    const D = C.drive;
+                    for (const [bx, by] of [[D.x - 6, D.y + 14], [D.x + D.w + 6, D.y + 14], [D.x - 6, D.y + D.h - 16], [D.x + D.w + 6, D.y + D.h - 16]]) {
+                        glowA(ctx, bx, by, 26, '220, 200, 255', 0.4 * glow); glowA(ctx, bx, by, 6, '255, 250, 255', 0.8 * glow);
+                    }
+                    ctx.restore();
+                }
                 const cam = game.camera, t = _gameTimeSec, lod = _zoomLOD, fade = this._sqFade == null ? 1 : this._sqFade;
                 const P3 = (x, y, z) => this._sqP(x, y, z), a = Math.min(1, glow * 1.4);
                 const line = (p, q) => { ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke(); };
@@ -833,6 +963,17 @@
                 const rot = -0.8, corners = [[sx + 34, sy + 34], [sx + sw - 34, sy + 34], [sx + 34, sy + sh - 34], [sx + sw - 34, sy + sh - 34]];
                 if (!emissive) {
                     if (!PropPass.seg(false)) return;                                                           // (still: painted with the roof)
+                    // the deck round the pad: a plum walk inside the parapet, gold-lined, and the paving rayed out from the pad
+                    const ix = sx + 12, iy = sy + 12, iw = sw - 24, ih = sh - 24;
+                    ctx.strokeStyle = 'rgba(45,29,89,0.55)'; ctx.lineWidth = 14; ctx.strokeRect(ix + 7, iy + 7, iw - 14, ih - 14);
+                    ctx.strokeStyle = 'rgba(217,191,134,0.55)'; ctx.lineWidth = 1; ctx.strokeRect(ix + 14.5, iy + 14.5, iw - 29, ih - 29);
+                    ctx.save(); ctx.beginPath(); ctx.rect(ix + 15, iy + 15, iw - 30, ih - 30); ctx.clip();
+                    ctx.strokeStyle = 'rgba(217,191,134,0.16)'; ctx.lineWidth = 1; ctx.beginPath();
+                    for (let i = 0; i < 36; i++) { const a = i * Math.PI / 18; ctx.moveTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); ctx.lineTo(cx + Math.cos(a) * sw, cy + Math.sin(a) * sw); }
+                    ctx.stroke();
+                    ctx.strokeStyle = 'rgba(30,18,70,0.22)'; ctx.beginPath();
+                    for (const k of [1.25, 1.55, 1.9]) { ctx.moveTo(cx + R * k, cy); ctx.arc(cx, cy, R * k, 0, Math.PI * 2); }
+                    ctx.stroke(); ctx.restore();
                     for (const [px, py] of corners) {                                                        // wisteria in round planters
                         ctx.fillStyle = '#8f86b0'; ctx.beginPath(); ctx.arc(px, py, 16, 0, Math.PI * 2); ctx.fill();
                         ctx.fillStyle = '#6a4fb8'; ctx.beginPath(); ctx.arc(px, py, 13, 0, Math.PI * 2); ctx.fill();

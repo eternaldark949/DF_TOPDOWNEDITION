@@ -603,7 +603,9 @@
                 // 1. BASE: Start with Ambient Light Level (World Darkness)
                 // Outdoors (Day): Ambient 0 -> Visibility 1.0
                 // Indoors (Dark): Ambient 0.95 -> 1.0 - (0.95 * 1.3) = -0.235 (Clamped to 0.0)
-                let visibility = 1.0 - (this.getAmbientDarkness() * 1.3);
+                // (in a room-system map, the room she's in: lit-through rooms and outdoor rooms are lighter: RoomSystem.darknessAt)
+                const amb = this.getAmbientDarkness(), rs = this.roomSystem;
+                let visibility = 1.0 - ((rs && rs.active ? rs.darknessAt(this.player.x, this.player.y, amb, this.dayCycle().darkness) : amb) * 1.3);
                 
                 // 2. STATIC LIGHTS (Lamps)
                 for (const entry of this._queryLampCandidates({ left: this.player.x, right: this.player.x, top: this.player.y, bottom: this.player.y }, 'lampVisibility')) {
