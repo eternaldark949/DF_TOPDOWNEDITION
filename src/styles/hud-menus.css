@@ -57,6 +57,11 @@
         #ui-wave .w-bar { width: 100%; min-width: 120px; height: 2px; border-radius: 1px; background: rgba(202, 176, 250, 0.18); overflow: hidden; }
         #ui-wave .w-bar i { display: block; height: 100%; transform-origin: left; background: linear-gradient(90deg, var(--df-lavender), #fff); box-shadow: 0 0 6px rgba(241, 232, 254, 0.8); transition: transform 0.35s ease; }
         #ui-wave.between .w-bar { opacity: 0; }
+        #ui-wave .w-spoils { justify-content: center; gap: 6px; margin-top: 3px; font-size: max(6px, 0.5rem - var(--font-trim)); letter-spacing: 2px; color: rgba(202, 176, 250, 0.6); }
+        #ui-wave .w-tag { color: rgba(202, 176, 250, 0.45); margin-right: 2px; }
+        #ui-wave .w-dot { opacity: 0.5; }
+        #ui-wave .w-spoils.secured { color: var(--df-gold); text-shadow: 0 0 6px rgba(255, 194, 72, 0.45); }
+        #ui-wave .w-spoils.secured .w-tag { color: var(--df-cream); }
         body.wave-hud #ui-stealth-indicator { top: calc(12% + 52px); }
         /* The objective readout (GameEngine._objectiveHud, engine/markers.js): the job in champagne caps with how far in gold,
            the step beneath in lavender, in the wave readout's capsule; the stealth word steps down beneath it */

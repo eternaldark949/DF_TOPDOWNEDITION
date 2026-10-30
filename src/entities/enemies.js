@@ -2085,7 +2085,7 @@
                 if (!entry || entry.locked) return false;
                 this.entry = entry;
                 this.mapId = entry.mapId;
-                this.active = true;
+                this.active = true; this._secured = null; this._spoils = [];
                 this.wave = 0;
                 this.totalKills = 0;
                 this.hostiles = [];
@@ -2124,7 +2124,7 @@
                 this._hudKey = null; clearTimeout(this._endT);
                 const entry = GAUNTLET_MAPS.find(g => !g.locked && g.mapId === game.activeMap.id);
                 if (!entry) { this._hud(game); return; }
-                this.entry = entry; this.mapId = entry.mapId; this.active = true;
+                this.entry = entry; this.mapId = entry.mapId; this.active = true; this._secured = null; this._spoils = [];
                 this._waveStartedAt = _gameTimeSec; game._lastContactAt = _gameTimeSec;
                 const run = data?.run;
                 if (!run || run.id !== entry.id || !Array.isArray(run.hostiles)) {
@@ -2195,6 +2195,7 @@
 
             spawnWave(game) {
                 this.wave++;
+                this._spoils = [];
                 const id = this.entry.id;
                 if (this.wave > (this.highestWaves[id] || 0)) this.highestWaves[id] = this.wave;
                 this.hostiles = [];
@@ -2312,13 +2313,35 @@
                          + (gun ? `<span class="w-chip">${gun > 1 ? gun + ' gunners' : 'Gunner'}</span>` : '')
                          + (her ? `<span class="w-chip">${her}</span>` : '');
                 }
+                // Second line: what this wave pays, then, once it's cleared, what she secured (stays up through the countdown)
+                let sub = '';
+                if (!ended && key && this.waveDelay > 0 && this.wave > 0 && this._secured) sub = `<div class="w-line w-spoils secured"><span class="w-tag">Secured</span>${this._spoilText(this._secured)}</div>`;
+                else if (!ended && key && this.waveDelay <= 0) sub = `<div class="w-line w-spoils"><span class="w-tag">Pays</span>${this._spoilText(this._pays(this.wave))}</div>`;
+                key += '|' + sub;
                 if (key === this._hudKey) return;
                 this._hudKey = key;
                 if (!key) { el.classList.remove('show'); document.body.classList.remove('wave-hud'); return; }
-                el.innerHTML = `<div class="w-line">${html}</div><div class="w-bar"><i style="transform:scaleX(${frac.toFixed(3)})"></i></div>`;
+                el.innerHTML = `<div class="w-line">${html}</div>${sub}<div class="w-bar"><i style="transform:scaleX(${frac.toFixed(3)})"></i></div>`;
                 el.classList.toggle('between', !frac);
                 el.classList.add('show'); document.body.classList.add('wave-hud');
                 if (ended) { clearTimeout(this._endT); this._endT = setTimeout(() => { if (!this.active) { this._hudKey = ''; el.classList.remove('show'); document.body.classList.remove('wave-hud'); } }, 6000); }
+            }
+
+            /** The wave-clear payout, as the HUD's 'Pays' line lists it */
+            _pays(w) {
+                return [`${40 + w * 20} personics`, `${GAUNTLET_SCALE.SCRAP * w + (w % GAUNTLET_SCALE.BONUS_EVERY === 0 ? GAUNTLET_SCALE.BONUS_SCRAP : 0)} scrap`, ...(w % 3 === 0 ? ['Dark Element'] : [])];
+            }
+
+            /** A boss drop this wave (Lilitu's Dark Element, a schematic, a weapon): listed with the wave's spoils */
+            spoil(name) { if (this.active) (this._spoils || (this._spoils = [])).push(name); }
+
+            /** Spoils → "a · b · Dark Element ×2", at most four entries then "+N more" so one line stays one line */
+            _spoilText(list) {
+                const n = new Map();
+                for (const s of list) n.set(s, (n.get(s) || 0) + 1);
+                const items = [...n].map(([s, c]) => c > 1 ? `${s} ×${c}` : s);
+                const shown = items.slice(0, 4).map(s => `<span class="w-spoil">${s}</span>`).join('<span class="w-dot">·</span>');
+                return shown + (items.length > 4 ? `<span class="w-dot">·</span><span class="w-spoil">+${items.length - 4} more</span>` : '');
             }
 
             update(game) {
@@ -2361,6 +2384,7 @@
                     game.scrap += scrapReward;
                     if (game.resonance) game.earnResonance(40 * this.wave, `WAVE ${this.wave}`);
                     if (this.wave % 3 === 0) game.loot.push(new Loot(game.player.x + 30, game.player.y, 'dark_element'));   // every 3rd wave
+                    this._secured = [`+${reward} personics`, `+${scrapReward} scrap`, ...(this.wave % 3 === 0 ? ['Dark Element'] : []), ...(this._spoils || [])];
                     game.updateUI();
                     showMessage(`WAVE ${this.wave} CLEARED — +${reward} PERSONICS, +${scrapReward} SCRAP`);
                     this.waveDelay = 210; // 3.5 seconds between waves

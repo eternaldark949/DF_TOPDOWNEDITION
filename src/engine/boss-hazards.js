@@ -342,8 +342,11 @@
                 const qs = this.questState || (this.questState = {}), first = !qs.lilituSoloWins;
                 qs.lilituSoloWins = (qs.lilituSoloWins || 0) + 1;
                 this.loot.push(new Loot(her.x - 14, her.y + 8, 'dark_element'));
+                const g = this.hordeGauntlet;
+                if (g) g.spoil('Dark Element');
                 if (first) {
                     qs.goldenRetributionUnlocked = true;                 // the workbench's schematic (story/missions.js SCHEMATICS)
+                    if (g) g.spoil('Golden Retribution schematic');
                     this.addPausableTimeout(() => showMessage('SCHEMATIC UNLOCKED — GOLDEN RETRIBUTION'), 2200);
                 }
             },
@@ -354,8 +357,10 @@
                 this._triFallTick = _simTick;
                 const qs = this.questState || (this.questState = {}), first = !qs.triumvirateDefeats;
                 qs.triumvirateDefeats = (qs.triumvirateDefeats || 0) + 1;
-                if (first && !this.inventory.items.some(i => i.id === 'blood_pact') && this.dropBossWeapon('blood_pact', last.x, last.y + 8))
+                if (first && !this.inventory.items.some(i => i.id === 'blood_pact') && this.dropBossWeapon('blood_pact', last.x, last.y + 8)) {
                     this.addPausableTimeout(() => showMessage('COMPLINE LEAVES THE BLOOD PACT'), 1600);
+                    if (this.hordeGauntlet) this.hordeGauntlet.spoil('Blood Pact');
+                }
             },
 
             /** A boss's weapon on the floor where it fell, glowing gold (picked up like any weapon drop) */
