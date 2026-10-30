@@ -2320,10 +2320,11 @@
                 let sub = '';
                 if (!ended && key && this.waveDelay > 0 && this.wave > 0 && this._secured) sub = `<div class="w-line w-spoils secured"><span class="w-tag">Secured</span>${this._spoilText(this._secured)}</div>`;
                 else if (!ended && key && this.waveDelay <= 0) sub = `<div class="w-line w-spoils"><span class="w-tag">Pays</span>${this._spoilText(this._pays(this.wave))}</div>`;
+                const hidden = !key;
                 key += '|' + sub;
                 if (key === this._hudKey) return;
                 this._hudKey = key;
-                if (!key) { el.classList.remove('show'); document.body.classList.remove('wave-hud'); return; }
+                if (hidden) { el.classList.remove('show'); document.body.classList.remove('wave-hud'); return; }
                 el.innerHTML = `<div class="w-line">${html}</div>${sub}<div class="w-bar"><i style="transform:scaleX(${frac.toFixed(3)})"></i></div>`;
                 el.classList.toggle('between', !frac);
                 el.classList.add('show'); document.body.classList.add('wave-hud');

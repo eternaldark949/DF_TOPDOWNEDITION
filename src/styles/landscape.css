@@ -32,6 +32,13 @@
         body.landscape #btn-holster, body.landscape #emote-frown { bottom: calc(210px - var(--paw-drop)); }
         body.landscape #btn-sneak { bottom: calc(232px - var(--paw-drop)); }
         body.landscape #action-dock { bottom: calc(300px - var(--paw-drop)); }
+        /* The paw sits --paw-shift in from the right edge, where a thumb lands on a phone held on its side
+           (screen px: divided by the HUD's zoom, since these buttons are zoomed by it) */
+        body.landscape { --paw-shift: 80px; }
+        body.landscape #btn-fire, body.landscape #btn-emote, body.landscape #btn-heal, body.landscape #emote-smile,
+        body.landscape #btn-nv, body.landscape #emote-zany, body.landscape #btn-flit, body.landscape #emote-cry,
+        body.landscape #btn-handbrake, body.landscape #btn-autodrive, body.landscape #btn-zib-skip,
+        body.landscape #btn-holster, body.landscape #emote-frown, body.landscape #btn-sneak, body.landscape #action-dock { translate: calc(var(--paw-shift) / var(--hud, 1) * -1) 0; }
         body.landscape #input-zone-look { bottom: calc((285px - var(--paw-drop)) * var(--hud, 1)); }   /* not zoomed itself (it's half the screen): its edge follows the paw */
 
         /* (Dialogue and comms in landscape: styles/panels-phone.css, beside each talk style) */
