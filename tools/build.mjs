@@ -94,6 +94,7 @@ const SCRIPTS = [
     'buildings/neural-systems.js',
     'buildings/torque-auto.js',
     'buildings/ashgrove.js',
+    'buildings/enni-cole.js',
     'traffic/roads.js',
     'traffic/garage-zib.js',
     'traffic/zen-art.js',

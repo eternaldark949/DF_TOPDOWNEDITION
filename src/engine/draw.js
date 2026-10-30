@@ -1175,6 +1175,12 @@
                 if (RL.at('glow')) this.drawEmissivePass(this.ctx);
                 // Her halo, above the darkness so it reads at night (kept from her draw: engine/player-draw-input.js)
                 if (RL.at('stella')) this.drawPlayerGlow(this.ctx);
+                // Velvet's eyeshine, above the darkness; hidden under roofs and canopies like the speech bubbles
+                {
+                    const cat = this.velvetCat;
+                    if (RL.at('characters') && cat && cat.visible && !cat.inCar &&
+                        !this._speakerHidden(cat.x, cat.y, renderBuildings, RL.at('roofs'), RL.at('trees'))) cat.drawEyeShine(this.ctx, this.getAmbientDarkness());
+                }
                 if (RL.at('combat')) {
                     this.drawGunnerHeat(this.ctx, cullBounds.entities);
                     this.drawBossHazards(this.ctx, cullBounds.view);   // the duel's dimming, sigils, fire, hooks (engine/boss-hazards.js)

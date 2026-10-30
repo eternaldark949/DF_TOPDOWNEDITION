@@ -643,6 +643,15 @@ test('Velvet waits at unreachable routes and leaves rest when the player departs
   equal(r, {blocked:true,zeroDt:true,unadopted:true,woke:true});
 });
 
+test('Velvet is blended as an animal, not a humanoid, so her walk phase stays finite', env => {
+  const r = value(env, `
+    const player={x:400,y:220,angle:0,radius:12},cat=new VelvetCat(150,220);
+    for(let i=0;i<20;i++){_simTick++;cat.update(player,1,null,true);}
+    return {moved:cat.animationSpeed>0, animal:RenderInterp._entitySpec(cat)!==RenderInterp._HUMANOID_SPEC, finite:Number.isFinite(cat.walkPhase)};
+  `);
+  equal(r, {moved:true,animal:true,finite:true});
+});
+
 test('Contact shadows stay on the ground across rotation, bobbing, vector and sprite passes', env => {
   const r=value(env, `
     game._doLoadMap('apt_949'); const ctx=game.ctx, original=ctx.drawImage, shots=[];
