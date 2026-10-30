@@ -26,6 +26,11 @@
            look; `variant: '<id>'` asks for one.
            ===================================================================== */
         const STREET_SHOPS = [
+            { id: 'arcade', weight: 18, floors: [7, 8, 9], wall: '#ddd2b8', roof: '#3b4450', material: 'limestone',
+              trim: '#f6efdc', frame: '#28241f', mull: '#17181c', glass: '#28241f', ink: '#e9cf8e', glow: 'rgba(255,214,150,.95)',
+              awnings: [['#16171b', '#2c2d33'], ['#1d3a2c', '#2e5641'], ['#4a1a1f', '#6c2c32'], ['#1b2236', '#2e3854'], ['#3a2619', '#57402c']],
+              neons: ['#ffb45a'],
+              names: ['Maison Clair', 'Galerie Ondine', 'Mercer & Vane', 'Le Comptoir', 'Bellamy', 'Atelier Rose', 'Vauclair', 'Chandelle', 'Hartwell', 'Rue Dorée', 'The Gilded Hour', 'Ambre'] },
             { id: 'bakery', weight: 3, floors: [2, 3], wall: '#5a2b22', roof: '#4a2a20', material: 'brick',
               trim: '#efdcb6', frame: '#efdcb6', mull: '#3a2116', glass: '#2a1b14', board: ['#4a2a1a', '#2a160d'], edge: '#c99a52', ink: '#ffbf4d', glow: 'rgba(255,196,96,.95)',
               awnings: [['#e2902c', '#f1e0bd'], ['#b8433a', '#f1e0bd'], ['#3f7f7a', '#efe6cf'], ['#8a5a9e', '#efe2f2']],
@@ -49,6 +54,7 @@
             { id: 'loft', weight: 2, sills: null, noBalconies: true }
         ];
         const STREET_GOLD = '#d8b77a';
+        const _vArcMask = () => true;
 
         /** Shared paint for every building of a variant: sprites and paths in the variant's own frame. */
         const StreetArt = {
@@ -114,6 +120,7 @@
                     v.name = spec.names[Math.floor(r(3) * spec.names.length)];
                     if (spec.awnings) v.awning = spec.awnings[Math.floor(r(4) * spec.awnings.length)];
                     if (spec.neons) v.neon = spec.neons[Math.floor(r(5) * spec.neons.length)];
+                    if (spec.id === 'arcade') this._vArcInit(v, r);                     // its stone (buildings/street-arcade.js)
                 } else {
                     this.sills = spec.sills;
                     if (spec.noBalconies && this.facadeFeature === 'balconies') this.facadeFeature = null;
@@ -139,6 +146,7 @@
             },
             /** The window mask: a shop's ground floor front is its shopfront (_drawFaceWindows) */
             _vWindowMask(f) {
+                if (this.variant && this.variant.id === 'arcade') return _vArcMask;            // its own windows on every face
                 if (!this.variant || this.variant.kind !== 'shop' || f.side !== this.facing) return null;
                 return this._vMaskFn || (this._vMaskFn = (fl) => fl === 0);
             },
@@ -172,6 +180,7 @@
                 if (G.depth < 3 || f.side === 'C') return;
                 const FH = CONFIG.BUILDINGS.FLOOR_HEIGHT, fine = _zoomLOD < 2 && G.depth > 8, front = f.side === this.facing;
                 const mat = v.kind === 'shop' ? S.material : v.id === 'brownstone' ? 'brick' : null;
+                if (mat === 'limestone') { this._vArcUnder(ctx, f, G, H); return; }
                 if (mat === 'stone') {                                             // rose stone to the belt, dark steel over it (Enni Cole)
                     const hi = Math.min(1, FH * 1.15 / H);
                     ctx.fillStyle = S.stoneLo; ctx.fill(G.quad(new Path2D(), 0, 1, 0, hi * 0.5));
@@ -201,6 +210,7 @@
 
             /** Over the windows, on every face: the shopfront, lintels, spandrels, then (once for all faces) ledges and fins */
             _vFaceOver(ctx, faces, P) {
+                if (this.variant.id === 'arcade') { this._vArcOver(ctx, faces, P); return; }
                 const v = this.variant, S = v.spec, H = this._vH(), FH = CONFIG.BUILDINGS.FLOOR_HEIGHT, K = LandmarkKit;
                 const floors = Math.min(this.floors, CONFIG.BUILDINGS.MAX_FLOORS), fine = _zoomLOD < 2;
                 const edges = [], fins = [];
@@ -320,6 +330,7 @@
             },
 
             _vFront(ctx, emissive) {
+                if (this.variant.id === 'arcade') { this._vArcFront(ctx, emissive); return; }
                 const v = this.variant, S = v.spec, FH = CONFIG.BUILDINGS.FLOOR_HEIGHT, g = this._frontGeo(), K = LandmarkKit;
                 const F = this._vFrame(), half = F.fw / 2, door = F.door - half, side = this.facing === 'N' || this.facing === 'E' ? -1 : 1;
                 const font = `${S.id === 'bakery' || S.id === 'florist' ? 15 : 17}px "Great Vibes", "URW Chancery L", "Z003", cursive`;
@@ -389,7 +400,7 @@
 
             /** A shop's roof: its variant's roof, painted once for every shop of that variant and frame */
             _vShopRoof(ctx) {
-                const v = this.variant, F = this._vFrame(), key = `shop|${v.id}|${F.fw}x${F.fd}`;
+                const v = this.variant, F = this._vFrame(), key = `shop|${this._vId()}|${F.fw}x${F.fd}`;
                 const spr = StreetArt.sprite(key, 0, 0, F.fw, F.fd, 1, c => this._vPaintShopRoof(c, v.spec, F.fw, F.fd));
                 this._vInFrame(ctx, c => c.drawImage(spr.cv, 0, 0, F.fw, F.fd));
             },
@@ -404,11 +415,11 @@
 
             /** The roof's night lights (skylights, lanterns, the dome, string lights): a shared path, one or two fills */
             _vRoofGlow(ctx) {
-                const v = this.variant, F = this._vFrame(), key = `${v.kind}|${v.id}|${F.fw}x${F.fd}`;
+                const v = this.variant, F = this._vFrame(), key = `${v.kind}|${this._vId()}|${F.fw}x${F.fd}`;
                 const p = StreetArt.path(key + '|glow', path => { this._vGlowPath(path, v, F.fw, F.fd); return path; });
                 const bulbs = StreetArt.path(key + '|bulbs', path => { this._vBulbPath(path, v, F.fw, F.fd); return path; });
                 this._vInFrame(ctx, c => {
-                    const col = v.kind === 'apt' ? 'rgba(255,214,150,.75)' : v.id === 'lounge' ? hexToRgba(v.neon, 0.55) : v.id === 'florist' ? 'rgba(220,255,210,.4)' : 'rgba(255,196,110,.55)';
+                    const col = v.kind === 'apt' || v.id === 'arcade' ? 'rgba(255,214,150,.75)' : v.id === 'lounge' ? hexToRgba(v.neon, 0.55) : v.id === 'florist' ? 'rgba(220,255,210,.4)' : 'rgba(255,196,110,.55)';
                     c.fillStyle = col; c.fill(p);
                     c.fillStyle = v.id === 'lounge' ? 'rgba(255,226,170,.95)' : 'rgba(255,224,160,.95)'; c.fill(bulbs);
                 });
@@ -417,15 +428,19 @@
             /* ---------------- the pavement in front ---------------- */
 
             _vBase(ctx) {
-                const v = this.variant, F = this._vFrame(), key = `base|${v.kind}|${v.id}|${F.fw}`, door = Math.round(F.door);
+                const v = this.variant, F = this._vFrame(), key = `base|${v.kind}|${this._vId()}|${F.fw}`, door = Math.round(F.door);
                 const spr = StreetArt.sprite(key + '|' + door, -6, F.fd - 3, F.fw + 12, 52, 1, c => this._vPaintBase(c, v, F.fw, F.fd, door));
                 this._vInFrame(ctx, c => c.drawImage(spr.cv, spr.x, spr.y, spr.w, spr.h));
             },
+
+            /** What its shared bakes are kept under: the variant (an arcade's also by its stone and door place) */
+            _vId() { return this.variant.id === 'arcade' ? 'arcade|' + this._vArcKey() : this.variant.id; },
 
             /* ---------------- painters (run once a variant, in its frame) ---------------- */
 
             _vPaintShopRoof(c, S, fw, fd) {
                 const rect = (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
+                if (S.id === 'arcade') { this._vArcPaintRoof(c, this.variant, fw, fd); return; }
                 if (S.id === 'bakery') {
                     // A shingled hip roof: four planes, courses parallel to each eave, hips and ridge, a chimney and two skylights
                     const long = fw >= fd, half = Math.min(fw, fd) / 2, A = [0, 0], B = [fw, 0], C = [fw, fd], D = [0, fd];
@@ -605,7 +620,8 @@
                     if (S.id === 'loft') for (let x = fw * 0.32; x < fw * 0.84; x += 24) p.rect(x + 1.5, 4.5, 15, 7);
                     return;
                 }
-                if (S.id === 'bakery') for (const [x, y, w, h] of this._vSkylights(S, fw, fd)) p.rect(x + 1, y + 1, w - 2, h - 2);
+                if (S.id === 'arcade') this._vArcGlowPath(p, v, fw, fd);
+                else if (S.id === 'bakery') for (const [x, y, w, h] of this._vSkylights(S, fw, fd)) p.rect(x + 1, y + 1, w - 2, h - 2);
                 else if (S.id === 'florist') p.rect(fw - 81, 9, 72, 54);
                 else if (S.id === 'boutique') { const [lx, ly, lw, lh] = this._vLantern(fw, fd); p.roundRect(lx + 2, ly + 2, lw - 4, lh - 4, 12); }
                 else { const [dx, dy, r] = this._vDome(fw, fd); p.moveTo(dx + r, dy); p.arc(dx, dy, r, 0, Math.PI * 2); }
@@ -638,6 +654,7 @@
                     for (const x of [door - 34, door + 34]) { c.fillStyle = 'rgba(0,0,0,.3)'; c.fillRect(x - 6, y + 3, 14, 12); c.fillStyle = '#3a2a22'; c.fillRect(x - 7, y + 1, 14, 11); dot(x, y + 6, 5, '#3c7d44'); dot(x - 2, y + 5, 2.4, '#5c9a4c'); }
                     return;
                 }
+                if (S.id === 'arcade') { this._vArcPaintBase(c, v, fw, fd, door); return; }
                 // A shop's awning, canopy or signboard covers the first stride out, so its things stand past that
                 y += 16;
                 if (S.id === 'bakery') {
@@ -696,7 +713,8 @@
             _vGlow(ctx, faces, P, dark) {
                 const v = this.variant, S = v.spec, K = LandmarkKit, H = this._vH();
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
-                if (v.kind === 'shop') {
+                if (v.id === 'arcade') this._vArcGlow(ctx, faces, P, dark);
+                else if (v.kind === 'shop') {
                     for (const f of faces) if (f.side === this.facing && f.side !== 'C') { const G = this._vFaceAt(f, P); if (G.depth >= 3) this._vShopfront(ctx, f, G, H, true); }
                     if (S.id === 'lounge') {
                         const fins = [];
