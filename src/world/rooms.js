@@ -811,6 +811,16 @@
                 return room ? room.lightK : 1;
             }
 
+            /** The darkness at a point for stealth, as the light layer draws it: an outdoor room at the sky's
+                `skyDark`, a room with a `fill` thinned toward it as its lights are on, otherwise `ambient`. */
+            darknessAt(x, y, ambient, skyDark) {
+                const r = this.active ? this.getRoomAt(x, y) : null;
+                if (!r || ambient <= 0) return ambient;
+                if (r.type === 'outdoor') return Math.min(ambient, skyDark);
+                if (r.fill !== undefined && r.fill < ambient) return ambient - (ambient - r.fill) * r.lightK;
+                return ambient;
+            }
+
             /** Light level at a point (soft lights, glows, props that move). */
             lightAt(x, y) {
                 if (!this.active) return 1;
@@ -1130,7 +1140,7 @@
                     // fill: lit, the suite reads warm and lamp-lit like the cafe; a switch puts the room back in the dark
                     main_room:  { x: 8,   y: 208, w: 892,  h: 684, type: 'indoor',  label: 'Living Room', fill: 0.5 },
                     bedroom:    { x: 908,  y: 208, w: 484,  h: 340, type: 'indoor',  label: 'Bedroom', fill: 0.56 },
-                    bathroom:   { x: 908,  y: 556, w: 484,  h: 336, type: 'indoor',  label: 'Bathroom', fill: 0.5 }
+                    bathroom:   { x: 908,  y: 556, w: 484,  h: 336, type: 'indoor',  label: 'Bathroom', fill: 0.64 }   // (white marble, and its own ceiling light: lit less)
                 },
                 doors: [
                     // Veranda → Main room: 3 sliding glass doors across the veranda wall (y:200)

@@ -189,8 +189,8 @@
                 wallShadow(908, 208, 484, 340);
 
                 // The bathroom: big white marble tiles, grey and lilac veins, a darker band round the walls
-                c.fillStyle = '#ece8ee'; c.fillRect(908, 556, 484, 336);
-                for (let y = 556; y < 892; y += 48) for (let x = 908; x < 1392; x += 48) { c.fillStyle = shade('#ece8ee', (r() - 0.5) * 0.05); c.fillRect(x + 0.5, y + 0.5, 47, 47); }
+                c.fillStyle = '#d6d0da'; c.fillRect(908, 556, 484, 336);
+                for (let y = 556; y < 892; y += 48) for (let x = 908; x < 1392; x += 48) { c.fillStyle = shade('#d6d0da', (r() - 0.5) * 0.06); c.fillRect(x + 0.5, y + 0.5, 47, 47); }
                 veins(908, 556, 484, 336, 26, 'rgba(110,100,130,0.16)');
                 veins(908, 556, 484, 336, 12, 'rgba(160,130,200,0.12)', 1.4);
                 c.strokeStyle = 'rgba(140,130,150,0.35)'; c.lineWidth = 0.8; c.beginPath();
