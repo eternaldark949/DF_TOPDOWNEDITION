@@ -1143,6 +1143,7 @@
                 if (RL.at('stella')) this.drawPlayerGlow(this.ctx);
                 if (RL.at('combat')) {
                     this.drawGunnerHeat(this.ctx, cullBounds.entities);
+                    this.drawBossHazards(this.ctx, cullBounds.view);   // the duel's dimming, sigils, fire, hooks (engine/boss-hazards.js)
                     this.drawFireTrail(this.ctx, cullBounds.view);
                     for (const p of this.projectiles) if (p.isFireball) p.draw(this.ctx);
                 }

@@ -62,6 +62,7 @@
                 this.updateCasings();
                 this.updateCorpses();
                 this.updateStatuses();                                 // bleeding and the rest (engine/status-effects.js)
+                this.updateBossHazards();                              // sigils, fire, censers, hooks; her burn (engine/boss-hazards.js)
                 this.updateMeleeSwing();                               // a blade's cut lands as it passes (engine/status-effects.js)
                 this.updateExecution();                                // a takedown in progress (engine/executions.js)
                 this.updateSneak();
@@ -603,6 +604,7 @@
                     // Unified projectile collection — handles single shots, arrays, or null
                     if (result) {
                         const shots = Array.isArray(result) ? result : [result];
+                        if (enemy.dmgMul > 1) for (const s of shots) if (s instanceof ProjectileEntity) s.damage = Math.round(s.damage * enemy.dmgMul);   // a late gauntlet wave hits harder
                         if (shots.some(s => s instanceof ProjectileEntity && !s.melee)) this.emitNoise(enemy.x, enemy.y, CONFIG.NOISE.enemyShot, 'enemyShot', false, { src: enemy });   // their gunfire draws their friends
                         for (const shot of shots) {
                             if (shot instanceof ProjectileEntity && shot.melee) { this.projectiles.push(shot); continue; }   // a claw: no flash, no casing
@@ -615,6 +617,11 @@
                         }
                     }
                     
+                    if (enemy.dead && enemy.decoy) {                              // a Blood Mirror decoy: a crimson puff, nothing more
+                        this.weather.spawnExplosion(enemy.x, enemy.y, '#7a0618', 6, 1.6);
+                        this.enemies.splice(i, 1);
+                        continue;
+                    }
                     if (enemy.dead) { 
                         this.awardKill(enemy);                                    // Resonance for the kill (core/resonance.js)
                         audioSys.sfx('explode'); 
@@ -632,6 +639,9 @@
                                                  draw(ctx) { ctx.save(); ctx.translate(this.x, this.y); ctx.save(); ctx.translate(0, 10); ctx.scale(1, 0.36); ctx.globalAlpha = 0.75; drawGlow(ctx, 0, 0, 22, '#ffd76a', 0.3); ctx.restore(); drawWeapon(ctx, this.item.id, 0, Math.sin(_frameTime / 500) * 3, this.angle, 0.9); ctx.restore(); } });
                                 showMessage("THE DEMONESS FALLS — SHE LEAVES THE MAIDEN'S KUKRI");
                             } else showMessage('THE DEMONESS FALLS');
+                            if (enemy.solo) this.lilituDuelWon(enemy);            // her duel: a second Dark Element, the schematic (engine/boss-hazards.js)
+                            this.clearHazards(enemy);
+                            for (const m of this.enemies) if (m._mirrorOf === enemy && m._vanish) m._vanish();
                         }
                         const finReason = this.finisherReason(enemy);
                         this.spawnLoot(enemy.x, enemy.y);
@@ -648,12 +658,17 @@
                             for (let e of this.enemies) {
                                 if (e instanceof GatlingGunner && e !== enemy && !e.dead) {
                                     remainingGunners++;
-                                    e.maxBurstCount += 5; e.reloadTime = Math.max(30, e.reloadTime - 0.7);
+                                    if (e.persona) e.enrage();                    // a warden falls: the others fire faster
+                                    else { e.maxBurstCount += 5; e.reloadTime = Math.max(30, e.reloadTime - 0.7); }
                                 }
+                            }
+                            if (enemy.persona) {
+                                this.clearHazards(enemy);
+                                if (!remainingGunners) this.triumvirateFallen(enemy);   // the Blood Pact, the first time (engine/boss-hazards.js)
                             }
                             
                             if (remainingGunners > 0) {
-                                showMessage("REMAINING GUNNERS ENRAGED!");
+                                showMessage(enemy.persona ? `${WARDENS[enemy.persona].name.toUpperCase()} FALLS — THE OTHERS BURN HOTTER` : "REMAINING GUNNERS ENRAGED!");
                             } else if (!finReason) {
                                 // Last GatlingGunner killed - trigger dramatic time slow!
                                 this.triggerTimeSlow(0.4, 4, true);

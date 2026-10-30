@@ -25,7 +25,7 @@
                     this.enemies.push(b);
                 }
                 qs[flag] = true;
-                const names = bosses.map(b => b.bossName).filter(Boolean);
+                const names = opts.subtitle ? [opts.subtitle] : bosses.map(b => b.bossName).filter(Boolean);
                 if (this._bossIntro) short = true;                  // one already running: this set just wakes in place
                 (this._bossIntros || (this._bossIntros = [])).push(this._bossIntro = { bosses, short, f: 0, title: opts.title || 'THE TRIUMVIRATE', names, skipped: false,
                                     zoom: this.camera.zoom || 1, woke: 0 });
@@ -59,6 +59,22 @@
                     ctx.globalAlpha = 0.07 + 0.06 * eye; drawGlow(ctx, e.x, e.y, 30 * S, W.eye, 0);          // their accent, faint, so the three read apart
                     if (e.persona === 'matins' && eye > 0.02) { ctx.globalAlpha = 0.35 * eye; ctx.strokeStyle = W.trim; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(e.x, e.y + (-6 * e._riseK - 2) * S * 1.12, 16 * S * 1.12, 6 * S * 1.12, 0, 0, Math.PI * 2); ctx.stroke(); }
                     if (e._heat > 0.05) { ctx.globalAlpha = 0.5 * e._heat; drawGlow(ctx, e.x + Math.cos(e.angle) * 34 * S, e.y + Math.sin(e.angle) * 34 * S, 16 * S, '255, 150, 60', 0.3); }
+                    // Its move winding up (entities/enemies.js _wardenMove): the censer swings hot, the hymn gathers, the chain shows its line
+                    const T = e._move && e._move.tell;
+                    if (T) {
+                        const k = Math.min(1, (_gameTimeSec - T.from) / Math.max(0.01, T.at - T.from)), pulse = 0.7 + 0.3 * Math.sin(_frameTime / 40);
+                        if (e.persona === 'vesper') {
+                            const hx = e.x + (Math.cos(e.angle) * 14 - Math.sin(e.angle) * 9) * S, hy = e.y + (Math.sin(e.angle) * 14 + Math.cos(e.angle) * 9) * S;
+                            ctx.globalAlpha = 0.5 + 0.5 * k; drawGlow(ctx, hx, hy, (10 + 18 * k) * S, '255, 150, 50', 0.35);
+                        } else if (e.persona === 'matins') {
+                            ctx.globalAlpha = 0.4 + 0.5 * k * pulse; drawGlow(ctx, e.x, e.y, (40 + 40 * k) * S, '255, 230, 150', 0.2);
+                            ctx.strokeStyle = '#ffe9a8'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(e.x, e.y, (90 - 60 * k) * S, 0, Math.PI * 2); ctx.stroke();
+                        } else if (e.persona === 'compline') {
+                            ctx.globalAlpha = 0.3 + 0.6 * k * pulse; ctx.strokeStyle = '#c890ff'; ctx.lineWidth = 1.5 + 2 * k; ctx.setLineDash([3, 5]);
+                            ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x + Math.cos(T.a) * 420, e.y + Math.sin(T.a) * 420); ctx.stroke(); ctx.setLineDash([]);
+                            ctx.globalAlpha = 0.6 + 0.4 * k; drawGlow(ctx, e.x + Math.cos(T.a) * 30 * S, e.y + Math.sin(T.a) * 30 * S, (8 + 10 * k) * S, '200, 120, 255', 0.3);
+                        }
+                    }
                 }
                 ctx.restore();
             },

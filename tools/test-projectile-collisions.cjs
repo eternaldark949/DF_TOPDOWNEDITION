@@ -99,9 +99,10 @@ function run(){
   const out=[];
   for(const Enemy of [Ganger,Drone,GatlingGunner])for(const speed of [0,80]){
    const target=new Enemy(1300,1000);target.hp=target.maxHp=5000;target.invincibleTimer=20;
+   if(target instanceof Drone){target.alt=0;target.state='hover';target.eyePos=()=>({x:-1e9,y:-1e9});}   // landed, hit on the shell (armored)
    for(let i=0;i<2;i++){const p=bullet(1000,1000,{speed:speed||1});p.vx=speed;p.vy=0;target.onProjectileHit(p,game);p.destroy();}
-   out.push({hp:target.hp,frames:target.invincibleTimer});
-  }return out;`,r=>{for(const row of r)assert.deepEqual(row,{hp:4800,frames:20});});
+   out.push({hp:target.hp,frames:target.invincibleTimer,drone:target instanceof Drone});
+  }return out;`,r=>{for(const row of r){assert.equal(row.frames,20);if(row.drone)assert.ok(row.hp<5000&&row.hp>4800,'the drone shell takes a share');else assert.equal(row.hp,4800);}});
  test('Doors are resolved in travel order and reduce only hits beyond a penetrated leaf',`
   const out=[];const event=ambience.doorEvent;ambience.doorEvent=()=>{};
   for(const [doorX,targetX,penetrating]of [[1050,1030,false],[1020,1070,false],[1050,1030,true],[1020,1070,true]]){

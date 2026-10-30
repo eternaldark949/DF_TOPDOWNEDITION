@@ -286,6 +286,11 @@
         #ui-wave .w-bar { width: 100%; min-width: 120px; height: 2px; border-radius: 1px; background: rgba(202, 176, 250, 0.18); overflow: hidden; }
         #ui-wave .w-bar i { display: block; height: 100%; transform-origin: left; background: linear-gradient(90deg, var(--df-lavender), #fff); box-shadow: 0 0 6px rgba(241, 232, 254, 0.8); transition: transform 0.35s ease; }
         #ui-wave.between .w-bar { opacity: 0; }
+        #ui-wave .w-spoils { justify-content: center; gap: 6px; margin-top: 3px; font-size: max(6px, 0.5rem - var(--font-trim)); letter-spacing: 2px; color: rgba(202, 176, 250, 0.6); }
+        #ui-wave .w-tag { color: rgba(202, 176, 250, 0.45); margin-right: 2px; }
+        #ui-wave .w-dot { opacity: 0.5; }
+        #ui-wave .w-spoils.secured { color: var(--df-gold); text-shadow: 0 0 6px rgba(255, 194, 72, 0.45); }
+        #ui-wave .w-spoils.secured .w-tag { color: var(--df-cream); }
         body.wave-hud #ui-stealth-indicator { top: calc(12% + 52px); }
         /* The objective readout (GameEngine._objectiveHud, engine/markers.js): the job in champagne caps with how far in gold,
            the step beneath in lavender, in the wave readout's capsule; the stealth word steps down beneath it */
@@ -9720,10 +9725,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                                     }
                                                     game.removeWall(w);
                                                 }
-                                                // The drones
-                                                game.enemies.push(new Drone(900, 1100));
-                                                game.enemies.push(new Drone(1000, 1150));
-                                                game.enemies.push(new Drone(1100, 1100));
+                                                // The drones drop in through the breach: a lancer, a seer, a grappler (entities/drones.js)
+                                                game.enemies.push(new Drone(900, 1100, 'lancer'));
+                                                game.enemies.push(new Drone(1000, 1150, 'seer'));
+                                                game.enemies.push(new Drone(1100, 1100, 'grappler'));
                                             }, 3200);
                                             game.addPausableTimeout(() => S.triggerComms("Max", "Fuck!", 1500), 3700);
                                             game.addPausableTimeout(() => S.triggerComms("Victoria", "It's them.", 2200), 5400);
@@ -28970,272 +28975,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
 
-        /**
-         * =====================================================================
-         *  DRONE (Flying Combat Enemy - extends ActorEntity)
-         * =====================================================================
-         * Hovering combat drones with LOS-based targeting.
-         * Now part of the unified collision system.
-         * 
-         * Features:
-         * - Circle collision for prop/wall interactions
-         * - HP system with knockback support
-         * - Hover animation effect
-         * - Line-of-sight checking
-         * - Strafe AI when blocked
-         */
-        class Drone extends ActorEntity {
-            constructor(x, y) {
-                // Initialize ActorEntity with circle collision
-                super({
-                    x: x,
-                    y: y,
-                    radius: 15,
-                    type: 'drone',
-                    alliance: 'hostile',
-                    hp: 60,
-                    mass: 8,          // Light (flying)
-                    friction: 0.9,
-                    speed: 3,
-                    hasCollision: true,
-                    invincibleDuration: 15
-                });
-                
-                // Combat
-                this.cooldown = Math.random() * 100;
-                
-                // Telegraph
-                this.telegraphThreshold = 8; // ~0.13s window
-                this.telegraphAngle = 0;
-                this.isTelegraphing = false;
-                this._prevPlayerX = 0;
-                this._prevPlayerY = 0;
-                
-                // Animation
-                this.hoverOffset = Math.random() * Math.PI * 2;
-                
-                // AI
-                this.strafeDir = Math.random() > 0.5 ? 1 : -1;
-                this.strafeTimer = 0;
-            }
-            
-            /**
-             * Check if there's line of sight to target.
-             */
-            hasLineOfSight(targetX, targetY, walls) {
-                const dx = targetX - this.x;
-                const dy = targetY - this.y;
-                const dist = Math.hypot(dx, dy);
-                const steps = Math.ceil(dist / 20);
-                
-                for (let i = 1; i < steps; i++) {
-                    const t = i / steps;
-                    const checkX = this.x + dx * t;
-                    const checkY = this.y + dy * t;
-                    
-                    for (let w of walls) {
-                        if (checkX > w.x && checkX < w.x + w.w && 
-                            checkY > w.y && checkY < w.y + w.h) {
-                            return false;
-                        }
-                    }
-                }
-                return true;
-            }
-            
-            /**
-             * Override ActorEntity update for drone AI.
-             */
-            update(playerX, playerY, walls) {
-                if (this.dead) return null;
-                
-                // Hover animation
-                this.hoverOffset += 0.1;
-                
-                // Decrement invincibility
-                if (this.invincibleTimer > 0) {
-                    this.invincibleTimer--;
-                }
-                
-                // Apply knockback physics
-                if (this.knockbackVx || this.knockbackVy) {
-                    this.vx += this.knockbackVx;
-                    this.vy += this.knockbackVy;
-                    this.knockbackVx *= this.knockbackFriction;
-                    this.knockbackVy *= this.knockbackFriction;
-                    if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
-                    if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
-                }
-                
-                const dx = playerX - this.x; 
-                const dy = playerY - this.y;
-                const dist = Math.hypot(dx, dy); 
-                const angle = Math.atan2(dy, dx);
-                const targetDist = 200;
-                
-                // Check line of sight to player
-                const hasLOS = this.hasLineOfSight(playerX, playerY, walls);
-                
-                if (!hasLOS) {
-                    // No LOS - strafe to find a better angle
-                    this.strafeTimer++;
-                    if (this.strafeTimer > 60) {
-                        this.strafeDir *= -1;
-                        this.strafeTimer = 0;
-                    }
-                    
-                    // Move perpendicular to player direction + slightly toward player
-                    const strafeAngle = angle + (Math.PI / 2) * this.strafeDir;
-                    this.vx += Math.cos(strafeAngle) * 0.3;
-                    this.vy += Math.sin(strafeAngle) * 0.3;
-                    
-                    // Also move toward player slowly
-                    this.vx += Math.cos(angle) * 0.1;
-                    this.vy += Math.sin(angle) * 0.1;
-                } else {
-                    // Has LOS - normal behavior
-                    this.strafeTimer = 0;
-                    if (dist > targetDist) { 
-                        this.vx += Math.cos(angle) * 0.2; 
-                        this.vy += Math.sin(angle) * 0.2; 
-                    } else { 
-                        this.vx -= Math.cos(angle) * 0.1; 
-                        this.vy -= Math.sin(angle) * 0.1; 
-                    }
-                }
-                
-                // Apply velocity with friction
-                this.vx *= 0.9; 
-                this.vy *= 0.9; 
-                this.x += this.vx; 
-                this.y += this.vy;
-                
-                // Wall collision (bounce off walls) - CollisionSystem handles separation
-                // but we still want bounce behavior for drones
-                for(let w of walls) {
-                    if (this.x + this.radius > w.x && this.x - this.radius < w.x + w.w && 
-                        this.y + this.radius > w.y && this.y - this.radius < w.y + w.h) {
-                        this.vx *= -1; 
-                        this.vy *= -1; 
-                        this.x += this.vx * 2; 
-                        this.y += this.vy * 2; 
-                    }
-                }
-                
-                // Shooting
-                this.cooldown--;
-                // Estimate player velocity from frame-to-frame delta
-                const playerVelX = playerX - this._prevPlayerX;
-                const playerVelY = playerY - this._prevPlayerY;
-                this._prevPlayerX = playerX;
-                this._prevPlayerY = playerY;
-                
-                // Telegraph: track player with predictive aim
-                if (this.cooldown > 0 && this.cooldown <= this.telegraphThreshold && dist < 500 && hasLOS) {
-                    this.isTelegraphing = true;
-                    const projSpeed = 24;
-                    const travelTime = dist / projSpeed;
-                    const predX = playerX + playerVelX * travelTime;
-                    const predY = playerY + playerVelY * travelTime;
-                    this.telegraphAngle = Math.atan2(predY - this.y, predX - this.x);
-                } else if (this.cooldown > this.telegraphThreshold || !hasLOS) {
-                    this.isTelegraphing = false;
-                }
-                if (this.cooldown <= 0 && dist < 500 && hasLOS) { 
-                    this.isTelegraphing = false;
-                    this.cooldown = 80 + Math.random() * 40; 
-                    return new ProjectileEntity({ 
-                        x: this.x, 
-                        y: this.y, 
-                        angle: this.telegraphAngle, 
-                        isEnemy: true,
-                        owner: this
-                    }); 
-                }
-                return null;
-            }
-            
-            /**
-             * Override onProjectileHit to only take damage from player projectiles.
-             */
-            onProjectileHit(projectile, game) {
-                // Only take damage from player projectiles
-                if (projectile.isEnemy) return;
-                this.lastHitBy = projectile.owner; this.lastHitMelee = !!projectile.melee;   // who gets the Resonance
-                const opts = { shot: !projectile.melee, punch: !!projectile.melee, crit: !!projectile.crit };
-                
-                const speed = Math.hypot(projectile.vx, projectile.vy);
-                if (speed > 0) {
-                    // Drones are light (mass 8) - sniper shots send them FLYING
-                    const projMomentum = (projectile.mass || 1) * speed;
-                    const damageMultiplier = projectile.damage / 20;
-                    const knockbackStrength = Math.min((projMomentum * damageMultiplier) / (this.mass || 8), 80);
-                    
-                    const kbX = (projectile.vx / speed) * knockbackStrength;
-                    const kbY = (projectile.vy / speed) * knockbackStrength;
-                    this.takeDamage(projectile.damage, kbX, kbY, opts);
-                } else {
-                    this.takeDamage(projectile.damage, 0, 0, opts);
-                }
-            }
-            
-            /**
-             * Legacy takeDamage for non-projectile damage (e.g., vehicle hits).
-             */
-            takeDamageOld(amount, bulletAngle) { 
-                const kbX = Math.cos(bulletAngle) * 8;
-                const kbY = Math.sin(bulletAngle) * 8;
-                this.takeDamage(amount, kbX, kbY);
-            }
-            
-            draw(ctx) {
-                if (this.dead) return;
-                
-                // Flash if invincible
-                if (this.invincibleTimer > 0 && this.invincibleTimer % 6 < 3) {
-                    return;
-                }
-                
-                ctx.save(); 
-                ctx.translate(this.x, this.y + Math.sin(this.hoverOffset) * 3);
-                
-                // Body
-                ctx.fillStyle = '#444'; 
-                ctx.beginPath(); 
-                ctx.arc(0, 0, 15, 0, Math.PI*2); 
-                ctx.fill();
-                
-                // Eye (glowing) — flashes crimson during telegraph
-                const eyeColor = this.isTelegraphing ? '#ff2244' : '#a469ff';
-                ctx.fillStyle = eyeColor; 
-                ctx.shadowColor = eyeColor; 
-                ctx.shadowBlur = this.isTelegraphing ? 18 : 10; 
-                ctx.beginPath(); 
-                ctx.arc(0, 0, 6, 0, Math.PI*2); 
-                ctx.fill();
-                ctx.shadowBlur = 0; 
-                
-                // Rotating wings
-                ctx.fillStyle = '#666'; 
-                const rOffset = _frameTime / 50;
-                ctx.beginPath(); 
-                ctx.arc(Math.cos(rOffset)*20, Math.sin(rOffset)*20, 4, 0, Math.PI*2); 
-                ctx.fill();
-                ctx.beginPath(); 
-                ctx.arc(Math.cos(rOffset + 2)*20, Math.sin(rOffset + 2)*20, 4, 0, Math.PI*2); 
-                ctx.fill();
-                
-                // (Health bar: drawn with the other combat overlays once hit — engine/combat-fx.js)
-                ctx.restore();
+        // (The Double Nights drones: entities/drones.js)
 
-                // Telegraph aim line (world space)
-                if (this.isTelegraphing && this.cooldown > 0) {
-                    drawEnemyTelegraph(ctx, this.x, this.y, this.telegraphAngle,
-                        this.cooldown, this.telegraphThreshold, '#a469ff');
-                }
-            }
-        }
-        
         /* --- TRAFFIC & GANGERS --- */
         /**
          * =====================================================================
@@ -29258,6 +28999,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             matins:   { name: 'Matins, the Choir',      accent: '#e8c27a', trim: '#fff1c2', mantle: '#1a1216', eye: '255, 190, 80' },
             compline: { name: 'Compline, the Penitent', accent: '#8a5cff', trim: '#e6ddd0', mantle: '#24163a', eye: '200, 120, 255' }
         };
+        /* How the Triumvirate fights (a persona; times in seconds unless noted):
+             HP each; RELOAD frames between bursts, and they stagger them (STAGGER frames apart on waking, and a
+             warden whose burst ends while the others reload fires EXTEND more, so all three never go quiet);
+             lose her and a burst goes on into her cover for COVER_FIRE; hidden past FLANK_AFTER, one of them
+             walks to a firing spot (findShotSpot); a fall makes the others fire faster (enrage).
+             Vesper lobs a burning censer over cover (CENSER_EVERY, a WIND tell); Matins sings through walls
+             (HYMN_EVERY, a CHARGE tell); Compline throws its chain hook past cover (HOOK_EVERY, a HOOK_TELL),
+             within HOOK_RANGE (engine/boss-hazards.js does the rest). */
+        const WARDEN = { HP: 1500, RELOAD: 120, STAGGER: 40, EXTEND: 4, COVER_FIRE: 0.5, FLANK_AFTER: 2,
+            CENSER_EVERY: 7, CENSER_WIND: 0.5, CENSER_RANGE: 640, HYMN_EVERY: 6, HYMN_CHARGE: 0.6,
+            HOOK_EVERY: 8, HOOK_TELL: 0.7, HOOK_RANGE: 420 };
 
         class GatlingGunner extends ActorEntity {
             constructor(x, y, id, opts = {}) {
@@ -29313,6 +29065,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.sightGated = true;
                     this.telegraphThreshold = 30;                 // ~0.5 s: dodgeable on reaction
                     this.bossName = WARDENS[this.persona].name;
+                    this.hp = this.maxHp = WARDEN.HP;
+                    this.reloadTime = WARDEN.RELOAD;
+                    this._move = { at: 0, tell: null };          // its own move (censer, hymn, hook): next due, wind-up
                 }
                 this._heat = 0;           // the Wardens' original barrel heat
                 // Ordinary gunner visual momentum: advanced by simulation, never by draw().
@@ -29325,7 +29080,93 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             makeDormant() { this.dormant = true; this._eyeK = 0; this._riseK = 0; this.burstCooldown = 0; this.burstCount = 0; this.angle = Math.PI / 2; }
 
             /** Wake: move now, but the first burst waits `hold` frames (and still telegraphs). */
-            awaken(hold = 60) { this.dormant = false; this._eyeK = 1; this._riseK = 1; this._holdFire = hold; }
+            awaken(hold = 60) {
+                this.dormant = false; this._eyeK = 1; this._riseK = 1; this._holdFire = hold;
+                if (this.persona) {                                       // staggered: their first bursts (and so their reloads) fall apart
+                    this._holdFire += this.id * WARDEN.STAGGER;
+                    const every = { vesper: WARDEN.CENSER_EVERY, matins: WARDEN.HYMN_EVERY, compline: WARDEN.HOOK_EVERY }[this.persona];
+                    this._move.at = _gameTimeSec + 2 + every * (0.3 + 0.25 * this.id);
+                }
+            }
+
+            /** A warden falls: the survivors fire faster */
+            enrage() {
+                this.burstDelay = Math.max(3, this.burstDelay - 1);
+                this.reloadTime = Math.max(60, Math.round(this.reloadTime * 0.75));
+                this.maxBurstCount += 3;
+                this._igniteFlash = 1;
+            }
+
+            /**
+             * What a warden knows of her this tick: sight (a clear line, and no censer smoke between), the last
+             * place it saw her, Matins' reveal; and so where to aim — her, or (cover fire) where she went.
+             */
+            _wardenSense(px, py) {
+                const now = _gameTimeSec, g = typeof game !== 'undefined' ? game : null;
+                const sight = this._hasSight(px, py) && !(g && g.smokeBlocks && g.smokeBlocks(this.x, this.y, px, py));
+                const revealed = !!(g && g._revealedUntil > now);
+                if (sight || revealed) this._seen = { x: px, y: py, t: now };
+                const seen = this._seen;
+                // a burst in flight keeps going at her cover a moment; revealed, they open on her through it
+                const cover = !sight && !!seen && (revealed || (this.burstCount > 0 && now - seen.t < WARDEN.COVER_FIRE));
+                const S = this._sense || (this._sense = {});
+                S.sight = sight; S.revealed = revealed; S.cover = cover; S.seen = seen;
+                S.hiddenFor = seen ? now - seen.t : 0;
+                return S;
+            }
+
+            /** Hidden too long: one warden (only one) goes to a spot with a line on where she was */
+            _wardenFlank(squad, S) {
+                const now = _gameTimeSec, map = this.navMap;
+                let lead = GatlingGunner._flanker;
+                if (lead && (lead.dead || !squad.includes(lead))) lead = GatlingGunner._flanker = null;
+                const lastAny = Math.max(...squad.map(w => (w._seen ? w._seen.t : 0)));
+                if (now - lastAny < WARDEN.FLANK_AFTER || !S.seen || !map) {
+                    if (lead === this) GatlingGunner._flanker = null;
+                    this._flankTo = null; return;
+                }
+                if (!lead) lead = GatlingGunner._flanker = this;
+                if (lead !== this) { this._flankTo = null; return; }
+                if (!this._flankTo || now > (this._flankAt || 0)) {
+                    this._flankAt = now + 1;
+                    const spot = findShotSpot(map, this.x, this.y, S.seen.x, S.seen.y, { searchDist: 900, maxDist: 420, minDist: 140, stride: 2, maxChecks: 60,
+                        avoid: squad.filter(w => w !== this), spacing: 90 });
+                    this._flankTo = spot ? { x: spot.x, y: spot.y } : null;
+                }
+            }
+
+            /** Its own move, one at a time: a wind-up that reads, then the censer, the hymn or the hook */
+            _wardenMove(px, py, S) {
+                const g = typeof game !== 'undefined' ? game : null; if (!g || !g.addHazard) return;
+                const now = _gameTimeSec, M = this._move, d = Math.hypot(px - this.x, py - this.y);
+                if (M.tell) {
+                    if (this.persona === 'compline' && (S.sight || S.revealed)) M.tell.a = Math.atan2(py - this.y, px - this.x);   // it tracks her while it winds
+                    if (now < M.tell.at) return;
+                    const T = M.tell; M.tell = null;
+                    if (this.persona === 'vesper') {
+                        const to = S.sight || S.revealed ? { x: px, y: py } : S.seen;
+                        if (to) g.addHazard({ kind: 'censer', x0: this.x, y0: this.y, x1: to.x, y1: to.y, flight: 0.9, owner: this });
+                    } else if (this.persona === 'matins') {
+                        g.addHazard({ kind: 'hymn', x: this.x, y: this.y, owner: this });
+                        audioSys.sfx('explode');
+                    } else if (this.persona === 'compline') {
+                        g.addHazard({ kind: 'hook', x: this.x, y: this.y, x0: this.x, y0: this.y, a: T.a, state: 'out', owner: this });
+                    }
+                    return;
+                }
+                if (now < M.at || this._holdFire > 0) return;
+                if (this.persona === 'vesper') {
+                    const to = S.sight || S.revealed ? { x: px, y: py } : S.hiddenFor < 4 ? S.seen : null;
+                    if (!to || Math.hypot(to.x - this.x, to.y - this.y) > WARDEN.CENSER_RANGE) return;
+                    M.at = now + WARDEN.CENSER_EVERY; M.tell = { at: now + WARDEN.CENSER_WIND, from: now };
+                } else if (this.persona === 'matins') {
+                    M.at = now + WARDEN.HYMN_EVERY; M.tell = { at: now + WARDEN.HYMN_CHARGE, from: now };
+                } else if (this.persona === 'compline') {
+                    if (d > WARDEN.HOOK_RANGE || !(S.sight || S.revealed || S.hiddenFor < 2)) return;
+                    const to = S.sight || S.revealed ? { x: px, y: py } : S.seen;
+                    M.at = now + WARDEN.HOOK_EVERY; M.tell = { at: now + WARDEN.HOOK_TELL, from: now, a: Math.atan2(to.y - this.y, to.x - this.x) };
+                }
+            }
 
             /** Has she a clear line from here (walls, props, shut doors)? Checked every few frames. */
             _hasSight(px, py) {
@@ -29381,6 +29222,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.knockbackVy *= this.knockbackFriction;
                     if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
                     if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
+                }
+
+                // A warden: what it knows of her, its own move; out of sight, its burst goes on into her cover
+                const S = this.persona ? this._wardenSense(playerX, playerY) : null;
+                if (S) {
+                    this._wardenMove(playerX, playerY, S);
+                    if (S.cover && !S.sight && !S.revealed) { playerX = S.seen.x; playerY = S.seen.y; }
                 }
                 
                 const dx = playerX - this.x;
@@ -29446,6 +29294,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const st = actorSteer(this, playerX, playerY, 2, this.navMap);
                     moveX = st.x; moveY = st.y;
                 }
+                // She's been hidden a while: one warden walks to a firing spot on where she went
+                if (S) {
+                    this._wardenFlank(squad, S);
+                    if (this._flankTo) { const st = actorSteer(this, this._flankTo.x, this._flankTo.y, 2.4, this.navMap); moveX = st.x; moveY = st.y; }
+                }
 
                 // SEPARATION FORCE (Prevent Overlap)
                 const separationDist = this.persona ? 90 : 60;
@@ -29485,7 +29338,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._heat = Math.max(0, Math.min(1, this._heat + (firingNow ? 0.05 : -0.012)));
                 // Boss mode: no burst begins (or goes on) without a clear line on her, nor in the grace after waking
                 if (this._holdFire > 0) this._holdFire--;
-                if (this.sightGated && (this._holdFire > 0 || !this._hasSight(playerX, playerY))) {
+                const blind = S ? !(S.sight || S.cover || S.revealed) : this.sightGated && !this._hasSight(playerX, playerY);
+                const winding = S && this.persona === 'compline' && this._move.tell;      // the hook takes both its hands
+                if (this.sightGated && (this._holdFire > 0 || blind || winding)) {
                     this.isTelegraphing = false;
                     if (this.burstCount > 0) { this.burstCount = 0; this.burstTimer = 0; }
                     this.burstCooldown = Math.max(this.burstCooldown, this.telegraphThreshold + 1);   // it'll telegraph again first
@@ -29507,7 +29362,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 } else if (this.burstCount < this.maxBurstCount) {
                     this.isTelegraphing = false;
                     this.burstTimer--;
-                    if (this.burstTimer <= 0 && this.sightGated && !(this._sight = hasShotLine(this.x, this.y, playerX, playerY, game.activeMap))) {
+                    if (this.burstTimer <= 0 && this.sightGated && !(S ? S.sight || S.cover || S.revealed : (this._sight = hasShotLine(this.x, this.y, playerX, playerY, game.activeMap)))) {
                         this.burstCount = 0; this.burstTimer = 0; this.burstCooldown = this.telegraphThreshold + 1;   // she slipped behind cover mid-burst
                     } else if (this.burstTimer <= 0) {
                         const spread = (Math.random() - 0.5) * 0.15;
@@ -29526,10 +29381,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         this.burstCount++;
                         this.burstTimer = this.burstDelay;
                     }
+                } else if (S && squad.length > 1 && (this._extended || 0) < 2 && squad.every(o => o === this || o.burstCooldown > o.telegraphThreshold)) {
+                    this.burstCount -= WARDEN.EXTEND; this._extended = (this._extended || 0) + 1;   // the others are reloading: keep the line hot
                 } else {
                     this.burstCooldown = this.reloadTime;
                     this.burstCount = 0;
                     this.burstTimer = 0;
+                    this._extended = 0;
                 }
                 this._updateBarrelVisuals();
                 return shots;
@@ -30356,6 +30214,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             onProjectileHit(projectile, game) {
                 if (projectile.isEnemy) return;
+                if (this.decoy) { this.takeDamage(this.hp, 0, 0, { shot: true }); return; }                 // one of Lilitu's Blood Mirror decoys: any hit
+                if (this.elite && eliteWardTurns(this, projectile)) return;                  // a warded elite turns it
                 this.lastHitBy = projectile.owner; this.lastHitMelee = !!projectile.melee;   // who gets the Resonance
                 const opts = { shot: !projectile.melee, punch: !!projectile.melee, crit: !!projectile.crit };
                 this.suspicion = 100;
@@ -30379,6 +30239,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const kbY = (projectile.vy / speed) * knockbackStrength;
                     if (this.takeDamage(projectile.damage, kbX, kbY, opts) && projectile.melee) this.interruptMelee();
                 } else if (this.takeDamage(projectile.damage, 0, 0, opts) && projectile.melee) { this.interruptMelee(); }
+            }
+
+            /** An armored elite takes half from burn and bleed */
+            takeDamage(amount, knockbackX = 0, knockbackY = 0, opts = null) {
+                if (this.elite === 'armored' && opts && (opts.type === 'bleed' || opts.type === 'burn')) amount *= 0.5;
+                return super.takeDamage(amount, knockbackX, knockbackY, opts);
             }
 
             /** The vision cone's outline in world space, cast against the map's walls and buildings (cached). */
@@ -30604,14 +30470,91 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     [690, 490], [1110, 960], [420, 1300], [120, 1250], [1300, 1300], [1700, 1300]   // throne hall, dressing room, kennels
                 ],
                 gunnerSpawns: [],
-                // Waves of hunters (night vision, dashes); an alpha from wave 3; the Demoness every fifth wave
-                waves: (w) => ({ hunters: Math.min(3 + w, 10), alphas: w >= 3 ? 1 + Math.floor((w - 3) / 4) : 0, demoness: w % 5 === 0,
-                                 hp: 55 + w * 8, speed: 2.6 + Math.min(w * 0.08, 1) })
+                // Waves of hunters (night vision, dashes); an alpha from wave 3; the Demoness every fifth wave —
+                // with her hunters on 5, 15, 25…, and alone (Lilitu's duel, `solo`) on 10, 20, 30…
+                waves: (w) => {
+                    const solo = w % 10 === 0;
+                    return { hunters: solo ? 0 : Math.min(3 + w, 10), alphas: solo || w < 3 ? 0 : 1 + Math.floor((w - 3) / 4), demoness: w % 5 === 0, solo,
+                             hp: 55 + w * 8, speed: 2.6 + Math.min(w * 0.08, 1) };
+                }
             },
             { id: 'sealed_2', label: 'Sealed', locked: true, blurb: 'Coming soon.' },
             { id: 'sealed_3', label: 'Sealed', locked: true, blurb: 'Coming soon.' }
         ];
         const GAUNTLET_SPAWN_MIN_DIST = 350;
+        /* Past the early waves (both maps): from wave FROM every hostile's HP grows ×HP_GROWTH a wave and its
+           damage +DMG_STEP a wave (claws too); from ELITE_FROM about one in ELITE_EVERY is an elite (Armored,
+           Swift or Warded: ELITES). A cleared wave pays SCRAP × wave, and BONUS_SCRAP more every BONUS_EVERY-th.
+           The Demoness: DEMONESS_HP + DEMONESS_HP_W × wave with her hunters; alone, SOLO_HP + SOLO_HP_W × wave. */
+        const GAUNTLET_SCALE = { FROM: 15, HP_GROWTH: 1.04, DMG_STEP: 0.02, ELITE_FROM: 12, ELITE_EVERY: 6,
+            SCRAP: 5, BONUS_EVERY: 5, BONUS_SCRAP: 100, DEMONESS_HP: 1000, DEMONESS_HP_W: 80, SOLO_HP: 3000, SOLO_HP_W: 100 };
+        /* The elites (a gauntlet's rank and file, from ELITE_FROM): each wears its mark — a ring and a word
+           under it in its colour — and fights its own way.
+             armored  steel plates: burn and bleed do half, and it shrugs off shoves
+             swift    quicker on its feet (a hunter dashes sooner)
+             warded   a gold ward before it turns shots from the front (WARD_ARC either side) until it
+                      has turned WARD_HP × its health in them; then it shatters. Blades and burns go through */
+        const ELITES = {
+            armored: { label: 'ARMORED', col: '180, 196, 214' },
+            swift:   { label: 'SWIFT',   col: '110, 230, 255' },
+            warded:  { label: 'WARDED',  col: '255, 214, 110' }
+        };
+        const ELITE_WARD = { ARC: 1.05, HP: 0.6 };
+        /** Make a hostile an elite (restore: from a save, its numbers are already in place) */
+        function applyElite(h, kind, restore) {
+            if (!ELITES[kind]) return;
+            h.elite = kind;
+            if (kind === 'armored') h.mass = (h.mass || 10) * 2.5;
+            if (restore) return;
+            if (kind === 'swift') {
+                h.speed *= 1.3; if (h.huntSpeed) h.huntSpeed *= 1.3;
+                if (h.dashCDBase) { h.dashCDBase *= 0.7; h.dashCD = Math.min(h.dashCD, h.dashCDBase); }
+            }
+            if (kind === 'warded') h.ward = h.wardMax = Math.round((h.maxHp || h.hp) * ELITE_WARD.HP);
+        }
+        /** A warded elite turns a shot from in front of it: true if it did (the ward takes it) */
+        function eliteWardTurns(h, p) {
+            if (h.elite !== 'warded' || !(h.ward > 0) || p.melee) return false;
+            const sp = Math.hypot(p.vx, p.vy); if (!sp) return false;
+            const from = Math.atan2(-p.vy, -p.vx);                                  // where the shot came from
+            if (Math.abs(normalizeAngle(from - h.angle)) > ELITE_WARD.ARC) return false;
+            h.ward = Math.max(0, h.ward - p.damage); h._wardHitT = _gameTimeSec;
+            if (typeof game !== 'undefined' && game.weather) game.weather.spawnExplosion(p.x, p.y, '#ffd66e', 3, 0.8);
+            if (h.ward <= 0) h._wardBrokeT = _gameTimeSec;
+            return true;
+        }
+        /** The elite's mark (above the darkness, engine/boss-hazards.js): a ring at its feet, its word beneath, the ward's arc while it holds */
+        function drawEliteMark(ctx, h) {
+            const E = ELITES[h.elite]; if (!E) return;
+            const t = _frameTime / 1000;
+            ctx.save();
+            ctx.strokeStyle = `rgba(${E.col}, ${0.55 + 0.2 * Math.sin(t * 4)})`; ctx.lineWidth = 1.5;
+            ctx.setLineDash(h.elite === 'swift' ? [4, 4] : []);
+            ctx.beginPath(); ctx.arc(h.x, h.y, 21, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+            if (h.elite === 'armored') {                                              // studs round the ring
+                ctx.fillStyle = `rgba(${E.col}, 0.9)`;
+                for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; ctx.fillRect(h.x + Math.cos(a) * 21 - 1.5, h.y + Math.sin(a) * 21 - 1.5, 3, 3); }
+            }
+            if (h.elite === 'warded' && h.ward > 0) {
+                const hit = h._wardHitT ? Math.max(0, 1 - (_gameTimeSec - h._wardHitT) / 0.25) : 0, k = h.ward / (h.wardMax || 1);
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.strokeStyle = `rgba(${E.col}, ${0.35 + 0.35 * k + 0.3 * hit})`; ctx.lineWidth = 2.5 + 2 * hit;
+                ctx.beginPath(); ctx.arc(h.x, h.y, 27, h.angle - ELITE_WARD.ARC, h.angle + ELITE_WARD.ARC); ctx.stroke();
+                ctx.globalCompositeOperation = 'source-over';
+            } else if (h._wardBrokeT && _gameTimeSec - h._wardBrokeT < 0.5) {
+                const u = (_gameTimeSec - h._wardBrokeT) / 0.5;
+                ctx.globalAlpha = 1 - u; ctx.strokeStyle = `rgb(${E.col})`; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(h.x, h.y, 27 + 20 * u, h.angle - ELITE_WARD.ARC, h.angle + ELITE_WARD.ARC); ctx.stroke(); ctx.globalAlpha = 1;
+            }
+            ctx.font = '600 7px Orbitron'; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(${E.col}, 0.9)`;
+            ctx.fillText(E.label, h.x, h.y + 34);
+            ctx.restore();
+        }
+        /** A wave's HP and damage multipliers */
+        function gauntletScale(w) {
+            const n = Math.max(0, w - GAUNTLET_SCALE.FROM);
+            return { hp: Math.pow(GAUNTLET_SCALE.HP_GROWTH, n), dmg: 1 + GAUNTLET_SCALE.DMG_STEP * n };
+        }
         const GAUNTLET_LEAD_ERR = 300;           // a wave arrives knowing only her rough area (px off)
         const GAUNTLET_STALL_SECS = 20;          // no one has seen or heard her this long → a vague lead…
         const GAUNTLET_STALL_ERR = 220;          // …this far off: enough to sweep the right rooms
@@ -30619,7 +30562,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         const GAUNTLET_HOSTILE_NUMBERS = ['x', 'y', 'angle', 'hp', 'maxHp', 'speed', 'huntSpeed', 'visionRange',
             'suspicion', 'cooldown', 'telegraphAngle', 'telegraphThreshold', 'dashMax', 'dashCDBase', 'dashCD',
             'clawCD', 'clawDmg', 'clawReach', '_chain', 'whipCD', 'burstCooldown', 'burstCount', 'burstTimer',
-            'moveTimer', 'strafeDirection'];
+            'moveTimer', 'strafeDirection', 'dmgMul', 'ward', 'wardMax'];
 
         class HordeGauntlet {
             constructor() {
@@ -30656,7 +30599,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (!entry || entry.locked) return false;
                 this.entry = entry;
                 this.mapId = entry.mapId;
-                this.active = true;
+                this.active = true; this._secured = null; this._spoils = [];
                 this.wave = 0;
                 this.totalKills = 0;
                 this.hostiles = [];
@@ -30669,7 +30612,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             serialize(game) {
                 const data = { highestWave: this.highestWave, highestWaves: { ...this.highestWaves }, run: null };
                 if (!this.active || game.activeMap.id !== this.mapId) return data;
-                const living = this.hostiles.filter(h => !h.dead && game.enemies.includes(h));
+                const living = this.hostiles.filter(h => !h.dead && !h.decoy && game.enemies.includes(h));
                 data.run = {
                     id: this.entry.id, wave: this.wave, waveDelay: this.waveDelay,
                     totalKills: this.totalKills + this.hostiles.length - living.length,
@@ -30677,7 +30620,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     hostiles: living.map(h => {
                         const row = { kind: h instanceof Demoness ? 'demoness' : h instanceof Hunter ? 'hunter'
                             : h instanceof GatlingGunner ? 'gunner' : 'ganger', alpha: !!h.alpha,
-                            weaponId: h.equippedWeaponId || null, look: h.look,
+                            weaponId: h.equippedWeaponId || null, look: h.look, elite: h.elite || null, solo: !!h.solo,
                             state: h.state, isTelegraphing: !!h.isTelegraphing,
                             investigateTarget: h.investigateTarget && { ...h.investigateTarget } };
                         for (const key of GAUNTLET_HOSTILE_NUMBERS) if (Number.isFinite(h[key])) row[key] = h[key];
@@ -30695,7 +30638,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._hudKey = null; clearTimeout(this._endT);
                 const entry = GAUNTLET_MAPS.find(g => !g.locked && g.mapId === game.activeMap.id);
                 if (!entry) { this._hud(game); return; }
-                this.entry = entry; this.mapId = entry.mapId; this.active = true;
+                this.entry = entry; this.mapId = entry.mapId; this.active = true; this._secured = null; this._spoils = [];
                 this._waveStartedAt = _gameTimeSec; game._lastContactAt = _gameTimeSec;
                 const run = data?.run;
                 if (!run || run.id !== entry.id || !Array.isArray(run.hostiles)) {
@@ -30711,7 +30654,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 for (const row of run.hostiles) {
                     if (!Number.isFinite(row.x) || !Number.isFinite(row.y) || !(row.hp > 0)) continue;
                     const cfg = { hp: row.maxHp || row.hp, speed: row.speed, visionRange: row.visionRange,
-                        weaponId: row.weaponId, alpha: row.alpha, look: row.look };
+                        weaponId: row.weaponId, alpha: row.alpha, look: row.look, solo: !!row.solo };
                     let h;
                     if (row.kind === 'demoness') h = new Demoness(row.x, row.y, cfg);
                     else if (row.kind === 'hunter') h = new Hunter(row.x, row.y, cfg);
@@ -30720,6 +30663,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     else continue;
                     for (const key of GAUNTLET_HOSTILE_NUMBERS) if (Number.isFinite(row[key])) h[key] = row[key];
                     if (row.look) h.look = row.look;
+                    if (ELITES[row.elite]) applyElite(h, row.elite, true);
                     if (['IDLE', 'SUSPICIOUS', 'SEARCHING', 'ALERT', 'SUPPRESSING'].includes(row.state)) h.state = row.state;
                     if (Number.isFinite(row.investigateTarget?.x) && Number.isFinite(row.investigateTarget?.y))
                         h.investigateTarget = { x: row.investigateTarget.x, y: row.investigateTarget.y };
@@ -30765,6 +30709,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             spawnWave(game) {
                 this.wave++;
+                this._spoils = [];
                 const id = this.entry.id;
                 if (this.wave > (this.highestWaves[id] || 0)) this.highestWaves[id] = this.wave;
                 this.hostiles = [];
@@ -30773,60 +30718,82 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const cfg = this.getWaveConfig(this.wave);
                 const nav = game.activeMap;
 
+                const S = gauntletScale(this.wave);
                 for (const pt of this._spawnPoints(game, this.entry.spawns, cfg.gangerCount)) {
                     const ganger = new Ganger(pt.x, pt.y, {
-                        hp: cfg.hp, speed: cfg.speed, visionRange: 450, weaponId: cfg.weaponId
+                        hp: Math.round(cfg.hp * S.hp), speed: cfg.speed, visionRange: 450, weaponId: cfg.weaponId
                     });
-                    ganger._gauntletWave = this.wave;
+                    ganger._gauntletWave = this.wave; ganger.dmgMul = S.dmg;
                     ganger.huntSpeed = Math.min(2.6, cfg.speed * 0.8);
                     this._lead(ganger, game, GAUNTLET_LEAD_ERR);
                     this.hostiles.push(ganger);
                     game.enemies.push(ganger);
                 }
+                const elites = this._makeElites(this.hostiles);
 
                 const gSpots = this._spawnPoints(game, this.entry.gunnerSpawns, cfg.gunnerCount);
                 for (let i = 0; i < cfg.gunnerCount; i++) {
                     const gunner = new GatlingGunner(gSpots[i].x, gSpots[i].y, i);
                     gunner._gauntletWave = this.wave;
                     gunner.navMap = nav;                     // indoors: routes round walls to find a line on her
-                    gunner.hp = 150 + this.wave * 15;
-                    gunner.maxHp = gunner.hp;
+                    gunner.hp = Math.round((150 + this.wave * 15) * S.hp);
+                    gunner.maxHp = gunner.hp; gunner.dmgMul = S.dmg;
                     this.hostiles.push(gunner);
                     game.enemies.push(gunner);
                 }
 
                 const gunnerText = cfg.gunnerCount > 0 ? ` + ${cfg.gunnerCount} GUNNER${cfg.gunnerCount > 1 ? 'S' : ''}` : '';
-                showMessage(`WAVE ${this.wave} — ${cfg.gangerCount} GANGERS${gunnerText}`);
+                showMessage(`WAVE ${this.wave} — ${cfg.gangerCount} GANGERS${gunnerText}` + (elites ? ` (${elites} ELITE${elites > 1 ? 'S' : ''})` : ''));
                 game.triggerShake(8);
                 this._waveSize = this.hostiles.length;
             }
 
             /** A palace wave: hunters, an alpha or two, and every fifth wave the Demoness with her intro */
             _spawnHunters(game, W) {
+                const S = gauntletScale(this.wave);
                 for (const pt of this._spawnPoints(game, this.entry.spawns, W.hunters)) {
-                    const h = new Hunter(pt.x, pt.y, { hp: W.hp, speed: W.speed });
-                    h._gauntletWave = this.wave; h.navMap = game.activeMap;
+                    const h = new Hunter(pt.x, pt.y, { hp: Math.round(W.hp * S.hp), speed: W.speed });
+                    h._gauntletWave = this.wave; h.navMap = game.activeMap; h.dmgMul = S.dmg;
                     this._lead(h, game, GAUNTLET_LEAD_ERR);
                     this.hostiles.push(h); game.enemies.push(h);
                 }
                 for (const pt of this._spawnPoints(game, this.entry.spawns, W.alphas)) {
-                    const a = new Hunter(pt.x, pt.y, { hp: Math.round(W.hp * 1.9), speed: W.speed + 0.2, alpha: true, dashes: 2, dashCD: 180, claw: 18 });
-                    a._gauntletWave = this.wave; a.navMap = game.activeMap;
+                    const a = new Hunter(pt.x, pt.y, { hp: Math.round(W.hp * 1.9 * S.hp), speed: W.speed + 0.2, alpha: true, dashes: 2, dashCD: 180, claw: 18 });
+                    a._gauntletWave = this.wave; a.navMap = game.activeMap; a.dmgMul = S.dmg;
                     this._lead(a, game, GAUNTLET_LEAD_ERR);
                     this.hostiles.push(a); game.enemies.push(a);
                 }
-                let text = `WAVE ${this.wave} — ${W.hunters} HUNTERS` + (W.alphas ? ` + ${W.alphas} ALPHA${W.alphas > 1 ? 'S' : ''}` : '');
+                const elites = this._makeElites(this.hostiles);
+                let text = `WAVE ${this.wave} — ${W.hunters} HUNTERS` + (W.alphas ? ` + ${W.alphas} ALPHA${W.alphas > 1 ? 'S' : ''}` : '')
+                         + (elites ? ` (${elites} ELITE${elites > 1 ? 'S' : ''})` : '');
                 if (W.demoness) {
+                    const G = GAUNTLET_SCALE;
                     for (const h of this.hostiles) h.dormant = true;               // her hunters hold still while she makes her entrance
-                    const d = new Demoness(900, 480, { hp: 700 + this.wave * 40 });
-                    d._gauntletWave = this.wave;
+                    const d = new Demoness(900, 480, { hp: W.solo ? G.SOLO_HP + G.SOLO_HP_W * this.wave : G.DEMONESS_HP + G.DEMONESS_HP_W * this.wave, solo: W.solo });
+                    d._gauntletWave = this.wave; d.dmgMul = S.dmg;
                     this.hostiles.push(d);
-                    game.bossIntro([d], { title: 'THE DEMONESS', seenFlag: 'demonessIntroSeen' });   // (bossIntro adds her to the enemies)
-                    text += ' — AND SHE COMES';
+                    // (bossIntro adds her to the enemies); alone, the palace dims and she has her own entrance
+                    if (W.solo) game.bossIntro([d], { title: 'LILITU', subtitle: 'She hunts you alone', seenFlag: 'lilituDuelSeen' });
+                    else game.bossIntro([d], { title: 'THE DEMONESS', seenFlag: 'demonessIntroSeen' });
+                    text = W.solo ? `WAVE ${this.wave} — LILITU HUNTS YOU ALONE` : text + ' — AND SHE COMES';
                 }
                 showMessage(text);
                 game.triggerShake(8);
                 this._waveSize = this.hostiles.length;
+            }
+
+            /** From ELITE_FROM: about one in ELITE_EVERY of a wave's rank and file becomes an elite (never a gunner or a boss) */
+            _makeElites(list) {
+                if (this.wave < GAUNTLET_SCALE.ELITE_FROM) return 0;
+                const pool = list.filter(h => h instanceof Ganger && !h.bossName && !h.elite);
+                const n = Math.min(pool.length, Math.max(1, Math.round(pool.length / GAUNTLET_SCALE.ELITE_EVERY)));
+                const kinds = Object.keys(ELITES);
+                for (let i = 0; i < n; i++) {
+                    const j = i + Math.floor(Math.random() * (pool.length - i));
+                    [pool[i], pool[j]] = [pool[j], pool[i]];
+                    applyElite(pool[i], kinds[Math.floor(Math.random() * kinds.length)]);
+                }
+                return n;
             }
 
             /**
@@ -30852,20 +30819,43 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         : `<span class="w-title">Wave 1</span><span class="w-sep">◆</span><span class="w-sub">In ${n}</span>`;
                 } else {
                     const left = this.hostiles.length, gun = this.hostiles.filter(h => h instanceof GatlingGunner).length;
-                    const her = typeof Demoness !== 'undefined' && this.hostiles.some(h => h instanceof Demoness && !h.dead);
+                    const herE = typeof Demoness !== 'undefined' && this.hostiles.find(h => h instanceof Demoness && !h.dead);
+                    const her = herE ? (herE.solo ? 'Lilitu' + (herE.phase > 1 ? ' · ' + ['', 'I', 'II', 'III'][herE.phase] : '') : 'The Demoness') : '';
                     key = 'w' + this.wave + ':' + left + ':' + gun + ':' + her;
                     frac = this._waveSize ? left / this._waveSize : 0;
                     html = `<span class="w-title">Wave ${this.wave}</span><span class="w-sep">◆</span><span class="w-sub">${left} left</span>`
                          + (gun ? `<span class="w-chip">${gun > 1 ? gun + ' gunners' : 'Gunner'}</span>` : '')
-                         + (her ? `<span class="w-chip">The Demoness</span>` : '');
+                         + (her ? `<span class="w-chip">${her}</span>` : '');
                 }
+                // Second line: what this wave pays, then, once it's cleared, what she secured (stays up through the countdown)
+                let sub = '';
+                if (!ended && key && this.waveDelay > 0 && this.wave > 0 && this._secured) sub = `<div class="w-line w-spoils secured"><span class="w-tag">Secured</span>${this._spoilText(this._secured)}</div>`;
+                else if (!ended && key && this.waveDelay <= 0) sub = `<div class="w-line w-spoils"><span class="w-tag">Pays</span>${this._spoilText(this._pays(this.wave))}</div>`;
+                key += '|' + sub;
                 if (key === this._hudKey) return;
                 this._hudKey = key;
                 if (!key) { el.classList.remove('show'); document.body.classList.remove('wave-hud'); return; }
-                el.innerHTML = `<div class="w-line">${html}</div><div class="w-bar"><i style="transform:scaleX(${frac.toFixed(3)})"></i></div>`;
+                el.innerHTML = `<div class="w-line">${html}</div>${sub}<div class="w-bar"><i style="transform:scaleX(${frac.toFixed(3)})"></i></div>`;
                 el.classList.toggle('between', !frac);
                 el.classList.add('show'); document.body.classList.add('wave-hud');
                 if (ended) { clearTimeout(this._endT); this._endT = setTimeout(() => { if (!this.active) { this._hudKey = ''; el.classList.remove('show'); document.body.classList.remove('wave-hud'); } }, 6000); }
+            }
+
+            /** The wave-clear payout, as the HUD's 'Pays' line lists it */
+            _pays(w) {
+                return [`${40 + w * 20} personics`, `${GAUNTLET_SCALE.SCRAP * w + (w % GAUNTLET_SCALE.BONUS_EVERY === 0 ? GAUNTLET_SCALE.BONUS_SCRAP : 0)} scrap`, ...(w % 3 === 0 ? ['Dark Element'] : [])];
+            }
+
+            /** A boss drop this wave (Lilitu's Dark Element, a schematic, a weapon): listed with the wave's spoils */
+            spoil(name) { if (this.active) (this._spoils || (this._spoils = [])).push(name); }
+
+            /** Spoils → "a · b · Dark Element ×2", at most four entries then "+N more" so one line stays one line */
+            _spoilText(list) {
+                const n = new Map();
+                for (const s of list) n.set(s, (n.get(s) || 0) + 1);
+                const items = [...n].map(([s, c]) => c > 1 ? `${s} ×${c}` : s);
+                const shown = items.slice(0, 4).map(s => `<span class="w-spoil">${s}</span>`).join('<span class="w-dot">·</span>');
+                return shown + (items.length > 4 ? `<span class="w-dot">·</span><span class="w-spoil">+${items.length - 4} more</span>` : '');
             }
 
             update(game) {
@@ -30903,11 +30893,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Wave cleared
                 if (this.hostiles.length === 0 && this.wave > 0) {
                     const reward = 40 + this.wave * 20;
-                    const scrapReward = Math.floor(this.wave * 2);
+                    const scrapReward = GAUNTLET_SCALE.SCRAP * this.wave + (this.wave % GAUNTLET_SCALE.BONUS_EVERY === 0 ? GAUNTLET_SCALE.BONUS_SCRAP : 0);
                     game.currency += reward;
                     game.scrap += scrapReward;
                     if (game.resonance) game.earnResonance(40 * this.wave, `WAVE ${this.wave}`);
                     if (this.wave % 3 === 0) game.loot.push(new Loot(game.player.x + 30, game.player.y, 'dark_element'));   // every 3rd wave
+                    this._secured = [`+${reward} personics`, `+${scrapReward} scrap`, ...(this.wave % 3 === 0 ? ['Dark Element'] : []), ...(this._spoils || [])];
                     game.updateUI();
                     showMessage(`WAVE ${this.wave} CLEARED — +${reward} PERSONICS, +${scrapReward} SCRAP`);
                     this.waveDelay = 210; // 3.5 seconds between waves
@@ -30947,7 +30938,29 @@ Exercise extreme caution. The Empereal Lord is watching.`,
            horns, wings, a gown; chained dashes, a whip-claw at reach, she hunts
            by sound when she loses Stella; can't be executed; her intro under
            THE DEMONESS; her first defeat leaves the Maiden's Kukri.
+           Lilitu's duel (`solo`, palace waves 10, 20, 30…): she comes alone, the
+           palace dims, and her kit grows as she bleeds (DUEL; _duelStep):
+             I   (to 66%) Ember Sigils where she last heard 949, burst after 1 s;
+                 a fan of ember bolts (a Mirror Blade turns them back)
+             II  (to 33%) + Shadow Step (a red flare, 0.4 s, then behind her and a
+                 claw); Wing Gale (a knockback cone that breaks a blade's guard);
+                 Blood Mirror (two one-hit decoys: only she keeps her ember eyes)
+             III + Infernal Rite (the edges burn, the safe circle shrinks for 8 s);
+                 quicker dashes; the whip strikes twice
+           A haymaker's stagger stops her moves and cancels a tell. Her first solo
+           defeat unlocks the Golden Retribution schematic; every one leaves two
+           Dark Elements (update.js).
            ===================================================================== */
+        const DUEL = {
+            P2: 0.66, P3: 0.33,
+            SIGIL_EVERY: [0, 4.5, 3.8, 3.2], SIGILS: [0, 1, 2, 3], SIGIL_SPREAD: 95,
+            BOLT_EVERY: 2.8, BOLT_TELL: 0.35, BOLT_FAN: 3, BOLT_SPREAD: 0.17, BOLT_DMG: 12, BOLT_SPEED: 13,
+            STEP_EVERY: 7, STEP_TELL: 0.4, STEP_BEHIND: 46,
+            GALE_EVERY: 8, GALE_TELL: 0.5, GALE_REACH: 170, GALE_SPREAD: 0.75, GALE_PUSH: 140, GALE_HIT: 12, GUARD_BREAK: 1.2,
+            MIRROR_EVERY: 16, MIRROR_SECS: 9, MIRROR_SPREAD: 80,
+            RITE_EVERY: 20, RITE_R0: 430, RITE_R1: 140,
+            DASH_CD_P3: 95, WHIP2_DELAY: 0.16
+        };
         class Hunter extends Ganger {
             constructor(x, y, cfg = {}) {
                 super(x, y, { hp: cfg.hp || 70, speed: cfg.speed || 2.8, visionRange: cfg.visionRange || 520, weaponId: cfg.weaponId || 'pistol_ganger' });
@@ -31032,8 +31045,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.bossName = 'Lilitu, the Demoness';
                 this.maxHp = this.hp;
                 this._noExecute = true;
-                this.whipCD = 60; this.telegraphThreshold = 30;
+                this.whipCD = 60; this.telegraphThreshold = 30; this.whipDmg = 18;
                 this._eyeK = 1; this._eyeT = 1; this._riseK = 1; this._riseT = 1; this._igniteFlash = 0;
+                this.solo = !!cfg.solo; this.phase = 1;
+                if (cfg.decoy) {                                     // a Blood Mirror decoy: her shape, dead eyes, one hit
+                    this.decoy = true; this.bossName = null; this.hp = this.maxHp = 1; this._noExecute = true;
+                    this.look = { ...this.look, eyeColor: '#2a0508' }; this.clawDmg = 6; this.whipDmg = 5;
+                }
             }
 
             static look() {
@@ -31055,6 +31073,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (p) { this.state = 'SEARCHING'; this.suspicion = 70; this.investigateTarget = { x: p.x, y: p.y }; }
             }
 
+            /** Lilitu marks where she last heard her (Ember Sigils) */
+            hearNoise(nx, ny, strength, err) {
+                const heard = super.hearNoise(nx, ny, strength, err);
+                if (heard) this._heard = { x: nx, y: ny, t: _gameTimeSec };
+                return heard;
+            }
+
             update(player, walls, buildings, markers, traffic, map, enemies) {
                 this._eyeK += (this._eyeT - this._eyeK) * 0.08; this._riseK += (this._riseT - this._riseK) * 0.05;
                 this._igniteFlash = Math.max(0, (this._igniteFlash || 0) - 0.03);
@@ -31069,14 +31094,222 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.whipCD = 75; this._whipT = _gameTimeSec; this._whipTo = { x: player.x, y: player.y };
                     const a = Math.atan2(dy, dx);
                     const whip = new ProjectileEntity({ x: player.x - Math.cos(a) * 4, y: player.y - Math.sin(a) * 4, angle: a, radius: 20, speed: 0.5, life: 3,
-                                                        damage: 18, isEnemy: true, owner: this, color: 'rgba(0,0,0,0)', melee: true });
+                                                        damage: this.whipDmg, isEnemy: true, owner: this, color: 'rgba(0,0,0,0)', melee: true });
                     res = res ? [].concat(res, whip) : whip;
                 }
                 if (this.state === 'SEARCHING' && this.investigateTarget && this.dashCD <= 0) {
                     const t = this.investigateTarget, dd = Math.hypot(t.x - this.x, t.y - this.y);
                     if (dd > 160 && dd < 460 && this._dash(t.x, t.y, walls, buildings)) this.dashCD = this.dashCDBase;
                 }
+                if (this.solo) res = this._duelStep(player, walls, buildings, res);
+                else if (this.decoy && _gameTimeSec > (this._decoyUntil || Infinity)) this._vanish();
                 return res;
+            }
+
+            /** A decoy's time is up (or she fell): gone in a puff of crimson (the enemy loop takes it away) */
+            _vanish() { this.dead = true; }
+
+            /** The duel: her phase from her blood, then at most one tell at a time, and her sigils and bolts */
+            _duelStep(player, walls, buildings, res) {
+                const g = typeof game !== 'undefined' ? game : null; if (!g || this.dead) return res;
+                const now = _gameTimeSec, D = DUEL, add = (s) => { res = res ? [].concat(res, s) : s; };
+                const frac = this.hp / (this.maxHp || 1), phase = frac > D.P2 ? 1 : frac > D.P3 ? 2 : 3;
+                if (!this._duel) this._duel = { sigil: now + 2, bolt: now + 1.5, step: now + 4, gale: now + 3, mirror: now + 2, rite: now + 1, whip: this._whipT || 0 };
+                const T = this._duel;
+                if (phase > this.phase) {                                     // she sheds her grace
+                    this.phase = phase; this._igniteFlash = 1; this._tell = null;
+                    g.triggerShake(10); audioSys.sfx('explode');
+                    g.addHazard({ kind: 'flare', x: this.x, y: this.y, dur: 0.6, owner: this });
+                    showMessage(phase === 2 ? 'LILITU — HER SHADOW WAKES' : 'LILITU — THE INFERNAL RITE');
+                    if (phase === 2) { T.mirror = now + 1.5; T.step = now + 3; }
+                    if (phase === 3) { T.rite = now + 1; this.dashCDBase = D.DASH_CD_P3; this.dashCD = Math.min(this.dashCD, 30); }
+                }
+                // Phase III: the whip strikes twice
+                if (this.phase >= 3 && this._whipT && this._whipT !== T.whip) {
+                    T.whip = this._whipT; T.whip2 = now + D.WHIP2_DELAY;
+                }
+                if (T.whip2 && now >= T.whip2) {
+                    T.whip2 = 0;
+                    const dx = player.x - this.x, dy = player.y - this.y, d = Math.hypot(dx, dy);
+                    if (d < 130 && !isLineBlocked(this.x, this.y, player.x, player.y, walls, buildings)) {
+                        const a = Math.atan2(dy, dx); this._whipT = T.whip = now; this._whipTo = { x: player.x, y: player.y };
+                        add(new ProjectileEntity({ x: player.x - Math.cos(a) * 4, y: player.y - Math.sin(a) * 4, angle: a, radius: 20, speed: 0.5, life: 3,
+                                                   damage: this.whipDmg, isEnemy: true, owner: this, color: 'rgba(0,0,0,0)', melee: true }));
+                    }
+                }
+                // Staggered (a haymaker): no moves, and whatever she was winding up is lost
+                if (this._staggerUntil && now < this._staggerUntil) { this._tell = null; return res; }
+                if (g.isDriving || !player.visible) return res;
+                const dx = player.x - this.x, dy = player.y - this.y, d = Math.hypot(dx, dy);
+                const engaged = this.state === 'ALERT' || this.state === 'SUPPRESSING';
+                const clear = !isLineBlocked(this.x, this.y, player.x, player.y, walls, buildings);
+                // A tell running: when it's due, the move happens
+                const tl = this._tell;
+                if (tl && now >= tl.at) {
+                    this._tell = null;
+                    if (tl.kind === 'bolt') add(this._emberBolts(player));
+                    else if (tl.kind === 'step') { const c = this._shadowStep(player, tl); if (c) add(c); }
+                    else if (tl.kind === 'gale') this._wingGale(player, tl);
+                    return res;
+                }
+                if (tl) return res;
+                // Ember Sigils: where she last heard her (or sees her), and round it
+                if (now >= T.sigil) {
+                    const fresh = engaged ? { x: player.x, y: player.y } : this._heard && now - this._heard.t < 6 ? this._heard : null;
+                    T.sigil = now + D.SIGIL_EVERY[this.phase] * (0.85 + Math.random() * 0.3);
+                    if (fresh && Math.hypot(fresh.x - this.x, fresh.y - this.y) < 700) {
+                        const nav = NavGrid.for(g.activeMap);
+                        for (let i = 0; i < D.SIGILS[this.phase]; i++) {
+                            const a = Math.random() * Math.PI * 2, r = i ? D.SIGIL_SPREAD * (0.6 + Math.random() * 0.5) : 0;
+                            const x = fresh.x + Math.cos(a) * r, y = fresh.y + Math.sin(a) * r;
+                            if (i && nav && !nav.walkable(x, y)) continue;
+                            g.addHazard({ kind: 'sigil', x, y, r: 58, owner: this });
+                        }
+                    }
+                }
+                // Infernal Rite (III): the safe circle round where 949 stands
+                if (this.phase >= 3 && now >= T.rite) {
+                    T.rite = now + D.RITE_EVERY;
+                    g.addHazard({ kind: 'rite', x: player.x, y: player.y, r0: D.RITE_R0, r1: D.RITE_R1, r: D.RITE_R0, dur: 8, owner: this });
+                    showMessage('INFERNAL RITE — STAY INSIDE THE CIRCLE');
+                    this._igniteFlash = 1;
+                }
+                // Blood Mirror (II+): two decoys, and she may be any of the three
+                if (this.phase >= 2 && now >= T.mirror && engaged) {
+                    T.mirror = now + D.MIRROR_EVERY;
+                    this._bloodMirror(walls, buildings);
+                    return res;
+                }
+                // Wing Gale (II+) up close
+                if (this.phase >= 2 && now >= T.gale && d < D.GALE_REACH * 0.85 && clear) {
+                    T.gale = now + D.GALE_EVERY;
+                    this._tell = { kind: 'gale', at: now + D.GALE_TELL, a: Math.atan2(dy, dx) };
+                    return res;
+                }
+                // Shadow Step (II+): a flare where she is and where she'll be
+                if (this.phase >= 2 && now >= T.step && d > 90 && d < 520 && engaged) {
+                    const spot = this._behind(player);
+                    if (spot) {
+                        T.step = now + D.STEP_EVERY * (this.phase >= 3 ? 0.7 : 1);
+                        this._tell = { kind: 'step', at: now + D.STEP_TELL, x: spot.x, y: spot.y };
+                        g.addHazard({ kind: 'flare', x: this.x, y: this.y, dur: D.STEP_TELL, owner: this });
+                        g.addHazard({ kind: 'flare', x: spot.x, y: spot.y, dur: D.STEP_TELL, owner: this });
+                        return res;
+                    }
+                }
+                // Ember bolts at range, with a clear line
+                if (now >= T.bolt && engaged && clear && d > 140 && d < 560) {
+                    T.bolt = now + D.BOLT_EVERY * (this.phase >= 3 ? 0.75 : 1);
+                    this._tell = { kind: 'bolt', at: now + D.BOLT_TELL };
+                    this._boltTellT = now;
+                }
+                return res;
+            }
+
+            /** Her tells, above the darkness (engine/boss-hazards.js): embers gathering, the gale's cone, the Rite's flames on her */
+            drawDuelTells(ctx) {
+                if (this.dead || !this.solo) return;
+                const now = _gameTimeSec, t = _frameTime / 1000, tl = this._tell;
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                if (tl && tl.kind === 'bolt') {
+                    const k = Math.min(1, (now - (this._boltTellT || now)) / DUEL.BOLT_TELL), a = this.angle;
+                    const x = this.x + Math.cos(a) * 16, y = this.y + Math.sin(a) * 16;
+                    ctx.globalAlpha = 0.5 + 0.5 * k; drawGlow(ctx, x, y, 8 + 14 * k, '255, 110, 30', 0.35);
+                    ctx.strokeStyle = `rgba(255,120,40,${0.25 + 0.4 * k})`; ctx.lineWidth = 1; ctx.setLineDash([5, 6]);
+                    for (let i = 0; i < DUEL.BOLT_FAN; i++) {
+                        const off = (i - (DUEL.BOLT_FAN - 1) / 2) * DUEL.BOLT_SPREAD;
+                        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a + off) * 160 * k, y + Math.sin(a + off) * 160 * k); ctx.stroke();
+                    }
+                    ctx.setLineDash([]);
+                } else if (tl && tl.kind === 'gale') {
+                    const k = 1 - Math.max(0, (tl.at - now) / DUEL.GALE_TELL);
+                    ctx.globalAlpha = 0.15 + 0.35 * k; ctx.fillStyle = '#ff3a5a';
+                    ctx.beginPath(); ctx.moveTo(this.x, this.y); ctx.arc(this.x, this.y, DUEL.GALE_REACH, tl.a - DUEL.GALE_SPREAD, tl.a + DUEL.GALE_SPREAD); ctx.closePath(); ctx.fill();
+                    ctx.globalAlpha = 0.8; ctx.strokeStyle = '#ffb0c0'; ctx.lineWidth = 1.2; ctx.stroke();
+                }
+                if (this.phase >= 2) {                                         // the duel's later phases burn round her
+                    const n = this.phase >= 3 ? 10 : 5;
+                    for (let i = 0; i < n; i++) {
+                        const ph = (t * 1.8 + i / n) % 1, a = i * 2.39 + t * 0.5, r = 14 + 6 * Math.sin(t * 3 + i);
+                        ctx.globalAlpha = (1 - ph) * (this.phase >= 3 ? 0.8 : 0.45); ctx.fillStyle = ph < 0.3 ? '#ffd0a0' : this.phase >= 3 ? '#ff3a10' : '#b0122e';
+                        ctx.beginPath(); ctx.ellipse(this.x + Math.cos(a) * r, this.y + Math.sin(a) * r - ph * 18, 2.2, 4.5, 0, 0, Math.PI * 2); ctx.fill();
+                    }
+                }
+                ctx.restore();
+            }
+
+            /** A fan of ember bolts at her (enemy shots: a Mirror Blade's cut turns them back) */
+            _emberBolts(player) {
+                const D = DUEL, a = Math.atan2(player.y - this.y, player.x - this.x), out = [];
+                for (let i = 0; i < D.BOLT_FAN; i++) {
+                    const off = (i - (D.BOLT_FAN - 1) / 2) * D.BOLT_SPREAD;
+                    out.push(new ProjectileEntity({ x: this.x + Math.cos(a) * 16, y: this.y + Math.sin(a) * 16, angle: a + off, speed: D.BOLT_SPEED,
+                                                    radius: 6, damage: D.BOLT_DMG, isEnemy: true, owner: this, color: '#ff5a1a', life: 70 }));
+                }
+                return out;
+            }
+
+            /** A walkable spot just behind 949 (or beside her), or null */
+            _behind(player) {
+                const g = game, nav = NavGrid.for(g.activeMap), fa = player.angle || 0;
+                for (const off of [Math.PI, Math.PI * 0.7, -Math.PI * 0.7, Math.PI / 2, -Math.PI / 2]) {
+                    const x = player.x + Math.cos(fa + off) * DUEL.STEP_BEHIND, y = player.y + Math.sin(fa + off) * DUEL.STEP_BEHIND;
+                    if ((!nav || nav.walkable(x, y)) && !isLineBlocked(player.x, player.y, x, y, g.activeMap.walls, getColliders(g.activeMap))) return { x, y };
+                }
+                return null;
+            }
+
+            /** Shadow Step: there in a blink (a crimson trail), and a claw */
+            _shadowStep(player, tl) {
+                const g = game, L = g.hunterDashes || (g.hunterDashes = []);
+                L.push({ x0: this.x, y0: this.y, x1: tl.x, y1: tl.y, t0: _gameTimeSec, a: this.angle, look: this.look, boss: true, seed: Math.random() * 100 });
+                if (L.length > 12) L.shift();
+                this.x = tl.x; this.y = tl.y;
+                const a = Math.atan2(player.y - this.y, player.x - this.x);
+                this.angle = a; this.clawCD = 45; this._clawT = _gameTimeSec;
+                g.emitNoise(this.x, this.y, 220, 'dash', false, { src: this });
+                if (Math.hypot(player.x - this.x, player.y - this.y) > 90) return null;
+                return new ProjectileEntity({ x: player.x - Math.cos(a) * 4, y: player.y - Math.sin(a) * 4, angle: a, radius: 18, speed: 0.5, life: 3,
+                                              damage: Math.round(this.clawDmg * 1.2), isEnemy: true, owner: this, color: 'rgba(0,0,0,0)', melee: true });
+            }
+
+            /** Wing Gale: a cone of wind before her; caught, she's thrown back and her blade's guard broken */
+            _wingGale(player, tl) {
+                const g = game, D = DUEL, now = _gameTimeSec;
+                const a = Math.atan2(player.y - this.y, player.x - this.x);
+                g.addHazard({ kind: 'gale', x: this.x, y: this.y, a, spread: D.GALE_SPREAD, reach: D.GALE_REACH, dur: 0.35, owner: this });
+                this._galeT = now; g.triggerShake(5);
+                const dx = player.x - this.x, dy = player.y - this.y, d = Math.hypot(dx, dy);
+                if (d > D.GALE_REACH || Math.abs(normalizeAngle(Math.atan2(dy, dx) - tl.a)) > D.GALE_SPREAD) return;
+                if (!g.hurtPlayer(D.GALE_HIT)) return;
+                g.shovePlayer(dx / (d || 1) * D.GALE_PUSH, dy / (d || 1) * D.GALE_PUSH);
+                // a blade's guard breaks: no swing for a moment, and the one in hand is lost
+                g.guardBrokenUntil = now + D.GUARD_BREAK;
+                if (g.weaponMode === 'melee') { g.shootCooldown = Math.max(g.shootCooldown || 0, 40); g._slashT = -99; g._swing = null; }
+                showMessage('WING GALE — GUARD BROKEN');
+            }
+
+            /** Blood Mirror: two decoys beside her, and she trades places with one of them */
+            _bloodMirror(walls, buildings) {
+                const g = game, nav = NavGrid.for(g.activeMap), D = DUEL;
+                const pa = this.angle + Math.PI / 2, spots = [{ x: this.x, y: this.y }];
+                for (const s of [-1, 1]) {
+                    const x = this.x + Math.cos(pa) * D.MIRROR_SPREAD * s, y = this.y + Math.sin(pa) * D.MIRROR_SPREAD * s;
+                    if ((!nav || nav.walkable(x, y)) && !isLineBlocked(this.x, this.y, x, y, walls, buildings)) spots.push({ x, y });
+                }
+                if (spots.length < 2) return;
+                for (let i = spots.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [spots[i], spots[j]] = [spots[j], spots[i]]; }
+                this.x = spots[0].x; this.y = spots[0].y;
+                for (const s of spots.slice(1)) {
+                    const m = new Demoness(s.x, s.y, { decoy: true });
+                    m.angle = this.angle; m.state = this.state; m.suspicion = this.suspicion; m.navMap = this.navMap;
+                    m.investigateTarget = this.investigateTarget && { ...this.investigateTarget };
+                    m._decoyUntil = _gameTimeSec + D.MIRROR_SECS; m._gauntletWave = this._gauntletWave; m._mirrorOf = this;
+                    g.enemies.push(m);
+                }
+                for (const s of spots) if (g.weather) g.weather.spawnExplosion(s.x, s.y, '#7a0618', 5, 1.4);
+                g.triggerShake(4);
+                showMessage('BLOOD MIRROR — ONLY ONE OF THEM HAS HER EYES');
             }
 
             draw(ctx) {
@@ -31105,6 +31338,448 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
 
+        /* =====================================================================
+           DRONES — the hunter-killers that come for the Dark Maker (the Double
+           Nights ambush, story/story-db.js), after ETERNAL's concept sheet
+           ---------------------------------------------------------------------
+           A black armoured shell like a jellyfish's bell, a violet sensor-core
+           eye at its front, cable tendrils trailing beneath, and two long jointed
+           arms ending in crackling violet energy lances. It hovers.
+             · armour: hits on the shell do ARMOR of their damage (a blade finds
+               the seams: BLADE); hits on the glowing eye do EYE_MULT. After a
+               lance dive the lances are stuck a moment and the shell opens (OPEN)
+             · it arrives from above (DESCENT s, a shadow growing where it'll
+               land; untouchable until it's down), and when it loses her for
+               LOST s it rises and drops again near her
+           Three kinds, each with its own move (one at a time, each telegraphed):
+             lancer    LANCE: a locked line, then a dive that impales and burns
+             grappler  GRAPPLE: a tether; caught, she's lifted and dragged to it
+                       (a flit breaks free)
+             seer      BEAM: a sensor beam that charges on her, then fires
+                       straight through walls and cover
+           The lancer and the grappler also spit violet bolts between moves.
+           ===================================================================== */
+        const DRONE = {
+            HP: 110, ARMOR: 0.3, OPEN: 0.7, BLADE: 0.6, EYE_MULT: 1.8, EYE_R: 10, EYE_FWD: 15,
+            DESCENT: 0.9, RISE: 0.6, LOST: 5, LAND_HIT: 10, LAND_R: 48, HOVER_PX: 7,
+            BOLT_EVERY: 2.2, BOLT_TELL: 0.25,
+            LANCE: { EVERY: 4.5, RANGE: 330, TELL: 0.65, LOCK: 0.15, SPEED: 15, DIST: 400, HIT: 18, BURN_DPS: 6, BURN_SECS: 2.5, RECOVER: 1.0 },
+            GRAPPLE: { EVERY: 6.5, RANGE: 320, TELL: 0.5, SPEED: 15, HIT: 6, PULL: 2.8, SECS: 2.4, TICK: 0.5, TICK_DMG: 4, HOLD: 64 },
+            BEAM: { EVERY: 5.5, RANGE: 640, CHARGE: 1.2, LOCK: 0.2, FIRE: 0.3, HIT: 22, WIDTH: 15 },
+            KEEP: { lancer: 230, grappler: 210, seer: 330 }
+        };
+        const DRONE_KINDS = ['lancer', 'grappler', 'seer'];
+
+        class Drone extends ActorEntity {
+            constructor(x, y, kind) {
+                super({ x, y, radius: 20, type: 'drone', alliance: 'hostile', hp: DRONE.HP, mass: 30, friction: 0.9, speed: 3,
+                        hasCollision: true, invincibleDuration: 15 });
+                this.kind = DRONE_KINDS.includes(kind) ? kind : DRONE_KINDS[Math.floor(Math.random() * DRONE_KINDS.length)];
+                this.angle = Math.PI / 2;
+                this.hoverOffset = Math.random() * Math.PI * 2;
+                this.strafeDir = Math.random() > 0.5 ? 1 : -1; this.strafeTimer = 0;
+                this.telegraphThreshold = 1; this.telegraphAngle = 0; this.isTelegraphing = false;
+                // It drops in from above
+                this.state = 'descend'; this.alt = 1; this._stateT = _gameTimeSec;
+                this._moveAt = _gameTimeSec + DRONE.DESCENT + 1 + Math.random() * 1.5;
+                this._boltAt = _gameTimeSec + DRONE.DESCENT + 1 + Math.random();
+                this._lostSince = null;
+                this._seed = Math.random() * 1000;
+            }
+
+            _setState(s) { this.state = s; this._stateT = _gameTimeSec; }
+
+            /** Clear line, walls only (props are low: it hovers over them) */
+            _los(px, py, walls) { return !isLineBlocked(this.x, this.y, px, py, walls, []); }
+
+            /** Where its eye is (world) */
+            eyePos() { return { x: this.x + Math.cos(this.angle) * DRONE.EYE_FWD, y: this.y + Math.sin(this.angle) * DRONE.EYE_FWD }; }
+
+            update(playerX, playerY, walls) {
+                if (this.dead) return null;
+                const g = typeof game !== 'undefined' ? game : null, now = _gameTimeSec, age = now - this._stateT;
+                this.hoverOffset += 0.08;
+                if (this.invincibleTimer > 0) this.invincibleTimer--;
+                if (this.knockbackVx || this.knockbackVy) {
+                    this.vx += this.knockbackVx; this.vy += this.knockbackVy;
+                    this.knockbackVx *= this.knockbackFriction; this.knockbackVy *= this.knockbackFriction;
+                    if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
+                    if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
+                }
+                const dx = playerX - this.x, dy = playerY - this.y, dist = Math.hypot(dx, dy), toHer = Math.atan2(dy, dx);
+                const turn = (to, k) => { this.angle += normalizeAngle(to - this.angle) * k; };
+                let shot = null;
+                switch (this.state) {
+                    case 'descend': {
+                        this.alt = Math.max(0, 1 - age / DRONE.DESCENT);
+                        turn(toHer, 0.1);
+                        if (this.alt <= 0) {
+                            this._setState('hover');
+                            if (g) {
+                                g.triggerShake(6); audioSys.sfx('explode');
+                                if (g.weather) g.weather.spawnExplosion(this.x, this.y, '#a469ff', 5, 1.4);
+                                if (dist < DRONE.LAND_R && g.hurtPlayer(DRONE.LAND_HIT)) g.shovePlayer(dx / (dist || 1) * 40, dy / (dist || 1) * 40);
+                            }
+                        }
+                        return null;
+                    }
+                    case 'rise': {
+                        this.alt = Math.min(1, age / DRONE.RISE);
+                        if (this.alt >= 1) {                                       // and down again, near her
+                            const spot = this._dropSpot(playerX, playerY);
+                            if (spot) { this.x = spot.x; this.y = spot.y; }
+                            this.vx = this.vy = 0;
+                            this._setState('descend');
+                        }
+                        return null;
+                    }
+                    case 'tell': {                                                 // a move winding up
+                        const M = this._tell;
+                        if (age < M.secs - M.lock) M.a = toHer;                    // it tracks her until the lock
+                        turn(M.a, 0.25);
+                        this.isTelegraphing = true; this.telegraphAngle = M.a;
+                        if (age >= M.secs) { this.isTelegraphing = false; shot = this._unleash(M, playerX, playerY); }
+                        break;
+                    }
+                    case 'dive': {
+                        const L = DRONE.LANCE, ux = Math.cos(this._diveA), uy = Math.sin(this._diveA);
+                        const nx = this.x + ux * L.SPEED, ny = this.y + uy * L.SPEED;
+                        const blocked = isLineBlocked(this.x, this.y, nx, ny, walls, []);
+                        if (!blocked) { this.x = nx; this.y = ny; this._dived += L.SPEED; }
+                        if (!this._impaled && g && Math.hypot(playerX - this.x, playerY - this.y) < this.radius + 16) {
+                            this._impaled = true;
+                            if (g.hurtPlayer(L.HIT)) { g.burnPlayer(L.BURN_DPS, L.BURN_SECS); g.shovePlayer(ux * 40, uy * 40); g.triggerShake(8); }
+                        }
+                        if (blocked || this._dived >= L.DIST) { this._setState('recover'); if (blocked && g) g.triggerShake(4); }
+                        return null;
+                    }
+                    case 'recover':                                                // lances stuck: the shell's open
+                        this.vx *= 0.8; this.vy *= 0.8;
+                        if (age >= DRONE.LANCE.RECOVER) this._setState('hover');
+                        break;
+                    case 'tether': {
+                        const T = this._tether, G = DRONE.GRAPPLE;
+                        if (T.state === 'out') {
+                            const nx = T.x + Math.cos(T.a) * G.SPEED, ny = T.y + Math.sin(T.a) * G.SPEED;
+                            const wall = isLineBlocked(T.x, T.y, nx, ny, walls, []);
+                            T.x = nx; T.y = ny;
+                            if (g && Math.hypot(playerX - T.x, playerY - T.y) < 18 && !g.playerDodging()) {
+                                T.state = 'held'; T.until = now + G.SECS; T.next = now + G.TICK;
+                                g.hurtPlayer(G.HIT); showMessage('GRAPPLED — FLIT TO BREAK FREE');
+                            } else if (wall || Math.hypot(T.x - this.x, T.y - this.y) > G.RANGE + 40) T.state = 'back';
+                        } else if (T.state === 'held') {
+                            T.x = playerX; T.y = playerY;
+                            if (!g || g.playerDodging() || now > T.until) { T.state = 'back'; if (g && g.playerDodging()) showMessage('BROKE FREE'); }
+                            else {
+                                const d = Math.hypot(this.x - playerX, this.y - playerY);
+                                if (d > G.HOLD) g.shovePlayer((this.x - playerX) / d * G.PULL, (this.y - playerY) / d * G.PULL);
+                                if (now >= T.next) { T.next += G.TICK; g.hurtPlayer(G.TICK_DMG); }
+                                this.vx -= Math.cos(toHer) * 0.12; this.vy -= Math.sin(toHer) * 0.12;   // it backs off, hauling her
+                            }
+                        } else {
+                            const bx = this.x - T.x, by = this.y - T.y, d = Math.hypot(bx, by);
+                            if (d < 24) { this._tether = null; this._setState('hover'); }
+                            else { T.x += bx / d * 20; T.y += by / d * 20; }
+                        }
+                        turn(toHer, 0.15);
+                        break;
+                    }
+                    case 'beam':
+                        if (age >= DRONE.BEAM.FIRE) this._setState('hover');
+                        break;
+                    default: {                                                     // hover: keep its distance, look for a line
+                        turn(toHer, 0.12);
+                        const los = this._los(playerX, playerY, walls);
+                        if (los) this._lostSince = null; else if (this._lostSince === null) this._lostSince = now;
+                        if (!los) {
+                            if (++this.strafeTimer > 60) { this.strafeDir *= -1; this.strafeTimer = 0; }
+                            const sa = toHer + Math.PI / 2 * this.strafeDir;
+                            this.vx += Math.cos(sa) * 0.3 + Math.cos(toHer) * 0.1; this.vy += Math.sin(sa) * 0.3 + Math.sin(toHer) * 0.1;
+                        } else {
+                            this.strafeTimer = 0;
+                            const keep = DRONE.KEEP[this.kind];
+                            const k = dist > keep ? 0.2 : -0.1;
+                            this.vx += Math.cos(toHer) * k + Math.cos(toHer + Math.PI / 2) * 0.05 * this.strafeDir;
+                            this.vy += Math.sin(toHer) * k + Math.sin(toHer + Math.PI / 2) * 0.05 * this.strafeDir;
+                        }
+                        // Lost her too long: up, and down again by her
+                        if (!los && this._lostSince !== null && now - this._lostSince > DRONE.LOST) { this._lostSince = null; this._setState('rise'); return null; }
+                        // Its own move
+                        if (now >= this._moveAt && g && !g.isDriving) {
+                            const M = this._pickMove(dist, los);
+                            if (M) { this._tell = M; this._setState('tell'); break; }
+                        }
+                        // Bolts between moves (not the seer)
+                        if (this.kind !== 'seer' && los && dist < 500) {
+                            if (now >= this._boltAt - DRONE.BOLT_TELL) { this.isTelegraphing = true; this.telegraphAngle = toHer; }
+                            if (now >= this._boltAt) {
+                                this.isTelegraphing = false;
+                                this._boltAt = now + DRONE.BOLT_EVERY * (0.8 + Math.random() * 0.4);
+                                const e = this.eyePos();
+                                shot = new ProjectileEntity({ x: e.x, y: e.y, angle: toHer, isEnemy: true, owner: this });
+                            }
+                        } else this.isTelegraphing = false;
+                    }
+                }
+                // Drift, and bounce off walls
+                this.vx *= 0.9; this.vy *= 0.9;
+                this.x += this.vx; this.y += this.vy;
+                for (const w of walls) {
+                    if (this.x + this.radius > w.x && this.x - this.radius < w.x + w.w && this.y + this.radius > w.y && this.y - this.radius < w.y + w.h) {
+                        this.vx *= -1; this.vy *= -1; this.x += this.vx * 2; this.y += this.vy * 2;
+                    }
+                }
+                return shot;
+            }
+
+            /** Its kind's move, if she's where it can use it */
+            _pickMove(dist, los) {
+                const now = _gameTimeSec;
+                if (this.kind === 'lancer' && los && dist < DRONE.LANCE.RANGE)
+                    return { kind: 'lance', secs: DRONE.LANCE.TELL, lock: DRONE.LANCE.LOCK, a: this.angle };
+                if (this.kind === 'grappler' && los && dist < DRONE.GRAPPLE.RANGE)
+                    return { kind: 'grapple', secs: DRONE.GRAPPLE.TELL, lock: 0.1, a: this.angle };
+                if (this.kind === 'seer' && dist < DRONE.BEAM.RANGE)                // through walls: it needs no line
+                    return { kind: 'beam', secs: DRONE.BEAM.CHARGE, lock: DRONE.BEAM.LOCK, a: this.angle };
+                this._moveAt = now + 0.5;
+                return null;
+            }
+
+            /** The tell's over: the move itself */
+            _unleash(M, px, py) {
+                const g = game, now = _gameTimeSec;
+                if (M.kind === 'lance') {
+                    this._moveAt = now + DRONE.LANCE.EVERY; this._diveA = M.a; this._dived = 0; this._impaled = false;
+                    this._setState('dive');
+                } else if (M.kind === 'grapple') {
+                    this._moveAt = now + DRONE.GRAPPLE.EVERY;
+                    const e = this.eyePos();
+                    this._tether = { x: e.x, y: e.y, a: M.a, state: 'out' };
+                    this._setState('tether');
+                } else if (M.kind === 'beam') {
+                    this._moveAt = now + DRONE.BEAM.EVERY;
+                    const e = this.eyePos(), B = DRONE.BEAM;
+                    this._beam = { x0: e.x, y0: e.y, x1: e.x + Math.cos(M.a) * B.RANGE, y1: e.y + Math.sin(M.a) * B.RANGE, t0: now };
+                    const d2 = CollisionSystem.distToSegmentSquared(px, py, this._beam.x0, this._beam.y0, this._beam.x1, this._beam.y1);
+                    if (d2 < B.WIDTH * B.WIDTH && g.hurtPlayer(B.HIT)) { g.burnPlayer(4, 1.5); g.triggerShake(6); }
+                    this._setState('beam');
+                }
+                return null;
+            }
+
+            /** A walkable spot 130–220 px from her, for dropping back in */
+            _dropSpot(px, py) {
+                const map = typeof game !== 'undefined' && game.activeMap, nav = map && NavGrid.for(map);
+                for (let i = 0; i < 12; i++) {
+                    const a = Math.random() * Math.PI * 2, r = 130 + Math.random() * 90, x = px + Math.cos(a) * r, y = py + Math.sin(a) * r;
+                    if (!nav || nav.walkable(x, y)) return { x, y };
+                }
+                return null;
+            }
+
+            /** The shell's share of a hit (the eye's hits say so) */
+            takeDamage(amount, knockbackX = 0, knockbackY = 0, opts = null) {
+                if (this.alt > 0.15) return false;                                 // still up there
+                if (!(opts && opts.eye)) amount *= opts && (opts.cut || opts.punch || opts.type === 'melee') ? DRONE.BLADE : this.state === 'recover' ? DRONE.OPEN : DRONE.ARMOR;
+                return super.takeDamage(Math.max(1, Math.round(amount)), knockbackX, knockbackY, opts);
+            }
+
+            onProjectileHit(projectile, game) {
+                if (projectile.isEnemy || this.alt > 0.15) return;
+                this.lastHitBy = projectile.owner; this.lastHitMelee = !!projectile.melee;   // who gets the Resonance
+                const e = this.eyePos(), eye = Math.hypot(projectile.x - e.x, projectile.y - e.y) < DRONE.EYE_R + (projectile.radius || 5);
+                const speed = Math.hypot(projectile.vx, projectile.vy);
+                const kb = speed ? Math.min(((projectile.mass || 1) * speed * projectile.damage / 20) / this.mass, 30) : 0;
+                const kbX = speed ? projectile.vx / speed * kb : 0, kbY = speed ? projectile.vy / speed * kb : 0;
+                const opts = { shot: !projectile.melee, punch: !!projectile.melee, crit: !!projectile.crit, eye };
+                if (game && game.weather) game.weather.spawnExplosion(projectile.x, projectile.y, eye ? '#d8b8ff' : '#8a8f9a', eye ? 4 : 2, eye ? 1.2 : 0.6);
+                this.takeDamage(eye ? projectile.damage * DRONE.EYE_MULT : projectile.damage, kbX, kbY, opts);
+                if (eye) this._eyeHitT = _gameTimeSec;
+            }
+
+            /** Legacy non-projectile damage (e.g. vehicle hits) */
+            takeDamageOld(amount, bulletAngle) { this.takeDamage(amount, Math.cos(bulletAngle) * 8, Math.sin(bulletAngle) * 8); }
+
+            /** How high it hangs (px, drawn upward) */
+            _lift() { return DRONE.HOVER_PX + Math.sin(this.hoverOffset) * 3 + this.alt * 240; }
+
+            draw(ctx) {
+                if (this.dead) return;
+                if (this.invincibleTimer > 0 && this.invincibleTimer % 6 < 3) return;
+                const t = _frameTime / 1000, lift = this._lift(), A = this.angle, TAU = Math.PI * 2;
+                // Its shadow on the floor: wide and faint while it's high, then tightening as it lands
+                ctx.save();
+                const sh = 0.25 + 0.4 * (1 - this.alt);
+                ctx.fillStyle = `rgba(0,0,0,${sh})`; ctx.beginPath(); ctx.ellipse(this.x, this.y + 4, 24 + 20 * this.alt, 16 + 12 * this.alt, 0, 0, TAU); ctx.fill();
+                if (this.alt > 0.02 && this.state === 'descend') {                // where it'll land
+                    ctx.strokeStyle = `rgba(164,105,255,${0.4 + 0.4 * Math.sin(t * 14)})`; ctx.lineWidth = 1.5; ctx.setLineDash([5, 5]);
+                    ctx.beginPath(); ctx.arc(this.x, this.y, DRONE.LAND_R, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+                }
+                ctx.restore();
+                ctx.save();
+                ctx.translate(this.x, this.y - lift);
+                const S = 1 + this.alt * 0.5;                                      // nearer the camera while it's high
+                ctx.scale(S, S);
+                ctx.rotate(A);
+                this._drawTendrils(ctx, t);
+                this._drawArms(ctx, t);
+                this._drawShell(ctx, t);
+                ctx.restore();
+            }
+
+            /** Cable tendrils trailing from under the bell, swaying */
+            _drawTendrils(ctx, t) {
+                ctx.save(); ctx.lineCap = 'round';
+                for (let i = 0; i < 13; i++) {
+                    const side = (i / 12 - 0.5) * 2, x0 = -4 + Math.abs(side) * 5, y0 = side * 15;
+                    const len = 30 + (i * 7 % 5) * 6, sw = Math.sin(t * 2.2 + i * 1.3 + this._seed) * 6;
+                    ctx.strokeStyle = i % 2 ? '#14111b' : '#26202f'; ctx.lineWidth = i % 3 ? 1.7 : 2.8;
+                    ctx.beginPath(); ctx.moveTo(x0, y0);
+                    ctx.bezierCurveTo(x0 - len * 0.4, y0 + sw, x0 - len * 0.7, y0 * 1.1 - sw, x0 - len, y0 * 1.15 + sw * 0.6);
+                    ctx.stroke();
+                    if (i % 3 === 1) {                                              // a node light along it
+                        ctx.fillStyle = `rgba(190,140,255,${0.5 + 0.5 * Math.sin(t * 5 + i)})`;
+                        ctx.beginPath(); ctx.arc(x0 - len * 0.62, y0 * 1.08, 1.1, 0, Math.PI * 2); ctx.fill();
+                    }
+                }
+                ctx.restore();
+            }
+
+            /** An arm's joints (shoulder, elbow, wrist, lance tip) on side s: out wide and forward; folded to a point in a dive */
+            static armPose(diving, stuck, s) {
+                if (diving) return [5, 12 * s, 18, 24 * s, 30, 13 * s, 64, 3 * s];
+                if (stuck) return [5, 12 * s, 13, 29 * s, 28, 24 * s, 50, 13 * s];
+                return [5, 12 * s, 13, 30 * s, 28, 25 * s, 58, 11 * s];
+            }
+
+            /** Two long jointed arms, out and forward, ending in crackling violet lances */
+            _drawArms(ctx, t) {
+                const st = this.state, tl = st === 'tell' ? this._tell : null;
+                const diving = st === 'dive' || (tl && tl.kind === 'lance'), stuck = st === 'recover';
+                const reach = st === 'tether' && this._tether ? 1 : 0;
+                for (const s of [-1, 1]) {
+                    // shoulder → elbow → wrist → lance tip; a dive folds both lances forward together
+                    const [sx, sy, ex, ey, wx, wy, tx, ty] = Drone.armPose(diving, stuck, s);
+                    ctx.lineCap = 'round';
+                    ctx.strokeStyle = '#08070b'; ctx.lineWidth = 7;
+                    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.lineTo(wx, wy); ctx.stroke();
+                    ctx.strokeStyle = '#2a2436'; ctx.lineWidth = 4;
+                    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.lineTo(wx, wy); ctx.stroke();
+                    ctx.strokeStyle = 'rgba(200,190,230,0.18)'; ctx.lineWidth = 1;          // a glint along the plating
+                    ctx.beginPath(); ctx.moveTo(sx, sy - 1); ctx.lineTo(ex, ey - 1); ctx.lineTo(wx, wy - 1); ctx.stroke();
+                    for (const [jx, jy] of [[ex, ey], [wx, wy]]) {                  // the joints
+                        ctx.fillStyle = '#17131f'; ctx.beginPath(); ctx.arc(jx, jy, 3.2, 0, Math.PI * 2); ctx.fill();
+                        ctx.fillStyle = 'rgba(180,120,255,0.8)'; ctx.beginPath(); ctx.arc(jx, jy, 1, 0, Math.PI * 2); ctx.fill();
+                    }
+                    if (reach && s === 1) continue;                                 // its lance is the tether (drawn in the glow pass)
+                    // the lance: a long dark blade, a violet core burning down its length
+                    const la = Math.atan2(ty - wy, tx - wx), nx = -Math.sin(la), ny = Math.cos(la);
+                    ctx.fillStyle = '#15101e';
+                    ctx.beginPath(); ctx.moveTo(wx + nx * 3.4, wy + ny * 3.4); ctx.lineTo(tx, ty); ctx.lineTo(wx - nx * 3.4, wy - ny * 3.4); ctx.closePath(); ctx.fill();
+                    ctx.strokeStyle = '#7a4cd8'; ctx.lineWidth = 0.8; ctx.stroke();
+                    ctx.strokeStyle = '#e2ccff'; ctx.lineWidth = 1.2;
+                    ctx.beginPath(); ctx.moveTo(wx + (tx - wx) * 0.1, wy + (ty - wy) * 0.1); ctx.lineTo(tx, ty); ctx.stroke();
+                }
+            }
+
+            /** The bell: armoured plates, violet seams, the sensor-core eye at its front */
+            _drawShell(ctx, t) {
+                const tele = this.isTelegraphing, open = this.state === 'recover';
+                // under-rim shadow, then the bell
+                ctx.fillStyle = '#050407'; ctx.beginPath(); ctx.ellipse(-1, 0, 23, 21, 0, 0, Math.PI * 2); ctx.fill();
+                const gr = ctx.createRadialGradient(-6, -6, 2, 0, 0, 24);
+                gr.addColorStop(0, '#3a3446'); gr.addColorStop(0.5, '#17141e'); gr.addColorStop(1, '#09080c');
+                ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(-2, 0, 21, 19, 0, 0, Math.PI * 2); ctx.fill();
+                // plates: concentric bands and radial seams (they part when it's open)
+                ctx.strokeStyle = open ? 'rgba(190,140,255,0.7)' : '#04030a'; ctx.lineWidth = open ? 1.2 : 1;
+                for (const r of [8, 14]) { ctx.beginPath(); ctx.ellipse(-3, 0, r * 1.05, r, 0, 0, Math.PI * 2); ctx.stroke(); }
+                for (let i = 0; i < 8; i++) {
+                    const a = i * Math.PI / 4 + 0.2;
+                    ctx.beginPath(); ctx.moveTo(-3 + Math.cos(a) * 8, Math.sin(a) * 8); ctx.lineTo(-2 + Math.cos(a) * 20, Math.sin(a) * 18); ctx.stroke();
+                }
+                // violet light slits along the plate edges
+                ctx.strokeStyle = `rgba(170,110,255,${0.55 + 0.25 * Math.sin(t * 3 + this._seed)})`; ctx.lineWidth = 1.3; ctx.lineCap = 'round';
+                for (const [a0, a1, r] of [[-2.4, -1.7, 17], [1.7, 2.4, 17], [-0.9, -0.5, 11], [0.5, 0.9, 11], [2.9, 3.4, 15]]) {
+                    ctx.beginPath(); ctx.ellipse(-2, 0, r * 1.05, r, 0, a0, a1); ctx.stroke();
+                }
+                // a sheen on the crown, and the hood's brow plates arching over the eye
+                ctx.fillStyle = 'rgba(200,190,230,0.12)'; ctx.beginPath(); ctx.ellipse(-8, -6, 7, 4, -0.5, 0, Math.PI * 2); ctx.fill();
+                for (const s of [-1, 1]) {
+                    ctx.fillStyle = '#1d1926'; ctx.strokeStyle = '#05040a'; ctx.lineWidth = 0.8;
+                    ctx.beginPath(); ctx.moveTo(6, 2 * s); ctx.quadraticCurveTo(14, 13 * s, 2, 18 * s); ctx.quadraticCurveTo(-1, 9 * s, 6, 2 * s); ctx.fill(); ctx.stroke();
+                    ctx.strokeStyle = `rgba(170,110,255,${0.6 + 0.3 * Math.sin(t * 4 + s)})`; ctx.lineWidth = 0.9;
+                    ctx.beginPath(); ctx.moveTo(8, 6 * s); ctx.quadraticCurveTo(11, 12 * s, 4, 15 * s); ctx.stroke();
+                }
+                // the eye: rings round a hot core
+                const ex = DRONE.EYE_FWD, hit = this._eyeHitT ? Math.max(0, 1 - (_gameTimeSec - this._eyeHitT) / 0.2) : 0;
+                ctx.fillStyle = '#0a0710'; ctx.beginPath(); ctx.arc(ex, 0, 7.5, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = tele ? '#f0e0ff' : '#9a62ff'; ctx.lineWidth = 1;
+                for (const r of [6.5, 4.5]) { ctx.beginPath(); ctx.arc(ex, 0, r, 0, Math.PI * 2); ctx.stroke(); }
+                ctx.fillStyle = hit > 0 ? '#ffffff' : tele ? '#f6eaff' : '#c9a2ff';
+                ctx.beginPath(); ctx.arc(ex, 0, 2.6 + (tele ? 0.8 * Math.sin(t * 30) : 0), 0, Math.PI * 2); ctx.fill();
+            }
+
+            /** Above the darkness (engine/boss-hazards.js): the eye's glow, the lances' crackle, its tells, the tether, the beam */
+            drawLights(ctx) {
+                if (this.dead) return;
+                const t = _frameTime / 1000, now = _gameTimeSec, lift = this._lift(), S = 1 + this.alt * 0.5;
+                const ca = Math.cos(this.angle), sa = Math.sin(this.angle);
+                const W = (lx, ly) => ({ x: this.x + (lx * ca - ly * sa) * S, y: this.y - lift + (lx * sa + ly * ca) * S });
+                const tl = this.state === 'tell' ? this._tell : null, k = tl ? Math.min(1, (now - this._stateT) / tl.secs) : 0;
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                // the sensor core
+                const e = W(DRONE.EYE_FWD, 0);
+                ctx.globalAlpha = 0.55 + 0.45 * k; drawGlow(ctx, e.x, e.y, (18 + 22 * k) * S, k > 0 ? '235, 200, 255' : '164, 105, 255', 0.35);
+                // the lances crackle (brighter while it winds up or dives)
+                const diving = this.state === 'dive' || (tl && tl.kind === 'lance');
+                const hot = diving || (tl && tl.kind === 'lance') ? 1 : 0.45;
+                for (const s of [-1, 1]) {
+                    if (this.state === 'tether' && s === 1) continue;
+                    const P = Drone.armPose(diving, this.state === 'recover', s), w = W(P[4], P[5]), tip = W(P[6], P[7]);
+                    ctx.globalAlpha = 0.35 * hot; drawGlow(ctx, tip.x, tip.y, 12 * S, '170, 110, 255', 0.3);
+                    ctx.strokeStyle = `rgba(210,170,255,${0.5 * hot + 0.3})`; ctx.lineWidth = 1;
+                    ctx.beginPath(); ctx.moveTo(w.x, w.y);
+                    const n = 5, seed = Math.floor(t * 18) + s * 7;
+                    for (let i = 1; i <= n; i++) {
+                        const u = i / n, j = i < n ? (Math.sin(seed * 12.9898 + i * 78.233) * 43758.5453 % 1) * 5 * hot : 0;
+                        ctx.lineTo(w.x + (tip.x - w.x) * u - sa * j, w.y + (tip.y - w.y) * u + ca * j);
+                    }
+                    ctx.stroke();
+                }
+                // tells: the lance line it'll dive along, the beam it's charging
+                if (tl && tl.kind === 'lance') {
+                    ctx.globalAlpha = 0.3 + 0.6 * k; ctx.strokeStyle = '#c9a2ff'; ctx.lineWidth = 1 + 3 * k; ctx.setLineDash([8, 6]);
+                    ctx.beginPath(); ctx.moveTo(this.x, this.y); ctx.lineTo(this.x + Math.cos(tl.a) * DRONE.LANCE.DIST, this.y + Math.sin(tl.a) * DRONE.LANCE.DIST); ctx.stroke(); ctx.setLineDash([]);
+                } else if (tl && tl.kind === 'beam') {
+                    const R = DRONE.BEAM.RANGE;
+                    ctx.globalAlpha = 0.15 + 0.5 * k; ctx.strokeStyle = '#d8b8ff'; ctx.lineWidth = 0.6 + 2.4 * k;
+                    ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x + Math.cos(tl.a) * R, e.y + Math.sin(tl.a) * R); ctx.stroke();
+                } else if (tl && tl.kind === 'grapple') {
+                    const tip = W(58, 11); ctx.globalAlpha = 0.4 + 0.5 * k; drawGlow(ctx, tip.x, tip.y, (10 + 12 * k) * S, '200, 150, 255', 0.3);
+                }
+                // the tether: its lance flung out on a crackling line
+                const T = this._tether;
+                if (T) {
+                    const w = W(28, 25);
+                    ctx.globalAlpha = 0.9; ctx.strokeStyle = '#cfa8ff'; ctx.lineWidth = 1.5;
+                    ctx.beginPath(); ctx.moveTo(w.x, w.y);
+                    const n = 8, dx = T.x - w.x, dy = T.y - w.y, L = Math.hypot(dx, dy) || 1;
+                    for (let i = 1; i <= n; i++) { const u = i / n, j = i < n ? Math.sin(t * 40 + i * 2.1) * 3 : 0; ctx.lineTo(w.x + dx * u - dy / L * j, w.y + dy * u + dx / L * j); }
+                    ctx.stroke();
+                    ctx.globalAlpha = 0.8; drawGlow(ctx, T.x, T.y, T.state === 'held' ? 26 : 14, '190, 130, 255', 0.3);
+                }
+                // the beam itself: a white-violet line through everything
+                const B = this._beam;
+                if (B && now - B.t0 < DRONE.BEAM.FIRE) {
+                    const u = (now - B.t0) / DRONE.BEAM.FIRE;
+                    for (const [w, a] of [[14, 0.18], [6, 0.45], [2, 0.95]]) {
+                        ctx.globalAlpha = a * (1 - u); ctx.strokeStyle = w > 4 ? '#a469ff' : '#ffffff'; ctx.lineWidth = w;
+                        ctx.beginPath(); ctx.moveTo(B.x0, B.y0 - lift); ctx.lineTo(B.x1, B.y1); ctx.stroke();
+                    }
+                }
+                ctx.restore();
+            }
+        }
         // --- TRAFFIC CONSTANTS ---
         const STANDARD_VEHICLE_WIDTH = 30;
         const LANE_WIDTH = STANDARD_VEHICLE_WIDTH * 2; // 60 units per lane
@@ -65697,7 +66372,7 @@ engineMixin({
                     this.enemies.push(b);
                 }
                 qs[flag] = true;
-                const names = bosses.map(b => b.bossName).filter(Boolean);
+                const names = opts.subtitle ? [opts.subtitle] : bosses.map(b => b.bossName).filter(Boolean);
                 if (this._bossIntro) short = true;                  // one already running: this set just wakes in place
                 (this._bossIntros || (this._bossIntros = [])).push(this._bossIntro = { bosses, short, f: 0, title: opts.title || 'THE TRIUMVIRATE', names, skipped: false,
                                     zoom: this.camera.zoom || 1, woke: 0 });
@@ -65731,6 +66406,22 @@ engineMixin({
                     ctx.globalAlpha = 0.07 + 0.06 * eye; drawGlow(ctx, e.x, e.y, 30 * S, W.eye, 0);          // their accent, faint, so the three read apart
                     if (e.persona === 'matins' && eye > 0.02) { ctx.globalAlpha = 0.35 * eye; ctx.strokeStyle = W.trim; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(e.x, e.y + (-6 * e._riseK - 2) * S * 1.12, 16 * S * 1.12, 6 * S * 1.12, 0, 0, Math.PI * 2); ctx.stroke(); }
                     if (e._heat > 0.05) { ctx.globalAlpha = 0.5 * e._heat; drawGlow(ctx, e.x + Math.cos(e.angle) * 34 * S, e.y + Math.sin(e.angle) * 34 * S, 16 * S, '255, 150, 60', 0.3); }
+                    // Its move winding up (entities/enemies.js _wardenMove): the censer swings hot, the hymn gathers, the chain shows its line
+                    const T = e._move && e._move.tell;
+                    if (T) {
+                        const k = Math.min(1, (_gameTimeSec - T.from) / Math.max(0.01, T.at - T.from)), pulse = 0.7 + 0.3 * Math.sin(_frameTime / 40);
+                        if (e.persona === 'vesper') {
+                            const hx = e.x + (Math.cos(e.angle) * 14 - Math.sin(e.angle) * 9) * S, hy = e.y + (Math.sin(e.angle) * 14 + Math.cos(e.angle) * 9) * S;
+                            ctx.globalAlpha = 0.5 + 0.5 * k; drawGlow(ctx, hx, hy, (10 + 18 * k) * S, '255, 150, 50', 0.35);
+                        } else if (e.persona === 'matins') {
+                            ctx.globalAlpha = 0.4 + 0.5 * k * pulse; drawGlow(ctx, e.x, e.y, (40 + 40 * k) * S, '255, 230, 150', 0.2);
+                            ctx.strokeStyle = '#ffe9a8'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(e.x, e.y, (90 - 60 * k) * S, 0, Math.PI * 2); ctx.stroke();
+                        } else if (e.persona === 'compline') {
+                            ctx.globalAlpha = 0.3 + 0.6 * k * pulse; ctx.strokeStyle = '#c890ff'; ctx.lineWidth = 1.5 + 2 * k; ctx.setLineDash([3, 5]);
+                            ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x + Math.cos(T.a) * 420, e.y + Math.sin(T.a) * 420); ctx.stroke(); ctx.setLineDash([]);
+                            ctx.globalAlpha = 0.6 + 0.4 * k; drawGlow(ctx, e.x + Math.cos(T.a) * 30 * S, e.y + Math.sin(T.a) * 30 * S, (8 + 10 * k) * S, '200, 120, 255', 0.3);
+                        }
+                    }
                 }
                 ctx.restore();
             },
@@ -65790,6 +66481,380 @@ engineMixin({
                 // Wake each at its time (the first burst still waits a full telegraph)
                 for (const b of B) if (b.dormant && b._wakeAt && f >= b._wakeAt) { b.awaken(b.telegraphThreshold); I.woke++; }
                 if (I.woke >= B.length || B.every(b => b.dead)) I.done = true;
+            }
+        });
+        // GameEngine — boss hazards: what the bosses leave on the floor and throw at her. Methods are added to
+        // GameEngine.prototype (see engineMixin in game-engine.js).
+        //
+        // One list (`_hazards`), stepped each tick (updateBossHazards, from update.js) and drawn above the
+        // darkness (drawBossHazards, from draw.js) so they read in a dark palace. Every one telegraphs:
+        //   sigil   Lilitu's Ember Sigil: a ring where she last heard 949; after ARM s it bursts into fire
+        //   fire    a burning patch (a sigil's aftermath, a censer): standing in it sets her burning
+        //   smoke   a censer's incense: a thick cloud the wardens can't see through either (smokeBlocks)
+        //   censer  Vesper's thurible in flight, its landing ring on the floor; lands as fire + smoke
+        //   hymn    Matins' pulse: a ring through walls; caught by it (no flit) she's hurt and revealed
+        //   hook    Compline's chain: flies past cover (not walls); it catches her and drags her out
+        //   rite    Lilitu's Infernal Rite: the edges burn and the safe circle shrinks for RITE_SECS
+        //   flare   a red flare (Shadow Step's tell), gale (Wing Gale's cone): looks only
+        // She burns (`_playerBurn`, burnPlayer) for a few seconds after fire touches her; a flit puts it out.
+        // The duel's dimming (`_duelDimK`) lives here too: the palace darkens while Lilitu hunts alone.
+
+        const HAZARD = {
+            SIGIL_ARM: 1.0, SIGIL_R: 58, SIGIL_HIT: 16, FIRE_SECS: 1.6,
+            BURN_TICK: 0.5,
+            CENSER_FLIGHT: 0.9, CENSER_FIRE_R: 62, CENSER_FIRE_SECS: 4, CENSER_SMOKE_R: 96, CENSER_SMOKE_SECS: 6, CENSER_HIT: 12,
+            HYMN_SECS: 1.1, HYMN_RANGE: 760, HYMN_HIT: 10, REVEAL_SECS: 2.5,
+            HOOK_SPEED: 17, HOOK_RANGE: 430, HOOK_HIT: 8, HOOK_PULL: 8, HOOK_STOP: 80, HOOK_PULL_SECS: 0.6,
+            RITE_SECS: 8, RITE_WARN: 1.0, RITE_DPS: 14
+        };
+
+        engineMixin({
+            bossHazards() { return this._hazards || (this._hazards = []); },
+
+            /** Lay a hazard (see the list above); returns it */
+            addHazard(h) {
+                h.t0 = _gameTimeSec; h.mapId = this.activeMap && this.activeMap.id;
+                const L = this.bossHazards(); L.push(h); if (L.length > 60) L.shift();
+                return h;
+            },
+
+            /** Clear every hazard (or only an owner's) — a boss falls, the map changes */
+            clearHazards(owner) {
+                if (!this._hazards) return;
+                this._hazards = owner ? this._hazards.filter(h => h.owner !== owner) : [];
+                if (!owner) { this._playerBurn = null; this._hooked = null; }
+            },
+
+            /** Flitting: out of reach of every hazard */
+            playerDodging() { return !!(this.flitState && this.flitState.active); },
+
+            /** A boss move lands on her (unless she's mid-flit); true if it did */
+            hurtPlayer(amount) {
+                if (this.playerDodging() || !this.player || this.player.dead || this.isDriving) return false;
+                this.damagePlayer(Math.round(amount));
+                return true;
+            },
+
+            /** Set her burning for `secs` at `dps` (fresh fire refreshes it) */
+            burnPlayer(dps, secs) {
+                if (this.playerDodging()) return;
+                const now = _gameTimeSec, B = this._playerBurn;
+                if (B && now < B.until) { B.until = Math.max(B.until, now + secs); B.dps = Math.max(B.dps, dps); }
+                else this._playerBurn = { dps, until: now + secs, next: now + HAZARD.BURN_TICK };
+            },
+
+            /** Push her (dx, dy), stopping at the first unwalkable step or wall */
+            shovePlayer(dx, dy) {
+                const p = this.player, map = this.activeMap; if (!p || !map) return;
+                const nav = NavGrid.for(map), d = Math.hypot(dx, dy), n = Math.max(1, Math.ceil(d / 6));
+                for (let i = 0; i < n; i++) {
+                    const nx = p.x + dx / n, ny = p.y + dy / n;
+                    if (nav && !nav.walkable(nx, ny)) break;
+                    if (isLineBlocked(p.x, p.y, nx, ny, map.walls, [])) break;
+                    p.x = nx; p.y = ny;
+                }
+            },
+
+            /** Does a censer's smoke cut the line (x0, y0)–(x1, y1)? */
+            smokeBlocks(x0, y0, x1, y1) {
+                if (!this._hazards) return false;
+                for (const h of this._hazards) {
+                    if (h.kind !== 'smoke') continue;
+                    const r = h.r * this._smokeK(h);
+                    if (r > 20 && CollisionSystem.distToSegmentSquared(h.x, h.y, x0, y0, x1, y1) < (r * 0.7) ** 2) return true;
+                }
+                return false;
+            },
+
+            _smokeK(h) {
+                const age = _gameTimeSec - h.t0;
+                return Math.min(1, age / 0.5) * Math.min(1, (h.until - _gameTimeSec) / 1.2);
+            },
+
+            /** One tick: every hazard does its work; her burn ticks; the duel's dimming eases */
+            updateBossHazards() {
+                const now = _gameTimeSec, p = this.player, mapId = this.activeMap && this.activeMap.id;
+                const duel = (this.enemies || []).some(e => e.solo && !e.dead && !e.dormant);
+                this._duelDimK = (this._duelDimK || 0) + ((duel ? 1 : 0) - (this._duelDimK || 0)) * 0.03;
+                if (!this._hazards && !this._playerBurn && !this._hooked) return;
+                if (this._hazards) this._hazards = this._hazards.filter(h => h.mapId === mapId && !h.done);
+                const L = this._hazards || [];
+                const inside = (x, y, r) => p && Math.hypot(p.x - x, p.y - y) < r;
+                for (const h of L) {
+                    const age = now - h.t0;
+                    switch (h.kind) {
+                        case 'sigil':
+                            if (age >= HAZARD.SIGIL_ARM) {
+                                h.done = true;
+                                if (inside(h.x, h.y, h.r) && this.hurtPlayer(HAZARD.SIGIL_HIT)) this.burnPlayer(6, 2);
+                                this.addHazard({ kind: 'fire', x: h.x, y: h.y, r: h.r * 0.8, until: now + HAZARD.FIRE_SECS, dps: 8, owner: h.owner });
+                                if (this.weather) this.weather.spawnExplosion(h.x, h.y, '#ff5a1a', 6, 1.6);
+                                this.triggerShake(3);
+                            }
+                            break;
+                        case 'fire':
+                            if (now > h.until) h.done = true;
+                            else if (inside(h.x, h.y, h.r)) this.burnPlayer(h.dps || 8, 1.2);
+                            break;
+                        case 'smoke':
+                            if (now > h.until) h.done = true;
+                            break;
+                        case 'censer':
+                            if (age >= h.flight) {
+                                h.done = true;
+                                if (inside(h.x1, h.y1, HAZARD.CENSER_FIRE_R)) this.hurtPlayer(HAZARD.CENSER_HIT);
+                                this.addHazard({ kind: 'fire', x: h.x1, y: h.y1, r: HAZARD.CENSER_FIRE_R, until: now + HAZARD.CENSER_FIRE_SECS, dps: 9, owner: h.owner, censer: true });
+                                this.addHazard({ kind: 'smoke', x: h.x1, y: h.y1, r: HAZARD.CENSER_SMOKE_R, until: now + HAZARD.CENSER_SMOKE_SECS, owner: h.owner, seed: Math.random() * 100 });
+                                if (this.weather) this.weather.spawnExplosion(h.x1, h.y1, '#ffaa33', 5, 1.4);
+                                this.triggerShake(4); audioSys.sfx('explode');
+                            }
+                            break;
+                        case 'hymn': {
+                            const r = HAZARD.HYMN_RANGE * Math.min(1, age / HAZARD.HYMN_SECS);
+                            if (age > HAZARD.HYMN_SECS + 0.25) h.done = true;
+                            if (!h.hit && p && Math.abs(Math.hypot(p.x - h.x, p.y - h.y) - r) < 22) {
+                                h.hit = true;
+                                if (this.hurtPlayer(HAZARD.HYMN_HIT)) {
+                                    this._revealedUntil = now + HAZARD.REVEAL_SECS;
+                                    showMessage('MATINS SINGS — YOU ARE REVEALED');
+                                }
+                            }
+                            break;
+                        }
+                        case 'hook': {
+                            if (h.state === 'out') {
+                                const nx = h.x + Math.cos(h.a) * HAZARD.HOOK_SPEED, ny = h.y + Math.sin(h.a) * HAZARD.HOOK_SPEED;
+                                const wall = isLineBlocked(h.x, h.y, nx, ny, this.activeMap.walls, []);
+                                h.x = nx; h.y = ny;
+                                if (p && Math.hypot(p.x - h.x, p.y - h.y) < 20 && !this.playerDodging()) {
+                                    h.state = 'caught'; h.caughtAt = now;
+                                    this.hurtPlayer(HAZARD.HOOK_HIT);
+                                    this._hooked = { owner: h.owner, until: now + HAZARD.HOOK_PULL_SECS, hook: h };
+                                    showMessage('COMPLINE HOOKS YOU');
+                                    this.triggerShake(6);
+                                } else if (wall || Math.hypot(h.x - h.x0, h.y - h.y0) > HAZARD.HOOK_RANGE) h.state = 'back';
+                            } else if (h.state === 'caught') {
+                                if (p) { h.x = p.x; h.y = p.y; }
+                                if (!this._hooked || this._hooked.hook !== h) h.state = 'back';
+                            } else {
+                                const o = h.owner, dx = (o ? o.x : h.x0) - h.x, dy = (o ? o.y : h.y0) - h.y, d = Math.hypot(dx, dy);
+                                if (d < 24 || !o || o.dead) h.done = true;
+                                else { h.x += dx / d * 22; h.y += dy / d * 22; }
+                            }
+                            break;
+                        }
+                        case 'rite': {
+                            if (age > h.dur) { h.done = true; break; }
+                            const k = Math.min(1, Math.max(0, (age - HAZARD.RITE_WARN) / (h.dur - HAZARD.RITE_WARN)));
+                            h.r = h.r0 + (h.r1 - h.r0) * k;
+                            if (age > HAZARD.RITE_WARN && p && !inside(h.x, h.y, h.r)) this.burnPlayer(HAZARD.RITE_DPS, 0.8);
+                            break;
+                        }
+                        default:
+                            if (age > (h.dur || 0.5)) h.done = true;
+                    }
+                }
+                // Hooked: dragged toward Compline until close, or a flit breaks the chain
+                const H = this._hooked;
+                if (H) {
+                    const o = H.owner;
+                    if (!o || o.dead || now > H.until || this.playerDodging() || !p) this._hooked = null;
+                    else {
+                        const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy);
+                        if (d < HAZARD.HOOK_STOP) this._hooked = null;
+                        else this.shovePlayer(dx / d * HAZARD.HOOK_PULL, dy / d * HAZARD.HOOK_PULL);
+                    }
+                }
+                // Burning: a tick every half second; a flit snuffs it
+                const B = this._playerBurn;
+                if (B) {
+                    if (this.playerDodging() && now - B.next < 2) { this._playerBurn = null; }
+                    else {
+                        while (B && now >= B.next && B.next <= B.until) {
+                            B.next += HAZARD.BURN_TICK;
+                            this.hurtPlayer(B.dps * HAZARD.BURN_TICK);
+                        }
+                        if (now > B.until) this._playerBurn = null;
+                    }
+                }
+            },
+
+            /** Above the darkness: the duel's dimming, the elites' marks, every hazard, then her flames if she burns */
+            drawBossHazards(ctx, view) {
+                const dim = this._duelDimK || 0;
+                if (dim > 0.01 && view) {
+                    ctx.save(); ctx.fillStyle = `rgba(6,0,2,${0.42 * dim})`;
+                    ctx.fillRect(view.left - 50, view.top - 50, view.right - view.left + 100, view.bottom - view.top + 100);
+                    ctx.restore();
+                }
+                for (const e of this.enemies || []) {                                   // the elites' marks (entities/enemies.js)
+                    if (!e.elite || e.dead || !view || e.x < view.left - 40 || e.x > view.right + 40 || e.y < view.top - 40 || e.y > view.bottom + 40) continue;
+                    drawEliteMark(ctx, e);
+                }
+                for (const e of this.enemies || []) {
+                    if (e.solo && e.drawDuelTells) e.drawDuelTells(ctx);              // Lilitu's tells (entities/hunters.js)
+                    else if (e instanceof Drone) e.drawLights(ctx);                    // a drone's eye, lances, tells (entities/drones.js)
+                }
+                const L = this._hazards, B = this._playerBurn, p = this.player;
+                if ((!L || !L.length) && !B) return;
+                const now = _gameTimeSec, t = _frameTime / 1000, TAU = Math.PI * 2;
+                ctx.save();
+                for (const h of L || []) {
+                    const age = now - h.t0;
+                    switch (h.kind) {
+                        case 'sigil': {
+                            const k = Math.min(1, age / HAZARD.SIGIL_ARM), flick = 0.7 + 0.3 * Math.sin(t * 30);
+                            ctx.globalCompositeOperation = 'lighter';
+                            ctx.globalAlpha = 0.18 + 0.4 * k; drawGlow(ctx, h.x, h.y, h.r * (0.6 + 0.4 * k), '255, 70, 20', 0);
+                            ctx.globalAlpha = 0.85; ctx.strokeStyle = `rgba(255,${120 - 60 * k | 0},40,${0.5 + 0.5 * k * flick})`; ctx.lineWidth = 2;
+                            ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, TAU); ctx.stroke();
+                            ctx.beginPath(); ctx.arc(h.x, h.y, h.r * k, 0, TAU); ctx.stroke();
+                            // the sigil: a five-point star turning inside the ring
+                            ctx.lineWidth = 1.2; ctx.beginPath();
+                            for (let i = 0; i <= 5; i++) { const a = t * 0.8 + i * 4 * Math.PI / 5, rr = h.r * 0.72; i ? ctx.lineTo(h.x + Math.cos(a) * rr, h.y + Math.sin(a) * rr) : ctx.moveTo(h.x + Math.cos(a) * rr, h.y + Math.sin(a) * rr); }
+                            ctx.stroke();
+                            break;
+                        }
+                        case 'fire': {
+                            const fade = Math.min(1, (h.until - now) / 0.6) * Math.min(1, age / 0.15);
+                            ctx.globalCompositeOperation = 'lighter';
+                            ctx.globalAlpha = 0.55 * fade; drawGlow(ctx, h.x, h.y, h.r * 1.15, h.censer ? '255, 150, 50' : '255, 80, 25', 0.2);
+                            for (let i = 0; i < 9; i++) {                       // tongues of flame licking up
+                                const a = i * 2.4 + (h.x % 7), rr = h.r * (0.25 + 0.6 * ((i * 0.37 + t * 0.3) % 1)), ph = (t * 2.2 + i * 0.31) % 1;
+                                const fx = h.x + Math.cos(a) * rr, fy = h.y + Math.sin(a) * rr - ph * 14;
+                                ctx.globalAlpha = (1 - ph) * 0.7 * fade; ctx.fillStyle = ph < 0.25 ? '#ffd890' : ph < 0.6 ? '#ff7a22' : '#c8320c';
+                                ctx.beginPath(); ctx.ellipse(fx, fy, 2 + 2.5 * (1 - ph), 4 + 5 * (1 - ph), 0, 0, TAU); ctx.fill();
+                            }
+                            break;
+                        }
+                        case 'smoke': {
+                            const k = this._smokeK(h);
+                            ctx.globalCompositeOperation = 'source-over';
+                            for (let i = 0; i < 9; i++) {
+                                const a = (h.seed || 0) + i * 0.7 + t * 0.15 * (i % 2 ? 1 : -1), rr = h.r * 0.45 * ((i * 0.53) % 1);
+                                ctx.globalAlpha = 0.16 * k; ctx.fillStyle = i % 3 ? '#5c5262' : '#8a7f90';
+                                ctx.beginPath(); ctx.arc(h.x + Math.cos(a) * rr, h.y + Math.sin(a) * rr, h.r * (0.45 + 0.12 * Math.sin(t + i)), 0, TAU); ctx.fill();
+                            }
+                            break;
+                        }
+                        case 'censer': {
+                            const u = Math.min(1, age / h.flight), x = h.x0 + (h.x1 - h.x0) * u, y = h.y0 + (h.y1 - h.y0) * u - Math.sin(u * Math.PI) * 70;
+                            ctx.globalCompositeOperation = 'lighter';
+                            ctx.globalAlpha = 0.25 + 0.5 * u; ctx.strokeStyle = '#ffb04a'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 5]);
+                            ctx.beginPath(); ctx.arc(h.x1, h.y1, HAZARD.CENSER_FIRE_R, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+                            ctx.globalAlpha = 0.2 * u; drawGlow(ctx, h.x1, h.y1, HAZARD.CENSER_FIRE_R, '255, 140, 40', 0);
+                            ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+                            ctx.fillStyle = '#e8c27a'; ctx.strokeStyle = '#6a4f22'; ctx.lineWidth = 1;
+                            ctx.beginPath(); ctx.arc(x, y, 6, 0, TAU); ctx.fill(); ctx.stroke();
+                            ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.8; drawGlow(ctx, x, y, 14, '255, 150, 60', 0.3);
+                            break;
+                        }
+                        case 'hymn': {
+                            const u = Math.min(1, age / HAZARD.HYMN_SECS), r = HAZARD.HYMN_RANGE * u;
+                            ctx.globalCompositeOperation = 'lighter';
+                            for (const [w, a] of [[10, 0.12], [4, 0.35], [1.5, 0.8]]) {
+                                ctx.globalAlpha = a * (1 - u * 0.7); ctx.strokeStyle = '#ffe9a8'; ctx.lineWidth = w;
+                                ctx.beginPath(); ctx.arc(h.x, h.y, r, 0, TAU); ctx.stroke();
+                            }
+                            break;
+                        }
+                        case 'hook': {
+                            const o = h.owner; if (!o) break;
+                            ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+                            const d = Math.hypot(h.x - o.x, h.y - o.y), n = Math.max(1, d / 7 | 0), a = Math.atan2(h.y - o.y, h.x - o.x);
+                            ctx.strokeStyle = '#cfc6b8'; ctx.lineWidth = 1.4;
+                            for (let i = 0; i < n; i++) {                       // the links
+                                const u = (i + 0.5) / n, x = o.x + (h.x - o.x) * u, y = o.y + (h.y - o.y) * u;
+                                ctx.beginPath(); ctx.ellipse(x, y, 3.2, 1.8, a + (i % 2 ? Math.PI / 2 : 0), 0, TAU); ctx.stroke();
+                            }
+                            ctx.save(); ctx.translate(h.x, h.y); ctx.rotate(h.a);
+                            ctx.fillStyle = '#e6ddd0'; ctx.beginPath(); ctx.moveTo(9, 0); ctx.lineTo(-3, -7); ctx.lineTo(0, 0); ctx.lineTo(-3, 7); ctx.closePath(); ctx.fill();
+                            ctx.restore();
+                            ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.6; drawGlow(ctx, h.x, h.y, 14, '200, 120, 255', 0.3);
+                            break;
+                        }
+                        case 'rite': {
+                            const warn = age < HAZARD.RITE_WARN, pulse = 0.6 + 0.4 * Math.sin(t * 10);
+                            ctx.globalCompositeOperation = 'lighter';
+                            ctx.globalAlpha = warn ? 0.5 * pulse : 0.9; ctx.strokeStyle = warn ? '#ff9a4a' : '#ff3a1a'; ctx.lineWidth = warn ? 2 : 3;
+                            ctx.setLineDash(warn ? [10, 8] : []); ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+                            if (!warn) {
+                                // the burning beyond: a band of fire just outside the circle and a red wash past it
+                                ctx.globalAlpha = 0.12; ctx.fillStyle = '#ff2a10';
+                                ctx.beginPath(); ctx.arc(h.x, h.y, h.r + 1400, 0, TAU); ctx.arc(h.x, h.y, h.r, 0, TAU, true); ctx.fill();
+                                const n = Math.min(64, h.r / 9 | 0);
+                                for (let i = 0; i < n; i++) {
+                                    const a = i / n * TAU + t * 0.4, ph = (t * 2 + i * 0.37) % 1, rr = h.r + 6 + ph * 18;
+                                    ctx.globalAlpha = (1 - ph) * 0.8; ctx.fillStyle = ph < 0.35 ? '#fff0b0' : '#ff5a1a';
+                                    ctx.beginPath(); ctx.ellipse(h.x + Math.cos(a) * rr, h.y + Math.sin(a) * rr - ph * 10, 3, 6, 0, 0, TAU); ctx.fill();
+                                }
+                            }
+                            break;
+                        }
+                        case 'flare': {
+                            const u = Math.min(1, age / (h.dur || 0.4));
+                            ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.9 * (1 - u * 0.5);
+                            drawGlow(ctx, h.x, h.y, 16 + 26 * u, '255, 30, 50', 0.25);
+                            ctx.strokeStyle = '#ff3050'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(h.x, h.y, 26 * (1 - u) + 6, 0, TAU); ctx.stroke();
+                            break;
+                        }
+                        case 'gale': {
+                            const u = Math.min(1, age / (h.dur || 0.35));
+                            ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.3 * (1 - u);
+                            ctx.fillStyle = '#ff7a8a';
+                            ctx.beginPath(); ctx.moveTo(h.x, h.y); ctx.arc(h.x, h.y, h.reach * (0.4 + 0.6 * u), h.a - h.spread, h.a + h.spread); ctx.closePath(); ctx.fill();
+                            ctx.strokeStyle = '#ffd0d8'; ctx.lineWidth = 1;
+                            for (let i = -2; i <= 2; i++) { const a = h.a + i * h.spread / 2.5, r0 = h.reach * u * 0.5; ctx.beginPath(); ctx.moveTo(h.x + Math.cos(a) * r0, h.y + Math.sin(a) * r0); ctx.lineTo(h.x + Math.cos(a) * (r0 + 30), h.y + Math.sin(a) * (r0 + 30)); ctx.stroke(); }
+                            break;
+                        }
+                    }
+                }
+                // Burning: flames on her
+                if (B && p && p.visible) {
+                    ctx.globalCompositeOperation = 'lighter';
+                    ctx.globalAlpha = 0.5; drawGlow(ctx, p.x, p.y, 20, '255, 100, 30', 0.2);
+                    for (let i = 0; i < 5; i++) {
+                        const ph = (t * 2.6 + i * 0.2) % 1, a = i * 1.26;
+                        ctx.globalAlpha = (1 - ph) * 0.9; ctx.fillStyle = ph < 0.4 ? '#ffe9a0' : '#ff6a1a';
+                        ctx.beginPath(); ctx.ellipse(p.x + Math.cos(a) * 8, p.y + Math.sin(a) * 8 - ph * 16, 2.5, 5, 0, 0, TAU); ctx.fill();
+                    }
+                }
+                ctx.restore();
+            },
+
+            /** Lilitu falls in her duel: a second Dark Element; the first time, the Golden Retribution schematic */
+            lilituDuelWon(her) {
+                const qs = this.questState || (this.questState = {}), first = !qs.lilituSoloWins;
+                qs.lilituSoloWins = (qs.lilituSoloWins || 0) + 1;
+                this.loot.push(new Loot(her.x - 14, her.y + 8, 'dark_element'));
+                const g = this.hordeGauntlet;
+                if (g) g.spoil('Dark Element');
+                if (first) {
+                    qs.goldenRetributionUnlocked = true;                 // the workbench's schematic (story/missions.js SCHEMATICS)
+                    if (g) g.spoil('Golden Retribution schematic');
+                    this.addPausableTimeout(() => showMessage('SCHEMATIC UNLOCKED — GOLDEN RETRIBUTION'), 2200);
+                }
+            },
+
+            /** The last of the Triumvirate falls: the first time, Compline leaves the Blood Pact (if she hasn't one) */
+            triumvirateFallen(last) {
+                if (this._triFallTick === _simTick) return;           // (two falling in the same tick: one defeat)
+                this._triFallTick = _simTick;
+                const qs = this.questState || (this.questState = {}), first = !qs.triumvirateDefeats;
+                qs.triumvirateDefeats = (qs.triumvirateDefeats || 0) + 1;
+                if (first && !this.inventory.items.some(i => i.id === 'blood_pact') && this.dropBossWeapon('blood_pact', last.x, last.y + 8)) {
+                    this.addPausableTimeout(() => showMessage('COMPLINE LEAVES THE BLOOD PACT'), 1600);
+                    if (this.hordeGauntlet) this.hordeGauntlet.spoil('Blood Pact');
+                }
+            },
+
+            /** A boss's weapon on the floor where it fell, glowing gold (picked up like any weapon drop) */
+            dropBossWeapon(id, x, y) {
+                const item = createItemFromRegistry(id, this); if (!item) return null;
+                const drop = { x, y, type: 'weapon_drop', item, angle: 0.6, dropTime: 0,
+                    draw(ctx) { ctx.save(); ctx.translate(this.x, this.y); ctx.save(); ctx.translate(0, 10); ctx.scale(1, 0.36); ctx.globalAlpha = 0.75; drawGlow(ctx, 0, 0, 22, '#ffd76a', 0.3); ctx.restore(); drawWeapon(ctx, this.item.id, 0, Math.sin(_frameTime / 500) * 3, this.angle, 0.9); ctx.restore(); } };
+                this.loot.push(drop);
+                return drop;
             }
         });
         // GameEngine — Noise: sounds that give 949 (and fights) away. Methods are added to
@@ -77004,6 +78069,7 @@ engineMixin({
                 this.updateCasings();
                 this.updateCorpses();
                 this.updateStatuses();                                 // bleeding and the rest (engine/status-effects.js)
+                this.updateBossHazards();                              // sigils, fire, censers, hooks; her burn (engine/boss-hazards.js)
                 this.updateMeleeSwing();                               // a blade's cut lands as it passes (engine/status-effects.js)
                 this.updateExecution();                                // a takedown in progress (engine/executions.js)
                 this.updateSneak();
@@ -77545,6 +78611,7 @@ engineMixin({
                     // Unified projectile collection — handles single shots, arrays, or null
                     if (result) {
                         const shots = Array.isArray(result) ? result : [result];
+                        if (enemy.dmgMul > 1) for (const s of shots) if (s instanceof ProjectileEntity) s.damage = Math.round(s.damage * enemy.dmgMul);   // a late gauntlet wave hits harder
                         if (shots.some(s => s instanceof ProjectileEntity && !s.melee)) this.emitNoise(enemy.x, enemy.y, CONFIG.NOISE.enemyShot, 'enemyShot', false, { src: enemy });   // their gunfire draws their friends
                         for (const shot of shots) {
                             if (shot instanceof ProjectileEntity && shot.melee) { this.projectiles.push(shot); continue; }   // a claw: no flash, no casing
@@ -77557,6 +78624,11 @@ engineMixin({
                         }
                     }
                     
+                    if (enemy.dead && enemy.decoy) {                              // a Blood Mirror decoy: a crimson puff, nothing more
+                        this.weather.spawnExplosion(enemy.x, enemy.y, '#7a0618', 6, 1.6);
+                        this.enemies.splice(i, 1);
+                        continue;
+                    }
                     if (enemy.dead) { 
                         this.awardKill(enemy);                                    // Resonance for the kill (core/resonance.js)
                         audioSys.sfx('explode'); 
@@ -77574,6 +78646,9 @@ engineMixin({
                                                  draw(ctx) { ctx.save(); ctx.translate(this.x, this.y); ctx.save(); ctx.translate(0, 10); ctx.scale(1, 0.36); ctx.globalAlpha = 0.75; drawGlow(ctx, 0, 0, 22, '#ffd76a', 0.3); ctx.restore(); drawWeapon(ctx, this.item.id, 0, Math.sin(_frameTime / 500) * 3, this.angle, 0.9); ctx.restore(); } });
                                 showMessage("THE DEMONESS FALLS — SHE LEAVES THE MAIDEN'S KUKRI");
                             } else showMessage('THE DEMONESS FALLS');
+                            if (enemy.solo) this.lilituDuelWon(enemy);            // her duel: a second Dark Element, the schematic (engine/boss-hazards.js)
+                            this.clearHazards(enemy);
+                            for (const m of this.enemies) if (m._mirrorOf === enemy && m._vanish) m._vanish();
                         }
                         const finReason = this.finisherReason(enemy);
                         this.spawnLoot(enemy.x, enemy.y);
@@ -77590,12 +78665,17 @@ engineMixin({
                             for (let e of this.enemies) {
                                 if (e instanceof GatlingGunner && e !== enemy && !e.dead) {
                                     remainingGunners++;
-                                    e.maxBurstCount += 5; e.reloadTime = Math.max(30, e.reloadTime - 0.7);
+                                    if (e.persona) e.enrage();                    // a warden falls: the others fire faster
+                                    else { e.maxBurstCount += 5; e.reloadTime = Math.max(30, e.reloadTime - 0.7); }
                                 }
+                            }
+                            if (enemy.persona) {
+                                this.clearHazards(enemy);
+                                if (!remainingGunners) this.triumvirateFallen(enemy);   // the Blood Pact, the first time (engine/boss-hazards.js)
                             }
                             
                             if (remainingGunners > 0) {
-                                showMessage("REMAINING GUNNERS ENRAGED!");
+                                showMessage(enemy.persona ? `${WARDENS[enemy.persona].name.toUpperCase()} FALLS — THE OTHERS BURN HOTTER` : "REMAINING GUNNERS ENRAGED!");
                             } else if (!finReason) {
                                 // Last GatlingGunner killed - trigger dramatic time slow!
                                 this.triggerTimeSlow(0.4, 4, true);
@@ -79491,6 +80571,7 @@ engineMixin({
                 if (RL.at('stella')) this.drawPlayerGlow(this.ctx);
                 if (RL.at('combat')) {
                     this.drawGunnerHeat(this.ctx, cullBounds.entities);
+                    this.drawBossHazards(this.ctx, cullBounds.view);   // the duel's dimming, sigils, fire, hooks (engine/boss-hazards.js)
                     this.drawFireTrail(this.ctx, cullBounds.view);
                     for (const p of this.projectiles) if (p.isFireball) p.draw(this.ctx);
                 }
@@ -81538,7 +82619,7 @@ engineMixin({
             /** After the darkness: hunters' eyes burn ember (night vision's tell) */
             drawHunterEyes(ctx) {
                 for (const e of this.enemies || []) {
-                    if (!e || e.dead || !e.hunter) continue;
+                    if (!e || e.dead || !e.hunter || e.decoy) continue;          // (a Blood Mirror decoy's eyes are dead)
                     const k = e.bossName ? (e._eyeK ?? 1) : 1; if (k < 0.05) continue;
                     const fx = Math.cos(e.angle), fy = Math.sin(e.angle), S = e.bossName ? 1.15 : 1;
                     ctx.save(); ctx.globalCompositeOperation = 'lighter';

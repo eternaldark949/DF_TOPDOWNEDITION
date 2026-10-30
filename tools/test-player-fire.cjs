@@ -76,16 +76,17 @@ test('Enemy projectile callbacks accept normal and critical punches inside exist
  const out=[];
  for(const Enemy of [Ganger,Drone,GatlingGunner])for(const speed of [0,10]){
   const target=new Enemy(1300,1000);target.hp=target.maxHp=5000;target.invincibleTimer=20;
+  if(target instanceof Drone){target.alt=0;target.state='hover';target.eyePos=()=>({x:-1e9,y:-1e9});}   // landed, hit on the shell (armored)
   let interrupts=0;target.interruptMelee=()=>interrupts++;
   for(const crit of [1,2]){
    game.rollCrit=()=>crit;game.fireWeapon();const p=game.projectiles.pop();p.vx=speed;p.vy=0;
    target.onProjectileHit(p,game);p.destroy();
   }
-  out.push({lost:5000-target.hp,frames:target.invincibleTimer,melee:target.lastHitMelee,by:target.lastHitBy===game.player,interrupts});
+  out.push({drone:target instanceof Drone,lost:5000-target.hp,frames:target.invincibleTimer,melee:target.lastHitMelee,by:target.lastHitBy===game.player,interrupts});
  }
  return out;`,r=>{
  assert.equal(r.length,6);
- for(const result of r){assert.equal(result.lost,45);assert.equal(result.frames,20);assert.equal(result.melee,true);assert.equal(result.by,true);}
+ for(const result of r){if(result.drone)assert.ok(result.lost>0&&result.lost<45,'the drone shell takes a share');else assert.equal(result.lost,45);assert.equal(result.frames,20);assert.equal(result.melee,true);assert.equal(result.by,true);}
  assert.equal(r[0].interrupts,2);assert.equal(r[1].interrupts,2);
 });
 test('Punches preserve existing i-frames while repeated contact damage is still blocked',`

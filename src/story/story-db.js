@@ -118,10 +118,10 @@
                                                     }
                                                     game.removeWall(w);
                                                 }
-                                                // The drones
-                                                game.enemies.push(new Drone(900, 1100));
-                                                game.enemies.push(new Drone(1000, 1150));
-                                                game.enemies.push(new Drone(1100, 1100));
+                                                // The drones drop in through the breach: a lancer, a seer, a grappler (entities/drones.js)
+                                                game.enemies.push(new Drone(900, 1100, 'lancer'));
+                                                game.enemies.push(new Drone(1000, 1150, 'seer'));
+                                                game.enemies.push(new Drone(1100, 1100, 'grappler'));
                                             }, 3200);
                                             game.addPausableTimeout(() => S.triggerComms("Max", "Fuck!", 1500), 3700);
                                             game.addPausableTimeout(() => S.triggerComms("Victoria", "It's them.", 2200), 5400);
