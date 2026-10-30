@@ -53,7 +53,8 @@
                     if (w <= best) continue;
                     best = w;
                     const half = n[1] ? hh : hw;
-                    out.x = -n[0] * half * D.SHIFT * w; out.y = -n[1] * half * D.SHIFT * w;   // toward the building, against its facing
+                    const shift = b.driftShift || D.SHIFT;   // (a landmark can ask for more: Enni Cole, whose sign is up on its showroom roof)
+                    out.x = -n[0] * half * shift * w; out.y = -n[1] * half * shift * w;   // toward the building, against its facing
                 }
                 return out;
             },
