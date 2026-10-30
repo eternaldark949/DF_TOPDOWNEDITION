@@ -5,12 +5,12 @@
            own height:
              · two pale brick wings, eight floors, a limestone ground floor, and
                a slate mansard with dormers and chimneys on top of each;
-             · between them a limestone podium, four floors, arched windows,
-               the name in its frieze and the door under the bay, a roof
-               terrace with planters;
-             · behind the podium the tower, fourteen floors, set back, its
-               water tank on the roof;
-             · out of the tower's front, standing on the podium's roof, the
+             · roof terraces in front of the mansards, festoon-lit after dark;
+             · between them the tower, fourteen floors, on the street front: a
+               limestone ground floor with arched windows, the name in its
+               frieze and the door under the bay; skylights, air handlers and
+               a water tank on its roof;
+             · out of the tower's front, from the second floor up, the
                ornate bay in green-teal stone: mullioned windows lit warm,
                cornice bands round the curve, a carved crown (a lion's mask,
                rosettes in acanthus scrolls, volute consoles), rising past the
@@ -21,11 +21,11 @@
            the park and its front on Foundry Rd: a front facing north would lie
            upside down on the screen (the camera looks down from the street), so
            the carving faces south (config.facing 'N' turns it round).
-           Collision is the wings, podium and tower; the bay, oriels and turret
+           Collision is the wings and tower; the bay, oriels and turret
            overhang.
            ===================================================================== */
         const ASH = {
-            HERO: 1.6,
+            HERO: 2.1,
             PLAN: { W: 820, D: 470 },
             TEAL: { stone: '#40806f', stoneMid: '#336a5c', stoneLo: '#214b40', stoneDk: '#0e2622', stoneHi: '#9ad6bf', stoneLt: '#5f9e89',
                     trim: '#e6e1d2', trimLo: '#a29c8d', trimDk: '#6f6a5f', frame: '#11171a' },
@@ -76,7 +76,7 @@
             rows.forEach((y, i) => { if (i % 2 || !i) return; d.fillStyle = C.trim; d.fillRect(0, y - 0.6, L, 2.2); d.fillStyle = '#fffaf0'; d.fillRect(0, y - 0.6, L, 0.5); d.fillStyle = 'rgba(60, 56, 46, 0.3)'; d.fillRect(0, y + 1.6, L, 0.8); });
             d.fillStyle = C.trim; d.fillRect(0, 0, L, 6); d.fillStyle = '#fffaf0'; d.fillRect(0, 0, L, 0.8); d.fillStyle = C.trimLo; d.fillRect(0, 3.2, L, 0.4);
             for (let x = 1; x < L; x += 3.4) { d.fillStyle = C.trim; d.fillRect(x, 6, 1.6, 1.4); d.fillStyle = 'rgba(60, 56, 46, 0.4)'; d.fillRect(x, 7.4, 1.6, 0.5); }
-            if (plinth) _ashLime(d, l, t, H, L, { y0: H - plinth, seed: (opt.seed || 11) + 3, arches: true });
+            if (plinth) _ashLime(d, l, t, H, L, { y0: H - plinth, seed: (opt.seed || 11) + 3, arches: true, ...opt.lime });
         }
 
         /** Limestone: rusticated ashlar, arched windows with voussoirs and keystones (or a door), a frieze with the name. */
@@ -123,8 +123,9 @@
                 for (let x = 1; x < L; x += 2.6) { d.fillStyle = C.stoneLt; d.fillRect(x, y0 + 1.2, 1.3, 1.2); }
                 const f = opt.door && opt.door(t);
                 if (f) for (const [c, col] of [[d, '#9a7a3c'], [l, 'rgba(255, 220, 160, 1)']]) {
-                    c.save(); c.font = 'bold 5.4px Montserrat, "Cinzel", serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = col;
-                    c.fillText('T H E   A S H G R O V E', f.u0 + f.L / 2, y0 + 5.2); c.restore();
+                    c.save(); c.font = 'bold 5px Montserrat, "Cinzel", serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = col;
+                    for (const at of opt.names || [0.5]) c.fillText('T H E  A S H G R O V E', f.u0 + f.L * at, y0 + 5.2);   // (either side of the bay)
+                    c.restore();
                 }
             }
         }
@@ -252,20 +253,34 @@
             path(); c.strokeStyle = 'rgba(0, 0, 0, 0.3)'; c.lineWidth = 1; c.stroke();
         }
 
-        function _ashTerraceRoof(c, t, emissive) {
-            const [x0, y0, x1, y1] = t.box;
+        /** A roof terrace in box [x0, y0, x1, y1]: tiles, planters, festoon strings (emissive: their bulbs). */
+        function _ashTerraceRoof(c, box, emissive) {
+            const [x0, y0, x1, y1] = box, rows = 3, row = (i) => y0 + 24 + i * (y1 - y0 - 48) / (rows - 1);
             if (emissive) {                                                                             // festoon lights over the terrace
-                for (let i = 0; i < 4; i++) { const y = y0 + 30 + i * (y1 - y0 - 60) / 3; for (let x = x0 + 20; x < x1 - 20; x += 21) { const yy = y + Math.sin(x * 0.2) * 3, g = c.createRadialGradient(x, yy, 0, x, yy, 3.5); g.addColorStop(0, 'rgba(255, 236, 190, 0.85)'); g.addColorStop(0.35, 'rgba(255, 200, 120, 0.35)'); g.addColorStop(1, 'rgba(255, 200, 120, 0)'); c.fillStyle = g; c.fillRect(x - 4, yy - 4, 8, 8); } }
+                for (let i = 0; i < rows; i++) { const y = row(i); for (let x = x0 + 20; x < x1 - 20; x += 21) { const yy = y + Math.sin(x * 0.2) * 3, g = c.createRadialGradient(x, yy, 0, x, yy, 3.5); g.addColorStop(0, 'rgba(255, 236, 190, 0.85)'); g.addColorStop(0.35, 'rgba(255, 200, 120, 0.35)'); g.addColorStop(1, 'rgba(255, 200, 120, 0)'); c.fillStyle = g; c.fillRect(x - 4, yy - 4, 8, 8); } }
                 return;
             }
             c.fillStyle = '#b9ab90'; c.fillRect(x0, y0, x1 - x0, y1 - y0);
             for (let y = y0; y < y1; y += 10) for (let x = x0 + ((y - y0) / 10 % 2) * 10; x < x1; x += 20) { c.fillStyle = '#a99b80'; c.fillRect(x, y, 10, 10); }
-            for (const [px, py] of [[x0 + 18, y0 + 18], [x1 - 18, y0 + 18], [x0 + 18, y1 - 18], [x1 - 18, y1 - 18], [(x0 + x1) / 2 - 90, y1 - 18], [(x0 + x1) / 2 + 90, y1 - 18]]) {
+            for (const [px, py] of [[x0 + 18, y0 + 18], [x1 - 18, y0 + 18], [x0 + 18, y1 - 18], [x1 - 18, y1 - 18], [(x0 + x1) / 2, y1 - 18]]) {
                 c.fillStyle = '#5a4636'; c.fillRect(px - 9, py - 9, 18, 18); c.fillStyle = '#2f5a34'; c.beginPath(); c.arc(px, py, 8, 0, Math.PI * 2); c.fill();
                 c.fillStyle = 'rgba(140, 200, 120, 0.4)'; for (let k = 0; k < 6; k++) { c.beginPath(); c.arc(px - 3 + (k * 37 % 7), py - 3 + (k * 23 % 7), 2, 0, Math.PI * 2); c.fill(); }
             }
-            c.strokeStyle = 'rgba(40, 30, 20, 0.5)'; c.lineWidth = 0.6; for (let i = 0; i < 4; i++) { const y = y0 + 30 + i * (y1 - y0 - 60) / 3; c.beginPath(); for (let x = x0 + 20; x <= x1 - 20; x += 7) c.lineTo(x, y + Math.sin(x * 0.2) * 3); c.stroke(); }
-            c.strokeStyle = '#ece5d2'; c.lineWidth = 7; c.strokeRect(x0 + 3.5, y0 + 3.5, x1 - x0 - 7, y1 - y0 - 7);
+            c.strokeStyle = 'rgba(40, 30, 20, 0.5)'; c.lineWidth = 0.6; for (let i = 0; i < rows; i++) { const y = row(i); c.beginPath(); for (let x = x0 + 20; x <= x1 - 20; x += 7) c.lineTo(x, y + Math.sin(x * 0.2) * 3); c.stroke(); }
+            c.strokeStyle = '#ece5d2'; c.lineWidth = 4; c.strokeRect(x0 + 2, y0 + 2, x1 - x0 - 4, y1 - y0 - 4);
+            c.fillStyle = '#7a5a40'; for (let x = x0 + 40; x < x1 - 30; x += 46) { c.fillRect(x, y0 + 8, 14, 5); c.fillRect(x + 2, y0 + 14, 10, 1.5); }   // benches along the mansard
+        }
+
+        /** Skylights: glazed panes in a frame (emissive: lit from below). */
+        function _ashSkylights(c, x0, y0, n, w, h, gap, emissive) {
+            for (let i = 0; i < n; i++) {
+                const x = x0 + i * (w + gap);
+                if (emissive) { const g = c.createLinearGradient(x, y0, x, y0 + h); g.addColorStop(0, 'rgba(255, 196, 120, 0.12)'); g.addColorStop(1, 'rgba(255, 206, 140, 0.32)'); c.fillStyle = g; c.fillRect(x + 2, y0 + 2, w - 4, h - 4); c.fillStyle = 'rgba(0, 0, 0, 1)'; for (let k = 1; k < 3; k++) c.fillRect(x + 2, y0 + 2 + k * (h - 4) / 3, w - 4, 0.8); continue; }
+                c.fillStyle = '#d8d2c2'; c.fillRect(x, y0, w, h);
+                const g = c.createLinearGradient(x, y0, x + w, y0 + h); g.addColorStop(0, '#5d7a88'); g.addColorStop(1, '#2c3c46'); c.fillStyle = g; c.fillRect(x + 2, y0 + 2, w - 4, h - 4);
+                c.fillStyle = 'rgba(0, 0, 0, 0.35)'; for (let k = 1; k < 3; k++) c.fillRect(x + 2, y0 + 2 + k * (h - 4) / 3, w - 4, 0.8);
+                c.fillStyle = 'rgba(220, 240, 255, 0.25)'; c.fillRect(x + 3, y0 + 3, (w - 6) * 0.4, 1.2);
+            }
         }
 
         // ── what stands on the roofs, drawn live ──
@@ -285,7 +300,7 @@
 
         /** The dome over the turret: rings stacked up its curve, ribs to the lantern, a finial. */
         function _ashDome(ctx, emissive, t, b) {
-            const g = b._tkGeo(), base = t.poly, n = base.length, R = 22, N = 9;
+            const g = b._tkGeo(), base = t.poly, n = base.length, R = 15, N = 9;
             let cx = 0, cy = 0; for (const [x, y] of base) { cx += x; cy += y; } cx /= n; cy /= n;
             if (emissive) {                                                                             // the lantern's glow at the top
                 const p = b._tkP(cx, cy, t.z1 + R + 4), k = b._tkK(t.z1 + R);
@@ -324,14 +339,23 @@
                 { z: plinth, out: 2.2, th: 3, top: L.trim, band: [205, 196, 176], lip: '#fffaf0' },
                 { z: z1, out: 5, th: 6, top: '#efe8d6', band: [222, 214, 196], lip: '#ffffff' }
             ];
-            const wing = (id, x0, seed) => ({ id, rect: [x0, 0, 240, 420], z0: 0, z1: 72, S: 2, fill: ASH.BRICK.brickLo, paint: (d, l, t, H, Ln) => _ashBrick(d, l, t, H, Ln, { plinth: 18, seed }), ledges: brickLedges(72, 18), shade: [20, 22, 28] });
-            const mansard = (id, x0, on) => ({ id, on, rect: [x0 + 10, 10, 220, 400], z0: 72, z1: 86, S: 2, fill: ASH.SLATE.slate, paint: _ashMansard, shade: [10, 14, 20], roofRes: 1,
-                roof: (c, e, t) => { if (!e) { _ashFlatRoof(c, t, { a: '#465260', b: '#323b46', parapet: '#5f9e89', pw: 3, seed: x0 }); c.strokeStyle = 'rgba(0, 0, 0, 0.35)'; c.lineWidth = 2; const [a, b2, cc, dd] = t.box; c.beginPath(); c.moveTo((a + cc) / 2, b2 + 14); c.lineTo((a + cc) / 2, dd - 14); c.stroke(); } },
-                top: (ctx, e, t, b) => { if (e) return; const [a, b2, cc] = t.box; for (const [cx, cy] of [[a + 40, b2 + 60], [cc - 40, b2 + 200]]) _ashPrism(ctx, b, cx - 9, cy - 6, cx + 9, cy + 6, t.z1, t.z1 + 14, '#c9bfa8', '#7a5a46'); } });
+            const wing = (id, x0, seed) => ({ id, rect: [x0, 0, 240, 420], z0: 0, z1: 72, S: 2, fill: ASH.BRICK.brickLo, paint: (d, l, t, H, Ln) => _ashBrick(d, l, t, H, Ln, { plinth: 18, seed }), ledges: brickLedges(72, 18), shade: [20, 22, 28],
+                roofRes: 1, roofGlow: true, roof: (c, e, t) => { if (!e) _ashFlatRoof(c, t, { seed }); _ashTerraceRoof(c, [t.box[0] + 16, t.box[1] + 268, t.box[2] - 16, t.box[3] - 14], e); } });
+            const mansard = (id, x0, on) => ({ id, on, rect: [x0 + 10, 10, 220, 250], z0: 72, z1: 86, S: 2, fill: ASH.SLATE.slate, paint: _ashMansard, shade: [10, 14, 20], roofRes: 1,
+                roofGlow: true, roof: (c, e, t) => {
+                    const [a, b2, cc, dd] = t.box;
+                    if (!e) {
+                        _ashFlatRoof(c, t, { a: '#56626f', b: '#3e4853', parapet: '#5f9e89', pw: 3, seed: x0 });
+                        c.strokeStyle = 'rgba(20, 26, 32, 0.35)'; c.lineWidth = 0.6; c.beginPath(); for (let y = b2 + 6; y < dd - 4; y += 5) { c.moveTo(a + 4, y); c.lineTo(cc - 4, y); } c.stroke();   // slate courses
+                        c.strokeStyle = ASH.SLATE.copper; c.lineWidth = 3; c.beginPath(); c.moveTo((a + cc) / 2, b2 + 10); c.lineTo((a + cc) / 2, dd - 10); c.stroke();   // the copper ridge
+                    }
+                    for (const sx of [a + 22, (a + cc) / 2 + 12]) _ashSkylights(c, sx, b2 + 100, 2, 26, 34, 10, e);
+                },
+                top: (ctx, e, t, b) => { if (e) return; const [a, b2, cc] = t.box; for (const [cx, cy] of [[a + 40, b2 + 50], [cc - 40, b2 + 190]]) _ashPrism(ctx, b, cx - 9, cy - 6, cx + 9, cy + 6, t.z1, t.z1 + 14, '#c9bfa8', '#7a5a46'); } });
             const oriel = (id, x0, on) => ({ id, on, solid: false, poly: TierKit.bay(x0, x0 + 120, 420, 8, 30, 4), z0: 18, z1: 72, S: 3, fill: T.stoneMid, paint: _ashOriel,
                 ledges: [{ z: 19, out: 2.5, th: 4, top: T.stoneLt, band: [70, 128, 110], lip: T.stoneHi }, { z: 72, out: 4, th: 4, top: T.stoneLt, band: [82, 140, 122], lip: T.stoneHi }],
                 roof: (c, e, t) => { if (!e) { c.beginPath(); t.poly.forEach(([px, py], i) => i ? c.lineTo(px, py) : c.moveTo(px, py)); c.closePath(); c.fillStyle = '#2f4a46'; c.fill(); c.lineWidth = 5; c.strokeStyle = T.stoneLt; c.stroke(); } } });
-            const bayPoly = TierKit.bay(330, 490, 260, 14, 56, 5);
+            const bayPoly = TierKit.bay(330, 490, 420, 14, 46, 5);
             const b = new AshgroveBuilding({
                 id: 'ashgrove', x, y, label: 'The Ashgrove', type: 'apartment', style: 'ashgrove', facing, hero: ASH.HERO, plan: ASH.PLAN,
                 roofColor: '#2a2c30', roofLightColor: '#3a3c40', wallColor: ASH.BRICK.brick, wallLightColor: L.trim, accentColor: '#ffd29a',
@@ -339,12 +363,24 @@
                 tiers: [
                     wing('wingW', 0, 31), wing('wingE', 580, 47),
                     mansard('mansW', 0, 'wingW'), mansard('mansE', 580, 'wingE'),
-                    { id: 'tower', rect: [240, 20, 340, 240], z0: 0, z1: 126, S: 2, fill: ASH.BRICK.brickLo, paint: (d, l, t, H, Ln) => _ashBrick(d, l, t, H, Ln, { seed: 59 }), shade: [20, 22, 28],
-                      ledges: [{ z: 90, out: 2, th: 3, top: L.trim, band: [205, 196, 176], lip: '#fffaf0' }, { z: 126, out: 6, th: 7, top: '#efe8d6', band: [222, 214, 196], lip: '#ffffff' }],
-                      roof: (c, e, t) => { if (!e) { _ashFlatRoof(c, t, { seed: 9 }); c.fillStyle = '#2a2c30'; c.fillRect(t.box[0] + 30, t.box[1] + 150, 26, 20); c.strokeStyle = '#8a8070'; c.lineWidth = 1.5; c.strokeRect(t.box[0] + 30, t.box[1] + 150, 26, 20); } },
+                    { id: 'tower', rect: [240, 20, 340, 400], z0: 0, z1: 126, S: 2, fill: ASH.BRICK.brickLo, paint: (d, l, t, H, Ln) => _ashBrick(d, l, t, H, Ln, { plinth: 36, seed: 59, lime: { frieze: true, door: frontEdge, names: [0.13, 0.87] } }), shade: [20, 22, 28],
+                      ledges: [{ z: 36, out: 4, th: 4, top: '#efe8d6', band: [226, 216, 194], lip: '#ffffff' }, { z: 90, out: 2, th: 3, top: L.trim, band: [205, 196, 176], lip: '#fffaf0' }, { z: 126, out: 6, th: 7, top: '#efe8d6', band: [222, 214, 196], lip: '#ffffff' }],
+                      roofRes: 1, roofGlow: true,
+                      roof: (c, e, t) => {
+                          const [a, b2, cc] = t.box;
+                          if (!e) {
+                              _ashFlatRoof(c, t, { seed: 9 });
+                              c.fillStyle = '#2a2c30'; c.fillRect(a + 30, b2 + 150, 26, 20); c.strokeStyle = '#8a8070'; c.lineWidth = 1.5; c.strokeRect(a + 30, b2 + 150, 26, 20);
+                              c.strokeStyle = 'rgba(30, 28, 24, 0.25)'; c.lineWidth = 0.7; c.beginPath(); for (let x = a + 20; x < cc - 10; x += 24) { c.moveTo(x, b2 + 10); c.lineTo(x, b2 + 380); } c.stroke();   // the roll seams
+                              c.fillStyle = '#9a8f78'; c.fillRect(a + 90, b2 + 30, 200, 6); c.fillRect(a + 90, b2 + 30, 6, 330);   // duct runs
+                          }
+                          _ashSkylights(c, a + 110, b2 + 200, 4, 34, 46, 12, e);
+                      },
                       top: (ctx, e, t, b2) => {
                           if (e) return;
                           _ashPrism(ctx, b2, t.box[0] + 30, t.box[1] + 150, t.box[0] + 56, t.box[1] + 170, t.z1, t.z1 + 7, '#bdb3a0', '#55504a');   // the roof hatch
+                          for (const [px, py] of [[t.box[0] + 120, t.box[1] + 60], [t.box[0] + 200, t.box[1] + 60], [t.box[0] + 30, t.box[1] + 270]])   // the plant: air handlers
+                              _ashPrism(ctx, b2, px, py, px + 50, py + 34, t.z1, t.z1 + 10, '#b7b9b4', '#8e918c');
                           const [cx, cy] = b2._tkLocal(300, 70), X = b2.x + cx, Y = b2.y + cy;                                                  // the tank's legs
                           ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 1.4; ctx.beginPath();
                           for (const [dx, dy] of [[-12, -12], [12, -12], [12, 12], [-12, 12]]) { const p = b2._tkP(X + dx, Y + dy, 126), q = b2._tkP(X + dx, Y + dy, 132); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); }
@@ -353,16 +389,12 @@
                     { id: 'tank', on: 'tower', solid: false, poly: Array.from({ length: 12 }, (_, i) => [300 + Math.cos(-i * Math.PI / 6) * 18, 70 + Math.sin(-i * Math.PI / 6) * 18]), z0: 132, z1: 150, S: 2, fill: '#5a3e2a', paint: _ashTank, shade: [20, 12, 8],
                       roof: (c, e, t) => { if (e) return; const [a, b2, cc, dd] = t.box, cx = (a + cc) / 2, cy = (b2 + dd) / 2; c.fillStyle = '#4a3a2c'; c.beginPath(); c.arc(cx, cy, 19, 0, Math.PI * 2); c.fill(); c.strokeStyle = 'rgba(0, 0, 0, 0.4)'; c.lineWidth = 0.8; for (let i = 0; i < 12; i++) { const a2 = i * Math.PI / 6; c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + Math.cos(a2) * 19, cy + Math.sin(a2) * 19); c.stroke(); } c.fillStyle = '#2a2420'; c.beginPath(); c.arc(cx, cy, 2.5, 0, Math.PI * 2); c.fill(); },
                     },
-                    { id: 'podium', rect: [240, 260, 340, 160], z0: 0, z1: 36, S: 2, fill: L.stoneMid, shade: [40, 34, 24], roofRes: 1, roofGlow: true,
-                      paint: (d, l, t, H, Ln) => _ashLime(d, l, t, H, Ln, { frieze: true, door: frontEdge, seed: 77 }),
-                      ledges: [{ z: 36, out: 4, th: 4, top: '#efe8d6', band: [226, 216, 194], lip: '#ffffff' }],
-                      roof: (c, e, t) => _ashTerraceRoof(c, t, e) },
-                    { id: 'bay', on: 'podium', solid: false, poly: bayPoly, z0: 36, z1: 126, S: 4, fill: T.stoneMid, paint: _ashBay, shade: [6, 18, 20],
+                    { id: 'bay', on: 'tower', solid: false, poly: bayPoly, z0: 36, z1: 126, S: 4, fill: T.stoneMid, paint: _ashBay, shade: [6, 18, 20],
                       ledges: [{ z: 37, out: 2, th: 3, top: T.stoneLt, band: [70, 128, 110], lip: T.stoneHi }, { z: 126 - 48 - 0.5, out: 3.2, th: 5, top: T.stoneLt, band: [82, 138, 120], lip: T.stoneHi },
                                { z: 126 - 70 - 0.5, out: 3.2, th: 5, top: T.stoneLt, band: [82, 138, 120], lip: T.stoneHi }, { z: 126 - 28, out: 1.4, th: 2.5, top: T.stoneLt, band: [82, 138, 120], lip: T.stoneHi },
                                { z: 126, out: 6, th: 4, top: T.stoneLt, band: [82, 138, 120], lip: T.stoneHi }] },
                     { id: 'turret', on: 'bay', solid: false, poly: bayPoly, z0: 126, z1: 150, S: 4, fill: T.stone, paint: _ashTurret, shade: [6, 18, 20],
-                      ledges: [{ z: 150, out: 4, th: 3, top: T.stoneLt, band: [82, 138, 120], lip: T.stoneHi }], top: _ashDome },
+                      ledges: [{ z: 150, out: 4, th: 3, top: T.stoneLt, band: [82, 138, 120], lip: T.stoneHi }], top: _ashDome, rise: 24 },   // (the dome and finial)
                     oriel('orielW', 60, 'wingW'), oriel('orielE', 640, 'wingE')
                 ],
                 ...config, facing

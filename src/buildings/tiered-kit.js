@@ -268,24 +268,35 @@
                 if (beamsOnly || !(CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera)) return;
                 const glow = Math.max(0.12, Math.min(0.92, dark * 1.05));
                 ctx.save(); ctx.globalAlpha *= glow; ctx.globalCompositeOperation = 'lighter';
-                for (const t of this._tkOrder()) {
+                // each tier's light is cut out of the tiers drawn over it (a window behind the bay mustn't shine through it)
+                const order = this._tkOrder(), hulls = order.map(t => this._tkHull(t));
+                order.forEach((t, i) => {
+                    ctx.save();
+                    for (let j = i + 1; j < order.length; j++) {                       // one clip each: overlapping hulls in one even-odd path would cancel
+                        ctx.beginPath(); ctx.rect(-1e7, -1e7, 2e7, 2e7);
+                        hulls[j].forEach(([x, y], n) => n ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+                        ctx.clip('evenodd');
+                    }
                     const art = this._tkArt(t);
                     for (const f of this._tkVisible(t)) this._tkMap(ctx, f, art.lit, art.S, null);
                     if (t.roof && t.roofGlow) LandmarkKit.drawSprite(ctx, this._tkRoof(t, true), this._tkK(t.z1));
                     if (t.top) t.top(ctx, true, t, this);
-                }
+                    ctx.restore();
+                });
                 ctx.restore();
+            }
+
+            /** A tier on screen: the hull of its plan at its foot and at its top (and its `rise`'s apex: a dome on its top hook). */
+            _tkHull(t) {
+                const pts = [];
+                for (const [x, y] of t.poly) pts.push(this._tkP(x, y, t.z0), this._tkP(x, y, t.z1));
+                if (t.rise) { let cx = 0, cy = 0; for (const [x, y] of t.poly) { cx += x / t.poly.length; cy += y / t.poly.length; } pts.push(this._tkP(cx, cy, t.z1 + t.rise)); }
+                return TierKit.hull(pts);
             }
 
             /** What hides the glow of buildings behind it: each tier, footprint to leaned roof. */
             _glowOccluders() {
-                const out = [];
-                for (const t of this._tkGeo().tiers) {
-                    const pts = [];
-                    for (const [x, y] of t.poly) pts.push(this._tkP(x, y, t.z0), this._tkP(x, y, t.z1));
-                    out.push(TierKit.hull(pts));
-                }
-                return out;
+                return this._tkGeo().tiers.map(t => this._tkHull(t));
             }
 
             /** The sun's shadow of each tier: its plan swept along the sun to its top. */
