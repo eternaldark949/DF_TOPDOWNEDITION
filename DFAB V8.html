@@ -28631,7 +28631,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         /* Velvet's body is one flexible spine (rump to neck) bent into an arc, with a width profile per pose:
            standing, sitting (bunched haunches), loafing, sleeping (curled), stretching. Four legs step from it in
            a walk, trot or gallop chosen by speed; a nine-segment tail, the head, ears, eyes and whiskers all move
-           on springs in update(). draw() only reads that state. Widths are half-widths at VELVET_T along the spine. */
+           on springs in update(). draw() only reads that state (and notes where her eyes are for drawEyeShine). Widths are half-widths at VELVET_T along the spine. */
         const VELVET_T = [0, .12, .28, .5, .72, .88, 1];
         const VELVET_PROFILES = {
             stand:   [2.6, 5.5, 6.1, 4.1, 5.4, 4.7, 3.1],
@@ -28882,6 +28882,29 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._blink = Math.max(b, P.sleep > 0.5 ? 1 : 0);
             }
 
+            /**
+             * Eyeshine: in the dark her eyes catch the light, two small violet-silver points drawn after the darkness
+             * layer (engine/draw.js) so they read where her coat doesn't. They fade with the dark, close with
+             * her lids and are gone while she sleeps. `darkness` is the scene's ambient darkness, 0..1.
+             */
+            drawEyeShine(ctx, darkness) {
+                if (!this.visible || this.inCar || !this._eyeWorld) return;
+                const shine = Math.max(0, Math.min(1, (darkness - 0.25) / 0.45)) * (1 - (this._blink || 0));
+                if (shine < 0.03) return;
+                // brighter as she turns her face toward the light; a lowered head (grooming) dims it
+                const a = shine * (0.8 + 0.2 * Math.cos((this._headYaw || 0) * 2)) * (1 - ((this._poses && this._poses.groom) || 0) * 0.5);
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighter';
+                for (const e of this._eyeWorld) {
+                    const g = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, 3.6);
+                    g.addColorStop(0, `rgba(236,222,255,${0.95 * a})`);
+                    g.addColorStop(0.25, `rgba(190,150,255,${0.55 * a})`);
+                    g.addColorStop(1, 'rgba(120,70,220,0)');
+                    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(e.x, e.y, 3.6, 0, Math.PI * 2); ctx.fill();
+                }
+                ctx.restore();
+            }
+
             /** The gait's offsets, duty and stride, blended between walk, trot and gallop. */
             _gaitParams() {
                 const gi = Math.max(0, Math.min(2, this._gait || 0)), i0 = Math.min(1, Math.floor(gi)), u = gi - i0;
@@ -29104,6 +29127,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // --- Head ---
                 const headScale = 1 + P.sit * .07 - P.sleep * .04 - P.stretch * .05;
                 const hx = neck.x + 2.6 - P.sit * 1.2 + P.stretch * 1.5, hy = neck.y;
+                // Where her eyes are in the world, for the eyeshine drawn above the darkness (drawEyeShine)
+                {
+                    const yaw = this._headYaw || 0, ca = Math.cos(this.angle), sa = Math.sin(this.angle);
+                    const eyes = this._eyeWorld || (this._eyeWorld = [{ x: 0, y: 0 }, { x: 0, y: 0 }]);
+                    for (let e = 0; e < 2; e++) {
+                        const ex = 2.9 * headScale, ey = (e ? 1 : -1) * 2.05 * headScale;
+                        const lx2 = hx + ex * Math.cos(yaw) - ey * Math.sin(yaw), ly2 = hy + ex * Math.sin(yaw) + ey * Math.cos(yaw);
+                        eyes[e].x = this.x + lx2 * ca - ly2 * sa; eyes[e].y = this.y + lx2 * sa + ly2 * ca;
+                    }
+                }
                 ctx.save();
                 ctx.translate(hx, hy); ctx.rotate(this._headYaw || 0); ctx.scale(headScale, headScale);
                 // the head shades the shoulders under it
@@ -80791,6 +80824,12 @@ engineMixin({
                 if (RL.at('glow')) this.drawEmissivePass(this.ctx);
                 // Her halo, above the darkness so it reads at night (kept from her draw: engine/player-draw-input.js)
                 if (RL.at('stella')) this.drawPlayerGlow(this.ctx);
+                // Velvet's eyeshine, above the darkness; hidden under roofs and canopies like the speech bubbles
+                {
+                    const cat = this.velvetCat;
+                    if (RL.at('characters') && cat && cat.visible && !cat.inCar &&
+                        !this._speakerHidden(cat.x, cat.y, renderBuildings, RL.at('roofs'), RL.at('trees'))) cat.drawEyeShine(this.ctx, this.getAmbientDarkness());
+                }
                 if (RL.at('combat')) {
                     this.drawGunnerHeat(this.ctx, cullBounds.entities);
                     this.drawBossHazards(this.ctx, cullBounds.view);   // the duel's dimming, sigils, fire, hooks (engine/boss-hazards.js)
