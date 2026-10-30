@@ -4149,6 +4149,13 @@
         body.landscape #btn-holster, body.landscape #emote-frown { bottom: calc(210px - var(--paw-drop)); }
         body.landscape #btn-sneak { bottom: calc(232px - var(--paw-drop)); }
         body.landscape #action-dock { bottom: calc(300px - var(--paw-drop)); }
+        /* The paw sits --paw-shift in from the right edge, where a thumb lands on a phone held on its side
+           (screen px: divided by the HUD's zoom, since these buttons are zoomed by it) */
+        body.landscape { --paw-shift: 80px; }
+        body.landscape #btn-fire, body.landscape #btn-emote, body.landscape #btn-heal, body.landscape #emote-smile,
+        body.landscape #btn-nv, body.landscape #emote-zany, body.landscape #btn-flit, body.landscape #emote-cry,
+        body.landscape #btn-handbrake, body.landscape #btn-autodrive, body.landscape #btn-zib-skip,
+        body.landscape #btn-holster, body.landscape #emote-frown, body.landscape #btn-sneak, body.landscape #action-dock { translate: calc(var(--paw-shift) / var(--hud, 1) * -1) 0; }
         body.landscape #input-zone-look { bottom: calc((285px - var(--paw-drop)) * var(--hud, 1)); }   /* not zoomed itself (it's half the screen): its edge follows the paw */
 
         /* (Dialogue and comms in landscape: styles/panels-phone.css, beside each talk style) */
@@ -30831,10 +30838,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 let sub = '';
                 if (!ended && key && this.waveDelay > 0 && this.wave > 0 && this._secured) sub = `<div class="w-line w-spoils secured"><span class="w-tag">Secured</span>${this._spoilText(this._secured)}</div>`;
                 else if (!ended && key && this.waveDelay <= 0) sub = `<div class="w-line w-spoils"><span class="w-tag">Pays</span>${this._spoilText(this._pays(this.wave))}</div>`;
+                const hidden = !key;
                 key += '|' + sub;
                 if (key === this._hudKey) return;
                 this._hudKey = key;
-                if (!key) { el.classList.remove('show'); document.body.classList.remove('wave-hud'); return; }
+                if (hidden) { el.classList.remove('show'); document.body.classList.remove('wave-hud'); return; }
                 el.innerHTML = `<div class="w-line">${html}</div>${sub}<div class="w-bar"><i style="transform:scaleX(${frac.toFixed(3)})"></i></div>`;
                 el.classList.toggle('between', !frac);
                 el.classList.add('show'); document.body.classList.add('wave-hud');
