@@ -20,12 +20,13 @@ const setup=`game._doLoadMap('ollo_test');game.running=true;game.paused=false;ga
    for(const p of game.projectiles)p.update(1,true);CollisionSystem.resolveProjectiles(game);game.projectiles=game.projectiles.filter(p=>p.active&&!p.markedForDestroy);}};
  const punch=()=>{game.shootCooldown=0;withRandom(.99,()=>game.fireWeapon());land();_gameTimeSec+=0.25;};`;
 
-test('The schematic costs 400 scrap, makes the knuckles, and they go on as fists',e=>{
- const r=value(e,setup+`const sch=SCHEMATICS.find(s=>s.id==='golden_retribution');game.scrap=400;
+test('The schematic stays locked until Lilitu falls to her alone; then 400 scrap makes the knuckles, worn as fists',e=>{
+ const r=value(e,setup+`const sch=SCHEMATICS.find(s=>s.id==='golden_retribution');game.scrap=400;game.questState=game.questState||{};
+  game.questState.goldenRetributionUnlocked=false;const locked=game.craftSchematic('golden_retribution'),hint=game.schematicNeeds(sch);game.questState.goldenRetributionUnlocked=true;
   const made=game.craftSchematic('golden_retribution');const it=game.inventory.items.find(i=>i.id==='golden_retribution');
   if(it&&it.action)it.action(it);
-  return {cost:sch.scrapCost,made,scrap:game.scrap,mode:game.weaponMode,name:ITEM_REGISTRY.golden_retribution.name};`);
- assert.deepEqual(r,{cost:400,made:true,scrap:0,mode:'fists',name:'Golden Retribution'});
+  return {locked,hint,cost:sch.scrapCost,made,scrap:game.scrap,mode:game.weaponMode,name:ITEM_REGISTRY.golden_retribution.name};`);
+ assert.deepEqual(r,{locked:false,hint:'Defeat Lilitu alone in the palace',cost:400,made:true,scrap:0,mode:'fists',name:'Golden Retribution'});
 });
 
 test('Jab, jab, haymaker: 16, 16, then ×2.5, a harder shove and a stagger',e=>{
@@ -45,7 +46,7 @@ test('A haymaker stops a shot being lined up and the ganger stands still; a boss
   const boss=ganger(1036,1000);boss.bossName='Test Boss';game.enemies=[boss];game._punchCombo=2;game._punchAt=_gameTimeSec;punch();const b1=boss._staggerUntil-_gameTimeSec+0.25;
   const was=boss._staggerUntil;game._punchCombo=2;game._punchAt=_gameTimeSec;punch();
   return {tele:g.isTelegraphing,aim:g._aimPoint,cd:g.cooldown>g.telegraphThreshold,stag:+stag.toFixed(2),still:res,boss:+b1.toFixed(2),again:boss._staggerUntil===was};`);
- assert.deepEqual(r,{tele:false,aim:null,cd:true,stag:0.5,still:null,boss:0.25,again:true});
+ assert.deepEqual(r,{tele:false,aim:null,cd:true,stag:0.5,still:null,boss:0.3,again:true});
 });
 
 test("Driven into a wall, a haymaker's target takes half the hit again; in the open it does not",e=>{

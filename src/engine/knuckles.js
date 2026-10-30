@@ -14,7 +14,7 @@
 
         const KNUCKLES = {
             ID: 'golden_retribution', EVERY: 3, HAY_MULT: 2.5, JAB_KNOCK: 1, HAY_KNOCK: 3,
-            STAGGER: 0.5, BOSS_STAGGER: 0.25, BOSS_RESIST: 1.5, SLAM: 0.5, SLAM_SECS: 0.45,
+            STAGGER: 0.5, BOSS_STAGGER: 0.3, BOSS_RESIST: 1.5, SLAM: 0.5, SLAM_SECS: 0.45,
             COMBO_RESET: 1.2,          // s without a punch before the count starts again
             STEP_REACH: 46             // px ahead (past both bodies) she'll step in toward someone on a jab
         };

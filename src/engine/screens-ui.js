@@ -1424,7 +1424,7 @@
                         if (st.haymakerEvery) chips.push(`Every ${st.haymakerEvery === 3 ? '3rd' : st.haymakerEvery + 'th'}: haymaker ×${st.haymakerMult}`, 'Staggers · wall slam');
                         if (sch.id === 'acc_mirror_glass') chips.push('All damage ×1.35', 'Shield 90 · 3 s recharge');
                         if (sch.id === 'clothing_dyer') chips.push('Recolour outfits', `${DYER.FEE} scrap a piece`);
-                        const status = owned ? 'Crafted' : needs ? `Needs the ${needs}` : role;
+                        const status = owned ? 'Crafted' : needs ? (sch.unlock && needs === sch.unlockHint ? needs : `Needs ${needs}`) : role;
                         html += `<div class="dc-card cr-card${owned ? ' owned' : ''}${!owned && (needs || !afford) ? ' short' : ''}" style="--acc:${acc}" tabindex="0" data-key="${sch.id}">`;
                         html += `<div class="dc-portrait cr-icon"><div class="mono">${sch.icon || '⊕'}</div><svg class="portrait-rim" aria-hidden="true"><use href="#portrait-rim"/></svg></div>`;
                         html += `<div class="dc-who"><div class="dc-name">${esc(name)}</div><div class="dc-role">${esc(status)}</div><div class="dc-quote">${esc(sch.desc)}</div>`;
@@ -1464,8 +1464,9 @@
 
             /** What a schematic still needs first (its `requires`, by name), or null */
             schematicNeeds(sch) {
+                if (sch.unlock && !(this.questState && this.questState[sch.unlock])) return sch.unlockHint || 'Locked';   // earned first (e.g. a boss)
                 if (!sch.requires || (this.cosmetics && this.cosmetics.isOwned(sch.requires))) return null;
-                return COSMETICS_REGISTRY[sch.requires]?.name || sch.requires;
+                return 'the ' + (COSMETICS_REGISTRY[sch.requires]?.name || sch.requires);
             },
 
             /** Craft a schematic by id: spends its scrap and gives the item or piece. False if it can't be made */

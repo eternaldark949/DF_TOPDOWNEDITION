@@ -597,6 +597,8 @@
             },
             {
                 id: 'golden_retribution',
+                unlock: 'goldenRetributionUnlocked',   // a questState flag: set by Lilitu's first solo defeat (the gauntlet)
+                unlockHint: 'Defeat Lilitu alone in the palace',
                 name: 'GOLDEN RETRIBUTION',
                 icon: '✊',
                 desc: 'Gild a pair of brass knuckles. Fast jabs that can crit; every third punch is a haymaker that staggers, and drives them into walls.',
