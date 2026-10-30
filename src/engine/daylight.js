@@ -94,6 +94,10 @@
                 for (const entry of buildingCandidates) {
                     const b = entry.item;
                     if (!b.isV2 || b.x > cull.right + 300 || b.x + b.w < cull.left - 300 || b.y > cull.bottom + 300 || b.y + b.h < cull.top - 300) continue;
+                    if (b._sunShadowHulls) {                                                       // tiered buildings: each tier to its own height
+                        for (const h of b._sunShadowHulls(dx, dy)) { h.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath(); }
+                        continue;
+                    }
                     const hgt = Math.min(b.floors, B.MAX_FLOORS) * B.FLOOR_HEIGHT, ox = dx * hgt, oy = dy * hgt;
                     // Rounded corner data is lazily initialized by the footprint helper.
                     if (b.roundR) b._leanFaces();

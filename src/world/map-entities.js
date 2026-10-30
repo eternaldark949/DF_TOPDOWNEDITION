@@ -22,6 +22,7 @@
             club: 'block_8_6',          // Moon City and Enni Cole, the middle of the city, on Clinic Way
             clinic: 'block_4_12',       // Dr. Yin's and Neural Systems, the east edge, on Commerce Blvd
             biggs: 'block_12_8',        // Biggs Amusement Park and its wheel
+            ashgrove: 'block_14_8',     // The Ashgrove, across Ashgrove St from the park, fronting Foundry Rd
             scrapyard: 'block_16_12',   // the Scrapyard (restricted zone), the far south-east
             graveyard: 'block_18_6',    // the graveyard (HUB_GRAVEYARD), the middle of the southern edge
         };

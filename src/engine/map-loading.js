@@ -537,6 +537,8 @@ engineMixin({
                     city.corner(HUB_BLOCKS.clinic, 'sw', 'dr_yins', { margin: 60 });
                     city.corner(HUB_BLOCKS.clinic, 'se', 'neural_sys', { margin: 60 });
                     city.placeBuilding('biggs_park', HUB_BLOCKS.biggs, { align: 'center' });    // Biggs Amusement Park - south-east, its wheel above it
+                    // The Ashgrove in the block across Ashgrove St from it, fronting Foundry Rd (buildings/ashgrove.js); rows fill in round it
+                    { const B = city.blockMap[HUB_BLOCKS.ashgrove]; city.placeAt('ashgrove', B.x + 215, B.y + B.h - 470 - 14); }
 
                     // 5a. A HAND-LAID BLOCK (world/city-layout.js: row, corner, lot, placeAt)
                     // NE of Double Nights: a shop parade along Hotel Dr., wall to wall, a second row fronting East Ave.
@@ -578,7 +580,7 @@ engineMixin({
                         fill: 1,
                         categories: ['residential', 'shopping', 'commercial'],
                         scatter: [HUB_BLOCKS.scrapyard],
-                        fillPartial: [HUB_BLOCKS.cafe, HUB_BLOCKS.club, HUB_BLOCKS.clinic]   // the shared blocks: rows round their landmarks
+                        fillPartial: [HUB_BLOCKS.cafe, HUB_BLOCKS.club, HUB_BLOCKS.clinic, HUB_BLOCKS.ashgrove]   // the shared blocks: rows round their landmarks
                     });
                     
                     // 7. CREATE ROAD NETWORK

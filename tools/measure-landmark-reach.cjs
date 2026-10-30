@@ -76,7 +76,7 @@ const args = process.argv.slice(2), file = path.resolve(args[0] || 'DFAB V8.html
                         }
                     }
                 }
-                out.push({ style: bl.style, samples: n, need: [need.top, need.glow, need.all].map(Math.ceil), declared: [bl.topReach, bl.glowReach, bl.emissiveReach || 0] });
+                out.push({ style: bl.style || bl.id, samples: n, need: [need.top, need.glow, need.all].map(Math.ceil), declared: [bl.topReach, bl.glowReach, bl.emissiveReach || 0] });
             }
             return out;
         }, map);
