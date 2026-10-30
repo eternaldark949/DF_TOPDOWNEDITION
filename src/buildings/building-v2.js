@@ -859,6 +859,24 @@
                 return !(R + r < V.left || L - r > V.right || Bt + r < V.top || T - r > V.bottom);
             },
 
+            /** What it hides of the glow behind it (world): each section, footprint to leaned roof (engine/world-state.js drawEmissivePass). */
+            _glowOccluders(cam) {
+                const k = 1 + this._leanScale(), out = [];
+                this.sections.forEach((s, si) => {
+                    const fp = this._footprint(s, si), pts = fp.map(p => p.slice());
+                    for (const [x, y] of fp) pts.push([cam.x + (x - cam.x) * k, cam.y + (y - cam.y) * k]);
+                    out.push(TierKit.hull(pts));
+                });
+                return out;
+            },
+
+            /** The box its walls, roof and glow cover (world: x0, y0, x1, y1), against which the glow pass looks for what's in front. */
+            _glowBox(cam) {
+                const k = this._hullK(), x0 = this.x, y0 = this.y, x1 = this.x + (this.w || 200), y1 = this.y + (this.h || 200), r = this.glowReach || 0;
+                const rx0 = cam.x + (x0 - cam.x) * k, rx1 = cam.x + (x1 - cam.x) * k, ry0 = cam.y + (y0 - cam.y) * k, ry1 = cam.y + (y1 - cam.y) * k;
+                return [Math.min(x0, rx0) - r, Math.min(y0, ry0) - r, Math.max(x1, rx1) + r, Math.max(y1, ry1) + r];
+            },
+
             /** The lean of the highest thing it draws: LEAN_EXTRA floors over the roof, or its crown (crownZ, world px
                 up, leaned as LandmarkKit.k / _sqK lean it) if that's higher */
             _hullK() {

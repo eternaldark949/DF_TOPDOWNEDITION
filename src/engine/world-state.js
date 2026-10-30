@@ -227,12 +227,34 @@
                     const z = this.camera.zoom || 1;
                     const hw = this.canvas.width / 2 / z + 200, hh = this.canvas.height / 2 / z + 200;
                     if (V) {
-                        const visible = this._prepareRenderBuildingLists(this._cullBounds).v2;
-                        for (const entry of visible) {
-                            const b = entry.item;
+                        // In the roof pass's order (farthest first), and each building's glow kept off the walls and roofs of
+                        // the nearer ones drawn over it there: a tall roof hides the lit windows of the low building behind it.
+                        // (Not for the beam throwers, emissiveReach: their beams climb over whatever's in front.)
+                        const order = this._depthSortTops(this._prepareRenderBuildingLists(this._cullBounds).v2, this.camera), n = order.length;
+                        const boxes = this._glowBoxes || (this._glowBoxes = []);
+                        boxes.length = 0;
+                        for (const entry of order) {
+                            const b = entry.item, drawn = b.isV2 && b.drawTop && (entry.standardV2 ? entry.topIn : b.inView(V, this.camera));
+                            boxes.push(drawn && b._glowBox ? b._glowBox(this.camera) : null);
+                        }
+                        for (let i = 0; i < n; i++) {
+                            const entry = order[i], b = entry.item;
                             if (!b.isV2 || !b.drawEmissive) continue;
                             if (!entry.standardV2 && !b.inView(V, this.camera)) continue;
-                            b.drawEmissive(ctx, dark, entry.standardV2 && !entry.glowIn);   // off screen but for its beams: just those
+                            const beamsOnly = entry.standardV2 && !entry.glowIn, bb = boxes[i];
+                            let clipped = false;
+                            if (!beamsOnly && bb && !b.emissiveReach) for (let j = i + 1; j < n; j++) {
+                                const o = boxes[j];
+                                if (!o || o[0] > bb[2] || o[2] < bb[0] || o[1] > bb[3] || o[3] < bb[1]) continue;
+                                if (!clipped) { ctx.save(); clipped = true; }
+                                for (const poly of order[j].item._glowOccluders(this.camera)) {
+                                    ctx.beginPath(); ctx.rect(-1e7, -1e7, 2e7, 2e7);
+                                    poly.forEach((p, k) => k ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath();
+                                    ctx.clip('evenodd');
+                                }
+                            }
+                            b.drawEmissive(ctx, dark, beamsOnly);   // off screen but for its beams: just those
+                            if (clipped) ctx.restore();
                         }
                     } else {
                         // Standalone calls without a draw view retain their original fallback predicate.
