@@ -127,6 +127,10 @@
                         new PropEntity({ x: 1010, y: 555, width: 10, height: 14, color: '#2a2a2a', interactionType: 'light_switch', roomId: 'bathroom', mass: 999999 }),
                         // Added later: kept at the end, so a saved layout (questState.aptLayout, by index) still fits the pieces before them
                         new PropEntity({ x: 600, y: 770, width: 38, height: 22, mass: 1e7, color: '#2a1e24', interactionType: 'bar_cart', decorType: 'apt_bar_cart' }),   // tops up her glass (engine/spills.js)
+                        // The Silver Queen refit: dining for six, the baby grand, the bedroom's bench and chaise, the veranda's fire bowl and sofas
+                        F(114, 268, 124, 124, 'apt_dining'), F(98, 548, 104, 80, 'apt_piano'),
+                        F(1012, 338, 86, 18, 'apt_bench'), F(1272, 242, 40, 98, 'apt_chaise'),
+                        F(606, 72, 48, 48, 'apt_firepit'), F(546, 58, 34, 80, 'apt_patio_sofa'), F(680, 58, 34, 80, 'apt_patio_sofa', { face: 'W' }),
                     ];
                     e.lamps = [
                         new LampEntity({ x: 16, y: 100, lampType: 5, color: '#ffaa88', lightRadius: 400, angle: 0 }),
@@ -166,7 +170,7 @@
                         S(433, 864, 60, '#ff5a30', 0.6), S(312, 859, 55, '#7aa8ff', 0.5, 14),              // induction zone, gas burner
                         S(1252, 616, 70, '#ffc890', 0.75, 9), S(1368, 619, 60, '#ffc890', 0.7, 9),         // tub candles
                         S(1027, 866, 90, '#ffe0cc', 0.6),                                                  // vanity mirror
-                        { x: 1150, y: 724, w: 460, h: 310, round: 90, soft: true, color: '#efe8f4', intensity: 0.85 },   // bathroom ceiling: area light over the whole floor
+                        { x: 1150, y: 724, w: 460, h: 310, round: 90, soft: true, color: '#efe8f4', intensity: 0.4 },   // bathroom ceiling: area light over the whole floor
                         S(1335, 830, 80, '#e6f0ff', 0.6),                                                  // shower glow
                         S(1246, 476, 100, '#ffd2a8', 0.75),                                                // bedroom reading chair
                         S(390, 236, 80, '#ffd9b0', 0.55),                                                  // bookshelf

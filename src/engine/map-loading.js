@@ -946,6 +946,8 @@ engineMixin({
                         const inCourt = (o, front = 0) => o.x > court.x && o.x < court.x + court.w && o.y > court.y && o.y < court.y + court.h + front;
                         mapData.foliage = mapData.foliage.filter(f => !inCourt(f, 110));   // nor on the pavement in front, where a canopy would hide the steps
                         mapData.lamps = mapData.lamps.filter(l => !inCourt(l));
+                        const dr = b.style === 'silver_queen' && b._sqCourt && b._sqCourt() && b._sqCourt().drive;   // and the Silver Queen's drive, out to the street
+                        if (dr) mapData.foliage = mapData.foliage.filter(f => !(f.x > dr.x - 30 && f.x < dr.x + dr.w + 30 && f.y > dr.y && f.y < dr.y + dr.h + 110));
                     }
                     // and the pavement in front of a row of shopfronts (city.row, whichever street it fronts): a street wall shows its fronts, its trees go elsewhere
                     for (const pl of city.placedBuildings) {
