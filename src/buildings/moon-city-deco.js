@@ -558,7 +558,7 @@
             _mcForecourt() { return { x: this.x, y: this.y + 490, w: 600, h: 194 }; }
 
             /** The rotunda's outline on screen, from its foot to its top: what hides the canopy's back. */
-            _mcdRotHull() { const t = this._tkGeo().tiers.find(q => q.id === 'rotunda'); return t ? this._tkHull(t) : null; }
+            _mcdRotHull() { const t = this._tkGeo().tiers.find(q => q.id === 'rotunda'); return t ? this._tkHullOf(t) : null; }
             _mcdLean(fn) { return LandmarkKit.using((z) => this._tkK(z), fn); }
             /** The canopy, less what's behind the glass drum over it. */
             _mcdCanopy(ctx, emissive) {
