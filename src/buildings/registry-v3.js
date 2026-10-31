@@ -509,21 +509,7 @@
         //  REGISTER V2 BUILDINGS
         // =====================================================================
         
-        BuildingV2Registry.register('silver_queen', {
-            factory: createSilverQueenApartments,
-            sections: [
-                { x: 0, y: 0, w: 700, h: 500 },
-                { x: 0, y: 500, w: 350, h: 380 }
-            ],
-            accentColor: '#8142ff',
-            label: 'Silver Queen Apts',
-            type: 'apartment',
-            category: 'residential',
-            floors: 18,
-            sign: { text: 'Silver Queen', color: '#8142ff', size: 32 },
-            door: { target: 'apt_949', label: 'Enter Apartment', lightColor: '#9900ff' },
-            apron: { x: -40, y: 880, w: 430, h: 150 }   // the portico, steps and carpet: _sqForecourt (buildings/silver-queen.js)
-        });
+        // (the Silver Queen registers itself: buildings/silver-queen-deco.js)
         
         
         BuildingV2Registry.register('cozy_cafe', {

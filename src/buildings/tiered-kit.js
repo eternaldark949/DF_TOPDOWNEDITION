@@ -57,6 +57,8 @@
             area(p) { let s = 0; for (let i = 0; i < p.length; i++) { const a = p[i], b = p[(i + 1) % p.length]; s += a[0] * b[1] - b[0] * a[1]; } return s / 2; }
         };
 
+        const _TK_TILE = [40, 14];   // a face is mapped in tiles this wide and tall (world px): each an affine piece of its perspective quad (tier.tile overrides)
+
         class TieredBuilding extends BuildingV2 {
             /**
              * config.plan: { W, D } the frame; config.tiers: [{ id, poly | rect: [x, y, w, h], z0, z1, on (the tier it stands on), fill (the wall's colour under its art), paint(d, l, t, H, L),
@@ -179,13 +181,19 @@
 
             /** A face's slice of its tier's strip on its leaning quad, from z0 up to z1 (tiles in u and z). */
             _tkMap(ctx, f, tex, S, base) {
-                const t = f.tier, L = f.L, H = t.z1 - t.z0, nu = Math.max(1, Math.ceil(L / 40)), nz = Math.max(2, Math.ceil((f.z1 - f.z0) / 14));
+                const t = f.tier, L = f.L, H = t.z1 - t.z0, tile = t.tile || _TK_TILE, nu = Math.max(1, Math.ceil(L / tile[0])), nz = Math.max(2, Math.ceil((f.z1 - f.z0) / tile[1]));
                 const P = (u, z) => this._tkP(f.x1 + (f.x2 - f.x1) * u, f.y1 + (f.y2 - f.y1) * u, z);
                 if (base) { this._tkQuad(ctx, f, f.z0, f.z1); ctx.fillStyle = base; ctx.fill(); }
                 const ov = base ? S : 0.5;            // tiles overlap a world px (no seams); the additive glow barely, or the overlaps glow twice
+                const V = typeof game !== 'undefined' && ctx.canvas === game.canvas && game._cullBounds && game._cullBounds.view, m = 4;   // (a tile off the screen is skipped; not in a bake or a mirror, which have views of their own)
                 for (let j = 0; j < nz; j++) for (let i = 0; i < nu; i++) {
                     const ua = i / nu, ub = (i + 1) / nu, z0 = f.z0 + (f.z1 - f.z0) * j / nz, z1 = f.z0 + (f.z1 - f.z0) * (j + 1) / nz;
                     const a = P(ua, z0), b = P(ub, z0), d = P(ua, z1);
+                    if (V) {
+                        const cx = b[0] + d[0] - a[0], cy = b[1] + d[1] - a[1];
+                        if (Math.max(a[0], b[0], d[0], cx) < V.left - m || Math.min(a[0], b[0], d[0], cx) > V.right + m ||
+                            Math.max(a[1], b[1], d[1], cy) < V.top - m || Math.min(a[1], b[1], d[1], cy) > V.bottom + m) continue;
+                    }
                     const sx = (f.u0 + ua * L) * S, sw = Math.min(tex.width - sx, (ub - ua) * L * S + ov), sy = (t.z1 - z1) * S, sh = Math.min(tex.height - sy, (z1 - z0) * S + ov);
                     if (sw <= 0 || sh <= 0) continue;
                     ctx.save();
@@ -270,9 +278,13 @@
                 ctx.save(); ctx.globalAlpha *= glow; ctx.globalCompositeOperation = 'lighter';
                 // each tier's light is cut out of the tiers drawn over it (a window behind the bay mustn't shine through it)
                 const order = this._tkOrder(), hulls = order.map(t => this._tkHull(t));
+                const boxes = hulls.map(h => { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const [x, y] of h) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } return [x0, y0, x1, y1]; });
                 order.forEach((t, i) => {
                     ctx.save();
+                    const bi = boxes[i];
                     for (let j = i + 1; j < order.length; j++) {                       // one clip each: overlapping hulls in one even-odd path would cancel
+                        const bj = boxes[j];
+                        if (bj[0] > bi[2] || bj[2] < bi[0] || bj[1] > bi[3] || bj[3] < bi[1]) continue;   // (a hull clear of this tier's can't cover any of its light)
                         ctx.beginPath(); ctx.rect(-1e7, -1e7, 2e7, 2e7);
                         hulls[j].forEach(([x, y], n) => n ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
                         ctx.clip('evenodd');

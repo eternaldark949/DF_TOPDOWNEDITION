@@ -818,19 +818,8 @@ test('A landmark whose body is off screen draws only its beams in the glow pass'
   env.setTrace(false);
 });
 
-test('Portico marquee: one stamp a bulb, from a sprite baked to the screen scale', env => {
+test('Bulb sprites: baked once per screen scale, stamped the same size in the world', env => {
   env.run(`game.story.update=()=>{}; game._doLoadMap('sdc'); game.worldMinutes=22*60;`);
-  const r = value(env, `
-    const b = game.activeMap.buildings.find(x => x.style === 'silver_queen'), g = b._sqPortico();
-    game.camera.x = g.dx; game.camera.y = g.yb + 120; game.camera.zoom = 1; _zoomLOD = 0;
-    b._sqDrawPorticoGlow(game.ctx, 1, 1);   // (bakes the sprites)
-    return { id: game.activeMap.buildings.indexOf(b), n: Math.floor((g.x1 - g.x0 - 8) / 9) + 1 };`);
-  env.setTrace(true);
-  env.run(`game.activeMap.buildings[${r.id}]._sqDrawPorticoGlow(game.ctx, 1, 1)`);
-  const ops = env.trace.map(op => op[1]);
-  env.setTrace(false);
-  equal(ops.filter(o => o === 'arc').length, 0, 'no bulb, dot or lantern is an arc of its own');
-  ok(ops.filter(o => o === 'drawImage').length >= r.n, `the ${r.n} marquee bulbs are stamped`);
   const s = value(env, `
     const c = game.ctx, bulb = () => bulbSprite(c, '1,2,3', 1, 1.5, '4,5,6', 0.22, 4.5);
     c.setTransform(1, 0, 0, 1, 0, 0); const a = bulb(); c.setTransform(2.5, 0, 0, 2.5, 0, 0); const b = bulb(); c.setTransform(1, 0, 0, 1, 0, 0);
@@ -1134,11 +1123,10 @@ test('Rooftop festoons: every bulb at its own shimmer of the string, in one fill
 
 test('Landmark roofs: every painted run draws the same at any time and in any wind', env => {
   env.run(`game.story.update=()=>{}; game._doLoadMap('sdc');`);
-  const paint = { silver_queen: 'b._leanRoof(game.ctx, true)', moon_city: 'b._mcDrawRoof(game.ctx, false)',
-    portico: "(() => { const g = b._sqPortico(); b._sqPorticoPlane(game.ctx, g, g.x1 - g.x0, SQ_PORTICO.depth, 0); })()",   // (unmarked: one whole run)
-    canopy: 'b._mcCanopyPlane(game.ctx)' };
-  const owner = { silver_queen: 'silver_queen', moon_city: 'moon_city', portico: 'silver_queen', canopy: 'moon_city' };
-  const whole = { portico: true, canopy: true };
+  // (the Silver Queen is a tiered building now: its roofs are baked tier sprites, not painted runs)
+  const paint = { moon_city: 'b._mcDrawRoof(game.ctx, false)', canopy: 'b._mcCanopyPlane(game.ctx)' };   // (canopy unmarked: one whole run)
+  const owner = { moon_city: 'moon_city', canopy: 'moon_city' };
+  const whole = { canopy: true };
   const tr = (style, run, T, wind) => {
     env.setTrace(true);
     env.run(`(() => { const b = game.activeMap.buildings.find(x => x.style === '${owner[style]}'); _gameTimeSec = ${T}; _frameTime = ${T * 1000};
