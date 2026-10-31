@@ -1172,7 +1172,13 @@
                     this.drawFireLightGlow(this.ctx);
                 }
                 // Glowing details drawn after the darkness layer: windows, neon, rooftops, sky
-                if (RL.at('glow')) this.drawEmissivePass(this.ctx);
+                if (RL.at('glow')) {
+                    // Full mode: the lit pass gets a row of its own, broken down by what's tagged for 'Glow' (RenderTags)
+                    const timed = RenderStats.timed;
+                    if (timed) { this.profiler.add('Lighting: Glow', 0, true); this.profiler.start('Lighting: Glow'); WorldRenderProfiler.begin('Glow', this.profiler, 'Lighting: Glow'); }
+                    this.drawEmissivePass(this.ctx);
+                    if (timed) { this.profiler.stop('Lighting: Glow'); WorldRenderProfiler.end(this.profiler); }
+                }
                 // Her halo, above the darkness so it reads at night (kept from her draw: engine/player-draw-input.js)
                 if (RL.at('stella')) this.drawPlayerGlow(this.ctx);
                 // Velvet's eyeshine, above the darkness; hidden under roofs and canopies like the speech bubbles
