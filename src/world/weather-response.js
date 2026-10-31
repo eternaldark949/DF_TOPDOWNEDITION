@@ -39,11 +39,12 @@
             const seed = entity._wxSeed !== undefined ? entity._wxSeed : (entity._wxSeed = Math.random() * 100);
             const t = _gameTimeSec;
             const gust = 1 + 0.35 * Math.sin(t * 2.3 + seed) + 0.15 * Math.sin(t * 5.1 + seed * 1.7);
+            if (entity._bakePed !== undefined) reach = 0;          // a crowd bake (ui/crowd-impostors.js) faces one way for every facing: no wind, rain kept
             const k = WEATHER_RESPONSE, wv = w.windVec || { x: 0, y: 0 }, v = { x: wv.x * reach, y: wv.y * reach };
             const out = {
                 wind: { x: v.x * k.CLOTH_WIND * gust, y: v.y * k.CLOTH_WIND * gust },
                 hairWind: { x: v.x * k.HAIR_WIND * gust, y: v.y * k.HAIR_WIND * gust },
-                rain: w.isRaining ? Math.min(1, w.intensity || 0) * reach : 0,
+                rain: w.isRaining ? Math.min(1, w.intensity || 0) * (entity._bakePed !== undefined ? 1 : reach) : 0,
                 strong: Math.max(0, Math.min(1, ((w.wind || 0) - k.STRONG_FROM) / k.STRONG_SPAN)) * reach,
                 dir: _weatherWindAngle(wv.x, wv.y)
             };
