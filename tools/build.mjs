@@ -96,6 +96,7 @@ const SCRIPTS = [
     'buildings/ashgrove.js',
     'buildings/enni-cole.js',
     'buildings/silver-queen-deco.js',
+    'buildings/moon-city-deco.js',
     'traffic/roads.js',
     'traffic/garage-zib.js',
     'traffic/zen-art.js',
