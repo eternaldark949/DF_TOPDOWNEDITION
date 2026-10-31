@@ -1583,7 +1583,7 @@
          */
         function humanShade(ctx, entity, config) {
             const lod = typeof _zoomLOD !== 'undefined' ? _zoomLOD : 0;
-            const ped = typeof Pedestrian !== 'undefined' && entity instanceof Pedestrian;
+            const ped = entity._bakePed !== undefined ? entity._bakePed : typeof Pedestrian !== 'undefined' && entity instanceof Pedestrian;
             const level = lod === 0 ? 2 : (lod === 1 && !ped ? 1 : 0);
             if (!level || _crowdLite || typeof sunNow !== 'function') return null;    // (Crowd Quality medium/low: flat)
             if (_shadeFrame !== _frameTime) { _shadeFrame = _frameTime; _shadeRims = 0; _shadeCols = null; }
@@ -1604,7 +1604,7 @@
             }
             const S = { level, body: level > 1 && !ped, lx, ly, a: K.a, m: Math.min(1, K.a * 1.7), shA: K.shA, rgb: K.rgb, hl: K.hl, hl2: K.hl2, sh: K.sh, rim: null };
             // Night: the nearest burning street lamp rims them in its colour (the block's lamp colour)
-            if (level === 2 && sun.night > 0.3 && entity.x !== undefined && (!ped || _shadeRims < C.RIM_PEDS)) {
+            if (level === 2 && sun.night > 0.3 && entity.x !== undefined && entity._bakePed === undefined && (!ped || _shadeRims < C.RIM_PEDS)) {
                 const n = _lampNear(entity.x, entity.y, C.RIM_R);
                 if (n) {
                     const on = lampWake(n.l) * lampFlicker(n.l) * (n.l.intensity ?? 1);
@@ -1620,6 +1620,20 @@
                 }
             }
             return S;
+        }
+
+        /** A street lamp's colour catching shoulder and head (rim: humanShade's S.rim), in the body's frame */
+        function drawHumanRim(ctx, rim, rimY, hcx, hr) {
+            const r = rim.ang, rimX = 9.5, rt = Math.atan2(rimX * Math.sin(r), rimY * Math.cos(r));
+            ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.ellipse(-1.5, 0, rimX, rimY, 0, rt - 0.75, rt + 0.75);
+            ctx.moveTo(hcx + Math.cos(r - 1.1) * hr, Math.sin(r - 1.1) * hr); ctx.arc(hcx, 0, hr, r - 1.1, r + 1.1);
+            ctx.strokeStyle = rim.soft; ctx.lineWidth = 3.6; ctx.stroke();          // the light wrapping round, soft
+            ctx.strokeStyle = rim.style; ctx.lineWidth = 1.2; ctx.stroke();         // … and its bright edge
+            // The lit side of the head and shoulder takes on the lamp's colour
+            _softSpot(ctx, hcx + Math.cos(r) * hr * 0.6, Math.sin(r) * hr * 0.6, 15, 15, rim.rgb, rim.k * 0.4);
+            _softSpot(ctx, -1.5 + Math.cos(rt) * rimX * 0.7, Math.sin(rt) * rimY * 0.7, 12, 12, rim.rgb, rim.k * 0.3);
+            ctx.restore();
         }
 
         /** Centred ground contact at every facing, plus a sun-directed cast by day.
@@ -1925,7 +1939,8 @@
             const S = bodyScale(config), A = androidLook(config.body);
             const hover = A && A.hover && !config.isDriving;
             if (!config.isDriving && _zoomLOD < 2) {
-                const t = ctx.getTransform(); _bodyRot = entity._reflectionProxy ? (entity.angle || 0) : Math.atan2(t.b, t.a); // original facing for mirrored art
+                const t = ctx.getTransform(); _bodyRot = entity._bakeRot !== undefined ? entity._bakeRot   // a crowd bake: lit as the walker it stands in for faces (ui/crowd-impostors.js)
+                    : entity._reflectionProxy ? (entity.angle || 0) : Math.atan2(t.b, t.a); // original facing for mirrored art
                 if (!config.noShadow) drawHumanContactShadow(ctx, entity);
             }
             if (!S && !hover) return _drawHumanoidBody(ctx, entity, config, null, A);
@@ -2825,20 +2840,12 @@
                 }
                 if (turning) ctx.restore();
             });
-            if (SH && SH.rim) {                                             // a street lamp's colour catching shoulder and head
-                const r = SH.rim.ang;
-                ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = SH.rim.style; ctx.lineWidth = 1.4; ctx.lineCap = 'round';
-                const rimX = 9.5, rimY = BC.sh + BC.del * 0.55, rt = Math.atan2(rimX * Math.sin(r), rimY * Math.cos(r));   // round the shoulders
-                ctx.beginPath(); ctx.ellipse(-1.5, 0, rimX, rimY, 0, rt - 0.75, rt + 0.75);
+            if ((SH && SH.rim) || entity._bakePed !== undefined) {
+                const rimY = BC.sh + BC.del * 0.55;                         // round the shoulders
                 const crown = clothes.hair && !clothes.hat ? HAIR_CROWNS[clothes.hair.type] : null;     // round the hair, not the scalp under it
                 const hcx = headX + (crown ? crown[0] : 0), hr = crown ? Math.max(crown[1], crown[2]) - 0.3 : 8.5;
-                ctx.moveTo(hcx + Math.cos(r - 1.1) * hr, Math.sin(r - 1.1) * hr); ctx.arc(hcx, 0, hr, r - 1.1, r + 1.1);
-                ctx.strokeStyle = SH.rim.soft; ctx.lineWidth = 3.6; ctx.stroke();          // the light wrapping round, soft
-                ctx.strokeStyle = SH.rim.style; ctx.lineWidth = 1.2; ctx.stroke();         // … and its bright edge
-                // The lit side of the head and shoulder takes on the lamp's colour
-                _softSpot(ctx, hcx + Math.cos(r) * hr * 0.6, Math.sin(r) * hr * 0.6, 15, 15, SH.rim.rgb, SH.rim.k * 0.4);
-                _softSpot(ctx, -1.5 + Math.cos(rt) * rimX * 0.7, Math.sin(rt) * rimY * 0.7, 12, 12, SH.rim.rgb, SH.rim.k * 0.3);
-                ctx.restore();
+                if (entity._bakePed !== undefined) entity._rimGeo = { rimY, hcx, hr };   // a crowd bake: its live rim goes here (ui/crowd-impostors.js)
+                else drawHumanRim(ctx, SH.rim, rimY, hcx, hr);
             }
             if (hitK > 0.05) {                                              // the flash of the hit
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';       // a cached glow (lightning flashes every body outdoors at once)
