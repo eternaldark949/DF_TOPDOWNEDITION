@@ -23,7 +23,7 @@
         const PROP_PAD = {
             apt_vanity: 13, apt_planter: 11, apt_fireplace: 10, apt_bed: 9,
             ps_suitcase: 27, ps_piano: 16, ps_wardrobe: 16, ps_telescope: 11, mc_coatcheck: 17, mc_lost_purse: 11, mc_dj: 9,
-            dn_lost_luggage: 14, dn_palm: 10, cc_fireplace: 13, cc_plant: 12, cc_sacks: 9, hod_chair: 10, sc_fallen: 11, sc_altar: 9,
+            dn_lost_luggage: 14, dn_palm: 10, ls_tote: 9, ls_shopbag: 12, ls_envelope: 10, ls_offering: 9, ls_tribute: 14, cc_fireplace: 13, cc_plant: 12, cc_sacks: 9, hod_chair: 10, sc_fallen: 11, sc_altar: 9,
             ta_lift: 14, ta_wrap: 12, ta_turntable: 12, dp_throne: 31, dp_pool: 9, dp_embers: 9, light_switch: 10, vending_machine: 12, medbay_refill: 14
         };
         // One period of the sway, painted as `frames` phase frames

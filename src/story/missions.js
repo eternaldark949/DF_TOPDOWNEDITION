@@ -605,6 +605,13 @@
                 scrapCost: 400,
             },
             {
+                id: 'vampiric_fists',
+                name: 'VAMPIRIC FISTS',
+                icon: '❦',
+                desc: 'Set blood-garnets in the knuckles. Every punch you land heals 15% of its damage; a haymaker heals 30% and opens a bleed. Bare fists or brass.',
+                scrapCost: 350,
+            },
+            {
                 id: 'acc_mirror_glass',
                 cosmetic: true,           // a COSMETICS_REGISTRY accessory, not an item: it's worn, and takes no attachment slot
                 requires: 'acc_glass',    // silvered from the Crystal Glass

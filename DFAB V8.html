@@ -15641,7 +15641,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         ...EMPORIUM_AISLES.flatMap(([cat, kinds], i) => [0, 1].map(run => F(2070 + i * 90, run ? 620 : 180, 40, 360, 'ec_tall_aisle',
                             { decor: { aisle: i + 1, cat, kinds, run, sign: run ? undefined : 580 }, visible: false }))),
                         F(2120, 1150, 170, 60, 'ec_checkout'), F(2880, 1150, 170, 60, 'ec_checkout', { variant: 1 }),
-                        F(2000, 1260, 40, 40, 'ec_topiary'), F(3130, 1260, 40, 40, 'ec_topiary')
+                        F(2000, 1260, 40, 40, 'ec_topiary'), F(3130, 1260, 40, 40, 'ec_topiary'),
+                        // Lost things (searchLostLuggage): a bag set down by the tills and never picked up
+                        F(884, 1166, 20, 18, 'ls_shopbag', { interactionType: 'lost_luggage', noteId: 'enni_bag', label: 'Dropped shopping bag', lootMin: 25, lootMax: 70,
+                            lootLines: ['TISSUE PAPER… AND PERSONICS', 'THE RECEIPT SAYS SHE CAN AFFORD IT', 'ENNI COLE, NEVER CHEAP'], noNav: true })
                     ];
                     e.npcs = [ new NPC(755, 1238, "Valentina", 'vip'), new NPC(330, 1180, "Model Kira", 'dancer'),
                         new NPC(1665, 975, "Concierge Lux", 'robot_gold') ];
@@ -15694,7 +15697,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         F(1680, 760, 140, 54, 'ec_chaise'), F(1730, 994, 96, 40, 'ec_mirror'),
                         F(1460, 640, 84, 84, 'ec_display', { variant: 3 }), F(1540, 420, 44, 44, 'ec_mannequin', { variant: 2 }), F(1540, 500, 44, 44, 'ec_mannequin', { variant: 5 }), F(1430, 994, 160, 50, 'ec_jewel'),
                         // The fitting rooms
-                        F(1670, 56, 270, 104, 'ec_fitting'), F(1690, 230, 56, 56, 'ec_ottoman')
+                        F(1670, 56, 270, 104, 'ec_fitting'), F(1690, 230, 56, 56, 'ec_ottoman'),
+                        // Lost things (searchLostLuggage): an envelope dropped outside the fitting rooms
+                        F(1790, 184, 18, 12, 'ls_envelope', { interactionType: 'lost_luggage', noteId: 'enni_envelope', label: 'Receipt envelope', lootMin: 25, lootMax: 70,
+                            lootLines: ['A REFUND, IN CASH', 'SHE CHANGED HER MIND ABOUT THE SHOES', 'FINDERS KEEPERS'], noNav: true })
                     ];
                     e.npcs = [ new NPC(1000, 745, "Model Sienne", 'dancer'), new NPC(230, 140, "Chef Amara") ];
                     e.npcs[0].angle = Math.PI / 2; e.npcs[1].angle = -Math.PI / 2;
@@ -15745,6 +15751,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         // Storeroom: crates of beans, flour sacks, shelving
                         F(990, 756, 56, 40, 'cc_crate'), F(1060, 756, 56, 40, 'cc_crate', { variant: 1 }), F(1056, 856, 76, 52, 'cc_sacks'),
                         F(962, 880, 36, 60, 'cc_shelf', { vertical: true }),
+                        // Lost things (searchLostLuggage): a tote left by the fire
+                        F(198, 424, 18, 16, 'ls_tote', { interactionType: 'lost_luggage', noteId: 'cafe_tote', label: 'Forgotten tote', lootMin: 10, lootMax: 35,
+                            lootLines: ['A PAPERBACK, A SCARF… AND PERSONICS', 'LEFT WITH THE LAST LATTE', 'THE FIRE KEPT IT WARM'], noNav: true }),
                     ];
                     e.npcs = [ new NPC(250, 170, "Barista Ren", 'bartender'), new NPC(785, 128, "Chef Koda") ];
                     e.npcs[0].angle = Math.PI / 2; e.npcs[1].angle = -Math.PI / 2;           // Ren faces the counter, Koda the range
@@ -15792,6 +15801,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         // The parts room
                         F(920, 730, 180, 40, 'ta_shelf'), F(920, 820, 180, 40, 'ta_shelf'),
                         F(1150, 730, 150, 40, 'ta_shelf'), F(1150, 820, 150, 40, 'ta_shelf'),
+                        // Lost things (searchLostLuggage): the cash tin under the bench
+                        F(700, 102, 22, 14, 'ls_cashtin', { interactionType: 'lost_luggage', noteId: 'torque_tin', label: 'Cash tin', lootMin: 30, lootMax: 80,
+                            lootLines: ["TORQUE'S RAINY-DAY MONEY", 'GREASY BILLS, STILL GOOD', 'UNDER THE BENCH, AS ALWAYS'], noNav: true }),
                     ];
                     TorqueArt.warm();                                                              // the show cars' sprites, painted before any piece is
                     e.npcs = [ new NPC(1050, 200, "Torque", 'mechanic') ];
@@ -15893,7 +15905,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         // Entrance Hall: braziers by the door
                         brazier(760, 1300), brazier(1014, 1300),
                         // The Kennels: cages where her hunters rest
-                        ...[1260, 1400, 1540, 1680].map(x => F(x, 1040, 80, 60, 'dp_cage'))
+                        ...[1260, 1400, 1540, 1680].map(x => F(x, 1040, 80, 60, 'dp_cage')),
+                        // Lost things (searchLostLuggage): her tribute, at the foot of the throne. Opening it is loud (lootNoise)
+                        F(790, 470, 30, 22, 'ls_tribute', { interactionType: 'lost_luggage', noteId: 'palace_tribute', label: 'Tribute chest', lootMin: 60, lootMax: 150, lootNoise: 700,
+                            lootLines: ["LILITU WON'T MISS IT. SHE WILL NOTICE", 'GOLD FOR THE QUEEN, NOW YOURS', 'THE HINGES SCREAM…'], noNav: true })
                     ];
                     e.npcs = [];
                     const L = (x,y,color,r) => hiddenLamp(x,y,color,r);
@@ -15966,6 +15981,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         // Reliquary: a display coffin among four glass cases
                         F(1380, 1290, 110, 50, 'hod_coffin'),
                         F(1300, 1196, 36, 36, 'hod_reliquary'), F(1540, 1196, 36, 36, 'hod_reliquary'), F(1300, 1440, 36, 36, 'hod_reliquary'), F(1540, 1440, 36, 36, 'hod_reliquary'),
+                        // Lost things (searchLostLuggage): the offering bowl at the altar's foot. Taking from it is loud (lootNoise)
+                        F(834, 142, 24, 16, 'ls_offering', { interactionType: 'lost_luggage', noteId: 'house_offering', label: 'Offering bowl', lootMin: 60, lootMax: 150, lootNoise: 700,
+                            lootLines: ["THE DEAD DON'T SPEND IT", 'TITHES FOR THE HOUSE', 'SOMETHING STIRS…'], noNav: true }),
                     ];
                     e.npcs = [];
                     const L = (x, y, color, lightRadius, lampType = 4, extra = {}) => Object.assign(new LampEntity({ x, y, lampType, color, lightRadius, ...extra }), extra);
@@ -17435,6 +17453,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         if (landed && p.melee && e.interruptMelee) e.interruptMelee();
                         if (landed && p.sticky && !e.dead) game.stickOrb(e, p);
                         if (landed && p.knuckles && game.onKnuckleHit) game.onKnuckleHit(e, p);
+                        if (landed && p.melee && !p.isEnemy && p.owner === game.player && game.onPunchLanded) game.onPunchLanded(e, p);   // her punches (Vampiric Fists)
                     } else if (hit.kind === 'actor') e.onProjectileHit(p, game);
                     else if (hit.kind === 'traffic') {
                         const speed = Math.hypot(p.vx, p.vy), push = (p.damage * speed * 0.005) / 5;
@@ -20475,6 +20494,81 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
 
+        /* Stashes round the city (ls_*): lost things searched once a day (searchLostLuggage), drawn
+           closed and full, or lying open once searched today (the sprite repaints on _searched). */
+        function drawStashDecorProp(ctx, p) {
+            const x = p.x, y = p.y, w = p.width, h = p.height, open = p._searched;
+            const gold = '#e8c26a', goldDk = '#9a7a32';
+            const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
+                ctx.beginPath(); ctx.roundRect(X, Y, W, H, r);
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+            };
+            const circ = (cx, cy, r, fill, stroke, lw = 1) => {
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+            };
+            const bills = (bx, by, n) => { for (let i = 0; i < n; i++) rr(bx + i * 3, by - i, 7, 4, 0.8, i % 2 ? '#8fc89a' : '#6fb07e', 'rgba(20,50,30,0.5)', 0.4); };
+            ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.beginPath(); ctx.ellipse(x + w / 2 + 1.5, y + h + 1, w * 0.55, 2.4, 0, 0, Math.PI * 2); ctx.fill();
+            switch (p.decorType) {
+                case 'ls_tote': {                                          // a canvas tote, a paperback and a knitted scarf poking out
+                    ctx.strokeStyle = '#a8916c'; ctx.lineWidth = 1.4;
+                    ctx.beginPath(); ctx.moveTo(x + 4, y + 2); ctx.quadraticCurveTo(x + w / 2, y - 7, x + w - 4, y + 2); ctx.stroke();
+                    rr(x, y + 1, w, h - 1, 2, '#e9dcc2', '#a8916c', 0.8);
+                    rr(x + 3, y + 4, w - 6, 5, 1, '#c6553a');                                         // the cafe's stamp
+                    if (open) { rr(x + 2, y + 2, w - 4, h - 5, 1.5, '#4a3a2a'); rr(x + w - 3, y + h - 4, 9, 4, 1.5, '#b9446a'); }   // emptied, the scarf trailing out
+                    else { rr(x + 2, y - 2, 7, 5, 1, '#3d6a8a', '#22384a', 0.5); rr(x + 8, y - 3, 7, 5, 2, '#b9446a'); }
+                    break;
+                }
+                case 'ls_cashtin': {                                       // a dented steel cash box, grease on the lid
+                    rr(x, y, w, h, 2, '#6c7480', '#2c3038', 0.9);
+                    if (open) { rr(x, y - h * 0.55, w, h * 0.55, 2, '#7d8592', '#2c3038', 0.8); rr(x + 2, y + 2, w - 4, h - 4, 1, '#1c1f24');
+                                for (let i = 0; i < 4; i++) rr(x + 3 + i * 4, y + 3, 3, h - 6, 0.5, '#2a2e36'); }   // the empty coin tray
+                    else { ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(x + 2, y + 2, w - 6, 1.2);
+                           ctx.fillStyle = 'rgba(20,16,10,0.4)'; ctx.beginPath(); ctx.ellipse(x + w * 0.3, y + h * 0.6, 3, 1.6, 0.3, 0, Math.PI * 2); ctx.fill();
+                           rr(x + w / 2 - 3, y + h / 2 - 1.5, 6, 3, 0.8, '#c9ccd2', '#3a3e46', 0.5); bills(x + w - 4, y + h - 2, 1); }
+                    break;
+                }
+                case 'ls_shopbag': {                                       // an Enni Cole bag: rose paper, black rope handles, tissue
+                    ctx.strokeStyle = '#1a1014'; ctx.lineWidth = 1.1;
+                    for (const hx of [x + 5, x + w - 5]) { ctx.beginPath(); ctx.moveTo(hx - 2, y + 2); ctx.quadraticCurveTo(hx, y - 5, hx + 2, y + 2); ctx.stroke(); }
+                    rr(x, y + 1, w, h - 1, 1.5, '#e8a6b8', '#7a3a4e', 0.8);
+                    ctx.fillStyle = gold; ctx.font = '600 6px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('EC', x + w / 2, y + h / 2 + 2);
+                    if (open) { ctx.save(); ctx.translate(x + w + 2, y + h - 3); ctx.rotate(0.4); rr(-6, -3, 12, 6, 2, '#f6eef2', 'rgba(120,80,100,0.5)', 0.5); ctx.restore(); }   // the tissue, pulled out
+                    else { ctx.fillStyle = '#f6eef2'; ctx.beginPath(); ctx.moveTo(x + 3, y + 2); ctx.lineTo(x + 7, y - 3); ctx.lineTo(x + 10, y + 1); ctx.lineTo(x + 14, y - 3); ctx.lineTo(x + w - 3, y + 2); ctx.fill(); }
+                    break;
+                }
+                case 'ls_envelope': {                                      // a cream envelope, the store's gold seal
+                    rr(x, y, w, h, 1, '#f2e6cf', '#9a8458', 0.6);
+                    ctx.strokeStyle = 'rgba(120,96,56,0.6)'; ctx.lineWidth = 0.5;
+                    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w / 2, y + h * 0.55); ctx.lineTo(x + w, y); ctx.stroke();
+                    if (open) { ctx.fillStyle = '#e6d6b8'; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w / 2, y - h * 0.6); ctx.lineTo(x + w, y); ctx.fill(); ctx.stroke(); }
+                    else { circ(x + w / 2, y + h * 0.55, 2.2, '#9a1c3a', goldDk, 0.4); bills(x + w - 6, y + 1, 1); }
+                    break;
+                }
+                case 'ls_offering': {                                      // a black stone bowl of coins and wax, three bone candles round it
+                    for (const [cx, cy] of [[x - 3, y + 2], [x + w + 3, y + 2], [x + w / 2, y + h + 3]]) { circ(cx, cy, 2, '#e8dcc6'); circ(cx, cy - 0.5, 0.8, '#ffb46a'); }
+                    ctx.fillStyle = '#16101a'; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = '#4a2a4a'; ctx.lineWidth = 1; ctx.stroke();
+                    ctx.fillStyle = '#2a1626'; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2 - 3, h / 2 - 2.5, 0, 0, Math.PI * 2); ctx.fill();
+                    if (!open) for (let i = 0; i < 7; i++) circ(x + w / 2 + Math.cos(i * 2.4) * (i % 3 + 1) * 2.4, y + h / 2 + Math.sin(i * 2.4) * (i % 3) * 1.4, 1.7, i % 2 ? gold : '#c9a24a', goldDk, 0.3);
+                    else circ(x + w / 2, y + h / 2, 2.2, 'rgba(176,112,255,0.5)');           // a last violet ember in the empty bowl
+                    break;
+                }
+                case 'ls_tribute': {                                       // a black-lacquer chest bound in gold, a crimson gem in the lock
+                    rr(x, y, w, h, 2, '#1e0a12', gold, 1);
+                    ctx.fillStyle = goldDk; ctx.fillRect(x + 6, y, 2, h); ctx.fillRect(x + w - 8, y, 2, h);           // the bands
+                    if (open) { rr(x - 1, y - h * 0.6, w + 2, h * 0.6, 2, '#2a0e18', gold, 0.8); rr(x + 3, y + 3, w - 6, h - 6, 1.5, '#3a0614');
+                                circ(x + w / 2, y + h / 2, 1.4, 'rgba(255,90,110,0.6)'); }
+                    else { ctx.fillStyle = 'rgba(255,220,150,0.25)'; ctx.fillRect(x + 2, y + 2, w - 4, 1.2);
+                           for (let i = 0; i < 5; i++) circ(x + 4 + i * (w - 8) / 4, y - 1, 1.6, gold, goldDk, 0.3);   // coins spilling over the lip
+                           circ(x + w / 2, y + h / 2, 2.6, '#c8102e', gold, 0.6); circ(x + w / 2 - 0.7, y + h / 2 - 0.7, 0.8, 'rgba(255,220,230,0.8)'); }
+                    break;
+                }
+            }
+        }
+
         function drawClinicDecorProp(ctx, p) {
             if (p.decorType.startsWith('apt_')) return drawApartmentDecorProp(ctx, p);
             if (p.decorType.startsWith('sc_')) return drawSanctumDecorProp(ctx, p);
@@ -20488,6 +20582,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             if (p.decorType.startsWith('dp_')) return drawPalaceDecorProp(ctx, p);
             if (p.decorType.startsWith('cc_')) return drawCafeDecorProp(ctx, p);
             if (p.decorType.startsWith('ec_')) return drawEnniDecorProp(ctx, p);
+            if (p.decorType.startsWith('ls_')) return drawStashDecorProp(ctx, p);
             const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000;
             const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
                 ctx.beginPath(); ctx.roundRect(X, Y, W, H, r);
@@ -20616,7 +20711,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.patient = !!config.patient;
                 this.noteId = config.noteId || null;
                 if (config.label) this.label = config.label;                   // what the action pill names it
-                if (config.lootLines) { this.lootMin = config.lootMin; this.lootMax = config.lootMax; this.lootLines = config.lootLines; }   // lost things (searchLostLuggage)
+                if (config.lootLines) { this.lootMin = config.lootMin; this.lootMax = config.lootMax; this.lootLines = config.lootLines; this.lootNoise = config.lootNoise || 0; }   // lost things (searchLostLuggage)
                 this.roomId = config.roomId || null;  // For light switches: which room this controls
                 this._switchState = true;  // Light switch: true = lights ON
                 this.angularFriction = 0.85;  // Rotation slows down over time (as fast as sliding does)
@@ -20977,7 +21072,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         const PROP_PAD = {
             apt_vanity: 13, apt_planter: 11, apt_fireplace: 10, apt_bed: 9,
             ps_suitcase: 27, ps_piano: 16, ps_wardrobe: 16, ps_telescope: 11, mc_coatcheck: 17, mc_lost_purse: 11, mc_dj: 9,
-            dn_lost_luggage: 14, dn_palm: 10, cc_fireplace: 13, cc_plant: 12, cc_sacks: 9, hod_chair: 10, sc_fallen: 11, sc_altar: 9,
+            dn_lost_luggage: 14, dn_palm: 10, ls_tote: 9, ls_shopbag: 12, ls_envelope: 10, ls_offering: 9, ls_tribute: 14, cc_fireplace: 13, cc_plant: 12, cc_sacks: 9, hod_chair: 10, sc_fallen: 11, sc_altar: 9,
             ta_lift: 14, ta_wrap: 12, ta_turntable: 12, dp_throne: 31, dp_pool: 9, dp_embers: 9, light_switch: 10, vending_machine: 12, medbay_refill: 14
         };
         // One period of the sway, painted as `frames` phase frames
@@ -58538,8 +58633,9 @@ Object.assign(TrafficVehicle.prototype, {
         
             // 7b. Golden Retribution: a gilded knuckle bar across each fist (engine/knuckles.js)
             if (config.knuckles && typeof drawKnuckleDuster === 'function' && !isDriving) {
-                drawKnuckleDuster(ctx, lFistX, lFistY, Math.atan2(lFistY - lElbowY, lFistX - lElbowX));
-                drawKnuckleDuster(ctx, rFistX, rFistY, Math.atan2(rFistY - rElbowY, rFistX - rElbowX));
+                const vamp = config.knuckles === 'vamp';                                  // Vampiric Fists: garnet studs
+                drawKnuckleDuster(ctx, lFistX, lFistY, Math.atan2(lFistY - lElbowY, lFistX - lElbowX), 1, vamp);
+                drawKnuckleDuster(ctx, rFistX, rFistY, Math.atan2(rFistY - rElbowY, rFistX - rElbowX), 1, vamp);
             }
 
             // 8. Upper Arms (fabric under short or long sleeves). They hang from the shoulders, so their
@@ -62731,6 +62827,12 @@ Object.assign(TrafficVehicle.prototype, {
                 // engine/status-effects.js meleeSlash / applyStatus: blade damage × bladeDamageMult, bleed up to bleedMax stacks
                 stats: { effect: 'crimson_edge', bladeDamageMult: 1.5, bleedMax: 5 }
             },
+            'vampiric_fists': {
+                name: 'Vampiric Fists', type: 'attachment', icon: '❦',
+                desc: 'Blood-garnet studs for the knuckles. Every punch you land heals you; a haymaker drinks deeper and leaves them bleeding.',
+                // engine/knuckles.js onPunchLanded: any punch of hers (bare fists, Golden Retribution, fist weapons to come)
+                stats: { effect: 'vampiric_fists', lifesteal: 0.15, haymakerLifesteal: 0.3, bleedDps: 5, bleedSecs: 3 }
+            },
             'blood_muzzle': {
                 name: 'Bloodthirsty Muzzle', type: 'attachment', icon: '♆',
                 desc: 'A crimson muzzle brake that drinks the shot. Bullets deal 75% more damage.',
@@ -64270,6 +64372,13 @@ Object.assign(TrafficVehicle.prototype, {
                 icon: '✊',
                 desc: 'Gild a pair of brass knuckles. Fast jabs that can crit; every third punch is a haymaker that staggers, and drives them into walls.',
                 scrapCost: 400,
+            },
+            {
+                id: 'vampiric_fists',
+                name: 'VAMPIRIC FISTS',
+                icon: '❦',
+                desc: 'Set blood-garnets in the knuckles. Every punch you land heals 15% of its damage; a haymaker heals 30% and opens a bleed. Bare fists or brass.',
+                scrapCost: 350,
             },
             {
                 id: 'acc_mirror_glass',
@@ -70373,7 +70482,7 @@ engineMixin({
                         isDriving: false, isShootingFromCar: false, carAngle: this.car ? this.car.angle : 0,
                         recoil: stance === 'punch' && this.shootCooldown > 0 ? this.shootCooldown / 10 : 0,
                         kick, punchTicks: stance === 'punch' ? this.punchStanceTicks() : undefined,
-                        knuckles: this.weaponMode === 'fists' && !this.weaponHolstered,
+                        knuckles: this.weaponMode === 'fists' && !this.weaponHolstered && (this.vampiricFists() ? 'vamp' : true),
                         top: outfit.top, bottom: outfit.bottom, shoes: outfit.shoes, train: outfit.train || null,
                         hat: cosmetic.hat || (rainOn && outfit.top && outfit.top.type === 'hoodie'
                             ? { type: 'hood_up', color: outfit.top.color } : null),
@@ -72420,6 +72529,11 @@ engineMixin({
         // window is always a haymaker, Flit-Strike's bonus on top. Jabs step her in like a blade does.
         // Each punch leaves gold afterimages of the fist along its path; a haymaker adds a ring burst,
         // sparks and a clink (drawKnuckleFx, after the slashes).
+        //
+        // Vampiric Fists (an attachment, SCHEMATICS vampiric_fists, 350 scrap): any punch of hers that lands —
+        // bare fists, the knuckles, fist weapons to come — heals her VAMPIRIC.LIFESTEAL of its damage, a haymaker
+        // HAY_LIFESTEAL and a bleed (onPunchLanded, from CollisionSystem.resolveProjectile). Crimson motes run
+        // from the wound to her (drawKnuckleFx); the knuckle bar's studs turn garnet.
 
         const KNUCKLES = {
             ID: 'golden_retribution', EVERY: 3, HAY_MULT: 2.5, JAB_KNOCK: 1, HAY_KNOCK: 3,
@@ -72427,6 +72541,7 @@ engineMixin({
             COMBO_RESET: 1.2,          // s without a punch before the count starts again
             STEP_REACH: 46             // px ahead (past both bodies) she'll step in toward someone on a jab
         };
+        const VAMPIRIC = { ID: 'vampiric_fists', MOTES: 5, HAY_MOTES: 9, LIFE: 0.45 };
 
         engineMixin({
             /** Ticks into the punch for the body's strike curve: a quicker punch runs the same 15-tick curve faster */
@@ -72494,6 +72609,22 @@ engineMixin({
                 if (typeof ambience !== 'undefined' && ambience.clink) ambience.clink();
             },
 
+            /** Vampiric Fists worn? */
+            vampiricFists() { return !!(this.inventory && this.inventory.hasAttachment(VAMPIRIC.ID)); },
+
+            /** One of her punches landed (CollisionSystem.resolveProjectile): with Vampiric Fists, she drinks */
+            onPunchLanded(e, p) {
+                if (!this.vampiricFists()) return 0;
+                const V = ITEM_REGISTRY[VAMPIRIC.ID].stats, pl = this.player;
+                const healed = pl.heal ? pl.heal(Math.max(1, Math.round(p.damage * (p.haymaker ? V.haymakerLifesteal : V.lifesteal)))) : 0;
+                if (p.haymaker && !e.dead) this.applyStatus(e, 'bleed', { dps: V.bleedDps * this.playerDamageMult(), secs: V.bleedSecs, by: pl });
+                const fx = this.knuckleFx || (this.knuckleFx = []), now = _gameTimeSec;
+                const n = p.haymaker ? VAMPIRIC.HAY_MOTES : VAMPIRIC.MOTES;
+                for (let i = 0; i < n; i++) fx.push({ k: 'drain', x: e.x, y: e.y, t0: now + i * 0.025, ph: Math.random() * 6.28, sp: 10 + Math.random() * 12 });
+                if (fx.length > 48) fx.splice(0, fx.length - 48);
+                return healed;
+            },
+
             /** Once a sim tick: a body a haymaker drove into a wall takes the slam */
             updateKnuckleSlams() {
                 if (!this.enemies || !this.activeMap) return;
@@ -72532,7 +72663,21 @@ engineMixin({
                 const now = _gameTimeSec, TAU = Math.PI * 2, R = CONFIG.PUNCH.REACH;
                 for (let i = L.length - 1; i >= 0; i--) {
                     const f = L[i], age = now - f.t0;
-                    if (f.k === 'trail') {
+                    if (f.k === 'drain') {                                         // Vampiric Fists: a crimson mote, wound to her
+                        if (age < 0) continue;
+                        if (age > VAMPIRIC.LIFE || !this.player) { L.splice(i, 1); continue; }
+                        const u = age / VAMPIRIC.LIFE, e2 = u * u * (3 - 2 * u), pl = this.player;
+                        const dx = pl.x - f.x, dy = pl.y - f.y, d = Math.hypot(dx, dy) || 1;
+                        const bow = Math.sin(u * Math.PI) * f.sp * Math.sin(f.ph);           // each one curves its own way
+                        const x = f.x + dx * e2 - dy / d * bow, y = f.y + dy * e2 + dx / d * bow;
+                        const a = (u < 0.15 ? u / 0.15 : 1) * (1 - Math.max(0, u - 0.8) / 0.2), r = 2.2 - u * 0.8;
+                        ctx.save();
+                        const g = ctx.createRadialGradient(x, y, 0, x, y, r * 3);
+                        g.addColorStop(0, `rgba(255, 120, 140, ${a * 0.9})`); g.addColorStop(0.4, `rgba(200, 16, 46, ${a * 0.6})`); g.addColorStop(1, 'rgba(120, 0, 20, 0)');
+                        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 3, 0, TAU); ctx.fill();
+                        ctx.fillStyle = `rgba(255, 210, 220, ${a})`; ctx.beginPath(); ctx.arc(x, y, r * 0.5, 0, TAU); ctx.fill();
+                        ctx.restore();
+                    } else if (f.k === 'trail') {
                         const life = f.hay ? 0.32 : 0.22;
                         if (age > life) { L.splice(i, 1); continue; }
                         const c = Math.cos(f.a), s = Math.sin(f.a), side = f.side === 'right' ? 1 : -1;
@@ -72566,15 +72711,15 @@ engineMixin({
         });
 
         /** Gilded brass knuckles across a fist, seen from above: `a` is the forearm's way (toward the knuckles) */
-        function drawKnuckleDuster(ctx, fx, fy, a, scale = 1) {
+        function drawKnuckleDuster(ctx, fx, fy, a, scale = 1, vamp = false) {
             ctx.save();
             ctx.translate(fx, fy); ctx.rotate(a); ctx.scale(scale, scale);
             ctx.fillStyle = '#7a5a1a'; ctx.beginPath(); ctx.roundRect(1.2, -3.6, 2.6, 7.2, 1.1); ctx.fill();          // the bar's shadowed base
             const g = ctx.createLinearGradient(1.2, -3.6, 3.8, 3.6);
             g.addColorStop(0, '#fff0b0'); g.addColorStop(0.45, '#e8b84a'); g.addColorStop(1, '#a87a22');
             ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(1.6, -3.4, 2.2, 6.8, 1); ctx.fill();
-            ctx.fillStyle = '#fff6d0';
-            for (const y of [-2.4, -0.8, 0.8, 2.4]) { ctx.beginPath(); ctx.arc(3.3, y, 0.55, 0, Math.PI * 2); ctx.fill(); }   // a stud over each knuckle
+            ctx.fillStyle = vamp ? '#d0103a' : '#fff6d0';                                   // Vampiric Fists: blood-garnet studs
+            for (const y of [-2.4, -0.8, 0.8, 2.4]) { ctx.beginPath(); ctx.arc(3.3, y, vamp ? 0.7 : 0.55, 0, Math.PI * 2); ctx.fill(); }   // a stud over each knuckle
             ctx.restore();
         }
         // GameEngine — the parks' moon pools as water (world/parks.js paints them; engine/map-loading.js lists them in
@@ -73911,8 +74056,11 @@ engineMixin({
 
             // =========================================================
             //  LOST THINGS — the Double Nights lobby's forgotten cases, Moon City's clutches,
-            //  coat and VIP purses. A few personics lifted from each; each fills again once a
-            //  day. Props may carry their own pay range (lootMin/lootMax) and lines (lootLines).
+            //  coat and VIP purses, and stashes round the city (ls_*: the cafe's tote, Torque's
+            //  cash tin, Enni Cole's bag and envelope, the House of Death's offering bowl, Lilitu's
+            //  tribute chest). A few personics lifted from each; each fills again once a day.
+            //  Props may carry their own pay range (lootMin/lootMax), lines (lootLines) and a
+            //  noise that carries when it's taken (lootNoise: the gauntlet's stashes wake the house).
             //  (Save key questState.lobbyLuggage, kept for old saves, now holds them all.)
             // =========================================================
             searchLostLuggage(prop) {
@@ -73924,6 +74072,7 @@ engineMixin({
                 const pp = lo + Math.floor(Math.random() * (hi - lo + 1));
                 qs.lobbyLuggage[id] = day; prop._searched = true;
                 this.currency += pp; this.updateUI();
+                if (prop.lootNoise) this.emitNoise(prop.x + prop.width / 2, prop.y + prop.height / 2, prop.lootNoise, 'stash');
                 showMessage(`+${pp} PERSONICS — ${pickFrom(Math.random, prop.lootLines || ["SOMEONE WON'T MISS IT", 'FINDERS KEEPERS', 'A TIP, OF SORTS', 'THINK EXCELLENCE'])}`);
                 audioSys.sfx('ui');
             },
@@ -76075,6 +76224,7 @@ engineMixin({
                         if (st.effect === 'laser_sight') chips.push('Targeting beam');
                         if (st.effect === 'mirror_blade') chips.push('Cuts deflect bullets');
                         if (st.gunDamageMult) chips.push(`Bullets ×${st.gunDamageMult}`);
+                        if (st.lifesteal) chips.push(`Punches heal ${Math.round(st.lifesteal * 100)}%`, `Haymaker ${Math.round(st.haymakerLifesteal * 100)}% · bleed`);
                         if (st.haymakerEvery) chips.push(`Every ${st.haymakerEvery === 3 ? '3rd' : st.haymakerEvery + 'th'}: haymaker ×${st.haymakerMult}`, 'Staggers · wall slam');
                         if (sch.id === 'acc_mirror_glass') chips.push('All damage ×1.35', 'Shield 90 · 3 s recharge');
                         if (sch.id === 'clothing_dyer') chips.push('Recolour outfits', `${DYER.FEE} scrap a piece`);
@@ -87459,7 +87609,7 @@ engineMixin({
                     kick: gunKick,
                     // Ticks since the punch was thrown, blended between ticks like everything else
                     punchTicks: currentStance === 'punch' ? this.punchStanceTicks() : undefined,
-                    knuckles: this.weaponMode === 'fists' && !this.weaponHolstered,   // Golden Retribution across her fists
+                    knuckles: this.weaponMode === 'fists' && !this.weaponHolstered && (this.vampiricFists() ? 'vamp' : true),   // Golden Retribution across her fists ('vamp': garnet studs)
                     top: outfit.top,
                     bottom: outfit.bottom,
                     shoes: outfit.shoes,

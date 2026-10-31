@@ -2334,6 +2334,81 @@
             }
         }
 
+        /* Stashes round the city (ls_*): lost things searched once a day (searchLostLuggage), drawn
+           closed and full, or lying open once searched today (the sprite repaints on _searched). */
+        function drawStashDecorProp(ctx, p) {
+            const x = p.x, y = p.y, w = p.width, h = p.height, open = p._searched;
+            const gold = '#e8c26a', goldDk = '#9a7a32';
+            const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
+                ctx.beginPath(); ctx.roundRect(X, Y, W, H, r);
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+            };
+            const circ = (cx, cy, r, fill, stroke, lw = 1) => {
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+            };
+            const bills = (bx, by, n) => { for (let i = 0; i < n; i++) rr(bx + i * 3, by - i, 7, 4, 0.8, i % 2 ? '#8fc89a' : '#6fb07e', 'rgba(20,50,30,0.5)', 0.4); };
+            ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.beginPath(); ctx.ellipse(x + w / 2 + 1.5, y + h + 1, w * 0.55, 2.4, 0, 0, Math.PI * 2); ctx.fill();
+            switch (p.decorType) {
+                case 'ls_tote': {                                          // a canvas tote, a paperback and a knitted scarf poking out
+                    ctx.strokeStyle = '#a8916c'; ctx.lineWidth = 1.4;
+                    ctx.beginPath(); ctx.moveTo(x + 4, y + 2); ctx.quadraticCurveTo(x + w / 2, y - 7, x + w - 4, y + 2); ctx.stroke();
+                    rr(x, y + 1, w, h - 1, 2, '#e9dcc2', '#a8916c', 0.8);
+                    rr(x + 3, y + 4, w - 6, 5, 1, '#c6553a');                                         // the cafe's stamp
+                    if (open) { rr(x + 2, y + 2, w - 4, h - 5, 1.5, '#4a3a2a'); rr(x + w - 3, y + h - 4, 9, 4, 1.5, '#b9446a'); }   // emptied, the scarf trailing out
+                    else { rr(x + 2, y - 2, 7, 5, 1, '#3d6a8a', '#22384a', 0.5); rr(x + 8, y - 3, 7, 5, 2, '#b9446a'); }
+                    break;
+                }
+                case 'ls_cashtin': {                                       // a dented steel cash box, grease on the lid
+                    rr(x, y, w, h, 2, '#6c7480', '#2c3038', 0.9);
+                    if (open) { rr(x, y - h * 0.55, w, h * 0.55, 2, '#7d8592', '#2c3038', 0.8); rr(x + 2, y + 2, w - 4, h - 4, 1, '#1c1f24');
+                                for (let i = 0; i < 4; i++) rr(x + 3 + i * 4, y + 3, 3, h - 6, 0.5, '#2a2e36'); }   // the empty coin tray
+                    else { ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(x + 2, y + 2, w - 6, 1.2);
+                           ctx.fillStyle = 'rgba(20,16,10,0.4)'; ctx.beginPath(); ctx.ellipse(x + w * 0.3, y + h * 0.6, 3, 1.6, 0.3, 0, Math.PI * 2); ctx.fill();
+                           rr(x + w / 2 - 3, y + h / 2 - 1.5, 6, 3, 0.8, '#c9ccd2', '#3a3e46', 0.5); bills(x + w - 4, y + h - 2, 1); }
+                    break;
+                }
+                case 'ls_shopbag': {                                       // an Enni Cole bag: rose paper, black rope handles, tissue
+                    ctx.strokeStyle = '#1a1014'; ctx.lineWidth = 1.1;
+                    for (const hx of [x + 5, x + w - 5]) { ctx.beginPath(); ctx.moveTo(hx - 2, y + 2); ctx.quadraticCurveTo(hx, y - 5, hx + 2, y + 2); ctx.stroke(); }
+                    rr(x, y + 1, w, h - 1, 1.5, '#e8a6b8', '#7a3a4e', 0.8);
+                    ctx.fillStyle = gold; ctx.font = '600 6px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('EC', x + w / 2, y + h / 2 + 2);
+                    if (open) { ctx.save(); ctx.translate(x + w + 2, y + h - 3); ctx.rotate(0.4); rr(-6, -3, 12, 6, 2, '#f6eef2', 'rgba(120,80,100,0.5)', 0.5); ctx.restore(); }   // the tissue, pulled out
+                    else { ctx.fillStyle = '#f6eef2'; ctx.beginPath(); ctx.moveTo(x + 3, y + 2); ctx.lineTo(x + 7, y - 3); ctx.lineTo(x + 10, y + 1); ctx.lineTo(x + 14, y - 3); ctx.lineTo(x + w - 3, y + 2); ctx.fill(); }
+                    break;
+                }
+                case 'ls_envelope': {                                      // a cream envelope, the store's gold seal
+                    rr(x, y, w, h, 1, '#f2e6cf', '#9a8458', 0.6);
+                    ctx.strokeStyle = 'rgba(120,96,56,0.6)'; ctx.lineWidth = 0.5;
+                    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w / 2, y + h * 0.55); ctx.lineTo(x + w, y); ctx.stroke();
+                    if (open) { ctx.fillStyle = '#e6d6b8'; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w / 2, y - h * 0.6); ctx.lineTo(x + w, y); ctx.fill(); ctx.stroke(); }
+                    else { circ(x + w / 2, y + h * 0.55, 2.2, '#9a1c3a', goldDk, 0.4); bills(x + w - 6, y + 1, 1); }
+                    break;
+                }
+                case 'ls_offering': {                                      // a black stone bowl of coins and wax, three bone candles round it
+                    for (const [cx, cy] of [[x - 3, y + 2], [x + w + 3, y + 2], [x + w / 2, y + h + 3]]) { circ(cx, cy, 2, '#e8dcc6'); circ(cx, cy - 0.5, 0.8, '#ffb46a'); }
+                    ctx.fillStyle = '#16101a'; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = '#4a2a4a'; ctx.lineWidth = 1; ctx.stroke();
+                    ctx.fillStyle = '#2a1626'; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2 - 3, h / 2 - 2.5, 0, 0, Math.PI * 2); ctx.fill();
+                    if (!open) for (let i = 0; i < 7; i++) circ(x + w / 2 + Math.cos(i * 2.4) * (i % 3 + 1) * 2.4, y + h / 2 + Math.sin(i * 2.4) * (i % 3) * 1.4, 1.7, i % 2 ? gold : '#c9a24a', goldDk, 0.3);
+                    else circ(x + w / 2, y + h / 2, 2.2, 'rgba(176,112,255,0.5)');           // a last violet ember in the empty bowl
+                    break;
+                }
+                case 'ls_tribute': {                                       // a black-lacquer chest bound in gold, a crimson gem in the lock
+                    rr(x, y, w, h, 2, '#1e0a12', gold, 1);
+                    ctx.fillStyle = goldDk; ctx.fillRect(x + 6, y, 2, h); ctx.fillRect(x + w - 8, y, 2, h);           // the bands
+                    if (open) { rr(x - 1, y - h * 0.6, w + 2, h * 0.6, 2, '#2a0e18', gold, 0.8); rr(x + 3, y + 3, w - 6, h - 6, 1.5, '#3a0614');
+                                circ(x + w / 2, y + h / 2, 1.4, 'rgba(255,90,110,0.6)'); }
+                    else { ctx.fillStyle = 'rgba(255,220,150,0.25)'; ctx.fillRect(x + 2, y + 2, w - 4, 1.2);
+                           for (let i = 0; i < 5; i++) circ(x + 4 + i * (w - 8) / 4, y - 1, 1.6, gold, goldDk, 0.3);   // coins spilling over the lip
+                           circ(x + w / 2, y + h / 2, 2.6, '#c8102e', gold, 0.6); circ(x + w / 2 - 0.7, y + h / 2 - 0.7, 0.8, 'rgba(255,220,230,0.8)'); }
+                    break;
+                }
+            }
+        }
+
         function drawClinicDecorProp(ctx, p) {
             if (p.decorType.startsWith('apt_')) return drawApartmentDecorProp(ctx, p);
             if (p.decorType.startsWith('sc_')) return drawSanctumDecorProp(ctx, p);
@@ -2347,6 +2422,7 @@
             if (p.decorType.startsWith('dp_')) return drawPalaceDecorProp(ctx, p);
             if (p.decorType.startsWith('cc_')) return drawCafeDecorProp(ctx, p);
             if (p.decorType.startsWith('ec_')) return drawEnniDecorProp(ctx, p);
+            if (p.decorType.startsWith('ls_')) return drawStashDecorProp(ctx, p);
             const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000;
             const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
                 ctx.beginPath(); ctx.roundRect(X, Y, W, H, r);
@@ -2475,7 +2551,7 @@
                 this.patient = !!config.patient;
                 this.noteId = config.noteId || null;
                 if (config.label) this.label = config.label;                   // what the action pill names it
-                if (config.lootLines) { this.lootMin = config.lootMin; this.lootMax = config.lootMax; this.lootLines = config.lootLines; }   // lost things (searchLostLuggage)
+                if (config.lootLines) { this.lootMin = config.lootMin; this.lootMax = config.lootMax; this.lootLines = config.lootLines; this.lootNoise = config.lootNoise || 0; }   // lost things (searchLostLuggage)
                 this.roomId = config.roomId || null;  // For light switches: which room this controls
                 this._switchState = true;  // Light switch: true = lights ON
                 this.angularFriction = 0.85;  // Rotation slows down over time (as fast as sliding does)
