@@ -759,6 +759,7 @@
                 }
             }
         }
+        TierKit.profile(MoonCityBuilding);
 
         /** Moon City: x, y its corner; it fronts south. */
         function createMoonCity(x, y, config = {}) {

@@ -580,6 +580,7 @@
                 ctx.restore();
             }
         }
+        TierKit.profile(SilverQueenBuilding);
 
         /** The Silver Queen: x, y its corner; it fronts south. */
         function createSilverQueen(x, y, config = {}) {

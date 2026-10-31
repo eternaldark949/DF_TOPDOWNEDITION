@@ -333,6 +333,7 @@
                 ctx.drawImage(s.cv, s.x, s.y, s.w, s.h);
             }
         }
+        TierKit.profile(EnniColeBuilding);
 
         /** Enni Cole: x, y its corner; it fronts south. */
         function createEnniCole(x, y, config = {}) {

@@ -90,11 +90,12 @@
         /** Buildings/World tops detail hooks exist only while the Full profiler is shown.
             Stage rows are exclusive; body drawing stays in its existing People rows. */
         const WorldRenderProfiler = {
-            active: false, hooks: null, scope: null, part: null, partT: 0, partP: 0,
+            active: false, hooks: null, scope: null, part: null, partT: 0, partP: 0, _tagsBound: 0,
             parts: Object.create(null),
             keys: {
                 Buildings: ['Base', 'Forecourts', 'Reflection prep', 'Wet ground', 'Reflections', 'Sun shadows', 'Cloud shadows', 'Indoor floors', 'Windows', 'Signs'],
-                'World tops': ['Roofs and facades', 'Windows', 'Signs', 'Ferris wheel', 'Foliage', 'Leaves', 'Lamp bodies', 'Linens']
+                'World tops': ['Roofs and facades', 'Windows', 'Signs', 'Ferris wheel', 'Foliage', 'Leaves', 'Lamp bodies', 'Linens'],
+                Glow: []                                                       // (filled by RenderTags: the lit pass after the darkness)
             },
 
             _wrap(tag, original) {
@@ -153,6 +154,14 @@
                     bind('Leaves', LeafParticleSystem.prototype, 'draw');
                     bind('Lamp bodies', LampEntity.prototype, 'draw');
                     bind('Linens', RoomSystem.prototype, 'drawLinens');
+                }
+                // Methods tagged where they're written (RenderTags, entities/static-builders-profiler.js): each new tag
+                // is bound once, and its row joins the scopes it names
+                for (; this._tagsBound < RenderTags.list.length; this._tagsBound++) {
+                    const { owner, key, part, scopes } = RenderTags.list[this._tagsBound], original = owner[key];
+                    if (typeof original !== 'function') continue;
+                    this.hooks.push({ owner, key, original, wrapped: this._wrap(part, original) });
+                    for (const s of scopes || []) if (this.keys[s] && !this.keys[s].includes(part)) this.keys[s].push(part);
                 }
                 for (const h of this.hooks) h.owner[h.key] = on ? h.wrapped : h.original;
                 this.active = on; this.scope = null; this.part = null;

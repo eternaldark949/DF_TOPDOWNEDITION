@@ -301,6 +301,23 @@
         };
         if (typeof window !== 'undefined') window.PerfBench = PerfBench;
 
+        /* RENDER TAGS — render code tags its own methods for the Full profiler, next to the code
+           (no list here to keep up). A tag names the row its time goes to and the scopes it's billed
+           in: 'Buildings' (the base pass), 'World tops' (roofs and facades over the player), 'Glow'
+           (the lit pass after the darkness). The world profiler (world/city-layout.js) wraps them only
+           while Full mode is on; outside those scopes a tagged method runs untouched. Rows nest: time a
+           tagged method spends in another tagged method is that one's.
+             RenderTags.tag(LandmarkKit, 'sprite', 'Bakes', ['Buildings', 'World tops', 'Glow']);
+             RenderTags.tagClass(MyBuilding, { drawTop: ['My building', ['World tops']] });   // the methods it defines itself */
+        const RenderTags = {
+            list: [],
+            tag(owner, key, part, scopes) { this.list.push({ owner, key, part, scopes }); },
+            /** Each method `cls` itself defines (an inherited one is tagged where it's defined). */
+            tagClass(cls, map) {
+                for (const key of Object.keys(map)) if (Object.prototype.hasOwnProperty.call(cls.prototype, key)) this.tag(cls.prototype, key, map[key][0], map[key][1]);
+            }
+        };
+
         class Profiler {
             constructor() {
                 this.metrics = {};

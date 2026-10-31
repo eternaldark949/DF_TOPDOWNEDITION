@@ -401,3 +401,15 @@
                 return hulls;
             }
         }
+
+        /** The Full profiler's rows (RenderTags): the tiers' walls and roofs, their night light, and the art baked once.
+            A building on the kit passes its class to TierKit.profile, so its own overrides bill the same rows. */
+        TierKit.PROFILE = {
+            drawTop: ['Tiered buildings', ['World tops']],
+            drawEmissive: ['Tiered lights', ['Glow']],
+            _tkArt: ['Bakes', ['World tops', 'Glow']],
+            _tkRoof: ['Bakes', ['World tops', 'Glow']]
+        };
+        TierKit.profile = (cls) => RenderTags.tagClass(cls, TierKit.PROFILE);
+        TierKit.profile(TieredBuilding);
+        RenderTags.tag(LandmarkKit, 'sprite', 'Bakes', ['Buildings', 'World tops', 'Glow']);

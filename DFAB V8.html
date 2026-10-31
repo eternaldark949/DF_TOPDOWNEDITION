@@ -24978,6 +24978,23 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         };
         if (typeof window !== 'undefined') window.PerfBench = PerfBench;
 
+        /* RENDER TAGS — render code tags its own methods for the Full profiler, next to the code
+           (no list here to keep up). A tag names the row its time goes to and the scopes it's billed
+           in: 'Buildings' (the base pass), 'World tops' (roofs and facades over the player), 'Glow'
+           (the lit pass after the darkness). The world profiler (world/city-layout.js) wraps them only
+           while Full mode is on; outside those scopes a tagged method runs untouched. Rows nest: time a
+           tagged method spends in another tagged method is that one's.
+             RenderTags.tag(LandmarkKit, 'sprite', 'Bakes', ['Buildings', 'World tops', 'Glow']);
+             RenderTags.tagClass(MyBuilding, { drawTop: ['My building', ['World tops']] });   // the methods it defines itself */
+        const RenderTags = {
+            list: [],
+            tag(owner, key, part, scopes) { this.list.push({ owner, key, part, scopes }); },
+            /** Each method `cls` itself defines (an inherited one is tagged where it's defined). */
+            tagClass(cls, map) {
+                for (const key of Object.keys(map)) if (Object.prototype.hasOwnProperty.call(cls.prototype, key)) this.tag(cls.prototype, key, map[key][0], map[key][1]);
+            }
+        };
+
         class Profiler {
             constructor() {
                 this.metrics = {};
@@ -35136,6 +35153,18 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return hulls;
             }
         }
+
+        /** The Full profiler's rows (RenderTags): the tiers' walls and roofs, their night light, and the art baked once.
+            A building on the kit passes its class to TierKit.profile, so its own overrides bill the same rows. */
+        TierKit.PROFILE = {
+            drawTop: ['Tiered buildings', ['World tops']],
+            drawEmissive: ['Tiered lights', ['Glow']],
+            _tkArt: ['Bakes', ['World tops', 'Glow']],
+            _tkRoof: ['Bakes', ['World tops', 'Glow']]
+        };
+        TierKit.profile = (cls) => RenderTags.tagClass(cls, TierKit.PROFILE);
+        TierKit.profile(TieredBuilding);
+        RenderTags.tag(LandmarkKit, 'sprite', 'Bakes', ['Buildings', 'World tops', 'Glow']);
         // =====================================================================
         //  SILVER QUEEN — portico, pilasters, verandas, crown and searchlights
         // =====================================================================
@@ -41699,6 +41728,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
             _setupSign() { this.attachedSign = null; }
             _generateLights() {}
         }
+        TierKit.profile(AshgroveBuilding);
 
         /** The Ashgrove: x, y its corner; it fronts south (config.facing 'N' turns it round to front north). */
         function createAshgrove(x, y, config = {}) {
@@ -42118,6 +42148,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 ctx.drawImage(s.cv, s.x, s.y, s.w, s.h);
             }
         }
+        TierKit.profile(EnniColeBuilding);
 
         /** Enni Cole: x, y its corner; it fronts south. */
         function createEnniCole(x, y, config = {}) {
@@ -42744,6 +42775,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 ctx.restore();
             }
         }
+        TierKit.profile(SilverQueenBuilding);
 
         /** The Silver Queen: x, y its corner; it fronts south. */
         function createSilverQueen(x, y, config = {}) {
@@ -43587,6 +43619,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 }
             }
         }
+        TierKit.profile(MoonCityBuilding);
 
         /** Moon City: x, y its corner; it fronts south. */
         function createMoonCity(x, y, config = {}) {
@@ -62569,11 +62602,12 @@ Object.assign(TrafficVehicle.prototype, {
         /** Buildings/World tops detail hooks exist only while the Full profiler is shown.
             Stage rows are exclusive; body drawing stays in its existing People rows. */
         const WorldRenderProfiler = {
-            active: false, hooks: null, scope: null, part: null, partT: 0, partP: 0,
+            active: false, hooks: null, scope: null, part: null, partT: 0, partP: 0, _tagsBound: 0,
             parts: Object.create(null),
             keys: {
                 Buildings: ['Base', 'Forecourts', 'Reflection prep', 'Wet ground', 'Reflections', 'Sun shadows', 'Cloud shadows', 'Indoor floors', 'Windows', 'Signs'],
-                'World tops': ['Roofs and facades', 'Windows', 'Signs', 'Ferris wheel', 'Foliage', 'Leaves', 'Lamp bodies', 'Linens']
+                'World tops': ['Roofs and facades', 'Windows', 'Signs', 'Ferris wheel', 'Foliage', 'Leaves', 'Lamp bodies', 'Linens'],
+                Glow: []                                                       // (filled by RenderTags: the lit pass after the darkness)
             },
 
             _wrap(tag, original) {
@@ -62632,6 +62666,14 @@ Object.assign(TrafficVehicle.prototype, {
                     bind('Leaves', LeafParticleSystem.prototype, 'draw');
                     bind('Lamp bodies', LampEntity.prototype, 'draw');
                     bind('Linens', RoomSystem.prototype, 'drawLinens');
+                }
+                // Methods tagged where they're written (RenderTags, entities/static-builders-profiler.js): each new tag
+                // is bound once, and its row joins the scopes it names
+                for (; this._tagsBound < RenderTags.list.length; this._tagsBound++) {
+                    const { owner, key, part, scopes } = RenderTags.list[this._tagsBound], original = owner[key];
+                    if (typeof original !== 'function') continue;
+                    this.hooks.push({ owner, key, original, wrapped: this._wrap(part, original) });
+                    for (const s of scopes || []) if (this.keys[s] && !this.keys[s].includes(part)) this.keys[s].push(part);
                 }
                 for (const h of this.hooks) h.owner[h.key] = on ? h.wrapped : h.original;
                 this.active = on; this.scope = null; this.part = null;
@@ -84397,7 +84439,13 @@ engineMixin({
                     this.drawFireLightGlow(this.ctx);
                 }
                 // Glowing details drawn after the darkness layer: windows, neon, rooftops, sky
-                if (RL.at('glow')) this.drawEmissivePass(this.ctx);
+                if (RL.at('glow')) {
+                    // Full mode: the lit pass gets a row of its own, broken down by what's tagged for 'Glow' (RenderTags)
+                    const timed = RenderStats.timed;
+                    if (timed) { this.profiler.add('Lighting: Glow', 0, true); this.profiler.start('Lighting: Glow'); WorldRenderProfiler.begin('Glow', this.profiler, 'Lighting: Glow'); }
+                    this.drawEmissivePass(this.ctx);
+                    if (timed) { this.profiler.stop('Lighting: Glow'); WorldRenderProfiler.end(this.profiler); }
+                }
                 // Her halo, above the darkness so it reads at night (kept from her draw: engine/player-draw-input.js)
                 if (RL.at('stella')) this.drawPlayerGlow(this.ctx);
                 // Velvet's eyeshine, above the darkness; hidden under roofs and canopies like the speech bubbles
