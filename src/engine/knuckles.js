@@ -11,6 +11,11 @@
         // window is always a haymaker, Flit-Strike's bonus on top. Jabs step her in like a blade does.
         // Each punch leaves gold afterimages of the fist along its path; a haymaker adds a ring burst,
         // sparks and a clink (drawKnuckleFx, after the slashes).
+        //
+        // Vampiric Fists (an attachment, SCHEMATICS vampiric_fists, 350 scrap): any punch of hers that lands —
+        // bare fists, the knuckles, fist weapons to come — heals her VAMPIRIC.LIFESTEAL of its damage, a haymaker
+        // HAY_LIFESTEAL and a bleed (onPunchLanded, from CollisionSystem.resolveProjectile). Crimson motes run
+        // from the wound to her (drawKnuckleFx); the knuckle bar's studs turn garnet.
 
         const KNUCKLES = {
             ID: 'golden_retribution', EVERY: 3, HAY_MULT: 2.5, JAB_KNOCK: 1, HAY_KNOCK: 3,
@@ -18,6 +23,7 @@
             COMBO_RESET: 1.2,          // s without a punch before the count starts again
             STEP_REACH: 46             // px ahead (past both bodies) she'll step in toward someone on a jab
         };
+        const VAMPIRIC = { ID: 'vampiric_fists', MOTES: 5, HAY_MOTES: 9, LIFE: 0.45 };
 
         engineMixin({
             /** Ticks into the punch for the body's strike curve: a quicker punch runs the same 15-tick curve faster */
@@ -85,6 +91,22 @@
                 if (typeof ambience !== 'undefined' && ambience.clink) ambience.clink();
             },
 
+            /** Vampiric Fists worn? */
+            vampiricFists() { return !!(this.inventory && this.inventory.hasAttachment(VAMPIRIC.ID)); },
+
+            /** One of her punches landed (CollisionSystem.resolveProjectile): with Vampiric Fists, she drinks */
+            onPunchLanded(e, p) {
+                if (!this.vampiricFists()) return 0;
+                const V = ITEM_REGISTRY[VAMPIRIC.ID].stats, pl = this.player;
+                const healed = pl.heal ? pl.heal(Math.max(1, Math.round(p.damage * (p.haymaker ? V.haymakerLifesteal : V.lifesteal)))) : 0;
+                if (p.haymaker && !e.dead) this.applyStatus(e, 'bleed', { dps: V.bleedDps * this.playerDamageMult(), secs: V.bleedSecs, by: pl });
+                const fx = this.knuckleFx || (this.knuckleFx = []), now = _gameTimeSec;
+                const n = p.haymaker ? VAMPIRIC.HAY_MOTES : VAMPIRIC.MOTES;
+                for (let i = 0; i < n; i++) fx.push({ k: 'drain', x: e.x, y: e.y, t0: now + i * 0.025, ph: Math.random() * 6.28, sp: 10 + Math.random() * 12 });
+                if (fx.length > 48) fx.splice(0, fx.length - 48);
+                return healed;
+            },
+
             /** Once a sim tick: a body a haymaker drove into a wall takes the slam */
             updateKnuckleSlams() {
                 if (!this.enemies || !this.activeMap) return;
@@ -123,7 +145,21 @@
                 const now = _gameTimeSec, TAU = Math.PI * 2, R = CONFIG.PUNCH.REACH;
                 for (let i = L.length - 1; i >= 0; i--) {
                     const f = L[i], age = now - f.t0;
-                    if (f.k === 'trail') {
+                    if (f.k === 'drain') {                                         // Vampiric Fists: a crimson mote, wound to her
+                        if (age < 0) continue;
+                        if (age > VAMPIRIC.LIFE || !this.player) { L.splice(i, 1); continue; }
+                        const u = age / VAMPIRIC.LIFE, e2 = u * u * (3 - 2 * u), pl = this.player;
+                        const dx = pl.x - f.x, dy = pl.y - f.y, d = Math.hypot(dx, dy) || 1;
+                        const bow = Math.sin(u * Math.PI) * f.sp * Math.sin(f.ph);           // each one curves its own way
+                        const x = f.x + dx * e2 - dy / d * bow, y = f.y + dy * e2 + dx / d * bow;
+                        const a = (u < 0.15 ? u / 0.15 : 1) * (1 - Math.max(0, u - 0.8) / 0.2), r = 2.2 - u * 0.8;
+                        ctx.save();
+                        const g = ctx.createRadialGradient(x, y, 0, x, y, r * 3);
+                        g.addColorStop(0, `rgba(255, 120, 140, ${a * 0.9})`); g.addColorStop(0.4, `rgba(200, 16, 46, ${a * 0.6})`); g.addColorStop(1, 'rgba(120, 0, 20, 0)');
+                        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 3, 0, TAU); ctx.fill();
+                        ctx.fillStyle = `rgba(255, 210, 220, ${a})`; ctx.beginPath(); ctx.arc(x, y, r * 0.5, 0, TAU); ctx.fill();
+                        ctx.restore();
+                    } else if (f.k === 'trail') {
                         const life = f.hay ? 0.32 : 0.22;
                         if (age > life) { L.splice(i, 1); continue; }
                         const c = Math.cos(f.a), s = Math.sin(f.a), side = f.side === 'right' ? 1 : -1;
@@ -157,14 +193,14 @@
         });
 
         /** Gilded brass knuckles across a fist, seen from above: `a` is the forearm's way (toward the knuckles) */
-        function drawKnuckleDuster(ctx, fx, fy, a, scale = 1) {
+        function drawKnuckleDuster(ctx, fx, fy, a, scale = 1, vamp = false) {
             ctx.save();
             ctx.translate(fx, fy); ctx.rotate(a); ctx.scale(scale, scale);
             ctx.fillStyle = '#7a5a1a'; ctx.beginPath(); ctx.roundRect(1.2, -3.6, 2.6, 7.2, 1.1); ctx.fill();          // the bar's shadowed base
             const g = ctx.createLinearGradient(1.2, -3.6, 3.8, 3.6);
             g.addColorStop(0, '#fff0b0'); g.addColorStop(0.45, '#e8b84a'); g.addColorStop(1, '#a87a22');
             ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(1.6, -3.4, 2.2, 6.8, 1); ctx.fill();
-            ctx.fillStyle = '#fff6d0';
-            for (const y of [-2.4, -0.8, 0.8, 2.4]) { ctx.beginPath(); ctx.arc(3.3, y, 0.55, 0, Math.PI * 2); ctx.fill(); }   // a stud over each knuckle
+            ctx.fillStyle = vamp ? '#d0103a' : '#fff6d0';                                   // Vampiric Fists: blood-garnet studs
+            for (const y of [-2.4, -0.8, 0.8, 2.4]) { ctx.beginPath(); ctx.arc(3.3, y, vamp ? 0.7 : 0.55, 0, Math.PI * 2); ctx.fill(); }   // a stud over each knuckle
             ctx.restore();
         }

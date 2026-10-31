@@ -1421,6 +1421,7 @@
                         if (st.effect === 'laser_sight') chips.push('Targeting beam');
                         if (st.effect === 'mirror_blade') chips.push('Cuts deflect bullets');
                         if (st.gunDamageMult) chips.push(`Bullets ×${st.gunDamageMult}`);
+                        if (st.lifesteal) chips.push(`Punches heal ${Math.round(st.lifesteal * 100)}%`, `Haymaker ${Math.round(st.haymakerLifesteal * 100)}% · bleed`);
                         if (st.haymakerEvery) chips.push(`Every ${st.haymakerEvery === 3 ? '3rd' : st.haymakerEvery + 'th'}: haymaker ×${st.haymakerMult}`, 'Staggers · wall slam');
                         if (sch.id === 'acc_mirror_glass') chips.push('All damage ×1.35', 'Shield 90 · 3 s recharge');
                         if (sch.id === 'clothing_dyer') chips.push('Recolour outfits', `${DYER.FEE} scrap a piece`);

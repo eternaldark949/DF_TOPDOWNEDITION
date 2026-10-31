@@ -357,6 +357,7 @@
                         if (landed && p.melee && e.interruptMelee) e.interruptMelee();
                         if (landed && p.sticky && !e.dead) game.stickOrb(e, p);
                         if (landed && p.knuckles && game.onKnuckleHit) game.onKnuckleHit(e, p);
+                        if (landed && p.melee && !p.isEnemy && p.owner === game.player && game.onPunchLanded) game.onPunchLanded(e, p);   // her punches (Vampiric Fists)
                     } else if (hit.kind === 'actor') e.onProjectileHit(p, game);
                     else if (hit.kind === 'traffic') {
                         const speed = Math.hypot(p.vx, p.vy), push = (p.damage * speed * 0.005) / 5;
