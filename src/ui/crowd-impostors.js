@@ -1,7 +1,8 @@
         // ═══ CROWD QUALITY — how the crowd is drawn (Settings → Graphics → Crowd Quality) ═══
         // The crowd: pedestrians, the lobby's and club's guests and staff, and a map's standing
         // NPCs. Never Stella, the crew, enemies or the fallen (they're always drawn live).
-        //   high   — fully live (the default)
+        //   ultra  — fully live
+        //   high   — the walking crowd from shaded bakes with hair and cloth in motion (CrowdBakes below; the default)
         //   medium — live, but flat-shaded, with hair and cloth at rest (no physics), no lamp rim
         //   low    — baked: each crowd member's look is drawn once into a strip of frames (an idle
         //            frame and an 8-step walk cycle) and replayed: the contact shadow is drawn live,
@@ -103,13 +104,207 @@
                 return true;
             },
 
-            clear() { this.cache.clear(); }
+            clear() { this.cache.clear(); if (typeof CrowdBakes !== 'undefined') CrowdBakes.clear(); }
         };
 
-        /** The crowd's draw: by Crowd Quality (high live, medium lighter, low baked) */
+        // ═══ HIGH: shaded walk bakes, hair and cloth swinging ═══
+        // On High the walking crowd is drawn from a bake too, but a full one: shaded as on Ultra (the sun's
+        // side for the way they face, rain on them), hair and cloth run through their physics in step with
+        // the walk (a few warm-up steps, then a 12-step cycle, so it swings and trails as they stride), and a
+        // street lamp's rim painted live over the bake. Each bake is spread over a few frames (BAKE_DRAWS
+        // bodies' worth a frame for the whole crowd), so a new look costs about what a few live bodies would;
+        // until it's ready they're drawn live. Someone who has just stopped (IDLE_FROM…IDLE_TO s: their hair
+        // settled, but before the idle pose starts shifting their weight and glancing round) is one still bake;
+        // past that they're live again. Anyone dancing, dying, hovering, lit by
+        // lightning, in night vision's heat or casting a High lamp silhouette, and anyone seen up close
+        // (zoomed past LIVE_SCALE), is drawn live, as on Ultra. Ultra is fully live everywhere.
+        const CROWD_HQ = { FRAMES: 12, WARM: 6, R: 40, Q: 1.25, MAX: 40, PER_OWNER: 3, BAKE_DRAWS: 5, LIGHT_STEPS: 8, LIVE_SCALE: 1.6, STRIDE_SLACK: 0.5, IDLE_FROM: 0.6, IDLE_TO: 3.8 };
+
+        const CrowdBakes = {
+            bakes: new Map(),          // owner → [bake, ...] (newest first)
+            count: 0,
+            job: null,                 // the bake under way: { owner, ... }
+            _budgetFrame: -1, _budget: 0,
+            _scratch: null,
+
+            /** Facing-dependent light: which of LIGHT_STEPS directions the sun comes from (relative to the body), or -1 (none) */
+            _lightStep(rot) {
+                if (typeof sunNow !== 'function') return -1;
+                const sun = sunNow();
+                if (!(sun.day > 0.05) || !(sun.dx || sun.dy)) return -1;
+                const N = CROWD_HQ.LIGHT_STEPS, rel = Math.atan2(sun.dy, sun.dx) - rot;
+                return ((Math.round(rel / (Math.PI * 2) * N) % N) + N) % N;
+            },
+            /** Everything a bake's paint depends on besides the look and pace */
+            _env(e, light) {
+                const sun = typeof sunNow === 'function' ? sunNow() : null;
+                const d = sun && sun.day > 0.05 ? Math.round(Math.min(1, sun.day * 1.4) * 5) : 0;
+                const W = typeof weatherAt === 'function' ? weatherAt(e) : null, rain = W ? Math.round(W.rain * 4) : 0;
+                return light + ':' + d + ':' + (d ? sun.rgb : '') + ':' + rain + ':' + (typeof _zoomLOD !== 'undefined' ? _zoomLOD : 0);
+            },
+            _look(c) {
+                const held = c.held ? c.held.type + (c.held.open ?? '') : '';
+                return (c.pose || '') + '|' + held + '|' + (c.hat ? c.hat.type : '') + '|' + (c.hair ? c.hair.type : '');
+            },
+            /** Should this body be drawn live, as on Ultra? */
+            _live(ctx, e, c) {
+                if (c.pose === 'dance' || c.pose === 'die' || c.isDriving || c.poseWhileMoving) return true;
+                if (c.body && c.body.kind === 'android' && c.body.hover) return true;
+                if (typeof SilhouetteFX !== 'undefined' && (SilhouetteFX.glow || SilhouetteFX.heat > 0.01)) return true;
+                if (e._hitT !== undefined && _gameTimeSec - e._hitT < 0.2) return true;
+                const t = ctx.getTransform();
+                if (Math.hypot(t.a, t.b) > CROWD_HQ.LIVE_SCALE) return true;
+                if (_lampShadowLevel() >= 2 && !c.noShadow && e.x !== undefined && (typeof _zoomLOD === 'undefined' || _zoomLOD < 2) &&
+                    sunNow().night > 0.3 && _lampsNear2(e.x, e.y, CONFIG.HUMAN_SHADE.LAMP_SHADOW_R)) return true;
+                return false;
+            },
+            _find(owner, look, env, sp) {
+                const list = this.bakes.get(owner);
+                if (!list) return null;
+                let best = null, bd = Infinity;
+                for (const b of list) {
+                    if (b.look !== look || b.env !== env || (b.stride === 0) !== (sp === 0)) continue;
+                    const dd = Math.abs(b.stride - sp);
+                    if (dd < bd) { bd = dd; best = b; }
+                }
+                return best && bd <= Math.max(CROWD_HQ.STRIDE_SLACK, sp * 0.12) ? best : null;    // a stride a touch long or short can't be seen
+            },
+            /** A near-enough bake while the right one is made: same look, another light step or pace */
+            _near(owner, look, idle) {
+                const list = this.bakes.get(owner);
+                if (!list) return null;
+                for (const b of list) if (b.look === look && (b.stride === 0) === idle) return b;
+                return null;
+            },
+            _store(owner, b) {
+                let list = this.bakes.get(owner);
+                if (!list) this.bakes.set(owner, list = []);
+                list.unshift(b); this.count++;
+                if (list.length > CROWD_HQ.PER_OWNER) { list.pop(); this.count--; }
+                while (this.count > CROWD_HQ.MAX) {                            // full: drop the bake seen longest ago (never one in use this frame)
+                    let oldK = null, oldI = -1, oldT = Infinity;
+                    for (const [k, l] of this.bakes) for (let i = 0; i < l.length; i++) if (l[i].used < oldT) { oldT = l[i].used; oldK = k; oldI = i; }
+                    if (oldK === null || oldT >= _frameTime) break;
+                    const l = this.bakes.get(oldK); l.splice(oldI, 1); this.count--;
+                    if (!l.length) this.bakes.delete(oldK);
+                }
+            },
+
+            _startJob(owner, e, c, look, env, light, sp, rot) {
+                const F = CROWD_HQ.FRAMES, R = CROWD_HQ.R, Q = CROWD_HQ.Q, cell = Math.ceil(R * 2 * Q);
+                const cv = document.createElement('canvas'); cv.width = cell * (sp > 0 ? F : 1); cv.height = cell;
+                const g = cv.getContext('2d'); if (!g) return null;
+                // A stand-in walker: their look, walking along +x through its own little world
+                const B = { x: 0, y: 0, angle: 0, look: e.look, walkPhase: 0, _bakePed: typeof Pedestrian !== 'undefined' && e instanceof Pedestrian, _wxSeed: 0 };
+                syncHumanoidGait(B);
+                let bakeRot;                                                   // lit from the light step's side, as they face now
+                if (light >= 0) { const sun = sunNow(); bakeRot = Math.atan2(sun.dy, sun.dx) - light / CROWD_HQ.LIGHT_STEPS * Math.PI * 2; }
+                else bakeRot = rot;
+                B._bakeRot = bakeRot;
+                const cfg = Object.assign({}, c, { lerpSpeed: 1, noShadow: true, poseInstant: true, _crowdBake: true });
+                return this.job = { owner, look, env, stride: sp, cv, g, cell, B, cfg, step: 0, t0: _gameTimeSec, cadence: humanoidCadence(sp), used: _frameTime };
+            },
+
+            /** Run up to `n` steps of the bake under way. Returns the finished bake, or null. */
+            _bakeSteps(n) {
+                const J = this.job; if (!J) return null;
+                const walk = J.stride > 0, F = walk ? CROWD_HQ.FRAMES : 1, W = walk ? CROWD_HQ.WARM : 0, R = CROWD_HQ.R, Q = CROWD_HQ.Q, cell = J.cell;
+                let sc = this._scratch;
+                if (!sc || sc.width !== cell) { sc = this._scratch = document.createElement('canvas'); sc.width = sc.height = cell; }
+                const g = sc.getContext('2d'), B = J.B, G = B._gait;
+                const wm = _worldMatrix, wc = _worldCanvas, lite = _crowdLite, gt = _gameTimeSec, rot = _bodyRot;
+                _crowdLite = false;
+                try {
+                    for (let k = 0; k < n && J.step < W + F; k++, J.step++) {
+                        const ph = walk ? (J.step - W) / F * Math.PI * 2 : 0, ticks = walk ? ph / J.cadence : 0;
+                        _gameTimeSec = J.t0 + ticks / 60;
+                        B.x = ticks * J.stride; B.y = 0; B.walkPhase = ph;
+                        G.speed = J.stride; G.dirX = 1; G.dirY = 0; G.tick = _simTick; G.prevX = B.x; G.prevY = B.y; G.phasePrev = ph;
+                        _worldCanvas = sc;
+                        _worldMatrix = new DOMMatrix([Q, 0, 0, Q, R * Q - Q * B.x, R * Q - Q * B.y]);
+                        g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cell, cell);
+                        g.setTransform(Q, 0, 0, Q, R * Q, R * Q);
+                        drawProceduralHumanoid(g, B, J.cfg);
+                        if (J.step >= W) J.g.drawImage(sc, cell * (J.step - W), 0);
+                    }
+                } catch (err) { this.job = null; return null; }
+                finally { _crowdLite = lite; _worldMatrix = wm; _worldCanvas = wc; _gameTimeSec = gt; _bodyRot = rot; }
+                if (J.step < W + F) return null;
+                this.job = null;
+                return { look: J.look, env: J.env, stride: J.stride, cv: J.cv, cell, rim: B._rimGeo || null, used: _frameTime };
+            },
+
+            /** Bake work for this frame, from whoever asks first (the bake under way, else theirs) */
+            _work(owner, e, c, look, env, light, sp, rot) {
+                if (this._budgetFrame !== _frameTime) { this._budgetFrame = _frameTime; this._budget = CROWD_HQ.BAKE_DRAWS; }
+                if (this._budget <= 0) return;
+                if (this.job && (this.job.used < _frameTime - 1000)) this.job = null;     // its walker went away
+                if (!this.job) { if (!this._startJob(owner, e, c, look, env, light, sp, rot)) return; }
+                else if (this.job.owner === owner) this.job.used = _frameTime;
+                const J = this.job, n = this._budget;
+                this._budget = 0;
+                const b = this._bakeSteps(n);
+                if (b) this._store(J.owner, b);
+            },
+
+            /** Draw from a bake (true), else false (the caller draws live). */
+            draw(ctx, e, c) {
+                if (this._live(ctx, e, c)) return false;
+                const g = syncHumanoidGait(e);
+                let sp = g ? Math.round(g.speed * 2) / 2 : 0;
+                if (!(g && g.speed > CONFIG.GAIT.STOP_SPEED) || sp < 0.5) {                        // standing: a still bake only while the idle pose is just breathing
+                    if (e._crowdStopT == null) e._crowdStopT = _gameTimeSec;
+                    const still = _gameTimeSec - e._crowdStopT;
+                    if (still < CROWD_HQ.IDLE_FROM || still > CROWD_HQ.IDLE_TO) return false;
+                    sp = 0;
+                } else e._crowdStopT = null;
+                const t = ctx.getTransform(), rot = Math.atan2(t.b, t.a);
+                const light = this._lightStep(rot), look = this._look(c), env = this._env(e, light);
+                let b = this._find(e, look, env, sp);
+                if (!b) {
+                    const steady = e._crowdHQsp === sp; e._crowdHQsp = sp;           // easing in or out of a stroll: don't bake every pace on the way
+                    if (steady) this._work(e, e, c, look, env, light, sp, rot);
+                    b = this._find(e, look, env, sp);
+                    if (!b) { b = this._near(e, look, sp === 0); if (!b || light < 0 && b.env !== env) return false; }
+                } else e._crowdHQsp = sp;
+                if (this.job && this.job.owner === e) this.job.used = _frameTime;
+                b.used = _frameTime;
+                const F = CROWD_HQ.FRAMES, R = CROWD_HQ.R;
+                const ph = ((e.walkPhase || 0) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+                const f = b.stride > 0 ? Math.round(ph / (Math.PI * 2) * F) % F : 0;
+                if (!c.noShadow && _zoomLOD < 2) { _bodyRot = rot; drawHumanContactShadow(ctx, e); }
+                const S = bodyScale(c);
+                ctx.drawImage(b.cv, b.cell * f, 0, b.cell, b.cell, -R, -R, R * 2, R * 2);
+                if (b.rim) {                                                   // a street lamp's rim, live as they pass it
+                    _bodyRot = rot;
+                    const SH = humanShade(ctx, e, { _wet: 0 });
+                    if (SH && SH.rim) {
+                        if (S) { ctx.save(); ctx.scale(S.x, S.y); }
+                        drawHumanRim(ctx, SH.rim, b.rim.rimY, b.rim.hcx, b.rim.hr);
+                        if (S) ctx.restore();
+                    }
+                }
+                RenderStats.bodies++; RenderStats.cachedBodies++;
+                return true;
+            },
+
+            clear() { this.bakes.clear(); this.count = 0; this.job = null; }
+        };
+
+        /** The crowd's draw: by Crowd Quality (ultra live, high shaded walk bakes, medium lighter, low baked) */
         function drawCrowdHumanoid(ctx, entity, config) {
             const q = GameSettings.crowdQuality || 'high';
-            if (q === 'high') return drawProceduralHumanoid(ctx, entity, config);
+            if (q === 'ultra') return drawProceduralHumanoid(ctx, entity, config);
+            if (q === 'high') {
+                if (!RenderStats.timed) { if (CrowdBakes.draw(ctx, entity, config)) return; }
+                else {
+                    const t0 = performance.now(), pm = RenderStats.peopleMs;
+                    const ok = CrowdBakes.draw(ctx, entity, config);
+                    RenderStats.peopleMs = pm + (performance.now() - t0);
+                    if (ok) return;
+                }
+                return drawProceduralHumanoid(ctx, entity, config);
+            }
             if (q === 'low') {
                 if (!RenderStats.timed) { if (CrowdImpostors.draw(ctx, entity, config)) return; }
                 else {                                                              // a baked body is still a body: Entities: People

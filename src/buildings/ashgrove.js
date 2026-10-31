@@ -330,6 +330,7 @@
             _setupSign() { this.attachedSign = null; }
             _generateLights() {}
         }
+        TierKit.profile(AshgroveBuilding);
 
         /** The Ashgrove: x, y its corner; it fronts south (config.facing 'N' turns it round to front north). */
         function createAshgrove(x, y, config = {}) {

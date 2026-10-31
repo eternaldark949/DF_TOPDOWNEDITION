@@ -26,6 +26,18 @@
                tower's foot.
              · The glow pass and the sun's shadows go by the tiers too
                (_glowOccluders, _sunShadowHulls).
+             · Speed: the art and roofs are baked once; what depends on where the
+               camera stands (the draw order, the faces turned to it, each tier's
+               outline on screen, each face's grid of tile corners) is worked out
+               once per vantage (_tkView) and shared by the walls, the glow, the
+               other buildings' glow clips and the mirrors; it's kept while the
+               camera stands still. Tiles off the screen are skipped. The night
+               light isn't drawn at all in full daylight.
+             · Level of detail: each face gets only the tiles it needs for its
+               error on screen to stay under a px or two (_tkTiles: fewer zoomed
+               out, far off, or where it leans less), never more than the stock
+               _TK_TILE and never worse than those; zoomed right out the ledges'
+               lips and the contact shadows go. TierKit.LOD = false: as before.
 
            The plan is laid out in the building's own frame with its front at the
            bottom (+y); facing 'N' turns it round (a rotation, so faces keep their
@@ -54,10 +66,14 @@
                 return pts;
             },
             /** A polygon's signed area (negative: its edges' left normals (-dy, dx) point out). */
+            LOD: true,                 // tiles sized by their error on screen (_tkTiles); false: always _TK_TILE (to compare)
             area(p) { let s = 0; for (let i = 0; i < p.length; i++) { const a = p[i], b = p[(i + 1) % p.length]; s += a[0] * b[1] - b[0] * a[1]; } return s / 2; }
         };
 
-        const _TK_TILE = [40, 14];   // a face is mapped in tiles this wide and tall (world px): each an affine piece of its perspective quad (tier.tile overrides)
+        const _TK_TILE = [40, 14];   // a face is mapped in tiles at most this wide and tall (world px): each an affine piece of its perspective quad (tier.tile overrides)
+        // Level of detail: a face gets only as many tiles as it needs for its tiles' error on screen to stay under this many px
+        // (by _zoomLOD: full, reduced, minimal). Zoomed out, far off or low (less lean), that's fewer tiles; never more than _TK_TILE gives.
+        const _TK_ERR = [0.75, 1.25, 2];
 
         class TieredBuilding extends BuildingV2 {
             /**
@@ -181,26 +197,72 @@
 
             /** A face's slice of its tier's strip on its leaning quad, from z0 up to z1 (tiles in u and z). */
             _tkMap(ctx, f, tex, S, base) {
-                const t = f.tier, L = f.L, H = t.z1 - t.z0, tile = t.tile || _TK_TILE, nu = Math.max(1, Math.ceil(L / tile[0])), nz = Math.max(2, Math.ceil((f.z1 - f.z0) / tile[1]));
-                const P = (u, z) => this._tkP(f.x1 + (f.x2 - f.x1) * u, f.y1 + (f.y2 - f.y1) * u, z);
+                const t = f.tier, L = f.L, G = this._tkGrid(f), nu = G.nu, nz = G.nz, p = G.p, row = (nu + 1) * 2;
                 if (base) { this._tkQuad(ctx, f, f.z0, f.z1); ctx.fillStyle = base; ctx.fill(); }
                 const ov = base ? S : 0.5;            // tiles overlap a world px (no seams); the additive glow barely, or the overlaps glow twice
                 const V = typeof game !== 'undefined' && ctx.canvas === game.canvas && game._cullBounds && game._cullBounds.view, m = 4;   // (a tile off the screen is skipped; not in a bake or a mirror, which have views of their own)
+                // each tile's transform is composed onto the context's here and set outright (no save / restore per tile)
+                const M = ctx.getTransform(), Ma = M.a, Mb = M.b, Mc = M.c, Md = M.d, Me = M.e, Mf = M.f, du = L * S / nu, dz = (f.z1 - f.z0) / nz;
+                let drew = false;
                 for (let j = 0; j < nz; j++) for (let i = 0; i < nu; i++) {
-                    const ua = i / nu, ub = (i + 1) / nu, z0 = f.z0 + (f.z1 - f.z0) * j / nz, z1 = f.z0 + (f.z1 - f.z0) * (j + 1) / nz;
-                    const a = P(ua, z0), b = P(ub, z0), d = P(ua, z1);
+                    const ia = j * row + i * 2, id = ia + row;
+                    const ax = p[ia], ay = p[ia + 1], bx = p[ia + 2], by = p[ia + 3], dx = p[id], dy = p[id + 1];
                     if (V) {
-                        const cx = b[0] + d[0] - a[0], cy = b[1] + d[1] - a[1];
-                        if (Math.max(a[0], b[0], d[0], cx) < V.left - m || Math.min(a[0], b[0], d[0], cx) > V.right + m ||
-                            Math.max(a[1], b[1], d[1], cy) < V.top - m || Math.min(a[1], b[1], d[1], cy) > V.bottom + m) continue;
+                        const cx = bx + dx - ax, cy = by + dy - ay;
+                        if (Math.max(ax, bx, dx, cx) < V.left - m || Math.min(ax, bx, dx, cx) > V.right + m ||
+                            Math.max(ay, by, dy, cy) < V.top - m || Math.min(ay, by, dy, cy) > V.bottom + m) continue;
                     }
-                    const sx = (f.u0 + ua * L) * S, sw = Math.min(tex.width - sx, (ub - ua) * L * S + ov), sy = (t.z1 - z1) * S, sh = Math.min(tex.height - sy, (z1 - z0) * S + ov);
+                    const z1 = f.z0 + dz * (j + 1);
+                    const sx = f.u0 * S + i * du, sw = Math.min(tex.width - sx, du + ov), sy = (t.z1 - z1) * S, sh = Math.min(tex.height - sy, dz * S + ov);
                     if (sw <= 0 || sh <= 0) continue;
-                    ctx.save();
-                    ctx.transform((b[0] - a[0]) / ((ub - ua) * L * S), (b[1] - a[1]) / ((ub - ua) * L * S), (a[0] - d[0]) / ((z1 - z0) * S), (a[1] - d[1]) / ((z1 - z0) * S), d[0], d[1]);
+                    const ta = (bx - ax) / du, tb = (by - ay) / du, tc = (ax - dx) / (dz * S), td = (ay - dy) / (dz * S);
+                    ctx.setTransform(Ma * ta + Mc * tb, Mb * ta + Md * tb, Ma * tc + Mc * td, Mb * tc + Md * td, Ma * dx + Mc * dy + Me, Mb * dx + Md * dy + Mf);
                     ctx.drawImage(tex, sx, sy, sw, sh, 0, 0, sw, sh);
-                    ctx.restore();
+                    drew = true;
                 }
+                if (drew) ctx.setTransform(M);
+            }
+            /**
+             * How many tiles (across, up) a face needs, at most (nu, nz). A point at height z draws at cam + (p − cam)·k(z): along a
+             * row (one z) that's exact for an affine tile, but up the wall k isn't linear in z, so a tile's art slides along the wall
+             * by up to D·|k(mid) − (k(z0) + k(z1)) / 2| (D: how far the face's ends are from the camera), a quarter of that with
+             * twice the rows; and a tile's far corner misses by its width × its k span (the twist), both × the zoom on screen.
+             */
+            _tkTiles(f, nu, nz) {
+                const cam = game.camera, zoom = cam.zoom || 1;
+                const k0 = this._tkK(f.z0), k1 = this._tkK(f.z1), km = this._tkK((f.z0 + f.z1) / 2);
+                const D = Math.max(Math.hypot(f.x1 - cam.x, f.y1 - cam.y), Math.hypot(f.x2 - cam.x, f.y2 - cam.y));
+                const slide = zoom * D * Math.abs(km - (k0 + k1) / 2), dkTop = (rows) => k1 - this._tkK(f.z1 - (f.z1 - f.z0) / rows);
+                // what the stock tiles miss by: never ask for better than that (no face gets worse than it was, only cheaper)
+                const stock = Math.max(slide / (nz * nz), zoom * f.L / nu * dkTop(nz));
+                const err = Math.max(_TK_ERR[Math.max(0, Math.min(2, _zoomLOD | 0))], stock);
+                // the fewest tiles that hold both: more rows shrink the slide and each tile's k span, more columns its width
+                let best = null;
+                for (let rows = Math.max(1, Math.min(nz, Math.ceil(Math.sqrt(slide / err)))); rows <= nz; rows++) {
+                    const cols = Math.max(1, Math.ceil(zoom * f.L * dkTop(rows) / err - 1e-9));   // (the top row's k span: the widest, k is convex in z)
+                    if (cols <= nu && rows * rows * err >= slide - 1e-9 && (!best || cols * rows < best[0] * best[1])) best = [cols, rows];
+                }
+                return best || [nu, nz];                                          // (needing more than the stock tiles: the stock tiles)
+            }
+            /** A face's tile corners on screen (from where the camera stands now): (nu + 1) × (nz + 1) points, row by row up from z0. */
+            _tkGrid(f) {
+                const v = this._tkView();
+                let G = v.grids.get(f);
+                if (G) return G;
+                const t = f.tier, tile = t.tile || _TK_TILE, cam = game.camera, cx = cam.x, cy = cam.y;
+                let nu = Math.max(1, Math.ceil(f.L / tile[0])), nz = Math.max(2, Math.ceil((f.z1 - f.z0) / tile[1]));
+                if (TierKit.LOD) [nu, nz] = this._tkTiles(f, nu, nz);
+                const p = new Float64Array((nu + 1) * (nz + 1) * 2);
+                let o = 0;
+                for (let j = 0; j <= nz; j++) {
+                    const k = this._tkK(f.z0 + (f.z1 - f.z0) * j / nz);
+                    for (let i = 0; i <= nu; i++) {
+                        const u = i / nu;
+                        p[o++] = cx + (f.x1 + (f.x2 - f.x1) * u - cx) * k; p[o++] = cy + (f.y1 + (f.y2 - f.y1) * u - cy) * k;
+                    }
+                }
+                v.grids.set(f, G = { nu, nz, p });
+                return G;
             }
             _tkQuad(ctx, f, z0, z1) {
                 const a = this._tkP(f.x1, f.y1, z0), b = this._tkP(f.x2, f.y2, z0), c = this._tkP(f.x2, f.y2, z1), d = this._tkP(f.x1, f.y1, z1);
@@ -213,19 +275,27 @@
             _tkLedges(ctx, t, faces, g) {
                 const cam = game.camera, p = (x, y, k) => [cam.x + (x - cam.x) * k, cam.y + (y - cam.y) * k], n = t.poly.length;
                 const kT = this._tkK(g.z), kB = this._tkK(Math.max(t.z0, g.z - g.th)), [r, gg, b] = g.band;
+                const fine = !TierKit.LOD || _zoomLOD < 2;                               // (zoomed right out: the lip and the shadow line under it, a px wide, go)
                 for (const f of faces) {
                     if (g.z <= f.z0 + 0.5 || g.z > f.z1 + 0.5) continue;
-                    const i = f.edge, va = t.poly[i], vb = t.poly[(i + 1) % n];
-                    const oa = f.atA ? this._tkMitre(t, i, g.out) : [f.x1 + f.nx * g.out, f.y1 + f.ny * g.out];
-                    const ob = f.atB ? this._tkMitre(t, (i + 1) % n, g.out) : [f.x2 + f.nx * g.out, f.y2 + f.ny * g.out];
-                    const wa = f.atA ? va : [f.x1, f.y1], wb = f.atB ? vb : [f.x2, f.y2];
+                    // where the ledge runs in the world and its front's colour don't change with the camera: once per face and ledge
+                    const lc = f.ledgeCache || (f.ledgeCache = new Map());
+                    let L = lc.get(g);
+                    if (!L) {
+                        const i = f.edge, va = t.poly[i], vb = t.poly[(i + 1) % n], s = 1 - 0.5 * this._tkTurn(f);
+                        L = { oa: f.atA ? this._tkMitre(t, i, g.out) : [f.x1 + f.nx * g.out, f.y1 + f.ny * g.out],
+                              ob: f.atB ? this._tkMitre(t, (i + 1) % n, g.out) : [f.x2 + f.nx * g.out, f.y2 + f.ny * g.out],
+                              wa: f.atA ? va : [f.x1, f.y1], wb: f.atB ? vb : [f.x2, f.y2],
+                              front: `rgb(${Math.round(r * s)}, ${Math.round(gg * s)}, ${Math.round(b * s)})` };
+                        lc.set(g, L);
+                    }
+                    const { oa, ob, wa, wb } = L;
                     const A = p(oa[0], oa[1], kB), B = p(ob[0], ob[1], kB), Bt = p(ob[0], ob[1], kT), At = p(oa[0], oa[1], kT), a1 = p(wa[0], wa[1], kT), b1 = p(wb[0], wb[1], kT);
-                    const s = 1 - 0.5 * this._tkTurn(f);
-                    ctx.fillStyle = `rgb(${Math.round(r * s)}, ${Math.round(gg * s)}, ${Math.round(b * s)})`;
+                    ctx.fillStyle = L.front;
                     ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.lineTo(Bt[0], Bt[1]); ctx.lineTo(At[0], At[1]); ctx.closePath(); ctx.fill();
                     ctx.fillStyle = g.top; ctx.beginPath(); ctx.moveTo(a1[0], a1[1]); ctx.lineTo(b1[0], b1[1]); ctx.lineTo(Bt[0], Bt[1]); ctx.lineTo(At[0], At[1]); ctx.closePath(); ctx.fill();
-                    if (g.lip) { ctx.strokeStyle = g.lip; ctx.globalAlpha = 1 - 0.6 * this._tkTurn(f); ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(At[0], At[1]); ctx.lineTo(Bt[0], Bt[1]); ctx.stroke(); ctx.globalAlpha = 1; }
-                    ctx.strokeStyle = 'rgba(6, 12, 14, 0.45)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke();
+                    if (fine && g.lip) { ctx.strokeStyle = g.lip; ctx.globalAlpha = 1 - 0.6 * this._tkTurn(f); ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(At[0], At[1]); ctx.lineTo(Bt[0], Bt[1]); ctx.stroke(); ctx.globalAlpha = 1; }
+                    if (fine) { ctx.strokeStyle = 'rgba(6, 12, 14, 0.45)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke(); }
                 }
             }
 
@@ -242,43 +312,88 @@
                 return g.tiers.slice().sort((a, b) => (dist(b) - dist(a)) || (a.z1 - b.z1) || (a.z0 - b.z0) || (a.i - b.i));
             }
             _tkVisible(t) {
+                const v = this._tkView();
+                let faces = v.visible.get(t);
+                if (!faces) v.visible.set(t, faces = this._tkFacing(t));
+                return faces;
+            }
+            /** A tier's faces turned to the camera, farthest first (see _tkVisible: the cached copy). */
+            _tkFacing(t) {
                 const cam = game.camera;
                 return t.faces.filter(f => (cam.x - (f.x1 + f.x2) / 2) * f.nx + (cam.y - (f.y1 + f.y2) / 2) * f.ny > 0)
                     .sort((a, b) => Math.hypot(cam.x - (b.x1 + b.x2) / 2, cam.y - (b.y1 + b.y2) / 2) - Math.hypot(cam.x - (a.x1 + a.x2) / 2, cam.y - (a.y1 + a.y2) / 2));
             }
 
+            /**
+             * What drawing needs from where the camera stands: the tiers' order, the faces each turns to the camera, each tier's
+             * outline on screen and each face's tile corners. Worked out as it's asked for, kept until the camera, the zoom
+             * (the lean) or the building moves: the walls, the glow, other buildings' glow clips and the mirrors all share it.
+             */
+            _tkView() {
+                const cam = game.camera, C = leanCamHeight(), lean = CONFIG.BUILDINGS.LEAN, geo = this._tkGeo(), v = this._tkV;
+                const zoom = cam.zoom || 1, lod = TierKit.LOD ? _zoomLOD | 0 : -1;
+                if (v && v.cx === cam.x && v.cy === cam.y && v.C === C && v.lean === lean && v.geo === geo && v.zoom === zoom && v.lod === lod) return v;
+                return (this._tkV = { cx: cam.x, cy: cam.y, C, lean, geo, zoom, lod, order: null, visible: new Map(), hulls: new Map(), boxes: new Map(), grids: new Map(), occluders: null });
+            }
+            /** The tiers in drawing order, from where the camera stands (cached; subclasses refine _tkOrder). */
+            _tkOrdered() { const v = this._tkView(); return v.order || (v.order = this._tkOrder()); }
+            /** A tier's outline on screen (cached per vantage) and its bounding box. */
+            _tkHullOf(t) { const v = this._tkView(); let h = v.hulls.get(t); if (!h) v.hulls.set(t, h = this._tkHull(t)); return h; }
+            _tkBoxOf(t) {
+                const v = this._tkView(); let b = v.boxes.get(t);
+                if (!b) { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const [x, y] of this._tkHullOf(t)) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } v.boxes.set(t, b = [x0, y0, x1, y1]); }
+                return b;
+            }
+            /** The shade's fall-off up a wall: a gradient made once in a unit frame, along +y from 0 to 1 (laid onto each face by _tkFade). */
+            _tkFadeGrad(ctx, key, c0, c1) {
+                const store = this._tkGrads || (this._tkGrads = {});
+                let g = store[key];
+                if (!g) { g = ctx.createLinearGradient(0, 0, 0, 1); g.addColorStop(0, c0); g.addColorStop(1, c1); store[key] = g; }
+                return g;
+            }
+            /** Fill the current path with a unit gradient laid from screen point A (0) to B (1). The path was set before: it keeps its place. */
+            _tkFade(ctx, grad, A, B) {
+                const c = B[0] - A[0], d = B[1] - A[1];
+                if (c * c + d * d < 1e-6) return;
+                const M = ctx.getTransform();
+                ctx.transform(d, -c, c, d, A[0], A[1]);              // (0, 1) → B, the gradient's cross-axis square to it
+                ctx.fillStyle = grad; ctx.fill();
+                ctx.setTransform(M);
+            }
+
             drawTop(ctx) {
                 if (!(CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera)) { super.drawTop(ctx); return; }
                 ctx.save();
-                for (const t of this._tkOrder()) {
+                for (const t of this._tkOrdered()) {
                     const faces = this._tkVisible(t), art = this._tkArt(t), sh = t.shade || [6, 16, 18];
+                    const foot = this._tkFadeGrad(ctx, 'foot_' + sh.join(','), `rgba(${sh[0]}, ${sh[1]}, ${sh[2]}, 0.35)`, `rgba(${sh[0]}, ${sh[1]}, ${sh[2]}, 0)`);
+                    const contact = this._tkFadeGrad(ctx, 'contact', 'rgba(0, 0, 0, 0.3)', 'rgba(0, 0, 0, 0)');
                     for (const f of faces) {
                         this._tkMap(ctx, f, art.day, art.S, t.fill || '#555');
-                        this._tkQuad(ctx, f, f.z0, f.z1); ctx.fillStyle = `rgba(${sh[0]}, ${sh[1]}, ${sh[2]}, ${0.03 + 0.4 * this._tkTurn(f)})`; ctx.fill();
+                        this._tkQuad(ctx, f, f.z0, f.z1); ctx.fillStyle = f.shadeFill || (f.shadeFill = `rgba(${sh[0]}, ${sh[1]}, ${sh[2]}, ${0.03 + 0.4 * this._tkTurn(f)})`); ctx.fill();
                         if (f.z0 < 1) {                                                                  // the street's shade at the foot
-                            const ao = ctx.createLinearGradient(...this._tkP(f.x1, f.y1, 0), ...this._tkP(f.x1, f.y1, 22));
-                            ao.addColorStop(0, `rgba(${sh[0]}, ${sh[1]}, ${sh[2]}, 0.35)`); ao.addColorStop(1, `rgba(${sh[0]}, ${sh[1]}, ${sh[2]}, 0)`);
-                            this._tkQuad(ctx, f, 0, 22); ctx.fillStyle = ao; ctx.fill();
-                        } else {                                                                         // a contact shadow where it meets the roof below
-                            const ao = ctx.createLinearGradient(...this._tkP(f.x1, f.y1, f.z0), ...this._tkP(f.x1, f.y1, f.z0 + 8));
-                            ao.addColorStop(0, 'rgba(0, 0, 0, 0.3)'); ao.addColorStop(1, 'rgba(0, 0, 0, 0)');
-                            this._tkQuad(ctx, f, f.z0, f.z0 + 8); ctx.fillStyle = ao; ctx.fill();
+                            this._tkQuad(ctx, f, 0, 22); this._tkFade(ctx, foot, this._tkP(f.x1, f.y1, 0), this._tkP(f.x1, f.y1, 22));
+                        } else if (!TierKit.LOD || _zoomLOD < 2) {                                       // a contact shadow where it meets the roof below (zoomed right out: too thin to see)
+                            this._tkQuad(ctx, f, f.z0, f.z0 + 8); this._tkFade(ctx, contact, this._tkP(f.x1, f.y1, f.z0), this._tkP(f.x1, f.y1, f.z0 + 8));
                         }
                     }
-                    for (const g of (t.ledges || []).slice().sort((a, b) => a.z - b.z)) this._tkLedges(ctx, t, faces, g);
+                    for (const g of t.ledgesByZ || (t.ledgesByZ = (t.ledges || []).slice().sort((a, b) => a.z - b.z))) this._tkLedges(ctx, t, faces, g);
                     if (t.roof) LandmarkKit.drawSprite(ctx, this._tkRoof(t, false), this._tkK(t.z1));
                     if (t.top) t.top(ctx, false, t, this);
                 }
                 ctx.restore();
             }
 
+            /** How strongly the tiers' night light shows: 12% at the least once the sky starts to darken (a lit window reads at dusk), none in full daylight. */
+            _tkGlow(dark) { return Math.max(0.12, Math.min(0.92, dark * 1.05)) * Math.min(1, Math.max(0, dark) / 0.12); }
+
             drawEmissive(ctx, dark, beamsOnly) {
                 if (beamsOnly || !(CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera)) return;
-                const glow = Math.max(0.12, Math.min(0.92, dark * 1.05));
+                const glow = this._tkGlow(dark);
+                if (glow < 0.004) return;                                              // broad day: the whole lit pass would add next to nothing
                 ctx.save(); ctx.globalAlpha *= glow; ctx.globalCompositeOperation = 'lighter';
                 // each tier's light is cut out of the tiers drawn over it (a window behind the bay mustn't shine through it)
-                const order = this._tkOrder(), hulls = order.map(t => this._tkHull(t));
-                const boxes = hulls.map(h => { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const [x, y] of h) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } return [x0, y0, x1, y1]; });
+                const order = this._tkOrdered(), hulls = order.map(t => this._tkHullOf(t)), boxes = order.map(t => this._tkBoxOf(t));
                 order.forEach((t, i) => {
                     ctx.save();
                     const bi = boxes[i];
@@ -308,7 +423,8 @@
 
             /** What hides the glow of buildings behind it: each tier, footprint to leaned roof. */
             _glowOccluders() {
-                return this._tkGeo().tiers.map(t => this._tkHull(t));
+                const v = this._tkView();
+                return v.occluders || (v.occluders = v.geo.tiers.map(t => this._tkHullOf(t)));
             }
 
             /** The sun's shadow of each tier: its plan swept along the sun to its top. */
@@ -320,3 +436,15 @@
                 return hulls;
             }
         }
+
+        /** The Full profiler's rows (RenderTags): the tiers' walls and roofs, their night light, and the art baked once.
+            A building on the kit passes its class to TierKit.profile, so its own overrides bill the same rows. */
+        TierKit.PROFILE = {
+            drawTop: ['Tiered buildings', ['World tops']],
+            drawEmissive: ['Tiered lights', ['Glow']],
+            _tkArt: ['Bakes', ['World tops', 'Glow']],
+            _tkRoof: ['Bakes', ['World tops', 'Glow']]
+        };
+        TierKit.profile = (cls) => RenderTags.tagClass(cls, TierKit.PROFILE);
+        TierKit.profile(TieredBuilding);
+        RenderTags.tag(LandmarkKit, 'sprite', 'Bakes', ['Buildings', 'World tops', 'Glow']);

@@ -201,7 +201,7 @@
                 if (gb) for (const cv of gb.cache.values()) { ground += px(cv); groundN++; }
                 if (typeof MAP_BAKES !== 'undefined') { const seen = new Set(); for (const id in MAP_BAKES) for (const k of MAP_BAKES[id]) if (!seen.has(k)) { seen.add(k); floors += px(game[k]); } }
                 if (typeof _carSprites !== 'undefined') for (const sp of _carSprites.values()) cars += px(sp.cv);
-                if (typeof CrowdImpostors !== 'undefined') for (const b of CrowdImpostors.cache.values()) crowd += px(b.cv);
+                if (typeof CrowdImpostors !== 'undefined') for (const b of CrowdImpostors.cache.values()) crowd += px(b.cv); if (typeof CrowdBakes !== 'undefined') for (const l of CrowdBakes.bakes.values()) for (const b of l) crowd += px(b.cv);
                 const props = typeof PropSprites !== 'undefined' ? PropSprites.bytes / 4 : 0;
                 this._mem = { ground: ground * MB, groundN, floors: floors * MB, cars: cars * MB, crowd: crowd * MB, props: props * MB, total: (ground + floors + cars + crowd + props) * MB };
                 this._memAt = now;

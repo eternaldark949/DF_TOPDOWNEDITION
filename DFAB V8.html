@@ -9269,7 +9269,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             pedestrianDensity: _lvl(_deviceDensity.pedestrianDensity, 'high'),   // 'low' | 'medium' | 'high'
             foliageDensity: _lvl(_deviceDensity.foliageDensity, 'high'),         // 'low' | 'medium' | 'high'
             rainDensity: _lvl(_deviceDensity.rainDensity, 'high'),               // 'low' | 'medium' | 'high'
-            crowdQuality: _lvl(_deviceDensity.crowdQuality, 'high'),             // 'high' (live) | 'medium' (cheaper live) | 'low' (baked) — ui/crowd-impostors.js
+            crowdQuality: _deviceDensity.crowdQuality === 'ultra' ? 'ultra' : _lvl(_deviceDensity.crowdQuality, 'high'),   // 'ultra' (live) | 'high' (shaded walk bakes) | 'medium' (cheaper live) | 'low' (flat bakes) — ui/crowd-impostors.js
             lampShadows: ['off', 'low', 'high', 'ultra'].includes(_deviceDensity.lampShadows) ? _deviceDensity.lampShadows : 'low',   // people's shadows from street lamps — ui/humanoid-render.js
             saveDensity() {
                 try { localStorage.setItem('dfab_density', JSON.stringify({ trafficDensity: this.trafficDensity, pedestrianDensity: this.pedestrianDensity, foliageDensity: this.foliageDensity, rainDensity: this.rainDensity, crowdQuality: this.crowdQuality, lampShadows: this.lampShadows })); } catch (e) { /* private mode */ }
@@ -12648,11 +12648,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const seed = entity._wxSeed !== undefined ? entity._wxSeed : (entity._wxSeed = Math.random() * 100);
             const t = _gameTimeSec;
             const gust = 1 + 0.35 * Math.sin(t * 2.3 + seed) + 0.15 * Math.sin(t * 5.1 + seed * 1.7);
+            if (entity._bakePed !== undefined) reach = 0;          // a crowd bake (ui/crowd-impostors.js) faces one way for every facing: no wind, rain kept
             const k = WEATHER_RESPONSE, wv = w.windVec || { x: 0, y: 0 }, v = { x: wv.x * reach, y: wv.y * reach };
             const out = {
                 wind: { x: v.x * k.CLOTH_WIND * gust, y: v.y * k.CLOTH_WIND * gust },
                 hairWind: { x: v.x * k.HAIR_WIND * gust, y: v.y * k.HAIR_WIND * gust },
-                rain: w.isRaining ? Math.min(1, w.intensity || 0) * reach : 0,
+                rain: w.isRaining ? Math.min(1, w.intensity || 0) * (entity._bakePed !== undefined ? 1 : reach) : 0,
                 strong: Math.max(0, Math.min(1, ((w.wind || 0) - k.STRONG_FROM) / k.STRONG_SPAN)) * reach,
                 dir: _weatherWindAngle(wv.x, wv.y)
             };
@@ -24978,6 +24979,23 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         };
         if (typeof window !== 'undefined') window.PerfBench = PerfBench;
 
+        /* RENDER TAGS — render code tags its own methods for the Full profiler, next to the code
+           (no list here to keep up). A tag names the row its time goes to and the scopes it's billed
+           in: 'Buildings' (the base pass), 'World tops' (roofs and facades over the player), 'Glow'
+           (the lit pass after the darkness). The world profiler (world/city-layout.js) wraps them only
+           while Full mode is on; outside those scopes a tagged method runs untouched. Rows nest: time a
+           tagged method spends in another tagged method is that one's.
+             RenderTags.tag(LandmarkKit, 'sprite', 'Bakes', ['Buildings', 'World tops', 'Glow']);
+             RenderTags.tagClass(MyBuilding, { drawTop: ['My building', ['World tops']] });   // the methods it defines itself */
+        const RenderTags = {
+            list: [],
+            tag(owner, key, part, scopes) { this.list.push({ owner, key, part, scopes }); },
+            /** Each method `cls` itself defines (an inherited one is tagged where it's defined). */
+            tagClass(cls, map) {
+                for (const key of Object.keys(map)) if (Object.prototype.hasOwnProperty.call(cls.prototype, key)) this.tag(cls.prototype, key, map[key][0], map[key][1]);
+            }
+        };
+
         class Profiler {
             constructor() {
                 this.metrics = {};
@@ -34761,6 +34779,18 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                tower's foot.
              · The glow pass and the sun's shadows go by the tiers too
                (_glowOccluders, _sunShadowHulls).
+             · Speed: the art and roofs are baked once; what depends on where the
+               camera stands (the draw order, the faces turned to it, each tier's
+               outline on screen, each face's grid of tile corners) is worked out
+               once per vantage (_tkView) and shared by the walls, the glow, the
+               other buildings' glow clips and the mirrors; it's kept while the
+               camera stands still. Tiles off the screen are skipped. The night
+               light isn't drawn at all in full daylight.
+             · Level of detail: each face gets only the tiles it needs for its
+               error on screen to stay under a px or two (_tkTiles: fewer zoomed
+               out, far off, or where it leans less), never more than the stock
+               _TK_TILE and never worse than those; zoomed right out the ledges'
+               lips and the contact shadows go. TierKit.LOD = false: as before.
 
            The plan is laid out in the building's own frame with its front at the
            bottom (+y); facing 'N' turns it round (a rotation, so faces keep their
@@ -34789,10 +34819,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return pts;
             },
             /** A polygon's signed area (negative: its edges' left normals (-dy, dx) point out). */
+            LOD: true,                 // tiles sized by their error on screen (_tkTiles); false: always _TK_TILE (to compare)
             area(p) { let s = 0; for (let i = 0; i < p.length; i++) { const a = p[i], b = p[(i + 1) % p.length]; s += a[0] * b[1] - b[0] * a[1]; } return s / 2; }
         };
 
-        const _TK_TILE = [40, 14];   // a face is mapped in tiles this wide and tall (world px): each an affine piece of its perspective quad (tier.tile overrides)
+        const _TK_TILE = [40, 14];   // a face is mapped in tiles at most this wide and tall (world px): each an affine piece of its perspective quad (tier.tile overrides)
+        // Level of detail: a face gets only as many tiles as it needs for its tiles' error on screen to stay under this many px
+        // (by _zoomLOD: full, reduced, minimal). Zoomed out, far off or low (less lean), that's fewer tiles; never more than _TK_TILE gives.
+        const _TK_ERR = [0.75, 1.25, 2];
 
         class TieredBuilding extends BuildingV2 {
             /**
@@ -34916,26 +34950,72 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             /** A face's slice of its tier's strip on its leaning quad, from z0 up to z1 (tiles in u and z). */
             _tkMap(ctx, f, tex, S, base) {
-                const t = f.tier, L = f.L, H = t.z1 - t.z0, tile = t.tile || _TK_TILE, nu = Math.max(1, Math.ceil(L / tile[0])), nz = Math.max(2, Math.ceil((f.z1 - f.z0) / tile[1]));
-                const P = (u, z) => this._tkP(f.x1 + (f.x2 - f.x1) * u, f.y1 + (f.y2 - f.y1) * u, z);
+                const t = f.tier, L = f.L, G = this._tkGrid(f), nu = G.nu, nz = G.nz, p = G.p, row = (nu + 1) * 2;
                 if (base) { this._tkQuad(ctx, f, f.z0, f.z1); ctx.fillStyle = base; ctx.fill(); }
                 const ov = base ? S : 0.5;            // tiles overlap a world px (no seams); the additive glow barely, or the overlaps glow twice
                 const V = typeof game !== 'undefined' && ctx.canvas === game.canvas && game._cullBounds && game._cullBounds.view, m = 4;   // (a tile off the screen is skipped; not in a bake or a mirror, which have views of their own)
+                // each tile's transform is composed onto the context's here and set outright (no save / restore per tile)
+                const M = ctx.getTransform(), Ma = M.a, Mb = M.b, Mc = M.c, Md = M.d, Me = M.e, Mf = M.f, du = L * S / nu, dz = (f.z1 - f.z0) / nz;
+                let drew = false;
                 for (let j = 0; j < nz; j++) for (let i = 0; i < nu; i++) {
-                    const ua = i / nu, ub = (i + 1) / nu, z0 = f.z0 + (f.z1 - f.z0) * j / nz, z1 = f.z0 + (f.z1 - f.z0) * (j + 1) / nz;
-                    const a = P(ua, z0), b = P(ub, z0), d = P(ua, z1);
+                    const ia = j * row + i * 2, id = ia + row;
+                    const ax = p[ia], ay = p[ia + 1], bx = p[ia + 2], by = p[ia + 3], dx = p[id], dy = p[id + 1];
                     if (V) {
-                        const cx = b[0] + d[0] - a[0], cy = b[1] + d[1] - a[1];
-                        if (Math.max(a[0], b[0], d[0], cx) < V.left - m || Math.min(a[0], b[0], d[0], cx) > V.right + m ||
-                            Math.max(a[1], b[1], d[1], cy) < V.top - m || Math.min(a[1], b[1], d[1], cy) > V.bottom + m) continue;
+                        const cx = bx + dx - ax, cy = by + dy - ay;
+                        if (Math.max(ax, bx, dx, cx) < V.left - m || Math.min(ax, bx, dx, cx) > V.right + m ||
+                            Math.max(ay, by, dy, cy) < V.top - m || Math.min(ay, by, dy, cy) > V.bottom + m) continue;
                     }
-                    const sx = (f.u0 + ua * L) * S, sw = Math.min(tex.width - sx, (ub - ua) * L * S + ov), sy = (t.z1 - z1) * S, sh = Math.min(tex.height - sy, (z1 - z0) * S + ov);
+                    const z1 = f.z0 + dz * (j + 1);
+                    const sx = f.u0 * S + i * du, sw = Math.min(tex.width - sx, du + ov), sy = (t.z1 - z1) * S, sh = Math.min(tex.height - sy, dz * S + ov);
                     if (sw <= 0 || sh <= 0) continue;
-                    ctx.save();
-                    ctx.transform((b[0] - a[0]) / ((ub - ua) * L * S), (b[1] - a[1]) / ((ub - ua) * L * S), (a[0] - d[0]) / ((z1 - z0) * S), (a[1] - d[1]) / ((z1 - z0) * S), d[0], d[1]);
+                    const ta = (bx - ax) / du, tb = (by - ay) / du, tc = (ax - dx) / (dz * S), td = (ay - dy) / (dz * S);
+                    ctx.setTransform(Ma * ta + Mc * tb, Mb * ta + Md * tb, Ma * tc + Mc * td, Mb * tc + Md * td, Ma * dx + Mc * dy + Me, Mb * dx + Md * dy + Mf);
                     ctx.drawImage(tex, sx, sy, sw, sh, 0, 0, sw, sh);
-                    ctx.restore();
+                    drew = true;
                 }
+                if (drew) ctx.setTransform(M);
+            }
+            /**
+             * How many tiles (across, up) a face needs, at most (nu, nz). A point at height z draws at cam + (p − cam)·k(z): along a
+             * row (one z) that's exact for an affine tile, but up the wall k isn't linear in z, so a tile's art slides along the wall
+             * by up to D·|k(mid) − (k(z0) + k(z1)) / 2| (D: how far the face's ends are from the camera), a quarter of that with
+             * twice the rows; and a tile's far corner misses by its width × its k span (the twist), both × the zoom on screen.
+             */
+            _tkTiles(f, nu, nz) {
+                const cam = game.camera, zoom = cam.zoom || 1;
+                const k0 = this._tkK(f.z0), k1 = this._tkK(f.z1), km = this._tkK((f.z0 + f.z1) / 2);
+                const D = Math.max(Math.hypot(f.x1 - cam.x, f.y1 - cam.y), Math.hypot(f.x2 - cam.x, f.y2 - cam.y));
+                const slide = zoom * D * Math.abs(km - (k0 + k1) / 2), dkTop = (rows) => k1 - this._tkK(f.z1 - (f.z1 - f.z0) / rows);
+                // what the stock tiles miss by: never ask for better than that (no face gets worse than it was, only cheaper)
+                const stock = Math.max(slide / (nz * nz), zoom * f.L / nu * dkTop(nz));
+                const err = Math.max(_TK_ERR[Math.max(0, Math.min(2, _zoomLOD | 0))], stock);
+                // the fewest tiles that hold both: more rows shrink the slide and each tile's k span, more columns its width
+                let best = null;
+                for (let rows = Math.max(1, Math.min(nz, Math.ceil(Math.sqrt(slide / err)))); rows <= nz; rows++) {
+                    const cols = Math.max(1, Math.ceil(zoom * f.L * dkTop(rows) / err - 1e-9));   // (the top row's k span: the widest, k is convex in z)
+                    if (cols <= nu && rows * rows * err >= slide - 1e-9 && (!best || cols * rows < best[0] * best[1])) best = [cols, rows];
+                }
+                return best || [nu, nz];                                          // (needing more than the stock tiles: the stock tiles)
+            }
+            /** A face's tile corners on screen (from where the camera stands now): (nu + 1) × (nz + 1) points, row by row up from z0. */
+            _tkGrid(f) {
+                const v = this._tkView();
+                let G = v.grids.get(f);
+                if (G) return G;
+                const t = f.tier, tile = t.tile || _TK_TILE, cam = game.camera, cx = cam.x, cy = cam.y;
+                let nu = Math.max(1, Math.ceil(f.L / tile[0])), nz = Math.max(2, Math.ceil((f.z1 - f.z0) / tile[1]));
+                if (TierKit.LOD) [nu, nz] = this._tkTiles(f, nu, nz);
+                const p = new Float64Array((nu + 1) * (nz + 1) * 2);
+                let o = 0;
+                for (let j = 0; j <= nz; j++) {
+                    const k = this._tkK(f.z0 + (f.z1 - f.z0) * j / nz);
+                    for (let i = 0; i <= nu; i++) {
+                        const u = i / nu;
+                        p[o++] = cx + (f.x1 + (f.x2 - f.x1) * u - cx) * k; p[o++] = cy + (f.y1 + (f.y2 - f.y1) * u - cy) * k;
+                    }
+                }
+                v.grids.set(f, G = { nu, nz, p });
+                return G;
             }
             _tkQuad(ctx, f, z0, z1) {
                 const a = this._tkP(f.x1, f.y1, z0), b = this._tkP(f.x2, f.y2, z0), c = this._tkP(f.x2, f.y2, z1), d = this._tkP(f.x1, f.y1, z1);
@@ -34948,19 +35028,27 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             _tkLedges(ctx, t, faces, g) {
                 const cam = game.camera, p = (x, y, k) => [cam.x + (x - cam.x) * k, cam.y + (y - cam.y) * k], n = t.poly.length;
                 const kT = this._tkK(g.z), kB = this._tkK(Math.max(t.z0, g.z - g.th)), [r, gg, b] = g.band;
+                const fine = !TierKit.LOD || _zoomLOD < 2;                               // (zoomed right out: the lip and the shadow line under it, a px wide, go)
                 for (const f of faces) {
                     if (g.z <= f.z0 + 0.5 || g.z > f.z1 + 0.5) continue;
-                    const i = f.edge, va = t.poly[i], vb = t.poly[(i + 1) % n];
-                    const oa = f.atA ? this._tkMitre(t, i, g.out) : [f.x1 + f.nx * g.out, f.y1 + f.ny * g.out];
-                    const ob = f.atB ? this._tkMitre(t, (i + 1) % n, g.out) : [f.x2 + f.nx * g.out, f.y2 + f.ny * g.out];
-                    const wa = f.atA ? va : [f.x1, f.y1], wb = f.atB ? vb : [f.x2, f.y2];
+                    // where the ledge runs in the world and its front's colour don't change with the camera: once per face and ledge
+                    const lc = f.ledgeCache || (f.ledgeCache = new Map());
+                    let L = lc.get(g);
+                    if (!L) {
+                        const i = f.edge, va = t.poly[i], vb = t.poly[(i + 1) % n], s = 1 - 0.5 * this._tkTurn(f);
+                        L = { oa: f.atA ? this._tkMitre(t, i, g.out) : [f.x1 + f.nx * g.out, f.y1 + f.ny * g.out],
+                              ob: f.atB ? this._tkMitre(t, (i + 1) % n, g.out) : [f.x2 + f.nx * g.out, f.y2 + f.ny * g.out],
+                              wa: f.atA ? va : [f.x1, f.y1], wb: f.atB ? vb : [f.x2, f.y2],
+                              front: `rgb(${Math.round(r * s)}, ${Math.round(gg * s)}, ${Math.round(b * s)})` };
+                        lc.set(g, L);
+                    }
+                    const { oa, ob, wa, wb } = L;
                     const A = p(oa[0], oa[1], kB), B = p(ob[0], ob[1], kB), Bt = p(ob[0], ob[1], kT), At = p(oa[0], oa[1], kT), a1 = p(wa[0], wa[1], kT), b1 = p(wb[0], wb[1], kT);
-                    const s = 1 - 0.5 * this._tkTurn(f);
-                    ctx.fillStyle = `rgb(${Math.round(r * s)}, ${Math.round(gg * s)}, ${Math.round(b * s)})`;
+                    ctx.fillStyle = L.front;
                     ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.lineTo(Bt[0], Bt[1]); ctx.lineTo(At[0], At[1]); ctx.closePath(); ctx.fill();
                     ctx.fillStyle = g.top; ctx.beginPath(); ctx.moveTo(a1[0], a1[1]); ctx.lineTo(b1[0], b1[1]); ctx.lineTo(Bt[0], Bt[1]); ctx.lineTo(At[0], At[1]); ctx.closePath(); ctx.fill();
-                    if (g.lip) { ctx.strokeStyle = g.lip; ctx.globalAlpha = 1 - 0.6 * this._tkTurn(f); ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(At[0], At[1]); ctx.lineTo(Bt[0], Bt[1]); ctx.stroke(); ctx.globalAlpha = 1; }
-                    ctx.strokeStyle = 'rgba(6, 12, 14, 0.45)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke();
+                    if (fine && g.lip) { ctx.strokeStyle = g.lip; ctx.globalAlpha = 1 - 0.6 * this._tkTurn(f); ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(At[0], At[1]); ctx.lineTo(Bt[0], Bt[1]); ctx.stroke(); ctx.globalAlpha = 1; }
+                    if (fine) { ctx.strokeStyle = 'rgba(6, 12, 14, 0.45)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke(); }
                 }
             }
 
@@ -34977,43 +35065,88 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return g.tiers.slice().sort((a, b) => (dist(b) - dist(a)) || (a.z1 - b.z1) || (a.z0 - b.z0) || (a.i - b.i));
             }
             _tkVisible(t) {
+                const v = this._tkView();
+                let faces = v.visible.get(t);
+                if (!faces) v.visible.set(t, faces = this._tkFacing(t));
+                return faces;
+            }
+            /** A tier's faces turned to the camera, farthest first (see _tkVisible: the cached copy). */
+            _tkFacing(t) {
                 const cam = game.camera;
                 return t.faces.filter(f => (cam.x - (f.x1 + f.x2) / 2) * f.nx + (cam.y - (f.y1 + f.y2) / 2) * f.ny > 0)
                     .sort((a, b) => Math.hypot(cam.x - (b.x1 + b.x2) / 2, cam.y - (b.y1 + b.y2) / 2) - Math.hypot(cam.x - (a.x1 + a.x2) / 2, cam.y - (a.y1 + a.y2) / 2));
             }
 
+            /**
+             * What drawing needs from where the camera stands: the tiers' order, the faces each turns to the camera, each tier's
+             * outline on screen and each face's tile corners. Worked out as it's asked for, kept until the camera, the zoom
+             * (the lean) or the building moves: the walls, the glow, other buildings' glow clips and the mirrors all share it.
+             */
+            _tkView() {
+                const cam = game.camera, C = leanCamHeight(), lean = CONFIG.BUILDINGS.LEAN, geo = this._tkGeo(), v = this._tkV;
+                const zoom = cam.zoom || 1, lod = TierKit.LOD ? _zoomLOD | 0 : -1;
+                if (v && v.cx === cam.x && v.cy === cam.y && v.C === C && v.lean === lean && v.geo === geo && v.zoom === zoom && v.lod === lod) return v;
+                return (this._tkV = { cx: cam.x, cy: cam.y, C, lean, geo, zoom, lod, order: null, visible: new Map(), hulls: new Map(), boxes: new Map(), grids: new Map(), occluders: null });
+            }
+            /** The tiers in drawing order, from where the camera stands (cached; subclasses refine _tkOrder). */
+            _tkOrdered() { const v = this._tkView(); return v.order || (v.order = this._tkOrder()); }
+            /** A tier's outline on screen (cached per vantage) and its bounding box. */
+            _tkHullOf(t) { const v = this._tkView(); let h = v.hulls.get(t); if (!h) v.hulls.set(t, h = this._tkHull(t)); return h; }
+            _tkBoxOf(t) {
+                const v = this._tkView(); let b = v.boxes.get(t);
+                if (!b) { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const [x, y] of this._tkHullOf(t)) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } v.boxes.set(t, b = [x0, y0, x1, y1]); }
+                return b;
+            }
+            /** The shade's fall-off up a wall: a gradient made once in a unit frame, along +y from 0 to 1 (laid onto each face by _tkFade). */
+            _tkFadeGrad(ctx, key, c0, c1) {
+                const store = this._tkGrads || (this._tkGrads = {});
+                let g = store[key];
+                if (!g) { g = ctx.createLinearGradient(0, 0, 0, 1); g.addColorStop(0, c0); g.addColorStop(1, c1); store[key] = g; }
+                return g;
+            }
+            /** Fill the current path with a unit gradient laid from screen point A (0) to B (1). The path was set before: it keeps its place. */
+            _tkFade(ctx, grad, A, B) {
+                const c = B[0] - A[0], d = B[1] - A[1];
+                if (c * c + d * d < 1e-6) return;
+                const M = ctx.getTransform();
+                ctx.transform(d, -c, c, d, A[0], A[1]);              // (0, 1) → B, the gradient's cross-axis square to it
+                ctx.fillStyle = grad; ctx.fill();
+                ctx.setTransform(M);
+            }
+
             drawTop(ctx) {
                 if (!(CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera)) { super.drawTop(ctx); return; }
                 ctx.save();
-                for (const t of this._tkOrder()) {
+                for (const t of this._tkOrdered()) {
                     const faces = this._tkVisible(t), art = this._tkArt(t), sh = t.shade || [6, 16, 18];
+                    const foot = this._tkFadeGrad(ctx, 'foot_' + sh.join(','), `rgba(${sh[0]}, ${sh[1]}, ${sh[2]}, 0.35)`, `rgba(${sh[0]}, ${sh[1]}, ${sh[2]}, 0)`);
+                    const contact = this._tkFadeGrad(ctx, 'contact', 'rgba(0, 0, 0, 0.3)', 'rgba(0, 0, 0, 0)');
                     for (const f of faces) {
                         this._tkMap(ctx, f, art.day, art.S, t.fill || '#555');
-                        this._tkQuad(ctx, f, f.z0, f.z1); ctx.fillStyle = `rgba(${sh[0]}, ${sh[1]}, ${sh[2]}, ${0.03 + 0.4 * this._tkTurn(f)})`; ctx.fill();
+                        this._tkQuad(ctx, f, f.z0, f.z1); ctx.fillStyle = f.shadeFill || (f.shadeFill = `rgba(${sh[0]}, ${sh[1]}, ${sh[2]}, ${0.03 + 0.4 * this._tkTurn(f)})`); ctx.fill();
                         if (f.z0 < 1) {                                                                  // the street's shade at the foot
-                            const ao = ctx.createLinearGradient(...this._tkP(f.x1, f.y1, 0), ...this._tkP(f.x1, f.y1, 22));
-                            ao.addColorStop(0, `rgba(${sh[0]}, ${sh[1]}, ${sh[2]}, 0.35)`); ao.addColorStop(1, `rgba(${sh[0]}, ${sh[1]}, ${sh[2]}, 0)`);
-                            this._tkQuad(ctx, f, 0, 22); ctx.fillStyle = ao; ctx.fill();
-                        } else {                                                                         // a contact shadow where it meets the roof below
-                            const ao = ctx.createLinearGradient(...this._tkP(f.x1, f.y1, f.z0), ...this._tkP(f.x1, f.y1, f.z0 + 8));
-                            ao.addColorStop(0, 'rgba(0, 0, 0, 0.3)'); ao.addColorStop(1, 'rgba(0, 0, 0, 0)');
-                            this._tkQuad(ctx, f, f.z0, f.z0 + 8); ctx.fillStyle = ao; ctx.fill();
+                            this._tkQuad(ctx, f, 0, 22); this._tkFade(ctx, foot, this._tkP(f.x1, f.y1, 0), this._tkP(f.x1, f.y1, 22));
+                        } else if (!TierKit.LOD || _zoomLOD < 2) {                                       // a contact shadow where it meets the roof below (zoomed right out: too thin to see)
+                            this._tkQuad(ctx, f, f.z0, f.z0 + 8); this._tkFade(ctx, contact, this._tkP(f.x1, f.y1, f.z0), this._tkP(f.x1, f.y1, f.z0 + 8));
                         }
                     }
-                    for (const g of (t.ledges || []).slice().sort((a, b) => a.z - b.z)) this._tkLedges(ctx, t, faces, g);
+                    for (const g of t.ledgesByZ || (t.ledgesByZ = (t.ledges || []).slice().sort((a, b) => a.z - b.z))) this._tkLedges(ctx, t, faces, g);
                     if (t.roof) LandmarkKit.drawSprite(ctx, this._tkRoof(t, false), this._tkK(t.z1));
                     if (t.top) t.top(ctx, false, t, this);
                 }
                 ctx.restore();
             }
 
+            /** How strongly the tiers' night light shows: 12% at the least once the sky starts to darken (a lit window reads at dusk), none in full daylight. */
+            _tkGlow(dark) { return Math.max(0.12, Math.min(0.92, dark * 1.05)) * Math.min(1, Math.max(0, dark) / 0.12); }
+
             drawEmissive(ctx, dark, beamsOnly) {
                 if (beamsOnly || !(CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera)) return;
-                const glow = Math.max(0.12, Math.min(0.92, dark * 1.05));
+                const glow = this._tkGlow(dark);
+                if (glow < 0.004) return;                                              // broad day: the whole lit pass would add next to nothing
                 ctx.save(); ctx.globalAlpha *= glow; ctx.globalCompositeOperation = 'lighter';
                 // each tier's light is cut out of the tiers drawn over it (a window behind the bay mustn't shine through it)
-                const order = this._tkOrder(), hulls = order.map(t => this._tkHull(t));
-                const boxes = hulls.map(h => { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const [x, y] of h) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } return [x0, y0, x1, y1]; });
+                const order = this._tkOrdered(), hulls = order.map(t => this._tkHullOf(t)), boxes = order.map(t => this._tkBoxOf(t));
                 order.forEach((t, i) => {
                     ctx.save();
                     const bi = boxes[i];
@@ -35043,7 +35176,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             /** What hides the glow of buildings behind it: each tier, footprint to leaned roof. */
             _glowOccluders() {
-                return this._tkGeo().tiers.map(t => this._tkHull(t));
+                const v = this._tkView();
+                return v.occluders || (v.occluders = v.geo.tiers.map(t => this._tkHullOf(t)));
             }
 
             /** The sun's shadow of each tier: its plan swept along the sun to its top. */
@@ -35055,6 +35189,18 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return hulls;
             }
         }
+
+        /** The Full profiler's rows (RenderTags): the tiers' walls and roofs, their night light, and the art baked once.
+            A building on the kit passes its class to TierKit.profile, so its own overrides bill the same rows. */
+        TierKit.PROFILE = {
+            drawTop: ['Tiered buildings', ['World tops']],
+            drawEmissive: ['Tiered lights', ['Glow']],
+            _tkArt: ['Bakes', ['World tops', 'Glow']],
+            _tkRoof: ['Bakes', ['World tops', 'Glow']]
+        };
+        TierKit.profile = (cls) => RenderTags.tagClass(cls, TierKit.PROFILE);
+        TierKit.profile(TieredBuilding);
+        RenderTags.tag(LandmarkKit, 'sprite', 'Bakes', ['Buildings', 'World tops', 'Glow']);
         // =====================================================================
         //  SILVER QUEEN — portico, pilasters, verandas, crown and searchlights
         // =====================================================================
@@ -41618,6 +41764,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
             _setupSign() { this.attachedSign = null; }
             _generateLights() {}
         }
+        TierKit.profile(AshgroveBuilding);
 
         /** The Ashgrove: x, y its corner; it fronts south (config.facing 'N' turns it round to front north). */
         function createAshgrove(x, y, config = {}) {
@@ -42037,6 +42184,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 ctx.drawImage(s.cv, s.x, s.y, s.w, s.h);
             }
         }
+        TierKit.profile(EnniColeBuilding);
 
         /** Enni Cole: x, y its corner; it fronts south. */
         function createEnniCole(x, y, config = {}) {
@@ -42663,6 +42811,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 ctx.restore();
             }
         }
+        TierKit.profile(SilverQueenBuilding);
 
         /** The Silver Queen: x, y its corner; it fronts south. */
         function createSilverQueen(x, y, config = {}) {
@@ -43305,7 +43454,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
             _mcForecourt() { return { x: this.x, y: this.y + 490, w: 600, h: 194 }; }
 
             /** The rotunda's outline on screen, from its foot to its top: what hides the canopy's back. */
-            _mcdRotHull() { const t = this._tkGeo().tiers.find(q => q.id === 'rotunda'); return t ? this._tkHull(t) : null; }
+            _mcdRotHull() { const t = this._tkGeo().tiers.find(q => q.id === 'rotunda'); return t ? this._tkHullOf(t) : null; }
             _mcdLean(fn) { return LandmarkKit.using((z) => this._tkK(z), fn); }
             /** The canopy, less what's behind the glass drum over it. */
             _mcdCanopy(ctx, emissive) {
@@ -43506,6 +43655,7 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 }
             }
         }
+        TierKit.profile(MoonCityBuilding);
 
         /** Moon City: x, y its corner; it fronts south. */
         function createMoonCity(x, y, config = {}) {
@@ -58881,7 +59031,7 @@ Object.assign(TrafficVehicle.prototype, {
          */
         function humanShade(ctx, entity, config) {
             const lod = typeof _zoomLOD !== 'undefined' ? _zoomLOD : 0;
-            const ped = typeof Pedestrian !== 'undefined' && entity instanceof Pedestrian;
+            const ped = entity._bakePed !== undefined ? entity._bakePed : typeof Pedestrian !== 'undefined' && entity instanceof Pedestrian;
             const level = lod === 0 ? 2 : (lod === 1 && !ped ? 1 : 0);
             if (!level || _crowdLite || typeof sunNow !== 'function') return null;    // (Crowd Quality medium/low: flat)
             if (_shadeFrame !== _frameTime) { _shadeFrame = _frameTime; _shadeRims = 0; _shadeCols = null; }
@@ -58902,7 +59052,7 @@ Object.assign(TrafficVehicle.prototype, {
             }
             const S = { level, body: level > 1 && !ped, lx, ly, a: K.a, m: Math.min(1, K.a * 1.7), shA: K.shA, rgb: K.rgb, hl: K.hl, hl2: K.hl2, sh: K.sh, rim: null };
             // Night: the nearest burning street lamp rims them in its colour (the block's lamp colour)
-            if (level === 2 && sun.night > 0.3 && entity.x !== undefined && (!ped || _shadeRims < C.RIM_PEDS)) {
+            if (level === 2 && sun.night > 0.3 && entity.x !== undefined && entity._bakePed === undefined && (!ped || _shadeRims < C.RIM_PEDS)) {
                 const n = _lampNear(entity.x, entity.y, C.RIM_R);
                 if (n) {
                     const on = lampWake(n.l) * lampFlicker(n.l) * (n.l.intensity ?? 1);
@@ -58918,6 +59068,20 @@ Object.assign(TrafficVehicle.prototype, {
                 }
             }
             return S;
+        }
+
+        /** A street lamp's colour catching shoulder and head (rim: humanShade's S.rim), in the body's frame */
+        function drawHumanRim(ctx, rim, rimY, hcx, hr) {
+            const r = rim.ang, rimX = 9.5, rt = Math.atan2(rimX * Math.sin(r), rimY * Math.cos(r));
+            ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.ellipse(-1.5, 0, rimX, rimY, 0, rt - 0.75, rt + 0.75);
+            ctx.moveTo(hcx + Math.cos(r - 1.1) * hr, Math.sin(r - 1.1) * hr); ctx.arc(hcx, 0, hr, r - 1.1, r + 1.1);
+            ctx.strokeStyle = rim.soft; ctx.lineWidth = 3.6; ctx.stroke();          // the light wrapping round, soft
+            ctx.strokeStyle = rim.style; ctx.lineWidth = 1.2; ctx.stroke();         // … and its bright edge
+            // The lit side of the head and shoulder takes on the lamp's colour
+            _softSpot(ctx, hcx + Math.cos(r) * hr * 0.6, Math.sin(r) * hr * 0.6, 15, 15, rim.rgb, rim.k * 0.4);
+            _softSpot(ctx, -1.5 + Math.cos(rt) * rimX * 0.7, Math.sin(rt) * rimY * 0.7, 12, 12, rim.rgb, rim.k * 0.3);
+            ctx.restore();
         }
 
         /** Centred ground contact at every facing, plus a sun-directed cast by day.
@@ -59223,7 +59387,8 @@ Object.assign(TrafficVehicle.prototype, {
             const S = bodyScale(config), A = androidLook(config.body);
             const hover = A && A.hover && !config.isDriving;
             if (!config.isDriving && _zoomLOD < 2) {
-                const t = ctx.getTransform(); _bodyRot = entity._reflectionProxy ? (entity.angle || 0) : Math.atan2(t.b, t.a); // original facing for mirrored art
+                const t = ctx.getTransform(); _bodyRot = entity._bakeRot !== undefined ? entity._bakeRot   // a crowd bake: lit as the walker it stands in for faces (ui/crowd-impostors.js)
+                    : entity._reflectionProxy ? (entity.angle || 0) : Math.atan2(t.b, t.a); // original facing for mirrored art
                 if (!config.noShadow) drawHumanContactShadow(ctx, entity);
             }
             if (!S && !hover) return _drawHumanoidBody(ctx, entity, config, null, A);
@@ -60123,20 +60288,12 @@ Object.assign(TrafficVehicle.prototype, {
                 }
                 if (turning) ctx.restore();
             });
-            if (SH && SH.rim) {                                             // a street lamp's colour catching shoulder and head
-                const r = SH.rim.ang;
-                ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = SH.rim.style; ctx.lineWidth = 1.4; ctx.lineCap = 'round';
-                const rimX = 9.5, rimY = BC.sh + BC.del * 0.55, rt = Math.atan2(rimX * Math.sin(r), rimY * Math.cos(r));   // round the shoulders
-                ctx.beginPath(); ctx.ellipse(-1.5, 0, rimX, rimY, 0, rt - 0.75, rt + 0.75);
+            if ((SH && SH.rim) || entity._bakePed !== undefined) {
+                const rimY = BC.sh + BC.del * 0.55;                         // round the shoulders
                 const crown = clothes.hair && !clothes.hat ? HAIR_CROWNS[clothes.hair.type] : null;     // round the hair, not the scalp under it
                 const hcx = headX + (crown ? crown[0] : 0), hr = crown ? Math.max(crown[1], crown[2]) - 0.3 : 8.5;
-                ctx.moveTo(hcx + Math.cos(r - 1.1) * hr, Math.sin(r - 1.1) * hr); ctx.arc(hcx, 0, hr, r - 1.1, r + 1.1);
-                ctx.strokeStyle = SH.rim.soft; ctx.lineWidth = 3.6; ctx.stroke();          // the light wrapping round, soft
-                ctx.strokeStyle = SH.rim.style; ctx.lineWidth = 1.2; ctx.stroke();         // … and its bright edge
-                // The lit side of the head and shoulder takes on the lamp's colour
-                _softSpot(ctx, hcx + Math.cos(r) * hr * 0.6, Math.sin(r) * hr * 0.6, 15, 15, SH.rim.rgb, SH.rim.k * 0.4);
-                _softSpot(ctx, -1.5 + Math.cos(rt) * rimX * 0.7, Math.sin(rt) * rimY * 0.7, 12, 12, SH.rim.rgb, SH.rim.k * 0.3);
-                ctx.restore();
+                if (entity._bakePed !== undefined) entity._rimGeo = { rimY, hcx, hr };   // a crowd bake: its live rim goes here (ui/crowd-impostors.js)
+                else drawHumanRim(ctx, SH.rim, rimY, hcx, hr);
             }
             if (hitK > 0.05) {                                              // the flash of the hit
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';       // a cached glow (lightning flashes every body outdoors at once)
@@ -62130,7 +62287,8 @@ Object.assign(TrafficVehicle.prototype, {
         // ═══ CROWD QUALITY — how the crowd is drawn (Settings → Graphics → Crowd Quality) ═══
         // The crowd: pedestrians, the lobby's and club's guests and staff, and a map's standing
         // NPCs. Never Stella, the crew, enemies or the fallen (they're always drawn live).
-        //   high   — fully live (the default)
+        //   ultra  — fully live
+        //   high   — the walking crowd from shaded bakes with hair and cloth in motion (CrowdBakes below; the default)
         //   medium — live, but flat-shaded, with hair and cloth at rest (no physics), no lamp rim
         //   low    — baked: each crowd member's look is drawn once into a strip of frames (an idle
         //            frame and an 8-step walk cycle) and replayed: the contact shadow is drawn live,
@@ -62232,13 +62390,207 @@ Object.assign(TrafficVehicle.prototype, {
                 return true;
             },
 
-            clear() { this.cache.clear(); }
+            clear() { this.cache.clear(); if (typeof CrowdBakes !== 'undefined') CrowdBakes.clear(); }
         };
 
-        /** The crowd's draw: by Crowd Quality (high live, medium lighter, low baked) */
+        // ═══ HIGH: shaded walk bakes, hair and cloth swinging ═══
+        // On High the walking crowd is drawn from a bake too, but a full one: shaded as on Ultra (the sun's
+        // side for the way they face, rain on them), hair and cloth run through their physics in step with
+        // the walk (a few warm-up steps, then a 12-step cycle, so it swings and trails as they stride), and a
+        // street lamp's rim painted live over the bake. Each bake is spread over a few frames (BAKE_DRAWS
+        // bodies' worth a frame for the whole crowd), so a new look costs about what a few live bodies would;
+        // until it's ready they're drawn live. Someone who has just stopped (IDLE_FROM…IDLE_TO s: their hair
+        // settled, but before the idle pose starts shifting their weight and glancing round) is one still bake;
+        // past that they're live again. Anyone dancing, dying, hovering, lit by
+        // lightning, in night vision's heat or casting a High lamp silhouette, and anyone seen up close
+        // (zoomed past LIVE_SCALE), is drawn live, as on Ultra. Ultra is fully live everywhere.
+        const CROWD_HQ = { FRAMES: 12, WARM: 6, R: 40, Q: 1.25, MAX: 40, PER_OWNER: 3, BAKE_DRAWS: 5, LIGHT_STEPS: 8, LIVE_SCALE: 1.6, STRIDE_SLACK: 0.5, IDLE_FROM: 0.6, IDLE_TO: 3.8 };
+
+        const CrowdBakes = {
+            bakes: new Map(),          // owner → [bake, ...] (newest first)
+            count: 0,
+            job: null,                 // the bake under way: { owner, ... }
+            _budgetFrame: -1, _budget: 0,
+            _scratch: null,
+
+            /** Facing-dependent light: which of LIGHT_STEPS directions the sun comes from (relative to the body), or -1 (none) */
+            _lightStep(rot) {
+                if (typeof sunNow !== 'function') return -1;
+                const sun = sunNow();
+                if (!(sun.day > 0.05) || !(sun.dx || sun.dy)) return -1;
+                const N = CROWD_HQ.LIGHT_STEPS, rel = Math.atan2(sun.dy, sun.dx) - rot;
+                return ((Math.round(rel / (Math.PI * 2) * N) % N) + N) % N;
+            },
+            /** Everything a bake's paint depends on besides the look and pace */
+            _env(e, light) {
+                const sun = typeof sunNow === 'function' ? sunNow() : null;
+                const d = sun && sun.day > 0.05 ? Math.round(Math.min(1, sun.day * 1.4) * 5) : 0;
+                const W = typeof weatherAt === 'function' ? weatherAt(e) : null, rain = W ? Math.round(W.rain * 4) : 0;
+                return light + ':' + d + ':' + (d ? sun.rgb : '') + ':' + rain + ':' + (typeof _zoomLOD !== 'undefined' ? _zoomLOD : 0);
+            },
+            _look(c) {
+                const held = c.held ? c.held.type + (c.held.open ?? '') : '';
+                return (c.pose || '') + '|' + held + '|' + (c.hat ? c.hat.type : '') + '|' + (c.hair ? c.hair.type : '');
+            },
+            /** Should this body be drawn live, as on Ultra? */
+            _live(ctx, e, c) {
+                if (c.pose === 'dance' || c.pose === 'die' || c.isDriving || c.poseWhileMoving) return true;
+                if (c.body && c.body.kind === 'android' && c.body.hover) return true;
+                if (typeof SilhouetteFX !== 'undefined' && (SilhouetteFX.glow || SilhouetteFX.heat > 0.01)) return true;
+                if (e._hitT !== undefined && _gameTimeSec - e._hitT < 0.2) return true;
+                const t = ctx.getTransform();
+                if (Math.hypot(t.a, t.b) > CROWD_HQ.LIVE_SCALE) return true;
+                if (_lampShadowLevel() >= 2 && !c.noShadow && e.x !== undefined && (typeof _zoomLOD === 'undefined' || _zoomLOD < 2) &&
+                    sunNow().night > 0.3 && _lampsNear2(e.x, e.y, CONFIG.HUMAN_SHADE.LAMP_SHADOW_R)) return true;
+                return false;
+            },
+            _find(owner, look, env, sp) {
+                const list = this.bakes.get(owner);
+                if (!list) return null;
+                let best = null, bd = Infinity;
+                for (const b of list) {
+                    if (b.look !== look || b.env !== env || (b.stride === 0) !== (sp === 0)) continue;
+                    const dd = Math.abs(b.stride - sp);
+                    if (dd < bd) { bd = dd; best = b; }
+                }
+                return best && bd <= Math.max(CROWD_HQ.STRIDE_SLACK, sp * 0.12) ? best : null;    // a stride a touch long or short can't be seen
+            },
+            /** A near-enough bake while the right one is made: same look, another light step or pace */
+            _near(owner, look, idle) {
+                const list = this.bakes.get(owner);
+                if (!list) return null;
+                for (const b of list) if (b.look === look && (b.stride === 0) === idle) return b;
+                return null;
+            },
+            _store(owner, b) {
+                let list = this.bakes.get(owner);
+                if (!list) this.bakes.set(owner, list = []);
+                list.unshift(b); this.count++;
+                if (list.length > CROWD_HQ.PER_OWNER) { list.pop(); this.count--; }
+                while (this.count > CROWD_HQ.MAX) {                            // full: drop the bake seen longest ago (never one in use this frame)
+                    let oldK = null, oldI = -1, oldT = Infinity;
+                    for (const [k, l] of this.bakes) for (let i = 0; i < l.length; i++) if (l[i].used < oldT) { oldT = l[i].used; oldK = k; oldI = i; }
+                    if (oldK === null || oldT >= _frameTime) break;
+                    const l = this.bakes.get(oldK); l.splice(oldI, 1); this.count--;
+                    if (!l.length) this.bakes.delete(oldK);
+                }
+            },
+
+            _startJob(owner, e, c, look, env, light, sp, rot) {
+                const F = CROWD_HQ.FRAMES, R = CROWD_HQ.R, Q = CROWD_HQ.Q, cell = Math.ceil(R * 2 * Q);
+                const cv = document.createElement('canvas'); cv.width = cell * (sp > 0 ? F : 1); cv.height = cell;
+                const g = cv.getContext('2d'); if (!g) return null;
+                // A stand-in walker: their look, walking along +x through its own little world
+                const B = { x: 0, y: 0, angle: 0, look: e.look, walkPhase: 0, _bakePed: typeof Pedestrian !== 'undefined' && e instanceof Pedestrian, _wxSeed: 0 };
+                syncHumanoidGait(B);
+                let bakeRot;                                                   // lit from the light step's side, as they face now
+                if (light >= 0) { const sun = sunNow(); bakeRot = Math.atan2(sun.dy, sun.dx) - light / CROWD_HQ.LIGHT_STEPS * Math.PI * 2; }
+                else bakeRot = rot;
+                B._bakeRot = bakeRot;
+                const cfg = Object.assign({}, c, { lerpSpeed: 1, noShadow: true, poseInstant: true, _crowdBake: true });
+                return this.job = { owner, look, env, stride: sp, cv, g, cell, B, cfg, step: 0, t0: _gameTimeSec, cadence: humanoidCadence(sp), used: _frameTime };
+            },
+
+            /** Run up to `n` steps of the bake under way. Returns the finished bake, or null. */
+            _bakeSteps(n) {
+                const J = this.job; if (!J) return null;
+                const walk = J.stride > 0, F = walk ? CROWD_HQ.FRAMES : 1, W = walk ? CROWD_HQ.WARM : 0, R = CROWD_HQ.R, Q = CROWD_HQ.Q, cell = J.cell;
+                let sc = this._scratch;
+                if (!sc || sc.width !== cell) { sc = this._scratch = document.createElement('canvas'); sc.width = sc.height = cell; }
+                const g = sc.getContext('2d'), B = J.B, G = B._gait;
+                const wm = _worldMatrix, wc = _worldCanvas, lite = _crowdLite, gt = _gameTimeSec, rot = _bodyRot;
+                _crowdLite = false;
+                try {
+                    for (let k = 0; k < n && J.step < W + F; k++, J.step++) {
+                        const ph = walk ? (J.step - W) / F * Math.PI * 2 : 0, ticks = walk ? ph / J.cadence : 0;
+                        _gameTimeSec = J.t0 + ticks / 60;
+                        B.x = ticks * J.stride; B.y = 0; B.walkPhase = ph;
+                        G.speed = J.stride; G.dirX = 1; G.dirY = 0; G.tick = _simTick; G.prevX = B.x; G.prevY = B.y; G.phasePrev = ph;
+                        _worldCanvas = sc;
+                        _worldMatrix = new DOMMatrix([Q, 0, 0, Q, R * Q - Q * B.x, R * Q - Q * B.y]);
+                        g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cell, cell);
+                        g.setTransform(Q, 0, 0, Q, R * Q, R * Q);
+                        drawProceduralHumanoid(g, B, J.cfg);
+                        if (J.step >= W) J.g.drawImage(sc, cell * (J.step - W), 0);
+                    }
+                } catch (err) { this.job = null; return null; }
+                finally { _crowdLite = lite; _worldMatrix = wm; _worldCanvas = wc; _gameTimeSec = gt; _bodyRot = rot; }
+                if (J.step < W + F) return null;
+                this.job = null;
+                return { look: J.look, env: J.env, stride: J.stride, cv: J.cv, cell, rim: B._rimGeo || null, used: _frameTime };
+            },
+
+            /** Bake work for this frame, from whoever asks first (the bake under way, else theirs) */
+            _work(owner, e, c, look, env, light, sp, rot) {
+                if (this._budgetFrame !== _frameTime) { this._budgetFrame = _frameTime; this._budget = CROWD_HQ.BAKE_DRAWS; }
+                if (this._budget <= 0) return;
+                if (this.job && (this.job.used < _frameTime - 1000)) this.job = null;     // its walker went away
+                if (!this.job) { if (!this._startJob(owner, e, c, look, env, light, sp, rot)) return; }
+                else if (this.job.owner === owner) this.job.used = _frameTime;
+                const J = this.job, n = this._budget;
+                this._budget = 0;
+                const b = this._bakeSteps(n);
+                if (b) this._store(J.owner, b);
+            },
+
+            /** Draw from a bake (true), else false (the caller draws live). */
+            draw(ctx, e, c) {
+                if (this._live(ctx, e, c)) return false;
+                const g = syncHumanoidGait(e);
+                let sp = g ? Math.round(g.speed * 2) / 2 : 0;
+                if (!(g && g.speed > CONFIG.GAIT.STOP_SPEED) || sp < 0.5) {                        // standing: a still bake only while the idle pose is just breathing
+                    if (e._crowdStopT == null) e._crowdStopT = _gameTimeSec;
+                    const still = _gameTimeSec - e._crowdStopT;
+                    if (still < CROWD_HQ.IDLE_FROM || still > CROWD_HQ.IDLE_TO) return false;
+                    sp = 0;
+                } else e._crowdStopT = null;
+                const t = ctx.getTransform(), rot = Math.atan2(t.b, t.a);
+                const light = this._lightStep(rot), look = this._look(c), env = this._env(e, light);
+                let b = this._find(e, look, env, sp);
+                if (!b) {
+                    const steady = e._crowdHQsp === sp; e._crowdHQsp = sp;           // easing in or out of a stroll: don't bake every pace on the way
+                    if (steady) this._work(e, e, c, look, env, light, sp, rot);
+                    b = this._find(e, look, env, sp);
+                    if (!b) { b = this._near(e, look, sp === 0); if (!b || light < 0 && b.env !== env) return false; }
+                } else e._crowdHQsp = sp;
+                if (this.job && this.job.owner === e) this.job.used = _frameTime;
+                b.used = _frameTime;
+                const F = CROWD_HQ.FRAMES, R = CROWD_HQ.R;
+                const ph = ((e.walkPhase || 0) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+                const f = b.stride > 0 ? Math.round(ph / (Math.PI * 2) * F) % F : 0;
+                if (!c.noShadow && _zoomLOD < 2) { _bodyRot = rot; drawHumanContactShadow(ctx, e); }
+                const S = bodyScale(c);
+                ctx.drawImage(b.cv, b.cell * f, 0, b.cell, b.cell, -R, -R, R * 2, R * 2);
+                if (b.rim) {                                                   // a street lamp's rim, live as they pass it
+                    _bodyRot = rot;
+                    const SH = humanShade(ctx, e, { _wet: 0 });
+                    if (SH && SH.rim) {
+                        if (S) { ctx.save(); ctx.scale(S.x, S.y); }
+                        drawHumanRim(ctx, SH.rim, b.rim.rimY, b.rim.hcx, b.rim.hr);
+                        if (S) ctx.restore();
+                    }
+                }
+                RenderStats.bodies++; RenderStats.cachedBodies++;
+                return true;
+            },
+
+            clear() { this.bakes.clear(); this.count = 0; this.job = null; }
+        };
+
+        /** The crowd's draw: by Crowd Quality (ultra live, high shaded walk bakes, medium lighter, low baked) */
         function drawCrowdHumanoid(ctx, entity, config) {
             const q = GameSettings.crowdQuality || 'high';
-            if (q === 'high') return drawProceduralHumanoid(ctx, entity, config);
+            if (q === 'ultra') return drawProceduralHumanoid(ctx, entity, config);
+            if (q === 'high') {
+                if (!RenderStats.timed) { if (CrowdBakes.draw(ctx, entity, config)) return; }
+                else {
+                    const t0 = performance.now(), pm = RenderStats.peopleMs;
+                    const ok = CrowdBakes.draw(ctx, entity, config);
+                    RenderStats.peopleMs = pm + (performance.now() - t0);
+                    if (ok) return;
+                }
+                return drawProceduralHumanoid(ctx, entity, config);
+            }
             if (q === 'low') {
                 if (!RenderStats.timed) { if (CrowdImpostors.draw(ctx, entity, config)) return; }
                 else {                                                              // a baked body is still a body: Entities: People
@@ -62458,6 +62810,9 @@ Object.assign(TrafficVehicle.prototype, {
                     }
                     bind('Crowd sprites', () => CrowdImpostors.draw, fn => { CrowdImpostors.draw = fn; }, true);
                     bind('Crowd baking', () => CrowdImpostors._bake, fn => { CrowdImpostors._bake = fn; }, false, true);
+                    // High's shaded walk bakes (ui/crowd-impostors.js CrowdBakes): drawing from a bake, and the bake work spread over frames
+                    bind('Crowd sprites', () => CrowdBakes.draw, fn => { CrowdBakes.draw = fn; }, true);
+                    bind('Crowd baking', () => CrowdBakes._bakeSteps, fn => { CrowdBakes._bakeSteps = fn; }, false, true);
                     for (const type of Object.keys(HAIR_RENDERERS)) {
                         bind('Hair drawing', () => HAIR_RENDERERS[type], fn => { HAIR_RENDERERS[type] = fn; });
                     }
@@ -62488,11 +62843,12 @@ Object.assign(TrafficVehicle.prototype, {
         /** Buildings/World tops detail hooks exist only while the Full profiler is shown.
             Stage rows are exclusive; body drawing stays in its existing People rows. */
         const WorldRenderProfiler = {
-            active: false, hooks: null, scope: null, part: null, partT: 0, partP: 0,
+            active: false, hooks: null, scope: null, part: null, partT: 0, partP: 0, _tagsBound: 0,
             parts: Object.create(null),
             keys: {
                 Buildings: ['Base', 'Forecourts', 'Reflection prep', 'Wet ground', 'Reflections', 'Sun shadows', 'Cloud shadows', 'Indoor floors', 'Windows', 'Signs'],
-                'World tops': ['Roofs and facades', 'Windows', 'Signs', 'Ferris wheel', 'Foliage', 'Leaves', 'Lamp bodies', 'Linens']
+                'World tops': ['Roofs and facades', 'Windows', 'Signs', 'Ferris wheel', 'Foliage', 'Leaves', 'Lamp bodies', 'Linens'],
+                Glow: []                                                       // (filled by RenderTags: the lit pass after the darkness)
             },
 
             _wrap(tag, original) {
@@ -62551,6 +62907,14 @@ Object.assign(TrafficVehicle.prototype, {
                     bind('Leaves', LeafParticleSystem.prototype, 'draw');
                     bind('Lamp bodies', LampEntity.prototype, 'draw');
                     bind('Linens', RoomSystem.prototype, 'drawLinens');
+                }
+                // Methods tagged where they're written (RenderTags, entities/static-builders-profiler.js): each new tag
+                // is bound once, and its row joins the scopes it names
+                for (; this._tagsBound < RenderTags.list.length; this._tagsBound++) {
+                    const { owner, key, part, scopes } = RenderTags.list[this._tagsBound], original = owner[key];
+                    if (typeof original !== 'function') continue;
+                    this.hooks.push({ owner, key, original, wrapped: this._wrap(part, original) });
+                    for (const s of scopes || []) if (this.keys[s] && !this.keys[s].includes(part)) this.keys[s].push(part);
                 }
                 for (const h of this.hooks) h.owner[h.key] = on ? h.wrapped : h.original;
                 this.active = on; this.scope = null; this.part = null;
@@ -74484,7 +74848,7 @@ engineMixin({
                 if (gb) for (const cv of gb.cache.values()) { ground += px(cv); groundN++; }
                 if (typeof MAP_BAKES !== 'undefined') { const seen = new Set(); for (const id in MAP_BAKES) for (const k of MAP_BAKES[id]) if (!seen.has(k)) { seen.add(k); floors += px(game[k]); } }
                 if (typeof _carSprites !== 'undefined') for (const sp of _carSprites.values()) cars += px(sp.cv);
-                if (typeof CrowdImpostors !== 'undefined') for (const b of CrowdImpostors.cache.values()) crowd += px(b.cv);
+                if (typeof CrowdImpostors !== 'undefined') for (const b of CrowdImpostors.cache.values()) crowd += px(b.cv); if (typeof CrowdBakes !== 'undefined') for (const l of CrowdBakes.bakes.values()) for (const b of l) crowd += px(b.cv);
                 const props = typeof PropSprites !== 'undefined' ? PropSprites.bytes / 4 : 0;
                 this._mem = { ground: ground * MB, groundN, floors: floors * MB, cars: cars * MB, crowd: crowd * MB, props: props * MB, total: (ground + floors + cars + crowd + props) * MB };
                 this._memAt = now;
@@ -84316,7 +84680,13 @@ engineMixin({
                     this.drawFireLightGlow(this.ctx);
                 }
                 // Glowing details drawn after the darkness layer: windows, neon, rooftops, sky
-                if (RL.at('glow')) this.drawEmissivePass(this.ctx);
+                if (RL.at('glow')) {
+                    // Full mode: the lit pass gets a row of its own, broken down by what's tagged for 'Glow' (RenderTags)
+                    const timed = RenderStats.timed;
+                    if (timed) { this.profiler.add('Lighting: Glow', 0, true); this.profiler.start('Lighting: Glow'); WorldRenderProfiler.begin('Glow', this.profiler, 'Lighting: Glow'); }
+                    this.drawEmissivePass(this.ctx);
+                    if (timed) { this.profiler.stop('Lighting: Glow'); WorldRenderProfiler.end(this.profiler); }
+                }
                 // Her halo, above the darkness so it reads at night (kept from her draw: engine/player-draw-input.js)
                 if (RL.at('stella')) this.drawPlayerGlow(this.ctx);
                 // Velvet's eyeshine, above the darkness; hidden under roofs and canopies like the speech bubbles
@@ -95442,10 +95812,10 @@ engineMixin({
                     
                 } else {
                     // Density settings: cycle LOW → MEDIUM → HIGH
-                    const order = ['low', 'medium', 'high'];
+                    const order = key === 'crowdQuality' ? ['low', 'medium', 'high', 'ultra'] : ['low', 'medium', 'high'];
                     const current = GameSettings[key];
                     const idx = order.indexOf(current);
-                    GameSettings[key] = order[(idx + 1) % 3];
+                    GameSettings[key] = order[(idx + 1) % order.length];
                     GameSettings.saveDensity();                                    // this device's, and applied now (trimToCap)
                     if (key === 'crowdQuality' && typeof CrowdImpostors !== 'undefined') CrowdImpostors.clear();
                     this._updateValueEl(el.id, GameSettings[key]);
