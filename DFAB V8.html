@@ -34785,6 +34785,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                other buildings' glow clips and the mirrors; it's kept while the
                camera stands still. Tiles off the screen are skipped. The night
                light isn't drawn at all in full daylight.
+             · Level of detail: each face gets only the tiles it needs for its
+               error on screen to stay under a px or two (_tkTiles: fewer zoomed
+               out, far off, or where it leans less), never more than the stock
+               _TK_TILE and never worse than those; zoomed right out the ledges'
+               lips and the contact shadows go. TierKit.LOD = false: as before.
 
            The plan is laid out in the building's own frame with its front at the
            bottom (+y); facing 'N' turns it round (a rotation, so faces keep their
@@ -34813,10 +34818,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return pts;
             },
             /** A polygon's signed area (negative: its edges' left normals (-dy, dx) point out). */
+            LOD: true,                 // tiles sized by their error on screen (_tkTiles); false: always _TK_TILE (to compare)
             area(p) { let s = 0; for (let i = 0; i < p.length; i++) { const a = p[i], b = p[(i + 1) % p.length]; s += a[0] * b[1] - b[0] * a[1]; } return s / 2; }
         };
 
-        const _TK_TILE = [40, 14];   // a face is mapped in tiles this wide and tall (world px): each an affine piece of its perspective quad (tier.tile overrides)
+        const _TK_TILE = [40, 14];   // a face is mapped in tiles at most this wide and tall (world px): each an affine piece of its perspective quad (tier.tile overrides)
+        // Level of detail: a face gets only as many tiles as it needs for its tiles' error on screen to stay under this many px
+        // (by _zoomLOD: full, reduced, minimal). Zoomed out, far off or low (less lean), that's fewer tiles; never more than _TK_TILE gives.
+        const _TK_ERR = [0.75, 1.25, 2];
 
         class TieredBuilding extends BuildingV2 {
             /**
@@ -34965,13 +34974,37 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 if (drew) ctx.setTransform(M);
             }
+            /**
+             * How many tiles (across, up) a face needs, at most (nu, nz). A point at height z draws at cam + (p − cam)·k(z): along a
+             * row (one z) that's exact for an affine tile, but up the wall k isn't linear in z, so a tile's art slides along the wall
+             * by up to D·|k(mid) − (k(z0) + k(z1)) / 2| (D: how far the face's ends are from the camera), a quarter of that with
+             * twice the rows; and a tile's far corner misses by its width × its k span (the twist), both × the zoom on screen.
+             */
+            _tkTiles(f, nu, nz) {
+                const cam = game.camera, zoom = cam.zoom || 1;
+                const k0 = this._tkK(f.z0), k1 = this._tkK(f.z1), km = this._tkK((f.z0 + f.z1) / 2);
+                const D = Math.max(Math.hypot(f.x1 - cam.x, f.y1 - cam.y), Math.hypot(f.x2 - cam.x, f.y2 - cam.y));
+                const slide = zoom * D * Math.abs(km - (k0 + k1) / 2), dkTop = (rows) => k1 - this._tkK(f.z1 - (f.z1 - f.z0) / rows);
+                // what the stock tiles miss by: never ask for better than that (no face gets worse than it was, only cheaper)
+                const stock = Math.max(slide / (nz * nz), zoom * f.L / nu * dkTop(nz));
+                const err = Math.max(_TK_ERR[Math.max(0, Math.min(2, _zoomLOD | 0))], stock);
+                // the fewest tiles that hold both: more rows shrink the slide and each tile's k span, more columns its width
+                let best = null;
+                for (let rows = Math.max(1, Math.min(nz, Math.ceil(Math.sqrt(slide / err)))); rows <= nz; rows++) {
+                    const cols = Math.max(1, Math.ceil(zoom * f.L * dkTop(rows) / err - 1e-9));   // (the top row's k span: the widest, k is convex in z)
+                    if (cols <= nu && rows * rows * err >= slide - 1e-9 && (!best || cols * rows < best[0] * best[1])) best = [cols, rows];
+                }
+                return best || [nu, nz];                                          // (needing more than the stock tiles: the stock tiles)
+            }
             /** A face's tile corners on screen (from where the camera stands now): (nu + 1) × (nz + 1) points, row by row up from z0. */
             _tkGrid(f) {
                 const v = this._tkView();
                 let G = v.grids.get(f);
                 if (G) return G;
-                const t = f.tier, tile = t.tile || _TK_TILE, nu = Math.max(1, Math.ceil(f.L / tile[0])), nz = Math.max(2, Math.ceil((f.z1 - f.z0) / tile[1]));
-                const p = new Float64Array((nu + 1) * (nz + 1) * 2), cam = game.camera, cx = cam.x, cy = cam.y;
+                const t = f.tier, tile = t.tile || _TK_TILE, cam = game.camera, cx = cam.x, cy = cam.y;
+                let nu = Math.max(1, Math.ceil(f.L / tile[0])), nz = Math.max(2, Math.ceil((f.z1 - f.z0) / tile[1]));
+                if (TierKit.LOD) [nu, nz] = this._tkTiles(f, nu, nz);
+                const p = new Float64Array((nu + 1) * (nz + 1) * 2);
                 let o = 0;
                 for (let j = 0; j <= nz; j++) {
                     const k = this._tkK(f.z0 + (f.z1 - f.z0) * j / nz);
@@ -34994,6 +35027,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             _tkLedges(ctx, t, faces, g) {
                 const cam = game.camera, p = (x, y, k) => [cam.x + (x - cam.x) * k, cam.y + (y - cam.y) * k], n = t.poly.length;
                 const kT = this._tkK(g.z), kB = this._tkK(Math.max(t.z0, g.z - g.th)), [r, gg, b] = g.band;
+                const fine = !TierKit.LOD || _zoomLOD < 2;                               // (zoomed right out: the lip and the shadow line under it, a px wide, go)
                 for (const f of faces) {
                     if (g.z <= f.z0 + 0.5 || g.z > f.z1 + 0.5) continue;
                     // where the ledge runs in the world and its front's colour don't change with the camera: once per face and ledge
@@ -35012,8 +35046,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.fillStyle = L.front;
                     ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.lineTo(Bt[0], Bt[1]); ctx.lineTo(At[0], At[1]); ctx.closePath(); ctx.fill();
                     ctx.fillStyle = g.top; ctx.beginPath(); ctx.moveTo(a1[0], a1[1]); ctx.lineTo(b1[0], b1[1]); ctx.lineTo(Bt[0], Bt[1]); ctx.lineTo(At[0], At[1]); ctx.closePath(); ctx.fill();
-                    if (g.lip) { ctx.strokeStyle = g.lip; ctx.globalAlpha = 1 - 0.6 * this._tkTurn(f); ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(At[0], At[1]); ctx.lineTo(Bt[0], Bt[1]); ctx.stroke(); ctx.globalAlpha = 1; }
-                    ctx.strokeStyle = 'rgba(6, 12, 14, 0.45)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke();
+                    if (fine && g.lip) { ctx.strokeStyle = g.lip; ctx.globalAlpha = 1 - 0.6 * this._tkTurn(f); ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(At[0], At[1]); ctx.lineTo(Bt[0], Bt[1]); ctx.stroke(); ctx.globalAlpha = 1; }
+                    if (fine) { ctx.strokeStyle = 'rgba(6, 12, 14, 0.45)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke(); }
                 }
             }
 
@@ -35049,8 +35083,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              */
             _tkView() {
                 const cam = game.camera, C = leanCamHeight(), lean = CONFIG.BUILDINGS.LEAN, geo = this._tkGeo(), v = this._tkV;
-                if (v && v.cx === cam.x && v.cy === cam.y && v.C === C && v.lean === lean && v.geo === geo) return v;
-                return (this._tkV = { cx: cam.x, cy: cam.y, C, lean, geo, order: null, visible: new Map(), hulls: new Map(), boxes: new Map(), grids: new Map(), occluders: null });
+                const zoom = cam.zoom || 1, lod = TierKit.LOD ? _zoomLOD | 0 : -1;
+                if (v && v.cx === cam.x && v.cy === cam.y && v.C === C && v.lean === lean && v.geo === geo && v.zoom === zoom && v.lod === lod) return v;
+                return (this._tkV = { cx: cam.x, cy: cam.y, C, lean, geo, zoom, lod, order: null, visible: new Map(), hulls: new Map(), boxes: new Map(), grids: new Map(), occluders: null });
             }
             /** The tiers in drawing order, from where the camera stands (cached; subclasses refine _tkOrder). */
             _tkOrdered() { const v = this._tkView(); return v.order || (v.order = this._tkOrder()); }
@@ -35090,7 +35125,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         this._tkQuad(ctx, f, f.z0, f.z1); ctx.fillStyle = f.shadeFill || (f.shadeFill = `rgba(${sh[0]}, ${sh[1]}, ${sh[2]}, ${0.03 + 0.4 * this._tkTurn(f)})`); ctx.fill();
                         if (f.z0 < 1) {                                                                  // the street's shade at the foot
                             this._tkQuad(ctx, f, 0, 22); this._tkFade(ctx, foot, this._tkP(f.x1, f.y1, 0), this._tkP(f.x1, f.y1, 22));
-                        } else {                                                                         // a contact shadow where it meets the roof below
+                        } else if (!TierKit.LOD || _zoomLOD < 2) {                                       // a contact shadow where it meets the roof below (zoomed right out: too thin to see)
                             this._tkQuad(ctx, f, f.z0, f.z0 + 8); this._tkFade(ctx, contact, this._tkP(f.x1, f.y1, f.z0), this._tkP(f.x1, f.y1, f.z0 + 8));
                         }
                     }
