@@ -540,21 +540,7 @@
             apron: { x: -10, y: 380, w: 820, h: 480 }   // the drive, fountain and forecourt: _dnForecourt (buildings/double-nights.js)
         });
         
-        BuildingV2Registry.register('moon_city', {
-            factory: createMoonCityNightclub,
-            sections: [
-                { x: 0, y: 0, w: 600, h: 300 },
-                { x: 0, y: 300, w: 280, h: 200 }
-            ],
-            accentColor: '#b48cff',
-            label: 'Moon City Nightclub',
-            type: 'club',
-            category: 'entertainment',
-            floors: 13,                     // one grand club floor, raised so its deco walls show (buildings/factories.js)
-            sign: { text: 'CLUB', color: '#c8a8ff', size: 40 },
-            door: { target: 'moon_city_nightclub', label: 'Enter Club', lightColor: '#ff3a6a' },
-            apron: { x: 0, y: 490, w: 280, h: 194 }     // the court, the queue and the carpet's end: _mcForecourt (buildings/moon-city.js)
-        });
+        // Moon City registers itself on the tiered kit (buildings/moon-city-deco.js)
         
         // Generic V2 buildings for auto-fill (not unique — can be placed multiple times)
         BuildingV2Registry.register('apartment_small', {
