@@ -60,6 +60,9 @@
                     }
                     bind('Crowd sprites', () => CrowdImpostors.draw, fn => { CrowdImpostors.draw = fn; }, true);
                     bind('Crowd baking', () => CrowdImpostors._bake, fn => { CrowdImpostors._bake = fn; }, false, true);
+                    // High's shaded walk bakes (ui/crowd-impostors.js CrowdBakes): drawing from a bake, and the bake work spread over frames
+                    bind('Crowd sprites', () => CrowdBakes.draw, fn => { CrowdBakes.draw = fn; }, true);
+                    bind('Crowd baking', () => CrowdBakes._bakeSteps, fn => { CrowdBakes._bakeSteps = fn; }, false, true);
                     for (const type of Object.keys(HAIR_RENDERERS)) {
                         bind('Hair drawing', () => HAIR_RENDERERS[type], fn => { HAIR_RENDERERS[type] = fn; });
                     }
