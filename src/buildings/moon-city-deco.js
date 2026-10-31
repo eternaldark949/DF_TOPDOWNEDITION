@@ -548,14 +548,14 @@
                     door: { x: dx, y: dy },
                     sign: { x: dx, y: dy + MCD.ROT[2] + 20 },                        // out in front of the glass drum, over the canopy's back
                     canopy: { x: dx, y: dy + MCD.ROT[2] + 4 },                       // the canopy fans out from the drum's front (its centre: _mcDrawCanopy takes door.y - 4)
-                    court: { x: X - 10, y: dy, w: 300, h: 200 },
+                    court: { x: X - 10, y: dy, w: 300, h: 184 },
                     bouncer: { x: dx + 46, y: dy + 112 },
-                    queue: [0, 1, 2, 3, 4, 5, 6].map(i => [dx + 54, dy + 120 + i * 13]),
+                    queue: [0, 1, 2, 3, 4, 5, 6].map(i => [dx + 54, dy + 118 + i * 11]),
                     spawn: { x: dx + 120, y: dy + 214 }, exit: { x: dx, y: dy + 230 }
                 });
             }
-            /** Kept clear of street trees and lamps (engine/map-loading.js): the plaza and the carpet's end. */
-            _mcForecourt() { const c = this._mcGeo().court; return { x: c.x - 20, y: c.y - 10, w: c.w + 40, h: c.h + 10 }; }
+            /** Kept clear of street trees and lamps (engine/map-loading.js): all it draws on the ground, the registry's apron. */
+            _mcForecourt() { return { x: this.x, y: this.y + 490, w: 600, h: 194 }; }
 
             /** The rotunda's outline on screen, from its foot to its top: what hides the canopy's back. */
             _mcdRotHull() { const t = this._tkGeo().tiers.find(q => q.id === 'rotunda'); return t ? this._tkHull(t) : null; }
@@ -586,11 +586,11 @@
                     this._mcdLean(() => { this._mcdCanopy(ctx, true); this._mcDrawSign(ctx, true, dark); });
                     ctx.restore();
                 }
-                this._mcdBeams(ctx, dark);
+                this._mcBeams(ctx, dark);
             }
 
             /** Two searchlights from the turrets, violet and rose, sweeping the night sky. */
-            _mcdBeams(ctx, dark) {
+            _mcBeams(ctx, dark) {
                 if (dark < 0.2 || _zoomLOD >= 2) return;
                 const t = _gameTimeSec, a = Math.min(1, (dark - 0.2) / 0.3), z0 = MCD.Z.HALL + 8;
                 ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 1;
@@ -652,7 +652,7 @@
                 c.stroke();
                 c.strokeStyle = 'rgba(232, 194, 122, 0.4)'; for (const rr of [74, 112, 150]) { c.beginPath(); c.arc(dx, Q.y, rr, 0, Math.PI); c.stroke(); }
                 for (const sx of [-1, 1]) {
-                    const px = dx + sx * 96, py = Q.y + 150;
+                    const px = dx + sx * 96, py = Q.y + 146;
                     c.beginPath(); c.arc(px, py, 17, 0, Math.PI * 2); c.strokeStyle = 'rgba(232, 194, 122, 0.5)'; c.stroke();
                     c.fillStyle = 'rgba(232, 194, 122, 0.65)'; _mcCrescent(c, px, py, 11, sx < 0 ? 0.6 : Math.PI - 0.6); c.fill();
                 }
@@ -661,7 +661,7 @@
                 c.fillStyle = 'rgba(0,0,0,0.18)'; for (let y = Q.y + 6; y < Q.y + Q.h; y += 8) c.fillRect(dx - cw / 2, y, cw, 1);
                 c.fillStyle = C.gold; c.fillRect(dx - cw / 2, Q.y, 2, Q.h); c.fillRect(dx + cw / 2 - 2, Q.y, 2, Q.h);
                 for (const sx of [-1, 1]) {
-                    const xr = dx + sx * 34, ys = [Q.y + 110, Q.y + 132, Q.y + 154, Q.y + 176, Q.y + 198];
+                    const xr = dx + sx * 34, ys = [Q.y + 110, Q.y + 128, Q.y + 146, Q.y + 164, Q.y + 182];
                     c.strokeStyle = C.velvetLt; c.lineWidth = 2.6;
                     for (let i = 0; i < ys.length - 1; i++) { c.beginPath(); c.moveTo(xr, ys[i]); c.quadraticCurveTo(xr + sx * 5, (ys[i] + ys[i + 1]) / 2, xr, ys[i + 1]); c.stroke(); }
                     for (const y of ys) { c.fillStyle = 'rgba(0,0,0,0.4)'; c.beginPath(); c.arc(xr + 1.5, y + 2, 3.6, 0, Math.PI * 2); c.fill(); c.fillStyle = C.gold; c.beginPath(); c.arc(xr, y, 3.4, 0, Math.PI * 2); c.fill(); c.fillStyle = C.goldLt; c.beginPath(); c.arc(xr - 1, y - 1, 1.2, 0, Math.PI * 2); c.fill(); }

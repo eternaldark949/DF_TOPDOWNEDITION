@@ -1123,9 +1123,9 @@ test('Rooftop festoons: every bulb at its own shimmer of the string, in one fill
 
 test('Landmark roofs: every painted run draws the same at any time and in any wind', env => {
   env.run(`game.story.update=()=>{}; game._doLoadMap('sdc');`);
-  // (the Silver Queen is a tiered building now: its roofs are baked tier sprites, not painted runs)
-  const paint = { moon_city: 'b._mcDrawRoof(game.ctx, false)', canopy: 'b._mcCanopyPlane(game.ctx)' };   // (canopy unmarked: one whole run)
-  const owner = { moon_city: 'moon_city', canopy: 'moon_city' };
+  // (the Silver Queen and Moon City are tiered buildings now: their roofs are baked tier sprites, not painted runs; Moon City's canopy is still one)
+  const paint = { canopy: 'b._mcCanopyPlane(game.ctx)' };   // (canopy unmarked: one whole run)
+  const owner = { canopy: 'moon_city' };
   const whole = { canopy: true };
   const tr = (style, run, T, wind) => {
     env.setTrace(true);
