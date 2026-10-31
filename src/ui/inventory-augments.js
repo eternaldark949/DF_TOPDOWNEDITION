@@ -91,6 +91,12 @@
                 // engine/status-effects.js meleeSlash / applyStatus: blade damage × bladeDamageMult, bleed up to bleedMax stacks
                 stats: { effect: 'crimson_edge', bladeDamageMult: 1.5, bleedMax: 5 }
             },
+            'vampiric_fists': {
+                name: 'Vampiric Fists', type: 'attachment', icon: '❦',
+                desc: 'Blood-garnet studs for the knuckles. Every punch you land heals you; a haymaker drinks deeper and leaves them bleeding.',
+                // engine/knuckles.js onPunchLanded: any punch of hers (bare fists, Golden Retribution, fist weapons to come)
+                stats: { effect: 'vampiric_fists', lifesteal: 0.15, haymakerLifesteal: 0.3, bleedDps: 5, bleedSecs: 3 }
+            },
             'blood_muzzle': {
                 name: 'Bloodthirsty Muzzle', type: 'attachment', icon: '♆',
                 desc: 'A crimson muzzle brake that drinks the shot. Bullets deal 75% more damage.',

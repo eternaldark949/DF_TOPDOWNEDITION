@@ -82,7 +82,7 @@
                     kick: gunKick,
                     // Ticks since the punch was thrown, blended between ticks like everything else
                     punchTicks: currentStance === 'punch' ? this.punchStanceTicks() : undefined,
-                    knuckles: this.weaponMode === 'fists' && !this.weaponHolstered,   // Golden Retribution across her fists
+                    knuckles: this.weaponMode === 'fists' && !this.weaponHolstered && (this.vampiricFists() ? 'vamp' : true),   // Golden Retribution across her fists ('vamp': garnet studs)
                     top: outfit.top,
                     bottom: outfit.bottom,
                     shoes: outfit.shoes,

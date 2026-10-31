@@ -342,8 +342,11 @@
 
             // =========================================================
             //  LOST THINGS — the Double Nights lobby's forgotten cases, Moon City's clutches,
-            //  coat and VIP purses. A few personics lifted from each; each fills again once a
-            //  day. Props may carry their own pay range (lootMin/lootMax) and lines (lootLines).
+            //  coat and VIP purses, and stashes round the city (ls_*: the cafe's tote, Torque's
+            //  cash tin, Enni Cole's bag and envelope, the House of Death's offering bowl, Lilitu's
+            //  tribute chest). A few personics lifted from each; each fills again once a day.
+            //  Props may carry their own pay range (lootMin/lootMax), lines (lootLines) and a
+            //  noise that carries when it's taken (lootNoise: the gauntlet's stashes wake the house).
             //  (Save key questState.lobbyLuggage, kept for old saves, now holds them all.)
             // =========================================================
             searchLostLuggage(prop) {
@@ -355,6 +358,7 @@
                 const pp = lo + Math.floor(Math.random() * (hi - lo + 1));
                 qs.lobbyLuggage[id] = day; prop._searched = true;
                 this.currency += pp; this.updateUI();
+                if (prop.lootNoise) this.emitNoise(prop.x + prop.width / 2, prop.y + prop.height / 2, prop.lootNoise, 'stash');
                 showMessage(`+${pp} PERSONICS — ${pickFrom(Math.random, prop.lootLines || ["SOMEONE WON'T MISS IT", 'FINDERS KEEPERS', 'A TIP, OF SORTS', 'THINK EXCELLENCE'])}`);
                 audioSys.sfx('ui');
             },

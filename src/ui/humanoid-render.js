@@ -2734,8 +2734,9 @@
         
             // 7b. Golden Retribution: a gilded knuckle bar across each fist (engine/knuckles.js)
             if (config.knuckles && typeof drawKnuckleDuster === 'function' && !isDriving) {
-                drawKnuckleDuster(ctx, lFistX, lFistY, Math.atan2(lFistY - lElbowY, lFistX - lElbowX));
-                drawKnuckleDuster(ctx, rFistX, rFistY, Math.atan2(rFistY - rElbowY, rFistX - rElbowX));
+                const vamp = config.knuckles === 'vamp';                                  // Vampiric Fists: garnet studs
+                drawKnuckleDuster(ctx, lFistX, lFistY, Math.atan2(lFistY - lElbowY, lFistX - lElbowX), 1, vamp);
+                drawKnuckleDuster(ctx, rFistX, rFistY, Math.atan2(rFistY - rElbowY, rFistX - rElbowX), 1, vamp);
             }
 
             // 8. Upper Arms (fabric under short or long sleeves). They hang from the shoulders, so their

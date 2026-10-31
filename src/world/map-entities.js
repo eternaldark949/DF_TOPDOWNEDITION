@@ -471,7 +471,10 @@
                         ...EMPORIUM_AISLES.flatMap(([cat, kinds], i) => [0, 1].map(run => F(2070 + i * 90, run ? 620 : 180, 40, 360, 'ec_tall_aisle',
                             { decor: { aisle: i + 1, cat, kinds, run, sign: run ? undefined : 580 }, visible: false }))),
                         F(2120, 1150, 170, 60, 'ec_checkout'), F(2880, 1150, 170, 60, 'ec_checkout', { variant: 1 }),
-                        F(2000, 1260, 40, 40, 'ec_topiary'), F(3130, 1260, 40, 40, 'ec_topiary')
+                        F(2000, 1260, 40, 40, 'ec_topiary'), F(3130, 1260, 40, 40, 'ec_topiary'),
+                        // Lost things (searchLostLuggage): a bag set down by the tills and never picked up
+                        F(884, 1166, 20, 18, 'ls_shopbag', { interactionType: 'lost_luggage', noteId: 'enni_bag', label: 'Dropped shopping bag', lootMin: 25, lootMax: 70,
+                            lootLines: ['TISSUE PAPER… AND PERSONICS', 'THE RECEIPT SAYS SHE CAN AFFORD IT', 'ENNI COLE, NEVER CHEAP'], noNav: true })
                     ];
                     e.npcs = [ new NPC(755, 1238, "Valentina", 'vip'), new NPC(330, 1180, "Model Kira", 'dancer'),
                         new NPC(1665, 975, "Concierge Lux", 'robot_gold') ];
@@ -524,7 +527,10 @@
                         F(1680, 760, 140, 54, 'ec_chaise'), F(1730, 994, 96, 40, 'ec_mirror'),
                         F(1460, 640, 84, 84, 'ec_display', { variant: 3 }), F(1540, 420, 44, 44, 'ec_mannequin', { variant: 2 }), F(1540, 500, 44, 44, 'ec_mannequin', { variant: 5 }), F(1430, 994, 160, 50, 'ec_jewel'),
                         // The fitting rooms
-                        F(1670, 56, 270, 104, 'ec_fitting'), F(1690, 230, 56, 56, 'ec_ottoman')
+                        F(1670, 56, 270, 104, 'ec_fitting'), F(1690, 230, 56, 56, 'ec_ottoman'),
+                        // Lost things (searchLostLuggage): an envelope dropped outside the fitting rooms
+                        F(1790, 184, 18, 12, 'ls_envelope', { interactionType: 'lost_luggage', noteId: 'enni_envelope', label: 'Receipt envelope', lootMin: 25, lootMax: 70,
+                            lootLines: ['A REFUND, IN CASH', 'SHE CHANGED HER MIND ABOUT THE SHOES', 'FINDERS KEEPERS'], noNav: true })
                     ];
                     e.npcs = [ new NPC(1000, 745, "Model Sienne", 'dancer'), new NPC(230, 140, "Chef Amara") ];
                     e.npcs[0].angle = Math.PI / 2; e.npcs[1].angle = -Math.PI / 2;
@@ -575,6 +581,9 @@
                         // Storeroom: crates of beans, flour sacks, shelving
                         F(990, 756, 56, 40, 'cc_crate'), F(1060, 756, 56, 40, 'cc_crate', { variant: 1 }), F(1056, 856, 76, 52, 'cc_sacks'),
                         F(962, 880, 36, 60, 'cc_shelf', { vertical: true }),
+                        // Lost things (searchLostLuggage): a tote left by the fire
+                        F(198, 424, 18, 16, 'ls_tote', { interactionType: 'lost_luggage', noteId: 'cafe_tote', label: 'Forgotten tote', lootMin: 10, lootMax: 35,
+                            lootLines: ['A PAPERBACK, A SCARF… AND PERSONICS', 'LEFT WITH THE LAST LATTE', 'THE FIRE KEPT IT WARM'], noNav: true }),
                     ];
                     e.npcs = [ new NPC(250, 170, "Barista Ren", 'bartender'), new NPC(785, 128, "Chef Koda") ];
                     e.npcs[0].angle = Math.PI / 2; e.npcs[1].angle = -Math.PI / 2;           // Ren faces the counter, Koda the range
@@ -622,6 +631,9 @@
                         // The parts room
                         F(920, 730, 180, 40, 'ta_shelf'), F(920, 820, 180, 40, 'ta_shelf'),
                         F(1150, 730, 150, 40, 'ta_shelf'), F(1150, 820, 150, 40, 'ta_shelf'),
+                        // Lost things (searchLostLuggage): the cash tin under the bench
+                        F(700, 102, 22, 14, 'ls_cashtin', { interactionType: 'lost_luggage', noteId: 'torque_tin', label: 'Cash tin', lootMin: 30, lootMax: 80,
+                            lootLines: ["TORQUE'S RAINY-DAY MONEY", 'GREASY BILLS, STILL GOOD', 'UNDER THE BENCH, AS ALWAYS'], noNav: true }),
                     ];
                     TorqueArt.warm();                                                              // the show cars' sprites, painted before any piece is
                     e.npcs = [ new NPC(1050, 200, "Torque", 'mechanic') ];
@@ -723,7 +735,10 @@
                         // Entrance Hall: braziers by the door
                         brazier(760, 1300), brazier(1014, 1300),
                         // The Kennels: cages where her hunters rest
-                        ...[1260, 1400, 1540, 1680].map(x => F(x, 1040, 80, 60, 'dp_cage'))
+                        ...[1260, 1400, 1540, 1680].map(x => F(x, 1040, 80, 60, 'dp_cage')),
+                        // Lost things (searchLostLuggage): her tribute, at the foot of the throne. Opening it is loud (lootNoise)
+                        F(790, 470, 30, 22, 'ls_tribute', { interactionType: 'lost_luggage', noteId: 'palace_tribute', label: 'Tribute chest', lootMin: 60, lootMax: 150, lootNoise: 700,
+                            lootLines: ["LILITU WON'T MISS IT. SHE WILL NOTICE", 'GOLD FOR THE QUEEN, NOW YOURS', 'THE HINGES SCREAM…'], noNav: true })
                     ];
                     e.npcs = [];
                     const L = (x,y,color,r) => hiddenLamp(x,y,color,r);
@@ -796,6 +811,9 @@
                         // Reliquary: a display coffin among four glass cases
                         F(1380, 1290, 110, 50, 'hod_coffin'),
                         F(1300, 1196, 36, 36, 'hod_reliquary'), F(1540, 1196, 36, 36, 'hod_reliquary'), F(1300, 1440, 36, 36, 'hod_reliquary'), F(1540, 1440, 36, 36, 'hod_reliquary'),
+                        // Lost things (searchLostLuggage): the offering bowl at the altar's foot. Taking from it is loud (lootNoise)
+                        F(834, 142, 24, 16, 'ls_offering', { interactionType: 'lost_luggage', noteId: 'house_offering', label: 'Offering bowl', lootMin: 60, lootMax: 150, lootNoise: 700,
+                            lootLines: ["THE DEAD DON'T SPEND IT", 'TITHES FOR THE HOUSE', 'SOMETHING STIRS…'], noNav: true }),
                     ];
                     e.npcs = [];
                     const L = (x, y, color, lightRadius, lampType = 4, extra = {}) => Object.assign(new LampEntity({ x, y, lampType, color, lightRadius, ...extra }), extra);
