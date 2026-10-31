@@ -1345,10 +1345,10 @@
                     
                 } else {
                     // Density settings: cycle LOW → MEDIUM → HIGH
-                    const order = ['low', 'medium', 'high'];
+                    const order = key === 'crowdQuality' ? ['low', 'medium', 'high', 'ultra'] : ['low', 'medium', 'high'];
                     const current = GameSettings[key];
                     const idx = order.indexOf(current);
-                    GameSettings[key] = order[(idx + 1) % 3];
+                    GameSettings[key] = order[(idx + 1) % order.length];
                     GameSettings.saveDensity();                                    // this device's, and applied now (trimToCap)
                     if (key === 'crowdQuality' && typeof CrowdImpostors !== 'undefined') CrowdImpostors.clear();
                     this._updateValueEl(el.id, GameSettings[key]);
