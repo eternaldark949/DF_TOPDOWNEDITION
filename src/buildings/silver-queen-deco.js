@@ -537,7 +537,7 @@
                     super.drawEmissive(ctx, dark, false);
                     this._sqdGroundGlow(ctx, dark);
                 }
-                this._sqdBeams(ctx, dark);
+                this._sqDrawBeams(ctx, dark);
             }
 
             /** The court's fountain and bollards, the forecourt's lanterns and urns, at night. */
@@ -557,7 +557,7 @@
             }
 
             /** Two violet searchlights sweeping the sky from the crown's front corners. */
-            _sqdBeams(ctx, dark) {
+            _sqDrawBeams(ctx, dark) {
                 if (dark < 0.2 || _zoomLOD >= 2) return;
                 const t = _gameTimeSec, a = Math.min(1, (dark - 0.2) / 0.3), z0 = SQD.Z.CROWN + 2;
                 const srcs = [[this.x + 278, this.y + 446, 0], [this.x + 422, this.y + 446, 2.3]];
@@ -636,7 +636,8 @@
                     { id: 'monument', solid: false, rect: [300, 960, 80, 8], z0: 0, z1: 12, S: 4, fill: S.stoneMid, paint: _sqdMonument, shade: [40, 30, 70],
                       ledges: [{ z: 12, out: 1, th: 1.4, top: S.trim, band: [172, 169, 182], lip: '#d8d5e2' }], roof: (c, e, t) => { if (!e) { _sqdPolyPath(c, t.poly); c.fillStyle = S.stoneLt; c.fill(); } } },
                 ],
-                ...config
+                ...config,
+                facing: 'S'   // (a landmark keeps its own front, whatever street it's placed on)
             });
             for (const t of b._tkDefs) t.owner = b;                                                          // (the painters find their bays in the building's frame)
             // its lights (light only, no fixtures): the door under the marquee, the marquee's downlights, the plaza, the court, the lanterns
