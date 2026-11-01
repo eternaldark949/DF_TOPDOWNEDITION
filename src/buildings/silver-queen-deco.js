@@ -487,8 +487,16 @@
             /** The forecourt kept clear of street trees: paving, steps, urns, the lawn and its sign. */
             _sqForecourt() { return { x: this.x - 40, y: this.y + 880, w: 430, h: 150 }; }
 
+            /** The wet ground for the reflections' mask (engine/reflections.js): the motor court and its drive, the plaza (not the lawns). */
+            wetGround() {
+                const C = this._sqCourt(), r = [[this.x + 60, this.y + 880, 230, 150, 0.5]];
+                if (C) r.push([C.x, C.y, C.w, C.h + C.drive.h, 0.45]);
+                return r;
+            }
+
             /** The ground in front: the court (buildings/silver-queen.js), then the forecourt, painted once. */
-            _sqDrawGround(ctx) {
+            _sqDrawGround(ctx, phase) {
+                if (phase === 'top') return;                              // all paving: it goes under the puddles and reflections
                 this._sqDrawCourt(ctx);
                 const s = LandmarkKit.sprite(this, 'sqd_forecourt', this.x - 40, this.y + 878, 430, 152, 2, (c) => this._sqdPaintForecourt(c));
                 ctx.drawImage(s.cv, s.x, s.y, s.w, s.h);

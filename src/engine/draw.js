@@ -2,6 +2,23 @@
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
             /** Keep diagnostics available on demand without timing normal gameplay. */
+            /** The buildings' forecourts, in two phases: 'floor' (the landmarks' painted paving, under the puddles and reflections)
+             *  and 'top' (their cars, doormen, queues and door light, and a street variant's stoop, over them). The candidates are
+             *  found once, in the floor phase, and reused by the top phase the same frame. */
+            _drawForecourts(cullBounds, phase) {
+                if (!(RenderLayers.at('buildings') && this.activeMap.buildings && this.activeMap.type === 'outdoor')) return;
+                const cbW = cullBounds.world, list = this._forecourtCandidates || (this._forecourtCandidates = []);
+                if (phase === 'floor') this._queryRenderBuildings({ left: cbW.left - 60, right: cbW.right + 60, top: cbW.top - 480, bottom: cbW.bottom }, list);
+                for (const entry of list) {
+                    const b = entry.item;
+                    const land = b.style === 'silver_queen' ? b._sqDrawGround : b.style === 'double_nights' ? b._dnDrawGround : b.style === 'moon_city' ? b._mcDrawGround : null;
+                    const ground = land || (phase === 'top' && b.variant && b._vOn() ? b._vBase : null);   // a street variant's stoop, carpet, buckets (street-variants.js)
+                    if (!ground) continue;
+                    if (b.x + b.w + 60 < cbW.left || b.x - 60 > cbW.right || b.y > cbW.bottom || b.y + b.h + 480 < cbW.top) continue;
+                    land ? ground.call(b, this.ctx, phase) : ground.call(b, this.ctx);
+                }
+            },
+
             _syncProfiler() {
                 _profileSampling = !!(this.showProfiler || PerfBench.active || PerformanceBench.active);
                 this.profiler.setEnabled(_profileSampling);
@@ -496,6 +513,9 @@
                 // Inlaid medallions in the paving, where a map lists them (engine/paving-inlays.js); the puddles go over them
                 this.drawPavingInlays(this.ctx);
 
+                // The landmarks' forecourt paving (Silver Queen court, Double Nights terrace, Moon City plaza) goes under the puddles and reflections
+                this._drawForecourts(cullBounds, 'floor');
+
                 // Reflections (engine/reflections.js): the puddles, and the mirrored lights in them and
                 // the wet asphalt, on the ground and the floors (after the painted interiors) before buildings and people so they walk over it
                 if (RL.at('reflections')) {
@@ -506,20 +526,8 @@
                     this._adaptReflections(reflT ? performance.now() - reflT : -1);
                 } else this._refl = null;                                 // (so the light layer lifts no stale one)
 
-                // Building forecourts sit on top of the pavement (Silver Queen portico floor, steps, carpet)
-                if (RL.at('buildings') && this.activeMap.buildings && this.activeMap.type === 'outdoor') {
-                    const cbW = cullBounds.world;
-                    const candidates = this._queryRenderBuildings({ left: cbW.left - 60, right: cbW.right + 60, top: cbW.top - 480, bottom: cbW.bottom },
-                        this._forecourtCandidates || (this._forecourtCandidates = []));
-                    for (const entry of candidates) {
-                        const b = entry.item;
-                        const ground = b.style === 'silver_queen' ? b._sqDrawGround : b.style === 'double_nights' ? b._dnDrawGround : b.style === 'moon_city' ? b._mcDrawGround
-                                     : b.variant && b._vOn() ? b._vBase : null;   // a street variant's stoop, carpet, buckets (street-variants.js)
-                        if (!ground) continue;
-                        if (b.x + b.w + 60 < cbW.left || b.x - 60 > cbW.right || b.y > cbW.bottom || b.y + b.h + 480 < cbW.top) continue;
-                        ground.call(b, this.ctx);
-                    }
-                }
+                // The forecourts' people, cars and lights stand on it (the landmarks' 'top' phase; a street variant's stoop draws whole here)
+                this._drawForecourts(cullBounds, 'top');
                 if (RL.at('decals')) {
                     this.decals.draw(this.ctx, cullBounds.world);
                     this.drawSpills(this.ctx, cullBounds.world);              // spilt drinks (engine/spills.js)

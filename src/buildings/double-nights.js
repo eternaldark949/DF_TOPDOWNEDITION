@@ -1,517 +1,827 @@
         /* =====================================================================
-           DOUBLE NIGHTS HOTEL — the city's landmark (BuildingV2 style 'double_nights')
+           DOUBLE NIGHTS HOTEL — the city's landmark, on the tiered kit
            ---------------------------------------------------------------------
-           Its emblem made architecture: two crescent towers in black lacquer,
-           crimson and champagne gold, facing each other across a lens-shaped
-           glass atrium (the vesica where the two moons overlap), lit from below
-           by the lobby's chandelier. The west crown carries a helipad, the east
-           the penthouse and its pool (chapter 1's suite). At the front a
-           porte-cochère, a circular drive round a double-crescent fountain, the
-           carpet. At night gold uplights climb the towers, halo crowns breathe
-           crimson and two gold searchlights cross over the roofs.
-
-           Real curves: the towers are polygons extruded with the same lean
-           projection as every other building (leanCamHeight), not section boxes.
-           The sections (bands) are only for collision and shadows.
-           All geometry is in the building's local frame (800 × 450, the south
-           forecourt below it); _dnGeo() turns it into world coordinates once.
+           Rebuilt on the tiered kit (buildings/tiered-kit.js) after ETERNAL's
+           concept picture: a grand hotel in warm limestone, black iron and
+           champagne gold, the crescent idea carried by its emblem and its
+           rounded corner tower rather than by the plan.
+             · the rotunda: a rounded tower out of the middle of the front,
+               the tallest tier, iron balconies with planters on every floor
+               up it, the tall glazed entrance at its foot (the chandelier and
+               the lobby's fountain behind the glass), the DOUBLE NIGHTS HOTEL
+               sign over the door and the gold double crescent over that;
+             · on it, a round lantern with a slate dome and the emblem in gold
+               on top of it;
+             · the core behind it, with the penthouse terrace and its pool
+               (chapter 1's suite) on its attic;
+             · the two wings either side, lower, under slate mansards with
+               dormers; arched windows over their doors;
+             · out of the wings, two curved canopies with iron cresting,
+               "ONE NIGHT" and "ANOTHER NIGHT" on their fascias, a doorman
+               and clipped topiaries at each;
+             · the forecourt: a marble terrace, a basalt drop-off lane with
+               two black cars, granite paving with the emblem inlaid in brass,
+               lamp posts with crescent banners, the SAME SKY / DIFFERENT
+               STORIES plinth, lawns. At night the stone is wet: the lamps,
+               the canopies and the entrance throw long gold reflections.
+           Same footprint, door target and forecourt as before, so nothing round
+           it moves. It fronts south. Collision is the wings, the core and the
+           rotunda; the canopies overhang; topiaries, posts, plinth and cars
+           stand free (getCollisionShapes).
            ===================================================================== */
         const DN = {
-            FLOORS: 14,
-            OUT: [260, 225, 210], IN: [360, 225, 190],            // the west crescent: outer and inner circles (the east mirrors it)
-            ATRIUM_Z: 30, CANOPY_Z: 36, CROWN_Z: 16,             // heights above the ground / above the roofs
-            CANOPY: { x0: 292, x1: 508, y0: 396, y1: 534 },
-            DOOR: { x: 350, y: 420, w: 100, h: 56 },
-            COURT: { cx: 400, cy: 672, rx: 236, ry: 128, lane: 46, fountain: 62 },
-            FORECOURT_H: 420,                                      // paving south of the footprint
-            C: { lacquer: '#0e070c', lacquerHi: '#2b1422', crimson: '#6d0c26', crimsonHi: '#d11e4c', gold: '#e8c27a', goldHi: '#fff1c9',
-                 glass: '#140a14', stone: '#2c2427', stoneHi: '#43363b', lawn: '#16301f', lawnHi: '#24482f', carpet: '#8a1030' }
+            HERO: 1.5,
+            PLAN: { W: 800, D: 430 },
+            G: 22, ST: 11,                                                       // the ground floor's and each storey's height
+            Z: { WING: 92, MANS: 106, CORE: 114, ATTIC: 126, ROT: 132, CROWN: 146, DOME: 20, CAN0: 25, CAN1: 32, PLINTH: 30 },
+            ROT: [270, 530, 320, 10, 100],                                       // the rotunda: a bay from x0 to x1 out of the wall at y, cheek, depth
+            CROWN: [400, 372, 40],                                               // the lantern on it: centre, radius
+            CAN: [[90, 250, 'ONE NIGHT'], [550, 710, 'ANOTHER NIGHT']],          // the canopies out of the wings (66 deep)
+            DOOR: { x: 366, y: 424, w: 68, h: 44 },
+            LAMPS: [[30, 600], [262, 600], [538, 600], [770, 600]],
+            TOPI: [[112, 398], [228, 398], [572, 398], [688, 398], [336, 446], [464, 446]],
+            DOORMEN: [[170, 402], [630, 402]],
+            PLINTH: [586, 646, 44, 14],
+            CARS: [[158, 538, 0], [642, 538, Math.PI]],
+            MEDAL: [400, 730, 76],
+            BEAMS: [[322, 396], [478, 396]],
+            SERIF: 'Georgia, "Times New Roman", serif',
+            C: { stone: '#b9a98f', stoneHi: '#d3c5aa', stoneLo: '#8f7f69', stoneDk: '#4a3f36', cream: '#efe4cc',
+                 iron: '#17141a', ironHi: '#3a3540', gold: '#e3c07a', goldHi: '#fff0c4', goldDk: '#9a7a3e',
+                 slate: '#3e4250', slateHi: '#5a5f70', slateDk: '#262934', lacquer: '#120f16', leaf: '#2f5a32', leafHi: '#4d8650' }
         };
 
-        /** The crescent's x-range across a horizontal line (local, west tower), for the collision bands. */
-        function _dnCrescentSpan(y) {
-            const [ox, oy, R] = DN.OUT, [ix, , r] = DN.IN, dy = y - oy;
-            if (Math.abs(dy) >= R) return null;
-            const oh = Math.sqrt(R * R - dy * dy), lo = ox - oh, hi = ox + oh;
-            if (Math.abs(dy) >= r) return [lo, hi];
-            const ih = Math.sqrt(r * r - dy * dy), iLo = ix - ih;
-            return [lo, Math.min(iLo, hi)];
+        /** The rotunda's collision: bands down its curve (local), for the registry and the building. */
+        function _dnRotundaBands() {
+            const [x0, x1, wy, cheek, depth] = DN.ROT, cx = (x0 + x1) / 2, a = (x1 - x0) / 2, out = [], band = 20;
+            for (let y = wy; y < wy + cheek + depth - 4; y += band) {
+                const m = Math.min(1, Math.max(0, (y + band / 2 - wy - cheek) / depth)), hw = y + band / 2 < wy + cheek ? a : a * Math.sqrt(1 - m * m);
+                out.push({ x: Math.round(cx - hw), y, w: Math.round(hw * 2), h: Math.min(band, wy + cheek + depth - 4 - y) });
+            }
+            return out;
         }
-
-        /** Collision/shadow bands for the whole building (local sections). */
+        /** Collision for the whole building (local): the wings, the core, the rotunda's bands. */
         function doubleNightsSections() {
-            const S = [], band = 30;
-            for (let y = DN.OUT[1] - DN.OUT[2] + 6; y < DN.OUT[1] + DN.OUT[2] - 6; y += band) {
-                const sp = _dnCrescentSpan(y + band / 2); if (!sp || sp[1] - sp[0] < 8) continue;
-                const x0 = Math.round(sp[0]), w = Math.round(sp[1] - sp[0]), h = Math.min(band, DN.OUT[1] + DN.OUT[2] - 6 - y);
-                S.push({ x: x0, y: Math.round(y), w, h }, { x: 800 - x0 - w, y: Math.round(y), w, h });   // west, and its mirror
-            }
-            // The atrium lens: where the two inner circles overlap
-            const [ix, iy, r] = DN.IN, d = 400 - ix;
-            for (let y = iy - 180; y < iy + 180; y += band) {
-                const dy = y + band / 2 - iy; if (Math.abs(dy) >= r) continue;
-                const hw = Math.sqrt(r * r - dy * dy) - d; if (hw < 6) continue;
-                S.push({ x: Math.round(400 - hw), y: Math.round(y), w: Math.round(hw * 2), h: band });
-            }
-            return S;
+            return [{ x: 20, y: 40, w: 250, h: 280 }, { x: 530, y: 40, w: 250, h: 280 }, { x: 270, y: 0, w: 260, h: 320 }, ..._dnRotundaBands()];
         }
 
-        Object.assign(BuildingV2.prototype, {
-            /** World-space geometry, built once: the two crescents, the lens, the canopy, the court. */
-            _dnGeo() {
-                if (this._dnG) return this._dnG;
-                const X = this.x, Y = this.y, deg = Math.PI / 180;
-                const [ox, oy, R] = DN.OUT, [ix, iy, r] = DN.IN;
-                const d = ix - ox, tx = (d * d + R * R - r * r) / (2 * d), th = Math.sqrt(R * R - tx * tx);
-                const tO = Math.atan2(th, tx), tI = Math.atan2(th, tx - d);                    // tip angles on the outer and inner circle
-                const west = [];
-                for (let a = tO; a <= 2 * Math.PI - tO + 1e-6; a += 7 * deg) west.push([ox + R * Math.cos(a), oy + R * Math.sin(a)]);
-                west.push([ox + R * Math.cos(2 * Math.PI - tO), oy + R * Math.sin(2 * Math.PI - tO)]);
-                const nOuter = west.length;
-                for (let a = 2 * Math.PI - tI; a >= tI - 1e-6; a -= 7 * deg) west.push([ix + r * Math.cos(a), iy + r * Math.sin(a)]);
-                const east = west.map(([x, y]) => [800 - x, y]).reverse();
-                // The lens: the east inner circle's west arc, then the west inner circle's east arc
-                const lens = [], hd = 400 - ix, lh = Math.sqrt(r * r - hd * hd), la = Math.atan2(lh, -hd), lb = Math.atan2(lh, hd);
-                const eix = 800 - ix;
-                for (let a = 2 * Math.PI - la; a >= la - 1e-6; a -= 6 * deg) lens.push([eix + r * Math.cos(a), iy + r * Math.sin(a)]);
-                for (let a = lb; a >= -lb - 1e-6; a -= 6 * deg) lens.push([ix + r * Math.cos(a), iy + r * Math.sin(a)]);
-                const W = (p) => p.map(([x, y]) => [X + x, Y + y]);
-                const shape = (pts) => {                                                        // outward normals, per edge
-                    const inside = (px, py) => { let c = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const [xi, yi] = pts[i], [xj, yj] = pts[j]; if ((yi > py) !== (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi) c = !c; } return c; };
-                    const edges = [];
-                    for (let i = 0; i < pts.length; i++) {
-                        const a = pts[i], b = pts[(i + 1) % pts.length], dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1;
-                        let nx = dy / L, ny = -dx / L;
-                        const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
-                        if (inside(mx + nx * 2, my + ny * 2)) { nx = -nx; ny = -ny; }
-                        edges.push({ a, b, nx, ny, mx, my, len: L });
+        // ── wall art (strip coordinates: x along the plan from vertex 0, y down from the tier's top) ──
+
+        /** A tier's walls in runs: neighbouring edges that turn less than ~30° (a curve's facets) run on as one wall. */
+        function _dnRuns(t) {
+            const es = [];
+            t.mitre.forEach((m, i) => { if (m) es.push({ ...m, i, a: t.poly[i], b: t.poly[(i + 1) % t.poly.length] }); });
+            es.sort((p, q) => p.u0 - q.u0);
+            const runs = [];
+            for (const e of es) {
+                const last = runs[runs.length - 1], prev = last && last.edges[last.edges.length - 1];
+                if (prev && Math.abs(prev.u0 + prev.L - e.u0) < 0.01 && prev.nx * e.nx + prev.ny * e.ny > 0.85 && !prev.hidden === !e.hidden) { last.edges.push(e); last.len += e.L; }
+                else runs.push({ u0: e.u0, len: e.L, edges: [e], hidden: e.hidden });
+            }
+            for (const r of runs) { let nx = 0, ny = 0; for (const e of r.edges) { nx += e.nx * e.L; ny += e.ny * e.L; } const m = Math.hypot(nx, ny) || 1; r.nx = nx / m; r.ny = ny / m; }
+            return runs;
+        }
+        /** Where along a run u falls (world point, its edge's normal). */
+        function _dnAt(run, u) {
+            for (const e of run.edges) if (u <= e.u0 + e.L + 1e-6) { const s = Math.max(0, (u - e.u0) / e.L); return { x: e.a[0] + (e.b[0] - e.a[0]) * s, y: e.a[1] + (e.b[1] - e.a[1]) * s, nx: e.nx, ny: e.ny }; }
+            const e = run.edges[run.edges.length - 1]; return { x: e.b[0], y: e.b[1], nx: e.nx, ny: e.ny };
+        }
+        /** Where along the strip the wall facing (roughly) south passes world x, or null. */
+        function _dnU(t, wx, minNy = 0.8) {
+            for (const r of _dnRuns(t)) for (const e of r.edges) {
+                if (e.hidden || e.ny < minNy) continue;
+                const x0 = Math.min(e.a[0], e.b[0]), x1 = Math.max(e.a[0], e.b[0]);
+                if (wx < x0 - 0.01 || wx > x1 + 0.01 || x1 - x0 < 0.5) continue;
+                return e.u0 + Math.abs(wx - e.a[0]) / (x1 - x0) * e.L;
+            }
+            return null;
+        }
+
+        /** The double crescent: two crescents opening on each other, a four-point star between. */
+        function _dnEmblem(c, cx, cy, R) {
+            _mcCrescent(c, cx - R * 0.42, cy, R * 0.62, 0); c.fill();
+            _mcCrescent(c, cx + R * 0.42, cy, R * 0.62, Math.PI); c.fill();
+            _dnStar(c, cx, cy, R * 0.34); c.fill();
+        }
+        function _dnStar(c, x, y, r) {
+            c.beginPath();
+            for (let i = 0; i < 8; i++) { const a = -Math.PI / 2 + i * Math.PI / 4, rr = i % 2 ? r * 0.22 : r; i ? c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr) : c.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+            c.closePath();
+        }
+        /** Spaced capitals, where the canvas can (letterSpacing), at x centre. */
+        function _dnText(c, text, x, y, px, weight = 600, spacing = 0.18) {
+            c.font = `${weight} ${px}px ${DN.SERIF}`; c.textAlign = 'center'; c.textBaseline = 'middle';
+            if ('letterSpacing' in c) c.letterSpacing = (px * spacing).toFixed(2) + 'px';
+            c.fillText(text, x, y);
+            if ('letterSpacing' in c) c.letterSpacing = '0px';
+        }
+
+        /** Limestone: a warm wash, fine coursing, rusticated below the ground floor's cornice. */
+        function _dnStone(d, l, t, H, L, r) {
+            const C = DN.C, g = d.createLinearGradient(0, 0, 0, H); g.addColorStop(0, C.stoneHi); g.addColorStop(0.55, C.stone); g.addColorStop(1, C.stoneLo);
+            d.fillStyle = g; d.fillRect(0, 0, L, H);
+            for (let i = 0; i < L / 6; i++) { d.fillStyle = `rgba(${r() < 0.5 ? '255, 245, 225' : '70, 55, 40'}, ${0.03 + r() * 0.04})`; d.fillRect(r() * L, r() * H, 3 + r() * 10, 1 + r() * 2.5); }
+            d.fillStyle = 'rgba(80, 64, 48, 0.16)'; for (let y = H - 4.5; y > 0; y -= 4.5) d.fillRect(0, y, L, 0.35);
+            if (t.z0 === 0) {                                                                        // the rusticated base
+                const top = H - DN.G;
+                d.fillStyle = 'rgba(60, 46, 34, 0.35)';
+                for (let y = H - 3.6, k = 0; y > top; y -= 3.6, k++) { d.fillRect(0, y, L, 0.6); for (let x = (k % 2) * 6; x < L; x += 12) d.fillRect(x, y - 3.6, 0.5, 3.6); }
+            }
+        }
+        /** A window from y (its top) h tall: the reveal, glass, curtains, mullion; lit warm at night (most of them). */
+        function _dnWin(d, l, x, y, w, h, r, arch, litP = 0.62) {
+            const C = DN.C, rr = w / 2, sp = y + (arch ? rr : 0);
+            const path = (c, i = 0) => { c.beginPath(); if (arch) { c.moveTo(x + i, y + h - i); c.lineTo(x + i, sp); c.arc(x + rr, sp, rr - i, Math.PI, 0); c.lineTo(x + w - i, y + h - i); c.closePath(); } else c.rect(x + i, y + i, w - i * 2, h - i * 2); };
+            d.fillStyle = 'rgba(52, 40, 30, 0.6)'; path(d, -0.8); d.fill();
+            d.fillStyle = '#242733'; path(d); d.fill();
+            d.fillStyle = 'rgba(205, 214, 232, 0.14)'; d.fillRect(x, sp, w * 0.5, (y + h - sp) * 0.45);                       // the sky in it
+            d.fillStyle = 'rgba(232, 214, 184, 0.5)'; d.fillRect(x + 0.4, sp, w * 0.2, y + h - sp - 0.4); d.fillRect(x + w * 0.8 - 0.4, sp, w * 0.2, y + h - sp - 0.4);   // curtains
+            d.fillStyle = C.iron; d.fillRect(x + rr - 0.25, y + (arch ? 0 : 0.5), 0.5, h - 0.5); d.fillRect(x, y + h * (arch ? 0.42 : 0.3), w, 0.45);
+            d.fillStyle = C.stoneHi; d.fillRect(x - 1, y + h, w + 2, 0.9);                                                     // the sill
+            if (!arch) { d.fillStyle = C.cream; d.fillRect(x + rr - 1.2, y - 1.6, 2.4, 1.6); }                                // a keystone
+            const v = r();
+            if (v < litP) {
+                path(l); { const g = l.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, 'rgba(255, 222, 160, 0.95)'); g.addColorStop(1, 'rgba(255, 168, 90, 0.92)'); l.fillStyle = g; } l.fill();
+                l.fillStyle = 'rgba(255, 240, 210, 1)'; l.fillRect(x + 0.4, sp, w * 0.2, y + h - sp - 0.4); l.fillRect(x + w * 0.8 - 0.4, sp, w * 0.2, y + h - sp - 0.4);
+                l.save(); l.globalCompositeOperation = 'destination-out'; l.fillStyle = '#000'; l.fillRect(x + rr - 0.25, y, 0.5, h); l.fillRect(x, y + h * (arch ? 0.42 : 0.3), w, 0.45); l.restore();
+            } else if (v < litP + 0.14) { path(l); l.fillStyle = 'rgba(255, 190, 120, 0.28)'; l.fill(); }
+        }
+        /** An iron balcony rail whose foot is at y: the top bar, balusters, a scroll in each panel; planters spilling over it, ivy hanging under. */
+        function _dnRail(d, l, x0, x1, y, r, plants) {
+            const C = DN.C, top = y - 3.6;
+            d.fillStyle = 'rgba(30, 22, 18, 0.35)'; d.fillRect(x0, y, x1 - x0, 1.1);                                          // the slab's shadow
+            d.fillStyle = C.iron; d.fillRect(x0, top, x1 - x0, 0.6); d.fillRect(x0, y - 0.6, x1 - x0, 0.6);
+            for (let x = x0; x <= x1 + 0.01; x += 0.9) d.fillRect(x, top, 0.22, 3.6);
+            d.strokeStyle = C.iron; d.lineWidth = 0.3;
+            for (let x = x0 + 2; x < x1 - 1; x += 4) { d.beginPath(); d.arc(x, y - 1.8, 0.9, 0, Math.PI * 1.6); d.stroke(); }
+            l.fillStyle = 'rgba(255, 214, 150, 0.35)'; l.fillRect(x0, top, x1 - x0, 0.5);
+            if (!plants) return;
+            for (let x = x0 + 0.8; x < x1 - 0.6; x += 1.3 + r() * 1.2) {
+                d.fillStyle = r() < 0.5 ? C.leaf : C.leafHi; d.beginPath(); d.arc(x, top - 0.4 + r() * 0.8, 0.9 + r() * 0.8, 0, Math.PI * 2); d.fill();
+                if (r() < 0.25) { d.fillStyle = r() < 0.5 ? '#f2e6ef' : '#e98ab0'; d.beginPath(); d.arc(x + 0.3, top - 0.8, 0.45, 0, Math.PI * 2); d.fill(); }
+            }
+            if (r() < 0.45) { const x = x0 + r() * (x1 - x0), n = 3 + r() * 6; d.fillStyle = C.leaf; for (let k = 0; k < n; k++) { d.beginPath(); d.arc(x + Math.sin(k) * 0.6, y + 0.6 + k * 0.9, 0.6, 0, Math.PI * 2); d.fill(); } }
+        }
+        /** Warm uplights washing up the wall from the pavement. */
+        function _dnUplight(l, x, H, h) {
+            const g = l.createLinearGradient(0, H, 0, H - h); g.addColorStop(0, 'rgba(255, 196, 120, 0.55)'); g.addColorStop(1, 'rgba(255, 196, 120, 0)');
+            l.fillStyle = g; l.beginPath(); l.moveTo(x - 1.5, H); l.lineTo(x - 9, H - h); l.lineTo(x + 9, H - h); l.lineTo(x + 1.5, H); l.closePath(); l.fill();
+        }
+        /** A pair of glass doors from y0 to the foot, a fanlight over them, gold frames, the lobby's light (revolving, under the canopies). */
+        function _dnDoorway(d, l, cx, H, w, h) {
+            const C = DN.C, y0 = H - h, rr = w / 2;
+            d.fillStyle = C.stoneDk; d.beginPath(); d.moveTo(cx - rr - 1.2, H); d.lineTo(cx - rr - 1.2, y0 + rr); d.arc(cx, y0 + rr, rr + 1.2, Math.PI, 0); d.lineTo(cx + rr + 1.2, H); d.fill();
+            d.fillStyle = '#2a1f1a'; d.beginPath(); d.moveTo(cx - rr, H); d.lineTo(cx - rr, y0 + rr); d.arc(cx, y0 + rr, rr, Math.PI, 0); d.lineTo(cx + rr, H); d.fill();
+            const g = l.createLinearGradient(0, y0, 0, H); g.addColorStop(0, 'rgba(255, 214, 150, 0.85)'); g.addColorStop(1, 'rgba(255, 186, 110, 1)');
+            l.fillStyle = g; l.beginPath(); l.moveTo(cx - rr, H); l.lineTo(cx - rr, y0 + rr); l.arc(cx, y0 + rr, rr, Math.PI, 0); l.lineTo(cx + rr, H); l.fill();
+            d.strokeStyle = C.gold; d.lineWidth = 0.45;
+            for (let k = 1; k < 6; k++) { const a = Math.PI + k * Math.PI / 6; d.beginPath(); d.moveTo(cx, y0 + rr); d.lineTo(cx + Math.cos(a) * rr, y0 + rr + Math.sin(a) * rr); d.stroke(); }   // the fanlight's spokes
+            d.fillStyle = C.gold; d.fillRect(cx - rr, y0 + rr, w, 0.6); d.fillRect(cx - 0.3, y0 + rr, 0.6, h - rr);
+            d.fillRect(cx - rr, H - 0.8, w, 0.8); d.strokeRect(cx - rr + 0.8, y0 + rr + 1.2, w / 2 - 1.6, h - rr - 2); d.strokeRect(cx + 0.8, y0 + rr + 1.2, w / 2 - 1.6, h - rr - 2);
+            l.save(); l.globalCompositeOperation = 'destination-out'; l.fillStyle = 'rgba(0, 0, 0, 0.7)'; l.fillRect(cx - 0.3, y0 + rr, 0.6, h - rr); l.fillRect(cx - rr, y0 + rr, w, 0.6); l.restore();
+            l.fillStyle = 'rgba(255, 245, 220, 1)'; for (const s of [-1, 1]) { l.beginPath(); l.arc(cx + s * (rr + 2.4), y0 + rr + 3, 0.8, 0, Math.PI * 2); l.fill(); }   // wall lanterns either side
+            d.fillStyle = C.goldDk; for (const s of [-1, 1]) d.fillRect(cx + s * (rr + 2.4) - 0.7, y0 + rr + 2, 1.4, 2.4);
+        }
+
+        /**
+         * A tier's limestone walls: a bay of windows every o.bay along each run, a storey every DN.ST up from the ground floor's
+         * cornice; balconies where o.balc says (1 rail, 2 rail and planters); o.ground: arched windows in the base, doors at
+         * o.doors (local x, on the front); o.skip(lx, z, u): leave a window out; o.after(d, l, t, H, L, r) paints over the lot.
+         */
+        function _dnFacade(d, l, t, H, L, o) {
+            const r = seededRandom(o.seed), b = t.owner, z1 = t.z1, G = DN.G, ST = DN.ST;
+            _dnStone(d, l, t, H, L, r);
+            for (const run of _dnRuns(t)) {
+                if (run.hidden) continue;
+                const n = Math.max(1, Math.round(run.len / o.bay)), bw = run.len / n, w = Math.min(bw * 0.46, o.win || 10.5);
+                for (let i = 0; i < n; i++) {
+                    const uc = run.u0 + (i + 0.5) * bw, P = _dnAt(run, uc), lx = P.x - b.x, front = run.ny > 0.75;
+                    if (t.z0 === 0) {
+                        const door = front && o.doors && o.doors.some(dx => Math.abs(dx - lx) < bw * 0.55);
+                        if (door) _dnDoorway(d, l, uc, H, Math.min(bw * 0.62, 16), G - 2.5);
+                        else if (!o.skip || !o.skip(lx, G / 2, uc)) _dnWin(d, l, uc - w * 0.55, H - G + 3, w * 1.1, G - 5.5, r, true, 0.7);
+                        if (front && i % 3 === 1) _dnUplight(l, run.u0 + i * bw, H, Math.min(H * 0.7, 70));
                     }
-                    let cx = 0, cy = 0; for (const p of pts) { cx += p[0]; cy += p[1]; }
-                    return { pts, edges, cx: cx / pts.length, cy: cy / pts.length };
-                };
-                const Cn = DN.CANOPY, Ct = DN.COURT;
-                const wS = shape(W(west)), eS = shape(W(east));
-                wS.outer = wS.pts.slice(0, nOuter); eS.outer = W(west.slice(0, nOuter).map(([x, y]) => [800 - x, y]));
-                return (this._dnG = {
-                    west: wS, east: eS, lens: shape(W(lens)),
-                    canopy: { x0: X + Cn.x0, x1: X + Cn.x1, y0: Y + Cn.y0, y1: Y + Cn.y1 },
-                    cols: [[Cn.x0 + 10, Cn.y1 - 10], [Cn.x1 - 10, Cn.y1 - 10], [Cn.x0 + 10, Cn.y0 + 34], [Cn.x1 - 10, Cn.y0 + 34]].map(([x, y]) => [X + x, Y + y]),
-                    court: { cx: X + Ct.cx, cy: Y + Ct.cy, rx: Ct.rx, ry: Ct.ry },
-                    helipad: [X + 112, Y + 225], penthouse: [X + 688, Y + 225]
+                    for (let f = t.z0 === 0 ? G : t.z0 + 2, k = 0; f + ST <= z1 - 3; f += ST, k++) {
+                        if (o.skip && o.skip(lx, f + ST / 2, uc)) continue;
+                        const top = z1 - (f + ST - 2.2), bot = z1 - (f + 1.8);
+                        _dnWin(d, l, uc - w / 2, top, w, bot - top, r, k === 0 && t.z0 === 0);
+                        const bal = o.balc ? o.balc(f, k, i, run, lx) : 0;
+                        if (bal) _dnRail(d, l, uc - w / 2 - 2.2, uc + w / 2 + 2.2, z1 - f, r, bal === 2 || (bal === 3 && r() < 0.55));
+                    }
+                    if (i > 0 && !o.plain) { d.fillStyle = 'rgba(255, 246, 228, 0.12)'; d.fillRect(run.u0 + i * bw - 0.8, 0, 1.6, H - (t.z0 === 0 ? G : 0)); }   // a pilaster's light edge
+                }
+            }
+            if (o.after) o.after(d, l, t, H, L, r);
+        }
+
+        /** The rotunda: balconies with planters on every floor; at its front the glazed entrance, the sign and the emblem over it. */
+        function _dnRotunda(d, l, t, H, L) {
+            const b = t.owner, uc = b ? _dnU(t, b.x + 400, 0.9) : null, FRONT = 32;
+            _dnFacade(d, l, t, H, L, {
+                seed: 7313, bay: 22, win: 9.5,
+                skip: (lx, z, u) => uc !== null && Math.abs(u - uc) < FRONT && z < 66,
+                balc: (f) => f >= 77 ? 3 : f === 33 || f === 44 || f === 55 || f === 66 ? 1 : 0,
+                after: (d, l, t, H, L, r) => { if (uc !== null) _dnEntrance(d, l, uc, H, r); }
+            });
+        }
+        /** The tall glazed entrance (two storeys), the chandelier and the fountain inside; the sign over it; the emblem over that. */
+        function _dnEntrance(d, l, uc, H, r) {
+            const C = DN.C, ew = 34, eh = 36, x0 = uc - ew / 2, y0 = H - eh;
+            // the bronze frame and the glass
+            d.fillStyle = C.iron; d.fillRect(x0 - 3, y0 - 3, ew + 6, eh + 3);
+            d.fillStyle = '#2b2018'; d.fillRect(x0, y0, ew, eh);
+            { const g = l.createLinearGradient(0, y0, 0, H); g.addColorStop(0, 'rgba(255, 210, 140, 0.8)'); g.addColorStop(0.6, 'rgba(255, 196, 120, 0.95)'); g.addColorStop(1, 'rgba(255, 176, 96, 1)'); l.fillStyle = g; l.fillRect(x0, y0, ew, eh); }
+            d.fillStyle = 'rgba(255, 220, 170, 0.18)'; d.fillRect(x0, y0, ew, eh);
+            // the curtains drawn back in swags
+            for (const [c, col] of [[d, 'rgba(236, 220, 192, 0.55)'], [l, 'rgba(255, 238, 205, 1)']]) {
+                c.fillStyle = col; c.beginPath(); c.moveTo(x0, y0); c.quadraticCurveTo(x0 + 6, y0 + 12, x0 + 2, H); c.lineTo(x0, H); c.closePath(); c.fill();
+                c.beginPath(); c.moveTo(x0 + ew, y0); c.quadraticCurveTo(x0 + ew - 6, y0 + 12, x0 + ew - 2, H); c.lineTo(x0 + ew, H); c.closePath(); c.fill();
+            }
+            // the chandelier: tiers of lights round a gold drop
+            d.fillStyle = C.goldDk; d.fillRect(uc - 0.3, y0, 0.6, 7);
+            for (let k = 0; k < 3; k++) {
+                const yy = y0 + 7 + k * 2.6, w = 7 - k * 1.8;
+                d.fillStyle = C.gold; d.fillRect(uc - w, yy, w * 2, 0.5);
+                for (let x = -w; x <= w + 0.01; x += 1.4) { l.fillStyle = 'rgba(255, 252, 235, 1)'; l.beginPath(); l.arc(uc + x, yy - 0.3, 0.45, 0, Math.PI * 2); l.fill(); }
+            }
+            l.fillStyle = 'rgba(255, 240, 200, 0.6)'; l.beginPath(); l.arc(uc, y0 + 10, 7, 0, Math.PI * 2); l.fill();
+            // the lobby's fountain: a basin on a stem, the tiers above, water catching the light
+            for (const [c, col] of [[d, 'rgba(70, 52, 40, 0.75)']]) { c.fillStyle = col; c.fillRect(uc - 7, H - 4, 14, 2.4); c.fillRect(uc - 1, H - 10, 2, 6); c.fillRect(uc - 4, H - 10.6, 8, 1.2); c.fillRect(uc - 0.6, H - 14, 1.2, 3.4); }
+            l.fillStyle = 'rgba(210, 230, 255, 0.7)'; l.fillRect(uc - 6, H - 4.4, 12, 0.6); l.fillRect(uc - 3.6, H - 11, 7.2, 0.5);
+            // figures inside: a couple on the mezzanine, a guest crossing
+            d.fillStyle = 'rgba(30, 20, 14, 0.75)';
+            for (const [fx, fy, s] of [[uc - 3, y0 + 21, 0.9], [uc + 2.4, y0 + 21, 1], [uc + 10, H - 1, 1.2]]) { d.beginPath(); d.arc(fx, fy - 7 * s, 0.9 * s, 0, Math.PI * 2); d.fill(); d.fillRect(fx - 1.1 * s, fy - 6 * s, 2.2 * s, 6 * s); }
+            l.save(); l.globalCompositeOperation = 'destination-out'; l.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            for (const [fx, fy, s] of [[uc - 3, y0 + 21, 0.9], [uc + 2.4, y0 + 21, 1], [uc + 10, H - 1, 1.2]]) { l.beginPath(); l.arc(fx, fy - 7 * s, 0.9 * s, 0, Math.PI * 2); l.fill(); l.fillRect(fx - 1.1 * s, fy - 6 * s, 2.2 * s, 6 * s); }
+            l.restore();
+            // the mezzanine rail and the frame's mullions (the doors at the foot)
+            d.fillStyle = C.gold; d.fillRect(x0, y0 + 21, ew, 0.6); d.fillRect(x0, H - 13, ew, 0.5);
+            for (const x of [x0 + ew / 4, uc, x0 + ew * 3 / 4]) d.fillRect(x - 0.3, H - 13, 0.6, 13);
+            d.fillRect(x0 - 3, y0 - 3, ew + 6, 0.8); d.fillRect(x0 - 3, y0 - 3, 0.8, eh + 3); d.fillRect(x0 + ew + 2.2, y0 - 3, 0.8, eh + 3);
+            l.save(); l.globalCompositeOperation = 'destination-out'; l.fillStyle = 'rgba(0, 0, 0, 0.6)'; l.fillRect(x0, y0 + 21, ew, 0.6); l.fillRect(x0, H - 13, ew, 0.5); l.restore();
+            // the sign: a black band, DOUBLE NIGHTS in gold capitals, HOTEL under it
+            const sy = H - 50, sw = 70;
+            d.fillStyle = C.lacquer; d.fillRect(uc - sw / 2, sy, sw, 12);
+            d.fillStyle = C.goldDk; d.fillRect(uc - sw / 2, sy, sw, 0.5); d.fillRect(uc - sw / 2, sy + 11.5, sw, 0.5);
+            for (const [c, col] of [[d, C.gold], [l, 'rgba(255, 238, 200, 1)']]) {
+                c.save(); c.fillStyle = col; if (c === l) { c.shadowColor = 'rgba(255, 196, 110, 1)'; c.shadowBlur = 4; }
+                _dnText(c, 'DOUBLE NIGHTS', uc, sy + 4.6, 6.2, 600, 0.08); _dnText(c, 'HOTEL', uc, sy + 9.4, 3, 600, 0.6);
+                c.restore();
+            }
+            // the emblem over it, in a ring, ivy round the band
+            const ey = H - 59, R = 7.5;
+            d.fillStyle = C.lacquer; d.beginPath(); d.arc(uc, ey, R + 1.6, 0, Math.PI * 2); d.fill();
+            d.strokeStyle = C.goldDk; d.lineWidth = 0.5; d.stroke();
+            for (const [c, col] of [[d, C.gold], [l, 'rgba(255, 236, 190, 1)']]) { c.fillStyle = col; _dnEmblem(c, uc, ey, R); }
+            l.fillStyle = 'rgba(255, 210, 140, 0.35)'; l.beginPath(); l.arc(uc, ey, R + 5, 0, Math.PI * 2); l.fill();
+            for (let k = 0; k < 70; k++) {
+                const side = r() < 0.5 ? -1 : 1, x = uc + side * (sw / 2 + r() * 8), y = sy - 2 + r() * 18;
+                d.fillStyle = r() < 0.5 ? DN.C.leaf : DN.C.leafHi; d.beginPath(); d.arc(x, y, 0.6 + r() * 0.8, 0, Math.PI * 2); d.fill();
+            }
+        }
+        /** The lantern on the rotunda: tall arched windows lit gold between pilasters, a gold band. */
+        function _dnLantern(d, l, t, H, L) {
+            const C = DN.C, r = seededRandom(7411);
+            d.fillStyle = C.stone; d.fillRect(0, 0, L, H);
+            d.fillStyle = 'rgba(255, 246, 228, 0.1)'; d.fillRect(0, 0, L, 2);
+            for (let x = 3; x < L - 6; x += 13) {
+                const w = 6, y0 = 3.5, y1 = H - 2.5;
+                _dnWin(d, l, x + 1, y0, w, y1 - y0, r, true, 1);
+                d.fillStyle = C.stoneHi; d.fillRect(x + w + 2.4, 1, 2, H - 2);
+            }
+            d.fillStyle = C.gold; d.fillRect(0, 0.6, L, 0.6); d.fillRect(0, H - 1.4, L, 0.6);
+        }
+        /** A slate mansard: the slope's light, standing seams, dormers with stone frames and pediments. */
+        function _dnMansard(d, l, t, H, L) {
+            const C = DN.C, r = seededRandom(7519 + t.i);
+            const g = d.createLinearGradient(0, 0, 0, H); g.addColorStop(0, C.slateDk); g.addColorStop(1, C.slateHi);
+            d.fillStyle = g; d.fillRect(0, 0, L, H);
+            d.fillStyle = 'rgba(0, 0, 0, 0.18)'; for (let x = 0; x < L; x += 2.2) d.fillRect(x, 0, 0.3, H);
+            for (const run of _dnRuns(t)) {
+                if (run.hidden) continue;
+                const n = Math.max(1, Math.round(run.len / 28)), bw = run.len / n;
+                for (let i = 0; i < n; i++) {
+                    const uc = run.u0 + (i + 0.5) * bw, w = 6, y0 = H - 11;
+                    d.fillStyle = C.stoneHi; d.fillRect(uc - w / 2 - 1.4, y0 - 1, w + 2.8, 10);
+                    d.fillStyle = C.cream; d.beginPath(); d.moveTo(uc - w / 2 - 2, y0 - 0.6); d.lineTo(uc, y0 - 4); d.lineTo(uc + w / 2 + 2, y0 - 0.6); d.closePath(); d.fill();
+                    _dnWin(d, l, uc - w / 2, y0 + 0.6, w, 7, r, true, 0.5);
+                }
+            }
+            d.fillStyle = '#7a7c86'; d.fillRect(0, 0, L, 1.2);                                                                 // the zinc cap
+        }
+        /** A canopy's fascia: black lacquer between gold lines, its name over the door, bulbs along its foot. */
+        function _dnCanopyArt(text) {
+            return (d, l, t, H, L) => {
+                const C = DN.C, b = t.owner, uc = b ? _dnU(t, b.x + (t.cx || 0), 0.9) : null;
+                d.fillStyle = C.lacquer; d.fillRect(0, 0, L, H);
+                d.fillStyle = C.gold; d.fillRect(0, 0.4, L, 0.7); d.fillRect(0, H - 1.6, L, 0.7);
+                d.fillStyle = 'rgba(232, 194, 122, 0.35)'; for (let x = 4; x < L; x += 8) d.fillRect(x, 1.6, 0.4, H - 3.6);
+                for (let x = 1.5; x < L - 1; x += 2.6) { d.fillStyle = '#6a5530'; d.beginPath(); d.arc(x, H - 0.5, 0.4, 0, Math.PI * 2); d.fill();
+                    l.fillStyle = 'rgba(255, 236, 190, 1)'; l.beginPath(); l.arc(x, H - 0.5, 0.5, 0, Math.PI * 2); l.fill(); }
+                if (uc === null) return;
+                d.fillStyle = C.lacquer; d.fillRect(uc - text.length * 2.3, 1.4, text.length * 4.6, H - 3.2);
+                for (const [c, col] of [[d, C.gold], [l, 'rgba(255, 240, 205, 1)']]) {
+                    c.save(); c.fillStyle = col; if (c === l) { c.shadowColor = 'rgba(255, 190, 110, 1)'; c.shadowBlur = 3; }
+                    _dnText(c, text, uc, H / 2 - 0.2, 3.6, 600, 0.22); c.restore();
+                }
+            };
+        }
+        /** The plinth's front: dark stone, SAME SKY / DIFFERENT STORIES in gold, the emblem under it. */
+        function _dnPlinthArt(d, l, t, H, L) {
+            const C = DN.C;
+            d.fillStyle = '#26222a'; d.fillRect(0, 0, L, H);
+            d.fillStyle = 'rgba(255, 255, 255, 0.05)'; d.fillRect(0, 0, L, 1.2);
+            const e = _dnRuns(t).find(q => q.ny > 0.9);
+            if (!e) return;
+            const cx = e.u0 + e.len / 2;
+            d.strokeStyle = C.goldDk; d.lineWidth = 0.4; d.strokeRect(e.u0 + 3, 2.5, e.len - 6, H - 6);
+            for (const [c, col] of [[d, C.gold], [l, 'rgba(255, 236, 196, 0.9)']]) {
+                c.fillStyle = col;
+                ['SAME', 'SKY', 'DIFFERENT', 'STORIES'].forEach((w, i) => _dnText(c, w, cx, 6.5 + i * 4.2, 2.6, 600, 0.12));
+                _dnEmblem(c, cx, H - 7.5, 2.4);
+            }
+        }
+        /** A planter: black, a gold band at its rim. */
+        function _dnPot(d, l, t, H, L) {
+            d.fillStyle = DN.C.lacquer; d.fillRect(0, 0, L, H);
+            d.fillStyle = DN.C.gold; d.fillRect(0, 0.4, L, 0.7); d.fillStyle = 'rgba(255, 255, 255, 0.06)'; d.fillRect(0, 1.2, L, 1.2);
+        }
+
+        // ── roofs (world coordinates, painted once) and what stands on them (live) ──
+
+        function _dnPath(c, poly) { c.beginPath(); poly.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.closePath(); }
+        const _dnCentre = (poly) => { let x = 0, y = 0; for (const p of poly) { x += p[0] / poly.length; y += p[1] / poly.length; } return [x, y]; };
+
+        /** Lead flats round a setback, a stone gutter. */
+        function _dnLeadRoof(c, e, t) {
+            if (e) return;
+            _dnPath(c, t.poly); c.fillStyle = '#45434c'; c.fill();
+            c.strokeStyle = DN.C.stoneHi; c.lineWidth = 3; c.stroke(); c.strokeStyle = 'rgba(0, 0, 0, 0.3)'; c.lineWidth = 1; c.stroke();
+        }
+        /** A mansard's top: four zinc slopes up to a deck (seams down each, hips at the corners), skylights, chimney stacks with their pots. */
+        function _dnZincRoof(c, e, t) {
+            const [x0, y0, x1, y1] = t.box, r = seededRandom('dn-zinc' + t.i), w = x1 - x0, h = y1 - y0, I = 24;
+            const sky = [0.22, 0.5, 0.78].map((v) => [x0 + w / 2 - 12, y0 + I + 8 + (h - I * 2 - 16) * v - 16, 24, 32]);
+            if (e) { c.fillStyle = 'rgba(255, 210, 150, 0.6)'; for (const [x, y, sw, sh] of sky) c.fillRect(x + 2, y + 2, sw - 4, sh - 4); return; }
+            const O = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]], N = [[x0 + I, y0 + I], [x1 - I, y0 + I], [x1 - I, y1 - I], [x0 + I, y1 - I]];
+            const shade = ['#6a6e7c', '#4c4f5c', '#5c606d', '#777b89'];                                   // north, east, south, west (the light from the west)
+            for (let q = 0; q < 4; q++) {
+                const a = O[q], b = O[(q + 1) % 4], bi = N[(q + 1) % 4], ai = N[q];
+                c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.lineTo(bi[0], bi[1]); c.lineTo(ai[0], ai[1]); c.closePath();
+                c.fillStyle = shade[q]; c.fill();
+                c.save(); c.clip(); c.strokeStyle = 'rgba(0, 0, 0, 0.2)'; c.lineWidth = 0.8; c.beginPath();
+                if (q % 2 === 0) for (let x = x0 + 3; x < x1; x += 5) { c.moveTo(x, y0); c.lineTo(x, y1); }
+                else for (let y = y0 + 3; y < y1; y += 5) { c.moveTo(x0, y); c.lineTo(x1, y); }
+                c.stroke(); c.restore();
+            }
+            c.fillStyle = '#5e6270'; c.fillRect(N[0][0], N[0][1], w - I * 2, h - I * 2);                     // the deck
+            c.strokeStyle = 'rgba(255, 255, 255, 0.06)'; c.lineWidth = 0.8; c.beginPath(); for (let x = N[0][0] + 4; x < N[1][0]; x += 6) { c.moveTo(x, N[0][1]); c.lineTo(x, N[3][1]); } c.stroke();
+            c.strokeStyle = '#9a9ca6'; c.lineWidth = 1.4; c.beginPath();                                       // the hips and the deck's edge
+            for (let q = 0; q < 4; q++) { c.moveTo(O[q][0], O[q][1]); c.lineTo(N[q][0], N[q][1]); }
+            c.rect(N[0][0], N[0][1], w - I * 2, h - I * 2); c.stroke();
+            c.strokeStyle = '#8a8c96'; c.lineWidth = 2; c.strokeRect(x0 + 1, y0 + 1, w - 2, h - 2);
+            for (const [x, y, sw, sh] of sky) { c.fillStyle = 'rgba(0, 0, 0, 0.3)'; c.fillRect(x + 2, y + 3, sw, sh); c.fillStyle = '#1e2330'; c.fillRect(x, y, sw, sh); c.strokeStyle = DN.C.goldDk; c.lineWidth = 1.2; c.strokeRect(x, y, sw, sh);
+                c.strokeStyle = 'rgba(232, 194, 122, 0.4)'; c.lineWidth = 0.6; c.beginPath(); c.moveTo(x + sw / 2, y); c.lineTo(x + sw / 2, y + sh); c.stroke(); c.fillStyle = 'rgba(190, 205, 230, 0.15)'; c.fillRect(x + 2, y + 2, sw * 0.4, sh - 4); }
+            // chimney stacks astride the slopes, east and west, each with a row of pots
+            for (let k = 0; k < 6; k++) {
+                const side = k % 2, y = y0 + 30 + Math.floor(k / 2) * (h - 70) / 2 + r() * 8, x = side ? x1 - I - 6 : x0 + I - 22;
+                c.fillStyle = 'rgba(0, 0, 0, 0.35)'; c.fillRect(x + 4, y + 5, 28, 12);
+                c.fillStyle = '#a08c70'; c.fillRect(x, y, 28, 12); c.fillStyle = '#c0ad8c'; c.fillRect(x, y, 28, 2.5); c.fillStyle = '#7d6b54'; c.fillRect(x, y + 10, 28, 2);
+                for (let p = 0; p < 4; p++) { c.fillStyle = '#a5583b'; c.beginPath(); c.arc(x + 4 + p * 6.6, y + 6, 2.2, 0, Math.PI * 2); c.fill(); c.fillStyle = '#2a1a14'; c.beginPath(); c.arc(x + 4 + p * 6.6, y + 6, 1, 0, Math.PI * 2); c.fill(); }
+            }
+        }
+        /** The attic's top: the penthouse terrace, a teak deck, the pool (chapter 1's suite), loungers, planters, the glass pavilion. */
+        function _dnPenthouseRoof(c, e, t) {
+            const [x0, y0, x1, y1] = t.box, C = DN.C, cx = (x0 + x1) / 2;
+            const pool = [cx - 34, y0 + 70, 68, 150], pav = [x0 + 18, y0 + 14, x1 - x0 - 36, 36];
+            if (e) {
+                c.fillStyle = 'rgba(90, 140, 255, 0.45)'; c.fillRect(...pool);
+                c.fillStyle = 'rgba(255, 214, 160, 0.5)'; c.fillRect(pav[0] + 3, pav[1] + 3, pav[2] - 6, pav[3] - 6);
+                c.fillStyle = 'rgba(255, 220, 160, 0.8)'; for (let y = y0 + 64; y < y1 - 20; y += 26) for (const x of [x0 + 12, x1 - 12]) { c.beginPath(); c.arc(x, y, 2, 0, Math.PI * 2); c.fill(); }
+                return;
+            }
+            _dnPath(c, t.poly); c.fillStyle = '#5b3f2c'; c.fill();
+            c.strokeStyle = 'rgba(30, 18, 10, 0.35)'; c.lineWidth = 0.8; c.beginPath(); for (let y = y0 + 3; y < y1; y += 4) { c.moveTo(x0, y); c.lineTo(x1, y); } c.stroke();
+            c.strokeStyle = C.stoneHi; c.lineWidth = 4; _dnPath(c, t.poly); c.stroke();
+            // the pool: a gold rim, deep blue, a crescent mosaic at its foot
+            c.fillStyle = C.stoneHi; c.fillRect(pool[0] - 5, pool[1] - 5, pool[2] + 10, pool[3] + 10);
+            { const g = c.createLinearGradient(pool[0], pool[1], pool[0] + pool[2], pool[1] + pool[3]); g.addColorStop(0, '#1b2f62'); g.addColorStop(1, '#2d5a94'); c.fillStyle = g; c.fillRect(...pool); }
+            c.strokeStyle = C.gold; c.lineWidth = 1.5; c.strokeRect(...pool);
+            c.strokeStyle = 'rgba(200, 225, 255, 0.25)'; c.lineWidth = 0.8; c.beginPath(); for (let y = pool[1] + 14; y < pool[1] + pool[3]; y += 18) { c.moveTo(pool[0] + 4, y); c.quadraticCurveTo(cx, y + 5, pool[0] + pool[2] - 4, y); } c.stroke();
+            c.fillStyle = 'rgba(232, 194, 122, 0.55)'; _dnEmblem(c, cx, pool[1] + pool[3] - 22, 14);
+            // loungers both sides, planters at the corners
+            for (let k = 0; k < 4; k++) for (const s of [-1, 1]) {
+                const x = cx + s * 64 - 9, y = pool[1] + 10 + k * 36;
+                c.fillStyle = 'rgba(0, 0, 0, 0.35)'; c.fillRect(x + 2, y + 2, 18, 26); c.fillStyle = '#efe6d6'; c.fillRect(x, y, 18, 26); c.fillStyle = '#d8c8b0'; c.fillRect(x, y, 18, 7);
+            }
+            for (const [x, y] of [[x0 + 14, y1 - 14], [x1 - 14, y1 - 14], [x0 + 14, y0 + 64], [x1 - 14, y0 + 64]]) {
+                c.fillStyle = 'rgba(0, 0, 0, 0.35)'; c.beginPath(); c.arc(x + 2, y + 3, 9, 0, Math.PI * 2); c.fill();
+                c.fillStyle = C.lacquer; c.beginPath(); c.arc(x, y, 9, 0, Math.PI * 2); c.fill();
+                const g = c.createRadialGradient(x - 2, y - 2, 1, x, y, 8); g.addColorStop(0, C.leafHi); g.addColorStop(1, '#173a1e'); c.fillStyle = g; c.beginPath(); c.arc(x, y, 7, 0, Math.PI * 2); c.fill();
+            }
+            // the pavilion: the suite's glass room on the north side
+            c.fillStyle = 'rgba(0, 0, 0, 0.35)'; c.fillRect(pav[0] + 3, pav[1] + 4, pav[2], pav[3]);
+            c.fillStyle = '#1f1c26'; c.fillRect(...pav); c.strokeStyle = C.gold; c.lineWidth = 1.4; c.strokeRect(...pav);
+            c.strokeStyle = 'rgba(232, 194, 122, 0.35)'; c.lineWidth = 0.8; c.beginPath(); for (let x = pav[0] + 12; x < pav[0] + pav[2]; x += 12) { c.moveTo(x, pav[1]); c.lineTo(x, pav[1] + pav[3]); } c.stroke();
+        }
+        /** The rotunda's top round the lantern: lead, a stone parapet, planters spilling greenery all round its curve. */
+        function _dnRotundaRoof(c, e, t) {
+            if (e) return;
+            const C = DN.C, r = seededRandom('dn-rot-roof');
+            _dnPath(c, t.poly); c.fillStyle = '#4a4650'; c.fill();
+            c.strokeStyle = C.stoneHi; c.lineWidth = 4; c.stroke();
+            const [cx, cy] = DN.CROWN, b = t.owner, X = b.x + cx, Y = b.y + cy;
+            c.strokeStyle = 'rgba(232, 194, 122, 0.3)'; c.lineWidth = 1; c.beginPath();
+            for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2; c.moveTo(X + Math.cos(a) * 44, Y + Math.sin(a) * 44); c.lineTo(X + Math.cos(a) * 140, Y + Math.sin(a) * 140); }
+            c.save(); _dnPath(c, t.poly); c.clip(); c.stroke(); c.restore();
+            const pts = t.poly;
+            for (let i = 0; i < pts.length; i++) {
+                const [ax, ay] = pts[i], [bx, by] = pts[(i + 1) % pts.length];
+                if (Math.abs(ay - by) < 0.5 && Math.abs(ay - (b.y + DN.ROT[2])) < 1) continue;           // (not along the core)
+                const n = Math.max(1, Math.round(Math.hypot(bx - ax, by - ay) / 3));
+                for (let k = 0; k < n; k++) {
+                    const u = (k + 0.5) / n, x = ax + (bx - ax) * u, y = ay + (by - ay) * u, ix = x + (X - x) * 0.05, iy = y + (Y - y) * 0.05;
+                    c.fillStyle = r() < 0.5 ? C.leaf : C.leafHi; c.beginPath(); c.arc(ix, iy, 2.6 + r() * 2, 0, Math.PI * 2); c.fill();
+                    if (r() < 0.2) { c.fillStyle = r() < 0.5 ? '#f3e8f0' : '#e78db2'; c.beginPath(); c.arc(ix + 1, iy - 1, 1, 0, Math.PI * 2); c.fill(); }
+                }
+            }
+        }
+        /** The lantern's top under the dome. */
+        function _dnCrownRoof(c, e, t) {
+            if (e) return;
+            _dnPath(c, t.poly); c.fillStyle = DN.C.slateDk; c.fill(); c.strokeStyle = DN.C.gold; c.lineWidth = 2; c.stroke();
+        }
+        /** The canopy's top: dark glass in iron ribs fanning from the wall, a gold rim; lit from under at night. */
+        function _dnCanopyRoof(c, e, t) {
+            const pts = t.poly, b = t.owner, C = DN.C;
+            const wy = b.y + DN.ROT[2], [cx] = _dnCentre(pts);
+            if (e) { _dnPath(c, pts); c.fillStyle = 'rgba(255, 210, 150, 0.22)'; c.fill(); return; }
+            _dnPath(c, pts); { const g = c.createLinearGradient(0, wy, 0, wy + 66); g.addColorStop(0, '#1e1a22'); g.addColorStop(1, '#2c2630'); c.fillStyle = g; c.fill(); }
+            c.strokeStyle = 'rgba(232, 194, 122, 0.4)'; c.lineWidth = 0.8; c.beginPath();
+            for (const [x, y] of pts) { if (Math.abs(y - wy) < 1) continue; c.moveTo(cx, wy); c.lineTo(x, y); } c.stroke();
+            c.strokeStyle = C.gold; c.lineWidth = 1.8; _dnPath(c, pts); c.stroke();
+            c.fillStyle = 'rgba(255, 255, 255, 0.06)'; _dnPath(c, pts); c.fill();
+        }
+
+        /** The canopy's iron cresting: a rail round its curve, scrolls, gold finials at the corners. */
+        function _dnCresting(ctx, e, t, b) {
+            if (e || _zoomLOD >= 2) return;
+            const wy = b.y + DN.ROT[2], pts = t.poly.filter(([, y]) => Math.abs(y - wy) > 0.5), z0 = t.z1, z1 = t.z1 + 4;
+            const rail = new Path2D();
+            pts.forEach(([x, y], j) => { const p = b._tkP(x, y, z1); j ? rail.lineTo(p[0], p[1]) : rail.moveTo(p[0], p[1]); });
+            for (let j = 0; j < pts.length; j++) {
+                const [x, y] = pts[j], p0 = b._tkP(x, y, z0), p1 = b._tkP(x, y, z1 + (j % 2 ? 0 : 1.6));
+                rail.moveTo(p0[0], p0[1]); rail.lineTo(p1[0], p1[1]);
+            }
+            ctx.strokeStyle = DN.C.iron; ctx.lineWidth = 0.9; ctx.stroke(rail);
+            ctx.fillStyle = DN.C.gold;
+            for (const j of [0, pts.length - 1]) { const p = b._tkP(pts[j][0], pts[j][1], z1 + 2.4); ctx.beginPath(); ctx.arc(p[0], p[1], 1.4 * b._tkK(z1), 0, Math.PI * 2); ctx.fill(); }
+        }
+        /** The lantern's dome: slate rings up its curve, gold ribs, the gold emblem on its crown; lit gold at night. */
+        function _dnDome(ctx, e, t, b) {
+            const [cx, cy] = _dnCentre(t.poly), R = DN.CROWN[2] - 3, Hd = DN.Z.DOME, z0 = t.z1, N = 8;
+            const ring = (i) => { const th = i / N * Math.PI / 2 * 0.92; return { z: z0 + Hd * Math.sin(th), r: R * Math.cos(th) }; };
+            const top = ring(N);
+            if (e) {
+                const base = ctx.globalAlpha;
+                LandmarkKit.flat(ctx, b._tkK(top.z), (c) => {
+                    c.globalCompositeOperation = 'lighter';
+                    glowA(c, cx, cy, 34, '255, 200, 120', base * 0.5);
+                    c.globalAlpha = base; c.fillStyle = 'rgba(255, 236, 190, 0.9)'; _dnEmblem(c, cx, cy, 13);
                 });
-            },
+                LandmarkKit.flat(ctx, b._tkK(z0 + 1), (c) => { c.globalCompositeOperation = 'lighter'; c.globalAlpha = base; c.beginPath(); c.arc(cx, cy, R + 2, 0, Math.PI * 2); c.strokeStyle = 'rgba(255, 220, 160, 0.6)'; c.lineWidth = 2; c.stroke(); });
+                ctx.globalAlpha = base; return;
+            }
+            for (let i = 0; i <= N; i++) {
+                const q = ring(i), s = 0.5 + 0.5 * (i / N);
+                LandmarkKit.flat(ctx, b._tkK(q.z), (c) => {
+                    c.beginPath(); c.arc(cx, cy, q.r, 0, Math.PI * 2);
+                    c.fillStyle = `rgb(${Math.round(40 + 40 * s)}, ${Math.round(42 + 42 * s)}, ${Math.round(54 + 46 * s)})`; c.fill();
+                    if (i === 0) { c.lineWidth = 2; c.strokeStyle = DN.C.goldDk; c.stroke(); }
+                    if (i === N) { c.fillStyle = DN.C.gold; _dnEmblem(c, cx, cy, 13); c.strokeStyle = DN.C.goldDk; c.lineWidth = 1.2; c.beginPath(); c.arc(cx, cy, q.r, 0, Math.PI * 2); c.stroke(); }
+                });
+            }
+            if (_zoomLOD >= 2) return;
+            ctx.strokeStyle = 'rgba(232, 194, 122, 0.55)'; ctx.lineWidth = 1; ctx.beginPath();
+            for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; for (let i = 0; i < N; i++) { const q = ring(i), p = b._tkP(cx + Math.cos(a) * q.r, cy + Math.sin(a) * q.r, q.z); i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); } }
+            ctx.stroke();
+        }
+        /** A clipped cone of box out of its planter. */
+        function _dnTopiary(ctx, e, t, b) {
+            if (e) return;
+            const [cx, cy] = _dnCentre(t.poly), N = _zoomLOD >= 1 ? 4 : 6, R = 7.5, Hc = 26;
+            for (let i = 0; i <= N; i++) {
+                const u = i / N, z = t.z1 + Hc * u, rr = R * (1 - u) + 0.8, s = 0.55 + 0.45 * u;
+                LandmarkKit.flat(ctx, b._tkK(z), (c) => {
+                    c.fillStyle = `rgb(${Math.round(30 * s + 10)}, ${Math.round(74 * s + 16)}, ${Math.round(44 * s + 12)})`;
+                    c.beginPath(); c.arc(cx, cy, rr, 0, Math.PI * 2); c.fill();
+                    c.fillStyle = 'rgba(150, 200, 120, 0.16)'; c.beginPath(); c.arc(cx - rr * 0.3, cy - rr * 0.3, rr * 0.45, 0, Math.PI * 2); c.fill();
+                });
+            }
+        }
 
-            _dnK(z) { return LandmarkKit.k(z); },
-            _dnP(x, y, z) { const cam = game.camera, k = this._dnK(z); return [cam.x + (x - cam.x) * k, cam.y + (y - cam.y) * k]; },
-            _dnH() { return DN.FLOORS * CONFIG.BUILDINGS.FLOOR_HEIGHT; },
+        // ── the building ──
 
-            /** The forecourt rect (for keeping street trees and lamps off it). */
-            _dnForecourt() { return { x: this.x - 10, y: this.y + 380, w: 820, h: DN.FORECOURT_H + 60 }; },
-
-            _dnDoor(doorConfig) {
+        class DoubleNightsBuilding extends TieredBuilding {
+            /** It keeps the 'double_nights' style (its ground pass and the street trees go by it), none of the old body's settings. */
+            _applyStyle(config) {
+                this.style = 'double_nights';
+                this._seed = Math.round(this.x * 0.37 + this.y * 1.13);
+                this.roofFeatures = [];
+                this.emissiveReach = 700;                                          // the searchlights reach well past it
+            }
+            _setupSign() { this.attachedSign = null; }
+            /** The door: the glazed entrance at the rotunda's foot. */
+            _setupDoor(doorConfig) {
                 const D = DN.DOOR;
                 this._doorLightColor = null;
                 this.attachedTransition = { x: this.x + D.x, y: this.y + D.y, w: D.w, h: D.h, target: doorConfig.target, label: doorConfig.label };
-            },
+            }
+            _generateLights() {}
+            _dnDrawSign() {}                                                       // (its name is on the rotunda's wall)
+            /** A tier standing out in front of a wall (front: the canopies) draws right after the one it's on, or that wall, below its top, would paint over it. */
+            _tkOrder() {
+                const order = super._tkOrder(), fronts = order.filter(t => t.front);
+                if (!fronts.length) return order;
+                const rest = order.filter(t => !t.front);
+                for (const f of fronts) rest.splice(rest.indexOf(f.support) + 1, 0, f);
+                return rest;
+            }
+            /** Kept clear of street trees and lamps (engine/map-loading.js): all it draws on the ground, the registry's apron. */
+            _dnForecourt() { return { x: this.x - 10, y: this.y + 380, w: 820, h: 480 }; }
 
-            _dnLights() {
-                const X = this.x, Y = this.y, add = (x, y, color, r, type = 4) => this.attachedLights.push(Object.assign(new LampEntity({ x: X + x, y: Y + y, lampType: type, color, lightRadius: r }), { visible: false }));
-                add(400, 474, '#ffd9a0', 250);                       // under the canopy
-                add(400, 672, '#ffc870', 160);                       // the fountain
-                for (const a of [0.35, 0.8, 1.25, 1.9, 2.35, 2.8]) add(400 + Math.cos(a) * 262, 672 + Math.sin(a) * 150, '#ffcf95', 120);   // drive lanterns
-                add(150, 432, '#ff6a8a', 120); add(650, 432, '#ff6a8a', 120);   // tower-foot uplights, rose
-                add(250, 60, '#ffd08a', 120); add(550, 60, '#ffd08a', 120);
-                add(400, 225, '#ffdca8', 170);                       // the atrium, from within
-            },
-
-            // ── Base pass (under the entities) ───────────────────────────────
-            _dnDrawBase(ctx) {
-                const G = this._dnGeo();
-                ctx.save();
-                ctx.fillStyle = 'rgba(6, 2, 8, 0.55)';                   // contact shadow, a little offset
-                for (const s of [G.west, G.east, G.lens]) { ctx.beginPath(); s.pts.forEach(([x, y], i) => i ? ctx.lineTo(x + 7, y + 9) : ctx.moveTo(x + 7, y + 9)); ctx.closePath(); ctx.fill(); }
-                ctx.restore();
-            },
-
-            /** The forecourt and the courtyard gardens, painted once into a sprite; the water moves live. */
-            _dnDrawGround(ctx) {
-                if (!this._dnGround) this._dnGround = this._dnPaintGround();
-                const g = this._dnGround;
-                ctx.drawImage(g.cv, this.x + g.ox, this.y + g.oy, g.w, g.h);
-                // The fountain's water: ripples out from the two crescents, glints
-                const C = this._dnGeo().court, t = _gameTimeSec;
-                ctx.save();
-                ctx.strokeStyle = 'rgba(200, 230, 255, 0.35)'; ctx.lineWidth = 1;
-                for (let i = 0; i < 3; i++) {
-                    const k = ((t * 0.45 + i / 3) % 1), rr = 10 + k * (DN.COURT.fountain - 16);
-                    ctx.globalAlpha = 0.5 * (1 - k); ctx.beginPath(); ctx.ellipse(C.cx, C.cy, rr, rr * 0.92, 0, 0, Math.PI * 2); ctx.stroke();
-                }
-                ctx.globalAlpha = 1; ctx.fillStyle = 'rgba(255, 245, 220, 0.8)';
-                for (let i = 0; i < 6; i++) { const a = t * 0.7 + i * 1.05, rr = 18 + (i * 7) % 30; if (Math.sin(t * 5 + i * 2) > 0.6) ctx.fillRect(C.cx + Math.cos(a) * rr, C.cy + Math.sin(a) * rr * 0.9, 1.5, 1.5); }
-                ctx.restore();
-            },
-
-            _dnPaintGround() {
-                const ox = -20, oy = 0, w = 840, h = 450 + DN.FORECOURT_H, S = 1;
-                const cv = document.createElement('canvas'); cv.width = w * S; cv.height = h * S;
-                const c = cv.getContext('2d'), rnd = seededRandom(6012);
-                c.scale(S, S); c.translate(-ox, -oy);
-                const Cr = DN.COURT, Cn = DN.CANOPY, P = DN.C;
-                // Rose-grey stone paving across the forecourt, laid in a fan from the door
-                c.fillStyle = P.stone; c.fillRect(-20, 380, 840, h - 380);
-                c.strokeStyle = 'rgba(0,0,0,0.28)'; c.lineWidth = 1;
-                for (let rr = 40; rr < 520; rr += 26) { c.beginPath(); c.arc(400, 400, rr, 0.05, Math.PI - 0.05); c.stroke(); }
-                c.strokeStyle = 'rgba(255,230,210,0.05)';
-                for (let a = 0.1; a < Math.PI; a += 0.09) { c.beginPath(); c.moveTo(400 + Math.cos(a) * 40, 400 + Math.sin(a) * 40); c.lineTo(400 + Math.cos(a) * 520, 400 + Math.sin(a) * 520); c.stroke(); }
-                for (let i = 0; i < 260; i++) { c.fillStyle = `rgba(${rnd() < 0.5 ? '0,0,0' : '255,220,230'},${0.03 + rnd() * 0.04})`; c.fillRect(-20 + rnd() * 840, 380 + rnd() * (h - 380), 2 + rnd() * 6, 1 + rnd() * 3); }
-                // A gold band framing the forecourt
-                
-                // The circular drive: dark asphalt ring, gold kerbs
-                const ring = (rx, ry) => { c.beginPath(); c.ellipse(Cr.cx, Cr.cy, rx, ry, 0, 0, Math.PI * 2); };
-                c.fillStyle = '#17131a'; ring(Cr.rx + Cr.lane / 2, Cr.ry + Cr.lane / 2); c.fill();
-                c.fillStyle = P.stone; ring(Cr.rx - Cr.lane / 2, Cr.ry - Cr.lane / 2); c.fill();
-                c.strokeStyle = 'rgba(232,194,122,0.55)'; c.lineWidth = 2; ring(Cr.rx + Cr.lane / 2, Cr.ry + Cr.lane / 2); c.stroke(); ring(Cr.rx - Cr.lane / 2, Cr.ry - Cr.lane / 2); c.stroke();
-                c.setLineDash([10, 12]); c.strokeStyle = 'rgba(232,194,122,0.3)'; c.lineWidth = 1.2; ring(Cr.rx, Cr.ry); c.stroke(); c.setLineDash([]);
-                // Two spurs out to the avenue
-                c.fillStyle = '#17131a';
-                for (const s of [-1, 1]) { c.beginPath(); c.roundRect(Cr.cx + s * 150 - 23, Cr.cy + Cr.ry - 4, 46, h - (Cr.cy + Cr.ry) + 4, 6); c.fill(); }
-                // The island: a lawn, pink and violet flower beds round the fountain
-                c.fillStyle = P.lawn; ring(Cr.rx - Cr.lane / 2 - 10, Cr.ry - Cr.lane / 2 - 10); c.fill();
-                for (let i = 0; i < 380; i++) { const a = rnd() * Math.PI * 2, k = Math.sqrt(rnd()); c.fillStyle = rnd() < 0.5 ? P.lawnHi : 'rgba(8,24,14,0.7)'; c.fillRect(Cr.cx + Math.cos(a) * (Cr.rx - 40) * k, Cr.cy + Math.sin(a) * (Cr.ry - 40) * k, 2, 2); }
-                for (let i = 0; i < 140; i++) {
-                    const a = rnd() * Math.PI * 2, rr = DN.COURT.fountain + 10 + rnd() * 26;
-                    c.fillStyle = ['#ff8fc8', '#ffb3dc', '#c79bff', '#fff0f8'][Math.floor(rnd() * 4)];
-                    c.beginPath(); c.arc(Cr.cx + Math.cos(a) * rr * 1.5, Cr.cy + Math.sin(a) * rr * 0.9, 1.4 + rnd() * 1.4, 0, Math.PI * 2); c.fill();
-                }
-                // The fountain: a stone basin, the water, two gilt crescents rising from it
-                const F = DN.COURT.fountain;
-                c.fillStyle = '#3a2f33'; c.beginPath(); c.arc(Cr.cx, Cr.cy, F + 6, 0, Math.PI * 2); c.fill();
-                const wg = c.createRadialGradient(Cr.cx, Cr.cy, 4, Cr.cx, Cr.cy, F);
-                wg.addColorStop(0, '#3a2c5a'); wg.addColorStop(1, '#150f28'); c.fillStyle = wg; c.beginPath(); c.arc(Cr.cx, Cr.cy, F, 0, Math.PI * 2); c.fill();
-                c.strokeStyle = P.gold; c.lineWidth = 2; c.beginPath(); c.arc(Cr.cx, Cr.cy, F + 3, 0, Math.PI * 2); c.stroke();
-                const crescent = (x, y, R, dx, col) => { c.save(); c.beginPath(); c.arc(x, y, R, 0, Math.PI * 2); c.arc(x + dx, y, R * 0.86, 0, Math.PI * 2, true); c.fillStyle = col; c.fill('evenodd'); c.restore(); };
-                crescent(Cr.cx - 8, Cr.cy, 22, 9, P.gold); crescent(Cr.cx + 8, Cr.cy, 22, -9, P.goldHi);
-                // The porte-cochère: its floor is marble, the carpet runs from the drive to the door
-                c.fillStyle = '#3a3034'; c.fillRect(Cn.x0, 400, Cn.x1 - Cn.x0, Cn.y1 - 400 + 8);
-                c.strokeStyle = 'rgba(255,240,230,0.07)'; for (let x = Cn.x0; x < Cn.x1; x += 24) { c.beginPath(); c.moveTo(x, 400); c.lineTo(x, Cn.y1 + 8); c.stroke(); }
-                c.fillStyle = P.carpet; c.fillRect(372, 404, 56, Cn.y1 - 404 + 26);
-                c.strokeStyle = P.gold; c.lineWidth = 1.5; c.strokeRect(374, 404, 52, Cn.y1 - 404 + 24);
-                c.fillStyle = 'rgba(232,194,122,0.5)';                                     // stair nosings at the door
-                for (let i = 0; i < 3; i++) c.fillRect(344, 404 + i * 6, 112, 1.5);
-                // Stanchions and rope along the carpet
-                for (let y = 470; y < Cn.y1 + 20; y += 22) for (const x of [364, 436]) { c.fillStyle = P.gold; c.beginPath(); c.arc(x, y, 2.4, 0, Math.PI * 2); c.fill(); }
-                c.strokeStyle = 'rgba(160,20,50,0.9)'; c.lineWidth = 1.6;
-                for (const x of [364, 436]) { c.beginPath(); for (let y = 470; y < Cn.y1 + 20; y += 22) { c.moveTo(x, y); c.quadraticCurveTo(x, y + 11 + 3, x, y + 22); } c.stroke(); }
-                // Planters with clipped topiary spheres along the frontage
-                for (const x of [70, 170, 630, 730]) {
-                    c.fillStyle = '#3a2f33'; c.beginPath(); c.arc(x, 484, 17, 0, Math.PI * 2); c.fill();
-                    c.strokeStyle = 'rgba(232,194,122,0.55)'; c.lineWidth = 1.2; c.stroke();
-                    const tg = c.createRadialGradient(x - 4, 480, 2, x, 484, 14); tg.addColorStop(0, '#4d8a58'); tg.addColorStop(1, '#14331d'); c.fillStyle = tg; c.beginPath(); c.arc(x, 484, 13, 0, Math.PI * 2); c.fill();
-                    for (let i = 0; i < 7; i++) { const a = i * 0.9; c.fillStyle = i % 2 ? '#ff9ccf' : '#d7a8ff'; c.beginPath(); c.arc(x + Math.cos(a) * 9, 484 + Math.sin(a) * 9, 1.6, 0, Math.PI * 2); c.fill(); }
-                }
-                // The courtyards between the crescents and the atrium: reflecting pools in a lawn
-                c.save();
-                c.beginPath(); c.arc(DN.IN[0], DN.IN[1], DN.IN[2], 0, Math.PI * 2); c.arc(800 - DN.IN[0], DN.IN[1], DN.IN[2], 0, Math.PI * 2); c.clip('nonzero');
-                c.fillStyle = P.lawn; c.fillRect(160, 30, 480, 390);
-                for (let i = 0; i < 400; i++) { c.fillStyle = rnd() < 0.5 ? P.lawnHi : 'rgba(8,24,14,0.7)'; c.fillRect(160 + rnd() * 480, 30 + rnd() * 390, 2, 2); }
-                for (const s of [-1, 1]) {
-                    const x = 400 + s * 162;
-                    c.fillStyle = '#18103a'; c.beginPath(); c.ellipse(x, 225, 22, 120, 0, 0, Math.PI * 2); c.fill();
-                    c.strokeStyle = 'rgba(232,194,122,0.6)'; c.lineWidth = 1.5; c.stroke();
-                }
-                c.restore();
-                return { cv, ox, oy, w, h };
-            },
-
-            // ── Top pass (over the entities) ─────────────────────────────────
-            // Built on the landmark kit (buildings/landmark-kit.js): the roofs, the atrium's
-            // glass and the canopy slab draw in their height's plane from cached paths and gradients;
-            // floor lines are one path stroked per floor; fins, ledges, the plinth and the
-            // penthouse verandas are batched; the lean is only projected where it must be.
-
-            /** The walls facing the camera, far first (and each edge's outward normal). */
-            _dnVisible(sh) {
-                const cam = game.camera;
-                return sh.edges.filter(e => (cam.x - e.mx) * e.nx + (cam.y - e.my) * e.ny > 0)
-                    .sort((a, b) => ((b.mx - cam.x) ** 2 + (b.my - cam.y) ** 2) - ((a.mx - cam.x) ** 2 + (a.my - cam.y) ** 2));
-            },
-
-            /** Flat-shaded walls from z0 to z1 (one colour per facet by where it faces), then one height shade over them all. */
-            _dnWalls(ctx, sh, vis, z0, z1, base, lit, shadeTop) {
-                const K = LandmarkKit, k0 = K.k(z0), k1 = K.k(z1), q = [0, 0, 0, 0, 0, 0, 0, 0], all = new Path2D();
-                for (const e of vis) {
-                    K._p(q, 0, e.a[0], e.a[1], k0); K._p(q, 2, e.b[0], e.b[1], k0); K._p(q, 4, e.b[0], e.b[1], k1); K._p(q, 6, e.a[0], e.a[1], k1);
-                    const p = new Path2D(); p.moveTo(q[0], q[1]); p.lineTo(q[2], q[3]); p.lineTo(q[4], q[5]); p.lineTo(q[6], q[7]); p.closePath();
-                    ctx.fillStyle = lit && (0.5 + 0.5 * Math.max(0, e.ny * 0.6 - e.nx * 0.4)) > 0.7 ? lit : base; ctx.fill(p);
-                    all.addPath(p);
-                }
-                if (shadeTop && vis.length) {                                                   // darker at the foot, the colour at the top
-                    const c = game.camera, cx = sh.cx, cy = sh.cy, t = [c.x + (cx - c.x) * k1, c.y + (cy - c.y) * k1];
-                    const g = ctx.createLinearGradient(cx, cy, t[0], t[1]);
-                    g.addColorStop(0, 'rgba(8, 3, 6, 0.55)'); g.addColorStop(1, shadeTop);
-                    ctx.fillStyle = g; ctx.fill(all);
-                }
-                return all;
-            },
-
-            /** Wall anchors for fins: every other facet corner of the visible walls. */
-            _dnAnchors(vis) {
-                const out = [];
-                vis.forEach((e, i) => { if (i % 2 === 0) out.push({ x: e.a[0], y: e.a[1], nx: e.nx, ny: e.ny }); });
-                return out;
-            },
-
-            _dnTowerWalls(ctx, sh, key, H) {
-                const K = LandmarkKit, C = DN.C, FH = CONFIG.BUILDINGS.FLOOR_HEIGHT, vis = this._dnVisible(sh);
-                const faceLit = (e) => e.ny * 0.6 - e.nx * 0.4 > 0.2;
-                // The plinth: the two lowest floors stand 6 px proud, dark stone with a gold lip
-                K.ledge(ctx, vis, 2 * FH, 6, 2 * FH, C.stone, '#221b1e', 'rgba(232, 194, 122, 0.45)');
-                // The walls: lacquer, lighter where they face south-west (the plinth darkens the foot)
-                this._dnWalls(ctx, sh, vis, 2 * FH, H, '#1a0c14', C.lacquerHi, null);
-                // Spandrels: one path of the visible edges, stroked at every floor
-                const edgesPath = new Path2D();
-                for (const e of vis) { edgesPath.moveTo(e.a[0], e.a[1]); edgesPath.lineTo(e.b[0], e.b[1]); }
-                const floorKs = [];
-                for (let f = 3; f < DN.FLOORS; f++) if (f % 3) floorKs.push(K.k(f * FH));
-                K.rings(ctx, edgesPath, floorKs, 1.1, 'rgba(160, 24, 58, 0.55)');
-                // Fins: gilt-edged lacquer plates standing out at the facet corners, the full height
-                K.fins(ctx, this._dnAnchors(vis), 2 * FH, H, 2.2, 2.5, C.lacquerHi, 'rgba(232, 194, 122, 0.35)', a => faceLit(a) ? 1 : 0);
-                // Ledges every third floor: a crimson band with a gold lip
-                const lips = [];
-                for (let f = 3; f < DN.FLOORS; f += 3) lips.push(K.ledge(ctx, vis, f * FH, 3.5, 1.6, '#241019', '#4a0a1c', 'rgba(232, 194, 122, 0.3)'));
-                // The penthouse floors of the east tower: verandas along the south faces
-                let rails = null;
-                if (key === 'e') {
-                    const south = vis.filter(e => e.ny > 0.35);
-                    rails = K.veranda(ctx, south, (DN.FLOORS - 2) * FH, 7, 5, 4, '#3a1a2c', '#1c0c16', 'rgba(232, 194, 122, 0.75)');
-                }
-                return { vis, lips, rails, edgesPath };
-            },
-
-            /** A tower's roof in its plane: lacquer, gold parapet, art-deco fins, the crimson band; the helipad on the west. */
-            _dnRoof(ctx, sh, key, k) {
-                const K = LandmarkKit, C = DN.C, G = this._dnGeo();
-                const outline = K.path(this, 'roof_' + key, p => { sh.pts.forEach(([x, y], i) => i ? p.lineTo(x, y) : p.moveTo(x, y)); p.closePath(); return p; });
-                const fins = K.path(this, 'fins_' + key, p => {
-                    const n = sh.outer.length, inner = sh.pts.slice(n).reverse();
-                    for (let i = 2; i < n - 2; i += 2) {
-                        const o = sh.outer[i], j = Math.round(i / (n - 1) * (inner.length - 1)), q = inner[Math.max(0, Math.min(inner.length - 1, j))];
-                        p.moveTo(o[0], o[1]); p.lineTo(o[0] + (q[0] - o[0]) * 0.8, o[1] + (q[1] - o[1]) * 0.8);
-                    }
-                    return p;
-                });
-                const band = K.path(this, 'band_' + key, p => { sh.outer.forEach((q, i) => { const x = sh.cx + (q[0] - sh.cx) * 0.95, y = sh.cy + (q[1] - sh.cy) * 0.95; i ? p.lineTo(x, y) : p.moveTo(x, y); }); return p; });
-                const g = K.grad(this, 'roof_' + key, () => { const g = ctx.createRadialGradient(sh.cx, sh.cy, 10, sh.cx, sh.cy, 220); g.addColorStop(0, '#3a1a2c'); g.addColorStop(0.7, '#1c0c16'); g.addColorStop(1, '#12080e'); return g; });
-                K.flat(ctx, k, (c) => {
-                    c.fillStyle = g; c.fill(outline);
-                    c.strokeStyle = C.gold; c.lineWidth = 2.2; c.stroke(outline);
-                    c.strokeStyle = 'rgba(232, 194, 122, 0.28)'; c.lineWidth = 1; c.stroke(fins);
-                    c.strokeStyle = 'rgba(160, 20, 56, 0.6)'; c.lineWidth = 2; c.stroke(band);
-                    if (key === 'w') {                                                         // the helipad
-                        const [hx, hy] = G.helipad;
-                        c.fillStyle = '#1d1419'; c.beginPath(); c.arc(hx, hy, 40, 0, Math.PI * 2); c.fill();
-                        c.strokeStyle = C.gold; c.lineWidth = 2; c.stroke();
-                        c.font = '600 26px Montserrat, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = 'rgba(232,194,122,0.85)'; c.fillText('H', hx, hy + 1);
-                    }
-                });
-            },
-
-            /** The atrium's glass roof in its plane (by day; and lit, for the night pass). */
-            _dnAtriumRoof(ctx, lit) {
-                const K = LandmarkKit, C = DN.C, L = this._dnGeo().lens;
-                const outline = K.path(this, 'lens', p => { L.pts.forEach(([x, y], i) => i ? p.lineTo(x, y) : p.moveTo(x, y)); p.closePath(); return p; });
-                const ribs = K.path(this, 'ribs', p => { for (let i = 0; i < L.pts.length; i += 2) { p.moveTo(L.cx, L.cy); p.lineTo(L.pts[i][0], L.pts[i][1]); } return p; });
-                const emblem = K.path(this, 'emblem', p => { for (const s of [-1, 1]) { const a0 = s < 0 ? Math.PI * 0.35 : -Math.PI * 0.65; p.moveTo(L.cx + s * 8 + Math.cos(a0) * 26, L.cy + Math.sin(a0) * 26); p.arc(L.cx + s * 8, L.cy, 26, a0, s < 0 ? Math.PI * 1.65 : Math.PI * 0.65); } return p; });
-                const g = lit ? K.grad(this, 'lens_lit', () => { const g = ctx.createRadialGradient(L.cx, L.cy, 6, L.cx, L.cy, 170); g.addColorStop(0, 'rgba(255, 206, 140, 0.3)'); g.addColorStop(0.6, 'rgba(255, 160, 110, 0.1)'); g.addColorStop(1, 'rgba(255,150,100,0)'); return g; })
-                              : K.grad(this, 'lens', () => { const g = ctx.createRadialGradient(L.cx, L.cy, 10, L.cx, L.cy, 190); g.addColorStop(0, '#3a2530'); g.addColorStop(1, C.glass); return g; });
-                K.flat(ctx, K.k(DN.ATRIUM_Z), (c) => {
-                    c.fillStyle = g; c.fill(outline);
-                    if (!lit) { c.strokeStyle = C.gold; c.lineWidth = 1.6; c.stroke(outline); }
-                    c.strokeStyle = lit ? 'rgba(255,225,170,0.22)' : 'rgba(232,194,122,0.3)'; c.lineWidth = 0.8; c.stroke(ribs);
-                    c.lineWidth = 2; c.strokeStyle = lit ? 'rgba(255,236,190,0.9)' : C.gold; c.stroke(emblem);
-                });
-            },
-
-            _dnDrawTop(ctx) {
-                const G = this._dnGeo(), C = DN.C, H = this._dnH(), K = LandmarkKit;
-                ctx.save();
-                // The atrium first (low), then the towers over it
-                const lv = this._dnVisible(G.lens);
-                const aw = this._dnWalls(ctx, G.lens, lv, 0, DN.ATRIUM_Z, '#1b1017', null, null);
-                K.rings(ctx, (() => { const p = new Path2D(); for (const e of lv) { p.moveTo(e.a[0], e.a[1]); p.lineTo(e.b[0], e.b[1]); } return p; })(), [K.k(DN.ATRIUM_Z)], 0.8, 'rgba(232,194,122,0.35)');
-                this._dnAtriumRoof(ctx, false);
-                this._dnCanopy(ctx, G, false);
-                this._dnDrawSign(ctx);                                   // the script on the canopy, before the towers can hide it
-                this._dnTop = {};
-                for (const [sh, key] of [[G.west, 'w'], [G.east, 'e']]) {
-                    this._dnTop[key] = this._dnTowerWalls(ctx, sh, key, H);
-                    this._dnRoof(ctx, sh, key, K.k(H));
-                    this._dnCrown(ctx, sh, key, H, false);
-                }
-                ctx.restore();
-            },
-
-            /** The canopy slab and its skylight, in the canopy's plane. */
-            _dnCanopySlab(ctx, k) {
-                const K = LandmarkKit, C = DN.C, Cn = this._dnGeo().canopy, rad = 46;
-                const slab = K.path(this, 'canopy', p => { p.roundRect(Cn.x0, Cn.y0, Cn.x1 - Cn.x0, Cn.y1 - Cn.y0, [6, 6, rad, rad]); return p; });
-                const inner = K.path(this, 'canopy_in', p => { p.roundRect(Cn.x0 + 5, Cn.y0 + 5, Cn.x1 - Cn.x0 - 10, Cn.y1 - Cn.y0 - 10, [4, 4, rad - 5, rad - 5]); return p; });
-                const g = K.grad(this, 'canopy', () => { const g = ctx.createLinearGradient(Cn.x0, Cn.y0, Cn.x0, Cn.y1); g.addColorStop(0, '#1d0c16'); g.addColorStop(1, '#2c1220'); return g; });
-                K.flat(ctx, k, (c) => {
-                    c.fillStyle = g; c.fill(slab); c.strokeStyle = C.gold; c.lineWidth = 2; c.stroke(slab);
-                    c.strokeStyle = 'rgba(160, 20, 56, 0.7)'; c.lineWidth = 1.2; c.stroke(inner);
-                    const mx = (Cn.x0 + Cn.x1) / 2; c.fillStyle = '#2a1a24'; c.fillRect(mx - 12, Cn.y0 + 14, 24, Cn.y1 - Cn.y0 - 28);
-                });
-            },
-
-            /** The porte-cochère: a lacquer slab on four gilt columns, a skylight down its middle. */
-            _dnCanopy(ctx, G, emissive) {
-                const K = LandmarkKit, z = DN.CANOPY_Z, Cn = G.canopy, C = DN.C, kz = K.k(z);
-                // Someone under it (her, or anyone the camera follows): the slab thins to a veil so they stay in view
-                const p = game.player, cam = game.camera, fx = p && p.visible ? p.x : cam.x, fy = p && p.visible ? p.y : cam.y;
-                const under = fx > Cn.x0 - 20 && fx < Cn.x1 + 20 && fy > Cn.y0 - 10 && fy < Cn.y1 + 40;
-                this._dnFade = (this._dnFade == null ? 1 : this._dnFade) + ((under ? 0.3 : 1) - (this._dnFade == null ? 1 : this._dnFade)) * 0.12;
-                ctx.save();
-                ctx.globalAlpha *= this._dnFade == null ? 1 : this._dnFade;
-                if (!emissive) {
-                    K.columns(ctx, G.cols, 2.6, 0, z, C.gold, C.goldHi);                      // gilt columns, ground to slab
-                    this._dnCanopySlab(ctx, kz);
-                } else {
-                    const mx = (Cn.x0 + Cn.x1) / 2, [ax, ay] = this._dnP(mx - 12, Cn.y0 + 14, z), [bx, by] = this._dnP(mx + 12, Cn.y1 - 14, z);
-                    ctx.fillStyle = 'rgba(255, 214, 150, 0.22)'; ctx.fillRect(ax, ay, bx - ax, by - ay);
-                }
-                ctx.restore();
-            },
-
-            /** A tower's crown: the crimson halo, and on the east the penthouse pavilion and its pool (the helipad is in the roof sprite). */
-            _dnCrown(ctx, sh, key, H, emissive) {
-                const C = DN.C, G = this._dnGeo(), t = _gameTimeSec, zc = H + DN.CROWN_Z, K = LandmarkKit;
-                ctx.save();
-                // The halo: the outer arc of the crescent, lifted and inset — one world path in the crown's plane
-                if (!this['_dnHalo' + key]) {
-                    const p = new Path2D();
-                    sh.outer.forEach((q, i) => { const x = sh.cx + (q[0] - sh.cx) * 0.9, y = sh.cy + (q[1] - sh.cy) * 0.9; i ? p.lineTo(x, y) : p.moveTo(x, y); });
-                    this['_dnHalo' + key] = p;
-                }
-                const halo = this['_dnHalo' + key], kc = K.k(zc);
-                if (emissive) {
-                    const br = 0.65 + 0.35 * Math.sin(t * 1.3 + (key === 'w' ? 0 : 1.7));
-                    ctx.globalCompositeOperation = 'lighter';
-                    K.rings(ctx, halo, [kc], 9, `rgba(209, 30, 76, ${0.35 * br})`);
-                    K.rings(ctx, halo, [kc], 2.5, `rgba(255, 90, 130, ${0.8 * br})`);
-                } else K.rings(ctx, halo, [kc], 3, '#3a0c1c');
-                ctx.globalCompositeOperation = 'source-over';
-                if (key === 'w') {                                                             // the helipad's lights
-                    if (emissive) {
-                        const [hx, hy] = G.helipad, p = this._dnP(hx, hy, H + 1), k = this._dnK(H);
-                        ctx.globalCompositeOperation = 'lighter';
-                        for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, on = Math.sin(t * 3 - i * 0.8) > 0.2; ctx.fillStyle = on ? 'rgba(255,220,150,0.9)' : 'rgba(255,220,150,0.25)'; ctx.beginPath(); ctx.arc(p[0] + Math.cos(a) * 40 * k, p[1] + Math.sin(a) * 40 * k, 1.8 * k, 0, Math.PI * 2); ctx.fill(); }
-                    }
-                } else {                                                                       // the penthouse: a glass pavilion, the pool balcony
-                    const [px, py] = G.penthouse;
-                    const pc = this._dnP(px + 6, py, H + 1), kp = this._dnK(H + 1);
-                    const pool = { x: pc[0] - 11 * kp, y: pc[1] - 58 * kp, w: 22 * kp, h: 116 * kp };
-                    const vc = this._dnP(px - 26, py, H + 10), kv = this._dnK(H + 10);
-                    const pav = { x: vc[0] - 12 * kv, y: vc[1] - 38 * kv, w: 24 * kv, h: 76 * kv };
-                    const poly = (Q) => { ctx.beginPath(); ctx.roundRect(Q.x, Q.y, Q.w, Q.h, Q.w / 2); };
-                    if (!emissive) {
-                        poly(pool); const g = ctx.createLinearGradient(pool.x, pool.y, pool.x + pool.w, pool.y + pool.h);
-                        g.addColorStop(0, '#1a2250'); g.addColorStop(1, '#34215e'); ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = C.gold; ctx.lineWidth = 1.5; ctx.stroke();
-                        ctx.strokeStyle = 'rgba(190, 210, 255, 0.35)'; ctx.lineWidth = 0.8; ctx.beginPath();                 // caustic
-                        for (let i = 1; i < 5; i++) { const yy = pool.y + pool.h * i / 5 + Math.sin(t * 1.6 + i) * 2; ctx.moveTo(pool.x + 3, yy); ctx.quadraticCurveTo(pool.x + pool.w / 2, yy + 3, pool.x + pool.w - 3, yy); }
-                        ctx.stroke();
-                        poly(pav); ctx.fillStyle = '#1b1220'; ctx.fill(); ctx.strokeStyle = 'rgba(232,194,122,0.7)'; ctx.stroke();
-                    } else {
-                        ctx.globalCompositeOperation = 'lighter';
-                        poly(pav); ctx.fillStyle = 'rgba(255, 214, 160, 0.35)'; ctx.fill();         // the suite is always lit
-                        poly(pool); ctx.fillStyle = `rgba(90, 130, 255, ${0.12 + 0.05 * Math.sin(t * 2)})`; ctx.fill();
-                    }
-                }
-                ctx.restore();
-            },
-
-            // ── Emissive pass (after the darkness) ───────────────────────────
-            _dnDrawEmissive(ctx, dark) {
-                const G = this._dnGeo(), H = this._dnH(), FH = CONFIG.BUILDINGS.FLOOR_HEIGHT, t = _gameTimeSec, K = LandmarkKit;
-                const glow = Math.max(0.15, Math.min(1, dark * 1.1));
-                ctx.save();
-                ctx.globalAlpha = glow;
-                ctx.globalCompositeOperation = 'lighter';
-                // Atrium: the chandelier's warmth through the glass, and its ribs and emblem, lit
-                this._dnAtriumRoof(ctx, true);
-                this._dnCanopy(ctx, G, true);
-                // The details catch the building's lamp colour: ledge lips, fin edges, the verandas' rails
-                const rim = K.rim(this, dark), top = this._dnTop || {};
-                for (const [sh, key] of [[G.west, 'w'], [G.east, 'e']]) {
-                    const T = top[key], vis = T ? T.vis : this._dnVisible(sh), q = [0, 0, 0, 0, 0, 0, 0, 0];
-                    // Lit rooms: a curated scatter, the top floors of the east tower always on
-                    const rooms = new Path2D();
-                    for (const e of vis) {
-                        const idx = sh.edges.indexOf(e);
-                        const A = [e.a[0] + (e.b[0] - e.a[0]) * 0.18, e.a[1] + (e.b[1] - e.a[1]) * 0.18], B = [e.a[0] + (e.b[0] - e.a[0]) * 0.82, e.a[1] + (e.b[1] - e.a[1]) * 0.82];
-                        for (let f = 0; f < DN.FLOORS; f++) {
-                            const on = (key === 'e' && f >= DN.FLOORS - 2) || _bldHash(this._seed || 7, idx * 31 + f * 7 + (key === 'e' ? 500 : 0)) < 0.34;
-                            if (!on) continue;
-                            const k0 = K.k(f * FH + 2), k1 = K.k(f * FH + FH - 2);
-                            K._p(q, 0, A[0], A[1], k0); K._p(q, 2, B[0], B[1], k0); K._p(q, 4, B[0], B[1], k1); K._p(q, 6, A[0], A[1], k1);
-                            rooms.moveTo(q[0], q[1]); rooms.lineTo(q[2], q[3]); rooms.lineTo(q[4], q[5]); rooms.lineTo(q[6], q[7]); rooms.closePath();
-                        }
-                    }
-                    ctx.fillStyle = 'rgba(255, 214, 150, 0.85)'; ctx.fill(rooms);
-                    // Gold uplights climbing the faces from the ground: one gradient per tower
-                    const kU = K.k(H * 0.55), c = game.camera, ups = new Path2D();
-                    for (const e of vis) {
-                        K._p(q, 0, e.a[0], e.a[1], kU); K._p(q, 2, e.b[0], e.b[1], kU);
-                        ups.moveTo(e.a[0], e.a[1]); ups.lineTo(e.b[0], e.b[1]); ups.lineTo(q[2], q[3]); ups.lineTo(q[0], q[1]); ups.closePath();
-                    }
-                    const tc = [c.x + (sh.cx - c.x) * kU, c.y + (sh.cy - c.y) * kU], g = ctx.createLinearGradient(sh.cx, sh.cy, tc[0], tc[1]);
-                    g.addColorStop(0, 'rgba(255, 196, 110, 0.32)'); g.addColorStop(1, 'rgba(255, 196, 110, 0)');
-                    ctx.fillStyle = g; ctx.fill(ups);
-                    // The parapet glints
-                    if (!this['_dnOutline' + key]) { const p = new Path2D(); sh.pts.forEach(([x, y], i) => i ? p.lineTo(x, y) : p.moveTo(x, y)); p.closePath(); this['_dnOutline' + key] = p; }
-                    K.rings(ctx, this['_dnOutline' + key], [K.k(H)], 1.5, 'rgba(255, 220, 160, 0.35)');
-                    if (rim.a > 0.01 && T) {
-                        ctx.lineWidth = 1.1; ctx.strokeStyle = `rgba(${rim.rgb}, ${0.55 * rim.a})`;
-                        for (const lp of T.lips) if (lp) ctx.stroke(lp);
-                        if (T.rails) ctx.stroke(T.rails);
-                    }
-                    ctx.globalCompositeOperation = 'source-over';
-                    this._dnCrown(ctx, sh, key, H, true);
-                    ctx.globalCompositeOperation = 'lighter';
-                }
-                // Ground: the fountain's gold, the lanterns round the drive, the carpet's pool of light
-                const Cr = G.court;
-                glowA(ctx, Cr.cx, Cr.cy, 90, '255, 200, 120', 0.14);
-                for (const a of [0.35, 0.8, 1.25, 1.9, 2.35, 2.8]) {
-                    const x = Cr.cx + Math.cos(a) * (Cr.rx + 26), y = Cr.cy + Math.sin(a) * (Cr.ry + 22);
-                    glowA(ctx, x, y, 26, '255, 214, 150', 0.5); ctx.fillStyle = 'rgba(255, 240, 210, 0.9)'; ctx.beginPath(); ctx.arc(x, y, 2.2, 0, Math.PI * 2); ctx.fill();
-                }
-                // Two gold searchlights crossing over the roofs (not when zoomed far out)
-                if (dark > 0.25 && _zoomLOD < 2) {
-                    for (const [sh, ph] of [[G.west, 0], [G.east, 2.4]]) {
-                        const o = this._dnP(sh.cx, sh.cy, H + 20), ang = -Math.PI / 2 + Math.sin(t * 0.22 + ph) * 0.85 + (sh === G.west ? 0.35 : -0.35);
-                        const L = 900, wid = 0.07, x1 = o[0] + Math.cos(ang - wid) * L, y1 = o[1] + Math.sin(ang - wid) * L, x2 = o[0] + Math.cos(ang + wid) * L, y2 = o[1] + Math.sin(ang + wid) * L;
-                        const g = ctx.createLinearGradient(o[0], o[1], (x1 + x2) / 2, (y1 + y2) / 2);
-                        g.addColorStop(0, `rgba(255, 224, 160, ${0.34 * dark})`); g.addColorStop(1, 'rgba(255, 224, 160, 0)');
-                        ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(o[0], o[1]); ctx.lineTo(x1, y1); ctx.lineTo(x2, y2); ctx.closePath(); ctx.fill();
-                    }
-                }
-                ctx.restore();
-            },
-            /** "Double Nights" in script on the canopy's fascia, in the canopy's height plane. */
-            _dnDrawSign(ctx) {
-                const G = this._dnGeo(), z = DN.CANOPY_Z, cam = game.camera, k = this._dnK(z);
-                const x = (G.canopy.x0 + G.canopy.x1) / 2, y = G.canopy.y1 - 16;
-                const dark = this.getAmbientDarknessSafe ? this.getAmbientDarknessSafe() : (game.getAmbientDarkness ? game.getAmbientDarkness() : 0.6);
-                const t = _frameTime, a = Math.max(0.55, Math.min(1, 0.9 + Math.sin(t / 1300) * 0.08 + (Math.sin(t / 4100) > 0.95 ? -0.35 : 0)));
-                ctx.save();
-                ctx.globalAlpha = Math.max(0.45, this._dnFade == null ? 1 : this._dnFade);
-                ctx.translate(cam.x, cam.y); ctx.scale(k, k); ctx.translate(-cam.x, -cam.y);
-                ctx.font = '30px "Great Vibes", cursive'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                const on = 0.35 + 0.65 * Math.min(1, dark * 1.4);
-                if (_zoomLOD < 1) { ctx.shadowColor = '#ff1a55'; ctx.shadowBlur = 18 * a * on; }
-                ctx.fillStyle = `rgba(255, 40, 90, ${a * on})`; ctx.fillText('Double Nights', x, y);
-                ctx.shadowBlur = 0; ctx.fillStyle = `rgba(255, 236, 240, ${0.55 * a * on})`; ctx.fillText('Double Nights', x, y);
+            /** Its shade on the ground, close under it (the tiers' own sun shadows do the rest). */
+            drawBase(ctx) {
+                ctx.save(); ctx.fillStyle = 'rgba(6, 3, 8, 0.45)';
+                for (const s of this.sections) ctx.fillRect(this.x + s.x + 4, this.y + s.y + 5, s.w, s.h);
                 ctx.restore();
             }
-        });
+
+            /** Solid: its walls, and out front the planters, the posts, the plinth and the cars. */
+            getCollisionShapes() {
+                const s = super.getCollisionShapes(), X = this.x, Y = this.y;
+                for (const [x, y] of DN.TOPI) s.push({ x: X + x - 7, y: Y + y - 7, w: 14, h: 14 });
+                for (const [x, y] of DN.LAMPS) s.push({ x: X + x - 3, y: Y + y - 3, w: 6, h: 6 });
+                const [px, py, pw, ph] = DN.PLINTH; s.push({ x: X + px, y: Y + py, w: pw, h: ph });
+                for (const [x, y] of DN.CARS) s.push({ x: X + x - 48, y: Y + y - 20, w: 96, h: 40 });
+                return s;
+            }
+
+            /** The forecourt's wet ground for the reflections' mask (engine/reflections.js): [x, y, w, h, strength], world.
+             *  The polished terrace mirrors most, the setts and granite less; the lawns not at all. */
+            wetGround() {
+                const X = this.x, Y = this.y;
+                if (this._dnWet && this._dnWet.x === X && this._dnWet.y === Y) return this._dnWet.r;
+                const r = [[10, 320, 780, 165, 0.48], [-10, 486, 820, 104, 0.38], [-10, 590, 820, 50, 0.34], [170, 640, 460, 220, 0.34]].map(([x, y, w, h, k]) => [X + x, Y + y, w, h, k]);
+                return (this._dnWet = { x: X, y: Y, r }).r;
+            }
+
+            /** The ground in front, painted once (phase 'floor', under the puddles and reflections); the cars, the doormen (phase 'top'). No phase draws both. */
+            _dnDrawGround(ctx, phase) {
+                if (phase !== 'top') {
+                    const s = LandmarkKit.sprite(this, 'dn_court', this.x - 10, this.y + 318, 820, 542, 1.5, (c) => this._dnPaintGround(c));
+                    ctx.drawImage(s.cv, s.x, s.y, s.w, s.h);
+                }
+                if (phase === 'floor') return;
+                this._dnCars(ctx);
+                this._dnDoormen(ctx);
+            }
+
+            _dnPaintGround(c) {
+                const X = (x) => this.x + x, Y = (y) => this.y + y, r = seededRandom('dn-court'), C = DN.C;
+                // the terrace along the front: pale marble slabs, a brass line, three steps down
+                for (let y = 320; y < 470; y += 16) for (let x = 10, k = 0; x < 790; x += 24, k++) { c.fillStyle = (k + (y / 16 | 0)) % 2 ? '#8d867b' : '#857e73'; c.fillRect(X(x) + 0.5, Y(y) + 0.5, 23, 15); }
+                c.fillStyle = 'rgba(255, 255, 255, 0.07)'; for (let i = 0; i < 60; i++) c.fillRect(X(10 + r() * 780), Y(322 + r() * 146), 6 + r() * 14, 0.8);
+                c.strokeStyle = C.goldDk; c.lineWidth = 1.2; c.strokeRect(X(14), Y(322), 772, 144);
+                for (let k = 0; k < 3; k++) { c.fillStyle = ['#7b756b', '#716b62', '#68625a'][k]; c.fillRect(X(10), Y(470 + k * 5), 780, 5); c.fillStyle = 'rgba(0, 0, 0, 0.25)'; c.fillRect(X(10), Y(474.4 + k * 5), 780, 0.6); }
+                // the drop-off lane: basalt setts between kerbs
+                c.fillStyle = '#34313a'; c.fillRect(X(-10), Y(486), 820, 104);
+                for (let y = 488; y < 588; y += 6) for (let x = -10 + ((y / 6 | 0) % 2) * 4; x < 810; x += 8) { const v = r(); c.fillStyle = v < 0.33 ? '#3e3a44' : v < 0.66 ? '#38353f' : '#423e48'; c.fillRect(X(x) + 0.5, Y(y) + 0.5, 7, 5); }
+                for (const y of [486, 588]) { c.fillStyle = '#6e675d'; c.fillRect(X(-10), Y(y), 820, 3); c.fillStyle = 'rgba(255, 240, 210, 0.15)'; c.fillRect(X(-10), Y(y), 820, 0.8); }
+                c.strokeStyle = 'rgba(232, 194, 122, 0.25)'; c.setLineDash([12, 10]); c.lineWidth = 1; c.beginPath(); c.moveTo(X(-10), Y(538)); c.lineTo(X(810), Y(538)); c.stroke(); c.setLineDash([]);
+                // the plaza: granite slabs, a marble walk down the middle
+                for (let y = 591; y < 860; y += 30) for (let x = -10; x < 810; x += 30) { const v = r(); c.fillStyle = v < 0.5 ? '#4f4b55' : '#55515b'; c.fillRect(X(x) + 0.6, Y(y) + 0.6, 29, 29); }
+                for (let y = 591; y < 860; y += 20) for (let x = 340; x < 460; x += 30) { c.fillStyle = ((x + y) / 10 | 0) % 2 ? '#7a746b' : '#837d73'; c.fillRect(X(x) + 0.5, Y(y) + 0.5, 29, 19); }
+                c.strokeStyle = C.goldDk; c.lineWidth = 1; c.strokeRect(X(340), Y(591), 120, 270);
+                // the medallion: brass rings, rays, the double crescent inlaid in gold
+                const [mx, my, mr] = DN.MEDAL;
+                c.fillStyle = '#2c2930'; c.beginPath(); c.arc(X(mx), Y(my), mr, 0, Math.PI * 2); c.fill();
+                c.strokeStyle = 'rgba(232, 194, 122, 0.3)'; c.lineWidth = 1; c.beginPath();
+                for (let i = 0; i < 32; i++) { const a = i / 32 * Math.PI * 2; c.moveTo(X(mx) + Math.cos(a) * 34, Y(my) + Math.sin(a) * 34); c.lineTo(X(mx) + Math.cos(a) * (mr - 6), Y(my) + Math.sin(a) * (mr - 6)); }
+                c.stroke();
+                for (const [rr, w] of [[mr, 3], [mr - 6, 1], [32, 1.5]]) { c.strokeStyle = C.goldDk; c.lineWidth = w; c.beginPath(); c.arc(X(mx), Y(my), rr, 0, Math.PI * 2); c.stroke(); }
+                c.fillStyle = C.gold; _dnEmblem(c, X(mx), Y(my), 26);
+                // the lawns either side: a box hedge round them, flowers, a clipped ball or two
+                for (const [x0, x1] of [[-10, 170], [630, 810]]) {
+                    c.fillStyle = '#1f3d22'; c.fillRect(X(x0), Y(640), x1 - x0, 220);
+                    c.fillStyle = '#2f5230'; c.fillRect(X(x0) + 7, Y(647), x1 - x0 - 14, 213);
+                    for (let i = 0; i < 260; i++) { c.fillStyle = r() < 0.5 ? '#3a6338' : 'rgba(10, 30, 14, 0.5)'; c.fillRect(X(x0 + 8 + r() * (x1 - x0 - 16)), Y(648 + r() * 210), 2, 2); }
+                    for (let i = 0; i < 120; i++) { const v = r(); c.fillStyle = v < 0.4 ? '#f2eaf3' : v < 0.75 ? '#c79bff' : '#ff9ccf'; c.beginPath(); c.arc(X(x0 + 12 + r() * (x1 - x0 - 24)), Y(652 + r() * 40), 1.2 + r(), 0, Math.PI * 2); c.fill(); }
+                    for (const [bx, by] of [[x0 + 50, 740], [x1 - 50, 800]]) {
+                        c.fillStyle = 'rgba(0, 0, 0, 0.35)'; c.beginPath(); c.arc(X(bx) + 3, Y(by) + 4, 15, 0, Math.PI * 2); c.fill();
+                        const g = c.createRadialGradient(X(bx) - 4, Y(by) - 4, 2, X(bx), Y(by), 15); g.addColorStop(0, '#4d8650'); g.addColorStop(1, '#173a1e'); c.fillStyle = g; c.beginPath(); c.arc(X(bx), Y(by), 14, 0, Math.PI * 2); c.fill();
+                    }
+                }
+                // wet: puddles holding the sky, a dark sheen
+                for (let i = 0; i < 18; i++) {
+                    const x = 0 + r() * 800, y = 492 + r() * 360;
+                    if (y > 640 && (x < 175 || x > 625)) continue;
+                    const w = 14 + r() * 34, h = 4 + r() * 8;
+                    c.fillStyle = 'rgba(18, 18, 34, 0.32)'; c.beginPath(); c.ellipse(X(x), Y(y), w, h, 0, 0, Math.PI * 2); c.fill();
+                    c.fillStyle = 'rgba(190, 200, 230, 0.12)'; c.beginPath(); c.ellipse(X(x) - w * 0.2, Y(y) - h * 0.2, w * 0.5, h * 0.3, 0, 0, Math.PI * 2); c.fill();
+                }
+                // the lamp posts' footings
+                for (const [x, y] of DN.LAMPS) { c.fillStyle = 'rgba(0, 0, 0, 0.35)'; c.fillRect(X(x) - 4, Y(y) - 3, 10, 10); c.fillStyle = '#26222a'; c.fillRect(X(x) - 5, Y(y) - 5, 10, 10); }
+            }
+
+            /** The black cars waiting in the lane. */
+            _dnCars(ctx) {
+                if (typeof carSprite !== 'function' || typeof VEHICLE_BRANDS === 'undefined' || !VEHICLE_BRANDS.LADY) return;
+                const m = VEHICLE_BRANDS.LADY.models.suv; if (!m) return;
+                const v = this._dnV || (this._dnV = { brand: 'LADY', model: 'suv', visualStyle: VEHICLE_BRANDS.LADY.visualStyle, length: m.length, width: m.width, noHearseCap: !!m.noHearseCap, color: '#050505', glowColor: null });
+                const sp = carSprite(v), P = CAR_ART.PAD;
+                for (const [lx, ly, a] of DN.CARS) {
+                    ctx.save(); ctx.translate(this.x + lx, this.y + ly); ctx.rotate(a);
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'; ctx.beginPath(); ctx.roundRect(-sp.L / 2 - 2, -sp.W / 2 + 2, sp.L + 4, sp.W, 10); ctx.fill();
+                    ctx.drawImage(sp.cv, -sp.L / 2 - P, -sp.W / 2 - P, sp.L + P * 2, sp.W + P * 2);
+                    ctx.restore();
+                }
+            }
+
+            /** The doormen at the canopies, in the house's gold livery; they turn to whoever comes near. */
+            _dnDoormen(ctx) {
+                const cam = typeof game !== 'undefined' ? game.camera : null;
+                if (!cam || Math.hypot(this.x + 400 - cam.x, this.y + 400 - cam.y) > 1500) return;
+                const D = this._dnDM || (this._dnDM = DN.DOORMEN.map(([x, y], i) => ({ x: this.x + x, y: this.y + y, angle: Math.PI / 2, walkPhase: 0, look: ROLE_LOOKS.dn_staff('gold', seededRandom('dn-door' + i)) })));
+                const p = game.player;
+                for (const m of D) {
+                    const near = p && p.visible !== false && Math.hypot(p.x - m.x, p.y - m.y) < 160;
+                    const want = near ? Math.atan2(p.y - m.y, p.x - m.x) : Math.PI / 2;
+                    let da = want - m.angle; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
+                    m.angle += da * 0.08;
+                    m.look.pose = 'concierge';
+                    gaitCommand(m, 0, 0);
+                    if (!decorativeBodyInView(m.x, m.y, m.look)) { tickHiddenDecorativeBody(m, m.look); continue; }
+                    ctx.save(); ctx.translate(m.x, m.y); ctx.rotate(m.angle); drawProceduralHumanoid(ctx, m, { stance: 'idle', ...m.look }); ctx.restore();
+                }
+            }
+
+            drawTop(ctx, worldMinutes) {
+                super.drawTop(ctx, worldMinutes);
+                if (CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera) this._dnPosts(ctx, false);
+            }
+
+            /** The lamp posts: an iron column, a lantern on top, a black banner with the gold emblem on an arm (turned outward). */
+            _dnPosts(ctx, e) {
+                const C = DN.C, fine = _zoomLOD < 2;
+                for (const [lx, ly] of DN.LAMPS) {
+                    const x = this.x + lx, y = this.y + ly, s = lx < 400 ? -1 : 1;
+                    const P = (dx, z) => this._tkP(x + dx, y, z), kL = this._tkK(38);
+                    if (e) { const q = P(0, 38); glowA(ctx, q[0], q[1], 24 * kL, '255, 210, 140', 0.9); continue; }
+                    ctx.lineCap = 'round';
+                    let a = P(0, 0), b2 = P(0, 6); ctx.strokeStyle = C.iron; ctx.lineWidth = 4 * this._tkK(3); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b2[0], b2[1]); ctx.stroke();
+                    a = P(0, 6); b2 = P(0, 34); ctx.lineWidth = 1.8 * this._tkK(20); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b2[0], b2[1]); ctx.stroke();
+                    if (fine) {                                                                    // the arm and its banner
+                        a = P(0, 30); b2 = P(s * 9, 30); ctx.lineWidth = 0.8 * kL; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b2[0], b2[1]); ctx.stroke();
+                        const q = [P(s * 2, 29.5), P(s * 9, 29.5), P(s * 9, 15), P(s * 5.5, 17.5), P(s * 2, 15)];
+                        ctx.fillStyle = '#121016'; ctx.beginPath(); q.forEach(([px, py], i) => i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)); ctx.closePath(); ctx.fill();
+                        ctx.strokeStyle = C.goldDk; ctx.lineWidth = 0.6; ctx.stroke();
+                        const m = P(s * 5.5, 24.5), k = this._tkK(24);
+                        ctx.save(); ctx.translate(m[0], m[1]); ctx.scale(k, k); ctx.fillStyle = C.gold; _dnEmblem(ctx, 0, 0, 2.6); ctx.restore();
+                    }
+                    const g0 = P(0, 34), g1 = P(0, 42), w = 2.6 * kL;                               // the lantern
+                    ctx.fillStyle = '#efe0b0'; ctx.fillRect(Math.min(g0[0], g1[0]) - w, Math.min(g0[1], g1[1]), w * 2, Math.abs(g1[1] - g0[1]) + 0.5);
+                    ctx.strokeStyle = C.iron; ctx.lineWidth = 0.7; ctx.strokeRect(Math.min(g0[0], g1[0]) - w, Math.min(g0[1], g1[1]), w * 2, Math.abs(g1[1] - g0[1]) + 0.5);
+                    const cap = P(0, 44); ctx.fillStyle = C.iron; ctx.beginPath(); ctx.arc(cap[0], cap[1], w * 1.1, 0, Math.PI * 2); ctx.fill();
+                }
+            }
+
+            /** Night: the tiers' light, the lamps, the canopies' and entrance's light on the wet stone and its reflections, the searchlights. */
+            drawEmissive(ctx, dark, beamsOnly) {
+                if (!(CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera)) return;
+                if (!beamsOnly) {
+                    super.drawEmissive(ctx, dark, false);
+                    this._dnGroundGlow(ctx, dark);
+                }
+                this._dnBeams(ctx, dark);
+            }
+
+            _dnGroundGlow(ctx, dark) {
+                if (dark < 0.05) return;
+                const glow = this._tkGlow(dark), X = this.x, Y = this.y, wet = typeof game !== 'undefined' && game.weather && game.weather.isRaining ? 1 : 0.65;
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                // light pooled under the canopies and at the entrance, round the plinth
+                for (const [x0, x1] of DN.CAN) glowA(ctx, X + (x0 + x1) / 2, Y + 380, 120, '255, 200, 130', 0.32 * glow);
+                glowA(ctx, X + 400, Y + 460, 130, '255, 206, 140', 0.38 * glow);
+                glowA(ctx, X + DN.PLINTH[0] + 22, Y + DN.PLINTH[1] + 22, 34, '255, 210, 150', 0.4 * glow);
+                for (const [lx, ly] of DN.LAMPS) glowA(ctx, X + lx, Y + ly, 80, '255, 200, 130', 0.22 * glow);
+                // the reflections in the wet stone, stretched toward the eye
+                ctx.save(); ctx.beginPath(); ctx.rect(X - 10, Y + 330, 820, 530); ctx.clip();
+                for (const [x0, x1] of DN.CAN) this._dnStreak(ctx, X + (x0 + x1) / 2, Y + 392, 30, 34, 0.32 * glow * wet);
+                this._dnStreak(ctx, X + 400, Y + 436, 44, 30, 0.4 * glow * wet);
+                for (const [lx, ly] of DN.LAMPS) this._dnStreak(ctx, X + lx, Y + ly + 4, 26, 22, 0.42 * glow * wet);
+                ctx.restore();
+                ctx.globalAlpha = Math.min(1, glow); this._dnPosts(ctx, true);
+                ctx.restore();
+            }
+            /** A light's reflection on wet ground: a gold streak from under it toward the camera, longer the higher the light, with a ripple. */
+            _dnStreak(ctx, x, y, h, w, a) {
+                if (a < 0.01) return;
+                const cam = game.camera; let dx = cam.x - x, dy = cam.y - y; const D = Math.hypot(dx, dy) || 1; dx /= D; dy /= D;
+                const len = Math.min(D + 40, 70 + h * 3.4), ex = x + dx * len, ey = y + dy * len, nx = -dy, ny = dx, t = _gameTimeSec;
+                const g = ctx.createLinearGradient(x, y, ex, ey);
+                g.addColorStop(0, 'rgba(255, 206, 130, 1)'); g.addColorStop(0.3, 'rgba(255, 190, 110, 0.45)'); g.addColorStop(1, 'rgba(255, 180, 100, 0)');
+                ctx.globalAlpha = Math.min(1, a); ctx.fillStyle = g;
+                const w0 = w * 0.5, w1 = w * 0.8;
+                ctx.beginPath(); ctx.moveTo(x + nx * w0, y + ny * w0); ctx.lineTo(ex + nx * w1, ey + ny * w1); ctx.lineTo(ex - nx * w1, ey - ny * w1); ctx.lineTo(x - nx * w0, y - ny * w0); ctx.closePath(); ctx.fill();
+                if (_zoomLOD >= 1) return;
+                ctx.fillStyle = 'rgba(255, 236, 190, 1)';                                          // glints breaking it up
+                for (let i = 0; i < 7; i++) {
+                    const u = 0.08 + i * 0.12, wob = Math.sin(t * 2.2 + i * 1.9 + x * 0.01) * w * 0.25, px = x + dx * len * u + nx * wob, py = y + dy * len * u + ny * wob;
+                    ctx.globalAlpha = Math.min(1, a * (1 - u) * (0.6 + 0.4 * Math.sin(t * 3.1 + i)));
+                    ctx.beginPath(); ctx.ellipse(px, py, w * 0.22 * (1 - u * 0.5), 1, Math.atan2(ny, nx), 0, Math.PI * 2); ctx.fill();
+                }
+            }
+
+            /** Two gold searchlights from the rotunda's roof, crossing over it. */
+            _dnBeams(ctx, dark) {
+                if (dark < 0.2 || _zoomLOD >= 2) return;
+                const t = _gameTimeSec, a = Math.min(1, (dark - 0.2) / 0.3), z0 = DN.Z.ROT + 4;
+                ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 1;
+                DN.BEAMS.forEach(([lx, ly], i) => {
+                    const ph = i * 2.4, sx = this.x + lx, sy = this.y + ly;
+                    const az = -Math.PI / 2 + (i ? 0.45 : -0.45) + Math.sin(t * 0.2 + ph) * 0.9, elev = 1.02 + 0.16 * Math.sin(t * 0.12 + ph * 1.7);
+                    const C = leanCamHeight(), zTop = C * 0.8, run = (zTop - z0 * TierKit.Z_SCALE) / Math.tan(elev);
+                    const p0 = this._tkP(sx, sy, z0), cam = game.camera, k1 = C / (C - Math.min(zTop, C * 0.86)), ex = sx + Math.cos(az) * run, ey = sy + Math.sin(az) * run;
+                    const p1 = [cam.x + (ex - cam.x) * k1, cam.y + (ey - cam.y) * k1];
+                    const vx = p1[0] - p0[0], vy = p1[1] - p0[1], L = Math.hypot(vx, vy) || 1, nx = -vy / L, ny = vx / L;
+                    const beam = (w0, w1, c0, c1) => {
+                        const gr = ctx.createLinearGradient(p0[0], p0[1], p1[0], p1[1]); gr.addColorStop(0, c0); gr.addColorStop(0.3, c1); gr.addColorStop(1, 'rgba(255, 210, 140, 0)');
+                        ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(p0[0] + nx * w0, p0[1] + ny * w0); ctx.lineTo(p1[0] + nx * w1, p1[1] + ny * w1); ctx.lineTo(p1[0] - nx * w1, p1[1] - ny * w1); ctx.lineTo(p0[0] - nx * w0, p0[1] - ny * w0); ctx.closePath(); ctx.fill();
+                    };
+                    const w1 = Math.max(60, L * 0.13);
+                    beam(6, w1, `rgba(255, 214, 150, ${0.18 * a})`, `rgba(255, 196, 120, ${0.06 * a})`);
+                    beam(2, w1 * 0.3, `rgba(255, 246, 225, ${0.28 * a})`, `rgba(255, 214, 150, ${0.07 * a})`);
+                    glowA(ctx, p0[0], p0[1], 14, '255, 248, 230', 0.9 * a);
+                });
+                ctx.restore();
+            }
+        }
+        TierKit.profile(DoubleNightsBuilding);
+
+        /** The Double Nights Hotel: x, y its corner; it fronts south. */
+        function createDoubleNightsHotel(x, y, config = {}) {
+            const Z = DN.Z, C = DN.C, G = DN.G;
+            const cornice = (z, out = 4, th = 4.5) => ({ z, out, th, top: C.stoneHi, band: [200, 186, 160], lip: C.cream });
+            const stone = (z1) => [{ z: 2.4, out: 1.2, th: 2.4, top: C.stoneLo, band: [120, 108, 94] }, cornice(G, 2.2, 2.6), cornice(z1)];
+            const iron = (z) => ({ z, out: 3.2, th: 1.3, top: '#4a4048', band: [52, 44, 46], lip: 'rgba(232, 194, 122, 0.8)' });
+            const circle = (cx, cy, r, n) => Array.from({ length: n }, (_, i) => [cx + Math.cos(-i * Math.PI * 2 / n) * r, cy + Math.sin(-i * Math.PI * 2 / n) * r]);
+            const [rx0, rx1, ry, rch, rdp] = DN.ROT, [cx, cy, cr] = DN.CROWN;
+            const wing = (id, x0, doorX) => ({ id, rect: [x0, 40, 250, 280], z0: 0, z1: Z.WING, S: 2, fill: C.stone, shade: [40, 30, 24], ledges: stone(Z.WING), roofRes: 1, roof: _dnLeadRoof,
+                paint: (d, l, t, H, L) => _dnFacade(d, l, t, H, L, { seed: 7100 + x0, bay: 26, doors: [doorX], balc: (f, k, i) => f === 33 ? (i % 2 ? 2 : 0) : f === 66 ? 1 : 0 }) });
+            const mansard = (id, on, x0) => ({ id, on, rect: [x0 + 10, 50, 230, 260], z0: Z.WING, z1: Z.MANS, S: 2, fill: C.slate, paint: _dnMansard, shade: [14, 16, 24],
+                ledges: [{ z: Z.MANS, out: 1.5, th: 1.8, top: '#8a8c96', band: [110, 112, 122] }], roofRes: 1, roofGlow: true, roof: _dnZincRoof });
+            const canopy = (id, on, x0, x1, text) => ({ id, on, front: true, solid: false, cx: (x0 + x1) / 2, poly: TierKit.bay(x0, x1, ry, 2, 64, 12), z0: Z.CAN0, z1: Z.CAN1, S: 4, fill: C.lacquer,
+                paint: _dnCanopyArt(text), shade: [10, 8, 14], ledges: [{ z: Z.CAN1, out: 1.2, th: 1.4, top: C.goldDk, band: [154, 122, 62], lip: C.goldHi }],
+                roofRes: 2, roofGlow: true, roof: _dnCanopyRoof, top: _dnCresting });
+            const topiary = (id, lx, ly) => ({ id, solid: false, poly: circle(lx, ly, 7, 8), z0: 0, z1: 7, S: 3, fill: C.lacquer, paint: _dnPot, shade: [10, 8, 14],
+                roof: (c, e, t) => { if (!e) { _dnPath(c, t.poly); c.fillStyle = '#2a1e16'; c.fill(); } }, top: _dnTopiary, rise: 28 });
+            const [px, py, pw, ph] = DN.PLINTH;
+            const b = new DoubleNightsBuilding({
+                id: 'double_nights', x, y, label: 'Double Nights Hotel', type: 'hotel', style: 'double_nights', facing: 'S', hero: DN.HERO, plan: DN.PLAN,
+                roofColor: '#3e4250', roofLightColor: '#5a5f70', wallColor: C.stone, wallLightColor: C.stoneHi, accentColor: '#ffcf8a',
+                windowColor: '#242733', windowLitColor: '#ffd696', windowFrameColor: C.iron, balconies: [], roofProps: [{ type: 'vent', section: 0, x: 20, y: 20, w: 1, h: 1 }],
+                sign: { text: 'Double Nights', color: '#e3c07a', size: 32 },
+                door: { target: config.doorTarget || 'hotel_lobby', label: 'Enter Hotel', lightColor: null },
+                tiers: [
+                    wing('wingW', 20, 170), wing('wingE', 530, 630),
+                    { id: 'core', rect: [270, 0, 260, 320], z0: 0, z1: Z.CORE, S: 2, fill: C.stone, shade: [40, 30, 24], ledges: stone(Z.CORE), roofRes: 1, roof: _dnLeadRoof,
+                      paint: (d, l, t, H, L) => _dnFacade(d, l, t, H, L, { seed: 7207, bay: 26, balc: (f) => f >= 99 ? 1 : 0 }) },
+                    { id: 'rotunda', solid: false, poly: TierKit.bay(rx0, rx1, ry, rch, rdp, 16), z0: 0, z1: Z.ROT, S: 3, fill: C.stone, paint: _dnRotunda, shade: [40, 30, 24],
+                      ledges: [...stone(Z.ROT), iron(37), iron(77), iron(88), iron(99), iron(110), iron(121)], roofRes: 1.5, roof: _dnRotundaRoof },
+                    mansard('mansW', 'wingW', 20), mansard('mansE', 'wingE', 530),
+                    { id: 'attic', on: 'core', rect: [284, 12, 232, 296], z0: Z.CORE, z1: Z.ATTIC, S: 2, fill: C.slate, paint: _dnMansard, shade: [14, 16, 24],
+                      ledges: [{ z: Z.ATTIC, out: 1.5, th: 1.8, top: '#8a8c96', band: [110, 112, 122] }], roofRes: 1, roofGlow: true, roof: _dnPenthouseRoof },
+                    { id: 'crown', on: 'rotunda', poly: circle(cx, cy, cr, 24), z0: Z.ROT, z1: Z.CROWN, S: 3, fill: C.stone, paint: _dnLantern, shade: [40, 30, 24],
+                      ledges: [cornice(Z.CROWN, 2.5, 3)], roofRes: 1.5, roof: _dnCrownRoof, top: _dnDome, rise: Z.DOME + 4 },
+                    canopy('canW', 'wingW', ...DN.CAN[0]), canopy('canE', 'wingE', ...DN.CAN[1]),
+                    { id: 'plinth', solid: false, rect: [px, py, pw, ph], z0: 0, z1: Z.PLINTH, S: 5, fill: '#26222a', paint: _dnPlinthArt, shade: [10, 8, 14],
+                      ledges: [{ z: Z.PLINTH, out: 1.2, th: 1.6, top: '#3a3540', band: [70, 62, 72], lip: C.gold }], roof: (c, e, t) => { if (!e) { _dnPath(c, t.poly); c.fillStyle = '#3a3540'; c.fill(); } } },
+                    ...DN.TOPI.map(([lx, ly], i) => topiary('topi' + i, lx, ly))
+                ],
+                ...config,
+                facing: 'S'   // (a landmark keeps its own front, whatever street it's placed on)
+            });
+            for (const t of b._tkDefs) t.owner = b;                                                          // (the painters find the door and the sign in the building's frame)
+            b.sections.push(..._dnRotundaBands());                                                           // (the rotunda's curve, in bands)
+            // its lights (light only, no fixtures): under the canopies, the entrance, the lamp posts, the plinth, uplights along the front, the terrace
+            for (const [lx, ly, color, r] of [[170, 372, '#ffd9a0', 190], [630, 372, '#ffd9a0', 190], [400, 452, '#ffd08a', 230], [400, 560, '#ffc890', 160],
+                                              ...DN.LAMPS.map(([lx, ly]) => [lx, ly, '#ffcf8a', 150]), [608, 672, '#ffd08a', 80],
+                                              [60, 328, '#ffcf95', 110], [740, 328, '#ffcf95', 110], [400, 730, '#ffc870', 140]]) {
+                const lamp = new LampEntity({ x: b.x + lx, y: b.y + ly, lampType: 3, color, lightRadius: r }); lamp.keepColor = true; lamp.visible = false; b.attachedLights.push(lamp);
+            }
+            b.topReach = 130; b.glowReach = 130;
+            b.viewDrift = true;   // out in front of it, the view drifts toward it (engine/draw.js _landmarkDriftTarget)
+            return b;
+        }

@@ -13,7 +13,7 @@
         const _FW_SHEEN_GROUPS = new Map();   // _drawFaceWindows: sheen alpha -> the windows sharing it (one fill each)
         // How far a landmark's base and roof passes draw past its leaned outline (world px, measured at every
         // angle and zoom, plus a margin): the glow pass's emissiveReach is for the beams alone
-        const SQ_TOP_REACH = 200, DN_TOP_REACH = 190, MC_TOP_REACH = 100;
+        const SQ_TOP_REACH = 200, MC_TOP_REACH = 100;
         // ...and how far the glow pass draws past it without the beams (lamp halos, portico mist, the crown):
         // past this, only the beams can reach the screen (drawEmissive's beamsOnly)
         const SQ_GLOW_REACH = 240, MC_GLOW_REACH = 100;
@@ -198,7 +198,6 @@
             }
             
             _setupDoor(doorConfig) {
-                if (this.style === 'double_nights') { this._dnDoor(doorConfig); return; }   // the door is under the porte-cochère
                 this._doorLightColor = doorConfig.lightColor || null;
                 // On the front wall of the section furthest out on its facing side (the southernmost, facing south)
                 const g = this._frontGeo(), D = 10, L = 100, T = 60;
@@ -307,7 +306,6 @@
              * Draw base layer (under player): shadow, ground floor, entrance.
              */
             drawBase(ctx) {
-                if (this.style === 'double_nights') { this._dnDrawBase(ctx); return; }   // buildings/double-nights.js
                 if (this.style === 'cozy_cafe') { this._ccDrawBase(ctx); return; }   // buildings/cozy-cafe.js
                 ctx.save();
                 
@@ -339,7 +337,6 @@
              * Draw top layer (over player): roof, facades, windows, details.
              */
             drawTop(ctx, worldMinutes = 1260) {
-                if (this.style === 'double_nights' && typeof game !== 'undefined' && game.camera) { this._dnDrawTop(ctx); return; }
                 if (this.style === 'cozy_cafe' && typeof game !== 'undefined' && game.camera) { this._ccDrawTop(ctx); return; }
                 if (CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera) { this._drawLeanTop(ctx); return; }
                 ctx.save();
@@ -405,7 +402,7 @@
              * cantilevered awning two floors up over the door, in that plane (_signAwning).
              */
             _paintSign(ctx) {
-                if (this.style === 'double_nights') { if (typeof game !== 'undefined' && game.camera) this._dnDrawSign(ctx); return; }
+                if (this.style === 'double_nights') return;   // its name is on the rotunda's wall (buildings/double-nights.js)
                 if (this.style === 'moon_city') { if (typeof game !== 'undefined' && game.camera) { this._mcDrawCanopy(ctx, false); this._mcDrawSign(ctx, false); } return; }
                 if (this.variant && this.variant.kind === 'shop' && this._vOn()) { this._vFront(ctx, false); return; }   // awnings, canopy, signboard (street-variants.js)
                 const E = this.attachedSign && this._entrance();
@@ -626,7 +623,6 @@
                 if (this.style === 'silver_queen' && this._sqPortico()) {
                     for (const c of this._sqPortico().cols) shapes.push({ x: c.x - 5, y: c.y - 5, w: 10, h: 10 });
                 }
-                if (this.style === 'double_nights') for (const [x, y] of this._dnGeo().cols) shapes.push({ x: x - 5, y: y - 5, w: 10, h: 10 });   // the canopy's columns
                 return shapes;
             }
         }
@@ -678,9 +674,6 @@
                     }
                     this.roofFeatures = ['stair', ...picked];
                     this.facadeFeature = r(4) < 0.55 ? 'balconies' : 'fire_escape';
-                } else if (this.style === 'double_nights') {
-                    this.floors = DN.FLOORS; this.roofFeatures = []; this.emissiveReach = 950;   // crowns, beams (buildings/double-nights.js)
-                    this.topReach = DN_TOP_REACH;                           // base and roof passes: the canopy and court in front
                 } else if (this.style === 'moon_city') {
                     this.roofFeatures = []; this.facadeFeature = 'moon_city'; this.emissiveReach = 600;   // fins, skylight, searchlights (buildings/moon-city.js)
                     this.topReach = MC_TOP_REACH;                           // base and roof passes: the canopy and sign
@@ -705,7 +698,6 @@
                 const t = this.attachedTransition;
                 const accent = this.colors.accent;
                 if (this.style === 'silver_queen' && t) { this._sqLights(); return; }
-                if (this.style === 'double_nights') { this._dnLights(); return; }
                 if (this.style === 'moon_city') { this._mcLights(); return; }
                 if (this.style === 'cozy_cafe') { this._ccLights(); return; }
                 const E = this._entrance();
@@ -1007,7 +999,6 @@
             drawEmissive(ctx, dark, beamsOnly) {
                 if (this.style === 'cozy_cafe' && typeof game !== 'undefined' && game.camera) { this._ccDrawEmissive(ctx, dark); return; }
                 if (!(CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera)) return;
-                if (this.style === 'double_nights') { this._dnDrawEmissive(ctx, dark); return; }
                 if (beamsOnly) {   // all but the beams is past glowReach, off screen (world-state.js drawEmissivePass)
                     if (this.style === 'silver_queen') { this._sqDark = dark; this._sqDrawBeams(ctx, dark); }
                     if (this.style === 'moon_city') this._mcBeams(ctx, dark);

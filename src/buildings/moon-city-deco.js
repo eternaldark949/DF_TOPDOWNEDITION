@@ -556,6 +556,12 @@
             }
             /** Kept clear of street trees and lamps (engine/map-loading.js): all it draws on the ground, the registry's apron. */
             _mcForecourt() { return { x: this.x, y: this.y + 490, w: 600, h: 194 }; }
+            /** Solid: its walls, and the car waiting in the valet bay. */
+            getCollisionShapes() {
+                const s = super.getCollisionShapes(), [cx, cy] = MCD.CAR;
+                s.push({ x: this.x + cx - 49, y: this.y + cy - 21, w: 98, h: 42 });
+                return s;
+            }
 
             /** The rotunda's outline on screen, from its foot to its top: what hides the canopy's back. */
             _mcdRotHull() { const t = this._tkGeo().tiers.find(q => q.id === 'rotunda'); return t ? this._tkHullOf(t) : null; }
@@ -613,13 +619,22 @@
                 ctx.restore();
             }
 
-            /** The ground in front: the marble plaza, carpet and ropes; the terrace and the valet bay with its car; then the light at the door and the people. */
-            _mcDrawGround(ctx) {
+            /** The forecourt's wet ground for the reflections' mask (engine/reflections.js): the black marble plaza, the terrace. */
+            wetGround() {
+                const Q = this._mcGeo().court;
+                return [[Q.x, Q.y, Q.w, Q.h, 0.6], [this.x + 284, this.y + 300, 316, 404, 0.4]];
+            }
+
+            /** The ground in front: the marble plaza, carpet and ropes; the terrace and the valet bay (phase 'floor'); then its car, the light at the door and the people (phase 'top'). No phase draws both. */
+            _mcDrawGround(ctx, phase) {
                 const X = this.x, Y = this.y, G = this._mcGeo(), Q = G.court;
-                const s1 = LandmarkKit.sprite(this, 'mcd_plaza', Q.x - 10, Q.y, Q.w + 20, Q.h + 6, 2, (c) => this._mcdPaintPlaza(c));
-                ctx.drawImage(s1.cv, s1.x, s1.y, s1.w, s1.h);
-                const s2 = LandmarkKit.sprite(this, 'mcd_east', X + 284, Y + 300, 316, 404, 1.5, (c) => this._mcdPaintEast(c));
-                ctx.drawImage(s2.cv, s2.x, s2.y, s2.w, s2.h);
+                if (phase !== 'top') {                                    // the paving: under the puddles and reflections
+                    const s1 = LandmarkKit.sprite(this, 'mcd_plaza', Q.x - 10, Q.y, Q.w + 20, Q.h + 6, 2, (c) => this._mcdPaintPlaza(c));
+                    ctx.drawImage(s1.cv, s1.x, s1.y, s1.w, s1.h);
+                    const s2 = LandmarkKit.sprite(this, 'mcd_east', X + 284, Y + 300, 316, 404, 1.5, (c) => this._mcdPaintEast(c));
+                    ctx.drawImage(s2.cv, s2.x, s2.y, s2.w, s2.h);
+                }
+                if (phase === 'floor') return;
                 this._mcdCar(ctx);
                 const dark = typeof game !== 'undefined' && game.getAmbientDarkness ? game.getAmbientDarkness() : 0.6;
                 const night = typeof game !== 'undefined' && game.dayCycle ? game.dayCycle().lampsOn : dark > 0.4;

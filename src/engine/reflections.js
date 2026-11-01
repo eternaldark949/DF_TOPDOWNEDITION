@@ -40,6 +40,10 @@
             BANDS: 30,              // shimmer bands in the composite (High)
             PUDDLE_SCALE: 1.25,      // a little broader, without increasing the number of puddles
             FEATHER_SCALE: 1.08,     // a narrow damp fringe outside the water's original contour
+            STREAK: 0.62,           // a tiered building's mirrored windows: how bright the nearest copy of the streak
+            STREAK_STEP: 7,         // and how far apart the copies fall, world px (growing down the streak)
+            STREAK_COPIES: 9,       // how many copies make the streak
+            STREAK_REACH: 420,      // how far below a tiered building's foot its mirror and streaks can reach, world px
             ULTRA_REPAINT_MS: 45     // Ultra: how often a reflected body or car repaints its art (every 3rd frame at 60 FPS); Stella's is every frame
         };
 
@@ -359,8 +363,21 @@
                     if (p.poly) { mc.beginPath(); Poly.trace(mc, p.poly); mc.fill(); } else mc.fillRect(p.x, p.y, p.w, p.h);
                     if (wetBox) wetBox.push(p.x, p.y, p.x + p.w, p.y + p.h);
                 }
+                // the landmarks' forecourts: their paving is the building's, not a pavement (buildings: wetGround())
+                let courts = false;
                 mc.globalAlpha = 1;
-                let any = !!net || !!(wet >= 0.02 && this.activeMap.pavements && this.activeMap.pavements.length);
+                if (wet >= 0.02) for (const entry of this._queryRenderBuildings({ left: v.x - hw, right: v.x + hw, top: v.y - hh, bottom: v.y + hh },
+                    this._effectCandidateBuffer('wetCourts'))) {
+                    const b = entry.item;
+                    if (!b.wetGround) continue;
+                    for (const [x, y, w, h, k] of b.wetGround()) {
+                        if (x > v.x + hw || x + w < v.x - hw || y > v.y + hh || y + h < v.y - hh) continue;
+                        mc.fillStyle = `rgba(255,255,255,${(k * Math.min(1, wet * 1.3)).toFixed(3)})`; mc.fillRect(x, y, w, h); courts = true;   // (flat: polished stone, not asphalt's glints)
+                        if (wetBox) wetBox.push(x, y, x + w, y + h);
+                    }
+                }
+                mc.globalAlpha = 1;
+                let any = !!net || courts || !!(wet >= 0.02 && this.activeMap.pavements && this.activeMap.pavements.length);
                 if (surf) {                                                    // polished floors and water
                     any = true;
                     for (const [x, y, w, h, k] of surf.rects) {
@@ -402,6 +419,8 @@
                 // meets the street (foreshortened), billboards about their front edge
                 const dark = this.getAmbientDarkness();
                 if (night > 0.01 && (q === 'high' || q === 'ultra') && CONFIG.BUILDINGS.LEAN) {
+                    const tiered = this._reflTiered || (this._reflTiered = []);
+                    tiered.length = 0;
                     const reflectedBuildings = this._queryRenderBuildings({ left: v.x - hw, right: v.x + hw,
                         top: v.y - hh - 40, bottom: v.y + hh + 260 }, this._effectCandidateBuffer('reflectedBuildings'));
                     for (const entry of reflectedBuildings) {
@@ -409,6 +428,7 @@
                         if (!b.isV2 || !b.drawEmissive) continue;
                         const gy = b.y + b.h;
                         if (gy < v.y - hh - 40 || gy > v.y + hh + 260 || b.x > v.x + hw || b.x + b.w < v.x - hw) continue;
+                        if (b.drawReflection) { tiered.push(b); continue; }      // (the tiered buildings: below, after the softening)
                         rc.save(); rc.globalCompositeOperation = 'lighter';
                         rc.translate(0, gy); rc.scale(1, -0.75); rc.translate(0, -gy);
                         try { b.drawEmissive(rc, dark); } catch (e) { /* a facade that can't mirror is left out */ }
@@ -425,6 +445,7 @@
                     rc.globalCompositeOperation = 'destination-out'; rc.globalAlpha = 0.55;
                     rc.setTransform(1, 0, 0, 1, 0, 0); rc.fillRect(0, 0, rw, rh); toView(rc);
                     rc.globalAlpha = 1; rc.globalCompositeOperation = 'lighter';
+                    if (tiered.length) this._reflTieredStreaks(tiered, dark, rc, rw, rh, s, z, toView, v, W, H);
                 }
                 const rs = this.roomSystem;
                 if (night > 0.01) {
@@ -546,6 +567,36 @@
                 this._refl = { R, D, Dr, Drs, q, wet };
             },
 
+
+            /** The tiered buildings' lit windows in the wet ground (buildings/tiered-kit.js drawReflection): each tier mirrored
+             *  about its own front into a scratch layer, then laid into the reflections smeared straight down the screen, the
+             *  way a window's light runs in long streaks down wet stone. The copies fade as they fall, and shiver a little. */
+            _reflTieredStreaks(list, dark, rc, rw, rh, s, z, toView, v, W, H) {
+                // only the screen box the buildings and their streaks can cover is cleared and laid in
+                const k = z * s, step = REFLECT.STREAK_STEP * k, n = REFLECT.STREAK_COPIES, fall = Math.ceil(step * (n - 1) * 2) + 2;
+                let x0 = rw, y0 = rh, x1 = 0, y1 = 0;
+                for (const b of list) {
+                    x0 = Math.min(x0, (b.x - 40 - v.x) * k + W * s / 2); x1 = Math.max(x1, (b.x + b.w + 40 - v.x) * k + W * s / 2);
+                    y0 = Math.min(y0, (b.y - v.y) * k + H * s / 2); y1 = Math.max(y1, (b.y + b.h + REFLECT.STREAK_REACH - v.y) * k + H * s / 2);
+                }
+                x0 = Math.max(0, Math.floor(x0)); y0 = Math.max(0, Math.floor(y0)); x1 = Math.min(rw, Math.ceil(x1)); y1 = Math.min(rh, Math.ceil(y1));
+                if (x1 <= x0 || y1 <= y0) return;
+                const T = this._reflTierCv || (this._reflTierCv = document.createElement('canvas'));
+                if (T.width !== rw || T.height !== rh) { T.width = rw; T.height = rh; }
+                const tc = T.getContext('2d');
+                tc.setTransform(1, 0, 0, 1, 0, 0); tc.clearRect(x0, y0, x1 - x0, y1 - y0); toView(tc);
+                for (const b of list) { try { b.drawReflection(tc, dark); } catch (e) { /* a facade that can't mirror is left out */ } }
+                rc.save(); rc.setTransform(1, 0, 0, 1, 0, 0); rc.globalCompositeOperation = 'lighter';
+                const t = _gameTimeSec, w = x1 - x0;
+                for (let i = 0; i < n; i++) {
+                    const f = i / (n - 1), dy = Math.round(step * i * (1 + f)), dx = i ? Math.sin(t * 2.3 + i * 1.9) * 0.6 * f * k : 0;
+                    const h = Math.min(y1 - y0, rh - y0 - dy);
+                    if (h <= 0) break;
+                    rc.globalAlpha = REFLECT.STREAK * Math.pow(1 - f, 1.6) * (i ? 1 : 1.25);
+                    rc.drawImage(T, x0, y0, w, h, x0 + dx, y0 + dy, w, h);
+                }
+                rc.restore();
+            },
 
             /** Ultra uses the actual visible cast, including indoor guests and scene actors. */
             _ultraReflectionMovers(near) {

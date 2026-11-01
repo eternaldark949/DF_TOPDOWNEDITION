@@ -18,32 +18,7 @@
             });
         }
 
-        /**
-         * Double Nights Hotel: twin crescent towers round a glass atrium (buildings/double-nights.js).
-         * The sections are collision/shadow bands; the building draws its own curves.
-         */
-        function createDoubleNightsHotel(x, y, config = {}) {
-            return new BuildingV2({
-                id: 'double_nights',
-                x: x,
-                y: y,
-                label: 'Double Nights Hotel',
-                type: 'hotel',
-                style: 'double_nights',
-                floors: 14,
-                sections: doubleNightsSections(),
-                roofColor: '#1a0c14', roofLightColor: '#2a1320', wallColor: '#0e070c', wallLightColor: '#2b1422',
-                accentColor: '#ffcf8a', windowColor: '#140a14', windowLitColor: '#ffd696', windowFrameColor: '#1a0f0a', balconyColor: '#2a1018',
-                roofProps: [{ type: 'none' }],
-                sign: { text: 'Double Nights', color: '#ff1a55', size: 32 },
-                door: {
-                    target: config.doorTarget || 'hotel_lobby',
-                    label: 'Enter Hotel',
-                    lightColor: '#ffdf80'
-                },
-                ...config
-            });
-        }
+        // (the Double Nights Hotel's factory is in buildings/double-nights.js, on the tiered kit)
 
         /**
          * Factory function to create Moon City Nightclub.
