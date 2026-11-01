@@ -572,7 +572,7 @@
         });
         
         BuildingV2Registry.register('warehouse', {
-            factory: createGenericWarehouse,
+            factory: createWarehouseHall,                  // on the tiered kit: buildings/warehouse-hall.js (the city view keeps the stock one)
             sections: [
                 { x: 0, y: 0, w: 500, h: 400 }
             ],

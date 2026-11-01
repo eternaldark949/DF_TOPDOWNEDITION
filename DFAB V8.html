@@ -40744,60 +40744,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
         function createDrYinsClinic(x, y, config = {}) {
-            return new BuildingV2({
-                id: 'dr_yins',
-                x: x,
-                y: y,
-                label: "Dr. Yin's",
-                type: 'clinic',
-                floors: 5,
-                
-                // L-shape: main ward + treatment wing extending east
-                sections: [
-                    { x: 0, y: 0, w: 250, h: 400 },       // Main ward (tall, west)
-                    { x: 250, y: 150, w: 250, h: 250 },    // Treatment wing (east, offset south)
-                ],
-                
-                // Clean medical windows
-                windowWidth: 12,
-                windowHeight: 16,
-                windowSpacingX: 30,
-                windowSpacingY: 26,
-                windowMarginX: 18,
-                windowMarginY: 14,
-                
-                // Colors - dark teal/cyan medical theme
-                roofColor: '#142828',           // Teal roof
-                roofLightColor: '#1a3434',      // Slightly lighter teal
-                wallColor: '#142222',           // Very dark teal walls
-                wallLightColor: '#182c2c',      // Dark teal
-                accentColor: '#00f3ff',         // Medical cyan accent
-                windowColor: '#04100f',         // Dark tinted glass
-                windowLitColor: '#00f3ff',      // Cyan glow (medical equipment)
-                windowFrameColor: '#060e0e',    // Dark teal frames
-                balconyColor: '#0a1a1a',        // Teal railings
-                
-                // Entrance overhang on main ward
-                balconies: [
-                    { section: 0, side: 'south', startX: 50, width: 150, floors: [1] },
-                ],
-                
-                roofProps: [
-                    { type: 'ac_unit', section: 0, x: 20, y: 20, w: 50, h: 35 },
-                    { type: 'ac_unit', section: 1, x: 170, y: 20, w: 50, h: 35 },
-                    { type: 'vent', section: 0, x: 180, y: 340, w: 30, h: 25 },
-                    { type: 'water_tank', section: 1, x: 125, y: 200, r: 25 },
-                ],
-                
-                sign: { text: 'CLINIC', color: '#00f3ff', size: 28 },
-                door: {
-                    target: config.doorTarget || 'medbay_sw',
-                    label: 'Enter Clinic',
-                    lightColor: '#00f3ff'
-                },
-                
-                ...config
-            });
+            return createDrYins(x, y, config);           // on the tiered kit: buildings/dr-yins.js
         }
 
         /* =====================================================================
@@ -41746,7 +41693,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         });
         
         BuildingV2Registry.register('warehouse', {
-            factory: createGenericWarehouse,
+            factory: createWarehouseHall,                  // on the tiered kit: buildings/warehouse-hall.js (the city view keeps the stock one)
             sections: [
                 { x: 0, y: 0, w: 500, h: 400 }
             ],
@@ -42443,6 +42390,330 @@ class NeuralSystemsBuilding extends BuildingV2 {
                       ledges: [eave(T.HALL, T.amber)], roofRes: 1, roofGlow: true, roof: _tqHallRoof },
                     { id: 'wing', rect: [500, 50, 200, 300], z0: 0, z1: T.WING, S: 2, fill: T.wall, paint: _tqWing, shade: [10, 10, 14],
                       ledges: [eave(T.WING, T.roseGold)], roofRes: 1, roofGlow: true, roof: _tqWingRoof }
+                ],
+                ...config
+            });
+        }
+        /* =====================================================================
+           DR. YIN'S — the clinic on the hub's south-west corner
+           ---------------------------------------------------------------------
+           Built on the tiered kit (buildings/tiered-kit.js), in the clinic's dark
+           teal and medical cyan:
+             · the ward, the tall west block: dark teal spandrels with a cyan LED
+               line in each, ribbon windows behind slim fins, lit cool white
+               after dark; the glass lobby on the street with the sliding doors
+               under DR. YIN'S CLINIC in cyan, a glass canopy over the door; on
+               its roof the medical cross, lit cyan at night, and the plant;
+             · the treatment wing, lower, east: frosted glass panels (lit soft
+               cyan), the pharmacy's window and its cross on the street, and the
+               healing garden on its roof (a deck, raked gravel, bamboo).
+           Collision is the ward and the wing (the old sections); the canopy
+           overhangs. Lights are the stock ones, in the clinic's cyan.
+           ===================================================================== */
+        const YIN = { teal: '#1c3434', tealLo: '#0e1c1c', tealHi: '#2a4a4a', fin: '#0b1616', glass: '#0a1a1c', cyan: '#00f3ff', cyanSoft: '#7affd8',
+            frost: '#5f8a88', frostHi: '#86b0ad', ink: '#061010', W: 500, D: 400, WARD: 54, WING: 30, LOBBY: 14 };
+        const _yinFront = (t) => t.mitre.find(e => e && !e.hidden && e.ny > 0.99);
+
+        /** Cyan letters on the strip (and lit on the light layer) */
+        function _yinText(d, l, s, x, y, px, col, spacing) {
+            for (const [c, cc] of [[d, col], [l, YIN.cyan]]) {
+                c.save(); c.font = `600 ${px}px Montserrat, Helvetica, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = cc;
+                if (spacing && 'letterSpacing' in c) c.letterSpacing = spacing + 'px';
+                c.fillText(s, x, y); c.restore();
+            }
+        }
+
+        /** The ward: ribbon windows over cyan-lined spandrels between slim fins; the glass lobby on the street front */
+        function _yinWard(d, l, t, H, L) {
+            const Y = YIN, lobby = Y.LOBBY, top = 4, rows = 4, rh = (H - lobby - 3 - top) / rows;
+            const g = d.createLinearGradient(0, 0, 0, H); g.addColorStop(0, Y.teal); g.addColorStop(1, Y.tealLo); d.fillStyle = g; d.fillRect(0, 0, L, H);
+            d.fillStyle = Y.tealHi; d.fillRect(0, 0, L, 2.6); d.fillStyle = 'rgba(255,255,255,.12)'; d.fillRect(0, 0, L, 0.5);
+            d.fillStyle = Y.cyan; d.fillRect(0, 3, L, 0.4); l.fillStyle = Y.cyan; l.fillRect(0, 2.9, L, 0.6);
+            const front = _yinFront(t);
+            for (const e of t.mitre) {
+                if (!e || e.hidden) continue;
+                const x0 = e.u0 + 3, x1 = e.u0 + e.L - 3;
+                for (let r = 0; r < rows; r++) {                                                   // the ribbon windows
+                    const y0 = top + r * rh + 2, y1 = top + (r + 1) * rh - 1.6;
+                    d.fillStyle = Y.glass; d.fillRect(x0, y0, x1 - x0, y1 - y0);
+                    d.fillStyle = 'rgba(160,220,230,.14)'; d.fillRect(x0, y0, x1 - x0, (y1 - y0) * 0.35);
+                    d.fillStyle = 'rgba(0,243,255,.05)'; d.fillRect(x0, y0, x1 - x0, y1 - y0);
+                    for (let x = x0, k = 0; x < x1; x += 10, k++) {
+                        const w = Math.min(10, x1 - x), on = ((k * 7 + r * 3 + Math.round(e.u0)) % 9);
+                        if (on < 6) { l.fillStyle = on < 4 ? 'rgba(222,250,255,.8)' : 'rgba(0,243,255,.55)'; l.fillRect(x, y0, w, y1 - y0); }
+                        d.fillStyle = Y.fin; d.fillRect(x - 0.3, y0, 0.6, y1 - y0);
+                    }
+                    d.fillStyle = Y.cyan; d.globalAlpha = 0.5; d.fillRect(x0, y1 + 0.6, x1 - x0, 0.3); d.globalAlpha = 1;   // the spandrel's LED line
+                    l.fillStyle = 'rgba(0,243,255,.8)'; l.fillRect(x0, y1 + 0.5, x1 - x0, 0.5);
+                }
+                for (let x = e.u0 + 12.5; x < e.u0 + e.L - 2; x += 25) { d.fillStyle = Y.fin; d.fillRect(x - 0.7, top, 1.4, H - lobby - 3 - top); d.fillStyle = 'rgba(122,255,216,.15)'; d.fillRect(x - 0.7, top, 0.3, H - lobby - 3 - top); }
+                // the ground floor: the lobby's glass on the street front, dark panels and a few windows round the rest
+                const gy = H - lobby;
+                if (e === front) {
+                    d.fillStyle = '#081416'; d.fillRect(e.u0, gy - 3, e.L, 3);                         // the fascia
+                    _yinText(d, l, "DR. YIN'S CLINIC", e.u0 + e.L / 2, gy - 1.4, 2.4, '#5fe6ee', 0.6);
+                    d.fillStyle = '#0f2a2e'; d.fillRect(e.u0 + 2, gy, e.L - 4, lobby - 1);
+                    d.fillStyle = 'rgba(180,240,245,.12)'; d.beginPath(); d.moveTo(e.u0 + 20, gy); d.lineTo(e.u0 + 44, gy); d.lineTo(e.u0 + 30, H - 1); d.lineTo(e.u0 + 6, H - 1); d.closePath(); d.fill();
+                    const lg = l.createLinearGradient(0, gy, 0, H); lg.addColorStop(0, 'rgba(200,250,255,.55)'); lg.addColorStop(1, 'rgba(230,255,255,.85)'); l.fillStyle = lg; l.fillRect(e.u0 + 2, gy, e.L - 4, lobby - 1);
+                    const dc = e.u0 + 125;                                                              // the sliding doors
+                    d.fillStyle = '#c8d6d8'; d.fillRect(dc - 11, gy + 1, 22, 0.6); d.fillRect(dc - 0.3, gy + 1, 0.6, lobby - 2);
+                    d.fillStyle = 'rgba(0,243,255,.6)'; d.fillRect(dc - 11, gy + 0.4, 22, 0.4);
+                    d.fillStyle = '#8fb6b8'; l.fillStyle = '#000';
+                    for (let x = e.u0 + 2; x < e.u0 + e.L - 2; x += 12) { if (Math.abs(x - dc) < 12) continue; d.fillRect(x - 0.3, gy, 0.6, lobby - 1); l.fillRect(x - 0.3, gy, 0.6, lobby - 1); }
+                    d.fillStyle = 'rgba(20,40,40,.8)'; for (const px of [dc - 40, dc + 40]) { d.fillRect(px - 5, H - 4, 10, 3); }   // the waiting room's benches
+                } else {
+                    d.fillStyle = '#132626'; d.fillRect(e.u0, gy - 3, e.L, lobby + 3);
+                    for (let x = e.u0 + 15; x < e.u0 + e.L - 10; x += 30) { d.fillStyle = Y.glass; d.fillRect(x, gy + 2, 12, 7); if ((x | 0) % 3) { l.fillStyle = 'rgba(222,250,255,.6)'; l.fillRect(x, gy + 2, 12, 7); } }
+                }
+                d.fillStyle = '#081010'; d.fillRect(e.u0, H - 1, e.L, 1);
+            }
+        }
+
+        /** The treatment wing: frosted glass panels in a grid (lit soft cyan), the pharmacy's window and cross on the street */
+        function _yinWing(d, l, t, H, L) {
+            const Y = YIN, front = _yinFront(t), gy = H - Y.LOBBY;
+            d.fillStyle = Y.tealLo; d.fillRect(0, 0, L, H);
+            d.fillStyle = 'rgba(200,240,240,.35)'; d.fillRect(0, 0, L, 2.2);                     // the garden's glass balustrade
+            d.fillStyle = Y.tealHi; d.fillRect(0, 2.2, L, 1.4);
+            for (const e of t.mitre) {
+                if (!e || e.hidden) continue;
+                const pw = 9, n = Math.floor(e.L / pw), x0 = e.u0 + (e.L - n * pw) / 2;
+                for (let i = 0; i < n; i++) for (let y = 4.6; y + 6 <= (e === front ? gy - 1 : H - 2); y += 6.4) {
+                    const x = x0 + i * pw, k = (i * 5 + Math.round(y) * 3 + Math.round(e.u0)) % 7;
+                    d.fillStyle = k === 0 ? Y.glass : Y.frost; d.fillRect(x + 0.4, y, pw - 0.8, 5.8);
+                    if (k) { d.fillStyle = 'rgba(255,255,255,.08)'; d.fillRect(x + 0.4, y, pw - 0.8, 2); }
+                    l.fillStyle = k === 0 ? 'rgba(222,250,255,.7)' : 'rgba(122,255,216,.32)'; l.fillRect(x + 0.4, y, pw - 0.8, 5.8);
+                }
+                if (e !== front) continue;
+                d.fillStyle = '#081416'; d.fillRect(e.u0, gy - 1, e.L, 1.4);
+                d.fillStyle = '#0f2a2e'; d.fillRect(e.u0 + 6, gy + 1, e.L - 12, Y.LOBBY - 2);        // the pharmacy's window
+                l.fillStyle = 'rgba(210,255,250,.7)'; l.fillRect(e.u0 + 6, gy + 1, e.L - 12, Y.LOBBY - 2);
+                d.fillStyle = '#8fb6b8'; l.fillStyle = '#000'; for (let x = e.u0 + 6; x <= e.u0 + e.L - 6; x += 16) { d.fillRect(x - 0.3, gy + 1, 0.6, Y.LOBBY - 2); l.fillRect(x - 0.3, gy + 1, 0.6, Y.LOBBY - 2); }
+                const cx = e.u0 + e.L - 30, cy = gy - 6;                                                // the pharmacy's cross over it
+                for (const [c, col] of [[d, '#2fd6a8'], [l, '#7affd8']]) { c.fillStyle = col; c.fillRect(cx - 1.4, cy - 4, 2.8, 8); c.fillRect(cx - 4, cy - 1.4, 8, 2.8); }
+                _yinText(d, l, 'P H A R M A C Y', e.u0 + 70, gy - 6, 2.6, '#5fe6ee', 0.4);
+            }
+        }
+
+        /** The canopy's edge: a thin glass slab with a cyan lip */
+        function _yinCanopy(d, l, t, H, L) {
+            d.fillStyle = '#2a4a4e'; d.fillRect(0, 0, L, H); d.fillStyle = 'rgba(200,250,255,.5)'; d.fillRect(0, 0, L, 0.4);
+            d.fillStyle = YIN.cyan; d.fillRect(0, H - 0.5, L, 0.5); l.fillStyle = YIN.cyan; l.fillRect(0, 0, L, H);
+        }
+
+        // ── roofs (world coordinates; x, y the building's corner) ──
+
+        function _yinWardRoof(c, glow, t) {
+            const [x, y] = t.box, Y = YIN, cx = x + 125, cy = y + 210;
+                        if (glow) { c.fillStyle = 'rgba(0,243,255,.5)'; c.fillRect(cx - 10, cy - 32, 20, 64); c.fillRect(cx - 32, cy - 10, 64, 20); c.strokeStyle = Y.cyan; c.lineWidth = 2; c.strokeRect(x + 6, y + 6, 238, 388); return; }
+            c.fillStyle = '#1a2c2c'; c.fillRect(x, y, 250, 400);
+            c.strokeStyle = 'rgba(0,0,0,.25)'; c.lineWidth = 1; c.beginPath(); for (let xx = x + 20; xx < x + 250; xx += 20) { c.moveTo(xx, y + 8); c.lineTo(xx, y + 392); } c.stroke();
+            c.strokeStyle = Y.tealHi; c.lineWidth = 8; c.strokeRect(x + 4, y + 4, 242, 392);
+            c.strokeStyle = 'rgba(0,243,255,.5)'; c.lineWidth = 1; c.strokeRect(x + 9, y + 9, 232, 382);
+            c.fillStyle = '#cfe4e4'; c.fillRect(cx - 12, cy - 34, 24, 68); c.fillRect(cx - 34, cy - 12, 68, 24);
+            c.fillStyle = '#0f9aa6'; c.fillRect(cx - 10, cy - 32, 20, 64); c.fillRect(cx - 32, cy - 10, 64, 20);
+            for (const [px, py, w, h] of [[x + 24, y + 24, 56, 38], [x + 170, y + 24, 50, 34], [x + 24, y + 320, 40, 40]]) {   // the plant
+                c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(px + 4, py + 4, w, h);
+                c.fillStyle = '#9aa6a6'; c.fillRect(px, py, w, h); c.strokeStyle = '#5a6666'; c.lineWidth = 1; c.strokeRect(px + 0.5, py + 0.5, w - 1, h - 1);
+                c.fillStyle = '#4a5656'; c.beginPath(); c.arc(px + w / 2, py + h / 2, Math.min(w, h) * 0.32, 0, Math.PI * 2); c.fill();
+                c.strokeStyle = '#2a3434'; c.beginPath(); for (let k = 0; k < 4; k++) { const a = k * Math.PI / 4; c.moveTo(px + w / 2 - Math.cos(a) * h * 0.3, py + h / 2 - Math.sin(a) * h * 0.3); c.lineTo(px + w / 2 + Math.cos(a) * h * 0.3, py + h / 2 + Math.sin(a) * h * 0.3); } c.stroke();
+            }
+        }
+
+        /** The healing garden: a timber deck, raked gravel round stones, bamboo, benches, path lights (emissive) */
+        function _yinGardenRoof(c, glow, t) {
+            const [x, y] = t.box, Y = YIN;
+            const lights = [[x + 30, y + 30], [x + 220, y + 30], [x + 30, y + 220], [x + 220, y + 220], [x + 125, y + 125]];
+            if (glow) { for (const [px, py] of lights) { const g = c.createRadialGradient(px, py, 0, px, py, 14); g.addColorStop(0, 'rgba(200,255,240,.8)'); g.addColorStop(1, 'rgba(122,255,216,0)'); c.fillStyle = g; c.fillRect(px - 14, py - 14, 28, 28); } return; }
+            c.fillStyle = '#2a3a34'; c.fillRect(x, y, 250, 250);
+            c.fillStyle = '#7a5a40'; c.fillRect(x + 10, y + 10, 230, 60);                           // the deck
+            c.strokeStyle = 'rgba(40,24,12,.35)'; c.lineWidth = 0.8; c.beginPath(); for (let xx = x + 16; xx < x + 240; xx += 6) { c.moveTo(xx, y + 10); c.lineTo(xx, y + 70); } c.stroke();
+            c.fillStyle = '#9e9a8e'; c.fillRect(x + 10, y + 80, 230, 160);                          // the gravel, raked round its stones
+            c.strokeStyle = 'rgba(70,66,56,.45)'; c.lineWidth = 0.8;
+            for (let yy = y + 86; yy < y + 236; yy += 5) { c.beginPath(); c.moveTo(x + 12, yy); c.lineTo(x + 238, yy); c.stroke(); }
+            for (const [sx, sy, r] of [[x + 90, y + 140, 14], [x + 170, y + 190, 10], [x + 60, y + 205, 8]]) {
+                c.fillStyle = '#9e9a8e'; c.beginPath(); c.arc(sx, sy, r * 2.4, 0, Math.PI * 2); c.fill();
+                for (let k = 1; k <= 3; k++) { c.beginPath(); c.arc(sx, sy, r + k * 4, 0, Math.PI * 2); c.stroke(); }
+                c.fillStyle = '#5a5c58'; c.beginPath(); c.ellipse(sx, sy, r, r * 0.8, 0.4, 0, Math.PI * 2); c.fill(); c.fillStyle = 'rgba(255,255,255,.15)'; c.beginPath(); c.ellipse(sx - r * 0.3, sy - r * 0.3, r * 0.4, r * 0.3, 0.4, 0, Math.PI * 2); c.fill();
+            }
+            for (const [bx, by] of [[x + 225, y + 95], [x + 225, y + 130], [x + 25, y + 95]]) for (let k = 0; k < 9; k++) {   // the bamboo
+                c.fillStyle = k % 2 ? '#4f8a46' : '#77a25d'; c.beginPath(); c.arc(bx + Math.cos(k * 2.4) * 6, by + Math.sin(k * 2.4) * 6, 4, 0, Math.PI * 2); c.fill();
+            }
+            c.fillStyle = '#5a4030'; for (const bx of [x + 60, x + 150]) c.fillRect(bx, y + 30, 40, 9);   // benches on the deck
+            for (const [px, py] of lights) { c.fillStyle = '#2a3434'; c.beginPath(); c.arc(px, py, 2.5, 0, Math.PI * 2); c.fill(); }
+            c.strokeStyle = 'rgba(200,240,240,.6)'; c.lineWidth = 3; c.strokeRect(x + 2.5, y + 2.5, 245, 245);   // the glass balustrade
+        }
+
+        function _yinCanopyRoof(c, glow, t) {
+            const [x0, y0, x1, y1] = t.box;
+            if (glow) { c.strokeStyle = 'rgba(0,243,255,.8)'; c.lineWidth = 2; c.strokeRect(x0 + 1, y0 + 1, x1 - x0 - 2, y1 - y0 - 2); return; }
+            c.fillStyle = 'rgba(58,106,112,.85)'; c.fillRect(x0, y0, x1 - x0, y1 - y0);
+            c.strokeStyle = 'rgba(200,250,255,.35)'; c.lineWidth = 0.8; c.beginPath(); for (let x = x0 + 13; x < x1; x += 13) { c.moveTo(x, y0); c.lineTo(x, y1); } c.stroke();
+            c.strokeStyle = YIN.cyan; c.lineWidth = 1; c.strokeRect(x0 + 0.5, y0 + 0.5, x1 - x0 - 1, y1 - y0 - 1);
+        }
+
+        class DrYinsBuilding extends TieredBuilding {
+            _setupSign() { this.attachedSign = null; }                  // the name is on the lobby's fascia, the cross on the roof
+        }
+        TierKit.profile(DrYinsBuilding);
+
+        /** Dr. Yin's: x, y its corner; the ward (west) and the treatment wing (east) front south. */
+        function createDrYins(x, y, config = {}) {
+            const Y = YIN, ledge = (z, lip) => ({ z, out: 2.4, th: 2.4, top: Y.tealHi, band: [24, 44, 44], lip });
+            return new DrYinsBuilding({
+                id: 'dr_yins', x, y, label: "Dr. Yin's", type: 'clinic', facing: 'S', hero: 1.5, plan: { W: Y.W, D: Y.D },
+                roofColor: '#142828', roofLightColor: '#1a3434', wallColor: Y.teal, wallLightColor: Y.tealHi, accentColor: Y.cyan,
+                windowColor: '#04100f', windowLitColor: Y.cyan, windowFrameColor: '#060e0e', balconies: [], roofProps: [],
+                sign: { text: 'CLINIC', color: Y.cyan, size: 28 },
+                door: { target: config.doorTarget || 'medbay_sw', label: 'Enter Clinic', lightColor: Y.cyan },
+                tiers: [
+                    { id: 'ward', rect: [0, 0, 250, 400], z0: 0, z1: Y.WARD, S: 2, fill: Y.teal, paint: _yinWard, shade: [6, 16, 18],
+                      ledges: [ledge(Y.LOBBY, 'rgba(0,243,255,.8)'), ledge(Y.WARD, 'rgba(122,255,216,.7)')], roofRes: 1, roofGlow: true, roof: _yinWardRoof },
+                    { id: 'wing', rect: [250, 150, 250, 250], z0: 0, z1: Y.WING, S: 2, fill: Y.tealLo, paint: _yinWing, shade: [6, 16, 18],
+                      ledges: [ledge(Y.WING, 'rgba(200,240,240,.7)')], roofRes: 1, roofGlow: true, roof: _yinGardenRoof },
+                    // (a px off the wall: a tier back to back with a wall hides it below its top, _tkGeo)
+                    { id: 'canopy', solid: false, rect: [60, 401, 130, 22], z0: Y.LOBBY - 1.5, z1: Y.LOBBY, S: 4, fill: '#2a4a4e', paint: _yinCanopy, shade: [6, 16, 18],
+                      roofRes: 1, roofGlow: true, roof: _yinCanopyRoof }
+                ],
+                ...config
+            });
+        }
+        /* =====================================================================
+           THE WAREHOUSE — the hub's storage hall (the registry's 'warehouse')
+           ---------------------------------------------------------------------
+           Built on the tiered kit (buildings/tiered-kit.js), in its cold grey:
+             · the shed: corrugated steel streaked with rust over a concrete
+               plinth, a band of high windows (some lit a sodium yellow-white),
+               its name stencilled faint along the front; three loading docks
+               on the front, roll-up doors in black-and-yellow bumpers, a lamp
+               over each, the personnel door at the end;
+             · the monitor roof along its ridge: a ribbon of clerestory glass,
+               lit from inside after dark;
+             · a steel canopy over the docks, and the dock apron in front.
+           The city view's backdrop warehouses (buildings/city-view.js) stay on
+           the stock factory, createGenericWarehouse; this is the map's.
+           ===================================================================== */
+        const WH = { steel: '#3a3c40', steelLo: '#25272a', steelHi: '#55585e', conc: '#55524c', yellow: '#e0b02a', sodium: 'rgba(255,226,150,.85)', W: 500, D: 400, SHED: 34, MON: 8,
+            DOCKS: [125, 250, 375], DOCK_W: 60, DOCK_H: 22 };
+        const _whFront = (t) => t.mitre.find(e => e && !e.hidden && e.ny > 0.99);
+
+        /** The shed: ribbed steel, rust streaks, the plinth, high windows; the docks and the personnel door on the front */
+        function _whShed(d, l, t, H, L) {
+            const r = seededRandom(4471), front = _whFront(t);
+            const g = d.createLinearGradient(0, 0, 0, H); g.addColorStop(0, WH.steelHi); g.addColorStop(0.15, WH.steel); g.addColorStop(1, WH.steelLo); d.fillStyle = g; d.fillRect(0, 0, L, H);
+            d.fillStyle = 'rgba(0,0,0,.28)'; for (let x = 0; x < L; x += 2.6) d.fillRect(x, 2, 0.8, H - 6);
+            d.fillStyle = 'rgba(255,255,255,.05)'; for (let x = 1.2; x < L; x += 2.6) d.fillRect(x, 2, 0.4, H - 6);
+            for (let i = 0; i < L / 9; i++) { const x = r() * L, y = 2 + r() * 8, h = 4 + r() * 12; d.fillStyle = `rgba(130,74,40,${0.08 + r() * 0.12})`; d.fillRect(x, y, 0.8 + r() * 1.6, h); }   // rust
+            d.fillStyle = '#1c1d20'; d.fillRect(0, 0, L, 2); d.fillStyle = 'rgba(255,255,255,.1)'; d.fillRect(0, 0, L, 0.4);
+            d.fillStyle = WH.conc; d.fillRect(0, H - 4, L, 4); d.fillStyle = 'rgba(0,0,0,.25)'; d.fillRect(0, H - 4, L, 0.5);
+            for (const e of t.mitre) {
+                if (!e || e.hidden) continue;
+                for (let x = e.u0 + 12, k = 0; x < e.u0 + e.L - 14; x += 24, k++) {                   // the high windows
+                    d.fillStyle = '#121416'; d.fillRect(x - 0.6, 3.6, 13.2, 4.2); d.fillStyle = '#1e2a30'; d.fillRect(x, 4.2, 12, 3);
+                    d.fillStyle = 'rgba(190,210,220,.16)'; d.fillRect(x, 4.2, 12, 1); d.fillStyle = '#121416'; for (const m of [4, 8]) d.fillRect(x + m - 0.2, 4.2, 0.4, 3);
+                    if ((k * 5 + Math.round(e.u0)) % 3) { l.fillStyle = WH.sodium; l.fillRect(x, 4.2, 12, 3); l.fillStyle = '#000'; for (const m of [4, 8]) l.fillRect(x + m - 0.2, 4.2, 0.4, 3); }
+                }
+            }
+            if (!front) return;
+            const X = (px) => front.u0 + px, name = (t.name || 'Warehouse').toUpperCase().split('').join(' ');
+            d.save(); d.font = 'bold 4px Montserrat, Helvetica, sans-serif'; d.textAlign = 'center'; d.textBaseline = 'middle'; d.fillStyle = 'rgba(230,226,214,.32)'; d.fillText(name, X(250), 10.6); d.restore();
+            WH.DOCKS.forEach((dx, i) => {
+                const x0 = X(dx) - WH.DOCK_W / 2, w = WH.DOCK_W, y0 = H - 4 - WH.DOCK_H, y1 = H - 4;
+                d.fillStyle = '#16171a'; d.fillRect(x0 - 2, y0 - 2, w + 4, y1 - y0 + 2);
+                const dg = d.createLinearGradient(0, y0, 0, y1); dg.addColorStop(0, '#70757c'); dg.addColorStop(1, '#4c5056'); d.fillStyle = dg; d.fillRect(x0, y0, w, y1 - y0);
+                d.fillStyle = 'rgba(16,16,18,.5)'; for (let y = y0 + 1.6; y < y1; y += 1.6) d.fillRect(x0, y, w, 0.35);
+                d.fillStyle = '#121214'; d.fillRect(x0 - 3, y1 - 5, 2.4, 5); d.fillRect(x0 + w + 0.6, y1 - 5, 2.4, 5);   // the bumpers
+                d.fillStyle = WH.yellow; for (let k = 0; k < 3; k++) { d.fillRect(x0 - 3, y1 - 5 + k * 1.8, 2.4, 0.8); d.fillRect(x0 + w + 0.6, y1 - 5 + k * 1.8, 2.4, 0.8); }
+                d.fillStyle = WH.yellow; d.fillRect(X(dx) - 3, y0 - 6.2, 6, 3.4); d.fillStyle = '#16171a'; d.font = 'bold 3px Montserrat, sans-serif'; d.textAlign = 'center'; d.textBaseline = 'middle'; d.fillText(String(i + 1), X(dx), y0 - 4.4);
+                for (const s of [-1, 1]) { const lx = X(dx) + s * (w / 2 - 4); d.fillStyle = '#2a2c30'; d.fillRect(lx - 1.4, y0 - 4.4, 2.8, 1.4); l.fillStyle = 'rgba(255,230,170,1)'; l.fillRect(lx - 1.4, y0 - 3.4, 2.8, 0.8); }
+                l.fillStyle = 'rgba(255,214,140,.4)'; l.fillRect(x0, y1 - 0.8, w, 0.8);
+            });
+            const px = X(468);                                                                            // the personnel door
+            d.fillStyle = '#2c3036'; d.fillRect(px - 5, H - 4 - 15, 10, 15); d.strokeStyle = '#16171a'; d.lineWidth = 0.5; d.strokeRect(px - 5, H - 4 - 15, 10, 15);
+            d.fillStyle = '#1e2a30'; d.fillRect(px - 2, H - 4 - 13, 4, 4); l.fillStyle = WH.sodium; l.fillRect(px - 2, H - 4 - 13, 4, 4);
+            d.fillStyle = '#c9ccd2'; d.fillRect(px + 2.6, H - 4 - 7, 1.4, 0.6);
+            d.fillStyle = '#2a2c30'; d.fillRect(px - 2, H - 4 - 17.6, 4, 1.2); l.fillStyle = 'rgba(255,230,170,1)'; l.fillRect(px - 2, H - 4 - 16.6, 4, 0.6);
+        }
+
+        /** The monitor: a ribbon of clerestory glass, lit from inside */
+        function _whMonitor(d, l, t, H, L) {
+            d.fillStyle = WH.steel; d.fillRect(0, 0, L, H);
+            d.fillStyle = '#1c1d20'; d.fillRect(0, 0, L, 1.4);
+            d.fillStyle = '#1e2a30'; d.fillRect(0, 2, L, H - 3); d.fillStyle = 'rgba(190,210,220,.18)'; d.fillRect(0, 2, L, 1.4);
+            l.fillStyle = WH.sodium; l.fillRect(0, 2, L, H - 3);
+            d.fillStyle = '#121416'; l.fillStyle = '#000'; for (let x = 0; x < L; x += 6) { d.fillRect(x - 0.3, 2, 0.6, H - 3); l.fillRect(x - 0.3, 2, 0.6, H - 3); }
+            d.fillStyle = WH.steelLo; d.fillRect(0, H - 1, L, 1);
+        }
+
+        /** The dock canopy's edge: steel with a yellow lip */
+        function _whCanopy(d, l, t, H, L) { d.fillStyle = '#2c2e33'; d.fillRect(0, 0, L, H); d.fillStyle = WH.yellow; d.fillRect(0, H - 0.4, L, 0.4); }
+
+        // ── roofs ──
+
+        function _whShedRoof(c, glow, t) {
+            const [x, y] = t.box, r = seededRandom(99);
+            const sky = []; for (let i = 0; i < 4; i++) for (const sy of [40, 300]) sky.push([x + 50 + i * 110, y + sy, 60, 36]);
+            if (glow) { for (const [sx, sy, w, h] of sky) { c.fillStyle = 'rgba(255,226,150,.28)'; c.fillRect(sx + 2, sy + 2, w - 4, h - 4); } return; }
+            c.fillStyle = '#34363a'; c.fillRect(x, y, 500, 400);
+            c.strokeStyle = 'rgba(0,0,0,.3)'; c.lineWidth = 1; c.beginPath(); for (let xx = x + 8; xx < x + 500; xx += 8) { c.moveTo(xx, y); c.lineTo(xx, y + 400); } c.stroke();
+            c.strokeStyle = 'rgba(255,255,255,.04)'; c.beginPath(); for (let xx = x + 11; xx < x + 500; xx += 8) { c.moveTo(xx, y); c.lineTo(xx, y + 400); } c.stroke();
+            for (let i = 0; i < 26; i++) { const rx = x + r() * 480, ry = y + r() * 380; const g = c.createRadialGradient(rx, ry, 0, rx, ry, 10 + r() * 18); g.addColorStop(0, 'rgba(130,74,40,.3)'); g.addColorStop(1, 'rgba(130,74,40,0)'); c.fillStyle = g; c.fillRect(rx - 30, ry - 30, 60, 60); }
+            for (const [sx, sy, w, h] of sky) { c.fillStyle = '#1c1d20'; c.fillRect(sx - 1.5, sy - 1.5, w + 3, h + 3); c.fillStyle = 'rgba(200,214,220,.35)'; c.fillRect(sx, sy, w, h); c.strokeStyle = 'rgba(30,32,36,.6)'; c.lineWidth = 0.8; c.beginPath(); for (let k = 1; k < 4; k++) { c.moveTo(sx + k * w / 4, sy); c.lineTo(sx + k * w / 4, sy + h); } c.stroke(); }
+            c.strokeStyle = '#1c1d20'; c.lineWidth = 6; c.strokeRect(x + 3, y + 3, 494, 394);
+            for (const [px, py] of [[x + 30, y + 120], [x + 440, y + 120], [x + 30, y + 250]]) { c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(px + 4, py + 4, 34, 26); c.fillStyle = '#6a6e74'; c.fillRect(px, py, 34, 26); c.fillStyle = '#3a3e44'; c.beginPath(); c.arc(px + 17, py + 13, 9, 0, Math.PI * 2); c.fill(); }
+        }
+
+        function _whMonitorRoof(c, glow, t) {
+            if (glow) return;
+            const [x0, y0, x1, y1] = t.box;
+            c.fillStyle = '#3e4044'; c.fillRect(x0, y0, x1 - x0, y1 - y0);
+            c.fillStyle = '#2c2e32'; c.fillRect(x0, (y0 + y1) / 2 - 1, x1 - x0, 2);                  // the ridge
+            c.strokeStyle = 'rgba(0,0,0,.3)'; c.lineWidth = 1; c.beginPath(); for (let xx = x0 + 8; xx < x1; xx += 8) { c.moveTo(xx, y0); c.lineTo(xx, y1); } c.stroke();
+            c.strokeStyle = '#1c1d20'; c.lineWidth = 3; c.strokeRect(x0 + 1.5, y0 + 1.5, x1 - x0 - 3, y1 - y0 - 3);
+        }
+
+        function _whCanopyRoof(c, glow, t) {
+            if (glow) return;
+            const [x0, y0, x1, y1] = t.box;
+            c.fillStyle = '#3a3c42'; c.fillRect(x0, y0, x1 - x0, y1 - y0);
+            c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 1; c.beginPath(); for (let xx = x0 + 10; xx < x1; xx += 10) { c.moveTo(xx, y0); c.lineTo(xx, y1); } c.stroke();
+            c.strokeStyle = WH.yellow; c.lineWidth = 1.2; c.beginPath(); c.moveTo(x0, y1 - 0.6); c.lineTo(x1, y1 - 0.6); c.stroke();
+        }
+
+        class WarehouseHall extends TieredBuilding {
+            /** The dock apron in front: concrete, a yellow guide line to each dock, wheel chocks */
+            drawBase(c) {
+                super.drawBase(c);
+                const N = this.facing === 'N';
+                const s = LandmarkKit.sprite(this, 'wh_apron', this.x - 10, this.y + (N ? -50 : WH.D), 520, 50, 1, p => {
+                    const x = this.x, y = N ? this.y - 46 : this.y + WH.D, X = (px) => N ? x + WH.W - px : x + px;
+                    p.fillStyle = 'rgba(70,68,64,.92)'; p.fillRect(x, y, WH.W, 46);
+                    p.strokeStyle = 'rgba(0,0,0,.3)'; p.lineWidth = 1; p.beginPath(); for (let xx = 50; xx < WH.W; xx += 50) { p.moveTo(x + xx, y); p.lineTo(x + xx, y + 46); } p.stroke();
+                    for (const dx of WH.DOCKS) {
+                        p.strokeStyle = 'rgba(224,176,42,.75)'; p.lineWidth = 2; p.beginPath(); p.moveTo(X(dx) - 34, y + (N ? 0 : 46)); p.lineTo(X(dx) - 34, y + (N ? 46 : 0)); p.moveTo(X(dx) + 34, y + (N ? 0 : 46)); p.lineTo(X(dx) + 34, y + (N ? 46 : 0)); p.stroke();
+                        p.fillStyle = WH.yellow; p.fillRect(X(dx) - 26, y + (N ? 34 : 6), 8, 6); p.fillRect(X(dx) + 18, y + (N ? 34 : 6), 8, 6);
+                    }
+                });
+                LandmarkKit.drawSprite(c, s, 1);
+            }
+        }
+        TierKit.profile(WarehouseHall);
+
+        /** The map's warehouse: x, y its corner; the docks on its front (south, or north with config.facing 'N'). */
+        function createWarehouseHall(x, y, config = {}) {
+            const ledge = (z) => ({ z, out: 2, th: 2, top: '#4a4c52', band: [30, 31, 34], lip: 'rgba(255,255,255,.18)' }), name = config.label || 'Warehouse';
+            return new WarehouseHall({
+                id: 'warehouse', x, y, label: name, type: 'warehouse', hero: 1.5, plan: { W: WH.W, D: WH.D },
+                roofColor: '#282828', roofLightColor: '#323232', wallColor: '#202020', wallLightColor: '#2a2a2a', accentColor: '#666666',
+                windowColor: '#0a0a0a', windowLitColor: '#ccccaa', windowFrameColor: '#111111', balconies: [], roofProps: [], sign: config.sign || null,
+                tiers: [
+                    { id: 'shed', name, rect: [0, 0, WH.W, WH.D], z0: 0, z1: WH.SHED, S: 2, fill: WH.steel, paint: _whShed, shade: [12, 12, 14],
+                      ledges: [ledge(WH.SHED)], roofRes: 1, roofGlow: true, roof: _whShedRoof },
+                    { id: 'monitor', on: 'shed', solid: false, rect: [60, 140, 380, 120], z0: WH.SHED, z1: WH.SHED + WH.MON, S: 2, fill: WH.steel, paint: _whMonitor, shade: [12, 12, 14],
+                      ledges: [ledge(WH.SHED + WH.MON)], roofRes: 1, roofGlow: true, roof: _whMonitorRoof },
+                    // (a px off the wall: a tier back to back with a wall hides it below its top, _tkGeo)
+                    { id: 'canopy', solid: false, rect: [40, WH.D + 1, 420, 26], z0: WH.DOCK_H + 7, z1: WH.DOCK_H + 8.5, S: 4, fill: '#2c2e33', paint: _whCanopy, shade: [12, 12, 14],
+                      roofRes: 1, roof: _whCanopyRoof }
                 ],
                 ...config
             });

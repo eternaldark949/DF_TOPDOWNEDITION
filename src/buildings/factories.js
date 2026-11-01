@@ -296,59 +296,6 @@
         }
 
         function createDrYinsClinic(x, y, config = {}) {
-            return new BuildingV2({
-                id: 'dr_yins',
-                x: x,
-                y: y,
-                label: "Dr. Yin's",
-                type: 'clinic',
-                floors: 5,
-                
-                // L-shape: main ward + treatment wing extending east
-                sections: [
-                    { x: 0, y: 0, w: 250, h: 400 },       // Main ward (tall, west)
-                    { x: 250, y: 150, w: 250, h: 250 },    // Treatment wing (east, offset south)
-                ],
-                
-                // Clean medical windows
-                windowWidth: 12,
-                windowHeight: 16,
-                windowSpacingX: 30,
-                windowSpacingY: 26,
-                windowMarginX: 18,
-                windowMarginY: 14,
-                
-                // Colors - dark teal/cyan medical theme
-                roofColor: '#142828',           // Teal roof
-                roofLightColor: '#1a3434',      // Slightly lighter teal
-                wallColor: '#142222',           // Very dark teal walls
-                wallLightColor: '#182c2c',      // Dark teal
-                accentColor: '#00f3ff',         // Medical cyan accent
-                windowColor: '#04100f',         // Dark tinted glass
-                windowLitColor: '#00f3ff',      // Cyan glow (medical equipment)
-                windowFrameColor: '#060e0e',    // Dark teal frames
-                balconyColor: '#0a1a1a',        // Teal railings
-                
-                // Entrance overhang on main ward
-                balconies: [
-                    { section: 0, side: 'south', startX: 50, width: 150, floors: [1] },
-                ],
-                
-                roofProps: [
-                    { type: 'ac_unit', section: 0, x: 20, y: 20, w: 50, h: 35 },
-                    { type: 'ac_unit', section: 1, x: 170, y: 20, w: 50, h: 35 },
-                    { type: 'vent', section: 0, x: 180, y: 340, w: 30, h: 25 },
-                    { type: 'water_tank', section: 1, x: 125, y: 200, r: 25 },
-                ],
-                
-                sign: { text: 'CLINIC', color: '#00f3ff', size: 28 },
-                door: {
-                    target: config.doorTarget || 'medbay_sw',
-                    label: 'Enter Clinic',
-                    lightColor: '#00f3ff'
-                },
-                
-                ...config
-            });
+            return createDrYins(x, y, config);           // on the tiered kit: buildings/dr-yins.js
         }
 

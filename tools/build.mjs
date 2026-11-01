@@ -94,6 +94,8 @@ const SCRIPTS = [
     'buildings/biggs-park.js',
     'buildings/neural-systems.js',
     'buildings/torque-auto.js',
+    'buildings/dr-yins.js',
+    'buildings/warehouse-hall.js',
     'buildings/ashgrove.js',
     'buildings/enni-cole.js',
     'buildings/silver-queen-deco.js',
