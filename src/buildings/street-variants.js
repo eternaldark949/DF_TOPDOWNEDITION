@@ -11,9 +11,8 @@
                          garden), boutique (rose stone, gold-framed windows,
                          black canopy, glass lantern), lounge (lacquer, neon
                          fins, velvet canopy, red carpet, moon dome)
-             apartments  brownstone (brick, quoins, lintels, cornice), deco
-                         (pilasters, gilt bands), terrace (verandas on the
-                         front), loft (steel spandrels and mullions)
+             apartments  brownstone, deco, terrace, loft: their facades,
+                         doors and pavements in buildings/street-apartments.js
 
            Cheap on a phone: what doesn't move is painted once and SHARED by
            every building of that variant and size (StreetArt: a shop roof,
@@ -123,7 +122,7 @@
                     if (spec.id === 'arcade') this._vArcInit(v, r);                     // its stone (buildings/street-arcade.js)
                 } else {
                     this.sills = spec.sills;
-                    if (spec.id === 'brownstone') this._vBrInit(v, r);                 // its brick, the arcades' lean (buildings/street-brownstone.js)
+                    if (APT_KIT[spec.id]) this._vBrInit(v, r);                         // its style, the arcades' lean (buildings/street-apartments.js)
                     if (spec.noBalconies && this.facadeFeature === 'balconies') this.facadeFeature = null;
                 }
             },
@@ -147,7 +146,7 @@
             },
             /** The window mask: a shop's ground floor front is its shopfront (_drawFaceWindows) */
             _vWindowMask(f) {
-                if (this.variant && (this.variant.id === 'arcade' || this.variant.id === 'brownstone')) return _vArcMask;   // its own windows on every face
+                if (this.variant && (this.variant.id === 'arcade' || this.variant.st)) return _vArcMask;   // its own windows on every face
                 if (!this.variant || this.variant.kind !== 'shop' || f.side !== this.facing) return null;
                 return this._vMaskFn || (this._vMaskFn = (fl) => fl === 0);
             },
@@ -180,7 +179,7 @@
                 const v = this.variant, S = v.spec, H = this._vH(), G = this._vFaceAt(f, P);
                 if (G.depth < 3 || f.side === 'C') return;
                 const FH = CONFIG.BUILDINGS.FLOOR_HEIGHT, fine = _zoomLOD < 2 && G.depth > 8, front = f.side === this.facing;
-                if (v.id === 'brownstone') { this._vBrUnder(ctx, f, G, H); return; }
+                if (v.st) { this._vBrUnder(ctx, f, G, H); return; }
                 const mat = v.kind === 'shop' ? S.material : null;
                 if (mat === 'limestone') { this._vArcUnder(ctx, f, G, H); return; }
                 if (mat === 'stone') {                                             // rose stone to the belt, dark steel over it (Enni Cole)
@@ -200,22 +199,21 @@
                     for (let i = 0; i < n; i++) { const u0 = i / n, u1 = (i + 0.5) / n, u2 = (i + 1) / n; G.line(ch, u0, zf, u1, zf + 1.8 / H); G.line(ch, u1, zf + 1.8 / H, u2, zf); }
                     ctx.strokeStyle = S.gold; ctx.globalAlpha *= 0.75; ctx.lineWidth = 0.8; ctx.stroke(ch); ctx.globalAlpha /= 0.75;
                 }
-                if ((mat === 'brick' || (v.kind === 'apt' && v.id === 'deco')) && fine) {   // quoins: stone blocks up both ends, long and short by turns
+                if (mat === 'brick' && fine) {   // quoins: stone blocks up both ends, long and short by turns
                     const q = new Path2D(), floors = Math.round(H / FH);
                     for (let i = 0; i < floors * 2; i++) {
                         const z0 = i * FH / 2 + 0.4, z1 = (i + 1) * FH / 2 - 0.4, w = (i % 2 ? 5 : 8) / G.L;
                         G.quad(q, 0, w, z0 / H, z1 / H); G.quad(q, 1 - w, 1, z0 / H, z1 / H);
                     }
-                    ctx.fillStyle = v.kind === 'shop' ? S.trim : lightenHex(this.colors.wall, 30); ctx.fill(q);
+                    ctx.fillStyle = S.trim; ctx.fill(q);
                 }
             },
 
             /** Over the windows, on every face: the shopfront, lintels, spandrels, then (once for all faces) ledges and fins */
             _vFaceOver(ctx, faces, P) {
                 if (this.variant.id === 'arcade') { this._vArcOver(ctx, faces, P); return; }
-                if (this.variant.id === 'brownstone') { this._vBrOver(ctx, faces, P); this._vBrLanterns(ctx, false); return; }
+                if (this.variant.st) { this._vBrOver(ctx, faces, P); this._vBrLanterns(ctx, false); return; }
                 const v = this.variant, S = v.spec, H = this._vH(), FH = CONFIG.BUILDINGS.FLOOR_HEIGHT, K = LandmarkKit;
-                const floors = Math.min(this.floors, CONFIG.BUILDINGS.MAX_FLOORS), fine = _zoomLOD < 2;
                 const edges = [], fins = [];
                 for (const f of faces) {
                     if (f.side === 'C') continue;
@@ -225,21 +223,7 @@
                     if (G.depth < 3) continue;
                     const cols = Math.max(1, Math.floor(G.L / 26));
                     if (v.kind === 'shop' && f.side === this.facing) this._vShopfront(ctx, f, G, H, false);
-                    if (v.kind === 'apt' && fine && G.depth > floors * 2.4) {
-                        if (v.id === 'brownstone') {                               // lintels over every window
-                            const l = new Path2D();
-                            for (let fl = 0; fl < floors; fl++) for (let c = 0; c < cols; c++) G.line(l, (c + 0.2) / cols, (fl + 0.84) / floors, (c + 0.8) / cols, (fl + 0.84) / floors);
-                            ctx.strokeStyle = 'rgba(232,214,180,0.55)'; ctx.lineWidth = 1.1; ctx.stroke(l);
-                        } else if (v.id === 'loft') {                              // steel spandrels between the floors and mullions between the bays
-                            const sp = new Path2D(), mu = new Path2D();
-                            for (let fl = 1; fl <= floors; fl++) G.quad(sp, 0, 1, (fl - 0.16) / floors, Math.min(1, (fl + 0.06) / floors));
-                            for (let c = 0; c <= cols; c++) G.quad(mu, Math.max(0, c / cols - 0.9 / G.L), Math.min(1, c / cols + 0.9 / G.L), 0, 1);
-                            ctx.fillStyle = 'rgba(18,20,26,0.82)'; ctx.fill(sp); ctx.fill(mu);
-                            ctx.strokeStyle = 'rgba(214,190,150,0.22)'; ctx.lineWidth = 0.6; ctx.stroke(sp);
-                            ctx.fillStyle = lightenHex(this.colors.wall, 26); ctx.fill(G.quad(new Path2D(), 0, 1, 0, 0.3 / floors));   // stone plinth
-                        }
-                    }
-                    if ((v.kind === 'shop' && v.id === 'lounge') || (v.kind === 'apt' && v.id === 'deco')) {
+                    if (v.kind === 'shop' && v.id === 'lounge') {
                         for (let c = 0; c <= cols; c++) {                          // a pilaster at every bay
                             const u = c / cols, x = f.x1 + (f.x2 - f.x1) * u, y = f.y1 + (f.y2 - f.y1) * u;
                             fins.push({ x, y, nx: f.nx, ny: f.ny });
@@ -247,33 +231,11 @@
                     }
                 }
                 // The depth vocabulary, one fill a kind for all the faces (buildings/landmark-kit.js)
-                if (v.kind === 'shop') {
-                    if (fins.length) K.fins(ctx, fins, 0, H - 2, 3, 2, '#2a1e33', hexToRgba(v.neon, 0.55));
-                    const lipC = S.id === 'bakery' ? S.trim : S.id === 'florist' ? '#e8e2cc' : S.gold;
-                    if (S.id !== 'florist') K.ledge(ctx, edges, FH * 1.02, 1.6, 1.2, darkenHex(S.wall, -18), darkenHex(S.wall, 10), hexToRgba(lipC, 0.6));
-                    K.ledge(ctx, edges, H, 2.6, 2.2, S.id === 'bakery' ? S.trim : S.id === 'florist' ? '#d9d2b8' : S.id === 'boutique' ? '#5d303e' : '#2a2030',
-                            S.id === 'bakery' ? '#3a2116' : S.id === 'florist' ? '#1f2a22' : '#24161e', hexToRgba(lipC, 0.85));
-                } else {
-                    const wall = this.colors.wall, top = lightenHex(wall, 24), band = darkenHex(wall, 4);
-                    if (v.id === 'deco' && fins.length) {
-                        K.fins(ctx, fins, 0, H, 3.5, 2.2, lightenHex(wall, 14), 'rgba(226,198,146,0.55)');
-                        for (let fl = 3; fl < floors; fl += 3) K.ledge(ctx, edges, fl * FH, 2.2, 1.4, 'rgba(216,183,122,0.85)', darkenHex(wall, 2), 'rgba(243,221,176,0.6)');
-                        K.ledge(ctx, edges, H, 3.4, 3, top, band, 'rgba(243,221,176,0.75)');
-                    } else if (v.id === 'brownstone') {
-                        K.ledge(ctx, edges, FH, 1.8, 1.4, top, band, 'rgba(239,220,182,0.5)');
-                        K.ledge(ctx, edges, H, 4, 3.2, lightenHex(wall, 30), darkenHex(wall, 6), 'rgba(239,220,182,0.75)');
-                    } else if (v.id === 'terrace') {
-                        K.ledge(ctx, edges, FH * 0.35, 1.6, FH * 0.35, top, lightenHex(wall, 10), null);   // plinth
-                        const fr = faces.filter(f => f.side === this.facing);
-                        const ve = fr.map(f => { const L = Math.hypot(f.x2 - f.x1, f.y2 - f.y1), ux = (f.x2 - f.x1) / L, uy = (f.y2 - f.y1) / L;
-                            return { a: [f.x1 + ux * 10, f.y1 + uy * 10], b: [f.x2 - ux * 10, f.y2 - uy * 10], nx: f.nx, ny: f.ny }; });
-                        if (ve.length && fine) for (let fl = 1; fl < floors; fl += 2)
-                            K.veranda(ctx, ve, fl * FH + 0.6, 6, 6, 3.4, lightenHex(wall, 34), darkenHex(wall, 2), 'rgba(236,230,244,0.75)');
-                        K.ledge(ctx, edges, H, 3, 2.4, top, band, 'rgba(240,236,228,0.6)');
-                    } else {
-                        K.ledge(ctx, edges, H, 2.4, 2, '#2a2e36', '#14171d', 'rgba(214,190,150,0.55)');
-                    }
-                }
+                if (fins.length) K.fins(ctx, fins, 0, H - 2, 3, 2, '#2a1e33', hexToRgba(v.neon, 0.55));
+                const lipC = S.id === 'bakery' ? S.trim : S.id === 'florist' ? '#e8e2cc' : S.gold;
+                if (S.id !== 'florist') K.ledge(ctx, edges, FH * 1.02, 1.6, 1.2, darkenHex(S.wall, -18), darkenHex(S.wall, 10), hexToRgba(lipC, 0.6));
+                K.ledge(ctx, edges, H, 2.6, 2.2, S.id === 'bakery' ? S.trim : S.id === 'florist' ? '#d9d2b8' : S.id === 'boutique' ? '#5d303e' : '#2a2030',
+                        S.id === 'bakery' ? '#3a2116' : S.id === 'florist' ? '#1f2a22' : '#24161e', hexToRgba(lipC, 0.85));
             },
 
             /** A shop's ground floor along its front: display windows either side of the door, the door */
@@ -649,15 +611,7 @@
             /** The pavement just in front: a strip from the wall out, painted once a variant (and door place) */
             _vPaintBase(c, v, fw, fd, door) {
                 let y = fd; const S = v.spec, dot = (x, yy, r, col) => { c.fillStyle = col; c.beginPath(); c.arc(x, yy, r, 0, Math.PI * 2); c.fill(); };
-                if (S.id === 'brownstone') { this._vBrPaintBase(c, v, fw, fd, door); return; }
-                if (v.kind === 'apt') {
-                    // A stoop: stone steps up to the door, and a planter either side
-                    c.fillStyle = 'rgba(0,0,0,.3)'; c.fillRect(door - 20, y + 2, 44, 14);
-                    c.fillStyle = S.id === 'loft' ? '#3a3e46' : S.id === 'deco' ? '#4a4038' : '#5a4a44'; c.fillRect(door - 22, y, 44, 13);
-                    c.strokeStyle = 'rgba(232,214,180,.35)'; c.lineWidth = 1; c.beginPath(); for (const yy of [y + 4.5, y + 8.5]) { c.moveTo(door - 22, yy); c.lineTo(door + 22, yy); } c.stroke();
-                    for (const x of [door - 34, door + 34]) { c.fillStyle = 'rgba(0,0,0,.3)'; c.fillRect(x - 6, y + 3, 14, 12); c.fillStyle = '#3a2a22'; c.fillRect(x - 7, y + 1, 14, 11); dot(x, y + 6, 5, '#3c7d44'); dot(x - 2, y + 5, 2.4, '#5c9a4c'); }
-                    return;
-                }
+                if (v.st) { this._vBrPaintBase(c, v, fw, fd, door); return; }
                 if (S.id === 'arcade') { this._vArcPaintBase(c, v, fw, fd, door); return; }
                 // A shop's awning, canopy or signboard covers the first stride out, so its things stand past that
                 y += 16;
@@ -718,7 +672,7 @@
                 const v = this.variant, S = v.spec, K = LandmarkKit, H = this._vH();
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 if (v.id === 'arcade') this._vArcGlow(ctx, faces, P, dark);
-                else if (v.id === 'brownstone') this._vBrGlow(ctx, faces, P, dark);
+                else if (v.st) this._vBrGlow(ctx, faces, P, dark);
                 else if (v.kind === 'shop') {
                     for (const f of faces) if (f.side === this.facing && f.side !== 'C') { const G = this._vFaceAt(f, P); if (G.depth >= 3) this._vShopfront(ctx, f, G, H, true); }
                     if (S.id === 'lounge') {
@@ -731,12 +685,6 @@
                         if (fins.length) K.fins(ctx, fins, 1, H - 2, 1.4, 2.4, hexToRgba(v.neon, 0.85), null);
                     }
                     this._vFront(ctx, true);
-                } else {
-                    const rim = K.rim(this, dark);
-                    if (rim.a > 0.01 && (v.id === 'deco' || v.id === 'terrace')) {   // gilt bands and veranda rails in the lamps' colour
-                        const edges = faces.filter(f => f.side !== 'C').map(f => ({ a: [f.x1, f.y1], b: [f.x2, f.y2], nx: f.nx, ny: f.ny }));
-                        K.ledge(ctx, edges, H, v.id === 'deco' ? 3.4 : 3, 0.01, 'rgba(0,0,0,0)', 'rgba(0,0,0,0)', `rgba(${rim.rgb}, ${0.6 * rim.a})`);
-                    }
                 }
                 ctx.restore();
             }

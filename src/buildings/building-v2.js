@@ -405,7 +405,7 @@
                 if (this.style === 'double_nights') return;   // its name is on the rotunda's wall (buildings/double-nights.js)
                 if (this.style === 'moon_city') { if (typeof game !== 'undefined' && game.camera) { this._mcDrawCanopy(ctx, false); this._mcDrawSign(ctx, false); } return; }
                 if (this.variant && this.variant.kind === 'shop' && this._vOn()) { this._vFront(ctx, false); return; }   // awnings, canopy, signboard (street-variants.js)
-                if (this.variant && this.variant.id === 'brownstone' && this._vOn()) { this._vBrFront(ctx, false); return; }   // its name on the door's hood (street-brownstone.js)
+                if (this.variant && this.variant.st && this._vOn()) { this._vBrFront(ctx, false); return; }   // its name on the door's hood (street-apartments.js)
                 const E = this.attachedSign && this._entrance();
                 if (!E) return;
                 
