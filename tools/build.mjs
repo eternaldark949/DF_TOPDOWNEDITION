@@ -13,15 +13,24 @@
  * scope, so the ORDER below matters: a file can only use, at load time, what
  * files above it declared (classes before subclasses, systems before the code
  * that instantiates them). Add a new file by putting it in the right place here.
+ *
+ * Each file is its own script (src/app/boot-loader.js runs them one after another
+ * under the loading screen), so a function declared in a later file is not hoisted
+ * into an earlier one either: at load time, `factory: createThing` needs createThing's
+ * file above; `factory: (...a) => createThing(...a)` works from anywhere. Inside a
+ * function body anything goes, as before. The regression runner runs the files the
+ * same way, so a slip shows up there as a ReferenceError naming the file.
  */
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, extname, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { inlineLoadingArt } from './loading-art.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUTPUT = 'DFAB V8.html';
 
 const STYLES = [
+    'styles/loading-screen.css',   // first: the loading screen paints before anything else has parsed
     'styles/base.css',
     'styles/hud-menus.css',
     'styles/panels-phone.css',
@@ -236,9 +245,22 @@ function scanAssets(kind) {
     return table;
 }
 
-function assetsScript() {
+// The asset table is most of the file's weight (the music). It is declared empty and then filled a piece
+// at a time, so the loading screen's bar moves through it instead of sitting on one long parse.
+const ASSET_PIECE_BYTES = 768 * 1024;
+function assetPieces() {
     const table = { images: scanAssets('images'), audio: scanAssets('audio') };
-    return `        const ASSETS = ${JSON.stringify(table)};\n\n`;
+    const pieces = ['        const ASSETS = { images: {}, audio: {} };\n'];
+    for (const kind of ['images', 'audio']) {
+        let part = {}, bytes = 0;
+        const flush = () => { if (bytes) pieces.push(`        Object.assign(ASSETS.${kind}, ${JSON.stringify(part)});\n`); part = {}; bytes = 0; };
+        for (const [key, uri] of Object.entries(table[kind])) {
+            part[key] = uri; bytes += uri.length;
+            if (bytes >= ASSET_PIECE_BYTES) flush();
+        }
+        flush();
+    }
+    return pieces;
 }
 
 // Each font in assets/fonts as an @font-face; the family is the file name without its extension.
@@ -250,12 +272,35 @@ function fontFaces() {
     }).join('');
 }
 
-const read = (p) => p === '@assets' ? assetsScript() : readFileSync(join(ROOT, 'src', p), 'utf8');
+const read = (p) => readFileSync(join(ROOT, 'src', p), 'utf8');
+
+/*
+ * Each script file goes into the page as an inert <script type="text/dfab"> block. The boot loader
+ * (src/app/boot-loader.js, the one plain script) runs them in this order, one task apiece, so the
+ * browser paints the loading screen between them and its bar shows how much has run. They are still
+ * classic scripts sharing one global scope, exactly as when the game was one big <script>.
+ */
+const escapeAttr = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+function scriptBlocks() {
+    const blocks = [];
+    for (const p of SCRIPTS) {
+        if (p === '@assets') assetPieces().forEach((code, i) => blocks.push([`assets#${i}`, code]));
+        else blocks.push([p, read(p)]);
+    }
+    for (const [name, code] of blocks) {
+        if (/<\/script/i.test(code)) throw new Error(`src/${name} contains "</script", which would end its block early`);
+    }
+    // data-cost: roughly how long the block takes to run, for the bar. The music is long but cheap (one string
+    // literal per track); code is the slow part.
+    const cost = (name, code) => Math.max(1, Math.round(code.length * (name.startsWith('assets#') ? 0.15 : 1) / 100));
+    return blocks.map(([name, code]) => `    <script type="text/dfab" data-src="${escapeAttr(name)}" data-cost="${cost(name, code)}">\n${code}    </script>\n`).join('')
+        + `    <script>\n${read('app/boot-loader.js')}    </script>\n`;
+}
 
 export function build() {
     let html = read('index.html');
-    const styles = fontFaces() + STYLES.map(read).join('');
-    const scripts = SCRIPTS.map(read).join('');
+    const styles = fontFaces() + inlineLoadingArt(STYLES.map(read).join(''));
+    const scripts = scriptBlocks();
     const put = (marker, text) => {
         const tag = `<!-- @${marker} -->\n`;
         if (!html.includes(tag)) throw new Error(`src/index.html is missing ${tag.trim()}`);

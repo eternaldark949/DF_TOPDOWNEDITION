@@ -112,9 +112,11 @@
             }
 
             // --- UI ---
-            open(mode, onComplete) {
+            /** opts.loadVia(load): for a load, hand the chosen slot's load over (the menu runs it under the loading screen) */
+            open(mode, onComplete, opts = {}) {
                 this.mode = mode;
                 this.onComplete = onComplete || null;
+                this.loadVia = opts.loadVia || null;
                 this._confirmTarget = null;
                 clearTimeout(this._closeT);                                     // reopened mid-close: stay open
                 this._render();
@@ -355,6 +357,7 @@
 
             _executeLoad(slot) {
                 this.close();
+                if (this.loadVia) { const via = this.loadVia; this.loadVia = null; via(() => this.loadFromSlot(slot)); return; }
                 // Small delay so overlay fades before heavy load work
                 setTimeout(() => {
                     const success = this.loadFromSlot(slot);

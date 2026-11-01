@@ -65,18 +65,20 @@
             // 2. Reset all game state to new-game defaults
             game.resetGameState();
             
-            // 3. Fade out the Menu Text, and meanwhile paint the Keeper's hill and decode its music
-            mainMenuDiv.style.opacity = '0'; 
-            setTimeout(() => game.preloadKeeper(), 60);
-            
-            // 4. Wait for fade (500ms), then Swap Layers & Start
-            setTimeout(() => { 
-                // The prologue (story/scenes/prologue.js), then chapter 1
- 
-                _starting = false;
-                game.scenes.play('prologue').then(() => game.story.startPrologue());
-                game.enterWorld();
-            }, 500); 
+            // 3. The menu fades as the loading screen comes up over it; under it, paint the Keeper's places a job
+            //    a frame and decode her music, then start the prologue (story/scenes/prologue.js, then chapter 1)
+            //    and let its first frames draw before the loading screen fades into its black
+            mainMenuDiv.style.opacity = '0';
+            const paint = game.keeperPreloadJobs();
+            game.loadIntoWorld([
+                { label: 'Opening the way', weight: 1, run: () => {} },
+                ...paint.map((job, i) => ({ label: i < 2 ? 'Painting the Keeper\u2019s hill' : 'Lighting the parlour fire', weight: 2, run: job })),
+                { label: 'Crossing over', weight: 3, run: (progress) => {
+                    game.scenes.play('prologue').then(() => game.story.startPrologue());
+                    game.enterWorld();
+                    return game._settleUnderLoader(progress, { frames: 8, maxMs: 900 });
+                } }
+            ]).finally(() => { _starting = false; });
         });
         document.getElementById('btn-story-747').addEventListener('click', () => { showMessage("TIMELINE 747 LOCKED."); });
         document.getElementById('btn-story-back').addEventListener('click', () => { storyModeList.classList.add('hidden'); mainMenuList.classList.remove('hidden'); });

@@ -1,0 +1,132 @@
+        /* ── Loading screen (app/boot-loader.js) ──────────────────────────────────────────────────────────
+           Shown from the page's first paint while the game's scripts run, and again between the menu and the
+           world. Everything that moves here moves by transform or opacity alone: the browser runs those on its
+           compositor, so the city keeps drifting and the rings keep turning even while the game's own thread is
+           busy building a map. The art is drawn at build time (tools/loading-art.mjs, the url(@art:…) images). */
+        #loading-screen { position: fixed; inset: 0; z-index: 6000; overflow: hidden; pointer-events: auto; cursor: default;
+            background: radial-gradient(ellipse 90% 70% at 50% 38%, #1d0a2a 0%, #10051a 45%, #060209 100%);
+            color: #f1eaff; font-family: 'Montserrat', sans-serif; user-select: none; -webkit-user-select: none;
+            opacity: 1; transition: opacity 0.7s ease; -webkit-tap-highlight-color: transparent; }
+        #loading-screen.ls-hide { opacity: 0; pointer-events: none; }
+        #loading-screen.ls-gone { display: none; }
+        #loading-screen.ls-enter { opacity: 0; }
+        #loading-screen * { box-sizing: border-box; }
+        #loading-screen .ls-layer { position: absolute; pointer-events: none; will-change: transform; }
+
+        /* the sky: a violet haze low over the city, two star fields drifting at their own speeds */
+        #loading-screen .ls-haze { position: absolute; left: -10%; right: -10%; bottom: 8%; height: 55%; pointer-events: none;
+            background: radial-gradient(ellipse 60% 55% at 50% 100%, rgba(164, 105, 255, 0.28), rgba(164, 105, 255, 0) 70%),
+                        radial-gradient(ellipse 35% 40% at 22% 100%, rgba(232, 150, 90, 0.16), rgba(232, 150, 90, 0) 70%),
+                        radial-gradient(ellipse 35% 40% at 80% 100%, rgba(255, 90, 140, 0.12), rgba(255, 90, 140, 0) 70%);
+            animation: lsBreathe 7s ease-in-out infinite; will-change: opacity; }
+        /* (each moving layer is one tile wider than the screen and slides by exactly one tile, then loops: small layers, no seam) */
+        #loading-screen .ls-stars { left: 0; top: 0; width: calc(100% + var(--tile)); height: 72%; background-repeat: repeat; background-size: var(--tile) var(--tile);
+            animation: lsSlide 150s linear infinite; }
+        #loading-screen .ls-stars-a { --tile: 600px; background-image: url(@art:stars-a); opacity: 0.85; }
+        #loading-screen .ls-stars-b { --tile: 900px; background-image: url(@art:stars-b); will-change: transform, opacity;
+            animation: lsSlide 160s linear infinite, lsTwinkle 5.2s ease-in-out infinite -1.7s; }
+
+        /* a shooting star now and then */
+        #loading-screen .ls-meteor { left: 62%; top: 9%; width: 160px; height: 2px; border-radius: 2px; opacity: 0;
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(214, 190, 255, 0.5) 60%, #fff);
+            transform: rotate(-24deg) translateX(0); animation: lsMeteor 9s ease-in infinite 2.5s; }
+        #loading-screen .ls-meteor.ls-m2 { left: 18%; top: 22%; width: 110px; animation-duration: 13s; animation-delay: 7s; }
+
+        /* the portal: rings of light turning behind the title */
+        #loading-screen .ls-portal { position: absolute; left: 50%; top: 40%; width: min(78vh, 64vw); height: min(78vh, 64vw); transform: translate(-50%, -50%); pointer-events: none; }
+        #loading-screen .ls-ring { position: absolute; inset: 0; border-radius: 50%; will-change: transform; animation: lsSpin 18s linear infinite;
+            -webkit-mask: radial-gradient(closest-side, transparent 88%, #000 90%, #000 94%, transparent 96%);
+                    mask: radial-gradient(closest-side, transparent 88%, #000 90%, #000 94%, transparent 96%);
+            background: conic-gradient(from 0deg, rgba(232, 194, 122, 0) 0deg, rgba(232, 194, 122, 0.95) 40deg, rgba(232, 194, 122, 0) 110deg,
+                rgba(164, 105, 255, 0) 170deg, rgba(164, 105, 255, 0.85) 230deg, rgba(164, 105, 255, 0) 300deg); }
+        #loading-screen .ls-ring-2 { inset: 9%; animation-duration: 11s; animation-direction: reverse; opacity: 0.8;
+            background: conic-gradient(from 90deg, rgba(214, 190, 255, 0) 0deg, rgba(214, 190, 255, 0.9) 70deg, rgba(214, 190, 255, 0) 140deg,
+                rgba(255, 120, 170, 0) 200deg, rgba(255, 120, 170, 0.7) 250deg, rgba(255, 120, 170, 0) 320deg); }
+        #loading-screen .ls-ring-3 { inset: 19%; animation-duration: 27s; opacity: 0.55;
+            -webkit-mask: radial-gradient(closest-side, transparent 95%, #000 96.5%, #000 98%, transparent 99.5%);
+                    mask: radial-gradient(closest-side, transparent 95%, #000 96.5%, #000 98%, transparent 99.5%);
+            background: repeating-conic-gradient(rgba(241, 234, 255, 0.85) 0deg 2deg, rgba(241, 234, 255, 0) 2deg 12deg); }
+        #loading-screen .ls-glow { position: absolute; inset: 14%; border-radius: 50%; will-change: transform, opacity; animation: lsPulse 4.6s ease-in-out infinite;
+            background: radial-gradient(closest-side, rgba(164, 105, 255, 0.34), rgba(120, 60, 220, 0.12) 55%, rgba(120, 60, 220, 0) 100%); }
+        /* two sparks orbiting the rings */
+        #loading-screen .ls-orbit { position: absolute; inset: 4%; will-change: transform; animation: lsSpin 7.5s linear infinite; }
+        #loading-screen .ls-orbit::before { content: ''; position: absolute; left: 50%; top: -5px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%;
+            background: radial-gradient(circle, #fff 0%, #ffe3a6 35%, rgba(232, 194, 122, 0) 70%); box-shadow: 0 0 14px 4px rgba(232, 194, 122, 0.55); }
+        #loading-screen .ls-orbit-2 { inset: 13%; animation-duration: 12s; animation-direction: reverse; }
+        #loading-screen .ls-orbit-2::before { background: radial-gradient(circle, #fff 0%, #d6beff 35%, rgba(164, 105, 255, 0) 70%); box-shadow: 0 0 14px 4px rgba(164, 105, 255, 0.55); }
+
+        /* the city: two rows of towers sliding past at different speeds, their windows flickering on and off */
+        #loading-screen .ls-city { left: 0; bottom: 0; width: calc(100% + var(--tile)); height: var(--city-h); animation: lsSlide 80s linear infinite; }
+        #loading-screen .ls-city > div { position: absolute; inset: 0; background-repeat: repeat-x; background-size: var(--tile) 100%; }
+        #loading-screen .ls-city-far { --city-h: 30vh; --tile: calc(30vh * 4); bottom: 9vh; opacity: 0.9; }
+        #loading-screen .ls-city-near { --city-h: 38vh; --tile: calc(38vh * 4); bottom: -3vh; animation-duration: 42s; }
+        /* the towers with a third of their windows, steady; the other two thirds flicker on and off on their own */
+        #loading-screen .ls-city-far .ls-shape { background-image: url(@art:windows-far-c), url(@art:skyline-far); }
+        #loading-screen .ls-city-far .ls-win-a { background-image: url(@art:windows-far-a); }
+        #loading-screen .ls-city-far .ls-win-b { background-image: url(@art:windows-far-b); }
+        #loading-screen .ls-city-near .ls-shape { background-image: url(@art:windows-near-c), url(@art:skyline-near); }
+        #loading-screen .ls-city-near .ls-win-a { background-image: url(@art:windows-near-a); }
+        #loading-screen .ls-city-near .ls-win-b { background-image: url(@art:windows-near-b); }
+        #loading-screen .ls-city .ls-win-a { animation: lsFlickerA 6.5s steps(1, end) infinite; will-change: opacity; }
+        #loading-screen .ls-city .ls-win-b { animation: lsFlickerB 8.5s steps(1, end) infinite; will-change: opacity; }
+        /* the street's glow under it all, and mist rolling along it */
+        #loading-screen .ls-street { position: absolute; left: 0; right: 0; bottom: 0; height: 30vh; pointer-events: none;
+            background: linear-gradient(to top, rgba(6, 2, 9, 0.96) 0%, rgba(6, 2, 9, 0.78) 22%, rgba(6, 2, 9, 0.22) 55%, rgba(6, 2, 9, 0) 85%); }
+        #loading-screen .ls-mist { --tile: 100vw; left: 0; bottom: 4vh; width: 200vw; height: 22vh; opacity: 0.55; animation: lsSlide 38s linear infinite;
+            background: radial-gradient(ellipse 18% 50% at 10% 60%, rgba(196, 160, 255, 0.22), rgba(196, 160, 255, 0) 70%),
+                        radial-gradient(ellipse 22% 45% at 36% 70%, rgba(232, 194, 122, 0.12), rgba(232, 194, 122, 0) 70%),
+                        radial-gradient(ellipse 16% 50% at 60% 55%, rgba(196, 160, 255, 0.2), rgba(196, 160, 255, 0) 70%),
+                        radial-gradient(ellipse 24% 40% at 86% 65%, rgba(255, 140, 190, 0.1), rgba(255, 140, 190, 0) 70%);
+            background-size: 100vw 100%; background-repeat: repeat-x; }
+
+        /* the title, in the menu's hollow neon script */
+        #loading-screen .ls-title { position: absolute; left: 0; right: 0; top: 40%; transform: translateY(-50%); text-align: center; pointer-events: none; --title-size: min(17vh, 11vw); }
+        #loading-screen .ls-title-main, #loading-screen .ls-title-sub { margin: 0; font-family: 'Anthropology', 'Great Vibes', cursive; font-weight: 400; line-height: 1; color: transparent;
+            -webkit-text-stroke: 1.2px #f1eaff; filter: drop-shadow(0 0 1px rgba(240, 228, 255, 0.7)) drop-shadow(0 0 5px rgba(170, 120, 255, 0.6)) drop-shadow(0 0 16px rgba(120, 60, 220, 0.35)); }
+        #loading-screen .ls-title-main { font-size: var(--title-size); }
+        #loading-screen .ls-title-sub { font-size: calc(var(--title-size) * 0.6); letter-spacing: 0.34em; margin: 0.02em 0 0 0.34em; -webkit-text-stroke-width: 1px; }
+        #loading-screen .ls-title-glow { animation: lsBreathe 4.6s ease-in-out infinite; will-change: opacity; }
+        #loading-screen .ls-title { opacity: 0; transition: opacity 0.6s ease; }
+        #loading-screen.ls-font .ls-title { opacity: 1; }
+
+        /* the bar, what it's doing, and how far along */
+        #loading-screen .ls-foot { position: absolute; left: 50%; bottom: max(7vh, 28px, calc(env(safe-area-inset-bottom, 0px) + 18px)); transform: translateX(-50%);
+            width: min(440px, 76vw); display: flex; flex-direction: column; align-items: stretch; gap: 10px; pointer-events: none; }
+        #loading-screen .ls-foot::before { content: ''; position: absolute; left: -22%; right: -22%; top: -70%; bottom: -90%; z-index: -1; pointer-events: none;
+            background: radial-gradient(closest-side, rgba(6, 2, 9, 0.9), rgba(6, 2, 9, 0.6) 55%, rgba(6, 2, 9, 0)); }
+        #loading-screen .ls-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+        #loading-screen .ls-status { font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; font-size: 1.05rem; letter-spacing: 0.12em; color: #e8c27a;
+            text-shadow: 0 0 10px rgba(232, 194, 122, 0.45); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #loading-screen .ls-dots span { display: inline-block; animation: lsDot 1.4s ease-in-out infinite; will-change: opacity; }
+        #loading-screen .ls-dots span:nth-child(2) { animation-delay: 0.2s; }
+        #loading-screen .ls-dots span:nth-child(3) { animation-delay: 0.4s; }
+        #loading-screen .ls-pct { font-family: 'Orbitron', 'Montserrat', sans-serif; font-size: 0.7rem; letter-spacing: 0.2em; color: rgba(214, 200, 240, 0.7); font-variant-numeric: tabular-nums; }
+        #loading-screen .ls-bar { position: relative; height: 3px; border-radius: 3px; overflow: hidden; background: rgba(241, 234, 255, 0.1); box-shadow: 0 0 0 1px rgba(164, 105, 255, 0.12); }
+        #loading-screen .ls-fill { position: absolute; inset: 0; transform-origin: 0 50%; transform: scaleX(0); transition: transform 0.35s ease-out; will-change: transform;
+            background: linear-gradient(90deg, #8f5fe8, #c49be8 55%, #e8c27a); box-shadow: 0 0 10px rgba(232, 194, 122, 0.6); }
+        #loading-screen .ls-glint { position: absolute; top: 0; bottom: 0; left: 0; width: 22%; will-change: transform; animation: lsGlint 1.9s ease-in-out infinite;
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0)); mix-blend-mode: screen; }
+        #loading-screen .ls-error { display: none; font-size: 0.8rem; line-height: 1.5; color: #ffb3c4; text-align: center; letter-spacing: 0.04em; }
+        #loading-screen.ls-failed .ls-error { display: block; pointer-events: auto; cursor: pointer; }
+        #loading-screen.ls-failed .ls-glint, #loading-screen.ls-failed .ls-dots { display: none; }
+        #loading-screen.ls-failed .ls-fill { background: linear-gradient(90deg, #8f3a5f, #e86a8a); }
+
+        body.landscape #loading-screen .ls-foot, #loading-screen.ls-short .ls-foot { bottom: max(5vh, 16px); gap: 7px; }
+        @media (max-height: 460px) { #loading-screen .ls-status { font-size: 0.9rem; } #loading-screen .ls-title { top: 36%; } #loading-screen .ls-portal { top: 36%; } }
+
+        @keyframes lsSpin { to { transform: rotate(360deg); } }
+        @keyframes lsSlide { to { transform: translateX(calc(-1 * var(--tile))); } }
+        @keyframes lsPulse { 0%, 100% { opacity: 0.65; transform: scale(0.94); } 50% { opacity: 1; transform: scale(1.04); } }
+        @keyframes lsBreathe { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
+        @keyframes lsTwinkle { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+        @keyframes lsFlickerA { 0% { opacity: 1; } 22% { opacity: 0.15; } 31% { opacity: 1; } 64% { opacity: 0.3; } 70% { opacity: 1; } }
+        @keyframes lsFlickerB { 0% { opacity: 0.2; } 14% { opacity: 1; } 47% { opacity: 0.4; } 52% { opacity: 1; } 83% { opacity: 0.1; } 90% { opacity: 1; } }
+        @keyframes lsDot { 0%, 100% { opacity: 0.15; } 40% { opacity: 1; } }
+        @keyframes lsGlint { 0% { transform: translateX(-120%); } 100% { transform: translateX(560%); } }
+        @keyframes lsMeteor { 0%, 90% { opacity: 0; transform: rotate(-24deg) translateX(0); } 92% { opacity: 1; } 100% { opacity: 0; transform: rotate(-24deg) translateX(-420px); } }
+
+        @media (prefers-reduced-motion: reduce) {
+            #loading-screen .ls-city, #loading-screen .ls-stars, #loading-screen .ls-mist { animation-duration: 600s; }
+            #loading-screen .ls-ring, #loading-screen .ls-orbit { animation-duration: 60s; }
+            #loading-screen .ls-meteor { display: none; }
+        }

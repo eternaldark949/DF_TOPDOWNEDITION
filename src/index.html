@@ -13,6 +13,49 @@
     </style>
 </head>
 <body>
+    <!-- The loading screen: first thing in the page so it paints while the rest is still arriving.
+         Styles in styles/loading-screen.css; driven by app/boot-loader.js (LoadingScreen). -->
+    <div id="loading-screen" role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="ls-layer ls-stars ls-stars-b"></div>
+        <div class="ls-layer ls-stars ls-stars-a"></div>
+        <div class="ls-layer ls-meteor"></div>
+        <div class="ls-layer ls-meteor ls-m2"></div>
+        <div class="ls-haze"></div>
+        <div class="ls-portal">
+            <div class="ls-glow"></div>
+            <div class="ls-ring ls-ring-1"></div>
+            <div class="ls-ring ls-ring-2"></div>
+            <div class="ls-ring ls-ring-3"></div>
+            <div class="ls-orbit"></div>
+            <div class="ls-orbit ls-orbit-2"></div>
+        </div>
+        <div class="ls-layer ls-city ls-city-far"><div class="ls-shape"></div><div class="ls-win-a"></div><div class="ls-win-b"></div></div>
+        <div class="ls-layer ls-mist"></div>
+        <div class="ls-layer ls-city ls-city-near"><div class="ls-shape"></div><div class="ls-win-a"></div><div class="ls-win-b"></div></div>
+        <div class="ls-street"></div>
+        <div class="ls-title"><div class="ls-title-glow">
+            <div class="ls-title-main">Dimensions</div>
+            <div class="ls-title-sub">Freelancer</div>
+        </div></div>
+        <div class="ls-foot">
+            <div class="ls-row">
+                <div class="ls-status"><span class="ls-status-text">Waking the city</span><span class="ls-dots"><span>.</span><span>.</span><span>.</span></span></div>
+                <div class="ls-pct">0%</div>
+            </div>
+            <div class="ls-bar"><div class="ls-fill"></div><div class="ls-glint"></div></div>
+            <div class="ls-error"></div>
+        </div>
+    </div>
+    <script>
+        /* The title waits for its script font (embedded, so a moment at most), then fades in, instead of flashing
+           up in a stand-in face first */
+        (function () {
+            var ls = document.getElementById('loading-screen'), shown = function () { ls.classList.add('ls-font'); };
+            if (!ls || !document.fonts || !document.fonts.load) { if (ls) shown(); return; }
+            document.fonts.load('40px Anthropology').then(shown, shown);
+            setTimeout(shown, 1500);
+        })();
+    </script>
     <!-- Shared icons, drawn with <svg><use href="#icon-…"/></svg> -->
     <svg width="0" height="0" style="position:absolute" aria-hidden="true">
         <!-- Cinematic aperture, after ETERNAL's mock-up: a violet disc of swirling blades in a lavender ring -->
@@ -1343,9 +1386,7 @@
             </filter>
         </defs>
     </svg>
-    <script>
 <!-- @scripts -->
-    </script>
     
     <svg style="position: absolute; height: 0; width: 0; overflow: hidden;">
         <defs>

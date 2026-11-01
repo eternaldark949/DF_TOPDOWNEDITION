@@ -110,8 +110,11 @@ function runtime(file,options={}) {
     confirm(){return true;},alert(){},prompt(){return null;},};
   scope.window=scope;scope.self=scope;scope.globalThis=scope;
   vm.createContext(scope);
-  const html=fs.readFileSync(file,'utf8');const scripts=[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map(m=>m[1]);
-  vm.runInContext(scripts.join('\n')+'\n;globalThis.__probe={game,GameSettings,MAPS:MAP_DATA,PerfBench,DevOverlay,RenderStats,RenderLayers};',scope,{filename:file,timeout:30000});
+  // Each block runs as a script of its own, as the boot loader (src/app/boot-loader.js) runs them in the browser:
+  // a file that uses, at load time, something only a later file declares fails here just as it would there.
+  const html=fs.readFileSync(file,'utf8');const scripts=[...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)].map(m=>({code:m[2],name:(m[1].match(/data-src="([^"]*)"/)||[])[1]||'boot-loader'}));
+  for(const s of scripts)vm.runInContext(s.code,scope,{filename:'src/'+s.name,timeout:30000});
+  vm.runInContext('globalThis.__probe={game,GameSettings,MAPS:MAP_DATA,PerfBench,DevOverlay,RenderStats,RenderLayers};',scope,{filename:file,timeout:30000});
   return {scope,probe:scope.__probe,counters,logs,warnings,errors,trace,pendingTimers,dispatchWindow(e){for(const f of windowEvents.get(e.type)||[])f(e);},setTrace(on){traceEnabled=on;trace.length=0;},run(source){return vm.runInContext(source,scope,{timeout:30000});}};
 }
 module.exports={runtime};
