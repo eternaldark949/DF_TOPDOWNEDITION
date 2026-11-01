@@ -36400,7 +36400,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
            stand free (getCollisionShapes).
            ===================================================================== */
         const DN = {
-            HERO: 2,
+            HERO: 1.5,
             PLAN: { W: 800, D: 430 },
             G: 22, ST: 11,                                                       // the ground floor's and each storey's height
             Z: { WING: 92, MANS: 106, CORE: 114, ATTIC: 126, ROT: 132, CROWN: 146, DOME: 20, CAN0: 25, CAN1: 32, PLINTH: 30 },
@@ -37122,7 +37122,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 DN.BEAMS.forEach(([lx, ly], i) => {
                     const ph = i * 2.4, sx = this.x + lx, sy = this.y + ly;
                     const az = -Math.PI / 2 + (i ? 0.45 : -0.45) + Math.sin(t * 0.2 + ph) * 0.9, elev = 1.02 + 0.16 * Math.sin(t * 0.12 + ph * 1.7);
-                    const C = leanCamHeight(), zTop = C * 0.8, run = (zTop - z0) / Math.tan(elev);
+                    const C = leanCamHeight(), zTop = C * 0.8, run = (zTop - z0 * TierKit.Z_SCALE) / Math.tan(elev);
                     const p0 = this._tkP(sx, sy, z0), cam = game.camera, k1 = C / (C - Math.min(zTop, C * 0.86)), ex = sx + Math.cos(az) * run, ey = sy + Math.sin(az) * run;
                     const p1 = [cam.x + (ex - cam.x) * k1, cam.y + (ey - cam.y) * k1];
                     const vx = p1[0] - p0[0], vy = p1[1] - p0[1], L = Math.hypot(vx, vy) || 1, nx = -vy / L, ny = vx / L;
