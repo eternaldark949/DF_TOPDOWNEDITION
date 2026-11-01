@@ -568,6 +568,15 @@
                 return s;
             }
 
+            /** The forecourt's wet ground for the reflections' mask (engine/reflections.js): [x, y, w, h, strength], world.
+             *  The polished terrace mirrors most, the setts and granite less; the lawns not at all. */
+            wetGround() {
+                const X = this.x, Y = this.y;
+                if (this._dnWet && this._dnWet.x === X && this._dnWet.y === Y) return this._dnWet.r;
+                const r = [[10, 320, 780, 165, 0.48], [-10, 486, 820, 104, 0.38], [-10, 590, 820, 50, 0.34], [170, 640, 460, 220, 0.34]].map(([x, y, w, h, k]) => [X + x, Y + y, w, h, k]);
+                return (this._dnWet = { x: X, y: Y, r }).r;
+            }
+
             /** The ground in front, painted once (phase 'floor', under the puddles and reflections); the cars, the doormen (phase 'top'). No phase draws both. */
             _dnDrawGround(ctx, phase) {
                 if (phase !== 'top') {

@@ -619,6 +619,12 @@
                 ctx.restore();
             }
 
+            /** The forecourt's wet ground for the reflections' mask (engine/reflections.js): the black marble plaza, the terrace. */
+            wetGround() {
+                const Q = this._mcGeo().court;
+                return [[Q.x, Q.y, Q.w, Q.h, 0.6], [this.x + 284, this.y + 300, 316, 404, 0.4]];
+            }
+
             /** The ground in front: the marble plaza, carpet and ropes; the terrace and the valet bay (phase 'floor'); then its car, the light at the door and the people (phase 'top'). No phase draws both. */
             _mcDrawGround(ctx, phase) {
                 const X = this.x, Y = this.y, G = this._mcGeo(), Q = G.court;
