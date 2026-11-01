@@ -150,7 +150,7 @@
                     bind('Windows', RoomSystem.prototype, 'drawWindows');
                     bind('Windows', B, '_drawFaceWindows');
                     bind('Signs', NeonSign.prototype, 'draw');
-                    for (const key of ['drawSign', '_paintSign', '_dnDrawSign', '_mcDrawSign']) bind('Signs', B, key);
+                    for (const key of ['drawSign', '_paintSign', '_mcDrawSign']) bind('Signs', B, key);
                     bind('Ferris wheel', FerrisWheel.prototype, 'drawBase');
                     bind('Ferris wheel', FerrisWheel.prototype, 'drawTop');
                     bind('Foliage', Foliage.prototype, 'draw');

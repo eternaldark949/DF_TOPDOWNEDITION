@@ -529,7 +529,7 @@
         
         BuildingV2Registry.register('double_nights', {
             factory: createDoubleNightsHotel,
-            sections: doubleNightsSections(),     // twin crescents and the atrium, as collision bands (buildings/double-nights.js)
+            sections: doubleNightsSections(),     // the wings, the core and the rotunda's curve in bands (buildings/double-nights.js, on the tiered kit)
             accentColor: '#ffcf8a',               // warm gold: the block's street lamps take this colour
             label: 'Double Nights Hotel',
             type: 'hotel',
@@ -537,7 +537,7 @@
             floors: 14,
             sign: { text: 'Double Nights', color: '#ff1a55', size: 32 },
             door: { target: 'hotel_lobby', label: 'Enter Hotel', lightColor: '#ffdf80' },
-            apron: { x: -10, y: 380, w: 820, h: 480 }   // the drive, fountain and forecourt: _dnForecourt (buildings/double-nights.js)
+            apron: { x: -10, y: 380, w: 820, h: 480 }   // the terrace, lane, plaza and lawns: _dnForecourt (buildings/double-nights.js)
         });
         
         // Moon City registers itself on the tiered kit (buildings/moon-city-deco.js)

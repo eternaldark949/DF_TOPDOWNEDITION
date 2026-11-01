@@ -55,6 +55,5 @@
             bind(B, '_paintSign', 'Building sign and awning');
             bind(B, '_bakeSignSprites', 'Cold sprite baking');
             bind(B, '_vFront', 'Shopfronts');
-            bind(B, '_dnDrawSign', 'Double Nights');
             bind(B, '_mcDrawSign', 'Moon City');
         };
