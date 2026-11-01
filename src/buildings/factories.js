@@ -292,59 +292,7 @@
          * Wide, low industrial garage with amber/orange accent.
          */
         function createTorqueAutoShop(x, y, config = {}) {
-            return new TorqueAutoBuilding({                // its art: buildings/torque-auto.js
-                id: 'torque_auto',
-                x: x,
-                y: y,
-                label: 'Torque Auto',
-                type: 'auto_shop',
-                floors: 2,
-                
-                // Wide garage footprint
-                sections: [
-                    { x: 0, y: 0, w: 500, h: 350 },       // Main garage bay
-                    { x: 500, y: 50, w: 200, h: 300 },     // Showroom wing (offset)
-                ],
-                
-                // Industrial windows
-                windowWidth: 18,
-                windowHeight: 12,
-                windowSpacingX: 40,
-                windowSpacingY: 30,
-                windowMarginX: 20,
-                windowMarginY: 15,
-                
-                // Colors — dark industrial with amber accents
-                roofColor: '#1a1a14',
-                roofLightColor: '#222218',
-                wallColor: '#1a1814',
-                wallLightColor: '#22201a',
-                accentColor: '#ff8800',
-                windowColor: '#1a1808',
-                windowLitColor: '#ffaa00',
-                windowFrameColor: '#111',
-                balconyColor: '#2a2520',
-                
-                // Overhang above garage doors
-                balconies: [
-                    { section: 0, side: 'south', startX: 50, width: 400, floors: [1] },
-                ],
-                
-                roofProps: [
-                    { type: 'ac_unit', section: 0, x: 30, y: 30, w: 60, h: 40 },
-                    { type: 'vent', section: 0, x: 350, y: 250, w: 30, h: 25 },
-                    { type: 'ac_unit', section: 1, x: 80, y: 100, w: 50, h: 35 },
-                ],
-                
-                sign: { text: 'TORQUE', color: '#ff8800', size: 36 },
-                door: {
-                    target: config.doorTarget || 'auto_shop',
-                    label: 'Enter Auto Shop',
-                    lightColor: '#ff8800'
-                },
-                
-                ...config
-            });
+            return createTorqueAuto(x, y, config);       // on the tiered kit: buildings/torque-auto.js
         }
 
         function createDrYinsClinic(x, y, config = {}) {
