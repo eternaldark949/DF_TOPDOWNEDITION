@@ -583,7 +583,8 @@
             },
 
             /** The forecourt: marble, gold crescents, the red carpet, the ropes (baked); the pool, mist, bouncer and queue (live). */
-            _mcDrawGround(ctx) {
+            _mcDrawGround(ctx, phase) {
+                if (phase === 'top') return;                              // (drawn whole in the floor phase, under the reflections)
                 const G = this._mcGeo(), Q = G.court, C = MCX.C;
                 const spr = LandmarkKit.sprite(this, 'mcground', Q.x, Q.y, Q.w, Q.h, 2, (c) => {
                     c.fillStyle = C.marble; c.fillRect(Q.x, Q.y, Q.w, Q.h);

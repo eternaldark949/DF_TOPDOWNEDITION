@@ -516,7 +516,8 @@
             },
 
             /** Ground layer: the motor court, the marble portico floor, steps and the violet carpet to the curb. */
-            _sqDrawGround(ctx) {
+            _sqDrawGround(ctx, phase) {
+                if (phase === 'top') return;                              // (drawn whole in the floor phase, under the reflections)
                 this._sqDrawCourt(ctx);
                 const g = this._sqPortico();
                 if (!g) return;

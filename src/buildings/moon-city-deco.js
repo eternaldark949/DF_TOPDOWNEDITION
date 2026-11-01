@@ -619,13 +619,16 @@
                 ctx.restore();
             }
 
-            /** The ground in front: the marble plaza, carpet and ropes; the terrace and the valet bay with its car; then the light at the door and the people. */
-            _mcDrawGround(ctx) {
+            /** The ground in front: the marble plaza, carpet and ropes; the terrace and the valet bay (phase 'floor'); then its car, the light at the door and the people (phase 'top'). No phase draws both. */
+            _mcDrawGround(ctx, phase) {
                 const X = this.x, Y = this.y, G = this._mcGeo(), Q = G.court;
-                const s1 = LandmarkKit.sprite(this, 'mcd_plaza', Q.x - 10, Q.y, Q.w + 20, Q.h + 6, 2, (c) => this._mcdPaintPlaza(c));
-                ctx.drawImage(s1.cv, s1.x, s1.y, s1.w, s1.h);
-                const s2 = LandmarkKit.sprite(this, 'mcd_east', X + 284, Y + 300, 316, 404, 1.5, (c) => this._mcdPaintEast(c));
-                ctx.drawImage(s2.cv, s2.x, s2.y, s2.w, s2.h);
+                if (phase !== 'top') {                                    // the paving: under the puddles and reflections
+                    const s1 = LandmarkKit.sprite(this, 'mcd_plaza', Q.x - 10, Q.y, Q.w + 20, Q.h + 6, 2, (c) => this._mcdPaintPlaza(c));
+                    ctx.drawImage(s1.cv, s1.x, s1.y, s1.w, s1.h);
+                    const s2 = LandmarkKit.sprite(this, 'mcd_east', X + 284, Y + 300, 316, 404, 1.5, (c) => this._mcdPaintEast(c));
+                    ctx.drawImage(s2.cv, s2.x, s2.y, s2.w, s2.h);
+                }
+                if (phase === 'floor') return;
                 this._mcdCar(ctx);
                 const dark = typeof game !== 'undefined' && game.getAmbientDarkness ? game.getAmbientDarkness() : 0.6;
                 const night = typeof game !== 'undefined' && game.dayCycle ? game.dayCycle().lampsOn : dark > 0.4;

@@ -488,7 +488,8 @@
             _sqForecourt() { return { x: this.x - 40, y: this.y + 880, w: 430, h: 150 }; }
 
             /** The ground in front: the court (buildings/silver-queen.js), then the forecourt, painted once. */
-            _sqDrawGround(ctx) {
+            _sqDrawGround(ctx, phase) {
+                if (phase === 'top') return;                              // all paving: it goes under the puddles and reflections
                 this._sqDrawCourt(ctx);
                 const s = LandmarkKit.sprite(this, 'sqd_forecourt', this.x - 40, this.y + 878, 430, 152, 2, (c) => this._sqdPaintForecourt(c));
                 ctx.drawImage(s.cv, s.x, s.y, s.w, s.h);

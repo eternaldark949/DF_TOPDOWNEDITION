@@ -35732,7 +35732,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             },
 
             /** Ground layer: the motor court, the marble portico floor, steps and the violet carpet to the curb. */
-            _sqDrawGround(ctx) {
+            _sqDrawGround(ctx, phase) {
+                if (phase === 'top') return;                              // (drawn whole in the floor phase, under the reflections)
                 this._sqDrawCourt(ctx);
                 const g = this._sqPortico();
                 if (!g) return;
@@ -36926,10 +36927,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return s;
             }
 
-            /** The ground in front, painted once; the cars, the doormen. */
-            _dnDrawGround(ctx) {
-                const s = LandmarkKit.sprite(this, 'dn_court', this.x - 10, this.y + 318, 820, 542, 1.5, (c) => this._dnPaintGround(c));
-                ctx.drawImage(s.cv, s.x, s.y, s.w, s.h);
+            /** The ground in front, painted once (phase 'floor', under the puddles and reflections); the cars, the doormen (phase 'top'). No phase draws both. */
+            _dnDrawGround(ctx, phase) {
+                if (phase !== 'top') {
+                    const s = LandmarkKit.sprite(this, 'dn_court', this.x - 10, this.y + 318, 820, 542, 1.5, (c) => this._dnPaintGround(c));
+                    ctx.drawImage(s.cv, s.x, s.y, s.w, s.h);
+                }
+                if (phase === 'floor') return;
                 this._dnCars(ctx);
                 this._dnDoormen(ctx);
             }
@@ -37756,7 +37760,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             },
 
             /** The forecourt: marble, gold crescents, the red carpet, the ropes (baked); the pool, mist, bouncer and queue (live). */
-            _mcDrawGround(ctx) {
+            _mcDrawGround(ctx, phase) {
+                if (phase === 'top') return;                              // (drawn whole in the floor phase, under the reflections)
                 const G = this._mcGeo(), Q = G.court, C = MCX.C;
                 const spr = LandmarkKit.sprite(this, 'mcground', Q.x, Q.y, Q.w, Q.h, 2, (c) => {
                     c.fillStyle = C.marble; c.fillRect(Q.x, Q.y, Q.w, Q.h);
@@ -43005,7 +43010,8 @@ class NeuralSystemsBuilding extends BuildingV2 {
             _sqForecourt() { return { x: this.x - 40, y: this.y + 880, w: 430, h: 150 }; }
 
             /** The ground in front: the court (buildings/silver-queen.js), then the forecourt, painted once. */
-            _sqDrawGround(ctx) {
+            _sqDrawGround(ctx, phase) {
+                if (phase === 'top') return;                              // all paving: it goes under the puddles and reflections
                 this._sqDrawCourt(ctx);
                 const s = LandmarkKit.sprite(this, 'sqd_forecourt', this.x - 40, this.y + 878, 430, 152, 2, (c) => this._sqdPaintForecourt(c));
                 ctx.drawImage(s.cv, s.x, s.y, s.w, s.h);
@@ -43801,13 +43807,16 @@ class NeuralSystemsBuilding extends BuildingV2 {
                 ctx.restore();
             }
 
-            /** The ground in front: the marble plaza, carpet and ropes; the terrace and the valet bay with its car; then the light at the door and the people. */
-            _mcDrawGround(ctx) {
+            /** The ground in front: the marble plaza, carpet and ropes; the terrace and the valet bay (phase 'floor'); then its car, the light at the door and the people (phase 'top'). No phase draws both. */
+            _mcDrawGround(ctx, phase) {
                 const X = this.x, Y = this.y, G = this._mcGeo(), Q = G.court;
-                const s1 = LandmarkKit.sprite(this, 'mcd_plaza', Q.x - 10, Q.y, Q.w + 20, Q.h + 6, 2, (c) => this._mcdPaintPlaza(c));
-                ctx.drawImage(s1.cv, s1.x, s1.y, s1.w, s1.h);
-                const s2 = LandmarkKit.sprite(this, 'mcd_east', X + 284, Y + 300, 316, 404, 1.5, (c) => this._mcdPaintEast(c));
-                ctx.drawImage(s2.cv, s2.x, s2.y, s2.w, s2.h);
+                if (phase !== 'top') {                                    // the paving: under the puddles and reflections
+                    const s1 = LandmarkKit.sprite(this, 'mcd_plaza', Q.x - 10, Q.y, Q.w + 20, Q.h + 6, 2, (c) => this._mcdPaintPlaza(c));
+                    ctx.drawImage(s1.cv, s1.x, s1.y, s1.w, s1.h);
+                    const s2 = LandmarkKit.sprite(this, 'mcd_east', X + 284, Y + 300, 316, 404, 1.5, (c) => this._mcdPaintEast(c));
+                    ctx.drawImage(s2.cv, s2.x, s2.y, s2.w, s2.h);
+                }
+                if (phase === 'floor') return;
                 this._mcdCar(ctx);
                 const dark = typeof game !== 'undefined' && game.getAmbientDarkness ? game.getAmbientDarkness() : 0.6;
                 const night = typeof game !== 'undefined' && game.dayCycle ? game.dayCycle().lampsOn : dark > 0.4;
@@ -83805,6 +83814,23 @@ engineMixin({
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
             /** Keep diagnostics available on demand without timing normal gameplay. */
+            /** The buildings' forecourts, in two phases: 'floor' (the landmarks' painted paving, under the puddles and reflections)
+             *  and 'top' (their cars, doormen, queues and door light, and a street variant's stoop, over them). The candidates are
+             *  found once, in the floor phase, and reused by the top phase the same frame. */
+            _drawForecourts(cullBounds, phase) {
+                if (!(RenderLayers.at('buildings') && this.activeMap.buildings && this.activeMap.type === 'outdoor')) return;
+                const cbW = cullBounds.world, list = this._forecourtCandidates || (this._forecourtCandidates = []);
+                if (phase === 'floor') this._queryRenderBuildings({ left: cbW.left - 60, right: cbW.right + 60, top: cbW.top - 480, bottom: cbW.bottom }, list);
+                for (const entry of list) {
+                    const b = entry.item;
+                    const land = b.style === 'silver_queen' ? b._sqDrawGround : b.style === 'double_nights' ? b._dnDrawGround : b.style === 'moon_city' ? b._mcDrawGround : null;
+                    const ground = land || (phase === 'top' && b.variant && b._vOn() ? b._vBase : null);   // a street variant's stoop, carpet, buckets (street-variants.js)
+                    if (!ground) continue;
+                    if (b.x + b.w + 60 < cbW.left || b.x - 60 > cbW.right || b.y > cbW.bottom || b.y + b.h + 480 < cbW.top) continue;
+                    land ? ground.call(b, this.ctx, phase) : ground.call(b, this.ctx);
+                }
+            },
+
             _syncProfiler() {
                 _profileSampling = !!(this.showProfiler || PerfBench.active || PerformanceBench.active);
                 this.profiler.setEnabled(_profileSampling);
@@ -84299,6 +84325,9 @@ engineMixin({
                 // Inlaid medallions in the paving, where a map lists them (engine/paving-inlays.js); the puddles go over them
                 this.drawPavingInlays(this.ctx);
 
+                // The landmarks' forecourt paving (Silver Queen court, Double Nights terrace, Moon City plaza) goes under the puddles and reflections
+                this._drawForecourts(cullBounds, 'floor');
+
                 // Reflections (engine/reflections.js): the puddles, and the mirrored lights in them and
                 // the wet asphalt, on the ground and the floors (after the painted interiors) before buildings and people so they walk over it
                 if (RL.at('reflections')) {
@@ -84309,20 +84338,8 @@ engineMixin({
                     this._adaptReflections(reflT ? performance.now() - reflT : -1);
                 } else this._refl = null;                                 // (so the light layer lifts no stale one)
 
-                // Building forecourts sit on top of the pavement (Silver Queen portico floor, steps, carpet)
-                if (RL.at('buildings') && this.activeMap.buildings && this.activeMap.type === 'outdoor') {
-                    const cbW = cullBounds.world;
-                    const candidates = this._queryRenderBuildings({ left: cbW.left - 60, right: cbW.right + 60, top: cbW.top - 480, bottom: cbW.bottom },
-                        this._forecourtCandidates || (this._forecourtCandidates = []));
-                    for (const entry of candidates) {
-                        const b = entry.item;
-                        const ground = b.style === 'silver_queen' ? b._sqDrawGround : b.style === 'double_nights' ? b._dnDrawGround : b.style === 'moon_city' ? b._mcDrawGround
-                                     : b.variant && b._vOn() ? b._vBase : null;   // a street variant's stoop, carpet, buckets (street-variants.js)
-                        if (!ground) continue;
-                        if (b.x + b.w + 60 < cbW.left || b.x - 60 > cbW.right || b.y > cbW.bottom || b.y + b.h + 480 < cbW.top) continue;
-                        ground.call(b, this.ctx);
-                    }
-                }
+                // The forecourts' people, cars and lights stand on it (the landmarks' 'top' phase; a street variant's stoop draws whole here)
+                this._drawForecourts(cullBounds, 'top');
                 if (RL.at('decals')) {
                     this.decals.draw(this.ctx, cullBounds.world);
                     this.drawSpills(this.ctx, cullBounds.world);              // spilt drinks (engine/spills.js)

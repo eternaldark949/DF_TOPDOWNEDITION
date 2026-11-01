@@ -568,10 +568,13 @@
                 return s;
             }
 
-            /** The ground in front, painted once; the cars, the doormen. */
-            _dnDrawGround(ctx) {
-                const s = LandmarkKit.sprite(this, 'dn_court', this.x - 10, this.y + 318, 820, 542, 1.5, (c) => this._dnPaintGround(c));
-                ctx.drawImage(s.cv, s.x, s.y, s.w, s.h);
+            /** The ground in front, painted once (phase 'floor', under the puddles and reflections); the cars, the doormen (phase 'top'). No phase draws both. */
+            _dnDrawGround(ctx, phase) {
+                if (phase !== 'top') {
+                    const s = LandmarkKit.sprite(this, 'dn_court', this.x - 10, this.y + 318, 820, 542, 1.5, (c) => this._dnPaintGround(c));
+                    ctx.drawImage(s.cv, s.x, s.y, s.w, s.h);
+                }
+                if (phase === 'floor') return;
                 this._dnCars(ctx);
                 this._dnDoormen(ctx);
             }
