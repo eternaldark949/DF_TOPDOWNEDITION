@@ -131,6 +131,7 @@ const SCRIPTS = [
     'ui/inventory-augments.js',
     'ui/action-dock.js',
     'world/bokeh.js',
+    'world/dream-planet.js',
     'story/missions.js',
     'story/dialogue-bonding.js',
     'story/npc-dialogue.js',

@@ -1303,6 +1303,10 @@
                     this.closeSettings(); this.close();
                     PerformanceBench.run();
 
+                } else if (key === 'dreamStarMap') {
+                    // the dreamlike star map prototype (world/dream-planet.js), over the paused game
+                    DreamStarMap.open();
+
                 } else if (key === 'perfBench') {
                     // The resolution sweep (entities/static-builders-profiler.js PerfBench): back in the game to measure it
                     GameSettings.profilerMode = GameSettings.profilerMode === 'off' || !GameSettings.profilerMode ? 'compact' : GameSettings.profilerMode;
