@@ -14,7 +14,7 @@
    ===================================================================== */
 const NEURAL = { ink:'#081326', navy:'#102444', blue:'#234d80', cobalt:'#326fc2', ice:'#bed8ee',
     metal:'#9baebe', pale:'#e5e6df', gold:'#c1a980', glass:'#102a46',
-    W:400, D:400, ATRIUM:46, SALON:28, VIT:14 };
+    W:400, D:400, ATRIUM:72, SALON:46, VIT:14 };
 const NeuralArt = {
     box(c,x,y,w,h,fill,stroke,r=3,lw=1){c.beginPath();c.roundRect(x,y,w,h,r);if(fill){c.fillStyle=fill;c.fill();}if(stroke){c.strokeStyle=stroke;c.lineWidth=lw;c.stroke();}},
     text(c,t,x,y,size,color=NEURAL.ice){c.fillStyle=color;c.font=`${size}px Georgia,serif`;c.textAlign='center';c.textBaseline='middle';c.fillText(t,x,y);},

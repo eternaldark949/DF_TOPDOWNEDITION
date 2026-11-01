@@ -41780,7 +41780,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         // between arched windows lit warm, a bulb row under the eave; out of its roof the glazed lantern rises
         // under the brass star. The entrance block in front is lower: the grand arch with the door, ringed with
         // marquee bulbs, mirror panels under stars either side, the Biggs marquee on its roof as before.
-        const BG_PLAN = { W: 450, D: 400, PAV: 34, ENT: 24, LANTERN: [172, 78, 106, 94], LANT: 10 };
+        const BG_PLAN = { W: 450, D: 400, PAV: 54, ENT: 34, LANTERN: [172, 78, 106, 94], LANT: 14 };
         const _bgFontsReady = () => !document.fonts || (document.fonts.check('36px "Great Vibes"') && document.fonts.check('12px Orbitron'));
         const _bgFront = (t) => t.mitre.find(e => e && !e.hidden && e.ny > 0.99);
 
@@ -41800,8 +41800,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const n = Math.max(1, Math.round(e.L / 24));
                 for (let i = 0; i <= n; i++) { const x = e.u0 + e.L * i / n; d.fillStyle = T.brass; d.fillRect(x - 0.7, 5.5, 1.4, H - 11); d.fillStyle = 'rgba(255,236,190,.35)'; d.fillRect(x - 0.7, 5.5, 0.4, H - 11); }
                 if (opt.windows === false) continue;
-                for (let i = 0; i < n; i++) {
-                    const xc = e.u0 + e.L * (i + 0.5) / n, w = Math.min(11, e.L / n * 0.5), x0 = xc - w / 2, x1 = xc + w / 2, yt = 7, yb = H - 7.5;
+                const rows = Math.max(1, Math.round((H - 14.5) / 20)), rh = (H - 14.5) / rows;     // a storey of arches every ~20 units
+                for (let rI = 1; rI < rows; rI++) { const y = 7 + rI * rh - 1.6; d.fillStyle = T.brass; d.fillRect(e.u0, y, e.L, 0.9); d.fillStyle = 'rgba(255,236,190,.4)'; d.fillRect(e.u0, y, e.L, 0.3); }
+                for (let rI = 0; rI < rows; rI++) for (let i = 0; i < n; i++) {
+                    const xc = e.u0 + e.L * (i + 0.5) / n, w = Math.min(11, e.L / n * 0.5), x0 = xc - w / 2, x1 = xc + w / 2, yt = 7 + rI * rh + (rI ? 1.6 : 0), yb = 7 + (rI + 1) * rh - (rI < rows - 1 ? 3.2 : 0.5);
                     if (yb - yt < w) continue;
                     _bgArch(d, x0 - 1, x1 + 1, yt - 1, yb + 0.6); d.fillStyle = T.cream; d.fill();
                     _bgArch(d, x0, x1, yt, yb); d.fillStyle = '#13232b'; d.fill();
@@ -41809,7 +41811,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     d.fillStyle = 'rgba(255,200,130,.12)'; d.fillRect(x0, yt, w, yb - yt); d.restore();
                     d.strokeStyle = T.brass; d.lineWidth = 0.4; d.beginPath(); d.moveTo(xc, yt); d.lineTo(xc, yb); d.moveTo(x0, yt + w / 2); d.lineTo(x1, yt + w / 2); d.stroke();
                     BiggsArt.star(d, xc, yt - 2.6, 1.3, T.brass);
-                    if ((i * 5 + Math.round(e.u0)) % 4 !== 0) {
+                    if ((i * 5 + rI * 3 + Math.round(e.u0)) % 4 !== 0) {
                         l.save(); _bgArch(l, x0, x1, yt, yb); l.clip(); const lg = l.createLinearGradient(0, yt, 0, yb); lg.addColorStop(0, 'rgba(255,190,120,.7)'); lg.addColorStop(1, 'rgba(255,220,160,.95)');
                         l.fillStyle = lg; l.fillRect(x0, yt, w, yb - yt); l.fillStyle = '#000'; l.fillRect(xc - 0.2, yt, 0.4, yb - yt); l.fillRect(x0, yt + w / 2 - 0.2, w, 0.4); l.restore();
                     }
@@ -42000,7 +42002,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
    ===================================================================== */
 const NEURAL = { ink:'#081326', navy:'#102444', blue:'#234d80', cobalt:'#326fc2', ice:'#bed8ee',
     metal:'#9baebe', pale:'#e5e6df', gold:'#c1a980', glass:'#102a46',
-    W:400, D:400, ATRIUM:46, SALON:28, VIT:14 };
+    W:400, D:400, ATRIUM:72, SALON:46, VIT:14 };
 const NeuralArt = {
     box(c,x,y,w,h,fill,stroke,r=3,lw=1){c.beginPath();c.roundRect(x,y,w,h,r);if(fill){c.fillStyle=fill;c.fill();}if(stroke){c.strokeStyle=stroke;c.lineWidth=lw;c.stroke();}},
     text(c,t,x,y,size,color=NEURAL.ice){c.fillStyle=color;c.font=`${size}px Georgia,serif`;c.textAlign='center';c.textBaseline='middle';c.fillText(t,x,y);},
