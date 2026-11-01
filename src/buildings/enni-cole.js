@@ -21,7 +21,7 @@
            overhangs. It leans harder than the street (EC.HERO).
            ===================================================================== */
         const EC = {
-            HERO: 2,
+            HERO: 1.5,
             PLAN: { W: 900, D: 700 },
             STONE: { stone: '#b8698a', stoneMid: '#a85d7e', stoneLo: '#8a4566', stoneDk: '#55223c', stoneHi: '#e6b0c6', stoneLt: '#c97c9c' },
             STEEL: '#15161c', STEEL_HI: '#2b2c35', BRONZE: '#7d5c3c', GOLD: '#d6b277', GOLD_HI: '#f5dfb2', NEON: 'rgba(255, 234, 196, 1)',

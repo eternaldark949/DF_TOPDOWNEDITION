@@ -25,7 +25,7 @@
            overhang.
            ===================================================================== */
         const ASH = {
-            HERO: 2.1,
+            HERO: 1.5,
             PLAN: { W: 820, D: 470 },
             TEAL: { stone: '#40806f', stoneMid: '#336a5c', stoneLo: '#214b40', stoneDk: '#0e2622', stoneHi: '#9ad6bf', stoneLt: '#5f9e89',
                     trim: '#e6e1d2', trimLo: '#a29c8d', trimDk: '#6f6a5f', frame: '#11171a' },
@@ -59,7 +59,7 @@
                 for (const X of [e.u0, e.u0 + e.L]) for (let y = top, k = 0; y < H - plinth - 4; y += 4.6, k++) {
                     const w = k % 2 ? 4 : 5.5, x = X === e.u0 ? X : X - w; d.fillStyle = C.trim; d.fillRect(x, y, w, 4.2); d.fillStyle = C.trimLo; d.fillRect(x, y + 3.8, w, 0.4);
                 }
-                const n = Math.max(1, Math.floor((e.L - 10) / 30)), ww = 10;
+                const n = Math.max(1, Math.floor((e.L - 10) / 30)), ww = Math.min(15, e.L / n * 0.55);   // (half the bay: they stretch twice as tall, TierKit.Z_SCALE)
                 for (let i = 0; i < n; i++) {
                     const xc = e.u0 + (i + 0.5) * e.L / n, x0 = xc - ww / 2, x1 = xc + ww / 2;
                     for (const y of rows) {
@@ -89,7 +89,7 @@
             d.fillStyle = C.stoneLo; d.fillRect(0, H - 2.5, L, 2.5);
             for (const e of _ashEdges(t)) {
                 if (e.hidden) continue;
-                const top = y0 + (opt.frieze ? 11 : 3), bot = H - 3, n = Math.max(1, Math.floor(e.L / 40)), aw = Math.min(16, e.L / n * 0.5);
+                const top = y0 + (opt.frieze ? 11 : 3), bot = H - 3, n = Math.max(1, Math.floor(e.L / 40)), aw = Math.min(24, e.L / n * 0.6);
                 const door = opt.door && e === opt.door(t) ? Math.floor(n / 2) : -1;
                 for (let i = 0; i < n; i++) {
                     const xc = e.u0 + (i + 0.5) * e.L / n, isDoor = i === door, w = isDoor ? aw * 1.3 : aw, spring = top + w / 2 + 1;
