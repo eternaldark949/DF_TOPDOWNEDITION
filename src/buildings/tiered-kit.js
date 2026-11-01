@@ -64,6 +64,57 @@
             },
             rect(x, y, w, h) { return [[x, y], [x, y + h], [x + w, y + h], [x + w, y]]; },
             /**
+             * Where a light strip has any light: a summed-area table over cells LIT_CU world px along the wall by LIT_CZ
+             * design units down it (a cell counts as lit if any pixel in it adds anything under 'lighter'). The glow pass
+             * skips a tile whose cells are all dark: it would add nothing. Null if the strip can't be read back.
+             */
+            LIT_CU: 4, LIT_CZ: 1,
+            litMask(cv, S) {
+                let px;
+                try {                                                                   // (read from a throwaway copy: reading the strip itself could move it off the GPU)
+                    const tmp = document.createElement('canvas'); tmp.width = cv.width; tmp.height = cv.height;
+                    const tc = tmp.getContext('2d', { willReadFrequently: true }); tc.drawImage(cv, 0, 0);
+                    px = tc.getImageData(0, 0, cv.width, cv.height).data;
+                } catch (e) { return null; }
+                const W = cv.width, Hh = cv.height, cw = TierKit.LIT_CU * S, ch = TierKit.LIT_CZ * S;
+                const nx = Math.ceil(W / cw), ny = Math.ceil(Hh / ch), cell = new Uint8Array(nx * ny), u32 = new Uint32Array(px.buffer, px.byteOffset, W * Hh);
+                for (let y = 0; y < Hh; y++) {
+                    const row = Math.floor(y / ch) * nx, o = y * W;
+                    for (let c = 0; c < nx; c++) {
+                        if (cell[row + c]) continue;                                    // (already lit: the rest of the cell needn't be read)
+                        for (let x = c * cw, x1 = Math.min(W, x + cw); x < x1; x++) { const v = u32[o + x]; if ((v >>> 24) > 2 && (v & 0xFCFCFC)) { cell[row + c] = 1; break; } }
+                    }
+                }
+                const sat = new Int32Array((nx + 1) * (ny + 1));
+                for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++)
+                    sat[(j + 1) * (nx + 1) + i + 1] = cell[j * nx + i] + sat[j * (nx + 1) + i + 1] + sat[(j + 1) * (nx + 1) + i] - sat[j * (nx + 1) + i];
+                return { cw, ch, nx, ny, sat };
+            },
+            /** Make a light strip's table when the browser is idle (never during the frame that bakes it: no hitch); until then nothing is skipped. */
+            litLater(cv, S) {
+                const go = () => { cv._lit = TierKit.litMask(cv, S); };
+                if (typeof requestIdleCallback === 'function') requestIdleCallback(go, { timeout: 2000 }); else setTimeout(go, 50);
+            },
+            /** Whether the strip rectangle (strip px) holds any light (litMask's table). */
+            litAny(m, sx, sy, sw, sh) {
+                const i0 = Math.max(0, Math.floor(sx / m.cw)), i1 = Math.min(m.nx, Math.ceil((sx + sw) / m.cw)), j0 = Math.max(0, Math.floor(sy / m.ch)), j1 = Math.min(m.ny, Math.ceil((sy + sh) / m.ch));
+                if (i1 <= i0 || j1 <= j0) return false;
+                const W = m.nx + 1, a = m.sat;
+                return a[j1 * W + i1] - a[j0 * W + i1] - a[j1 * W + i0] + a[j0 * W + i0] > 0;
+            },
+            /** Whether a convex polygon (a hull) holds the point at least `inset` inside every edge. */
+            inside(h, x, y, inset) {
+                let sgn = 0;
+                for (let i = 0, n = h.length; i < n; i++) {
+                    const a = h[i], b = h[(i + 1) % n], ex = b[0] - a[0], ey = b[1] - a[1], L = Math.hypot(ex, ey);
+                    if (L < 1e-6) continue;
+                    const c = (ex * (y - a[1]) - ey * (x - a[0])) / L;
+                    if (!sgn) { if (Math.abs(c) < inset) return false; sgn = c > 0 ? 1 : -1; }
+                    if (c * sgn < inset) return false;
+                }
+                return sgn !== 0;
+            },
+            /**
              * A bay standing out of a wall at y = wy (the wall runs along x, the bay out toward +y): cheeks `cheek` long
              * from x0 and x1, then a half-ellipse `depth` deep in n facets. Open at the wall (the tier closes it).
              */
@@ -201,6 +252,7 @@
                 const mk = () => { const cv = document.createElement('canvas'); cv.width = Math.max(1, Math.ceil(L * S)); cv.height = Math.max(1, Math.ceil(H * S)); const c = cv.getContext('2d'); c.scale(S, S); return [cv, c]; };
                 const [dcv, d] = mk(), [lcv, l] = mk();
                 t.paint(d, l, t, H, L);
+                TierKit.litLater(lcv, S);
                 LandmarkKit.stats.baked++;
                 return (t.art = { day: dcv, lit: lcv, S, H });
             }
@@ -212,6 +264,8 @@
                 const ov = base ? S : 0.5;            // tiles overlap a world px (no seams); the additive glow barely, or the overlaps glow twice
                 const V = typeof game !== 'undefined' && ctx.canvas === game.canvas && game._cullBounds && game._cullBounds.view, m = 4;   // (a tile off the screen is skipped; not in a bake or a mirror, which have views of their own)
                 // each tile's transform is composed onto the context's here and set outright (no save / restore per tile)
+                // (the light pass only: skip what adds no light, and what the glow's clips would cut away whole)
+                const lit = base ? null : tex._lit, cover = base ? null : this._tkCover;
                 const M = ctx.getTransform(), Ma = M.a, Mb = M.b, Mc = M.c, Md = M.d, Me = M.e, Mf = M.f, du = L * S / nu, dz = (f.z1 - f.z0) / nz;
                 let drew = false;
                 for (let j = 0; j < nz; j++) for (let i = 0; i < nu; i++) {
@@ -225,6 +279,13 @@
                     const z1 = f.z0 + dz * (j + 1);
                     const sx = f.u0 * S + i * du, sw = Math.min(tex.width - sx, du + ov), sy = (t.z1 - z1) * S, sh = Math.min(tex.height - sy, dz * S + ov);
                     if (sw <= 0 || sh <= 0) continue;
+                    if (lit && !TierKit.litAny(lit, sx, sy, sw, sh)) continue;                   // a dark piece of the light strip adds nothing
+                    if (cover) {                                                                // wholly behind a nearer tier or building: clipped away anyway
+                        const cx = bx + dx - ax, cy = by + dy - ay;
+                        let hid = false;
+                        for (const h of cover) if (TierKit.inside(h, ax, ay, 1) && TierKit.inside(h, bx, by, 1) && TierKit.inside(h, dx, dy, 1) && TierKit.inside(h, cx, cy, 1)) { hid = true; break; }
+                        if (hid) continue;
+                    }
                     const ta = (bx - ax) / du, tb = (by - ay) / du, tc = (ax - dx) / (dz * S), td = (ay - dy) / (dz * S);
                     ctx.setTransform(Ma * ta + Mc * tb, Mb * ta + Md * tb, Ma * tc + Mc * td, Mb * tc + Md * td, Ma * dx + Mc * dy + Me, Mb * dx + Md * dy + Mf);
                     ctx.drawImage(tex, sx, sy, sw, sh, 0, 0, sw, sh);
@@ -405,18 +466,22 @@
                 ctx.save(); ctx.globalAlpha *= glow; ctx.globalCompositeOperation = 'lighter';
                 // each tier's light is cut out of the tiers drawn over it (a window behind the bay mustn't shine through it)
                 const order = this._tkOrdered(), hulls = order.map(t => this._tkHullOf(t)), boxes = order.map(t => this._tkBoxOf(t));
+                const ext = this._glowCover || [];                                     // nearer buildings' hulls, clipped out by the glow pass (engine/world-state.js)
                 order.forEach((t, i) => {
                     ctx.save();
-                    const bi = boxes[i];
+                    const bi = boxes[i], cover = ext.slice();
                     for (let j = i + 1; j < order.length; j++) {                       // one clip each: overlapping hulls in one even-odd path would cancel
                         const bj = boxes[j];
                         if (bj[0] > bi[2] || bj[2] < bi[0] || bj[1] > bi[3] || bj[3] < bi[1]) continue;   // (a hull clear of this tier's can't cover any of its light)
                         ctx.beginPath(); ctx.rect(-1e7, -1e7, 2e7, 2e7);
                         hulls[j].forEach(([x, y], n) => n ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
                         ctx.clip('evenodd');
+                        cover.push(hulls[j]);
                     }
                     const art = this._tkArt(t);
+                    this._tkCover = cover.length ? cover : null;
                     for (const f of this._tkVisible(t)) this._tkMap(ctx, f, art.lit, art.S, null);
+                    this._tkCover = null;
                     if (t.roof && t.roofGlow) LandmarkKit.drawSprite(ctx, this._tkRoof(t, true), this._tkK(t.z1));
                     if (t.top) t.top(ctx, true, t, this);
                     ctx.restore();

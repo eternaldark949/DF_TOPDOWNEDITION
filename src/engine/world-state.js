@@ -242,18 +242,21 @@
                             if (!b.isV2 || !b.drawEmissive) continue;
                             if (!entry.standardV2 && !b.inView(V, this.camera)) continue;
                             const beamsOnly = entry.standardV2 && !entry.glowIn, bb = boxes[i];
-                            let clipped = false;
+                            let clipped = false, cover = null;
                             if (!beamsOnly && bb && !b.emissiveReach) for (let j = i + 1; j < n; j++) {
                                 const o = boxes[j];
                                 if (!o || o[0] > bb[2] || o[2] < bb[0] || o[1] > bb[3] || o[3] < bb[1]) continue;
-                                if (!clipped) { ctx.save(); clipped = true; }
+                                if (!clipped) { ctx.save(); clipped = true; cover = []; }
                                 for (const poly of order[j].item._glowOccluders(this.camera)) {
                                     ctx.beginPath(); ctx.rect(-1e7, -1e7, 2e7, 2e7);
                                     poly.forEach((p, k) => k ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath();
                                     ctx.clip('evenodd');
+                                    cover.push(poly);
                                 }
                             }
+                            b._glowCover = cover;                   // (the tiered kit skips light it would draw wholly under these clips)
                             b.drawEmissive(ctx, dark, beamsOnly);   // off screen but for its beams: just those
+                            b._glowCover = null;
                             if (clipped) ctx.restore();
                         }
                     } else {
