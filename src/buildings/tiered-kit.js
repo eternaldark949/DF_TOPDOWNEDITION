@@ -43,6 +43,14 @@
            bottom (+y); facing 'N' turns it round (a rotation, so faces keep their
            handedness). Collision is the bounding rectangle of each tier that
            stands on the street (z0 = 0).
+
+           Scale: a building's heights (z0, z1, ledges, what stands on its roofs)
+           are authored in design units; it stands TierKit.Z_SCALE times as tall
+           in the world. The kit applies it where heights become the lean (_tkK),
+           the sun's shadows and the crown's reach, and the art strips are still
+           painted in design units and stretched up their walls, so every storey,
+           door and window keeps its count and grows with the wall. Design units
+           were the world's until the humanoid stood next to the doors.
            ===================================================================== */
         const TierKit = {
             /** Convex hull (monotone chain) of [x, y] points. */
@@ -67,6 +75,7 @@
             },
             /** A polygon's signed area (negative: its edges' left normals (-dy, dx) point out). */
             LOD: true,                 // tiles sized by their error on screen (_tkTiles); false: always _TK_TILE (to compare)
+            Z_SCALE: 2,                // world height per design unit (see Scale above): storeys, doors and windows at the humanoid's scale
             area(p) { let s = 0; for (let i = 0; i < p.length; i++) { const a = p[i], b = p[(i + 1) % p.length]; s += a[0] * b[1] - b[0] * a[1]; } return s / 2; }
         };
 
@@ -92,7 +101,7 @@
                     sections.push({ x: x0, y: y0, w: Math.max(...xs) - x0, h: Math.max(...ys) - y0 });
                 }
                 const top = Math.max(...config.tiers.map(t => t.z1));
-                super({ ...config, sections, floors: Math.min(CONFIG.BUILDINGS.MAX_FLOORS, Math.ceil(top / CONFIG.BUILDINGS.FLOOR_HEIGHT)) });
+                super({ ...config, sections, floors: Math.min(CONFIG.BUILDINGS.MAX_FLOORS, Math.ceil(top * TierKit.Z_SCALE / CONFIG.BUILDINGS.FLOOR_HEIGHT)) });
                 this.isTiered = true;
                 // Its box (culling, the depth order, the glow pass) runs from its corner to the far side of every tier, overhangs too
                 let mx = 0, my = 0;
@@ -104,13 +113,14 @@
                 this.facing = config.facing === 'N' ? 'N' : 'S';
                 // The render query reckons a building's reach by its crown, at the street's lean: one leaning `hero` times
                 // as hard reaches at least as far as one hero times as tall (k is convex in z)
-                this.crownZ = top * this.hero;
+                this._tkTop = top;
+                this.crownZ = top * TierKit.Z_SCALE * this.hero;
             }
 
-            /** The lean scale at height z, `hero` times the street's. */
-            _tkK(z) { if (!CONFIG.BUILDINGS.LEAN) return 1; const C = leanCamHeight(); return 1 + (C / (C - Math.min(z, C * 0.86)) - 1) * this.hero; }
+            /** The lean scale at design height z (Z_SCALE times as high in the world), `hero` times the street's. */
+            _tkK(z) { if (!CONFIG.BUILDINGS.LEAN) return 1; const C = leanCamHeight(); return 1 + (C / (C - Math.min(z * TierKit.Z_SCALE, C * 0.86)) - 1) * this.hero; }
             _tkP(x, y, z) { const k = this._tkK(z), c = game.camera; return [c.x + (x - c.x) * k, c.y + (y - c.y) * k]; }
-            _hullK() { return Math.max(super._hullK(), this._tkK(this.crownZ / this.hero + CONFIG.CULLING.LEAN_EXTRA * CONFIG.BUILDINGS.FLOOR_HEIGHT)); }
+            _hullK() { return Math.max(super._hullK(), this._tkK(this._tkTop + CONFIG.CULLING.LEAN_EXTRA * CONFIG.BUILDINGS.FLOOR_HEIGHT / TierKit.Z_SCALE)); }
 
             /** The tiers in world coordinates, their faces (exposed by height), and the order groups. Built once per position. */
             _tkGeo() {
@@ -372,7 +382,8 @@
                         this._tkMap(ctx, f, art.day, art.S, t.fill || '#555');
                         this._tkQuad(ctx, f, f.z0, f.z1); ctx.fillStyle = f.shadeFill || (f.shadeFill = `rgba(${sh[0]}, ${sh[1]}, ${sh[2]}, ${0.03 + 0.4 * this._tkTurn(f)})`); ctx.fill();
                         if (f.z0 < 1) {                                                                  // the street's shade at the foot
-                            this._tkQuad(ctx, f, 0, 22); this._tkFade(ctx, foot, this._tkP(f.x1, f.y1, 0), this._tkP(f.x1, f.y1, 22));
+                            const fz = 22 / TierKit.Z_SCALE;                                              // (22 world px: the street's, not the building's)
+                            this._tkQuad(ctx, f, 0, fz); this._tkFade(ctx, foot, this._tkP(f.x1, f.y1, 0), this._tkP(f.x1, f.y1, fz));
                         } else if (!TierKit.LOD || _zoomLOD < 2) {                                       // a contact shadow where it meets the roof below (zoomed right out: too thin to see)
                             this._tkQuad(ctx, f, f.z0, f.z0 + 8); this._tkFade(ctx, contact, this._tkP(f.x1, f.y1, f.z0), this._tkP(f.x1, f.y1, f.z0 + 8));
                         }
@@ -431,7 +442,7 @@
             _sunShadowHulls(dx, dy) {
                 const c = this._tkSun;
                 if (c && c.dx === dx && c.dy === dy && c.x === this.x && c.y === this.y) return c.hulls;
-                const hulls = this._tkGeo().tiers.filter(t => t.z0 < 1 || t.castShadow).map(t => TierKit.hull(t.poly.map(p => p.slice()).concat(t.poly.map(([x, y]) => [x + dx * t.z1, y + dy * t.z1]))));
+                const hulls = this._tkGeo().tiers.filter(t => t.z0 < 1 || t.castShadow).map(t => TierKit.hull(t.poly.map(p => p.slice()).concat(t.poly.map(([x, y]) => [x + dx * t.z1 * TierKit.Z_SCALE, y + dy * t.z1 * TierKit.Z_SCALE]))));
                 this._tkSun = { dx, dy, x: this.x, y: this.y, hulls };
                 return hulls;
             }
