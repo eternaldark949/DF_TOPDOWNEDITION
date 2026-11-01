@@ -32784,7 +32784,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         // ...and how far the glow pass draws past it without the beams (lamp halos, portico mist, the crown):
         // past this, only the beams can reach the screen (drawEmissive's beamsOnly)
         const SQ_GLOW_REACH = 240, MC_GLOW_REACH = 100;
-        const BUILDING_LANDMARK_STYLES = ['silver_queen', 'double_nights', 'moon_city', 'enni_cole', 'cozy_cafe'];
+        const BUILDING_LANDMARK_STYLES = ['silver_queen', 'double_nights', 'moon_city', 'enni_cole'];
 
         class BuildingV2 {
             constructor(config) {
@@ -32946,7 +32946,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
             
             _setupSign(signConfig) {
-                if (this.style === 'double_nights' || this.style === 'moon_city' || this.style === 'cozy_cafe') { this.attachedSign = null; return; }   // these landmarks draw their own script signs
+                if (this.style === 'double_nights' || this.style === 'moon_city') { this.attachedSign = null; return; }   // these landmarks draw their own script signs
                 const mainSection = this.sections[0];
                 const titleCase = (str) => str.replace(/\w\S*/g, (txt) => 
                     txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
@@ -33073,7 +33073,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              * Draw base layer (under player): shadow, ground floor, entrance.
              */
             drawBase(ctx) {
-                if (this.style === 'cozy_cafe') { this._ccDrawBase(ctx); return; }   // buildings/cozy-cafe.js
                 ctx.save();
                 
                 // Draw shadow for each section
@@ -33104,7 +33103,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              * Draw top layer (over player): roof, facades, windows, details.
              */
             drawTop(ctx, worldMinutes = 1260) {
-                if (this.style === 'cozy_cafe' && typeof game !== 'undefined' && game.camera) { this._ccDrawTop(ctx); return; }
                 if (CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera) { this._drawLeanTop(ctx); return; }
                 ctx.save();
                 
@@ -33446,10 +33444,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.roofFeatures = []; this.facadeFeature = 'moon_city'; this.emissiveReach = 600;   // fins, skylight, searchlights (buildings/moon-city.js)
                     this.topReach = MC_TOP_REACH;                           // base and roof passes: the canopy and sign
                     this.glowReach = MC_GLOW_REACH;                         // glow pass, all but the searchlights
-                } else if (this.style === 'cozy_cafe') {
-                    this.roofFeatures = [];                                // hip roof, terrace and chimney (buildings/cozy-cafe.js)
-                    this.topReach = 60;                                    // base and top passes: awnings, signboard, the bistro tables
-                    this.crownZ = 120;                                     // the chimney and its smoke stand over the roof
                 } else if (this.style === 'silver_queen') {
                     this.roofFeatures = ['penthouse'];                     // the rest of the roof is _sqDrawRoof
                     this.facadeFeature = 'silver_queen';
@@ -33467,7 +33461,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const accent = this.colors.accent;
                 if (this.style === 'silver_queen' && t) { this._sqLights(); return; }
                 if (this.style === 'moon_city') { this._mcLights(); return; }
-                if (this.style === 'cozy_cafe') { this._ccLights(); return; }
                 const E = this._entrance();
                 if (E) {
                     const cx = E.cx, cy = E.cy, at = (u, n) => ({ x: cx + E.ux * u + E.nx * n, y: cy + E.uy * u + E.ny * n });
@@ -33765,7 +33758,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             /** Emissive layer (after lighting): lit windows, neon trim, rooftop lights. dark = ambient darkness 0..1 */
             drawEmissive(ctx, dark, beamsOnly) {
-                if (this.style === 'cozy_cafe' && typeof game !== 'undefined' && game.camera) { this._ccDrawEmissive(ctx, dark); return; }
                 if (!(CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera)) return;
                 if (beamsOnly) {   // all but the beams is past glowReach, off screen (world-state.js drawEmissivePass)
                     if (this.style === 'silver_queen') { this._sqDark = dark; this._sqDrawBeams(ctx, dark); }
@@ -37885,20 +37877,21 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         });
         /* =====================================================================
-           COZY CAFE — the hub's corner cafe on Crimson Blvd (style 'cozy_cafe')
+           COZY CAFE — the hub's corner cafe on Crimson Blvd
            ---------------------------------------------------------------------
-           A brick corner house: a shingled hip roof over the back two thirds
-           with the hearth's chimney on its west slope (the fireplace inside sits
-           against the west wall: HEARTHS.cozy_cafe_interior), and a roof terrace
-           over the front with striped parasols and string lights. Down at the
-           street, striped awnings over the shop windows and a wooden signboard
-           over the door; a planter and a bistro table on the pavement.
-
-           Every point is leaned with the walls' camera (LandmarkKit.k), so the
-           roof's slopes, the chimney and the parasols stand at their own heights.
-           Flat busy layers (the deck, the parasols, the pavement) are baked once;
-           the roof planes and walls are a few projected fills a frame. The
-           sections are untouched: collision, shadows and the block are as before.
+           A brick corner house on the tiered kit (buildings/tiered-kit.js):
+             · the house: brick courses between cream quoins, big multi-pane shop
+               windows on the ground floor (warm inside, even by day), flower-
+               boxed windows above, a wood cornice; on the street the door and
+               over it the signboard, "Cozy Cafe" in amber script;
+             · two striped awnings over the shop windows (canopy tiers);
+             · over the house, drawn with the kit's lean (its `top`): a shingled
+               hip roof over the back two thirds with the hearth's chimney on its
+               west slope (the fireplace inside sits against the west wall:
+               HEARTHS.cozy_cafe_interior), and a roof terrace over the front
+               with striped parasols and string lights.
+           Collision is the house (the old section). Down on the pavement: a
+           planter, the chalkboard and two bistro tables.
            ===================================================================== */
         const CAFE_EXTERIOR = {
             brick: '#6a3426', brickHi: '#7d4130', brickLo: '#43201a', mortar: 'rgba(232,190,140,.16)',
@@ -37910,19 +37903,157 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         // The plan, relative to the building's corner: the hip roof's eaves (an overhang past the walls on three
         // sides), its rise, the terrace in front of it, the chimney on the west slope, the door's signboard.
         const CAFE_PLAN = {
-            W: 350, D: 350, EAVE: 3, ROOF_Y1: 232, RISE: 48,
+            W: 350, D: 350, HOUSE: 30, DOOR: 175, AWN: [[14, 115], [221, 115]], AWN_Z: [13, 16], EAVE: 3, ROOF_Y1: 232, RISE: 48,
             CHIM: { x: 34, y: 98, w: 30, h: 30, up: 34 },
             PARASOLS: [[66, 292], [176, 284], [286, 292]], PARASOL_R: 25, PARASOL_Z: 17,
             LIGHTS_Z: 21, SKY: [[62, 112], [238, 288]]
         };
 
-        Object.assign(BuildingV2.prototype, {
-            _ccH() { return Math.min(this.floors, CONFIG.BUILDINGS.MAX_FLOORS) * CONFIG.BUILDINGS.FLOOR_HEIGHT; },
-            _ccK(z) { return CONFIG.BUILDINGS.LEAN ? LandmarkKit.k(z) : 1; },
-            _ccP(x, y, z) {
-                const k = this._ccK(z), cam = game.camera;
-                return [cam.x + (x - cam.x) * k, cam.y + (y - cam.y) * k];
-            },
+        /** The house's walls: brick, quoins, the shop windows and the windows above, the cornice; the door and signboard on the front */
+        function _ccWall(d, l, t, H, L) {
+            const T = CAFE_EXTERIOR, front = t.mitre.find(e => e && !e.hidden && e.ny > 0.99), r = seededRandom(5150);
+            const g = d.createLinearGradient(0, 0, 0, H); g.addColorStop(0, T.brick); g.addColorStop(1, T.brickLo); d.fillStyle = g; d.fillRect(0, 0, L, H);
+            for (let i = 0; i < L * H / 30; i++) { d.fillStyle = r() < 0.5 ? 'rgba(125,65,48,.5)' : 'rgba(52,24,18,.35)'; d.fillRect(r() * L, r() * H, 2.4, 0.6); }   // odd bricks
+            d.fillStyle = T.mortar; for (let y = 1.25; y < H; y += 1.25) d.fillRect(0, y, L, 0.25);
+            const cx = front ? front.u0 + CAFE_PLAN.DOOR : -1e4, gl = H - 1.5, gt = H - 13, ut = H - 26, ub = H - 18;
+            for (const e of t.mitre) {
+                if (!e || e.hidden) continue;
+                d.fillStyle = T.cream; d.fillRect(e.u0, 0, 5, H); d.fillRect(e.u0 + e.L - 5, 0, 5, H);          // the quoins
+                d.fillStyle = 'rgba(120,90,60,.35)'; for (let y = 2; y < H; y += 2.5) { d.fillRect(e.u0, y, 5, 0.3); d.fillRect(e.u0 + e.L - 5, y, 5, 0.3); }
+                // the shop windows below (either side of the door on the front)
+                const spans = [];
+                if (e === front) { spans.push([e.u0 + 16, cx - 30], [cx + 30, e.u0 + e.L - 16]); }
+                else { const n = Math.max(2, Math.round(e.L / 90)); for (let i = 0; i < n; i++) spans.push([e.u0 + e.L * (i + 0.18) / n, e.u0 + e.L * (i + 0.82) / n]); }
+                for (const [a, b] of spans) {
+                    d.fillStyle = T.cream; d.fillRect(a - 1.6, gt - 0.8, b - a + 3.2, gl - gt + 0.8);
+                    const gg = d.createLinearGradient(0, gt, 0, gl); gg.addColorStop(0, '#4a2e1c'); gg.addColorStop(1, T.glass); d.fillStyle = gg; d.fillRect(a, gt, b - a, gl - gt - 0.6);
+                    d.fillStyle = 'rgba(255,200,120,.2)'; d.fillRect(a, gt, b - a, gl - gt - 0.6);
+                    l.fillStyle = 'rgba(255,186,96,.8)'; l.fillRect(a, gt, b - a, gl - gt - 0.6);
+                    const n = Math.max(2, Math.round((b - a) / 22));
+                    d.fillStyle = T.wood; l.fillStyle = '#000';
+                    for (let i = 1; i < n; i++) { const x = a + (b - a) * i / n; d.fillRect(x - 0.6, gt, 1.2, gl - gt); l.fillRect(x - 0.6, gt, 1.2, gl - gt); }
+                    d.fillRect(a, gt + 2.6, b - a, 0.5); l.fillRect(a, gt + 2.6, b - a, 0.5);                    // the transom
+                    d.fillStyle = T.wood; d.fillRect(a - 1.6, gl - 0.8, b - a + 3.2, 0.8);                       // the sill
+                    // a shadow of the room: tables and a lamp or two
+                    for (let x = a + 8; x < b - 6; x += 18) { d.fillStyle = 'rgba(40,20,10,.35)'; d.fillRect(x, gl - 4.6, 9, 0.6); d.fillRect(x + 4, gl - 4.6, 1, 3.6); l.fillStyle = 'rgba(255,230,170,.9)'; l.beginPath(); l.arc(x + 4.5, gt + 4.6, 1.2, 0, Math.PI * 2); l.fill(); }
+                }
+                // the windows above, flower boxes under them (none behind the signboard)
+                const nu = Math.max(3, Math.round(e.L / 70));
+                for (let i = 0; i < nu; i++) {
+                    const a = e.u0 + e.L * (i + 0.3) / nu, b = e.u0 + e.L * (i + 0.7) / nu;
+                    if (e === front && b > cx - 58 && a < cx + 58) continue;
+                    d.fillStyle = T.cream; d.fillRect(a - 1.2, ut - 0.8, b - a + 2.4, ub - ut + 1.6);
+                    d.fillStyle = T.glass; d.fillRect(a, ut, b - a, ub - ut); d.fillStyle = 'rgba(255,200,120,.14)'; d.fillRect(a, ut, b - a, ub - ut);
+                    d.fillStyle = T.cream; d.fillRect((a + b) / 2 - 0.5, ut, 1, ub - ut); d.fillRect(a, (ut + ub) / 2 - 0.3, b - a, 0.6);
+                    if ((i * 7 + Math.round(e.u0)) % 3) { l.fillStyle = 'rgba(255,214,140,.6)'; l.fillRect(a, ut, b - a, ub - ut); l.fillStyle = '#000'; l.fillRect((a + b) / 2 - 0.5, ut, 1, ub - ut); l.fillRect(a, (ut + ub) / 2 - 0.3, b - a, 0.6); }
+                    d.fillStyle = T.wood; d.fillRect(a - 2, ub + 0.8, b - a + 4, 1.4);                        // the flower box
+                    for (let x = a - 1.4; x < b + 2; x += 2.2) { d.fillStyle = r() < 0.6 ? T.leaf : T.leafHi; d.beginPath(); d.arc(x, ub + 0.6, 1, 0, Math.PI * 2); d.fill(); if (r() < 0.4) { d.fillStyle = ['#f2c14e', '#e86a5c', '#f6ecd8'][Math.floor(r() * 3)]; d.fillRect(x - 0.4, ub, 0.8, 0.6); } }
+                }
+            }
+            // the cornice: a cream lip over a wood band
+            d.fillStyle = T.cream; d.fillRect(0, 0, L, 0.9); d.fillStyle = T.wood; d.fillRect(0, 0.9, L, 1.4); d.fillStyle = 'rgba(0,0,0,.25)'; d.fillRect(0, 2.3, L, 0.4);
+            if (!front) return;
+            // the door: dark wood in a cream surround, a lit glass panel, the brass handle
+            const dt = H - 14;
+            d.fillStyle = T.cream; d.fillRect(cx - 14, dt - 1, 28, H - dt + 1);
+            d.fillStyle = T.wood; d.fillRect(cx - 12, dt, 24, H - dt);
+            d.fillStyle = 'rgba(255,200,120,.35)'; for (const x of [cx - 10, cx + 1.5]) d.fillRect(x, dt + 2, 8.5, 6);
+            l.fillStyle = 'rgba(255,200,120,.95)'; for (const x of [cx - 10, cx + 1.5]) l.fillRect(x, dt + 2, 8.5, 6);
+            d.fillStyle = T.woodHi; d.fillRect(cx - 0.4, dt, 0.8, H - dt);
+            d.fillStyle = '#d8b26a'; d.fillRect(cx - 2.6, dt + 9, 1, 1.6); d.fillRect(cx + 1.6, dt + 9, 1, 1.6);
+            // the signboard over it: dark wood, a brass edge, the name in amber script and a steaming cup
+            const bx = cx - 52, by = H - 22.6, bw = 104, bh = 7.4;
+            d.fillStyle = 'rgba(0,0,0,.35)'; d.fillRect(bx + 1, by + bh, bw - 2, 0.8);
+            const bg = d.createLinearGradient(0, by, 0, by + bh); bg.addColorStop(0, '#4a2a1a'); bg.addColorStop(1, '#2a160d'); d.fillStyle = bg; d.fillRect(bx, by, bw, bh);
+            d.strokeStyle = '#c99a52'; d.lineWidth = 0.5; d.strokeRect(bx + 0.25, by + 0.25, bw - 0.5, bh - 0.5);
+            l.strokeStyle = 'rgba(255,190,90,.55)'; l.lineWidth = 0.4; l.strokeRect(bx + 0.25, by + 0.25, bw - 0.5, bh - 0.5);
+            for (const [c, col] of [[d, '#ffbf4d'], [l, 'rgba(255,196,96,1)']]) {
+                c.save(); c.translate(cx + 6, by + bh / 2 + 0.4); c.scale(1, 0.5);                           // (the strip's y is design units, twice the world's)
+                c.font = '12.5px "Great Vibes", "URW Chancery L", "Z003", cursive'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = col; c.fillText('Cozy Cafe', 0, 0);
+                c.restore();
+                const ux = bx + 11, uy = by + bh / 2 + 1;
+                c.fillStyle = c === d ? T.cream : 'rgba(255,214,150,.8)'; c.fillRect(ux - 3, uy - 1.6, 5.5, 3); c.fillRect(ux + 2.5, uy - 1, 1, 1.6);
+                c.fillRect(ux - 1.4, uy - 3.2, 0.5, 1.2); c.fillRect(ux + 0.8, uy - 3.4, 0.5, 1.2);
+            }
+            // a lantern either side of the door
+            for (const s of [-1, 1]) { const lx = cx + s * 20; d.fillStyle = '#1e1410'; d.fillRect(lx - 1.4, dt + 1, 2.8, 3.2); d.fillStyle = '#ffd690'; d.fillRect(lx - 0.9, dt + 1.6, 1.8, 2); l.fillStyle = 'rgba(255,200,110,1)'; l.fillRect(lx - 0.9, dt + 1.6, 1.8, 2); }
+        }
+
+        /** An awning's edges: amber and cream stripes, a scalloped valance, warm light under it at night */
+        function _ccAwning(d, l, t, H, L) {
+            const T = CAFE_EXTERIOR, w = 6.5;
+            for (let x = 0, i = 0; x < L; x += w, i++) { d.fillStyle = i % 2 ? T.stripeB : T.stripeA; d.fillRect(x, 0, w, H); }
+            d.fillStyle = 'rgba(0,0,0,.18)'; d.fillRect(0, 0, L, 0.5);
+            for (let x = 0, i = 0; x < L; x += w, i++) { d.fillStyle = i % 2 ? '#d9c7a2' : '#c2741f'; d.beginPath(); d.ellipse(x + w / 2, H - 0.9, w / 2, 0.9, 0, 0, Math.PI); d.fill(); }
+            l.fillStyle = 'rgba(255,190,110,.35)'; l.fillRect(0, H - 0.6, L, 0.6);
+        }
+
+        function _ccHouseRoof(c, glow, t) {
+            if (glow) return;
+            const [x, y] = t.box;
+            c.fillStyle = CAFE_EXTERIOR.ridge; c.fillRect(x, y, CAFE_PLAN.W, CAFE_PLAN.D);               // (under the hip roof and the terrace's deck)
+        }
+
+        function _ccAwningRoof(c, glow, t) {
+            const [x0, y0, x1, y1] = t.box, T = CAFE_EXTERIOR, w = 13;
+            if (glow) return;
+            for (let x = x0, i = 0; x < x1; x += w, i++) { c.fillStyle = i % 2 ? T.stripeB : T.stripeA; c.fillRect(x, y0, Math.min(w, x1 - x), y1 - y0); }
+            const sh = c.createLinearGradient(0, y0, 0, y1); sh.addColorStop(0, 'rgba(60,30,10,.28)'); sh.addColorStop(1, 'rgba(255,240,210,.12)'); c.fillStyle = sh; c.fillRect(x0, y0, x1 - x0, y1 - y0);
+            c.strokeStyle = 'rgba(58,33,22,.55)'; c.lineWidth = 0.8; c.beginPath(); c.moveTo(x0, y1 - 0.4); c.lineTo(x1, y1 - 0.4); c.stroke();
+        }
+
+        /** The hip roof, the terrace and the chimney, drawn over the house with its lean */
+        function _ccTop(ctx, emissive, t, b) {
+            ctx.save();
+            b._ccDrawRoof(ctx, emissive); b._ccDrawTerrace(ctx, emissive); b._ccDrawChimney(ctx, emissive);
+            ctx.restore();
+        }
+
+        const _ccFontsReady = () => !document.fonts || document.fonts.check('25px "Great Vibes"');
+
+        class CozyCafeBuilding extends TieredBuilding {
+            constructor(config) {
+                super(config);
+                this.crownZ = (CAFE_PLAN.HOUSE * TierKit.Z_SCALE + CAFE_PLAN.RISE + CAFE_PLAN.CHIM.up + 50) * this.hero;   // the chimney and its smoke stand over the roof
+            }
+            _setupSign() { this.attachedSign = null; }                  // the signboard is on the front wall
+            _generateLights() { this._ccLights(); this.topReach = 60; }  // (the awnings and the bistro tables)
+            drawBase(c) { super.drawBase(c); this._ccDrawBase(c); }
+            /** The signboard's script waits for its font: the walls are painted again once it has loaded. */
+            drawTop(c) {
+                if (!this._ccFonts && _ccFontsReady()) { this._ccFonts = true; this._lkSprites = {}; for (const t of this._tkGeo().tiers) t.art = null; }
+                super.drawTop(c);
+            }
+            drawSign() {}
+        }
+        TierKit.profile(CozyCafeBuilding);
+
+        /** The Cozy Cafe: x, y its corner, the door on its front (south). */
+        function createCozyCafeTiered(x, y, config = {}) {
+            const T = CAFE_EXTERIOR, P = CAFE_PLAN, [za, zb] = P.AWN_Z;
+            const awning = (i) => ({ id: 'awning' + i, solid: false, rect: [P.AWN[i][0], P.D + 1, P.AWN[i][1], 20], z0: za, z1: zb, S: 4, fill: T.stripeA, paint: _ccAwning, shade: [30, 14, 8],
+                roofRes: 1, roof: _ccAwningRoof });
+            return new CozyCafeBuilding({
+                id: 'cozy_cafe', x, y, label: 'Cozy Cafe', type: 'cafe', facing: 'S', hero: 1.5, plan: { W: P.W, D: P.D },
+                roofColor: '#4a3028', roofLightColor: '#5a3a30', wallColor: T.brick, wallLightColor: T.brickHi, accentColor: '#ffaa00',
+                windowColor: '#2a1b14', windowLitColor: '#ffe0a0', windowFrameColor: T.cream, balconyColor: '#3e2723', balconies: [], roofProps: [],
+                sign: { text: 'Cozy Cafe', color: '#ffaa00', size: 28 },
+                door: { target: config.doorTarget || 'cozy_cafe_interior', label: 'Enter Cafe', lightColor: null },   // (lit by _ccLights)
+                tiers: [
+                    { id: 'house', rect: [0, 0, P.W, P.D], z0: 0, z1: P.HOUSE, S: 2, fill: T.brick, paint: _ccWall, shade: [30, 14, 8],
+                      ledges: [{ z: P.HOUSE, out: 2, th: 1.6, top: T.wood, band: [58, 33, 22], lip: 'rgba(239,220,182,.7)' }], roofRes: 1, roof: _ccHouseRoof, top: _ccTop },
+                    // (a px off the wall: a tier back to back with a wall hides it below its top, _tkGeo)
+                    awning(0), awning(1)
+                ],
+                ...config
+            });
+        }
+
+        Object.assign(CozyCafeBuilding.prototype, {
+            // (heights here are world px; the kit's are design units, Z_SCALE times smaller)
+            _ccH() { return CAFE_PLAN.HOUSE * TierKit.Z_SCALE; },
+            _ccK(z) { return this._tkK(z / TierKit.Z_SCALE); },
+            _ccP(x, y, z) { return this._tkP(x, y, z / TierKit.Z_SCALE); },
             /** The hip roof: its four planes as world points with heights (eave corners, ridge ends). */
             _ccRoof() {
                 if (this._ccRoofGeo && this._ccRoofGeo.x === this.x && this._ccRoofGeo.y === this.y) return this._ccRoofGeo;
@@ -37958,7 +38089,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             _ccDrawBase(ctx) {
                 const s = LandmarkKit.sprite(this, 'cc_ground', this.x - 16, this.y - 12, CAFE_PLAN.W + 52, CAFE_PLAN.D + 66, 1, c => {
                     const x = this.x, y = this.y, T = CAFE_EXTERIOR, wy = y + CAFE_PLAN.D;
-                    c.fillStyle = 'rgba(0,0,0,.42)'; c.fillRect(x + 16, y + 16, CAFE_PLAN.W, CAFE_PLAN.D);
                     const t = this.attachedTransition, cx = t.x + t.w / 2;
                     // Brick step and a coir mat at the door
                     c.fillStyle = '#5a3326'; c.beginPath(); c.roundRect(cx - 48, wy, 96, 16, [0, 0, 6, 6]); c.fill();
@@ -37999,121 +38129,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 });
                 ctx.drawImage(s.cv, s.x, s.y, s.w, s.h);
-            },
-
-            /** One wall: brick courses, cream corners, windows (big shop windows below, flower-boxed ones above), cornice. */
-            _ccFace(ctx, f, emissive) {
-                const T = CAFE_EXTERIOR, H = this._ccH(), L = Math.hypot(f.x2 - f.x1, f.y2 - f.y1);
-                const P = (u, z) => this._ccP(f.x1 + (f.x2 - f.x1) * u, f.y1 + (f.y2 - f.y1) * u, z);
-                const quad = (path, u0, u1, z0, z1) => {
-                    const a = P(u0, z0), b = P(u1, z0), d = P(u0, z1), e = P(u1, z1);
-                    path.moveTo(a[0], a[1]); path.lineTo(b[0], b[1]); path.lineTo(e[0], e[1]); path.lineTo(d[0], d[1]); path.closePath();
-                    return path;
-                };
-                const front = f.side === 'S';
-                // The door's span along this face (front only), so the shop windows sit either side of it
-                const t = this.attachedTransition, du = front ? (t.x + t.w / 2 - f.x1) / (f.x2 - f.x1) : -1, dw = 34 / L;
-                const lower = [], upper = [], z0 = 3, z1 = H * 0.48, z2 = H * 0.6, z3 = H * 0.86;
-                if (front) {
-                    for (const [a, b] of [[0.05, du - dw - 0.06], [du + dw + 0.06, 0.95]]) if (b > a) lower.push([Math.min(a, b), Math.max(a, b)]);
-                } else {
-                    const n = Math.max(2, Math.round(L / 90));
-                    for (let i = 0; i < n; i++) lower.push([(i + 0.2) / n, (i + 0.8) / n]);
-                }
-                const nu = Math.max(3, Math.round(L / 70));
-                for (let i = 0; i < nu; i++) upper.push([(i + 0.3) / nu, (i + 0.7) / nu]);
-                if (!emissive) {
-                    const g = ctx.createLinearGradient(...P(0.5, 0), ...P(0.5, H));
-                    g.addColorStop(0, T.brickLo); g.addColorStop(1, front ? T.brickHi : T.brick);
-                    ctx.fillStyle = g; ctx.fill(quad(new Path2D(), 0, 1, 0, H));
-                    const courses = new Path2D();
-                    for (let z = 2.5; z < H - 2; z += 2.5) { const a = P(0, z), b = P(1, z); courses.moveTo(a[0], a[1]); courses.lineTo(b[0], b[1]); }
-                    ctx.strokeStyle = T.mortar; ctx.lineWidth = 0.7; ctx.stroke(courses);
-                    const corners = new Path2D(); quad(corners, 0, 6 / L, 0, H); quad(corners, 1 - 6 / L, 1, 0, H);
-                    ctx.fillStyle = T.cream; ctx.fill(corners);
-                    const frames = new Path2D(), glass = new Path2D(), bars = new Path2D(), boxes = new Path2D();
-                    for (const [a, b] of lower) {
-                        quad(frames, a, b, z0, z1); quad(glass, a + 2 / L, b - 2 / L, z0 + 1, z1 - 1);
-                        const n = Math.max(2, Math.round((b - a) * L / 26));
-                        for (let i = 1; i < n; i++) quad(bars, a + (b - a) * i / n - 0.6 / L, a + (b - a) * i / n + 0.6 / L, z0, z1);
-                        quad(bars, a, b, z1 - 3.2, z1 - 2.6);                            // the transom
-                    }
-                    for (const [a, b] of upper) {
-                        quad(frames, a, b, z2, z3); quad(glass, a + 1.5 / L, b - 1.5 / L, z2 + 0.8, z3 - 0.8);
-                        quad(bars, (a + b) / 2 - 0.5 / L, (a + b) / 2 + 0.5 / L, z2, z3);
-                        quad(boxes, a - 2 / L, b + 2 / L, z2 - 1.6, z2 + 0.4);
-                    }
-                    ctx.fillStyle = T.cream; ctx.fill(frames);
-                    const gg = ctx.createLinearGradient(...P(0.5, z0), ...P(0.5, z3));
-                    gg.addColorStop(0, '#4a2e1c'); gg.addColorStop(1, T.glass);
-                    ctx.fillStyle = gg; ctx.fill(glass);
-                    ctx.fillStyle = 'rgba(255,200,120,.16)'; ctx.fill(glass);                  // a warm room behind the glass, even by day
-                    ctx.fillStyle = T.wood; ctx.fill(bars);
-                    ctx.fillStyle = T.leaf; ctx.fill(boxes);
-                    // Cornice: a wood band and a cream lip along the top
-                    ctx.fillStyle = T.wood; ctx.fill(quad(new Path2D(), 0, 1, H - 3.5, H - 1.5));
-                    ctx.fillStyle = T.cream; ctx.fill(quad(new Path2D(), 0, 1, H - 1.5, H));
-                    if (front && du > 0) {
-                        // The door: dark wood, a lit glass panel, a cream surround
-                        ctx.fillStyle = T.cream; ctx.fill(quad(new Path2D(), du - dw, du + dw, 0, z1 + 1.5));
-                        ctx.fillStyle = T.wood; ctx.fill(quad(new Path2D(), du - dw + 2 / L, du + dw - 2 / L, 0, z1));
-                        ctx.fillStyle = 'rgba(255,200,120,.35)'; ctx.fill(quad(new Path2D(), du - dw + 6 / L, du + dw - 6 / L, z1 * 0.35, z1 - 2));
-                        ctx.fillStyle = T.wood; ctx.fill(quad(new Path2D(), du - 0.5 / L, du + 0.5 / L, 0, z1));
-                    }
-                } else {
-                    const glow = new Path2D();
-                    for (const [a, b] of lower) quad(glow, a + 2 / L, b - 2 / L, z0 + 1, z1 - 1);
-                    if (front && du > 0) quad(glow, du - dw + 6 / L, du + dw - 6 / L, z1 * 0.35, z1 - 2);
-                    ctx.fillStyle = 'rgba(255,186,96,.55)'; ctx.fill(glow);
-                    const up = new Path2D();
-                    for (let i = 0; i < upper.length; i++) if ((i * 7 + (f.side.charCodeAt(0))) % 3) quad(up, upper[i][0] + 1.5 / L, upper[i][1] - 1.5 / L, z2 + 0.8, z3 - 0.8);
-                    ctx.fillStyle = 'rgba(255,214,140,.42)'; ctx.fill(up);
-                }
-            },
-
-            /** The striped awnings over the shop windows and the signboard over the door (in front of the south wall). */
-            _ccAwnings(ctx, emissive) {
-                const T = CAFE_EXTERIOR, H = this._ccH(), wy = this.y + CAFE_PLAN.D, zt = H * 0.52, zf = H * 0.34, out = 20;
-                const t = this.attachedTransition, cx = t.x + t.w / 2;
-                const spans = [[this.x + 14, cx - 46], [cx + 46, this.x + CAFE_PLAN.W - 14]];
-                if (!emissive) {
-                    for (const [xa, xb] of spans) {
-                        const n = Math.max(2, Math.round((xb - xa) / 13)), w = (xb - xa) / n;
-                        const A = new Path2D(), B = new Path2D();
-                        for (let i = 0; i < n; i++) {
-                            const p = i % 2 ? B : A, a = xa + i * w, b = a + w;
-                            const q0 = this._ccP(a, wy, zt), q1 = this._ccP(b, wy, zt), q2 = this._ccP(b, wy + out, zf), q3 = this._ccP(a, wy + out, zf);
-                            p.moveTo(q0[0], q0[1]); p.lineTo(q1[0], q1[1]); p.lineTo(q2[0], q2[1]); p.lineTo(q3[0], q3[1]); p.closePath();
-                        }
-                        ctx.fillStyle = T.stripeA; ctx.fill(A); ctx.fillStyle = T.stripeB; ctx.fill(B);
-                        // The scalloped valance, flat at the awning's front edge
-                        LandmarkKit.flat(ctx, this._ccK(zf), c => {
-                            const sa = new Path2D(), sb = new Path2D();
-                            for (let i = 0; i < n; i++) { const mx = xa + (i + 0.5) * w, p = i % 2 ? sb : sa; p.moveTo(mx + w / 2, wy + out); p.arc(mx, wy + out, w / 2, 0, Math.PI); }
-                            c.fillStyle = '#c2741f'; c.fill(sa); c.fillStyle = '#d9c7a2'; c.fill(sb);
-                            c.strokeStyle = 'rgba(58,33,22,.55)'; c.lineWidth = 0.8; c.beginPath(); c.moveTo(xa, wy + out); c.lineTo(xb, wy + out); c.stroke();
-                        });
-                    }
-                }
-                // The signboard over the door: dark wood, a brass edge, "Cozy Cafe" in amber script, a little steaming cup
-                LandmarkKit.flat(ctx, this._ccK(H * 0.62), c => {
-                    const bx = cx - 74, by = wy + 1, bw = 148, bh = 30;
-                    c.beginPath(); c.roundRect(bx, by, bw, bh, [2, 2, 9, 9]);
-                    if (!emissive) {
-                        c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(bx + 3, by + bh, bw - 6, 3);
-                        const g = LandmarkKit.grad(this, 'cc_board', () => { const q = c.createLinearGradient(bx, by, bx, by + bh); q.addColorStop(0, '#4a2a1a'); q.addColorStop(1, '#2a160d'); return q; });
-                        c.fillStyle = g; c.fill(); c.strokeStyle = '#c99a52'; c.lineWidth = 1.4; c.stroke();
-                        c.beginPath(); c.roundRect(bx + 3, by + 3, bw - 6, bh - 6, [1, 1, 7, 7]); c.strokeStyle = 'rgba(232,190,120,.25)'; c.lineWidth = 0.7; c.stroke();
-                    } else { c.strokeStyle = 'rgba(255,190,90,.55)'; c.lineWidth = 1; c.stroke(); }
-                    c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = '25px "Great Vibes", "URW Chancery L", "Z003", cursive';
-                    c.fillStyle = emissive ? 'rgba(255,196,96,.95)' : '#ffbf4d'; c.fillText('Cozy Cafe', cx + 8, by + bh / 2 + 1);
-                    // the cup
-                    const ux = bx + 17, uy = by + bh / 2 + 3;
-                    c.fillStyle = emissive ? 'rgba(255,214,150,.8)' : T.cream;
-                    c.beginPath(); c.roundRect(ux - 6, uy - 4, 11, 8, [0, 0, 4, 4]); c.fill();
-                    c.strokeStyle = c.fillStyle; c.lineWidth = 1.2; c.beginPath(); c.arc(ux + 6, uy, 2.4, -Math.PI / 2, Math.PI / 2); c.stroke();
-                    c.lineWidth = 0.9; c.beginPath(); c.moveTo(ux - 2, uy - 6); c.quadraticCurveTo(ux - 4, uy - 9, ux - 2, uy - 12); c.moveTo(ux + 2, uy - 6); c.quadraticCurveTo(ux, uy - 9, ux + 2, uy - 12); c.stroke();
-                });
             },
 
             /** The hip roof: planes away from the camera first, then those facing it, with shingle courses and hips. */
@@ -38297,29 +38312,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 });
             },
-
-            _ccDrawTop(ctx) {
-                ctx.save();
-                const faces = CONFIG.BUILDINGS.LEAN ? this._visibleFaces(game.camera) : [];
-                for (const f of faces) this._ccFace(ctx, f, false);
-                this._ccAwnings(ctx, false);
-                this._ccDrawRoof(ctx, false);
-                this._ccDrawTerrace(ctx, false);
-                this._ccDrawChimney(ctx, false);
-                ctx.restore();
-            },
-
-            _ccDrawEmissive(ctx, dark) {
-                const glow = Math.max(0.12, Math.min(0.85, dark * 1.0));
-                ctx.save(); ctx.globalAlpha *= glow; ctx.globalCompositeOperation = 'lighter';
-                const faces = CONFIG.BUILDINGS.LEAN ? this._visibleFaces(game.camera) : [];
-                for (const f of faces) this._ccFace(ctx, f, true);
-                this._ccAwnings(ctx, true);
-                this._ccDrawRoof(ctx, true);
-                this._ccDrawTerrace(ctx, true);
-                this._ccDrawChimney(ctx, true);
-                ctx.restore();
-            }
         });
         /* =====================================================================
            STREET VARIANTS — the city's own shops and apartments, in the style
@@ -40451,19 +40443,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         /** The Cozy Cafe: a brick corner house with a shingled hip roof, the hearth's chimney, a roof terrace with
             parasols and string lights, striped awnings and a signboard over the door (buildings/cozy-cafe.js). */
         function createCozyCafe(x, y, config = {}) {
-            return new BuildingV2({
-                id: 'cozy_cafe', x, y, label: 'Cozy Cafe', type: 'cafe', style: 'cozy_cafe', floors: 3,
-                sections: [
-                    { x: 0, y: 0, w: 350, h: 350 },
-                ],
-                roofColor: '#4a3028', roofLightColor: '#5a3a30',
-                wallColor: '#6a3426', wallLightColor: '#7d4130', accentColor: '#ffaa00',
-                windowColor: '#2a1b14', windowLitColor: '#ffe0a0', windowFrameColor: '#efdcb6',
-                balconyColor: '#3e2723', balconies: [],
-                sign: { text: 'Cozy Cafe', color: '#ffaa00', size: 28 },
-                door: { target: config.doorTarget || 'cozy_cafe_interior', label: 'Enter Cafe', lightColor: null },   // (lit by _ccLights)
-                ...config
-            });
+            return createCozyCafeTiered(x, y, config);   // on the tiered kit: buildings/cozy-cafe.js
         }
 
         // (the Double Nights Hotel's factory is in buildings/double-nights.js, on the tiered kit)
@@ -40670,64 +40650,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             });
         }
 
-        /**
-         * Factory function to create Neural Systems building.
-         * T-shaped tech facility: wide server wing + narrow front office.
-         * Cold blue/digital theme.
-         */
+        /** Neural Systems: on the tiered kit (buildings/neural-systems.js). */
         function createNeuralSystems(x, y, config = {}) {
-            return new NeuralSystemsBuilding({
-                id: 'neural_sys',
-                x: x,
-                y: y,
-                label: 'Neural Systems',
-                type: 'tech',
-                floors: 8,
-                
-                // T-shape: wide server wing at back, narrow front office
-                sections: [
-                    { x: 0, y: 0, w: 400, h: 200 },       // Back server wing (full width)
-                    { x: 75, y: 200, w: 250, h: 200 },     // Front office (centered, narrower)
-                ],
-                
-                // Small uniform tech windows (data center vibe)
-                windowWidth: 8,
-                windowHeight: 10,
-                windowSpacingX: 24,
-                windowSpacingY: 20,
-                windowMarginX: 16,
-                windowMarginY: 12,
-                
-                // Colors - cold digital blue theme
-                roofColor: '#161630',           // Navy blue roof
-                roofLightColor: '#1e1e3a',      // Slightly lighter navy
-                wallColor: '#141428',           // Near-black blue walls
-                wallLightColor: '#1a1a30',      // Dark blue-grey
-                accentColor: '#0088ff',         // Tech blue accent
-                windowColor: '#040410',         // Very dark blue glass
-                windowLitColor: '#0088ff',      // Blue monitor glow
-                windowFrameColor: '#060612',    // Dark frames
-                balconyColor: '#0a0a18',        // Dark navy railings
-                
-                balconies: [],
-                
-                roofProps: [
-                    { type: 'ac_unit', section: 0, x: 20, y: 20, w: 55, h: 40 },
-                    { type: 'ac_unit', section: 0, x: 320, y: 20, w: 55, h: 40 },
-                    { type: 'vent', section: 0, x: 180, y: 80, w: 35, h: 30 },
-                    { type: 'vent', section: 1, x: 100, y: 30, w: 30, h: 25 },
-                ],
-                
-                sign: { text: 'NEURAL', color: '#0088ff', size: 22 },
-                
-                door: {
-                    target: config.doorTarget || 'neural_sys_interior',
-                    label: 'Enter Neural Systems',
-                    lightColor: '#0088ff'
-                },
-                
-                ...config
-            });
+            return createNeuralSystemsTiered(x, y, config);
         }
 
         /**
@@ -42059,9 +41984,23 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             });
         }
 
-// Neural Systems: a luxury department store carved from dark sapphire crystal.
+/* =====================================================================
+   NEURAL SYSTEMS: a luxury department store carved from dark sapphire
+   ---------------------------------------------------------------------
+   Built on the tiered kit (buildings/tiered-kit.js):
+     · the atrium, the tall back block: sapphire glass cut into facets on
+       every wall (a few lit ice blue after dark), a gold thread over the
+       vitrines, a pale stone plinth; on its roof the great crystal;
+     · the salon, the lower front block: pale stone vitrines along the
+       street (mannequins and crystals, lit after dark), the portal in the
+       middle under NEURAL SYSTEMS in the fascia, sapphire facets above;
+       on its roof the crystal and the engraved lettering;
+     · a slim glass canopy over the portal.
+   Collision is the atrium and the salon (the old T); the canopy overhangs.
+   ===================================================================== */
 const NEURAL = { ink:'#081326', navy:'#102444', blue:'#234d80', cobalt:'#326fc2', ice:'#bed8ee',
-    metal:'#9baebe', pale:'#e5e6df', gold:'#c1a980', glass:'#102a46' };
+    metal:'#9baebe', pale:'#e5e6df', gold:'#c1a980', glass:'#102a46',
+    W:400, D:400, ATRIUM:46, SALON:28, VIT:14 };
 const NeuralArt = {
     box(c,x,y,w,h,fill,stroke,r=3,lw=1){c.beginPath();c.roundRect(x,y,w,h,r);if(fill){c.fillStyle=fill;c.fill();}if(stroke){c.strokeStyle=stroke;c.lineWidth=lw;c.stroke();}},
     text(c,t,x,y,size,color=NEURAL.ice){c.fillStyle=color;c.font=`${size}px Georgia,serif`;c.textAlign='center';c.textBaseline='middle';c.fillText(t,x,y);},
@@ -42077,83 +42016,198 @@ const NeuralArt = {
         c.beginPath();c.moveTo(0,-r);c.lineTo(r*.7,-r*.35);c.lineTo(r*.52,r*.55);c.lineTo(0,r);c.lineTo(-r*.52,r*.55);c.lineTo(-r*.7,-r*.35);c.closePath();c.stroke();
         c.beginPath();c.moveTo(0,-r);c.lineTo(r*.3,0);c.lineTo(0,r);c.lineTo(-r*.3,0);c.closePath();c.moveTo(-r*.7,-r*.35);c.lineTo(r*.7,-r*.35);c.moveTo(-r*.52,r*.55);c.lineTo(r*.52,r*.55);c.stroke();c.restore();
     }
-
 };
-class NeuralSystemsBuilding extends BuildingV2 {
-    _setupSign(){this.attachedSign=null;}
-    _generateLights(){
-        const e=this._entrance();if(e)for(const d of [-76,76])this.attachedLights.push(new LampEntity({
-            x:e.cx+e.ny*d+e.nx*14,y:e.cy-e.nx*d+e.ny*14,lampType:3,color:'#b4d1f5',lightRadius:145}));
-        this.topReach=80;this.glowReach=80;
-    }
-    _neuralLayer(c,key,paint,k=1){
-        const ready=!document.fonts||document.fonts.check('16px Georgia');
-        if(!ready){c.save();LandmarkKit.plane(c,k);paint(c);c.restore();return;}
-        const s=LandmarkKit.sprite(this,key,this.x-36,this.y-36,472,472,1,paint);LandmarkKit.drawSprite(c,s,k);
-    }
-    _neuralForecourt(){
-        const e=this._entrance();if(!e)return null;
-        return e.ny?{x:e.cx-110,y:e.cy+(e.ny<0?-42:0),w:220,h:42}
-            :{x:e.cx+(e.nx<0?-42:0),y:e.cy-110,w:42,h:220};
-    }
-    drawBase(c){
-        super.drawBase(c);
-        this._neuralLayer(c,'neural_entry',p=>{
-            const e=this._entrance();if(!e)return;
-            p.save();p.transform(e.ny,-e.nx,e.nx,e.ny,e.cx,e.cy);
-            NeuralArt.box(p,-82,0,164,34,'#172840',NEURAL.metal,3);
-            for(const y of [8,17,26]){p.strokeStyle='#526275';p.lineWidth=.6;p.beginPath();p.moveTo(-80,y);p.lineTo(80,y);p.stroke();}
-            NeuralArt.box(p,-41,0,82,33,'rgba(111,161,205,.24)','#afc8dc',1);
-            p.strokeStyle='#b0c7d8';p.lineWidth=.8;p.beginPath();p.moveTo(0,1);p.lineTo(0,31);p.stroke();
-            NeuralArt.seal(p,0,16,9,NEURAL.pale);
-            for(const x of [-101,85]){
-                NeuralArt.crystal(p,x,3,16,28,'#41648c');
-            }p.restore();
-        });
-    }
-    drawTop(c){
-        const cam=game.camera,k=CONFIG.BUILDINGS.LEAN?1+this._leanScale():1;
-        const P=(x,y)=>[cam.x+(x-cam.x)*k,cam.y+(y-cam.y)*k];
-        c.save();
-        for(const f of this._visibleFaces(cam)){
-            const a=P(f.x1,f.y1),b=P(f.x2,f.y2),g=c.createLinearGradient(f.x1,f.y1,a[0],a[1]);
-            g.addColorStop(0,'#081326');g.addColorStop(.5,'#163552');g.addColorStop(1,'#30567a');
-            c.fillStyle=g;c.beginPath();c.moveTo(f.x1,f.y1);c.lineTo(f.x2,f.y2);c.lineTo(...b);c.lineTo(...a);c.closePath();c.fill();
-            c.strokeStyle='#8cabbf';c.lineWidth=1;c.stroke();
-            const count=Math.max(2,Math.floor(Math.hypot(f.x2-f.x1,f.y2-f.y1)/72));
-            c.beginPath();c.strokeStyle='rgba(165,204,239,.32)';c.lineWidth=.8;
-            for(let i=1;i<count;i++){const u=i/count,x=f.x1+(f.x2-f.x1)*u,y=f.y1+(f.y2-f.y1)*u,q=P(x,y);c.moveTo(x,y);c.lineTo(...q);c.lineTo(...b);}c.stroke();
-            for(const u of [.16,.92]){c.strokeStyle=u===.16?'#c0b49c':'#35577c';c.lineWidth=u===.16?2:1;c.beginPath();c.moveTo(f.x1+(a[0]-f.x1)*u,f.y1+(a[1]-f.y1)*u);c.lineTo(f.x2+(b[0]-f.x2)*u,f.y2+(b[1]-f.y2)*u);c.stroke();}
-        }c.restore();
-        this._neuralLayer(c,'neural_roof',p=>{
-            const x=this.x,y=this.y,B=NeuralArt.box,T=NEURAL;
-            for(const s of this.sections){
-                const g=p.createLinearGradient(x+s.x,y+s.y,x+s.x+s.w,y+s.y+s.h);g.addColorStop(0,'#264363');g.addColorStop(.45,'#11233c');g.addColorStop(1,'#0a1427');
-                B(p,x+s.x,y+s.y,s.w,s.h,g,T.metal,4,1.5);B(p,x+s.x+7,y+s.y+7,s.w-14,s.h-14,null,'#43638a',3);
-            }
-            // Large, quiet facets read as load-bearing crystal rather than cladding.
-            NeuralArt.crystal(p,x+13,y+12,374,175,'#183d6d');
-            NeuralArt.crystal(p,x+123,y+34,154,122,'#315d8b');
-            p.save();p.globalAlpha=.24;p.fillStyle='#c0daf0';p.beginPath();p.moveTo(x+49,y+16);p.lineTo(x+75,y+16);p.lineTo(x+289,y+180);p.lineTo(x+252,y+180);p.closePath();p.fill();p.restore();
-            NeuralArt.crystal(p,x+87,y+210,226,178,'#183963');
-            // Engraved department-store lettering sits directly on the sapphire surface.
-            NeuralArt.text(p,'NEURAL',x+200,y+278,29,T.pale);
-            NeuralArt.text(p,'S Y S T E M S',x+200,y+307,12,T.ice);
-            p.fillStyle='#b4c7d7';p.fillRect(x+158,y+326,84,.7);
-            NeuralArt.text(p,'THE ART OF BECOMING',x+200,y+348,7,T.pale);
+const _nsFront = (t) => t.mitre.find(e => e && !e.hidden && e.ny > 0.99);
+const _NS_FACET = ['#0e2442','#163558','#1d4372','#0b1d38','#25528a','#112c4e'];
 
-        },k);
+/** Sapphire facets from y0 down to y1 on every visible edge: columns cut on alternating diagonals, a few lit at night */
+function _nsFacets(d, l, t, y0, y1, seed) {
+    const r = seededRandom(seed), cw = 22;
+    for (const e of t.mitre) {
+        if (!e || e.hidden) continue;
+        const n = Math.max(1, Math.round(e.L / cw)), w = e.L / n;
+        for (let i = 0; i < n; i++) {
+            const x0 = e.u0 + i * w, x1 = x0 + w, mid = y0 + (y1 - y0) * (0.3 + r() * 0.4), flip = (i % 2) === 0;
+            const tris = flip ? [[[x0, y0], [x1, y0], [x0, mid]], [[x1, y0], [x1, y1], [x0, mid]], [[x0, mid], [x1, y1], [x0, y1]]]
+                              : [[[x0, y0], [x1, y0], [x1, mid]], [[x0, y0], [x1, mid], [x0, y1]], [[x0, y1], [x1, mid], [x1, y1]]];
+            for (const tri of tris) {
+                d.fillStyle = _NS_FACET[Math.floor(r() * _NS_FACET.length)];
+                d.beginPath(); d.moveTo(...tri[0]); d.lineTo(...tri[1]); d.lineTo(...tri[2]); d.closePath(); d.fill();
+                const lit = r();
+                if (lit < 0.3) { l.fillStyle = `rgba(120,176,240,${(0.18 + lit).toFixed(2)})`; l.beginPath(); l.moveTo(...tri[0]); l.lineTo(...tri[1]); l.lineTo(...tri[2]); l.closePath(); l.fill(); }
+            }
+            d.strokeStyle = 'rgba(190,216,238,.42)'; d.lineWidth = 0.35; d.beginPath();
+            if (flip) { d.moveTo(x1, y0); d.lineTo(x0, mid); d.lineTo(x1, y1); } else { d.moveTo(x0, y0); d.lineTo(x1, mid); d.lineTo(x0, y1); }
+            d.stroke();
+            d.fillStyle = 'rgba(155,174,190,.7)'; d.fillRect(x0 - 0.3, y0, 0.6, y1 - y0);             // the mullions
+        }
+        d.fillStyle = 'rgba(232,245,255,.08)'; d.fillRect(e.u0, y0, e.L, (y1 - y0) * 0.25);         // the sky in the top of the glass
     }
-    drawEmissive(c,dark=1,beamsOnly=false){
-        if(beamsOnly||dark<.04)return;const k=CONFIG.BUILDINGS.LEAN?1+this._leanScale():1;
-        c.save();c.globalAlpha=dark*.65;c.globalCompositeOperation='lighter';
-        this._neuralLayer(c,'neural_glow',p=>{
-            NeuralArt.text(p,'NEURAL',this.x+200,this.y+278,29,'#a7cdf4');
-            NeuralArt.text(p,'S Y S T E M S',this.x+200,this.y+307,12,'#82aed8');
-            NeuralArt.seal(p,this.x+200,this.y+96,30,'#668db8');
-            for(const s of this.sections){p.strokeStyle='#2b548a';p.lineWidth=2;p.strokeRect(this.x+s.x+8,this.y+s.y+8,s.w-16,s.h-16);}},k);c.restore();
+}
+
+/** Pale stone vitrines from y0 to the plinth, on every visible edge (gapped for the portal on the salon's front) */
+function _nsVitrines(d, l, t, y0, H, gap) {
+    const r = seededRandom(t.i * 31 + 7), plinth = H - 2.2;
+    for (const e of t.mitre) {
+        if (!e || e.hidden) continue;
+        d.fillStyle = '#d9d8cf'; d.fillRect(e.u0, y0, e.L, H - y0);
+        d.fillStyle = '#b9b8ae'; d.fillRect(e.u0, plinth, e.L, H - plinth);
+        d.fillStyle = 'rgba(0,0,0,.18)'; d.fillRect(e.u0, plinth, e.L, 0.3);
+        d.fillStyle = NEURAL.gold; d.fillRect(e.u0, y0, e.L, 0.6);
+        const n = Math.max(1, Math.floor((e.L - 8) / 40)), w = (e.L - 8) / n;
+        for (let i = 0; i < n; i++) {
+            const a = e.u0 + 4 + i * w + 3, b = a + w - 6, top = y0 + 2.4, bot = plinth - 0.8;
+            if (gap && b > gap[0] && a < gap[1]) continue;
+            d.fillStyle = '#0a1628'; d.fillRect(a, top, b - a, bot - top);
+            const g = d.createLinearGradient(0, top, 0, bot); g.addColorStop(0, 'rgba(120,170,220,.25)'); g.addColorStop(1, 'rgba(20,40,70,.1)'); d.fillStyle = g; d.fillRect(a, top, b - a, bot - top);
+            l.fillStyle = 'rgba(206,226,255,.62)'; l.fillRect(a, top, b - a, bot - top);
+            const m = (a + b) / 2, kind = Math.floor(r() * 3);                                         // what's in the window
+            for (const c of [d, l]) {
+                c.fillStyle = c === d ? '#cfd6de' : 'rgba(0,0,0,.55)';
+                if (kind === 0) { c.beginPath(); c.arc(m, top + 2.2, 0.9, 0, Math.PI * 2); c.fill(); c.fillRect(m - 1.2, top + 3.2, 2.4, 5); c.fillRect(m - 0.3, top + 8.2, 0.6, bot - top - 8.4); }
+                else if (kind === 1) { for (const dx of [-5, 5]) { c.beginPath(); c.arc(m + dx, top + 2.4, 0.8, 0, Math.PI * 2); c.fill(); c.fillRect(m + dx - 1, top + 3.3, 2, 4.6); } }
+                else { c.beginPath(); c.moveTo(m, top + 1.6); c.lineTo(m + 3, top + 4.4); c.lineTo(m, bot - 2.4); c.lineTo(m - 3, top + 4.4); c.closePath(); c.fill(); }
+            }
+            d.fillStyle = '#9baebe'; d.fillRect(a - 0.6, top - 0.6, b - a + 1.2, 0.6); d.fillRect(a - 0.6, bot, b - a + 1.2, 0.5);
+            d.fillStyle = 'rgba(255,255,255,.08)'; d.fillRect(a + 1, top, 1.2, bot - top);
+        }
     }
-    drawSign(){}
+}
+
+/** The coping along the top: brushed metal, a cobalt LED line under it */
+function _nsCoping(d, l, L) {
+    d.fillStyle = NEURAL.metal; d.fillRect(0, 0, L, 1.6); d.fillStyle = 'rgba(255,255,255,.35)'; d.fillRect(0, 0, L, 0.35);
+    d.fillStyle = '#0b1830'; d.fillRect(0, 1.6, L, 0.8);
+    d.fillStyle = '#5b8fd0'; d.fillRect(0, 2.0, L, 0.3); l.fillStyle = 'rgba(80,150,255,1)'; l.fillRect(0, 1.9, L, 0.5);
+}
+
+/** The atrium: sapphire facets over a band of vitrines */
+function _nsAtrium(d, l, t, H, L) {
+    d.fillStyle = NEURAL.ink; d.fillRect(0, 0, L, H);
+    _nsFacets(d, l, t, 2.4, H - NEURAL.VIT, 811);
+    _nsVitrines(d, l, t, H - NEURAL.VIT, H, null);
+    _nsCoping(d, l, L);
+}
+
+/** The salon: facets over the fascia, the vitrines and the portal on the street */
+function _nsSalon(d, l, t, H, L) {
+    const front = _nsFront(t), V = NEURAL.VIT, fy = H - V - 4.6;
+    d.fillStyle = NEURAL.ink; d.fillRect(0, 0, L, H);
+    _nsFacets(d, l, t, 2.4, fy, 377);
+    const cx = front ? front.u0 + 125 : -999, pw = 24;
+    _nsVitrines(d, l, t, H - V, H, front ? [cx - pw - 4, cx + pw + 4] : null);
+    // the fascia: dark sapphire stone with a gold thread, the name engraved on the front
+    d.fillStyle = '#0b1a32'; d.fillRect(0, fy, L, 4.6); d.fillStyle = NEURAL.gold; d.fillRect(0, fy, L, 0.4); d.fillRect(0, fy + 4.2, L, 0.4);
+    if (front) {
+        for (const [c, col] of [[d, NEURAL.pale], [l, 'rgba(170,205,245,1)']]) {
+            c.save(); c.font = '3.4px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = col;
+            if ('letterSpacing' in c) c.letterSpacing = '1.6px';
+            c.fillText('NEURAL  SYSTEMS', cx, fy + 2.4); c.restore();
+        }
+        // the portal: a stone frame, two glass doors, the seal over them
+        const top = H - V + 1.2, bot = H - 2.2;
+        d.fillStyle = '#e8e7df'; d.fillRect(cx - pw - 3, H - V, (pw + 3) * 2, V - 2.2);
+        d.fillStyle = '#b9b8ae'; d.fillRect(cx - pw - 3, H - V, 0.6, V - 2.2); d.fillRect(cx + pw + 2.4, H - V, 0.6, V - 2.2);
+        d.fillStyle = '#0c1a2e'; d.fillRect(cx - pw, top + 3.4, pw * 2, bot - top - 3.4);
+        const g = d.createLinearGradient(0, top, 0, bot); g.addColorStop(0, 'rgba(150,196,236,.38)'); g.addColorStop(1, 'rgba(60,100,150,.18)'); d.fillStyle = g; d.fillRect(cx - pw, top + 3.4, pw * 2, bot - top - 3.4);
+        l.fillStyle = 'rgba(214,232,255,.85)'; l.fillRect(cx - pw, top + 3.4, pw * 2, bot - top - 3.4);
+        d.fillStyle = '#9baebe'; for (const x of [cx - pw, cx - pw / 2, cx, cx + pw / 2, cx + pw - 0.5]) d.fillRect(x, top + 3.4, 0.5, bot - top - 3.4);
+        d.fillStyle = NEURAL.gold; d.fillRect(cx - 2.6, top + 7, 0.5, 3); d.fillRect(cx + 2.1, top + 7, 0.5, 3);   // the pulls
+        d.save(); d.translate(cx, top + 1.7); d.scale(1, 0.55); NeuralArt.seal(d, 0, 0, 2.6, '#3a5a84'); d.restore();
+        l.save(); l.translate(cx, top + 1.7); l.scale(1, 0.55); NeuralArt.seal(l, 0, 0, 2.6, 'rgba(140,190,250,1)'); l.restore();
+        // the two crystal plinths either side
+        for (const s of [-1, 1]) { const px = cx + s * (pw + 9); d.fillStyle = '#41648c'; d.beginPath(); d.moveTo(px, top + 1); d.lineTo(px + 2.6, top + 4); d.lineTo(px, bot - 1); d.lineTo(px - 2.6, top + 4); d.closePath(); d.fill(); l.fillStyle = 'rgba(120,180,250,.7)'; l.fill(); }
+    }
+    _nsCoping(d, l, L);
+}
+
+/** The canopy's edge: brushed metal and a cobalt line */
+function _nsCanopy(d, l, t, H, L) { d.fillStyle = NEURAL.metal; d.fillRect(0, 0, L, H); d.fillStyle = '#5b8fd0'; d.fillRect(0, H - 0.4, L, 0.4); l.fillStyle = 'rgba(80,150,255,1)'; l.fillRect(0, H - 0.4, L, 0.4); }
+
+// ── roofs ──
+
+function _nsAtriumRoof(c, glow, t) {
+    const [x, y] = t.box, B = NeuralArt.box, T = NEURAL;
+    if (glow) { NeuralArt.seal(c, x + 200, y + 96, 30, '#668db8'); c.strokeStyle = '#2b548a'; c.lineWidth = 2; c.strokeRect(x + 8, y + 8, 384, 184); return; }
+    const g = c.createLinearGradient(x, y, x + 400, y + 200); g.addColorStop(0, '#264363'); g.addColorStop(.45, '#11233c'); g.addColorStop(1, '#0a1427');
+    B(c, x, y, 400, 200, g, T.metal, 2, 1.5); B(c, x + 7, y + 7, 386, 186, null, '#43638a', 3);
+    // large, quiet facets read as load-bearing crystal rather than cladding
+    NeuralArt.crystal(c, x + 13, y + 12, 374, 175, '#183d6d');
+    NeuralArt.crystal(c, x + 123, y + 34, 154, 122, '#315d8b');
+    c.save(); c.globalAlpha = .24; c.fillStyle = '#c0daf0'; c.beginPath(); c.moveTo(x + 49, y + 16); c.lineTo(x + 75, y + 16); c.lineTo(x + 289, y + 180); c.lineTo(x + 252, y + 180); c.closePath(); c.fill(); c.restore();
+}
+
+function _nsSalonRoof(c, glow, t) {
+    const [x0, y0] = t.box, x = x0 - 75, y = y0 - 200, T = NEURAL;           // (the old plan's frame: the lettering keeps its place)
+    if (glow) {
+        NeuralArt.text(c, 'NEURAL', x + 200, y + 278, 29, '#a7cdf4'); NeuralArt.text(c, 'S Y S T E M S', x + 200, y + 307, 12, '#82aed8');
+        c.strokeStyle = '#2b548a'; c.lineWidth = 2; c.strokeRect(x0 + 8, y0 + 8, 234, 184); return;
+    }
+    const g = c.createLinearGradient(x0, y0, x0 + 250, y0 + 200); g.addColorStop(0, '#264363'); g.addColorStop(.45, '#11233c'); g.addColorStop(1, '#0a1427');
+    NeuralArt.box(c, x0, y0, 250, 200, g, T.metal, 2, 1.5); NeuralArt.box(c, x0 + 7, y0 + 7, 236, 186, null, '#43638a', 3);
+    NeuralArt.crystal(c, x + 87, y + 210, 226, 178, '#183963');
+    // engraved department-store lettering sits directly on the sapphire surface
+    NeuralArt.text(c, 'NEURAL', x + 200, y + 278, 29, T.pale);
+    NeuralArt.text(c, 'S Y S T E M S', x + 200, y + 307, 12, T.ice);
+    c.fillStyle = '#b4c7d7'; c.fillRect(x + 158, y + 326, 84, .7);
+    NeuralArt.text(c, 'THE ART OF BECOMING', x + 200, y + 348, 7, T.pale);
+}
+
+function _nsCanopyRoof(c, glow, t) {
+    const [x0, y0, x1, y1] = t.box;
+    if (glow) { c.strokeStyle = 'rgba(80,150,255,.8)'; c.lineWidth = 1.6; c.strokeRect(x0 + 1, y0 + 1, x1 - x0 - 2, y1 - y0 - 2); return; }
+    c.fillStyle = 'rgba(70,110,150,.85)'; c.fillRect(x0, y0, x1 - x0, y1 - y0);
+    c.strokeStyle = 'rgba(210,232,250,.4)'; c.lineWidth = 0.8; c.beginPath(); for (let x = x0 + 12; x < x1; x += 12) { c.moveTo(x, y0); c.lineTo(x, y1); } c.stroke();
+    c.strokeStyle = NEURAL.metal; c.lineWidth = 1.2; c.strokeRect(x0 + 0.6, y0 + 0.6, x1 - x0 - 1.2, y1 - y0 - 1.2);
+}
+
+class NeuralSystemsBuilding extends TieredBuilding {
+    _setupSign() { this.attachedSign = null; }
+    _generateLights() {
+        const e = this._entrance(); if (e) for (const d of [-76, 76]) this.attachedLights.push(new LampEntity({
+            x: e.cx + e.ny * d + e.nx * 14, y: e.cy - e.nx * d + e.ny * 14, lampType: 3, color: '#b4d1f5', lightRadius: 145 }));
+        this.topReach = 80; this.glowReach = 80;
+    }
+    /** The forecourt at the portal: a stone mat, the seal, two crystal plinths */
+    drawBase(c) {
+        super.drawBase(c);
+        const e = this._entrance(); if (!e) return;
+        const s = LandmarkKit.sprite(this, 'neural_entry', e.cx - 120, e.cy - 50, 240, 100, 1, p => {
+            p.save(); p.transform(e.ny, -e.nx, e.nx, e.ny, e.cx, e.cy);
+            NeuralArt.box(p, -82, 0, 164, 34, '#172840', NEURAL.metal, 3);
+            for (const y of [8, 17, 26]) { p.strokeStyle = '#526275'; p.lineWidth = .6; p.beginPath(); p.moveTo(-80, y); p.lineTo(80, y); p.stroke(); }
+            NeuralArt.box(p, -41, 0, 82, 33, 'rgba(111,161,205,.24)', '#afc8dc', 1);
+            p.strokeStyle = '#b0c7d8'; p.lineWidth = .8; p.beginPath(); p.moveTo(0, 1); p.lineTo(0, 31); p.stroke();
+            NeuralArt.seal(p, 0, 16, 9, NEURAL.pale);
+            for (const x of [-101, 85]) NeuralArt.crystal(p, x, 3, 16, 28, '#41648c');
+            p.restore();
+        });
+        LandmarkKit.drawSprite(c, s, 1);
+    }
+    drawSign() {}
+}
+TierKit.profile(NeuralSystemsBuilding);
+
+/** Neural Systems: x, y its corner; the atrium at the back, the salon (and the portal) on the street, south. */
+function createNeuralSystemsTiered(x, y, config = {}) {
+    const T = NEURAL, ledge = (z, lip) => ({ z, out: 2.2, th: 2, top: '#9baebe', band: [26, 44, 70], lip });
+    return new NeuralSystemsBuilding({
+        id: 'neural_sys', x, y, label: 'Neural Systems', type: 'tech', facing: 'S', hero: 1.5, plan: { W: T.W, D: T.D },
+        roofColor: '#161630', roofLightColor: '#1e1e3a', wallColor: '#141428', wallLightColor: '#1a1a30', accentColor: '#0088ff',
+        windowColor: '#040410', windowLitColor: '#0088ff', windowFrameColor: '#060612', balconyColor: '#0a0a18', balconies: [], roofProps: [],
+        sign: { text: 'NEURAL', color: '#0088ff', size: 22 },
+        door: { target: config.doorTarget || 'neural_sys_interior', label: 'Enter Neural Systems', lightColor: '#0088ff' },
+        tiers: [
+            { id: 'atrium', rect: [0, 0, 400, 200], z0: 0, z1: T.ATRIUM, S: 2, fill: T.ink, paint: _nsAtrium, shade: [6, 12, 26],
+              ledges: [ledge(T.VIT, 'rgba(193,169,128,.9)'), ledge(T.ATRIUM, 'rgba(190,216,238,.8)')], roofRes: 1, roofGlow: true, roof: _nsAtriumRoof },
+            { id: 'salon', rect: [75, 200, 250, 200], z0: 0, z1: T.SALON, S: 2, fill: T.ink, paint: _nsSalon, shade: [6, 12, 26],
+              ledges: [ledge(T.VIT, 'rgba(193,169,128,.9)'), ledge(T.SALON, 'rgba(190,216,238,.8)')], roofRes: 1, roofGlow: true, roof: _nsSalonRoof },
+            // (a px off the wall: a tier back to back with a wall hides it below its top, _tkGeo)
+            { id: 'canopy', solid: false, rect: [160, 401, 80, 18], z0: T.VIT - 1.4, z1: T.VIT, S: 4, fill: T.metal, paint: _nsCanopy, shade: [6, 12, 26],
+              roofRes: 1, roofGlow: true, roof: _nsCanopyRoof }
+        ],
+        ...config
+    });
 }
         /* =====================================================================
            TORQUE AUTO — Crimson Blvd's garage, beside the Cozy Cafe
