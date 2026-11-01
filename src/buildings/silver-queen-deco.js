@@ -28,7 +28,7 @@
            pavilion; the marquee, the cypresses and the sign stand free.
            ===================================================================== */
         const SQD = {
-            HERO: 2,
+            HERO: 1.5,
             PLAN: { W: 700, D: 880 },
             STONE: { stone: '#a4a0ae', stoneMid: '#96919f', stoneLo: '#7a7489', stoneDk: '#46415a', stoneHi: '#cac7d4', stoneLt: '#aeabb8',
                      trim: '#b6b3c0', trimLo: '#8e8a9c', trimDk: '#5e5970', frame: '#17151e' },
@@ -572,7 +572,7 @@
                 ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 1;
                 for (const [sx, sy, ph] of srcs) {
                     const az = -Math.PI / 2 + (ph ? 0.45 : -0.45) + Math.sin(t * 0.19 + ph) * 0.95, elev = 1.02 + 0.16 * Math.sin(t * 0.11 + ph * 1.7);
-                    const C = leanCamHeight(), zTop = C * 0.8, run = (zTop - z0) / Math.tan(elev);
+                    const C = leanCamHeight(), zTop = C * 0.8, run = (zTop - z0 * TierKit.Z_SCALE) / Math.tan(elev);
                     const p0 = this._tkP(sx, sy, z0), cam = game.camera, k1 = C / (C - Math.min(zTop, C * 0.86)), ex = sx + Math.cos(az) * run, ey = sy + Math.sin(az) * run;
                     const p1 = [cam.x + (ex - cam.x) * k1, cam.y + (ey - cam.y) * k1];
                     const vx = p1[0] - p0[0], vy = p1[1] - p0[1], L = Math.hypot(vx, vy) || 1, nx = -vy / L, ny = vx / L;

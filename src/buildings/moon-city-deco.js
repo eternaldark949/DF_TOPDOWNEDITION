@@ -30,7 +30,7 @@
            the door, the palms stand free.
            ===================================================================== */
         const MCD = {
-            HERO: 2,
+            HERO: 1.5,
             PLAN: { W: 600, D: 500 },
             Z: { WING: 46, ROT0: 18, ROT: 82, HALL: 92, DRUM: 110, DOME: 30 },
             DOOR: [140, 500],
@@ -603,7 +603,7 @@
                 for (const [lx, ly, rgb, ph] of MCD.TURRETS) {
                     const sx = this.x + lx, sy = this.y + ly;
                     const az = -Math.PI / 2 + (ph ? 0.5 : -0.5) + Math.sin(t * 0.22 + ph) * 1.0, elev = 1.02 + 0.16 * Math.sin(t * 0.13 + ph * 1.7);
-                    const C = leanCamHeight(), zTop = C * 0.8, run = (zTop - z0) / Math.tan(elev);
+                    const C = leanCamHeight(), zTop = C * 0.8, run = (zTop - z0 * TierKit.Z_SCALE) / Math.tan(elev);
                     const p0 = this._tkP(sx, sy, z0), cam = game.camera, k1 = C / (C - Math.min(zTop, C * 0.86)), ex = sx + Math.cos(az) * run, ey = sy + Math.sin(az) * run;
                     const p1 = [cam.x + (ex - cam.x) * k1, cam.y + (ey - cam.y) * k1];
                     const vx = p1[0] - p0[0], vy = p1[1] - p0[1], L = Math.hypot(vx, vy) || 1, nx = -vy / L, ny = vx / L;
