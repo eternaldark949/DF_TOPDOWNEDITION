@@ -409,6 +409,10 @@
                         if (!b.isV2 || !b.drawEmissive) continue;
                         const gy = b.y + b.h;
                         if (gy < v.y - hh - 40 || gy > v.y + hh + 260 || b.x > v.x + hw || b.x + b.w < v.x - hw) continue;
+                        if (b.drawReflection) {                                  // the tiered buildings mirror each tier about its own front (buildings/tiered-kit.js)
+                            try { b.drawReflection(rc, dark); } catch (e) { /* ditto */ }
+                            continue;
+                        }
                         rc.save(); rc.globalCompositeOperation = 'lighter';
                         rc.translate(0, gy); rc.scale(1, -0.75); rc.translate(0, -gy);
                         try { b.drawEmissive(rc, dark); } catch (e) { /* a facade that can't mirror is left out */ }

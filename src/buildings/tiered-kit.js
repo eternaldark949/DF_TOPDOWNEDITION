@@ -413,6 +413,28 @@
                 ctx.restore();
             }
 
+            /**
+             * Its reflection in the wet street (engine/reflections.js, High and Ultra): each tier's lit walls mirrored about
+             * the line its own front stands on (its plan's southmost y), foreshortened as the stock facades are. Only the
+             * walls: no roofs (a mirror under a building can't see them), nor the searchlights, the forecourt's lamps
+             * and the canopies' pools a landmark adds to its glow pass (those are on the ground, or in the sky).
+             */
+            drawReflection(ctx, dark) {
+                if (!(CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera)) return;
+                const glow = this._tkGlow(dark);
+                if (glow < 0.004) return;
+                ctx.save(); ctx.globalAlpha *= glow; ctx.globalCompositeOperation = 'lighter';
+                for (const t of this._tkOrdered()) {
+                    if (t.z1 - t.z0 < 12 && t.z0 < 1) continue;                     // (planters, posts: too low to show)
+                    const gy = t.box[3];
+                    ctx.save(); ctx.translate(0, gy); ctx.scale(1, -0.75); ctx.translate(0, -gy);
+                    const art = this._tkArt(t);
+                    for (const f of this._tkVisible(t)) this._tkMap(ctx, f, art.lit, art.S, null);
+                    ctx.restore();
+                }
+                ctx.restore();
+            }
+
             /** A tier on screen: the hull of its plan at its foot and at its top (and its `rise`'s apex: a dome on its top hook). */
             _tkHull(t) {
                 const pts = [];
