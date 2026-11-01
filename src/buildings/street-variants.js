@@ -123,6 +123,7 @@
                     if (spec.id === 'arcade') this._vArcInit(v, r);                     // its stone (buildings/street-arcade.js)
                 } else {
                     this.sills = spec.sills;
+                    if (spec.id === 'brownstone') this._vBrInit(v, r);                 // its brick, the arcades' lean (buildings/street-brownstone.js)
                     if (spec.noBalconies && this.facadeFeature === 'balconies') this.facadeFeature = null;
                 }
             },
@@ -146,7 +147,7 @@
             },
             /** The window mask: a shop's ground floor front is its shopfront (_drawFaceWindows) */
             _vWindowMask(f) {
-                if (this.variant && this.variant.id === 'arcade') return _vArcMask;            // its own windows on every face
+                if (this.variant && (this.variant.id === 'arcade' || this.variant.id === 'brownstone')) return _vArcMask;   // its own windows on every face
                 if (!this.variant || this.variant.kind !== 'shop' || f.side !== this.facing) return null;
                 return this._vMaskFn || (this._vMaskFn = (fl) => fl === 0);
             },
@@ -179,7 +180,8 @@
                 const v = this.variant, S = v.spec, H = this._vH(), G = this._vFaceAt(f, P);
                 if (G.depth < 3 || f.side === 'C') return;
                 const FH = CONFIG.BUILDINGS.FLOOR_HEIGHT, fine = _zoomLOD < 2 && G.depth > 8, front = f.side === this.facing;
-                const mat = v.kind === 'shop' ? S.material : v.id === 'brownstone' ? 'brick' : null;
+                if (v.id === 'brownstone') { this._vBrUnder(ctx, f, G, H); return; }
+                const mat = v.kind === 'shop' ? S.material : null;
                 if (mat === 'limestone') { this._vArcUnder(ctx, f, G, H); return; }
                 if (mat === 'stone') {                                             // rose stone to the belt, dark steel over it (Enni Cole)
                     const hi = Math.min(1, FH * 1.15 / H);
@@ -211,6 +213,7 @@
             /** Over the windows, on every face: the shopfront, lintels, spandrels, then (once for all faces) ledges and fins */
             _vFaceOver(ctx, faces, P) {
                 if (this.variant.id === 'arcade') { this._vArcOver(ctx, faces, P); return; }
+                if (this.variant.id === 'brownstone') { this._vBrOver(ctx, faces, P); this._vBrLanterns(ctx, false); return; }
                 const v = this.variant, S = v.spec, H = this._vH(), FH = CONFIG.BUILDINGS.FLOOR_HEIGHT, K = LandmarkKit;
                 const floors = Math.min(this.floors, CONFIG.BUILDINGS.MAX_FLOORS), fine = _zoomLOD < 2;
                 const edges = [], fins = [];
@@ -646,6 +649,7 @@
             /** The pavement just in front: a strip from the wall out, painted once a variant (and door place) */
             _vPaintBase(c, v, fw, fd, door) {
                 let y = fd; const S = v.spec, dot = (x, yy, r, col) => { c.fillStyle = col; c.beginPath(); c.arc(x, yy, r, 0, Math.PI * 2); c.fill(); };
+                if (S.id === 'brownstone') { this._vBrPaintBase(c, v, fw, fd, door); return; }
                 if (v.kind === 'apt') {
                     // A stoop: stone steps up to the door, and a planter either side
                     c.fillStyle = 'rgba(0,0,0,.3)'; c.fillRect(door - 20, y + 2, 44, 14);
@@ -714,6 +718,7 @@
                 const v = this.variant, S = v.spec, K = LandmarkKit, H = this._vH();
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 if (v.id === 'arcade') this._vArcGlow(ctx, faces, P, dark);
+                else if (v.id === 'brownstone') this._vBrGlow(ctx, faces, P, dark);
                 else if (v.kind === 'shop') {
                     for (const f of faces) if (f.side === this.facing && f.side !== 'C') { const G = this._vFaceAt(f, P); if (G.depth >= 3) this._vShopfront(ctx, f, G, H, true); }
                     if (S.id === 'lounge') {

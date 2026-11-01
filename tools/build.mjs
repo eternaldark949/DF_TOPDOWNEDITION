@@ -85,6 +85,7 @@ const SCRIPTS = [
     'buildings/cozy-cafe.js',
     'buildings/street-variants.js',
     'buildings/street-arcade.js',
+    'buildings/street-brownstone.js',
     'buildings/sky-craft.js',
     'buildings/sky-layer.js',
     'buildings/factories.js',
