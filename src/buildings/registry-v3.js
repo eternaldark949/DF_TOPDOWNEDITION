@@ -635,53 +635,7 @@
          * Striped burgundy pavilion with brass trim; art in buildings/biggs-park.js.
          */
         function createBiggsAmusementPark(x, y, config = {}) {
-            return new BiggsParkBuilding({
-                id: 'biggs_park',
-                x: x, y: y,
-                label: 'Biggs Park',
-                type: 'entertainment',
-                floors: 3,
-                
-                sections: [
-                    { x: 0, y: 0, w: 450, h: 250 },
-                    { x: 50, y: 250, w: 350, h: 150 }
-                ],
-                
-                windowWidth: 12,
-                windowHeight: 14,
-                windowSpacingX: 30,
-                windowSpacingY: 22,
-                windowMarginX: 20,
-                windowMarginY: 14,
-                
-                // Carnival colors — deep violet with amber accents
-                roofColor: '#1a0a28',
-                roofLightColor: '#220e32',
-                wallColor: '#160820',
-                wallLightColor: '#1e0c2a',
-                accentColor: '#ff8800',
-                windowColor: '#0a0410',
-                windowLitColor: '#ff8800',
-                windowFrameColor: '#0c0616',
-                balconyColor: '#120818',
-                
-                balconies: [],
-                
-                roofProps: [
-                    { type: 'ac_unit', section: 0, x: 30, y: 20, w: 50, h: 35 },
-                    { type: 'vent', section: 0, x: 380, y: 20, w: 30, h: 25 },
-                ],
-                
-                sign: { text: 'BIGGS', color: '#ff8800', size: 32 },
-                
-                door: {
-                    target: config.doorTarget || 'biggs_arena',
-                    label: 'Enter Biggs Amusement Park',
-                    lightColor: '#ff8800'
-                },
-                
-                ...config
-            });
+            return createBiggsPark(x, y, config);        // on the tiered kit: buildings/biggs-park.js
         }
 
         BuildingV2Registry.register('biggs_park', {
