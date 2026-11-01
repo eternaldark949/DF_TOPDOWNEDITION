@@ -147,6 +147,18 @@
             transition: opacity 0.4s ease;
         }
         #fade-overlay.active { opacity: 1; }
+        /* the loading strip in the corner while a door leads to another map: a short white bar that fills as the map
+           is built and its first textures painted, a glint running along it (compositor-only, so it moves through the
+           build). Only map loads light it; the other fades that borrow the overlay leave it dark. */
+        #fade-overlay .map-load-strip { position: absolute; right: calc(28px + env(safe-area-inset-right, 0px)); bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+            width: min(150px, 28vw); height: 4px; border-radius: 2px; overflow: hidden; background: rgba(255, 255, 255, 0.16); opacity: 0; transition: opacity 0.25s ease; }
+        #fade-overlay.map-loading .map-load-strip { opacity: 1; }
+        #fade-overlay .mls-fill { position: absolute; inset: 0; background: #fff; transform-origin: 0 50%; transform: scaleX(0); transition: transform 0.25s ease-out;
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.6); will-change: transform; }
+        #fade-overlay .mls-glint { position: absolute; top: 0; bottom: 0; left: 0; width: 30%; will-change: transform; animation: mlsGlint 1.1s ease-in-out infinite;
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0)); }
+        #fade-overlay:not(.map-loading) .mls-glint { animation: none; }
+        @keyframes mlsGlint { from { transform: translateX(-110%); } to { transform: translateX(380%); } }
 
         /* --- CINEMATIC BARS (Letterboxing) --- */
         #cinematic-bars {

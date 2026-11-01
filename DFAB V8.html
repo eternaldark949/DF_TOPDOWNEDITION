@@ -293,6 +293,18 @@
             transition: opacity 0.4s ease;
         }
         #fade-overlay.active { opacity: 1; }
+        /* the loading strip in the corner while a door leads to another map: a short white bar that fills as the map
+           is built and its first textures painted, a glint running along it (compositor-only, so it moves through the
+           build). Only map loads light it; the other fades that borrow the overlay leave it dark. */
+        #fade-overlay .map-load-strip { position: absolute; right: calc(28px + env(safe-area-inset-right, 0px)); bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+            width: min(150px, 28vw); height: 4px; border-radius: 2px; overflow: hidden; background: rgba(255, 255, 255, 0.16); opacity: 0; transition: opacity 0.25s ease; }
+        #fade-overlay.map-loading .map-load-strip { opacity: 1; }
+        #fade-overlay .mls-fill { position: absolute; inset: 0; background: #fff; transform-origin: 0 50%; transform: scaleX(0); transition: transform 0.25s ease-out;
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.6); will-change: transform; }
+        #fade-overlay .mls-glint { position: absolute; top: 0; bottom: 0; left: 0; width: 30%; will-change: transform; animation: mlsGlint 1.1s ease-in-out infinite;
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0)); }
+        #fade-overlay:not(.map-loading) .mls-glint { animation: none; }
+        @keyframes mlsGlint { from { transform: translateX(-110%); } to { transform: translateX(380%); } }
 
         /* --- CINEMATIC BARS (Letterboxing) --- */
         #cinematic-bars {
@@ -4549,7 +4561,8 @@
         </div>
     </div>
 
-    <div id="fade-overlay"></div>
+    <!-- The black between maps; its strip (bottom right) shows how far the next map has loaded (engine/map-loading.js) -->
+    <div id="fade-overlay"><div class="map-load-strip" aria-hidden="true"><div class="mls-fill"></div><div class="mls-glint"></div></div></div>
     
     <div id="cinematic-bars">
         <div class="cine-bar"></div>
@@ -80856,7 +80869,7 @@ engineMixin({
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/map-loading.js" data-cost="1054">
+    <script type="text/dfab" data-src="engine/map-loading.js" data-cost="1074">
         // GameEngine — loadMap / _doLoadMap (building every map), baked lighting.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
                 /* Each interior's painted floor (or backdrop) is a big canvas — 2–11 MB apiece. They're painted from
@@ -80892,12 +80905,14 @@ engineMixin({
                 this.pauseSystem.acquire('map_load');
                 const seq = this._loadSeq = (this._loadSeq || 0) + 1;
                 this._cancelMapTextureWarmup();
+                this._mapLoadStrip(0.08);                                       // the corner strip: started, and creeping
+                setTimeout(() => { if (seq === this._loadSeq && !this.lightingBaked) this._mapLoadStrip(0.3); }, 150);   // on while the screen goes black
                 
                 // 3. Wait for Screen to go Black (400ms)
                 setTimeout(() => {
                     if (seq !== this._loadSeq) return;                          // a newer load took over: it switches and fades in
                     if (!this.activeMap) {                                       // the game was quit mid-fade: nothing to load into
-                        fadeOverlay.classList.remove('active'); this.pauseSystem.release('map_load'); return;
+                        fadeOverlay.classList.remove('active'); this._mapLoadStrip(-1); this.pauseSystem.release('map_load'); return;
                     }
                     // A. Switch the Map Data
                     this._doLoadMap(mapId, spawnAt);
@@ -80905,6 +80920,7 @@ engineMixin({
                     // B. Bake Lighting for the NEW Map
                     // Now that activeMap is updated, this will calculate the correct lines
                     this.bakeStaticLighting(); 
+                    this._mapLoadStrip(0.6);                                     // built and lit; the textures are the rest
                     
                     // C. Use the existing black hold to prepare first-visible textures. Keep the
                     // same 100ms minimum; unusually costly paints finish before revealing the map.
@@ -80913,15 +80929,34 @@ engineMixin({
                     const reveal = () => {
                         if (seq !== this._loadSeq || arrivingMap !== this.activeMap || !held || !prepared) return;
                         this._mapTextureTransition = null;
+                        this._mapLoadStrip(1, seq);
                         fadeOverlay.classList.remove('active');
                         this.pauseSystem.release('map_load');
                     };
                     setTimeout(() => { held = true; reveal(); }, 100);
-                    this._prepareMapTextures(() => { prepared = true; reveal(); }, seq);
+                    this._prepareMapTextures(() => { prepared = true; reveal(); }, seq,
+                        (p) => { if (seq === this._loadSeq) this._mapLoadStrip(0.6 + 0.38 * p); });
                     this._mapTextureTransition = { map: arrivingMap, seq };
                 }, 400);
             },
             
+            /** The loading strip in the black between maps (#fade-overlay .map-load-strip): p is 0..1. At 1 (with the
+             *  load's seq) it fills and fades out with the overlay, then resets, unless a newer load has started. */
+            _mapLoadStrip(p, doneSeq) {
+                const fade = document.getElementById('fade-overlay');
+                const fill = fade && fade.querySelector && fade.querySelector('.mls-fill');
+                if (!fill) return;
+                clearTimeout(this._mapStripT);
+                if (p <= 0.08 && !fade.classList.contains('map-loading')) { fill.style.transition = 'none'; fill.style.transform = 'scaleX(0)'; void fill.offsetWidth; fill.style.transition = ''; }
+                fade.classList.add('map-loading');
+                fill.style.transform = `scaleX(${Math.max(0, Math.min(1, p)).toFixed(3)})`;
+                if (doneSeq !== undefined || p < 0) this._mapStripT = setTimeout(() => {
+                    if (doneSeq !== undefined && doneSeq !== this._loadSeq) return;
+                    fade.classList.remove('map-loading');
+                    fill.style.transition = 'none'; fill.style.transform = 'scaleX(0)'; void fill.offsetWidth; fill.style.transition = '';
+                }, p < 0 ? 0 : 450);
+            },
+
             /** Cancel queued texture work and, on reset/quit, invalidate pending transition callbacks. */
             _cancelMapTextureWarmup(abandonTransition = false) {
                 const warm = this._mapTextureWarmup;
@@ -80935,6 +80970,7 @@ engineMixin({
                     this._loadSeq = (this._loadSeq || 0) + 1;
                     const fade = document.getElementById('fade-overlay');
                     if (fade) fade.classList.remove('active');
+                    this._mapLoadStrip(-1);                                      // (and the strip goes with it)
                     if (this.pauseSystem) this.pauseSystem.release('map_load');
                 }
             },
@@ -80959,7 +80995,7 @@ engineMixin({
             },
 
             /** Prepare only existing static bakes; moving details keep their original render-time updates. */
-            _prepareMapTextures(done, seq) {
+            _prepareMapTextures(done, seq, progress) {
                 this._cancelMapTextureWarmup();
                 const map = this.activeMap, jobs = [];
                 const floors = {
@@ -81022,7 +81058,7 @@ engineMixin({
                 const step = () => {
                     if (this._mapTextureWarmup !== warm || seq !== this._loadSeq || map !== this.activeMap) return;
                     if (warm.index >= jobs.length) { finish(); return; }
-                    try { jobs[warm.index++](); }
+                    try { jobs[warm.index++](); if (progress) progress(warm.index / jobs.length); }
                     catch (error) { console.warn('Map texture preparation', error); finish(); return; }
                     // One expensive canvas per task lets the browser present the fade between paints.
                     warm.timer = setTimeout(step, 0);

@@ -33,12 +33,14 @@ engineMixin({
                 this.pauseSystem.acquire('map_load');
                 const seq = this._loadSeq = (this._loadSeq || 0) + 1;
                 this._cancelMapTextureWarmup();
+                this._mapLoadStrip(0.08);                                       // the corner strip: started, and creeping
+                setTimeout(() => { if (seq === this._loadSeq && !this.lightingBaked) this._mapLoadStrip(0.3); }, 150);   // on while the screen goes black
                 
                 // 3. Wait for Screen to go Black (400ms)
                 setTimeout(() => {
                     if (seq !== this._loadSeq) return;                          // a newer load took over: it switches and fades in
                     if (!this.activeMap) {                                       // the game was quit mid-fade: nothing to load into
-                        fadeOverlay.classList.remove('active'); this.pauseSystem.release('map_load'); return;
+                        fadeOverlay.classList.remove('active'); this._mapLoadStrip(-1); this.pauseSystem.release('map_load'); return;
                     }
                     // A. Switch the Map Data
                     this._doLoadMap(mapId, spawnAt);
@@ -46,6 +48,7 @@ engineMixin({
                     // B. Bake Lighting for the NEW Map
                     // Now that activeMap is updated, this will calculate the correct lines
                     this.bakeStaticLighting(); 
+                    this._mapLoadStrip(0.6);                                     // built and lit; the textures are the rest
                     
                     // C. Use the existing black hold to prepare first-visible textures. Keep the
                     // same 100ms minimum; unusually costly paints finish before revealing the map.
@@ -54,15 +57,34 @@ engineMixin({
                     const reveal = () => {
                         if (seq !== this._loadSeq || arrivingMap !== this.activeMap || !held || !prepared) return;
                         this._mapTextureTransition = null;
+                        this._mapLoadStrip(1, seq);
                         fadeOverlay.classList.remove('active');
                         this.pauseSystem.release('map_load');
                     };
                     setTimeout(() => { held = true; reveal(); }, 100);
-                    this._prepareMapTextures(() => { prepared = true; reveal(); }, seq);
+                    this._prepareMapTextures(() => { prepared = true; reveal(); }, seq,
+                        (p) => { if (seq === this._loadSeq) this._mapLoadStrip(0.6 + 0.38 * p); });
                     this._mapTextureTransition = { map: arrivingMap, seq };
                 }, 400);
             },
             
+            /** The loading strip in the black between maps (#fade-overlay .map-load-strip): p is 0..1. At 1 (with the
+             *  load's seq) it fills and fades out with the overlay, then resets, unless a newer load has started. */
+            _mapLoadStrip(p, doneSeq) {
+                const fade = document.getElementById('fade-overlay');
+                const fill = fade && fade.querySelector && fade.querySelector('.mls-fill');
+                if (!fill) return;
+                clearTimeout(this._mapStripT);
+                if (p <= 0.08 && !fade.classList.contains('map-loading')) { fill.style.transition = 'none'; fill.style.transform = 'scaleX(0)'; void fill.offsetWidth; fill.style.transition = ''; }
+                fade.classList.add('map-loading');
+                fill.style.transform = `scaleX(${Math.max(0, Math.min(1, p)).toFixed(3)})`;
+                if (doneSeq !== undefined || p < 0) this._mapStripT = setTimeout(() => {
+                    if (doneSeq !== undefined && doneSeq !== this._loadSeq) return;
+                    fade.classList.remove('map-loading');
+                    fill.style.transition = 'none'; fill.style.transform = 'scaleX(0)'; void fill.offsetWidth; fill.style.transition = '';
+                }, p < 0 ? 0 : 450);
+            },
+
             /** Cancel queued texture work and, on reset/quit, invalidate pending transition callbacks. */
             _cancelMapTextureWarmup(abandonTransition = false) {
                 const warm = this._mapTextureWarmup;
@@ -76,6 +98,7 @@ engineMixin({
                     this._loadSeq = (this._loadSeq || 0) + 1;
                     const fade = document.getElementById('fade-overlay');
                     if (fade) fade.classList.remove('active');
+                    this._mapLoadStrip(-1);                                      // (and the strip goes with it)
                     if (this.pauseSystem) this.pauseSystem.release('map_load');
                 }
             },
@@ -100,7 +123,7 @@ engineMixin({
             },
 
             /** Prepare only existing static bakes; moving details keep their original render-time updates. */
-            _prepareMapTextures(done, seq) {
+            _prepareMapTextures(done, seq, progress) {
                 this._cancelMapTextureWarmup();
                 const map = this.activeMap, jobs = [];
                 const floors = {
@@ -163,7 +186,7 @@ engineMixin({
                 const step = () => {
                     if (this._mapTextureWarmup !== warm || seq !== this._loadSeq || map !== this.activeMap) return;
                     if (warm.index >= jobs.length) { finish(); return; }
-                    try { jobs[warm.index++](); }
+                    try { jobs[warm.index++](); if (progress) progress(warm.index / jobs.length); }
                     catch (error) { console.warn('Map texture preparation', error); finish(); return; }
                     // One expensive canvas per task lets the browser present the fade between paints.
                     warm.timer = setTimeout(step, 0);
