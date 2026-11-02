@@ -176,12 +176,85 @@
             },
 
             /* ───────────────────────── faces ───────────────────────── */
-            _faceURL(name, size) {
+            /*
+             * Each face is a painted bust (ui/portrait-real.js): hundreds of hair strands and dozens of blurred
+             * forms, a few tens of milliseconds apiece on a laptop and a couple of hundred on a slow phone. So:
+             *  - one size for everyone here (FACE px, scaled by CSS), so a person is painted once, not per size;
+             *  - a face not painted yet shows its initial, and is painted one per task afterwards (_pumpFaces),
+             *    the app's white splash covering the first batch (showContacts);
+             *  - painted faces are kept across sessions (CacheDB, keyed by the look, signed by the build), so the
+             *    next time the app opens they're there at once.
+             */
+            FACE: 96,
+            _faceKey(name) {
                 try {
-                    if (typeof game === 'undefined' || !game || !game.getPortraitCanvas) return null;
-                    const e = game.getPortraitCanvas(name, size, null);
-                    return e && e.config && !e.config.isFallback ? game.getPortraitDataURL(name, size, null) : null;
+                    if (typeof game === 'undefined' || !game || !game.resolvePortraitConfig) return null;
+                    const config = game.resolvePortraitConfig(name);
+                    return config && !config.isFallback ? game.portraitCacheKey(config) : null;
                 } catch (err) { return null; }
+            },
+            _faceStoreKey(name, look) {
+                let h = 7; for (let i = 0; i < look.length; i++) h = (h * 31 + look.charCodeAt(i)) % 2147483647;
+                return `msgface|${this.FACE}|${name}|${h}`;
+            },
+            _faceSig(look) { return (typeof DFAB_BUILD !== 'undefined' ? DFAB_BUILD : 'dev') + '|' + look; },
+            /** The face's picture if it's ready (painted this session, or kept from an earlier one); else null */
+            _faceReady(name) {
+                const look = this._faceKey(name);
+                if (!look) return null;
+                const id = name + '|' + look;
+                if (!this._faces) this._faces = new Map();
+                let url = this._faces.get(id);
+                if (!url && typeof CacheDB !== 'undefined') {
+                    url = CacheDB.get(this._faceStoreKey(name, look), this._faceSig(look));
+                    if (url) this._faces.set(id, url);
+                }
+                return url || null;
+            },
+            /** Paint one face now (the slow part), keep it, and return its picture */
+            _paintFace(name) {
+                const look = this._faceKey(name);
+                if (!look) return null;
+                const id = name + '|' + look;
+                if (!this._faces) this._faces = new Map();
+                let url = this._faces.get(id);
+                if (url) return url;
+                try { url = game.getPortraitDataURL(name, this.FACE, null); } catch (err) { return null; }
+                this._faces.set(id, url);
+                if (typeof CacheDB !== 'undefined') CacheDB.put(this._faceStoreKey(name, look), this._faceSig(look), url);
+                return url;
+            },
+            _faceURL(name) { return this._faceReady(name) || this._paintFace(name); },
+            _setFace(el, url) {
+                el.textContent = '';
+                const img = new Image(); img.alt = ''; img.src = url; el.appendChild(img);
+                el.classList.add('face-in');
+            },
+            /** Paint the queued faces one per task, so the screen (and the splash's fade) keeps moving between them.
+             *  Resolves when the queue is empty. */
+            _pumpFaces() {
+                if (this._facePump) return this._facePump;
+                this._facePump = new Promise(resolve => {
+                    const step = () => {
+                        const q = this._faceQueue;
+                        const job = q && q.shift();
+                        if (!job) { this._facePump = null; resolve(); return; }
+                        const live = job.els.filter(el => el.isConnected);
+                        if (live.length) {
+                            const url = this._paintFace(job.name);
+                            if (url) live.forEach(el => this._setFace(el, url));
+                        }
+                        requestAnimationFrame(() => setTimeout(step, 0));
+                    };
+                    setTimeout(step, 0);
+                });
+                return this._facePump;
+            },
+            _queueFace(name, el) {
+                if (!this._faceQueue) this._faceQueue = [];
+                const job = this._faceQueue.find(j => j.name === name);
+                if (job) job.els.push(el); else this._faceQueue.push({ name, els: [el] });
+                this._pumpFaces();
             },
             _ring(name) {
                 const tm = typeof game !== 'undefined' && game && (game.teammates || []).find(t => t.name === name);
@@ -190,12 +263,15 @@
                 return tier && tier.ring;
             },
             /** A round painted face (or the name's initial), with the bond's ring for the crew */
-            _face(name, cls = 'mav', size = 96) {
+            _face(name, cls = 'mav') {
                 const el = document.createElement('div');
                 el.className = cls;
-                const url = this._faceURL(name, size);
+                const url = this._faceReady(name);
                 if (url) { const img = new Image(); img.alt = ''; img.src = url; el.appendChild(img); }
-                else el.textContent = String(name).replace(/[^A-Za-z0-9]/g, '').charAt(0) || '?';
+                else {
+                    el.textContent = String(name).replace(/[^A-Za-z0-9]/g, '').charAt(0) || '?';
+                    if (this._faceKey(name)) this._queueFace(name, el);          // painted shortly, one per task
+                }
                 const ring = this._ring(name);
                 if (ring) el.style.setProperty('--ring', ring);
                 const tm = typeof game !== 'undefined' && game && (game.teammates || []).find(t => t.name === name);
@@ -206,7 +282,7 @@
             _groupFace(cls = 'mav') {
                 const el = document.createElement('div');
                 el.className = cls + ' stack';
-                for (const n of ['Victoria', '747', 'Max']) el.appendChild(this._face(n, 'mav-mini', 64));
+                for (const n of ['Victoria', '747', 'Max']) el.appendChild(this._face(n, 'mav-mini'));
                 return el;
             },
             _color(name) { return (typeof SPEAKER_COLORS !== 'undefined' && SPEAKER_COLORS[name]) || '#e8c27a'; },
@@ -246,6 +322,25 @@
                 this._buildContactDefs();
                 this.renderContacts();
                 this._paintEmpty();
+                // Faces still to paint: the white M splash fades in over the app while they're painted, then away
+                if (this._faceQueue && this._faceQueue.length) this._splash(scr);
+            },
+            /** The Messages splash (#msg-splash): in now, out once the queued faces are painted (at least a moment,
+             *  so it never just flickers; at most a few seconds, then the rest paint in place) */
+            _splash(scr) {
+                const sp = document.getElementById('msg-splash');
+                if (!sp) return;
+                const run = this._splashRun = (this._splashRun || 0) + 1;
+                clearTimeout(this._splashT);
+                sp.classList.remove('out'); sp.classList.add('on');
+                const t0 = performance.now();
+                const done = () => {
+                    if (run !== this._splashRun) return;
+                    const wait = Math.max(0, 450 - (performance.now() - t0));
+                    this._splashT = setTimeout(() => { if (run === this._splashRun) { sp.classList.add('out'); sp.classList.remove('on'); } }, wait);
+                };
+                this._pumpFaces().then(done);
+                setTimeout(done, 3500);
             },
 
             _lastRec(name) { const h = this.messageHistory[name]; return h && h.length ? h[h.length - 1] : null; },
@@ -473,7 +568,7 @@
                 const row = document.createElement('div');
                 row.className = 'mb-row ' + (mine ? 'me' : 'them') + (cont ? ' cont' : '');
                 if (contact.group && !mine) {
-                    const av = cont ? document.createElement('div') : this._face(rec.who || '?', 'mav mb-av', 48);
+                    const av = cont ? document.createElement('div') : this._face(rec.who || '?', 'mav mb-av');
                     if (cont) av.className = 'mb-av blank';
                     row.appendChild(av);
                 }
@@ -943,7 +1038,7 @@
                 const chip = document.createElement('div');
                 chip.className = 'comm-chip mb-sub';
                 chip.style.setProperty('--who', this._color(speaker));
-                const face = this._face(speaker, 'comm-face', 64);
+                const face = this._face(speaker, 'comm-face');
                 const body = document.createElement('div'); body.className = 'comm-body';
                 const name = document.createElement('div'); name.className = 'comm-name'; name.textContent = speaker;
                 const sig = document.createElement('span'); sig.className = 'comm-sig'; sig.innerHTML = '<i></i><i></i><i></i>';

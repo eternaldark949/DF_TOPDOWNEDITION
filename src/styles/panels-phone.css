@@ -814,6 +814,25 @@
            Her lines violet on the right, theirs smoke on the left,
            gold reply chips, painted faces with the bond's ring.
            ========================================================= */
+        /* Messages splash: white, a big M, fading in while the app's faces are painted and away once they're done.
+           Opacity and transform only, so it keeps moving while a face is being painted. */
+        #msg-splash { position: absolute; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+            background: radial-gradient(ellipse 80% 70% at 50% 45%, #ffffff 0%, #fbf6fb 60%, #f1e8f2 100%);
+            opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.28s ease, visibility 0s linear 0.28s; }
+        #msg-splash.on { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity 0.22s ease, visibility 0s; }
+        #msg-splash.out { transition: opacity 0.45s ease, visibility 0s linear 0.45s; }
+        #msg-splash .msp-m { font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: min(26vh, 22vw); line-height: 1; letter-spacing: -0.02em;
+            background: linear-gradient(160deg, #ff3d7f 0%, #d4145a 55%, #8a0f4a 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+            filter: drop-shadow(0 6px 18px rgba(212, 20, 90, 0.25)); will-change: transform, opacity; animation: mspBreathe 1.8s ease-in-out infinite; }
+        #msg-splash .msp-dots { display: flex; gap: 8px; }
+        #msg-splash .msp-dots i { width: 7px; height: 7px; border-radius: 50%; background: #d4145a; opacity: 0.2; will-change: opacity; animation: mspDot 1.2s ease-in-out infinite; }
+        #msg-splash .msp-dots i:nth-child(2) { animation-delay: 0.15s; }
+        #msg-splash .msp-dots i:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes mspBreathe { 0%, 100% { transform: scale(1); opacity: 0.92; } 50% { transform: scale(1.05); opacity: 1; } }
+        @keyframes mspDot { 0%, 100% { opacity: 0.2; } 40% { opacity: 1; } }
+        /* a face that arrives after its initial fades in over it */
+        #screen-contacts .face-in img, .comm-face.face-in img { animation: faceIn 0.3s ease; }
+        @keyframes faceIn { from { opacity: 0; } to { opacity: 1; } }
         #screen-contacts { flex-direction: row; padding: 0 0 42px; position: relative;
             background: radial-gradient(ellipse 70% 60% at 30% 15%, rgba(93, 20, 226, 0.22), transparent 70%), linear-gradient(180deg, #0e0418, #07020c); }
         body.phone-wide #screen-contacts { padding: 0 0 34px; }

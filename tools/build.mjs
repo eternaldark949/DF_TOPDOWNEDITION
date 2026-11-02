@@ -24,6 +24,7 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, extname, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 import { inlineLoadingArt } from './loading-art.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -291,6 +292,10 @@ function scriptBlocks() {
     for (const [name, code] of blocks) {
         if (/<\/script/i.test(code)) throw new Error(`src/${name} contains "</script", which would end its block early`);
     }
+    // DFAB_BUILD: a fingerprint of this build's code, for caches kept across sessions that must not outlive the code
+    // that made them (the Messages app's painted faces, ui/messages.js)
+    const build = createHash('sha1').update(blocks.filter(([n]) => !n.startsWith('assets#')).map(([, c]) => c).join('\n')).digest('hex').slice(0, 12);
+    blocks.unshift(['@build', `        const DFAB_BUILD = '${build}';\n`]);
     // data-cost: roughly how long the block takes to run, for the bar. The music is long but cheap (one string
     // literal per track); code is the slow part.
     const cost = (name, code) => Math.max(1, Math.round(code.length * (name.startsWith('assets#') ? 0.15 : 1) / 100));
