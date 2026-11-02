@@ -3924,6 +3924,9 @@
         /* Avatars: a painted bust in the sidebar portrait's peach dotted frame */
         .df-avatar { position: relative; flex-shrink: 0; width: 48px; height: 48px; border-radius: 50%; padding: 2px; border: 2px dotted var(--df-peach); }
         .df-avatar img, .df-avatar .mono { width: 100%; height: 100%; border-radius: 50%; display: block; object-fit: cover; }
+        /* faces are painted on a clear ground (ui/face-cache.js); this is the ground they used to carry */
+        .df-avatar img, .dc-portrait img { background: rgba(40, 5, 25, 0.95); }
+        .df-avatar img.face-in, .dc-portrait img.face-in { animation: faceIn 0.3s ease; }
         .df-avatar .mono { display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 40%, rgba(60, 20, 30, 0.9), #050103 75%);
             font: 400 max(6px, 1.5rem - var(--font-trim)) var(--font-script); color: var(--df-lavender-pale); }
         .df-avatar .dot { position: absolute; right: -1px; bottom: 1px; width: 11px; height: 11px; border-radius: 50%; background: var(--acc, var(--df-lavender)); border: 2px solid #0b0414; box-shadow: 0 0 6px var(--acc, var(--df-lavender)); }
@@ -5799,7 +5802,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'e1f6498fcb64';
+        const DFAB_BUILD = 'd7b5310485ac';
     </script>
     <script type="text/dfab" data-src="core/config.js" data-cost="406">
 
@@ -64085,7 +64088,131 @@ Object.assign(TrafficVehicle.prototype, {
             return drawCharacterPortraitClassic(ctx, w, h, config);
         }
     </script>
-    <script type="text/dfab" data-src="ui/comms.js" data-cost="50">
+    <script type="text/dfab" data-src="ui/face-cache.js" data-cost="69">
+        /* =====================================================================
+           FACE CACHE: every app's painted faces, painted once and kept
+           ---------------------------------------------------------------------
+           A face is a painted bust (ui/portrait-real.js): hundreds of hair strands
+           and dozens of blurred forms, a few tens of milliseconds apiece on a laptop
+           and a couple of hundred on a slow phone. Painting a screenful of them in
+           one go is what made the portrait apps sit frozen when they opened. So:
+
+             - few sizes (FaceCache.SMALL for avatars and chips, .LARGE for the big
+               cards), always on a transparent ground (the CSS gives the backdrop),
+               so one person is painted once for Messages, Contacts, Team and the
+               dialogue chips alike;
+             - a face that isn't painted yet shows its initial and is painted one per
+               task afterwards (FaceCache.queue), so the screen keeps moving between;
+             - painted faces are kept across sessions (CacheDB, keyed by the look and
+               signed by the build), so the next time they're there at once.
+
+             FaceCache.ready(name, size)       its picture if painted already, else null
+             FaceCache.paint(name, size)       paint it now (slow), keep it, return it
+             FaceCache.queue(name, size, cb)   paint it soon, then cb(url)
+             FaceCache.pump()                  a promise for the queue being empty
+             FaceCache.html(name, size, mono)  an <img> if ready, else `mono` marked to
+                                               turn into the face once it's painted
+           ===================================================================== */
+        const FaceCache = {
+            SMALL: 96,
+            LARGE: 128,
+            _mem: new Map(),
+            _queue: [],
+            _pumping: null,
+
+            /** The face's look as a key (null if this person has no painted portrait) */
+            look(name) {
+                try {
+                    if (typeof game === 'undefined' || !game || !game.resolvePortraitConfig) return null;
+                    const config = game.resolvePortraitConfig(name);
+                    return config && !config.isFallback ? game.portraitCacheKey(config) : null;
+                } catch (err) { return null; }
+            },
+            has(name) { return !!this.look(name); },
+            _storeKey(name, size, look) {
+                let h = 7; for (let i = 0; i < look.length; i++) h = (h * 31 + look.charCodeAt(i)) % 2147483647;
+                return `face|${size}|${name}|${h}`;
+            },
+            _sig(look) { return (typeof DFAB_BUILD !== 'undefined' ? DFAB_BUILD : 'dev') + '|' + look; },
+
+            ready(name, size = this.SMALL) {
+                const look = this.look(name);
+                if (!look) return null;
+                const id = size + '|' + name + '|' + look;
+                let url = this._mem.get(id);
+                if (!url && typeof CacheDB !== 'undefined') {
+                    url = CacheDB.get(this._storeKey(name, size, look), this._sig(look));
+                    if (url) this._mem.set(id, url);
+                }
+                return url || null;
+            },
+            paint(name, size = this.SMALL) {
+                const look = this.look(name);
+                if (!look) return null;
+                const id = size + '|' + name + '|' + look;
+                let url = this._mem.get(id) || this.ready(name, size);
+                if (url) return url;
+                try { url = game.getPortraitDataURL(name, size, null); } catch (err) { return null; }
+                if (!url) return null;
+                this._mem.set(id, url);
+                if (typeof CacheDB !== 'undefined') CacheDB.put(this._storeKey(name, size, look), this._sig(look), url);
+                return url;
+            },
+            url(name, size = this.SMALL) { return this.ready(name, size) || this.paint(name, size); },
+
+            /** Paint soon, one face per task; cb(url) once it's painted. cb may return false to say it's no longer wanted. */
+            queue(name, size, cb) {
+                const job = this._queue.find(j => j.name === name && j.size === size);
+                if (job) job.cbs.push(cb); else this._queue.push({ name, size, cbs: [cb] });
+                return this.pump();
+            },
+            pump() {
+                if (this._pumping) return this._pumping;
+                if (!this._queue.length) return Promise.resolve();
+                this._pumping = new Promise(resolve => {
+                    const step = () => {
+                        const job = this._queue.shift();
+                        if (!job) { this._pumping = null; resolve(); return; }
+                        // only paint for someone still wanting it (an element still on screen, say)
+                        const live = job.cbs.filter(cb => !cb.wanted || cb.wanted());
+                        if (live.length) {
+                            const url = this.paint(job.name, job.size);
+                            if (url) live.forEach(cb => { try { cb(url); } catch (e) { console.error(e); } });
+                        }
+                        requestAnimationFrame(() => setTimeout(step, 0));
+                    };
+                    setTimeout(step, 0);
+                });
+                return this._pumping;
+            },
+            get pending() { return this._queue.length; },
+
+            /** For HTML built as a string: the face if it's ready, else `mono` (an element's HTML), marked so the
+             *  face replaces it once painted. */
+            html(name, size, mono) {
+                const url = this.ready(name, size);
+                if (url) return `<img alt="" src="${url}">`;
+                if (!this.has(name)) return mono;
+                clearTimeout(this._scanTimer);
+                this._scanTimer = setTimeout(() => this.scan(), 0);
+                const esc = String(name).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+                return mono.replace(/^<(\w+)/, `<$1 data-face="${esc}" data-face-size="${size}"`);
+            },
+            /** Queue every marked placeholder now in the page */
+            scan(root = document) {
+                root.querySelectorAll('[data-face]:not([data-face-queued])').forEach(el => {
+                    el.setAttribute('data-face-queued', '');
+                    const cb = (url) => {
+                        const img = new Image(); img.alt = ''; img.src = url; img.className = 'face-in';
+                        el.replaceWith(img);
+                    };
+                    cb.wanted = () => el.isConnected;
+                    this.queue(el.dataset.face, +el.dataset.faceSize || this.SMALL, cb);
+                });
+            }
+        };
+    </script>
+    <script type="text/dfab" data-src="ui/comms.js" data-cost="54">
         /* =====================================================================
            COMMS & TALK STYLE — the earpiece, and which look the talk UI wears
            ---------------------------------------------------------------------
@@ -64121,7 +64248,16 @@ Object.assign(TrafficVehicle.prototype, {
                 face.className = 'comm-face';
                 const url = this._face(game, speaker);
                 if (url) { const img = new Image(); img.alt = ''; img.src = url; face.appendChild(img); }
-                else face.textContent = String(speaker || '?').trim().charAt(0).toUpperCase();
+                else {
+                    face.textContent = String(speaker || '?').trim().charAt(0).toUpperCase();
+                    // not painted yet: paint it on the next task (FaceCache keeps it), so the line shows at once
+                    const n = this._name(speaker);
+                    if (FaceCache.has(n)) {
+                        const cb = (u) => { face.textContent = ''; const img = new Image(); img.alt = ''; img.src = u; face.appendChild(img); face.classList.add('face-in'); };
+                        cb.wanted = () => face.isConnected;
+                        FaceCache.queue(n, FaceCache.SMALL, cb);
+                    }
+                }
                 const body = document.createElement('div');
                 body.className = 'comm-body';
                 const name = document.createElement('div');
@@ -64167,8 +64303,7 @@ Object.assign(TrafficVehicle.prototype, {
             _face(game, speaker) {
                 try {
                     const n = this._name(speaker);
-                    if (!game || !game.resolvePortraitConfig || game.resolvePortraitConfig(n).isFallback) return null;
-                    return game.getPortraitDataURL(n, 104, null);
+                    return FaceCache.ready(n, FaceCache.SMALL);
                 } catch (e) { return null; }
             },
         };
@@ -66394,7 +66529,7 @@ Object.assign(TrafficVehicle.prototype, {
         }
 
     </script>
-    <script type="text/dfab" data-src="ui/inventory-augments.js" data-cost="530">
+    <script type="text/dfab" data-src="ui/inventory-augments.js" data-cost="562">
         /* =====================================================================
            INVENTORY SYSTEM
            ---------------------------------------------------------------------
@@ -67107,14 +67242,17 @@ Object.assign(TrafficVehicle.prototype, {
                     if (!drag.moved && Math.abs(dy) < 6) return;
                     if (!drag.moved) { drag.moved = true; close(); el.classList.add('dragging'); }
                     el.style.transform = `translateY(${dy}px)`;
-                    // Swap with a neighbour once the pill passes its middle
-                    const rect = el.getBoundingClientRect(), mid = rect.top + rect.height / 2;
+                    // Swap with a neighbour once the pill passes its middle. Measured by layout (offsetTop), not by
+                    // what's on screen: a neighbour still sliding to its new spot mustn't swap straight back.
+                    const mid = el.offsetTop + dy + el.offsetHeight / 2;
                     const prev = el.previousElementSibling, next = el.nextElementSibling;
-                    if (prev?.classList.contains('ui-pill') && mid < prev.getBoundingClientRect().top + prev.offsetHeight / 2) {
-                        el.parentNode.insertBefore(el, prev); drag.y -= prev.offsetHeight + parseFloat(getComputedStyle(prev).marginBottom);
+                    if (prev?.classList.contains('ui-pill') && mid < prev.offsetTop + prev.offsetHeight / 2) {
+                        this._slidePills(() => el.parentNode.insertBefore(el, prev), el);
+                        drag.y -= prev.offsetHeight + parseFloat(getComputedStyle(prev).marginBottom);
                         el.style.transform = `translateY(${event.clientY - drag.y}px)`;
-                    } else if (next?.classList.contains('ui-pill') && mid > next.getBoundingClientRect().top + next.offsetHeight / 2) {
-                        el.parentNode.insertBefore(next, el); drag.y += next.offsetHeight + parseFloat(getComputedStyle(next).marginBottom);
+                    } else if (next?.classList.contains('ui-pill') && mid > next.offsetTop + next.offsetHeight / 2) {
+                        this._slidePills(() => el.parentNode.insertBefore(next, el), el);
+                        drag.y += next.offsetHeight + parseFloat(getComputedStyle(next).marginBottom);
                         el.style.transform = `translateY(${event.clientY - drag.y}px)`;
                     }
                 });
@@ -67123,7 +67261,10 @@ Object.assign(TrafficVehicle.prototype, {
                     const moved = drag.moved; drag = null;
                     if (!moved) return;
                     swallowClick = true;
+                    // let go: the pill settles into its slot rather than jumping there
+                    const from = el.style.transform;
                     el.classList.remove('dragging'); el.style.transform = '';
+                    if (from && el.animate && !this._still()) el.animate([{ transform: from }, { transform: 'none' }], { duration: 220, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
                     this._keepOrder(el);
                 };
                 control.addEventListener('pointerup', endDrag);
@@ -67143,7 +67284,7 @@ Object.assign(TrafficVehicle.prototype, {
                         event.preventDefault();
                         const sibling = event.key === 'ArrowUp' ? el.previousElementSibling : el.nextElementSibling;
                         if (!sibling?.classList.contains('ui-pill')) return;
-                        if (event.key === 'ArrowUp') el.parentNode.insertBefore(el, sibling); else el.parentNode.insertBefore(sibling, el);
+                        this._slidePills(() => { if (event.key === 'ArrowUp') el.parentNode.insertBefore(el, sibling); else el.parentNode.insertBefore(sibling, el); });
                         this._keepOrder(el); control.focus();
                     }
                 });
@@ -67167,7 +67308,47 @@ Object.assign(TrafficVehicle.prototype, {
                     .sort((a, b) => (a.r ?? Infinity) - (b.r ?? Infinity) || a.i - b.i).map(x => x.entry);
             }
 
-            render() {
+            /** No sliding for players who've asked the system for less motion */
+            _still() { return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches; }
+
+            /**
+             * Make a change to the list, then slide every pill (and heading) from where it was to where it is now,
+             * rather than letting it jump: measure, change, then play each one's offset back to nothing (FLIP).
+             * Pills are matched by source and id, so this works across a full re-render too. New pills fade in.
+             * `skip`: a pill to leave alone (the one being dragged follows the pointer).
+             */
+            _slidePills(change, skip = null) {
+                const list = this.uiList;
+                if (!list || this._still() || typeof Element === 'undefined' || !Element.prototype.animate) { change(); return; }
+                const keyOf = n => n.classList.contains('ui-pill') ? `p|${n.dataset.source}:${n.dataset.id}` : `h|${n.dataset.category}`;
+                const sel = '.ui-pill, .inventory-section-title';
+                const before = new Map();
+                list.querySelectorAll(sel).forEach(n => {
+                    const r = n.getBoundingClientRect();          // where it's drawn now, mid-slide included
+                    if (r.width) before.set(keyOf(n), r);
+                });
+                change();
+                if (!before.size) return;                         // first fill (or the list was hidden): nothing to slide from
+                list.querySelectorAll(sel).forEach(n => {
+                    if (n === skip) return;
+                    n.getAnimations().forEach(a => { if (a.id === 'pill-slide' || a.id === 'pill-in') a.cancel(); });
+                    const r = n.getBoundingClientRect();
+                    if (!r.width) return;
+                    const was = before.get(keyOf(n));
+                    let anim;
+                    if (!was) anim = n.animate([{ opacity: 0, transform: 'scale(0.97)' }, { opacity: 1, transform: 'none' }], { duration: 240, easing: 'ease-out' });
+                    else {
+                        const dx = was.left - r.left, dy = was.top - r.top;
+                        if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+                        anim = n.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: 280, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+                    }
+                    anim.id = was ? 'pill-slide' : 'pill-in';
+                });
+            }
+
+            render() { this._slidePills(() => this._renderList()); }
+
+            _renderList() {
                 if (!this.uiList) return;
                 this.uiList.replaceChildren();
                 const equippedOnly = Screens.current === 'equipped';
@@ -67189,6 +67370,7 @@ Object.assign(TrafficVehicle.prototype, {
                     if (!group.length) continue;
                     const heading = document.createElement('h2');
                     heading.className = 'inventory-section-title';
+                    heading.dataset.category = category;
                     heading.textContent = `${label} · ${group.length}`;
                     this.uiList.appendChild(heading);
                     group.forEach(entry => this.uiList.appendChild(this._renderEntry(entry)));
@@ -79293,18 +79475,17 @@ engineMixin({
                 }));
             },
 
-            /** A contact or crew avatar: their painted bust (getPortraitDataURL), else a script monogram. */
+            /** A contact or crew avatar: their painted bust (FaceCache), else a script monogram. */
             _dfAvatar(name, acc, big) {
-                return `<div class="df-avatar${big ? ' big' : ''}" style="--acc:${acc}">${this._dfFace(name, big ? 128 : 72)}${big ? '' : '<span class="dot"></span>'}</div>`;
+                return `<div class="df-avatar${big ? ' big' : ''}" style="--acc:${acc}">${this._dfFace(name, big ? FaceCache.LARGE : FaceCache.SMALL)}${big ? '' : '<span class="dot"></span>'}</div>`;
             },
 
-            /** The face inside an avatar: the painted bust at `size`px, else a script monogram. */
+            /** The face inside an avatar: the painted bust if it's painted already, else a script monogram that
+             *  turns into the bust once FaceCache gets to it (one face per task, so the screen opens at once). */
             _dfFace(name, size) {
-                try {
-                    const cfg = this.resolvePortraitConfig(name);
-                    if (cfg && !cfg.isFallback) return `<img alt="" src="${this.getPortraitDataURL(name, size)}">`;
-                } catch (e) { /* no portrait: fall through to the monogram */ }
-                return `<div class="mono">${(name || '?').replace(/^(Dr\.|Barista|Chef)\s+/, '').charAt(0)}</div>`;
+                const mono = `<div class="mono">${(name || '?').replace(/^(Dr\.|Barista|Chef)\s+/, '').charAt(0)}</div>`;
+                try { return FaceCache.html(name, size <= FaceCache.SMALL ? FaceCache.SMALL : FaceCache.LARGE, mono); }
+                catch (e) { return mono; }
             },
 
             // Render contacts screen in the sidebar
@@ -79360,7 +79541,7 @@ engineMixin({
                     // capitals (script was tried; handles like LUVSH4D3 read badly in it, and one face for all keeps it tidy)
                     for (const c of contacts) {
                         html += `<div class="dc-card" style="--acc:${color}" tabindex="0">`;
-                        html += `<div class="dc-portrait">${this._dfFace(c.name, 128)}<svg class="portrait-rim" aria-hidden="true"><use href="#portrait-rim"/></svg></div>`;
+                        html += `<div class="dc-portrait">${this._dfFace(c.name, FaceCache.LARGE)}<svg class="portrait-rim" aria-hidden="true"><use href="#portrait-rim"/></svg></div>`;
                         html += `<div class="dc-who"><div class="dc-name">${c.name}</div><div class="dc-role">${roleLabels[cat]}</div>`;
                         if (c.lastMsg) html += `<div class="dc-quote">“${c.lastMsg}”</div>`;
                         html += `</div><span class="dc-diamond" aria-hidden="true"></span></div>`;
@@ -93737,7 +93918,7 @@ engineMixin({
         });
         
     </script>
-    <script type="text/dfab" data-src="ui/messages.js" data-cost="850">
+    <script type="text/dfab" data-src="ui/messages.js" data-cost="816">
         /* =====================================================================
            MESSAGES — the phone's Messages app ("Velvet Thread")
            ---------------------------------------------------------------------
@@ -93916,85 +94097,24 @@ engineMixin({
             },
 
             /* ───────────────────────── faces ───────────────────────── */
-            /*
-             * Each face is a painted bust (ui/portrait-real.js): hundreds of hair strands and dozens of blurred
-             * forms, a few tens of milliseconds apiece on a laptop and a couple of hundred on a slow phone. So:
-             *  - one size for everyone here (FACE px, scaled by CSS), so a person is painted once, not per size;
-             *  - a face not painted yet shows its initial, and is painted one per task afterwards (_pumpFaces),
-             *    the app's white splash covering the first batch (showContacts);
-             *  - painted faces are kept across sessions (CacheDB, keyed by the look, signed by the build), so the
-             *    next time the app opens they're there at once.
-             */
-            FACE: 96,
-            _faceKey(name) {
-                try {
-                    if (typeof game === 'undefined' || !game || !game.resolvePortraitConfig) return null;
-                    const config = game.resolvePortraitConfig(name);
-                    return config && !config.isFallback ? game.portraitCacheKey(config) : null;
-                } catch (err) { return null; }
-            },
-            _faceStoreKey(name, look) {
-                let h = 7; for (let i = 0; i < look.length; i++) h = (h * 31 + look.charCodeAt(i)) % 2147483647;
-                return `msgface|${this.FACE}|${name}|${h}`;
-            },
-            _faceSig(look) { return (typeof DFAB_BUILD !== 'undefined' ? DFAB_BUILD : 'dev') + '|' + look; },
-            /** The face's picture if it's ready (painted this session, or kept from an earlier one); else null */
-            _faceReady(name) {
-                const look = this._faceKey(name);
-                if (!look) return null;
-                const id = name + '|' + look;
-                if (!this._faces) this._faces = new Map();
-                let url = this._faces.get(id);
-                if (!url && typeof CacheDB !== 'undefined') {
-                    url = CacheDB.get(this._faceStoreKey(name, look), this._faceSig(look));
-                    if (url) this._faces.set(id, url);
-                }
-                return url || null;
-            },
-            /** Paint one face now (the slow part), keep it, and return its picture */
-            _paintFace(name) {
-                const look = this._faceKey(name);
-                if (!look) return null;
-                const id = name + '|' + look;
-                if (!this._faces) this._faces = new Map();
-                let url = this._faces.get(id);
-                if (url) return url;
-                try { url = game.getPortraitDataURL(name, this.FACE, null); } catch (err) { return null; }
-                this._faces.set(id, url);
-                if (typeof CacheDB !== 'undefined') CacheDB.put(this._faceStoreKey(name, look), this._faceSig(look), url);
-                return url;
-            },
-            _faceURL(name) { return this._faceReady(name) || this._paintFace(name); },
+            /* Painted once and kept across sessions by FaceCache (ui/face-cache.js); a face not painted yet shows
+               its initial and is painted one per task, the app's white splash covering the first batch (showContacts). */
+            FACE: FaceCache.SMALL,
+            _faceKey(name) { return FaceCache.look(name); },
+            _faceReady(name) { return FaceCache.ready(name, this.FACE); },
+            _paintFace(name) { return FaceCache.paint(name, this.FACE); },
+            _faceURL(name) { return FaceCache.url(name, this.FACE); },
             _setFace(el, url) {
                 el.textContent = '';
                 const img = new Image(); img.alt = ''; img.src = url; el.appendChild(img);
                 el.classList.add('face-in');
             },
-            /** Paint the queued faces one per task, so the screen (and the splash's fade) keeps moving between them.
-             *  Resolves when the queue is empty. */
-            _pumpFaces() {
-                if (this._facePump) return this._facePump;
-                this._facePump = new Promise(resolve => {
-                    const step = () => {
-                        const q = this._faceQueue;
-                        const job = q && q.shift();
-                        if (!job) { this._facePump = null; resolve(); return; }
-                        const live = job.els.filter(el => el.isConnected);
-                        if (live.length) {
-                            const url = this._paintFace(job.name);
-                            if (url) live.forEach(el => this._setFace(el, url));
-                        }
-                        requestAnimationFrame(() => setTimeout(step, 0));
-                    };
-                    setTimeout(step, 0);
-                });
-                return this._facePump;
-            },
+            /** Resolves when every queued face is painted */
+            _pumpFaces() { return FaceCache.pump(); },
             _queueFace(name, el) {
-                if (!this._faceQueue) this._faceQueue = [];
-                const job = this._faceQueue.find(j => j.name === name);
-                if (job) job.els.push(el); else this._faceQueue.push({ name, els: [el] });
-                this._pumpFaces();
+                const cb = (url) => this._setFace(el, url);
+                cb.wanted = () => el.isConnected;
+                FaceCache.queue(name, this.FACE, cb);
             },
             _ring(name) {
                 const tm = typeof game !== 'undefined' && game && (game.teammates || []).find(t => t.name === name);
@@ -94063,7 +94183,7 @@ engineMixin({
                 this.renderContacts();
                 this._paintEmpty();
                 // Faces still to paint: the white M splash fades in over the app while they're painted, then away
-                if (this._faceQueue && this._faceQueue.length) this._splash(scr);
+                if (FaceCache.pending) this._splash(scr);
             },
             /** The Messages splash (#msg-splash): in now, out once the queued faces are painted (at least a moment,
              *  so it never just flickers; at most a few seconds, then the rest paint in place) */

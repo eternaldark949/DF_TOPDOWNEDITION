@@ -136,6 +136,7 @@ const SCRIPTS = [
     'ui/weapon-models.js',
     'ui/humanoid-render.js',
     'ui/portrait-real.js',
+    'ui/face-cache.js',
     'ui/comms.js',
     'ui/crowd-impostors.js',
     'ui/silhouette-fx.js',
@@ -293,7 +294,7 @@ function scriptBlocks() {
         if (/<\/script/i.test(code)) throw new Error(`src/${name} contains "</script", which would end its block early`);
     }
     // DFAB_BUILD: a fingerprint of this build's code, for caches kept across sessions that must not outlive the code
-    // that made them (the Messages app's painted faces, ui/messages.js)
+    // that made them (every app's painted faces, ui/face-cache.js)
     const build = createHash('sha1').update(blocks.filter(([n]) => !n.startsWith('assets#')).map(([, c]) => c).join('\n')).digest('hex').slice(0, 12);
     blocks.unshift(['@build', `        const DFAB_BUILD = '${build}';\n`]);
     // data-cost: roughly how long the block takes to run, for the bar. The music is long but cheap (one string

@@ -176,85 +176,24 @@
             },
 
             /* ───────────────────────── faces ───────────────────────── */
-            /*
-             * Each face is a painted bust (ui/portrait-real.js): hundreds of hair strands and dozens of blurred
-             * forms, a few tens of milliseconds apiece on a laptop and a couple of hundred on a slow phone. So:
-             *  - one size for everyone here (FACE px, scaled by CSS), so a person is painted once, not per size;
-             *  - a face not painted yet shows its initial, and is painted one per task afterwards (_pumpFaces),
-             *    the app's white splash covering the first batch (showContacts);
-             *  - painted faces are kept across sessions (CacheDB, keyed by the look, signed by the build), so the
-             *    next time the app opens they're there at once.
-             */
-            FACE: 96,
-            _faceKey(name) {
-                try {
-                    if (typeof game === 'undefined' || !game || !game.resolvePortraitConfig) return null;
-                    const config = game.resolvePortraitConfig(name);
-                    return config && !config.isFallback ? game.portraitCacheKey(config) : null;
-                } catch (err) { return null; }
-            },
-            _faceStoreKey(name, look) {
-                let h = 7; for (let i = 0; i < look.length; i++) h = (h * 31 + look.charCodeAt(i)) % 2147483647;
-                return `msgface|${this.FACE}|${name}|${h}`;
-            },
-            _faceSig(look) { return (typeof DFAB_BUILD !== 'undefined' ? DFAB_BUILD : 'dev') + '|' + look; },
-            /** The face's picture if it's ready (painted this session, or kept from an earlier one); else null */
-            _faceReady(name) {
-                const look = this._faceKey(name);
-                if (!look) return null;
-                const id = name + '|' + look;
-                if (!this._faces) this._faces = new Map();
-                let url = this._faces.get(id);
-                if (!url && typeof CacheDB !== 'undefined') {
-                    url = CacheDB.get(this._faceStoreKey(name, look), this._faceSig(look));
-                    if (url) this._faces.set(id, url);
-                }
-                return url || null;
-            },
-            /** Paint one face now (the slow part), keep it, and return its picture */
-            _paintFace(name) {
-                const look = this._faceKey(name);
-                if (!look) return null;
-                const id = name + '|' + look;
-                if (!this._faces) this._faces = new Map();
-                let url = this._faces.get(id);
-                if (url) return url;
-                try { url = game.getPortraitDataURL(name, this.FACE, null); } catch (err) { return null; }
-                this._faces.set(id, url);
-                if (typeof CacheDB !== 'undefined') CacheDB.put(this._faceStoreKey(name, look), this._faceSig(look), url);
-                return url;
-            },
-            _faceURL(name) { return this._faceReady(name) || this._paintFace(name); },
+            /* Painted once and kept across sessions by FaceCache (ui/face-cache.js); a face not painted yet shows
+               its initial and is painted one per task, the app's white splash covering the first batch (showContacts). */
+            FACE: FaceCache.SMALL,
+            _faceKey(name) { return FaceCache.look(name); },
+            _faceReady(name) { return FaceCache.ready(name, this.FACE); },
+            _paintFace(name) { return FaceCache.paint(name, this.FACE); },
+            _faceURL(name) { return FaceCache.url(name, this.FACE); },
             _setFace(el, url) {
                 el.textContent = '';
                 const img = new Image(); img.alt = ''; img.src = url; el.appendChild(img);
                 el.classList.add('face-in');
             },
-            /** Paint the queued faces one per task, so the screen (and the splash's fade) keeps moving between them.
-             *  Resolves when the queue is empty. */
-            _pumpFaces() {
-                if (this._facePump) return this._facePump;
-                this._facePump = new Promise(resolve => {
-                    const step = () => {
-                        const q = this._faceQueue;
-                        const job = q && q.shift();
-                        if (!job) { this._facePump = null; resolve(); return; }
-                        const live = job.els.filter(el => el.isConnected);
-                        if (live.length) {
-                            const url = this._paintFace(job.name);
-                            if (url) live.forEach(el => this._setFace(el, url));
-                        }
-                        requestAnimationFrame(() => setTimeout(step, 0));
-                    };
-                    setTimeout(step, 0);
-                });
-                return this._facePump;
-            },
+            /** Resolves when every queued face is painted */
+            _pumpFaces() { return FaceCache.pump(); },
             _queueFace(name, el) {
-                if (!this._faceQueue) this._faceQueue = [];
-                const job = this._faceQueue.find(j => j.name === name);
-                if (job) job.els.push(el); else this._faceQueue.push({ name, els: [el] });
-                this._pumpFaces();
+                const cb = (url) => this._setFace(el, url);
+                cb.wanted = () => el.isConnected;
+                FaceCache.queue(name, this.FACE, cb);
             },
             _ring(name) {
                 const tm = typeof game !== 'undefined' && game && (game.teammates || []).find(t => t.name === name);
@@ -323,7 +262,7 @@
                 this.renderContacts();
                 this._paintEmpty();
                 // Faces still to paint: the white M splash fades in over the app while they're painted, then away
-                if (this._faceQueue && this._faceQueue.length) this._splash(scr);
+                if (FaceCache.pending) this._splash(scr);
             },
             /** The Messages splash (#msg-splash): in now, out once the queued faces are painted (at least a moment,
              *  so it never just flickers; at most a few seconds, then the rest paint in place) */
