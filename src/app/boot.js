@@ -92,7 +92,13 @@
             const w = gradeWash(g);
             if (w) { ov.style.background = w.rgb; ov.style.opacity = w.alpha; ov.style.display = 'block'; }
             else ov.style.display = 'none';
-            c.style.boxShadow = g.vignette > 0 ? 'inset 0 0 ' + (g.vignette * 2) + 'px ' + g.vignette + 'px rgba(0,0,0,' + (g.vignette / 100) + ')' : 'none';
+            // The vignette on a layer of its own over the canvas: an inset shadow on the canvas itself is painted under its
+            // pixels, so it never showed in play (only saved photos, which bake it in, had it)
+            let vg = document.getElementById('grade-vignette');
+            if (!vg) { vg = document.createElement('div'); vg.id = 'grade-vignette'; vg.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;'; c.parentElement.appendChild(vg); }
+            c.style.boxShadow = 'none';
+            vg.style.boxShadow = g.vignette > 0 ? 'inset 0 0 ' + (g.vignette * 2) + 'px ' + g.vignette + 'px rgba(0,0,0,' + (g.vignette / 100) + ')' : 'none';
+            vg.style.display = g.vignette > 0 ? 'block' : 'none';
         }
         /** Bake the wash and vignette into a photo (out: a canvas already holding the filtered frame) */
         function gradePhotoPass(out, cssW) {
