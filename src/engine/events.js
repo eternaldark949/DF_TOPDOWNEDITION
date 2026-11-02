@@ -219,12 +219,8 @@
                     FullscreenManager.requestIfEnabled();
                     audioSys.init();
                     if (typeof saveSlotManager !== 'undefined' && saveSlotManager.hasAnySave()) {
-                        saveSlotManager.open('load', (success) => {
-                            if (success) {
-                                document.getElementById('main-menu').style.opacity = '0';
-                                setTimeout(() => this.enterWorld(), 500);
-                            }
-                        });
+                        // The chosen save loads under the loading screen (engine/loop.js loadIntoWorld)
+                        saveSlotManager.open('load', null, { loadVia: (load) => this.loadSaveFromMenu(load) });
                     } else {
                         showMessage('NO SAVE FILES FOUND.');
                         audioSys.sfx('ui');

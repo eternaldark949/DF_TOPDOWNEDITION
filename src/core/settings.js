@@ -160,7 +160,7 @@
             reflections: 'high',            // 'ultra' | 'high' | 'medium' | 'off': puddles and the wet street mirror the lights (engine/reflections.js)
             photoReflections: true,         // Cinematic View's own toggle
             atmosphereTint: '',             // Color wash: '' | 'amber' | 'violet' | 'crimson' | 'teal'
-            colorGrade: 'none',             // 'none' | 'amber_night' | 'violet_noir' | 'crimson' | 'cold_teal' | 'dreampunk' | 'custom'
+            colorGrade: 'none',             // 'none' | 'amber_night' | 'violet_noir' | 'crimson' | 'cold_teal' | 'dreampunk' | 'neon_dream' | 'custom'
             gradeCustom: null,              // the seven slider values when colorGrade is 'custom' (app/boot.js)
             stealthGray: true,              // the world greys as Stella slips into shadow
             photoFullColour: false,         // Cinematic View: lift the stealth grey for a photo

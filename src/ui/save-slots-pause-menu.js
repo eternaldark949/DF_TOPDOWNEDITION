@@ -112,9 +112,11 @@
             }
 
             // --- UI ---
-            open(mode, onComplete) {
+            /** opts.loadVia(load): for a load, hand the chosen slot's load over (the menu runs it under the loading screen) */
+            open(mode, onComplete, opts = {}) {
                 this.mode = mode;
                 this.onComplete = onComplete || null;
+                this.loadVia = opts.loadVia || null;
                 this._confirmTarget = null;
                 clearTimeout(this._closeT);                                     // reopened mid-close: stay open
                 this._render();
@@ -355,6 +357,7 @@
 
             _executeLoad(slot) {
                 this.close();
+                if (this.loadVia) { const via = this.loadVia; this.loadVia = null; via(() => this.loadFromSlot(slot)); return; }
                 // Small delay so overlay fades before heavy load work
                 setTimeout(() => {
                     const success = this.loadFromSlot(slot);
@@ -577,6 +580,17 @@
                     if (act === 'close') this._cineGrade(false);
                     else if (act === 'seen' || act === 'full') { GameSettings.photoFullColour = act === 'full'; syncGradeDrawer(); }
                     else if (act === 'refl-on' || act === 'refl-off') { GameSettings.photoReflections = act === 'refl-on'; syncGradeDrawer(); }
+                    else if (act === 'export') exportGameGrade();
+                    else if (act === 'import') document.getElementById('cg-import-file')?.click();
+                });
+                document.getElementById('cg-import-file')?.addEventListener('change', (e) => {
+                    const file = e.target.files && e.target.files[0];
+                    e.target.value = '';
+                    if (!file) return;
+                    file.text().then(text => {
+                        try { showMessage(`GRADE IMPORTED: ${importGameGrade(text).toUpperCase()}`); }
+                        catch (err) { showMessage(`COULDN'T IMPORT THAT GRADE: ${err.message.toUpperCase()}`); }
+                    });
                 });
                 drawer?.addEventListener('input', (e) => {
                     const k = e.target.dataset?.k;
@@ -642,6 +656,7 @@
             open(force = false) {
                 if (!game.running || document.body.classList.contains('cinematic-view') || (!force && hudInputBlocked())) return;
                 
+                PauseLook.capture();                                            // the world as it stood, before the menu covers it
                 this.menu.classList.add('active');
                 this.isOpen = true;
                 game.pauseSystem.acquire('pause_menu');
@@ -706,6 +721,7 @@
             
             close() {
                 this.menu.classList.remove('active');
+                PauseLook.release();
                 this.isOpen = false;
                 this.inSettings = false;
                 this.settingsPanel.classList.remove('active');
