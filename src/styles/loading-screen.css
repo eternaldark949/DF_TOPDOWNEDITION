@@ -32,28 +32,36 @@
             transform: rotate(-24deg) translateX(0); animation: lsMeteor 9s ease-in infinite 2.5s; }
         #loading-screen .ls-meteor.ls-m2 { left: 18%; top: 22%; width: 110px; animation-duration: 13s; animation-delay: 7s; }
 
-        /* the portal: rings of light turning behind the title */
-        #loading-screen .ls-portal { position: absolute; left: 50%; top: 40%; width: min(78vh, 64vw); height: min(78vh, 64vw); transform: translate(-50%, -50%); pointer-events: none; }
-        #loading-screen .ls-ring { position: absolute; inset: 0; border-radius: 50%; will-change: transform; animation: lsSpin 18s linear infinite;
-            -webkit-mask: radial-gradient(closest-side, transparent 88%, #000 90%, #000 94%, transparent 96%);
-                    mask: radial-gradient(closest-side, transparent 88%, #000 90%, #000 94%, transparent 96%);
-            background: conic-gradient(from 0deg, rgba(232, 194, 122, 0) 0deg, rgba(232, 194, 122, 0.95) 40deg, rgba(232, 194, 122, 0) 110deg,
-                rgba(164, 105, 255, 0) 170deg, rgba(164, 105, 255, 0.85) 230deg, rgba(164, 105, 255, 0) 300deg); }
-        #loading-screen .ls-ring-2 { inset: 9%; animation-duration: 11s; animation-direction: reverse; opacity: 0.8;
-            background: conic-gradient(from 90deg, rgba(214, 190, 255, 0) 0deg, rgba(214, 190, 255, 0.9) 70deg, rgba(214, 190, 255, 0) 140deg,
-                rgba(255, 120, 170, 0) 200deg, rgba(255, 120, 170, 0.7) 250deg, rgba(255, 120, 170, 0) 320deg); }
-        #loading-screen .ls-ring-3 { inset: 19%; animation-duration: 27s; opacity: 0.55;
-            -webkit-mask: radial-gradient(closest-side, transparent 95%, #000 96.5%, #000 98%, transparent 99.5%);
-                    mask: radial-gradient(closest-side, transparent 95%, #000 96.5%, #000 98%, transparent 99.5%);
-            background: repeating-conic-gradient(rgba(241, 234, 255, 0.85) 0deg 2deg, rgba(241, 234, 255, 0) 2deg 12deg); }
-        #loading-screen .ls-glow { position: absolute; inset: 14%; border-radius: 50%; will-change: transform, opacity; animation: lsPulse 4.6s ease-in-out infinite;
-            background: radial-gradient(closest-side, rgba(164, 105, 255, 0.34), rgba(120, 60, 220, 0.12) 55%, rgba(120, 60, 220, 0) 100%); }
-        /* two sparks orbiting the rings */
-        #loading-screen .ls-orbit { position: absolute; inset: 4%; will-change: transform; animation: lsSpin 7.5s linear infinite; }
-        #loading-screen .ls-orbit::before { content: ''; position: absolute; left: 50%; top: -5px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%;
-            background: radial-gradient(circle, #fff 0%, #ffe3a6 35%, rgba(232, 194, 122, 0) 70%); box-shadow: 0 0 14px 4px rgba(232, 194, 122, 0.55); }
-        #loading-screen .ls-orbit-2 { inset: 13%; animation-duration: 12s; animation-direction: reverse; }
-        #loading-screen .ls-orbit-2::before { background: radial-gradient(circle, #fff 0%, #d6beff 35%, rgba(164, 105, 255, 0) 70%); box-shadow: 0 0 14px 4px rgba(164, 105, 255, 0.55); }
+        /* the pink cube (after ETERNAL's reference): six glowing panes in a dark magenta frame, turning slowly in 3D over
+           a pool of its own light. A 3D transform animation, so it turns on the compositor like everything else here. */
+        #loading-screen .ls-cube-stage { position: absolute; left: 50%; top: 47%; width: var(--cube); height: var(--cube); --cube: min(21vh, 15vw);
+            transform: translate(-50%, -50%); pointer-events: none; }
+        #loading-screen .ls-glow { position: absolute; left: -170%; right: -170%; top: -150%; bottom: -150%; border-radius: 50%; will-change: transform, opacity;
+            animation: lsPulse 3.2s ease-in-out infinite;
+            background: radial-gradient(closest-side, rgba(255, 70, 200, 0.42), rgba(220, 40, 170, 0.16) 45%, rgba(160, 20, 140, 0) 100%); }
+        #loading-screen .ls-floor { position: absolute; left: -90%; right: -90%; top: 108%; height: 70%; border-radius: 50%; will-change: opacity;
+            background: radial-gradient(closest-side, rgba(255, 110, 215, 0.55), rgba(255, 60, 190, 0.18) 50%, rgba(255, 60, 190, 0) 100%);
+            animation: lsBreathe 3.2s ease-in-out infinite; }
+        #loading-screen .ls-cube { position: absolute; inset: 0; -webkit-perspective: calc(var(--cube) * 6); perspective: calc(var(--cube) * 6); }
+        #loading-screen .ls-cube-spin { position: absolute; inset: 0; -webkit-transform-style: preserve-3d; transform-style: preserve-3d; will-change: transform;
+            animation: lsCube 11s linear infinite; }
+        #loading-screen .ls-face { position: absolute; inset: 0; border-radius: 16%; -webkit-backface-visibility: hidden; backface-visibility: hidden;
+            background: radial-gradient(circle at 50% 50%, #8a1a72 0%, #4c0a40 70%, #2c0426 100%);
+            box-shadow: inset 0 0 0 calc(var(--cube) * 0.03) rgba(255, 140, 225, 0.35), 0 0 calc(var(--cube) * 0.25) rgba(255, 60, 190, 0.35); }
+        /* the pane: a bright rounded square inset in each face, hottest at its centre */
+        #loading-screen .ls-face::before { content: ''; position: absolute; inset: 13%; border-radius: 24%;
+            background: radial-gradient(circle at 50% 50%, #fff4fb 0%, #ffc2ec 22%, #ff6fd2 55%, #e2289f 85%, #b0127e 100%);
+            box-shadow: 0 0 calc(var(--cube) * 0.12) rgba(255, 120, 220, 0.9), inset 0 0 calc(var(--cube) * 0.08) rgba(255, 255, 255, 0.5); }
+        #loading-screen .ls-face::after { content: ''; position: absolute; inset: 13%; border-radius: 24%; background: #fff; opacity: 0; will-change: opacity;
+            animation: lsFlash 3.2s ease-in-out infinite; }
+        #loading-screen .ls-f1 { transform: translateZ(calc(var(--cube) / 2)); }
+        #loading-screen .ls-f2 { transform: rotateY(180deg) translateZ(calc(var(--cube) / 2)); }
+        #loading-screen .ls-f3 { transform: rotateY(90deg) translateZ(calc(var(--cube) / 2)); }
+        #loading-screen .ls-f4 { transform: rotateY(-90deg) translateZ(calc(var(--cube) / 2)); }
+        #loading-screen .ls-f5 { transform: rotateX(90deg) translateZ(calc(var(--cube) / 2)); }
+        #loading-screen .ls-f6 { transform: rotateX(-90deg) translateZ(calc(var(--cube) / 2)); }
+        /* a light at the heart of it, seen through the gaps between the panes */
+        #loading-screen .ls-core { position: absolute; inset: 30%; border-radius: 50%; background: radial-gradient(circle, #fff 0%, rgba(255, 150, 230, 0.8) 40%, rgba(255, 60, 190, 0) 72%); }
 
         /* the city: two rows of towers sliding past at different speeds, their windows flickering on and off */
         #loading-screen .ls-city { left: 0; bottom: 0; width: calc(100% + var(--tile)); height: var(--city-h); animation: lsSlide 80s linear infinite; }
@@ -80,7 +88,7 @@
             background-size: 100vw 100%; background-repeat: repeat-x; }
 
         /* the title, in the menu's hollow neon script */
-        #loading-screen .ls-title { position: absolute; left: 0; right: 0; top: 40%; transform: translateY(-50%); text-align: center; pointer-events: none; --title-size: min(17vh, 11vw); }
+        #loading-screen .ls-title { position: absolute; left: 0; right: 0; top: 17%; transform: translateY(-50%); text-align: center; pointer-events: none; --title-size: min(11vh, 8vw); }
         #loading-screen .ls-title-main, #loading-screen .ls-title-sub { margin: 0; font-family: 'Anthropology', 'Great Vibes', cursive; font-weight: 400; line-height: 1; color: transparent;
             -webkit-text-stroke: 1.2px #f1eaff; filter: drop-shadow(0 0 1px rgba(240, 228, 255, 0.7)) drop-shadow(0 0 5px rgba(170, 120, 255, 0.6)) drop-shadow(0 0 16px rgba(120, 60, 220, 0.35)); }
         #loading-screen .ls-title-main { font-size: var(--title-size); }
@@ -103,7 +111,7 @@
         #loading-screen .ls-pct { font-family: 'Orbitron', 'Montserrat', sans-serif; font-size: 0.7rem; letter-spacing: 0.2em; color: rgba(214, 200, 240, 0.7); font-variant-numeric: tabular-nums; }
         #loading-screen .ls-bar { position: relative; height: 3px; border-radius: 3px; overflow: hidden; background: rgba(241, 234, 255, 0.1); box-shadow: 0 0 0 1px rgba(164, 105, 255, 0.12); }
         #loading-screen .ls-fill { position: absolute; inset: 0; transform-origin: 0 50%; transform: scaleX(0); transition: transform 0.35s ease-out; will-change: transform;
-            background: linear-gradient(90deg, #8f5fe8, #c49be8 55%, #e8c27a); box-shadow: 0 0 10px rgba(232, 194, 122, 0.6); }
+            background: linear-gradient(90deg, #9a3cf0, #ff5ccf 60%, #ffd3f0); box-shadow: 0 0 10px rgba(255, 92, 207, 0.6); }
         #loading-screen .ls-glint { position: absolute; top: 0; bottom: 0; left: 0; width: 22%; will-change: transform; animation: lsGlint 1.9s ease-in-out infinite;
             background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0)); mix-blend-mode: screen; }
         #loading-screen .ls-error { display: none; font-size: 0.8rem; line-height: 1.5; color: #ffb3c4; text-align: center; letter-spacing: 0.04em; }
@@ -112,9 +120,10 @@
         #loading-screen.ls-failed .ls-fill { background: linear-gradient(90deg, #8f3a5f, #e86a8a); }
 
         body.landscape #loading-screen .ls-foot, #loading-screen.ls-short .ls-foot { bottom: max(5vh, 16px); gap: 7px; }
-        @media (max-height: 460px) { #loading-screen .ls-status { font-size: 0.9rem; } #loading-screen .ls-title { top: 36%; } #loading-screen .ls-portal { top: 36%; } }
+        @media (max-height: 460px) { #loading-screen .ls-status { font-size: 0.9rem; } #loading-screen .ls-title { top: 15%; } #loading-screen .ls-cube-stage { top: 45%; } }
 
-        @keyframes lsSpin { to { transform: rotate(360deg); } }
+        @keyframes lsCube { from { transform: rotateX(-28deg) rotateY(0deg); } to { transform: rotateX(-28deg) rotateY(360deg); } }
+        @keyframes lsFlash { 0%, 100% { opacity: 0; } 50% { opacity: 0.22; } }
         @keyframes lsSlide { to { transform: translateX(calc(-1 * var(--tile))); } }
         @keyframes lsPulse { 0%, 100% { opacity: 0.65; transform: scale(0.94); } 50% { opacity: 1; transform: scale(1.04); } }
         @keyframes lsBreathe { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
@@ -127,6 +136,6 @@
 
         @media (prefers-reduced-motion: reduce) {
             #loading-screen .ls-city, #loading-screen .ls-stars, #loading-screen .ls-mist { animation-duration: 600s; }
-            #loading-screen .ls-ring, #loading-screen .ls-orbit { animation-duration: 60s; }
+            #loading-screen .ls-cube-spin { animation-duration: 60s; }
             #loading-screen .ls-meteor { display: none; }
         }

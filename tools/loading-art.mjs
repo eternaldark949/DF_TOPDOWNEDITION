@@ -7,9 +7,12 @@
  *   url(@art:windows-far-a) … -c   that row's lit windows, split three ways so each set can twinkle on its own
  *   url(@art:windows-near-a) … -c
  *   url(@art:stars-a) / -b         two star fields that drift at different speeds
+ *   url(@art:grain)                film grain: a tile of grey pixel noise (a PNG), for the world and the pause screen
  *
  * Everything is seeded, so the build is the same every time (CI checks the built file is up to date).
  */
+
+import { deflateSync } from 'node:zlib';
 
 const W = 1600;            // one skyline tile, in SVG units; the CSS repeats it sideways
 const H = 400;
@@ -84,13 +87,40 @@ function stars(seed, count, size) {
     return svg(size, size, out.join(''));
 }
 
+/** A square of grey noise, each pixel its own shade, as a PNG (written by hand: no dependencies) */
+function grainPng(seed, size) {
+    const rand = rng(seed), raw = Buffer.alloc((size * 2 + 1) * size);   // grey + alpha per pixel, a filter byte per row
+    for (let y = 0; y < size; y++) {
+        const row = y * (size * 2 + 1);
+        raw[row] = 0;
+        for (let x = 0; x < size; x++) {
+            // mostly mid-grey, a long tail to black and white: reads as grain rather than static
+            const g = Math.max(0, Math.min(255, Math.round(128 + (rand() + rand() + rand() - 1.5) * 150)));
+            raw[row + 1 + x * 2] = g;
+            raw[row + 2 + x * 2] = 255;
+        }
+    }
+    const crcTable = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+    const crc = (buf) => { let c = 0xffffffff; for (const b of buf) c = crcTable[(c ^ b) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+    const chunk = (type, data) => {
+        const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+        const td = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+        const c = Buffer.alloc(4); c.writeUInt32BE(crc(td));
+        return Buffer.concat([len, td, c]);
+    };
+    const ihdr = Buffer.alloc(13);
+    ihdr.writeUInt32BE(size, 0); ihdr.writeUInt32BE(size, 4); ihdr[8] = 8; ihdr[9] = 4; ihdr[10] = ihdr[11] = ihdr[12] = 0;   // 8-bit grey + alpha
+    return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw, { level: 9 })), chunk('IEND', Buffer.alloc(0))]);
+}
+
 export function loadingArt() {
     const far = skyline(949, { minH: 90, maxH: 250, minW: 40, maxW: 120, fill: '#1c0c2c', rim: '#4a2a6a', windowColours: ['#8f6ad8', '#c49be8', '#e8c27a'] });
     const near = skyline(747, { minH: 60, maxH: 330, minW: 60, maxW: 170, fill: '#09030d', rim: '#3a1838', windowColours: ['#e8c27a', '#f3d9a0', '#ffb070', '#b48cff'] });
     return {
         'skyline-far': far.shape, 'windows-far-a': far.windows[0], 'windows-far-b': far.windows[1], 'windows-far-c': far.windows[2],
         'skyline-near': near.shape, 'windows-near-a': near.windows[0], 'windows-near-b': near.windows[1], 'windows-near-c': near.windows[2],
-        'stars-a': stars(6125, 90, 600), 'stars-b': stars(4202, 40, 900)
+        'stars-a': stars(6125, 90, 600), 'stars-b': stars(4202, 40, 900),
+        'grain': grainPng(35, 192)
     };
 }
 
@@ -99,6 +129,7 @@ export function inlineLoadingArt(css) {
     const art = loadingArt();
     return css.replace(/url\(@art:([a-z-]+)\)/g, (m, name) => {
         if (!art[name]) throw new Error(`loading art "${name}" is not drawn in tools/loading-art.mjs`);
+        if (Buffer.isBuffer(art[name])) return `url("data:image/png;base64,${art[name].toString('base64')}")`;
         return `url("data:image/svg+xml,${encodeURIComponent(art[name]).replace(/'/g, '%27')}")`;
     });
 }

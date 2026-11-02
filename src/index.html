@@ -21,13 +21,15 @@
         <div class="ls-layer ls-meteor"></div>
         <div class="ls-layer ls-meteor ls-m2"></div>
         <div class="ls-haze"></div>
-        <div class="ls-portal">
+        <!-- the pink cube, after ETERNAL's reference: turning slowly over its own glow -->
+        <div class="ls-cube-stage">
             <div class="ls-glow"></div>
-            <div class="ls-ring ls-ring-1"></div>
-            <div class="ls-ring ls-ring-2"></div>
-            <div class="ls-ring ls-ring-3"></div>
-            <div class="ls-orbit"></div>
-            <div class="ls-orbit ls-orbit-2"></div>
+            <div class="ls-floor"></div>
+            <div class="ls-cube"><div class="ls-cube-spin">
+                <div class="ls-face ls-f1"></div><div class="ls-face ls-f2"></div><div class="ls-face ls-f3"></div>
+                <div class="ls-face ls-f4"></div><div class="ls-face ls-f5"></div><div class="ls-face ls-f6"></div>
+                <div class="ls-core"></div>
+            </div></div>
         </div>
         <div class="ls-layer ls-city ls-city-far"><div class="ls-shape"></div><div class="ls-win-a"></div><div class="ls-win-b"></div></div>
         <div class="ls-layer ls-mist"></div>
@@ -1028,7 +1030,10 @@
     
     <!-- PAUSE MENU -->
     <div id="pause-menu">
+        <!-- the paused world, after ETERNAL's prototype (ui/pause-look.js): blurred, blooming, graded, grained -->
+        <div class="pause-look" aria-hidden="true"><canvas class="pl-base"></canvas><canvas class="pl-bloom"></canvas><div class="pl-grade"></div><div class="pl-vignette"></div></div>
         <div class="pause-backdrop"></div>
+        <div class="df-grain pause-grain" aria-hidden="true"></div>
         <div class="pause-content">
             <!-- Left: what's playing (hidden for now), objectives, quick access (after ETERNAL's pause mock-up) -->
             <div class="pause-left">
@@ -1370,6 +1375,8 @@
         <div class="cg-sliders"></div>
         <div class="cg-colour"><span class="cg-label">Colour</span><button class="df-chip" data-cg="seen" title="Stealth greys the picture as you see it">As seen</button><button class="df-chip" data-cg="full" title="Full colour, even in the shadows">Full colour</button></div>
         <div class="cg-colour"><span class="cg-label">Reflect</span><button class="df-chip" data-cg="refl-on" title="Puddles and the wet street mirror the lights">On</button><button class="df-chip" data-cg="refl-off">Off</button></div>
+        <div class="cg-colour"><span class="cg-label">File</span><button class="df-chip" data-cg="export" title="Save this grade as a file to share or keep">Export</button><button class="df-chip" data-cg="import" title="Load a grade from a file">Import</button>
+            <input type="file" id="cg-import-file" accept=".json,application/json" hidden></div>
     </div>
     <div id="cine-flash"><span>SAVED</span></div>
     

@@ -60,17 +60,27 @@
         /* =========================================
            FILM GRAIN OVERLAY
            -----------------------------------------
-           SVG noise filter applied over the game
-           for cinematic texture. Uses CSS blend mode.
+           A tile of grey pixel noise (tools/loading-art.mjs, url(@art:grain)) laid over the game in overlay
+           blend, and jumped to a new offset a dozen times a second so it moves like film. The jump is a
+           transform, so the compositor does it: no cost to the game's frame. The pause screen uses the same
+           grain, stronger (#pause-menu .pause-grain).
            ========================================= */
-        #game-container::after {
-            content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
-            pointer-events: none; z-index: 10; opacity: 0.4; mix-blend-mode: overlay;
+        .df-grain, #game-container::after {
+            content: ""; position: absolute; inset: -192px; pointer-events: none;
+            background-image: url(@art:grain); background-size: 192px 192px; background-repeat: repeat;
+            mix-blend-mode: overlay; will-change: transform; animation: dfGrain 0.84s steps(1, end) infinite;
         }
+        #game-container::after { z-index: 10; opacity: 0.2; }
         /* Disable grain overlay when toggled off */
         #game-container.no-grain::after { display: none; }
-        
+        @keyframes dfGrain {
+            0% { transform: translate(-37px, -121px); } 8% { transform: translate(-150px, -12px); } 17% { transform: translate(-81px, -170px); }
+            25% { transform: translate(-6px, -66px); } 33% { transform: translate(-166px, -98px); } 42% { transform: translate(-58px, -9px); }
+            50% { transform: translate(-121px, -141px); } 58% { transform: translate(-21px, -183px); } 67% { transform: translate(-101px, -44px); }
+            75% { transform: translate(-177px, -160px); } 83% { transform: translate(-69px, -88px); } 92% { transform: translate(-138px, -27px); }
+        }
+        @media (prefers-reduced-motion: reduce) { .df-grain, #game-container::after { animation: none; } }
+
         /* Vending Machine Items */
         .vend-item:hover { background: rgba(255, 255, 255, 0.05) !important; border-color: rgba(0, 243, 255, 0.15) !important; }
         .vend-item:active { transform: scale(0.98); }

@@ -212,6 +212,7 @@ const SCRIPTS = [
     'story/crew-nights.js', 'story/talks.js',
     'ui/screens.js',
     'ui/sidebars.js',
+    'ui/pause-look.js',
     'ui/save-slots-pause-menu.js',
     'app/boot.js',
 ];
