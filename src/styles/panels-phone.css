@@ -667,7 +667,17 @@
 
         /* --- PHONE SYSTEM --- */
         #btn-phone { position: absolute; top: 60px; left: 25px; width: 44px; height: 44px; border-radius: 4px; background: rgba(10, 8, 5, 0.7); border: 1px solid rgba(218, 165, 32, 0.15); color: #daa520; font-family: var(--font-tech); font-size: max(6px, 1.3rem - var(--font-trim)); font-weight: 700; display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 30; pointer-events: auto; text-shadow: 0 0 10px rgba(255, 200, 50, 0.7), 0 0 20px rgba(218, 165, 32, 0.4); animation: phoneGlowGold 2s infinite alternate; }
-        #btn-phone:active { transform: scale(0.95); }
+        #btn-phone { transition: transform 0.12s ease, border-color 0.25s ease, box-shadow 0.25s ease; }
+        #btn-phone:active { transform: scale(0.88); }
+        @media (hover: hover) { #btn-phone:hover { border-color: rgba(255, 196, 92, 0.55); box-shadow: 0 0 14px rgba(255, 184, 72, 0.35); } }
+        /* the tap: a warm gold flash that blooms out of the button or icon (ui/app-launch.js adds .tap-flash) */
+        #btn-phone::after, .phone-app-icon-circle::after { content: ''; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; opacity: 0;
+            box-shadow: 0 0 0 0 rgba(255, 190, 80, 0.85), inset 0 0 12px rgba(255, 214, 130, 0.9); }
+        #btn-phone.tap-flash::after, .phone-app-icon-circle.tap-flash::after { animation: tapFlash 0.55s ease-out; }
+        @keyframes tapFlash {
+            0% { opacity: 1; box-shadow: 0 0 0 0 rgba(255, 190, 80, 0.85), inset 0 0 14px rgba(255, 214, 130, 0.95); }
+            100% { opacity: 0; box-shadow: 0 0 0 14px rgba(255, 170, 60, 0), inset 0 0 4px rgba(255, 214, 130, 0); }
+        }
         @keyframes phoneGlowGold { 0% { text-shadow: 0 0 8px rgba(255, 200, 50, 0.5), 0 0 16px rgba(218, 165, 32, 0.3); } 100% { text-shadow: 0 0 14px rgba(255, 215, 0, 0.8), 0 0 28px rgba(255, 200, 50, 0.5); } }
         @keyframes phonePulseCrimson { 0% { box-shadow: 0 0 0 0 rgba(220, 20, 60, 0.7); } 70% { box-shadow: 0 0 0 20px rgba(220, 20, 60, 0); } 100% { box-shadow: 0 0 0 0 rgba(220, 20, 60, 0); } }
         
@@ -720,9 +730,11 @@
         
         #phone-apps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 8px 20px; margin-top: auto; }
         .phone-app-container { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; transition: transform 0.2s ease; position: relative; }
-        .phone-app-container:hover { transform: translateY(-3px); }
+        @media (hover: hover) { .phone-app-container:hover { transform: translateY(-3px); } }   /* hover only where there is one: a touch's hover would stick */
         .phone-app-icon-circle { width: 42px; height: 42px; border-radius: 12px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(5px); display: flex; justify-content: center; align-items: center; font-size: max(6px, 1.1rem - var(--font-trim)); box-shadow: 0 2px 8px rgba(0,0,0,0.3); transition: all 0.2s; position: relative; }
-        .phone-app-container:hover .phone-app-icon-circle { background: rgba(140, 20, 30, 0.2); border-color: rgba(140, 20, 30, 0.5); box-shadow: 0 0 12px rgba(140, 20, 30, 0.3); }
+        @media (hover: hover) { .phone-app-container:hover .phone-app-icon-circle { background: rgba(255, 170, 60, 0.12); border-color: rgba(255, 196, 92, 0.5); box-shadow: 0 0 12px rgba(255, 184, 72, 0.3); } }
+        .phone-app-container:active .phone-app-icon-circle { transform: scale(0.88); transition-duration: 0.08s; }
+        .phone-app-icon-circle.tap-flash { background: rgba(255, 170, 60, 0.16); border-color: rgba(255, 204, 110, 0.7); }
         .phone-app-name { font-family: var(--font-ui); font-size: max(6px, 0.55rem - var(--font-trim)); color: rgba(255,255,255,0.5); text-align: center; font-weight: 400; letter-spacing: 0.3px; }
         .app-badge { position: absolute; top: -4px; right: -4px; width: 10px; height: 10px; background: #ff0000; border: 1px solid #fff; border-radius: 50%; box-shadow: 0 0 5px #ff0000; z-index: 10; display: none; }
         .app-badge.active { display: block; }
@@ -814,6 +826,42 @@
            Her lines violet on the right, theirs smoke on the left,
            gold reply chips, painted faces with the bond's ring.
            ========================================================= */
+        /* Messages splash: white, a big M, fading in while the app's faces are painted and away once they're done.
+           Opacity and transform only, so it keeps moving while a face is being painted. */
+        #msg-splash { position: absolute; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+            background: radial-gradient(ellipse 80% 70% at 50% 45%, #ffffff 0%, #fbf6fb 60%, #f1e8f2 100%);
+            opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.28s ease, visibility 0s linear 0.28s; }
+        #msg-splash.on { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity 0.22s ease, visibility 0s; }
+        #msg-splash.out { transition: opacity 0.45s ease, visibility 0s linear 0.45s; }
+        #msg-splash.on.now { transition: none; }
+        /* Every other app's launch screen (ui/app-launch.js): its glyph and name on a ground lit in its colour */
+        .app-splash { position: absolute; z-index: 40; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; pointer-events: auto;
+            background: radial-gradient(ellipse 70% 55% at 50% 44%, color-mix(in srgb, var(--acc) 26%, transparent), transparent 70%), linear-gradient(180deg, #0c0612, #060309);
+            transition: opacity 0.34s ease; }
+        .app-splash.out { opacity: 0; pointer-events: none; }
+        .app-splash .as-tile { width: 76px; height: 76px; border-radius: 22px; display: flex; align-items: center; justify-content: center; font-size: 38px; color: var(--acc);
+            background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--acc) 30%, #140a1c), #0a0510 80%); border: 1px solid color-mix(in srgb, var(--acc) 55%, transparent);
+            box-shadow: 0 0 26px color-mix(in srgb, var(--acc) 40%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.12); animation: asTile 0.52s cubic-bezier(0.2, 0.9, 0.3, 1.3) both; }
+        .app-splash .as-tile svg { width: 40px; height: 40px; }
+        .app-splash .as-name { font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 13px; letter-spacing: 0.32em; text-transform: uppercase; color: #f6efff; padding-left: 0.32em;
+            text-shadow: 0 0 12px color-mix(in srgb, var(--acc) 70%, transparent); animation: asName 0.5s ease 0.08s both; }
+        .app-splash .as-line { width: 64px; height: 2px; border-radius: 2px; overflow: hidden; background: rgba(255, 255, 255, 0.08); position: relative; }
+        .app-splash .as-line::after { content: ''; position: absolute; inset: 0; width: 40%; background: linear-gradient(90deg, transparent, var(--acc), transparent); animation: asLine 0.7s ease-in-out infinite; }
+        @keyframes asTile { from { transform: scale(0.7); opacity: 0; } to { transform: none; opacity: 1; } }
+        @keyframes asName { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
+        @keyframes asLine { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+        #msg-splash .msp-m { font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: min(26vh, 22vw); line-height: 1; letter-spacing: -0.02em;
+            background: linear-gradient(160deg, #ff3d7f 0%, #d4145a 55%, #8a0f4a 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+            filter: drop-shadow(0 6px 18px rgba(212, 20, 90, 0.25)); will-change: transform, opacity; animation: mspBreathe 1.8s ease-in-out infinite; }
+        #msg-splash .msp-dots { display: flex; gap: 8px; }
+        #msg-splash .msp-dots i { width: 7px; height: 7px; border-radius: 50%; background: #d4145a; opacity: 0.2; will-change: opacity; animation: mspDot 1.2s ease-in-out infinite; }
+        #msg-splash .msp-dots i:nth-child(2) { animation-delay: 0.15s; }
+        #msg-splash .msp-dots i:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes mspBreathe { 0%, 100% { transform: scale(1); opacity: 0.92; } 50% { transform: scale(1.05); opacity: 1; } }
+        @keyframes mspDot { 0%, 100% { opacity: 0.2; } 40% { opacity: 1; } }
+        /* a face that arrives after its initial fades in over it */
+        #screen-contacts .face-in img, .comm-face.face-in img { animation: faceIn 0.3s ease; }
+        @keyframes faceIn { from { opacity: 0; } to { opacity: 1; } }
         #screen-contacts { flex-direction: row; padding: 0 0 42px; position: relative;
             background: radial-gradient(ellipse 70% 60% at 30% 15%, rgba(93, 20, 226, 0.22), transparent 70%), linear-gradient(180deg, #0e0418, #07020c); }
         body.phone-wide #screen-contacts { padding: 0 0 34px; }
@@ -1184,7 +1232,10 @@
         #log-clear-btn:hover { background: rgba(255,80,80,0.15); color: #fff; }
 
         /* --- MAP INTERFACE --- */
-        #map-interface { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #0b0614; z-index: 50; display: none; }
+        /* The map: a screen of the menu (#freelancer-menu), full-bleed under its sidebars (ui/screens.js) */
+        #map-interface { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #0b0614; z-index: 2004; display: none; }
+        /* while it shows, its own Filter sidebar stands in for the item filter, in the very same place */
+        #freelancer-menu.map-on #inv-sidebar-right, #freelancer-menu.map-on #inv-handle-right { display: none; }
         #golden-map-canvas { 
             position: absolute;
             left: 0;

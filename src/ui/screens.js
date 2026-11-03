@@ -1,8 +1,10 @@
         // --- SCREENS: the one way the sidebar-nav screens open and close ---
-        // Two panels: #map-interface (the golden map) and #freelancer-menu (every other
-        // screen, as a sub-screen of #inv-main-content). Screens.open(name) closes the other
-        // panel, hides every sub-screen, shows the one asked for, sets the title, the right
-        // sidebar (the item filter only where it filters) and both nav highlights.
+        // One menu, #freelancer-menu, with one left sidebar (portrait, nav, Back) for every screen.
+        // The map (#map-interface) is a full-bleed layer inside it, under the sidebars, with its own
+        // Filter sidebar in place of the item filter; every other screen is a sub-screen of
+        // #inv-main-content. Screens.open(name) hides every sub-screen (and the map), shows the one
+        // asked for, sets the title, the right sidebar and the nav highlight. Only the centre (and,
+        // to or from the map, the filter list) changes: the left sidebar stays exactly where it is.
         // toggleMap / toggleMenu, the dock, pause menu, armory and the Esc / B / M keys all
         // come through here, so two screens can never stack.
 
@@ -28,14 +30,21 @@
             mapOpen() { return document.getElementById('map-interface')?.style.display === 'block'; },
 
             open(name) {
+                const was = (this.menuOpen() || this.mapOpen()) ? this.current : null;
+                const main = document.getElementById('inv-main-content');
                 if (name === 'map') {
-                    this._showMenu(false);
+                    this._showMenu(true);
+                    this._menu().classList.add('map-on');
+                    this._menu().classList.remove('no-filter');
+                    if (main) main.style.visibility = 'hidden';            // the map is the centre now (kept in layout: no reflow)
                     if (!this.mapOpen()) game.ui._showMap(true);
                 } else {
                     const sub = this.SUBS[name];
                     if (!sub) return;
                     if (this.mapOpen()) game.ui._showMap(false);
                     this._showMenu(true);
+                    this._menu().classList.remove('map-on');
+                    if (main) main.style.visibility = '';
                     const ids = new Set(Object.values(this.SUBS).map(s => s[0]));
                     ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
                     document.getElementById(sub[0]).style.display = sub[0] === 'inventory-list-container' ? '' : 'block';
@@ -44,15 +53,31 @@
                     this._menu().classList.toggle('no-filter', !this.FILTERED[name]);
                     sub[2]();
                 }
+                // switching between screens: the new one fades up into the centre (the sidebar stays put)
+                if (was && was !== name) this._fadeIn(name === 'map' ? document.getElementById('map-interface') : document.getElementById('inv-main-content'), name === 'map' || was === 'map');
                 this.current = name;
                 syncHudInput(game);
                 if (typeof invSidebar !== 'undefined') invSidebar.setActiveNav(name);
-                if (typeof mapSidebar !== 'undefined') mapSidebar.setActiveNav(name);
+            },
+
+            /** A quick fade (and a small rise, for the screens; the map just fades) for the screen coming in */
+            _fadeIn(el, plain) {
+                if (!el || !el.animate || (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+                el.getAnimations().forEach(a => { if (a.id === 'screen-in') a.cancel(); });
+                const a = el.animate(plain ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }],
+                    { duration: 260, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+                a.id = 'screen-in';
+                // the map's Filter list and the item filter swap too: fade whichever right sidebar is now showing
+                const right = document.getElementById(this.current === 'map' || el.id === 'map-interface' ? 'map-sidebar-right' : 'inv-sidebar-right');
+                if (plain && right && right.animate) right.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: 'ease-out' });
             },
 
             close() {
                 if (this.mapOpen()) game.ui._showMap(false);
                 this._showMenu(false);
+                this._menu()?.classList.remove('map-on');
+                const main = document.getElementById('inv-main-content');
+                if (main) main.style.visibility = '';
                 this.current = null;
             },
 

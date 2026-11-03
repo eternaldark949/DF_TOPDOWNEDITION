@@ -11,6 +11,78 @@
                 this.running = true;
                 this.loop();
             },
+            /**
+             * From the menu into the world under the loading screen (app/boot-loader.js): run the steps (each
+             * { label, weight, run(progress) }), with a painted frame between them, then fade the screen away.
+             * The last step usually calls enterWorld() and _settleUnderLoader(), so the world's first, costly
+             * frames are drawn while the loading screen still covers them. Resolves true if every step ran.
+             */
+            async loadIntoWorld(steps) {
+                if (this._loadingIntoWorld) return false;                      // a second tap while one is under way
+                this._loadingIntoWorld = true;
+                try { await LoadingScreen.run(steps); return true; }
+                catch (e) { return false; }                                     // (the loading screen says what broke)
+                finally { this._loadingIntoWorld = false; }
+            },
+
+            /** Load Saved Game from the menu: `load` runs the slot's load (true if it worked) under the loading screen */
+            async loadSaveFromMenu(load) {
+                const menu = document.getElementById('main-menu');
+                let loaded = false;
+                if (menu) menu.style.opacity = '0';
+                const ok = await this.loadIntoWorld([
+                    { label: 'Reading your imprint', weight: 1, run: () => {} },
+                    { label: 'Rebuilding the world', weight: 6, run: () => {
+                        loaded = !!load();
+                        if (!loaded) throw new Error('That save could not be loaded.');
+                    } },
+                    { label: 'Painting the streets', weight: 3, run: (progress) => this._warmTexturesUnderLoader(progress) },
+                    { label: 'Stepping in', weight: 2, run: (progress) => { this.enterWorld(); return this._settleUnderLoader(progress); } }
+                ]);
+                // Nothing loaded: back to the menu once the loading screen has said so
+                if (!ok && !loaded && menu && !this.running) menu.style.opacity = '1';
+                return ok;
+            },
+
+            /** Under the loading screen: paint the arriving map's first textures (engine/map-loading.js), a job a task */
+            _warmTexturesUnderLoader(progress) {
+                return new Promise(resolve => {
+                    const fade = document.getElementById('fade-overlay');
+                    let timer = 0;
+                    const report = () => { const w = this._mapTextureWarmup; if (w && w.jobs.length) progress(w.index / w.jobs.length); };
+                    // The menu still held the last run's map, so this load went through the door fade: that already
+                    // warms the textures and lifts the fade when done. Wait it out.
+                    if (this._mapTextureTransition || (fade && fade.classList.contains('active'))) {
+                        const tick = () => {
+                            report();
+                            if (!this._mapTextureTransition && !(fade && fade.classList.contains('active'))) resolve();
+                            else timer = setTimeout(tick, 50);
+                        };
+                        tick();
+                        return;
+                    }
+                    if (!this.activeMap) { resolve(); return; }
+                    timer = setInterval(report, 50);
+                    this._prepareMapTextures(() => { clearInterval(timer); resolve(); }, this._loadSeq);
+                });
+            },
+
+            /** Under the loading screen: let the world draw its first frames (the ones that paint caches and stutter),
+             *  until a few come in quick succession, or a second and a half has gone. */
+            _settleUnderLoader(progress, { frames = 12, quick = 4, maxMs = 1500 } = {}) {
+                return new Promise(resolve => {
+                    const t0 = performance.now();
+                    let last = t0, n = 0, run = 0;
+                    const tick = (now) => {
+                        n++; run = (now - last < 34) ? run + 1 : 0; last = now;
+                        progress(Math.min(1, Math.max(n / frames, (now - t0) / maxMs)));
+                        if ((n >= frames && run >= quick) || now - t0 > maxMs || !this.running) resolve();
+                        else requestAnimationFrame(tick);
+                    };
+                    requestAnimationFrame(tick);
+                });
+            },
+
             stop() {
                 this.running = false;
                 ambience.silence();

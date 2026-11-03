@@ -176,12 +176,24 @@
             },
 
             /* ───────────────────────── faces ───────────────────────── */
-            _faceURL(name, size) {
-                try {
-                    if (typeof game === 'undefined' || !game || !game.getPortraitCanvas) return null;
-                    const e = game.getPortraitCanvas(name, size, null);
-                    return e && e.config && !e.config.isFallback ? game.getPortraitDataURL(name, size, null) : null;
-                } catch (err) { return null; }
+            /* Painted once and kept across sessions by FaceCache (ui/face-cache.js); a face not painted yet shows
+               its initial and is painted one per task, the app's white splash covering the first batch (showContacts). */
+            FACE: FaceCache.SMALL,
+            _faceKey(name) { return FaceCache.look(name); },
+            _faceReady(name) { return FaceCache.ready(name, this.FACE); },
+            _paintFace(name) { return FaceCache.paint(name, this.FACE); },
+            _faceURL(name) { return FaceCache.url(name, this.FACE); },
+            _setFace(el, url) {
+                el.textContent = '';
+                const img = new Image(); img.alt = ''; img.src = url; el.appendChild(img);
+                el.classList.add('face-in');
+            },
+            /** Resolves when every queued face is painted */
+            _pumpFaces() { return FaceCache.pump(); },
+            _queueFace(name, el) {
+                const cb = (url) => this._setFace(el, url);
+                cb.wanted = () => el.isConnected;
+                FaceCache.queue(name, this.FACE, cb);
             },
             _ring(name) {
                 const tm = typeof game !== 'undefined' && game && (game.teammates || []).find(t => t.name === name);
@@ -190,12 +202,15 @@
                 return tier && tier.ring;
             },
             /** A round painted face (or the name's initial), with the bond's ring for the crew */
-            _face(name, cls = 'mav', size = 96) {
+            _face(name, cls = 'mav') {
                 const el = document.createElement('div');
                 el.className = cls;
-                const url = this._faceURL(name, size);
+                const url = this._faceReady(name);
                 if (url) { const img = new Image(); img.alt = ''; img.src = url; el.appendChild(img); }
-                else el.textContent = String(name).replace(/[^A-Za-z0-9]/g, '').charAt(0) || '?';
+                else {
+                    el.textContent = String(name).replace(/[^A-Za-z0-9]/g, '').charAt(0) || '?';
+                    if (this._faceKey(name)) this._queueFace(name, el);          // painted shortly, one per task
+                }
                 const ring = this._ring(name);
                 if (ring) el.style.setProperty('--ring', ring);
                 const tm = typeof game !== 'undefined' && game && (game.teammates || []).find(t => t.name === name);
@@ -206,7 +221,7 @@
             _groupFace(cls = 'mav') {
                 const el = document.createElement('div');
                 el.className = cls + ' stack';
-                for (const n of ['Victoria', '747', 'Max']) el.appendChild(this._face(n, 'mav-mini', 64));
+                for (const n of ['Victoria', '747', 'Max']) el.appendChild(this._face(n, 'mav-mini'));
                 return el;
             },
             _color(name) { return (typeof SPEAKER_COLORS !== 'undefined' && SPEAKER_COLORS[name]) || '#e8c27a'; },
@@ -238,14 +253,38 @@
                 this._activeContact = null;
                 this._stopVoice();
                 this.broadcast('APP_OPENED', { app: 'contacts' });
+                const scr = document.getElementById('screen-contacts');
+                const reopening = scr.style.display !== 'flex' || !this.isOpen;   // not just back from a thread
                 this.homeScreen.style.display = 'none';
                 document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
-                const scr = document.getElementById('screen-contacts');
                 scr.style.display = 'flex';
                 scr.classList.remove('has-thread');
                 this._buildContactDefs();
                 this.renderContacts();
                 this._paintEmpty();
+                // The white M splash, every time the app opens: a beat of its own launch screen, longer only while
+                // faces are still being painted (and coming back from a thread, only for those)
+                if (reopening || FaceCache.pending) this._splash(scr);
+            },
+            /** The Messages splash (#msg-splash): in now, out once the queued faces are painted (at least a beat, the
+             *  app's launch screen; at most a few seconds, then the rest paint in place) */
+            _splash(scr) {
+                const sp = document.getElementById('msg-splash');
+                if (!sp) return;
+                const run = this._splashRun = (this._splashRun || 0) + 1;
+                clearTimeout(this._splashT);
+                // opened from its icon, the splash is what grows out of it (ui/app-launch.js): up at once, no fade in
+                const launched = typeof AppLaunch !== 'undefined' && AppLaunch.launching;
+                sp.classList.toggle('now', launched);
+                sp.classList.remove('out'); sp.classList.add('on');
+                const t0 = performance.now();
+                const done = () => {
+                    if (run !== this._splashRun) return;
+                    const wait = Math.max(0, (launched ? 560 : 420) - (performance.now() - t0));
+                    this._splashT = setTimeout(() => { if (run === this._splashRun) { sp.classList.add('out'); sp.classList.remove('on'); } }, wait);
+                };
+                this._pumpFaces().then(done);
+                setTimeout(done, 3500);
             },
 
             _lastRec(name) { const h = this.messageHistory[name]; return h && h.length ? h[h.length - 1] : null; },
@@ -473,7 +512,7 @@
                 const row = document.createElement('div');
                 row.className = 'mb-row ' + (mine ? 'me' : 'them') + (cont ? ' cont' : '');
                 if (contact.group && !mine) {
-                    const av = cont ? document.createElement('div') : this._face(rec.who || '?', 'mav mb-av', 48);
+                    const av = cont ? document.createElement('div') : this._face(rec.who || '?', 'mav mb-av');
                     if (cont) av.className = 'mb-av blank';
                     row.appendChild(av);
                 }
@@ -943,7 +982,7 @@
                 const chip = document.createElement('div');
                 chip.className = 'comm-chip mb-sub';
                 chip.style.setProperty('--who', this._color(speaker));
-                const face = this._face(speaker, 'comm-face', 64);
+                const face = this._face(speaker, 'comm-face');
                 const body = document.createElement('div'); body.className = 'comm-body';
                 const name = document.createElement('div'); name.className = 'comm-name'; name.textContent = speaker;
                 const sig = document.createElement('span'); sig.className = 'comm-sig'; sig.innerHTML = '<i></i><i></i><i></i>';

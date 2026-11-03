@@ -17,11 +17,16 @@
             /** Paint the Keeper's places and decode the prologue's music ahead of time (New Game, under the
              *  menu fade), so the epigraph opens smoothly instead of hitching on its first frames. */
             preloadKeeper() {
-                try {
-                    if (!this._keeperHill) { this._keeperHill = this._paintKeeperHill(); this._keeperHouse = this._paintKeeperHouse(); }
-                    if (!this._keeperParlor) this._keeperParlor = this._paintKeeperParlor();
-                    if (audioSys.ctx) loadSound('the visitor');
-                } catch (e) { console.warn('preloadKeeper', e); }
+                for (const job of this.keeperPreloadJobs()) job();
+            },
+            /** The same, a job at a time (New Game runs them under the loading screen, a frame between each) */
+            keeperPreloadJobs() {
+                const guard = (f) => () => { try { f(); } catch (e) { console.warn('preloadKeeper', e); } };
+                return [
+                    guard(() => { if (!this._keeperHill) this._keeperHill = this._paintKeeperHill(); if (audioSys.ctx) loadSound('the visitor'); }),
+                    guard(() => { if (!this._keeperHouse) this._keeperHouse = this._paintKeeperHouse(); }),
+                    guard(() => { if (!this._keeperParlor) this._keeperParlor = this._paintKeeperParlor(); })
+                ];
             },
             /** Under the lighting: the painted place, plus what moves in it (clouds, flowers, the floating gable). */
             drawKeeperInterior(ctx) {

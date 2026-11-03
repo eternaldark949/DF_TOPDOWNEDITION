@@ -174,10 +174,11 @@
             }
         });
         
+        // The map's filter sidebar (the map is a screen of the one menu, so it shares invSidebar's left side)
         const mapSidebar = new SidebarController({
-            leftId: 'map-sidebar-left',
+            leftId: null,
             rightId: 'map-sidebar-right',
-            leftHandleId: 'map-handle-left',
+            leftHandleId: null,
             rightHandleId: 'map-handle-right',
             canvasId: 'golden-map-canvas',
             onFilterChange: (enabled, filter) => {
