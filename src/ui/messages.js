@@ -253,29 +253,34 @@
                 this._activeContact = null;
                 this._stopVoice();
                 this.broadcast('APP_OPENED', { app: 'contacts' });
+                const scr = document.getElementById('screen-contacts');
+                const reopening = scr.style.display !== 'flex' || !this.isOpen;   // not just back from a thread
                 this.homeScreen.style.display = 'none';
                 document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
-                const scr = document.getElementById('screen-contacts');
                 scr.style.display = 'flex';
                 scr.classList.remove('has-thread');
                 this._buildContactDefs();
                 this.renderContacts();
                 this._paintEmpty();
-                // Faces still to paint: the white M splash fades in over the app while they're painted, then away
-                if (FaceCache.pending) this._splash(scr);
+                // The white M splash, every time the app opens: a beat of its own launch screen, longer only while
+                // faces are still being painted (and coming back from a thread, only for those)
+                if (reopening || FaceCache.pending) this._splash(scr);
             },
-            /** The Messages splash (#msg-splash): in now, out once the queued faces are painted (at least a moment,
-             *  so it never just flickers; at most a few seconds, then the rest paint in place) */
+            /** The Messages splash (#msg-splash): in now, out once the queued faces are painted (at least a beat, the
+             *  app's launch screen; at most a few seconds, then the rest paint in place) */
             _splash(scr) {
                 const sp = document.getElementById('msg-splash');
                 if (!sp) return;
                 const run = this._splashRun = (this._splashRun || 0) + 1;
                 clearTimeout(this._splashT);
+                // opened from its icon, the splash is what grows out of it (ui/app-launch.js): up at once, no fade in
+                const launched = typeof AppLaunch !== 'undefined' && AppLaunch.launching;
+                sp.classList.toggle('now', launched);
                 sp.classList.remove('out'); sp.classList.add('on');
                 const t0 = performance.now();
                 const done = () => {
                     if (run !== this._splashRun) return;
-                    const wait = Math.max(0, 450 - (performance.now() - t0));
+                    const wait = Math.max(0, (launched ? 560 : 420) - (performance.now() - t0));
                     this._splashT = setTimeout(() => { if (run === this._splashRun) { sp.classList.add('out'); sp.classList.remove('on'); } }, wait);
                 };
                 this._pumpFaces().then(done);

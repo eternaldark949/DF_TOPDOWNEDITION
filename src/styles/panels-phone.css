@@ -821,6 +821,7 @@
             opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.28s ease, visibility 0s linear 0.28s; }
         #msg-splash.on { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity 0.22s ease, visibility 0s; }
         #msg-splash.out { transition: opacity 0.45s ease, visibility 0s linear 0.45s; }
+        #msg-splash.on.now { transition: none; }
         #msg-splash .msp-m { font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: min(26vh, 22vw); line-height: 1; letter-spacing: -0.02em;
             background: linear-gradient(160deg, #ff3d7f 0%, #d4145a 55%, #8a0f4a 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
             filter: drop-shadow(0 6px 18px rgba(212, 20, 90, 0.25)); will-change: transform, opacity; animation: mspBreathe 1.8s ease-in-out infinite; }

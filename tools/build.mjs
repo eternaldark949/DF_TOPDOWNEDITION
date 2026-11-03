@@ -209,6 +209,7 @@ const SCRIPTS = [
     'engine/loop.js',
     'app/menu-wiring.js',
     'ui/phone.js',
+    'ui/app-launch.js',
     'ui/messages.js',
     'ui/amber-app.js',
     'story/crew-nights.js', 'story/talks.js',

@@ -2735,6 +2735,7 @@
             opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.28s ease, visibility 0s linear 0.28s; }
         #msg-splash.on { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity 0.22s ease, visibility 0s; }
         #msg-splash.out { transition: opacity 0.45s ease, visibility 0s linear 0.45s; }
+        #msg-splash.on.now { transition: none; }
         #msg-splash .msp-m { font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: min(26vh, 22vw); line-height: 1; letter-spacing: -0.02em;
             background: linear-gradient(160deg, #ff3d7f 0%, #d4145a 55%, #8a0f4a 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
             filter: drop-shadow(0 6px 18px rgba(212, 20, 90, 0.25)); will-change: transform, opacity; animation: mspBreathe 1.8s ease-in-out infinite; }
@@ -5802,7 +5803,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'd7b5310485ac';
+        const DFAB_BUILD = 'd4aa7c64a9b5';
     </script>
     <script type="text/dfab" data-src="core/config.js" data-cost="406">
 
@@ -93918,7 +93919,88 @@ engineMixin({
         });
         
     </script>
-    <script type="text/dfab" data-src="ui/messages.js" data-cost="816">
+    <script type="text/dfab" data-src="ui/app-launch.js" data-cost="57">
+        /* =====================================================================
+           APP LAUNCH: phone apps grow out of the icon you tapped
+           ---------------------------------------------------------------------
+           Every app shows itself by un-hiding its .phone-app-screen, from many
+           places (ui/phone.js, ui/messages.js, …). Rather than touch each one, this
+           watches the screens: when one appears within a moment of an icon tap, it
+           opens out of that icon (a clip from the icon's circle to the full screen,
+           with a slight scale-up), and when the home screen comes back from an app it
+           settles in from a touch larger, the way a real phone's does.
+           Players who ask for reduced motion get the plain switch.
+           ===================================================================== */
+        const AppLaunch = {
+            _tap: null,            // { rect, at }: the icon last tapped
+            _fromApp: false,       // an app was showing since the home screen last did
+            MS: 340,
+            _still() { return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches; },
+            /** True while an app is opening out of its icon (Messages times its splash to it) */
+            get launching() { return !!this._tap && performance.now() - this._tap.at < 700; },
+
+            init() {
+                const apps = document.getElementById('phone-apps'), home = document.getElementById('phone-home');
+                const overlay = document.getElementById('phone-overlay');
+                if (!apps || !home || typeof MutationObserver === 'undefined') return;
+                const remember = (e) => {
+                    const icon = e.target.closest && e.target.closest('.phone-app-container');
+                    if (!icon) return;
+                    const circle = icon.querySelector('.phone-app-icon-circle') || icon;
+                    this._tap = { rect: circle.getBoundingClientRect(), at: performance.now() };
+                };
+                apps.addEventListener('pointerdown', remember, true);
+                apps.addEventListener('click', remember, true);       // keyboards and controllers click without a pointer
+                const shown = (el) => el.style.display && el.style.display !== 'none';
+                const watch = new MutationObserver((records) => {
+                    const seen = new Set();                              // a screen hidden and shown again in one go counts once
+                    for (const r of records) {
+                        if (seen.has(r.target)) continue;
+                        const el = r.target, wasHidden = !/display:\s*(?!none)\w/.test(r.oldValue || '');
+                        if (el === overlay) { if (shown(el) && wasHidden) this._fromApp = false; continue; }   // the phone itself opening
+                        if (!shown(el) || !wasHidden) continue;         // only a hidden screen becoming visible
+                        seen.add(el);
+                        if (el === home) { if (this._fromApp) this._settleHome(); this._fromApp = false; }
+                        else { this._fromApp = true; this._grow(el); }
+                    }
+                });
+                document.querySelectorAll('.phone-app-screen').forEach(el => watch.observe(el, { attributes: true, attributeFilter: ['style'], attributeOldValue: true }));
+                watch.observe(home, { attributes: true, attributeFilter: ['style'], attributeOldValue: true });
+                if (overlay) watch.observe(overlay, { attributes: true, attributeFilter: ['style'], attributeOldValue: true });
+            },
+
+            _grow(el) {
+                const tap = this._tap;
+                if (!tap || performance.now() - tap.at > 700 || this._still() || !el.animate) return;
+                const box = el.getBoundingClientRect();
+                if (!box.width || !el.offsetWidth) return;
+                const k = box.width / el.offsetWidth;                   // the phone is scaled to fit the window
+                const t = (tap.rect.top - box.top) / k, l = (tap.rect.left - box.left) / k;
+                const b = (box.bottom - tap.rect.bottom) / k, r = (box.right - tap.rect.right) / k;
+                const ox = l + tap.rect.width / k / 2, oy = t + tap.rect.height / k / 2;
+                const R = tap.rect.width / k / 2;
+                el.getAnimations().forEach(a => { if (a.id === 'app-launch') a.cancel(); });
+                const a = el.animate([
+                    { clipPath: `inset(${t}px ${r}px ${b}px ${l}px round ${R}px)`, transform: 'scale(0.9)', opacity: 0.35 },
+                    { clipPath: 'inset(0px 0px 0px 0px round 14px)', transform: 'none', opacity: 1 }
+                ], { duration: this.MS, easing: 'cubic-bezier(0.2, 0.85, 0.25, 1)' });
+                a.id = 'app-launch';
+                el.style.transformOrigin = `${ox}px ${oy}px`;
+                a.onfinish = a.oncancel = () => { el.style.transformOrigin = ''; };
+            },
+
+            _settleHome() {
+                const home = document.getElementById('phone-home');
+                if (this._still() || !home.animate) return;
+                home.animate([{ transform: 'scale(1.06)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: 'cubic-bezier(0.2, 0.85, 0.25, 1)' });
+            },
+        };
+        if (typeof document !== 'undefined' && document.getElementById) {
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => AppLaunch.init());
+            else AppLaunch.init();
+        }
+    </script>
+    <script type="text/dfab" data-src="ui/messages.js" data-cost="821">
         /* =====================================================================
            MESSAGES — the phone's Messages app ("Velvet Thread")
            ---------------------------------------------------------------------
@@ -94174,29 +94256,34 @@ engineMixin({
                 this._activeContact = null;
                 this._stopVoice();
                 this.broadcast('APP_OPENED', { app: 'contacts' });
+                const scr = document.getElementById('screen-contacts');
+                const reopening = scr.style.display !== 'flex' || !this.isOpen;   // not just back from a thread
                 this.homeScreen.style.display = 'none';
                 document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
-                const scr = document.getElementById('screen-contacts');
                 scr.style.display = 'flex';
                 scr.classList.remove('has-thread');
                 this._buildContactDefs();
                 this.renderContacts();
                 this._paintEmpty();
-                // Faces still to paint: the white M splash fades in over the app while they're painted, then away
-                if (FaceCache.pending) this._splash(scr);
+                // The white M splash, every time the app opens: a beat of its own launch screen, longer only while
+                // faces are still being painted (and coming back from a thread, only for those)
+                if (reopening || FaceCache.pending) this._splash(scr);
             },
-            /** The Messages splash (#msg-splash): in now, out once the queued faces are painted (at least a moment,
-             *  so it never just flickers; at most a few seconds, then the rest paint in place) */
+            /** The Messages splash (#msg-splash): in now, out once the queued faces are painted (at least a beat, the
+             *  app's launch screen; at most a few seconds, then the rest paint in place) */
             _splash(scr) {
                 const sp = document.getElementById('msg-splash');
                 if (!sp) return;
                 const run = this._splashRun = (this._splashRun || 0) + 1;
                 clearTimeout(this._splashT);
+                // opened from its icon, the splash is what grows out of it (ui/app-launch.js): up at once, no fade in
+                const launched = typeof AppLaunch !== 'undefined' && AppLaunch.launching;
+                sp.classList.toggle('now', launched);
                 sp.classList.remove('out'); sp.classList.add('on');
                 const t0 = performance.now();
                 const done = () => {
                     if (run !== this._splashRun) return;
-                    const wait = Math.max(0, 450 - (performance.now() - t0));
+                    const wait = Math.max(0, (launched ? 560 : 420) - (performance.now() - t0));
                     this._splashT = setTimeout(() => { if (run === this._splashRun) { sp.classList.add('out'); sp.classList.remove('on'); } }, wait);
                 };
                 this._pumpFaces().then(done);
