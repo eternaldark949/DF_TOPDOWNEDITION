@@ -692,18 +692,17 @@
                 }));
             },
 
-            /** A contact or crew avatar: their painted bust (getPortraitDataURL), else a script monogram. */
+            /** A contact or crew avatar: their painted bust (FaceCache), else a script monogram. */
             _dfAvatar(name, acc, big) {
-                return `<div class="df-avatar${big ? ' big' : ''}" style="--acc:${acc}">${this._dfFace(name, big ? 128 : 72)}${big ? '' : '<span class="dot"></span>'}</div>`;
+                return `<div class="df-avatar${big ? ' big' : ''}" style="--acc:${acc}">${this._dfFace(name, big ? FaceCache.LARGE : FaceCache.SMALL)}${big ? '' : '<span class="dot"></span>'}</div>`;
             },
 
-            /** The face inside an avatar: the painted bust at `size`px, else a script monogram. */
+            /** The face inside an avatar: the painted bust if it's painted already, else a script monogram that
+             *  turns into the bust once FaceCache gets to it (one face per task, so the screen opens at once). */
             _dfFace(name, size) {
-                try {
-                    const cfg = this.resolvePortraitConfig(name);
-                    if (cfg && !cfg.isFallback) return `<img alt="" src="${this.getPortraitDataURL(name, size)}">`;
-                } catch (e) { /* no portrait: fall through to the monogram */ }
-                return `<div class="mono">${(name || '?').replace(/^(Dr\.|Barista|Chef)\s+/, '').charAt(0)}</div>`;
+                const mono = `<div class="mono">${(name || '?').replace(/^(Dr\.|Barista|Chef)\s+/, '').charAt(0)}</div>`;
+                try { return FaceCache.html(name, size <= FaceCache.SMALL ? FaceCache.SMALL : FaceCache.LARGE, mono); }
+                catch (e) { return mono; }
             },
 
             // Render contacts screen in the sidebar
@@ -759,7 +758,7 @@
                     // capitals (script was tried; handles like LUVSH4D3 read badly in it, and one face for all keeps it tidy)
                     for (const c of contacts) {
                         html += `<div class="dc-card" style="--acc:${color}" tabindex="0">`;
-                        html += `<div class="dc-portrait">${this._dfFace(c.name, 128)}<svg class="portrait-rim" aria-hidden="true"><use href="#portrait-rim"/></svg></div>`;
+                        html += `<div class="dc-portrait">${this._dfFace(c.name, FaceCache.LARGE)}<svg class="portrait-rim" aria-hidden="true"><use href="#portrait-rim"/></svg></div>`;
                         html += `<div class="dc-who"><div class="dc-name">${c.name}</div><div class="dc-role">${roleLabels[cat]}</div>`;
                         if (c.lastMsg) html += `<div class="dc-quote">“${c.lastMsg}”</div>`;
                         html += `</div><span class="dc-diamond" aria-hidden="true"></span></div>`;

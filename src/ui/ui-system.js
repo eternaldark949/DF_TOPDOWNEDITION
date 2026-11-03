@@ -56,7 +56,7 @@
                 this.isAnimating = false;
                 this.animationFrameId = null;
         
-                document.getElementById('map-close-btn').addEventListener('click', () => this.toggleMap(false));
+                // (the map's Back is the menu's: it closes every screen, the map among them)
                 // close-menu button is handled by InventorySystem.toggleMenu()
                 
                 window.addEventListener('resize', () => {
@@ -669,7 +669,7 @@
             _freeArea(w, h) {
                 const D = this.dpr, cr = this.mapCanvas.getBoundingClientRect();
                 let left = 0, right = w;
-                const L = document.getElementById('map-sidebar-left'), R = document.getElementById('map-sidebar-right');
+                const L = document.getElementById('inv-sidebar-left'), R = document.getElementById('map-sidebar-right');
                 const vis = (el) => el && el.offsetParent !== null && getComputedStyle(el).visibility !== 'hidden';
                 if (vis(L)) { const r = L.getBoundingClientRect(); if (r.width > 0 && r.right < cr.width * 0.5) left = Math.max(0, (r.right - cr.left) * D); }
                 if (vis(R)) { const r = R.getBoundingClientRect(); if (r.width > 0 && r.left > cr.width * 0.5) right = Math.min(w, (r.left - cr.left) * D); }
@@ -1092,7 +1092,7 @@
                 root.querySelector('.map-cycle-next').addEventListener('click', e => { e.stopPropagation(); open(false); step(1); });
                 box.addEventListener('click', e => { const b = e.target.closest('.map-pick'); e.stopPropagation(); if (!b || b.disabled) return; open(false); this.showMapOf(b.dataset.map); });
                 document.getElementById('map-interface').addEventListener('pointerdown', e => { if (!root.contains(e.target)) open(false); });
-                for (const id of ['map-sidebar-left', 'map-sidebar-right']) {   // the sidebars fold away: the heading stays centred over the map
+                for (const id of ['inv-sidebar-left', 'map-sidebar-right']) {   // the sidebars fold away: the heading stays centred over the map
                     const el = document.getElementById(id);
                     if (el) new MutationObserver(() => this._placeMapHeading()).observe(el, { attributes: true, attributeFilter: ['class'] });
                 }
@@ -1102,7 +1102,7 @@
                 const root = document.getElementById('map-heading');
                 if (!root || !root.offsetParent) return;
                 const side = id => { const e = document.getElementById(id); if (!e || e.classList.contains('collapsed') || !e.offsetParent) return 0; return e.getBoundingClientRect().width; };
-                const W = window.innerWidth, L = side('map-sidebar-left'), R = side('map-sidebar-right');
+                const W = window.innerWidth, L = side('inv-sidebar-left'), R = side('map-sidebar-right');
                 root.style.left = ((L + W - R) / 2) + 'px';
             }
 
@@ -1123,7 +1123,7 @@
                 // Indoors (or anywhere she isn't): show the whole plan, centred in the space between the sidebars
                 if (mapData.type === 'indoor' || !this.viewingHere()) {
                     const side = id => { const e = document.getElementById(id); return e && !e.classList.contains('collapsed') && e.offsetParent ? e.getBoundingClientRect().width * this.dpr : 0; };
-                    const L = side('map-sidebar-left'), R = side('map-sidebar-right');
+                    const L = side('inv-sidebar-left'), R = side('map-sidebar-right');
                     const base = Math.min(w / mapData.width, h / mapData.height) * 0.9;
                     const top = this._headingBottom(), fitW = Math.max(w * 0.35, w - L - R) * 0.9, fitH = (h - top) * 0.88;   // below the heading
                     const zMax = mapData.type === 'indoor' ? 2 : 5;

@@ -33,7 +33,16 @@
                 face.className = 'comm-face';
                 const url = this._face(game, speaker);
                 if (url) { const img = new Image(); img.alt = ''; img.src = url; face.appendChild(img); }
-                else face.textContent = String(speaker || '?').trim().charAt(0).toUpperCase();
+                else {
+                    face.textContent = String(speaker || '?').trim().charAt(0).toUpperCase();
+                    // not painted yet: paint it on the next task (FaceCache keeps it), so the line shows at once
+                    const n = this._name(speaker);
+                    if (FaceCache.has(n)) {
+                        const cb = (u) => { face.textContent = ''; const img = new Image(); img.alt = ''; img.src = u; face.appendChild(img); face.classList.add('face-in'); };
+                        cb.wanted = () => face.isConnected;
+                        FaceCache.queue(n, FaceCache.SMALL, cb);
+                    }
+                }
                 const body = document.createElement('div');
                 body.className = 'comm-body';
                 const name = document.createElement('div');
@@ -79,8 +88,7 @@
             _face(game, speaker) {
                 try {
                     const n = this._name(speaker);
-                    if (!game || !game.resolvePortraitConfig || game.resolvePortraitConfig(n).isFallback) return null;
-                    return game.getPortraitDataURL(n, 104, null);
+                    return FaceCache.ready(n, FaceCache.SMALL);
                 } catch (e) { return null; }
             },
         };

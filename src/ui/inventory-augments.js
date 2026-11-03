@@ -710,14 +710,17 @@
                     if (!drag.moved && Math.abs(dy) < 6) return;
                     if (!drag.moved) { drag.moved = true; close(); el.classList.add('dragging'); }
                     el.style.transform = `translateY(${dy}px)`;
-                    // Swap with a neighbour once the pill passes its middle
-                    const rect = el.getBoundingClientRect(), mid = rect.top + rect.height / 2;
+                    // Swap with a neighbour once the pill passes its middle. Measured by layout (offsetTop), not by
+                    // what's on screen: a neighbour still sliding to its new spot mustn't swap straight back.
+                    const mid = el.offsetTop + dy + el.offsetHeight / 2;
                     const prev = el.previousElementSibling, next = el.nextElementSibling;
-                    if (prev?.classList.contains('ui-pill') && mid < prev.getBoundingClientRect().top + prev.offsetHeight / 2) {
-                        el.parentNode.insertBefore(el, prev); drag.y -= prev.offsetHeight + parseFloat(getComputedStyle(prev).marginBottom);
+                    if (prev?.classList.contains('ui-pill') && mid < prev.offsetTop + prev.offsetHeight / 2) {
+                        this._slidePills(() => el.parentNode.insertBefore(el, prev), el);
+                        drag.y -= prev.offsetHeight + parseFloat(getComputedStyle(prev).marginBottom);
                         el.style.transform = `translateY(${event.clientY - drag.y}px)`;
-                    } else if (next?.classList.contains('ui-pill') && mid > next.getBoundingClientRect().top + next.offsetHeight / 2) {
-                        el.parentNode.insertBefore(next, el); drag.y += next.offsetHeight + parseFloat(getComputedStyle(next).marginBottom);
+                    } else if (next?.classList.contains('ui-pill') && mid > next.offsetTop + next.offsetHeight / 2) {
+                        this._slidePills(() => el.parentNode.insertBefore(next, el), el);
+                        drag.y += next.offsetHeight + parseFloat(getComputedStyle(next).marginBottom);
                         el.style.transform = `translateY(${event.clientY - drag.y}px)`;
                     }
                 });
@@ -726,7 +729,10 @@
                     const moved = drag.moved; drag = null;
                     if (!moved) return;
                     swallowClick = true;
+                    // let go: the pill settles into its slot rather than jumping there
+                    const from = el.style.transform;
                     el.classList.remove('dragging'); el.style.transform = '';
+                    if (from && el.animate && !this._still()) el.animate([{ transform: from }, { transform: 'none' }], { duration: 220, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
                     this._keepOrder(el);
                 };
                 control.addEventListener('pointerup', endDrag);
@@ -746,7 +752,7 @@
                         event.preventDefault();
                         const sibling = event.key === 'ArrowUp' ? el.previousElementSibling : el.nextElementSibling;
                         if (!sibling?.classList.contains('ui-pill')) return;
-                        if (event.key === 'ArrowUp') el.parentNode.insertBefore(el, sibling); else el.parentNode.insertBefore(sibling, el);
+                        this._slidePills(() => { if (event.key === 'ArrowUp') el.parentNode.insertBefore(el, sibling); else el.parentNode.insertBefore(sibling, el); });
                         this._keepOrder(el); control.focus();
                     }
                 });
@@ -770,7 +776,47 @@
                     .sort((a, b) => (a.r ?? Infinity) - (b.r ?? Infinity) || a.i - b.i).map(x => x.entry);
             }
 
-            render() {
+            /** No sliding for players who've asked the system for less motion */
+            _still() { return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches; }
+
+            /**
+             * Make a change to the list, then slide every pill (and heading) from where it was to where it is now,
+             * rather than letting it jump: measure, change, then play each one's offset back to nothing (FLIP).
+             * Pills are matched by source and id, so this works across a full re-render too. New pills fade in.
+             * `skip`: a pill to leave alone (the one being dragged follows the pointer).
+             */
+            _slidePills(change, skip = null) {
+                const list = this.uiList;
+                if (!list || this._still() || typeof Element === 'undefined' || !Element.prototype.animate) { change(); return; }
+                const keyOf = n => n.classList.contains('ui-pill') ? `p|${n.dataset.source}:${n.dataset.id}` : `h|${n.dataset.category}`;
+                const sel = '.ui-pill, .inventory-section-title';
+                const before = new Map();
+                list.querySelectorAll(sel).forEach(n => {
+                    const r = n.getBoundingClientRect();          // where it's drawn now, mid-slide included
+                    if (r.width) before.set(keyOf(n), r);
+                });
+                change();
+                if (!before.size) return;                         // first fill (or the list was hidden): nothing to slide from
+                list.querySelectorAll(sel).forEach(n => {
+                    if (n === skip) return;
+                    n.getAnimations().forEach(a => { if (a.id === 'pill-slide' || a.id === 'pill-in') a.cancel(); });
+                    const r = n.getBoundingClientRect();
+                    if (!r.width) return;
+                    const was = before.get(keyOf(n));
+                    let anim;
+                    if (!was) anim = n.animate([{ opacity: 0, transform: 'scale(0.97)' }, { opacity: 1, transform: 'none' }], { duration: 240, easing: 'ease-out' });
+                    else {
+                        const dx = was.left - r.left, dy = was.top - r.top;
+                        if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+                        anim = n.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: 280, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+                    }
+                    anim.id = was ? 'pill-slide' : 'pill-in';
+                });
+            }
+
+            render() { this._slidePills(() => this._renderList()); }
+
+            _renderList() {
                 if (!this.uiList) return;
                 this.uiList.replaceChildren();
                 const equippedOnly = Screens.current === 'equipped';
@@ -792,6 +838,7 @@
                     if (!group.length) continue;
                     const heading = document.createElement('h2');
                     heading.className = 'inventory-section-title';
+                    heading.dataset.category = category;
                     heading.textContent = `${label} · ${group.length}`;
                     this.uiList.appendChild(heading);
                     group.forEach(entry => this.uiList.appendChild(this._renderEntry(entry)));

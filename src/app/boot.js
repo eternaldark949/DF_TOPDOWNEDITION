@@ -11,6 +11,8 @@
             {key:'crimson', name:'Crimson', values:{exposure:0,brightness:92,contrast:135,saturate:120,temp:30,tint:15,vignette:30}},
             {key:'cold_teal', name:'Cold Teal', values:{exposure:-8,brightness:95,contrast:125,saturate:75,temp:-45,tint:-15,vignette:25}},
             {key:'dreampunk', name:'Dreampunk', values:{exposure:3,brightness:93,contrast:145,saturate:95,temp:15,tint:20,vignette:50}},
+            // after ETERNAL's pause-screen prototype: magenta lights in a violet night
+            {key:'neon_dream', name:'Neon Dream', values:{exposure:4,brightness:96,contrast:128,saturate:140,temp:12,tint:48,vignette:45}},
         ];
         // [key, label, min, max, track]
         const GAME_GRADE_SLIDERS = [
@@ -42,6 +44,36 @@
                 applyGameGradeToCanvas(); syncGradeDrawer();
             } else applyGameGradePreset(Math.max(0, GAME_GRADE_PRESETS.findIndex(p => p.key === GameSettings.colorGrade)));
         }
+        /** A grade as a file: what Export writes and Import reads ({ game, kind, name, values }) */
+        function exportGameGrade() {
+            const p = GAME_GRADE_PRESETS[_gameGradeActive];
+            const name = p && p.key !== 'none' ? p.name : 'Custom';
+            const data = { game: 'DFAB', kind: 'colour-grade', version: 1, name, exportDate: new Date().toISOString(), values: { ..._gameGrade } };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `dfab_grade_${name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}.json`;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+            showMessage(`GRADE EXPORTED: ${name.toUpperCase()}`);
+        }
+        /** Read a grade file (or its text): each value kept inside its slider's range, unknown keys ignored.
+         *  Returns the grade's name, or throws if there's nothing usable in it. */
+        function importGameGrade(text) {
+            let data;
+            try { data = JSON.parse(text); } catch (e) { throw new Error('not a grade file'); }
+            const src = data && typeof data === 'object' ? (data.values && typeof data.values === 'object' ? data.values : data) : null;
+            const vals = {};
+            for (const [k, , lo, hi] of GAME_GRADE_SLIDERS) {
+                const v = Number(src && src[k]);
+                if (src && k in src && Number.isFinite(v)) vals[k] = Math.round(Math.max(lo, Math.min(hi, v)));
+            }
+            if (!Object.keys(vals).length) throw new Error('no grade values in it');
+            _gameGrade = { ...GAME_GRADE_DEFAULTS, ...vals }; _gameGradeActive = -1;
+            GameSettings.colorGrade = 'custom'; GameSettings.gradeCustom = { ..._gameGrade };
+            applyGameGradeToCanvas(); syncGradeDrawer();
+            return typeof data.name === 'string' && data.name.trim() ? data.name.trim().slice(0, 40) : 'Custom';
+        }
         /** The temperature / tint wash: rgb and opacity (shared by the overlay and saved photos) */
         function gradeWash(g = _gameGrade) {
             if (!g.temp && !g.tint) return null;
@@ -60,7 +92,13 @@
             const w = gradeWash(g);
             if (w) { ov.style.background = w.rgb; ov.style.opacity = w.alpha; ov.style.display = 'block'; }
             else ov.style.display = 'none';
-            c.style.boxShadow = g.vignette > 0 ? 'inset 0 0 ' + (g.vignette * 2) + 'px ' + g.vignette + 'px rgba(0,0,0,' + (g.vignette / 100) + ')' : 'none';
+            // The vignette on a layer of its own over the canvas: an inset shadow on the canvas itself is painted under its
+            // pixels, so it never showed in play (only saved photos, which bake it in, had it)
+            let vg = document.getElementById('grade-vignette');
+            if (!vg) { vg = document.createElement('div'); vg.id = 'grade-vignette'; vg.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;'; c.parentElement.appendChild(vg); }
+            c.style.boxShadow = 'none';
+            vg.style.boxShadow = g.vignette > 0 ? 'inset 0 0 ' + (g.vignette * 2) + 'px ' + g.vignette + 'px rgba(0,0,0,' + (g.vignette / 100) + ')' : 'none';
+            vg.style.display = g.vignette > 0 ? 'block' : 'none';
         }
         /** Bake the wash and vignette into a photo (out: a canvas already holding the filtered frame) */
         function gradePhotoPass(out, cssW) {
