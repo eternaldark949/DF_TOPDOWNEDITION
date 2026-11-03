@@ -1,0 +1,1414 @@
+<!doctype html>
+<!-- ETRNL9 foundation harness: a single offline build, separate from the existing game. -->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>ETRNL9 · Engine Foundation</title>
+    <style>
+/* Harness presentation only. No external fonts or network assets are needed offline. */
+:root {
+    /* Ask browser-provided controls to use a dark appearance. */
+    color-scheme: dark;
+    /* Keep the owner's purple/cream palette in named reusable properties. */
+    --page-background: #08070e;
+    /* Cards are lighter than the page so grouping remains visible. */
+    --panel-background: #12101c;
+    /* Cream is the main reading color. */
+    --reading-color: #ffeed8;
+    /* Lavender identifies secondary explanations. */
+    --secondary-color: #b4a8c8;
+    /* Use system fonts so the file works with networking disabled. */
+    font-family: system-ui, sans-serif;
+    /* Apply the reading color to inherited text. */
+    color: var(--reading-color);
+    /* Supply the page background without depending on a rendered frame. */
+    background: var(--page-background);
+}
+/* Include borders and padding inside declared dimensions for predictable phone layouts. */
+* { box-sizing: border-box; }
+/* Remove browser-default outer whitespace. */
+body { margin: 0; }
+/* Keep the title and runtime status readable on opposite sides when space permits. */
+header { max-width: 1100px; margin: auto; padding: 28px 20px 18px; display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+/* Present the project identity above the engine title. */
+.eyebrow { font-size: 10px; letter-spacing: 0.15em; color: var(--secondary-color); }
+/* Keep the engine name prominent without consuming the phone screen. */
+h1 { margin: 0; font-size: 30px; letter-spacing: 0.08em; }
+/* Make the version secondary to the engine name. */
+h1 span { font-size: 13px; color: var(--secondary-color); }
+/* Distinguish live state from static explanatory text. */
+#status-value { font-size: 13px; color: #cebbff; }
+/* Constrain reading width while leaving a comfortable edge on small screens. */
+main { max-width: 1100px; margin: auto; padding: 0 20px 24px; }
+/* Give the drawing surface a stable visible rectangle owned by this host page. */
+.viewport { position: relative; height: clamp(260px, 48vh, 480px); overflow: hidden; border: 1px solid #393047; border-radius: 14px; background: #0d0b18; }
+/* Fill the host rectangle; suppress touch scrolling only over the interactive scene. */
+canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+/* Keep keyboard focus visible for users interacting with the canvas. */
+canvas:focus-visible { outline: 2px solid #cebbff; outline-offset: -3px; }
+/* Explain the scene without intercepting pointer/touch events. */
+.scene-caption { position: absolute; left: 16px; bottom: 8px; pointer-events: none; color: var(--secondary-color); font-size: 12px; }
+/* Group controls and measured data under the canvas. */
+.panel { margin-top: 14px; padding: 18px; background: var(--panel-background); border-radius: 14px; }
+/* Wrap controls instead of making the page wider than a phone. */
+.controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+/* Provide touch-sized controls with clear outlines and inherited fonts. */
+button, select { min-height: 44px; background: #292137; color: var(--reading-color); border: 1px solid #5d4d71; border-radius: 8px; padding: 8px 15px; font: inherit; }
+/* Disabled lifecycle actions remain visible but visually secondary. */
+button:disabled { opacity: 0.4; }
+/* Keep zoom labeling close to its select control. */
+label { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+/* Explanatory paragraphs use a consistent reading size and line height. */
+.panel p, article p, footer { font-size: 13px; line-height: 1.6; color: var(--secondary-color); }
+/* Measurements adapt column count to available width. */
+.measurements { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 16px; margin-bottom: 0; }
+/* Labels remain distinct from their measured values. */
+dt { font-size: 11px; color: var(--secondary-color); }
+/* Align values without the browser's default description indentation. */
+dd { margin: 5px 0 0; font-size: 19px; font-variant-numeric: tabular-nums; }
+/* Lay out architecture cards responsively without scripting their positions. */
+.levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-top: 18px; }
+/* Each card names one actual level and its responsibility. */
+article { padding: 16px; border: 1px solid #2a2335; border-radius: 12px; }
+/* Number levels according to the owner's Basement-to-Penthouse organization. */
+article span { color: #a469ff; font-size: 12px; }
+/* Keep card titles visually lighter than the engine title. */
+h2 { font-size: 16px; margin: 8px 0; }
+/* Separate the migration-status note from architecture cards. */
+footer { margin-top: 18px; }
+
+</style>
+</head>
+<body>
+    <!-- This header belongs to the harness; engine components do not query its IDs. -->
+    <header>
+        <div><p class="eyebrow">DIMENSIONS: FREELANCER · REWRITE FOUNDATION</p><h1>ETRNL9 <span>0.1.0</span></h1></div>
+        <p id="status-value" role="status">Initializing</p>
+    </header>
+    <main>
+        <!-- The canvas is sized in CSS; the renderer allocates backing pixels separately. -->
+        <section class="viewport" aria-label="Interactive engine test scene">
+            <canvas id="foundation-canvas" tabindex="0" aria-label="Moving rectangles and a controllable cream marker"></canvas>
+            <p class="scene-caption">A small study, running on four levels.</p>
+        </section>
+        <section class="panel" aria-label="Engine controls and measurements">
+            <div class="controls">
+                <button id="start-button" type="button">Start</button>
+                <button id="pause-button" type="button" aria-pressed="false">Pause</button>
+                <button id="stop-button" type="button">Stop</button>
+                <label>Zoom <select id="zoom-control"><option value="0.75">75%</option><option value="1" selected>100%</option><option value="1.5">150%</option></select></label>
+            </div>
+            <p>Drag or touch the scene to place the cream marker. Use WASD or arrow keys to move it. Pause freezes simulation; stop cancels frames.</p>
+            <dl class="measurements">
+                <div><dt>Rendered FPS</dt><dd id="fps-value">…</dd></div>
+                <div><dt>Fixed updates</dt><dd id="steps-value">0</dd></div>
+                <div><dt>Simulation</dt><dd id="time-value">0 s</dd></div>
+                <div><dt>Brush fills / frame</dt><dd id="draws-value">0</dd></div>
+                <div><dt>Dropped time</dt><dd id="dropped-value">0 s</dd></div>
+                <div><dt>Backing pixels</dt><dd id="resolution-value">…</dd></div>
+            </dl>
+        </section>
+        <section class="levels" aria-label="Level responsibilities">
+            <article><span>00</span><h2>Basement</h2><p>Shared settings, small methods, and basic libraries.</p></article>
+            <article><span>01</span><h2>Lobby</h2><p>One clock. Fixed updates, frame scheduling, and lifecycle.</p></article>
+            <article><span>02</span><h2>Directory</h2><p>Systems, tools, elements, and generalized asset libraries.</p></article>
+            <article><span>03</span><h2>Penthouse</h2><p>Optional procedural features built on Directory services.</p></article>
+        </section>
+        <footer>Foundation test harness. Original game content, humanoids, and tiered buildings have not been migrated.</footer>
+    </main>
+    <script data-source="engine/basement.js">
+/**
+ * BASEMENT — shared definitions and small operations, with no frame scheduling.
+ * This is the lowest level: it does not depend on the Directory or on game content.
+ * Classes remain ordinary JavaScript classes; the engine exposes their instances
+ * through named levels, matching the owner's G7 organization.
+ */
+class LevelBasement {
+    /** Create independent engine settings. Optional overrides use seconds or Hz. */
+    constructor(overrides = {}) {
+        // Keep settings together; freeze prevents later direct property reassignment.
+        this.configuration = Object.freeze({
+            // Identify this foundation independently of the existing game's version.
+            engineName: 'ETRNL9',
+            // Describe the first working foundation, not a migrated full game.
+            engineVersion: '0.1.0',
+            // Run simulation at sixty fixed steps per second on any display.
+            simulationHz: 60,
+            // Limit elapsed time accepted after a browser stall, in seconds.
+            maximumFrameSeconds: 0.25,
+            // Bound catch-up work so a slow device cannot accumulate endless work.
+            maximumStepsPerFrame: 5,
+            // Limit backing-image density to control memory use on phones.
+            maximumPixelRatio: 2,
+            // Copy caller overrides after defaults so supplied settings take precedence.
+            ...overrides
+        });
+        // Visit the numeric setting-name values one at a time and stop after all four.
+        // “of” retrieves names from this explicit list, unlike “in”, which reads keys.
+        for (const settingName of ['simulationHz', 'maximumFrameSeconds', 'maximumStepsPerFrame', 'maximumPixelRatio']) {
+            // Look up this setting's actual supplied value, including invalid strings.
+            const settingValue = this.configuration[settingName];
+            // Numeric settings must be finite positive numbers; do not coerce strings.
+            if (!Number.isFinite(settingValue) || settingValue <= 0) {
+                // Fail during setup instead of allowing an invalid timestep or canvas size.
+                throw new RangeError(`${settingName} must be a finite positive number.`);
+            }
+        }
+        // The catch-up limit counts whole updates, so fractional limits are invalid.
+        if (!Number.isInteger(this.configuration.maximumStepsPerFrame)) {
+            // Explain the invalid unit to callers immediately.
+            throw new RangeError('maximumStepsPerFrame must be an integer.');
+        }
+        // A pixel-density cap below one conflicts with the minimum supported density.
+        if (this.configuration.maximumPixelRatio < 1) {
+            // Reject contradictory bounds instead of allocating surprising dimensions.
+            throw new RangeError('maximumPixelRatio must be at least one.');
+        }
+    }
+
+    /** Return value restricted to the inclusive minimum/maximum range; change no state. */
+    clamp(value, minimum, maximum) {
+        // First prevent going below minimum, then prevent going above maximum.
+        return Math.min(maximum, Math.max(minimum, value));
+    }
+
+    /** Blend previous and current numbers by a fraction between zero and one. */
+    interpolate(previousValue, currentValue, fraction) {
+        // Move a fraction of the distance from the previous value toward the current one.
+        return previousValue + (currentValue - previousValue) * fraction;
+    }
+}
+
+/**
+ * NamedLibrary stores elements, assets, tools, or systems under readable IDs.
+ * It owns registration only; it does not assume how a registered object behaves.
+ */
+class NamedLibrary {
+    /** Label this library for error messages and start with no registered entries. */
+    constructor(libraryName) {
+        // Store the human-readable concern this collection represents.
+        this.name = libraryName;
+        // Map stores explicit keys without inheriting object-property names.
+        this.entries = new Map();
+    }
+
+    /** Register one value under an unused ID and return it; reject duplicate IDs. */
+    register(identifier, value) {
+        // Require a nonempty string so entries remain easy to address and diagnose.
+        if (typeof identifier !== 'string' || identifier.trim() === '') {
+            // Reject an unusable address before modifying the library.
+            throw new TypeError(`${this.name} requires a nonempty string ID.`);
+        }
+        // Never silently replace an existing object's ownership or reference.
+        if (this.entries.has(identifier)) {
+            // Report which concern and ID collided.
+            throw new Error(`${this.name} already contains ${identifier}.`);
+        }
+        // Keep the actual value reference, not a clone or an automatically linked path.
+        this.entries.set(identifier, value);
+        // Let callers retain the registered instance for later configuration.
+        return value;
+    }
+
+    /** Find an entry by ID; Map.get returns undefined when that ID is absent. */
+    get(identifier) {
+        // Retrieve the currently registered value each time this method is called.
+        return this.entries.get(identifier);
+    }
+
+    /** Remove an ID and return whether it existed; caller owns any needed cleanup. */
+    remove(identifier) {
+        // Deleting a registration does not destroy the referenced object automatically.
+        return this.entries.delete(identifier);
+    }
+}
+
+</script>
+<script data-source="engine/renderer.js">
+/**
+ * DIRECTORY SYSTEM — the renderer owns canvas sizing, camera coordinates, brushes,
+ * and ordered rendering passes. It never schedules frames and knows no game content.
+ * Canvas uses a 2D drawing context; world coordinates are transformed into CSS pixels,
+ * then into the backing image's physical pixels for sharp high-density displays.
+ */
+class RendererSystem {
+    /** Connect a canvas and Basement settings; throw if a 2D context is unavailable. */
+    constructor(canvas, basement) {
+        // Retain the existing canvas object, so resizing it needs no reference refresh.
+        this.canvas = canvas;
+        // Keep shared settings and arithmetic available without copying their state.
+        this.basement = basement;
+        // Ask the browser for the surface used by Canvas drawing commands.
+        this.drawingContext = canvas.getContext('2d');
+        // Stop initialization if this browser cannot supply a usable drawing surface.
+        if (!this.drawingContext) {
+            // Report an actionable initialization error rather than failing on the first draw.
+            throw new Error('This foundation requires a Canvas 2D drawing context.');
+        }
+        // Store callbacks in explicit drawing order instead of relying on property order.
+        this.renderPasses = [];
+        // Store a camera in world units; zoom is CSS pixels per world unit.
+        this.camera = {
+            // Center of the view along the world's horizontal axis.
+            positionX: 0,
+            // Center of the view along the world's vertical axis.
+            positionY: 0,
+            // A zoom of one maps one world unit to one CSS pixel.
+            zoom: 1
+        };
+        // Dimensions are CSS pixels, independent of device pixel density.
+        this.viewportWidth = 1;
+        // Start with a nonzero height so early coordinate conversions remain defined.
+        this.viewportHeight = 1;
+        // Backing-image pixels per CSS pixel; resize selects the actual capped density.
+        this.pixelRatio = 1;
+        // Reset draw accounting once per rendered frame.
+        this.drawCalls = 0;
+    }
+
+    /** Resize backing pixels from CSS dimensions; do not replace the canvas object. */
+    resize(widthCssPixels, heightCssPixels, devicePixelRatio = 1) {
+        // Reject invalid public inputs before they can poison transforms or allocation.
+        if (![widthCssPixels, heightCssPixels, devicePixelRatio].every(Number.isFinite)) {
+            // NaN and infinity cannot describe a drawing surface.
+            throw new RangeError('Canvas dimensions and pixel ratio must be finite.');
+        }
+        // Avoid a zero-size canvas while its parent is briefly hidden or collapsed.
+        this.viewportWidth = Math.max(1, widthCssPixels);
+        // Keep the CSS height nonzero for input conversion and rendering.
+        this.viewportHeight = Math.max(1, heightCssPixels);
+        // Respect the Basement's phone-friendly density limit.
+        this.pixelRatio = this.basement.clamp(devicePixelRatio, 1, this.basement.configuration.maximumPixelRatio);
+        // Allocate the horizontal backing resolution in physical pixels.
+        this.canvas.width = Math.round(this.viewportWidth * this.pixelRatio);
+        // Allocate vertical backing pixels; canvas resizing also resets context state.
+        this.canvas.height = Math.round(this.viewportHeight * this.pixelRatio);
+    }
+
+    /** Add an ordered pass: its ID, coordinate space, order, and drawing callback. */
+    registerPass(identifier, order, coordinateSpace, draw) {
+        // Reject ambiguous coordinates rather than silently choosing the wrong transform.
+        if (!['world', 'screen'].includes(coordinateSpace)) {
+            // Name the two supported spaces explicitly.
+            throw new Error('Render passes use world or screen coordinates.');
+        }
+        // A pass needs a callable implementation and a finite sorting priority.
+        if (typeof draw !== 'function' || !Number.isFinite(order)) {
+            // Avoid deferred failures inside the running animation callback.
+            throw new TypeError('A render pass needs a function and finite order.');
+        }
+        // Check each existing pass; “some” stops as soon as it finds a matching ID.
+        if (this.renderPasses.some((renderPass) => renderPass.identifier === identifier)) {
+            // Keep pass removal and toggles unambiguous.
+            throw new Error(`Render pass ${identifier} is already registered.`);
+        }
+        // Store all pass properties explicitly so callers can inspect and toggle them.
+        const renderPass = {
+            // Unique name used to find or remove this pass.
+            identifier,
+            // Lower values draw first, underneath later passes.
+            order,
+            // Choose camera-relative world drawing or fixed screen drawing.
+            coordinateSpace,
+            // Callback receives the renderer and the current frame information.
+            draw,
+            // A disabled pass remains registered but contributes no drawing.
+            enabled: true
+        };
+        // Append the pass before ordering the complete list.
+        this.renderPasses.push(renderPass);
+        // Compare priorities; modern JavaScript's stable sort preserves equal-order registration.
+        this.renderPasses.sort((firstPass, secondPass) => firstPass.order - secondPass.order);
+        // Return the actual pass object so its owner can toggle enabled directly.
+        return renderPass;
+    }
+
+    /** Remove a pass by ID; other registered passes keep their order. */
+    removePass(identifier) {
+        // Keep each pass whose identifier does not match the removed one.
+        this.renderPasses = this.renderPasses.filter((renderPass) => renderPass.identifier !== identifier);
+    }
+
+    /** Convert a CSS-pixel position inside the canvas to a world position. */
+    screenToWorld(screenPositionX, screenPositionY) {
+        // Return a fresh coordinate object; no camera or input state is changed.
+        return {
+            // Undo centering and zoom, then restore the camera's world position.
+            positionX: (screenPositionX - this.viewportWidth / 2) / this.camera.zoom + this.camera.positionX,
+            // Apply the same conversion to the vertical axis.
+            positionY: (screenPositionY - this.viewportHeight / 2) / this.camera.zoom + this.camera.positionY
+        };
+    }
+
+    /** Draw all enabled passes once; clear first and isolate every pass's Canvas state. */
+    render(frame) {
+        // Cache the context reference under a name that describes what it is.
+        const drawingContext = this.drawingContext;
+        // Begin draw-call accounting for this frame.
+        this.drawCalls = 0;
+        // Clear using backing pixels, without any camera or density transformation.
+        drawingContext.setTransform(1, 0, 0, 1, 0, 0);
+        // Erase the prior frame, including transparent parts of the scene.
+        drawingContext.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        // Visit pass values in their sorted order; stop after the list is exhausted.
+        // “of” is used because we need each pass object, not array property keys.
+        for (const renderPass of this.renderPasses) {
+            // Skip this pass when its owner has disabled it.
+            if (!renderPass.enabled) {
+                // Continue advances to the next pass without leaving the render method.
+                continue;
+            }
+            // Preserve context state so one pass cannot leak ordinary style/transform changes.
+            drawingContext.save();
+            // Finally restores that state even when a drawing callback throws.
+            try {
+                // Establish CSS-pixel coordinates for this pass.
+                drawingContext.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
+                // World-space passes follow the camera; screen-space UI stays fixed.
+                if (renderPass.coordinateSpace === 'world') {
+                    // Move the coordinate origin to the middle of the visible canvas.
+                    drawingContext.translate(this.viewportWidth / 2, this.viewportHeight / 2);
+                    // Scale world units by camera zoom on both axes.
+                    drawingContext.scale(this.camera.zoom, this.camera.zoom);
+                    // Move the world so the camera's position lands at the view center.
+                    drawingContext.translate(-this.camera.positionX, -this.camera.positionY);
+                }
+                // Clear paths too: Canvas paths are not included in save/restore state.
+                drawingContext.beginPath();
+                // Let this pass's owner supply content using the established coordinates.
+                renderPass.draw(this, frame);
+            } finally {
+                // Restore the previous styles, transform, clipping, and compositing state.
+                drawingContext.restore();
+                // Prevent an unfinished path from becoming the next pass's path.
+                drawingContext.beginPath();
+            }
+        }
+    }
+}
+
+/**
+ * CanvasBrush collects same-color rectangles, then fills their shared path once.
+ * One brush owns one color. Callers control brush order; the registry does not
+ * regroup different colors, which could change overlap and transparency behavior.
+ */
+class CanvasBrush {
+    /** Create a reusable brush with a fixed fill color and an empty instruction queue. */
+    constructor(color) {
+        // Keep the Canvas-compatible color string visible to the brush owner.
+        this.color = color;
+        // Store rectangles in the order the caller requests them.
+        this.instructions = [];
+    }
+
+    /** Queue a rectangle in the current pass's units without drawing it yet. */
+    rectangle(positionX, positionY, width, height) {
+        // Retain all four rectangle arguments together for the later drawing stage.
+        this.instructions.push({
+            // Horizontal position of the rectangle's starting corner.
+            positionX,
+            // Vertical position of the rectangle's starting corner.
+            positionY,
+            // Horizontal extent from that corner.
+            width,
+            // Vertical extent from that corner.
+            height
+        });
+    }
+
+    /** Fill all queued rectangles on the supplied renderer and always empty the queue. */
+    flush(renderer) {
+        // An empty queue requires no Canvas work.
+        if (this.instructions.length === 0) {
+            // Return without increasing the renderer's draw-call counter.
+            return;
+        }
+        // Use the renderer's context without taking over its coordinate transform.
+        const drawingContext = renderer.drawingContext;
+        // Release queued work even if the browser rejects a drawing operation.
+        try {
+            // Apply this brush's color to the next filled path.
+            drawingContext.fillStyle = this.color;
+            // Start one path containing all rectangles queued for this brush.
+            drawingContext.beginPath();
+            // Visit instruction values in order; “of” retrieves objects, not their keys.
+            // Finish when every queued rectangle has been added to the path.
+            for (const instruction of this.instructions) {
+                // Add a rectangle using its corner and dimensions; rect does not fill yet.
+                drawingContext.rect(instruction.positionX, instruction.positionY, instruction.width, instruction.height);
+            }
+            // Fill the collected rectangles together with the brush color.
+            drawingContext.fill();
+            // Record this one fill call in the renderer's current frame statistics.
+            renderer.drawCalls += 1;
+        } finally {
+            // Reuse the array while discarding instructions already submitted this frame.
+            this.instructions.length = 0;
+        }
+    }
+}
+
+</script>
+<script data-source="engine/input.js">
+/**
+ * InputSystem owns keyboard and pointer state. Pointer positions are CSS pixels
+ * inside the canvas; callers ask the renderer to convert them into world units.
+ * Gameplay bindings are deliberately left to the game or test harness.
+ */
+class InputSystem {
+    /** Store DOM references and handlers; connect() installs them after setup is complete. */
+    constructor(canvas, browserWindow) {
+        // Keep the interactive drawing surface used to measure pointer positions.
+        this.canvas = canvas;
+        // Retain the browser event source so listeners can be removed from that same object.
+        this.browserWindow = browserWindow;
+        // Track physical key codes without prescribing which action they mean.
+        this.heldKeys = new Set();
+        // Pointer state is one persistent object whose fields are updated by events.
+        this.pointer = {
+            // Horizontal CSS-pixel coordinate relative to the canvas.
+            positionX: 0,
+            // Vertical CSS-pixel coordinate relative to the canvas.
+            positionY: 0,
+            // Whether a primary pointer is currently held on this canvas.
+            held: false
+        };
+        // Avoid installing duplicate listeners if connect is accidentally requested twice.
+        this.connected = false;
+        // Bind preserves this InputSystem as “this” when the browser calls its method.
+        // Unlike a Python bound method, a detached JavaScript method does not retain its owner.
+        this.handleKeyDown = this.onKeyDown.bind(this);
+        // Retain the bound reference so removeEventListener receives the exact same function.
+        this.handleKeyUp = this.onKeyUp.bind(this);
+        // Pointer events serve both mouse and touch input through the same handler.
+        this.handlePointer = this.onPointer.bind(this);
+        // Losing focus must clear controls so a missed keyup cannot leave movement stuck.
+        this.handleBlur = this.clear.bind(this);
+    }
+
+    /** Install listeners once; called only after the engine has connected its components. */
+    connect() {
+        // Repeated connection must not create duplicate input delivery.
+        if (this.connected) {
+            // Leave the existing listener set intact.
+            return;
+        }
+        // Begin collecting key presses from the page.
+        this.browserWindow.addEventListener('keydown', this.handleKeyDown);
+        // Remove held keys when the browser reports releases.
+        this.browserWindow.addEventListener('keyup', this.handleKeyUp);
+        // Clear state if the browser stops delivering input to this page.
+        this.browserWindow.addEventListener('blur', this.handleBlur);
+        // Install the same handler for each supported pointer event name.
+        // “of” reads event-name strings in sequence, finishing after all four names.
+        for (const eventName of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) {
+            // Listen on the canvas so UI buttons outside it do not move the target.
+            this.canvas.addEventListener(eventName, this.handlePointer);
+        }
+        // Mark the listener installation complete.
+        this.connected = true;
+    }
+
+    /** Record a physical key press while allowing ordinary typing in page controls. */
+    onKeyDown(event) {
+        // Ignore form controls so engine input does not interfere with text editing.
+        if (event.target?.closest?.('input, textarea, select, button, [contenteditable]')) {
+            // The optional-chaining operators skip calls when a target lacks those methods.
+            return;
+        }
+        // A Set keeps a held key once even when the OS repeats keydown events.
+        this.heldKeys.add(event.code);
+        // Arrow keys and Space would otherwise scroll the page during canvas interaction.
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) {
+            // Prevent only these navigation defaults, leaving browser shortcuts intact.
+            event.preventDefault();
+        }
+    }
+
+    /** Release a key by physical code even if focus moved to another page control. */
+    onKeyUp(event) {
+        // Delete safely whether or not the corresponding keydown was recorded.
+        this.heldKeys.delete(event.code);
+    }
+
+    /** Update primary mouse/touch coordinates and held state from one pointer event. */
+    onPointer(event) {
+        // Ignore extra touch points; this basic foundation tracks one primary pointer.
+        if (event.isPrimary === false) {
+            // Leave primary input unchanged.
+            return;
+        }
+        // Read the canvas's actual CSS rectangle, not its high-density backing dimensions.
+        const canvasBounds = this.canvas.getBoundingClientRect();
+        // Convert the page's client coordinate into an offset within the canvas.
+        this.pointer.positionX = event.clientX - canvasBounds.left;
+        // Apply the same conversion to the vertical coordinate.
+        this.pointer.positionY = event.clientY - canvasBounds.top;
+        // A press begins a held gesture and captures subsequent movement/releases.
+        if (event.type === 'pointerdown') {
+            // Remember that the primary pointer is down.
+            this.pointer.held = true;
+            // Pointer capture lets an outside release still reach this canvas.
+            this.canvas.setPointerCapture(event.pointerId);
+        }
+        // Both normal release and browser cancellation finish the gesture.
+        if (event.type === 'pointerup' || event.type === 'pointercancel') {
+            // Stop treating this pointer as held.
+            this.pointer.held = false;
+        }
+    }
+
+    /** Clear transient controls on blur, pause, or stop; preserve coordinate values. */
+    clear() {
+        // No previously held key should act after focus or lifecycle changes.
+        this.heldKeys.clear();
+        // Require a fresh press before a pointer can control the scene again.
+        this.pointer.held = false;
+    }
+
+    /** Remove every installed listener and clear state; safe to call repeatedly. */
+    dispose() {
+        // Remove the exact bound keydown function installed during connection.
+        this.browserWindow.removeEventListener('keydown', this.handleKeyDown);
+        // Remove the corresponding keyup listener.
+        this.browserWindow.removeEventListener('keyup', this.handleKeyUp);
+        // Remove automatic focus-loss cleanup.
+        this.browserWindow.removeEventListener('blur', this.handleBlur);
+        // Visit the same four event-name values used when installing listeners.
+        // “of” yields each name once and ends when the array is exhausted.
+        for (const eventName of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) {
+            // Unsubscribe this canvas from its pointer handler.
+            this.canvas.removeEventListener(eventName, this.handlePointer);
+        }
+        // Release any input still recorded at destruction time.
+        this.clear();
+        // Record that no input listeners remain active.
+        this.connected = false;
+    }
+}
+
+</script>
+<script data-source="engine/profiler.js">
+/** FrameProfiler is a measurement tool, not a scheduler or a visual HUD. */
+class FrameProfiler {
+    /** Start with no measured frames or simulation work. */
+    constructor() {
+        // Count completed rendered frames since this tool was constructed.
+        this.frameCount = 0;
+        // Count fixed updates actually completed, independent of monitor refresh rate.
+        this.simulationSteps = 0;
+        // Sum discarded wall-clock duration when catch-up is capped, in seconds.
+        this.droppedSeconds = 0;
+        // Count rendered frames in the current sampling window.
+        this.sampleFrames = 0;
+        // Accumulate actual callback intervals before simulation clamping, in seconds.
+        this.sampleSeconds = 0;
+        // Zero means a complete measurement window is not available yet.
+        this.framesPerSecond = 0;
+        // Store the latest synchronous update/render cost, not GPU completion time.
+        this.frameCostMilliseconds = 0;
+    }
+
+    /** Record one completed frame; refresh FPS after at least half a second of samples. */
+    record(elapsedSeconds, simulationSteps, droppedSeconds, frameCostMilliseconds) {
+        // Increase the total number of frames actually rendered.
+        this.frameCount += 1;
+        // Add the number of fixed updates completed during this frame.
+        this.simulationSteps += simulationSteps;
+        // Track intentionally discarded time rather than hiding overloaded frames.
+        this.droppedSeconds += droppedSeconds;
+        // Add this frame to the current FPS sample.
+        this.sampleFrames += 1;
+        // Use actual elapsed time so a simulation clamp does not inflate reported FPS.
+        this.sampleSeconds += elapsedSeconds;
+        // Report synchronous execution time supplied by the Lobby.
+        this.frameCostMilliseconds = frameCostMilliseconds;
+        // Wait for enough elapsed time to avoid a jittery per-frame reciprocal display.
+        if (this.sampleSeconds >= 0.5) {
+            // Divide completed frames by actual wall-clock seconds.
+            this.framesPerSecond = this.sampleFrames / this.sampleSeconds;
+            // Begin the next independent measurement window.
+            this.sampleFrames = 0;
+            // Reset elapsed sample duration alongside its frame count.
+            this.sampleSeconds = 0;
+        }
+    }
+}
+
+</script>
+<script data-source="engine/directory.js">
+/**
+ * DIRECTORY — named systems, tools, elements, and reusable asset libraries.
+ * Components are constructed here, connected before execution, and updated through
+ * one system contract. This level does not start timers or animation callbacks.
+ */
+class LevelDirectory {
+    /** Create the selected renderer/input systems and the profiler tool, without starting. */
+    constructor(basement, canvas, browserWindow) {
+        // Retain the Basement instance rather than copying its settings.
+        this.basement = basement;
+        // Systems implement reusable concerns and may provide update/dispose methods.
+        this.systems = new NamedLibrary('systems');
+        // Tools hold utilities that do not need a simulation update every step.
+        this.tools = new NamedLibrary('tools');
+        // Elements are the actual objects used by installed game or procedural features.
+        this.elements = new NamedLibrary('elements');
+        // Assets can be images, audio, configuration, or other caller-owned references.
+        this.assets = new NamedLibrary('assets');
+        // Register the renderer without making the engine coordinate its internals.
+        this.systems.register('renderer', new RendererSystem(canvas, basement));
+        // Register input; its constructor stores references and installs no listeners yet.
+        this.systems.register('input', new InputSystem(canvas, browserWindow));
+        // Register per-frame measurements independently of any particular on-screen HUD.
+        this.tools.register('profiler', new FrameProfiler());
+    }
+
+    /** Connect optional systems after every Directory component has been constructed. */
+    connect(engine) {
+        // Keep the actual owning engine reference available to directory users.
+        this.parentEngine = engine;
+        // Visit system values, not their string IDs, once each in registration order.
+        // “of” iterates Map.values(); it finishes when no system values remain.
+        for (const system of this.systems.entries.values()) {
+            // Only systems that need a connection phase implement this method.
+            if (typeof system.connect === 'function') {
+                // Supply the finished Directory so dependencies can be looked up now.
+                system.connect(this);
+            }
+        }
+    }
+
+    /** Advance reusable systems by one fixed timestep, expressed in seconds. */
+    update(stepSeconds) {
+        // Visit a snapshot of system values so registration changes take effect next step.
+        // “of” supplies each system object; iteration ends after the snapshot is exhausted.
+        for (const system of Array.from(this.systems.entries.values())) {
+            // A rendering-only or event-driven system may not need simulation updates.
+            if (typeof system.update === 'function') {
+                // Give this system the same fixed duration as every other updated system.
+                system.update(stepSeconds);
+            }
+        }
+    }
+
+    /** Dispose components in reverse registration order, then release owned registries. */
+    dispose() {
+        // Convert values to an array so reverse order can undo later dependencies first.
+        const systemsInReverseOrder = Array.from(this.systems.entries.values()).reverse();
+        // Visit each system once; “of” reads values rather than array index keys.
+        for (const system of systemsInReverseOrder) {
+            // Only systems that allocate resources need a dispose implementation.
+            if (typeof system.dispose === 'function') {
+                // Remove that system's listeners or other external resources.
+                system.dispose();
+            }
+        }
+        // Forget registered systems now that their resources have been released.
+        this.systems.entries.clear();
+        // Release the Directory's references to tools.
+        this.tools.entries.clear();
+        // Release element references; element resource cleanup belongs to their owners.
+        this.elements.entries.clear();
+        // Release asset references; asset-specific cleanup belongs to their owners.
+        this.assets.entries.clear();
+    }
+}
+
+</script>
+<script data-source="engine/penthouse.js">
+/**
+ * PENTHOUSE — optional high-level features built from Directory services.
+ * Procedural humanoids and tiered buildings will belong here; they are not migrated
+ * in this foundation. Extensions are supplied by callers, not hard-coded in the engine.
+ */
+class LevelPenthouse {
+    /** Retain the service Directory and create an empty optional-feature library. */
+    constructor(directory) {
+        // Refer to the actual Directory instance so services can be looked up when needed.
+        this.directory = directory;
+        // Store installed features by unique names for later access and removal.
+        this.features = new NamedLibrary('penthouse features');
+    }
+
+    /** Install a feature with initialize(directory), update(seconds), and dispose() hooks. */
+    install(identifier, feature) {
+        // Prevent replacement from leaking the old feature's elements or render passes.
+        this.features.register(identifier, feature);
+        // Roll back the registration if initialization fails.
+        try {
+            // A feature can be purely computational and need no initialization hook.
+            if (typeof feature.initialize === 'function') {
+                // Supply reusable services only after the engine's components are connected.
+                feature.initialize(this.directory);
+            }
+        } catch (error) {
+            // Release partial registrations when the feature supports cleanup.
+            if (typeof feature.dispose === 'function') {
+                // Let the feature undo work completed before its failure.
+                feature.dispose();
+            }
+            // Remove the failed feature's name from the installed collection.
+            this.features.remove(identifier);
+            // Preserve the original initialization failure for the caller.
+            throw error;
+        }
+        // Return the same feature instance for explicit configuration by its owner.
+        return feature;
+    }
+
+    /** Advance installed features once per fixed simulation step. */
+    update(stepSeconds) {
+        // Snapshot feature values so installation/removal during a step affects the next one.
+        // “of” visits each feature object; iteration stops after this snapshot is exhausted.
+        for (const feature of Array.from(this.features.entries.values())) {
+            // Some features provide only render passes and need no update hook.
+            if (typeof feature.update === 'function') {
+                // Pass the same duration used by Directory systems.
+                feature.update(stepSeconds);
+            }
+        }
+    }
+
+    /** Uninstall a feature and its owned resources; an absent name is a harmless no-op. */
+    uninstall(identifier) {
+        // Resolve the currently installed object rather than keeping a duplicate reference.
+        const feature = this.features.get(identifier);
+        // There is nothing to release when this name is not registered.
+        if (!feature) {
+            // Leave the remaining feature collection unchanged.
+            return;
+        }
+        // Give the feature an opportunity to remove its passes and elements.
+        if (typeof feature.dispose === 'function') {
+            // Cleanup runs while Directory services still exist.
+            feature.dispose();
+        }
+        // Forget the feature only after its owned resources are released.
+        this.features.remove(identifier);
+    }
+
+    /** Uninstall all features before the engine disposes Directory services. */
+    dispose() {
+        // Visit a reversed snapshot of keys because uninstall mutates the underlying Map.
+        // “of” provides each ID value from the snapshot, ending after all IDs are visited.
+        for (const identifier of Array.from(this.features.entries.keys()).reverse()) {
+            // Reuse the same cleanup path as an individual feature removal.
+            this.uninstall(identifier);
+        }
+    }
+}
+
+</script>
+<script data-source="engine/lobby.js">
+/**
+ * LOBBY — the only owner of requestAnimationFrame scheduling.
+ * It advances systems in fixed seconds, then renders an interpolated frame.
+ * Pausing still permits rendering; stop cancels scheduling entirely. Hidden-page
+ * suspension cancels callbacks until visible so returning never fast-forwards time.
+ */
+class LevelLobby {
+    /** Store connected levels and an injectable scheduler; construction never starts a loop. */
+    constructor(basement, directory, penthouse, scheduler) {
+        // Keep shared timestep and catch-up settings available.
+        this.basement = basement;
+        // Systems and tools are addressed through the Directory.
+        this.directory = directory;
+        // Optional features advance after core systems on each fixed step.
+        this.penthouse = penthouse;
+        // Browser and deterministic tests provide the same request/cancel/now interface.
+        this.scheduler = scheduler;
+        // Running means start was requested and stop has not been called.
+        this.running = false;
+        // Hidden pages remain logically running but have no scheduled callback.
+        this.suspended = false;
+        // Different owners hold independent pause reasons; releasing one cannot release others.
+        this.pauseReasons = new Set();
+        // Null means there is no outstanding animation callback; zero is a valid callback ID.
+        this.animationRequestId = null;
+        // Null means the next frame must establish a fresh time baseline.
+        this.previousTimestampMilliseconds = null;
+        // Leftover accepted wall-clock time awaiting a complete fixed step.
+        this.accumulatedSeconds = 0;
+        // Simulation time advances only when an update actually runs.
+        this.simulationSeconds = 0;
+        // Preserve the most recent callback error for a diagnostic UI or test.
+        this.lastError = null;
+        // Keep “this” pointing to this Lobby when the scheduler invokes the callback.
+        this.handleFrame = this.onFrame.bind(this);
+    }
+
+    /** Report whether any owner currently requires simulation to remain paused. */
+    get paused() {
+        // Read the live Set size rather than maintaining a duplicate boolean.
+        return this.pauseReasons.size > 0;
+    }
+
+    /** Forget elapsed-time carry so stop, focus changes, and pause cannot queue catch-up work. */
+    resetTiming() {
+        // The next callback establishes its own baseline instead of using an old timestamp.
+        this.previousTimestampMilliseconds = null;
+        // Discard partial simulation time across lifecycle boundaries.
+        this.accumulatedSeconds = 0;
+        // Require fresh input after lifecycle changes to avoid stale held controls.
+        this.directory.systems.get('input').clear();
+    }
+
+    /** Request exactly one callback if active; repeated starts/resumes cannot multiply loops. */
+    schedule() {
+        // Stopped, hidden, or already-scheduled loops need no additional callback.
+        if (!this.running || this.suspended || this.animationRequestId !== null) {
+            // Preserve the current scheduling state.
+            return;
+        }
+        // Retain the ID needed to cancel this exact future callback.
+        this.animationRequestId = this.scheduler.request(this.handleFrame);
+    }
+
+    /** Start scheduling with a fresh timing baseline; calling start twice is harmless. */
+    start() {
+        // Do not reset a loop that is already active.
+        if (this.running) {
+            // Keep its existing callback and accumulated time.
+            return;
+        }
+        // Mark the Lobby active before asking for a callback.
+        this.running = true;
+        // A fresh run clears the diagnostic from a previous failed run.
+        this.lastError = null;
+        // Exclude any time spent stopped from simulation.
+        this.resetTiming();
+        // Schedule through the single guarded path.
+        this.schedule();
+    }
+
+    /** Stop all frame scheduling while preserving scene state for a later restart. */
+    stop() {
+        // Mark inactive so no later path can accidentally schedule another frame.
+        this.running = false;
+        // A pending callback must be canceled using its stored ID.
+        if (this.animationRequestId !== null) {
+            // Cancel only the Lobby's own outstanding request.
+            this.scheduler.cancel(this.animationRequestId);
+        }
+        // No outstanding callback remains after cancellation.
+        this.animationRequestId = null;
+        // Clear inputs and time carry, leaving actual simulation state intact.
+        this.resetTiming();
+    }
+
+    /** Add/remove a named pause owner; keep drawing so UI can remain responsive. */
+    setPaused(reason, shouldPause) {
+        // Choose between acquiring and releasing this owner's pause reason.
+        if (shouldPause) {
+            // A Set makes repeated acquisition by the same owner idempotent.
+            this.pauseReasons.add(reason);
+        } else {
+            // Release only this owner's reason, preserving every other owner's pause.
+            this.pauseReasons.delete(reason);
+        }
+        // Exclude the pause interval and any old held input from later simulation.
+        this.resetTiming();
+    }
+
+    /** Suspend scheduling while hidden; resume once with no hidden-time catch-up. */
+    setSuspended(shouldSuspend) {
+        // Remember browser visibility independently from manual pause reasons.
+        this.suspended = shouldSuspend;
+        // Hidden pages must release an already scheduled callback.
+        if (shouldSuspend && this.animationRequestId !== null) {
+            // Cancel the existing request rather than creating an additional hidden loop.
+            this.scheduler.cancel(this.animationRequestId);
+            // Record that no pending request remains.
+            this.animationRequestId = null;
+        }
+        // Discard time spent hidden or crossing the visibility boundary.
+        this.resetTiming();
+        // This schedules only if running, visible, and without another request.
+        this.schedule();
+    }
+
+    /** Consume one browser timestamp in milliseconds; stop and expose any execution error. */
+    onFrame(timestampMilliseconds) {
+        // The scheduler has consumed this request; no callback is outstanding now.
+        this.animationRequestId = null;
+        // A canceled callback that was already delivered must not do work.
+        if (!this.running || this.suspended) {
+            // Return without scheduling a replacement.
+            return;
+        }
+        // Stop safely if an update or render callback throws.
+        try {
+            // Measure synchronous CPU-side frame work independently from frame interval.
+            const frameStartedMilliseconds = this.scheduler.now();
+            // The first callback establishes a baseline and has zero elapsed time.
+            const previousTimestamp = this.previousTimestampMilliseconds ?? timestampMilliseconds;
+            // Convert milliseconds to seconds and reject negative clock movement.
+            const elapsedSeconds = Math.max(0, (timestampMilliseconds - previousTimestamp) / 1000);
+            // Save this timestamp for the next callback's interval.
+            this.previousTimestampMilliseconds = timestampMilliseconds;
+            // Read shared limits once for this frame.
+            const configuration = this.basement.configuration;
+            // A fixed update's duration is independent of monitor refresh rate.
+            const stepSeconds = 1 / configuration.simulationHz;
+            // Discard excessive wall-clock intervals instead of simulating a long stall.
+            const acceptedSeconds = Math.min(elapsedSeconds, configuration.maximumFrameSeconds);
+            // Track time deliberately excluded by the wall-clock clamp.
+            let droppedSeconds = elapsedSeconds - acceptedSeconds;
+            // Count only actual updates completed in this callback.
+            let completedSteps = 0;
+            // Paused frames render but accumulate no simulation backlog.
+            if (!this.paused) {
+                // Carry partial elapsed time forward until a full step is available.
+                this.accumulatedSeconds += acceptedSeconds;
+                // Repeat while a full fixed step remains and the work limit is not reached.
+                // Each repetition consumes one step and increments completedSteps by one.
+                // The tiny tolerance avoids losing a step to floating-point roundoff.
+                while (
+                    this.accumulatedSeconds + 1e-10 >= stepSeconds &&
+                    completedSteps < configuration.maximumStepsPerFrame
+                ) {
+                    // Advance reusable systems before optional high-level features.
+                    this.directory.update(stepSeconds);
+                    // Advance installed procedural/game features by the same duration.
+                    this.penthouse.update(stepSeconds);
+                    // Move simulation time only after both update phases succeed.
+                    this.simulationSeconds += stepSeconds;
+                    // Remove the elapsed duration consumed by this fixed update.
+                    this.accumulatedSeconds = Math.max(0, this.accumulatedSeconds - stepSeconds);
+                    // Count this completed simulation step toward the catch-up limit.
+                    completedSteps += 1;
+                }
+                // Discard whole extra steps after overload, retaining only a partial step.
+                if (this.accumulatedSeconds >= stepSeconds) {
+                    // Compute the duration that would require additional full updates.
+                    const excessSeconds = Math.floor(this.accumulatedSeconds / stepSeconds) * stepSeconds;
+                    // Record this dropped backlog for diagnostics.
+                    droppedSeconds += excessSeconds;
+                    // Retain only the fractional remainder used for interpolation.
+                    this.accumulatedSeconds -= excessSeconds;
+                }
+            }
+            // Describe rendering without exposing scheduler internals to drawing callbacks.
+            const frame = {
+                // Simulation duration already completed, measured in seconds.
+                simulationSeconds: this.simulationSeconds,
+                // Interpolate between prior/current states; pause uses the current state.
+                interpolationFraction: this.paused ? 1 : this.basement.clamp(this.accumulatedSeconds / stepSeconds, 0, 1),
+                // Let drawing code explain the current simulation status if necessary.
+                paused: this.paused
+            };
+            // Render once even if this display frame needed no simulation update.
+            this.directory.systems.get('renderer').render(frame);
+            // Finish the synchronous work measurement after rendering commands are submitted.
+            const frameCostMilliseconds = this.scheduler.now() - frameStartedMilliseconds;
+            // Record raw elapsed time, actual steps, discarded time, and CPU-side cost.
+            this.directory.tools.get('profiler').record(elapsedSeconds, completedSteps, droppedSeconds, frameCostMilliseconds);
+            // Request the next callback only through the duplicate-safe scheduler path.
+            this.schedule();
+        } catch (error) {
+            // Retain the failure for the harness or developer to inspect.
+            this.lastError = error;
+            // Stop the loop so the same broken frame cannot repeat indefinitely.
+            this.stop();
+            // Surface the failure to browser diagnostics and automated checks.
+            throw error;
+        }
+    }
+}
+
+</script>
+<script data-source="engine/engine.js">
+/**
+ * ETRNL9 ENGINE — assemble the four levels, connect them, and expose lifecycle.
+ * Implementations live under the levels, not inside this coordinator. Construction
+ * is inert: the caller installs any optional content and explicitly calls start().
+ */
+class Etrnl9Engine {
+    /** Assemble an engine around one canvas; browser/scheduler injection supports testing. */
+    constructor(canvas, configuration = {}, browserWindow = window, browserDocument = document, scheduler = null) {
+        // Keep the browser objects used for resize/visibility, so disposal can unsubscribe.
+        this.browserWindow = browserWindow;
+        // Visibility belongs to the page document, which is distinct from its window.
+        this.browserDocument = browserDocument;
+        // Do not permit restarting an engine whose listeners and services were destroyed.
+        this.destroyed = false;
+        // Build shared configuration and helpers before components that depend on them.
+        this.basement = new LevelBasement(configuration);
+        // Build the service Directory without starting listeners or frames.
+        this.directory = new LevelDirectory(this.basement, canvas, browserWindow);
+        // Build an empty Penthouse that can use the now-created service Directory.
+        this.penthouse = new LevelPenthouse(this.directory);
+        // Use an injected clock in tests, otherwise wrap browser methods with their owners.
+        const frameScheduler = scheduler ?? {
+            // Keep the browser window as requestAnimationFrame's receiver.
+            request: browserWindow.requestAnimationFrame.bind(browserWindow),
+            // Keep the same receiver for cancellation and preserve callback IDs.
+            cancel: browserWindow.cancelAnimationFrame.bind(browserWindow),
+            // Bind the high-resolution clock to its performance object.
+            now: browserWindow.performance.now.bind(browserWindow.performance)
+        };
+        // Create the Lobby last so it can coordinate all completed levels.
+        this.lobby = new LevelLobby(this.basement, this.directory, this.penthouse, frameScheduler);
+        // Establish parent/dependency connections only after all levels exist.
+        this.directory.connect(this);
+        // Bind resize to this engine and retain that function for later unsubscription.
+        this.handleResize = this.resize.bind(this);
+        // Bind page visibility handling to the same engine instance.
+        this.handleVisibility = this.onVisibilityChange.bind(this);
+        // Keep the drawing surface matched to its host's visible size.
+        this.browserWindow.addEventListener('resize', this.handleResize);
+        // Suspend the Lobby when the page becomes hidden.
+        this.browserDocument.addEventListener('visibilitychange', this.handleVisibility);
+        // Allocate initial backing pixels before the first possible draw.
+        this.resize();
+        // Honor an already hidden page without starting any frame callbacks.
+        this.onVisibilityChange();
+    }
+
+    /** Size the renderer from its canvas's CSS bounds and the browser's pixel density. */
+    resize() {
+        // Find the current renderer through its service address.
+        const renderer = this.directory.systems.get('renderer');
+        // Read actual canvas layout so embedded and full-page hosts both work.
+        const bounds = renderer.canvas.getBoundingClientRect();
+        // Update backing pixels; devicePixelRatio defaults to one when unavailable.
+        renderer.resize(bounds.width, bounds.height, this.browserWindow.devicePixelRatio || 1);
+    }
+
+    /** Translate document visibility into scheduling suspension, preserving manual pauses. */
+    onVisibilityChange() {
+        // Document.hidden reflects current visibility; the Lobby handles timing cleanup.
+        this.lobby.setSuspended(this.browserDocument.hidden);
+    }
+
+    /** Start the existing Lobby after optional features have been installed. */
+    start() {
+        // A destroyed engine no longer has usable Directory services or event listeners.
+        if (this.destroyed) {
+            // Require constructing a new instance instead of partially reviving old resources.
+            throw new Error('Cannot start a destroyed engine.');
+        }
+        // Delegate scheduling rather than implementing a second loop here.
+        this.lobby.start();
+    }
+
+    /** Stop recurring work without discarding the scene or disconnecting components. */
+    stop() {
+        // Destruction already canceled frames and removed input services.
+        if (this.destroyed) {
+            // A later redundant stop must not look up disposed Directory entries.
+            return;
+        }
+        // The Lobby is the sole scheduler, so stopping it cancels engine frames.
+        this.lobby.stop();
+    }
+
+    /** Release feature resources and listeners once; safe to call more than once. */
+    destroy() {
+        // Avoid trying to dispose services that have already been removed.
+        if (this.destroyed) {
+            // Repeated destruction is intentionally harmless.
+            return;
+        }
+        // Cancel frames before disposing anything those frames could access.
+        this.stop();
+        // Unsubscribe this engine's resize callback.
+        this.browserWindow.removeEventListener('resize', this.handleResize);
+        // Unsubscribe its document visibility callback.
+        this.browserDocument.removeEventListener('visibilitychange', this.handleVisibility);
+        // Features remove their passes/elements while Directory services still exist.
+        this.penthouse.dispose();
+        // Services then remove listeners and release registry references.
+        this.directory.dispose();
+        // Prevent future starts after teardown is complete.
+        this.destroyed = true;
+    }
+}
+
+</script>
+<script data-source="demo/rectangle-study.js">
+/**
+ * TEST CONTENT — a small procedural study installed through the Penthouse contract.
+ * This exercises brushes, elements, input, fixed updates, interpolation, and render
+ * order. It is not game content and is not the original humanoid/building renderer.
+ * The engine source contains no references to this class and runs without it.
+ */
+class RectangleStudy {
+    /** Store no engine resources until initialize receives the completed Directory. */
+    constructor() {
+        // The connection phase supplies a Directory after engine construction.
+        this.directory = null;
+        // Simulation time drives repeatable motion, independent of display frame rate.
+        this.elapsedSeconds = 0;
+        // The preceding step's time is used to interpolate smooth rendered motion.
+        this.previousSeconds = 0;
+        // Keep the controlled element close to the view center initially.
+        this.player = {
+            // Current horizontal world position.
+            positionX: 0,
+            // Current vertical world position.
+            positionY: 0,
+            // Previous step's horizontal world position.
+            previousPositionX: 0,
+            // Previous step's vertical world position.
+            previousPositionY: 0
+        };
+        // Brushes demonstrate the original rewrite's same-color queued drawing approach.
+        this.backgroundBrush = new CanvasBrush('#0d0b18');
+        // Background grid tiles use a darker color than the moving shapes.
+        this.gridBrush = new CanvasBrush('#242039');
+        // Animated rectangles use the owner's periwinkle palette.
+        this.tileBrush = new CanvasBrush('#cebbff');
+        // The controlled element uses a separate warm color for easy identification.
+        this.playerBrush = new CanvasBrush('#ffeed8');
+        // HUD refresh is throttled separately from rendering without creating a timer.
+        this.nextHudUpdateSeconds = 0;
+    }
+
+    /** Register one element and three passes; all service dependencies now exist. */
+    initialize(directory) {
+        // Retain the Directory reference for live service lookup during execution.
+        this.directory = directory;
+        // Register this study's controlled object without inventing a game-specific engine field.
+        directory.elements.register('study.player', this.player);
+        // Obtain the reusable renderer that accepts this feature's drawing callbacks.
+        const renderer = directory.systems.get('renderer');
+        // The bound method keeps this study as “this” when the renderer calls it later.
+        renderer.registerPass('study.background', 0, 'screen', this.drawBackground.bind(this));
+        // World content follows camera position and zoom, unlike the background.
+        renderer.registerPass('study.world', 10, 'world', this.drawWorld.bind(this));
+        // A last pass updates the harness HUD without giving the engine knowledge of HTML IDs.
+        renderer.registerPass('study.diagnostics', 100, 'screen', this.updateDiagnostics.bind(this));
+    }
+
+    /** Advance the study by fixed seconds; inputs change only this study's element. */
+    update(stepSeconds) {
+        // Keep the old simulation time before advancing it for this step.
+        this.previousSeconds = this.elapsedSeconds;
+        // Add the fixed duration rather than counting display frames.
+        this.elapsedSeconds += stepSeconds;
+        // Remember the old horizontal coordinate for smooth display interpolation.
+        this.player.previousPositionX = this.player.positionX;
+        // Remember the old vertical coordinate too.
+        this.player.previousPositionY = this.player.positionY;
+        // Read current input from its owning system instead of copying held state.
+        const input = this.directory.systems.get('input');
+        // Read the renderer to convert pointer positions from screen to world coordinates.
+        const renderer = this.directory.systems.get('renderer');
+        // Pointer dragging/touching places the study's marker in the world.
+        if (input.pointer.held) {
+            // Convert CSS pixels using the current camera and viewport settings.
+            const worldPosition = renderer.screenToWorld(input.pointer.positionX, input.pointer.positionY);
+            // Assign the marker's current horizontal world position.
+            this.player.positionX = worldPosition.positionX;
+            // Assign the marker's current vertical world position.
+            this.player.positionY = worldPosition.positionY;
+            // Finish this update without additionally applying keyboard movement.
+            return;
+        }
+        // Obtain one directional value for left/right input, in the range -1 through 1.
+        const horizontalDirection = Number(input.heldKeys.has('KeyD') || input.heldKeys.has('ArrowRight')) - Number(input.heldKeys.has('KeyA') || input.heldKeys.has('ArrowLeft'));
+        // Obtain a vertical value; Canvas positive y points down the screen.
+        const verticalDirection = Number(input.heldKeys.has('KeyS') || input.heldKeys.has('ArrowDown')) - Number(input.heldKeys.has('KeyW') || input.heldKeys.has('ArrowUp'));
+        // Normalize diagonals so two held directions do not produce faster movement.
+        const directionLength = Math.max(1, Math.hypot(horizontalDirection, verticalDirection));
+        // Move at 150 world units per second horizontally, scaled by the fixed duration.
+        this.player.positionX += horizontalDirection / directionLength * 150 * stepSeconds;
+        // Apply the same speed and duration to vertical movement.
+        this.player.positionY += verticalDirection / directionLength * 150 * stepSeconds;
+    }
+
+    /** Fill the screen background once using CSS-pixel dimensions, independent of camera. */
+    drawBackground(renderer) {
+        // Queue a rectangle starting at the top-left corner and covering the viewport.
+        this.backgroundBrush.rectangle(0, 0, renderer.viewportWidth, renderer.viewportHeight);
+        // Draw the queued background and empty this brush's queue.
+        this.backgroundBrush.flush(renderer);
+    }
+
+    /** Draw a world grid, animated rectangles, and the interpolated controlled element. */
+    drawWorld(renderer, frame) {
+        // Shared interpolation arithmetic belongs to the Basement.
+        const basement = this.directory.basement;
+        // Blend the previous/current simulation times for this display frame.
+        const displaySeconds = basement.interpolate(this.previousSeconds, this.elapsedSeconds, frame.interpolationFraction);
+        // Work from column -12 through 12, increasing the column index by one each time.
+        // This counting loop needs an index to calculate each tile's world position.
+        for (let columnIndex = -12; columnIndex <= 12; columnIndex += 1) {
+            // For each column, visit row -9 through 9, increasing the row by one.
+            // Restarting this inner loop creates every row in the current column.
+            for (let rowIndex = -9; rowIndex <= 9; rowIndex += 1) {
+                // Queue a small square at the intersection; spacing is forty world units.
+                this.gridBrush.rectangle(columnIndex * 40 - 1, rowIndex * 40 - 1, 2, 2);
+            }
+        }
+        // Fill all grid squares before moving shapes, placing the grid underneath them.
+        this.gridBrush.flush(renderer);
+        // Draw twelve numbered shapes; start at zero and stop before twelve.
+        // Increase tileIndex after each iteration so each shape gets a unique phase.
+        for (let tileIndex = 0; tileIndex < 12; tileIndex += 1) {
+            // Distribute phases evenly around a full circle, then rotate with time.
+            const phaseRadians = tileIndex / 12 * Math.PI * 2 + displaySeconds * 0.35;
+            // Use cosine to calculate horizontal motion across a 160-unit radius.
+            const positionX = Math.cos(phaseRadians) * 160;
+            // Use sine with a narrower radius to produce an elliptical orbit.
+            const positionY = Math.sin(phaseRadians) * 95;
+            // Queue a 14-unit square centered on this shape's calculated position.
+            this.tileBrush.rectangle(positionX - 7, positionY - 7, 14, 14);
+        }
+        // Fill the orbiting shapes as one same-color drawing batch.
+        this.tileBrush.flush(renderer);
+        // Blend horizontal position so displays faster than simulation still look smooth.
+        const playerPositionX = basement.interpolate(this.player.previousPositionX, this.player.positionX, frame.interpolationFraction);
+        // Blend the corresponding vertical positions using the same fraction.
+        const playerPositionY = basement.interpolate(this.player.previousPositionY, this.player.positionY, frame.interpolationFraction);
+        // Queue the larger cream marker centered on the controlled element.
+        this.playerBrush.rectangle(playerPositionX - 10, playerPositionY - 10, 20, 20);
+        // Draw it after the orbiting shapes so overlap demonstrates explicit pass order.
+        this.playerBrush.flush(renderer);
+    }
+
+    /** Update harness text at most five times per second; no engine-side UI assumptions. */
+    updateDiagnostics(renderer) {
+        // Use wall-clock time so diagnostics still refresh while simulation is paused.
+        const currentSeconds = performance.now() / 1000;
+        // Avoid repeated DOM writes on every rendered frame.
+        if (currentSeconds < this.nextHudUpdateSeconds) {
+            // Keep the previously displayed text until the next refresh is due.
+            return;
+        }
+        // Schedule the next text refresh by comparison, without creating another loop.
+        this.nextHudUpdateSeconds = currentSeconds + 0.2;
+        // Resolve the measurement tool from its owning Directory.
+        const profiler = this.directory.tools.get('profiler');
+        // Locate the owning Lobby through the connected engine reference.
+        const lobby = this.directory.parentEngine.lobby;
+        // Present the current completed measurement window, or a warmup label.
+        document.getElementById('fps-value').textContent = profiler.framesPerSecond ? profiler.framesPerSecond.toFixed(0) : '…';
+        // Show actual fixed updates, demonstrating that rendering and simulation differ.
+        document.getElementById('steps-value').textContent = String(profiler.simulationSteps);
+        // Show simulated time, which freezes on pause and does not catch up after stop.
+        document.getElementById('time-value').textContent = `${lobby.simulationSeconds.toFixed(1)} s`;
+        // Report draw submissions tracked by brushes, excluding HTML HUD updates.
+        document.getElementById('draws-value').textContent = String(renderer.drawCalls);
+        // Report time deliberately dropped by the catch-up protection.
+        document.getElementById('dropped-value').textContent = `${profiler.droppedSeconds.toFixed(2)} s`;
+        // Show the current high-density backing allocation.
+        document.getElementById('resolution-value').textContent = `${renderer.canvas.width} × ${renderer.canvas.height}`;
+    }
+
+    /** Remove only this feature's passes and element; Directory services remain reusable. */
+    dispose() {
+        // Installation can fail before a Directory reference exists.
+        if (!this.directory) {
+            // No service registrations need cleanup in that case.
+            return;
+        }
+        // Obtain the renderer while the engine still keeps Directory services alive.
+        const renderer = this.directory.systems.get('renderer');
+        // Visit each owned pass-name value once; finish after all three names.
+        // “of” is used because removal needs names, not array index keys.
+        for (const passName of ['study.background', 'study.world', 'study.diagnostics']) {
+            // Remove this feature's drawing callback without disturbing other features.
+            renderer.removePass(passName);
+        }
+        // Unregister the controlled element owned by this study.
+        this.directory.elements.remove('study.player');
+    }
+}
+
+</script>
+<script data-source="demo/boot.js">
+/**
+ * HARNESS ENTRY — construct the engine, install optional test content, wire controls,
+ * then start. This is deliberately separate from engine assembly and reusable systems.
+ * It replaces no existing game's entry point and requires no external runtime files.
+ */
+
+// Obtain the drawing surface after its HTML element has been parsed.
+const foundationCanvas = document.getElementById('foundation-canvas');
+
+// Construct and connect the four levels without starting any recurring callbacks.
+const foundationEngine = new Etrnl9Engine(foundationCanvas);
+
+// Install the optional study after the Directory and its parent-engine reference exist.
+foundationEngine.penthouse.install('rectangle-study', new RectangleStudy());
+
+// Expose the instance for inspection, learning, and browser verification.
+window.foundationEngine = foundationEngine;
+
+/** Refresh button states and the status label after a lifecycle command. */
+function refreshFoundationControls() {
+    // Read actual Lobby state instead of maintaining another running/paused copy.
+    const lobby = foundationEngine.lobby;
+    // Disable start while already running; start itself is also duplicate-safe.
+    document.getElementById('start-button').disabled = lobby.running;
+    // Stop is meaningful only while the Lobby is logically running.
+    document.getElementById('stop-button').disabled = !lobby.running;
+    // Pause can be set only while the harness is running.
+    document.getElementById('pause-button').disabled = !lobby.running;
+    // Name the action this button will perform for its own pause reason.
+    document.getElementById('pause-button').textContent = lobby.pauseReasons.has('harness') ? 'Resume' : 'Pause';
+    // Reflect this toggle to assistive technologies as well as visible text.
+    document.getElementById('pause-button').setAttribute('aria-pressed', String(lobby.pauseReasons.has('harness')));
+    // Compute a descriptive label without nested conditional expressions.
+    let statusLabel = 'Stopped';
+    // A running Lobby may be manually paused or advancing normally.
+    if (lobby.running) {
+        // Select the current status from the actual pause registry.
+        statusLabel = lobby.paused ? 'Paused · rendering continues' : 'Running';
+    }
+    // Update only the harness's status text; the engine owns no presentation labels.
+    document.getElementById('status-value').textContent = statusLabel;
+}
+
+/** Start the existing engine instance without creating a replacement scene or loop. */
+function startFoundation() {
+    // Delegate to the engine's idempotent start operation.
+    foundationEngine.start();
+    // Refresh controls immediately after the state change.
+    refreshFoundationControls();
+}
+
+/** Stop scheduling and retain the current scene for a later restart. */
+function stopFoundation() {
+    // Cancel the Lobby's outstanding frame request.
+    foundationEngine.stop();
+    // Show stopped status even though no new render callback will run.
+    refreshFoundationControls();
+}
+
+/** Toggle only the test harness's pause reason; leave other pause owners untouched. */
+function toggleFoundationPause() {
+    // Read whether this harness already owns a pause reason.
+    const harnessIsPaused = foundationEngine.lobby.pauseReasons.has('harness');
+    // Acquire or release that reason without starting a second scheduler.
+    foundationEngine.lobby.setPaused('harness', !harnessIsPaused);
+    // Update the visible action and status immediately.
+    refreshFoundationControls();
+}
+
+/** Apply the selected camera zoom; the renderer owns world/screen conversion. */
+function updateFoundationZoom(event) {
+    // Find the camera through its owning renderer system.
+    const renderer = foundationEngine.directory.systems.get('renderer');
+    // Input values are strings; Number converts the selected numeric value explicitly.
+    renderer.camera.zoom = Number(event.target.value);
+}
+
+// Connect the start control to the existing engine, without an anonymous inline loop.
+document.getElementById('start-button').addEventListener('click', startFoundation);
+// Connect stop to scheduling cancellation.
+document.getElementById('stop-button').addEventListener('click', stopFoundation);
+// Connect pause to the independent named pause registry.
+document.getElementById('pause-button').addEventListener('click', toggleFoundationPause);
+// Let the camera demonstrate world scaling while the screen background stays fixed.
+document.getElementById('zoom-control').addEventListener('change', updateFoundationZoom);
+// All construction, feature installation, and event wiring are complete; begin frames now.
+startFoundation();
+
+</script>
+</body>
+</html>

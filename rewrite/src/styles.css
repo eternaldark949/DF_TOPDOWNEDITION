@@ -1,0 +1,71 @@
+/* Harness presentation only. No external fonts or network assets are needed offline. */
+:root {
+    /* Ask browser-provided controls to use a dark appearance. */
+    color-scheme: dark;
+    /* Keep the owner's purple/cream palette in named reusable properties. */
+    --page-background: #08070e;
+    /* Cards are lighter than the page so grouping remains visible. */
+    --panel-background: #12101c;
+    /* Cream is the main reading color. */
+    --reading-color: #ffeed8;
+    /* Lavender identifies secondary explanations. */
+    --secondary-color: #b4a8c8;
+    /* Use system fonts so the file works with networking disabled. */
+    font-family: system-ui, sans-serif;
+    /* Apply the reading color to inherited text. */
+    color: var(--reading-color);
+    /* Supply the page background without depending on a rendered frame. */
+    background: var(--page-background);
+}
+/* Include borders and padding inside declared dimensions for predictable phone layouts. */
+* { box-sizing: border-box; }
+/* Remove browser-default outer whitespace. */
+body { margin: 0; }
+/* Keep the title and runtime status readable on opposite sides when space permits. */
+header { max-width: 1100px; margin: auto; padding: 28px 20px 18px; display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+/* Present the project identity above the engine title. */
+.eyebrow { font-size: 10px; letter-spacing: 0.15em; color: var(--secondary-color); }
+/* Keep the engine name prominent without consuming the phone screen. */
+h1 { margin: 0; font-size: 30px; letter-spacing: 0.08em; }
+/* Make the version secondary to the engine name. */
+h1 span { font-size: 13px; color: var(--secondary-color); }
+/* Distinguish live state from static explanatory text. */
+#status-value { font-size: 13px; color: #cebbff; }
+/* Constrain reading width while leaving a comfortable edge on small screens. */
+main { max-width: 1100px; margin: auto; padding: 0 20px 24px; }
+/* Give the drawing surface a stable visible rectangle owned by this host page. */
+.viewport { position: relative; height: clamp(260px, 48vh, 480px); overflow: hidden; border: 1px solid #393047; border-radius: 14px; background: #0d0b18; }
+/* Fill the host rectangle; suppress touch scrolling only over the interactive scene. */
+canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+/* Keep keyboard focus visible for users interacting with the canvas. */
+canvas:focus-visible { outline: 2px solid #cebbff; outline-offset: -3px; }
+/* Explain the scene without intercepting pointer/touch events. */
+.scene-caption { position: absolute; left: 16px; bottom: 8px; pointer-events: none; color: var(--secondary-color); font-size: 12px; }
+/* Group controls and measured data under the canvas. */
+.panel { margin-top: 14px; padding: 18px; background: var(--panel-background); border-radius: 14px; }
+/* Wrap controls instead of making the page wider than a phone. */
+.controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+/* Provide touch-sized controls with clear outlines and inherited fonts. */
+button, select { min-height: 44px; background: #292137; color: var(--reading-color); border: 1px solid #5d4d71; border-radius: 8px; padding: 8px 15px; font: inherit; }
+/* Disabled lifecycle actions remain visible but visually secondary. */
+button:disabled { opacity: 0.4; }
+/* Keep zoom labeling close to its select control. */
+label { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+/* Explanatory paragraphs use a consistent reading size and line height. */
+.panel p, article p, footer { font-size: 13px; line-height: 1.6; color: var(--secondary-color); }
+/* Measurements adapt column count to available width. */
+.measurements { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 16px; margin-bottom: 0; }
+/* Labels remain distinct from their measured values. */
+dt { font-size: 11px; color: var(--secondary-color); }
+/* Align values without the browser's default description indentation. */
+dd { margin: 5px 0 0; font-size: 19px; font-variant-numeric: tabular-nums; }
+/* Lay out architecture cards responsively without scripting their positions. */
+.levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-top: 18px; }
+/* Each card names one actual level and its responsibility. */
+article { padding: 16px; border: 1px solid #2a2335; border-radius: 12px; }
+/* Number levels according to the owner's Basement-to-Penthouse organization. */
+article span { color: #a469ff; font-size: 12px; }
+/* Keep card titles visually lighter than the engine title. */
+h2 { font-size: 16px; margin: 8px 0; }
+/* Separate the migration-status note from architecture cards. */
+footer { margin-top: 18px; }

@@ -1,0 +1,105 @@
+/**
+ * BASEMENT — shared definitions and small operations, with no frame scheduling.
+ * This is the lowest level: it does not depend on the Directory or on game content.
+ * Classes remain ordinary JavaScript classes; the engine exposes their instances
+ * through named levels, matching the owner's G7 organization.
+ */
+class LevelBasement {
+    /** Create independent engine settings. Optional overrides use seconds or Hz. */
+    constructor(overrides = {}) {
+        // Keep settings together; freeze prevents later direct property reassignment.
+        this.configuration = Object.freeze({
+            // Identify this foundation independently of the existing game's version.
+            engineName: 'ETRNL9',
+            // Describe the first working foundation, not a migrated full game.
+            engineVersion: '0.1.0',
+            // Run simulation at sixty fixed steps per second on any display.
+            simulationHz: 60,
+            // Limit elapsed time accepted after a browser stall, in seconds.
+            maximumFrameSeconds: 0.25,
+            // Bound catch-up work so a slow device cannot accumulate endless work.
+            maximumStepsPerFrame: 5,
+            // Limit backing-image density to control memory use on phones.
+            maximumPixelRatio: 2,
+            // Copy caller overrides after defaults so supplied settings take precedence.
+            ...overrides
+        });
+        // Visit the numeric setting-name values one at a time and stop after all four.
+        // “of” retrieves names from this explicit list, unlike “in”, which reads keys.
+        for (const settingName of ['simulationHz', 'maximumFrameSeconds', 'maximumStepsPerFrame', 'maximumPixelRatio']) {
+            // Look up this setting's actual supplied value, including invalid strings.
+            const settingValue = this.configuration[settingName];
+            // Numeric settings must be finite positive numbers; do not coerce strings.
+            if (!Number.isFinite(settingValue) || settingValue <= 0) {
+                // Fail during setup instead of allowing an invalid timestep or canvas size.
+                throw new RangeError(`${settingName} must be a finite positive number.`);
+            }
+        }
+        // The catch-up limit counts whole updates, so fractional limits are invalid.
+        if (!Number.isInteger(this.configuration.maximumStepsPerFrame)) {
+            // Explain the invalid unit to callers immediately.
+            throw new RangeError('maximumStepsPerFrame must be an integer.');
+        }
+        // A pixel-density cap below one conflicts with the minimum supported density.
+        if (this.configuration.maximumPixelRatio < 1) {
+            // Reject contradictory bounds instead of allocating surprising dimensions.
+            throw new RangeError('maximumPixelRatio must be at least one.');
+        }
+    }
+
+    /** Return value restricted to the inclusive minimum/maximum range; change no state. */
+    clamp(value, minimum, maximum) {
+        // First prevent going below minimum, then prevent going above maximum.
+        return Math.min(maximum, Math.max(minimum, value));
+    }
+
+    /** Blend previous and current numbers by a fraction between zero and one. */
+    interpolate(previousValue, currentValue, fraction) {
+        // Move a fraction of the distance from the previous value toward the current one.
+        return previousValue + (currentValue - previousValue) * fraction;
+    }
+}
+
+/**
+ * NamedLibrary stores elements, assets, tools, or systems under readable IDs.
+ * It owns registration only; it does not assume how a registered object behaves.
+ */
+class NamedLibrary {
+    /** Label this library for error messages and start with no registered entries. */
+    constructor(libraryName) {
+        // Store the human-readable concern this collection represents.
+        this.name = libraryName;
+        // Map stores explicit keys without inheriting object-property names.
+        this.entries = new Map();
+    }
+
+    /** Register one value under an unused ID and return it; reject duplicate IDs. */
+    register(identifier, value) {
+        // Require a nonempty string so entries remain easy to address and diagnose.
+        if (typeof identifier !== 'string' || identifier.trim() === '') {
+            // Reject an unusable address before modifying the library.
+            throw new TypeError(`${this.name} requires a nonempty string ID.`);
+        }
+        // Never silently replace an existing object's ownership or reference.
+        if (this.entries.has(identifier)) {
+            // Report which concern and ID collided.
+            throw new Error(`${this.name} already contains ${identifier}.`);
+        }
+        // Keep the actual value reference, not a clone or an automatically linked path.
+        this.entries.set(identifier, value);
+        // Let callers retain the registered instance for later configuration.
+        return value;
+    }
+
+    /** Find an entry by ID; Map.get returns undefined when that ID is absent. */
+    get(identifier) {
+        // Retrieve the currently registered value each time this method is called.
+        return this.entries.get(identifier);
+    }
+
+    /** Remove an ID and return whether it existed; caller owns any needed cleanup. */
+    remove(identifier) {
+        // Deleting a registration does not destroy the referenced object automatically.
+        return this.entries.delete(identifier);
+    }
+}

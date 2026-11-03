@@ -1,0 +1,50 @@
+<!doctype html>
+<!-- ETRNL9 foundation harness: a single offline build, separate from the existing game. -->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>ETRNL9 · Engine Foundation</title>
+    <!-- @styles -->
+</head>
+<body>
+    <!-- This header belongs to the harness; engine components do not query its IDs. -->
+    <header>
+        <div><p class="eyebrow">DIMENSIONS: FREELANCER · REWRITE FOUNDATION</p><h1>ETRNL9 <span>0.1.0</span></h1></div>
+        <p id="status-value" role="status">Initializing</p>
+    </header>
+    <main>
+        <!-- The canvas is sized in CSS; the renderer allocates backing pixels separately. -->
+        <section class="viewport" aria-label="Interactive engine test scene">
+            <canvas id="foundation-canvas" tabindex="0" aria-label="Moving rectangles and a controllable cream marker"></canvas>
+            <p class="scene-caption">A small study, running on four levels.</p>
+        </section>
+        <section class="panel" aria-label="Engine controls and measurements">
+            <div class="controls">
+                <button id="start-button" type="button">Start</button>
+                <button id="pause-button" type="button" aria-pressed="false">Pause</button>
+                <button id="stop-button" type="button">Stop</button>
+                <label>Zoom <select id="zoom-control"><option value="0.75">75%</option><option value="1" selected>100%</option><option value="1.5">150%</option></select></label>
+            </div>
+            <p>Drag or touch the scene to place the cream marker. Use WASD or arrow keys to move it. Pause freezes simulation; stop cancels frames.</p>
+            <dl class="measurements">
+                <div><dt>Rendered FPS</dt><dd id="fps-value">…</dd></div>
+                <div><dt>Fixed updates</dt><dd id="steps-value">0</dd></div>
+                <div><dt>Simulation</dt><dd id="time-value">0 s</dd></div>
+                <div><dt>Brush fills / frame</dt><dd id="draws-value">0</dd></div>
+                <div><dt>Dropped time</dt><dd id="dropped-value">0 s</dd></div>
+                <div><dt>Backing pixels</dt><dd id="resolution-value">…</dd></div>
+            </dl>
+        </section>
+        <section class="levels" aria-label="Level responsibilities">
+            <article><span>00</span><h2>Basement</h2><p>Shared settings, small methods, and basic libraries.</p></article>
+            <article><span>01</span><h2>Lobby</h2><p>One clock. Fixed updates, frame scheduling, and lifecycle.</p></article>
+            <article><span>02</span><h2>Directory</h2><p>Systems, tools, elements, and generalized asset libraries.</p></article>
+            <article><span>03</span><h2>Penthouse</h2><p>Optional procedural features built on Directory services.</p></article>
+        </section>
+        <footer>Foundation test harness. Original game content, humanoids, and tiered buildings have not been migrated.</footer>
+    </main>
+    <!-- @scripts -->
+</body>
+</html>

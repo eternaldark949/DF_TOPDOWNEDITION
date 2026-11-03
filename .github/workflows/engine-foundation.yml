@@ -1,0 +1,49 @@
+# Verify the separate rewrite without changing the original game's build workflow.
+name: Engine foundation
+
+# Run when the foundation or its requirements change, including manual checks.
+on:
+  # Watch this branch while its architecture is being developed.
+  push:
+    # Restrict automatic runs to the explicitly created rewrite branch.
+    branches: ['rewrite/engine-foundation']
+    # Documentation-only changes elsewhere do not require these checks.
+    paths: ['rewrite/**', 'AGENTS.md', 'CODE_REQUIREMENTS.md', '.github/workflows/engine-foundation.yml']
+  # Check future proposals containing foundation changes too.
+  pull_request:
+    # Keep PR checks focused on the files this workflow validates.
+    paths: ['rewrite/**', 'AGENTS.md', 'CODE_REQUIREMENTS.md', '.github/workflows/engine-foundation.yml']
+  # Allow a repository owner to rerun foundation checks directly.
+  workflow_dispatch:
+
+# Testing requires repository read access only; this workflow writes no commits.
+permissions:
+  # Checkout needs read permission for repository contents.
+  contents: read
+
+# Define the independently runnable foundation check job.
+jobs:
+  # Name the job by the behavior it checks.
+  foundation:
+    # Use GitHub's Linux runner for Node's dependency-free checks.
+    runs-on: ubuntu-latest
+    # Bound a broken check instead of consuming unbounded runner time.
+    timeout-minutes: 5
+    # Execute checkout, runtime setup, build verification, and deterministic tests in order.
+    steps:
+      # Retrieve the exact commit being checked.
+      - uses: actions/checkout@v4
+      # Match the original repository's supported Node generation.
+      - uses: actions/setup-node@v4
+        # Configure the Node major version for subsequent commands.
+        with:
+          # Node 20 supports the standard-library APIs used by the build and checks.
+          node-version: 20
+      # Fail if someone changes source without rebuilding the one-file artifact.
+      - name: Verify standalone artifact
+        # Check mode compares bytes and does not modify the checkout.
+        run: node rewrite/tools/build.mjs --check
+      # Exercise scheduling, renderer, input, lifecycle, and failure behavior.
+      - name: Verify foundation behavior
+        # This runner requires no npm installation or browser downloads.
+        run: node rewrite/tools/test-foundation.cjs
