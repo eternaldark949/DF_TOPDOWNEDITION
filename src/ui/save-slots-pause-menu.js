@@ -658,6 +658,7 @@
                 
                 PauseLook.capture();                                            // the world as it stood, before the menu covers it
                 this.menu.classList.add('active');
+                this._enter();
                 this.isOpen = true;
                 game.pauseSystem.acquire('pause_menu');
                 this._syncCutsceneMenu();
@@ -719,7 +720,20 @@
                 }
             }
             
+            /** The way in: the blur and grade lerp up over the world, the menu's items slip in from the right one after
+             *  another, the left column's from the left, and the lit item's pill fades up just after
+             *  (styles/hud-menus.css, #pause-menu.entering). */
+            _enter() {
+                const m = this.menu;
+                m.querySelectorAll('.pause-right > .pause-header, #pause-nav-main > .pause-menu-item').forEach((el, i) => el.style.setProperty('--i', i));
+                m.querySelectorAll('.pause-left > *:not([hidden])').forEach((el, i) => el.style.setProperty('--i', i));
+                m.classList.remove('entering'); void m.offsetWidth; m.classList.add('entering');
+                clearTimeout(this._enterT);
+                this._enterT = setTimeout(() => m.classList.remove('entering'), 1400);
+            }
+
             close() {
+                clearTimeout(this._enterT); this.menu.classList.remove('entering');
                 this.menu.classList.remove('active');
                 PauseLook.release();
                 this.isOpen = false;

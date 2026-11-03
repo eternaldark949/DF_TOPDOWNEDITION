@@ -25,7 +25,7 @@
                     const icon = e.target.closest && e.target.closest('.phone-app-container');
                     if (!icon) return;
                     const circle = icon.querySelector('.phone-app-icon-circle') || icon;
-                    this._tap = { rect: circle.getBoundingClientRect(), at: performance.now() };
+                    this._tap = { rect: circle.getBoundingClientRect(), at: performance.now(), icon };
                 };
                 apps.addEventListener('pointerdown', remember, true);
                 // a press you can feel: the icon or the M button squishes in, then springs back with a warm gold flash
@@ -63,20 +63,21 @@
             _grow(el) {
                 const tap = this._tap;
                 if (!tap || performance.now() - tap.at > 700 || this._still() || !el.animate) return;
-                const box = el.getBoundingClientRect();
+                el.getAnimations().forEach(a => { if (a.id === 'app-launch') a.cancel(); });
+                const box = el.getBoundingClientRect();                 // measured before the grow scales it
                 if (!box.width || !el.offsetWidth) return;
                 const k = box.width / el.offsetWidth;                   // the phone is scaled to fit the window
                 const t = (tap.rect.top - box.top) / k, l = (tap.rect.left - box.left) / k;
                 const b = (box.bottom - tap.rect.bottom) / k, r = (box.right - tap.rect.right) / k;
                 const ox = l + tap.rect.width / k / 2, oy = t + tap.rect.height / k / 2;
                 const R = tap.rect.width / k / 2;
-                el.getAnimations().forEach(a => { if (a.id === 'app-launch') a.cancel(); });
                 const a = el.animate([
                     { clipPath: `inset(${t}px ${r}px ${b}px ${l}px round ${R}px)`, transform: 'scale(0.9)', opacity: 0.35 },
                     { clipPath: 'inset(0px 0px 0px 0px round 14px)', transform: 'none', opacity: 1 }
                 ], { duration: this.MS, easing: 'cubic-bezier(0.2, 0.85, 0.25, 1)' });
                 a.id = 'app-launch';
                 el.style.transformOrigin = `${ox}px ${oy}px`;
+                this._splash(tap.icon, el, box, a.effect.getKeyframes(), { duration: this.MS, easing: 'cubic-bezier(0.2, 0.85, 0.25, 1)' });
                 a.onfinish = a.oncancel = () => { el.style.transformOrigin = ''; };
             },
 
@@ -97,6 +98,41 @@
                 a.id = 'phone-rise';
                 const overlay = document.getElementById('phone-overlay');
                 if (overlay) overlay.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: 'ease-out' });
+            },
+
+            /* Each app's launch screen, after its icon: the glyph on a tile, the name, a line of light
+               sweeping under it, on a ground lit in the app's own colour. (Messages has its own: the M.) */
+            ACCENT: {
+                'app-maps': '#ffc45c', 'app-sticky': '#ff5c9a', 'app-carme': '#ffb347', 'app-skyme': '#6aa9ff',
+                'app-zibme': '#a46bff', 'app-neume': '#ff4fe0', 'app-amber': '#ffb54a', 'app-help': '#c9b6ff', 'app-log': '#e0b25a'
+            },
+            SPLASH_MS: 520,
+            _splash(icon, screen, box, keyframes, opts) {
+                const host = document.getElementById('phone-screen');
+                if (!host || !icon || screen.id === 'screen-contacts') return;
+                host.querySelectorAll('.app-splash').forEach(e => e.remove());
+                const acc = this.ACCENT[icon.id] || '#e8c27a';
+                const glyph = icon.querySelector('.phone-app-icon-circle'), name = icon.querySelector('.phone-app-name');
+                const sp = document.createElement('div');
+                sp.className = 'app-splash';
+                sp.style.setProperty('--acc', acc);
+                const tile = document.createElement('div');
+                tile.className = 'as-tile';
+                if (glyph) glyph.childNodes.forEach(n => { if (!(n.classList && n.classList.contains('app-badge'))) tile.appendChild(n.cloneNode(true)); });
+                const label = document.createElement('div');
+                label.className = 'as-name'; label.textContent = name ? name.textContent : '';
+                const line = document.createElement('div');
+                line.className = 'as-line';
+                sp.append(tile, label, line);
+                // it sits over the app's screen, so it grows out of the icon with it
+                const hb = host.getBoundingClientRect(), k = hb.width / host.offsetWidth || 1;
+                Object.assign(sp.style, { left: (box.left - hb.left) / k + 'px', top: (box.top - hb.top) / k + 'px', width: screen.offsetWidth + 'px', height: screen.offsetHeight + 'px', transformOrigin: screen.style.transformOrigin });
+                host.appendChild(sp);
+                sp.animate(keyframes, opts);
+                setTimeout(() => {
+                    sp.classList.add('out');
+                    setTimeout(() => sp.remove(), 360);
+                }, this.SPLASH_MS);
             },
 
             _settleHome() {
