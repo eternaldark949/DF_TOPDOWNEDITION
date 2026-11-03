@@ -2,10 +2,9 @@
 
         // ──────────────────────────────────────────────────────────────────────
         // FREELANCER MENU NAV — single source of truth for the sidebar items.
-        // Both #map-interface and #freelancer-menu have a <nav class="sidebar-nav">
-        // with a `data-nav-screen` attribute marking which screen owns it. We
-        // populate both from this list so adding/renaming/reordering a screen
-        // happens in exactly one place.
+        // The menu's one <nav class="sidebar-nav"> (every screen, the map too,
+        // shares it) is populated from this list, so adding/renaming/reordering a
+        // screen happens in exactly one place.
         // ──────────────────────────────────────────────────────────────────────
         const FREELANCER_NAV_ITEMS = [
             { screen: 'story',      label: 'STORY/MISSIONS' },

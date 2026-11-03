@@ -924,7 +924,7 @@
         }
         
         /* --- Back buttons now inside sidebar-back-container, override positioning --- */
-        #close-menu, #map-close-btn {
+        #close-menu {
             position: relative !important;
             bottom: auto !important;
             left: auto !important;

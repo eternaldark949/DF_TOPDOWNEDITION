@@ -788,84 +788,6 @@
         </div>
     </div>
     
-    <div id="map-interface">
-        <!-- Left Sidebar (Navigation) -->
-        <div class="screen-sidebar-left" id="map-sidebar-left">
-            <div class="sidebar-portrait">
-                <canvas id="portrait-canvas-map" width="124" height="124"></canvas>
-                <svg class="portrait-rim" aria-hidden="true"><use href="#portrait-rim"/></svg>
-            </div>
-            
-            <nav class="sidebar-nav" data-nav-screen="map">
-                <!-- populated from FREELANCER_NAV_ITEMS at startup -->
-            </nav>
-            
-            <div class="sidebar-back-container">
-                <div id="map-close-btn" class="screen-back-btn"><span class="btn-arrow">◀</span> BACK <span class="btn-hint">(B)</span></div>
-            </div>
-        </div>
-        
-        <!-- Left Handle (shown when sidebar collapsed) -->
-        <div class="sidebar-handle sidebar-handle-left" id="map-handle-left">
-            <div class="sidebar-handle-diamond"></div>
-        </div>
-        
-        <!-- Map Canvas (Main Content) -->
-        <canvas id="golden-map-canvas"></canvas>
-
-        <!-- Heading: "Map", the place on screen, and the list of places she owns (ui-system.js renderMapHeading) -->
-        <div id="map-heading" class="map-heading">
-            <div class="map-heading-main">
-                <div class="map-heading-kicker">Map</div>
-                <div class="map-heading-row">
-                    <button type="button" class="map-cycle map-cycle-prev" aria-label="Previous map">◀</button>
-                    <button type="button" class="map-picker" aria-haspopup="listbox" aria-expanded="false">
-                        <span class="map-picker-name"></span>
-                        <span class="map-picker-caret" aria-hidden="true"></span>
-                    </button>
-                    <button type="button" class="map-cycle map-cycle-next" aria-label="Next map">▶</button>
-                </div>
-                <div class="map-picker-sub" hidden></div>
-            </div>
-            <div class="map-picker-list" role="listbox"></div>
-        </div>
-        
-        <!-- Right Handle (shown when sidebar collapsed) -->
-        <div class="sidebar-handle sidebar-handle-right" id="map-handle-right">
-            <div class="sidebar-handle-diamond"></div>
-        </div>
-        
-        <!-- Right Sidebar (Filters) -->
-        <div class="screen-sidebar-right" id="map-sidebar-right">
-            <div class="filter-header">
-                <span class="filter-title-text">Filter</span>
-                <div class="filter-toggle">
-                    <div class="filter-toggle-labels">
-                        <span class="active">ON</span>
-                        <span>OFF</span>
-                    </div>
-                    <div class="filter-toggle-track on" id="map-filter-toggle">
-                        <span class="filter-pill" data-state="on"></span>
-                        <span class="filter-pill-dot"></span>
-                        <span class="filter-pill" data-state="off"></span>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="filter-list" id="map-filter-list">
-                <div class="filter-item active" data-filter="missions">MISSIONS</div>
-                <div class="filter-item" data-filter="restaurants">RESTAURANTS</div>
-                <div class="filter-item" data-filter="workshops">WORKSHOPS</div>
-                <div class="filter-item" data-filter="homebases">HOME BASES</div>
-                <div class="filter-item" data-filter="pawnshops">PAWN SHOPS/VENDORS</div>
-                <div class="filter-item" data-filter="clients">CLIENTS</div>
-                <div class="filter-item" data-filter="attractions">ATTRACTIONS</div>
-                <div class="filter-item" data-filter="events">SPECIAL EVENTS</div>
-                <div class="filter-item" data-filter="danger">DANGER ZONES</div>
-            </div>
-        </div>
-    </div>
-        
     <div id="freelancer-menu" style="display:none;">
         <!-- Left Sidebar (Navigation) -->
         <div class="screen-sidebar-left" id="inv-sidebar-left">
@@ -888,6 +810,66 @@
             <div class="sidebar-handle-diamond"></div>
         </div>
         
+        <!-- The map: one of the menu's screens, full-bleed under the shared sidebars (Screens.open('map')).
+             Its own Filter sidebar stands in for the item filter while it's showing. -->
+        <div id="map-interface">
+            <!-- Map Canvas (Main Content) -->
+            <canvas id="golden-map-canvas"></canvas>
+
+            <!-- Heading: "Map", the place on screen, and the list of places she owns (ui-system.js renderMapHeading) -->
+            <div id="map-heading" class="map-heading">
+                <div class="map-heading-main">
+                    <div class="map-heading-kicker">Map</div>
+                    <div class="map-heading-row">
+                        <button type="button" class="map-cycle map-cycle-prev" aria-label="Previous map">◀</button>
+                        <button type="button" class="map-picker" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="map-picker-name"></span>
+                            <span class="map-picker-caret" aria-hidden="true"></span>
+                        </button>
+                        <button type="button" class="map-cycle map-cycle-next" aria-label="Next map">▶</button>
+                    </div>
+                    <div class="map-picker-sub" hidden></div>
+                </div>
+                <div class="map-picker-list" role="listbox"></div>
+            </div>
+        
+            <!-- Right Handle (shown when sidebar collapsed) -->
+            <div class="sidebar-handle sidebar-handle-right" id="map-handle-right">
+                <div class="sidebar-handle-diamond"></div>
+            </div>
+        
+            <!-- Right Sidebar (Filters) -->
+            <div class="screen-sidebar-right" id="map-sidebar-right">
+                <div class="filter-header">
+                    <span class="filter-title-text">Filter</span>
+                    <div class="filter-toggle">
+                        <div class="filter-toggle-labels">
+                            <span class="active">ON</span>
+                            <span>OFF</span>
+                        </div>
+                        <div class="filter-toggle-track on" id="map-filter-toggle">
+                            <span class="filter-pill" data-state="on"></span>
+                            <span class="filter-pill-dot"></span>
+                            <span class="filter-pill" data-state="off"></span>
+                        </div>
+                    </div>
+                </div>
+            
+                <div class="filter-list" id="map-filter-list">
+                    <div class="filter-item active" data-filter="missions">MISSIONS</div>
+                    <div class="filter-item" data-filter="restaurants">RESTAURANTS</div>
+                    <div class="filter-item" data-filter="workshops">WORKSHOPS</div>
+                    <div class="filter-item" data-filter="homebases">HOME BASES</div>
+                    <div class="filter-item" data-filter="pawnshops">PAWN SHOPS/VENDORS</div>
+                    <div class="filter-item" data-filter="clients">CLIENTS</div>
+                    <div class="filter-item" data-filter="attractions">ATTRACTIONS</div>
+                    <div class="filter-item" data-filter="events">SPECIAL EVENTS</div>
+                    <div class="filter-item" data-filter="danger">DANGER ZONES</div>
+                </div>
+            </div>
+        </div>
+        
+
         <!-- Main Content Area -->
         <div class="screen-main-content" id="inv-main-content">
             <h1 class="screen-title" id="screen-title-text">Inventory</h1>

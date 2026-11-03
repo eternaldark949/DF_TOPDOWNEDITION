@@ -285,7 +285,7 @@
             },
             
             renderSidebarPortrait() {
-                const canvasIds = ['portrait-canvas-map', 'portrait-canvas-inv'];
+                const canvasIds = ['portrait-canvas-inv'];   // the one menu's sidebar portrait
 
                 for (const id of canvasIds) {
                     const canvas = document.getElementById(id);

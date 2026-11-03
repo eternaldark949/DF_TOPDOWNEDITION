@@ -1,8 +1,10 @@
         // --- SCREENS: the one way the sidebar-nav screens open and close ---
-        // Two panels: #map-interface (the golden map) and #freelancer-menu (every other
-        // screen, as a sub-screen of #inv-main-content). Screens.open(name) closes the other
-        // panel, hides every sub-screen, shows the one asked for, sets the title, the right
-        // sidebar (the item filter only where it filters) and both nav highlights.
+        // One menu, #freelancer-menu, with one left sidebar (portrait, nav, Back) for every screen.
+        // The map (#map-interface) is a full-bleed layer inside it, under the sidebars, with its own
+        // Filter sidebar in place of the item filter; every other screen is a sub-screen of
+        // #inv-main-content. Screens.open(name) hides every sub-screen (and the map), shows the one
+        // asked for, sets the title, the right sidebar and the nav highlight. Only the centre (and,
+        // to or from the map, the filter list) changes: the left sidebar stays exactly where it is.
         // toggleMap / toggleMenu, the dock, pause menu, armory and the Esc / B / M keys all
         // come through here, so two screens can never stack.
 
@@ -28,14 +30,20 @@
             mapOpen() { return document.getElementById('map-interface')?.style.display === 'block'; },
 
             open(name) {
+                const main = document.getElementById('inv-main-content');
                 if (name === 'map') {
-                    this._showMenu(false);
+                    this._showMenu(true);
+                    this._menu().classList.add('map-on');
+                    this._menu().classList.remove('no-filter');
+                    if (main) main.style.visibility = 'hidden';            // the map is the centre now (kept in layout: no reflow)
                     if (!this.mapOpen()) game.ui._showMap(true);
                 } else {
                     const sub = this.SUBS[name];
                     if (!sub) return;
                     if (this.mapOpen()) game.ui._showMap(false);
                     this._showMenu(true);
+                    this._menu().classList.remove('map-on');
+                    if (main) main.style.visibility = '';
                     const ids = new Set(Object.values(this.SUBS).map(s => s[0]));
                     ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
                     document.getElementById(sub[0]).style.display = sub[0] === 'inventory-list-container' ? '' : 'block';
@@ -47,12 +55,14 @@
                 this.current = name;
                 syncHudInput(game);
                 if (typeof invSidebar !== 'undefined') invSidebar.setActiveNav(name);
-                if (typeof mapSidebar !== 'undefined') mapSidebar.setActiveNav(name);
             },
 
             close() {
                 if (this.mapOpen()) game.ui._showMap(false);
                 this._showMenu(false);
+                this._menu()?.classList.remove('map-on');
+                const main = document.getElementById('inv-main-content');
+                if (main) main.style.visibility = '';
                 this.current = null;
             },
 
