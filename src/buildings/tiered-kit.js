@@ -166,7 +166,13 @@
                 // as hard reaches at least as far as one hero times as tall (k is convex in z)
                 this._tkTop = top;
                 this.crownZ = top * TierKit.Z_SCALE * this.hero;
+                // The 3D lamps at its entrance (buildings/entrance-lamps.js), now the plan's frame is known, and their light
+                this._entLamps = this._entranceLamps ? this._entranceLamps() : null;
+                if (this._entLamps) { EntranceLamps.lights(this); this.topReach = Math.max(this.topReach || 0, 60); }
             }
+
+            /** The hub's cached layout makes the lights again (engine/map-loading.js): the entrance lamps' too */
+            regenerateLights() { super.regenerateLights(); if (this._entLamps) EntranceLamps.lights(this); }
 
             /** The lean scale at design height z (Z_SCALE times as high in the world), `hero` times the street's. */
             _tkK(z) { if (!CONFIG.BUILDINGS.LEAN) return 1; const C = leanCamHeight(); return 1 + (C / (C - Math.min(z * TierKit.Z_SCALE, C * 0.86)) - 1) * this.hero; }
@@ -453,6 +459,7 @@
                     if (t.roof) LandmarkKit.drawSprite(ctx, this._tkRoof(t, false), this._tkK(t.z1));
                     if (t.top) t.top(ctx, false, t, this);
                 }
+                if (this._entLamps) EntranceLamps.draw(ctx, this, false);                      // the entrance lamps stand in front of its walls
                 ctx.restore();
             }
 
@@ -487,6 +494,7 @@
                     ctx.restore();
                 });
                 ctx.restore();
+                if (this._entLamps) EntranceLamps.draw(ctx, this, true, glow);                  // their glass and halos
             }
 
             /**

@@ -140,6 +140,11 @@
             }
             _setupSign() { this.attachedSign = null; }                  // the signboard is on the front wall
             _generateLights() { this._ccLights(); this.topReach = 60; }  // (the awnings and the bistro tables)
+            /** Wrought-iron carriage lanterns either side of the door, under the cornice's shadow (buildings/entrance-lamps.js) */
+            _entranceLamps() {
+                const P = CAFE_PLAN;
+                return [-24, 24].map(dx => ({ kind: 'lantern', x: P.DOOR + dx, y: P.D, z: 10.5, out: 6, rgb: '255, 186, 100', light: [120, '#ffb347'] }));
+            }
             drawBase(c) { super.drawBase(c); this._ccDrawBase(c); }
             /** The signboard's script waits for its font: the walls are painted again once it has loaded. */
             drawTop(c) {
@@ -200,11 +205,10 @@
 
             _ccLights() {
                 const t = this.attachedTransition, cx = t.x + t.w / 2, wy = this.y + CAFE_PLAN.D;
-                // The two lanterns by the door, the warm pool on the step, and the bistro table's glow
-                for (const [x, y, color, r] of [
-                    [cx - 62, wy + 8, '#ffb347', 120], [cx + 62, wy + 8, '#ffb347', 120],
-                    [cx, wy + 30, '#ffe2b8', 170], [this.x + 282, wy + 34, '#ffcf8a', 105]
-                ]) this.attachedLights.push(new LampEntity({ x, y, lampType: 3, color, lightRadius: r }));
+                // The warm pool on the step and the bistro table's glow, light only (the lanterns by the door: _entranceLamps)
+                for (const [x, y, color, r] of [[cx, wy + 30, '#ffe2b8', 170], [this.x + 282, wy + 34, '#ffcf8a', 105]]) {
+                    const l = new LampEntity({ x, y, lampType: 3, color, lightRadius: r }); l.visible = false; l.keepColor = true; this.attachedLights.push(l);
+                }
             },
 
             /** Under the player: the shadow and the pavement dressing (doormat, planter, bistro set, chalkboard) */

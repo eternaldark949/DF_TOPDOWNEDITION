@@ -5800,7 +5800,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'ef0abf78cb2f';
+        const DFAB_BUILD = 'cd3b0292777f';
     </script>
     <script type="text/dfab" data-src="core/config.js" data-cost="406">
 
@@ -35098,7 +35098,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         Object.assign(Ornament, { carve: _ornCarve, ellipse: _ornEllipse, leaf: _ornLeaf, scroll: _ornScroll, rosette: _ornRosette, lion: _ornLion, console: _ornConsole, window: _ornWindow });
     </script>
-    <script type="text/dfab" data-src="buildings/tiered-kit.js" data-cost="414">
+    <script type="text/dfab" data-src="buildings/tiered-kit.js" data-cost="422">
         /* =====================================================================
            TIERED KIT — buildings of several heights, on any plan
            ---------------------------------------------------------------------
@@ -35267,7 +35267,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // as hard reaches at least as far as one hero times as tall (k is convex in z)
                 this._tkTop = top;
                 this.crownZ = top * TierKit.Z_SCALE * this.hero;
+                // The 3D lamps at its entrance (buildings/entrance-lamps.js), now the plan's frame is known, and their light
+                this._entLamps = this._entranceLamps ? this._entranceLamps() : null;
+                if (this._entLamps) { EntranceLamps.lights(this); this.topReach = Math.max(this.topReach || 0, 60); }
             }
+
+            /** The hub's cached layout makes the lights again (engine/map-loading.js): the entrance lamps' too */
+            regenerateLights() { super.regenerateLights(); if (this._entLamps) EntranceLamps.lights(this); }
 
             /** The lean scale at design height z (Z_SCALE times as high in the world), `hero` times the street's. */
             _tkK(z) { if (!CONFIG.BUILDINGS.LEAN) return 1; const C = leanCamHeight(); return 1 + (C / (C - Math.min(z * TierKit.Z_SCALE, C * 0.86)) - 1) * this.hero; }
@@ -35554,6 +35560,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (t.roof) LandmarkKit.drawSprite(ctx, this._tkRoof(t, false), this._tkK(t.z1));
                     if (t.top) t.top(ctx, false, t, this);
                 }
+                if (this._entLamps) EntranceLamps.draw(ctx, this, false);                      // the entrance lamps stand in front of its walls
                 ctx.restore();
             }
 
@@ -35588,6 +35595,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.restore();
                 });
                 ctx.restore();
+                if (this._entLamps) EntranceLamps.draw(ctx, this, true, glow);                  // their glass and halos
             }
 
             /**
@@ -35647,6 +35655,241 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         TierKit.profile = (cls) => RenderTags.tagClass(cls, TierKit.PROFILE);
         TierKit.profile(TieredBuilding);
         RenderTags.tag(LandmarkKit, 'sprite', 'Bakes', ['Buildings', 'World tops', 'Glow']);
+    </script>
+    <script type="text/dfab" data-src="buildings/entrance-lamps.js" data-cost="191">
+        /* =====================================================================
+           ENTRANCE LAMPS — 3D lamps at the doors of the tiered buildings
+           ---------------------------------------------------------------------
+           The stock building ringed its roof with flat round lamps (BuildingV2
+           _generateLights: one every 200 px round every edge). On the tiered
+           kit those read as dots stuck on the roofline. Here each building
+           says instead which lamps stand at its entrance, in the building's own
+           frame (front at +y, as its tiers are authored; facing 'N' turns them
+           round with the plan), and they're built the Silver Queen's way: real
+           pieces projected with the building's lean (_tkP / _tkK), drawn after
+           its tiers in drawTop, their glass and halo again in the glow pass,
+           and their light on the street as light-only LampEntities (no flat
+           fixture drawn).
+
+           A spec: { kind, x, y (plan px), z (design units: the lamp's height),
+           out (how far it stands off the wall, px), rgb (the glass's light,
+           'r, g, b'), light: [radius, '#hex'] (its pool on the street, which
+           sits `out + 18` px in front unless light[2] gives the offset) }.
+
+           Kinds, one per vibe:
+             lantern    a wrought-iron carriage lantern on a scroll bracket (Cozy Cafe)
+             gooseneck  a steel barn shade on a curved arm (Torque Auto's hall)
+             sconce     a slim up-and-down cylinder sconce (Torque's showroom)
+             pylon      a frosted light pylon on the pavement, a lit cap (Dr. Yin's)
+             crystal    a cut crystal glowing on a stone plinth (Neural Systems)
+             carnival   a brass post with a cluster of globes (Biggs Park)
+             bulkhead   a caged bulkhead hung from a canopy's edge (the warehouse)
+           ===================================================================== */
+        const EntranceLamps = {
+            /** The lamps' light on the street: light-only lamps (the pieces themselves are drawn here) */
+            lights(b) {
+                for (const s of b._entLamps || []) {
+                    if (!s.light) continue;
+                    const off = s.light[2] ?? (s.out || 0) + 18, [x, y] = EntranceLamps._w(b, s.x, s.y + off);
+                    const l = new LampEntity({ x, y, lampType: 3, color: s.light[1], lightRadius: s.light[0] });
+                    l.visible = false; l.keepColor = true; b.attachedLights.push(l);
+                }
+            },
+
+            /** Plan → world, and the front's normal in the world (y only: the kit's buildings face S or N) */
+            _w(b, x, y) { const [px, py] = b._tkLocal ? b._tkLocal(x, y) : [x, y]; return [b.x + px, b.y + py]; },
+            _n(b) { return b.facing === 'N' ? -1 : 1; },
+
+            /** A box from (x0, y0) to (x1, y1) world, z0..z1 design units: the faces turned to the camera, then the cap */
+            prism(ctx, b, x0, y0, x1, y1, z0, z1, wall, cap, shade = true) {
+                const cam = b.cam || game.camera;
+                const faces = [];
+                if (cam.y > y1) faces.push([x0, y1, x1, y1, 0]); if (cam.y < y0) faces.push([x1, y0, x0, y0, 0.3]);
+                if (cam.x > x1) faces.push([x1, y1, x1, y0, 0.15]); if (cam.x < x0) faces.push([x0, y0, x0, y1, 0.15]);
+                for (const [ax, ay, bx, by, s] of faces) {
+                    const a = b._tkP(ax, ay, z0), q = b._tkP(bx, by, z0), c2 = b._tkP(bx, by, z1), d2 = b._tkP(ax, ay, z1);
+                    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(q[0], q[1]); ctx.lineTo(c2[0], c2[1]); ctx.lineTo(d2[0], d2[1]); ctx.closePath();
+                    ctx.fillStyle = wall; ctx.fill();
+                    if (shade && s) { ctx.fillStyle = `rgba(0, 0, 0, ${s})`; ctx.fill(); }
+                }
+                if (cap) {
+                    ctx.beginPath(); [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].forEach(([x, y], i) => { const p = b._tkP(x, y, z1); i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); });
+                    ctx.fillStyle = cap; ctx.fill();
+                }
+            },
+            /** A line through points [x, y, z] (world x, y; design z), w px wide at the street */
+            line(ctx, b, pts, w, col) {
+                ctx.beginPath(); pts.forEach(([x, y, z], i) => { const p = b._tkP(x, y, z); i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); });
+                ctx.strokeStyle = col; ctx.lineWidth = w * b._tkK(pts[pts.length - 1][2]); ctx.lineCap = 'round'; ctx.stroke();
+            },
+            /** A disc (r px) lying at height z */
+            disc(ctx, b, x, y, z, r, fill) { const p = b._tkP(x, y, z), k = b._tkK(z); ctx.beginPath(); ctx.arc(p[0], p[1], r * k, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill(); },
+            /** A ball (r px) at height z: a lit side away from the camera's dark side */
+            ball(ctx, b, x, y, z, r, inner, outer) {
+                const p = b._tkP(x, y, z), k = b._tkK(z), R = r * k, g = ctx.createRadialGradient(p[0] - R * 0.35, p[1] - R * 0.35, R * 0.1, p[0], p[1], R);
+                g.addColorStop(0, inner); g.addColorStop(1, outer); ctx.beginPath(); ctx.arc(p[0], p[1], R, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill();
+            },
+            /** A halo at height z */
+            glow(ctx, b, x, y, z, r, rgb, a) { const p = b._tkP(x, y, z); glowA(ctx, p[0], p[1], r * b._tkK(z) / Math.sqrt(b.m || 1), rgb, a); },
+
+            /**
+             * The pieces are drawn `size` (default SIZE) times as wide as the numbers in KINDS and `zsize` times as tall (a
+             * wall lamp 1.5, one standing on the street 1: its height is its own), about the lamp's anchor: its foot on the
+             * street (GROUND kinds) or its fixing on the wall at z (the rest; a hung one: at `top`), so a lamp reads beside
+             * the humanoid. A view of the building that does that scaling inside its lean; m for the halos.
+             */
+            SIZE: 2.2,
+            GROUND: { pylon: 1, crystal: 1, carnival: 1 },
+            _view(b, s, ax, ay, cam) {
+                const g = EntranceLamps.GROUND[s.kind], m = s.size || EntranceLamps.SIZE, mz = s.zsize || (g ? 1 : 1.5), az = g ? 0 : (s.top ?? s.z);
+                return {
+                    _tkP: (x, y, z) => b._tkP(ax + (x - ax) * m, ay + (y - ay) * m, az + (z - az) * mz),
+                    _tkK: (z) => b._tkK(az + (z - az) * mz) * m,
+                    cam: { x: ax + (cam.x - ax) / m, y: ay + (cam.y - ay) / m }, m
+                };
+            },
+
+            /** Every lamp: lit = the glow pass (additive, at strength g) */
+            draw(ctx, b, lit, g = 1) {
+                const L = b._entLamps; if (!L || !L.length) return;
+                if (_zoomLOD >= 3 && !lit) return;                                      // (zoomed right out: smaller than a pixel)
+                ctx.save();
+                if (lit) ctx.globalCompositeOperation = 'lighter';
+                const n = EntranceLamps._n(b), cam = game.camera;
+                for (const s of L) {
+                    const [x, y] = EntranceLamps._w(b, s.x, s.y), f = EntranceLamps.KINDS[s.kind];
+                    if (f) f(ctx, EntranceLamps._view(b, s, x, y, cam), s, x, y, n, lit, g);
+                }
+                ctx.restore();
+            },
+
+            KINDS: {
+                /** Wrought iron: a scroll bracket off the wall, a tapered lantern of amber glass, a little roof and finial */
+                lantern(ctx, b, s, x, y, n, lit, g) {
+                    const E = EntranceLamps, z = s.z, ly = y + n * (s.out || 6), rgb = s.rgb || '255, 190, 110';
+                    if (lit) {
+                        E.glow(ctx, b, x, y + n * 2, z - 2, 26, rgb, 0.35 * g);                           // the wash on the brick
+                        E.glow(ctx, b, x, ly, z - 1.5, 13, rgb, 0.85 * g);
+                        E.prism(ctx, b, x - 1.6, ly - 1.6, x + 1.6, ly + 1.6, z - 3.4, z + 0.2, `rgba(255, 214, 150, ${0.9 * g})`, null, false);
+                        return;
+                    }
+                    E.line(ctx, b, [[x, y, z + 1.2], [x, y + n * (s.out || 6) * 0.6, z + 1.8], [x, ly, z + 1.2]], 0.9, '#17110c');   // the bracket
+                    E.line(ctx, b, [[x, y, z - 1.5], [x, y + n * 2.5, z - 0.3], [x, y + n * 3.2, z + 1.4]], 0.6, '#17110c');           // its scroll
+                    E.line(ctx, b, [[x - 2.2, y, z - 2.5], [x + 2.2, y, z - 2.5]], 1.4, '#1d1610');                                  // the wall plate
+                    E.prism(ctx, b, x - 2, ly - 2, x + 2, ly + 2, z - 4, z - 3.4, '#1a140e', '#2b2118');                              // the base
+                    E.prism(ctx, b, x - 1.7, ly - 1.7, x + 1.7, ly + 1.7, z - 3.4, z + 0.2, '#9a6a32', null);                         // the glass
+                    E.line(ctx, b, [[x - 1.7, ly + 1.7 * n, z - 3.4], [x - 1.7, ly + 1.7 * n, z + 0.2]], 0.5, '#17110c');              // the frame's corners
+                    E.line(ctx, b, [[x + 1.7, ly + 1.7 * n, z - 3.4], [x + 1.7, ly + 1.7 * n, z + 0.2]], 0.5, '#17110c');
+                    E.prism(ctx, b, x - 2.3, ly - 2.3, x + 2.3, ly + 2.3, z + 0.2, z + 0.9, '#1a140e', '#33271c');                    // the roof
+                    E.prism(ctx, b, x - 1.1, ly - 1.1, x + 1.1, ly + 1.1, z + 0.9, z + 1.6, '#1a140e', '#3c2e20');
+                    E.disc(ctx, b, x, ly, z + 2.1, 0.7, '#b48a4a');                                                                   // the finial
+                },
+
+                /** A barn shade: a steel arm curving out and over, the shade's dome, a bulb under it lighting the wall */
+                gooseneck(ctx, b, s, x, y, n, lit, g) {
+                    const E = EntranceLamps, z = s.z, out = s.out || 8, hy = y + n * out, rgb = s.rgb || '255, 170, 80';
+                    if (lit) {
+                        E.glow(ctx, b, x, y + n * 1.5, z - 5, 34, rgb, 0.4 * g);                          // the cone on the wall below
+                        E.glow(ctx, b, x, hy, z - 0.8, 10, rgb, 0.9 * g);
+                        E.disc(ctx, b, x, hy + n * 0.6, z - 0.9, 3.4, `rgba(255, 196, 120, ${0.55 * g})`);  // the shade's lit rim, seen past its edge
+                        return;
+                    }
+                    E.line(ctx, b, [[x, y, z - 2.5], [x, y + n * 2, z + 1.2], [x, y + n * out * 0.55, z + 2.4], [x, hy - n * 1.5, z + 1.6], [x, hy, z + 0.4]], 0.9, '#2b2d33');
+                    E.line(ctx, b, [[x - 1.8, y, z - 2.5], [x + 1.8, y, z - 2.5]], 1.6, '#16171b');                                  // the wall plate
+                    E.ball(ctx, b, x, hy, z, 4.2, s.shadeHi || '#6a6f78', s.shadeLo || '#1d1f24');                                    // the shade's dome
+                    E.disc(ctx, b, x, hy, z + 0.6, 1.2, '#2b2d33');                                                                   // its socket
+                    if (s.band) E.line(ctx, b, [[x - 3.6, hy + n * 1.6, z - 0.4], [x + 3.6, hy + n * 1.6, z - 0.4]], 0.5, s.band);    // the enamel band
+                },
+
+                /** A slim cylinder on the wall, light out of both ends */
+                sconce(ctx, b, s, x, y, n, lit, g) {
+                    const E = EntranceLamps, z = s.z, cy = y + n * (s.out || 2.5), rgb = s.rgb || '255, 200, 170';
+                    if (lit) {
+                        E.glow(ctx, b, x, y + n * 0.5, z + 5, 18, rgb, 0.4 * g); E.glow(ctx, b, x, y + n * 0.5, z - 5, 18, rgb, 0.4 * g);
+                        E.glow(ctx, b, x, cy, z + 2.6, 6, rgb, 0.9 * g); E.glow(ctx, b, x, cy, z - 2.6, 6, rgb, 0.7 * g);
+                        return;
+                    }
+                    E.line(ctx, b, [[x, y, z], [x, cy, z]], 1.2, '#2a2a30');
+                    E.prism(ctx, b, x - 1.5, cy - 1.5, x + 1.5, cy + 1.5, z - 2.6, z + 2.6, s.metal || '#b88a76', s.metalHi || '#f4c4ae');
+                    E.disc(ctx, b, x, cy, z + 2.65, 0.9, '#3a2c28');
+                },
+
+                /** A frosted pylon on the pavement: a dark foot, a tall glass body with a lit seam, a cap that glows */
+                pylon(ctx, b, s, x, y, n, lit, g) {
+                    const E = EntranceLamps, z = s.z, rgb = s.rgb || '120, 255, 240', w = 2.2;
+                    if (lit) {
+                        E.glow(ctx, b, x, y, 2, 30, rgb, 0.35 * g);                                       // its pool round the foot
+                        E.prism(ctx, b, x - w + 0.5, y - w + 0.5, x + w - 0.5, y + w - 0.5, 2, z - 1, `rgba(${rgb}, ${0.45 * g})`, null, false);
+                        E.glow(ctx, b, x, y, z - 0.5, 12, rgb, 0.9 * g);
+                        E.disc(ctx, b, x, y, z + 0.05, w * 0.7, `rgba(${rgb}, ${0.9 * g})`);
+                        E.line(ctx, b, [[x - w + 0.4, y + n * w, 2.2], [x - w + 0.4, y + n * w, z - 1.2]], 0.6, `rgba(220, 255, 255, ${0.9 * g})`);
+                        return;
+                    }
+                    E.prism(ctx, b, x - w - 0.6, y - w - 0.6, x + w + 0.6, y + w + 0.6, 0, 2, '#0b1616', '#142424');
+                    E.prism(ctx, b, x - w, y - w, x + w, y + w, 2, z - 1, s.glass || '#5f8a88', null);
+                    E.line(ctx, b, [[x - w + 0.4, y + n * w, 2.2], [x - w + 0.4, y + n * w, z - 1.2]], 0.6, '#9fe8e0');               // the seam
+                    E.prism(ctx, b, x - w - 0.4, y - w - 0.4, x + w + 0.4, y + w + 0.4, z - 1, z, '#0b1616', '#0f1e1e');
+                    E.disc(ctx, b, x, y, z + 0.05, w * 0.7, s.cap || '#86b0ad');                                                       // the lens in its cap
+                },
+
+                /** A cut crystal on a stone plinth: a six-sided point, its facets shaded round, light in its heart */
+                crystal(ctx, b, s, x, y, n, lit, g) {
+                    const E = EntranceLamps, z = s.z, rgb = s.rgb || '150, 200, 255', z0 = 6.5, R = 3.6, cam = b.cam;
+                    const ring = Array.from({ length: 6 }, (_, i) => { const a = i * Math.PI / 3 + Math.PI / 6; return [x + Math.cos(a) * R, y + Math.sin(a) * R * 0.8]; });
+                    if (lit) {
+                        E.glow(ctx, b, x, y, z0 + 1, 34, rgb, 0.3 * g);
+                        E.glow(ctx, b, x, y, (z0 + z) / 2, 14, rgb, 0.8 * g);
+                        E.glow(ctx, b, x, y, z, 6, '235, 245, 255', 0.9 * g);
+                        return;
+                    }
+                    E.prism(ctx, b, x - 3.8, y - 3.8, x + 3.8, y + 3.8, 0, 1.5, '#3a4656', '#526275');                                // the step
+                    E.prism(ctx, b, x - 3, y - 3, x + 3, y + 3, 1.5, z0, '#14243c', '#1d2f4a');                                        // the plinth
+                    E.line(ctx, b, [[x - 3, y + 3 * n, z0 - 1], [x + 3, y + 3 * n, z0 - 1]], 0.5, '#c1a980');                          // its gold band
+                    // the facets: from the ring's foot (just above the plinth) to the point, the far ones first
+                    const foot = b._tkP(x, y, z0 + 0.4), tip = b._tkP(x, y, z), mid = z0 + (z - z0) * 0.32, cols = ['#2c5f99', '#4b80bb', '#1c3f6c', '#0f2547', '#3a6aa4', '#6d9cd0'];
+                    const fs = ring.map((p, i) => { const q = ring[(i + 1) % 6], mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2; return { i, p, q, d: -Math.hypot(mx - cam.x, my - cam.y) }; }).sort((a, c) => a.d - c.d);
+                    for (const f of fs) {
+                        const a = b._tkP(f.p[0], f.p[1], mid), c = b._tkP(f.q[0], f.q[1], mid);
+                        ctx.beginPath(); ctx.moveTo(foot[0], foot[1]); ctx.lineTo(a[0], a[1]); ctx.lineTo(tip[0], tip[1]); ctx.lineTo(c[0], c[1]); ctx.closePath();
+                        ctx.fillStyle = cols[f.i]; ctx.fill(); ctx.strokeStyle = 'rgba(190, 216, 238, 0.55)'; ctx.lineWidth = 0.4 * b._tkK(mid); ctx.stroke();
+                    }
+                },
+
+                /** A brass post, a ring of arms with a globe on each and one on top, a striped finial over that */
+                carnival(ctx, b, s, x, y, n, lit, g) {
+                    const E = EntranceLamps, z = s.z, rgb = s.rgb || '255, 214, 150', arms = s.arms ?? 2, aw = 4.6;
+                    const globes = [[x, y, z + 1.6]]; if (arms >= 2) globes.push([x - aw, y, z - 1], [x + aw, y, z - 1]);
+                    if (lit) {
+                        E.glow(ctx, b, x, y, z - 2, 40, rgb, 0.3 * g);
+                        for (const [gx, gy, gz] of globes) { E.glow(ctx, b, gx, gy, gz, 9, rgb, 0.85 * g); E.ball(ctx, b, gx, gy, gz, 1.9, `rgba(255, 250, 230, ${g})`, `rgba(255, 190, 110, ${0.5 * g})`); }
+                        return;
+                    }
+                    E.prism(ctx, b, x - 2.4, y - 2.4, x + 2.4, y + 2.4, 0, 1.6, '#3a1820', '#692735');                                // the plinth
+                    E.line(ctx, b, [[x, y, 1.6], [x, y, z]], 1.4, '#9a7444');                                                          // the post
+                    E.line(ctx, b, [[x, y, z * 0.35], [x, y, z * 0.35 + 0.4]], 2.4, '#d4b07a');                                        // its collars
+                    E.line(ctx, b, [[x, y, z * 0.7], [x, y, z * 0.7 + 0.4]], 2.2, '#d4b07a');
+                    if (arms >= 2) E.line(ctx, b, [[x - aw, y, z - 2.2], [x - aw * 0.5, y, z - 0.4], [x, y, z - 0.6], [x + aw * 0.5, y, z - 0.4], [x + aw, y, z - 2.2]], 0.8, '#bc945b');
+                    for (const [gx, gy, gz] of globes) E.ball(ctx, b, gx, gy, gz, 1.9, '#f6ead0', '#a88d6a');
+                    E.disc(ctx, b, x, y, z + 3.8, 1.2, '#e5a29a'); E.disc(ctx, b, x, y, z + 4.3, 0.7, '#ead8b1');                     // the finial
+                },
+
+                /** Hung from a canopy's edge on a rod: a cast box with a wire cage over sodium glass */
+                bulkhead(ctx, b, s, x, y, n, lit, g) {
+                    const E = EntranceLamps, z = s.z, rgb = s.rgb || '255, 200, 110', top = s.top ?? z + 3;
+                    if (lit) {
+                        E.glow(ctx, b, x, y, z - 2, 44, rgb, 0.35 * g);
+                        E.glow(ctx, b, x, y, z - 1, 10, rgb, 0.9 * g);
+                        E.prism(ctx, b, x - 2.6, y - 1.6, x + 2.6, y + 1.6, z - 1.8, z - 0.4, `rgba(255, 210, 130, ${0.85 * g})`, null, false);
+                        return;
+                    }
+                    E.line(ctx, b, [[x, y, top], [x, y, z]], 0.7, '#1b1c20');                                                         // the rod
+                    E.prism(ctx, b, x - 3, y - 2, x + 3, y + 2, z - 0.4, z + 0.4, '#2c2e33', '#4a4c52');                              // the housing
+                    E.prism(ctx, b, x - 2.6, y - 1.6, x + 2.6, y + 1.6, z - 1.8, z - 0.4, '#a7864a', null);                           // the glass
+                    for (const dx of [-1.3, 0, 1.3]) E.line(ctx, b, [[x + dx, y + 1.6 * n, z - 1.8], [x + dx, y + 1.6 * n, z - 0.4]], 0.35, '#1b1c20');   // the cage
+                    E.line(ctx, b, [[x - 2.6, y + 1.6 * n, z - 1.1], [x + 2.6, y + 1.6 * n, z - 1.1]], 0.35, '#1b1c20');
+                }
+            }
+        };
     </script>
     <script type="text/dfab" data-src="buildings/silver-queen.js" data-cost="935">
         // =====================================================================
@@ -38312,7 +38555,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         });
     </script>
-    <script type="text/dfab" data-src="buildings/cozy-cafe.js" data-cost="353">
+    <script type="text/dfab" data-src="buildings/cozy-cafe.js" data-cost="356">
         /* =====================================================================
            COZY CAFE — the hub's corner cafe on Crimson Blvd
            ---------------------------------------------------------------------
@@ -38455,6 +38698,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
             _setupSign() { this.attachedSign = null; }                  // the signboard is on the front wall
             _generateLights() { this._ccLights(); this.topReach = 60; }  // (the awnings and the bistro tables)
+            /** Wrought-iron carriage lanterns either side of the door, under the cornice's shadow (buildings/entrance-lamps.js) */
+            _entranceLamps() {
+                const P = CAFE_PLAN;
+                return [-24, 24].map(dx => ({ kind: 'lantern', x: P.DOOR + dx, y: P.D, z: 10.5, out: 6, rgb: '255, 186, 100', light: [120, '#ffb347'] }));
+            }
             drawBase(c) { super.drawBase(c); this._ccDrawBase(c); }
             /** The signboard's script waits for its font: the walls are painted again once it has loaded. */
             drawTop(c) {
@@ -38515,11 +38763,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             _ccLights() {
                 const t = this.attachedTransition, cx = t.x + t.w / 2, wy = this.y + CAFE_PLAN.D;
-                // The two lanterns by the door, the warm pool on the step, and the bistro table's glow
-                for (const [x, y, color, r] of [
-                    [cx - 62, wy + 8, '#ffb347', 120], [cx + 62, wy + 8, '#ffb347', 120],
-                    [cx, wy + 30, '#ffe2b8', 170], [this.x + 282, wy + 34, '#ffcf8a', 105]
-                ]) this.attachedLights.push(new LampEntity({ x, y, lampType: 3, color, lightRadius: r }));
+                // The warm pool on the step and the bistro table's glow, light only (the lanterns by the door: _entranceLamps)
+                for (const [x, y, color, r] of [[cx, wy + 30, '#ffe2b8', 170], [this.x + 282, wy + 34, '#ffcf8a', 105]]) {
+                    const l = new LampEntity({ x, y, lampType: 3, color, lightRadius: r }); l.visible = false; l.keepColor = true; this.attachedLights.push(l);
+                }
             },
 
             /** Under the player: the shadow and the pavement dressing (doormat, planter, bistro set, chalkboard) */
@@ -42153,7 +42400,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         });
 
     </script>
-    <script type="text/dfab" data-src="buildings/biggs-park.js" data-cost="230">
+    <script type="text/dfab" data-src="buildings/biggs-park.js" data-cost="235">
         // Biggs: a lacquer-and-brass fairground pavilion. The original footprint and door
         // remain authoritative. All busy ornament is baked in its own bounded plane.
         const BIGGS = { wine: '#692735', dark: '#23131f', cream: '#ead8b1', brass: '#bc945b',
@@ -42377,11 +42624,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         class BiggsParkBuilding extends TieredBuilding {
             _setupSign() { this.attachedSign = null; }
             _generateLights() {
-                // Small door lanterns and pavilion accents, instead of an orange flood over the whole roof.
-                for (const [dx,dy,color,r] of [[65,255,'#e3a69b',125],[385,255,'#e3a69b',125],
-                    [125,405,'#ffcf91',140],[325,405,'#ffcf91',140]])
-                    this.attachedLights.push(new LampEntity({x:this.x+dx,y:this.y+dy,lampType:3,color,lightRadius:r}));
+                // The pavilion's door lanterns, light only (the entrance's lamp posts: _entranceLamps)
+                for (const [dx,dy,color,r] of [[65,255,'#e3a69b',125],[385,255,'#e3a69b',125]]) {
+                    const l = new LampEntity({x:this.x+dx,y:this.y+dy,lampType:3,color,lightRadius:r}); l.visible = false; l.keepColor = true; this.attachedLights.push(l);
+                }
                 this.topReach = 120; this.glowReach = 120;
+            }
+            /** Fairground lamp posts (buildings/entrance-lamps.js): brass, three globes each either side of the arch, one at each corner */
+            _entranceLamps() {
+                const y = BG_PLAN.D + 14;
+                return [[182, 2, 17], [268, 2, 17], [62, 0, 14], [388, 0, 14]].map(([x, arms, z]) => ({ kind: 'carnival', x, y, z, arms, rgb: '255, 212, 150', light: [arms ? 140 : 110, arms ? '#ffcf91' : '#e3a69b', 0] }));
             }
             _layer(c,key,x,y,w,h,paint,k=1) {
                 // A fallback font must not be retained when fonts finish loading.
@@ -42428,7 +42680,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 roofColor: '#1a0a28', roofLightColor: '#220e32', wallColor: T.wine, wallLightColor: '#7a3a44', accentColor: '#ff8800',
                 windowColor: '#0a0410', windowLitColor: '#ff8800', windowFrameColor: '#0c0616', balconies: [], roofProps: [],
                 sign: { text: 'BIGGS', color: '#ff8800', size: 32 },
-                door: { target: config.doorTarget || 'biggs_arena', label: 'Enter Biggs Amusement Park', lightColor: '#ff8800' },
+                door: { target: config.doorTarget || 'biggs_arena', label: 'Enter Biggs Amusement Park', lightColor: null },   // (lit by its lamp posts)
                 tiers: [
                     { id: 'pavilion', rect: [0, 0, 450, 250], z0: 0, z1: Pl.PAV, S: 2, fill: T.wine, paint: _bgPavilion, shade: [24, 8, 14],
                       ledges: [brass(Pl.PAV, 3)], roofRes: 1, roofGlow: true, roof: _bgPavRoof },
@@ -42442,7 +42694,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
     </script>
-    <script type="text/dfab" data-src="buildings/neural-systems.js" data-cost="165">
+    <script type="text/dfab" data-src="buildings/neural-systems.js" data-cost="167">
 /* =====================================================================
    NEURAL SYSTEMS: a luxury department store carved from dark sapphire
    ---------------------------------------------------------------------
@@ -42622,10 +42874,10 @@ function _nsCanopyRoof(c, glow, t) {
 
 class NeuralSystemsBuilding extends TieredBuilding {
     _setupSign() { this.attachedSign = null; }
-    _generateLights() {
-        const e = this._entrance(); if (e) for (const d of [-76, 76]) this.attachedLights.push(new LampEntity({
-            x: e.cx + e.ny * d + e.nx * 14, y: e.cy - e.nx * d + e.ny * 14, lampType: 3, color: '#b4d1f5', lightRadius: 145 }));
-        this.topReach = 80; this.glowReach = 80;
+    _generateLights() { this.topReach = 80; this.glowReach = 80; }
+    /** The portal's two crystals (buildings/entrance-lamps.js): cut blue points on stone plinths, light in their hearts */
+    _entranceLamps() {
+        return [-93, 93].map(d => ({ kind: 'crystal', x: NEURAL.W / 2 + d, y: NEURAL.D + 17, z: 17, rgb: '150, 196, 255', light: [145, '#b4d1f5', 0] }));
     }
     /** The forecourt at the portal: a stone mat, the seal, two crystal plinths */
     drawBase(c) {
@@ -42638,7 +42890,7 @@ class NeuralSystemsBuilding extends TieredBuilding {
             NeuralArt.box(p, -41, 0, 82, 33, 'rgba(111,161,205,.24)', '#afc8dc', 1);
             p.strokeStyle = '#b0c7d8'; p.lineWidth = .8; p.beginPath(); p.moveTo(0, 1); p.lineTo(0, 31); p.stroke();
             NeuralArt.seal(p, 0, 16, 9, NEURAL.pale);
-            for (const x of [-101, 85]) NeuralArt.crystal(p, x, 3, 16, 28, '#41648c');
+            for (const x of [-101, 85]) { p.fillStyle = 'rgba(0,0,0,.35)'; p.fillRect(x + 1, 5, 16, 26); NeuralArt.box(p, x + 1, 5, 14, 24, '#1d2b3e', '#526275', 2); }   // the crystals' footings (the crystals: _entranceLamps)
             p.restore();
         });
         LandmarkKit.drawSprite(c, s, 1);
@@ -42655,7 +42907,7 @@ function createNeuralSystemsTiered(x, y, config = {}) {
         roofColor: '#161630', roofLightColor: '#1e1e3a', wallColor: '#141428', wallLightColor: '#1a1a30', accentColor: '#0088ff',
         windowColor: '#040410', windowLitColor: '#0088ff', windowFrameColor: '#060612', balconyColor: '#0a0a18', balconies: [], roofProps: [],
         sign: { text: 'NEURAL', color: '#0088ff', size: 22 },
-        door: { target: config.doorTarget || 'neural_sys_interior', label: 'Enter Neural Systems', lightColor: '#0088ff' },
+        door: { target: config.doorTarget || 'neural_sys_interior', label: 'Enter Neural Systems', lightColor: null },   // (lit by its crystals)
         tiers: [
             { id: 'atrium', rect: [0, 0, 400, 200], z0: 0, z1: T.ATRIUM, S: 2, fill: T.ink, paint: _nsAtrium, shade: [6, 12, 26],
               ledges: [ledge(T.VIT, 'rgba(193,169,128,.9)'), ledge(T.ATRIUM, 'rgba(190,216,238,.8)')], roofRes: 1, roofGlow: true, roof: _nsAtriumRoof },
@@ -42669,7 +42921,7 @@ function createNeuralSystemsTiered(x, y, config = {}) {
     });
 }
     </script>
-    <script type="text/dfab" data-src="buildings/torque-auto.js" data-cost="214">
+    <script type="text/dfab" data-src="buildings/torque-auto.js" data-cost="215">
         /* =====================================================================
            TORQUE AUTO — Crimson Blvd's garage, beside the Cozy Cafe
            ---------------------------------------------------------------------
@@ -42834,16 +43086,13 @@ function createNeuralSystemsTiered(x, y, config = {}) {
 
         class TorqueAutoBuilding extends TieredBuilding {
             _setupSign() { this.attachedSign = null; }                  // the script is on the roof's board
-            _generateLights() {
-                // The hall keeps Torque's hot orange lamps round every edge (its accent, #ff8800: ETERNAL's block colour);
-                // the showroom wing's are rose gold so the BlackMark's corner reads apart
-                const all = this.sections, accent = this.colors.accent;
-                this.sections = all.slice(0, 1); super._generateLights();
-                const n = this.attachedLights.length;
-                this.sections = all.slice(1); this.colors.accent = TQX.roseGold; super._generateLights();
-                for (const l of this.attachedLights.slice(n)) l.keepColor = true;   // the block's orange tint passes them by
-                this.sections = all; this.colors.accent = accent;
-                this.topReach = 120; this.glowReach = 120;
+            _generateLights() { this.topReach = 120; this.glowReach = 120; }
+            /** Garage lamps (buildings/entrance-lamps.js): steel barn shades with an amber band over each roll-up door and either
+                side of the glass entry, in Torque's hot orange; slim rose-gold sconces either side of the showroom's glass */
+            _entranceLamps() {
+                const D = TQ_PLAN.D, shade = (x, z, out) => ({ kind: 'gooseneck', x, y: D, z, out, rgb: '255, 160, 70', band: TQX.amber, light: [130, '#ff9a2a'] });
+                return [shade(58, 26.5, 9), shade(128, 26.5, 9), shade(372, 26.5, 9), shade(442, 26.5, 9), shade(178, 18, 6), shade(322, 18, 6),
+                    ...[506, 694].map(x => ({ kind: 'sconce', x, y: D, z: 12, out: 2.5, rgb: '255, 196, 170', metal: '#b88a76', metalHi: TQX.roseGold, light: [120, TQX.roseGold] }))];
             }
             _layer(c, key, x, y, w, h, paint, k = 1) {
                 const ready = !document.fonts || (document.fonts.check('36px "Great Vibes"') && document.fonts.check('12px Orbitron'));
@@ -42899,7 +43148,7 @@ function createNeuralSystemsTiered(x, y, config = {}) {
                 roofColor: '#1a1a14', roofLightColor: '#222218', wallColor: T.wall, wallLightColor: T.wallHi, accentColor: '#ff8800',
                 windowColor: '#1a1808', windowLitColor: '#ffaa00', windowFrameColor: '#111', balconies: [], roofProps: [],
                 sign: { text: 'TORQUE', color: '#ff8800', size: 36 },
-                door: { target: config.doorTarget || 'auto_shop', label: 'Enter Auto Shop', lightColor: '#ff8800' },
+                door: { target: config.doorTarget || 'auto_shop', label: 'Enter Auto Shop', lightColor: null },   // (lit by its entrance lamps)
                 tiers: [
                     { id: 'hall', rect: [0, 0, 500, 350], z0: 0, z1: T.HALL, S: 2, fill: T.wall, paint: _tqHall, shade: [10, 10, 14],
                       ledges: [eave(T.HALL, T.amber)], roofRes: 1, roofGlow: true, roof: _tqHallRoof },
@@ -42910,7 +43159,7 @@ function createNeuralSystemsTiered(x, y, config = {}) {
             });
         }
     </script>
-    <script type="text/dfab" data-src="buildings/dr-yins.js" data-cost="164">
+    <script type="text/dfab" data-src="buildings/dr-yins.js" data-cost="169">
         /* =====================================================================
            DR. YIN'S — the clinic on the hub's south-west corner
            ---------------------------------------------------------------------
@@ -43071,6 +43320,11 @@ function createNeuralSystemsTiered(x, y, config = {}) {
 
         class DrYinsBuilding extends TieredBuilding {
             _setupSign() { this.attachedSign = null; }                  // the name is on the lobby's fascia, the cross on the roof
+            _generateLights() {}                                        // (no lamps round the roof: the pylons at the door light it)
+            /** Clinic pylons (buildings/entrance-lamps.js): frosted glass on dark feet either side of the canopy, cyan caps */
+            _entranceLamps() {
+                return [[46, 0], [204, 0], [258, 1]].map(([x, wing]) => ({ kind: 'pylon', x, y: YIN.D + 16, z: wing ? 10 : 13, size: 1.5, rgb: '120, 255, 236', glass: '#2f5a58', cap: YIN.cyanSoft, light: [wing ? 110 : 140, '#7affd8', 0] }));
+            }
         }
         TierKit.profile(DrYinsBuilding);
 
@@ -43082,7 +43336,7 @@ function createNeuralSystemsTiered(x, y, config = {}) {
                 roofColor: '#142828', roofLightColor: '#1a3434', wallColor: Y.teal, wallLightColor: Y.tealHi, accentColor: Y.cyan,
                 windowColor: '#04100f', windowLitColor: Y.cyan, windowFrameColor: '#060e0e', balconies: [], roofProps: [],
                 sign: { text: 'CLINIC', color: Y.cyan, size: 28 },
-                door: { target: config.doorTarget || 'medbay_sw', label: 'Enter Clinic', lightColor: Y.cyan },
+                door: { target: config.doorTarget || 'medbay_sw', label: 'Enter Clinic', lightColor: null },   // (lit by its pylons)
                 tiers: [
                     { id: 'ward', rect: [0, 0, 250, 400], z0: 0, z1: Y.WARD, S: 2, fill: Y.teal, paint: _yinWard, shade: [6, 16, 18],
                       ledges: [ledge(Y.LOBBY, 'rgba(0,243,255,.8)'), ledge(Y.WARD, 'rgba(122,255,216,.7)')], roofRes: 1, roofGlow: true, roof: _yinWardRoof },
@@ -43096,7 +43350,7 @@ function createNeuralSystemsTiered(x, y, config = {}) {
             });
         }
     </script>
-    <script type="text/dfab" data-src="buildings/warehouse-hall.js" data-cost="128">
+    <script type="text/dfab" data-src="buildings/warehouse-hall.js" data-cost="133">
         /* =====================================================================
            THE WAREHOUSE — the hub's storage hall (the registry's 'warehouse')
            ---------------------------------------------------------------------
@@ -43200,6 +43454,11 @@ function createNeuralSystemsTiered(x, y, config = {}) {
         }
 
         class WarehouseHall extends TieredBuilding {
+            _generateLights() {}                                        // (no lamps round the roof: the docks' bulkheads light it)
+            /** Dock lamps (buildings/entrance-lamps.js): a caged sodium bulkhead on a rod from the canopy's edge over each dock */
+            _entranceLamps() {
+                return WH.DOCKS.map(x => ({ kind: 'bulkhead', x, y: WH.D + 29, z: WH.DOCK_H + 4.5, top: WH.DOCK_H + 7.6, rgb: '255, 200, 110', light: [150, '#ffd58a', 22] }));
+            }
             /** The dock apron in front: concrete, a yellow guide line to each dock, wheel chocks */
             drawBase(c) {
                 super.drawBase(c);
@@ -81119,7 +81378,7 @@ engineMixin({
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/map-loading.js" data-cost="1074">
+    <script type="text/dfab" data-src="engine/map-loading.js" data-cost="1079">
         // GameEngine — loadMap / _doLoadMap (building every map), baked lighting.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
                 /* Each interior's painted floor (or backdrop) is a big canvas — 2–11 MB apiece. They're painted from
@@ -82093,6 +82352,12 @@ engineMixin({
                         mapData.lamps = mapData.lamps.filter(l => !inCourt(l));
                         const dr = b.style === 'silver_queen' && b._sqCourt && b._sqCourt() && b._sqCourt().drive;   // and the Silver Queen's drive, out to the street
                         if (dr) mapData.foliage = mapData.foliage.filter(f => !(f.x > dr.x - 30 && f.x < dr.x + dr.w + 30 && f.y > dr.y && f.y < dr.y + dr.h + 110));
+                    }
+                    // and the entrance lamps (buildings/entrance-lamps.js): no street tree over them
+                    for (const b of mapData.buildings || []) {
+                        if (!b._entLamps) continue;
+                        const at = b._entLamps.map(s => EntranceLamps._w(b, s.x, s.y));
+                        mapData.foliage = mapData.foliage.filter(f => !at.some(([x, y]) => Math.abs(f.x - x) < 60 && f.y > y - 50 && f.y < y + 90));
                     }
                     // and the pavement in front of a row of shopfronts (city.row, whichever street it fronts): a street wall shows its fronts, its trees go elsewhere
                     for (const pl of city.placedBuildings) {

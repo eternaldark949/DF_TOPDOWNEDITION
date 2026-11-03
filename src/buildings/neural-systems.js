@@ -177,10 +177,10 @@ function _nsCanopyRoof(c, glow, t) {
 
 class NeuralSystemsBuilding extends TieredBuilding {
     _setupSign() { this.attachedSign = null; }
-    _generateLights() {
-        const e = this._entrance(); if (e) for (const d of [-76, 76]) this.attachedLights.push(new LampEntity({
-            x: e.cx + e.ny * d + e.nx * 14, y: e.cy - e.nx * d + e.ny * 14, lampType: 3, color: '#b4d1f5', lightRadius: 145 }));
-        this.topReach = 80; this.glowReach = 80;
+    _generateLights() { this.topReach = 80; this.glowReach = 80; }
+    /** The portal's two crystals (buildings/entrance-lamps.js): cut blue points on stone plinths, light in their hearts */
+    _entranceLamps() {
+        return [-93, 93].map(d => ({ kind: 'crystal', x: NEURAL.W / 2 + d, y: NEURAL.D + 17, z: 17, rgb: '150, 196, 255', light: [145, '#b4d1f5', 0] }));
     }
     /** The forecourt at the portal: a stone mat, the seal, two crystal plinths */
     drawBase(c) {
@@ -193,7 +193,7 @@ class NeuralSystemsBuilding extends TieredBuilding {
             NeuralArt.box(p, -41, 0, 82, 33, 'rgba(111,161,205,.24)', '#afc8dc', 1);
             p.strokeStyle = '#b0c7d8'; p.lineWidth = .8; p.beginPath(); p.moveTo(0, 1); p.lineTo(0, 31); p.stroke();
             NeuralArt.seal(p, 0, 16, 9, NEURAL.pale);
-            for (const x of [-101, 85]) NeuralArt.crystal(p, x, 3, 16, 28, '#41648c');
+            for (const x of [-101, 85]) { p.fillStyle = 'rgba(0,0,0,.35)'; p.fillRect(x + 1, 5, 16, 26); NeuralArt.box(p, x + 1, 5, 14, 24, '#1d2b3e', '#526275', 2); }   // the crystals' footings (the crystals: _entranceLamps)
             p.restore();
         });
         LandmarkKit.drawSprite(c, s, 1);
@@ -210,7 +210,7 @@ function createNeuralSystemsTiered(x, y, config = {}) {
         roofColor: '#161630', roofLightColor: '#1e1e3a', wallColor: '#141428', wallLightColor: '#1a1a30', accentColor: '#0088ff',
         windowColor: '#040410', windowLitColor: '#0088ff', windowFrameColor: '#060612', balconyColor: '#0a0a18', balconies: [], roofProps: [],
         sign: { text: 'NEURAL', color: '#0088ff', size: 22 },
-        door: { target: config.doorTarget || 'neural_sys_interior', label: 'Enter Neural Systems', lightColor: '#0088ff' },
+        door: { target: config.doorTarget || 'neural_sys_interior', label: 'Enter Neural Systems', lightColor: null },   // (lit by its crystals)
         tiers: [
             { id: 'atrium', rect: [0, 0, 400, 200], z0: 0, z1: T.ATRIUM, S: 2, fill: T.ink, paint: _nsAtrium, shade: [6, 12, 26],
               ledges: [ledge(T.VIT, 'rgba(193,169,128,.9)'), ledge(T.ATRIUM, 'rgba(190,216,238,.8)')], roofRes: 1, roofGlow: true, roof: _nsAtriumRoof },

@@ -158,6 +158,11 @@
 
         class DrYinsBuilding extends TieredBuilding {
             _setupSign() { this.attachedSign = null; }                  // the name is on the lobby's fascia, the cross on the roof
+            _generateLights() {}                                        // (no lamps round the roof: the pylons at the door light it)
+            /** Clinic pylons (buildings/entrance-lamps.js): frosted glass on dark feet either side of the canopy, cyan caps */
+            _entranceLamps() {
+                return [[46, 0], [204, 0], [258, 1]].map(([x, wing]) => ({ kind: 'pylon', x, y: YIN.D + 16, z: wing ? 10 : 13, size: 1.5, rgb: '120, 255, 236', glass: '#2f5a58', cap: YIN.cyanSoft, light: [wing ? 110 : 140, '#7affd8', 0] }));
+            }
         }
         TierKit.profile(DrYinsBuilding);
 
@@ -169,7 +174,7 @@
                 roofColor: '#142828', roofLightColor: '#1a3434', wallColor: Y.teal, wallLightColor: Y.tealHi, accentColor: Y.cyan,
                 windowColor: '#04100f', windowLitColor: Y.cyan, windowFrameColor: '#060e0e', balconies: [], roofProps: [],
                 sign: { text: 'CLINIC', color: Y.cyan, size: 28 },
-                door: { target: config.doorTarget || 'medbay_sw', label: 'Enter Clinic', lightColor: Y.cyan },
+                door: { target: config.doorTarget || 'medbay_sw', label: 'Enter Clinic', lightColor: null },   // (lit by its pylons)
                 tiers: [
                     { id: 'ward', rect: [0, 0, 250, 400], z0: 0, z1: Y.WARD, S: 2, fill: Y.teal, paint: _yinWard, shade: [6, 16, 18],
                       ledges: [ledge(Y.LOBBY, 'rgba(0,243,255,.8)'), ledge(Y.WARD, 'rgba(122,255,216,.7)')], roofRes: 1, roofGlow: true, roof: _yinWardRoof },
