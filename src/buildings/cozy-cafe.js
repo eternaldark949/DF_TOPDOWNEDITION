@@ -1,18 +1,19 @@
         /* =====================================================================
-           COZY CAFE — the hub's corner cafe on Crimson Blvd (style 'cozy_cafe')
+           COZY CAFE — the hub's corner cafe on Crimson Blvd
            ---------------------------------------------------------------------
-           A brick corner house: a shingled hip roof over the back two thirds
-           with the hearth's chimney on its west slope (the fireplace inside sits
-           against the west wall: HEARTHS.cozy_cafe_interior), and a roof terrace
-           over the front with striped parasols and string lights. Down at the
-           street, striped awnings over the shop windows and a wooden signboard
-           over the door; a planter and a bistro table on the pavement.
-
-           Every point is leaned with the walls' camera (LandmarkKit.k), so the
-           roof's slopes, the chimney and the parasols stand at their own heights.
-           Flat busy layers (the deck, the parasols, the pavement) are baked once;
-           the roof planes and walls are a few projected fills a frame. The
-           sections are untouched: collision, shadows and the block are as before.
+           A brick corner house on the tiered kit (buildings/tiered-kit.js):
+             · the house: brick courses between cream quoins, big multi-pane shop
+               windows on the ground floor (warm inside, even by day), flower-
+               boxed windows above, a wood cornice; on the street the door and
+               over it the signboard, "Cozy Cafe" in amber script;
+             · two striped awnings over the shop windows (canopy tiers);
+             · over the house, drawn with the kit's lean (its `top`): a shingled
+               hip roof over the back two thirds with the hearth's chimney on its
+               west slope (the fireplace inside sits against the west wall:
+               HEARTHS.cozy_cafe_interior), and a roof terrace over the front
+               with striped parasols and string lights.
+           Collision is the house (the old section). Down on the pavement: a
+           planter, the chalkboard and two bistro tables.
            ===================================================================== */
         const CAFE_EXTERIOR = {
             brick: '#6a3426', brickHi: '#7d4130', brickLo: '#43201a', mortar: 'rgba(232,190,140,.16)',
@@ -24,19 +25,157 @@
         // The plan, relative to the building's corner: the hip roof's eaves (an overhang past the walls on three
         // sides), its rise, the terrace in front of it, the chimney on the west slope, the door's signboard.
         const CAFE_PLAN = {
-            W: 350, D: 350, EAVE: 3, ROOF_Y1: 232, RISE: 48,
+            W: 350, D: 350, HOUSE: 30, DOOR: 175, AWN: [[14, 115], [221, 115]], AWN_Z: [13, 16], EAVE: 3, ROOF_Y1: 232, RISE: 48,
             CHIM: { x: 34, y: 98, w: 30, h: 30, up: 34 },
             PARASOLS: [[66, 292], [176, 284], [286, 292]], PARASOL_R: 25, PARASOL_Z: 17,
             LIGHTS_Z: 21, SKY: [[62, 112], [238, 288]]
         };
 
-        Object.assign(BuildingV2.prototype, {
-            _ccH() { return Math.min(this.floors, CONFIG.BUILDINGS.MAX_FLOORS) * CONFIG.BUILDINGS.FLOOR_HEIGHT; },
-            _ccK(z) { return CONFIG.BUILDINGS.LEAN ? LandmarkKit.k(z) : 1; },
-            _ccP(x, y, z) {
-                const k = this._ccK(z), cam = game.camera;
-                return [cam.x + (x - cam.x) * k, cam.y + (y - cam.y) * k];
-            },
+        /** The house's walls: brick, quoins, the shop windows and the windows above, the cornice; the door and signboard on the front */
+        function _ccWall(d, l, t, H, L) {
+            const T = CAFE_EXTERIOR, front = t.mitre.find(e => e && !e.hidden && e.ny > 0.99), r = seededRandom(5150);
+            const g = d.createLinearGradient(0, 0, 0, H); g.addColorStop(0, T.brick); g.addColorStop(1, T.brickLo); d.fillStyle = g; d.fillRect(0, 0, L, H);
+            for (let i = 0; i < L * H / 30; i++) { d.fillStyle = r() < 0.5 ? 'rgba(125,65,48,.5)' : 'rgba(52,24,18,.35)'; d.fillRect(r() * L, r() * H, 2.4, 0.6); }   // odd bricks
+            d.fillStyle = T.mortar; for (let y = 1.25; y < H; y += 1.25) d.fillRect(0, y, L, 0.25);
+            const cx = front ? front.u0 + CAFE_PLAN.DOOR : -1e4, gl = H - 1.5, gt = H - 13, ut = H - 26, ub = H - 18;
+            for (const e of t.mitre) {
+                if (!e || e.hidden) continue;
+                d.fillStyle = T.cream; d.fillRect(e.u0, 0, 5, H); d.fillRect(e.u0 + e.L - 5, 0, 5, H);          // the quoins
+                d.fillStyle = 'rgba(120,90,60,.35)'; for (let y = 2; y < H; y += 2.5) { d.fillRect(e.u0, y, 5, 0.3); d.fillRect(e.u0 + e.L - 5, y, 5, 0.3); }
+                // the shop windows below (either side of the door on the front)
+                const spans = [];
+                if (e === front) { spans.push([e.u0 + 16, cx - 30], [cx + 30, e.u0 + e.L - 16]); }
+                else { const n = Math.max(2, Math.round(e.L / 90)); for (let i = 0; i < n; i++) spans.push([e.u0 + e.L * (i + 0.18) / n, e.u0 + e.L * (i + 0.82) / n]); }
+                for (const [a, b] of spans) {
+                    d.fillStyle = T.cream; d.fillRect(a - 1.6, gt - 0.8, b - a + 3.2, gl - gt + 0.8);
+                    const gg = d.createLinearGradient(0, gt, 0, gl); gg.addColorStop(0, '#4a2e1c'); gg.addColorStop(1, T.glass); d.fillStyle = gg; d.fillRect(a, gt, b - a, gl - gt - 0.6);
+                    d.fillStyle = 'rgba(255,200,120,.2)'; d.fillRect(a, gt, b - a, gl - gt - 0.6);
+                    l.fillStyle = 'rgba(255,186,96,.8)'; l.fillRect(a, gt, b - a, gl - gt - 0.6);
+                    const n = Math.max(2, Math.round((b - a) / 22));
+                    d.fillStyle = T.wood; l.fillStyle = '#000';
+                    for (let i = 1; i < n; i++) { const x = a + (b - a) * i / n; d.fillRect(x - 0.6, gt, 1.2, gl - gt); l.fillRect(x - 0.6, gt, 1.2, gl - gt); }
+                    d.fillRect(a, gt + 2.6, b - a, 0.5); l.fillRect(a, gt + 2.6, b - a, 0.5);                    // the transom
+                    d.fillStyle = T.wood; d.fillRect(a - 1.6, gl - 0.8, b - a + 3.2, 0.8);                       // the sill
+                    // a shadow of the room: tables and a lamp or two
+                    for (let x = a + 8; x < b - 6; x += 18) { d.fillStyle = 'rgba(40,20,10,.35)'; d.fillRect(x, gl - 4.6, 9, 0.6); d.fillRect(x + 4, gl - 4.6, 1, 3.6); l.fillStyle = 'rgba(255,230,170,.9)'; l.beginPath(); l.arc(x + 4.5, gt + 4.6, 1.2, 0, Math.PI * 2); l.fill(); }
+                }
+                // the windows above, flower boxes under them (none behind the signboard)
+                const nu = Math.max(3, Math.round(e.L / 70));
+                for (let i = 0; i < nu; i++) {
+                    const a = e.u0 + e.L * (i + 0.3) / nu, b = e.u0 + e.L * (i + 0.7) / nu;
+                    if (e === front && b > cx - 58 && a < cx + 58) continue;
+                    d.fillStyle = T.cream; d.fillRect(a - 1.2, ut - 0.8, b - a + 2.4, ub - ut + 1.6);
+                    d.fillStyle = T.glass; d.fillRect(a, ut, b - a, ub - ut); d.fillStyle = 'rgba(255,200,120,.14)'; d.fillRect(a, ut, b - a, ub - ut);
+                    d.fillStyle = T.cream; d.fillRect((a + b) / 2 - 0.5, ut, 1, ub - ut); d.fillRect(a, (ut + ub) / 2 - 0.3, b - a, 0.6);
+                    if ((i * 7 + Math.round(e.u0)) % 3) { l.fillStyle = 'rgba(255,214,140,.6)'; l.fillRect(a, ut, b - a, ub - ut); l.fillStyle = '#000'; l.fillRect((a + b) / 2 - 0.5, ut, 1, ub - ut); l.fillRect(a, (ut + ub) / 2 - 0.3, b - a, 0.6); }
+                    d.fillStyle = T.wood; d.fillRect(a - 2, ub + 0.8, b - a + 4, 1.4);                        // the flower box
+                    for (let x = a - 1.4; x < b + 2; x += 2.2) { d.fillStyle = r() < 0.6 ? T.leaf : T.leafHi; d.beginPath(); d.arc(x, ub + 0.6, 1, 0, Math.PI * 2); d.fill(); if (r() < 0.4) { d.fillStyle = ['#f2c14e', '#e86a5c', '#f6ecd8'][Math.floor(r() * 3)]; d.fillRect(x - 0.4, ub, 0.8, 0.6); } }
+                }
+            }
+            // the cornice: a cream lip over a wood band
+            d.fillStyle = T.cream; d.fillRect(0, 0, L, 0.9); d.fillStyle = T.wood; d.fillRect(0, 0.9, L, 1.4); d.fillStyle = 'rgba(0,0,0,.25)'; d.fillRect(0, 2.3, L, 0.4);
+            if (!front) return;
+            // the door: dark wood in a cream surround, a lit glass panel, the brass handle
+            const dt = H - 14;
+            d.fillStyle = T.cream; d.fillRect(cx - 14, dt - 1, 28, H - dt + 1);
+            d.fillStyle = T.wood; d.fillRect(cx - 12, dt, 24, H - dt);
+            d.fillStyle = 'rgba(255,200,120,.35)'; for (const x of [cx - 10, cx + 1.5]) d.fillRect(x, dt + 2, 8.5, 6);
+            l.fillStyle = 'rgba(255,200,120,.95)'; for (const x of [cx - 10, cx + 1.5]) l.fillRect(x, dt + 2, 8.5, 6);
+            d.fillStyle = T.woodHi; d.fillRect(cx - 0.4, dt, 0.8, H - dt);
+            d.fillStyle = '#d8b26a'; d.fillRect(cx - 2.6, dt + 9, 1, 1.6); d.fillRect(cx + 1.6, dt + 9, 1, 1.6);
+            // the signboard over it: dark wood, a brass edge, the name in amber script and a steaming cup
+            const bx = cx - 52, by = H - 22.6, bw = 104, bh = 7.4;
+            d.fillStyle = 'rgba(0,0,0,.35)'; d.fillRect(bx + 1, by + bh, bw - 2, 0.8);
+            const bg = d.createLinearGradient(0, by, 0, by + bh); bg.addColorStop(0, '#4a2a1a'); bg.addColorStop(1, '#2a160d'); d.fillStyle = bg; d.fillRect(bx, by, bw, bh);
+            d.strokeStyle = '#c99a52'; d.lineWidth = 0.5; d.strokeRect(bx + 0.25, by + 0.25, bw - 0.5, bh - 0.5);
+            l.strokeStyle = 'rgba(255,190,90,.55)'; l.lineWidth = 0.4; l.strokeRect(bx + 0.25, by + 0.25, bw - 0.5, bh - 0.5);
+            for (const [c, col] of [[d, '#ffbf4d'], [l, 'rgba(255,196,96,1)']]) {
+                c.save(); c.translate(cx + 6, by + bh / 2 + 0.4); c.scale(1, 0.5);                           // (the strip's y is design units, twice the world's)
+                c.font = '12.5px "Great Vibes", "URW Chancery L", "Z003", cursive'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = col; c.fillText('Cozy Cafe', 0, 0);
+                c.restore();
+                const ux = bx + 11, uy = by + bh / 2 + 1;
+                c.fillStyle = c === d ? T.cream : 'rgba(255,214,150,.8)'; c.fillRect(ux - 3, uy - 1.6, 5.5, 3); c.fillRect(ux + 2.5, uy - 1, 1, 1.6);
+                c.fillRect(ux - 1.4, uy - 3.2, 0.5, 1.2); c.fillRect(ux + 0.8, uy - 3.4, 0.5, 1.2);
+            }
+            // a lantern either side of the door
+            for (const s of [-1, 1]) { const lx = cx + s * 20; d.fillStyle = '#1e1410'; d.fillRect(lx - 1.4, dt + 1, 2.8, 3.2); d.fillStyle = '#ffd690'; d.fillRect(lx - 0.9, dt + 1.6, 1.8, 2); l.fillStyle = 'rgba(255,200,110,1)'; l.fillRect(lx - 0.9, dt + 1.6, 1.8, 2); }
+        }
+
+        /** An awning's edges: amber and cream stripes, a scalloped valance, warm light under it at night */
+        function _ccAwning(d, l, t, H, L) {
+            const T = CAFE_EXTERIOR, w = 6.5;
+            for (let x = 0, i = 0; x < L; x += w, i++) { d.fillStyle = i % 2 ? T.stripeB : T.stripeA; d.fillRect(x, 0, w, H); }
+            d.fillStyle = 'rgba(0,0,0,.18)'; d.fillRect(0, 0, L, 0.5);
+            for (let x = 0, i = 0; x < L; x += w, i++) { d.fillStyle = i % 2 ? '#d9c7a2' : '#c2741f'; d.beginPath(); d.ellipse(x + w / 2, H - 0.9, w / 2, 0.9, 0, 0, Math.PI); d.fill(); }
+            l.fillStyle = 'rgba(255,190,110,.35)'; l.fillRect(0, H - 0.6, L, 0.6);
+        }
+
+        function _ccHouseRoof(c, glow, t) {
+            if (glow) return;
+            const [x, y] = t.box;
+            c.fillStyle = CAFE_EXTERIOR.ridge; c.fillRect(x, y, CAFE_PLAN.W, CAFE_PLAN.D);               // (under the hip roof and the terrace's deck)
+        }
+
+        function _ccAwningRoof(c, glow, t) {
+            const [x0, y0, x1, y1] = t.box, T = CAFE_EXTERIOR, w = 13;
+            if (glow) return;
+            for (let x = x0, i = 0; x < x1; x += w, i++) { c.fillStyle = i % 2 ? T.stripeB : T.stripeA; c.fillRect(x, y0, Math.min(w, x1 - x), y1 - y0); }
+            const sh = c.createLinearGradient(0, y0, 0, y1); sh.addColorStop(0, 'rgba(60,30,10,.28)'); sh.addColorStop(1, 'rgba(255,240,210,.12)'); c.fillStyle = sh; c.fillRect(x0, y0, x1 - x0, y1 - y0);
+            c.strokeStyle = 'rgba(58,33,22,.55)'; c.lineWidth = 0.8; c.beginPath(); c.moveTo(x0, y1 - 0.4); c.lineTo(x1, y1 - 0.4); c.stroke();
+        }
+
+        /** The hip roof, the terrace and the chimney, drawn over the house with its lean */
+        function _ccTop(ctx, emissive, t, b) {
+            ctx.save();
+            b._ccDrawRoof(ctx, emissive); b._ccDrawTerrace(ctx, emissive); b._ccDrawChimney(ctx, emissive);
+            ctx.restore();
+        }
+
+        const _ccFontsReady = () => !document.fonts || document.fonts.check('25px "Great Vibes"');
+
+        class CozyCafeBuilding extends TieredBuilding {
+            constructor(config) {
+                super(config);
+                this.crownZ = (CAFE_PLAN.HOUSE * TierKit.Z_SCALE + CAFE_PLAN.RISE + CAFE_PLAN.CHIM.up + 50) * this.hero;   // the chimney and its smoke stand over the roof
+            }
+            _setupSign() { this.attachedSign = null; }                  // the signboard is on the front wall
+            _generateLights() { this._ccLights(); this.topReach = 60; }  // (the awnings and the bistro tables)
+            drawBase(c) { super.drawBase(c); this._ccDrawBase(c); }
+            /** The signboard's script waits for its font: the walls are painted again once it has loaded. */
+            drawTop(c) {
+                if (!this._ccFonts && _ccFontsReady()) { this._ccFonts = true; this._lkSprites = {}; for (const t of this._tkGeo().tiers) t.art = null; }
+                super.drawTop(c);
+            }
+            drawSign() {}
+        }
+        TierKit.profile(CozyCafeBuilding);
+
+        /** The Cozy Cafe: x, y its corner, the door on its front (south). */
+        function createCozyCafeTiered(x, y, config = {}) {
+            const T = CAFE_EXTERIOR, P = CAFE_PLAN, [za, zb] = P.AWN_Z;
+            const awning = (i) => ({ id: 'awning' + i, solid: false, rect: [P.AWN[i][0], P.D + 1, P.AWN[i][1], 20], z0: za, z1: zb, S: 4, fill: T.stripeA, paint: _ccAwning, shade: [30, 14, 8],
+                roofRes: 1, roof: _ccAwningRoof });
+            return new CozyCafeBuilding({
+                id: 'cozy_cafe', x, y, label: 'Cozy Cafe', type: 'cafe', facing: 'S', hero: 1.5, plan: { W: P.W, D: P.D },
+                roofColor: '#4a3028', roofLightColor: '#5a3a30', wallColor: T.brick, wallLightColor: T.brickHi, accentColor: '#ffaa00',
+                windowColor: '#2a1b14', windowLitColor: '#ffe0a0', windowFrameColor: T.cream, balconyColor: '#3e2723', balconies: [], roofProps: [],
+                sign: { text: 'Cozy Cafe', color: '#ffaa00', size: 28 },
+                door: { target: config.doorTarget || 'cozy_cafe_interior', label: 'Enter Cafe', lightColor: null },   // (lit by _ccLights)
+                tiers: [
+                    { id: 'house', rect: [0, 0, P.W, P.D], z0: 0, z1: P.HOUSE, S: 2, fill: T.brick, paint: _ccWall, shade: [30, 14, 8],
+                      ledges: [{ z: P.HOUSE, out: 2, th: 1.6, top: T.wood, band: [58, 33, 22], lip: 'rgba(239,220,182,.7)' }], roofRes: 1, roof: _ccHouseRoof, top: _ccTop },
+                    // (a px off the wall: a tier back to back with a wall hides it below its top, _tkGeo)
+                    awning(0), awning(1)
+                ],
+                ...config
+            });
+        }
+
+        Object.assign(CozyCafeBuilding.prototype, {
+            // (heights here are world px; the kit's are design units, Z_SCALE times smaller)
+            _ccH() { return CAFE_PLAN.HOUSE * TierKit.Z_SCALE; },
+            _ccK(z) { return this._tkK(z / TierKit.Z_SCALE); },
+            _ccP(x, y, z) { return this._tkP(x, y, z / TierKit.Z_SCALE); },
             /** The hip roof: its four planes as world points with heights (eave corners, ridge ends). */
             _ccRoof() {
                 if (this._ccRoofGeo && this._ccRoofGeo.x === this.x && this._ccRoofGeo.y === this.y) return this._ccRoofGeo;
@@ -72,7 +211,6 @@
             _ccDrawBase(ctx) {
                 const s = LandmarkKit.sprite(this, 'cc_ground', this.x - 16, this.y - 12, CAFE_PLAN.W + 52, CAFE_PLAN.D + 66, 1, c => {
                     const x = this.x, y = this.y, T = CAFE_EXTERIOR, wy = y + CAFE_PLAN.D;
-                    c.fillStyle = 'rgba(0,0,0,.42)'; c.fillRect(x + 16, y + 16, CAFE_PLAN.W, CAFE_PLAN.D);
                     const t = this.attachedTransition, cx = t.x + t.w / 2;
                     // Brick step and a coir mat at the door
                     c.fillStyle = '#5a3326'; c.beginPath(); c.roundRect(cx - 48, wy, 96, 16, [0, 0, 6, 6]); c.fill();
@@ -113,121 +251,6 @@
                     }
                 });
                 ctx.drawImage(s.cv, s.x, s.y, s.w, s.h);
-            },
-
-            /** One wall: brick courses, cream corners, windows (big shop windows below, flower-boxed ones above), cornice. */
-            _ccFace(ctx, f, emissive) {
-                const T = CAFE_EXTERIOR, H = this._ccH(), L = Math.hypot(f.x2 - f.x1, f.y2 - f.y1);
-                const P = (u, z) => this._ccP(f.x1 + (f.x2 - f.x1) * u, f.y1 + (f.y2 - f.y1) * u, z);
-                const quad = (path, u0, u1, z0, z1) => {
-                    const a = P(u0, z0), b = P(u1, z0), d = P(u0, z1), e = P(u1, z1);
-                    path.moveTo(a[0], a[1]); path.lineTo(b[0], b[1]); path.lineTo(e[0], e[1]); path.lineTo(d[0], d[1]); path.closePath();
-                    return path;
-                };
-                const front = f.side === 'S';
-                // The door's span along this face (front only), so the shop windows sit either side of it
-                const t = this.attachedTransition, du = front ? (t.x + t.w / 2 - f.x1) / (f.x2 - f.x1) : -1, dw = 34 / L;
-                const lower = [], upper = [], z0 = 3, z1 = H * 0.48, z2 = H * 0.6, z3 = H * 0.86;
-                if (front) {
-                    for (const [a, b] of [[0.05, du - dw - 0.06], [du + dw + 0.06, 0.95]]) if (b > a) lower.push([Math.min(a, b), Math.max(a, b)]);
-                } else {
-                    const n = Math.max(2, Math.round(L / 90));
-                    for (let i = 0; i < n; i++) lower.push([(i + 0.2) / n, (i + 0.8) / n]);
-                }
-                const nu = Math.max(3, Math.round(L / 70));
-                for (let i = 0; i < nu; i++) upper.push([(i + 0.3) / nu, (i + 0.7) / nu]);
-                if (!emissive) {
-                    const g = ctx.createLinearGradient(...P(0.5, 0), ...P(0.5, H));
-                    g.addColorStop(0, T.brickLo); g.addColorStop(1, front ? T.brickHi : T.brick);
-                    ctx.fillStyle = g; ctx.fill(quad(new Path2D(), 0, 1, 0, H));
-                    const courses = new Path2D();
-                    for (let z = 2.5; z < H - 2; z += 2.5) { const a = P(0, z), b = P(1, z); courses.moveTo(a[0], a[1]); courses.lineTo(b[0], b[1]); }
-                    ctx.strokeStyle = T.mortar; ctx.lineWidth = 0.7; ctx.stroke(courses);
-                    const corners = new Path2D(); quad(corners, 0, 6 / L, 0, H); quad(corners, 1 - 6 / L, 1, 0, H);
-                    ctx.fillStyle = T.cream; ctx.fill(corners);
-                    const frames = new Path2D(), glass = new Path2D(), bars = new Path2D(), boxes = new Path2D();
-                    for (const [a, b] of lower) {
-                        quad(frames, a, b, z0, z1); quad(glass, a + 2 / L, b - 2 / L, z0 + 1, z1 - 1);
-                        const n = Math.max(2, Math.round((b - a) * L / 26));
-                        for (let i = 1; i < n; i++) quad(bars, a + (b - a) * i / n - 0.6 / L, a + (b - a) * i / n + 0.6 / L, z0, z1);
-                        quad(bars, a, b, z1 - 3.2, z1 - 2.6);                            // the transom
-                    }
-                    for (const [a, b] of upper) {
-                        quad(frames, a, b, z2, z3); quad(glass, a + 1.5 / L, b - 1.5 / L, z2 + 0.8, z3 - 0.8);
-                        quad(bars, (a + b) / 2 - 0.5 / L, (a + b) / 2 + 0.5 / L, z2, z3);
-                        quad(boxes, a - 2 / L, b + 2 / L, z2 - 1.6, z2 + 0.4);
-                    }
-                    ctx.fillStyle = T.cream; ctx.fill(frames);
-                    const gg = ctx.createLinearGradient(...P(0.5, z0), ...P(0.5, z3));
-                    gg.addColorStop(0, '#4a2e1c'); gg.addColorStop(1, T.glass);
-                    ctx.fillStyle = gg; ctx.fill(glass);
-                    ctx.fillStyle = 'rgba(255,200,120,.16)'; ctx.fill(glass);                  // a warm room behind the glass, even by day
-                    ctx.fillStyle = T.wood; ctx.fill(bars);
-                    ctx.fillStyle = T.leaf; ctx.fill(boxes);
-                    // Cornice: a wood band and a cream lip along the top
-                    ctx.fillStyle = T.wood; ctx.fill(quad(new Path2D(), 0, 1, H - 3.5, H - 1.5));
-                    ctx.fillStyle = T.cream; ctx.fill(quad(new Path2D(), 0, 1, H - 1.5, H));
-                    if (front && du > 0) {
-                        // The door: dark wood, a lit glass panel, a cream surround
-                        ctx.fillStyle = T.cream; ctx.fill(quad(new Path2D(), du - dw, du + dw, 0, z1 + 1.5));
-                        ctx.fillStyle = T.wood; ctx.fill(quad(new Path2D(), du - dw + 2 / L, du + dw - 2 / L, 0, z1));
-                        ctx.fillStyle = 'rgba(255,200,120,.35)'; ctx.fill(quad(new Path2D(), du - dw + 6 / L, du + dw - 6 / L, z1 * 0.35, z1 - 2));
-                        ctx.fillStyle = T.wood; ctx.fill(quad(new Path2D(), du - 0.5 / L, du + 0.5 / L, 0, z1));
-                    }
-                } else {
-                    const glow = new Path2D();
-                    for (const [a, b] of lower) quad(glow, a + 2 / L, b - 2 / L, z0 + 1, z1 - 1);
-                    if (front && du > 0) quad(glow, du - dw + 6 / L, du + dw - 6 / L, z1 * 0.35, z1 - 2);
-                    ctx.fillStyle = 'rgba(255,186,96,.55)'; ctx.fill(glow);
-                    const up = new Path2D();
-                    for (let i = 0; i < upper.length; i++) if ((i * 7 + (f.side.charCodeAt(0))) % 3) quad(up, upper[i][0] + 1.5 / L, upper[i][1] - 1.5 / L, z2 + 0.8, z3 - 0.8);
-                    ctx.fillStyle = 'rgba(255,214,140,.42)'; ctx.fill(up);
-                }
-            },
-
-            /** The striped awnings over the shop windows and the signboard over the door (in front of the south wall). */
-            _ccAwnings(ctx, emissive) {
-                const T = CAFE_EXTERIOR, H = this._ccH(), wy = this.y + CAFE_PLAN.D, zt = H * 0.52, zf = H * 0.34, out = 20;
-                const t = this.attachedTransition, cx = t.x + t.w / 2;
-                const spans = [[this.x + 14, cx - 46], [cx + 46, this.x + CAFE_PLAN.W - 14]];
-                if (!emissive) {
-                    for (const [xa, xb] of spans) {
-                        const n = Math.max(2, Math.round((xb - xa) / 13)), w = (xb - xa) / n;
-                        const A = new Path2D(), B = new Path2D();
-                        for (let i = 0; i < n; i++) {
-                            const p = i % 2 ? B : A, a = xa + i * w, b = a + w;
-                            const q0 = this._ccP(a, wy, zt), q1 = this._ccP(b, wy, zt), q2 = this._ccP(b, wy + out, zf), q3 = this._ccP(a, wy + out, zf);
-                            p.moveTo(q0[0], q0[1]); p.lineTo(q1[0], q1[1]); p.lineTo(q2[0], q2[1]); p.lineTo(q3[0], q3[1]); p.closePath();
-                        }
-                        ctx.fillStyle = T.stripeA; ctx.fill(A); ctx.fillStyle = T.stripeB; ctx.fill(B);
-                        // The scalloped valance, flat at the awning's front edge
-                        LandmarkKit.flat(ctx, this._ccK(zf), c => {
-                            const sa = new Path2D(), sb = new Path2D();
-                            for (let i = 0; i < n; i++) { const mx = xa + (i + 0.5) * w, p = i % 2 ? sb : sa; p.moveTo(mx + w / 2, wy + out); p.arc(mx, wy + out, w / 2, 0, Math.PI); }
-                            c.fillStyle = '#c2741f'; c.fill(sa); c.fillStyle = '#d9c7a2'; c.fill(sb);
-                            c.strokeStyle = 'rgba(58,33,22,.55)'; c.lineWidth = 0.8; c.beginPath(); c.moveTo(xa, wy + out); c.lineTo(xb, wy + out); c.stroke();
-                        });
-                    }
-                }
-                // The signboard over the door: dark wood, a brass edge, "Cozy Cafe" in amber script, a little steaming cup
-                LandmarkKit.flat(ctx, this._ccK(H * 0.62), c => {
-                    const bx = cx - 74, by = wy + 1, bw = 148, bh = 30;
-                    c.beginPath(); c.roundRect(bx, by, bw, bh, [2, 2, 9, 9]);
-                    if (!emissive) {
-                        c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(bx + 3, by + bh, bw - 6, 3);
-                        const g = LandmarkKit.grad(this, 'cc_board', () => { const q = c.createLinearGradient(bx, by, bx, by + bh); q.addColorStop(0, '#4a2a1a'); q.addColorStop(1, '#2a160d'); return q; });
-                        c.fillStyle = g; c.fill(); c.strokeStyle = '#c99a52'; c.lineWidth = 1.4; c.stroke();
-                        c.beginPath(); c.roundRect(bx + 3, by + 3, bw - 6, bh - 6, [1, 1, 7, 7]); c.strokeStyle = 'rgba(232,190,120,.25)'; c.lineWidth = 0.7; c.stroke();
-                    } else { c.strokeStyle = 'rgba(255,190,90,.55)'; c.lineWidth = 1; c.stroke(); }
-                    c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = '25px "Great Vibes", "URW Chancery L", "Z003", cursive';
-                    c.fillStyle = emissive ? 'rgba(255,196,96,.95)' : '#ffbf4d'; c.fillText('Cozy Cafe', cx + 8, by + bh / 2 + 1);
-                    // the cup
-                    const ux = bx + 17, uy = by + bh / 2 + 3;
-                    c.fillStyle = emissive ? 'rgba(255,214,150,.8)' : T.cream;
-                    c.beginPath(); c.roundRect(ux - 6, uy - 4, 11, 8, [0, 0, 4, 4]); c.fill();
-                    c.strokeStyle = c.fillStyle; c.lineWidth = 1.2; c.beginPath(); c.arc(ux + 6, uy, 2.4, -Math.PI / 2, Math.PI / 2); c.stroke();
-                    c.lineWidth = 0.9; c.beginPath(); c.moveTo(ux - 2, uy - 6); c.quadraticCurveTo(ux - 4, uy - 9, ux - 2, uy - 12); c.moveTo(ux + 2, uy - 6); c.quadraticCurveTo(ux, uy - 9, ux + 2, uy - 12); c.stroke();
-                });
             },
 
             /** The hip roof: planes away from the camera first, then those facing it, with shingle courses and hips. */
@@ -411,27 +434,4 @@
                     }
                 });
             },
-
-            _ccDrawTop(ctx) {
-                ctx.save();
-                const faces = CONFIG.BUILDINGS.LEAN ? this._visibleFaces(game.camera) : [];
-                for (const f of faces) this._ccFace(ctx, f, false);
-                this._ccAwnings(ctx, false);
-                this._ccDrawRoof(ctx, false);
-                this._ccDrawTerrace(ctx, false);
-                this._ccDrawChimney(ctx, false);
-                ctx.restore();
-            },
-
-            _ccDrawEmissive(ctx, dark) {
-                const glow = Math.max(0.12, Math.min(0.85, dark * 1.0));
-                ctx.save(); ctx.globalAlpha *= glow; ctx.globalCompositeOperation = 'lighter';
-                const faces = CONFIG.BUILDINGS.LEAN ? this._visibleFaces(game.camera) : [];
-                for (const f of faces) this._ccFace(ctx, f, true);
-                this._ccAwnings(ctx, true);
-                this._ccDrawRoof(ctx, true);
-                this._ccDrawTerrace(ctx, true);
-                this._ccDrawChimney(ctx, true);
-                ctx.restore();
-            }
         });

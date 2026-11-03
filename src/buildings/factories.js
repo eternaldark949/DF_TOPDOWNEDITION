@@ -3,19 +3,7 @@
         /** The Cozy Cafe: a brick corner house with a shingled hip roof, the hearth's chimney, a roof terrace with
             parasols and string lights, striped awnings and a signboard over the door (buildings/cozy-cafe.js). */
         function createCozyCafe(x, y, config = {}) {
-            return new BuildingV2({
-                id: 'cozy_cafe', x, y, label: 'Cozy Cafe', type: 'cafe', style: 'cozy_cafe', floors: 3,
-                sections: [
-                    { x: 0, y: 0, w: 350, h: 350 },
-                ],
-                roofColor: '#4a3028', roofLightColor: '#5a3a30',
-                wallColor: '#6a3426', wallLightColor: '#7d4130', accentColor: '#ffaa00',
-                windowColor: '#2a1b14', windowLitColor: '#ffe0a0', windowFrameColor: '#efdcb6',
-                balconyColor: '#3e2723', balconies: [],
-                sign: { text: 'Cozy Cafe', color: '#ffaa00', size: 28 },
-                door: { target: config.doorTarget || 'cozy_cafe_interior', label: 'Enter Cafe', lightColor: null },   // (lit by _ccLights)
-                ...config
-            });
+            return createCozyCafeTiered(x, y, config);   // on the tiered kit: buildings/cozy-cafe.js
         }
 
         // (the Double Nights Hotel's factory is in buildings/double-nights.js, on the tiered kit)
@@ -222,64 +210,9 @@
             });
         }
 
-        /**
-         * Factory function to create Neural Systems building.
-         * T-shaped tech facility: wide server wing + narrow front office.
-         * Cold blue/digital theme.
-         */
+        /** Neural Systems: on the tiered kit (buildings/neural-systems.js). */
         function createNeuralSystems(x, y, config = {}) {
-            return new NeuralSystemsBuilding({
-                id: 'neural_sys',
-                x: x,
-                y: y,
-                label: 'Neural Systems',
-                type: 'tech',
-                floors: 8,
-                
-                // T-shape: wide server wing at back, narrow front office
-                sections: [
-                    { x: 0, y: 0, w: 400, h: 200 },       // Back server wing (full width)
-                    { x: 75, y: 200, w: 250, h: 200 },     // Front office (centered, narrower)
-                ],
-                
-                // Small uniform tech windows (data center vibe)
-                windowWidth: 8,
-                windowHeight: 10,
-                windowSpacingX: 24,
-                windowSpacingY: 20,
-                windowMarginX: 16,
-                windowMarginY: 12,
-                
-                // Colors - cold digital blue theme
-                roofColor: '#161630',           // Navy blue roof
-                roofLightColor: '#1e1e3a',      // Slightly lighter navy
-                wallColor: '#141428',           // Near-black blue walls
-                wallLightColor: '#1a1a30',      // Dark blue-grey
-                accentColor: '#0088ff',         // Tech blue accent
-                windowColor: '#040410',         // Very dark blue glass
-                windowLitColor: '#0088ff',      // Blue monitor glow
-                windowFrameColor: '#060612',    // Dark frames
-                balconyColor: '#0a0a18',        // Dark navy railings
-                
-                balconies: [],
-                
-                roofProps: [
-                    { type: 'ac_unit', section: 0, x: 20, y: 20, w: 55, h: 40 },
-                    { type: 'ac_unit', section: 0, x: 320, y: 20, w: 55, h: 40 },
-                    { type: 'vent', section: 0, x: 180, y: 80, w: 35, h: 30 },
-                    { type: 'vent', section: 1, x: 100, y: 30, w: 30, h: 25 },
-                ],
-                
-                sign: { text: 'NEURAL', color: '#0088ff', size: 22 },
-                
-                door: {
-                    target: config.doorTarget || 'neural_sys_interior',
-                    label: 'Enter Neural Systems',
-                    lightColor: '#0088ff'
-                },
-                
-                ...config
-            });
+            return createNeuralSystemsTiered(x, y, config);
         }
 
         /**
@@ -292,115 +225,10 @@
          * Wide, low industrial garage with amber/orange accent.
          */
         function createTorqueAutoShop(x, y, config = {}) {
-            return new TorqueAutoBuilding({                // its art: buildings/torque-auto.js
-                id: 'torque_auto',
-                x: x,
-                y: y,
-                label: 'Torque Auto',
-                type: 'auto_shop',
-                floors: 2,
-                
-                // Wide garage footprint
-                sections: [
-                    { x: 0, y: 0, w: 500, h: 350 },       // Main garage bay
-                    { x: 500, y: 50, w: 200, h: 300 },     // Showroom wing (offset)
-                ],
-                
-                // Industrial windows
-                windowWidth: 18,
-                windowHeight: 12,
-                windowSpacingX: 40,
-                windowSpacingY: 30,
-                windowMarginX: 20,
-                windowMarginY: 15,
-                
-                // Colors — dark industrial with amber accents
-                roofColor: '#1a1a14',
-                roofLightColor: '#222218',
-                wallColor: '#1a1814',
-                wallLightColor: '#22201a',
-                accentColor: '#ff8800',
-                windowColor: '#1a1808',
-                windowLitColor: '#ffaa00',
-                windowFrameColor: '#111',
-                balconyColor: '#2a2520',
-                
-                // Overhang above garage doors
-                balconies: [
-                    { section: 0, side: 'south', startX: 50, width: 400, floors: [1] },
-                ],
-                
-                roofProps: [
-                    { type: 'ac_unit', section: 0, x: 30, y: 30, w: 60, h: 40 },
-                    { type: 'vent', section: 0, x: 350, y: 250, w: 30, h: 25 },
-                    { type: 'ac_unit', section: 1, x: 80, y: 100, w: 50, h: 35 },
-                ],
-                
-                sign: { text: 'TORQUE', color: '#ff8800', size: 36 },
-                door: {
-                    target: config.doorTarget || 'auto_shop',
-                    label: 'Enter Auto Shop',
-                    lightColor: '#ff8800'
-                },
-                
-                ...config
-            });
+            return createTorqueAuto(x, y, config);       // on the tiered kit: buildings/torque-auto.js
         }
 
         function createDrYinsClinic(x, y, config = {}) {
-            return new BuildingV2({
-                id: 'dr_yins',
-                x: x,
-                y: y,
-                label: "Dr. Yin's",
-                type: 'clinic',
-                floors: 5,
-                
-                // L-shape: main ward + treatment wing extending east
-                sections: [
-                    { x: 0, y: 0, w: 250, h: 400 },       // Main ward (tall, west)
-                    { x: 250, y: 150, w: 250, h: 250 },    // Treatment wing (east, offset south)
-                ],
-                
-                // Clean medical windows
-                windowWidth: 12,
-                windowHeight: 16,
-                windowSpacingX: 30,
-                windowSpacingY: 26,
-                windowMarginX: 18,
-                windowMarginY: 14,
-                
-                // Colors - dark teal/cyan medical theme
-                roofColor: '#142828',           // Teal roof
-                roofLightColor: '#1a3434',      // Slightly lighter teal
-                wallColor: '#142222',           // Very dark teal walls
-                wallLightColor: '#182c2c',      // Dark teal
-                accentColor: '#00f3ff',         // Medical cyan accent
-                windowColor: '#04100f',         // Dark tinted glass
-                windowLitColor: '#00f3ff',      // Cyan glow (medical equipment)
-                windowFrameColor: '#060e0e',    // Dark teal frames
-                balconyColor: '#0a1a1a',        // Teal railings
-                
-                // Entrance overhang on main ward
-                balconies: [
-                    { section: 0, side: 'south', startX: 50, width: 150, floors: [1] },
-                ],
-                
-                roofProps: [
-                    { type: 'ac_unit', section: 0, x: 20, y: 20, w: 50, h: 35 },
-                    { type: 'ac_unit', section: 1, x: 170, y: 20, w: 50, h: 35 },
-                    { type: 'vent', section: 0, x: 180, y: 340, w: 30, h: 25 },
-                    { type: 'water_tank', section: 1, x: 125, y: 200, r: 25 },
-                ],
-                
-                sign: { text: 'CLINIC', color: '#00f3ff', size: 28 },
-                door: {
-                    target: config.doorTarget || 'medbay_sw',
-                    label: 'Enter Clinic',
-                    lightColor: '#00f3ff'
-                },
-                
-                ...config
-            });
+            return createDrYins(x, y, config);           // on the tiered kit: buildings/dr-yins.js
         }
 
