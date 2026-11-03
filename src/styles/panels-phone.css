@@ -667,7 +667,17 @@
 
         /* --- PHONE SYSTEM --- */
         #btn-phone { position: absolute; top: 60px; left: 25px; width: 44px; height: 44px; border-radius: 4px; background: rgba(10, 8, 5, 0.7); border: 1px solid rgba(218, 165, 32, 0.15); color: #daa520; font-family: var(--font-tech); font-size: max(6px, 1.3rem - var(--font-trim)); font-weight: 700; display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 30; pointer-events: auto; text-shadow: 0 0 10px rgba(255, 200, 50, 0.7), 0 0 20px rgba(218, 165, 32, 0.4); animation: phoneGlowGold 2s infinite alternate; }
-        #btn-phone:active { transform: scale(0.95); }
+        #btn-phone { transition: transform 0.12s ease, border-color 0.25s ease, box-shadow 0.25s ease; }
+        #btn-phone:active { transform: scale(0.88); }
+        @media (hover: hover) { #btn-phone:hover { border-color: rgba(255, 196, 92, 0.55); box-shadow: 0 0 14px rgba(255, 184, 72, 0.35); } }
+        /* the tap: a warm gold flash that blooms out of the button or icon (ui/app-launch.js adds .tap-flash) */
+        #btn-phone::after, .phone-app-icon-circle::after { content: ''; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; opacity: 0;
+            box-shadow: 0 0 0 0 rgba(255, 190, 80, 0.85), inset 0 0 12px rgba(255, 214, 130, 0.9); }
+        #btn-phone.tap-flash::after, .phone-app-icon-circle.tap-flash::after { animation: tapFlash 0.55s ease-out; }
+        @keyframes tapFlash {
+            0% { opacity: 1; box-shadow: 0 0 0 0 rgba(255, 190, 80, 0.85), inset 0 0 14px rgba(255, 214, 130, 0.95); }
+            100% { opacity: 0; box-shadow: 0 0 0 14px rgba(255, 170, 60, 0), inset 0 0 4px rgba(255, 214, 130, 0); }
+        }
         @keyframes phoneGlowGold { 0% { text-shadow: 0 0 8px rgba(255, 200, 50, 0.5), 0 0 16px rgba(218, 165, 32, 0.3); } 100% { text-shadow: 0 0 14px rgba(255, 215, 0, 0.8), 0 0 28px rgba(255, 200, 50, 0.5); } }
         @keyframes phonePulseCrimson { 0% { box-shadow: 0 0 0 0 rgba(220, 20, 60, 0.7); } 70% { box-shadow: 0 0 0 20px rgba(220, 20, 60, 0); } 100% { box-shadow: 0 0 0 0 rgba(220, 20, 60, 0); } }
         
@@ -720,9 +730,11 @@
         
         #phone-apps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 8px 20px; margin-top: auto; }
         .phone-app-container { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; transition: transform 0.2s ease; position: relative; }
-        .phone-app-container:hover { transform: translateY(-3px); }
+        @media (hover: hover) { .phone-app-container:hover { transform: translateY(-3px); } }   /* hover only where there is one: a touch's hover would stick */
         .phone-app-icon-circle { width: 42px; height: 42px; border-radius: 12px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(5px); display: flex; justify-content: center; align-items: center; font-size: max(6px, 1.1rem - var(--font-trim)); box-shadow: 0 2px 8px rgba(0,0,0,0.3); transition: all 0.2s; position: relative; }
-        .phone-app-container:hover .phone-app-icon-circle { background: rgba(140, 20, 30, 0.2); border-color: rgba(140, 20, 30, 0.5); box-shadow: 0 0 12px rgba(140, 20, 30, 0.3); }
+        @media (hover: hover) { .phone-app-container:hover .phone-app-icon-circle { background: rgba(255, 170, 60, 0.12); border-color: rgba(255, 196, 92, 0.5); box-shadow: 0 0 12px rgba(255, 184, 72, 0.3); } }
+        .phone-app-container:active .phone-app-icon-circle { transform: scale(0.88); transition-duration: 0.08s; }
+        .phone-app-icon-circle.tap-flash { background: rgba(255, 170, 60, 0.16); border-color: rgba(255, 204, 110, 0.7); }
         .phone-app-name { font-family: var(--font-ui); font-size: max(6px, 0.55rem - var(--font-trim)); color: rgba(255,255,255,0.5); text-align: center; font-weight: 400; letter-spacing: 0.3px; }
         .app-badge { position: absolute; top: -4px; right: -4px; width: 10px; height: 10px; background: #ff0000; border: 1px solid #fff; border-radius: 50%; box-shadow: 0 0 5px #ff0000; z-index: 10; display: none; }
         .app-badge.active { display: block; }

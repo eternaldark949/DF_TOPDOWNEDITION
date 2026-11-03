@@ -2581,7 +2581,17 @@
 
         /* --- PHONE SYSTEM --- */
         #btn-phone { position: absolute; top: 60px; left: 25px; width: 44px; height: 44px; border-radius: 4px; background: rgba(10, 8, 5, 0.7); border: 1px solid rgba(218, 165, 32, 0.15); color: #daa520; font-family: var(--font-tech); font-size: max(6px, 1.3rem - var(--font-trim)); font-weight: 700; display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 30; pointer-events: auto; text-shadow: 0 0 10px rgba(255, 200, 50, 0.7), 0 0 20px rgba(218, 165, 32, 0.4); animation: phoneGlowGold 2s infinite alternate; }
-        #btn-phone:active { transform: scale(0.95); }
+        #btn-phone { transition: transform 0.12s ease, border-color 0.25s ease, box-shadow 0.25s ease; }
+        #btn-phone:active { transform: scale(0.88); }
+        @media (hover: hover) { #btn-phone:hover { border-color: rgba(255, 196, 92, 0.55); box-shadow: 0 0 14px rgba(255, 184, 72, 0.35); } }
+        /* the tap: a warm gold flash that blooms out of the button or icon (ui/app-launch.js adds .tap-flash) */
+        #btn-phone::after, .phone-app-icon-circle::after { content: ''; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; opacity: 0;
+            box-shadow: 0 0 0 0 rgba(255, 190, 80, 0.85), inset 0 0 12px rgba(255, 214, 130, 0.9); }
+        #btn-phone.tap-flash::after, .phone-app-icon-circle.tap-flash::after { animation: tapFlash 0.55s ease-out; }
+        @keyframes tapFlash {
+            0% { opacity: 1; box-shadow: 0 0 0 0 rgba(255, 190, 80, 0.85), inset 0 0 14px rgba(255, 214, 130, 0.95); }
+            100% { opacity: 0; box-shadow: 0 0 0 14px rgba(255, 170, 60, 0), inset 0 0 4px rgba(255, 214, 130, 0); }
+        }
         @keyframes phoneGlowGold { 0% { text-shadow: 0 0 8px rgba(255, 200, 50, 0.5), 0 0 16px rgba(218, 165, 32, 0.3); } 100% { text-shadow: 0 0 14px rgba(255, 215, 0, 0.8), 0 0 28px rgba(255, 200, 50, 0.5); } }
         @keyframes phonePulseCrimson { 0% { box-shadow: 0 0 0 0 rgba(220, 20, 60, 0.7); } 70% { box-shadow: 0 0 0 20px rgba(220, 20, 60, 0); } 100% { box-shadow: 0 0 0 0 rgba(220, 20, 60, 0); } }
         
@@ -2634,9 +2644,11 @@
         
         #phone-apps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 8px 20px; margin-top: auto; }
         .phone-app-container { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; transition: transform 0.2s ease; position: relative; }
-        .phone-app-container:hover { transform: translateY(-3px); }
+        @media (hover: hover) { .phone-app-container:hover { transform: translateY(-3px); } }   /* hover only where there is one: a touch's hover would stick */
         .phone-app-icon-circle { width: 42px; height: 42px; border-radius: 12px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(5px); display: flex; justify-content: center; align-items: center; font-size: max(6px, 1.1rem - var(--font-trim)); box-shadow: 0 2px 8px rgba(0,0,0,0.3); transition: all 0.2s; position: relative; }
-        .phone-app-container:hover .phone-app-icon-circle { background: rgba(140, 20, 30, 0.2); border-color: rgba(140, 20, 30, 0.5); box-shadow: 0 0 12px rgba(140, 20, 30, 0.3); }
+        @media (hover: hover) { .phone-app-container:hover .phone-app-icon-circle { background: rgba(255, 170, 60, 0.12); border-color: rgba(255, 196, 92, 0.5); box-shadow: 0 0 12px rgba(255, 184, 72, 0.3); } }
+        .phone-app-container:active .phone-app-icon-circle { transform: scale(0.88); transition-duration: 0.08s; }
+        .phone-app-icon-circle.tap-flash { background: rgba(255, 170, 60, 0.16); border-color: rgba(255, 204, 110, 0.7); }
         .phone-app-name { font-family: var(--font-ui); font-size: max(6px, 0.55rem - var(--font-trim)); color: rgba(255,255,255,0.5); text-align: center; font-weight: 400; letter-spacing: 0.3px; }
         .app-badge { position: absolute; top: -4px; right: -4px; width: 10px; height: 10px; background: #ff0000; border: 1px solid #fff; border-radius: 50%; box-shadow: 0 0 5px #ff0000; z-index: 10; display: none; }
         .app-badge.active { display: block; }
@@ -5803,7 +5815,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'd4aa7c64a9b5';
+        const DFAB_BUILD = 'edb59705d7a1';
     </script>
     <script type="text/dfab" data-src="core/config.js" data-cost="406">
 
@@ -93919,7 +93931,7 @@ engineMixin({
         });
         
     </script>
-    <script type="text/dfab" data-src="ui/app-launch.js" data-cost="57">
+    <script type="text/dfab" data-src="ui/app-launch.js" data-cost="83">
         /* =====================================================================
            APP LAUNCH: phone apps grow out of the icon you tapped
            ---------------------------------------------------------------------
@@ -93950,6 +93962,19 @@ engineMixin({
                     this._tap = { rect: circle.getBoundingClientRect(), at: performance.now() };
                 };
                 apps.addEventListener('pointerdown', remember, true);
+                // a press you can feel: the icon or the M button squishes in, then springs back with a warm gold flash
+                const press = (el) => {
+                    if (!el || this._still() || !el.animate) return;
+                    el.classList.remove('tap-flash'); void el.offsetWidth; el.classList.add('tap-flash');
+                    clearTimeout(el._tapT); el._tapT = setTimeout(() => el.classList.remove('tap-flash'), 600);
+                    el.animate([{ transform: 'scale(0.86)' }, { transform: 'scale(1.08)', offset: 0.45 }, { transform: 'none' }], { duration: 380, easing: 'cubic-bezier(0.3, 0.7, 0.3, 1)' });
+                };
+                apps.addEventListener('click', (e) => {
+                    const icon = e.target.closest && e.target.closest('.phone-app-container');
+                    if (icon) press(icon.querySelector('.phone-app-icon-circle'));
+                }, true);
+                const btn = document.getElementById('btn-phone');
+                if (btn) btn.addEventListener('click', () => press(btn), true);
                 apps.addEventListener('click', remember, true);       // keyboards and controllers click without a pointer
                 const shown = (el) => el.style.display && el.style.display !== 'none';
                 const watch = new MutationObserver((records) => {
@@ -93957,7 +93982,7 @@ engineMixin({
                     for (const r of records) {
                         if (seen.has(r.target)) continue;
                         const el = r.target, wasHidden = !/display:\s*(?!none)\w/.test(r.oldValue || '');
-                        if (el === overlay) { if (shown(el) && wasHidden) this._fromApp = false; continue; }   // the phone itself opening
+                        if (el === overlay) { if (shown(el) && wasHidden) { this._fromApp = false; this._rise(); } continue; }   // the phone itself opening
                         if (!shown(el) || !wasHidden) continue;         // only a hidden screen becoming visible
                         seen.add(el);
                         if (el === home) { if (this._fromApp) this._settleHome(); this._fromApp = false; }
@@ -93987,6 +94012,25 @@ engineMixin({
                 a.id = 'app-launch';
                 el.style.transformOrigin = `${ox}px ${oy}px`;
                 a.onfinish = a.oncancel = () => { el.style.transformOrigin = ''; };
+            },
+
+            /** The phone rises out of the M button (#btn-phone) and grows to its full size */
+            _rise() {
+                const phone = document.getElementById('phone-container'), btn = document.getElementById('btn-phone');
+                if (this._still() || !phone || !phone.animate) return;
+                const k = (typeof phoneSystem !== 'undefined' && phoneSystem.scale) || 1;
+                const box = phone.getBoundingClientRect(), from = btn && btn.getBoundingClientRect();
+                const end = { transform: `scale(${k})`, opacity: 1 };
+                let start = { transform: `translateY(40px) scale(${k * 0.92})`, opacity: 0 };      // no button on screen: rise from below
+                if (from && from.width && box.width) {
+                    const dx = from.left + from.width / 2 - (box.left + box.width / 2), dy = from.top + from.height / 2 - (box.top + box.height / 2);
+                    start = { transform: `translate(${dx}px, ${dy}px) scale(${(from.width / box.width * k).toFixed(4)})`, opacity: 0.2 };
+                }
+                phone.getAnimations().forEach(a => { if (a.id === 'phone-rise') a.cancel(); });
+                const a = phone.animate([start, { transform: `scale(${k * 1.015})`, opacity: 1, offset: 0.8 }, end], { duration: 420, easing: 'cubic-bezier(0.2, 0.9, 0.25, 1)' });
+                a.id = 'phone-rise';
+                const overlay = document.getElementById('phone-overlay');
+                if (overlay) overlay.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: 'ease-out' });
             },
 
             _settleHome() {
