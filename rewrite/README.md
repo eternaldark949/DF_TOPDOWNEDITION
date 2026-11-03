@@ -1,4 +1,4 @@
-# ETRNL9 engine foundation — 0.2.0
+# ETRNL9 engine foundation — 0.3.0
 
 The rewrite now has a shared world foundation, built on ETERNAL's Basement, Lobby,
 Directory, and Penthouse organization. This is still an engine laboratory, not a
@@ -23,10 +23,22 @@ count with visible elements and local geometry checks. This one-time setup can b
 block the page while registrations are created. Reset scene removes that population.
 Zoom out to 50% to inspect the whole scene on a phone.
 
-**Loop & brushes** preserves the original Canvas-only rectangle study in the same file.
+**Loop & interpolation** preserves the scheduling/input exercise using scene planes
+and the same WebGL output as the shared world.
 Start, Pause/Resume, Stop, Reset scene, and Zoom use actual engine lifecycle operations.
 Pause keeps rendering; Stop cancels frame callbacks. No game-specific collision response
 or per-object painter priority is implemented by either study.
+
+## Actual output and reusable artwork
+
+The displayed canvas uses WebGL2 directly. A completed world image stays in GPU memory
+and is presented by a GPU framebuffer copy, including unchanged frames. Canvas 2D never
+composites the final world frame. The output backbuffer does not require preservation.
+
+The artwork system registers image generators, paints/uploads on first demand, and
+reuses unchanged images/textures. Explicit invalidation regenerates only changed artwork.
+GPU restoration reuploads preserved images without repainting. Read **[ARTWORK.md](ARTWORK.md)**
+for the API and its current boundary: world material texture mapping remains future work.
 
 ## Where concerns live
 
@@ -39,7 +51,8 @@ or per-object painter priority is implemented by either study.
 | Directory | Assemble systems/tools and expose element/asset libraries | [directory.js](src/engine/directory.js) |
 | Scene system | Declarative elements/lights, ownership, automatic physical/visual index membership | [scene.js](src/engine/scene.js) |
 | Physics system | Generic shape contacts, Z intervals, linear mass/friction response, sensors/events | [physics.js](src/engine/physics.js) |
-| Canvas renderer | Final viewport, camera helpers, brushes, screen composition | [renderer.js](src/engine/renderer.js) |
+| Output renderer | Displayed WebGL2 canvas, viewport, camera helpers, frame callbacks | [renderer.js](src/engine/renderer.js) |
+| Artwork system | Demand-driven Canvas image generation and resident GPU texture ownership | [artwork.js](src/engine/artwork.js) |
 | World renderer | GPU resource lifetime, opaque depth visibility, central surface lighting | [world-renderer.js](src/engine/world-renderer.js) |
 | Render geometry helper | Reusable triangles generated from shared world geometry | [world-mesh.js](src/engine/world-mesh.js) |
 | Point-light backend | Six-direction source visibility from nearby opaque geometry | [point-light-renderer.js](src/engine/point-light-renderer.js) |
@@ -68,7 +81,7 @@ no new character/vehicle collision handler.
 The default simulation rate is 60 Hz. The Lobby caps catch-up work and reports dropped
 time rather than allowing an endless backlog. Physics independently subdivides fast
 movement within an explicit safety budget; exceeding it fails before movement instead
-of silently permitting missed contacts. The Canvas study interpolates its own display
+of silently permitting missed contacts. The Loop study interpolates its own display
 motion; shared-world rendering currently uses authoritative current geometry.
 
 ## Build and automated checks
@@ -92,6 +105,7 @@ python -m pip install -r rewrite/tools/requirements-browser.txt
 python -m playwright install chromium
 python rewrite/tools/test-browser.py
 python rewrite/tools/test-world-browser.py
+python rewrite/tools/test-artwork-browser.py
 ```
 
 Tests use a configured `CHROMIUM_EXECUTABLE`, a system `chromium`, or Playwright's managed

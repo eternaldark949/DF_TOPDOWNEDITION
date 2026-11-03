@@ -1,7 +1,7 @@
 /**
  * Deterministic foundation checks using only Node built-ins. A fake scheduler lets
- * tests supply exact timestamps and count outstanding callbacks. A Canvas recorder
- * verifies ordering and transforms; real Chromium is tested separately for pixels,
+ * tests supply exact timestamps and count outstanding callbacks. A minimal GPU recorder
+ * verifies callback order and output commands; real Chromium is tested separately for pixels,
  * input, offline loading, and browser behavior. These mocks do not measure GPU work.
  */
 const assert = require('node:assert/strict');
@@ -49,22 +49,26 @@ function eventTarget() {
 
 /** Create fresh source-loaded classes, browser fakes, and a manually advanced clock. */
 function environment(configuration = {}) {
-    // Record drawing operations for assertions about transforms and execution order.
+    // Record GPU output operations for assertions about clearing and execution order.
     const drawingCalls = [];
-    // Emulate only the Canvas methods used by this foundation.
-    const drawingContext = {};
-    // Visit method-name values once each, stopping after all required methods are installed.
-    // “of” supplies names from the list, not numeric array keys.
-    for (const methodName of ['setTransform', 'clearRect', 'save', 'restore', 'translate', 'scale', 'beginPath', 'rect', 'fill']) {
-        /** Record this Canvas call's name and arguments without rendering actual pixels. */
-        drawingContext[methodName] = (...argumentsList) => drawingCalls.push([methodName, ...argumentsList]);
+    // Emulate only GPU output clearing used by empty-world scheduler tests.
+    const graphics = {};
+    // Visit GPU method-name values once; “of” supplies names and stops after the list.
+    for (const methodName of ['bindFramebuffer', 'viewport', 'disable', 'depthMask', 'clearColor', 'clear']) {
+        /** Record output commands; real browser tests independently verify GPU pixels. */
+        graphics[methodName] = (...argumentsList) => drawingCalls.push([methodName, ...argumentsList]);
     }
     // Combine an event target with a controllable canvas rectangle.
     const canvas = Object.assign(eventTarget(), {
         // Start with a normal desktop-sized CSS canvas.
         bounds: { left: 10, top: 20, width: 800, height: 500 },
-        /** Return the recorder used for all engine drawing. */
-        getContext() { return drawingContext; },
+        /** Permit only WebGL2 on the displayed surface; fail if production requests Canvas 2D. */
+        getContext(kind) {
+            // The actual output contract permits exactly the GPU context type.
+            assert.equal(kind, 'webgl2');
+            // Return the minimal recorder rather than pretending to rasterize GPU geometry.
+            return graphics;
+        },
         /** Return current CSS bounds, which tests can replace before resize. */
         getBoundingClientRect() { return this.bounds; },
         /** Accept capture requests without needing an operating-system pointer. */
@@ -102,21 +106,21 @@ function environment(configuration = {}) {
     const context = vm.createContext({ console });
     // Load dependencies before classes that instantiate them.
     // “of” reads each filename value and stops after all foundational source files.
-    for (const sourceName of ['basement', 'spatial', 'world-geometry', 'physics', 'scene', 'world-shaders', 'world-mesh', 'point-light-renderer', 'world-renderer', 'renderer', 'input', 'profiler', 'directory', 'penthouse', 'lobby', 'engine']) {
+    for (const sourceName of ['basement', 'spatial', 'world-geometry', 'physics', 'scene', 'world-shaders', 'world-mesh', 'point-light-renderer', 'world-renderer', 'artwork', 'renderer', 'input', 'profiler', 'directory', 'penthouse', 'lobby', 'engine']) {
         // Read the current implementation, including changes made since the prior run.
         const sourceCode = readFileSync(join(__dirname, '../src/engine', `${sourceName}.js`), 'utf8');
         // Execute that file as a separate script, preserving real load-order constraints.
         vm.runInContext(sourceCode, context, { filename: `${sourceName}.js` });
     }
     // Retrieve class references from their lexical global bindings.
-    const classes = vm.runInContext('({Etrnl9Engine, CanvasBrush, LevelBasement, SpatialHashIndex, WorldGeometry, ContactGeometry})', context);
+    const classes = vm.runInContext('({Etrnl9Engine, LevelBasement, SpatialHashIndex, WorldGeometry, ContactGeometry})', context);
     // Create a complete but stopped engine, injecting the deterministic browser and scheduler.
     const engine = new classes.Etrnl9Engine(canvas, configuration, browserWindow, browserDocument, scheduler);
     // Return references needed to drive behavior and inspect its effects.
     return {
         // Expose the source-loaded engine instance.
         engine,
-        // Expose the classes for validation and independent brush tests.
+        // Expose the source-loaded classes for independent validation checks.
         classes,
         // Expose resizing and pointer event inputs.
         canvas,
@@ -124,7 +128,7 @@ function environment(configuration = {}) {
         browserWindow,
         // Expose page visibility input.
         browserDocument,
-        // Expose Canvas operation accounting.
+        // Expose GPU operation accounting.
         drawingCalls,
         // Expose outstanding callback accounting.
         pendingCallbacks,
@@ -280,61 +284,45 @@ test('stall work limit and discarded-time accounting', () => {
     fixture.engine.destroy();
 });
 
-/** Verify pass order, camera conversions, density cap, batching, and queue clearing. */
-test('renderer order, camera, resize, state restoration, and brushes', () => {
-    // Obtain fresh engine and renderer references.
+/** Verify screen callback order, camera conversion, density limits, and output clearing. */
+test('WebGL output, callback order, camera, and resize', () => {
+    // Create an empty engine whose displayed canvas rejects Canvas 2D requests.
     const fixture = environment();
-    // Resolve the renderer from its Directory registration.
+    // Resolve actual output ownership from the Directory.
     const renderer = fixture.engine.directory.systems.get('renderer');
-    // Device density three must be capped to two: 800 CSS pixels become 1600 backing pixels.
+    // Device density three is capped at two: 800 CSS pixels become 1600 output pixels.
     assert.equal(fixture.canvas.width, 1600);
-    // Put the camera at a known world coordinate.
+    // Put the camera at a known horizontal world coordinate.
     renderer.camera.positionX = 100;
-    // Set vertical camera position independently.
+    // Set its vertical projected-world center independently.
     renderer.camera.positionY = 200;
-    // Double world scale without changing CSS input coordinates.
+    // Double world scale while CSS input positions retain their own units.
     renderer.camera.zoom = 2;
-    // The center of the CSS viewport must map exactly to the camera world position.
+    // The CSS viewport center must reconstruct the horizontal camera coordinate.
     assert.equal(renderer.screenToWorld(400, 250).positionX, 100);
-    // Check the same conversion on the vertical axis.
+    // The same center must reconstruct the vertical camera coordinate.
     assert.equal(renderer.screenToWorld(400, 250).positionY, 200);
-    // Record pass execution order independently of Canvas command recording.
+    // Record callback order independently from GPU command recording.
     const passOrder = [];
-    /** Register a later world pass first, proving sort order is explicit. */
-    renderer.registerPass('later', 10, 'world', () => passOrder.push('later'));
-    /** Register an earlier screen pass second. */
+    /** Record the later screen callback when production invokes it. */
+    renderer.registerPass('later', 10, 'screen', () => passOrder.push('later'));
+    /** Record the earlier callback despite its later registration. */
     renderer.registerPass('earlier', 0, 'screen', () => passOrder.push('earlier'));
-    // Submit one frame directly without starting the Lobby scheduler.
+    // Run production output with no mocked world geometry or shading.
     renderer.render({ interpolationFraction: 0 });
-    // Sorting must override registration order when pass priorities differ.
+    // Sorting must determine callback execution order.
     assert.deepEqual(passOrder, ['earlier', 'later']);
-    // Both passes must have isolated Canvas state.
-    assert.equal(fixture.drawingCalls.filter((call) => call[0] === 'restore').length, 2);
-    // A world pass must apply camera translation.
-    assert.ok(fixture.drawingCalls.some((call) => call[0] === 'translate' && call[1] === -100 && call[2] === -200));
-    // Create a same-color brush to exercise the actual drawing implementation.
-    const brush = new fixture.classes.CanvasBrush('#ffffff');
-    // Queue one rectangle with a known corner and size.
-    brush.rectangle(1, 2, 3, 4);
-    // Queue another rectangle that should share the same fill call.
-    brush.rectangle(5, 6, 7, 8);
-    // Submit both rectangles to the renderer's current drawing context.
-    brush.flush(renderer);
-    // The queue must release instructions after submission.
-    assert.equal(brush.instructions.length, 0);
-    // Two rectangles in the brush require one actual fill.
-    assert.equal(fixture.drawingCalls.filter((call) => call[0] === 'fill').length, 1);
-    // Flushing an empty brush must produce no additional fill.
-    brush.flush(renderer);
-    // Confirm empty queue submission remains a no-op.
-    assert.equal(fixture.drawingCalls.filter((call) => call[0] === 'fill').length, 1);
-    // Simulate a resized embedded canvas.
+    // Empty worlds must clear output through the GPU, without a Canvas composition stage.
+    assert.equal(fixture.drawingCalls.filter((call) => call[0] === 'clear').length, 1);
+    // There is no final Canvas drawing context exposed by this renderer.
+    assert.equal(renderer.drawingContext, undefined);
+    // Update the CSS host size through the same data the real resize listener reads.
     fixture.canvas.bounds.width = 320;
-    // Deliver resize through the engine's real window listener.
+    // Deliver the production resize event, preserving ordinary engine lifecycle behavior.
     fixture.browserWindow.dispatch('resize');
-    // Backing width must follow the new CSS bounds at the capped density.
+    // Backing pixels must match the new width and capped density.
     assert.equal(fixture.canvas.width, 640);
-    // Release the fixture.
+    // Remove every registered listener and pending callback.
     fixture.engine.destroy();
 });
 
@@ -417,13 +405,11 @@ test('validation and failure cleanup', () => {
     // Resolve the real renderer for an injected failure.
     const renderer = fixture.engine.directory.systems.get('renderer');
     /** Fail inside a pass to check the actual renderer/Lobby error boundary. */
-    renderer.registerPass('broken', 0, 'world', () => { throw new Error('intentional failure'); });
+    renderer.registerPass('broken', 0, 'screen', () => { throw new Error('intentional failure'); });
     // Begin the loop so a real scheduled callback exercises the failure.
     fixture.engine.start();
     // The original failure must remain visible to the caller.
     assert.throws(() => fixture.fire(0), /intentional failure/);
-    // The renderer must restore Canvas state even when its pass throws.
-    assert.equal(fixture.drawingCalls.filter((call) => call[0] === 'restore').length, 1);
     // The Lobby must stop instead of repeatedly invoking a broken frame.
     assert.equal(fixture.engine.lobby.running, false);
     // No callback may remain scheduled after failure.

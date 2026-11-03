@@ -27,7 +27,7 @@
                 <button id="stop-button" type="button">Stop</button>
                 <button id="reset-button" type="button">Reset scene</button>
                 <label>Zoom <select id="zoom-control"><option value="0.5">50%</option><option value="0.75">75%</option><option value="1" selected>100%</option><option value="1.5">150%</option></select></label>
-                <label>Study <select id="study-control"><option value="world">Shared world</option><option value="loop">Loop &amp; brushes</option></select></label>
+                <label>Study <select id="study-control"><option value="world">Shared world</option><option value="loop">Loop &amp; interpolation</option></select></label>
             </div>
             <p id="study-instructions">Controls and instructions follow the selected engine study.</p>
             <div class="controls" id="world-controls">
@@ -55,7 +55,7 @@
             <article><span>02</span><h2>Directory</h2><p>Scene, spatial indexes, physics, depth rendering, lighting, input, and tools.</p></article>
             <article><span>03</span><h2>Penthouse</h2><p>Optional procedural features built on Directory services.</p></article>
         </section>
-        <footer>Neutral engine tests, with no game migration. Shared-world rendering requires WebGL2; opaque boxes, circles, and planes are supported. The Loop study remains Canvas-only. Bloom and transparent surfaces are not implemented.</footer>
+        <footer>Neutral engine tests, with no game migration. Shared-world rendering requires WebGL2; opaque boxes, circles, and planes are supported. Both studies use WebGL output; Canvas 2D is reserved for cached artwork. Bloom and transparent surfaces are not implemented.</footer>
     </main>
     <!-- @scripts -->
 </body>

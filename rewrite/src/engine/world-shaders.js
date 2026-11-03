@@ -26,7 +26,7 @@ in vec3 aColor;
 in vec3 aEmission;
 // CSS-pixel dimensions of the final view.
 uniform vec2 uViewport;
-// Projected-world view center, matching the Canvas renderer's camera.
+// Projected-world view center, matching the output renderer's camera.
 uniform vec2 uCamera;
 // CSS pixels per world unit.
 uniform float uZoom;
@@ -50,7 +50,7 @@ void main() {
     vec2 screen = (projected - uCamera) * uZoom * 2.0 / uViewport;
     // Greater camera-facing depth should produce a smaller GPU depth value.
     float depth = -((aPosition.y - uCamera.y) * uHeightScale + aPosition.z) / uDepthRange;
-    // Canvas Y points down, while normalized device Y points up.
+    // Public screen Y points down, while normalized device Y points up.
     gl_Position = vec4(screen.x, -screen.y, depth, 1.0);
     // Preserve actual physical coordinates for point-light distance and obstruction tests.
     vPosition = aPosition;

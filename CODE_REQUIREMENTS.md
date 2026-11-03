@@ -208,8 +208,8 @@ game migration. Follow `rewrite/ENGINE_CONTRACTS.md` when extending the foundati
   direct lighting must respect engine-managed visibility instead of per-building ordering.
 - Do not fix glow over roofs by adding a special shop/window/building painter priority.
   Declare actual surface geometry/material/source information and use shared visibility.
-- Unstructured world Canvas callbacks cannot bypass a depth-aware scene. Canvas screen
-  UI/backgrounds and explicit diagnostic overlays remain separate from physical surfaces.
+- World drawing callbacks cannot bypass shared scene geometry, even when a scene is empty.
+  Screen callbacks prepare content or update UI; they do not restore a Canvas compositor.
 - Keep asset definitions separate from placed scene instances. Share spatial algorithms
   without forcing collision, visibility, and light reach into one universal index.
 - Preserve explicit budgets and diagnostics. Do not advertise unlimited/constant-time
@@ -218,3 +218,21 @@ game migration. Follow `rewrite/ENGINE_CONTRACTS.md` when extending the foundati
   including height separation and visible emission occlusion, before migrating game content.
 - Unsupported geometry/material/dynamics must be stated explicitly, not treated as fully
   implemented by an incorrect fallback. Keep named concerns and detailed comments intact.
+
+## 12. WebGL owns the actual output frame
+
+- The displayed canvas uses WebGL2. Do not render the world into a WebGL canvas and
+  copy it into a final Canvas 2D canvas. Do not provide a hidden Canvas world fallback.
+- A retained GPU framebuffer and GPU-to-GPU presentation are permitted. Keep completed
+  world images in GPU storage rather than reading them back for CPU composition.
+- Canvas 2D is an artwork/information generator. Generate reusable images on first use
+  or during explicit preparation, then reuse resident textures. Repaint only when an
+  asset changes or an explicit update is requested; do not automatically repaint every
+  asset every display frame. A periodic feature may invalidate only its changed assets.
+- Keep artwork generators, asset ownership/cache lifetime, GPU uploads, placed scene
+  instances, physical geometry, and frame scheduling as separately named concerns.
+- Preserve CPU artwork across GPU loss. Restore lost GPU textures by uploading that
+  preserved image, without rerunning unchanged procedural drawing instructions.
+- Verify paint/upload counts and actual browser GPU pixels. A resource cache alone
+  does not prove world texture mapping, transparent materials, or visual game parity;
+  document those capabilities only when implemented and checked.

@@ -103,9 +103,9 @@ class PointLightRenderer {
             renderer.statistics.drawCalls += 1;
         }
         // Return to the camera-facing world framebuffer before direct illumination.
-        renderer.graphics.bindFramebuffer(renderer.graphics.FRAMEBUFFER, null);
+        renderer.graphics.bindFramebuffer(renderer.graphics.FRAMEBUFFER, renderer.resources.frameFramebuffer);
         // Restore the camera image's actual pixel dimensions.
-        renderer.graphics.viewport(0, 0, renderer.canvas.width, renderer.canvas.height);
+        renderer.graphics.viewport(0, 0, renderer.renderWidth, renderer.renderHeight);
         // Lighting must revisit exactly the previously visible camera surface.
         renderer.graphics.depthFunc(renderer.graphics.EQUAL);
         // Preserve established camera depth while adding illumination.

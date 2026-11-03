@@ -48,7 +48,7 @@ def check_browser(browser, mobile):
     # Managed Chromium blocks file:// navigation, so this checks standalone content
     # without claiming to test the owner's phone file-opening application.
     page.set_content(artifact_html)
-    # Preserve the original Canvas-only test contract within the same new deliverable.
+    # Exercise the scheduling study through the same WebGL output as the shared world.
     page.locator('#study-control').select_option('loop')
     # Wait for the real engine to render enough frames to establish it is running.
     page.wait_for_function('window.foundationEngine?.directory.tools.get("profiler").frameCount > 5')
@@ -57,7 +57,12 @@ def check_browser(browser, mobile):
         // Read the actual renderer and its backing image.
         const renderer = foundationEngine.directory.systems.get('renderer');
         // Sample the center, where the study places the cream marker initially.
-        const pixel = renderer.drawingContext.getImageData(Math.floor(renderer.canvas.width / 2), Math.floor(renderer.canvas.height / 2), 1, 1).data;
+        // Read the completed output within the same browser task as GPU presentation.
+        renderer.render({interpolationFraction: 1});
+        // One pixel is enough to establish that real WebGL output contains the marker.
+        const pixel = new Uint8Array(4);
+        // CSS center maps to the backing image center under the capped output density.
+        renderer.graphics.readPixels(Math.floor(renderer.canvas.width / 2), Math.floor(renderer.canvas.height / 2), 1, 1, renderer.graphics.RGBA, renderer.graphics.UNSIGNED_BYTE, pixel);
         // Cream has high red and green channels; a blank dark canvas cannot pass.
         return pixel[0] > 230 && pixel[1] > 200 && pixel[3] === 255;
     }""")

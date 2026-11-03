@@ -12,7 +12,7 @@ class LevelBasement {
             // Identify this foundation independently of the existing game's version.
             engineName: 'ETRNL9',
             // Describe the first working foundation, not a migrated full game.
-            engineVersion: '0.2.0',
+            engineVersion: '0.3.0',
             // Run simulation at sixty fixed steps per second on any display.
             simulationHz: 60,
             // Limit elapsed time accepted after a browser stall, in seconds.

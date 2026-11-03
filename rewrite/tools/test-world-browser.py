@@ -24,22 +24,29 @@ evidence_directory = Path(sys.argv[1]) if len(sys.argv) > 1 else None
 
 
 def sample(page, world_x, world_y, world_z=0):
-    """Read final Canvas RGB at the engine-projected physical world point."""
+    """Read final WebGL output RGB at the engine-projected physical world point."""
     # Use the engine's shared coordinate conversion instead of duplicating projection formulas.
     return page.evaluate("""([worldX, worldY, worldZ]) => {
-        // Obtain the final compositor and its actual high-density canvas.
+        // Obtain the actual WebGL output owner and its high-density displayed canvas.
         const renderer = foundationEngine.directory.systems.get('renderer');
         // Project the supplied physical XYZ through the public engine API.
         const point = renderer.worldToScreen(worldX, worldY, worldZ);
-        // Convert CSS pixels into backing pixels for actual image readback.
-        const pixel = renderer.drawingContext.getImageData(Math.floor(point.positionX * renderer.pixelRatio), Math.floor(point.positionY * renderer.pixelRatio), 1, 1).data;
+        // Render and read within one browser task: the displayed backbuffer may be
+        // discarded after browser presentation because preserveDrawingBuffer is false.
+        renderer.render({interpolationFraction: 1});
+        // Allocate one RGBA pixel for GPU readback from the actual output framebuffer.
+        const pixel = new Uint8Array(4);
+        // WebGL starts Y at the bottom; public screen coordinates start at the top.
+        const backingY = renderer.canvas.height - 1 - Math.floor(point.positionY * renderer.pixelRatio);
+        // Read the actual displayed GPU surface, not a CPU-generated imitation or shader mock.
+        renderer.graphics.readPixels(Math.floor(point.positionX * renderer.pixelRatio), backingY, 1, 1, renderer.graphics.RGBA, renderer.graphics.UNSIGNED_BYTE, pixel);
         // Return ordinary numbers that Python can assert against.
         return Array.from(pixel);
     }""", [world_x, world_y, world_z])
 
 
 def render(page):
-    """Draw the current stopped scene once through the production compositor."""
+    """Draw the current stopped scene once through production WebGL output."""
     # Manual execution isolates pixel assertions from gravity/motion between samples.
     page.evaluate("""() => {
         // Use the exact production render path, not a test-specific shader.
@@ -132,7 +139,7 @@ def check_world(browser, mobile):
     ground_pixel = sample(page, 70, -60, 0.02)
     # Visibility must not suppress the entire source just because part is covered.
     assert ground_pixel[0] > 240 and ground_pixel[1] < 5, ground_pixel
-    # An unchanged scene should reuse its complete preserved world image, including visibility.
+    # An unchanged scene should reuse its complete retained GPU world image, including visibility.
     render(page)
     # No internal GPU geometry should be resubmitted on this identical frame.
     assert page.evaluate('foundationEngine.directory.systems.get("worldRenderer").statistics.drawCalls') == 0

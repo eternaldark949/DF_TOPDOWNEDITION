@@ -1,7 +1,7 @@
 /**
  * DIRECTORY WORLD RENDERER — opaque surfaces use a real GPU depth buffer.
- * Rendering occurs on an internal WebGL2 canvas, then the existing Canvas renderer
- * composites that one world image. Geometry, surface emission, and point-light
+ * Rendering uses the displayed canvas's WebGL2 context. A retained GPU image is
+ * presented by a GPU framebuffer copy, never by a Canvas 2D drawing context. Geometry, surface emission, and point-light
  * contributions all use identical vertex positions and depth tests. No building,
  * shop, roof, or character name changes visibility rules.
  * This first contract supports opaque extruded boxes/circles and flat planes;
@@ -12,7 +12,7 @@ class WorldRendererSystem {
     constructor(basement) {
         // Shared height projection and ambient configuration must match the Scene indexes.
         this.basement = basement;
-        // Offscreen canvas is allocated lazily so an empty/Canvas-only engine needs no WebGL.
+        // The connection phase supplies the actual displayed canvas, never an offscreen canvas.
         this.canvas = null;
         // Null means no WebGL resource set has been created yet.
         this.resources = null;
@@ -29,7 +29,18 @@ class WorldRendererSystem {
         // Point-light visibility has its own backend helper, using live parent resource lookup.
         this.pointLighting = new PointLightRenderer(this);
         // Track what the GPU is actually asked to draw.
-        this.statistics = { visibleElements: 0, vertices: 0, lights: 0, shadowCandidates: 0, drawCalls: 0 };
+        this.statistics = {
+            // Scene elements returned by the current camera visibility query.
+            visibleElements: 0,
+            // Triangle corners submitted for the visible opaque geometry.
+            vertices: 0,
+            // Point sources whose influence reaches the current view.
+            lights: 0,
+            // Nearby opaque candidates processed for source visibility this frame.
+            shadowCandidates: 0,
+            // Actual world/light/shadow GPU draw submissions, excluding final presentation.
+            drawCalls: 0
+        };
         // Bound handlers retain this renderer when the canvas dispatches GPU lifecycle events.
         this.handleContextLost = this.onContextLost.bind(this);
         // Keep the exact function reference for later listener removal.
@@ -40,8 +51,18 @@ class WorldRendererSystem {
     connect(directory) {
         // Scene elements are the authoritative geometry providers.
         this.scene = directory.systems.get('scene');
-        // The Canvas renderer remains the owner of final viewport composition.
+        // The output system owns the actual displayed canvas and its WebGL2 context.
         this.renderer = directory.systems.get('renderer');
+        // Both systems use the same canvas object; no inter-canvas world copy is possible.
+        this.canvas = this.renderer.canvas;
+        // Retain the same live GPU context used for final presentation.
+        this.graphics = this.renderer.graphics;
+        // Artwork remains CPU-resident across context loss and restores textures on demand.
+        this.artwork = directory.systems.get('artwork');
+        // Listen before the first frame so early GPU loss is handled too.
+        this.canvas.addEventListener('webglcontextlost', this.handleContextLost);
+        // Reuse the Lobby's existing schedule after the browser restores GPU availability.
+        this.canvas.addEventListener('webglcontextrestored', this.handleContextRestored);
     }
 
     /** Register one central world pass when the first scene element is added. */
@@ -53,13 +74,13 @@ class WorldRendererSystem {
         }
         // The world image uses screen coordinates because its vertices already project the camera.
         this.renderer.registerPass('engine.world', 20, 'screen', this.draw.bind(this));
-        // Remember that the final compositor now owns this one callback.
+        // Remember that the final GPU output schedule now owns this callback.
         this.active = true;
     }
 
     /** Remove the central pass when the scene becomes empty, keeping reusable GPU resources. */
     deactivate() {
-        // Remove only the world pass, leaving independent UI/Canvas passes intact.
+        // Remove only the world pass, leaving independent screen preparation/UI callbacks intact.
         this.renderer.removePass('engine.world');
         // A later scene can reactivate the same renderer.
         this.active = false;
@@ -127,26 +148,16 @@ class WorldRendererSystem {
         return program;
     }
 
-    /** Allocate one internal WebGL2 canvas and reusable geometry/shadow buffers. */
+    /** Allocate retained GPU image/depth storage and reusable geometry/shadow buffers. */
     initialize() {
-        // Create the offscreen surface only when a nonempty world is rendered.
-        if (!this.canvas) {
-            // Use the host canvas's document so embedding does not depend on a global page.
-            this.canvas = this.renderer.canvas.ownerDocument.createElement('canvas');
-            // Context loss is a browser event, not a reason to start another engine loop.
-            this.canvas.addEventListener('webglcontextlost', this.handleContextLost);
-            // Restoration reconstructs resources during the existing Lobby schedule.
-            this.canvas.addEventListener('webglcontextrestored', this.handleContextRestored);
-        }
-        // Request a real depth-capable rendering context; no external engine dependency is used.
-        this.graphics = this.canvas.getContext('webgl2', { alpha: true, premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: true });
-        // Devices without WebGL2 must receive a clear capability error.
-        if (!this.graphics) {
-            // Do not fall back to incorrect painter ordering while claiming depth correctness.
-            throw new Error('Shared world surfaces require WebGL2; the Canvas-only loop study remains available.');
-        }
         // Keep GPU handles together for explicit disposal and context restoration.
         this.resources = {
+            // Retain the completed world image on the GPU between display callbacks.
+            frameTexture: this.graphics.createTexture(),
+            // Physical visibility needs depth storage at the world's shading resolution.
+            frameDepth: this.graphics.createRenderbuffer(),
+            // Attach that color/depth storage to one reusable world rendering target.
+            frameFramebuffer: this.graphics.createFramebuffer(),
             // Draw opaque color and attached surface emission into the depth buffer.
             baseProgram: this.createProgram(WorldShaders.baseFragmentSource),
             // Add point lighting only to the same visible fragments, with geometric shadows.
@@ -162,6 +173,10 @@ class WorldRendererSystem {
             // Render depth into one cubemap face at a time, without touching the world image.
             shadowFramebuffer: this.graphics.createFramebuffer()
         };
+        // Force color/depth allocation even when restoring the same canvas dimensions.
+        this.renderWidth = 0;
+        // A new resource set has no valid retained image height either.
+        this.renderHeight = 0;
         // Validate configured shadow resolution against actual hardware capacity.
         const shadowSize = this.basement.configuration.shadowMapSize;
         // Cubemap allocation must fit the device rather than silently reducing declared quality.
@@ -206,6 +221,8 @@ class WorldRendererSystem {
         this.resources = null;
         // Permit draw() to initialize a fresh resource set.
         this.contextLost = false;
+        // Artwork texture handles were lost too; retain painted images for upload, not repaint.
+        this.artwork.restoreContext();
         // Force a complete upload from authoritative scene data.
         this.cachedGeometryKey = '';
         // A restored context must shade the scene again before reusing its finished image.
@@ -248,7 +265,7 @@ class WorldRendererSystem {
         graphics.uniform1f(graphics.getUniformLocation(program, 'uDepthRange'), depthRange);
     }
 
-    /** Project, depth-test, shade, and composite all visible opaque world geometry once. */
+    /** Project, depth-test, shade, and present all visible opaque world geometry once. */
     draw(renderer) {
         // A lost context must not issue invalid GPU calls while waiting for restoration.
         if (this.contextLost) {
@@ -266,18 +283,12 @@ class WorldRendererSystem {
         const desiredWidth = Math.max(1, Math.round(renderer.viewportWidth * worldPixelRatio));
         // Calculate desired backing height with the same density policy.
         const desiredHeight = Math.max(1, Math.round(renderer.viewportHeight * worldPixelRatio));
-        // Reallocate only when actual shading dimensions change.
-        if (this.canvas.width !== desiredWidth) {
-            // Reallocate only on a real size change, not on every frame.
-            this.canvas.width = desiredWidth;
-        }
-        // Allocate matching vertical backing resolution.
-        if (this.canvas.height !== desiredHeight) {
-            // Keep unchanged backing storage across ordinary frames.
-            this.canvas.height = desiredHeight;
-        }
-        // Set the GPU viewport to the full internal backing image.
-        this.graphics.viewport(0, 0, this.canvas.width, this.canvas.height);
+        // Resize the retained GPU target only when the shading allocation changes.
+        this.resizeFrame(desiredWidth, desiredHeight);
+        // Select the retained world color/depth target before any camera shading.
+        this.graphics.bindFramebuffer(this.graphics.FRAMEBUFFER, this.resources.frameFramebuffer);
+        // Use the world shading density, independently of the displayed canvas density.
+        this.graphics.viewport(0, 0, this.renderWidth, this.renderHeight);
         // Read zoom once while constructing projected-world query bounds.
         const zoom = renderer.camera.zoom;
         // Camera coordinates are projected-world coordinates; Z was already included by Scene.
@@ -291,23 +302,32 @@ class WorldRendererSystem {
             // Lower edge of the visible projected world.
             maximumY: renderer.camera.positionY + renderer.viewportHeight / (2 * zoom)
         };
-        // Include pixel allocation because resizing invalidates the preserved drawing buffer.
-        const frameKey = `${this.scene.revision}:${JSON.stringify(view)}:${desiredWidth}:${desiredHeight}`;
-        // An unchanged view and world need only a final image copy, not another shadow pass.
+        // Include shading allocation because resizing invalidates the retained GPU image.
+        const frameKey = `${this.scene.revision}:${JSON.stringify(view)}:${desiredWidth}:${desiredHeight}:${renderer.backgroundColor.join(',')}`;
+        // An unchanged world needs only GPU presentation, not another geometry/light pass.
         if (frameKey === this.cachedFrameKey) {
-            // This frame submitted no internal GPU geometry or shadow work.
+            // No geometry or source-shadow work is submitted for this cached frame.
             this.statistics.drawCalls = 0;
-            // No shadow candidates were newly processed for this cached frame.
+            // No shadow candidates are processed when the retained image is reused.
             this.statistics.shadowCandidates = 0;
-            // Copy the preserved complete world image under the same final screen transform.
-            renderer.drawingContext.drawImage(this.canvas, 0, 0, renderer.viewportWidth, renderer.viewportHeight);
-            // Report the one actual Canvas copy required for this cached frame.
-            renderer.drawCalls += 1;
-            // Leave existing geometry and depth buffers available for a later changed frame.
+            // Copy between GPU framebuffers directly into the displayed WebGL canvas.
+            this.present(renderer);
+            // Leave retained color/depth and geometry available for the next changed frame.
             return;
         }
         // Reset current-frame diagnostics before visibility and lighting work.
-        this.statistics = { visibleElements: 0, vertices: 0, lights: 0, shadowCandidates: 0, drawCalls: 0 };
+        this.statistics = {
+            // Scene elements returned by the current camera visibility query.
+            visibleElements: 0,
+            // Triangle corners submitted for the visible opaque geometry.
+            vertices: 0,
+            // Point sources whose influence reaches the current view.
+            lights: 0,
+            // Nearby opaque candidates processed for source visibility this frame.
+            shadowCandidates: 0,
+            // Actual world/light/shadow GPU draw submissions, excluding final presentation.
+            drawCalls: 0
+        };
         // Query geometry using its actual height-expanded visual extent.
         const visible = this.scene.visibleGeometry.query(view).filter((element) => element.visible);
         // Stable IDs determine only exactly coplanar ties, never ordinary occlusion.
@@ -348,8 +368,8 @@ class WorldRendererSystem {
         }
         // Publish the actual geometry submitted rather than the total scene registry size.
         this.statistics.vertices = this.vertexCount;
-        // Clear to transparent so the Canvas background can remain independently styled.
-        this.graphics.clearColor(0, 0, 0, 0);
+        // The world target includes the opaque background; presentation needs no Canvas layer.
+        this.graphics.clearColor(...renderer.backgroundColor, 1);
         // Far depth starts at one; smaller fragment depth means closer to the camera.
         this.graphics.clearDepth(1);
         // Depth writes must be enabled when clearing and rendering opaque surfaces.
@@ -399,9 +419,9 @@ class WorldRendererSystem {
             // WebGL scissor Y starts at the bottom, unlike CSS coordinates.
             const minimumY = Math.max(0, Math.floor((renderer.viewportHeight - lightCenter.positionY - radiusY) * worldPixelRatio));
             // Clamp the right influence edge to avoid irrelevant offscreen fragments.
-            const maximumX = Math.min(this.canvas.width, Math.ceil((lightCenter.positionX + radiusX) * worldPixelRatio));
+            const maximumX = Math.min(this.renderWidth, Math.ceil((lightCenter.positionX + radiusX) * worldPixelRatio));
             // Clamp the upper WebGL influence edge using the inverted vertical coordinate.
-            const maximumY = Math.min(this.canvas.height, Math.ceil((renderer.viewportHeight - lightCenter.positionY + radiusY) * worldPixelRatio));
+            const maximumY = Math.min(this.renderHeight, Math.ceil((renderer.viewportHeight - lightCenter.positionY + radiusY) * worldPixelRatio));
             // Empty projected influence produces no lighting submission.
             if (maximumX <= minimumX || maximumY <= minimumY) {
                 // Continue with the next visible/reaching source.
@@ -430,14 +450,74 @@ class WorldRendererSystem {
         this.graphics.disable(this.graphics.SCISSOR_TEST);
         // Restore depth-write state for the next frame's clear/base pass.
         this.graphics.depthMask(true);
-        // Flush commands before copying this canvas into the final Canvas image.
-        this.graphics.flush();
-        // Composite the completed depth-aware world image in CSS-pixel screen coordinates.
-        renderer.drawingContext.drawImage(this.canvas, 0, 0, renderer.viewportWidth, renderer.viewportHeight);
-        // Account for this final Canvas composition independently of internal GPU submissions.
-        renderer.drawCalls += 1;
-        // The preserved opaque/light image is now reusable until tracked scene/view changes.
+        // The retained world color is complete; present it through the same GPU context.
+        this.present(renderer);
+        // Reuse this finished GPU image until a tracked scene/view/allocation change.
         this.cachedFrameKey = frameKey;
+    }
+
+    /** Allocate world color/depth pixels when shading dimensions change; no CPU image copy. */
+    resizeFrame(width, height) {
+        // Matching dimensions mean the retained GPU storage is already suitable.
+        if (width === this.renderWidth && height === this.renderHeight) {
+            // Preserve both image contents and allocation on ordinary frames.
+            return;
+        }
+        // Both color textures and depth renderbuffers must support the requested extent.
+        const maximumSize = Math.min(this.graphics.getParameter(this.graphics.MAX_TEXTURE_SIZE), this.graphics.getParameter(this.graphics.MAX_RENDERBUFFER_SIZE));
+        // Reject impossible image dimensions rather than silently producing an incomplete target.
+        if (width > maximumSize || height > maximumSize) {
+            // Let the caller reduce the declared output/shading density explicitly.
+            throw new RangeError('World shading dimensions exceed this GPU texture capacity.');
+        }
+        // Bind the retained color texture before allocating or configuring its pixels.
+        this.graphics.bindTexture(this.graphics.TEXTURE_2D, this.resources.frameTexture);
+        // Allocate normalized RGBA storage entirely on the GPU; null supplies no CPU pixels.
+        this.graphics.texImage2D(this.graphics.TEXTURE_2D, 0, this.graphics.RGBA8, width, height, 0, this.graphics.RGBA, this.graphics.UNSIGNED_BYTE, null);
+        // No mipmap chain is needed for a viewport-sized retained image.
+        this.graphics.texParameteri(this.graphics.TEXTURE_2D, this.graphics.TEXTURE_MIN_FILTER, this.graphics.LINEAR);
+        // Smoothly enlarge a deliberately lower-density world image onto the output canvas.
+        this.graphics.texParameteri(this.graphics.TEXTURE_2D, this.graphics.TEXTURE_MAG_FILTER, this.graphics.LINEAR);
+        // Select depth storage for this world's exact shading dimensions.
+        this.graphics.bindRenderbuffer(this.graphics.RENDERBUFFER, this.resources.frameDepth);
+        // A 24-bit depth buffer resolves physical visibility independently from color.
+        this.graphics.renderbufferStorage(this.graphics.RENDERBUFFER, this.graphics.DEPTH_COMPONENT24, width, height);
+        // Attach the retained color and depth resources to their owned framebuffer.
+        this.graphics.bindFramebuffer(this.graphics.FRAMEBUFFER, this.resources.frameFramebuffer);
+        // Color attachment zero receives the world fragment shader's output.
+        this.graphics.framebufferTexture2D(this.graphics.FRAMEBUFFER, this.graphics.COLOR_ATTACHMENT0, this.graphics.TEXTURE_2D, this.resources.frameTexture, 0);
+        // The shared visibility test writes the retained depth attachment.
+        this.graphics.framebufferRenderbuffer(this.graphics.FRAMEBUFFER, this.graphics.DEPTH_ATTACHMENT, this.graphics.RENDERBUFFER, this.resources.frameDepth);
+        // Verify actual hardware support before presenting any supposedly valid world frame.
+        if (this.graphics.checkFramebufferStatus(this.graphics.FRAMEBUFFER) !== this.graphics.FRAMEBUFFER_COMPLETE) {
+            // Stop clearly rather than displaying stale output from an incomplete target.
+            throw new Error('This GPU could not allocate the retained world framebuffer.');
+        }
+        // Remember the successfully allocated width in backing pixels.
+        this.renderWidth = width;
+        // Remember the successfully allocated height in backing pixels.
+        this.renderHeight = height;
+        // A reallocated color image must be shaded before reuse.
+        this.cachedFrameKey = '';
+    }
+
+    /** Present retained world color to the actual output using one GPU-to-GPU image copy. */
+    present(renderer) {
+        // No source-specific clipping may limit the completed image's output region.
+        this.graphics.disable(this.graphics.SCISSOR_TEST);
+        // Read pixels directly from the retained GPU world target.
+        this.graphics.bindFramebuffer(this.graphics.READ_FRAMEBUFFER, this.resources.frameFramebuffer);
+        // Write into the displayed canvas's default GPU framebuffer.
+        this.graphics.bindFramebuffer(this.graphics.DRAW_FRAMEBUFFER, null);
+        // Scale world shading pixels to output pixels entirely on the GPU. This operation
+        // copies only color; world visibility was already resolved by its physical depth.
+        this.graphics.blitFramebuffer(0, 0, this.renderWidth, this.renderHeight, 0, 0, this.canvas.width, this.canvas.height, this.graphics.COLOR_BUFFER_BIT, this.graphics.LINEAR);
+        // Restore both framebuffer bindings for later screen work or the next frame's clear.
+        this.graphics.bindFramebuffer(this.graphics.FRAMEBUFFER, null);
+        // Restore the full output viewport after lower-density world shading.
+        this.graphics.viewport(0, 0, this.canvas.width, this.canvas.height);
+        // Report the actual final-output GPU copy separately from world/shadow draw calls.
+        renderer.drawCalls += 1;
     }
 
     /** Compare element IDs solely to make exactly coplanar ties deterministic. */
@@ -458,9 +538,9 @@ class WorldRendererSystem {
 
     /** Release GPU objects and context listeners when the Directory destroys this service. */
     dispose() {
-        // Remove the compositor callback before releasing resources it might use.
+        // Remove the world presentation callback before releasing resources it might use.
         this.deactivate();
-        // A Canvas-only session may never have allocated an offscreen context.
+        // Lifecycle listeners belong to the displayed canvas even if no world was shaded.
         if (this.canvas) {
             // Remove the exact bound context-loss listener.
             this.canvas.removeEventListener('webglcontextlost', this.handleContextLost);
@@ -469,6 +549,12 @@ class WorldRendererSystem {
         }
         // Lost contexts already own invalid handles, so ordinary deletion is unnecessary there.
         if (this.resources && !this.contextLost) {
+            // Release retained world color pixels.
+            this.graphics.deleteTexture(this.resources.frameTexture);
+            // Release the world visibility depth storage.
+            this.graphics.deleteRenderbuffer(this.resources.frameDepth);
+            // Release the framebuffer joining world color and depth.
+            this.graphics.deleteFramebuffer(this.resources.frameFramebuffer);
             // Release linked base shader resources.
             this.graphics.deleteProgram(this.resources.baseProgram);
             // Release the direct-light program.

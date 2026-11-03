@@ -102,7 +102,7 @@ footer { margin-top: 18px; }
                 <button id="stop-button" type="button">Stop</button>
                 <button id="reset-button" type="button">Reset scene</button>
                 <label>Zoom <select id="zoom-control"><option value="0.5">50%</option><option value="0.75">75%</option><option value="1" selected>100%</option><option value="1.5">150%</option></select></label>
-                <label>Study <select id="study-control"><option value="world">Shared world</option><option value="loop">Loop &amp; brushes</option></select></label>
+                <label>Study <select id="study-control"><option value="world">Shared world</option><option value="loop">Loop &amp; interpolation</option></select></label>
             </div>
             <p id="study-instructions">Controls and instructions follow the selected engine study.</p>
             <div class="controls" id="world-controls">
@@ -130,7 +130,7 @@ footer { margin-top: 18px; }
             <article><span>02</span><h2>Directory</h2><p>Scene, spatial indexes, physics, depth rendering, lighting, input, and tools.</p></article>
             <article><span>03</span><h2>Penthouse</h2><p>Optional procedural features built on Directory services.</p></article>
         </section>
-        <footer>Neutral engine tests, with no game migration. Shared-world rendering requires WebGL2; opaque boxes, circles, and planes are supported. The Loop study remains Canvas-only. Bloom and transparent surfaces are not implemented.</footer>
+        <footer>Neutral engine tests, with no game migration. Shared-world rendering requires WebGL2; opaque boxes, circles, and planes are supported. Both studies use WebGL output; Canvas 2D is reserved for cached artwork. Bloom and transparent surfaces are not implemented.</footer>
     </main>
     <script data-source="engine/basement.js">
 /**
@@ -147,7 +147,7 @@ class LevelBasement {
             // Identify this foundation independently of the existing game's version.
             engineName: 'ETRNL9',
             // Describe the first working foundation, not a migrated full game.
-            engineVersion: '0.2.0',
+            engineVersion: '0.3.0',
             // Run simulation at sixty fixed steps per second on any display.
             simulationHz: 60,
             // Limit elapsed time accepted after a browser stall, in seconds.
@@ -1824,7 +1824,7 @@ in vec3 aColor;
 in vec3 aEmission;
 // CSS-pixel dimensions of the final view.
 uniform vec2 uViewport;
-// Projected-world view center, matching the Canvas renderer's camera.
+// Projected-world view center, matching the output renderer's camera.
 uniform vec2 uCamera;
 // CSS pixels per world unit.
 uniform float uZoom;
@@ -1848,7 +1848,7 @@ void main() {
     vec2 screen = (projected - uCamera) * uZoom * 2.0 / uViewport;
     // Greater camera-facing depth should produce a smaller GPU depth value.
     float depth = -((aPosition.y - uCamera.y) * uHeightScale + aPosition.z) / uDepthRange;
-    // Canvas Y points down, while normalized device Y points up.
+    // Public screen Y points down, while normalized device Y points up.
     gl_Position = vec4(screen.x, -screen.y, depth, 1.0);
     // Preserve actual physical coordinates for point-light distance and obstruction tests.
     vPosition = aPosition;
@@ -2174,9 +2174,9 @@ class PointLightRenderer {
             renderer.statistics.drawCalls += 1;
         }
         // Return to the camera-facing world framebuffer before direct illumination.
-        renderer.graphics.bindFramebuffer(renderer.graphics.FRAMEBUFFER, null);
+        renderer.graphics.bindFramebuffer(renderer.graphics.FRAMEBUFFER, renderer.resources.frameFramebuffer);
         // Restore the camera image's actual pixel dimensions.
-        renderer.graphics.viewport(0, 0, renderer.canvas.width, renderer.canvas.height);
+        renderer.graphics.viewport(0, 0, renderer.renderWidth, renderer.renderHeight);
         // Lighting must revisit exactly the previously visible camera surface.
         renderer.graphics.depthFunc(renderer.graphics.EQUAL);
         // Preserve established camera depth while adding illumination.
@@ -2201,8 +2201,8 @@ class PointLightRenderer {
 <script data-source="engine/world-renderer.js">
 /**
  * DIRECTORY WORLD RENDERER — opaque surfaces use a real GPU depth buffer.
- * Rendering occurs on an internal WebGL2 canvas, then the existing Canvas renderer
- * composites that one world image. Geometry, surface emission, and point-light
+ * Rendering uses the displayed canvas's WebGL2 context. A retained GPU image is
+ * presented by a GPU framebuffer copy, never by a Canvas 2D drawing context. Geometry, surface emission, and point-light
  * contributions all use identical vertex positions and depth tests. No building,
  * shop, roof, or character name changes visibility rules.
  * This first contract supports opaque extruded boxes/circles and flat planes;
@@ -2213,7 +2213,7 @@ class WorldRendererSystem {
     constructor(basement) {
         // Shared height projection and ambient configuration must match the Scene indexes.
         this.basement = basement;
-        // Offscreen canvas is allocated lazily so an empty/Canvas-only engine needs no WebGL.
+        // The connection phase supplies the actual displayed canvas, never an offscreen canvas.
         this.canvas = null;
         // Null means no WebGL resource set has been created yet.
         this.resources = null;
@@ -2230,7 +2230,18 @@ class WorldRendererSystem {
         // Point-light visibility has its own backend helper, using live parent resource lookup.
         this.pointLighting = new PointLightRenderer(this);
         // Track what the GPU is actually asked to draw.
-        this.statistics = { visibleElements: 0, vertices: 0, lights: 0, shadowCandidates: 0, drawCalls: 0 };
+        this.statistics = {
+            // Scene elements returned by the current camera visibility query.
+            visibleElements: 0,
+            // Triangle corners submitted for the visible opaque geometry.
+            vertices: 0,
+            // Point sources whose influence reaches the current view.
+            lights: 0,
+            // Nearby opaque candidates processed for source visibility this frame.
+            shadowCandidates: 0,
+            // Actual world/light/shadow GPU draw submissions, excluding final presentation.
+            drawCalls: 0
+        };
         // Bound handlers retain this renderer when the canvas dispatches GPU lifecycle events.
         this.handleContextLost = this.onContextLost.bind(this);
         // Keep the exact function reference for later listener removal.
@@ -2241,8 +2252,18 @@ class WorldRendererSystem {
     connect(directory) {
         // Scene elements are the authoritative geometry providers.
         this.scene = directory.systems.get('scene');
-        // The Canvas renderer remains the owner of final viewport composition.
+        // The output system owns the actual displayed canvas and its WebGL2 context.
         this.renderer = directory.systems.get('renderer');
+        // Both systems use the same canvas object; no inter-canvas world copy is possible.
+        this.canvas = this.renderer.canvas;
+        // Retain the same live GPU context used for final presentation.
+        this.graphics = this.renderer.graphics;
+        // Artwork remains CPU-resident across context loss and restores textures on demand.
+        this.artwork = directory.systems.get('artwork');
+        // Listen before the first frame so early GPU loss is handled too.
+        this.canvas.addEventListener('webglcontextlost', this.handleContextLost);
+        // Reuse the Lobby's existing schedule after the browser restores GPU availability.
+        this.canvas.addEventListener('webglcontextrestored', this.handleContextRestored);
     }
 
     /** Register one central world pass when the first scene element is added. */
@@ -2254,13 +2275,13 @@ class WorldRendererSystem {
         }
         // The world image uses screen coordinates because its vertices already project the camera.
         this.renderer.registerPass('engine.world', 20, 'screen', this.draw.bind(this));
-        // Remember that the final compositor now owns this one callback.
+        // Remember that the final GPU output schedule now owns this callback.
         this.active = true;
     }
 
     /** Remove the central pass when the scene becomes empty, keeping reusable GPU resources. */
     deactivate() {
-        // Remove only the world pass, leaving independent UI/Canvas passes intact.
+        // Remove only the world pass, leaving independent screen preparation/UI callbacks intact.
         this.renderer.removePass('engine.world');
         // A later scene can reactivate the same renderer.
         this.active = false;
@@ -2328,26 +2349,16 @@ class WorldRendererSystem {
         return program;
     }
 
-    /** Allocate one internal WebGL2 canvas and reusable geometry/shadow buffers. */
+    /** Allocate retained GPU image/depth storage and reusable geometry/shadow buffers. */
     initialize() {
-        // Create the offscreen surface only when a nonempty world is rendered.
-        if (!this.canvas) {
-            // Use the host canvas's document so embedding does not depend on a global page.
-            this.canvas = this.renderer.canvas.ownerDocument.createElement('canvas');
-            // Context loss is a browser event, not a reason to start another engine loop.
-            this.canvas.addEventListener('webglcontextlost', this.handleContextLost);
-            // Restoration reconstructs resources during the existing Lobby schedule.
-            this.canvas.addEventListener('webglcontextrestored', this.handleContextRestored);
-        }
-        // Request a real depth-capable rendering context; no external engine dependency is used.
-        this.graphics = this.canvas.getContext('webgl2', { alpha: true, premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: true });
-        // Devices without WebGL2 must receive a clear capability error.
-        if (!this.graphics) {
-            // Do not fall back to incorrect painter ordering while claiming depth correctness.
-            throw new Error('Shared world surfaces require WebGL2; the Canvas-only loop study remains available.');
-        }
         // Keep GPU handles together for explicit disposal and context restoration.
         this.resources = {
+            // Retain the completed world image on the GPU between display callbacks.
+            frameTexture: this.graphics.createTexture(),
+            // Physical visibility needs depth storage at the world's shading resolution.
+            frameDepth: this.graphics.createRenderbuffer(),
+            // Attach that color/depth storage to one reusable world rendering target.
+            frameFramebuffer: this.graphics.createFramebuffer(),
             // Draw opaque color and attached surface emission into the depth buffer.
             baseProgram: this.createProgram(WorldShaders.baseFragmentSource),
             // Add point lighting only to the same visible fragments, with geometric shadows.
@@ -2363,6 +2374,10 @@ class WorldRendererSystem {
             // Render depth into one cubemap face at a time, without touching the world image.
             shadowFramebuffer: this.graphics.createFramebuffer()
         };
+        // Force color/depth allocation even when restoring the same canvas dimensions.
+        this.renderWidth = 0;
+        // A new resource set has no valid retained image height either.
+        this.renderHeight = 0;
         // Validate configured shadow resolution against actual hardware capacity.
         const shadowSize = this.basement.configuration.shadowMapSize;
         // Cubemap allocation must fit the device rather than silently reducing declared quality.
@@ -2407,6 +2422,8 @@ class WorldRendererSystem {
         this.resources = null;
         // Permit draw() to initialize a fresh resource set.
         this.contextLost = false;
+        // Artwork texture handles were lost too; retain painted images for upload, not repaint.
+        this.artwork.restoreContext();
         // Force a complete upload from authoritative scene data.
         this.cachedGeometryKey = '';
         // A restored context must shade the scene again before reusing its finished image.
@@ -2449,7 +2466,7 @@ class WorldRendererSystem {
         graphics.uniform1f(graphics.getUniformLocation(program, 'uDepthRange'), depthRange);
     }
 
-    /** Project, depth-test, shade, and composite all visible opaque world geometry once. */
+    /** Project, depth-test, shade, and present all visible opaque world geometry once. */
     draw(renderer) {
         // A lost context must not issue invalid GPU calls while waiting for restoration.
         if (this.contextLost) {
@@ -2467,18 +2484,12 @@ class WorldRendererSystem {
         const desiredWidth = Math.max(1, Math.round(renderer.viewportWidth * worldPixelRatio));
         // Calculate desired backing height with the same density policy.
         const desiredHeight = Math.max(1, Math.round(renderer.viewportHeight * worldPixelRatio));
-        // Reallocate only when actual shading dimensions change.
-        if (this.canvas.width !== desiredWidth) {
-            // Reallocate only on a real size change, not on every frame.
-            this.canvas.width = desiredWidth;
-        }
-        // Allocate matching vertical backing resolution.
-        if (this.canvas.height !== desiredHeight) {
-            // Keep unchanged backing storage across ordinary frames.
-            this.canvas.height = desiredHeight;
-        }
-        // Set the GPU viewport to the full internal backing image.
-        this.graphics.viewport(0, 0, this.canvas.width, this.canvas.height);
+        // Resize the retained GPU target only when the shading allocation changes.
+        this.resizeFrame(desiredWidth, desiredHeight);
+        // Select the retained world color/depth target before any camera shading.
+        this.graphics.bindFramebuffer(this.graphics.FRAMEBUFFER, this.resources.frameFramebuffer);
+        // Use the world shading density, independently of the displayed canvas density.
+        this.graphics.viewport(0, 0, this.renderWidth, this.renderHeight);
         // Read zoom once while constructing projected-world query bounds.
         const zoom = renderer.camera.zoom;
         // Camera coordinates are projected-world coordinates; Z was already included by Scene.
@@ -2492,23 +2503,32 @@ class WorldRendererSystem {
             // Lower edge of the visible projected world.
             maximumY: renderer.camera.positionY + renderer.viewportHeight / (2 * zoom)
         };
-        // Include pixel allocation because resizing invalidates the preserved drawing buffer.
-        const frameKey = `${this.scene.revision}:${JSON.stringify(view)}:${desiredWidth}:${desiredHeight}`;
-        // An unchanged view and world need only a final image copy, not another shadow pass.
+        // Include shading allocation because resizing invalidates the retained GPU image.
+        const frameKey = `${this.scene.revision}:${JSON.stringify(view)}:${desiredWidth}:${desiredHeight}:${renderer.backgroundColor.join(',')}`;
+        // An unchanged world needs only GPU presentation, not another geometry/light pass.
         if (frameKey === this.cachedFrameKey) {
-            // This frame submitted no internal GPU geometry or shadow work.
+            // No geometry or source-shadow work is submitted for this cached frame.
             this.statistics.drawCalls = 0;
-            // No shadow candidates were newly processed for this cached frame.
+            // No shadow candidates are processed when the retained image is reused.
             this.statistics.shadowCandidates = 0;
-            // Copy the preserved complete world image under the same final screen transform.
-            renderer.drawingContext.drawImage(this.canvas, 0, 0, renderer.viewportWidth, renderer.viewportHeight);
-            // Report the one actual Canvas copy required for this cached frame.
-            renderer.drawCalls += 1;
-            // Leave existing geometry and depth buffers available for a later changed frame.
+            // Copy between GPU framebuffers directly into the displayed WebGL canvas.
+            this.present(renderer);
+            // Leave retained color/depth and geometry available for the next changed frame.
             return;
         }
         // Reset current-frame diagnostics before visibility and lighting work.
-        this.statistics = { visibleElements: 0, vertices: 0, lights: 0, shadowCandidates: 0, drawCalls: 0 };
+        this.statistics = {
+            // Scene elements returned by the current camera visibility query.
+            visibleElements: 0,
+            // Triangle corners submitted for the visible opaque geometry.
+            vertices: 0,
+            // Point sources whose influence reaches the current view.
+            lights: 0,
+            // Nearby opaque candidates processed for source visibility this frame.
+            shadowCandidates: 0,
+            // Actual world/light/shadow GPU draw submissions, excluding final presentation.
+            drawCalls: 0
+        };
         // Query geometry using its actual height-expanded visual extent.
         const visible = this.scene.visibleGeometry.query(view).filter((element) => element.visible);
         // Stable IDs determine only exactly coplanar ties, never ordinary occlusion.
@@ -2549,8 +2569,8 @@ class WorldRendererSystem {
         }
         // Publish the actual geometry submitted rather than the total scene registry size.
         this.statistics.vertices = this.vertexCount;
-        // Clear to transparent so the Canvas background can remain independently styled.
-        this.graphics.clearColor(0, 0, 0, 0);
+        // The world target includes the opaque background; presentation needs no Canvas layer.
+        this.graphics.clearColor(...renderer.backgroundColor, 1);
         // Far depth starts at one; smaller fragment depth means closer to the camera.
         this.graphics.clearDepth(1);
         // Depth writes must be enabled when clearing and rendering opaque surfaces.
@@ -2600,9 +2620,9 @@ class WorldRendererSystem {
             // WebGL scissor Y starts at the bottom, unlike CSS coordinates.
             const minimumY = Math.max(0, Math.floor((renderer.viewportHeight - lightCenter.positionY - radiusY) * worldPixelRatio));
             // Clamp the right influence edge to avoid irrelevant offscreen fragments.
-            const maximumX = Math.min(this.canvas.width, Math.ceil((lightCenter.positionX + radiusX) * worldPixelRatio));
+            const maximumX = Math.min(this.renderWidth, Math.ceil((lightCenter.positionX + radiusX) * worldPixelRatio));
             // Clamp the upper WebGL influence edge using the inverted vertical coordinate.
-            const maximumY = Math.min(this.canvas.height, Math.ceil((renderer.viewportHeight - lightCenter.positionY + radiusY) * worldPixelRatio));
+            const maximumY = Math.min(this.renderHeight, Math.ceil((renderer.viewportHeight - lightCenter.positionY + radiusY) * worldPixelRatio));
             // Empty projected influence produces no lighting submission.
             if (maximumX <= minimumX || maximumY <= minimumY) {
                 // Continue with the next visible/reaching source.
@@ -2631,14 +2651,74 @@ class WorldRendererSystem {
         this.graphics.disable(this.graphics.SCISSOR_TEST);
         // Restore depth-write state for the next frame's clear/base pass.
         this.graphics.depthMask(true);
-        // Flush commands before copying this canvas into the final Canvas image.
-        this.graphics.flush();
-        // Composite the completed depth-aware world image in CSS-pixel screen coordinates.
-        renderer.drawingContext.drawImage(this.canvas, 0, 0, renderer.viewportWidth, renderer.viewportHeight);
-        // Account for this final Canvas composition independently of internal GPU submissions.
-        renderer.drawCalls += 1;
-        // The preserved opaque/light image is now reusable until tracked scene/view changes.
+        // The retained world color is complete; present it through the same GPU context.
+        this.present(renderer);
+        // Reuse this finished GPU image until a tracked scene/view/allocation change.
         this.cachedFrameKey = frameKey;
+    }
+
+    /** Allocate world color/depth pixels when shading dimensions change; no CPU image copy. */
+    resizeFrame(width, height) {
+        // Matching dimensions mean the retained GPU storage is already suitable.
+        if (width === this.renderWidth && height === this.renderHeight) {
+            // Preserve both image contents and allocation on ordinary frames.
+            return;
+        }
+        // Both color textures and depth renderbuffers must support the requested extent.
+        const maximumSize = Math.min(this.graphics.getParameter(this.graphics.MAX_TEXTURE_SIZE), this.graphics.getParameter(this.graphics.MAX_RENDERBUFFER_SIZE));
+        // Reject impossible image dimensions rather than silently producing an incomplete target.
+        if (width > maximumSize || height > maximumSize) {
+            // Let the caller reduce the declared output/shading density explicitly.
+            throw new RangeError('World shading dimensions exceed this GPU texture capacity.');
+        }
+        // Bind the retained color texture before allocating or configuring its pixels.
+        this.graphics.bindTexture(this.graphics.TEXTURE_2D, this.resources.frameTexture);
+        // Allocate normalized RGBA storage entirely on the GPU; null supplies no CPU pixels.
+        this.graphics.texImage2D(this.graphics.TEXTURE_2D, 0, this.graphics.RGBA8, width, height, 0, this.graphics.RGBA, this.graphics.UNSIGNED_BYTE, null);
+        // No mipmap chain is needed for a viewport-sized retained image.
+        this.graphics.texParameteri(this.graphics.TEXTURE_2D, this.graphics.TEXTURE_MIN_FILTER, this.graphics.LINEAR);
+        // Smoothly enlarge a deliberately lower-density world image onto the output canvas.
+        this.graphics.texParameteri(this.graphics.TEXTURE_2D, this.graphics.TEXTURE_MAG_FILTER, this.graphics.LINEAR);
+        // Select depth storage for this world's exact shading dimensions.
+        this.graphics.bindRenderbuffer(this.graphics.RENDERBUFFER, this.resources.frameDepth);
+        // A 24-bit depth buffer resolves physical visibility independently from color.
+        this.graphics.renderbufferStorage(this.graphics.RENDERBUFFER, this.graphics.DEPTH_COMPONENT24, width, height);
+        // Attach the retained color and depth resources to their owned framebuffer.
+        this.graphics.bindFramebuffer(this.graphics.FRAMEBUFFER, this.resources.frameFramebuffer);
+        // Color attachment zero receives the world fragment shader's output.
+        this.graphics.framebufferTexture2D(this.graphics.FRAMEBUFFER, this.graphics.COLOR_ATTACHMENT0, this.graphics.TEXTURE_2D, this.resources.frameTexture, 0);
+        // The shared visibility test writes the retained depth attachment.
+        this.graphics.framebufferRenderbuffer(this.graphics.FRAMEBUFFER, this.graphics.DEPTH_ATTACHMENT, this.graphics.RENDERBUFFER, this.resources.frameDepth);
+        // Verify actual hardware support before presenting any supposedly valid world frame.
+        if (this.graphics.checkFramebufferStatus(this.graphics.FRAMEBUFFER) !== this.graphics.FRAMEBUFFER_COMPLETE) {
+            // Stop clearly rather than displaying stale output from an incomplete target.
+            throw new Error('This GPU could not allocate the retained world framebuffer.');
+        }
+        // Remember the successfully allocated width in backing pixels.
+        this.renderWidth = width;
+        // Remember the successfully allocated height in backing pixels.
+        this.renderHeight = height;
+        // A reallocated color image must be shaded before reuse.
+        this.cachedFrameKey = '';
+    }
+
+    /** Present retained world color to the actual output using one GPU-to-GPU image copy. */
+    present(renderer) {
+        // No source-specific clipping may limit the completed image's output region.
+        this.graphics.disable(this.graphics.SCISSOR_TEST);
+        // Read pixels directly from the retained GPU world target.
+        this.graphics.bindFramebuffer(this.graphics.READ_FRAMEBUFFER, this.resources.frameFramebuffer);
+        // Write into the displayed canvas's default GPU framebuffer.
+        this.graphics.bindFramebuffer(this.graphics.DRAW_FRAMEBUFFER, null);
+        // Scale world shading pixels to output pixels entirely on the GPU. This operation
+        // copies only color; world visibility was already resolved by its physical depth.
+        this.graphics.blitFramebuffer(0, 0, this.renderWidth, this.renderHeight, 0, 0, this.canvas.width, this.canvas.height, this.graphics.COLOR_BUFFER_BIT, this.graphics.LINEAR);
+        // Restore both framebuffer bindings for later screen work or the next frame's clear.
+        this.graphics.bindFramebuffer(this.graphics.FRAMEBUFFER, null);
+        // Restore the full output viewport after lower-density world shading.
+        this.graphics.viewport(0, 0, this.canvas.width, this.canvas.height);
+        // Report the actual final-output GPU copy separately from world/shadow draw calls.
+        renderer.drawCalls += 1;
     }
 
     /** Compare element IDs solely to make exactly coplanar ties deterministic. */
@@ -2659,9 +2739,9 @@ class WorldRendererSystem {
 
     /** Release GPU objects and context listeners when the Directory destroys this service. */
     dispose() {
-        // Remove the compositor callback before releasing resources it might use.
+        // Remove the world presentation callback before releasing resources it might use.
         this.deactivate();
-        // A Canvas-only session may never have allocated an offscreen context.
+        // Lifecycle listeners belong to the displayed canvas even if no world was shaded.
         if (this.canvas) {
             // Remove the exact bound context-loss listener.
             this.canvas.removeEventListener('webglcontextlost', this.handleContextLost);
@@ -2670,6 +2750,12 @@ class WorldRendererSystem {
         }
         // Lost contexts already own invalid handles, so ordinary deletion is unnecessary there.
         if (this.resources && !this.contextLost) {
+            // Release retained world color pixels.
+            this.graphics.deleteTexture(this.resources.frameTexture);
+            // Release the world visibility depth storage.
+            this.graphics.deleteRenderbuffer(this.resources.frameDepth);
+            // Release the framebuffer joining world color and depth.
+            this.graphics.deleteFramebuffer(this.resources.frameFramebuffer);
             // Release linked base shader resources.
             this.graphics.deleteProgram(this.resources.baseProgram);
             // Release the direct-light program.
@@ -2691,119 +2777,384 @@ class WorldRendererSystem {
 }
 
 </script>
+<script data-source="engine/artwork.js">
+/**
+ * DIRECTORY ARTWORK SYSTEM — Canvas 2D is an image-making tool, never the world
+ * frame renderer. Each named asset has fixed pixel dimensions and a synchronous
+ * paint callback. create() records it; prepare() paints/uploads it on first use.
+ * invalidate() requests a later repaint, so a sign changing text can update without
+ * repainting unchanged walls. No timer, render callback, or automatic periodic bake
+ * is installed here. Callers choose when changed information requires fresh artwork.
+ * “Bake” means drawing into a reusable image. The CPU image survives GPU loss;
+ * restoring a texture uploads that image again without rerunning the paint callback.
+ * These texture handles are a resource foundation, not yet world material mapping:
+ * textured world surfaces, alpha cutouts, atlases, and streaming remain future work.
+ */
+class ArtworkSystem {
+    /** Retain the output canvas for document/context lookup; allocate no artwork yet. */
+    constructor(outputCanvas) {
+        // Use the displayed canvas's document to create independent artwork canvases.
+        this.outputCanvas = outputCanvas;
+        // Map uses explicit asset IDs, without inherited object properties.
+        this.entries = new Map();
+        // Count successful CPU paints across the lifetime of this system.
+        this.paintCount = 0;
+        // Count successful image uploads, including uploads after GPU restoration.
+        this.uploadCount = 0;
+    }
+
+    /** Resolve the output context only after all Directory systems have been constructed. */
+    connect(directory) {
+        // Reuse the actual output GPU instead of creating an unrelated artwork GPU context.
+        this.renderer = directory.systems.get('renderer');
+        // Query loss status through the backend's current state, not a copied boolean.
+        this.worldRenderer = directory.systems.get('worldRenderer');
+    }
+
+    /** Record fixed image-pixel dimensions and paint(context); return its unique string ID. */
+    create(identifier, widthPixels, heightPixels, paint) {
+        // Named assets require a readable unique address and a callable generator.
+        if (typeof identifier !== 'string' || identifier.trim() === '' || this.entries.has(identifier) || typeof paint !== 'function') {
+            // Reject invalid registration before acquiring any CPU/GPU storage.
+            throw new TypeError('Artwork requires a unique nonempty ID and a synchronous paint function.');
+        }
+        // Pixel extents count whole positive pixels, not CSS or world coordinates.
+        if (!Number.isInteger(widthPixels) || !Number.isInteger(heightPixels) || widthPixels < 1 || heightPixels < 1) {
+            // Fractional/zero extents would silently change artwork placement and resolution.
+            throw new RangeError('Artwork dimensions must be positive integer pixels.');
+        }
+        // Keep owned state private to this system; callers address assets by identifier.
+        this.entries.set(identifier, {
+            // Horizontal resolution of the reusable image in pixels.
+            widthPixels,
+            // Vertical resolution of the reusable image in pixels.
+            heightPixels,
+            // Callback paints only this asset and must finish synchronously.
+            paint,
+            // No CPU artwork exists until prepare is first called.
+            canvas: null,
+            // Null means no current GPU texture has been uploaded.
+            texture: null,
+            // New assets need exactly one initial paint before they can be used.
+            dirty: true
+        });
+        // Return the stable asset address rather than exposing mutable cache internals.
+        return identifier;
+    }
+
+    /** Find a registered asset; throw for typos instead of silently manufacturing an image. */
+    require(identifier) {
+        // Read the exact registration belonging to this identifier.
+        const entry = this.entries.get(identifier);
+        // A missing address cannot safely provide either dimensions or a GPU texture.
+        if (!entry) {
+            // Include the requested name in the error to locate incorrect references.
+            throw new Error(`Artwork ${identifier} is not registered.`);
+        }
+        // Return the owned entry for this system's own cache operations.
+        return entry;
+    }
+
+    /** Mark changed artwork for repaint on its next use; repeated marks coalesce. */
+    invalidate(identifier) {
+        // Set the dirty flag on the actual cached asset, not a copied status value.
+        this.require(identifier).dirty = true;
+    }
+
+    /** Return a resident GPU texture, painting/uploading only when its cached state requires it. */
+    prepare(identifier) {
+        // Resolve registration before any side effects so invalid IDs fail consistently.
+        const entry = this.require(identifier);
+        // Context loss invalidates texture use; leave dirty work queued until restoration.
+        if (this.worldRenderer.contextLost) {
+            // Explicit null means temporarily unavailable, not a valid texture handle.
+            return null;
+        }
+        // Read the displayed context through its owner rather than creating another context.
+        const graphics = this.renderer.graphics;
+        // Reject oversize artwork before allocating its CPU canvas.
+        const maximumSize = graphics.getParameter(graphics.MAX_TEXTURE_SIZE);
+        // Both image dimensions must fit this GPU's real texture capability.
+        if (entry.widthPixels > maximumSize || entry.heightPixels > maximumSize) {
+            // Do not silently shrink authored artwork or hide allocation failure.
+            throw new RangeError(`Artwork ${identifier} exceeds this GPU texture capacity.`);
+        }
+        // A clean asset with a resident texture needs neither CPU paint nor GPU upload.
+        if (!entry.dirty && entry.texture) {
+            // Return the same handle so many instances can share this one image.
+            return entry.texture;
+        }
+        // Only explicit dirtiness or first use authorizes a paint callback.
+        if (entry.dirty) {
+            // Paint into a new image so a failed generator cannot corrupt the previous image.
+            const artworkCanvas = this.outputCanvas.ownerDocument.createElement('canvas');
+            // Set horizontal image pixels independently of the displayed canvas dimensions.
+            artworkCanvas.width = entry.widthPixels;
+            // Set vertical image pixels; no CSS layout is involved.
+            artworkCanvas.height = entry.heightPixels;
+            // Canvas 2D exists only on this separate image-generation surface.
+            const drawingContext = artworkCanvas.getContext('2d');
+            // A browser that lacks image-generation support receives an explicit error.
+            if (!drawingContext) {
+                // Preserve the old asset and dirty flag so later retry remains possible.
+                throw new Error('Canvas 2D is unavailable for artwork generation.');
+            }
+            // Ask the owner to paint this one image now, not inside a recurring engine schedule.
+            const result = entry.paint(drawingContext);
+            // Promise-like returns indicate asynchronous work that would escape cache ownership.
+            if (result && typeof result.then === 'function') {
+                // Require decoding/loading to finish before registering a synchronous generator.
+                throw new TypeError('Artwork paint callbacks must finish synchronously.');
+            }
+            // Publish the newly completed CPU image only after its callback succeeds.
+            entry.canvas = artworkCanvas;
+            // Delete the superseded resident texture before uploading this asset's new revision.
+            if (entry.texture) {
+                // Only this system owns the texture's lifetime; placed instances share its address.
+                graphics.deleteTexture(entry.texture);
+            }
+            // Force upload of the newly painted image instead of reusing the previous revision.
+            entry.texture = null;
+            // Clear dirtiness after a successful CPU paint; a later upload can retry without repaint.
+            entry.dirty = false;
+            // Count actual successful generator calls, not invalidation requests.
+            this.paintCount += 1;
+        }
+        // A new or restored asset needs one GPU upload of its preserved CPU image.
+        const texture = graphics.createTexture();
+        // Allocation failure cannot provide a usable resident image handle.
+        if (!texture) {
+            // Leave the completed CPU image available for an explicit later retry.
+            throw new Error(`GPU texture allocation failed for artwork ${identifier}.`);
+        }
+        // Remember the caller's current texture binding to avoid disturbing another GPU pass.
+        const previousTexture = graphics.getParameter(graphics.TEXTURE_BINDING_2D);
+        // Remember row orientation; artwork origin is top-left and is preserved in the stored image.
+        const previousFlip = graphics.getParameter(graphics.UNPACK_FLIP_Y_WEBGL);
+        // Remember whether the caller expected premultiplied image RGB during upload.
+        const previousPremultiply = graphics.getParameter(graphics.UNPACK_PREMULTIPLY_ALPHA_WEBGL);
+        // Remember browser color conversion so generation cannot leak upload settings.
+        const previousConversion = graphics.getParameter(graphics.UNPACK_COLORSPACE_CONVERSION_WEBGL);
+        // Finally restores upload state even if the browser rejects the image source.
+        try {
+            // Select this asset's new texture as the upload destination.
+            graphics.bindTexture(graphics.TEXTURE_2D, texture);
+            // Store source rows in top-left image order; future UV mapping must follow that contract.
+            graphics.pixelStorei(graphics.UNPACK_FLIP_Y_WEBGL, false);
+            // Keep straight-alpha artwork pixels; compositing must choose the matching blend rule.
+            graphics.pixelStorei(graphics.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+            // Preserve authored RGB values rather than applying browser-dependent upload conversion.
+            graphics.pixelStorei(graphics.UNPACK_COLORSPACE_CONVERSION_WEBGL, graphics.NONE);
+            // Upload this reusable image once; there is no upload of the completed world frame.
+            graphics.texImage2D(graphics.TEXTURE_2D, 0, graphics.RGBA, graphics.RGBA, graphics.UNSIGNED_BYTE, entry.canvas);
+            // Linear minification needs no generated mipmap chain for this initial resource contract.
+            graphics.texParameteri(graphics.TEXTURE_2D, graphics.TEXTURE_MIN_FILTER, graphics.LINEAR);
+            // Use the same smooth sampling when a future surface enlarges this artwork.
+            graphics.texParameteri(graphics.TEXTURE_2D, graphics.TEXTURE_MAG_FILTER, graphics.LINEAR);
+            // Clamp horizontal image edges instead of accidentally repeating unrelated border pixels.
+            graphics.texParameteri(graphics.TEXTURE_2D, graphics.TEXTURE_WRAP_S, graphics.CLAMP_TO_EDGE);
+            // Clamp the vertical image boundary under the same sampling rule.
+            graphics.texParameteri(graphics.TEXTURE_2D, graphics.TEXTURE_WRAP_T, graphics.CLAMP_TO_EDGE);
+            // GPU API failures may set an error code instead of throwing a JavaScript exception.
+            const uploadError = graphics.getError();
+            // Reject failed uploads rather than caching a handle with missing image pixels.
+            if (uploadError !== graphics.NO_ERROR) {
+                // Preserve the concrete numeric GPU error for diagnosis.
+                throw new Error(`Artwork ${identifier} upload failed with WebGL error ${uploadError}.`);
+            }
+            // Publish the handle only after all upload/configuration commands have been submitted.
+            entry.texture = texture;
+            // Count actual uploads, including restoration of previously painted assets.
+            this.uploadCount += 1;
+        } catch (error) {
+            // An unsuccessful handle must not leak or masquerade as a valid cached texture.
+            graphics.deleteTexture(texture);
+            // Retain the CPU image and propagate the concrete browser exception to the caller.
+            throw error;
+        } finally {
+            // Restore row orientation for the caller's subsequent uploads.
+            graphics.pixelStorei(graphics.UNPACK_FLIP_Y_WEBGL, previousFlip);
+            // Restore the caller's original alpha upload rule.
+            graphics.pixelStorei(graphics.UNPACK_PREMULTIPLY_ALPHA_WEBGL, previousPremultiply);
+            // Restore browser color conversion policy.
+            graphics.pixelStorei(graphics.UNPACK_COLORSPACE_CONVERSION_WEBGL, previousConversion);
+            // Restore the texture bound before this asset was prepared.
+            graphics.bindTexture(graphics.TEXTURE_2D, previousTexture);
+        }
+        // Return the one resident texture shared by every caller using this asset address.
+        return entry.texture;
+    }
+
+    /** Forget invalid GPU handles after restoration without repainting preserved CPU images. */
+    restoreContext() {
+        // “of” visits Map values like Python value iteration and stops after the last asset.
+        for (const entry of this.entries.values()) {
+            // A restored context needs new uploads, but a clean CPU image remains clean.
+            entry.texture = null;
+        }
+    }
+
+    /** Release a named asset's resident GPU resource and CPU image; absent IDs are harmless. */
+    remove(identifier) {
+        // Read the current entry before deleting its registration.
+        const entry = this.entries.get(identifier);
+        // A removed/missing asset has no resources left to release.
+        if (!entry) {
+            // Repeated cleanup intentionally does nothing.
+            return;
+        }
+        // Lost contexts already invalidate GPU handles, so skip deletion in that state.
+        if (entry.texture && !this.worldRenderer.contextLost) {
+            // Free the texture owned by this asset rather than waiting for browser collection.
+            this.renderer.graphics.deleteTexture(entry.texture);
+        }
+        // Removing the entry releases the generator and CPU canvas references too.
+        this.entries.delete(identifier);
+    }
+
+    /** Release every asset during Directory teardown without adding another scheduler. */
+    dispose() {
+        // “of” visits identifier values; deleting the current Map entry permits the next value.
+        // Stop when all registered asset keys have been visited and removed.
+        for (const identifier of this.entries.keys()) {
+            // Use the same resource-release path as ordinary asset unloading.
+            this.remove(identifier);
+        }
+    }
+}
+
+</script>
 <script data-source="engine/renderer.js">
 /**
- * DIRECTORY SYSTEM — the renderer owns canvas sizing, camera coordinates, brushes,
- * and ordered rendering passes. It never schedules frames and knows no game content.
- * Canvas uses a 2D drawing context; world coordinates are transformed into CSS pixels,
- * then into the backing image's physical pixels for sharp high-density displays.
+ * DIRECTORY OUTPUT SYSTEM — owns the actual displayed WebGL2 canvas, its pixel
+ * dimensions, camera, and ordered preparation/UI callbacks. WorldRenderer owns
+ * physical surface shading; no completed world frame passes through Canvas 2D.
+ * Canvas artwork is produced separately by ArtworkSystem, only on demand.
+ * This system never schedules frames and contains no game content.
  */
 class RendererSystem {
-    /** Connect a canvas and Basement settings; throw if a 2D context is unavailable. */
+    /** Connect the displayed canvas and settings; fail explicitly without WebGL2. */
     constructor(canvas, basement) {
-        // Retain the existing canvas object, so resizing it needs no reference refresh.
+        // Retain the actual HTML canvas; this is the surface the player sees.
         this.canvas = canvas;
-        // Keep shared settings and arithmetic available without copying their state.
+        // Retain shared configuration by reference rather than copying settings.
         this.basement = basement;
-        // Ask the browser for the surface used by Canvas drawing commands.
-        this.drawingContext = canvas.getContext('2d');
-        // Stop initialization if this browser cannot supply a usable drawing surface.
-        if (!this.drawingContext) {
-            // Report an actionable initialization error rather than failing on the first draw.
-            throw new Error('This foundation requires a Canvas 2D drawing context.');
+        // Request GPU output directly. The browser may discard its backbuffer after
+        // presentation; WorldRenderer retains an unchanged image in GPU-owned storage.
+        this.graphics = canvas.getContext('webgl2', {
+            // The output is opaque; world shading clears to the configured background.
+            alpha: false,
+            // All currently supported world materials are opaque, not premultiplied images.
+            premultipliedAlpha: false,
+            // Keep the existing deterministic sampling policy; antialiasing is future work.
+            antialias: false,
+            // Avoid requiring the browser to preserve the displayed backbuffer across frames.
+            preserveDrawingBuffer: false
+        });
+        // A missing GPU context cannot provide equivalent physical visibility through Canvas.
+        if (!this.graphics) {
+            // Report the required capability before any feature is installed.
+            throw new Error('ETRNL9 output requires WebGL2. Canvas 2D is only an artwork generator.');
         }
-        // Store callbacks in explicit drawing order instead of relying on property order.
+        // Screen callbacks prepare content or update UI; they are not Canvas drawing callbacks.
         this.renderPasses = [];
-        // Store a camera in world units; zoom is CSS pixels per world unit.
+        // Camera coordinates use projected world units; zoom is CSS pixels per world unit.
         this.camera = {
-            // Center of the view along the world's horizontal axis.
+            // Horizontal world coordinate at the center of the viewport.
             positionX: 0,
-            // Center of the view along the world's vertical axis.
+            // Projected vertical world coordinate at the center of the viewport.
             positionY: 0,
-            // A zoom of one maps one world unit to one CSS pixel.
+            // One CSS pixel per world unit at the default zoom.
             zoom: 1
         };
-        // Dimensions are CSS pixels, independent of device pixel density.
+        // Nonzero initial CSS dimensions keep coordinate conversions defined before resize.
         this.viewportWidth = 1;
-        // Start with a nonzero height so early coordinate conversions remain defined.
+        // CSS height is independent of the GPU's backing-image resolution.
         this.viewportHeight = 1;
-        // Backing-image pixels per CSS pixel; resize selects the actual capped density.
+        // Backing pixels per CSS pixel, selected by resize from the density cap.
         this.pixelRatio = 1;
-        // Reset draw accounting once per rendered frame.
+        // Opaque output background; normalized RGB is shared with the world target's clear.
+        this.backgroundColor = [13 / 255, 11 / 255, 24 / 255];
+        // Count final-output submissions separately from world/shadow submissions.
         this.drawCalls = 0;
     }
 
-    /** Resolve the shared scene after construction; legacy Canvas-only studies remain supported. */
+    /** Resolve the world backend after all Directory components exist. */
     connect(directory) {
-        // The actual scene object exists even before its own index connection phase runs.
-        this.scene = directory.systems.get('scene');
+        // Keep a live backend reference for context-loss status and empty-world clearing.
+        this.worldRenderer = directory.systems.get('worldRenderer');
     }
 
-    /** Resize backing pixels from CSS dimensions; do not replace the canvas object. */
+    /** Validate CSS dimensions and change backing storage only when its size changes. */
     resize(widthCssPixels, heightCssPixels, devicePixelRatio = 1) {
-        // Reject invalid public inputs before they can poison transforms or allocation.
+        // Reject nonnumeric dimensions before they enter camera calculations or allocations.
         if (![widthCssPixels, heightCssPixels, devicePixelRatio].every(Number.isFinite)) {
-            // NaN and infinity cannot describe a drawing surface.
+            // Infinity and NaN cannot describe finite GPU image dimensions.
             throw new RangeError('Canvas dimensions and pixel ratio must be finite.');
         }
-        // Avoid a zero-size canvas while its parent is briefly hidden or collapsed.
+        // Avoid zero-size views while the host is collapsed or briefly hidden.
         this.viewportWidth = Math.max(1, widthCssPixels);
-        // Keep the CSS height nonzero for input conversion and rendering.
+        // Apply the same minimum to CSS height.
         this.viewportHeight = Math.max(1, heightCssPixels);
-        // Respect the Basement's phone-friendly density limit.
+        // Bound output density independently from the world's shading-density budget.
         this.pixelRatio = this.basement.clamp(devicePixelRatio, 1, this.basement.configuration.maximumPixelRatio);
-        // Allocate the horizontal backing resolution in physical pixels.
-        this.canvas.width = Math.round(this.viewportWidth * this.pixelRatio);
-        // Allocate vertical backing pixels; canvas resizing also resets context state.
-        this.canvas.height = Math.round(this.viewportHeight * this.pixelRatio);
+        // Convert horizontal CSS extent into whole backing pixels.
+        const backingWidth = Math.round(this.viewportWidth * this.pixelRatio);
+        // Convert vertical CSS extent using the same output density.
+        const backingHeight = Math.round(this.viewportHeight * this.pixelRatio);
+        // Reassigning width discards storage, so skip it when the allocation already matches.
+        if (this.canvas.width !== backingWidth) {
+            // Resize the displayed GPU surface without replacing its object reference.
+            this.canvas.width = backingWidth;
+        }
+        // Height also resets storage when assigned, even if its number is unchanged.
+        if (this.canvas.height !== backingHeight) {
+            // Allocate only when the actual requested height differs.
+            this.canvas.height = backingHeight;
+        }
     }
 
-    /** Add an ordered pass: its ID, coordinate space, order, and drawing callback. */
+    /** Register a screen preparation/UI callback; world surfaces must use the scene API. */
     registerPass(identifier, order, coordinateSpace, draw) {
-        // Unstructured world Canvas calls cannot participate in the shared GPU depth buffer.
-        if (coordinateSpace === 'world' && this.scene?.worldElements.size > 0) {
-            // Require physical world surfaces to use the declarative scene API instead.
-            throw new Error('Depth-aware world content must use scene elements/materials, not Canvas world passes.');
+        // No arbitrary world callback can participate in the engine's shared surface depth.
+        if (coordinateSpace !== 'screen') {
+            // This rule applies even before the scene contains any elements.
+            throw new Error('World content must use scene elements/materials; only screen callbacks are supported.');
         }
-        // Reject ambiguous coordinates rather than silently choosing the wrong transform.
-        if (!['world', 'screen'].includes(coordinateSpace)) {
-            // Name the two supported spaces explicitly.
-            throw new Error('Render passes use world or screen coordinates.');
-        }
-        // A pass needs a callable implementation and a finite sorting priority.
+        // A callback must be callable and its sorting priority must be a finite number.
         if (typeof draw !== 'function' || !Number.isFinite(order)) {
-            // Avoid deferred failures inside the running animation callback.
+            // Report the invalid registration immediately, before a running frame encounters it.
             throw new TypeError('A render pass needs a function and finite order.');
         }
-        // Check each existing pass; “some” stops as soon as it finds a matching ID.
+        // some visits pass values and stops on the first matching unique identifier.
         if (this.renderPasses.some((renderPass) => renderPass.identifier === identifier)) {
-            // Keep pass removal and toggles unambiguous.
+            // Preserve unambiguous removal and ownership.
             throw new Error(`Render pass ${identifier} is already registered.`);
         }
-        // Store all pass properties explicitly so callers can inspect and toggle them.
+        // Expose the actual registration so its owner can deliberately toggle enabled.
         const renderPass = {
-            // Unique name used to find or remove this pass.
+            // Unique address for removal or inspection.
             identifier,
-            // Lower values draw first, underneath later passes.
+            // Lower values run first; this orders callbacks, not physical world visibility.
             order,
-            // Choose camera-relative world drawing or fixed screen drawing.
+            // Screen coordinates use CSS pixels; no automatic Canvas transform exists.
             coordinateSpace,
-            // Callback receives the renderer and the current frame information.
+            // Callable receives this renderer and the current Lobby frame information.
             draw,
-            // A disabled pass remains registered but contributes no drawing.
+            // Disabled registrations remain stored but do not execute.
             enabled: true
         };
-        // Append the pass before ordering the complete list.
+        // Store the callback before sorting all registrations by priority.
         this.renderPasses.push(renderPass);
-        // Compare priorities; modern JavaScript's stable sort preserves equal-order registration.
+        // The comparator returns negative/positive for earlier/later priorities.
         this.renderPasses.sort((firstPass, secondPass) => firstPass.order - secondPass.order);
-        // Return the actual pass object so its owner can toggle enabled directly.
+        // Return the live registration object, not a snapshot of its properties.
         return renderPass;
     }
 
-    /** Remove a pass by ID; other registered passes keep their order. */
+    /** Remove one callback by identifier while preserving the remaining callback order. */
     removePass(identifier) {
-        // Keep each pass whose identifier does not match the removed one.
+        // filter retains each pass whose identifier differs from the removed one.
         this.renderPasses = this.renderPasses.filter((renderPass) => renderPass.identifier !== identifier);
     }
 
@@ -2833,115 +3184,37 @@ class RendererSystem {
         };
     }
 
-    /** Draw all enabled passes once; clear first and isolate every pass's Canvas state. */
+    /** Clear the GPU output and run preparation, world presentation, and UI callbacks once. */
     render(frame) {
-        // Cache the context reference under a name that describes what it is.
-        const drawingContext = this.drawingContext;
-        // Begin draw-call accounting for this frame.
+        // Begin final-output accounting for this display frame.
         this.drawCalls = 0;
-        // Clear using backing pixels, without any camera or density transformation.
-        drawingContext.setTransform(1, 0, 0, 1, 0, 0);
-        // Erase the prior frame, including transparent parts of the scene.
-        drawingContext.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        // Visit pass values in their sorted order; stop after the list is exhausted.
-        // “of” is used because we need each pass object, not array property keys.
-        for (const renderPass of this.renderPasses) {
-            // Skip this pass when its owner has disabled it.
-            if (!renderPass.enabled) {
-                // Continue advances to the next pass without leaving the render method.
-                continue;
-            }
-            // Preserve context state so one pass cannot leak ordinary style/transform changes.
-            drawingContext.save();
-            // Finally restores that state even when a drawing callback throws.
-            try {
-                // A legacy pass may have been registered before a depth-aware scene was added.
-                if (renderPass.coordinateSpace === 'world' && this.scene?.worldElements.size > 0) {
-                    // Reject the incompatible mix instead of silently drawing through roofs.
-                    throw new Error('Canvas world passes cannot bypass a depth-aware scene. Use scene elements/materials.');
-                }
-                // Establish CSS-pixel coordinates for this pass.
-                drawingContext.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
-                // World-space passes follow the camera; screen-space UI stays fixed.
-                if (renderPass.coordinateSpace === 'world') {
-                    // Move the coordinate origin to the middle of the visible canvas.
-                    drawingContext.translate(this.viewportWidth / 2, this.viewportHeight / 2);
-                    // Scale world units by camera zoom on both axes.
-                    drawingContext.scale(this.camera.zoom, this.camera.zoom);
-                    // Move the world so the camera's position lands at the view center.
-                    drawingContext.translate(-this.camera.positionX, -this.camera.positionY);
-                }
-                // Clear paths too: Canvas paths are not included in save/restore state.
-                drawingContext.beginPath();
-                // Let this pass's owner supply content using the established coordinates.
-                renderPass.draw(this, frame);
-            } finally {
-                // Restore the previous styles, transform, clipping, and compositing state.
-                drawingContext.restore();
-                // Prevent an unfinished path from becoming the next pass's path.
-                drawingContext.beginPath();
-            }
-        }
-    }
-}
-
-/**
- * CanvasBrush collects same-color rectangles, then fills their shared path once.
- * One brush owns one color. Callers control brush order; the registry does not
- * regroup different colors, which could change overlap and transparency behavior.
- */
-class CanvasBrush {
-    /** Create a reusable brush with a fixed fill color and an empty instruction queue. */
-    constructor(color) {
-        // Keep the Canvas-compatible color string visible to the brush owner.
-        this.color = color;
-        // Store rectangles in the order the caller requests them.
-        this.instructions = [];
-    }
-
-    /** Queue a rectangle in the current pass's units without drawing it yet. */
-    rectangle(positionX, positionY, width, height) {
-        // Retain all four rectangle arguments together for the later drawing stage.
-        this.instructions.push({
-            // Horizontal position of the rectangle's starting corner.
-            positionX,
-            // Vertical position of the rectangle's starting corner.
-            positionY,
-            // Horizontal extent from that corner.
-            width,
-            // Vertical extent from that corner.
-            height
-        });
-    }
-
-    /** Fill all queued rectangles on the supplied renderer and always empty the queue. */
-    flush(renderer) {
-        // An empty queue requires no Canvas work.
-        if (this.instructions.length === 0) {
-            // Return without increasing the renderer's draw-call counter.
+        // Do not submit GPU work while the browser has lost the displayed context.
+        if (this.worldRenderer.contextLost) {
+            // Scene data and cached CPU artwork remain available for restoration.
             return;
         }
-        // Use the renderer's context without taking over its coordinate transform.
-        const drawingContext = renderer.drawingContext;
-        // Release queued work even if the browser rejects a drawing operation.
-        try {
-            // Apply this brush's color to the next filled path.
-            drawingContext.fillStyle = this.color;
-            // Start one path containing all rectangles queued for this brush.
-            drawingContext.beginPath();
-            // Visit instruction values in order; “of” retrieves objects, not their keys.
-            // Finish when every queued rectangle has been added to the path.
-            for (const instruction of this.instructions) {
-                // Add a rectangle using its corner and dimensions; rect does not fill yet.
-                drawingContext.rect(instruction.positionX, instruction.positionY, instruction.width, instruction.height);
+        // Explicitly select the displayed framebuffer, not a previous shadow/artwork target.
+        this.graphics.bindFramebuffer(this.graphics.FRAMEBUFFER, null);
+        // Cover the actual output allocation, which may be denser than world shading.
+        this.graphics.viewport(0, 0, this.canvas.width, this.canvas.height);
+        // A preceding light's scissor restriction must not leave old screen pixels uncleared.
+        this.graphics.disable(this.graphics.SCISSOR_TEST);
+        // Restore depth writes before clearing an empty scene's depth buffer.
+        this.graphics.depthMask(true);
+        // Clear to the same opaque background used by the retained world image.
+        this.graphics.clearColor(...this.backgroundColor, 1);
+        // Clear both displayed color and depth; an unloaded scene must leave no stale image.
+        this.graphics.clear(this.graphics.COLOR_BUFFER_BIT | this.graphics.DEPTH_BUFFER_BIT);
+        // Visit pass values in priority order, stopping after all registrations.
+        // JavaScript “of” reads values like Python's “for pass in passes”, not property keys.
+        for (const renderPass of this.renderPasses) {
+            // A disabled callback contributes neither preparation nor drawing.
+            if (!renderPass.enabled) {
+                // Continue with the next value instead of leaving the entire render method.
+                continue;
             }
-            // Fill the collected rectangles together with the brush color.
-            drawingContext.fill();
-            // Record this one fill call in the renderer's current frame statistics.
-            renderer.drawCalls += 1;
-        } finally {
-            // Reuse the array while discarding instructions already submitted this frame.
-            this.instructions.length = 0;
+            // Let the owning system/feature perform its specific frame-stage work.
+            renderPass.draw(this, frame);
         }
     }
 }
@@ -3163,6 +3436,8 @@ class LevelDirectory {
         this.systems.register('scene', new SceneSystem(basement));
         // One contact pipeline handles all supported bodies regardless of gameplay identity.
         this.systems.register('physics', new PhysicsSystem(basement));
+        // Canvas generates named images only on first use or explicit invalidation.
+        this.systems.register('artwork', new ArtworkSystem(canvas));
         // Opaque world visibility and lighting are engine-owned; GPU resources are allocated lazily.
         this.systems.register('worldRenderer', new WorldRendererSystem(basement));
         // Register per-frame measurements independently of any particular on-screen HUD.
@@ -3637,7 +3912,7 @@ class Etrnl9Engine {
 <script data-source="demo/rectangle-study.js">
 /**
  * TEST CONTENT — a small procedural study installed through the Penthouse contract.
- * This exercises brushes, elements, input, fixed updates, interpolation, and render
+ * This exercises scene elements, input, fixed updates, interpolation, and render
  * order. It is not game content and is not the original humanoid/building renderer.
  * The engine source contains no references to this class and runs without it.
  */
@@ -3661,32 +3936,82 @@ class RectangleStudy {
             // Previous step's vertical world position.
             previousPositionY: 0
         };
-        // Brushes demonstrate the original rewrite's same-color queued drawing approach.
-        this.backgroundBrush = new CanvasBrush('#0d0b18');
-        // Background grid tiles use a darker color than the moving shapes.
-        this.gridBrush = new CanvasBrush('#242039');
-        // Animated rectangles use the owner's periwinkle palette.
-        this.tileBrush = new CanvasBrush('#cebbff');
-        // The controlled element uses a separate warm color for easy identification.
-        this.playerBrush = new CanvasBrush('#ffeed8');
+        // Own every scene declaration so uninstall releases only this study's content.
+        this.sceneIdentifiers = [];
+        // Keep the orbiting scene elements available without searching the scene each frame.
+        this.orbitElements = [];
         // HUD refresh is throttled separately from rendering without creating a timer.
         this.nextHudUpdateSeconds = 0;
     }
 
-    /** Register one element and three passes; all service dependencies now exist. */
+    /** Install decorative planes and frame preparation; all output uses shared WebGL depth. */
     initialize(directory) {
-        // Retain the Directory reference for live service lookup during execution.
+        // Retain the completed Directory, whose scene and renderer already exist.
         this.directory = directory;
-        // Register this study's controlled object without inventing a game-specific engine field.
+        // Register the controlled simulation state separately from its interpolated visual plane.
         directory.elements.register('study.player', this.player);
-        // Obtain the reusable renderer that accepts this feature's drawing callbacks.
+        // Resolve the shared scene service once during installation.
+        this.scene = directory.systems.get('scene');
+        // Resolve output callbacks for interpolation before the engine's world stage.
         const renderer = directory.systems.get('renderer');
-        // The bound method keeps this study as “this” when the renderer calls it later.
-        renderer.registerPass('study.background', 0, 'screen', this.drawBackground.bind(this));
-        // World content follows camera position and zoom, unlike the background.
-        renderer.registerPass('study.world', 10, 'world', this.drawWorld.bind(this));
-        // A last pass updates the harness HUD without giving the engine knowledge of HTML IDs.
+        // Visit columns -12 through 12 inclusive, increasing by one after each column.
+        // A counting loop provides the column number needed for horizontal world placement.
+        for (let columnIndex = -12; columnIndex <= 12; columnIndex += 1) {
+            // Restart rows at -9 for each column; include row 9, advancing one row at a time.
+            // This nested loop supplies every row/column intersection of the stationary grid.
+            for (let rowIndex = -9; rowIndex <= 9; rowIndex += 1) {
+                // Create a two-unit ground plane centered on the original grid intersection.
+                this.createPlane(`grid-${columnIndex}-${rowIndex}`, columnIndex * 40, rowIndex * 40, 0, 2, '#242039');
+            }
+        }
+        // Create twelve orbiting shapes, counting from zero and excluding twelve.
+        // The index supplies a stable ID and later determines that shape's animation phase.
+        for (let tileIndex = 0; tileIndex < 12; tileIndex += 1) {
+            // A slight physical separation keeps moving decorative planes above ground dots.
+            const element = this.createPlane(`orbit-${tileIndex}`, 0, 0, 0.02, 14, '#cebbff');
+            // Retain the actual scene element for tracked position updates before rendering.
+            this.orbitElements.push(element);
+        }
+        // The marker is another opaque scene surface, slightly above the decorative orbit planes.
+        this.markerElement = this.createPlane('marker', 0, 0, 0.04, 20, '#ffeed8');
+        // Bind preserves this study as JavaScript's “this” when the renderer invokes the callback.
+        renderer.registerPass('study.prepare', 10, 'screen', this.prepareWorld.bind(this));
+        // HTML diagnostics run after presentation and do not draw into a Canvas context.
         renderer.registerPass('study.diagnostics', 100, 'screen', this.updateDiagnostics.bind(this));
+    }
+
+    /** Declare one unlit decorative plane, keeping its original palette independent of ambient light. */
+    createPlane(identifier, positionX, positionY, positionZ, size, color) {
+        // Prefix this study's addresses so cleanup cannot remove unrelated features.
+        const fullIdentifier = `study.${identifier}`;
+        // Use shared geometry/material declarations rather than a custom world drawing callback.
+        const element = this.scene.createElement(fullIdentifier, {
+            // A flat rectangle has no side faces or physical thickness.
+            shape: 'plane',
+            // Horizontal world coordinate of the rectangle center.
+            positionX,
+            // Ground-depth world coordinate of the rectangle center.
+            positionY,
+            // Actual elevation participates in the same visibility rule as every world surface.
+            positionZ,
+            // Horizontal world extent; unlike Canvas rect(), scene planes use a center origin.
+            width: size,
+            // Ground-depth world extent uses the same size for a square.
+            depth: size,
+            // These diagnostic decorations intentionally have no collision bodies.
+            body: false,
+            // Black reflection plus the original emitted color preserves this unlit study's palette.
+            material: {
+                // No reflected ambient/direct lighting is added to these flat test colors.
+                color: '#000000',
+                // Visible RGB belongs to the same depth-tested plane, never a late overlay.
+                emission: color
+            }
+        });
+        // Record this exact registration for feature-specific resource cleanup.
+        this.sceneIdentifiers.push(fullIdentifier);
+        // Return the live scene element for animation through its tracked transform.
+        return element;
     }
 
     /** Advance the study by fixed seconds; inputs change only this study's element. */
@@ -3716,7 +4041,7 @@ class RectangleStudy {
         }
         // Obtain one directional value for left/right input, in the range -1 through 1.
         const horizontalDirection = Number(input.heldKeys.has('KeyD') || input.heldKeys.has('ArrowRight')) - Number(input.heldKeys.has('KeyA') || input.heldKeys.has('ArrowLeft'));
-        // Obtain a vertical value; Canvas positive y points down the screen.
+        // Obtain a vertical value; public screen positive Y points down.
         const verticalDirection = Number(input.heldKeys.has('KeyS') || input.heldKeys.has('ArrowDown')) - Number(input.heldKeys.has('KeyW') || input.heldKeys.has('ArrowUp'));
         // Normalize diagonals so two held directions do not produce faster movement.
         const directionLength = Math.max(1, Math.hypot(horizontalDirection, verticalDirection));
@@ -3726,54 +4051,30 @@ class RectangleStudy {
         this.player.positionY += verticalDirection / directionLength * 150 * stepSeconds;
     }
 
-    /** Fill the screen background once using CSS-pixel dimensions, independent of camera. */
-    drawBackground(renderer) {
-        // Queue a rectangle starting at the top-left corner and covering the viewport.
-        this.backgroundBrush.rectangle(0, 0, renderer.viewportWidth, renderer.viewportHeight);
-        // Draw the queued background and empty this brush's queue.
-        this.backgroundBrush.flush(renderer);
-    }
-
-    /** Draw a world grid, animated rectangles, and the interpolated controlled element. */
-    drawWorld(renderer, frame) {
+    /** Interpolate visual planes before the engine world stage; execute no Canvas drawing. */
+    prepareWorld(renderer, frame) {
         // Shared interpolation arithmetic belongs to the Basement.
         const basement = this.directory.basement;
-        // Blend the previous/current simulation times for this display frame.
+        // Blend the preceding/current fixed times for this particular display callback.
         const displaySeconds = basement.interpolate(this.previousSeconds, this.elapsedSeconds, frame.interpolationFraction);
-        // Work from column -12 through 12, increasing the column index by one each time.
-        // This counting loop needs an index to calculate each tile's world position.
-        for (let columnIndex = -12; columnIndex <= 12; columnIndex += 1) {
-            // For each column, visit row -9 through 9, increasing the row by one.
-            // Restarting this inner loop creates every row in the current column.
-            for (let rowIndex = -9; rowIndex <= 9; rowIndex += 1) {
-                // Queue a small square at the intersection; spacing is forty world units.
-                this.gridBrush.rectangle(columnIndex * 40 - 1, rowIndex * 40 - 1, 2, 2);
-            }
-        }
-        // Fill all grid squares before moving shapes, placing the grid underneath them.
-        this.gridBrush.flush(renderer);
-        // Draw twelve numbered shapes; start at zero and stop before twelve.
-        // Increase tileIndex after each iteration so each shape gets a unique phase.
-        for (let tileIndex = 0; tileIndex < 12; tileIndex += 1) {
-            // Distribute phases evenly around a full circle, then rotate with time.
+        // Count each retained orbit element from zero, stopping before the array length.
+        // An index is needed because each element's numbered slot selects its orbit phase.
+        for (let tileIndex = 0; tileIndex < this.orbitElements.length; tileIndex += 1) {
+            // Spread phases evenly around a full circle and advance them with simulation time.
             const phaseRadians = tileIndex / 12 * Math.PI * 2 + displaySeconds * 0.35;
-            // Use cosine to calculate horizontal motion across a 160-unit radius.
+            // Cosine sets horizontal position on the original 160-unit orbit radius.
             const positionX = Math.cos(phaseRadians) * 160;
-            // Use sine with a narrower radius to produce an elliptical orbit.
+            // Sine sets vertical position on the original narrower 95-unit radius.
             const positionY = Math.sin(phaseRadians) * 95;
-            // Queue a 14-unit square centered on this shape's calculated position.
-            this.tileBrush.rectangle(positionX - 7, positionY - 7, 14, 14);
+            // Update shared XYZ atomically; scene indexes and visibility follow automatically.
+            this.orbitElements[tileIndex].transform.setPosition(positionX, positionY, 0.02);
         }
-        // Fill the orbiting shapes as one same-color drawing batch.
-        this.tileBrush.flush(renderer);
-        // Blend horizontal position so displays faster than simulation still look smooth.
+        // Interpolate horizontal simulation state without modifying that authoritative state.
         const playerPositionX = basement.interpolate(this.player.previousPositionX, this.player.positionX, frame.interpolationFraction);
-        // Blend the corresponding vertical positions using the same fraction.
+        // Use the same fraction for the controlled marker's vertical ground coordinate.
         const playerPositionY = basement.interpolate(this.player.previousPositionY, this.player.positionY, frame.interpolationFraction);
-        // Queue the larger cream marker centered on the controlled element.
-        this.playerBrush.rectangle(playerPositionX - 10, playerPositionY - 10, 20, 20);
-        // Draw it after the orbiting shapes so overlap demonstrates explicit pass order.
-        this.playerBrush.flush(renderer);
+        // Update the real decorative surface; the shared world stage performs its GPU drawing.
+        this.markerElement.transform.setPosition(playerPositionX, playerPositionY, 0.04);
     }
 
     /** Update harness text at most five times per second; no engine-side UI assumptions. */
@@ -3797,8 +4098,8 @@ class RectangleStudy {
         document.getElementById('steps-value').textContent = String(profiler.simulationSteps);
         // Show simulated time, which freezes on pause and does not catch up after stop.
         document.getElementById('time-value').textContent = `${lobby.simulationSeconds.toFixed(1)} s`;
-        // Report draw submissions tracked by brushes, excluding HTML HUD updates.
-        document.getElementById('draws-value').textContent = String(renderer.drawCalls);
+        // Count world GPU drawing and final GPU presentation, excluding HTML HUD writes.
+        document.getElementById('draws-value').textContent = String(renderer.drawCalls + this.directory.systems.get('worldRenderer').statistics.drawCalls);
         // Report time deliberately dropped by the catch-up protection.
         document.getElementById('dropped-value').textContent = `${profiler.droppedSeconds.toFixed(2)} s`;
         // Show the current high-density backing allocation.
@@ -3814,12 +4115,21 @@ class RectangleStudy {
         }
         // Obtain the renderer while the engine still keeps Directory services alive.
         const renderer = this.directory.systems.get('renderer');
-        // Visit each owned pass-name value once; finish after all three names.
+        // Visit each owned pass-name value once; finish after both callback names.
         // “of” is used because removal needs names, not array index keys.
-        for (const passName of ['study.background', 'study.world', 'study.diagnostics']) {
+        for (const passName of ['study.prepare', 'study.diagnostics']) {
             // Remove this feature's drawing callback without disturbing other features.
             renderer.removePass(passName);
         }
+        // “of” supplies scene identifier values, stopping after every owned plane is removed.
+        for (const identifier of this.sceneIdentifiers) {
+            // Scene removal releases visual-index membership and Directory element ownership.
+            this.scene.removeElement(identifier);
+        }
+        // Drop retained plane references so removed geometry can be garbage-collected.
+        this.orbitElements.length = 0;
+        // Release the marker's direct reference as part of this feature's ownership cleanup.
+        this.markerElement = null;
         // Unregister the controlled element owned by this study.
         this.directory.elements.remove('study.player');
     }
@@ -3846,8 +4156,6 @@ class WorldStudy {
         this.nextHudUpdateSeconds = 0;
         // No remote stress population has been created for this fresh study.
         this.distantPopulationAdded = false;
-        // Use one brush for the harness background only; world surfaces draw through the engine.
-        this.backgroundBrush = new CanvasBrush('#0d0b18');
     }
 
     /** Create one owned element using only the public scene declaration API. */
@@ -3868,10 +4176,8 @@ class WorldStudy {
         this.directory = directory;
         // Obtain the generic scene declaration interface.
         this.scene = directory.systems.get('scene');
-        // The foundation renderer still composites world output and HTML diagnostics.
+        // WebGL owns final world output; HTML diagnostics remain separate from physical surfaces.
         const renderer = directory.systems.get('renderer');
-        // Add a screen background beneath the engine-owned world pass.
-        renderer.registerPass('world-study.background', 0, 'screen', this.drawBackground.bind(this));
         // Add a harness diagnostic callback without making the engine query any HTML IDs.
         renderer.registerPass('world-study.diagnostics', 100, 'screen', this.updateDiagnostics.bind(this));
         // A floor is a regular solid box whose top lies at Z zero.
@@ -4085,14 +4391,6 @@ class WorldStudy {
         this.player.body.velocityY = length > 0 ? directionY / length * speed : 0;
     }
 
-    /** Fill the harness backdrop independently from all world geometry/depth decisions. */
-    drawBackground(renderer) {
-        // Queue one screen-space rectangle covering the entire visible drawing surface.
-        this.backgroundBrush.rectangle(0, 0, renderer.viewportWidth, renderer.viewportHeight);
-        // Submit and clear the background brush queue.
-        this.backgroundBrush.flush(renderer);
-    }
-
     /** Refresh engine measurements through harness-owned HTML, with no extra scheduling loop. */
     updateDiagnostics(renderer) {
         // Wall-clock sampling continues while physical simulation is paused.
@@ -4116,7 +4414,7 @@ class WorldStudy {
         document.getElementById('steps-value').textContent = String(profiler.simulationSteps);
         // Simulation time freezes during pause, irrespective of HUD sampling.
         document.getElementById('time-value').textContent = `${this.directory.parentEngine.lobby.simulationSeconds.toFixed(1)} s`;
-        // Count final Canvas submissions plus internal world GPU submissions.
+        // Count final GPU presentation plus internal world/shadow GPU submissions.
         document.getElementById('draws-value').textContent = String(renderer.drawCalls + worldRenderer.statistics.drawCalls);
         // Report intentionally dropped time rather than hiding slow simulation.
         document.getElementById('dropped-value').textContent = `${profiler.droppedSeconds.toFixed(2)} s`;
@@ -4182,10 +4480,8 @@ class WorldStudy {
         this.elementIdentifiers.length = 0;
         // Remove the source and its indexed influence, even if setup failed before creation.
         this.scene.removeLight('world-study.light');
-        // Resolve the final compositor while Directory services remain alive.
+        // Resolve the WebGL output owner while Directory services remain alive.
         const renderer = this.directory.systems.get('renderer');
-        // Remove this study's background callback only.
-        renderer.removePass('world-study.background');
         // Remove its diagnostics callback independently from engine-owned passes.
         renderer.removePass('world-study.diagnostics');
     }
@@ -4283,20 +4579,20 @@ function installFoundationStudy(studyName) {
     }
     // Keep scene-specific controls visible only when they have meaningful targets.
     const isWorldStudy = studyName === 'world';
-    // Select the neutral shared-world scene or the original scheduling/brush study.
+    // Select the neutral shared-world scene or the scheduling/interpolation study.
     selectedStudy = isWorldStudy ? 'world-study' : 'rectangle-study';
     // Install through the same optional Penthouse contract as future procedural features.
     foundationEngine.penthouse.install(selectedStudy, isWorldStudy ? new WorldStudy() : new RectangleStudy());
     // Set the selector to reflect programmatic selection as well as user input.
     document.getElementById('study-control').value = studyName;
-    // Hide stress/roof controls in the Canvas-only study.
+    // Hide stress/roof controls in the Loop study.
     document.getElementById('world-controls').hidden = !isWorldStudy;
     // Hide physical measurements when no world bodies exist.
     document.getElementById('world-measurements').hidden = !isWorldStudy;
     // Explain what pointer input means for the selected study.
     document.getElementById('study-instructions').textContent = isWorldStudy
         ? 'Move the cream circle with WASD/arrows or hold a touch destination. Physics handles all contacts. Pink rests above the slab; orange moves below. Purple ground emission stays behind opaque geometry.'
-        : 'Drag or touch to place the cream marker. WASD/arrows move it. This Canvas-only study checks scheduling and brush queues.';
+        : 'Drag or touch to place the cream marker. WASD/arrows move it. This WebGL study checks scheduling and interpolation.';
     // Explain that this scene is a neutral engine test rather than migrated gameplay.
     document.getElementById('scene-caption').textContent = isWorldStudy ? 'One world: bodies, height, visibility, and light.' : 'A small study, running on four levels.';
     // Reset the scene-specific roof toggle label.

@@ -17,8 +17,6 @@ class WorldStudy {
         this.nextHudUpdateSeconds = 0;
         // No remote stress population has been created for this fresh study.
         this.distantPopulationAdded = false;
-        // Use one brush for the harness background only; world surfaces draw through the engine.
-        this.backgroundBrush = new CanvasBrush('#0d0b18');
     }
 
     /** Create one owned element using only the public scene declaration API. */
@@ -39,10 +37,8 @@ class WorldStudy {
         this.directory = directory;
         // Obtain the generic scene declaration interface.
         this.scene = directory.systems.get('scene');
-        // The foundation renderer still composites world output and HTML diagnostics.
+        // WebGL owns final world output; HTML diagnostics remain separate from physical surfaces.
         const renderer = directory.systems.get('renderer');
-        // Add a screen background beneath the engine-owned world pass.
-        renderer.registerPass('world-study.background', 0, 'screen', this.drawBackground.bind(this));
         // Add a harness diagnostic callback without making the engine query any HTML IDs.
         renderer.registerPass('world-study.diagnostics', 100, 'screen', this.updateDiagnostics.bind(this));
         // A floor is a regular solid box whose top lies at Z zero.
@@ -256,14 +252,6 @@ class WorldStudy {
         this.player.body.velocityY = length > 0 ? directionY / length * speed : 0;
     }
 
-    /** Fill the harness backdrop independently from all world geometry/depth decisions. */
-    drawBackground(renderer) {
-        // Queue one screen-space rectangle covering the entire visible drawing surface.
-        this.backgroundBrush.rectangle(0, 0, renderer.viewportWidth, renderer.viewportHeight);
-        // Submit and clear the background brush queue.
-        this.backgroundBrush.flush(renderer);
-    }
-
     /** Refresh engine measurements through harness-owned HTML, with no extra scheduling loop. */
     updateDiagnostics(renderer) {
         // Wall-clock sampling continues while physical simulation is paused.
@@ -287,7 +275,7 @@ class WorldStudy {
         document.getElementById('steps-value').textContent = String(profiler.simulationSteps);
         // Simulation time freezes during pause, irrespective of HUD sampling.
         document.getElementById('time-value').textContent = `${this.directory.parentEngine.lobby.simulationSeconds.toFixed(1)} s`;
-        // Count final Canvas submissions plus internal world GPU submissions.
+        // Count final GPU presentation plus internal world/shadow GPU submissions.
         document.getElementById('draws-value').textContent = String(renderer.drawCalls + worldRenderer.statistics.drawCalls);
         // Report intentionally dropped time rather than hiding slow simulation.
         document.getElementById('dropped-value').textContent = `${profiler.droppedSeconds.toFixed(2)} s`;
@@ -353,10 +341,8 @@ class WorldStudy {
         this.elementIdentifiers.length = 0;
         // Remove the source and its indexed influence, even if setup failed before creation.
         this.scene.removeLight('world-study.light');
-        // Resolve the final compositor while Directory services remain alive.
+        // Resolve the WebGL output owner while Directory services remain alive.
         const renderer = this.directory.systems.get('renderer');
-        // Remove this study's background callback only.
-        renderer.removePass('world-study.background');
         // Remove its diagnostics callback independently from engine-owned passes.
         renderer.removePass('world-study.diagnostics');
     }

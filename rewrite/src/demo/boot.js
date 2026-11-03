@@ -88,20 +88,20 @@ function installFoundationStudy(studyName) {
     }
     // Keep scene-specific controls visible only when they have meaningful targets.
     const isWorldStudy = studyName === 'world';
-    // Select the neutral shared-world scene or the original scheduling/brush study.
+    // Select the neutral shared-world scene or the scheduling/interpolation study.
     selectedStudy = isWorldStudy ? 'world-study' : 'rectangle-study';
     // Install through the same optional Penthouse contract as future procedural features.
     foundationEngine.penthouse.install(selectedStudy, isWorldStudy ? new WorldStudy() : new RectangleStudy());
     // Set the selector to reflect programmatic selection as well as user input.
     document.getElementById('study-control').value = studyName;
-    // Hide stress/roof controls in the Canvas-only study.
+    // Hide stress/roof controls in the Loop study.
     document.getElementById('world-controls').hidden = !isWorldStudy;
     // Hide physical measurements when no world bodies exist.
     document.getElementById('world-measurements').hidden = !isWorldStudy;
     // Explain what pointer input means for the selected study.
     document.getElementById('study-instructions').textContent = isWorldStudy
         ? 'Move the cream circle with WASD/arrows or hold a touch destination. Physics handles all contacts. Pink rests above the slab; orange moves below. Purple ground emission stays behind opaque geometry.'
-        : 'Drag or touch to place the cream marker. WASD/arrows move it. This Canvas-only study checks scheduling and brush queues.';
+        : 'Drag or touch to place the cream marker. WASD/arrows move it. This WebGL study checks scheduling and interpolation.';
     // Explain that this scene is a neutral engine test rather than migrated gameplay.
     document.getElementById('scene-caption').textContent = isWorldStudy ? 'One world: bodies, height, visibility, and light.' : 'A small study, running on four levels.';
     // Reset the scene-specific roof toggle label.

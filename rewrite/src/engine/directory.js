@@ -26,6 +26,8 @@ class LevelDirectory {
         this.systems.register('scene', new SceneSystem(basement));
         // One contact pipeline handles all supported bodies regardless of gameplay identity.
         this.systems.register('physics', new PhysicsSystem(basement));
+        // Canvas generates named images only on first use or explicit invalidation.
+        this.systems.register('artwork', new ArtworkSystem(canvas));
         // Opaque world visibility and lighting are engine-owned; GPU resources are allocated lazily.
         this.systems.register('worldRenderer', new WorldRendererSystem(basement));
         // Register per-frame measurements independently of any particular on-screen HUD.

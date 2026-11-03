@@ -74,10 +74,14 @@ jobs:
         # Playwright manages this browser when the runner has no system Chromium executable.
         run: python -m playwright install --with-deps chromium
       # Verify original lifecycle, keyboard, touch, zoom, resize, and offline execution.
-      - name: Check Canvas foundation behavior
-        # The same HTML contains the Canvas-only study and the depth-aware world study.
+      - name: Check WebGL foundation behavior
+        # Both studies use the same displayed WebGL2 canvas and physical depth backend.
         run: python rewrite/tools/test-browser.py
       # Verify real depth/emission pixels, source obstruction, large scene culling, and GPU recovery.
       - name: Check world geometry and lighting
         # All scene-specific test objects are neutral primitives, not migrated game content.
         run: python rewrite/tools/test-world-browser.py
+      # Verify cached Canvas artwork never becomes the final frame renderer.
+      - name: Check artwork cache and direct output
+        # Inspect real GPU texture pixels, explicit repaint, restoration, and resource release.
+        run: python rewrite/tools/test-artwork-browser.py

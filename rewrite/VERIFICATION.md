@@ -1,16 +1,20 @@
-# Foundation verification — 0.2.0, 2026-11-03
+# Foundation verification — 0.3.0, 2026-11-03
 
 ## Completed locally
 
 - `node rewrite/tools/build.mjs` produced the single HTML artifact.
 - `node rewrite/tools/build.mjs --check` verified exact source/artifact agreement.
 - `node rewrite/tools/test-world.cjs` passed the original seven foundation scenarios
-  and ten added spatial/physics/world-contract scenarios.
+  and ten spatial/physics/world-contract scenarios.
 - `python rewrite/tools/test-browser.py` passed desktop and touch/rotation checks
   against the built HTML, with networking disabled and no attempted HTTP/HTTPS requests.
 - `python rewrite/tools/test-world-browser.py` passed actual WebGL2 pixel, shadow,
   large-scene, and context-restoration checks on desktop and touch viewports.
-- Real neutral-scene screenshots were inspected locally.
+- `python rewrite/tools/test-artwork-browser.py` passed direct-output instrumentation,
+  actual GPU texture pixels, unchanged-image reuse, explicit invalidation, failed-paint
+  preservation, GPU restoration without repaint, and texture unloading.
+- Desktop/touch neutral-scene screenshots were inspected locally for 0.2.0; 0.3.0 adds
+  direct GPU output checks and pixel assertions rather than claiming full visual parity.
 
 The ten added deterministic scenarios verify:
 
@@ -18,7 +22,7 @@ The ten added deterministic scenarios verify:
    multi-cell uniqueness, oversized objects, movement/removal, and safe address rejection.
 2. One shared transform/geometry updates physical and projected bounds; materials/visibility
    invalidate buffers; parent-attached lights follow rotation/height and clean up with owners.
-3. Canvas world callbacks cannot bypass a depth-aware scene, even if registered earlier.
+3. World drawing callbacks are rejected before scene creation, during use, and after unload.
 4. Circle/box, rotated box/box, and circle/circle contacts use generic shape response.
 5. Separated Z ranges permit an underpass; gravity lands another body on an elevated slab.
 6. Unequal masses exchange elastic momentum correctly; kinematic motion pushes dynamics.
@@ -41,7 +45,20 @@ The world browser checks read actual final image pixels. They verify that:
 - Losing/restoring the actual WebGL context rebuilds the same scene correctly.
 - The real stress control registers 10,000 additional bodies while visible mesh count stays local.
 
-## Sparse-scene CPU measurements
+The direct-output/artwork checks establish:
+
+- Both studies share the displayed canvas's WebGL2 context; neither asks it for Canvas 2D.
+- The output uses `preserveDrawingBuffer: false`; retained GPU storage preserves static frames.
+- Twenty frames and repeated clean artwork demands add zero paints and zero uploads.
+- Two invalidations coalesce into one repaint/upload on next demand; real texture pixels change.
+- GPU restoration adds one upload and zero paints of unchanged artwork.
+- Failed generators preserve the previous complete image/texture and permit retry.
+- Asset removal deletes actual resident GPU texture storage.
+
+These resource checks do not claim textured world materials are implemented. Their current
+scope is cached Canvas generation and resident GPU images, separately from scene geometry.
+
+## Sparse-scene CPU measurements (retained 0.2.0 evidence)
 
 `node rewrite/tools/bench-world.cjs rewrite/benchmark-world-local.json` records actual
 registration and simulation costs in this workspace. The workload keeps 100 moving

@@ -31,6 +31,8 @@ const sourceFiles = [
     'engine/point-light-renderer.js',
     // World surfaces use GPU depth and a central geometric lighting stage.
     'engine/world-renderer.js',
+    // Artwork generators cache CPU images and resident textures without rendering world frames.
+    'engine/artwork.js',
     // The Directory constructs the renderer defined here.
     'engine/renderer.js',
     // Input owns browser device state and listener cleanup.

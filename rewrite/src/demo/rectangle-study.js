@@ -1,6 +1,6 @@
 /**
  * TEST CONTENT — a small procedural study installed through the Penthouse contract.
- * This exercises brushes, elements, input, fixed updates, interpolation, and render
+ * This exercises scene elements, input, fixed updates, interpolation, and render
  * order. It is not game content and is not the original humanoid/building renderer.
  * The engine source contains no references to this class and runs without it.
  */
@@ -24,32 +24,82 @@ class RectangleStudy {
             // Previous step's vertical world position.
             previousPositionY: 0
         };
-        // Brushes demonstrate the original rewrite's same-color queued drawing approach.
-        this.backgroundBrush = new CanvasBrush('#0d0b18');
-        // Background grid tiles use a darker color than the moving shapes.
-        this.gridBrush = new CanvasBrush('#242039');
-        // Animated rectangles use the owner's periwinkle palette.
-        this.tileBrush = new CanvasBrush('#cebbff');
-        // The controlled element uses a separate warm color for easy identification.
-        this.playerBrush = new CanvasBrush('#ffeed8');
+        // Own every scene declaration so uninstall releases only this study's content.
+        this.sceneIdentifiers = [];
+        // Keep the orbiting scene elements available without searching the scene each frame.
+        this.orbitElements = [];
         // HUD refresh is throttled separately from rendering without creating a timer.
         this.nextHudUpdateSeconds = 0;
     }
 
-    /** Register one element and three passes; all service dependencies now exist. */
+    /** Install decorative planes and frame preparation; all output uses shared WebGL depth. */
     initialize(directory) {
-        // Retain the Directory reference for live service lookup during execution.
+        // Retain the completed Directory, whose scene and renderer already exist.
         this.directory = directory;
-        // Register this study's controlled object without inventing a game-specific engine field.
+        // Register the controlled simulation state separately from its interpolated visual plane.
         directory.elements.register('study.player', this.player);
-        // Obtain the reusable renderer that accepts this feature's drawing callbacks.
+        // Resolve the shared scene service once during installation.
+        this.scene = directory.systems.get('scene');
+        // Resolve output callbacks for interpolation before the engine's world stage.
         const renderer = directory.systems.get('renderer');
-        // The bound method keeps this study as “this” when the renderer calls it later.
-        renderer.registerPass('study.background', 0, 'screen', this.drawBackground.bind(this));
-        // World content follows camera position and zoom, unlike the background.
-        renderer.registerPass('study.world', 10, 'world', this.drawWorld.bind(this));
-        // A last pass updates the harness HUD without giving the engine knowledge of HTML IDs.
+        // Visit columns -12 through 12 inclusive, increasing by one after each column.
+        // A counting loop provides the column number needed for horizontal world placement.
+        for (let columnIndex = -12; columnIndex <= 12; columnIndex += 1) {
+            // Restart rows at -9 for each column; include row 9, advancing one row at a time.
+            // This nested loop supplies every row/column intersection of the stationary grid.
+            for (let rowIndex = -9; rowIndex <= 9; rowIndex += 1) {
+                // Create a two-unit ground plane centered on the original grid intersection.
+                this.createPlane(`grid-${columnIndex}-${rowIndex}`, columnIndex * 40, rowIndex * 40, 0, 2, '#242039');
+            }
+        }
+        // Create twelve orbiting shapes, counting from zero and excluding twelve.
+        // The index supplies a stable ID and later determines that shape's animation phase.
+        for (let tileIndex = 0; tileIndex < 12; tileIndex += 1) {
+            // A slight physical separation keeps moving decorative planes above ground dots.
+            const element = this.createPlane(`orbit-${tileIndex}`, 0, 0, 0.02, 14, '#cebbff');
+            // Retain the actual scene element for tracked position updates before rendering.
+            this.orbitElements.push(element);
+        }
+        // The marker is another opaque scene surface, slightly above the decorative orbit planes.
+        this.markerElement = this.createPlane('marker', 0, 0, 0.04, 20, '#ffeed8');
+        // Bind preserves this study as JavaScript's “this” when the renderer invokes the callback.
+        renderer.registerPass('study.prepare', 10, 'screen', this.prepareWorld.bind(this));
+        // HTML diagnostics run after presentation and do not draw into a Canvas context.
         renderer.registerPass('study.diagnostics', 100, 'screen', this.updateDiagnostics.bind(this));
+    }
+
+    /** Declare one unlit decorative plane, keeping its original palette independent of ambient light. */
+    createPlane(identifier, positionX, positionY, positionZ, size, color) {
+        // Prefix this study's addresses so cleanup cannot remove unrelated features.
+        const fullIdentifier = `study.${identifier}`;
+        // Use shared geometry/material declarations rather than a custom world drawing callback.
+        const element = this.scene.createElement(fullIdentifier, {
+            // A flat rectangle has no side faces or physical thickness.
+            shape: 'plane',
+            // Horizontal world coordinate of the rectangle center.
+            positionX,
+            // Ground-depth world coordinate of the rectangle center.
+            positionY,
+            // Actual elevation participates in the same visibility rule as every world surface.
+            positionZ,
+            // Horizontal world extent; unlike Canvas rect(), scene planes use a center origin.
+            width: size,
+            // Ground-depth world extent uses the same size for a square.
+            depth: size,
+            // These diagnostic decorations intentionally have no collision bodies.
+            body: false,
+            // Black reflection plus the original emitted color preserves this unlit study's palette.
+            material: {
+                // No reflected ambient/direct lighting is added to these flat test colors.
+                color: '#000000',
+                // Visible RGB belongs to the same depth-tested plane, never a late overlay.
+                emission: color
+            }
+        });
+        // Record this exact registration for feature-specific resource cleanup.
+        this.sceneIdentifiers.push(fullIdentifier);
+        // Return the live scene element for animation through its tracked transform.
+        return element;
     }
 
     /** Advance the study by fixed seconds; inputs change only this study's element. */
@@ -79,7 +129,7 @@ class RectangleStudy {
         }
         // Obtain one directional value for left/right input, in the range -1 through 1.
         const horizontalDirection = Number(input.heldKeys.has('KeyD') || input.heldKeys.has('ArrowRight')) - Number(input.heldKeys.has('KeyA') || input.heldKeys.has('ArrowLeft'));
-        // Obtain a vertical value; Canvas positive y points down the screen.
+        // Obtain a vertical value; public screen positive Y points down.
         const verticalDirection = Number(input.heldKeys.has('KeyS') || input.heldKeys.has('ArrowDown')) - Number(input.heldKeys.has('KeyW') || input.heldKeys.has('ArrowUp'));
         // Normalize diagonals so two held directions do not produce faster movement.
         const directionLength = Math.max(1, Math.hypot(horizontalDirection, verticalDirection));
@@ -89,54 +139,30 @@ class RectangleStudy {
         this.player.positionY += verticalDirection / directionLength * 150 * stepSeconds;
     }
 
-    /** Fill the screen background once using CSS-pixel dimensions, independent of camera. */
-    drawBackground(renderer) {
-        // Queue a rectangle starting at the top-left corner and covering the viewport.
-        this.backgroundBrush.rectangle(0, 0, renderer.viewportWidth, renderer.viewportHeight);
-        // Draw the queued background and empty this brush's queue.
-        this.backgroundBrush.flush(renderer);
-    }
-
-    /** Draw a world grid, animated rectangles, and the interpolated controlled element. */
-    drawWorld(renderer, frame) {
+    /** Interpolate visual planes before the engine world stage; execute no Canvas drawing. */
+    prepareWorld(renderer, frame) {
         // Shared interpolation arithmetic belongs to the Basement.
         const basement = this.directory.basement;
-        // Blend the previous/current simulation times for this display frame.
+        // Blend the preceding/current fixed times for this particular display callback.
         const displaySeconds = basement.interpolate(this.previousSeconds, this.elapsedSeconds, frame.interpolationFraction);
-        // Work from column -12 through 12, increasing the column index by one each time.
-        // This counting loop needs an index to calculate each tile's world position.
-        for (let columnIndex = -12; columnIndex <= 12; columnIndex += 1) {
-            // For each column, visit row -9 through 9, increasing the row by one.
-            // Restarting this inner loop creates every row in the current column.
-            for (let rowIndex = -9; rowIndex <= 9; rowIndex += 1) {
-                // Queue a small square at the intersection; spacing is forty world units.
-                this.gridBrush.rectangle(columnIndex * 40 - 1, rowIndex * 40 - 1, 2, 2);
-            }
-        }
-        // Fill all grid squares before moving shapes, placing the grid underneath them.
-        this.gridBrush.flush(renderer);
-        // Draw twelve numbered shapes; start at zero and stop before twelve.
-        // Increase tileIndex after each iteration so each shape gets a unique phase.
-        for (let tileIndex = 0; tileIndex < 12; tileIndex += 1) {
-            // Distribute phases evenly around a full circle, then rotate with time.
+        // Count each retained orbit element from zero, stopping before the array length.
+        // An index is needed because each element's numbered slot selects its orbit phase.
+        for (let tileIndex = 0; tileIndex < this.orbitElements.length; tileIndex += 1) {
+            // Spread phases evenly around a full circle and advance them with simulation time.
             const phaseRadians = tileIndex / 12 * Math.PI * 2 + displaySeconds * 0.35;
-            // Use cosine to calculate horizontal motion across a 160-unit radius.
+            // Cosine sets horizontal position on the original 160-unit orbit radius.
             const positionX = Math.cos(phaseRadians) * 160;
-            // Use sine with a narrower radius to produce an elliptical orbit.
+            // Sine sets vertical position on the original narrower 95-unit radius.
             const positionY = Math.sin(phaseRadians) * 95;
-            // Queue a 14-unit square centered on this shape's calculated position.
-            this.tileBrush.rectangle(positionX - 7, positionY - 7, 14, 14);
+            // Update shared XYZ atomically; scene indexes and visibility follow automatically.
+            this.orbitElements[tileIndex].transform.setPosition(positionX, positionY, 0.02);
         }
-        // Fill the orbiting shapes as one same-color drawing batch.
-        this.tileBrush.flush(renderer);
-        // Blend horizontal position so displays faster than simulation still look smooth.
+        // Interpolate horizontal simulation state without modifying that authoritative state.
         const playerPositionX = basement.interpolate(this.player.previousPositionX, this.player.positionX, frame.interpolationFraction);
-        // Blend the corresponding vertical positions using the same fraction.
+        // Use the same fraction for the controlled marker's vertical ground coordinate.
         const playerPositionY = basement.interpolate(this.player.previousPositionY, this.player.positionY, frame.interpolationFraction);
-        // Queue the larger cream marker centered on the controlled element.
-        this.playerBrush.rectangle(playerPositionX - 10, playerPositionY - 10, 20, 20);
-        // Draw it after the orbiting shapes so overlap demonstrates explicit pass order.
-        this.playerBrush.flush(renderer);
+        // Update the real decorative surface; the shared world stage performs its GPU drawing.
+        this.markerElement.transform.setPosition(playerPositionX, playerPositionY, 0.04);
     }
 
     /** Update harness text at most five times per second; no engine-side UI assumptions. */
@@ -160,8 +186,8 @@ class RectangleStudy {
         document.getElementById('steps-value').textContent = String(profiler.simulationSteps);
         // Show simulated time, which freezes on pause and does not catch up after stop.
         document.getElementById('time-value').textContent = `${lobby.simulationSeconds.toFixed(1)} s`;
-        // Report draw submissions tracked by brushes, excluding HTML HUD updates.
-        document.getElementById('draws-value').textContent = String(renderer.drawCalls);
+        // Count world GPU drawing and final GPU presentation, excluding HTML HUD writes.
+        document.getElementById('draws-value').textContent = String(renderer.drawCalls + this.directory.systems.get('worldRenderer').statistics.drawCalls);
         // Report time deliberately dropped by the catch-up protection.
         document.getElementById('dropped-value').textContent = `${profiler.droppedSeconds.toFixed(2)} s`;
         // Show the current high-density backing allocation.
@@ -177,12 +203,21 @@ class RectangleStudy {
         }
         // Obtain the renderer while the engine still keeps Directory services alive.
         const renderer = this.directory.systems.get('renderer');
-        // Visit each owned pass-name value once; finish after all three names.
+        // Visit each owned pass-name value once; finish after both callback names.
         // “of” is used because removal needs names, not array index keys.
-        for (const passName of ['study.background', 'study.world', 'study.diagnostics']) {
+        for (const passName of ['study.prepare', 'study.diagnostics']) {
             // Remove this feature's drawing callback without disturbing other features.
             renderer.removePass(passName);
         }
+        // “of” supplies scene identifier values, stopping after every owned plane is removed.
+        for (const identifier of this.sceneIdentifiers) {
+            // Scene removal releases visual-index membership and Directory element ownership.
+            this.scene.removeElement(identifier);
+        }
+        // Drop retained plane references so removed geometry can be garbage-collected.
+        this.orbitElements.length = 0;
+        // Release the marker's direct reference as part of this feature's ownership cleanup.
+        this.markerElement = null;
         // Unregister the controlled element owned by this study.
         this.directory.elements.remove('study.player');
     }

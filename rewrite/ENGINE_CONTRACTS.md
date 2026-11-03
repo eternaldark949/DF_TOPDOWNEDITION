@@ -115,12 +115,15 @@ or “unlimited objects” claim is made.
 
 Asset definitions remain distinct from placed elements. Directory asset libraries provide
 named lookup; spatial indexes apply to placed scene instances, not texture/audio files.
-Asset loading/streaming and resource decoding have not been implemented.
+Demand-driven procedural artwork has its own cache; asynchronous asset loading/streaming
+and external resource decoding have not been implemented. See `ARTWORK.md`.
 
 ## Depth is geometry, not a list of gameplay concerns
 
-The final Canvas renderer owns the viewport and screen-space composition. The shared
-world renderer produces an internal WebGL2 image with a real depth buffer. An opaque
+The output renderer owns the displayed WebGL2 canvas and its viewport. The shared
+world renderer uses that same context and a retained GPU image with a real depth buffer.
+GPU framebuffer presentation sends the image to the displayed surface; Canvas 2D never
+composites or presents a completed world frame. An opaque
 fragment appears only if its physical camera depth is nearer than the existing pixel.
 Whole-object Y sorting cannot provide this guarantee for overlapping surfaces.
 
@@ -139,10 +142,10 @@ Stable IDs decide only exactly coplanar ties, not ordinary visibility. Authors s
 declare a true surface position rather than stack coplanar meshes and depend on a name.
 
 **World features declare scene geometry/materials/lights. They do not stamp arbitrary
-world glow onto the completed image.** Legacy Canvas world callbacks are rejected while
-a depth-aware scene exists, including callbacks registered before the scene was created.
-The separate Canvas-only Loop Study remains supported. Screen-space backgrounds, UI,
-and intentional diagnostic overlays are not physical world surfaces and remain valid.
+world glow onto the completed image.** World drawing callbacks are rejected even when the scene is empty. Both neutral studies
+use shared scene geometry and WebGL output. Screen callbacks may prepare content or update
+HTML UI; they do not receive a Canvas 2D drawing context. Physical world surfaces must
+remain scene declarations. The opaque background is cleared directly by WebGL.
 
 ## Emission, illumination, and shadows
 
@@ -175,8 +178,8 @@ are rejected instead of silently treated as correctly depth-sorted transparency.
 
 ## GPU and cache ownership
 
-World shading requires WebGL2. GPU resources are created lazily; an empty or Canvas-only
-engine creates none. Unsupported devices receive an explicit error, not a falsely
+World shading requires WebGL2. The displayed canvas acquires a WebGL2 context at construction; world programs/buffers
+are created lazily when a scene is drawn. An empty engine still has actual GPU output. Unsupported devices receive an explicit error, not a falsely
 equivalent painter-order fallback. The harness displays engine errors on the page.
 
 The renderer owns programs/buffers/framebuffer/cubemap lifetime. Mesh generation/cache,
@@ -188,9 +191,19 @@ Unchanged element meshes are cached through weak references. Stationary scenes/v
 reuse uploaded geometry and the completed world image. A tracked transform, geometry,
 material, visibility, shadow flag, light, or view change invalidates the relevant image.
 Light fragment work is restricted to projected source reach. World shading defaults to
-one pixel per CSS pixel; final Canvas/UI density can be higher. Configure these quality
+one pixel per CSS pixel; displayed WebGL backing density can be higher. HTML UI follows
+browser layout independently. Configure these quality
 budgets explicitly instead of adding object-specific exceptions.
 
 Context-loss events suspend world GPU submission; restoration rebuilds resources from
 the preserved scene. Destruction removes listeners and GPU handles without starting an
 additional scheduler. Original game content remains unmodified and unported.
+
+## Demand-driven Canvas artwork
+
+The `artwork` Directory system owns CPU image generation and resident texture lifetime.
+Canvas 2D runs only for first-use generation or explicit invalidation of a particular
+asset. Clean demand does no repaint or upload. GPU loss preserves painted CPU images;
+restoration uploads them again without rerunning their generators. See `ARTWORK.md`
+for operations, counts, update timing, and upload conventions. World material image
+mapping remains unsupported; do not confuse cached texture resources with that feature.

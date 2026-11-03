@@ -169,22 +169,20 @@ test('shared transform, geometry replacement, height bounds, and removal', () =>
 
 /** Reject low-level world drawing that would bypass shared depth and recreate glow-overlay bugs. */
 test('world rendering contracts reject unstructured Canvas world overlays', () => {
-    // Begin with a source-loaded engine that has not allocated a GPU context.
+    // Begin with an empty source-loaded engine whose output is already WebGL2.
     const fixture = world();
-    // Resolve the final compositor through its normal Directory address.
+    // Resolve the actual output renderer through its normal Directory address.
     const renderer = fixture.engine.directory.systems.get('renderer');
-    // A normal scene element automatically activates the engine-owned world renderer.
+    // An empty scene must reject world Canvas callbacks before any feature is installed.
+    assert.throws(() => renderer.registerPass('legacy', 0, 'world', () => {}), /scene elements/);
+    // Ordinary scene registration activates the same central physical rendering rules.
     fixture.scene.createElement('ordinary', {});
-    // A new feature may not sidestep scene depth by drawing arbitrary world Canvas pixels.
+    // A populated scene must reject the same bypass rather than relying on feature identity.
     assert.throws(() => renderer.registerPass('incorrect-overlay', 999, 'world', () => {}), /scene elements/);
-    // Remove the scene to revisit the explicitly supported Canvas-only learning study.
+    // Unloading a scene must not reopen an incompatible legacy rendering path.
     fixture.scene.clear();
-    // Legacy Canvas-only callbacks remain valid when no depth-aware world exists.
-    renderer.registerPass('legacy', 0, 'world', () => {});
-    // Adding shared geometry afterward must not silently make that legacy callback depth-aware.
-    fixture.scene.createElement('shared', {});
-    // The compositor rejects the incompatible mix before trying to allocate mocked GPU resources.
-    assert.throws(() => renderer.render({}), /cannot bypass/);
+    // The requirement is an output foundation, not a condition of current scene population.
+    assert.throws(() => renderer.registerPass('after-unload', 0, 'world', () => {}), /scene elements/);
     // Release ordinary scene/Directory resources after the contract check.
     fixture.engine.destroy();
 });

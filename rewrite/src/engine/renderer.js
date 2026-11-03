@@ -1,115 +1,133 @@
 /**
- * DIRECTORY SYSTEM — the renderer owns canvas sizing, camera coordinates, brushes,
- * and ordered rendering passes. It never schedules frames and knows no game content.
- * Canvas uses a 2D drawing context; world coordinates are transformed into CSS pixels,
- * then into the backing image's physical pixels for sharp high-density displays.
+ * DIRECTORY OUTPUT SYSTEM — owns the actual displayed WebGL2 canvas, its pixel
+ * dimensions, camera, and ordered preparation/UI callbacks. WorldRenderer owns
+ * physical surface shading; no completed world frame passes through Canvas 2D.
+ * Canvas artwork is produced separately by ArtworkSystem, only on demand.
+ * This system never schedules frames and contains no game content.
  */
 class RendererSystem {
-    /** Connect a canvas and Basement settings; throw if a 2D context is unavailable. */
+    /** Connect the displayed canvas and settings; fail explicitly without WebGL2. */
     constructor(canvas, basement) {
-        // Retain the existing canvas object, so resizing it needs no reference refresh.
+        // Retain the actual HTML canvas; this is the surface the player sees.
         this.canvas = canvas;
-        // Keep shared settings and arithmetic available without copying their state.
+        // Retain shared configuration by reference rather than copying settings.
         this.basement = basement;
-        // Ask the browser for the surface used by Canvas drawing commands.
-        this.drawingContext = canvas.getContext('2d');
-        // Stop initialization if this browser cannot supply a usable drawing surface.
-        if (!this.drawingContext) {
-            // Report an actionable initialization error rather than failing on the first draw.
-            throw new Error('This foundation requires a Canvas 2D drawing context.');
+        // Request GPU output directly. The browser may discard its backbuffer after
+        // presentation; WorldRenderer retains an unchanged image in GPU-owned storage.
+        this.graphics = canvas.getContext('webgl2', {
+            // The output is opaque; world shading clears to the configured background.
+            alpha: false,
+            // All currently supported world materials are opaque, not premultiplied images.
+            premultipliedAlpha: false,
+            // Keep the existing deterministic sampling policy; antialiasing is future work.
+            antialias: false,
+            // Avoid requiring the browser to preserve the displayed backbuffer across frames.
+            preserveDrawingBuffer: false
+        });
+        // A missing GPU context cannot provide equivalent physical visibility through Canvas.
+        if (!this.graphics) {
+            // Report the required capability before any feature is installed.
+            throw new Error('ETRNL9 output requires WebGL2. Canvas 2D is only an artwork generator.');
         }
-        // Store callbacks in explicit drawing order instead of relying on property order.
+        // Screen callbacks prepare content or update UI; they are not Canvas drawing callbacks.
         this.renderPasses = [];
-        // Store a camera in world units; zoom is CSS pixels per world unit.
+        // Camera coordinates use projected world units; zoom is CSS pixels per world unit.
         this.camera = {
-            // Center of the view along the world's horizontal axis.
+            // Horizontal world coordinate at the center of the viewport.
             positionX: 0,
-            // Center of the view along the world's vertical axis.
+            // Projected vertical world coordinate at the center of the viewport.
             positionY: 0,
-            // A zoom of one maps one world unit to one CSS pixel.
+            // One CSS pixel per world unit at the default zoom.
             zoom: 1
         };
-        // Dimensions are CSS pixels, independent of device pixel density.
+        // Nonzero initial CSS dimensions keep coordinate conversions defined before resize.
         this.viewportWidth = 1;
-        // Start with a nonzero height so early coordinate conversions remain defined.
+        // CSS height is independent of the GPU's backing-image resolution.
         this.viewportHeight = 1;
-        // Backing-image pixels per CSS pixel; resize selects the actual capped density.
+        // Backing pixels per CSS pixel, selected by resize from the density cap.
         this.pixelRatio = 1;
-        // Reset draw accounting once per rendered frame.
+        // Opaque output background; normalized RGB is shared with the world target's clear.
+        this.backgroundColor = [13 / 255, 11 / 255, 24 / 255];
+        // Count final-output submissions separately from world/shadow submissions.
         this.drawCalls = 0;
     }
 
-    /** Resolve the shared scene after construction; legacy Canvas-only studies remain supported. */
+    /** Resolve the world backend after all Directory components exist. */
     connect(directory) {
-        // The actual scene object exists even before its own index connection phase runs.
-        this.scene = directory.systems.get('scene');
+        // Keep a live backend reference for context-loss status and empty-world clearing.
+        this.worldRenderer = directory.systems.get('worldRenderer');
     }
 
-    /** Resize backing pixels from CSS dimensions; do not replace the canvas object. */
+    /** Validate CSS dimensions and change backing storage only when its size changes. */
     resize(widthCssPixels, heightCssPixels, devicePixelRatio = 1) {
-        // Reject invalid public inputs before they can poison transforms or allocation.
+        // Reject nonnumeric dimensions before they enter camera calculations or allocations.
         if (![widthCssPixels, heightCssPixels, devicePixelRatio].every(Number.isFinite)) {
-            // NaN and infinity cannot describe a drawing surface.
+            // Infinity and NaN cannot describe finite GPU image dimensions.
             throw new RangeError('Canvas dimensions and pixel ratio must be finite.');
         }
-        // Avoid a zero-size canvas while its parent is briefly hidden or collapsed.
+        // Avoid zero-size views while the host is collapsed or briefly hidden.
         this.viewportWidth = Math.max(1, widthCssPixels);
-        // Keep the CSS height nonzero for input conversion and rendering.
+        // Apply the same minimum to CSS height.
         this.viewportHeight = Math.max(1, heightCssPixels);
-        // Respect the Basement's phone-friendly density limit.
+        // Bound output density independently from the world's shading-density budget.
         this.pixelRatio = this.basement.clamp(devicePixelRatio, 1, this.basement.configuration.maximumPixelRatio);
-        // Allocate the horizontal backing resolution in physical pixels.
-        this.canvas.width = Math.round(this.viewportWidth * this.pixelRatio);
-        // Allocate vertical backing pixels; canvas resizing also resets context state.
-        this.canvas.height = Math.round(this.viewportHeight * this.pixelRatio);
+        // Convert horizontal CSS extent into whole backing pixels.
+        const backingWidth = Math.round(this.viewportWidth * this.pixelRatio);
+        // Convert vertical CSS extent using the same output density.
+        const backingHeight = Math.round(this.viewportHeight * this.pixelRatio);
+        // Reassigning width discards storage, so skip it when the allocation already matches.
+        if (this.canvas.width !== backingWidth) {
+            // Resize the displayed GPU surface without replacing its object reference.
+            this.canvas.width = backingWidth;
+        }
+        // Height also resets storage when assigned, even if its number is unchanged.
+        if (this.canvas.height !== backingHeight) {
+            // Allocate only when the actual requested height differs.
+            this.canvas.height = backingHeight;
+        }
     }
 
-    /** Add an ordered pass: its ID, coordinate space, order, and drawing callback. */
+    /** Register a screen preparation/UI callback; world surfaces must use the scene API. */
     registerPass(identifier, order, coordinateSpace, draw) {
-        // Unstructured world Canvas calls cannot participate in the shared GPU depth buffer.
-        if (coordinateSpace === 'world' && this.scene?.worldElements.size > 0) {
-            // Require physical world surfaces to use the declarative scene API instead.
-            throw new Error('Depth-aware world content must use scene elements/materials, not Canvas world passes.');
+        // No arbitrary world callback can participate in the engine's shared surface depth.
+        if (coordinateSpace !== 'screen') {
+            // This rule applies even before the scene contains any elements.
+            throw new Error('World content must use scene elements/materials; only screen callbacks are supported.');
         }
-        // Reject ambiguous coordinates rather than silently choosing the wrong transform.
-        if (!['world', 'screen'].includes(coordinateSpace)) {
-            // Name the two supported spaces explicitly.
-            throw new Error('Render passes use world or screen coordinates.');
-        }
-        // A pass needs a callable implementation and a finite sorting priority.
+        // A callback must be callable and its sorting priority must be a finite number.
         if (typeof draw !== 'function' || !Number.isFinite(order)) {
-            // Avoid deferred failures inside the running animation callback.
+            // Report the invalid registration immediately, before a running frame encounters it.
             throw new TypeError('A render pass needs a function and finite order.');
         }
-        // Check each existing pass; “some” stops as soon as it finds a matching ID.
+        // some visits pass values and stops on the first matching unique identifier.
         if (this.renderPasses.some((renderPass) => renderPass.identifier === identifier)) {
-            // Keep pass removal and toggles unambiguous.
+            // Preserve unambiguous removal and ownership.
             throw new Error(`Render pass ${identifier} is already registered.`);
         }
-        // Store all pass properties explicitly so callers can inspect and toggle them.
+        // Expose the actual registration so its owner can deliberately toggle enabled.
         const renderPass = {
-            // Unique name used to find or remove this pass.
+            // Unique address for removal or inspection.
             identifier,
-            // Lower values draw first, underneath later passes.
+            // Lower values run first; this orders callbacks, not physical world visibility.
             order,
-            // Choose camera-relative world drawing or fixed screen drawing.
+            // Screen coordinates use CSS pixels; no automatic Canvas transform exists.
             coordinateSpace,
-            // Callback receives the renderer and the current frame information.
+            // Callable receives this renderer and the current Lobby frame information.
             draw,
-            // A disabled pass remains registered but contributes no drawing.
+            // Disabled registrations remain stored but do not execute.
             enabled: true
         };
-        // Append the pass before ordering the complete list.
+        // Store the callback before sorting all registrations by priority.
         this.renderPasses.push(renderPass);
-        // Compare priorities; modern JavaScript's stable sort preserves equal-order registration.
+        // The comparator returns negative/positive for earlier/later priorities.
         this.renderPasses.sort((firstPass, secondPass) => firstPass.order - secondPass.order);
-        // Return the actual pass object so its owner can toggle enabled directly.
+        // Return the live registration object, not a snapshot of its properties.
         return renderPass;
     }
 
-    /** Remove a pass by ID; other registered passes keep their order. */
+    /** Remove one callback by identifier while preserving the remaining callback order. */
     removePass(identifier) {
-        // Keep each pass whose identifier does not match the removed one.
+        // filter retains each pass whose identifier differs from the removed one.
         this.renderPasses = this.renderPasses.filter((renderPass) => renderPass.identifier !== identifier);
     }
 
@@ -139,115 +157,37 @@ class RendererSystem {
         };
     }
 
-    /** Draw all enabled passes once; clear first and isolate every pass's Canvas state. */
+    /** Clear the GPU output and run preparation, world presentation, and UI callbacks once. */
     render(frame) {
-        // Cache the context reference under a name that describes what it is.
-        const drawingContext = this.drawingContext;
-        // Begin draw-call accounting for this frame.
+        // Begin final-output accounting for this display frame.
         this.drawCalls = 0;
-        // Clear using backing pixels, without any camera or density transformation.
-        drawingContext.setTransform(1, 0, 0, 1, 0, 0);
-        // Erase the prior frame, including transparent parts of the scene.
-        drawingContext.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        // Visit pass values in their sorted order; stop after the list is exhausted.
-        // “of” is used because we need each pass object, not array property keys.
-        for (const renderPass of this.renderPasses) {
-            // Skip this pass when its owner has disabled it.
-            if (!renderPass.enabled) {
-                // Continue advances to the next pass without leaving the render method.
-                continue;
-            }
-            // Preserve context state so one pass cannot leak ordinary style/transform changes.
-            drawingContext.save();
-            // Finally restores that state even when a drawing callback throws.
-            try {
-                // A legacy pass may have been registered before a depth-aware scene was added.
-                if (renderPass.coordinateSpace === 'world' && this.scene?.worldElements.size > 0) {
-                    // Reject the incompatible mix instead of silently drawing through roofs.
-                    throw new Error('Canvas world passes cannot bypass a depth-aware scene. Use scene elements/materials.');
-                }
-                // Establish CSS-pixel coordinates for this pass.
-                drawingContext.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
-                // World-space passes follow the camera; screen-space UI stays fixed.
-                if (renderPass.coordinateSpace === 'world') {
-                    // Move the coordinate origin to the middle of the visible canvas.
-                    drawingContext.translate(this.viewportWidth / 2, this.viewportHeight / 2);
-                    // Scale world units by camera zoom on both axes.
-                    drawingContext.scale(this.camera.zoom, this.camera.zoom);
-                    // Move the world so the camera's position lands at the view center.
-                    drawingContext.translate(-this.camera.positionX, -this.camera.positionY);
-                }
-                // Clear paths too: Canvas paths are not included in save/restore state.
-                drawingContext.beginPath();
-                // Let this pass's owner supply content using the established coordinates.
-                renderPass.draw(this, frame);
-            } finally {
-                // Restore the previous styles, transform, clipping, and compositing state.
-                drawingContext.restore();
-                // Prevent an unfinished path from becoming the next pass's path.
-                drawingContext.beginPath();
-            }
-        }
-    }
-}
-
-/**
- * CanvasBrush collects same-color rectangles, then fills their shared path once.
- * One brush owns one color. Callers control brush order; the registry does not
- * regroup different colors, which could change overlap and transparency behavior.
- */
-class CanvasBrush {
-    /** Create a reusable brush with a fixed fill color and an empty instruction queue. */
-    constructor(color) {
-        // Keep the Canvas-compatible color string visible to the brush owner.
-        this.color = color;
-        // Store rectangles in the order the caller requests them.
-        this.instructions = [];
-    }
-
-    /** Queue a rectangle in the current pass's units without drawing it yet. */
-    rectangle(positionX, positionY, width, height) {
-        // Retain all four rectangle arguments together for the later drawing stage.
-        this.instructions.push({
-            // Horizontal position of the rectangle's starting corner.
-            positionX,
-            // Vertical position of the rectangle's starting corner.
-            positionY,
-            // Horizontal extent from that corner.
-            width,
-            // Vertical extent from that corner.
-            height
-        });
-    }
-
-    /** Fill all queued rectangles on the supplied renderer and always empty the queue. */
-    flush(renderer) {
-        // An empty queue requires no Canvas work.
-        if (this.instructions.length === 0) {
-            // Return without increasing the renderer's draw-call counter.
+        // Do not submit GPU work while the browser has lost the displayed context.
+        if (this.worldRenderer.contextLost) {
+            // Scene data and cached CPU artwork remain available for restoration.
             return;
         }
-        // Use the renderer's context without taking over its coordinate transform.
-        const drawingContext = renderer.drawingContext;
-        // Release queued work even if the browser rejects a drawing operation.
-        try {
-            // Apply this brush's color to the next filled path.
-            drawingContext.fillStyle = this.color;
-            // Start one path containing all rectangles queued for this brush.
-            drawingContext.beginPath();
-            // Visit instruction values in order; “of” retrieves objects, not their keys.
-            // Finish when every queued rectangle has been added to the path.
-            for (const instruction of this.instructions) {
-                // Add a rectangle using its corner and dimensions; rect does not fill yet.
-                drawingContext.rect(instruction.positionX, instruction.positionY, instruction.width, instruction.height);
+        // Explicitly select the displayed framebuffer, not a previous shadow/artwork target.
+        this.graphics.bindFramebuffer(this.graphics.FRAMEBUFFER, null);
+        // Cover the actual output allocation, which may be denser than world shading.
+        this.graphics.viewport(0, 0, this.canvas.width, this.canvas.height);
+        // A preceding light's scissor restriction must not leave old screen pixels uncleared.
+        this.graphics.disable(this.graphics.SCISSOR_TEST);
+        // Restore depth writes before clearing an empty scene's depth buffer.
+        this.graphics.depthMask(true);
+        // Clear to the same opaque background used by the retained world image.
+        this.graphics.clearColor(...this.backgroundColor, 1);
+        // Clear both displayed color and depth; an unloaded scene must leave no stale image.
+        this.graphics.clear(this.graphics.COLOR_BUFFER_BIT | this.graphics.DEPTH_BUFFER_BIT);
+        // Visit pass values in priority order, stopping after all registrations.
+        // JavaScript “of” reads values like Python's “for pass in passes”, not property keys.
+        for (const renderPass of this.renderPasses) {
+            // A disabled callback contributes neither preparation nor drawing.
+            if (!renderPass.enabled) {
+                // Continue with the next value instead of leaving the entire render method.
+                continue;
             }
-            // Fill the collected rectangles together with the brush color.
-            drawingContext.fill();
-            // Record this one fill call in the renderer's current frame statistics.
-            renderer.drawCalls += 1;
-        } finally {
-            // Reuse the array while discarding instructions already submitted this frame.
-            this.instructions.length = 0;
+            // Let the owning system/feature perform its specific frame-stage work.
+            renderPass.draw(this, frame);
         }
     }
 }
