@@ -162,16 +162,13 @@
 
         class TorqueAutoBuilding extends TieredBuilding {
             _setupSign() { this.attachedSign = null; }                  // the script is on the roof's board
-            _generateLights() {
-                // The hall keeps Torque's hot orange lamps round every edge (its accent, #ff8800: ETERNAL's block colour);
-                // the showroom wing's are rose gold so the BlackMark's corner reads apart
-                const all = this.sections, accent = this.colors.accent;
-                this.sections = all.slice(0, 1); super._generateLights();
-                const n = this.attachedLights.length;
-                this.sections = all.slice(1); this.colors.accent = TQX.roseGold; super._generateLights();
-                for (const l of this.attachedLights.slice(n)) l.keepColor = true;   // the block's orange tint passes them by
-                this.sections = all; this.colors.accent = accent;
-                this.topReach = 120; this.glowReach = 120;
+            _generateLights() { this.topReach = 120; this.glowReach = 120; }
+            /** Garage lamps (buildings/entrance-lamps.js): steel barn shades with an amber band over each roll-up door and either
+                side of the glass entry, in Torque's hot orange; slim rose-gold sconces either side of the showroom's glass */
+            _entranceLamps() {
+                const D = TQ_PLAN.D, shade = (x, z, out) => ({ kind: 'gooseneck', x, y: D, z, out, rgb: '255, 160, 70', band: TQX.amber, light: [130, '#ff9a2a'] });
+                return [shade(58, 26.5, 9), shade(128, 26.5, 9), shade(372, 26.5, 9), shade(442, 26.5, 9), shade(178, 18, 6), shade(322, 18, 6),
+                    ...[506, 694].map(x => ({ kind: 'sconce', x, y: D, z: 12, out: 2.5, rgb: '255, 196, 170', metal: '#b88a76', metalHi: TQX.roseGold, light: [120, TQX.roseGold] }))];
             }
             _layer(c, key, x, y, w, h, paint, k = 1) {
                 const ready = !document.fonts || (document.fonts.check('36px "Great Vibes"') && document.fonts.check('12px Orbitron'));
@@ -227,7 +224,7 @@
                 roofColor: '#1a1a14', roofLightColor: '#222218', wallColor: T.wall, wallLightColor: T.wallHi, accentColor: '#ff8800',
                 windowColor: '#1a1808', windowLitColor: '#ffaa00', windowFrameColor: '#111', balconies: [], roofProps: [],
                 sign: { text: 'TORQUE', color: '#ff8800', size: 36 },
-                door: { target: config.doorTarget || 'auto_shop', label: 'Enter Auto Shop', lightColor: '#ff8800' },
+                door: { target: config.doorTarget || 'auto_shop', label: 'Enter Auto Shop', lightColor: null },   // (lit by its entrance lamps)
                 tiers: [
                     { id: 'hall', rect: [0, 0, 500, 350], z0: 0, z1: T.HALL, S: 2, fill: T.wall, paint: _tqHall, shade: [10, 10, 14],
                       ledges: [eave(T.HALL, T.amber)], roofRes: 1, roofGlow: true, roof: _tqHallRoof },

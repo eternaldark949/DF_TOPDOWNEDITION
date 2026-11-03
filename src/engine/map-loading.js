@@ -972,6 +972,12 @@ engineMixin({
                         const dr = b.style === 'silver_queen' && b._sqCourt && b._sqCourt() && b._sqCourt().drive;   // and the Silver Queen's drive, out to the street
                         if (dr) mapData.foliage = mapData.foliage.filter(f => !(f.x > dr.x - 30 && f.x < dr.x + dr.w + 30 && f.y > dr.y && f.y < dr.y + dr.h + 110));
                     }
+                    // and the entrance lamps (buildings/entrance-lamps.js): no street tree over them
+                    for (const b of mapData.buildings || []) {
+                        if (!b._entLamps) continue;
+                        const at = b._entLamps.map(s => EntranceLamps._w(b, s.x, s.y));
+                        mapData.foliage = mapData.foliage.filter(f => !at.some(([x, y]) => Math.abs(f.x - x) < 60 && f.y > y - 50 && f.y < y + 90));
+                    }
                     // and the pavement in front of a row of shopfronts (city.row, whichever street it fronts): a street wall shows its fronts, its trees go elsewhere
                     for (const pl of city.placedBuildings) {
                         if (!pl.options || !pl.options.row || pl.options.autoPlaced) continue;   // (the auto-filled streets keep their trees)

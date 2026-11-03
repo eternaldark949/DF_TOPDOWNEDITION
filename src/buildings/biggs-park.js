@@ -221,11 +221,16 @@
         class BiggsParkBuilding extends TieredBuilding {
             _setupSign() { this.attachedSign = null; }
             _generateLights() {
-                // Small door lanterns and pavilion accents, instead of an orange flood over the whole roof.
-                for (const [dx,dy,color,r] of [[65,255,'#e3a69b',125],[385,255,'#e3a69b',125],
-                    [125,405,'#ffcf91',140],[325,405,'#ffcf91',140]])
-                    this.attachedLights.push(new LampEntity({x:this.x+dx,y:this.y+dy,lampType:3,color,lightRadius:r}));
+                // The pavilion's door lanterns, light only (the entrance's lamp posts: _entranceLamps)
+                for (const [dx,dy,color,r] of [[65,255,'#e3a69b',125],[385,255,'#e3a69b',125]]) {
+                    const l = new LampEntity({x:this.x+dx,y:this.y+dy,lampType:3,color,lightRadius:r}); l.visible = false; l.keepColor = true; this.attachedLights.push(l);
+                }
                 this.topReach = 120; this.glowReach = 120;
+            }
+            /** Fairground lamp posts (buildings/entrance-lamps.js): brass, three globes each either side of the arch, one at each corner */
+            _entranceLamps() {
+                const y = BG_PLAN.D + 14;
+                return [[182, 2, 17], [268, 2, 17], [62, 0, 14], [388, 0, 14]].map(([x, arms, z]) => ({ kind: 'carnival', x, y, z, arms, rgb: '255, 212, 150', light: [arms ? 140 : 110, arms ? '#ffcf91' : '#e3a69b', 0] }));
             }
             _layer(c,key,x,y,w,h,paint,k=1) {
                 // A fallback font must not be retained when fonts finish loading.
@@ -272,7 +277,7 @@
                 roofColor: '#1a0a28', roofLightColor: '#220e32', wallColor: T.wine, wallLightColor: '#7a3a44', accentColor: '#ff8800',
                 windowColor: '#0a0410', windowLitColor: '#ff8800', windowFrameColor: '#0c0616', balconies: [], roofProps: [],
                 sign: { text: 'BIGGS', color: '#ff8800', size: 32 },
-                door: { target: config.doorTarget || 'biggs_arena', label: 'Enter Biggs Amusement Park', lightColor: '#ff8800' },
+                door: { target: config.doorTarget || 'biggs_arena', label: 'Enter Biggs Amusement Park', lightColor: null },   // (lit by its lamp posts)
                 tiers: [
                     { id: 'pavilion', rect: [0, 0, 450, 250], z0: 0, z1: Pl.PAV, S: 2, fill: T.wine, paint: _bgPavilion, shade: [24, 8, 14],
                       ledges: [brass(Pl.PAV, 3)], roofRes: 1, roofGlow: true, roof: _bgPavRoof },

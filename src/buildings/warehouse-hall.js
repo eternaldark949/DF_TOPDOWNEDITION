@@ -101,6 +101,11 @@
         }
 
         class WarehouseHall extends TieredBuilding {
+            _generateLights() {}                                        // (no lamps round the roof: the docks' bulkheads light it)
+            /** Dock lamps (buildings/entrance-lamps.js): a caged sodium bulkhead on a rod from the canopy's edge over each dock */
+            _entranceLamps() {
+                return WH.DOCKS.map(x => ({ kind: 'bulkhead', x, y: WH.D + 29, z: WH.DOCK_H + 4.5, top: WH.DOCK_H + 7.6, rgb: '255, 200, 110', light: [150, '#ffd58a', 22] }));
+            }
             /** The dock apron in front: concrete, a yellow guide line to each dock, wheel chocks */
             drawBase(c) {
                 super.drawBase(c);

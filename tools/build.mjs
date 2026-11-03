@@ -89,6 +89,7 @@ const SCRIPTS = [
     'buildings/landmark-kit.js',
     'buildings/ornament-kit.js',
     'buildings/tiered-kit.js',
+    'buildings/entrance-lamps.js',
     'buildings/silver-queen.js',
     'buildings/double-nights.js',
     'buildings/moon-city.js',
