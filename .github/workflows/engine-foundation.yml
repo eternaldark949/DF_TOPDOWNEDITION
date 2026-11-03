@@ -85,3 +85,7 @@ jobs:
       - name: Check artwork cache and direct output
         # Inspect real GPU texture pixels, explicit repaint, restoration, and resource release.
         run: python rewrite/tools/test-artwork-browser.py
+      # A real source asset must exercise the same engine before larger game migration.
+      - name: Check Double Nights Hotel
+        # Verify real textures, height lean, retained buffers, contacts, depth, and GPU recovery offline.
+        run: python rewrite/tools/test-hotel-browser.py

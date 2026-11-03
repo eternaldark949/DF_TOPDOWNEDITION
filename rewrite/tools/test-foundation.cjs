@@ -106,7 +106,7 @@ function environment(configuration = {}) {
     const context = vm.createContext({ console });
     // Load dependencies before classes that instantiate them.
     // “of” reads each filename value and stops after all foundational source files.
-    for (const sourceName of ['basement', 'spatial', 'world-geometry', 'physics', 'scene', 'world-shaders', 'world-mesh', 'point-light-renderer', 'world-renderer', 'artwork', 'renderer', 'input', 'profiler', 'directory', 'penthouse', 'lobby', 'engine']) {
+    for (const sourceName of ['basement', 'projection', 'spatial', 'world-geometry', 'physics', 'scene', 'world-shaders', 'world-mesh', 'world-batches', 'point-light-renderer', 'world-renderer', 'artwork', 'renderer', 'input', 'profiler', 'directory', 'penthouse', 'lobby', 'engine']) {
         // Read the current implementation, including changes made since the prior run.
         const sourceCode = readFileSync(join(__dirname, '../src/engine', `${sourceName}.js`), 'utf8');
         // Execute that file as a separate script, preserving real load-order constraints.

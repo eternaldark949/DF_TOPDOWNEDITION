@@ -15,6 +15,8 @@ const rewriteRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sourceFiles = [
     // The Basement supplies shared settings and NamedLibrary before other classes use them.
     'engine/basement.js',
+    // Camera projection is shared by public tools and GPU uniform setup.
+    'engine/projection.js',
     // Sparse grids provide shared lookup before scene/physics services are defined.
     'engine/spatial.js',
     // World positions, dimensions, and materials share one vocabulary.
@@ -27,6 +29,8 @@ const sourceFiles = [
     'engine/world-shaders.js',
     // Mesh conversion/cache is independent of GPU context and rendering schedules.
     'engine/world-mesh.js',
+    // Retained GPU batches keep unchanged artwork geometry resident while other bodies move.
+    'engine/world-batches.js',
     // Point-light depth views use ordinary world geometry through a separate backend helper.
     'engine/point-light-renderer.js',
     // World surfaces use GPU depth and a central geometric lighting stage.
@@ -47,6 +51,10 @@ const sourceFiles = [
     'engine/lobby.js',
     // Assembly comes after all four level classes exist.
     'engine/engine.js',
+    // Prepared assets install explicit geometry through a reusable Penthouse tool.
+    'penthouse/textured-asset.js',
+    // Real game artwork tests the foundation before wider game migration.
+    'demo/hotel-study.js',
     // Test content is independently removable from the build list.
     'demo/rectangle-study.js',
     // Neutral bodies and height/lighting studies declare content without engine-specific repairs.
@@ -75,6 +83,10 @@ for (const sourceFile of sourceFiles) {
 }
 // Replace the style marker using a callback so literal dollar signs remain unchanged.
 outputHtml = outputHtml.replace('<!-- @styles -->', () => `<style>\n${stylesheet}\n</style>`);
+// Read prepared original artwork; this generated data contains images and local surface definitions.
+const hotelAssetData = readFileSync(join(rewriteRoot, 'src/assets/double-nights.json'), 'utf8');
+// Inline JSON separately from engine code, preserving one offline deliverable without runtime fetches.
+outputHtml = outputHtml.replace('<!-- @assets -->', () => `<script id="hotel-asset-data" type="application/json">${hotelAssetData}</script>`);
 // Insert the ordered inline scripts; no network fetch is needed when opening the result.
 outputHtml = outputHtml.replace('<!-- @scripts -->', () => scriptBlocks.join('\n'));
 // Keep the deliverable distinct from DFAB V8.html, which remains the original game.

@@ -1,17 +1,24 @@
-# ETRNL9 engine foundation — 0.3.0
+# ETRNL9 engine foundation — 0.4.0
 
 The rewrite now has a shared world foundation, built on ETERNAL's Basement, Lobby,
-Directory, and Penthouse organization. This is still an engine laboratory, not a
-migration of Dimensions: Freelancer's game content.
+Directory, and Penthouse organization. This remains an engine laboratory, with a real hotel exterior proof before wider
+migration of Dimensions: Freelancer's gameplay and content.
 
 Download **[ETRNL9 Foundation.html](ETRNL9%20Foundation.html)** and open that one file
 in a browser. All engine code, comments, shaders, styles, and test content are inline.
 There are no external runtime libraries, fonts, or assets. GitHub's source viewer
 is not the running page; download the raw HTML. Shared-world rendering requires WebGL2.
 
-## Neutral studies in the same file
+## Real asset and neutral studies in the same file
 
-**Shared world** is the default. WASD/arrows or a held touch destination move the cream
+**Double Nights Hotel** is the default. Its original prepared Canvas artwork appears on
+811 physical artwork/trim surfaces, using 112 shared image resources and the original
+radial height-lean formula. A cream test actor uses ordinary engine collision. Fit hotel,
+View left/right, Center hotel, and day/night artwork controls inspect the real asset.
+Read **[HOTEL_STUDY.md](HOTEL_STUDY.md)** for source preparation, verified behavior, and
+exact migration limits. This is an exterior asset proof, not the hotel's game/interior.
+
+**Shared world** WASD/arrows or a held touch destination move the cream
 circle through ordinary physics. A moving heavy box participates through the same
 contact solver. An orange volume moves below an elevated slab; a pink volume falls
 onto its top. Purple ground emission is hidden by opaque geometry automatically.
@@ -38,7 +45,7 @@ composites the final world frame. The output backbuffer does not require preserv
 The artwork system registers image generators, paints/uploads on first demand, and
 reuses unchanged images/textures. Explicit invalidation regenerates only changed artwork.
 GPU restoration reuploads preserved images without repainting. Read **[ARTWORK.md](ARTWORK.md)**
-for the API and its current boundary: world material texture mapping remains future work.
+for generated/decoded image ownership and the shared textured-surface contract.
 
 ## Where concerns live
 
@@ -54,6 +61,9 @@ for the API and its current boundary: world material texture mapping remains fut
 | Output renderer | Displayed WebGL2 canvas, viewport, camera helpers, frame callbacks | [renderer.js](src/engine/renderer.js) |
 | Artwork system | Demand-driven Canvas image generation and resident GPU texture ownership | [artwork.js](src/engine/artwork.js) |
 | World renderer | GPU resource lifetime, opaque depth visibility, central surface lighting | [world-renderer.js](src/engine/world-renderer.js) |
+| GPU batches | Retain static buffers while mutable objects move; reuse by material interface | [world-batches.js](src/engine/world-batches.js) |
+| Shared projection | Oblique/radial projection and inversion, source bounds, independent view framing | [projection.js](src/engine/projection.js) |
+| Prepared asset tool | Install reusable textured physical surfaces and supported volumes | [textured-asset.js](src/penthouse/textured-asset.js) |
 | Render geometry helper | Reusable triangles generated from shared world geometry | [world-mesh.js](src/engine/world-mesh.js) |
 | Point-light backend | Six-direction source visibility from nearby opaque geometry | [point-light-renderer.js](src/engine/point-light-renderer.js) |
 | GPU program library | Fully commented projection, emission, depth, and lighting calculations | [world-shaders.js](src/engine/world-shaders.js) |
@@ -94,7 +104,7 @@ node rewrite/tools/build.mjs --check
 node rewrite/tools/test-world.cjs
 ```
 
-The world runner includes the original seven foundation scenarios plus ten spatial,
+The world runner includes the original seven foundation scenarios plus eleven spatial,
 physics, and world-contract scenarios. No npm packages are needed. Edit `rewrite/src/`
 and rebuild; do not hand-edit the generated HTML. Comments are retained in the build.
 
@@ -106,6 +116,7 @@ python -m playwright install chromium
 python rewrite/tools/test-browser.py
 python rewrite/tools/test-world-browser.py
 python rewrite/tools/test-artwork-browser.py
+python rewrite/tools/test-hotel-browser.py
 ```
 
 Tests use a configured `CHROMIUM_EXECUTABLE`, a system `chromium`, or Playwright's managed

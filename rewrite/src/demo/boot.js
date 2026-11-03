@@ -7,8 +7,22 @@
 // Obtain the drawing surface after its HTML element has been parsed.
 const foundationCanvas = document.getElementById('foundation-canvas');
 
+/** Construct the connected engine; expose setup/capability failures directly in the phone-readable host. */
+function constructFoundationEngine(canvas) {
+    // A capability error can occur before the Lobby exists, so handle this construction boundary explicitly.
+    try {
+        // This constructor finishes before its returned engine object is assigned by the caller.
+        return new Etrnl9Engine(canvas);
+    } catch (error) {
+        // The host status label remains usable even if this device could not create WebGL2 output.
+        document.getElementById('status-value').textContent = error.message;
+        // Preserve the actual browser exception rather than hiding an unsupported renderer behind fallback.
+        throw error;
+    }
+}
+
 // Construct and connect the four levels without starting any recurring callbacks.
-const foundationEngine = new Etrnl9Engine(foundationCanvas);
+const foundationEngine = constructFoundationEngine(foundationCanvas);
 
 // Remember the selected optional study without mixing it into engine implementation.
 let selectedStudy = null;
@@ -71,6 +85,13 @@ function toggleFoundationPause() {
 function updateFoundationZoom(event) {
     // Find the camera through its owning renderer system.
     const renderer = foundationEngine.directory.systems.get('renderer');
+    // The adaptive hotel view depends on current viewport dimensions rather than a fixed percentage.
+    if (event.target.value === 'fit') {
+        // Resolve the installed test feature; optional chaining tolerates a different active study.
+        foundationEngine.penthouse.features.get('hotel-study')?.fitView();
+        // Do not convert the word fit into NaN or poison future camera calculations.
+        return;
+    }
     // Input values are strings; Number converts the selected numeric value explicitly.
     renderer.camera.zoom = Number(event.target.value);
 }
@@ -88,15 +109,60 @@ function installFoundationStudy(studyName) {
     }
     // Keep scene-specific controls visible only when they have meaningful targets.
     const isWorldStudy = studyName === 'world';
+    // A real asset study uses the same scene/renderer as the neutral exercises.
+    const isHotelStudy = studyName === 'hotel';
+    // Reset reusable camera settings when leaving the asset's radial view.
+    if (!isHotelStudy) {
+        // Neutral studies retain their original oblique camera model.
+        foundationEngine.directory.systems.get('renderer').camera.projection = 'oblique';
+        // Reset the world X center after viewing the hotel's 800-unit plan.
+        foundationEngine.directory.systems.get('renderer').camera.positionX = 0;
+        // Reset the world ground-depth center under the same explicit camera ownership.
+        foundationEngine.directory.systems.get('renderer').camera.positionY = 0;
+        // Neutral scenes use ordinary centered framing rather than the asset inspection window.
+        foundationEngine.directory.systems.get('renderer').camera.screenOffsetX = 0;
+        // Reset vertical framing under the same explicit camera ownership.
+        foundationEngine.directory.systems.get('renderer').camera.screenOffsetY = 0;
+        // Hotel night artwork must not silently darken another independent study.
+        foundationEngine.directory.systems.get('renderer').nightAmount = 0;
+        // Adaptive hotel fitting is not a valid numeric zoom for the other exercises.
+        if (document.getElementById('zoom-control').value === 'fit') {
+            // Restore the neutral studies' default one CSS pixel per world unit.
+            foundationEngine.directory.systems.get('renderer').camera.zoom = 1;
+            // Keep the visible control consistent with the actual camera scale.
+            document.getElementById('zoom-control').value = '1';
+        }
+    }
     // Select the neutral shared-world scene or the scheduling/interpolation study.
     selectedStudy = isWorldStudy ? 'world-study' : 'rectangle-study';
+    // Keep the real asset feature under its own removable Penthouse address.
+    if (isHotelStudy) {
+        // The feature owns test controls/content; the engine receives no hotel-specific methods.
+        selectedStudy = 'hotel-study';
+    }
+    // Default to the small scheduling exercise before selecting a different test feature.
+    let feature = new RectangleStudy();
+    // The shared-world option exercises generic primitive contacts and lighting.
+    if (isWorldStudy) {
+        // Construct this optional test feature without starting another engine or scheduler.
+        feature = new WorldStudy();
+    }
+    // The asset option uses actual prepared game artwork and ordinary scene geometry.
+    if (isHotelStudy) {
+        // Construct only test content; image resources have already been decoded separately.
+        feature = new HotelStudy();
+    }
     // Install through the same optional Penthouse contract as future procedural features.
-    foundationEngine.penthouse.install(selectedStudy, isWorldStudy ? new WorldStudy() : new RectangleStudy());
+    foundationEngine.penthouse.install(selectedStudy, feature);
     // Set the selector to reflect programmatic selection as well as user input.
     document.getElementById('study-control').value = studyName;
     // Hide stress/roof controls in the Loop study.
     document.getElementById('world-controls').hidden = !isWorldStudy;
-    // Hide physical measurements when no world bodies exist.
+    // Hotel-specific view/artwork controls belong to this harness rather than the engine.
+    document.getElementById('hotel-controls').hidden = !isHotelStudy;
+    // Show image/buffer reuse accounting only while the real asset is being inspected.
+    document.getElementById('hotel-cache-value').hidden = !isHotelStudy;
+    // Hide physical measurements when the selected study has no matching diagnostic fields.
     document.getElementById('world-measurements').hidden = !isWorldStudy;
     // Explain what pointer input means for the selected study.
     document.getElementById('study-instructions').textContent = isWorldStudy
@@ -104,6 +170,13 @@ function installFoundationStudy(studyName) {
         : 'Drag or touch to place the cream marker. WASD/arrows move it. This WebGL study checks scheduling and interpolation.';
     // Explain that this scene is a neutral engine test rather than migrated gameplay.
     document.getElementById('scene-caption').textContent = isWorldStudy ? 'One world: bodies, height, visibility, and light.' : 'A small study, running on four levels.';
+    // Real-asset instructions explain supported interaction without claiming migrated gameplay.
+    if (isHotelStudy) {
+        // Camera controls and cached night artwork let the owner inspect the same real asset.
+        document.getElementById('study-instructions').textContent = 'Double Nights Hotel: original artwork on WebGL surfaces. WASD/arrows or held touch moves the cream test actor; walls use ordinary collision. Use Fit hotel, view controls, and night artwork to inspect it.';
+        // Keep the caption readable over the actual rendered hotel.
+        document.getElementById('scene-caption').textContent = 'Double Nights Hotel · original artwork, shared world depth';
+    }
     // Reset the scene-specific roof toggle label.
     document.getElementById('roof-button').textContent = 'Hide slab visually';
     // Re-enable population setup for a newly constructed world study.
@@ -203,7 +276,118 @@ document.getElementById('population-button').addEventListener('click', addFounda
 window.addEventListener('error', reportFoundationError);
 // Derive the visible version from shared configuration instead of maintaining two version values.
 document.getElementById('version-value').textContent = foundationEngine.basement.configuration.engineVersion;
-// Install the neutral shared-world study after every level and service exists.
-installFoundationStudy('world');
-// All construction, feature installation, and event wiring are complete; begin frames now.
-startFoundation();
+/** Disable host controls while asynchronous image decoding prevents a complete real-asset scene. */
+function setFoundationLoading(loading) {
+    // querySelectorAll returns this page's actual lifecycle/view controls, not engine components.
+    const controls = document.querySelectorAll('.controls button, .controls select');
+    // “of” supplies DOM control values and stops after every selected button/dropdown.
+    for (const control of controls) {
+        // Ignore user input until all initialization dependencies have been connected.
+        control.disabled = loading;
+    }
+    // Loading status belongs to the host harness rather than a second engine state machine.
+    if (loading) {
+        // Keep the first-open state understandable on a phone while embedded PNGs decode.
+        document.getElementById('status-value').textContent = 'Preparing hotel artwork…';
+    }
+}
+
+/** Decode embedded images once before installing the real asset; no runtime network is used. */
+async function prepareHotelAsset() {
+    // Parse generated asset data separately from reusable engine implementation.
+    const definition = JSON.parse(document.getElementById('hotel-asset-data').textContent);
+    // Resolve the image resource owner that retains CPU sources across GPU restoration.
+    const artwork = foundationEngine.directory.systems.get('artwork');
+    // Object.entries provides own-property [image ID,data URI] pairs, unlike for...in inheritance.
+    const imageEntries = Object.entries(definition.images);
+    // Decode independent images concurrently; Promise.all resolves only after every image is ready.
+    await Promise.all(imageEntries.map(
+        /** Decode one embedded image and register its stable prefixed artwork address. */
+        async ([identifier, source]) => {
+            // A browser image decodes the original PNG; no Canvas drawing is needed at runtime.
+            const image = new Image();
+            // A data URI is embedded in this HTML and makes no external network request.
+            image.src = source;
+            // Await preserves initialization order; the engine is still stopped during decoding.
+            await image.decode();
+            // Use a source namespace so another building can reuse the same local asset names safely.
+            artwork.registerImage(`double-nights.${identifier}`, image);
+        }
+    ));
+    // “of” supplies surface values and stops after each material's image addresses are connected.
+    for (const surface of definition.surfaces) {
+        // A colored geometric surface needs no source image address.
+        if (surface.material.artwork) {
+            // Match the address used when registering the decoded image above.
+            surface.material.artwork = `double-nights.${surface.material.artwork}`;
+        }
+        // Emission is optional and remains a separate image on this same physical surface.
+        if (surface.material.emissionArtwork) {
+            // Connect the cached night image without creating a late glow overlay pass.
+            surface.material.emissionArtwork = `double-nights.${surface.material.emissionArtwork}`;
+        }
+    }
+    // Store reusable asset data separately from this scene's placed instance.
+    foundationEngine.directory.assets.register('double-nights', definition);
+    // Default to the actual game asset so the owner can inspect it immediately after opening one file.
+    installFoundationStudy('hotel');
+    // Reenable host controls only after source images and scene dependencies exist.
+    setFoundationLoading(false);
+    // Tests and future embedding can wait for completed decode/scene initialization explicitly.
+    window.foundationReady = true;
+    // All dependencies and actual asset images now exist; start the sole Lobby scheduler.
+    startFoundation();
+}
+
+/** Toggle cached night artwork through one renderer setting without repainting source images. */
+function toggleHotelNight() {
+    // Resolve the same output renderer used by every study.
+    const renderer = foundationEngine.directory.systems.get('renderer');
+    // Switch the normalized time-of-day amount between daytime and full visible night emission.
+    renderer.nightAmount = renderer.nightAmount === 0 ? 1 : 0;
+    // Describe the next action without claiming bloom/searchlights are already implemented.
+    document.getElementById('hotel-night-button').textContent = renderer.nightAmount ? 'Show day artwork' : 'Show night artwork';
+}
+
+/** Move the camera horizontally to inspect the source height lean; geometry remains retained. */
+function panHotel(amount) {
+    // Only camera position changes; image cache and physical geometry need no invalidation calls.
+    foundationEngine.directory.systems.get('renderer').camera.positionX += amount;
+}
+
+/** Return to the authored hotel center and adapt its scale to the current viewport. */
+function centerHotel() {
+    // Restore the horizontal center of the 800-world-unit plan.
+    foundationEngine.directory.systems.get('renderer').camera.positionX = 400;
+    // Restore the same vertical center used at asset installation.
+    foundationEngine.directory.systems.get('renderer').camera.positionY = 900;
+    // Fit through the current feature, without adding asset-specific behavior to the engine.
+    foundationEngine.penthouse.features.get('hotel-study')?.fitView();
+}
+
+// Connect the optional art/view controls to actual camera/material settings.
+document.getElementById('hotel-night-button').addEventListener('click', toggleHotelNight);
+/** Move left when this harness button is clicked; the callback starts no frame loop. */
+document.getElementById('hotel-left-button').addEventListener('click', () => panHotel(-100));
+/** Move right using the same camera operation and opposite world-unit displacement. */
+document.getElementById('hotel-right-button').addEventListener('click', () => panHotel(100));
+// Centering changes only this feature's view configuration.
+document.getElementById('hotel-center-button').addEventListener('click', centerHotel);
+// Expose loading state before asynchronous decoding starts.
+window.foundationReady = false;
+// Block premature lifecycle/study changes while embedded source images are still decoding.
+setFoundationLoading(true);
+// Make startup failures visible on a phone instead of silently leaving a blank scene.
+prepareHotelAsset().catch(
+    /** Present the concrete asset/decode/setup failure and keep the engine stopped. */
+    (error) => {
+        // Stop through the existing lifecycle boundary if initialization reached a running state.
+        foundationEngine.stop();
+        // Keep alternative neutral studies accessible after a source-image preparation failure.
+        setFoundationLoading(false);
+        // The status label belongs to this test harness, not reusable engine code.
+        document.getElementById('status-value').textContent = error.message;
+        // Preserve the original browser exception for automated checks and developer tools.
+        console.error(error);
+    }
+);

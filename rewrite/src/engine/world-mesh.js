@@ -14,8 +14,8 @@ class WorldSurfaceMesh {
     appendTriangle(output, first, second, third, normal, material) {
         // “of” visits the three vertex coordinate arrays in triangle order, then stops.
         for (const point of [first, second, third]) {
-            // Store twelve float attributes in the shader's explicitly documented layout.
-            output.push(...point, ...normal, ...material.color, ...material.emission);
+            // Store eighteen float attributes in the shader's explicitly documented layout.
+            output.push(...point, ...normal, ...material.color, ...material.emission, 0, 0, ...material.artworkShade);
         }
     }
 
@@ -27,6 +27,41 @@ class WorldSurfaceMesh {
         if (cached && cached.revision === element.geometryRevision && cached.material === element.material && cached.topMaterial === element.topMaterial) {
             // Reuse unchanged static geometry for camera and light views alike.
             return cached.vertices;
+        }
+        // Artwork meshes retain their explicit local triangle geometry rather than box approximation.
+        if (element.geometry.shape === 'surface') {
+            // Accumulate the same interleaved XYZ/normal/color/emission/UV format as ordinary meshes.
+            const vertices = [];
+            // Read orientation once to transform both coordinates and the face's normal.
+            const cosine = Math.cos(element.transform.angle);
+            // The corresponding sine supplies the other planar rotation term.
+            const sine = Math.sin(element.transform.angle);
+            // Read the declared local direction without copying changing parent state.
+            const localNormal = element.geometry.normal;
+            // Rotate the normal with its owning surface so direct light remains physically oriented.
+            const normal = [localNormal[0] * cosine - localNormal[1] * sine, localNormal[0] * sine + localNormal[1] * cosine, localNormal[2]];
+            // “of” supplies triangle corner values in order and stops after every explicit corner.
+            for (const vertex of element.geometry.vertices) {
+                // Put this actual corner into world XYZ through the shared element transform.
+                vertices.push(
+                    // Rotated horizontal coordinate plus the element's world X.
+                    element.transform.positionX + vertex[0] * cosine - vertex[1] * sine,
+                    // Rotated ground-depth coordinate plus the element's world Y.
+                    element.transform.positionY + vertex[0] * sine + vertex[1] * cosine,
+                    // Shared physical elevation; there is no separate visual height.
+                    element.transform.positionZ + vertex[2],
+                    // Surface direction for illumination, followed by material RGB values.
+                    ...normal, ...element.material.color, ...element.material.emission,
+                    // Normalized image coordinates choose pixels from the cached artwork.
+                    vertex[3], vertex[4],
+                    // Preserve source face shading without allocating another texture per normal.
+                    ...element.material.artworkShade
+                );
+            }
+            // Weak caching releases removed surfaces once no feature retains their element objects.
+            this.meshCache.set(element, {revision: element.geometryRevision, material: element.material, topMaterial: element.topMaterial, vertices});
+            // Return retained world triangles for camera and source visibility alike.
+            return vertices;
         }
         // Shared transforms define the lower elevation for every side face.
         const bottom = element.transform.positionZ;

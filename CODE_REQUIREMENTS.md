@@ -236,3 +236,24 @@ game migration. Follow `rewrite/ENGINE_CONTRACTS.md` when extending the foundati
 - Verify paint/upload counts and actual browser GPU pixels. A resource cache alone
   does not prove world texture mapping, transparent materials, or visual game parity;
   document those capabilities only when implemented and checked.
+
+## 13. Prove renderer migration with real source assets
+
+- Use a real original asset to exercise new renderer capabilities before treating the
+  renderer as visually proven. Preserve source artwork and camera/projection intent;
+  a neutral primitive study alone does not establish game-asset compatibility.
+- Keep preparation tools, generated image/geometry data, placed asset instances, and
+  test controls separate from reusable engine systems. Engine rendering must not
+  branch on hotel/shop/building identity to repair ordinary depth or collision.
+- Record when original painters run. Prepared images generated during development
+  are valid assets, but must not be described as shipped runtime procedural painters.
+- Static camera-independent artwork and mesh data must remain reusable when the
+  camera or an unrelated actor moves. Check actual image/buffer uploads, not only FPS.
+- Test ordinary source geometry contacts and actual roof/material pixels, plus GPU
+  loss/restoration and unload, using the same offline artifact delivered to the owner.
+- Generated PNG/base64/JSON asset payloads are generated data. Document their schema,
+  provenance, preparation command, and limitations; keep explanatory English in the
+  human-maintained preparation/runtime code rather than pretending image bytes are code.
+- State omitted animation, lighting, reflection, bloom, actor, and gameplay features
+  explicitly. Reusing original textures and a height formula does not prove complete
+  visual parity or performance on the owner's phone.

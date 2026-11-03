@@ -87,8 +87,12 @@ def check_artwork(browser):
     }""")
     # Load the production single-file artifact with instrumentation already installed.
     page.set_content(artifact_path.read_text())
+    # Embedded hotel images decode before the initial real-asset study is installed.
+    page.wait_for_function('window.foundationReady === true')
     # Require real geometry submission so a boot error cannot count as no Canvas work.
     page.wait_for_function('foundationEngine.directory.systems.get("worldRenderer").statistics.vertices > 0')
+    # Isolate cache-operation counts from the default hotel's already decoded resident images.
+    page.evaluate('window.artworkInitialUploads = foundationEngine.directory.systems.get("artwork").uploadCount')
     # Freeze simulation/render scheduling for exact cache-operation counts.
     page.evaluate('foundationEngine.stop()')
     # Both actual output and the world backend must refer to the same displayed canvas/context.
@@ -130,7 +134,7 @@ def check_artwork(browser):
     # Read real GPU storage after the production cache performs its first paint and upload.
     assert texture_pixel(page) == [255, 0, 0, 255]
     # First use must produce exactly one successful paint and upload.
-    assert page.evaluate('[foundationEngine.directory.systems.get("artwork").paintCount, foundationEngine.directory.systems.get("artwork").uploadCount]') == [1, 1]
+    assert page.evaluate('[foundationEngine.directory.systems.get("artwork").paintCount, foundationEngine.directory.systems.get("artwork").uploadCount - window.artworkInitialUploads]') == [1, 1]
     # Many display frames and prepare calls must reuse exactly the same resident texture.
     page.evaluate("""() => {
         // Resolve the live cache once for this feature's repeated demand.
@@ -149,7 +153,7 @@ def check_artwork(browser):
         }
     }""")
     # Frame rendering must add no CPU paints and no texture uploads for unchanged artwork.
-    assert page.evaluate('[foundationEngine.directory.systems.get("artwork").paintCount, foundationEngine.directory.systems.get("artwork").uploadCount]') == [1, 1]
+    assert page.evaluate('[foundationEngine.directory.systems.get("artwork").paintCount, foundationEngine.directory.systems.get("artwork").uploadCount - window.artworkInitialUploads]') == [1, 1]
     # Change source content and coalesce two invalidation requests into one later repaint.
     page.evaluate("""() => {
         // This new input cannot affect the already uploaded image by itself.
@@ -162,7 +166,7 @@ def check_artwork(browser):
     # The requested replacement must appear in the actual uploaded GPU image.
     assert texture_pixel(page) == [0, 0, 255, 255]
     # Exactly one new paint and upload are required for that changed asset.
-    assert page.evaluate('[foundationEngine.directory.systems.get("artwork").paintCount, foundationEngine.directory.systems.get("artwork").uploadCount]') == [2, 2]
+    assert page.evaluate('[foundationEngine.directory.systems.get("artwork").paintCount, foundationEngine.directory.systems.get("artwork").uploadCount - window.artworkInitialUploads]') == [2, 2]
     # Exercise the same real output context-loss event that invalidates world resources.
     page.evaluate("""() => {
         // Keep the browser extension available across asynchronous loss/restoration events.
@@ -181,7 +185,7 @@ def check_artwork(browser):
     # Preserved CPU artwork must repopulate the restored GPU with the correct image.
     assert texture_pixel(page) == [0, 0, 255, 255]
     # Restoration performs one upload and zero new paints.
-    assert page.evaluate('[foundationEngine.directory.systems.get("artwork").paintCount, foundationEngine.directory.systems.get("artwork").uploadCount]') == [2, 3]
+    assert page.evaluate('[foundationEngine.directory.systems.get("artwork").paintCount, foundationEngine.directory.systems.get("artwork").uploadCount - window.artworkInitialUploads]') == [2, 3]
     # A failing replacement must preserve previous image/texture and remain dirty for retry.
     assert page.evaluate("""() => {
         // Resolve the cache whose ownership is being tested.

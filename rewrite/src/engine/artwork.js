@@ -7,8 +7,9 @@
  * is installed here. Callers choose when changed information requires fresh artwork.
  * “Bake” means drawing into a reusable image. The CPU image survives GPU loss;
  * restoring a texture uploads that image again without rerunning the paint callback.
- * These texture handles are a resource foundation, not yet world material mapping:
- * textured world surfaces, alpha cutouts, atlases, and streaming remain future work.
+ * Explicit world surfaces can sample these resources through the shared depth pipeline.
+ * Alpha cutouts use the same image coverage for camera and source visibility; blended
+ * transparency, texture atlases, and streaming remain future work.
  */
 class ArtworkSystem {
     /** Retain the output canvas for document/context lookup; allocate no artwork yet. */
@@ -17,6 +18,8 @@ class ArtworkSystem {
         this.outputCanvas = outputCanvas;
         // Map uses explicit asset IDs, without inherited object properties.
         this.entries = new Map();
+        // Tracked image changes invalidate finished world images without changing world geometry.
+        this.revision = 0;
         // Count successful CPU paints across the lifetime of this system.
         this.paintCount = 0;
         // Count successful image uploads, including uploads after GPU restoration.
@@ -58,7 +61,41 @@ class ArtworkSystem {
             // New assets need exactly one initial paint before they can be used.
             dirty: true
         });
+        // A new asset can change material sampling on a previously drawn surface.
+        this.revision += 1;
         // Return the stable asset address rather than exposing mutable cache internals.
+        return identifier;
+    }
+
+    /** Register an already decoded image; preserve its pixels for upload/restoration without repaint. */
+    registerImage(identifier, image) {
+        // Complete browser images provide finite nonzero pixel dimensions before upload.
+        const widthPixels = image.naturalWidth;
+        // Image resolution is independent from the world size of surfaces that later reference it.
+        const heightPixels = image.naturalHeight;
+        // Reject duplicate/missing IDs and images whose decoding has not completed.
+        if (typeof identifier !== 'string' || !identifier || this.entries.has(identifier) || !image.complete || !widthPixels || !heightPixels) {
+            // Loading must finish before the image can participate in a deterministic render frame.
+            throw new TypeError('Artwork image registration needs a unique ID and a decoded image.');
+        }
+        // Use the same owned cache record as generated Canvas artwork.
+        this.entries.set(identifier, {
+            // Source image width in actual pixels.
+            widthPixels,
+            // Source image height in actual pixels.
+            heightPixels,
+            // Decoded prefabs have no procedural repaint callback.
+            paint: null,
+            // Preserve the actual decoded image as the CPU source for GPU restoration.
+            canvas: image,
+            // First demand still performs exactly one resident texture upload.
+            texture: null,
+            // This source image already exists and must not be painted again.
+            dirty: false
+        });
+        // Finished world images must observe newly registered material resources.
+        this.revision += 1;
+        // Return the stable address, not a handle that could become invalid after GPU loss.
         return identifier;
     }
 
@@ -77,8 +114,17 @@ class ArtworkSystem {
 
     /** Mark changed artwork for repaint on its next use; repeated marks coalesce. */
     invalidate(identifier) {
-        // Set the dirty flag on the actual cached asset, not a copied status value.
-        this.require(identifier).dirty = true;
+        // Decoded image assets must be replaced explicitly; they have no procedural paint function.
+        const entry = this.require(identifier);
+        // Invalidation is only meaningful for a registered synchronous generator.
+        if (!entry.paint) {
+            // Preserve the decoded source instead of later attempting to call null as a painter.
+            throw new Error('Decoded artwork images require remove/registerImage to replace their source.');
+        }
+        // Set dirtiness on the actual cached record, not a copied status value.
+        entry.dirty = true;
+        // Cached world images must resample this image after explicit content invalidation.
+        this.revision += 1;
     }
 
     /** Return a resident GPU texture, painting/uploading only when its cached state requires it. */
@@ -90,6 +136,11 @@ class ArtworkSystem {
             // Explicit null means temporarily unavailable, not a valid texture handle.
             return null;
         }
+        // A clean resident texture needs no hardware query, paint, or upload.
+        if (!entry.dirty && entry.texture) {
+            // Many surfaces may demand this same handle during one GPU frame.
+            return entry.texture;
+        }
         // Read the displayed context through its owner rather than creating another context.
         const graphics = this.renderer.graphics;
         // Reject oversize artwork before allocating its CPU canvas.
@@ -98,11 +149,6 @@ class ArtworkSystem {
         if (entry.widthPixels > maximumSize || entry.heightPixels > maximumSize) {
             // Do not silently shrink authored artwork or hide allocation failure.
             throw new RangeError(`Artwork ${identifier} exceeds this GPU texture capacity.`);
-        }
-        // A clean asset with a resident texture needs neither CPU paint nor GPU upload.
-        if (!entry.dirty && entry.texture) {
-            // Return the same handle so many instances can share this one image.
-            return entry.texture;
         }
         // Only explicit dirtiness or first use authorizes a paint callback.
         if (entry.dirty) {
@@ -230,6 +276,8 @@ class ArtworkSystem {
         }
         // Removing the entry releases the generator and CPU canvas references too.
         this.entries.delete(identifier);
+        // A removed image must invalidate any finished world frame that referenced it.
+        this.revision += 1;
     }
 
     /** Release every asset during Directory teardown without adding another scheduler. */

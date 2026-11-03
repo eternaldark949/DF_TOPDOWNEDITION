@@ -4,8 +4,8 @@
  * presented by a GPU framebuffer copy, never by a Canvas 2D drawing context. Geometry, surface emission, and point-light
  * contributions all use identical vertex positions and depth tests. No building,
  * shop, roof, or character name changes visibility rules.
- * This first contract supports opaque extruded boxes/circles and flat planes;
- * transparent materials, bloom blur, textures, and skeletal meshes are not implemented.
+ * Opaque primitives and explicit textured alpha-cutout surfaces share this pipeline.
+ * Blended transparency, bloom blur, and skeletal meshes are not implemented.
  */
 class WorldRendererSystem {
     /** Store no GPU resources until a world scene is actually drawn. */
@@ -20,12 +20,14 @@ class WorldRendererSystem {
         this.active = false;
         // Context loss suspends world drawing until the browser restores GPU resources.
         this.contextLost = false;
-        // Cache uploaded geometry against scene and viewport revisions.
-        this.cachedGeometryKey = '';
         // Reuse a completed world image when geometry, sources, and view are unchanged.
         this.cachedFrameKey = '';
         // Mesh generation/cache has its own concern, independent of GPU resource ownership.
         this.meshLibrary = new WorldSurfaceMesh();
+        // Retained camera batches keep static hotel meshes resident while actors move.
+        this.cameraBatches = new WorldGeometryBatches(this);
+        // Source visibility uses independently queried/cached geometry and the same material rules.
+        this.shadowBatches = new WorldGeometryBatches(this);
         // Point-light visibility has its own backend helper, using live parent resource lookup.
         this.pointLighting = new PointLightRenderer(this);
         // Track what the GPU is actually asked to draw.
@@ -38,6 +40,8 @@ class WorldRendererSystem {
             lights: 0,
             // Nearby opaque candidates processed for source visibility this frame.
             shadowCandidates: 0,
+            // Camera geometry buffers replaced this frame; unchanged static meshes stay resident.
+            bufferUploads: 0,
             // Actual world/light/shadow GPU draw submissions, excluding final presentation.
             drawCalls: 0
         };
@@ -82,10 +86,14 @@ class WorldRendererSystem {
     deactivate() {
         // Remove only the world pass, leaving independent screen preparation/UI callbacks intact.
         this.renderer.removePass('engine.world');
+        // Scene unload must release retained buffer source references, even while the Lobby is stopped.
+        this.cameraBatches.dispose();
+        // Release independent source-view batch ownership under the same unload rule.
+        this.shadowBatches.dispose();
+        // Drop the last returned batch array so removed scene objects are not held through it.
+        this.visibleBatches = [];
         // A later scene can reactivate the same renderer.
         this.active = false;
-        // Drop cached references and vertex count when the scene is unloaded.
-        this.cachedGeometryKey = '';
         // An empty/replaced scene must not reuse the prior scene's finished image.
         this.cachedFrameKey = '';
         // Prevent diagnostics from reporting the removed scene's population.
@@ -164,10 +172,6 @@ class WorldRendererSystem {
             lightProgram: this.createProgram(WorldShaders.lightFragmentSource),
             // The light's six views store nearest opaque geometry as radial depth.
             shadowProgram: this.createProgram(WorldShaders.shadowFragmentSource, WorldShaders.shadowVertexSource),
-            // One interleaved vertex buffer stores position, normal, color, and emission.
-            vertexBuffer: this.graphics.createBuffer(),
-            // Shadow geometry is queried independently of the camera's visible geometry.
-            shadowVertexBuffer: this.graphics.createBuffer(),
             // A depth cubemap covers every direction around one point source.
             shadowCube: this.graphics.createTexture(),
             // Render depth into one cubemap face at a time, without touching the world image.
@@ -201,8 +205,6 @@ class WorldRendererSystem {
             // Apply the same sampling boundary policy to all cube faces.
             this.graphics.texParameteri(this.graphics.TEXTURE_CUBE_MAP, axis, this.graphics.CLAMP_TO_EDGE);
         }
-        // A restored GPU has no uploaded geometry even if the scene itself did not change.
-        this.cachedGeometryKey = '';
         // Restored buffers contain no previously shaded scene image.
         this.cachedFrameKey = '';
     }
@@ -221,54 +223,118 @@ class WorldRendererSystem {
         this.resources = null;
         // Permit draw() to initialize a fresh resource set.
         this.contextLost = false;
+        // Uploaded camera geometry handles were lost, but scene declarations remain authoritative.
+        this.cameraBatches.restoreContext();
+        // Source-facing geometry will rebuild its own buffers on next demand.
+        this.shadowBatches.restoreContext();
         // Artwork texture handles were lost too; retain painted images for upload, not repaint.
         this.artwork.restoreContext();
-        // Force a complete upload from authoritative scene data.
-        this.cachedGeometryKey = '';
         // A restored context must shade the scene again before reusing its finished image.
         this.cachedFrameKey = '';
     }
 
-    /** Configure interleaved attributes and shared projection for one linked program. */
+    /** Select a camera program and projection; each retained batch binds its own vertex data before drawing. */
     useProgram(program, depthRange) {
         // Keep the Graphics API owner explicit in every call below.
         const graphics = this.graphics;
         // Select the base or point-light fragment computation.
         graphics.useProgram(program);
-        // Bind the same authoritative geometry buffer for both passes.
-        graphics.bindBuffer(graphics.ARRAY_BUFFER, this.resources.vertexBuffer);
-        // Describe each attribute's name, float offset, and vector width.
-        const attributes = [['aPosition', 0], ['aNormal', 3], ['aColor', 6], ['aEmission', 9]];
-        // “of” yields each [name, offset] pair; destructuring makes both meanings explicit.
-        for (const [name, offset] of attributes) {
-            // Link-time optimization may omit attributes unused by this particular fragment pass.
-            const location = graphics.getAttribLocation(program, name);
-            // A negative location means this program needs no data for that attribute.
-            if (location < 0) {
-                // Skip inactive attributes instead of issuing an invalid GPU command.
-                continue;
-            }
-            // Enable this attribute's data source.
-            graphics.enableVertexAttribArray(location);
-            // Each vertex has twelve floats (48 bytes); the offset is measured in bytes.
-            graphics.vertexAttribPointer(location, 3, graphics.FLOAT, false, 48, offset * 4);
-        }
         // Viewport and camera values use CSS pixels/world units, not backing pixel dimensions.
         graphics.uniform2f(graphics.getUniformLocation(program, 'uViewport'), this.renderer.viewportWidth, this.renderer.viewportHeight);
+        // Framing moves the view window without changing the eye point used for height lean.
+        graphics.uniform2f(graphics.getUniformLocation(program, 'uScreenOffset'), this.renderer.camera.screenOffsetX, this.renderer.camera.screenOffsetY);
         // Camera center addresses projected-world coordinates for both culling and drawing.
         graphics.uniform2f(graphics.getUniformLocation(program, 'uCamera'), this.renderer.camera.positionX, this.renderer.camera.positionY);
         // Camera zoom scales both projected axes consistently.
         graphics.uniform1f(graphics.getUniformLocation(program, 'uZoom'), this.renderer.camera.zoom);
         // Shared vertical projection must exactly match SceneSystem's visual bounds.
         graphics.uniform1f(graphics.getUniformLocation(program, 'uHeightScale'), this.basement.configuration.heightProjectionScale);
+        // Select the same camera model used by public world/screen coordinate helpers.
+        graphics.uniform1i(graphics.getUniformLocation(program, 'uRadial'), this.renderer.camera.projection === 'radial');
+        // Original zoom-dependent altitude is computed once through the shared helper.
+        graphics.uniform1f(graphics.getUniformLocation(program, 'uAltitude'), WorldProjection.altitude(this.renderer.camera));
+        // Height emphasis is a camera setting, not a shader exception for a named building.
+        graphics.uniform1f(graphics.getUniformLocation(program, 'uHeightExaggeration'), this.renderer.camera.heightExaggeration);
         // Fit visible depth into GPU clip range without relying on draw submission order.
         graphics.uniform1f(graphics.getUniformLocation(program, 'uDepthRange'), depthRange);
     }
 
+    /** Bind one retained buffer's XYZ, normal, RGB, emission, and normalized image coordinates. */
+    bindAttributes(program, vertexBuffer) {
+        // Select the actual interleaved geometry allocation for this particular material batch.
+        this.graphics.bindBuffer(this.graphics.ARRAY_BUFFER, vertexBuffer);
+        // Each entry names an attribute, its float offset, and its component width.
+        const attributes = [['aPosition', 0, 3], ['aNormal', 3, 3], ['aColor', 6, 3], ['aEmission', 9, 3], ['aTexCoord', 12, 2], ['aArtworkShade', 14, 4]];
+        // “of” supplies tuple values; destructuring names each attribute property explicitly.
+        // Stop after all six possible streams have been considered for this shader program.
+        for (const [attributeName, floatOffset, componentCount] of attributes) {
+            // The GPU compiler can remove streams unused by the current camera/source program.
+            const location = this.graphics.getAttribLocation(program, attributeName);
+            // Negative locations mean the linked shader does not consume this attribute.
+            if (location < 0) {
+                // Continue without issuing an invalid attribute-array command.
+                continue;
+            }
+            // Enable this attribute's input stream before describing its layout.
+            this.graphics.enableVertexAttribArray(location);
+            // Eighteen floats occupy 72 bytes; texture coordinates use two components, not three.
+            this.graphics.vertexAttribPointer(location, componentCount, this.graphics.FLOAT, false, 72, floatOffset * 4);
+        }
+    }
+
+    /** Bind cached artwork/unlit/cutout settings for the same camera or shadow material. */
+    useMaterial(program, material) {
+        // Base artwork is optional; normal colored primitives require no generated texture.
+        const artwork = material.artwork ? this.artwork.prepare(material.artwork) : null;
+        // Visible emission uses another cached image on this exact same physical surface.
+        const emission = material.emissionArtwork ? this.artwork.prepare(material.emissionArtwork) : null;
+        // Unit zero remains reserved for a point light's depth cubemap.
+        this.graphics.activeTexture(this.graphics.TEXTURE1);
+        // Bind either the resident image or an explicit empty binding for ordinary material RGB.
+        this.graphics.bindTexture(this.graphics.TEXTURE_2D, artwork);
+        // Tell this program where its base artwork sampler reads.
+        this.graphics.uniform1i(this.graphics.getUniformLocation(program, 'uArtwork'), 1);
+        // Unit two keeps emission separate from base artwork and shadow visibility.
+        this.graphics.activeTexture(this.graphics.TEXTURE2);
+        // A missing emission image intentionally contributes nothing.
+        this.graphics.bindTexture(this.graphics.TEXTURE_2D, emission);
+        // Assign the emission sampler even when a program optimizes that uniform away.
+        this.graphics.uniform1i(this.graphics.getUniformLocation(program, 'uEmissionArtwork'), 2);
+        // Null uniforms are ignored by WebGL, permitting the same contract in the shadow program.
+        this.graphics.uniform1i(this.graphics.getUniformLocation(program, 'uHasArtwork'), Boolean(artwork));
+        // Explicit presence flags avoid allocating/uploading dummy one-pixel images.
+        this.graphics.uniform1i(this.graphics.getUniformLocation(program, 'uHasEmissionArtwork'), Boolean(emission));
+        // Unlit art preserves its original generated colors rather than applying primitive shading.
+        this.graphics.uniform1i(this.graphics.getUniformLocation(program, 'uUnlit'), material.unlit);
+        // The same alpha threshold controls visible fragments and source obstruction.
+        this.graphics.uniform1f(this.graphics.getUniformLocation(program, 'uAlphaCutoff'), material.alphaCutoff);
+        // Time-of-day updates a uniform; it does not regenerate the hotel's windows every frame.
+        this.graphics.uniform1f(this.graphics.getUniformLocation(program, 'uNightAmount'), this.renderer.nightAmount);
+    }
+
+    /** Submit retained batches with their actual material images; return the actual draw count. */
+    drawBatches(program, batches) {
+        // Count only real triangle submissions, not per-element bookkeeping.
+        let drawCount = 0;
+        // “of” visits retained material batches and stops after the query's active batch list.
+        for (const batch of batches) {
+            // Select the physical geometry that belongs to this material interface.
+            this.bindAttributes(program, batch.buffer);
+            // Obtain resident images without repainting or reuploading clean artwork.
+            this.useMaterial(program, batch.material);
+            // Submit this retained triangle buffer under the stage's existing depth/blend policy.
+            this.graphics.drawArrays(this.graphics.TRIANGLES, 0, batch.vertexCount);
+            // Account for this real GPU submission.
+            drawCount += 1;
+        }
+        // The calling camera/light stage adds this count to its own frame diagnostics.
+        return drawCount;
+    }
+
     /** Project, depth-test, shade, and present all visible opaque world geometry once. */
     draw(renderer) {
-        // A lost context must not issue invalid GPU calls while waiting for restoration.
-        if (this.contextLost) {
+        // An unloaded scene or lost context must not submit obsolete or invalid GPU work.
+        if (!this.active || this.contextLost) {
             // Keep the authoritative CPU scene intact for a later restored frame.
             return;
         }
@@ -294,20 +360,22 @@ class WorldRendererSystem {
         // Camera coordinates are projected-world coordinates; Z was already included by Scene.
         const view = {
             // Left edge of the visible projected world.
-            minimumX: renderer.camera.positionX - renderer.viewportWidth / (2 * zoom),
+            minimumX: Math.min(renderer.camera.positionX, renderer.camera.positionX - (renderer.viewportWidth / 2 + renderer.camera.screenOffsetX) / zoom),
             // Upper edge of the visible projected world.
-            minimumY: renderer.camera.positionY - renderer.viewportHeight / (2 * zoom),
+            minimumY: Math.min(renderer.camera.positionY, renderer.camera.positionY - (renderer.viewportHeight / 2 + renderer.camera.screenOffsetY) / zoom),
             // Right edge of the visible projected world.
-            maximumX: renderer.camera.positionX + renderer.viewportWidth / (2 * zoom),
+            maximumX: Math.max(renderer.camera.positionX, renderer.camera.positionX + (renderer.viewportWidth / 2 - renderer.camera.screenOffsetX) / zoom),
             // Lower edge of the visible projected world.
-            maximumY: renderer.camera.positionY + renderer.viewportHeight / (2 * zoom)
+            maximumY: Math.max(renderer.camera.positionY, renderer.camera.positionY + (renderer.viewportHeight / 2 - renderer.camera.screenOffsetY) / zoom)
         };
         // Include shading allocation because resizing invalidates the retained GPU image.
-        const frameKey = `${this.scene.revision}:${JSON.stringify(view)}:${desiredWidth}:${desiredHeight}:${renderer.backgroundColor.join(',')}`;
+        const frameKey = `${this.scene.revision}:${JSON.stringify(view)}:${desiredWidth}:${desiredHeight}:${renderer.backgroundColor.join(',')}:${JSON.stringify(renderer.camera)}:${renderer.nightAmount}:${this.artwork.revision}`;
         // An unchanged world needs only GPU presentation, not another geometry/light pass.
         if (frameKey === this.cachedFrameKey) {
             // No geometry or source-shadow work is submitted for this cached frame.
             this.statistics.drawCalls = 0;
+            // Cached frames replace no geometry buffers either.
+            this.statistics.bufferUploads = 0;
             // No shadow candidates are processed when the retained image is reused.
             this.statistics.shadowCandidates = 0;
             // Copy between GPU framebuffers directly into the displayed WebGL canvas.
@@ -325,6 +393,8 @@ class WorldRendererSystem {
             lights: 0,
             // Nearby opaque candidates processed for source visibility this frame.
             shadowCandidates: 0,
+            // Camera geometry buffers replaced this frame; unchanged static meshes stay resident.
+            bufferUploads: 0,
             // Actual world/light/shadow GPU draw submissions, excluding final presentation.
             drawCalls: 0
         };
@@ -334,39 +404,34 @@ class WorldRendererSystem {
         visible.sort(WorldRendererSystem.compareElements);
         // Publish the number of actual visible scene elements.
         this.statistics.visibleElements = visible.length;
-        // Build a cache key from tracked scene changes and camera query bounds.
-        const geometryKey = `${this.scene.revision}:${JSON.stringify(view)}`;
-        // Reuse GPU geometry for a stationary scene and unchanged view.
-        if (geometryKey !== this.cachedGeometryKey) {
-            // Collect only currently visible geometry for upload.
-            const vertices = [];
-            // Minimum depth range avoids clipping a scene close to the origin.
-            this.depthRange = 100;
-            // “of” visits visible element values and ends after the culled list.
-            for (const element of visible) {
-                // Generate ordinary box/circle/plane surface attributes.
-                vertices.push(...this.meshLibrary.build(element));
-                // Include both extrema of physical Y and Z when fitting the depth range.
-                for (const groundY of [element.bounds.minimumY, element.bounds.maximumY]) {
-                    // Each vertical endpoint may be the nearest/farthest visible point.
-                    for (const height of [element.transform.positionZ, element.transform.positionZ + element.geometry.height]) {
-                        // Camera-relative depth is perpendicular to projected screen Y.
-                        const depth = (groundY - renderer.camera.positionY) * this.basement.configuration.heightProjectionScale + height;
-                        // Add a small margin so valid geometry cannot land on a clip boundary.
-                        this.depthRange = Math.max(this.depthRange, Math.abs(depth) * 1.05 + 1);
-                    }
+        // Prepare retained GPU batches; unchanged static geometry is neither assembled nor uploaded.
+        this.visibleBatches = this.cameraBatches.prepare(visible);
+        // Report actual current camera buffer replacements separately from draw submissions.
+        this.statistics.bufferUploads = this.cameraBatches.uploadCount;
+        // A generous minimum keeps nearby geometry within the clipping interval.
+        this.depthRange = 100;
+        // Count all submitted corners without reconstructing the already resident buffers.
+        this.vertexCount = 0;
+        // “of” visits current retained batches, finishing after every interface group.
+        for (const batch of this.visibleBatches) {
+            // Add the actual triangle corner count owned by this retained buffer.
+            this.vertexCount += batch.vertexCount;
+        }
+        // Fit the clip range from visible physical bounds; this does not generate triangle data.
+        // “of” visits element values and stops after the visibility query's results.
+        for (const element of visible) {
+            // Include both extrema of physical ground depth.
+            for (const groundY of [element.bounds.minimumY, element.bounds.maximumY]) {
+                // Include both physical elevation extrema for the same shared element geometry.
+                for (const height of [element.transform.positionZ, element.transform.positionZ + element.geometry.height]) {
+                    // Radial views order by physical Z; oblique views use their perpendicular axis.
+                    const depth = renderer.camera.projection === 'radial' ? height : (groundY - renderer.camera.positionY) * this.basement.configuration.heightProjectionScale + height;
+                    // Keep a numerical margin so valid corners do not lie on a clipping boundary.
+                    this.depthRange = Math.max(this.depthRange, Math.abs(depth) * 1.05 + 1);
                 }
             }
-            // Every vertex has twelve floats in the documented interleaved layout.
-            this.vertexCount = vertices.length / 12;
-            // Select the shared geometry buffer before replacing its contents.
-            this.graphics.bindBuffer(this.graphics.ARRAY_BUFFER, this.resources.vertexBuffer);
-            // Upload one compact vertex array, not one GPU draw per scene object.
-            this.graphics.bufferData(this.graphics.ARRAY_BUFFER, new Float32Array(vertices), this.graphics.DYNAMIC_DRAW);
-            // Remember which scene/view generated the current GPU geometry.
-            this.cachedGeometryKey = geometryKey;
         }
-        // Publish the actual geometry submitted rather than the total scene registry size.
+        // Publish actual submitted camera vertices rather than total scene population.
         this.statistics.vertices = this.vertexCount;
         // The world target includes the opaque background; presentation needs no Canvas layer.
         this.graphics.clearColor(...renderer.backgroundColor, 1);
@@ -389,9 +454,7 @@ class WorldRendererSystem {
         // Apply the shared scene ambient level without treating emission as a late overlay.
         this.graphics.uniform1f(this.graphics.getUniformLocation(this.resources.baseProgram, 'uAmbient'), this.basement.configuration.ambientLight);
         // Draw all opaque surfaces; depth resolves roofs/ground and unrelated objects alike.
-        this.graphics.drawArrays(this.graphics.TRIANGLES, 0, this.vertexCount);
-        // Count this actual GPU geometry submission.
-        this.statistics.drawCalls += 1;
+        this.statistics.drawCalls += this.drawBatches(this.resources.baseProgram, this.visibleBatches);
         // Add light only where the same already-visible surface passes an exact depth match.
         this.graphics.depthFunc(this.graphics.EQUAL);
         // Light contributions must not change the established visible-surface depth.
@@ -408,20 +471,16 @@ class WorldRendererSystem {
         this.graphics.enable(this.graphics.SCISSOR_TEST);
         // “of” visits visible/reaching point lights; each gets the same shared shading rules.
         for (const light of lights) {
-            // Convert the physical source position through the same public projection contract.
-            const lightCenter = renderer.worldToScreen(light.positionX, light.positionY, light.positionZ);
-            // A sphere projects to this horizontal influence radius in CSS pixels.
-            const radiusX = light.radius * renderer.camera.zoom;
-            // Height projection expands its vertical influence by this exact linear bound.
-            const radiusY = light.radius * Math.hypot(1, this.basement.configuration.heightProjectionScale) * renderer.camera.zoom;
-            // Clamp the left influence edge to the actual backing image.
-            const minimumX = Math.max(0, Math.floor((lightCenter.positionX - radiusX) * worldPixelRatio));
-            // WebGL scissor Y starts at the bottom, unlike CSS coordinates.
-            const minimumY = Math.max(0, Math.floor((renderer.viewportHeight - lightCenter.positionY - radiusY) * worldPixelRatio));
-            // Clamp the right influence edge to avoid irrelevant offscreen fragments.
-            const maximumX = Math.min(this.renderWidth, Math.ceil((lightCenter.positionX + radiusX) * worldPixelRatio));
-            // Clamp the upper WebGL influence edge using the inverted vertical coordinate.
-            const maximumY = Math.min(this.renderHeight, Math.ceil((renderer.viewportHeight - lightCenter.positionY + radiusY) * worldPixelRatio));
+            // Use the same camera projection as actual world surfaces when bounding light work.
+            const influence = WorldProjection.lightBounds(renderer, light);
+            // Convert the leftmost CSS influence into clamped world-target backing pixels.
+            const minimumX = Math.max(0, Math.floor(influence.minimumX * worldPixelRatio));
+            // GPU Y starts at the bottom, so the lower CSS edge becomes the minimum GPU Y.
+            const minimumY = Math.max(0, Math.floor((renderer.viewportHeight - influence.maximumY) * worldPixelRatio));
+            // Keep right-side fragment work inside the retained world target.
+            const maximumX = Math.min(this.renderWidth, Math.ceil(influence.maximumX * worldPixelRatio));
+            // Convert the upper CSS influence into the opposite GPU Y edge.
+            const maximumY = Math.min(this.renderHeight, Math.ceil((renderer.viewportHeight - influence.minimumY) * worldPixelRatio));
             // Empty projected influence produces no lighting submission.
             if (maximumX <= minimumX || maximumY <= minimumY) {
                 // Continue with the next visible/reaching source.
@@ -440,9 +499,7 @@ class WorldRendererSystem {
             // Finite shadow resolution sets the numerical comparison bias in world units.
             this.graphics.uniform1f(this.graphics.getUniformLocation(this.resources.lightProgram, 'uShadowMapSize'), this.basement.configuration.shadowMapSize);
             // Revisit geometry under exact depth equality, adding light only to visible fragments.
-            this.graphics.drawArrays(this.graphics.TRIANGLES, 0, this.vertexCount);
-            // Count this source's actual GPU submission.
-            this.statistics.drawCalls += 1;
+            this.statistics.drawCalls += this.drawBatches(this.resources.lightProgram, this.visibleBatches);
         }
         // Publish the number of sources considered by this frame's central light stage.
         this.statistics.lights = lights.length;
@@ -547,6 +604,10 @@ class WorldRendererSystem {
             // Remove the corresponding restoration listener.
             this.canvas.removeEventListener('webglcontextrestored', this.handleContextRestored);
         }
+        // Retained camera batches own independent GPU buffers and element references.
+        this.cameraBatches.dispose();
+        // Source-view batches must release their independent resources too.
+        this.shadowBatches.dispose();
         // Lost contexts already own invalid handles, so ordinary deletion is unnecessary there.
         if (this.resources && !this.contextLost) {
             // Release retained world color pixels.
@@ -559,12 +620,8 @@ class WorldRendererSystem {
             this.graphics.deleteProgram(this.resources.baseProgram);
             // Release the direct-light program.
             this.graphics.deleteProgram(this.resources.lightProgram);
-            // Release uploaded world geometry.
-            this.graphics.deleteBuffer(this.resources.vertexBuffer);
             // Release the light-view shader program.
             this.graphics.deleteProgram(this.resources.shadowProgram);
-            // Release uploaded nearby shadow geometry.
-            this.graphics.deleteBuffer(this.resources.shadowVertexBuffer);
             // Release the six-direction light visibility texture.
             this.graphics.deleteTexture(this.resources.shadowCube);
             // Release the target used to produce that visibility texture.

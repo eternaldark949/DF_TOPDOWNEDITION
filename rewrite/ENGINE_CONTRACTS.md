@@ -173,7 +173,8 @@ There is no fixed small blocker array and no per-shop/per-building occlusion han
 Depth maps have finite resolution and a shared slope-aware numerical bias. This first
 implementation has hard shadows; aliases or small shadow offsets can occur. It does
 not implement transparent light transmission, soft area lights, indirect illumination,
-reflections, textures/alpha cutouts, or blurred bloom. Unsupported alpha material strings
+reflections, blended transparency, or blurred bloom. Explicit artwork cutouts use
+the same sampled base alpha in camera and source-depth views. Unsupported alpha material strings
 are rejected instead of silently treated as correctly depth-sorted transparency.
 
 ## GPU and cache ownership
@@ -197,7 +198,8 @@ budgets explicitly instead of adding object-specific exceptions.
 
 Context-loss events suspend world GPU submission; restoration rebuilds resources from
 the preserved scene. Destruction removes listeners and GPU handles without starting an
-additional scheduler. Original game content remains unmodified and unported.
+additional scheduler. Original game source remains unmodified. The hotel proof reuses prepared source artwork;
+its game/interior/actor behavior has not been migrated.
 
 ## Demand-driven Canvas artwork
 
@@ -205,5 +207,45 @@ The `artwork` Directory system owns CPU image generation and resident texture li
 Canvas 2D runs only for first-use generation or explicit invalidation of a particular
 asset. Clean demand does no repaint or upload. GPU loss preserves painted CPU images;
 restoration uploads them again without rerunning their generators. See `ARTWORK.md`
-for operations, counts, update timing, and upload conventions. World material image
-mapping remains unsupported; do not confuse cached texture resources with that feature.
+for operations, counts, update timing, and upload conventions. Explicit physical surfaces now sample those cached images, including visible night
+emission on the same depth-tested fragment. Decoded prepared images can also be
+registered without runtime Canvas painting. See `HOTEL_STUDY.md` for the real-asset proof.
+
+## Explicit artwork surfaces
+
+`shape:'surface'` requires `body:false`, complete triangle `vertices` arrays containing
+local `[X,Y,Z,U,V]` corners, and a physical `normal`. Local Z must be nonnegative;
+the element's shared transform supplies its bottom elevation. Surface height and
+spatial bounds come from actual triangle coordinates, not image dimensions. Explicit
+meshes are visual geometry, not an implemented arbitrary triangle collision solver.
+Prepared solid volumes must use supported box/circle declarations from the same asset data.
+
+`material.artwork` names a registered base image. `material.emissionArtwork` names an
+optional night image on that same surface. `alphaCutoff` defaults to 0.5, rejecting base
+image alpha below that value from both camera depth and source shadows. There is no
+blended transparent ordering claim. `unlit:true` preserves baked painter shading;
+source-authored RGBA `artworkShade` overlays only base art, not visible night emission.
+`renderer.nightAmount` is a normalized appearance setting used by this first asset proof,
+not a completed time/weather/lighting simulation.
+
+GPU geometry is retained by image interface and a retained/mutable bucket. Dynamic and
+kinematic bodies start mutable. Tracked transform/geometry/material edits automatically
+promote other elements to that bucket, without manual render layers. Static neighbors
+need no CPU triangle assembly or GPU buffer replacement when only an actor moves.
+Batch membership changes can still require uploads. This is not universal instancing,
+constant-time rendering, a texture atlas, or proof of unlimited asset capacity.
+
+## Original-style radial projection
+
+`camera.projection` can be `oblique` (the neutral studies) or `radial` (the hotel proof).
+Radial altitude is `camera.altitude * clamp(1 / zoom, 0.7, 3.2)`; default altitude is
+700 world units. Its height scale is `1 + (altitude / (altitude - clampedZ) - 1) *
+heightExaggeration`, with physical Z clamped to 0..0.86 × altitude. The hotel camera
+uses its original height exaggeration of 1.5. Higher physical Z wins top-down depth.
+
+`screenOffsetX/Y` are CSS framing offsets independent from the eye's physical ground
+position. They let the asset inspection view include the entire hotel while retaining
+the original forecourt vantage. Projection/inversion/GPU uniforms use the same offsets.
+Radial culling conservatively includes ground view bounds and the eye point, covering
+height-projected surfaces even when the framing offset places that eye outside the
+viewport. Light influence bounds use the same projection rather than old oblique radii.

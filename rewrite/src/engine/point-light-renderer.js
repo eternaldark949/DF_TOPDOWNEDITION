@@ -30,29 +30,12 @@ class PointLightRenderer {
         const blockers = candidates.filter((element) => element.visible && element.castsShadow && element.transform.positionZ <= light.positionZ + light.radius && element.transform.positionZ + element.geometry.height >= light.positionZ - light.radius);
         // Report real nearby geometry rather than a fixed shader-array capacity.
         renderer.statistics.shadowCandidates += blockers.length;
-        // Collect actual surface triangles; static per-element meshes are reused from WeakMap.
-        const vertices = [];
-        // “of” retrieves each nearby element value and stops after the spatial result list.
-        for (const element of blockers) {
-            // The very same opaque geometry participates in camera depth and light visibility.
-            vertices.push(...renderer.meshLibrary.build(element));
-        }
-        // Twelve floats encode each interleaved position/normal/material vertex.
-        const vertexCount = vertices.length / 12;
-        // Select the buffer dedicated to this light's nearby obstruction geometry.
-        renderer.graphics.bindBuffer(renderer.graphics.ARRAY_BUFFER, renderer.resources.shadowVertexBuffer);
-        // Upload a contiguous geometry list without an artificial blocker-count limit.
-        renderer.graphics.bufferData(renderer.graphics.ARRAY_BUFFER, new Float32Array(vertices), renderer.graphics.DYNAMIC_DRAW);
-        // Use the six-view point-light projection rather than the camera projection.
+        // Prepare independently queried retained source geometry, using the camera's material rules.
+        const batches = renderer.shadowBatches.prepare(blockers);
+        // Select the six-view physical point-source program before configuring its uniforms.
         const program = renderer.resources.shadowProgram;
-        // Select the radial-depth shader pair.
+        // Source geometry uses its own view projection, not the current camera projection.
         renderer.graphics.useProgram(program);
-        // Shadow rendering needs positions only; other interleaved attributes are ignored.
-        const positionAttribute = renderer.graphics.getAttribLocation(program, 'aPosition');
-        // Enable the positional vertex stream.
-        renderer.graphics.enableVertexAttribArray(positionAttribute);
-        // Read three position floats at the start of each 48-byte vertex record.
-        renderer.graphics.vertexAttribPointer(positionAttribute, 3, renderer.graphics.FLOAT, false, 48, 0);
         // Supply source XYZ and radius to both shadow stages.
         renderer.graphics.uniform4f(renderer.graphics.getUniformLocation(program, 'uShadowLight'), light.positionX, light.positionY, light.positionZ, light.radius);
         // Light visibility must not be limited by the camera/source's screen scissor rectangle.
@@ -98,9 +81,7 @@ class PointLightRenderer {
             // Match cubemap sampling's vertical face convention.
             renderer.graphics.uniform3fv(renderer.graphics.getUniformLocation(program, 'uUp'), face.up);
             // Ordinary surface triangles populate this light-facing depth view.
-            renderer.graphics.drawArrays(renderer.graphics.TRIANGLES, 0, vertexCount);
-            // Count actual shadow submissions alongside base/light submissions.
-            renderer.statistics.drawCalls += 1;
+            renderer.statistics.drawCalls += renderer.drawBatches(program, batches);
         }
         // Return to the camera-facing world framebuffer before direct illumination.
         renderer.graphics.bindFramebuffer(renderer.graphics.FRAMEBUFFER, renderer.resources.frameFramebuffer);

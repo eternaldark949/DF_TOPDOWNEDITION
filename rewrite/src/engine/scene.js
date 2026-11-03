@@ -46,6 +46,11 @@ class SceneSystem {
         }
         // Validate geometry before any registry receives the element.
         const geometry = WorldGeometry.create(definition);
+        // Arbitrary triangle artwork has no implemented volume contact solver.
+        if (geometry.shape === 'surface' && definition.body !== false) {
+            // Require an intentional visual-only declaration instead of creating a false box body.
+            throw new Error('Explicit surfaces require body:false; declare supported solid volumes separately.');
+        }
         // Capture the scene in a descriptive reference for the transform callback.
         const scene = this;
         // Construct the shared element record with explicit ownership.
@@ -66,6 +71,8 @@ class SceneSystem {
             material: WorldGeometry.material(definition.material),
             // A top may have a distinct material, but uses the same physical top elevation.
             topMaterial: WorldGeometry.material(definition.topMaterial ?? definition.material),
+            // Moving physical bodies start in a mutable GPU bucket; tracked edits promote other elements automatically.
+            renderMutable: ['dynamic', 'kinematic'].includes(definition.body?.motion),
             // Previous coordinates support interpolation without changing actual world state.
             previousPosition: [definition.positionX ?? 0, definition.positionY ?? 0, definition.positionZ ?? 0],
             /** Replace dimensions through the tracked path so all affected indexes refresh. */
@@ -74,6 +81,11 @@ class SceneSystem {
                 this.geometry = nextDefinition;
             }
         };
+        // Primitive UV mapping is not implemented; image materials require explicit surface coordinates.
+        if (geometry.shape !== 'surface' && [element.material, element.topMaterial].some((material) => material.artwork || material.emissionArtwork)) {
+            // Refuse an incorrect corner-pixel fallback instead of claiming a textured box/circle API works.
+            throw new Error('Artwork materials require explicit surface vertices with image coordinates.');
+        }
         // Keep the current immutable geometry behind a tracked public property.
         let currentGeometry = geometry;
         // Accessors allow ordinary property assignment without bypassing automatic index updates.
@@ -90,12 +102,20 @@ class SceneSystem {
                 // Build a complete immutable replacement before changing live state.
                 const replacement = WorldGeometry.create(nextDefinition);
                 // A collision body cannot silently become a zero-thickness visual plane.
-                if (element.body && replacement.shape === 'plane') {
+                if (element.body && ['plane', 'surface'].includes(replacement.shape)) {
                     // Require explicit element recreation without a body for this transition.
                     throw new Error('Recreate the element without a body before changing it into a plane.');
                 }
                 // Replace the single descriptor used by all geometry consumers.
+                // A geometry replacement cannot silently discard coordinates required by current image materials.
+                if (replacement.shape !== 'surface' && [element.material, element.topMaterial].some((material) => material.artwork || material.emissionArtwork)) {
+                    // Keep the previous valid surface/material pair untouched on unsupported replacement.
+                    throw new Error('Artwork materials require explicit surface vertices with image coordinates.');
+                }
+                // Commit the validated shape only after all existing material requirements remain valid.
                 currentGeometry = replacement;
+                // A caller changing mesh shape must not cause every retained static neighbor to reupload.
+                element.renderMutable = true;
                 // Update only this object's physical and projected memberships.
                 scene.synchronize(element);
             }
@@ -139,14 +159,28 @@ class SceneSystem {
                 /** Validate new base/emission colors and invalidate cached vertex attributes. */
                 set(value) {
                     // A failed parse leaves the previous material and revision untouched.
-                    currentMaterial = WorldGeometry.material(value);
+                    const replacementMaterial = WorldGeometry.material(value);
+                    // Explicit image coordinates are required when assigning either source image address.
+                    if (element.geometry.shape !== 'surface' && (replacementMaterial.artwork || replacementMaterial.emissionArtwork)) {
+                        // Preserve the previous material on an unsupported primitive texture assignment.
+                        throw new Error('Artwork materials require explicit surface vertices with image coordinates.');
+                    }
+                    // Commit only the fully validated material/geometry combination.
+                    currentMaterial = replacementMaterial;
+                    // Keep edited vertex material data separate from unchanged retained static geometry.
+                    element.renderMutable = true;
                     // Rebuild affected rendering buffers on the next normal frame.
                     scene.revision += 1;
                 }
             });
         }
         /** Synchronize this element whenever its shared coordinates change. */
-        const onTransformChange = () => scene.synchronize(element);
+        const onTransformChange = () => {
+            // Tracked movement automatically separates edited geometry from retained static neighbors.
+            element.renderMutable = true;
+            // This same change updates physical, visual, and attached-source spatial membership.
+            scene.synchronize(element);
+        };
         // Establish one notifying transform, not separate physics and render positions.
         element.transform = new WorldTransform(definition, onTransformChange);
         // Volumes are solid by default; planes are visible surfaces unless explicitly rejected below.
@@ -191,11 +225,11 @@ class SceneSystem {
             // This oblique projection preserves horizontal world positions.
             minimumX: element.bounds.minimumX,
             // Top elevation shifts the highest screen extent upward.
-            minimumY: element.bounds.minimumY - (element.transform.positionZ + element.geometry.height) * heightScale,
+            minimumY: Math.min(element.bounds.minimumY, element.bounds.minimumY - (element.transform.positionZ + element.geometry.height) * heightScale),
             // The same footprint bounds the visual horizontal extent.
             maximumX: element.bounds.maximumX,
             // Bottom elevation determines the lowest projected screen extent.
-            maximumY: element.bounds.maximumY - element.transform.positionZ * heightScale
+            maximumY: Math.max(element.bounds.maximumY, element.bounds.maximumY - element.transform.positionZ * heightScale)
         };
         // Every element is indexed visually; visibility toggles are checked during rendering.
         this.visibleGeometry.upsert(element.identifier, element, element.projectedBounds);
@@ -304,12 +338,12 @@ class SceneSystem {
         this.lightReach.upsert(light.identifier, light, {
             // Leftmost projected influence of the source sphere.
             minimumX: light.positionX - light.radius,
-            // Uppermost projected influence including world height.
-            minimumY: projectedY - verticalRadius,
+            // Include both oblique projection and physical ground reach for radial camera queries.
+            minimumY: Math.min(projectedY - verticalRadius, light.positionY - light.radius),
             // Rightmost projected influence of the source sphere.
             maximumX: light.positionX + light.radius,
-            // Lowermost projected influence including world height.
-            maximumY: projectedY + verticalRadius
+            // A high source must remain queryable when radial surfaces project near its ground footprint.
+            maximumY: Math.max(projectedY + verticalRadius, light.positionY + light.radius)
         });
     }
 

@@ -76,6 +76,10 @@ def check_world(browser, mobile):
     page.on('pageerror', record_error)
     # Load exact standalone HTML without network or a development server.
     page.set_content(artifact_html)
+    # Embedded hotel images decode before the initial real-asset study is installed.
+    page.wait_for_function('window.foundationReady === true')
+    # Select the neutral geometry study after the real asset has completed initialization.
+    page.locator('#study-control').select_option('world')
     # Wait for the default world renderer to execute actual geometry.
     page.wait_for_function('foundationEngine.directory.systems.get("worldRenderer").statistics.vertices > 0')
     # A missing GPU capability must not quietly count as a successful world test.
@@ -236,6 +240,66 @@ def check_world(browser, mobile):
     restored = sample(page, 0, 70)
     # Pixel equality allows small device conversion roundoff, not a missing restored scene.
     assert abs(restored[0] - unshadowed[0]) <= 3, (restored, unshadowed)
+    # Replace the primitive scene with a narrow raised artwork cutout above a receiving floor.
+    page.evaluate("""() => {
+        // Use ordinary scene ownership rather than a special image-only renderer path.
+        const scene = foundationEngine.directory.systems.get('scene');
+        // Clear earlier lighting probes before checking the new shared alpha/material contract.
+        scene.clear();
+        // A procedural image source can change explicitly without changing surface geometry.
+        window.cutoutProbeColor = '#ff0000';
+        // Register a four-by-two source image with an opaque left half and transparent right half.
+        foundationEngine.directory.systems.get('artwork').create('cutout-probe',4,2,
+            /** Paint only the intended opaque half; the remaining image stays transparent. */
+            (drawingContext) => {
+                // Read changed source information only during actual cache regeneration.
+                drawingContext.fillStyle = window.cutoutProbeColor;
+                // Origin zero, width two, and height two fill the left half of this four-pixel image.
+                drawingContext.fillRect(0,0,2,2);
+            });
+        // Green emission makes underlying visible floor pixels unmistakable without direct illumination.
+        scene.createElement('cutout-floor',{shape:'plane',width:200,depth:200,body:false,material:{color:'#000000',emission:'#00ff00'}});
+        // The elevated artwork uses explicit physical triangles and normalized source image coordinates.
+        scene.createElement('cutout-surface',{shape:'surface',positionZ:40,body:false,normal:[0,0,1],vertices:[[-40,-5,0,0,0],[40,-5,0,1,0],[40,5,0,1,1],[-40,-5,0,0,0],[40,5,0,1,1],[-40,5,0,0,1]],material:{color:'#ffffff',artwork:'cutout-probe',unlit:true}});
+    }""")
+    # Actual opaque source coverage must replace lower floor pixels.
+    render(page)
+    # Read the left painted half at its physical height.
+    opaque_pixel = sample(page,-20,0,40)
+    # Red source pixels should appear without a Canvas-to-GPU path translation.
+    assert opaque_pixel[0] > 240 and opaque_pixel[1] < 5, opaque_pixel
+    # Read the right alpha hole at the same elevated-plane screen projection.
+    hole_pixel = sample(page,20,0,40)
+    # The lower green floor must remain visible through the image hole.
+    assert hole_pixel[1] > 240 and hole_pixel[0] < 5, hole_pixel
+    # Change only source image information and request explicit regeneration.
+    page.evaluate("""() => {
+        // Updated content should not force geometry or caller-maintained scene cache changes.
+        window.cutoutProbeColor = '#0000ff';
+        // This public cache operation must invalidate a previously completed world image automatically.
+        foundationEngine.directory.systems.get('artwork').invalidate('cutout-probe');
+    }""")
+    # Ordinary rendering must observe the changed source pixels with no manual scene revision edit.
+    render(page)
+    # The same physical textured surface must now show blue on its opaque side.
+    refreshed_pixel = sample(page,-20,0,40)
+    # Old red pixels must not survive the frame/image caches after explicit asset invalidation.
+    assert refreshed_pixel[2] > 240 and refreshed_pixel[0] < 5, refreshed_pixel
+    # Use the same cutout to verify source obstruction, independently from camera visibility.
+    page.evaluate("""() => {
+        // Replace floor emission with a plain reflective receiver for geometric shadow sampling.
+        foundationEngine.directory.elements.get('cutout-floor').topMaterial = {color:'#888888'};
+        // A source above the narrow cutout sends rays through both its painted and transparent halves.
+        foundationEngine.directory.systems.get('scene').createLight('cutout-source',{positionX:0,positionY:0,positionZ:100,radius:200,intensity:3,color:'#ffffff'});
+    }""")
+    # Camera sees these floor points outside the raised plane's projected strip.
+    render(page)
+    # The physical ray to the left floor point crosses opaque source pixels.
+    opaque_shadow = sample(page,-20,0,0)
+    # The right ray crosses the transparent half and must reach the receiver.
+    transparent_light = sample(page,20,0,0)
+    # Source-depth alpha testing must preserve a measurable lighting difference.
+    assert transparent_light[0] > opaque_shadow[0] + 20, (opaque_shadow,transparent_light)
     # Destroy every world surface, buffer, subscription, and pending frame.
     page.evaluate('foundationEngine.destroy()')
     # Shader errors, lifecycle exceptions, or invalid callbacks must fail the scenario.

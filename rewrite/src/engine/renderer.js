@@ -38,7 +38,17 @@ class RendererSystem {
             // Projected vertical world coordinate at the center of the viewport.
             positionY: 0,
             // One CSS pixel per world unit at the default zoom.
-            zoom: 1
+            zoom: 1,
+            // Oblique mode retains the primitive studies; radial mode matches original top-down lean.
+            projection: 'oblique',
+            // CSS view framing can shift independently of the eye point that controls height lean.
+            screenOffsetX: 0,
+            // A positive value frames content lower without changing physical camera/actor positions.
+            screenOffsetY: 0,
+            // Original virtual-camera world altitude at zoom one.
+            altitude: 700,
+            // Default radial height is unexaggerated; an asset study may choose a documented style setting.
+            heightExaggeration: 1
         };
         // Nonzero initial CSS dimensions keep coordinate conversions defined before resize.
         this.viewportWidth = 1;
@@ -48,6 +58,8 @@ class RendererSystem {
         this.pixelRatio = 1;
         // Opaque output background; normalized RGB is shared with the world target's clear.
         this.backgroundColor = [13 / 255, 11 / 255, 24 / 255];
+        // Zero is daylight; one reveals the cached night emission on textured surfaces.
+        this.nightAmount = 0;
         // Count final-output submissions separately from world/shadow submissions.
         this.drawCalls = 0;
     }
@@ -133,28 +145,14 @@ class RendererSystem {
 
     /** Project actual world XYZ into canvas-relative CSS pixels using the shared height model. */
     worldToScreen(positionX, positionY, positionZ = 0) {
-        // Return both visible coordinates and physical camera depth for tools/inspection.
-        return {
-            // Oblique projection preserves world X before ordinary centering and zoom.
-            positionX: (positionX - this.camera.positionX) * this.camera.zoom + this.viewportWidth / 2,
-            // Physical height shifts projected Y upward using the same shader/index scale.
-            positionY: (positionY - positionZ * this.basement.configuration.heightProjectionScale - this.camera.positionY) * this.camera.zoom + this.viewportHeight / 2,
-            // This perpendicular depth determines visibility, not arbitrary drawing priority.
-            cameraDepth: (positionY - this.camera.positionY) * this.basement.configuration.heightProjectionScale + positionZ
-        };
+        // Delegate to the same projection contract used to configure the GPU camera.
+        return WorldProjection.project(this, positionX, positionY, positionZ);
     }
 
-    /** Convert canvas-relative CSS pixels to world XY on a chosen Z plane (ground by default). */
+    /** Reconstruct world XY from CSS pixels on an explicitly chosen physical Z plane. */
     screenToWorld(screenPositionX, screenPositionY, positionZ = 0) {
-        // Return a fresh coordinate object; no camera or input state is changed.
-        return {
-            // Undo centering and zoom, then restore the camera's world position.
-            positionX: (screenPositionX - this.viewportWidth / 2) / this.camera.zoom + this.camera.positionX,
-            // Undo projected height as well as centering/zoom for the selected physical plane.
-            positionY: (screenPositionY - this.viewportHeight / 2) / this.camera.zoom + this.camera.positionY + positionZ * this.basement.configuration.heightProjectionScale,
-            // One screen point has many possible world heights; the caller explicitly chooses one.
-            positionZ
-        };
+        // Projection inversion belongs to one shared helper rather than duplicated formulas.
+        return WorldProjection.unproject(this, screenPositionX, screenPositionY, positionZ);
     }
 
     /** Clear the GPU output and run preparation, world presentation, and UI callbacks once. */

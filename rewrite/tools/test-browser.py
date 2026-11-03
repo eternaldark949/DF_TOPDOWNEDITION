@@ -48,6 +48,8 @@ def check_browser(browser, mobile):
     # Managed Chromium blocks file:// navigation, so this checks standalone content
     # without claiming to test the owner's phone file-opening application.
     page.set_content(artifact_html)
+    # Embedded hotel images decode before the initial real-asset study is installed.
+    page.wait_for_function('window.foundationReady === true')
     # Exercise the scheduling study through the same WebGL output as the shared world.
     page.locator('#study-control').select_option('loop')
     # Wait for the real engine to render enough frames to establish it is running.

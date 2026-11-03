@@ -1,11 +1,11 @@
-# Foundation verification — 0.3.0, 2026-11-03
+# Foundation verification — 0.4.0, 2026-11-03
 
 ## Completed locally
 
 - `node rewrite/tools/build.mjs` produced the single HTML artifact.
 - `node rewrite/tools/build.mjs --check` verified exact source/artifact agreement.
 - `node rewrite/tools/test-world.cjs` passed the original seven foundation scenarios
-  and ten spatial/physics/world-contract scenarios.
+  and eleven spatial/physics/world-contract scenarios.
 - `python rewrite/tools/test-browser.py` passed desktop and touch/rotation checks
   against the built HTML, with networking disabled and no attempted HTTP/HTTPS requests.
 - `python rewrite/tools/test-world-browser.py` passed actual WebGL2 pixel, shadow,
@@ -13,10 +13,13 @@
 - `python rewrite/tools/test-artwork-browser.py` passed direct-output instrumentation,
   actual GPU texture pixels, unchanged-image reuse, explicit invalidation, failed-paint
   preservation, GPU restoration without repaint, and texture unloading.
-- Desktop/touch neutral-scene screenshots were inspected locally for 0.2.0; 0.3.0 adds
-  direct GPU output checks and pixel assertions rather than claiming full visual parity.
+- `python rewrite/tools/test-hotel-browser.py` passes desktop and touch/rotation real-asset
+  checks, including actual source roof pixels, ordinary contacts, image/static-buffer reuse,
+  context recovery, offline loading, and full scene unload.
+- Actual desktop/phone day/night hotel screenshots were inspected locally. Full original-game
+  pixel equivalence and hardware phone performance are not claimed.
 
-The ten added deterministic scenarios verify:
+The eleven additional deterministic scenarios verify:
 
 1. Spatial queries match a seeded brute-force oracle, including negative positions,
    multi-cell uniqueness, oversized objects, movement/removal, and safe address rejection.
@@ -32,6 +35,8 @@ The ten added deterministic scenarios verify:
 9. A fast body is stopped by a thin wall; excessive safety work fails explicitly.
 10. Ten thousand static bodies remain registered while local narrow checks stay below 20;
     a moderate zoomed-out view visits cells; unloading releases body/index/contact references.
+11. Explicit artwork meshes retain actual XYZ bounds, frozen coordinate copies, and tracked transforms;
+    arbitrary meshes cannot silently receive a box collision fallback.
 
 The world browser checks read actual final image pixels. They verify that:
 
@@ -55,8 +60,17 @@ The direct-output/artwork checks establish:
 - Failed generators preserve the previous complete image/texture and permit retry.
 - Asset removal deletes actual resident GPU texture storage.
 
-These resource checks do not claim textured world materials are implemented. Their current
-scope is cached Canvas generation and resident GPU images, separately from scene geometry.
+World surfaces now sample original source images and night emission through shared depth.
+Additional actual GPU checks verify transparent image holes expose lower surfaces, explicit
+source regeneration invalidates a cached world frame, and source-depth shadows honor the
+same alpha coverage. The real hotel uses prepared original images with zero runtime Canvas
+paint requests; this is separate from the engine's tested procedural image-generation API.
+
+The hotel camera-only test retains every static GPU buffer with zero vertex uploads.
+Twelve actor edits upload only the actor's mutable batch, retaining static hotel buffers
+and causing zero image uploads. Restoring the real context reuploads preserved source
+images and recovers the same sampled roof pixel. These are behavioral observations,
+not a universal instancing or scalability guarantee.
 
 ## Sparse-scene CPU measurements (retained 0.2.0 evidence)
 
@@ -90,13 +104,15 @@ actual device/GPU performance remain unverified, as do Safari/Firefox behavior.
 
 The GPU checks use opaque primitives and finite-resolution hard shadow maps. They are
 not comprehensive visual regression coverage, and finite shadow-map sampling/bias can
-produce aliases or small shadow offsets. No support claim is made for transparency,
-material image textures, alpha-cutout sprites, bloom, reflections, or arbitrary meshes.
+produce aliases or small shadow offsets. No support claim is made for blended transparency, animated sprite rigs, bloom, or reflections. Explicit visual-only
+triangle surfaces and alpha cutouts are supported; arbitrary mesh physics is not.
 
 Physics is a linear 2.5D contact foundation with bounded substeps. It is not a full
 angular rigid-body/joint solver or general continuous-collision implementation. Dense
 clusters can require many real pair tests. Huge spatial queries can intentionally use
 a bounded entry scan. Sparse benchmark results do not establish universal scalability.
 
-The original game has not been changed or migrated. Its tests were not run for this
-independent engine implementation. No equivalence claim is made for unported features.
+The original game's source has not been changed. Original hotel images were prepared
+with its existing Canvas painters and placed through reusable surface/asset contracts.
+This is an exterior proof rather than migrated hotel gameplay, interiors, or actor logic.
+See `HOTEL_STUDY.md` for preparation provenance and omitted source features.

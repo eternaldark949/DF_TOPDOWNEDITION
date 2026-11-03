@@ -410,5 +410,39 @@ test('ten thousand static bodies, local candidates, automatic unload', () => {
     fixture.engine.destroy();
 });
 
+/** Verify explicit artwork surfaces use tracked world bounds and reject unsupported physical fallback. */
+test('explicit textured surfaces retain actual XYZ bounds and immutable image material data', () => {
+    // Create a real source-loaded scene without needing mocked shader or image behavior.
+    const fixture = world();
+    // Define one vertical triangle in local physical coordinates with normalized image U/V.
+    const vertices = [[-10,0,0,0,1],[10,0,0,1,1],[10,0,30,1,0]];
+    // An arbitrary triangle surface must not silently acquire a box collision approximation.
+    assert.throws(() => fixture.scene.createElement('unsupported-body',{shape:'surface',vertices}),/body:false/);
+    // Install that same surface as an explicit visual face at a real elevation.
+    const surface = fixture.scene.createElement('art-surface',{shape:'surface',vertices,positionZ:20,normal:[0,1,0],body:false,material:{artwork:'original-art',unlit:true}});
+    // Geometry height must come from actual triangle corners, not image pixels or a second visual Z.
+    assert.equal(surface.geometry.height,30);
+    // Physical ground bounds include the actual triangle's leftmost local position.
+    assert.equal(surface.bounds.minimumX,-10);
+    // Source artwork addresses remain explicit material data.
+    assert.equal(surface.material.artwork,'original-art');
+    // External mutation of the original corner arrays must not alter the retained geometry.
+    vertices[0][0]=-999;
+    // The normalized immutable geometry owns its own coordinate copies.
+    assert.equal(surface.geometry.vertices[0][0],-10);
+    // A tracked transform edit updates the same visual/ground index membership automatically.
+    surface.transform.positionX=100;
+    // Actual triangle bounds move with that shared transform.
+    assert.equal(surface.bounds.minimumX,90);
+    // A high source can illuminate a radial-view surface near its physical ground footprint.
+    const highLight = fixture.scene.createLight('high-source',{positionX:100,positionY:0,positionZ:300,radius:20});
+    // Height-aware light indexing must preserve that physical reach alongside oblique projected bounds.
+    assert.ok(fixture.scene.lightReach.query({minimumX:90,minimumY:-10,maximumX:110,maximumY:10}).includes(highLight));
+    // Invalid material coverage must fail at declaration instead of corrupting GPU sampling later.
+    assert.throws(()=>fixture.classes.WorldGeometry.material({alphaCutoff:2}),/alpha cutoff/);
+    // Clean up all surface/index registrations and Directory listeners.
+    fixture.engine.destroy();
+});
+
 // Report additional world checks separately from the earlier seven baseline scenarios.
 console.log(`${completedScenarios} world scenarios passed.`);

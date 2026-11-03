@@ -10,9 +10,14 @@ class WorldGeometry {
         // Default geometry is a box rather than a game-specific character or vehicle.
         const shape = definition.shape ?? 'box';
         // Only implemented shapes may enter the shared physics/rendering contract.
-        if (!['box', 'circle', 'plane'].includes(shape)) {
+        if (!['box', 'circle', 'plane', 'surface'].includes(shape)) {
             // Reject unsupported geometry instead of quietly drawing/colliding it differently.
             throw new Error(`Unsupported geometry shape: ${shape}`);
+        }
+        // A surface is an explicit triangle mesh for artwork, not an implied collision volume.
+        if (shape === 'surface') {
+            // Validate immutable local XYZ/UV corners through the dedicated surface contract.
+            return WorldGeometry.surface(definition);
         }
         // A plane is a flat rectangular surface with no vertical thickness.
         const height = shape === 'plane' ? 0 : (definition.height ?? 24);
@@ -46,6 +51,57 @@ class WorldGeometry {
         return Object.freeze(geometry);
     }
 
+    /** Validate visual-only local triangle corners [X,Y,Z,U,V] and return a frozen descriptor. */
+    static surface(definition) {
+        // Each consecutive three corners describes one triangle, with normalized artwork U/V.
+        const suppliedVertices = definition.vertices;
+        // Reject missing/incomplete geometry before it reaches indexes or GPU uploads.
+        if (!Array.isArray(suppliedVertices) || suppliedVertices.length < 3 || suppliedVertices.length % 3 !== 0) {
+            // No fan triangulation or approximate collision fallback is inferred for arbitrary meshes.
+            throw new TypeError('Surface vertices must contain complete triangles.');
+        }
+        // Own copied corner arrays so external mutation cannot stale physical/visual bounds.
+        const vertices = [];
+        // Local Z starts at zero; the element transform supplies its actual bottom elevation.
+        let height = 0;
+        // “of” supplies corner values in triangle order, stopping after the input array.
+        for (const vertex of suppliedVertices) {
+            // Every corner must explicitly provide three spatial and two texture coordinates.
+            if (!Array.isArray(vertex) || vertex.length !== 5 || !vertex.every(Number.isFinite) || vertex[2] < 0) {
+                // Reject invalid geometry instead of letting NaN or negative local height enter bounds.
+                throw new TypeError('Surface corners require finite X,Y,nonnegative Z,U,V.');
+            }
+            // Retain the greatest actual local elevation for the shared scene height bounds.
+            height = Math.max(height, vertex[2]);
+            // Copy and freeze this corner; const alone would not freeze an array object.
+            vertices.push(Object.freeze(vertex.slice()));
+        }
+        // A face normal expresses which side receives physical direct illumination.
+        const normal = definition.normal ?? [0, 0, 1];
+        // Normals must contain a real finite direction rather than zero length.
+        if (!Array.isArray(normal) || normal.length !== 3 || !normal.every(Number.isFinite) || Math.hypot(...normal) < 0.000001) {
+            // Report unsupported direction data at declaration time.
+            throw new TypeError('A surface normal needs three finite nonzero direction components.');
+        }
+        // Return the same immutable geometry vocabulary used by scene transforms and visibility.
+        return Object.freeze({
+            // Explicit visual triangles intentionally have no generic physical-volume solver.
+            shape: 'surface',
+            // Width is unused for this mesh; actual extents come from its supplied vertices.
+            width: 1,
+            // Depth is likewise measured from actual corners by bounds().
+            depth: 1,
+            // Radius is unused but remains explicit for the shared descriptor interface.
+            radius: 1,
+            // Highest local corner above the transform's physical bottom elevation.
+            height,
+            // Immutable triangle corners include normalized image coordinates.
+            vertices: Object.freeze(vertices),
+            // Retain a copied direction so later external edits cannot alter shading silently.
+            normal: Object.freeze(normal.slice())
+        });
+    }
+
     /** Generate a counterclockwise world footprint; circles use 20 visual segments only. */
     static footprint(element) {
         // Read the same geometry object that physical contact tests use.
@@ -54,6 +110,21 @@ class WorldGeometry {
         const transform = element.transform;
         // Accumulate world X/Y coordinates for sides and top triangulation.
         const points = [];
+        // Explicit triangle surfaces use their real local XY corners for world-ground bounds.
+        if (geometry.shape === 'surface') {
+            // “of” visits each corner value and stops after all triangle corners, including repeats.
+            for (const vertex of geometry.vertices) {
+                // Rotate local X/Y, then translate through the same shared world transform.
+                points.push([
+                    // Horizontal world coordinate of this actual surface corner.
+                    transform.positionX + vertex[0] * Math.cos(transform.angle) - vertex[1] * Math.sin(transform.angle),
+                    // Ground-depth world coordinate of the same corner.
+                    transform.positionY + vertex[0] * Math.sin(transform.angle) + vertex[1] * Math.cos(transform.angle)
+                ]);
+            }
+            // The mesh is already triangulated; do not replace it with a rectangle or circle.
+            return points;
+        }
         // Circle visuals approximate a circle; physical circle tests remain analytical.
         if (geometry.shape === 'circle') {
             // Visit segment indices zero through nineteen, advancing once per corner.
@@ -143,12 +214,34 @@ class WorldGeometry {
 
     /** Validate a surface material; emission remains attached to geometry, never a late overlay. */
     static material(definition = {}) {
+        // Validate optional artwork shade RGBA before freezing its copied channels.
+        const artworkShade = definition.artworkShade ?? [0, 0, 0, 0];
+        // Shade overlays are normalized color plus coverage, not a separate emission source.
+        if (!Array.isArray(artworkShade) || artworkShade.length !== 4 || !artworkShade.every((channel) => Number.isFinite(channel) && channel >= 0 && channel <= 1)) {
+            // Keep unsupported shade input out of GPU attributes and shared scene caches.
+            throw new TypeError('Artwork shade requires four normalized RGBA channels.');
+        }
+        // Explicit image addresses must remain strings; alpha cutoff counts normalized coverage.
+        if ((definition.artwork != null && typeof definition.artwork !== 'string') || (definition.emissionArtwork != null && typeof definition.emissionArtwork !== 'string') || !Number.isFinite(definition.alphaCutoff ?? 0.5) || (definition.alphaCutoff ?? 0.5) < 0 || (definition.alphaCutoff ?? 0.5) > 1) {
+            // Reject malformed material interfaces before any asset or GPU resource lookup.
+            throw new TypeError('Artwork IDs must be strings and alpha cutoff must be between zero and one.');
+        }
         // Freeze the descriptor and its channel arrays to prevent untracked visual edits.
         return Object.freeze({
             // Reflective base color participates in ambient and direct surface lighting.
-            color: Object.freeze(WorldGeometry.color(definition.color ?? '#cebbff')),
+            color: Object.freeze(WorldGeometry.color(definition.color ?? (definition.artwork ? '#ffffff' : '#cebbff'))),
             // Emission is added only for fragments that pass the same surface depth test.
-            emission: Object.freeze(WorldGeometry.color(definition.emission ?? '#000000'))
+            emission: Object.freeze(WorldGeometry.color(definition.emission ?? '#000000')),
+            // Original painted face tint, stored per vertex so different wall normals can batch.
+            artworkShade: Object.freeze(artworkShade.slice()),
+            // Optional named cached image, looked up in the Directory artwork system at draw time.
+            artwork: definition.artwork ?? null,
+            // Optional light image sampled on this same depth-tested surface at night.
+            emissionArtwork: definition.emissionArtwork ?? null,
+            // Original painted art can preserve its authored RGB without extra ambient shading.
+            unlit: definition.unlit === true,
+            // Image alpha below this threshold rejects a fragment; this is cutout, not transparency.
+            alphaCutoff: definition.alphaCutoff ?? 0.5
         });
     }
 }

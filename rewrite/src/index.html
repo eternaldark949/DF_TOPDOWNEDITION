@@ -11,7 +11,7 @@
 <body>
     <!-- This header belongs to the harness; engine components do not query its IDs. -->
     <header>
-        <div><p class="eyebrow">DIMENSIONS: FREELANCER · REWRITE FOUNDATION</p><h1>ETRNL9 <span id="version-value">0.2.0</span></h1></div>
+        <div><p class="eyebrow">DIMENSIONS: FREELANCER · REWRITE FOUNDATION</p><h1>ETRNL9 <span id="version-value">0.4.0</span></h1></div>
         <p id="status-value" role="status">Initializing</p>
     </header>
     <main>
@@ -26,14 +26,21 @@
                 <button id="pause-button" type="button" aria-pressed="false">Pause</button>
                 <button id="stop-button" type="button">Stop</button>
                 <button id="reset-button" type="button">Reset scene</button>
-                <label>Zoom <select id="zoom-control"><option value="0.5">50%</option><option value="0.75">75%</option><option value="1" selected>100%</option><option value="1.5">150%</option></select></label>
-                <label>Study <select id="study-control"><option value="world">Shared world</option><option value="loop">Loop &amp; interpolation</option></select></label>
+                <label>Zoom <select id="zoom-control"><option value="fit">Fit hotel</option><option value="0.5">50%</option><option value="0.75">75%</option><option value="1" selected>100%</option><option value="1.5">150%</option></select></label>
+                <label>Study <select id="study-control"><option value="hotel">Double Nights Hotel</option><option value="world">Shared world</option><option value="loop">Loop &amp; interpolation</option></select></label>
             </div>
             <p id="study-instructions">Controls and instructions follow the selected engine study.</p>
             <div class="controls" id="world-controls">
                 <button id="roof-button" type="button">Hide slab visually</button>
                 <button id="population-button" type="button">Add 10,000 distant bodies</button>
             </div>
+            <div class="controls" id="hotel-controls" hidden>
+                <button id="hotel-night-button" type="button">Show night artwork</button>
+                <button id="hotel-left-button" type="button">View left</button>
+                <button id="hotel-right-button" type="button">View right</button>
+                <button id="hotel-center-button" type="button">Center hotel</button>
+            </div>
+            <p id="hotel-cache-value" hidden></p>
             <dl class="measurements">
                 <div><dt>Rendered FPS</dt><dd id="fps-value">…</dd></div>
                 <div><dt>Fixed updates</dt><dd id="steps-value">0</dd></div>
@@ -55,8 +62,9 @@
             <article><span>02</span><h2>Directory</h2><p>Scene, spatial indexes, physics, depth rendering, lighting, input, and tools.</p></article>
             <article><span>03</span><h2>Penthouse</h2><p>Optional procedural features built on Directory services.</p></article>
         </section>
-        <footer>Neutral engine tests, with no game migration. Shared-world rendering requires WebGL2; opaque boxes, circles, and planes are supported. Both studies use WebGL output; Canvas 2D is reserved for cached artwork. Bloom and transparent surfaces are not implemented.</footer>
+        <footer>Real Double Nights Hotel artwork and neutral engine tests. Shared-world rendering requires WebGL2; opaque primitives and textured alpha-cutout surfaces are supported. All studies use WebGL output; Canvas 2D is reserved for cached artwork. Bloom and transparent surfaces are not implemented.</footer>
     </main>
+    <!-- @assets -->
     <!-- @scripts -->
 </body>
 </html>
