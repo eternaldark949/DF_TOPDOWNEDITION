@@ -46,4 +46,38 @@ jobs:
       # Exercise scheduling, renderer, input, lifecycle, and failure behavior.
       - name: Verify foundation behavior
         # This runner requires no npm installation or browser downloads.
-        run: node rewrite/tools/test-foundation.cjs
+        run: node rewrite/tools/test-world.cjs
+  # Pixel/event checks guard the renderer's actual geometry and lighting contract.
+  browser:
+    # Avoid expensive browser setup when dependency-free baseline checks already fail.
+    needs: foundation
+    # Linux runners use software WebGL for deterministic headless validation.
+    runs-on: ubuntu-latest
+    # Include time for a fresh browser/runtime installation without permitting endless waits.
+    timeout-minutes: 15
+    # Browser dependencies are test infrastructure only; the standalone artifact stays dependency-free.
+    steps:
+      # Retrieve the exact generated HTML and tests from this commit.
+      - uses: actions/checkout@v4
+      # Use the same Python generation as the local verification environment.
+      - uses: actions/setup-python@v5
+        # Runtime selection is explicit for reproducible test execution.
+        with:
+          # Python 3.12 supports the pinned Playwright driver used locally.
+          python-version: '3.12'
+      # Install the development-only browser driver at its recorded version.
+      - name: Install browser test driver
+        # Requirements are separate from runtime source and contain no game dependencies.
+        run: python -m pip install -r rewrite/tools/requirements-browser.txt
+      # Install a matching Chromium and the Linux libraries needed by its headless GPU path.
+      - name: Install Chromium
+        # Playwright manages this browser when the runner has no system Chromium executable.
+        run: python -m playwright install --with-deps chromium
+      # Verify original lifecycle, keyboard, touch, zoom, resize, and offline execution.
+      - name: Check Canvas foundation behavior
+        # The same HTML contains the Canvas-only study and the depth-aware world study.
+        run: python rewrite/tools/test-browser.py
+      # Verify real depth/emission pixels, source obstruction, large scene culling, and GPU recovery.
+      - name: Check world geometry and lighting
+        # All scene-specific test objects are neutral primitives, not migrated game content.
+        run: python rewrite/tools/test-world-browser.py

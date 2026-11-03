@@ -8,6 +8,10 @@ they verify visible pixels and real browser events, not performance on the owner
 from pathlib import Path
 # Read optional command-line arguments without introducing a third-party CLI parser.
 import sys
+# Permit an explicit CI browser path without depending on one workspace filesystem layout.
+import os
+# Prefer an installed system Chromium when available; otherwise use Playwright's managed browser.
+import shutil
 # Playwright drives the real installed Chromium browser for event and pixel checks.
 from playwright.sync_api import sync_playwright
 
@@ -44,6 +48,8 @@ def check_browser(browser, mobile):
     # Managed Chromium blocks file:// navigation, so this checks standalone content
     # without claiming to test the owner's phone file-opening application.
     page.set_content(artifact_html)
+    # Preserve the original Canvas-only test contract within the same new deliverable.
+    page.locator('#study-control').select_option('loop')
     # Wait for the real engine to render enough frames to establish it is running.
     page.wait_for_function('window.foundationEngine?.directory.tools.get("profiler").frameCount > 5')
     # Verify the canvas actually contains the cream player marker, not just a working counter.
@@ -165,8 +171,10 @@ def check_browser(browser, mobile):
 
 # Start and close Playwright's driver through its managed context.
 with sync_playwright() as playwright:
-    # Use the workspace's installed Chromium, keeping browser installation outside the build.
-    browser = playwright.chromium.launch(executable_path='/usr/bin/chromium', headless=True, args=['--no-sandbox'])
+    # Local work uses system Chromium; CI can install Playwright's matching managed browser.
+    browser_path = os.environ.get('CHROMIUM_EXECUTABLE') or shutil.which('chromium')
+    # Software WebGL also permits the default shared-world scene to initialize before selection.
+    browser = playwright.chromium.launch(executable_path=browser_path, headless=True, args=['--no-sandbox', '--enable-unsafe-swiftshader'])
     # Exercise desktop lifecycle and actual keyboard/mouse input.
     check_browser(browser, mobile=False)
     # Exercise phone layout, actual touch events, and landscape resize.

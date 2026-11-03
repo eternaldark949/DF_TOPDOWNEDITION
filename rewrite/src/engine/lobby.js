@@ -165,10 +165,12 @@ class LevelLobby {
                     this.accumulatedSeconds + 1e-10 >= stepSeconds &&
                     completedSteps < configuration.maximumStepsPerFrame
                 ) {
-                    // Advance reusable systems before optional high-level features.
-                    this.directory.update(stepSeconds);
-                    // Advance installed procedural/game features by the same duration.
+                    // Capture shared moving transforms before controls and physics change them.
+                    this.directory.systems.get('scene').beginStep();
+                    // Let installed controls/features declare this step's intended motion first.
                     this.penthouse.update(stepSeconds);
+                    // Apply reusable systems, including physics, to those intentions.
+                    this.directory.update(stepSeconds);
                     // Move simulation time only after both update phases succeed.
                     this.simulationSeconds += stepSeconds;
                     // Remove the elapsed duration consumed by this fixed update.

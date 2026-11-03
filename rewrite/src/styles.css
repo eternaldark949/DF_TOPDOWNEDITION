@@ -19,6 +19,8 @@
 }
 /* Include borders and padding inside declared dimensions for predictable phone layouts. */
 * { box-sizing: border-box; }
+/* Hidden test-only controls must not be overridden by grid/flex display declarations. */
+[hidden] { display: none !important; }
 /* Remove browser-default outer whitespace. */
 body { margin: 0; }
 /* Keep the title and runtime status readable on opposite sides when space permits. */

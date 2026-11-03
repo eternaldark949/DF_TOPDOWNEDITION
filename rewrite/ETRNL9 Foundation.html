@@ -28,6 +28,8 @@
 }
 /* Include borders and padding inside declared dimensions for predictable phone layouts. */
 * { box-sizing: border-box; }
+/* Hidden test-only controls must not be overridden by grid/flex display declarations. */
+[hidden] { display: none !important; }
 /* Remove browser-default outer whitespace. */
 body { margin: 0; }
 /* Keep the title and runtime status readable on opposite sides when space permits. */
@@ -84,39 +86,51 @@ footer { margin-top: 18px; }
 <body>
     <!-- This header belongs to the harness; engine components do not query its IDs. -->
     <header>
-        <div><p class="eyebrow">DIMENSIONS: FREELANCER · REWRITE FOUNDATION</p><h1>ETRNL9 <span>0.1.0</span></h1></div>
+        <div><p class="eyebrow">DIMENSIONS: FREELANCER · REWRITE FOUNDATION</p><h1>ETRNL9 <span id="version-value">0.2.0</span></h1></div>
         <p id="status-value" role="status">Initializing</p>
     </header>
     <main>
         <!-- The canvas is sized in CSS; the renderer allocates backing pixels separately. -->
         <section class="viewport" aria-label="Interactive engine test scene">
-            <canvas id="foundation-canvas" tabindex="0" aria-label="Moving rectangles and a controllable cream marker"></canvas>
-            <p class="scene-caption">A small study, running on four levels.</p>
+            <canvas id="foundation-canvas" tabindex="0" aria-label="Neutral engine scene with controllable solid geometry"></canvas>
+            <p class="scene-caption" id="scene-caption">One world: bodies, height, visibility, and light.</p>
         </section>
         <section class="panel" aria-label="Engine controls and measurements">
             <div class="controls">
                 <button id="start-button" type="button">Start</button>
                 <button id="pause-button" type="button" aria-pressed="false">Pause</button>
                 <button id="stop-button" type="button">Stop</button>
-                <label>Zoom <select id="zoom-control"><option value="0.75">75%</option><option value="1" selected>100%</option><option value="1.5">150%</option></select></label>
+                <button id="reset-button" type="button">Reset scene</button>
+                <label>Zoom <select id="zoom-control"><option value="0.5">50%</option><option value="0.75">75%</option><option value="1" selected>100%</option><option value="1.5">150%</option></select></label>
+                <label>Study <select id="study-control"><option value="world">Shared world</option><option value="loop">Loop &amp; brushes</option></select></label>
             </div>
-            <p>Drag or touch the scene to place the cream marker. Use WASD or arrow keys to move it. Pause freezes simulation; stop cancels frames.</p>
+            <p id="study-instructions">Controls and instructions follow the selected engine study.</p>
+            <div class="controls" id="world-controls">
+                <button id="roof-button" type="button">Hide slab visually</button>
+                <button id="population-button" type="button">Add 10,000 distant bodies</button>
+            </div>
             <dl class="measurements">
                 <div><dt>Rendered FPS</dt><dd id="fps-value">…</dd></div>
                 <div><dt>Fixed updates</dt><dd id="steps-value">0</dd></div>
                 <div><dt>Simulation</dt><dd id="time-value">0 s</dd></div>
-                <div><dt>Brush fills / frame</dt><dd id="draws-value">0</dd></div>
+                <div><dt>Draw submissions / frame</dt><dd id="draws-value">0</dd></div>
                 <div><dt>Dropped time</dt><dd id="dropped-value">0 s</dd></div>
                 <div><dt>Backing pixels</dt><dd id="resolution-value">…</dd></div>
             </dl>
+            <dl class="measurements" id="world-measurements">
+                <div><dt>Registered bodies</dt><dd id="bodies-value">0</dd></div>
+                <div><dt>Geometry checks / step</dt><dd id="checks-value">0</dd></div>
+                <div><dt>Visible elements</dt><dd id="visible-value">0</dd></div>
+                <div><dt>Contact beginnings</dt><dd id="contacts-value">0</dd></div>
+            </dl>
         </section>
         <section class="levels" aria-label="Level responsibilities">
-            <article><span>00</span><h2>Basement</h2><p>Shared settings, small methods, and basic libraries.</p></article>
+            <article><span>00</span><h2>Basement</h2><p>Shared settings, spatial hashes, and world geometry.</p></article>
             <article><span>01</span><h2>Lobby</h2><p>One clock. Fixed updates, frame scheduling, and lifecycle.</p></article>
-            <article><span>02</span><h2>Directory</h2><p>Systems, tools, elements, and generalized asset libraries.</p></article>
+            <article><span>02</span><h2>Directory</h2><p>Scene, spatial indexes, physics, depth rendering, lighting, input, and tools.</p></article>
             <article><span>03</span><h2>Penthouse</h2><p>Optional procedural features built on Directory services.</p></article>
         </section>
-        <footer>Foundation test harness. Original game content, humanoids, and tiered buildings have not been migrated.</footer>
+        <footer>Neutral engine tests, with no game migration. Shared-world rendering requires WebGL2; opaque boxes, circles, and planes are supported. The Loop study remains Canvas-only. Bloom and transparent surfaces are not implemented.</footer>
     </main>
     <script data-source="engine/basement.js">
 /**
@@ -133,7 +147,7 @@ class LevelBasement {
             // Identify this foundation independently of the existing game's version.
             engineName: 'ETRNL9',
             // Describe the first working foundation, not a migrated full game.
-            engineVersion: '0.1.0',
+            engineVersion: '0.2.0',
             // Run simulation at sixty fixed steps per second on any display.
             simulationHz: 60,
             // Limit elapsed time accepted after a browser stall, in seconds.
@@ -142,12 +156,26 @@ class LevelBasement {
             maximumStepsPerFrame: 5,
             // Limit backing-image density to control memory use on phones.
             maximumPixelRatio: 2,
+            // World shading defaults to one physical pixel per CSS pixel; UI can remain sharper.
+            maximumWorldPixelRatio: 1,
+            // Shared oblique projection: each upward Z unit shifts the image up by this amount.
+            heightProjectionScale: 0.75,
+            // Downward acceleration in upward-positive world Z, in world units per second squared.
+            gravityZ: -240,
+            // Bound safety subdivisions rather than silently skipping fast-body contacts.
+            maximumPhysicsSubsteps: 64,
+            // Repeat generic contact correction for neighboring bodies and simple stacks.
+            solverIterations: 4,
+            // Ambient reflected surface illumination, separate from surface emission.
+            ambientLight: 0.28,
+            // Each point light uses six depth faces of this resolution, independent of scene size.
+            shadowMapSize: 256,
             // Copy caller overrides after defaults so supplied settings take precedence.
             ...overrides
         });
-        // Visit the numeric setting-name values one at a time and stop after all four.
+        // Visit positive numeric setting-name values one at a time and stop after the list.
         // “of” retrieves names from this explicit list, unlike “in”, which reads keys.
-        for (const settingName of ['simulationHz', 'maximumFrameSeconds', 'maximumStepsPerFrame', 'maximumPixelRatio']) {
+        for (const settingName of ['simulationHz', 'maximumFrameSeconds', 'maximumStepsPerFrame', 'maximumPixelRatio', 'maximumWorldPixelRatio', 'heightProjectionScale', 'maximumPhysicsSubsteps', 'solverIterations', 'shadowMapSize']) {
             // Look up this setting's actual supplied value, including invalid strings.
             const settingValue = this.configuration[settingName];
             // Numeric settings must be finite positive numbers; do not coerce strings.
@@ -165,6 +193,16 @@ class LevelBasement {
         if (this.configuration.maximumPixelRatio < 1) {
             // Reject contradictory bounds instead of allocating surprising dimensions.
             throw new RangeError('maximumPixelRatio must be at least one.');
+        }
+        // Gravity may be zero or negative; ambient illumination may be zero but never negative.
+        if (!Number.isFinite(this.configuration.gravityZ) || !Number.isFinite(this.configuration.ambientLight) || this.configuration.ambientLight < 0) {
+            // Explain these distinct numeric rules rather than rejecting valid zero gravity.
+            throw new RangeError('Gravity must be finite; ambient light must be finite and nonnegative.');
+        }
+        // Subdivision/iteration counts represent whole repetitions, not fractional durations.
+        if (!Number.isInteger(this.configuration.maximumPhysicsSubsteps) || !Number.isInteger(this.configuration.solverIterations) || !Number.isInteger(this.configuration.shadowMapSize)) {
+            // Reject fractional loop budgets before any physics work begins.
+            throw new RangeError('Physics substep and solver iteration counts must be integers.');
         }
     }
 
@@ -226,6 +264,2433 @@ class NamedLibrary {
 }
 
 </script>
+<script data-source="engine/spatial.js">
+/**
+ * BASEMENT LIBRARY — a sparse spatial grid for rectangular bounds, in any 2D space.
+ * A spatial hash is the Map that addresses occupied grid cells by integer coordinates.
+ * Index entries refer to scene objects; they do not copy those objects or decide physics.
+ * Large entries use a bounded overflow collection instead of allocating millions of cells.
+ */
+class SpatialHashIndex {
+    /** Create an empty index with separate per-object membership and query-traversal budgets. */
+    constructor(cellSize = 64, maximumCells = 256, maximumQueryCells = 65536) {
+        // Require usable bounds before any object can be registered.
+        if (!Number.isFinite(cellSize) || cellSize <= 0 || !Number.isInteger(maximumCells) || maximumCells < 1 || !Number.isInteger(maximumQueryCells) || maximumQueryCells < 1) {
+            // Reject settings that would cause infinite loops or invalid grid coordinates.
+            throw new RangeError('Spatial cell size must be positive; maximumCells must be a positive integer.');
+        }
+        // Every grid square has this width and height in the index's coordinate space.
+        this.cellSize = cellSize;
+        // Cap both object insertion and query cell traversal.
+        this.maximumCells = maximumCells;
+        // Viewing many cells is reasonable even when one object should not fill all those cells.
+        this.maximumQueryCells = maximumQueryCells;
+        // Store only occupied cells, using collision-free string coordinate pairs.
+        this.cells = new Map();
+        // Address object entries by stable identifiers for update and removal.
+        this.entries = new Map();
+        // Very large objects remain queryable without unbounded cell allocation.
+        this.overflow = new Set();
+        // Each query gets an independent stamp so a multi-cell entry is returned once.
+        this.querySequence = 0;
+        // Report the actual broad-phase work instead of promising constant-time queries.
+        this.statistics = {
+            // Number of occupied cells visited during the latest query.
+            visitedCells: 0,
+            // Number of unique entries examined during the latest query.
+            examinedEntries: 0,
+            // Number of bounds-intersecting entries actually returned.
+            returnedEntries: 0,
+            // True when an exceptionally large query used a bounded full-index scan.
+            usedFullScan: false
+        };
+    }
+
+    /** Validate and return an inclusive integer cell range for finite min/max bounds. */
+    cellRange(bounds) {
+        // Read explicit axes; Object.values would allow unrelated configuration properties.
+        const coordinates = [bounds.minimumX, bounds.minimumY, bounds.maximumX, bounds.maximumY];
+        // Every coordinate must be finite and minima must not exceed maxima.
+        if (!coordinates.every(Number.isFinite) || bounds.minimumX > bounds.maximumX || bounds.minimumY > bounds.maximumY) {
+            // Fail before touching existing membership so an invalid update is atomic.
+            throw new RangeError('Spatial bounds require ordered, finite minimum/maximum coordinates.');
+        }
+        // Negative positions deliberately use floor, not truncation toward zero.
+        const minimumColumn = Math.floor(bounds.minimumX / this.cellSize);
+        // Inclusive maxima keep touching bounds discoverable for contact handling.
+        const maximumColumn = Math.floor(bounds.maximumX / this.cellSize);
+        // Convert the vertical minimum into its integer row address.
+        const minimumRow = Math.floor(bounds.minimumY / this.cellSize);
+        // Convert the vertical maximum into its integer row address.
+        const maximumRow = Math.floor(bounds.maximumY / this.cellSize);
+        // Extreme coordinates can exceed JavaScript's exact-integer address range.
+        if (![minimumColumn, maximumColumn, minimumRow, maximumRow].every(Number.isSafeInteger)) {
+            // Reject them rather than risk increment loops that no longer advance.
+            throw new RangeError('Spatial coordinates exceed the safe grid address range.');
+        }
+        // Return a named range rather than a cryptic four-number array.
+        return {
+            // First occupied horizontal cell.
+            minimumColumn,
+            // Last occupied horizontal cell, included in traversal.
+            maximumColumn,
+            // First occupied vertical cell.
+            minimumRow,
+            // Last occupied vertical cell, included in traversal.
+            maximumRow,
+            // Total cell visits needed for this rectangle; overflow is handled below.
+            count: (maximumColumn - minimumColumn + 1) * (maximumRow - minimumRow + 1)
+        };
+    }
+
+    /** Insert or update an ID; return its entry, rebuilding membership only when needed. */
+    upsert(identifier, value, bounds) {
+        // Validate the new range before removing the previous valid entry.
+        const range = this.cellRange(bounds);
+        // Preserve existing entry identity so retained membership remains valid.
+        let entry = this.entries.get(identifier);
+        // Construct metadata when this is the first registration of the identifier.
+        if (!entry) {
+            // Keep index-specific stamps on the entry, never on the shared world object.
+            entry = {
+                // Stable address used for removal and inspection.
+                identifier,
+                // Actual registered object reference.
+                value,
+                // Owned bounds snapshot, filled immediately below.
+                bounds: null,
+                // Cell address range, filled when membership is established.
+                range: null,
+                // Cell keys used to remove this entry without scanning the full index.
+                cellKeys: [],
+                // Last query that examined this entry.
+                querySequence: -1
+            };
+            // Make this entry addressable before populating its cell memberships.
+            this.entries.set(identifier, entry);
+        }
+        // Always refresh the object reference in case the caller deliberately replaces it.
+        entry.value = value;
+        // Copy numerical bounds so later caller mutation cannot silently corrupt the index.
+        entry.bounds = { ...bounds };
+        // Check whether all occupied grid cells stayed unchanged.
+        const sameCells = entry.range && entry.range.minimumColumn === range.minimumColumn && entry.range.maximumColumn === range.maximumColumn && entry.range.minimumRow === range.minimumRow && entry.range.maximumRow === range.maximumRow;
+        // Staying in the same cells needs only new precise bounds, not remove/reinsert work.
+        if (sameCells) {
+            // Return the live index entry to its owner.
+            return entry;
+        }
+        // Remove old membership before assigning the new range.
+        this.detach(entry);
+        // Retain the new integer address range for the next incremental update.
+        entry.range = range;
+        // Large geometry uses one overflow registration rather than thousands of cells.
+        if (range.count > this.maximumCells) {
+            // Queries still test this object's actual bounds.
+            this.overflow.add(entry);
+            // No ordinary cell allocation is needed for this entry.
+            return entry;
+        }
+        // Start at the minimum column, include maximumColumn, and increase by one.
+        // This counted loop creates each horizontal grid address covered by the bounds.
+        for (let column = range.minimumColumn; column <= range.maximumColumn; column += 1) {
+            // For each column, traverse minimumRow through maximumRow one row at a time.
+            // These nested loops cover every cell touched by a large or rotated object.
+            for (let row = range.minimumRow; row <= range.maximumRow; row += 1) {
+                // A comma separates the signed integer coordinates without numeric key collisions.
+                const key = `${column},${row}`;
+                // Create a cell only when its first object arrives.
+                if (!this.cells.has(key)) {
+                    // Sets make each entry's membership unique within a cell.
+                    this.cells.set(key, new Set());
+                }
+                // Register the entry in the current occupied cell.
+                this.cells.get(key).add(entry);
+                // Remember the exact key needed for efficient future removal.
+                entry.cellKeys.push(key);
+            }
+        }
+        // Return the registered metadata after all memberships are complete.
+        return entry;
+    }
+
+    /** Remove only an entry's cell/overflow memberships; retain its ID registration. */
+    detach(entry) {
+        // Visit stored key values with “of”; finish after all previous memberships.
+        for (const key of entry.cellKeys) {
+            // Find the cell that currently owns this membership.
+            const cell = this.cells.get(key);
+            // Remove only this entry, preserving neighboring objects.
+            cell.delete(entry);
+            // Empty cells must not accumulate as moving objects explore the scene.
+            if (cell.size === 0) {
+                // Release the unused cell and its Set allocation.
+                this.cells.delete(key);
+            }
+        }
+        // Reuse the metadata array while clearing obsolete addresses.
+        entry.cellKeys.length = 0;
+        // An entry may instead have belonged to the overflow collection.
+        this.overflow.delete(entry);
+    }
+
+    /** Unregister an ID completely; return false when the ID was already absent. */
+    remove(identifier) {
+        // Resolve the exact metadata needed to remove all of its memberships.
+        const entry = this.entries.get(identifier);
+        // An already removed object requires no additional cleanup.
+        if (!entry) {
+            // Tell the caller that this ID did not exist.
+            return false;
+        }
+        // Release ordinary and overflow memberships first.
+        this.detach(entry);
+        // Forget the ID and report successful removal.
+        return this.entries.delete(identifier);
+    }
+
+    /** Return intersecting values once each; an optional output array is cleared/reused. */
+    query(bounds, output = []) {
+        // Validate query size and coordinates before beginning traversal.
+        const range = this.cellRange(bounds);
+        // Discard the caller's previous results when reusing an output array.
+        output.length = 0;
+        // Advance this index's query stamp without modifying scene objects.
+        this.querySequence += 1;
+        // Start new measurements for this query.
+        this.statistics.visitedCells = 0;
+        // Count candidates even if exact bounds reject them afterward.
+        this.statistics.examinedEntries = 0;
+        // Record whether bounded cell traversal will fall back to an entry scan.
+        this.statistics.usedFullScan = range.count > this.maximumQueryCells || range.count > this.entries.size;
+        /** Examine one entry at most once and append it only if its actual bounds overlap. */
+        const collect = (entry) => {
+            // Objects spanning several visited cells share one query stamp.
+            if (entry.querySequence === this.querySequence) {
+                // Skip repeated memberships rather than returning duplicate candidates.
+                return;
+            }
+            // Record that this query has now inspected this entry.
+            entry.querySequence = this.querySequence;
+            // Increase candidate accounting before the exact rectangular bounds test.
+            this.statistics.examinedEntries += 1;
+            // Read the stored immutable-for-this-update numerical bounds.
+            const candidate = entry.bounds;
+            // A separating axis means the two rectangles do not overlap or touch.
+            if (candidate.maximumX < bounds.minimumX || candidate.minimumX > bounds.maximumX || candidate.maximumY < bounds.minimumY || candidate.minimumY > bounds.maximumY) {
+                // Reject this spatial false positive before returning it to physics/rendering.
+                return;
+            }
+            // Return the original object reference, not its internal index metadata.
+            output.push(entry.value);
+        };
+        // Huge query rectangles must not iterate over millions of empty cells.
+        if (this.statistics.usedFullScan) {
+            // “of” visits registered metadata values once, finishing after the full collection.
+            for (const entry of this.entries.values()) {
+                // Exact bounds still determine which values enter the output.
+                collect(entry);
+            }
+        } else {
+            // Count columns inclusively, advancing by one until maximumColumn is processed.
+            for (let column = range.minimumColumn; column <= range.maximumColumn; column += 1) {
+                // Within each column, visit the query's rows in increasing order.
+                for (let row = range.minimumRow; row <= range.maximumRow; row += 1) {
+                    // Count visited addresses, including currently empty cells.
+                    this.statistics.visitedCells += 1;
+                    // Resolve only the current address instead of scanning registered objects.
+                    const cell = this.cells.get(`${column},${row}`);
+                    // Empty addresses contain no possible candidates.
+                    if (!cell) {
+                        // Advance directly to the next row.
+                        continue;
+                    }
+                    // “of” supplies each entry value from this occupied cell's Set.
+                    for (const entry of cell) {
+                        // De-duplicate and test exact bounds for this entry.
+                        collect(entry);
+                    }
+                }
+            }
+            // Overflow objects have no ordinary cell memberships but remain queryable.
+            // “of” reads each overflow entry once and ends when that Set is exhausted.
+            for (const entry of this.overflow) {
+                // Use the same deduplication and precise bounds test as ordinary entries.
+                collect(entry);
+            }
+        }
+        // Publish result count separately from broad-phase candidate count.
+        this.statistics.returnedEntries = output.length;
+        // Let callers iterate results or retain their supplied reusable output array.
+        return output;
+    }
+
+    /** Empty all entries and cells when a scene is unloaded. */
+    clear() {
+        // Remove ordinary cell membership in one operation.
+        this.cells.clear();
+        // Release every registered object reference.
+        this.entries.clear();
+        // Release oversized-object references too.
+        this.overflow.clear();
+    }
+}
+
+/** DIRECTORY SYSTEM — own independent named indexes using the shared Basement algorithm. */
+class SpatialSystem {
+    /** Create no indexes until another component declares the collection it needs. */
+    constructor() {
+        // Different concerns can choose different cell sizes and coordinate spaces.
+        this.indexes = new NamedLibrary('spatial indexes');
+    }
+
+    /** Create a uniquely named index and return it for registration/query operations. */
+    createIndex(identifier, cellSize = 64, maximumCells = 256, maximumQueryCells = 65536) {
+        // Keep ownership in one addressable library rather than global grid variables.
+        return this.indexes.register(identifier, new SpatialHashIndex(cellSize, maximumCells, maximumQueryCells));
+    }
+
+    /** Remove all scene references when Directory services are destroyed. */
+    dispose() {
+        // “of” visits each index value; traversal ends after every named index is cleared.
+        for (const index of this.indexes.entries.values()) {
+            // Free memberships before discarding the index itself.
+            index.clear();
+        }
+        // Release the named indexes after their contents have been cleared.
+        this.indexes.entries.clear();
+    }
+}
+
+</script>
+<script data-source="engine/world-geometry.js">
+/**
+ * BASEMENT GEOMETRY — one position/height/shape vocabulary for physics and visuals.
+ * X and Y locate an element on the ground; Z is its bottom elevation. Height extends
+ * upward from Z. Box width/depth and circle radius are world units, not image pixels.
+ * Angles use radians. Geometry is immutable so changing it cannot silently stale an index.
+ */
+class WorldGeometry {
+    /** Validate a footprint and vertical extent; return a frozen, explicit descriptor. */
+    static create(definition = {}) {
+        // Default geometry is a box rather than a game-specific character or vehicle.
+        const shape = definition.shape ?? 'box';
+        // Only implemented shapes may enter the shared physics/rendering contract.
+        if (!['box', 'circle', 'plane'].includes(shape)) {
+            // Reject unsupported geometry instead of quietly drawing/colliding it differently.
+            throw new Error(`Unsupported geometry shape: ${shape}`);
+        }
+        // A plane is a flat rectangular surface with no vertical thickness.
+        const height = shape === 'plane' ? 0 : (definition.height ?? 24);
+        // Store all dimensions explicitly; radius is used only for circular footprints.
+        const geometry = {
+            // Shared shape identifier understood by both physics and surface generation.
+            shape,
+            // Horizontal size of a rectangular footprint before rotation.
+            width: definition.width ?? 24,
+            // Ground-plane depth of a rectangular footprint before rotation.
+            depth: definition.depth ?? 24,
+            // Circular footprint radius; the physics test uses a true circle.
+            radius: definition.radius ?? 12,
+            // Vertical extent above the transform's bottom Z elevation.
+            height
+        };
+        // Inspect each positive dimension by name; “of” reads name values, not array keys.
+        for (const name of ['width', 'depth', 'radius']) {
+            // Every stored dimension must be finite and strictly positive.
+            if (!Number.isFinite(geometry[name]) || geometry[name] <= 0) {
+                // A degenerate footprint would undermine both contact tests and rendering.
+                throw new RangeError(`${name} must be a finite positive world dimension.`);
+            }
+        }
+        // Volumes need positive height; only explicitly declared planes may have zero height.
+        if (!Number.isFinite(height) || height < 0 || (shape !== 'plane' && height === 0)) {
+            // Explain the supported surface/volume distinction to callers.
+            throw new RangeError('Volume height must be positive; a plane has zero height.');
+        }
+        // Freeze prevents direct dimension edits from bypassing geometry-change notifications.
+        return Object.freeze(geometry);
+    }
+
+    /** Generate a counterclockwise world footprint; circles use 20 visual segments only. */
+    static footprint(element) {
+        // Read the same geometry object that physical contact tests use.
+        const geometry = element.geometry;
+        // Cache the actual transform, not a separately maintained visual position.
+        const transform = element.transform;
+        // Accumulate world X/Y coordinates for sides and top triangulation.
+        const points = [];
+        // Circle visuals approximate a circle; physical circle tests remain analytical.
+        if (geometry.shape === 'circle') {
+            // Visit segment indices zero through nineteen, advancing once per corner.
+            // The count divides one complete revolution into equal angular steps.
+            for (let segmentIndex = 0; segmentIndex < 20; segmentIndex += 1) {
+                // Add orientation so an attached material rotates with the element.
+                const angle = segmentIndex / 20 * Math.PI * 2 + transform.angle;
+                // Append the current circumference point in world coordinates.
+                points.push([transform.positionX + Math.cos(angle) * geometry.radius, transform.positionY + Math.sin(angle) * geometry.radius]);
+            }
+        } else {
+            // Visit four local corners in counterclockwise mathematical X/Y order.
+            // “of” retrieves each [xSign, ySign] pair; destructuring names its two values.
+            for (const [horizontalSign, verticalSign] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+                // Half-extents place the element origin at the center of its footprint.
+                const localX = horizontalSign * geometry.width / 2;
+                // The second local axis lies on the ground, not vertically up the wall.
+                const localY = verticalSign * geometry.depth / 2;
+                // Rotate the corner around the element's origin, then translate into world space.
+                points.push([
+                    // Rotation preserves the footprint's true oriented width.
+                    transform.positionX + localX * Math.cos(transform.angle) - localY * Math.sin(transform.angle),
+                    // Apply the corresponding rotation to the ground-depth coordinate.
+                    transform.positionY + localX * Math.sin(transform.angle) + localY * Math.cos(transform.angle)
+                ]);
+            }
+        }
+        // Return generated coordinates; scene caches this until geometry/transform changes.
+        return points;
+    }
+
+    /** Return physical ground bounds, independent of camera projection and emission. */
+    static bounds(element) {
+        // A circle's bounds can be obtained exactly without polygon approximation.
+        if (element.geometry.shape === 'circle') {
+            // Use the true radius around the shared transform's center.
+            return {
+                // Leftmost possible physical point.
+                minimumX: element.transform.positionX - element.geometry.radius,
+                // Farthest-back possible physical point.
+                minimumY: element.transform.positionY - element.geometry.radius,
+                // Rightmost possible physical point.
+                maximumX: element.transform.positionX + element.geometry.radius,
+                // Farthest-forward possible physical point.
+                maximumY: element.transform.positionY + element.geometry.radius
+            };
+        }
+        // Start bounds at infinities so the first actual corner establishes each limit.
+        const bounds = { minimumX: Infinity, minimumY: Infinity, maximumX: -Infinity, maximumY: -Infinity };
+        // “of” visits each rotated footprint point, stopping after all corners are measured.
+        for (const point of WorldGeometry.footprint(element)) {
+            // Extend the minimum horizontal extent.
+            bounds.minimumX = Math.min(bounds.minimumX, point[0]);
+            // Extend the minimum ground-depth extent.
+            bounds.minimumY = Math.min(bounds.minimumY, point[1]);
+            // Extend the maximum horizontal extent.
+            bounds.maximumX = Math.max(bounds.maximumX, point[0]);
+            // Extend the maximum ground-depth extent.
+            bounds.maximumY = Math.max(bounds.maximumY, point[1]);
+        }
+        // Return one bounds vocabulary shared by every spatial-index caller.
+        return bounds;
+    }
+
+    /** Parse #rrggbb into normalized RGB channels; reject unsupported transparency explicitly. */
+    static color(value) {
+        // This first opaque-surface renderer intentionally accepts only six-digit colors.
+        if (typeof value !== 'string' || !/^#[0-9a-f]{6}$/i.test(value)) {
+            // Do not silently flatten transparent materials into opaque geometry.
+            throw new TypeError('Surface colors use opaque #rrggbb strings in this foundation.');
+        }
+        // Collect red, green, and blue in the order the GPU expects.
+        const channels = [];
+        // “of” visits the three channel-start positions, stopping after offsets 1, 3, and 5.
+        // Offset zero is the # marker; each following pair contains one hexadecimal channel.
+        for (const offset of [1, 3, 5]) {
+            // Read exactly two characters for the current red/green/blue channel.
+            const channelText = value.slice(offset, offset + 2);
+            // Parse base sixteen, converting 00..ff into an integer from zero through 255.
+            const channelValue = parseInt(channelText, 16);
+            // Normalize that integer into the GPU's zero-to-one color range.
+            channels.push(channelValue / 255);
+        }
+        // Return the ordered normalized RGB values without changing caller state.
+        return channels;
+    }
+
+    /** Validate a surface material; emission remains attached to geometry, never a late overlay. */
+    static material(definition = {}) {
+        // Freeze the descriptor and its channel arrays to prevent untracked visual edits.
+        return Object.freeze({
+            // Reflective base color participates in ambient and direct surface lighting.
+            color: Object.freeze(WorldGeometry.color(definition.color ?? '#cebbff')),
+            // Emission is added only for fragments that pass the same surface depth test.
+            emission: Object.freeze(WorldGeometry.color(definition.emission ?? '#000000'))
+        });
+    }
+}
+
+/** A shared transform notifies the scene when position or rotation changes. */
+class WorldTransform {
+    /** Store initial finite coordinates and a callback; setup itself sends no notifications. */
+    constructor(definition, onChange) {
+        // Keep mutable values private so public assignments can maintain spatial membership.
+        this.values = [definition.positionX ?? 0, definition.positionY ?? 0, definition.positionZ ?? 0, definition.angle ?? 0];
+        // Validate all supplied coordinates before they enter the scene.
+        if (!this.values.every(Number.isFinite)) {
+            // Prevent NaN geometry from reaching collision or GPU buffers.
+            throw new RangeError('World transform coordinates and angle must be finite.');
+        }
+        // The owner receives one notification for each completed transform change.
+        this.onChange = onChange;
+    }
+
+    /** Read the current horizontal world coordinate, with no copied visual state. */
+    get positionX() {
+        // Return the first stored coordinate.
+        return this.values[0];
+    }
+
+    /** Assign X through the notifying path, preserving the current Y/Z coordinates. */
+    set positionX(value) {
+        // Reuse atomic position validation and spatial synchronization.
+        this.setPosition(value, this.positionY, this.positionZ);
+    }
+
+    /** Read the current ground-depth coordinate. */
+    get positionY() {
+        // Return the second stored coordinate.
+        return this.values[1];
+    }
+
+    /** Assign Y and automatically update scene indexes. */
+    set positionY(value) {
+        // Keep the other world coordinates unchanged.
+        this.setPosition(this.positionX, value, this.positionZ);
+    }
+
+    /** Read the bottom elevation above the world origin. */
+    get positionZ() {
+        // Return the third stored coordinate.
+        return this.values[2];
+    }
+
+    /** Assign bottom elevation and notify both physical and visual indexing. */
+    set positionZ(value) {
+        // Use one shared Z value instead of separate physical/rendering heights.
+        this.setPosition(this.positionX, this.positionY, value);
+    }
+
+    /** Read orientation around the world's vertical axis, in radians. */
+    get angle() {
+        // Return the fourth stored value.
+        return this.values[3];
+    }
+
+    /** Assign orientation and refresh rotated shape bounds. */
+    set angle(value) {
+        // Reject invalid rotation before changing existing valid geometry.
+        if (!Number.isFinite(value)) {
+            // Report invalid public input at its source.
+            throw new RangeError('World angle must be finite.');
+        }
+        // Save the new orientation used by contact shapes and render meshes.
+        this.values[3] = value;
+        // Notify the scene that footprint and projected bounds may have changed.
+        this.onChange();
+    }
+
+    /** Change all coordinates atomically and notify once; return this transform for callers. */
+    setPosition(positionX, positionY, positionZ) {
+        // Validate the complete update before assigning any coordinate.
+        if (![positionX, positionY, positionZ].every(Number.isFinite)) {
+            // Keep prior position and index membership intact on invalid input.
+            throw new RangeError('World position must contain finite numbers.');
+        }
+        // Store the horizontal coordinate.
+        this.values[0] = positionX;
+        // Store the ground-depth coordinate.
+        this.values[1] = positionY;
+        // Store the shared bottom elevation.
+        this.values[2] = positionZ;
+        // Notify once after all three coordinates describe a complete position.
+        this.onChange();
+        // Return the live transform rather than a position snapshot.
+        return this;
+    }
+}
+
+</script>
+<script data-source="engine/physics.js">
+/**
+ * DIRECTORY PHYSICS — shared contacts between extruded circles and oriented boxes.
+ * Broad phase queries registered spatial bounds; narrow phase tests real shapes and
+ * overlapping Z intervals. A minimum-translation normal separates solid bodies, then
+ * linear impulses apply mass, restitution, and friction. No gameplay names are consulted.
+ * This is a linear 2.5D solver: it does not yet provide angular impulses or constraints.
+ */
+class PhysicsBody {
+    /** Validate body configuration for one shared element; solids interact by default. */
+    constructor(element, definition) {
+        // Retain the world element; geometry and position are never independently copied.
+        this.element = element;
+        // Static bodies stay still; kinematic bodies move but do not receive impulses.
+        const motion = definition.motion ?? 'static';
+        // Dynamic bodies participate in mass-based separation and velocity response.
+        if (!['static', 'dynamic', 'kinematic'].includes(motion)) {
+            // Unknown modes must not silently bypass generic contact processing.
+            throw new Error(`Unsupported body motion: ${motion}`);
+        }
+        // Motion is fixed for this body's lifetime so edits cannot stale static/moving indexes.
+        Object.defineProperty(this, 'motion', { value: motion, enumerable: true });
+        // Store finite positive mass even for immovable bodies for inspectable configuration.
+        this.mass = definition.mass ?? 1;
+        // Restitution is the fraction of closing normal speed returned as bounce.
+        this.restitution = definition.restitution ?? 0;
+        // Coulomb friction limits sliding impulse relative to the normal impulse.
+        this.friction = definition.friction ?? 0.5;
+        // A sensor reports contact without physically separating either participant.
+        this.sensor = definition.sensor === true;
+        // Category/mask filters are exceptions; the default mask accepts every category.
+        this.category = definition.category ?? 1;
+        // JavaScript bitwise operators operate on 32-bit integers; all bits means all categories.
+        this.collisionMask = definition.collisionMask ?? 0xffffffff;
+        // A caller may explicitly ignore specific IDs, such as an attached owner's body.
+        this.ignoredIdentifiers = new Set(definition.ignore ?? []);
+        // X velocity is measured in world units per second, independent of display rate.
+        this.velocityX = definition.velocityX ?? 0;
+        // Y velocity moves along the ground plane.
+        this.velocityY = definition.velocityY ?? 0;
+        // Z velocity moves upward/downward through the shared height coordinate.
+        this.velocityZ = definition.velocityZ ?? 0;
+        // Individual objects can deliberately opt out of global gravity.
+        this.gravityScale = definition.gravityScale ?? 1;
+        // Mass and material response must have physically meaningful finite values.
+        if (!Number.isFinite(this.mass) || this.mass <= 0 || !Number.isFinite(this.restitution) || this.restitution < 0 || this.restitution > 1 || !Number.isFinite(this.friction) || this.friction < 0 || !Number.isFinite(this.gravityScale)) {
+            // Reject invalid configuration before this body enters any registry.
+            throw new RangeError('Body mass must be positive; restitution 0..1; friction nonnegative; gravity finite.');
+        }
+        // Validate category and mask as explicit unsigned 32-bit integers.
+        for (const filter of [this.category, this.collisionMask]) {
+            // Each filter must be representable without accidental coercion.
+            if (!Number.isInteger(filter) || filter < 0 || filter > 0xffffffff) {
+                // Unsupported filter values must not turn interactions on/off unpredictably.
+                throw new RangeError('Collision categories and masks use unsigned 32-bit integers.');
+            }
+        }
+        // Validate initial velocity before the first physics update.
+        this.validateVelocity();
+    }
+
+    /** Read inverse mass; only dynamic bodies yield to physical response. */
+    get inverseMass() {
+        // Zero inverse mass makes static/kinematic bodies immovable during resolution.
+        return this.motion === 'dynamic' ? 1 / this.mass : 0;
+    }
+
+    /** Reject invalid public velocity edits before moving any coordinates. */
+    validateVelocity() {
+        // Check all three axes because height is a real physical coordinate.
+        if (![this.velocityX, this.velocityY, this.velocityZ].every(Number.isFinite)) {
+            // Surface the invalid input rather than poisoning the scene's shared transform.
+            throw new RangeError('Body velocities must be finite world units per second.');
+        }
+    }
+}
+
+/** Shape contact helpers live separately from registry ownership and simulation scheduling. */
+class ContactGeometry {
+    /** Test one pair; return A-to-B unit normal/penetration or null when separated. */
+    static intersect(firstBody, secondBody) {
+        // Read each participant's one shared world element.
+        const first = firstBody.element;
+        // The second body may be any gameplay identity with a supported geometry shape.
+        const second = secondBody.element;
+        // Compare vertical intervals before doing more expensive footprint tests.
+        const verticalOverlap = Math.min(first.transform.positionZ + first.geometry.height, second.transform.positionZ + second.geometry.height) - Math.max(first.transform.positionZ, second.transform.positionZ);
+        // A real vertical gap excludes contact; touching intervals still report resting contact.
+        if (verticalOverlap < -1e-8) {
+            // Objects on a bridge and below it can share XY without colliding.
+            return null;
+        }
+        // A minimum translation across Z may be smaller than a lateral correction.
+        const upwardExit = first.transform.positionZ + first.geometry.height - second.transform.positionZ;
+        // Measure how far the first volume could exit through the opposite vertical side.
+        const downwardExit = second.transform.positionZ + second.geometry.height - first.transform.positionZ;
+        // Begin with the smaller vertical separating translation.
+        let contact = {
+            // A Z separation has no horizontal component.
+            normalX: 0,
+            // A Z separation has no ground-depth component.
+            normalY: 0,
+            // Choose the shorter direction; equal overlaps use a stable upward normal.
+            normalZ: upwardExit <= downwardExit ? 1 : -1,
+            // Use exit distance, not intersection length, for fully contained volumes.
+            penetration: Math.max(0, Math.min(upwardExit, downwardExit))
+        };
+        // Gather shape axes: box face normals plus circle-specific separation directions.
+        const axes = [];
+        // Visit the two element values; “of” stops after both footprints contribute axes.
+        for (const element of [first, second]) {
+            // Circular shapes have no fixed face normals.
+            if (element.geometry.shape === 'box') {
+                // The rotated box's local X axis tests separation along its width.
+                axes.push([Math.cos(element.transform.angle), Math.sin(element.transform.angle)]);
+                // Its perpendicular local Y axis tests separation along its depth.
+                axes.push([-Math.sin(element.transform.angle), Math.cos(element.transform.angle)]);
+            }
+        }
+        // Circle-circle separation uses the line between centers.
+        if (first.geometry.shape === 'circle' && second.geometry.shape === 'circle') {
+            // Coincident centers use a stable X axis rather than dividing by zero.
+            const distance = Math.hypot(second.transform.positionX - first.transform.positionX, second.transform.positionY - first.transform.positionY);
+            // Add a normalized center axis, or the deterministic fallback.
+            axes.push(distance > 1e-10 ? [(second.transform.positionX - first.transform.positionX) / distance, (second.transform.positionY - first.transform.positionY) / distance] : [1, 0]);
+        } else {
+            // A circle touching a box corner also needs the circle-to-nearest-corner axis.
+            const circle = first.geometry.shape === 'circle' ? first : second;
+            // The other shape supplies corners when one participant is circular.
+            const box = circle === first ? second : first;
+            // Only mixed circle/box contacts need this additional curved-boundary test.
+            if (circle.geometry.shape === 'circle') {
+                // Track the closest box corner by squared distance.
+                let nearestDistanceSquared = Infinity;
+                // No nearest point exists until the first corner is examined.
+                let nearestPoint = null;
+                // “of” supplies each cached world corner, finishing after the four box corners.
+                for (const point of box.footprint) {
+                    // Squared distance avoids a square root during corner selection.
+                    const distanceSquared = (point[0] - circle.transform.positionX) ** 2 + (point[1] - circle.transform.positionY) ** 2;
+                    // Retain the nearest available corner.
+                    if (distanceSquared < nearestDistanceSquared) {
+                        // Update the best distance for the remaining comparisons.
+                        nearestDistanceSquared = distanceSquared;
+                        // Keep the corresponding world coordinate.
+                        nearestPoint = point;
+                    }
+                }
+                // A coincident corner supplies no usable axis but box axes still apply.
+                if (nearestDistanceSquared > 1e-16) {
+                    // Normalize the corner direction so projection distances use world units.
+                    const distance = Math.sqrt(nearestDistanceSquared);
+                    // Add the extra circle-to-corner separating axis.
+                    axes.push([(nearestPoint[0] - circle.transform.positionX) / distance, (nearestPoint[1] - circle.transform.positionY) / distance]);
+                }
+            }
+        }
+        // “of” visits each necessary normalized axis, stopping early on any separation.
+        for (const axis of axes) {
+            // Project the first shape onto this one-dimensional axis.
+            const firstInterval = ContactGeometry.project(first, axis);
+            // Project the second shape onto the same axis for a meaningful comparison.
+            const secondInterval = ContactGeometry.project(second, axis);
+            // A gap on any axis means the volumes do not contact at all.
+            if (firstInterval.maximum < secondInterval.minimum - 1e-8 || secondInterval.maximum < firstInterval.minimum - 1e-8) {
+                // Stop narrow-phase work as soon as separation is proven.
+                return null;
+            }
+            // Moving A backward along the axis exits this side of B.
+            const positiveExit = firstInterval.maximum - secondInterval.minimum;
+            // Moving A forward along the axis exits the opposite side.
+            const negativeExit = secondInterval.maximum - firstInterval.minimum;
+            // Choose the shorter exit, including complete shape containment.
+            const penetration = Math.max(0, Math.min(positiveExit, negativeExit));
+            // Keep the smallest correction across ground and vertical axes.
+            if (penetration < contact.penetration) {
+                // Orient the contact from A toward B along the shortest separating route.
+                const direction = positiveExit <= negativeExit ? 1 : -1;
+                // Replace the previous best contact with the current normalized axis.
+                contact = { normalX: axis[0] * direction, normalY: axis[1] * direction, normalZ: 0, penetration };
+            }
+        }
+        // All required axes overlap; return the least-displacement separating contact.
+        return contact;
+    }
+
+    /** Return the min/max footprint projection on a supplied normalized ground-plane axis. */
+    static project(element, axis) {
+        // A true circle projects to a center plus/minus radius on every normalized axis.
+        if (element.geometry.shape === 'circle') {
+            // Dot product measures the center's coordinate along this axis.
+            const center = element.transform.positionX * axis[0] + element.transform.positionY * axis[1];
+            // Return exact circular extent rather than the visual polygon approximation.
+            return { minimum: center - element.geometry.radius, maximum: center + element.geometry.radius };
+        }
+        // Start extrema beyond any valid projection so the first corner establishes them.
+        let minimum = Infinity;
+        // Maximum begins below every finite world coordinate.
+        let maximum = -Infinity;
+        // “of” visits the actual rotated box corners, finishing after all four projections.
+        for (const point of element.footprint) {
+            // Dot this corner with the normalized axis.
+            const projection = point[0] * axis[0] + point[1] * axis[1];
+            // Expand the lower one-dimensional bound.
+            minimum = Math.min(minimum, projection);
+            // Expand the upper one-dimensional bound.
+            maximum = Math.max(maximum, projection);
+        }
+        // Keep names explicit for contact calculations.
+        return { minimum, maximum };
+    }
+}
+
+/** One registry-driven simulation for every body; category names never choose algorithms. */
+class PhysicsSystem {
+    /** Initialize registries and tunable response settings without scheduling a loop. */
+    constructor(basement) {
+        // Read common gravity and safety limits from shared engine configuration.
+        this.basement = basement;
+        // Keep every registered body addressable without requiring a full scan during updates.
+        this.bodies = new Map();
+        // Only non-static bodies require velocity integration and neighborhood queries.
+        this.movingBodies = new Map();
+        // Subscribers receive begin/stay/end contacts separately from physical response.
+        this.listeners = new Set();
+        // Retain prior fixed-step contacts to distinguish begin, stay, and end.
+        this.previousContacts = new Map();
+        // Reuse nearby-static query storage instead of allocating one array per moving body.
+        this.staticQueryOutput = [];
+        // Keep moving query output separate while combining each body's candidate list.
+        this.movingQueryOutput = [];
+        // Publish bounded work counters for benchmarks and diagnostics.
+        this.statistics = { candidatePairs: 0, narrowChecks: 0, resolvedContacts: 0, substeps: 0 };
+    }
+
+    /** Resolve scene/index references after all Directory systems have been constructed. */
+    connect(directory) {
+        // The scene owns physical index memberships and shared world geometry.
+        this.scene = directory.systems.get('scene');
+    }
+
+    /** Register one body idempotently; scene synchronization calls this after tracked edits. */
+    register(body) {
+        // Use the same identifier used by elements and spatial membership.
+        this.bodies.set(body.element.identifier, body);
+        // Static bodies need no integration or pair-generation entry.
+        if (body.motion !== 'static') {
+            // Maintain the active moving collection incrementally.
+            this.movingBodies.set(body.element.identifier, body);
+        }
+    }
+
+    /** Unregister a body's integration reference; SceneSystem removes spatial membership. */
+    remove(identifier) {
+        // Remove this ID from the complete body registry.
+        this.bodies.delete(identifier);
+        // Remove it from the integration list if it was moving.
+        this.movingBodies.delete(identifier);
+        // Scratch query outputs are temporary and must not retain unloaded bodies while stopped.
+        this.staticQueryOutput.length = 0;
+        // Clear the separate moving-candidate buffer for the same ownership reason.
+        this.movingQueryOutput.length = 0;
+        // A stopped/unloaded scene must not retain old bodies through contact history.
+        for (const [pairIdentifier, collision] of this.previousContacts) {
+            // Only pairs involving this exact removed element are ending.
+            if (collision.first.element.identifier === identifier || collision.second.element.identifier === identifier) {
+                // Release history before notifying callbacks that might request another removal.
+                this.previousContacts.delete(pairIdentifier);
+                // Removal ends contact even if no later simulation step will run.
+                for (const listener of Array.from(this.listeners)) {
+                    // Contact observation remains independent from physical body cleanup.
+                    listener({ type: 'end', ...collision });
+                }
+            }
+        }
+    }
+
+    /** Subscribe to contact events and return a function that removes this exact listener. */
+    subscribe(listener) {
+        // Validate the API before a later fixed step attempts to call a non-function.
+        if (typeof listener !== 'function') {
+            // Keep callback errors local to registration.
+            throw new TypeError('A contact listener must be a function.');
+        }
+        // Sets prevent duplicate registration of the same callback reference.
+        this.listeners.add(listener);
+        /** Release this listener without changing any other subscriber. */
+        return () => this.listeners.delete(listener);
+    }
+
+    /** Determine whether a candidate pair is eligible, with all categories enabled by default. */
+    eligible(first, second) {
+        // Self-contact never represents two physical objects.
+        if (first === second) {
+            // Ignore duplicate membership referring to the same body.
+            return false;
+        }
+        // Both participants must agree to category filtering.
+        if ((first.collisionMask & second.category) === 0 || (second.collisionMask & first.category) === 0) {
+            // These exclusions are explicit body declarations, not missing shape handlers.
+            return false;
+        }
+        // Attached bodies or intentional exceptions can ignore a specific stable ID.
+        if (first.ignoredIdentifiers.has(second.element.identifier) || second.ignoredIdentifiers.has(first.element.identifier)) {
+            // An intentional exclusion does not trigger contact events either.
+            return false;
+        }
+        // Kinematic/immovable pairs still report contact even when neither yields to impulses.
+        return true;
+    }
+
+    /** Build unique nearby pairs in deterministic identifier order for one solver pass. */
+    candidatePairs() {
+        // Pair keys are JSON arrays, so IDs containing punctuation cannot collide.
+        const pairs = new Map();
+        // “of” visits moving-body values only, never the full static body list.
+        for (const body of this.movingBodies.values()) {
+            // Query stable geometry using only this body's current ground bounds.
+            const neighbors = this.scene.staticBodies.query(body.element.bounds, this.staticQueryOutput);
+            // Append nearby moving bodies from their independent index.
+            this.scene.movingBodies.query(body.element.bounds, this.movingQueryOutput);
+            // “of” visits nearby body values; avoid a huge spread argument list in dense scenes.
+            for (const movingCandidate of this.movingQueryOutput) {
+                // Append one candidate without risking the JavaScript function-argument limit.
+                neighbors.push(movingCandidate);
+            }
+            // “of” supplies candidate body references and ends after both query outputs.
+            for (const other of neighbors) {
+                // Remove self-pairs and intentionally excluded contacts before narrow tests.
+                if (!this.eligible(body, other)) {
+                    // Continue with the next nearby body.
+                    continue;
+                }
+                // Stable lexical identifier order makes contact processing independent of cells.
+                const first = body.element.identifier < other.element.identifier ? body : other;
+                // The remaining participant becomes the second body.
+                const second = first === body ? other : body;
+                // The same pair encountered from another body/cell overwrites rather than duplicates.
+                pairs.set(JSON.stringify([first.element.identifier, second.element.identifier]), { first, second });
+            }
+        }
+        // Sort the canonical pair keys so movement between cells cannot change solver order.
+        return Array.from(pairs.entries()).sort(PhysicsSystem.comparePairs);
+    }
+
+    /** Sort canonical pair-key entries deterministically without locale-dependent collation. */
+    static comparePairs(first, second) {
+        // Earlier string keys are processed first.
+        if (first[0] < second[0]) {
+            // Preserve a stable ordering independent of spatial-cell traversal.
+            return -1;
+        }
+        // Later keys follow earlier keys.
+        if (first[0] > second[0]) {
+            // Reverse the comparator result for this ordering.
+            return 1;
+        }
+        // A duplicate key represents the same pair.
+        return 0;
+    }
+
+    /** Apply a minimum translation and linear/friction impulses to one ordinary solid pair. */
+    resolve(first, second, contact) {
+        // Sensors inform gameplay/tools but never physically push either body.
+        if (first.sensor || second.sensor) {
+            // Detection has already been recorded by the caller.
+            return;
+        }
+        // Sum inverse masses to distribute separation and impulse consistently.
+        const inverseMassSum = first.inverseMass + second.inverseMass;
+        // An eligible sensorless pair should have movable mass, but guard against public edits.
+        if (inverseMassSum === 0) {
+            // Two immovable bodies cannot be separated by this linear solver.
+            return;
+        }
+        // Divide penetration according to how readily each body yields.
+        const correction = contact.penetration / inverseMassSum;
+        // Move the first body away from the second along the negative contact normal.
+        this.translate(first, -contact.normalX * correction * first.inverseMass, -contact.normalY * correction * first.inverseMass, -contact.normalZ * correction * first.inverseMass);
+        // Move the second body along the positive normal, respecting its inverse mass.
+        this.translate(second, contact.normalX * correction * second.inverseMass, contact.normalY * correction * second.inverseMass, contact.normalZ * correction * second.inverseMass);
+        // Compute relative velocity along the separating normal.
+        const closingSpeed = (second.velocityX - first.velocityX) * contact.normalX + (second.velocityY - first.velocityY) * contact.normalY + (second.velocityZ - first.velocityZ) * contact.normalZ;
+        // Bodies already moving apart need positional correction but no bounce impulse.
+        if (closingSpeed >= 0) {
+            // Avoid adding energy to an already separating pair.
+            return;
+        }
+        // Use the less-bouncy material so an elastic object does not make every wall elastic.
+        const restitution = Math.min(first.restitution, second.restitution);
+        // Convert closing speed to the impulse needed to separate these masses.
+        const impulse = -(1 + restitution) * closingSpeed / inverseMassSum;
+        // Apply the normal impulse to both participants.
+        this.applyImpulse(first, second, contact.normalX * impulse, contact.normalY * impulse, contact.normalZ * impulse);
+        // Recompute relative velocity after the normal response.
+        const relativeX = second.velocityX - first.velocityX;
+        // Read the updated ground-depth relative velocity.
+        const relativeY = second.velocityY - first.velocityY;
+        // Read the updated vertical relative velocity.
+        const relativeZ = second.velocityZ - first.velocityZ;
+        // Project the new relative velocity onto the contact normal.
+        const normalSpeed = relativeX * contact.normalX + relativeY * contact.normalY + relativeZ * contact.normalZ;
+        // Remove the normal component to obtain sliding motion across the contact.
+        const tangentX = relativeX - normalSpeed * contact.normalX;
+        // Find the corresponding ground-depth sliding component.
+        const tangentY = relativeY - normalSpeed * contact.normalY;
+        // Find vertical sliding for contacts against upright walls.
+        const tangentZ = relativeZ - normalSpeed * contact.normalZ;
+        // Normalize sliding only when there is meaningful tangent velocity.
+        const tangentSpeed = Math.hypot(tangentX, tangentY, tangentZ);
+        // Zero sliding needs no friction impulse.
+        if (tangentSpeed > 1e-10) {
+            // Geometric mean combines material friction symmetrically.
+            const frictionLimit = impulse * Math.sqrt(first.friction * second.friction);
+            // Do not reverse sliding; clamp friction to the amount needed to stop it.
+            const frictionImpulse = Math.min(tangentSpeed / inverseMassSum, frictionLimit);
+            // Apply an impulse opposing the relative tangent motion.
+            this.applyImpulse(first, second, -tangentX / tangentSpeed * frictionImpulse, -tangentY / tangentSpeed * frictionImpulse, -tangentZ / tangentSpeed * frictionImpulse);
+        }
+    }
+
+    /** Move a body by world deltas through its notifying shared transform. */
+    translate(body, deltaX, deltaY, deltaZ) {
+        // Avoid needless index updates for immovable participants or zero corrections.
+        if (deltaX === 0 && deltaY === 0 && deltaZ === 0) {
+            // Its position and memberships are already correct.
+            return;
+        }
+        // Use the shared element transform as the single source of physical/visual position.
+        const transform = body.element.transform;
+        // One atomic change refreshes collision and projected visual bounds automatically.
+        transform.setPosition(transform.positionX + deltaX, transform.positionY + deltaY, transform.positionZ + deltaZ);
+    }
+
+    /** Apply equal/opposite linear impulses, scaled by each participant's inverse mass. */
+    applyImpulse(first, second, impulseX, impulseY, impulseZ) {
+        // The first body receives the opposite X impulse.
+        first.velocityX -= impulseX * first.inverseMass;
+        // Apply the corresponding first-body Y response.
+        first.velocityY -= impulseY * first.inverseMass;
+        // Apply the corresponding first-body Z response.
+        first.velocityZ -= impulseZ * first.inverseMass;
+        // The second body receives the positive X impulse.
+        second.velocityX += impulseX * second.inverseMass;
+        // Apply the corresponding second-body Y response.
+        second.velocityY += impulseY * second.inverseMass;
+        // Apply the corresponding second-body Z response.
+        second.velocityZ += impulseZ * second.inverseMass;
+    }
+
+    /** Advance one fixed step with bounded adaptive substeps, then publish contact lifecycle. */
+    update(stepSeconds) {
+        // Validate time before any velocities or coordinates change.
+        if (!Number.isFinite(stepSeconds) || stepSeconds <= 0) {
+            // Reject invalid caller timing rather than permit a reversed simulation.
+            throw new RangeError('Physics step duration must be finite and positive.');
+        }
+        // Start a new set of fixed-step measurements.
+        this.statistics = { candidatePairs: 0, narrowChecks: 0, resolvedContacts: 0, substeps: 1 };
+        // Estimate travel relative to body size to prevent jumping over thin obstacles.
+        let requiredSubsteps = 1;
+        // “of” visits moving bodies only; static-scene population does not increase this scan.
+        for (const body of this.movingBodies.values()) {
+            // Public velocity assignments are checked before any body is moved.
+            body.validateVelocity();
+            // Read the physical shape's smallest dimension.
+            const geometry = body.element.geometry;
+            // Circle diameter or box minimum extent supplies the lateral travel scale.
+            const minimumWidth = geometry.shape === 'circle' ? geometry.radius * 2 : Math.min(geometry.width, geometry.depth);
+            // Height matters too, so a fast falling body cannot skip a thin support slab.
+            const minimumExtent = Math.min(minimumWidth, geometry.height);
+            // Include acceleration over the full step in the conservative travel estimate.
+            const maximumSpeed = Math.hypot(body.velocityX, body.velocityY, body.velocityZ) + Math.abs(this.basement.configuration.gravityZ * body.gravityScale) * stepSeconds;
+            // Limit each body's travel to less than half its smallest extent per substep.
+            requiredSubsteps = Math.max(requiredSubsteps, Math.ceil(maximumSpeed * stepSeconds / (minimumExtent * 0.4)));
+        }
+        // Reject unbounded work instead of silently capping and allowing extreme tunneling.
+        if (requiredSubsteps > this.basement.configuration.maximumPhysicsSubsteps) {
+            // Callers must reduce extreme speeds/step size or deliberately raise the budget.
+            throw new RangeError(`Physics needs ${requiredSubsteps} substeps, exceeding the configured safety budget.`);
+        }
+        // Publish the chosen safety subdivision count.
+        this.statistics.substeps = requiredSubsteps;
+        // Divide this fixed step into equal smaller durations.
+        const substepSeconds = stepSeconds / requiredSubsteps;
+        // Collect contacts across subdivisions so a fast impact still generates an event.
+        const currentContacts = new Map();
+        // Count from zero to requiredSubsteps-1, increasing by one after each complete substep.
+        for (let substepIndex = 0; substepIndex < requiredSubsteps; substepIndex += 1) {
+            // Visit each moving body once to integrate velocity and position.
+            for (const body of this.movingBodies.values()) {
+                // Gravity affects dynamic mass, while kinematic motion remains caller-controlled.
+                if (body.motion === 'dynamic') {
+                    // Integrate upward-positive Z velocity using configured downward gravity.
+                    body.velocityZ += this.basement.configuration.gravityZ * body.gravityScale * substepSeconds;
+                }
+                // Movement updates all spatial/visual membership through the same transform.
+                this.translate(body, body.velocityX * substepSeconds, body.velocityY * substepSeconds, body.velocityZ * substepSeconds);
+            }
+            // Repeat the shared solver a fixed number of times for stacks and multi-body contacts.
+            // Start at zero, stop before solverIterations, and increase by one per pass.
+            for (let iteration = 0; iteration < this.basement.configuration.solverIterations; iteration += 1) {
+                // Re-query after corrections so newly adjacent bodies can join the next pass.
+                const candidates = this.candidatePairs();
+                // Count actual spatially discovered candidate pairs for diagnostics.
+                this.statistics.candidatePairs += candidates.length;
+                // “of” retrieves [canonical key, pair] entries; destructuring names both values.
+                for (const [pairIdentifier, pair] of candidates) {
+                    // A contact callback from a previous step may have removed a retained object.
+                    if (!this.bodies.has(pair.first.element.identifier) || !this.bodies.has(pair.second.element.identifier)) {
+                        // Do not resolve against unregistered objects.
+                        continue;
+                    }
+                    // Record one actual geometry test rather than the total registry population.
+                    this.statistics.narrowChecks += 1;
+                    // Shape geometry, not gameplay class, determines the contact algorithm.
+                    const contact = ContactGeometry.intersect(pair.first, pair.second);
+                    // Separated footprints or height intervals need no physical response.
+                    if (!contact) {
+                        // Continue to the next nearby pair.
+                        continue;
+                    }
+                    // Retain the participants and measured normal for contact notifications.
+                    currentContacts.set(pairIdentifier, { first: pair.first, second: pair.second, contact });
+                    // Resolve every ordinary solid pair through the same mass-based response.
+                    this.resolve(pair.first, pair.second, contact);
+                    // Count actual contacts encountered, including sensors.
+                    this.statistics.resolvedContacts += 1;
+                }
+            }
+        }
+        // Snapshot events before notifying code that could modify the scene or subscriptions.
+        const events = [];
+        // “of” visits each contacted pair value once for this complete fixed step.
+        for (const [identifier, collision] of currentContacts) {
+            // Distinguish a first encounter from one also observed during the previous step.
+            events.push({ type: this.previousContacts.has(identifier) ? 'stay' : 'begin', ...collision });
+        }
+        // Visit prior pairs to discover contacts absent from this fixed step.
+        for (const [identifier, collision] of this.previousContacts) {
+            // A removed/separated pair produces one end event.
+            if (!currentContacts.has(identifier)) {
+                // Preserve the last measured contact for subscribers that need it.
+                events.push({ type: 'end', ...collision });
+            }
+        }
+        // Install the new reference before callbacks can initiate scene changes.
+        this.previousContacts = currentContacts;
+        // “of” reads event values in deterministic pair order and stops after all events.
+        for (const event of events) {
+            // Snapshot callbacks so subscription changes take effect on subsequent delivery.
+            for (const listener of Array.from(this.listeners)) {
+                // Notify game/tools without making physical resolution depend on their identity.
+                listener(event);
+            }
+        }
+    }
+
+    /** Release every body/contact/listener reference during Directory destruction. */
+    dispose() {
+        // Forget all registered bodies.
+        this.bodies.clear();
+        // Forget moving integration entries separately.
+        this.movingBodies.clear();
+        // Release contact-history references to removed scene elements.
+        this.previousContacts.clear();
+        // Release external callback references.
+        this.listeners.clear();
+        // Reusable scratch arrays must not retain neighbors after scene destruction.
+        this.staticQueryOutput.length = 0;
+        // Release moving-query body references separately.
+        this.movingQueryOutput.length = 0;
+    }
+}
+
+</script>
+<script data-source="engine/scene.js">
+/**
+ * DIRECTORY SCENE SYSTEM — own declared world elements, shared geometry, and indexes.
+ * Adding an ordinary element automatically registers its body and visible geometry.
+ * No character/vehicle/building identity is inspected. Materials and collision
+ * exceptions describe an element; they do not install pair-specific handlers.
+ */
+class SceneSystem {
+    /** Store services during connect(); construction does not create browser resources. */
+    constructor(basement) {
+        // Shared projection settings belong to the foundational coordinate contract.
+        this.basement = basement;
+        // Keep only world elements here; Directory.elements can also contain other values.
+        this.worldElements = new Map();
+        // Lights are scene declarations, separate from luminous surface materials.
+        this.lights = new NamedLibrary('scene lights');
+        // Parent element IDs map to light IDs for automatic transform updates and cleanup.
+        this.attachedLights = new Map();
+        // Increment when visual content changes so the renderer can reuse static buffers.
+        this.revision = 0;
+    }
+
+    /** Connect indexes after Directory construction; no element may be created before this. */
+    connect(directory) {
+        // Retain the actual Directory for element registration and physics service lookup.
+        this.directory = directory;
+        // Find the spatial service through its declared Directory address.
+        const spatial = directory.systems.get('spatial');
+        // Static collision geometry stays indexed until its transform/shape changes.
+        this.staticBodies = spatial.createIndex('physics.static');
+        // Moving bodies maintain a separate index so static geometry is never rebuilt per tick.
+        this.movingBodies = spatial.createIndex('physics.moving');
+        // Visual bounds use projected-world coordinates, including Z/height.
+        this.visibleGeometry = spatial.createIndex('render.geometry');
+        // Shadow rays use actual world-ground geometry, not camera-projected bounds.
+        this.shadowGeometry = spatial.createIndex('render.shadows');
+        // Light reach is indexed separately from geometry footprints.
+        this.lightReach = spatial.createIndex('render.lights');
+    }
+
+    /** Create a declarative element; shared position/shape drive both its body and visuals. */
+    createElement(identifier, definition = {}) {
+        // Duplicate protection is checked before constructing connected resources.
+        if (this.directory.elements.entries.has(identifier)) {
+            // Prevent collisions with either world or non-world element IDs.
+            throw new Error(`elements already contains ${identifier}.`);
+        }
+        // Validate geometry before any registry receives the element.
+        const geometry = WorldGeometry.create(definition);
+        // Capture the scene in a descriptive reference for the transform callback.
+        const scene = this;
+        // Construct the shared element record with explicit ownership.
+        const element = {
+            // Stable scene/Directory address; physical pairing uses this same identifier.
+            identifier,
+            // Shared immutable footprint and height descriptor.
+            geometry,
+            // Null until the notifying transform is installed below.
+            transform: null,
+            // Null means this element deliberately has no physical body.
+            body: null,
+            // Visible geometry can be disabled independently from physical solidity.
+            visible: definition.visible !== false,
+            // Opaque geometry blocks light unless explicitly declared otherwise.
+            castsShadow: definition.castsShadow !== false,
+            // Default surface appearance; no role-specific rendering rules are present.
+            material: WorldGeometry.material(definition.material),
+            // A top may have a distinct material, but uses the same physical top elevation.
+            topMaterial: WorldGeometry.material(definition.topMaterial ?? definition.material),
+            // Previous coordinates support interpolation without changing actual world state.
+            previousPosition: [definition.positionX ?? 0, definition.positionY ?? 0, definition.positionZ ?? 0],
+            /** Replace dimensions through the tracked path so all affected indexes refresh. */
+            setGeometry(nextDefinition) {
+                // The geometry property setter validates and synchronizes this replacement.
+                this.geometry = nextDefinition;
+            }
+        };
+        // Keep the current immutable geometry behind a tracked public property.
+        let currentGeometry = geometry;
+        // Accessors allow ordinary property assignment without bypassing automatic index updates.
+        Object.defineProperty(element, 'geometry', {
+            // Keep the public descriptor visible during ordinary inspection.
+            enumerable: true,
+            /** Read the geometry currently shared by physics, visibility, and shadows. */
+            get() {
+                // Return the actual frozen descriptor, not a stale copy.
+                return currentGeometry;
+            },
+            /** Validate a replacement descriptor and notify every dependent scene index. */
+            set(nextDefinition) {
+                // Build a complete immutable replacement before changing live state.
+                const replacement = WorldGeometry.create(nextDefinition);
+                // A collision body cannot silently become a zero-thickness visual plane.
+                if (element.body && replacement.shape === 'plane') {
+                    // Require explicit element recreation without a body for this transition.
+                    throw new Error('Recreate the element without a body before changing it into a plane.');
+                }
+                // Replace the single descriptor used by all geometry consumers.
+                currentGeometry = replacement;
+                // Update only this object's physical and projected memberships.
+                scene.synchronize(element);
+            }
+        });
+        // Visit appearance flag names by value; each accessor captures its own const name.
+        // “of” is used instead of property-key enumeration over the array.
+        for (const propertyName of ['visible', 'castsShadow']) {
+            // Capture this flag's initial declaration inside its accessor closure.
+            let currentValue = element[propertyName];
+            // Turn direct flag assignments into tracked scene revisions.
+            Object.defineProperty(element, propertyName, {
+                // Preserve a readable public property during inspection.
+                enumerable: true,
+                /** Read this element's current appearance flag. */
+                get() {
+                    // The closure holds the live value for this property only.
+                    return currentValue;
+                },
+                /** Assign the flag and invalidate cached GPU geometry/lighting. */
+                set(value) {
+                    // Explicit false disables the flag; other values enable it.
+                    currentValue = value !== false;
+                    // A visibility change must take effect without moving the object.
+                    scene.revision += 1;
+                }
+            });
+        }
+        // Visit material property names so direct material replacement remains tracked too.
+        for (const propertyName of ['material', 'topMaterial']) {
+            // Retain this property's already-validated normalized material.
+            let currentMaterial = element[propertyName];
+            // Expose a setter that accepts the same readable #rrggbb declarations as creation.
+            Object.defineProperty(element, propertyName, {
+                // Keep materials visible through ordinary property inspection.
+                enumerable: true,
+                /** Read the current frozen normalized material used by surface generation. */
+                get() {
+                    // Do not expose a separately copied color/emission state.
+                    return currentMaterial;
+                },
+                /** Validate new base/emission colors and invalidate cached vertex attributes. */
+                set(value) {
+                    // A failed parse leaves the previous material and revision untouched.
+                    currentMaterial = WorldGeometry.material(value);
+                    // Rebuild affected rendering buffers on the next normal frame.
+                    scene.revision += 1;
+                }
+            });
+        }
+        /** Synchronize this element whenever its shared coordinates change. */
+        const onTransformChange = () => scene.synchronize(element);
+        // Establish one notifying transform, not separate physics and render positions.
+        element.transform = new WorldTransform(definition, onTransformChange);
+        // Volumes are solid by default; planes are visible surfaces unless explicitly rejected below.
+        if (definition.body !== false && geometry.shape !== 'plane') {
+            // PhysicsBody validates mass, mode, filtering, and material response centrally.
+            element.body = new PhysicsBody(element, definition.body ?? {});
+        }
+        // A plane is not secretly a volume if a caller explicitly asks for a body.
+        if (geometry.shape === 'plane' && definition.body && definition.body !== false) {
+            // Ask callers to provide actual slab thickness for collision support.
+            throw new Error('Collision surfaces need a box thickness; a plane is visual-only.');
+        }
+        // Register the element under the standard Directory address.
+        this.directory.elements.register(identifier, element);
+        // Track world elements without mixing unrelated Directory values into geometry queries.
+        this.worldElements.set(identifier, element);
+        // Automatically establish physical and visual index membership.
+        this.synchronize(element);
+        // One engine-owned pass renders every declared surface, without per-feature draw order.
+        this.directory.systems.get('worldRenderer').activate();
+        // Give callers the same element instance used by every engine service.
+        return element;
+    }
+
+    /** Update this element's indexes after a tracked change; no full-scene rebuild occurs. */
+    synchronize(element) {
+        // Removed objects must not reinsert themselves through an old retained reference.
+        if (this.worldElements.get(element.identifier) !== element) {
+            // A stale reference is harmless to the currently loaded scene.
+            return;
+        }
+        // Compute physical ground bounds from the current shared geometry and transform.
+        element.bounds = WorldGeometry.bounds(element);
+        // Cache world footprint vertices for rendering until the next tracked change.
+        element.footprint = WorldGeometry.footprint(element);
+        // Mark this element's cached mesh dirty without invalidating every other static mesh.
+        element.geometryRevision = (element.geometryRevision ?? 0) + 1;
+        // Read the projection's world-unit vertical displacement scale.
+        const heightScale = this.basement.configuration.heightProjectionScale;
+        // Visual bounds include the highest corner's projection, not only the ground footprint.
+        element.projectedBounds = {
+            // This oblique projection preserves horizontal world positions.
+            minimumX: element.bounds.minimumX,
+            // Top elevation shifts the highest screen extent upward.
+            minimumY: element.bounds.minimumY - (element.transform.positionZ + element.geometry.height) * heightScale,
+            // The same footprint bounds the visual horizontal extent.
+            maximumX: element.bounds.maximumX,
+            // Bottom elevation determines the lowest projected screen extent.
+            maximumY: element.bounds.maximumY - element.transform.positionZ * heightScale
+        };
+        // Every element is indexed visually; visibility toggles are checked during rendering.
+        this.visibleGeometry.upsert(element.identifier, element, element.projectedBounds);
+        // Maintain potential opaque shadow geometry automatically alongside the same footprint.
+        this.shadowGeometry.upsert(element.identifier, element, element.bounds);
+        // Only elements with bodies participate in physical broad-phase indexes.
+        if (element.body) {
+            // Motion type determines which collection maintains this body's footprint.
+            const index = element.body.motion === 'static' ? this.staticBodies : this.movingBodies;
+            // Insert or update only this body, retaining all other static memberships.
+            index.upsert(element.identifier, element.body, element.bounds);
+            // Physics keeps a separate moving-body collection to avoid scanning every static body.
+            this.directory.systems.get('physics').register(element.body);
+        }
+        // Visit only this owner's attached source IDs; unrelated sources need no scan.
+        // “of” supplies each ID value and stops when this owner's Set is exhausted.
+        for (const lightIdentifier of this.attachedLights.get(element.identifier) ?? []) {
+            // Reindex current parent-relative source coordinates after the transform change.
+            this.indexLight(this.lights.get(lightIdentifier));
+        }
+        // Mark visual buffers dirty; a completely unchanged scene can reuse them.
+        this.revision += 1;
+    }
+
+    /** Add a point light; coordinates are world units, or local offsets when parent is supplied. */
+    createLight(identifier, definition) {
+        // An optional parent lets a source follow an element without manual position copying.
+        const parent = definition.parent ?? null;
+        // Only actual registered elements in this scene may own source attachments.
+        if (parent && this.worldElements.get(parent.identifier) !== parent) {
+            // Reject foreign or already removed owners before creating source membership.
+            throw new Error('A light parent must be an element registered in this scene.');
+        }
+        // Capture immutable local offsets or fixed world coordinates, depending on parent presence.
+        const position = [definition.positionX ?? 0, definition.positionY ?? 0, definition.positionZ ?? 0];
+        // Validate required light properties before registering anything.
+        if (![...position, definition.radius, definition.intensity ?? 1].every(Number.isFinite) || definition.radius <= 0 || (definition.intensity ?? 1) < 0) {
+            // Invalid light data must not reach GPU uniforms or spatial queries.
+            throw new RangeError('A point light needs finite coordinates, positive radius, and nonnegative intensity.');
+        }
+        // Freeze configuration so callers use replaceLight rather than staling light indexes.
+        const light = Object.freeze({
+            // Stable address for replacement, inspection, or removal.
+            identifier,
+            // Store ownership metadata for indexed cleanup, or null for an unattached source.
+            parentIdentifier: parent?.identifier ?? null,
+            /** Read world X from the live parent transform and the stored local offset. */
+            get positionX() {
+                // Without a parent, this coordinate was declared directly in world space.
+                if (!parent) {
+                    // Return the fixed source coordinate.
+                    return position[0];
+                }
+                // Rotate the local offset and add the parent's current horizontal position.
+                return parent.transform.positionX + position[0] * Math.cos(parent.transform.angle) - position[1] * Math.sin(parent.transform.angle);
+            },
+            /** Read world Y from the same live parent instead of an initialization-time copy. */
+            get positionY() {
+                // Unattached sources require no coordinate conversion.
+                if (!parent) {
+                    // Return the stored world ground-depth coordinate.
+                    return position[1];
+                }
+                // Rotate the local ground offset into the parent's current world frame.
+                return parent.transform.positionY + position[0] * Math.sin(parent.transform.angle) + position[1] * Math.cos(parent.transform.angle);
+            },
+            /** Read world Z using the same physical height convention as attached geometry. */
+            get positionZ() {
+                // An attached source adds its local elevation to its parent's current bottom Z.
+                return parent ? parent.transform.positionZ + position[2] : position[2];
+            },
+            // Maximum Euclidean distance reached by this light.
+            radius: definition.radius,
+            // Brightness multiplier before distance and surface-angle attenuation.
+            intensity: definition.intensity ?? 1,
+            // Shared normalized RGB representation.
+            color: Object.freeze(WorldGeometry.color(definition.color ?? '#ffeed8'))
+        });
+        // Preserve duplicate protection instead of silently leaving an old light registration.
+        this.lights.register(identifier, light);
+        // Track attached source IDs under their actual owner for incremental updates.
+        if (parent) {
+            // Create an attachment collection only for an owner that needs one.
+            if (!this.attachedLights.has(parent.identifier)) {
+                // Set membership prevents duplicate source ownership entries.
+                this.attachedLights.set(parent.identifier, new Set());
+            }
+            // Record this source as one of the parent's attachments.
+            this.attachedLights.get(parent.identifier).add(identifier);
+        }
+        // Establish the source's current projected influence automatically.
+        this.indexLight(light);
+        // Source changes invalidate lighting without requiring any object to move.
+        this.revision += 1;
+        // Return the immutable declaration with live computed world-coordinate getters.
+        return light;
+    }
+
+    /** Refresh one light's influence membership after creation or parent transform changes. */
+    indexLight(light) {
+        // Account for the projected vertical extent of the light's spherical reach.
+        const verticalRadius = light.radius * Math.hypot(1, this.basement.configuration.heightProjectionScale);
+        // Project the source center before building the screen-world query bounds.
+        const projectedY = light.positionY - light.positionZ * this.basement.configuration.heightProjectionScale;
+        // Index light influence, which can extend on screen even when its source is off screen.
+        this.lightReach.upsert(light.identifier, light, {
+            // Leftmost projected influence of the source sphere.
+            minimumX: light.positionX - light.radius,
+            // Uppermost projected influence including world height.
+            minimumY: projectedY - verticalRadius,
+            // Rightmost projected influence of the source sphere.
+            maximumX: light.positionX + light.radius,
+            // Lowermost projected influence including world height.
+            maximumY: projectedY + verticalRadius
+        });
+    }
+
+    /** Remove a light and its influence bounds, tolerating an already absent name. */
+    removeLight(identifier) {
+        // Read ownership before forgetting the registered source.
+        const light = this.lights.get(identifier);
+        // Attached sources must also release their parent ownership link.
+        if (light?.parentIdentifier) {
+            // Obtain the actual Set maintained for this source's parent.
+            const attachments = this.attachedLights.get(light.parentIdentifier);
+            // Remove only this source's link.
+            attachments.delete(identifier);
+            // Empty attachment collections should not accumulate after scene changes.
+            if (attachments.size === 0) {
+                // Release the now-unused parent entry.
+                this.attachedLights.delete(light.parentIdentifier);
+            }
+        }
+        // Release influence membership before forgetting its declaration.
+        this.lightReach.remove(identifier);
+        // Remove the actual source from the scene library.
+        this.lights.remove(identifier);
+        // Ensure cached lighting is not reused after removal.
+        this.revision += 1;
+    }
+
+    /** Capture current moving positions before controls/physics update this fixed step. */
+    beginStep() {
+        // “of” visits moving body values only; a massive static registry is not scanned.
+        for (const body of this.directory.systems.get('physics').movingBodies.values()) {
+            // Store this step's starting position for future visual interpolation.
+            body.element.previousPosition = [body.element.transform.positionX, body.element.transform.positionY, body.element.transform.positionZ];
+        }
+    }
+
+    /** Remove an element's body, visual membership, and Directory registration together. */
+    removeElement(identifier) {
+        // Find the world element owned by this particular scene.
+        const element = this.worldElements.get(identifier);
+        // Repeated removal must not affect an unrelated Directory entry.
+        if (!element) {
+            // Nothing remains to clean up for this identifier.
+            return;
+        }
+        // Snapshot owner-linked IDs because removeLight changes the same Set.
+        for (const lightIdentifier of Array.from(this.attachedLights.get(identifier) ?? [])) {
+            // Removing a parent automatically removes its attached sources and influence bounds.
+            this.removeLight(lightIdentifier);
+        }
+        // Remove ownership before any contact-end observer can mutate a retained transform.
+        this.worldElements.delete(identifier);
+        // Clear static membership whether or not this was a static body.
+        this.staticBodies.remove(identifier);
+        // Clear moving membership whether or not this was moving.
+        this.movingBodies.remove(identifier);
+        // Release the projected visible extent.
+        this.visibleGeometry.remove(identifier);
+        // Remove physical shadow obstruction independently of whether this element had a body.
+        this.shadowGeometry.remove(identifier);
+        // Remove the shared public Directory registration.
+        this.directory.elements.remove(identifier);
+        // Invalidate GPU content before observers can request a render during removal.
+        this.revision += 1;
+        // Release physical tracking last; end-contact observers now see consistent removed state.
+        this.directory.systems.get('physics').remove(identifier);
+        // Empty scenes should release their compositor callback, not draw an obsolete image.
+        if (this.worldElements.size === 0) {
+            // GPU resources can remain reusable, but no world pass should remain registered.
+            this.directory.systems.get('worldRenderer').deactivate();
+        }
+    }
+
+    /** Empty the scene without destroying reusable spatial/physics/rendering services. */
+    clear() {
+        // Snapshot IDs because removeElement changes the underlying world Map.
+        // “of” reads every ID value and finishes when the snapshot is exhausted.
+        for (const identifier of Array.from(this.worldElements.keys())) {
+            // Use the same complete cleanup path as individual removal.
+            this.removeElement(identifier);
+        }
+        // Snapshot light names because removeLight changes the source library.
+        for (const identifier of Array.from(this.lights.entries.keys())) {
+            // Remove both declarations and influence bounds.
+            this.removeLight(identifier);
+        }
+    }
+
+    /** Release world declarations during Directory teardown while services are still addressable. */
+    dispose() {
+        // Reuse complete element/light cleanup instead of leaving index references alive.
+        this.clear();
+    }
+}
+
+</script>
+<script data-source="engine/world-shaders.js">
+/**
+ * RENDER BACKEND LIBRARY — readable GPU programs and point-light view bases.
+ * This module only declares source text and shared directions. It creates no GPU
+ * context, schedules no work, and contains no game content or object-type exceptions.
+ */
+// Keep shader definitions under one descriptive library address.
+const WorldShaders = {};
+
+/**
+ * GLSL is the browser GPU's shader language, not another JavaScript framework.
+ * A vertex shader runs per submitted corner; a fragment shader computes a candidate pixel.
+ * vec2/vec3/vec4 contain two/three/four numbers. “in” receives data, “out” supplies results,
+ * and “uniform” is a shared setting supplied by JavaScript. “discard” rejects a pixel.
+ * Depth testing determines which candidate surface actually appears in the image.
+ */
+WorldShaders.vertexSource = `#version 300 es
+// Vertex calculations use high precision for world coordinates and depth agreement.
+precision highp float;
+// Actual world X, Y, Z, shared with physical element geometry.
+in vec3 aPosition;
+// Actual surface normal, used for illumination rather than visual layer guessing.
+in vec3 aNormal;
+// Reflective surface RGB in normalized channels.
+in vec3 aColor;
+// Luminous surface RGB, attached to this surface's geometry.
+in vec3 aEmission;
+// CSS-pixel dimensions of the final view.
+uniform vec2 uViewport;
+// Projected-world view center, matching the Canvas renderer's camera.
+uniform vec2 uCamera;
+// CSS pixels per world unit.
+uniform float uZoom;
+// Upward screen displacement per unit of physical Z.
+uniform float uHeightScale;
+// Fits physical camera depth into the GPU clipping interval.
+uniform float uDepthRange;
+// World coordinates interpolated across the visible triangle for lighting.
+out vec3 vPosition;
+// Surface normal interpolated across the same triangle.
+out vec3 vNormal;
+// Reflective color delivered to fragment shading.
+out vec3 vColor;
+// Emission delivered through the same depth-tested fragment path.
+out vec3 vEmission;
+// Project a world vertex while preserving a separate perpendicular camera depth.
+void main() {
+    // Height moves a visible point upward without changing its physical Y coordinate.
+    vec2 projected = vec2(aPosition.x, aPosition.y - aPosition.z * uHeightScale);
+    // Convert projected world coordinates to centered normalized device coordinates.
+    vec2 screen = (projected - uCamera) * uZoom * 2.0 / uViewport;
+    // Greater camera-facing depth should produce a smaller GPU depth value.
+    float depth = -((aPosition.y - uCamera.y) * uHeightScale + aPosition.z) / uDepthRange;
+    // Canvas Y points down, while normalized device Y points up.
+    gl_Position = vec4(screen.x, -screen.y, depth, 1.0);
+    // Preserve actual physical coordinates for point-light distance and obstruction tests.
+    vPosition = aPosition;
+    // Forward the physical normal unchanged.
+    vNormal = aNormal;
+    // Forward reflective color unchanged.
+    vColor = aColor;
+    // Forward surface emission unchanged.
+    vEmission = aEmission;
+}`;
+
+// Base color and emission are one opaque fragment, so roofs automatically hide both.
+WorldShaders.baseFragmentSource = `#version 300 es
+// High precision keeps the fragment interface consistent with the common vertex shader.
+precision highp float;
+// Interpolated world surface normal.
+in vec3 vNormal;
+// Reflective surface color.
+in vec3 vColor;
+// Self-emitted color; it does not illuminate unrelated geometry by itself.
+in vec3 vEmission;
+// Global ambient illumination level.
+uniform float uAmbient;
+// Output for the currently visible opaque fragment.
+out vec4 outputColor;
+// Shade only a fragment that passed the central depth buffer.
+void main() {
+    // A modest fixed directional term makes otherwise unlit surface orientation readable.
+    float facing = max(0.0, dot(normalize(vNormal), normalize(vec3(-0.4, -0.4, 1.0))));
+    // Add emission to this surface, not to arbitrary pixels in a later global overlay.
+    outputColor = vec4(vColor * (uAmbient + 0.18 * facing) + vEmission, 1.0);
+}`;
+
+// Cubemap directions follow OpenGL's +X, -X, +Y, -Y, +Z, -Z face convention.
+WorldShaders.cubeFaces = [
+    // Positive X looks right in world space; its image-right axis points toward negative Z.
+    { forward: [1, 0, 0], right: [0, 0, -1], up: [0, -1, 0] },
+    // Negative X reverses the forward and horizontal axes consistently.
+    { forward: [-1, 0, 0], right: [0, 0, 1], up: [0, -1, 0] },
+    // Positive Y uses world Z as this face's upward image direction.
+    { forward: [0, 1, 0], right: [1, 0, 0], up: [0, 0, 1] },
+    // Negative Y reverses that vertical image direction.
+    { forward: [0, -1, 0], right: [1, 0, 0], up: [0, 0, -1] },
+    // Positive Z looks upward from the source.
+    { forward: [0, 0, 1], right: [1, 0, 0], up: [0, -1, 0] },
+    // Negative Z looks downward toward ground surfaces.
+    { forward: [0, 0, -1], right: [-1, 0, 0], up: [0, -1, 0] }
+];
+
+// Light-view projection is separate from the camera projection but uses identical world vertices.
+WorldShaders.shadowVertexSource = `#version 300 es
+// Preserve enough precision for world coordinates and radial depth.
+precision highp float;
+// Read actual surface XYZ from the same scene mesh used by the camera.
+in vec3 aPosition;
+// Point source XYZ and maximum physical reach.
+uniform vec4 uShadowLight;
+// Current cubemap face's viewing direction.
+uniform vec3 uForward;
+// Current cubemap face's image-right direction.
+uniform vec3 uRight;
+// Current cubemap face's image-up direction.
+uniform vec3 uUp;
+// Pass actual world position to radial-distance storage.
+out vec3 vPosition;
+// Project each corner into a ninety-degree point-light view.
+void main() {
+    // Express this world corner relative to the source.
+    vec3 local = aPosition - uShadowLight.xyz;
+    // Perspective W is distance along the face's viewing axis.
+    float forward = dot(local, uForward);
+    // A small near plane avoids division at the source itself.
+    float nearPlane = min(0.1, uShadowLight.w * 0.01);
+    // The light's physical radius supplies its far clipping plane.
+    float farPlane = uShadowLight.w;
+    // Map the near/far face distances into the standard perspective clip interval.
+    float clipDepth = forward * (farPlane + nearPlane) / (farPlane - nearPlane) - 2.0 * farPlane * nearPlane / (farPlane - nearPlane);
+    // A ninety-degree field of view needs no extra horizontal/vertical focal scale.
+    gl_Position = vec4(dot(local, uRight), dot(local, uUp), clipDepth, forward);
+    // Preserve world coordinates for radial rather than face-axis depth storage.
+    vPosition = aPosition;
+}`;
+
+// One radial depth value gives a shared obstruction distance in every source direction.
+WorldShaders.shadowFragmentSource = `#version 300 es
+// Radial distance must match the receiving-surface comparison precision.
+precision highp float;
+// Interpolated actual surface position.
+in vec3 vPosition;
+// Point source XYZ and its radius.
+uniform vec4 uShadowLight;
+// Store nearest radial geometry depth without any color output.
+void main() {
+    // Normalize physical source-to-surface distance into the depth texture's zero-to-one range.
+    gl_FragDepth = length(vPosition - uShadowLight.xyz) / uShadowLight.w;
+}`;
+
+// Direct illumination samples the central source-visibility map instead of looping over blockers per pixel.
+WorldShaders.lightFragmentSource = `#version 300 es
+// Keep geometric distance, normals, and depth comparisons in high precision.
+precision highp float;
+// Actual receiving-surface world position.
+in vec3 vPosition;
+// Physical receiving-surface normal.
+in vec3 vNormal;
+// Reflective material RGB, independent of self-emission.
+in vec3 vColor;
+// Point source XYZ and physical radius.
+uniform vec4 uLight;
+// Normalized source RGB and brightness multiplier.
+uniform vec4 uLightColor;
+// Six nearest-geometry depth images centered at the source.
+uniform highp samplerCube uShadowMap;
+// Face resolution determines angular sampling precision, not object-specific lighting rules.
+uniform float uShadowMapSize;
+// Additive RGB result for a fragment that already passed camera-depth equality.
+out vec4 outputColor;
+// Evaluate this source on the same visible physical surface as the base pass.
+void main() {
+    // Include physical height when measuring source distance and orientation.
+    vec3 toLight = uLight.xyz - vPosition;
+    // Euclidean distance bounds the declared source influence.
+    float distanceToLight = length(toLight);
+    // No illumination exists beyond the source radius or at a degenerate zero-length direction.
+    if (distanceToLight >= uLight.w || distanceToLight < 0.0001) discard;
+    // Surface orientation prevents a source below a roof from lighting its upward face.
+    float facing = max(0.0, dot(normalize(vNormal), toLight / distanceToLight));
+    // Back-facing surfaces receive no direct contribution from this source.
+    if (facing <= 0.0) discard;
+    // Cubemap direction points outward from the source toward this receiving point.
+    float closestDistance = texture(uShadowMap, -toLight).r * uLight.w;
+    // Convert two angular texels and receiving-plane slope into a world-distance tolerance.
+    float depthBias = max(0.05, distanceToLight * 2.0 / uShadowMapSize * sqrt(max(0.0, 1.0 - facing * facing)) / max(facing, 0.1));
+    // Nearer opaque geometry blocks the source regardless of gameplay identity.
+    if (distanceToLight - depthBias > closestDistance) discard;
+    // Smoothly attenuate the source to zero at its physical radius.
+    float attenuation = pow(1.0 - distanceToLight / uLight.w, 2.0);
+    // Illuminate this surface's reflective color while preserving its base alpha during blending.
+    outputColor = vec4(vColor * uLightColor.rgb * uLightColor.a * attenuation * facing, 0.0);
+}`;
+
+</script>
+<script data-source="engine/world-mesh.js">
+/**
+ * RENDER GEOMETRY LIBRARY — convert shared element footprints/heights into triangles.
+ * This helper owns reusable mesh data only. GPU context, visibility, lighting, and
+ * scene registration remain in their respective systems. Weak keys permit unloading.
+ */
+class WorldSurfaceMesh {
+    /** Create a cache that does not keep removed scene elements alive. */
+    constructor() {
+        // Cache entries use tracked geometry revisions and immutable material references.
+        this.meshCache = new WeakMap();
+    }
+
+    /** Add one triangle's attributes to a flat GPU buffer, using an actual world-space normal. */
+    appendTriangle(output, first, second, third, normal, material) {
+        // “of” visits the three vertex coordinate arrays in triangle order, then stops.
+        for (const point of [first, second, third]) {
+            // Store twelve float attributes in the shader's explicitly documented layout.
+            output.push(...point, ...normal, ...material.color, ...material.emission);
+        }
+    }
+
+    /** Generate reusable world triangles for one extruded footprint or plane; no role branches. */
+    build(element) {
+        // Retrieve only this element's previously generated world triangles.
+        const cached = this.meshCache.get(element);
+        // Position/shape changes or either material replacement require regeneration.
+        if (cached && cached.revision === element.geometryRevision && cached.material === element.material && cached.topMaterial === element.topMaterial) {
+            // Reuse unchanged static geometry for camera and light views alike.
+            return cached.vertices;
+        }
+        // Shared transforms define the lower elevation for every side face.
+        const bottom = element.transform.positionZ;
+        // Geometry height defines the upper surface used by both rendering and collision.
+        const top = bottom + element.geometry.height;
+        // Start the interleaved vertex list for this element.
+        const output = [];
+        // Cache footprint corners in their already computed world order.
+        const footprint = element.footprint;
+        // Triangulate a convex top as a fan: vertex zero, current corner, next corner.
+        // Begin at corner one, stop before the final corner, and advance one corner each time.
+        for (let cornerIndex = 1; cornerIndex < footprint.length - 1; cornerIndex += 1) {
+            // Every top vertex lies at the same actual world Z elevation.
+            this.appendTriangle(output, [...footprint[0], top], [...footprint[cornerIndex], top], [...footprint[cornerIndex + 1], top], [0, 0, 1], element.topMaterial);
+        }
+        // A plane intentionally has no side walls or hidden thickness.
+        if (element.geometry.shape === 'plane') {
+            // Keep the same plane triangles available to both world and shadow submission.
+            this.meshCache.set(element, { revision: element.geometryRevision, material: element.material, topMaterial: element.topMaterial, vertices: output });
+            // Return only its top-surface triangles.
+            return output;
+        }
+        // Visit every footprint edge, increasing the index once per side face.
+        // Modulo below wraps the final edge back to corner zero.
+        for (let edgeIndex = 0; edgeIndex < footprint.length; edgeIndex += 1) {
+            // Obtain this edge's first world-space corner.
+            const first = footprint[edgeIndex];
+            // Obtain the next corner, wrapping at the end of the polygon.
+            const second = footprint[(edgeIndex + 1) % footprint.length];
+            // Edge length normalizes the outward face direction.
+            const length = Math.hypot(second[0] - first[0], second[1] - first[1]);
+            // Counterclockwise footprints have outward normals on each edge's right side.
+            const normal = [(second[1] - first[1]) / length, -(second[0] - first[0]) / length, 0];
+            // Split the rectangular wall into its first triangle.
+            this.appendTriangle(output, [...first, bottom], [...second, bottom], [...second, top], normal, element.material);
+            // Complete the same wall rectangle with a second triangle.
+            this.appendTriangle(output, [...first, bottom], [...second, top], [...first, top], normal, element.material);
+        }
+        // Retain completed surface triangles without retaining removed scene elements strongly.
+        this.meshCache.set(element, { revision: element.geometryRevision, material: element.material, topMaterial: element.topMaterial, vertices: output });
+        // Return world geometry; projection and visibility belong to the GPU stage.
+        return output;
+    }
+
+}
+
+</script>
+<script data-source="engine/point-light-renderer.js">
+/**
+ * DIRECTORY RENDER BACKEND — produce point-light visibility from shared opaque meshes.
+ * Each source uses six depth views, then the world renderer samples that visibility.
+ * The helper borrows its parent's GPU resources; it owns no extra scheduler or scene.
+ */
+class PointLightRenderer {
+    /** Retain the owner, not copies of GPU handles that may not exist yet or may be restored. */
+    constructor(parentRenderer) {
+        // Later methods follow this reference to the owner's current resources.
+        this.parentRenderer = parentRenderer;
+    }
+
+    /** Render nearby opaque geometry into six point-light depth views, independent of camera. */
+    renderShadowMap(light) {
+        // Read the live parent renderer now, after its GPU resources have been initialized.
+        // Keeping the parent reference does not snapshot its earlier null graphics/resources.
+        const renderer = this.parentRenderer;
+        // Query actual world-ground obstruction bounds, not camera-visible objects.
+        const candidates = renderer.scene.shadowGeometry.query({
+            // Leftmost possible source reach on the physical ground plane.
+            minimumX: light.positionX - light.radius,
+            // Farthest-back possible source reach.
+            minimumY: light.positionY - light.radius,
+            // Rightmost possible source reach.
+            maximumX: light.positionX + light.radius,
+            // Farthest-forward possible source reach.
+            maximumY: light.positionY + light.radius
+        });
+        // Filter only explicit visibility/shadow exceptions and nonintersecting height ranges.
+        const blockers = candidates.filter((element) => element.visible && element.castsShadow && element.transform.positionZ <= light.positionZ + light.radius && element.transform.positionZ + element.geometry.height >= light.positionZ - light.radius);
+        // Report real nearby geometry rather than a fixed shader-array capacity.
+        renderer.statistics.shadowCandidates += blockers.length;
+        // Collect actual surface triangles; static per-element meshes are reused from WeakMap.
+        const vertices = [];
+        // “of” retrieves each nearby element value and stops after the spatial result list.
+        for (const element of blockers) {
+            // The very same opaque geometry participates in camera depth and light visibility.
+            vertices.push(...renderer.meshLibrary.build(element));
+        }
+        // Twelve floats encode each interleaved position/normal/material vertex.
+        const vertexCount = vertices.length / 12;
+        // Select the buffer dedicated to this light's nearby obstruction geometry.
+        renderer.graphics.bindBuffer(renderer.graphics.ARRAY_BUFFER, renderer.resources.shadowVertexBuffer);
+        // Upload a contiguous geometry list without an artificial blocker-count limit.
+        renderer.graphics.bufferData(renderer.graphics.ARRAY_BUFFER, new Float32Array(vertices), renderer.graphics.DYNAMIC_DRAW);
+        // Use the six-view point-light projection rather than the camera projection.
+        const program = renderer.resources.shadowProgram;
+        // Select the radial-depth shader pair.
+        renderer.graphics.useProgram(program);
+        // Shadow rendering needs positions only; other interleaved attributes are ignored.
+        const positionAttribute = renderer.graphics.getAttribLocation(program, 'aPosition');
+        // Enable the positional vertex stream.
+        renderer.graphics.enableVertexAttribArray(positionAttribute);
+        // Read three position floats at the start of each 48-byte vertex record.
+        renderer.graphics.vertexAttribPointer(positionAttribute, 3, renderer.graphics.FLOAT, false, 48, 0);
+        // Supply source XYZ and radius to both shadow stages.
+        renderer.graphics.uniform4f(renderer.graphics.getUniformLocation(program, 'uShadowLight'), light.positionX, light.positionY, light.positionZ, light.radius);
+        // Light visibility must not be limited by the camera/source's screen scissor rectangle.
+        renderer.graphics.disable(renderer.graphics.SCISSOR_TEST);
+        // Shadow depth replaces nearest distance, so additive blending is inappropriate here.
+        renderer.graphics.disable(renderer.graphics.BLEND);
+        // Enable nearest-surface depth testing within each light view.
+        renderer.graphics.enable(renderer.graphics.DEPTH_TEST);
+        // Nearest source-facing geometry wins independently of submission order.
+        renderer.graphics.depthFunc(renderer.graphics.LESS);
+        // Each face needs to store its nearest obstruction distance.
+        renderer.graphics.depthMask(true);
+        // Use the configured bounded shadow resolution, independent of screen density.
+        const shadowSize = renderer.basement.configuration.shadowMapSize;
+        // Render into a separate target without touching the preserved world color/depth.
+        renderer.graphics.bindFramebuffer(renderer.graphics.FRAMEBUFFER, renderer.resources.shadowFramebuffer);
+        // This framebuffer intentionally contains no color attachments.
+        renderer.graphics.drawBuffers([renderer.graphics.NONE]);
+        // A depth-only framebuffer has no readable color attachment either.
+        renderer.graphics.readBuffer(renderer.graphics.NONE);
+        // Each cubemap face has the same square resolution.
+        renderer.graphics.viewport(0, 0, shadowSize, shadowSize);
+        // Process the six face definitions in the cubemap's documented direction order.
+        // The counted index chooses the target face and its matching basis vectors.
+        for (let faceIndex = 0; faceIndex < WorldShaders.cubeFaces.length; faceIndex += 1) {
+            // Read this face's forward, right, and up directions.
+            const face = WorldShaders.cubeFaces[faceIndex];
+            // Attach exactly this cube face as the current light-depth target.
+            renderer.graphics.framebufferTexture2D(renderer.graphics.FRAMEBUFFER, renderer.graphics.DEPTH_ATTACHMENT, renderer.graphics.TEXTURE_CUBE_MAP_POSITIVE_X + faceIndex, renderer.resources.shadowCube, 0);
+            // Hardware must support the actual depth target, not merely compile shaders.
+            if (renderer.graphics.checkFramebufferStatus(renderer.graphics.FRAMEBUFFER) !== renderer.graphics.FRAMEBUFFER_COMPLETE) {
+                // Refuse a broken shadow path instead of leaking light through opaque geometry.
+                throw new Error('This GPU could not create the point-light depth framebuffer.');
+            }
+            // Reset this direction to unobstructed maximum distance.
+            renderer.graphics.clearDepth(1);
+            // Clear only this face's depth; the world color image remains untouched.
+            renderer.graphics.clear(renderer.graphics.DEPTH_BUFFER_BIT);
+            // Orient a ninety-degree view along the current cubemap direction.
+            renderer.graphics.uniform3fv(renderer.graphics.getUniformLocation(program, 'uForward'), face.forward);
+            // Match cubemap sampling's horizontal face convention.
+            renderer.graphics.uniform3fv(renderer.graphics.getUniformLocation(program, 'uRight'), face.right);
+            // Match cubemap sampling's vertical face convention.
+            renderer.graphics.uniform3fv(renderer.graphics.getUniformLocation(program, 'uUp'), face.up);
+            // Ordinary surface triangles populate this light-facing depth view.
+            renderer.graphics.drawArrays(renderer.graphics.TRIANGLES, 0, vertexCount);
+            // Count actual shadow submissions alongside base/light submissions.
+            renderer.statistics.drawCalls += 1;
+        }
+        // Return to the camera-facing world framebuffer before direct illumination.
+        renderer.graphics.bindFramebuffer(renderer.graphics.FRAMEBUFFER, null);
+        // Restore the camera image's actual pixel dimensions.
+        renderer.graphics.viewport(0, 0, renderer.canvas.width, renderer.canvas.height);
+        // Lighting must revisit exactly the previously visible camera surface.
+        renderer.graphics.depthFunc(renderer.graphics.EQUAL);
+        // Preserve established camera depth while adding illumination.
+        renderer.graphics.depthMask(false);
+        // Point-source RGB contributions add on the already visible surface.
+        renderer.graphics.enable(renderer.graphics.BLEND);
+        // Preserve base alpha while accumulating reflected source color.
+        renderer.graphics.blendFuncSeparate(renderer.graphics.ONE, renderer.graphics.ONE, renderer.graphics.ZERO, renderer.graphics.ONE);
+        // Select the same camera geometry/projection as the base world image.
+        renderer.useProgram(renderer.resources.lightProgram, renderer.depthRange);
+        // Bind the completed six-direction visibility map to texture unit zero.
+        renderer.graphics.activeTexture(renderer.graphics.TEXTURE0);
+        // Sampling direction now directly finds the nearest source obstruction.
+        renderer.graphics.bindTexture(renderer.graphics.TEXTURE_CUBE_MAP, renderer.resources.shadowCube);
+        // Tell direct lighting which sampler contains its source visibility.
+        renderer.graphics.uniform1i(renderer.graphics.getUniformLocation(renderer.resources.lightProgram, 'uShadowMap'), 0);
+    }
+
+}
+
+</script>
+<script data-source="engine/world-renderer.js">
+/**
+ * DIRECTORY WORLD RENDERER — opaque surfaces use a real GPU depth buffer.
+ * Rendering occurs on an internal WebGL2 canvas, then the existing Canvas renderer
+ * composites that one world image. Geometry, surface emission, and point-light
+ * contributions all use identical vertex positions and depth tests. No building,
+ * shop, roof, or character name changes visibility rules.
+ * This first contract supports opaque extruded boxes/circles and flat planes;
+ * transparent materials, bloom blur, textures, and skeletal meshes are not implemented.
+ */
+class WorldRendererSystem {
+    /** Store no GPU resources until a world scene is actually drawn. */
+    constructor(basement) {
+        // Shared height projection and ambient configuration must match the Scene indexes.
+        this.basement = basement;
+        // Offscreen canvas is allocated lazily so an empty/Canvas-only engine needs no WebGL.
+        this.canvas = null;
+        // Null means no WebGL resource set has been created yet.
+        this.resources = null;
+        // One engine-owned pass draws all declared world surfaces.
+        this.active = false;
+        // Context loss suspends world drawing until the browser restores GPU resources.
+        this.contextLost = false;
+        // Cache uploaded geometry against scene and viewport revisions.
+        this.cachedGeometryKey = '';
+        // Reuse a completed world image when geometry, sources, and view are unchanged.
+        this.cachedFrameKey = '';
+        // Mesh generation/cache has its own concern, independent of GPU resource ownership.
+        this.meshLibrary = new WorldSurfaceMesh();
+        // Point-light visibility has its own backend helper, using live parent resource lookup.
+        this.pointLighting = new PointLightRenderer(this);
+        // Track what the GPU is actually asked to draw.
+        this.statistics = { visibleElements: 0, vertices: 0, lights: 0, shadowCandidates: 0, drawCalls: 0 };
+        // Bound handlers retain this renderer when the canvas dispatches GPU lifecycle events.
+        this.handleContextLost = this.onContextLost.bind(this);
+        // Keep the exact function reference for later listener removal.
+        this.handleContextRestored = this.onContextRestored.bind(this);
+    }
+
+    /** Resolve shared services after Directory assembly; do not register an empty draw pass. */
+    connect(directory) {
+        // Scene elements are the authoritative geometry providers.
+        this.scene = directory.systems.get('scene');
+        // The Canvas renderer remains the owner of final viewport composition.
+        this.renderer = directory.systems.get('renderer');
+    }
+
+    /** Register one central world pass when the first scene element is added. */
+    activate() {
+        // Multiple scene objects must not create multiple rendering pipelines.
+        if (this.active) {
+            // Preserve the existing engine-owned pass.
+            return;
+        }
+        // The world image uses screen coordinates because its vertices already project the camera.
+        this.renderer.registerPass('engine.world', 20, 'screen', this.draw.bind(this));
+        // Remember that the final compositor now owns this one callback.
+        this.active = true;
+    }
+
+    /** Remove the central pass when the scene becomes empty, keeping reusable GPU resources. */
+    deactivate() {
+        // Remove only the world pass, leaving independent UI/Canvas passes intact.
+        this.renderer.removePass('engine.world');
+        // A later scene can reactivate the same renderer.
+        this.active = false;
+        // Drop cached references and vertex count when the scene is unloaded.
+        this.cachedGeometryKey = '';
+        // An empty/replaced scene must not reuse the prior scene's finished image.
+        this.cachedFrameKey = '';
+        // Prevent diagnostics from reporting the removed scene's population.
+        this.statistics.visibleElements = 0;
+        // Reset draw accounting immediately even if the engine is stopped.
+        this.statistics.vertices = 0;
+    }
+
+    /** Compile one GLSL shader; a failure reports the GPU compiler's explanation. */
+    compileShader(type, source) {
+        // Use the currently owned WebGL2 context.
+        const graphics = this.graphics;
+        // Allocate the requested vertex/fragment shader object.
+        const shader = graphics.createShader(type);
+        // Supply readable shader code containing explanatory comments.
+        graphics.shaderSource(shader, source);
+        // Ask the GPU driver to compile the supplied source.
+        graphics.compileShader(shader);
+        // Invalid shader code must stop initialization rather than produce a blank world silently.
+        if (!graphics.getShaderParameter(shader, graphics.COMPILE_STATUS)) {
+            // Preserve the concrete GPU error before releasing the failed shader.
+            const message = graphics.getShaderInfoLog(shader);
+            // A failed object is no longer needed.
+            graphics.deleteShader(shader);
+            // Explain which shared renderer component failed.
+            throw new Error(`World shader compilation failed: ${message}`);
+        }
+        // Return the compiled shader to the program-linking stage.
+        return shader;
+    }
+
+    /** Create/link a vertex+fragment program and release temporary shader objects. */
+    createProgram(fragmentSource, vertexSource = WorldShaders.vertexSource) {
+        // Vertex projection is identical for base color and every light contribution.
+        const vertexShader = this.compileShader(this.graphics.VERTEX_SHADER, vertexSource);
+        // Fragment code supplies either base/emission or direct lighting.
+        const fragmentShader = this.compileShader(this.graphics.FRAGMENT_SHADER, fragmentSource);
+        // Allocate a program that joins geometry and pixel calculations.
+        const program = this.graphics.createProgram();
+        // Attach the common vertex computation.
+        this.graphics.attachShader(program, vertexShader);
+        // Attach this pass's pixel computation.
+        this.graphics.attachShader(program, fragmentShader);
+        // Link attribute/uniform interfaces into an executable GPU program.
+        this.graphics.linkProgram(program);
+        // Shader objects can be released after their compiled code is linked.
+        this.graphics.deleteShader(vertexShader);
+        // Release the corresponding fragment-shader object.
+        this.graphics.deleteShader(fragmentShader);
+        // Reject incompatible shader interfaces before attempting to render a frame.
+        if (!this.graphics.getProgramParameter(program, this.graphics.LINK_STATUS)) {
+            // Capture the actual driver diagnosis for debugging.
+            const message = this.graphics.getProgramInfoLog(program);
+            // Release the unsuccessful program allocation.
+            this.graphics.deleteProgram(program);
+            // Stop rather than pretending a fallback has equivalent depth/lighting behavior.
+            throw new Error(`World shader linking failed: ${message}`);
+        }
+        // Return the linked program to the renderer's resource owner.
+        return program;
+    }
+
+    /** Allocate one internal WebGL2 canvas and reusable geometry/shadow buffers. */
+    initialize() {
+        // Create the offscreen surface only when a nonempty world is rendered.
+        if (!this.canvas) {
+            // Use the host canvas's document so embedding does not depend on a global page.
+            this.canvas = this.renderer.canvas.ownerDocument.createElement('canvas');
+            // Context loss is a browser event, not a reason to start another engine loop.
+            this.canvas.addEventListener('webglcontextlost', this.handleContextLost);
+            // Restoration reconstructs resources during the existing Lobby schedule.
+            this.canvas.addEventListener('webglcontextrestored', this.handleContextRestored);
+        }
+        // Request a real depth-capable rendering context; no external engine dependency is used.
+        this.graphics = this.canvas.getContext('webgl2', { alpha: true, premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: true });
+        // Devices without WebGL2 must receive a clear capability error.
+        if (!this.graphics) {
+            // Do not fall back to incorrect painter ordering while claiming depth correctness.
+            throw new Error('Shared world surfaces require WebGL2; the Canvas-only loop study remains available.');
+        }
+        // Keep GPU handles together for explicit disposal and context restoration.
+        this.resources = {
+            // Draw opaque color and attached surface emission into the depth buffer.
+            baseProgram: this.createProgram(WorldShaders.baseFragmentSource),
+            // Add point lighting only to the same visible fragments, with geometric shadows.
+            lightProgram: this.createProgram(WorldShaders.lightFragmentSource),
+            // The light's six views store nearest opaque geometry as radial depth.
+            shadowProgram: this.createProgram(WorldShaders.shadowFragmentSource, WorldShaders.shadowVertexSource),
+            // One interleaved vertex buffer stores position, normal, color, and emission.
+            vertexBuffer: this.graphics.createBuffer(),
+            // Shadow geometry is queried independently of the camera's visible geometry.
+            shadowVertexBuffer: this.graphics.createBuffer(),
+            // A depth cubemap covers every direction around one point source.
+            shadowCube: this.graphics.createTexture(),
+            // Render depth into one cubemap face at a time, without touching the world image.
+            shadowFramebuffer: this.graphics.createFramebuffer()
+        };
+        // Validate configured shadow resolution against actual hardware capacity.
+        const shadowSize = this.basement.configuration.shadowMapSize;
+        // Cubemap allocation must fit the device rather than silently reducing declared quality.
+        if (shadowSize > this.graphics.getParameter(this.graphics.MAX_CUBE_MAP_TEXTURE_SIZE)) {
+            // State the capability mismatch explicitly during GPU initialization.
+            throw new RangeError('Configured shadowMapSize exceeds this GPU cubemap capacity.');
+        }
+        // Bind the one reusable six-direction shadow texture.
+        this.graphics.bindTexture(this.graphics.TEXTURE_CUBE_MAP, this.resources.shadowCube);
+        // Allocate every cubemap face before using the texture or attaching it to a framebuffer.
+        // Count zero through five, increasing once for each of the six cube directions.
+        for (let faceIndex = 0; faceIndex < 6; faceIndex += 1) {
+            // Depth textures store visibility distance, not decorative glow color.
+            this.graphics.texImage2D(this.graphics.TEXTURE_CUBE_MAP_POSITIVE_X + faceIndex, 0, this.graphics.DEPTH_COMPONENT24, shadowSize, shadowSize, 0, this.graphics.DEPTH_COMPONENT, this.graphics.UNSIGNED_INT, null);
+        }
+        // Use exact nearest samples for this first hard-shadow implementation.
+        this.graphics.texParameteri(this.graphics.TEXTURE_CUBE_MAP, this.graphics.TEXTURE_MIN_FILTER, this.graphics.NEAREST);
+        // Keep magnification consistent with the depth comparison rule.
+        this.graphics.texParameteri(this.graphics.TEXTURE_CUBE_MAP, this.graphics.TEXTURE_MAG_FILTER, this.graphics.NEAREST);
+        // Clamp each cube-coordinate axis rather than wrapping a shadow direction.
+        for (const axis of [this.graphics.TEXTURE_WRAP_S, this.graphics.TEXTURE_WRAP_T, this.graphics.TEXTURE_WRAP_R]) {
+            // Apply the same sampling boundary policy to all cube faces.
+            this.graphics.texParameteri(this.graphics.TEXTURE_CUBE_MAP, axis, this.graphics.CLAMP_TO_EDGE);
+        }
+        // A restored GPU has no uploaded geometry even if the scene itself did not change.
+        this.cachedGeometryKey = '';
+        // Restored buffers contain no previously shaded scene image.
+        this.cachedFrameKey = '';
+    }
+
+    /** Handle GPU loss by suspending world submission, preserving the scene's CPU declarations. */
+    onContextLost(event) {
+        // Allow the browser to restore this context instead of treating the loss as permanent.
+        event.preventDefault();
+        // The ordinary Lobby may continue; draw() skips unavailable GPU work.
+        this.contextLost = true;
+    }
+
+    /** Recreate programs/buffers after browser restoration; geometry uploads on the next frame. */
+    onContextRestored() {
+        // Old handles are invalid after restoration and must not be reused.
+        this.resources = null;
+        // Permit draw() to initialize a fresh resource set.
+        this.contextLost = false;
+        // Force a complete upload from authoritative scene data.
+        this.cachedGeometryKey = '';
+        // A restored context must shade the scene again before reusing its finished image.
+        this.cachedFrameKey = '';
+    }
+
+    /** Configure interleaved attributes and shared projection for one linked program. */
+    useProgram(program, depthRange) {
+        // Keep the Graphics API owner explicit in every call below.
+        const graphics = this.graphics;
+        // Select the base or point-light fragment computation.
+        graphics.useProgram(program);
+        // Bind the same authoritative geometry buffer for both passes.
+        graphics.bindBuffer(graphics.ARRAY_BUFFER, this.resources.vertexBuffer);
+        // Describe each attribute's name, float offset, and vector width.
+        const attributes = [['aPosition', 0], ['aNormal', 3], ['aColor', 6], ['aEmission', 9]];
+        // “of” yields each [name, offset] pair; destructuring makes both meanings explicit.
+        for (const [name, offset] of attributes) {
+            // Link-time optimization may omit attributes unused by this particular fragment pass.
+            const location = graphics.getAttribLocation(program, name);
+            // A negative location means this program needs no data for that attribute.
+            if (location < 0) {
+                // Skip inactive attributes instead of issuing an invalid GPU command.
+                continue;
+            }
+            // Enable this attribute's data source.
+            graphics.enableVertexAttribArray(location);
+            // Each vertex has twelve floats (48 bytes); the offset is measured in bytes.
+            graphics.vertexAttribPointer(location, 3, graphics.FLOAT, false, 48, offset * 4);
+        }
+        // Viewport and camera values use CSS pixels/world units, not backing pixel dimensions.
+        graphics.uniform2f(graphics.getUniformLocation(program, 'uViewport'), this.renderer.viewportWidth, this.renderer.viewportHeight);
+        // Camera center addresses projected-world coordinates for both culling and drawing.
+        graphics.uniform2f(graphics.getUniformLocation(program, 'uCamera'), this.renderer.camera.positionX, this.renderer.camera.positionY);
+        // Camera zoom scales both projected axes consistently.
+        graphics.uniform1f(graphics.getUniformLocation(program, 'uZoom'), this.renderer.camera.zoom);
+        // Shared vertical projection must exactly match SceneSystem's visual bounds.
+        graphics.uniform1f(graphics.getUniformLocation(program, 'uHeightScale'), this.basement.configuration.heightProjectionScale);
+        // Fit visible depth into GPU clip range without relying on draw submission order.
+        graphics.uniform1f(graphics.getUniformLocation(program, 'uDepthRange'), depthRange);
+    }
+
+    /** Project, depth-test, shade, and composite all visible opaque world geometry once. */
+    draw(renderer) {
+        // A lost context must not issue invalid GPU calls while waiting for restoration.
+        if (this.contextLost) {
+            // Keep the authoritative CPU scene intact for a later restored frame.
+            return;
+        }
+        // Initialize GPU resources only when a world pass actually executes.
+        if (!this.resources) {
+            // An unavailable WebGL2 capability produces an explicit setup error here.
+            this.initialize();
+        }
+        // Shading density is independently capped; the final image still fills the same CSS view.
+        const worldPixelRatio = Math.min(renderer.pixelRatio, this.basement.configuration.maximumWorldPixelRatio);
+        // Calculate desired backing width without forcing high-density lighting on phone GPUs.
+        const desiredWidth = Math.max(1, Math.round(renderer.viewportWidth * worldPixelRatio));
+        // Calculate desired backing height with the same density policy.
+        const desiredHeight = Math.max(1, Math.round(renderer.viewportHeight * worldPixelRatio));
+        // Reallocate only when actual shading dimensions change.
+        if (this.canvas.width !== desiredWidth) {
+            // Reallocate only on a real size change, not on every frame.
+            this.canvas.width = desiredWidth;
+        }
+        // Allocate matching vertical backing resolution.
+        if (this.canvas.height !== desiredHeight) {
+            // Keep unchanged backing storage across ordinary frames.
+            this.canvas.height = desiredHeight;
+        }
+        // Set the GPU viewport to the full internal backing image.
+        this.graphics.viewport(0, 0, this.canvas.width, this.canvas.height);
+        // Read zoom once while constructing projected-world query bounds.
+        const zoom = renderer.camera.zoom;
+        // Camera coordinates are projected-world coordinates; Z was already included by Scene.
+        const view = {
+            // Left edge of the visible projected world.
+            minimumX: renderer.camera.positionX - renderer.viewportWidth / (2 * zoom),
+            // Upper edge of the visible projected world.
+            minimumY: renderer.camera.positionY - renderer.viewportHeight / (2 * zoom),
+            // Right edge of the visible projected world.
+            maximumX: renderer.camera.positionX + renderer.viewportWidth / (2 * zoom),
+            // Lower edge of the visible projected world.
+            maximumY: renderer.camera.positionY + renderer.viewportHeight / (2 * zoom)
+        };
+        // Include pixel allocation because resizing invalidates the preserved drawing buffer.
+        const frameKey = `${this.scene.revision}:${JSON.stringify(view)}:${desiredWidth}:${desiredHeight}`;
+        // An unchanged view and world need only a final image copy, not another shadow pass.
+        if (frameKey === this.cachedFrameKey) {
+            // This frame submitted no internal GPU geometry or shadow work.
+            this.statistics.drawCalls = 0;
+            // No shadow candidates were newly processed for this cached frame.
+            this.statistics.shadowCandidates = 0;
+            // Copy the preserved complete world image under the same final screen transform.
+            renderer.drawingContext.drawImage(this.canvas, 0, 0, renderer.viewportWidth, renderer.viewportHeight);
+            // Report the one actual Canvas copy required for this cached frame.
+            renderer.drawCalls += 1;
+            // Leave existing geometry and depth buffers available for a later changed frame.
+            return;
+        }
+        // Reset current-frame diagnostics before visibility and lighting work.
+        this.statistics = { visibleElements: 0, vertices: 0, lights: 0, shadowCandidates: 0, drawCalls: 0 };
+        // Query geometry using its actual height-expanded visual extent.
+        const visible = this.scene.visibleGeometry.query(view).filter((element) => element.visible);
+        // Stable IDs determine only exactly coplanar ties, never ordinary occlusion.
+        visible.sort(WorldRendererSystem.compareElements);
+        // Publish the number of actual visible scene elements.
+        this.statistics.visibleElements = visible.length;
+        // Build a cache key from tracked scene changes and camera query bounds.
+        const geometryKey = `${this.scene.revision}:${JSON.stringify(view)}`;
+        // Reuse GPU geometry for a stationary scene and unchanged view.
+        if (geometryKey !== this.cachedGeometryKey) {
+            // Collect only currently visible geometry for upload.
+            const vertices = [];
+            // Minimum depth range avoids clipping a scene close to the origin.
+            this.depthRange = 100;
+            // “of” visits visible element values and ends after the culled list.
+            for (const element of visible) {
+                // Generate ordinary box/circle/plane surface attributes.
+                vertices.push(...this.meshLibrary.build(element));
+                // Include both extrema of physical Y and Z when fitting the depth range.
+                for (const groundY of [element.bounds.minimumY, element.bounds.maximumY]) {
+                    // Each vertical endpoint may be the nearest/farthest visible point.
+                    for (const height of [element.transform.positionZ, element.transform.positionZ + element.geometry.height]) {
+                        // Camera-relative depth is perpendicular to projected screen Y.
+                        const depth = (groundY - renderer.camera.positionY) * this.basement.configuration.heightProjectionScale + height;
+                        // Add a small margin so valid geometry cannot land on a clip boundary.
+                        this.depthRange = Math.max(this.depthRange, Math.abs(depth) * 1.05 + 1);
+                    }
+                }
+            }
+            // Every vertex has twelve floats in the documented interleaved layout.
+            this.vertexCount = vertices.length / 12;
+            // Select the shared geometry buffer before replacing its contents.
+            this.graphics.bindBuffer(this.graphics.ARRAY_BUFFER, this.resources.vertexBuffer);
+            // Upload one compact vertex array, not one GPU draw per scene object.
+            this.graphics.bufferData(this.graphics.ARRAY_BUFFER, new Float32Array(vertices), this.graphics.DYNAMIC_DRAW);
+            // Remember which scene/view generated the current GPU geometry.
+            this.cachedGeometryKey = geometryKey;
+        }
+        // Publish the actual geometry submitted rather than the total scene registry size.
+        this.statistics.vertices = this.vertexCount;
+        // Clear to transparent so the Canvas background can remain independently styled.
+        this.graphics.clearColor(0, 0, 0, 0);
+        // Far depth starts at one; smaller fragment depth means closer to the camera.
+        this.graphics.clearDepth(1);
+        // Depth writes must be enabled when clearing and rendering opaque surfaces.
+        this.graphics.depthMask(true);
+        // A previous source's scissor rectangle must never restrict the next frame's clear.
+        this.graphics.disable(this.graphics.SCISSOR_TEST);
+        // Clear both the image and its visibility buffer every frame.
+        this.graphics.clear(this.graphics.COLOR_BUFFER_BIT | this.graphics.DEPTH_BUFFER_BIT);
+        // Turn on geometry-based visibility rather than caller-maintained painter layers.
+        this.graphics.enable(this.graphics.DEPTH_TEST);
+        // Only nearer surfaces replace the current visible pixel.
+        this.graphics.depthFunc(this.graphics.LESS);
+        // Base material color is opaque and must replace, not add to, prior fragments.
+        this.graphics.disable(this.graphics.BLEND);
+        // Configure common geometry/projection and the base fragment program.
+        this.useProgram(this.resources.baseProgram, this.depthRange);
+        // Apply the shared scene ambient level without treating emission as a late overlay.
+        this.graphics.uniform1f(this.graphics.getUniformLocation(this.resources.baseProgram, 'uAmbient'), this.basement.configuration.ambientLight);
+        // Draw all opaque surfaces; depth resolves roofs/ground and unrelated objects alike.
+        this.graphics.drawArrays(this.graphics.TRIANGLES, 0, this.vertexCount);
+        // Count this actual GPU geometry submission.
+        this.statistics.drawCalls += 1;
+        // Add light only where the same already-visible surface passes an exact depth match.
+        this.graphics.depthFunc(this.graphics.EQUAL);
+        // Light contributions must not change the established visible-surface depth.
+        this.graphics.depthMask(false);
+        // Point lights accumulate color contributions on that visible surface.
+        this.graphics.enable(this.graphics.BLEND);
+        // Add RGB while preserving the opaque base alpha instead of making empty pixels opaque.
+        this.graphics.blendFuncSeparate(this.graphics.ONE, this.graphics.ONE, this.graphics.ZERO, this.graphics.ONE);
+        // Set the same vertex attributes and projection for the direct-light program.
+        this.useProgram(this.resources.lightProgram, this.depthRange);
+        // Light influence bounds account for elevation and offscreen sources.
+        const lights = this.scene.lightReach.query(view);
+        // Restrict expensive fragment lighting to each source's projected influence rectangle.
+        this.graphics.enable(this.graphics.SCISSOR_TEST);
+        // “of” visits visible/reaching point lights; each gets the same shared shading rules.
+        for (const light of lights) {
+            // Convert the physical source position through the same public projection contract.
+            const lightCenter = renderer.worldToScreen(light.positionX, light.positionY, light.positionZ);
+            // A sphere projects to this horizontal influence radius in CSS pixels.
+            const radiusX = light.radius * renderer.camera.zoom;
+            // Height projection expands its vertical influence by this exact linear bound.
+            const radiusY = light.radius * Math.hypot(1, this.basement.configuration.heightProjectionScale) * renderer.camera.zoom;
+            // Clamp the left influence edge to the actual backing image.
+            const minimumX = Math.max(0, Math.floor((lightCenter.positionX - radiusX) * worldPixelRatio));
+            // WebGL scissor Y starts at the bottom, unlike CSS coordinates.
+            const minimumY = Math.max(0, Math.floor((renderer.viewportHeight - lightCenter.positionY - radiusY) * worldPixelRatio));
+            // Clamp the right influence edge to avoid irrelevant offscreen fragments.
+            const maximumX = Math.min(this.canvas.width, Math.ceil((lightCenter.positionX + radiusX) * worldPixelRatio));
+            // Clamp the upper WebGL influence edge using the inverted vertical coordinate.
+            const maximumY = Math.min(this.canvas.height, Math.ceil((renderer.viewportHeight - lightCenter.positionY + radiusY) * worldPixelRatio));
+            // Empty projected influence produces no lighting submission.
+            if (maximumX <= minimumX || maximumY <= minimumY) {
+                // Continue with the next visible/reaching source.
+                continue;
+            }
+            // Build geometric source visibility independently from the camera's surface depth.
+            this.pointLighting.renderShadowMap(light);
+            // Shadow rendering used its own viewport/state; restore source-area camera clipping.
+            this.graphics.enable(this.graphics.SCISSOR_TEST);
+            // Fragment shading outside this rectangle cannot contribute to this source.
+            this.graphics.scissor(minimumX, minimumY, maximumX - minimumX, maximumY - minimumY);
+            // Supply actual world coordinates and radius to the pixel shader.
+            this.graphics.uniform4f(this.graphics.getUniformLocation(this.resources.lightProgram, 'uLight'), light.positionX, light.positionY, light.positionZ, light.radius);
+            // Supply normalized source color and intensity separately from receiving materials.
+            this.graphics.uniform4f(this.graphics.getUniformLocation(this.resources.lightProgram, 'uLightColor'), ...light.color, light.intensity);
+            // Finite shadow resolution sets the numerical comparison bias in world units.
+            this.graphics.uniform1f(this.graphics.getUniformLocation(this.resources.lightProgram, 'uShadowMapSize'), this.basement.configuration.shadowMapSize);
+            // Revisit geometry under exact depth equality, adding light only to visible fragments.
+            this.graphics.drawArrays(this.graphics.TRIANGLES, 0, this.vertexCount);
+            // Count this source's actual GPU submission.
+            this.statistics.drawCalls += 1;
+        }
+        // Publish the number of sources considered by this frame's central light stage.
+        this.statistics.lights = lights.length;
+        // Leave no source-specific scissor restriction on later world frames.
+        this.graphics.disable(this.graphics.SCISSOR_TEST);
+        // Restore depth-write state for the next frame's clear/base pass.
+        this.graphics.depthMask(true);
+        // Flush commands before copying this canvas into the final Canvas image.
+        this.graphics.flush();
+        // Composite the completed depth-aware world image in CSS-pixel screen coordinates.
+        renderer.drawingContext.drawImage(this.canvas, 0, 0, renderer.viewportWidth, renderer.viewportHeight);
+        // Account for this final Canvas composition independently of internal GPU submissions.
+        renderer.drawCalls += 1;
+        // The preserved opaque/light image is now reusable until tracked scene/view changes.
+        this.cachedFrameKey = frameKey;
+    }
+
+    /** Compare element IDs solely to make exactly coplanar ties deterministic. */
+    static compareElements(first, second) {
+        // An earlier lexical ID wins an exact depth tie under the LESS test.
+        if (first.identifier < second.identifier) {
+            // Place first before second without depending on locale collation.
+            return -1;
+        }
+        // A later lexical ID follows the other coplanar declaration.
+        if (first.identifier > second.identifier) {
+            // Reverse the comparison result for this ordering.
+            return 1;
+        }
+        // Matching IDs cannot coexist in a scene, but equality is still a valid comparator result.
+        return 0;
+    }
+
+    /** Release GPU objects and context listeners when the Directory destroys this service. */
+    dispose() {
+        // Remove the compositor callback before releasing resources it might use.
+        this.deactivate();
+        // A Canvas-only session may never have allocated an offscreen context.
+        if (this.canvas) {
+            // Remove the exact bound context-loss listener.
+            this.canvas.removeEventListener('webglcontextlost', this.handleContextLost);
+            // Remove the corresponding restoration listener.
+            this.canvas.removeEventListener('webglcontextrestored', this.handleContextRestored);
+        }
+        // Lost contexts already own invalid handles, so ordinary deletion is unnecessary there.
+        if (this.resources && !this.contextLost) {
+            // Release linked base shader resources.
+            this.graphics.deleteProgram(this.resources.baseProgram);
+            // Release the direct-light program.
+            this.graphics.deleteProgram(this.resources.lightProgram);
+            // Release uploaded world geometry.
+            this.graphics.deleteBuffer(this.resources.vertexBuffer);
+            // Release the light-view shader program.
+            this.graphics.deleteProgram(this.resources.shadowProgram);
+            // Release uploaded nearby shadow geometry.
+            this.graphics.deleteBuffer(this.resources.shadowVertexBuffer);
+            // Release the six-direction light visibility texture.
+            this.graphics.deleteTexture(this.resources.shadowCube);
+            // Release the target used to produce that visibility texture.
+            this.graphics.deleteFramebuffer(this.resources.shadowFramebuffer);
+        }
+        // Do not retain disposed GPU handles.
+        this.resources = null;
+    }
+}
+
+</script>
 <script data-source="engine/renderer.js">
 /**
  * DIRECTORY SYSTEM — the renderer owns canvas sizing, camera coordinates, brushes,
@@ -268,6 +2733,12 @@ class RendererSystem {
         this.drawCalls = 0;
     }
 
+    /** Resolve the shared scene after construction; legacy Canvas-only studies remain supported. */
+    connect(directory) {
+        // The actual scene object exists even before its own index connection phase runs.
+        this.scene = directory.systems.get('scene');
+    }
+
     /** Resize backing pixels from CSS dimensions; do not replace the canvas object. */
     resize(widthCssPixels, heightCssPixels, devicePixelRatio = 1) {
         // Reject invalid public inputs before they can poison transforms or allocation.
@@ -289,6 +2760,11 @@ class RendererSystem {
 
     /** Add an ordered pass: its ID, coordinate space, order, and drawing callback. */
     registerPass(identifier, order, coordinateSpace, draw) {
+        // Unstructured world Canvas calls cannot participate in the shared GPU depth buffer.
+        if (coordinateSpace === 'world' && this.scene?.worldElements.size > 0) {
+            // Require physical world surfaces to use the declarative scene API instead.
+            throw new Error('Depth-aware world content must use scene elements/materials, not Canvas world passes.');
+        }
         // Reject ambiguous coordinates rather than silently choosing the wrong transform.
         if (!['world', 'screen'].includes(coordinateSpace)) {
             // Name the two supported spaces explicitly.
@@ -331,14 +2807,29 @@ class RendererSystem {
         this.renderPasses = this.renderPasses.filter((renderPass) => renderPass.identifier !== identifier);
     }
 
-    /** Convert a CSS-pixel position inside the canvas to a world position. */
-    screenToWorld(screenPositionX, screenPositionY) {
+    /** Project actual world XYZ into canvas-relative CSS pixels using the shared height model. */
+    worldToScreen(positionX, positionY, positionZ = 0) {
+        // Return both visible coordinates and physical camera depth for tools/inspection.
+        return {
+            // Oblique projection preserves world X before ordinary centering and zoom.
+            positionX: (positionX - this.camera.positionX) * this.camera.zoom + this.viewportWidth / 2,
+            // Physical height shifts projected Y upward using the same shader/index scale.
+            positionY: (positionY - positionZ * this.basement.configuration.heightProjectionScale - this.camera.positionY) * this.camera.zoom + this.viewportHeight / 2,
+            // This perpendicular depth determines visibility, not arbitrary drawing priority.
+            cameraDepth: (positionY - this.camera.positionY) * this.basement.configuration.heightProjectionScale + positionZ
+        };
+    }
+
+    /** Convert canvas-relative CSS pixels to world XY on a chosen Z plane (ground by default). */
+    screenToWorld(screenPositionX, screenPositionY, positionZ = 0) {
         // Return a fresh coordinate object; no camera or input state is changed.
         return {
             // Undo centering and zoom, then restore the camera's world position.
             positionX: (screenPositionX - this.viewportWidth / 2) / this.camera.zoom + this.camera.positionX,
-            // Apply the same conversion to the vertical axis.
-            positionY: (screenPositionY - this.viewportHeight / 2) / this.camera.zoom + this.camera.positionY
+            // Undo projected height as well as centering/zoom for the selected physical plane.
+            positionY: (screenPositionY - this.viewportHeight / 2) / this.camera.zoom + this.camera.positionY + positionZ * this.basement.configuration.heightProjectionScale,
+            // One screen point has many possible world heights; the caller explicitly chooses one.
+            positionZ
         };
     }
 
@@ -364,6 +2855,11 @@ class RendererSystem {
             drawingContext.save();
             // Finally restores that state even when a drawing callback throws.
             try {
+                // A legacy pass may have been registered before a depth-aware scene was added.
+                if (renderPass.coordinateSpace === 'world' && this.scene?.worldElements.size > 0) {
+                    // Reject the incompatible mix instead of silently drawing through roofs.
+                    throw new Error('Canvas world passes cannot bypass a depth-aware scene. Use scene elements/materials.');
+                }
                 // Establish CSS-pixel coordinates for this pass.
                 drawingContext.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
                 // World-space passes follow the camera; screen-space UI stays fixed.
@@ -661,6 +3157,14 @@ class LevelDirectory {
         this.systems.register('renderer', new RendererSystem(canvas, basement));
         // Register input; its constructor stores references and installs no listeners yet.
         this.systems.register('input', new InputSystem(canvas, browserWindow));
+        // Shared spatial service owns independent indexes rather than one grid for every concern.
+        this.systems.register('spatial', new SpatialSystem());
+        // Scene declarations connect the same geometry to physics and visual indexing.
+        this.systems.register('scene', new SceneSystem(basement));
+        // One contact pipeline handles all supported bodies regardless of gameplay identity.
+        this.systems.register('physics', new PhysicsSystem(basement));
+        // Opaque world visibility and lighting are engine-owned; GPU resources are allocated lazily.
+        this.systems.register('worldRenderer', new WorldRendererSystem(basement));
         // Register per-frame measurements independently of any particular on-screen HUD.
         this.tools.register('profiler', new FrameProfiler());
     }
@@ -969,10 +3473,12 @@ class LevelLobby {
                     this.accumulatedSeconds + 1e-10 >= stepSeconds &&
                     completedSteps < configuration.maximumStepsPerFrame
                 ) {
-                    // Advance reusable systems before optional high-level features.
-                    this.directory.update(stepSeconds);
-                    // Advance installed procedural/game features by the same duration.
+                    // Capture shared moving transforms before controls and physics change them.
+                    this.directory.systems.get('scene').beginStep();
+                    // Let installed controls/features declare this step's intended motion first.
                     this.penthouse.update(stepSeconds);
+                    // Apply reusable systems, including physics, to those intentions.
+                    this.directory.update(stepSeconds);
                     // Move simulation time only after both update phases succeed.
                     this.simulationSeconds += stepSeconds;
                     // Remove the elapsed duration consumed by this fixed update.
@@ -1320,6 +3826,372 @@ class RectangleStudy {
 }
 
 </script>
+<script data-source="demo/world-study.js">
+/**
+ * NEUTRAL ENGINE STUDY — declare primitives, bodies, one elevated slab, emission, and
+ * a point light. No feature-specific collision handlers or per-object draw layers exist.
+ * Controls assign intended velocity; physics decides actual contact. The scene exercises
+ * world rules only and contains no characters, quests, shops, or migrated game assets.
+ */
+class WorldStudy {
+    /** Keep test-owned resources separate from engine implementation and scene lifecycle. */
+    constructor() {
+        // Retain owned IDs so uninstall removes this study without clearing other features.
+        this.elementIdentifiers = [];
+        // Contacts are observed for diagnostics, not used to repair physical response.
+        this.contactBegins = 0;
+        // No Directory or scene exists until the optional feature is initialized.
+        this.directory = null;
+        // Start HUD sampling immediately on the first rendered frame.
+        this.nextHudUpdateSeconds = 0;
+        // No remote stress population has been created for this fresh study.
+        this.distantPopulationAdded = false;
+        // Use one brush for the harness background only; world surfaces draw through the engine.
+        this.backgroundBrush = new CanvasBrush('#0d0b18');
+    }
+
+    /** Create one owned element using only the public scene declaration API. */
+    create(identifier, definition) {
+        // Prefix test IDs so another optional feature can own a separate namespace.
+        const fullIdentifier = `world-study.${identifier}`;
+        // Register the scene element; indexes, bodies, and rendering are automatic.
+        const element = this.scene.createElement(fullIdentifier, definition);
+        // Remember the registration for later feature-specific cleanup.
+        this.elementIdentifiers.push(fullIdentifier);
+        // Return the actual element so controls can refer to its body or transform.
+        return element;
+    }
+
+    /** Install primitives and test-only UI passes after Directory services are connected. */
+    initialize(directory) {
+        // Keep the actual service Directory for live input/statistics lookup.
+        this.directory = directory;
+        // Obtain the generic scene declaration interface.
+        this.scene = directory.systems.get('scene');
+        // The foundation renderer still composites world output and HTML diagnostics.
+        const renderer = directory.systems.get('renderer');
+        // Add a screen background beneath the engine-owned world pass.
+        renderer.registerPass('world-study.background', 0, 'screen', this.drawBackground.bind(this));
+        // Add a harness diagnostic callback without making the engine query any HTML IDs.
+        renderer.registerPass('world-study.diagnostics', 100, 'screen', this.updateDiagnostics.bind(this));
+        // A floor is a regular solid box whose top lies at Z zero.
+        this.create('floor', {
+            // Ground width along the world's X axis.
+            width: 640,
+            // Ground depth along the world's Y axis.
+            depth: 360,
+            // Put the bottom below zero so its top is the walking surface.
+            positionZ: -10,
+            // Ten units of thickness make this an ordinary volume, not a special floor type.
+            height: 10,
+            // Dark reflective material receives the point light normally.
+            material: { color: '#383041' },
+            // Frictionless support keeps the test block moving until a wall/body contact.
+            body: { motion: 'static', friction: 0 }
+        });
+        // Visit left/right boundary centers by value; both share ordinary static body rules.
+        for (const positionX of [-320, 320]) {
+            // Declare a narrow upright wall at the current horizontal boundary.
+            this.create(`side-${positionX}`, {
+                // X coordinate selects this wall's side of the scene.
+                positionX,
+                // Wall thickness is physical geometry, not an arbitrary collision radius.
+                width: 12,
+                // Span the entire ground depth.
+                depth: 360,
+                // Rise above the moving primitives.
+                height: 45,
+                // Lavender stone-like color remains a plain opaque material.
+                material: { color: '#78648f' },
+                // Bounce is shared material response, not a wall-specific update method.
+                body: { restitution: 1, friction: 0 }
+            });
+        }
+        // Add rear/front boundaries through the same declaration path.
+        for (const positionY of [-180, 180]) {
+            // Only dimensions/position change; no collision layer needs adjustment.
+            this.create(`edge-${positionY}`, {
+                // Ground depth position for the current edge.
+                positionY,
+                // Span the complete ground width.
+                width: 640,
+                // Keep the boundary thin along its inward normal.
+                depth: 12,
+                // Low walls still stop bodies at the same elevation.
+                height: 35,
+                // Use the same opaque boundary material.
+                material: { color: '#78648f' },
+                // Reuse the ordinary restitution/friction response.
+                body: { restitution: 1, friction: 0 }
+            });
+        }
+        // This ground surface emits light visibly but is not itself a physical obstacle.
+        this.create('emitting-ground', {
+            // A plane declares actual surface geometry, not a screen overlay.
+            shape: 'plane',
+            // Position its center under and around the elevated slab.
+            positionX: 100,
+            // Put the patch beneath the slab in ground depth too.
+            positionY: 65,
+            // A small geometric separation places it above the floor's surface.
+            positionZ: 0.03,
+            // Let its visible extent extend past the slab so occlusion can be compared.
+            width: 270,
+            // This footprint determines exactly which ground pixels emit.
+            depth: 145,
+            // Planes are nonphysical by declaration.
+            body: false,
+            // Purple emission remains attached to this surface under the central depth test.
+            material: { color: '#381444', emission: '#581469' }
+        });
+        // The elevated slab shares one Z interval between physics and GPU geometry.
+        this.roof = this.create('elevated-slab', {
+            // Ground position overlaps the emitting surface intentionally.
+            positionX: 100,
+            // Align with the emission patch's ground center.
+            positionY: 65,
+            // Bodies below this elevation can pass underneath.
+            positionZ: 65,
+            // A narrower surface leaves emission visible around its edges.
+            width: 145,
+            // Ground depth of the actual slab footprint.
+            depth: 115,
+            // The slab top is Z 77 and is a normal support surface.
+            height: 12,
+            // Opaque teal shows whether purple ground emission incorrectly paints over it.
+            material: { color: '#3d8b80' },
+            // Static support has no custom ground/roof collision handler.
+            body: { friction: 0.4 }
+        });
+        // The controlled primitive is a normal dynamic circular body.
+        this.player = this.create('controlled-circle', {
+            // Circle footprint is handled analytically by physics.
+            shape: 'circle',
+            // Start clearly to the left of the moving box.
+            positionX: -160,
+            // Use the rear lane so bodies approach each other in the same height range.
+            positionY: -85,
+            // Physical circle radius in world units.
+            radius: 13,
+            // This volume stands on the floor; visuals use exactly the same height.
+            height: 28,
+            // Cream distinguishes the controlled object without assigning a gameplay class.
+            material: { color: '#ffeed8' },
+            // A small finite mass receives generic pushes from heavier bodies.
+            body: { motion: 'dynamic', mass: 2, friction: 0 }
+        });
+        // A heavier moving box participates through the identical body registry.
+        this.create('moving-box', {
+            // Start to the right and move toward the controlled circle.
+            positionX: 150,
+            // Share the rear lane's ground-depth coordinate.
+            positionY: -85,
+            // Width sets the actual front/side collision extent.
+            width: 75,
+            // Depth sets the second physical footprint extent.
+            depth: 44,
+            // A taller box still uses generic overlapping Z intervals.
+            height: 38,
+            // Distinguish its opaque surface from the controlled circle.
+            material: { color: '#cebbff' },
+            // Mass, velocity, bounce, and friction describe behavior without type-pair code.
+            body: { motion: 'dynamic', mass: 30, velocityX: -70, restitution: 1, friction: 0 }
+        });
+        // This ordinary body starts under the elevated slab with a disjoint Z interval.
+        this.create('under-slab', {
+            // Use a second primitive shape to demonstrate common collision rules.
+            shape: 'circle',
+            // Place it under the slab's left side.
+            positionX: 65,
+            // Share the slab's ground-depth position.
+            positionY: 65,
+            // A small radius makes it easy to distinguish from the object above.
+            radius: 10,
+            // Top Z 20 is below slab bottom Z 65.
+            height: 20,
+            // Warm orange makes its ground-level location visible when unobstructed.
+            material: { color: '#f6961e' },
+            // The generic solver moves it without inventing an “under bridge” exception.
+            body: { motion: 'dynamic', velocityX: 24, friction: 0 }
+        });
+        // A body above the slab falls onto its top through normal gravity and contact.
+        this.create('above-slab', {
+            // Use a circle so visual segmentation and analytical circle collision are exercised.
+            shape: 'circle',
+            // Start near the slab center.
+            positionX: 105,
+            // Use the same ground-depth coordinate as the object below.
+            positionY: 65,
+            // Gravity will lower this bottom elevation until it meets the slab top.
+            positionZ: 110,
+            // A small footprint fits wholly on the support surface.
+            radius: 12,
+            // Its visible and physical height are both twenty units.
+            height: 20,
+            // Pink separates it visually from the orange object underneath.
+            material: { color: '#f971ce' },
+            // Dynamic mode enables shared gravity and support resolution.
+            body: { motion: 'dynamic' }
+        });
+        // Direct illumination is a source declaration, independent of surface self-emission.
+        this.scene.createLight('world-study.light', {
+            // Place the source to the left of the elevated structure.
+            positionX: -30,
+            // Keep its ground position near the scene center.
+            positionY: 0,
+            // This source is below the slab top and cannot directly light its upward surface.
+            positionZ: 48,
+            // Finite physical reach determines both culling and attenuation.
+            radius: 240,
+            // Warm color reflects through each receiving surface's material.
+            color: '#ffd29a',
+            // Brightness is a source setting, not a special-case additive overlay alpha.
+            intensity: 2.4
+        });
+        /** Count contact beginnings for observation only; no response is implemented here. */
+        this.unsubscribe = directory.systems.get('physics').subscribe((event) => {
+            // Resting/staying contacts should not inflate the first-contact count.
+            if (event.type === 'begin') {
+                // This counter has no effect on positions, velocity, or collision filtering.
+                this.contactBegins += 1;
+            }
+        });
+    }
+
+    /** Assign test-control velocity before the engine's physics step; never repair collisions. */
+    update(stepSeconds) {
+        // Read current input from its own reusable system.
+        const input = this.directory.systems.get('input');
+        // Compute keyboard intent without making input depend on object identity.
+        let directionX = Number(input.heldKeys.has('KeyD') || input.heldKeys.has('ArrowRight')) - Number(input.heldKeys.has('KeyA') || input.heldKeys.has('ArrowLeft'));
+        // Positive Y means toward the bottom of the ground-plane view.
+        let directionY = Number(input.heldKeys.has('KeyS') || input.heldKeys.has('ArrowDown')) - Number(input.heldKeys.has('KeyW') || input.heldKeys.has('ArrowUp'));
+        // A held pointer supplies a ground-level destination, not a teleport through walls.
+        if (input.pointer.held) {
+            // Input coordinates are CSS pixels; renderer converts them to projected-world units.
+            const target = this.directory.systems.get('renderer').screenToWorld(input.pointer.positionX, input.pointer.positionY);
+            // Aim toward the clicked ground X coordinate.
+            directionX = target.positionX - this.player.transform.positionX;
+            // The controlled body's base is ground level, so projected Y gives a ground target.
+            directionY = target.positionY - this.player.transform.positionY;
+        }
+        // Normalize diagonals/targets so movement speed has one consistent world-unit meaning.
+        const length = Math.hypot(directionX, directionY);
+        // Pointer destinations closer than one step should not be overshot by intended velocity.
+        const speed = input.pointer.held ? Math.min(150, length / stepSeconds) : 150;
+        // Assign horizontal intent; the common solver may subsequently stop or redirect it.
+        this.player.body.velocityX = length > 0 ? directionX / length * speed : 0;
+        // Assign ground-depth intent without resetting physical vertical velocity or gravity.
+        this.player.body.velocityY = length > 0 ? directionY / length * speed : 0;
+    }
+
+    /** Fill the harness backdrop independently from all world geometry/depth decisions. */
+    drawBackground(renderer) {
+        // Queue one screen-space rectangle covering the entire visible drawing surface.
+        this.backgroundBrush.rectangle(0, 0, renderer.viewportWidth, renderer.viewportHeight);
+        // Submit and clear the background brush queue.
+        this.backgroundBrush.flush(renderer);
+    }
+
+    /** Refresh engine measurements through harness-owned HTML, with no extra scheduling loop. */
+    updateDiagnostics(renderer) {
+        // Wall-clock sampling continues while physical simulation is paused.
+        const nowSeconds = performance.now() / 1000;
+        // Limit text updates to five times per second.
+        if (nowSeconds < this.nextHudUpdateSeconds) {
+            // Keep prior diagnostic text until another sample is due.
+            return;
+        }
+        // Set the next sample threshold without creating a timer or animation callback.
+        this.nextHudUpdateSeconds = nowSeconds + 0.2;
+        // Read measurements from their owning services.
+        const profiler = this.directory.tools.get('profiler');
+        // Physics reports actual spatial candidate/narrow-phase work.
+        const physics = this.directory.systems.get('physics');
+        // World rendering reports culled geometry and real GPU draw submissions.
+        const worldRenderer = this.directory.systems.get('worldRenderer');
+        // Display measured FPS only after a complete sample window.
+        document.getElementById('fps-value').textContent = profiler.framesPerSecond ? profiler.framesPerSecond.toFixed(0) : '…';
+        // Show completed fixed updates separately from display frames.
+        document.getElementById('steps-value').textContent = String(profiler.simulationSteps);
+        // Simulation time freezes during pause, irrespective of HUD sampling.
+        document.getElementById('time-value').textContent = `${this.directory.parentEngine.lobby.simulationSeconds.toFixed(1)} s`;
+        // Count final Canvas submissions plus internal world GPU submissions.
+        document.getElementById('draws-value').textContent = String(renderer.drawCalls + worldRenderer.statistics.drawCalls);
+        // Report intentionally dropped time rather than hiding slow simulation.
+        document.getElementById('dropped-value').textContent = `${profiler.droppedSeconds.toFixed(2)} s`;
+        // Preserve the existing backing-resolution display for orientation tests.
+        document.getElementById('resolution-value').textContent = `${renderer.canvas.width} × ${renderer.canvas.height}`;
+        // Show how many actual bodies are registered, including distant static objects.
+        document.getElementById('bodies-value').textContent = String(physics.bodies.size);
+        // Show how many geometry tests were needed in the latest fixed step.
+        document.getElementById('checks-value').textContent = String(physics.statistics.narrowChecks);
+        // Compare the rendered population with the whole scene registry.
+        document.getElementById('visible-value').textContent = String(worldRenderer.statistics.visibleElements);
+        // Report events observed through the generic contact subscription.
+        document.getElementById('contacts-value').textContent = String(this.contactBegins);
+    }
+
+    /** Add a large distant static population; ordinary registration performs all index work. */
+    addDistantPopulation() {
+        // Run this deliberate stress setup once per study instance.
+        if (this.distantPopulationAdded) {
+            // Repeated button clicks must not duplicate object IDs or population.
+            return;
+        }
+        // Count ten thousand ordinary objects, starting at zero and excluding ten thousand.
+        for (let objectIndex = 0; objectIndex < 10000; objectIndex += 1) {
+            // Place them outside the current scene's view and collision neighborhood.
+            this.create(`remote-${objectIndex}`, {
+                // Sparse columns keep nearby-query work proportional to local density.
+                positionX: 2000 + (objectIndex % 100) * 80,
+                // Integer division creates one hundred separate rows.
+                positionY: 2000 + Math.floor(objectIndex / 100) * 80,
+                // Each object has a real small footprint, not a fake count-only placeholder.
+                width: 20,
+                // Ordinary depth participates in actual spatial membership.
+                depth: 20,
+                // A positive height makes each registration a genuine solid volume.
+                height: 30,
+                // Plain material means these could be rendered if the camera visited them.
+                material: { color: '#78648f' }
+            });
+        }
+        // Remember that this actual population is already installed.
+        this.distantPopulationAdded = true;
+    }
+
+    /** Remove all owned declarations and callbacks, leaving reusable engine services intact. */
+    dispose() {
+        // A failed initialization can occur before Directory assignment.
+        if (!this.directory) {
+            // No registrations exist in that case.
+            return;
+        }
+        // A subscription may not exist if setup failed before that stage.
+        if (this.unsubscribe) {
+            // Release the test's contact callback before its bodies are removed.
+            this.unsubscribe();
+        }
+        // “of” visits each owned element ID and ends after every declaration is removed.
+        for (const identifier of this.elementIdentifiers) {
+            // One API removes physical, visual, shadow, and Directory membership together.
+            this.scene.removeElement(identifier);
+        }
+        // Forget owned IDs after cleanup completes.
+        this.elementIdentifiers.length = 0;
+        // Remove the source and its indexed influence, even if setup failed before creation.
+        this.scene.removeLight('world-study.light');
+        // Resolve the final compositor while Directory services remain alive.
+        const renderer = this.directory.systems.get('renderer');
+        // Remove this study's background callback only.
+        renderer.removePass('world-study.background');
+        // Remove its diagnostics callback independently from engine-owned passes.
+        renderer.removePass('world-study.diagnostics');
+    }
+}
+
+</script>
 <script data-source="demo/boot.js">
 /**
  * HARNESS ENTRY — construct the engine, install optional test content, wire controls,
@@ -1333,8 +4205,8 @@ const foundationCanvas = document.getElementById('foundation-canvas');
 // Construct and connect the four levels without starting any recurring callbacks.
 const foundationEngine = new Etrnl9Engine(foundationCanvas);
 
-// Install the optional study after the Directory and its parent-engine reference exist.
-foundationEngine.penthouse.install('rectangle-study', new RectangleStudy());
+// Remember the selected optional study without mixing it into engine implementation.
+let selectedStudy = null;
 
 // Expose the instance for inspection, learning, and browser verification.
 window.foundationEngine = foundationEngine;
@@ -1398,6 +4270,114 @@ function updateFoundationZoom(event) {
     renderer.camera.zoom = Number(event.target.value);
 }
 
+/** Replace only harness-owned test content; the same connected engine and Lobby remain. */
+function installFoundationStudy(studyName) {
+    // Remember whether this same engine should resume after replacing test content.
+    const wasRunning = foundationEngine.lobby.running;
+    // Prevent a half-installed scene from rendering between lifecycle operations.
+    foundationEngine.stop();
+    // Uninstall only a previously installed harness feature.
+    if (selectedStudy) {
+        // Feature cleanup removes its scene declarations, passes, and callbacks.
+        foundationEngine.penthouse.uninstall(selectedStudy);
+    }
+    // Keep scene-specific controls visible only when they have meaningful targets.
+    const isWorldStudy = studyName === 'world';
+    // Select the neutral shared-world scene or the original scheduling/brush study.
+    selectedStudy = isWorldStudy ? 'world-study' : 'rectangle-study';
+    // Install through the same optional Penthouse contract as future procedural features.
+    foundationEngine.penthouse.install(selectedStudy, isWorldStudy ? new WorldStudy() : new RectangleStudy());
+    // Set the selector to reflect programmatic selection as well as user input.
+    document.getElementById('study-control').value = studyName;
+    // Hide stress/roof controls in the Canvas-only study.
+    document.getElementById('world-controls').hidden = !isWorldStudy;
+    // Hide physical measurements when no world bodies exist.
+    document.getElementById('world-measurements').hidden = !isWorldStudy;
+    // Explain what pointer input means for the selected study.
+    document.getElementById('study-instructions').textContent = isWorldStudy
+        ? 'Move the cream circle with WASD/arrows or hold a touch destination. Physics handles all contacts. Pink rests above the slab; orange moves below. Purple ground emission stays behind opaque geometry.'
+        : 'Drag or touch to place the cream marker. WASD/arrows move it. This Canvas-only study checks scheduling and brush queues.';
+    // Explain that this scene is a neutral engine test rather than migrated gameplay.
+    document.getElementById('scene-caption').textContent = isWorldStudy ? 'One world: bodies, height, visibility, and light.' : 'A small study, running on four levels.';
+    // Reset the scene-specific roof toggle label.
+    document.getElementById('roof-button').textContent = 'Hide slab visually';
+    // Re-enable population setup for a newly constructed world study.
+    document.getElementById('population-button').disabled = false;
+    // Resume the single scheduler only if it was running before this replacement.
+    if (wasRunning) {
+        // The Lobby resets timing, so scene setup duration never becomes physics catch-up.
+        foundationEngine.start();
+    }
+    // Reflect the current lifecycle state in visible controls.
+    refreshFoundationControls();
+}
+
+/** Select a test scene from the harness dropdown; never construct a second engine. */
+function changeFoundationStudy(event) {
+    // The select value names only test content, not a renderer-specific layer repair.
+    installFoundationStudy(event.target.value);
+}
+
+/** Recreate the selected neutral scene while retaining all foundational services. */
+function resetFoundationStudy() {
+    // Choose the current study from its visible selector.
+    installFoundationStudy(document.getElementById('study-control').value);
+}
+
+/** Demonstrate that visibility and collision share geometry but are independent declarations. */
+function toggleFoundationRoof() {
+    // Find the installed world study through the optional feature library.
+    const study = foundationEngine.penthouse.features.get('world-study');
+    // The button has no target in another study.
+    if (!study) {
+        // Leave the current test scene unchanged.
+        return;
+    }
+    // The tracked visibility setter automatically invalidates cached GPU geometry.
+    study.roof.visible = !study.roof.visible;
+    // Explain the opposite action while retaining the slab's physical support body.
+    document.getElementById('roof-button').textContent = study.roof.visible ? 'Hide slab visually' : 'Show slab visually';
+}
+
+/** Populate real distant bodies to compare registry size against local query/render work. */
+function addFoundationPopulation() {
+    // Resolve the current test content, not a hard-coded engine population field.
+    const study = foundationEngine.penthouse.features.get('world-study');
+    // Other studies have no stress-population setup.
+    if (!study) {
+        // Avoid changing an unrelated test scene.
+        return;
+    }
+    // Prevent repeated setup requests and make this one-time ingestion operation explicit.
+    document.getElementById('population-button').disabled = true;
+    // Pause scheduling so deliberate registration time is not misreported as simulation catch-up.
+    const wasRunning = foundationEngine.lobby.running;
+    // Stop the single Lobby before the synchronous bulk-registration operation.
+    foundationEngine.stop();
+    // Create actual indexed static elements, not an artificial population counter.
+    study.addDistantPopulation();
+    // Resume only if the user had the engine running before setup.
+    if (wasRunning) {
+        // A fresh timing baseline excludes the one-time ingestion duration.
+        foundationEngine.start();
+    }
+    // Keep controls consistent if population setup was requested while stopped.
+    refreshFoundationControls();
+}
+
+/** Display actual engine failures in the phone-readable harness without suppressing console errors. */
+function reportFoundationError() {
+    // An unrelated page error does not necessarily describe an engine execution failure.
+    if (!foundationEngine.lobby.lastError) {
+        // Leave ordinary browser error reporting unchanged.
+        return;
+    }
+    // Refresh stopped-state controls so a supported alternative study can still be selected.
+    refreshFoundationControls();
+    // Replace a stale Running label with the actual capability/execution failure.
+    document.getElementById('status-value').textContent = foundationEngine.lobby.lastError.message;
+}
+
 // Connect the start control to the existing engine, without an anonymous inline loop.
 document.getElementById('start-button').addEventListener('click', startFoundation);
 // Connect stop to scheduling cancellation.
@@ -1406,6 +4386,20 @@ document.getElementById('stop-button').addEventListener('click', stopFoundation)
 document.getElementById('pause-button').addEventListener('click', toggleFoundationPause);
 // Let the camera demonstrate world scaling while the screen background stays fixed.
 document.getElementById('zoom-control').addEventListener('change', updateFoundationZoom);
+// Let users revisit the original loop study without downloading another file.
+document.getElementById('study-control').addEventListener('change', changeFoundationStudy);
+// Reset primitives through their normal optional-feature lifecycle.
+document.getElementById('reset-button').addEventListener('click', resetFoundationStudy);
+// Hide/show only the slab's visual declaration to reveal automatic emission occlusion.
+document.getElementById('roof-button').addEventListener('click', toggleFoundationRoof);
+// Add a genuine remote population using ordinary scene registration.
+document.getElementById('population-button').addEventListener('click', addFoundationPopulation);
+// Keep execution failures visible without requiring a phone user to open developer tools.
+window.addEventListener('error', reportFoundationError);
+// Derive the visible version from shared configuration instead of maintaining two version values.
+document.getElementById('version-value').textContent = foundationEngine.basement.configuration.engineVersion;
+// Install the neutral shared-world study after every level and service exists.
+installFoundationStudy('world');
 // All construction, feature installation, and event wiring are complete; begin frames now.
 startFoundation();
 

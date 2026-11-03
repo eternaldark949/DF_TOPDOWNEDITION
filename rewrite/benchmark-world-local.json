@@ -1,0 +1,34 @@
+{
+  "nodeVersion": "v24.22.1",
+  "workload": "Sparse static boxes, 100 dynamic circles, 4 solver iterations, zero gravity; 5 warmup + 60 measured fixed steps.",
+  "limitation": "CPU-only sparse-scene measurements; not GPU/phone FPS or a guarantee for clustered contacts.",
+  "reports": [
+    {
+      "staticPopulation": 1000,
+      "movingPopulation": 100,
+      "registrationMilliseconds": 60.923568,
+      "meanStepMilliseconds": 5.728109583333333,
+      "narrowChecksPerStep": 400,
+      "candidatePairsPerStep": 400,
+      "finalStaticQueryUsedFullScan": false
+    },
+    {
+      "staticPopulation": 10000,
+      "movingPopulation": 100,
+      "registrationMilliseconds": 428.895857,
+      "meanStepMilliseconds": 7.378224366666666,
+      "narrowChecksPerStep": 400,
+      "candidatePairsPerStep": 400,
+      "finalStaticQueryUsedFullScan": false
+    },
+    {
+      "staticPopulation": 25000,
+      "movingPopulation": 100,
+      "registrationMilliseconds": 938.2012140000002,
+      "meanStepMilliseconds": 5.346995183333335,
+      "narrowChecksPerStep": 400,
+      "candidatePairsPerStep": 400,
+      "finalStaticQueryUsedFullScan": false
+    }
+  ]
+}

@@ -1,113 +1,124 @@
-# ETRNL9 engine foundation
+# ETRNL9 engine foundation — 0.2.0
 
-This is the first working foundation of the rewrite, organized around ETERNAL's
-Basement, Lobby, Directory, and Penthouse design. It lives alongside the existing
-game so the original remains available for later behavioral comparisons.
+The rewrite now has a shared world foundation, built on ETERNAL's Basement, Lobby,
+Directory, and Penthouse organization. This is still an engine laboratory, not a
+migration of Dimensions: Freelancer's game content.
 
-Open **[ETRNL9 Foundation.html](ETRNL9%20Foundation.html)** after downloading it.
-That one file contains the engine source, test scene, presentation, and explanatory
-comments. It needs no runtime libraries, fonts, asset folders, or network connection.
-GitHub's file viewer displays source; download the raw HTML to run it in a browser.
+Download **[ETRNL9 Foundation.html](ETRNL9%20Foundation.html)** and open that one file
+in a browser. All engine code, comments, shaders, styles, and test content are inline.
+There are no external runtime libraries, fonts, or assets. GitHub's source viewer
+is not the running page; download the raw HTML. Shared-world rendering requires WebGL2.
 
-The cream marker responds to WASD/arrows or a held pointer/touch. The orbiting shapes
-demonstrate fixed simulation with display interpolation. Start, Pause/Resume, Stop,
-and Zoom exercise actual engine operations. Pause keeps drawing; Stop cancels frames.
+## Neutral studies in the same file
 
-## Where things belong
+**Shared world** is the default. WASD/arrows or a held touch destination move the cream
+circle through ordinary physics. A moving heavy box participates through the same
+contact solver. An orange volume moves below an elevated slab; a pink volume falls
+onto its top. Purple ground emission is hidden by opaque geometry automatically.
+A point source illuminates surfaces and casts geometric shadows.
 
-| Level | Responsibility | Source |
+**Hide slab visually** reveals emission/objects behind it without removing its physical
+support. **Add 10,000 distant bodies** registers real indexed objects; compare total body
+count with visible elements and local geometry checks. This one-time setup can briefly
+block the page while registrations are created. Reset scene removes that population.
+Zoom out to 50% to inspect the whole scene on a phone.
+
+**Loop & brushes** preserves the original Canvas-only rectangle study in the same file.
+Start, Pause/Resume, Stop, Reset scene, and Zoom use actual engine lifecycle operations.
+Pause keeps rendering; Stop cancels frame callbacks. No game-specific collision response
+or per-object painter priority is implemented by either study.
+
+## Where concerns live
+
+| Level / component | Responsibility | Source |
 |---|---|---|
-| Basement | Shared configuration, small methods, generic named-library implementation | [basement.js](src/engine/basement.js) |
-| Lobby | The one frame scheduler, fixed simulation, pause ownership, hidden-page suspension, start/stop | [lobby.js](src/engine/lobby.js) |
-| Directory | Systems, tools, element and generalized asset registrations | [directory.js](src/engine/directory.js) |
-| Directory → renderer | Canvas allocation, camera, ordered passes, queued same-color brushes | [renderer.js](src/engine/renderer.js) |
-| Directory → input | Keyboard and primary pointer state; no game action bindings | [input.js](src/engine/input.js) |
-| Directory → profiler | Actual completed frames/steps, sampled FPS, discarded time, synchronous CPU cost | [profiler.js](src/engine/profiler.js) |
-| Penthouse | Installation, update, and removal of optional high-level features | [penthouse.js](src/engine/penthouse.js) |
-| Engine | Assemble all four levels, connect them, delegate lifecycle | [engine.js](src/engine/engine.js) |
-| Harness | Optional scene, test-specific controls and diagnostics | [rectangle-study.js](src/demo/rectangle-study.js), [boot.js](src/demo/boot.js) |
+| Basement | Shared configuration and named collections | [basement.js](src/engine/basement.js) |
+| Basement spatial library | Sparse grids, unique local queries, movement/removal, overflow budgets | [spatial.js](src/engine/spatial.js) |
+| Basement world geometry | Shared XYZ, footprint, height, tracked transforms, material definitions | [world-geometry.js](src/engine/world-geometry.js) |
+| Lobby | Only frame scheduler; fixed steps, pauses, hidden-page suspension, lifecycle | [lobby.js](src/engine/lobby.js) |
+| Directory | Assemble systems/tools and expose element/asset libraries | [directory.js](src/engine/directory.js) |
+| Scene system | Declarative elements/lights, ownership, automatic physical/visual index membership | [scene.js](src/engine/scene.js) |
+| Physics system | Generic shape contacts, Z intervals, linear mass/friction response, sensors/events | [physics.js](src/engine/physics.js) |
+| Canvas renderer | Final viewport, camera helpers, brushes, screen composition | [renderer.js](src/engine/renderer.js) |
+| World renderer | GPU resource lifetime, opaque depth visibility, central surface lighting | [world-renderer.js](src/engine/world-renderer.js) |
+| Render geometry helper | Reusable triangles generated from shared world geometry | [world-mesh.js](src/engine/world-mesh.js) |
+| Point-light backend | Six-direction source visibility from nearby opaque geometry | [point-light-renderer.js](src/engine/point-light-renderer.js) |
+| GPU program library | Fully commented projection, emission, depth, and lighting calculations | [world-shaders.js](src/engine/world-shaders.js) |
+| Input system | Keyboard and primary pointer state, without game action mappings | [input.js](src/engine/input.js) |
+| Profiler tool | Actual frames/steps, sampled FPS, discarded time, CPU-side frame cost | [profiler.js](src/engine/profiler.js) |
+| Penthouse | Install/update/remove optional high-level features | [penthouse.js](src/engine/penthouse.js) |
+| Engine | Construct levels, connect dependencies, delegate lifecycle | [engine.js](src/engine/engine.js) |
+| Test content | Primitive declarations and harness controls/diagnostics | [world-study.js](src/demo/world-study.js), [rectangle-study.js](src/demo/rectangle-study.js), [boot.js](src/demo/boot.js) |
 
-The Rectangle Study is an example of the Penthouse extension contract, not a
-procedural humanoid or tiered-building migration. Those features, the existing
-game's content, saves, audio, physics, and quests have not been migrated yet.
-The asset library currently registers caller-provided references; it does not
-claim to load or decode audio/images. Rendering passes are real callbacks with
-explicit order and coordinate space; unimplemented lighting/bloom stages are not
-advertised as functional switches.
+Read **[ENGINE_CONTRACTS.md](ENGINE_CONTRACTS.md)** for every property, default, coordinate
+rule, ownership boundary, supported behavior, and explicit limitation. That document
+explains why world glow no longer bypasses roofs and why a new body category requires
+no new character/vehicle collision handler.
 
-## Construction and execution
+## Initialization and simulation order
 
-1. The engine constructs Basement settings and libraries.
-2. The Directory constructs systems and tools without subscribing or scheduling.
-3. The Penthouse and Lobby are constructed with their actual dependencies.
-4. The engine connects Directory components after all levels exist.
-5. The caller optionally installs Penthouse features.
-6. Only an explicit `engine.start()` begins recurring work in the Lobby.
+1. Construct Basement, Directory, Penthouse, and Lobby without starting execution.
+2. Connect system references after all components exist.
+3. Install optional test features using completed Directory services.
+4. Explicitly start the Lobby's one frame scheduler.
+5. For each fixed step, capture moving positions, update feature/control intentions,
+   then update Directory systems, including physics.
+6. Render the current world and harness once per display callback.
 
-An ordinary fixed step updates Directory systems, then Penthouse features. Rendering
-runs once per display callback. Fixed simulation defaults to 60 updates per second,
-with no more than five catch-up steps in one callback. Overload drops time and records
-it instead of silently creating an unbounded backlog. This is a foundation policy,
-not a claim of perfect simulation under overload.
+The default simulation rate is 60 Hz. The Lobby caps catch-up work and reports dropped
+time rather than allowing an endless backlog. Physics independently subdivides fast
+movement within an explicit safety budget; exceeding it fails before movement instead
+of silently permitting missed contacts. The Canvas study interpolates its own display
+motion; shared-world rendering currently uses authoritative current geometry.
 
-Pauses use named owners so closing a menu cannot release a different system's pause.
-Hidden pages suspend scheduling entirely and reset timing on return. Stop/restart
-preserves scene state but never accumulates stopped time. Destroy removes features
-first, then services and browser listeners; a destroyed engine cannot restart.
+## Build and automated checks
 
-## Addresses you can inspect
-
-```javascript
-// Read the current fixed simulation time from its owning Lobby.
-foundationEngine.lobby.simulationSeconds;
-
-// Retrieve the renderer system by its Directory registration name.
-foundationEngine.directory.systems.get('renderer');
-
-// Retrieve the controlled element installed by the optional test feature.
-foundationEngine.directory.elements.get('study.player');
-
-// Retrieve the optional feature itself rather than putting its internals on the engine.
-foundationEngine.penthouse.features.get('rectangle-study');
-
-// Remove the study and its passes/elements while leaving the empty engine running.
-foundationEngine.penthouse.uninstall('rectangle-study');
-```
-
-## Build and checks
-
-From the repository root, with Node 18 or newer:
+From the repository root, using Node 18 or newer:
 
 ```sh
 node rewrite/tools/build.mjs
 node rewrite/tools/build.mjs --check
-node rewrite/tools/test-foundation.cjs
+node rewrite/tools/test-world.cjs
 ```
 
-These commands require no third-party Node packages. The build preserves readable
-source blocks and all explanatory comments in the output. Edit `rewrite/src/`,
-then rebuild; do not hand-edit the generated HTML.
+The world runner includes the original seven foundation scenarios plus ten spatial,
+physics, and world-contract scenarios. No npm packages are needed. Edit `rewrite/src/`
+and rebuild; do not hand-edit the generated HTML. Comments are retained in the build.
 
-Real browser verification uses development-only Python Playwright and installed
-Chromium at `/usr/bin/chromium`:
+Development-only real-browser checks:
 
 ```sh
+python -m pip install -r rewrite/tools/requirements-browser.txt
+python -m playwright install chromium
 python rewrite/tools/test-browser.py
+python rewrite/tools/test-world-browser.py
 ```
 
-An optional argument saves screenshots to a local evidence folder:
+Tests use a configured `CHROMIUM_EXECUTABLE`, a system `chromium`, or Playwright's managed
+browser. An optional output-directory argument saves screenshots. Headless software
+WebGL is a test environment, not evidence of real phone performance.
+
+A reproducible CPU workload compares sparse registries of 1,000, 10,000, and 25,000 static
+bodies with a constant 100 moving bodies:
 
 ```sh
-python rewrite/tools/test-browser.py /tmp/etrnl9-evidence
+node rewrite/tools/bench-world.cjs /tmp/etrnl9-world-benchmark.json
 ```
 
-See [VERIFICATION.md](VERIFICATION.md) for completed checks and limitations.
-The foundation workflow checks source/build synchronization and deterministic
-behavior when rewrite files change. The original game's build workflow is unchanged.
+See **[VERIFICATION.md](VERIFICATION.md)** for measured results and limitations. GitHub CI
+runs source/build agreement, deterministic scenarios, and browser event/pixel checks.
+The existing game's source, artifact, and workflow remain separate.
 
-## Source standard
+## Deliberate scope
 
-Follow the repository's [CODE_REQUIREMENTS.md](../CODE_REQUIREMENTS.md).
-Source explains unit purpose and executable steps, uses descriptive names, and
-explains loop traversal and JavaScript-specific behavior where it appears.
-The engine owns no harness-specific HTML IDs or Rectangle Study logic.
+Supported now: opaque boxes, circular prisms, planes, shared physical Z, spatial indexes,
+linear body contacts, default all-category filtering, contact events, depth-tested emission,
+point lights with hard shadows, static mesh/image reuse, and GPU context recovery.
+
+Not implemented: migrated humanoids/buildings/gameplay, textures and alpha-cutout sprites,
+transparent world materials, blurred bloom, angular dynamics, joints, general mesh
+colliders, general continuous collision detection, asset streaming/decoding, and arbitrary
+complex-scene performance guarantees. No existing-game equivalence is claimed yet.
+
+Follow [CODE_REQUIREMENTS.md](../CODE_REQUIREMENTS.md) for descriptive names, function/class
+purpose explanations, line-by-line English comments, and explicit language/loop reasoning.

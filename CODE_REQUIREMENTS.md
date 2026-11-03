@@ -187,3 +187,34 @@ Do not declare this standard satisfied solely because comments are numerous, fil
 ## Scope for future work
 
 Follow this standard for new and changed code immediately. When refactoring a selected module, bring that module's implementation up to the standard rather than commenting only the newly added lines. Existing unmodified code is not automatically compliant. This document authorizes no rewrite, behavior change, deployment, or publication by itself; follow the current task's scope.
+
+## 11. Shared world rules precede game features
+
+The owner explicitly requires engine-managed interaction, visibility, and height before
+game migration. Follow `rewrite/ENGINE_CONTRACTS.md` when extending the foundation.
+
+- Use one world transform and physical shape/height description for collision, projection,
+  camera depth, and source obstruction. Do not maintain unrelated physical/render Z values.
+- Ordinary solid bodies interact by default through shared shape algorithms. Do not add
+  gameplay identity pairs such as cat/car or pedestrian/car to implement basic solidity.
+- Collision filters express intentional exclusions. Registering a new body category must
+  not require updating every existing category's default mask or adding another handler.
+- Physics candidates must not depend on the camera's visible objects. Offscreen bodies
+  remain physical according to the same rules.
+- Scene declarations automatically maintain spatial membership on tracked movement,
+  rotation, height/shape changes, removal, and unload. Attached sources follow their
+  owner's current transform without feature code copying positions every frame.
+- Rendering concerns do not replace geometric depth. World surfaces, emission, and
+  direct lighting must respect engine-managed visibility instead of per-building ordering.
+- Do not fix glow over roofs by adding a special shop/window/building painter priority.
+  Declare actual surface geometry/material/source information and use shared visibility.
+- Unstructured world Canvas callbacks cannot bypass a depth-aware scene. Canvas screen
+  UI/backgrounds and explicit diagnostic overlays remain separate from physical surfaces.
+- Keep asset definitions separate from placed scene instances. Share spatial algorithms
+  without forcing collision, visibility, and light reach into one universal index.
+- Preserve explicit budgets and diagnostics. Do not advertise unlimited/constant-time
+  capacity, truncate blockers silently, or claim mocked tests prove browser pixels.
+- Add engine-level behavioral checks for new supported geometry/interaction contracts,
+  including height separation and visible emission occlusion, before migrating game content.
+- Unsupported geometry/material/dynamics must be stated explicitly, not treated as fully
+  implemented by an incorrect fallback. Keep named concerns and detailed comments intact.

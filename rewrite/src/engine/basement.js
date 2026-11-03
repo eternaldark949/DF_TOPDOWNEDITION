@@ -12,7 +12,7 @@ class LevelBasement {
             // Identify this foundation independently of the existing game's version.
             engineName: 'ETRNL9',
             // Describe the first working foundation, not a migrated full game.
-            engineVersion: '0.1.0',
+            engineVersion: '0.2.0',
             // Run simulation at sixty fixed steps per second on any display.
             simulationHz: 60,
             // Limit elapsed time accepted after a browser stall, in seconds.
@@ -21,12 +21,26 @@ class LevelBasement {
             maximumStepsPerFrame: 5,
             // Limit backing-image density to control memory use on phones.
             maximumPixelRatio: 2,
+            // World shading defaults to one physical pixel per CSS pixel; UI can remain sharper.
+            maximumWorldPixelRatio: 1,
+            // Shared oblique projection: each upward Z unit shifts the image up by this amount.
+            heightProjectionScale: 0.75,
+            // Downward acceleration in upward-positive world Z, in world units per second squared.
+            gravityZ: -240,
+            // Bound safety subdivisions rather than silently skipping fast-body contacts.
+            maximumPhysicsSubsteps: 64,
+            // Repeat generic contact correction for neighboring bodies and simple stacks.
+            solverIterations: 4,
+            // Ambient reflected surface illumination, separate from surface emission.
+            ambientLight: 0.28,
+            // Each point light uses six depth faces of this resolution, independent of scene size.
+            shadowMapSize: 256,
             // Copy caller overrides after defaults so supplied settings take precedence.
             ...overrides
         });
-        // Visit the numeric setting-name values one at a time and stop after all four.
+        // Visit positive numeric setting-name values one at a time and stop after the list.
         // “of” retrieves names from this explicit list, unlike “in”, which reads keys.
-        for (const settingName of ['simulationHz', 'maximumFrameSeconds', 'maximumStepsPerFrame', 'maximumPixelRatio']) {
+        for (const settingName of ['simulationHz', 'maximumFrameSeconds', 'maximumStepsPerFrame', 'maximumPixelRatio', 'maximumWorldPixelRatio', 'heightProjectionScale', 'maximumPhysicsSubsteps', 'solverIterations', 'shadowMapSize']) {
             // Look up this setting's actual supplied value, including invalid strings.
             const settingValue = this.configuration[settingName];
             // Numeric settings must be finite positive numbers; do not coerce strings.
@@ -44,6 +58,16 @@ class LevelBasement {
         if (this.configuration.maximumPixelRatio < 1) {
             // Reject contradictory bounds instead of allocating surprising dimensions.
             throw new RangeError('maximumPixelRatio must be at least one.');
+        }
+        // Gravity may be zero or negative; ambient illumination may be zero but never negative.
+        if (!Number.isFinite(this.configuration.gravityZ) || !Number.isFinite(this.configuration.ambientLight) || this.configuration.ambientLight < 0) {
+            // Explain these distinct numeric rules rather than rejecting valid zero gravity.
+            throw new RangeError('Gravity must be finite; ambient light must be finite and nonnegative.');
+        }
+        // Subdivision/iteration counts represent whole repetitions, not fractional durations.
+        if (!Number.isInteger(this.configuration.maximumPhysicsSubsteps) || !Number.isInteger(this.configuration.solverIterations) || !Number.isInteger(this.configuration.shadowMapSize)) {
+            // Reject fractional loop budgets before any physics work begins.
+            throw new RangeError('Physics substep and solver iteration counts must be integers.');
         }
     }
 

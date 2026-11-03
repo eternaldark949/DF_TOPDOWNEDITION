@@ -48,7 +48,7 @@ function eventTarget() {
 }
 
 /** Create fresh source-loaded classes, browser fakes, and a manually advanced clock. */
-function environment() {
+function environment(configuration = {}) {
     // Record drawing operations for assertions about transforms and execution order.
     const drawingCalls = [];
     // Emulate only the Canvas methods used by this foundation.
@@ -101,17 +101,17 @@ function environment() {
     // Provide a separate classic-script context, mirroring the browser build's class scope.
     const context = vm.createContext({ console });
     // Load dependencies before classes that instantiate them.
-    // “of” reads each filename value and stops after the eight engine source files.
-    for (const sourceName of ['basement', 'renderer', 'input', 'profiler', 'directory', 'penthouse', 'lobby', 'engine']) {
+    // “of” reads each filename value and stops after all foundational source files.
+    for (const sourceName of ['basement', 'spatial', 'world-geometry', 'physics', 'scene', 'world-shaders', 'world-mesh', 'point-light-renderer', 'world-renderer', 'renderer', 'input', 'profiler', 'directory', 'penthouse', 'lobby', 'engine']) {
         // Read the current implementation, including changes made since the prior run.
         const sourceCode = readFileSync(join(__dirname, '../src/engine', `${sourceName}.js`), 'utf8');
         // Execute that file as a separate script, preserving real load-order constraints.
         vm.runInContext(sourceCode, context, { filename: `${sourceName}.js` });
     }
     // Retrieve class references from their lexical global bindings.
-    const classes = vm.runInContext('({Etrnl9Engine, CanvasBrush, LevelBasement})', context);
+    const classes = vm.runInContext('({Etrnl9Engine, CanvasBrush, LevelBasement, SpatialHashIndex, WorldGeometry, ContactGeometry})', context);
     // Create a complete but stopped engine, injecting the deterministic browser and scheduler.
-    const engine = new classes.Etrnl9Engine(canvas, {}, browserWindow, browserDocument, scheduler);
+    const engine = new classes.Etrnl9Engine(canvas, configuration, browserWindow, browserDocument, scheduler);
     // Return references needed to drive behavior and inspect its effects.
     return {
         // Expose the source-loaded engine instance.
@@ -434,3 +434,6 @@ test('validation and failure cleanup', () => {
 
 // Report the number of completed behavior scenarios rather than an invented coverage percentage.
 console.log(`${passedScenarios} foundation scenarios passed.`);
+
+// Reuse the real source-loaded fixture in world tests instead of copying engine behavior.
+module.exports = { environment };

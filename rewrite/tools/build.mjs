@@ -15,6 +15,22 @@ const rewriteRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sourceFiles = [
     // The Basement supplies shared settings and NamedLibrary before other classes use them.
     'engine/basement.js',
+    // Sparse grids provide shared lookup before scene/physics services are defined.
+    'engine/spatial.js',
+    // World positions, dimensions, and materials share one vocabulary.
+    'engine/world-geometry.js',
+    // Shape contact and body classes are defined before scene declarations instantiate them.
+    'engine/physics.js',
+    // Scenes own shared object and light declarations.
+    'engine/scene.js',
+    // GPU source definitions explain projection, depth, and source-visibility calculations.
+    'engine/world-shaders.js',
+    // Mesh conversion/cache is independent of GPU context and rendering schedules.
+    'engine/world-mesh.js',
+    // Point-light depth views use ordinary world geometry through a separate backend helper.
+    'engine/point-light-renderer.js',
+    // World surfaces use GPU depth and a central geometric lighting stage.
+    'engine/world-renderer.js',
     // The Directory constructs the renderer defined here.
     'engine/renderer.js',
     // Input owns browser device state and listener cleanup.
@@ -31,6 +47,8 @@ const sourceFiles = [
     'engine/engine.js',
     // Test content is independently removable from the build list.
     'demo/rectangle-study.js',
+    // Neutral bodies and height/lighting studies declare content without engine-specific repairs.
+    'demo/world-study.js',
     // Boot is last because it actually constructs and starts an engine.
     'demo/boot.js'
 ];

@@ -39,6 +39,12 @@ class RendererSystem {
         this.drawCalls = 0;
     }
 
+    /** Resolve the shared scene after construction; legacy Canvas-only studies remain supported. */
+    connect(directory) {
+        // The actual scene object exists even before its own index connection phase runs.
+        this.scene = directory.systems.get('scene');
+    }
+
     /** Resize backing pixels from CSS dimensions; do not replace the canvas object. */
     resize(widthCssPixels, heightCssPixels, devicePixelRatio = 1) {
         // Reject invalid public inputs before they can poison transforms or allocation.
@@ -60,6 +66,11 @@ class RendererSystem {
 
     /** Add an ordered pass: its ID, coordinate space, order, and drawing callback. */
     registerPass(identifier, order, coordinateSpace, draw) {
+        // Unstructured world Canvas calls cannot participate in the shared GPU depth buffer.
+        if (coordinateSpace === 'world' && this.scene?.worldElements.size > 0) {
+            // Require physical world surfaces to use the declarative scene API instead.
+            throw new Error('Depth-aware world content must use scene elements/materials, not Canvas world passes.');
+        }
         // Reject ambiguous coordinates rather than silently choosing the wrong transform.
         if (!['world', 'screen'].includes(coordinateSpace)) {
             // Name the two supported spaces explicitly.
@@ -102,14 +113,29 @@ class RendererSystem {
         this.renderPasses = this.renderPasses.filter((renderPass) => renderPass.identifier !== identifier);
     }
 
-    /** Convert a CSS-pixel position inside the canvas to a world position. */
-    screenToWorld(screenPositionX, screenPositionY) {
+    /** Project actual world XYZ into canvas-relative CSS pixels using the shared height model. */
+    worldToScreen(positionX, positionY, positionZ = 0) {
+        // Return both visible coordinates and physical camera depth for tools/inspection.
+        return {
+            // Oblique projection preserves world X before ordinary centering and zoom.
+            positionX: (positionX - this.camera.positionX) * this.camera.zoom + this.viewportWidth / 2,
+            // Physical height shifts projected Y upward using the same shader/index scale.
+            positionY: (positionY - positionZ * this.basement.configuration.heightProjectionScale - this.camera.positionY) * this.camera.zoom + this.viewportHeight / 2,
+            // This perpendicular depth determines visibility, not arbitrary drawing priority.
+            cameraDepth: (positionY - this.camera.positionY) * this.basement.configuration.heightProjectionScale + positionZ
+        };
+    }
+
+    /** Convert canvas-relative CSS pixels to world XY on a chosen Z plane (ground by default). */
+    screenToWorld(screenPositionX, screenPositionY, positionZ = 0) {
         // Return a fresh coordinate object; no camera or input state is changed.
         return {
             // Undo centering and zoom, then restore the camera's world position.
             positionX: (screenPositionX - this.viewportWidth / 2) / this.camera.zoom + this.camera.positionX,
-            // Apply the same conversion to the vertical axis.
-            positionY: (screenPositionY - this.viewportHeight / 2) / this.camera.zoom + this.camera.positionY
+            // Undo projected height as well as centering/zoom for the selected physical plane.
+            positionY: (screenPositionY - this.viewportHeight / 2) / this.camera.zoom + this.camera.positionY + positionZ * this.basement.configuration.heightProjectionScale,
+            // One screen point has many possible world heights; the caller explicitly chooses one.
+            positionZ
         };
     }
 
@@ -135,6 +161,11 @@ class RendererSystem {
             drawingContext.save();
             // Finally restores that state even when a drawing callback throws.
             try {
+                // A legacy pass may have been registered before a depth-aware scene was added.
+                if (renderPass.coordinateSpace === 'world' && this.scene?.worldElements.size > 0) {
+                    // Reject the incompatible mix instead of silently drawing through roofs.
+                    throw new Error('Canvas world passes cannot bypass a depth-aware scene. Use scene elements/materials.');
+                }
                 // Establish CSS-pixel coordinates for this pass.
                 drawingContext.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
                 // World-space passes follow the camera; screen-space UI stays fixed.

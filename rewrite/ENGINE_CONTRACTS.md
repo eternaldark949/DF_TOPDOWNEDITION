@@ -1,0 +1,196 @@
+# Shared world contracts
+
+These are reusable engine rules. The neutral World Study exercises them without
+implementing a game, copying the old game's physics, or adding type-pair handlers.
+
+## One world position and shape
+
+`scene.createElement(id, definition)` creates one shared element. Its transform and
+geometry feed physical contact, visual projection, camera depth, and light obstruction.
+There is no separate “render height” that must be kept synchronized with physical Z.
+
+| Declaration | Meaning |
+|---|---|
+| `positionX`, `positionY` | Footprint center on the ground, in world units. |
+| `positionZ` | Bottom elevation of the element, upward-positive world units. |
+| `height` | Vertical extent above that bottom. |
+| `angle` | Rotation around the vertical axis, in radians. |
+| `shape: 'box'` | Oriented rectangular footprint, extruded by height. |
+| `shape: 'circle'` | True circular physical footprint, extruded by height. Visual sides use 20 segments. |
+| `shape: 'plane'` | Zero-thickness rectangular opaque visual surface; not a physical body. |
+| `width`, `depth` | Unrotated rectangular footprint dimensions. |
+| `radius` | Circular footprint radius. |
+| `body` | Optional physical configuration; volumes receive ordinary static bodies by default. |
+| `body: false` | Deliberately visual-only geometry. |
+| `visible` | Whether this geometry appears. Hiding does not remove its physical body. |
+| `castsShadow` | Whether visible opaque geometry obstructs point-source illumination. Defaults to true. |
+| `material.color` | Opaque reflective RGB, written as `#rrggbb`. |
+| `material.emission` | Self-emitted RGB on that same visible surface; defaults to black. |
+| `topMaterial` | Optional distinct top-surface material. Defaults to the initially declared material. |
+
+Transforms notify the scene when public `positionX/Y/Z` or `angle` properties change.
+`transform.setPosition(x, y, z)` validates and changes all coordinates together, sending
+one notification. Ordinary position edits, teleports, and geometry replacements update
+physical and visual indexes automatically. Callers do not invalidate grids manually.
+
+Geometry and normalized material descriptors are frozen. Replace geometry through
+`element.geometry = {...}` or `element.setGeometry({...})`; replace material through
+`element.material = {...}` or `element.topMaterial = {...}`. These tracked assignments
+validate the replacement and invalidate affected indexes/buffers. Do not edit internal
+storage arrays or engine registries directly.
+
+## Ordinary physical contact is the default
+
+Every registered volume gets a body unless explicitly disabled. Body configuration:
+
+| Property | Meaning |
+|---|---|
+| `motion: 'static'` | Does not integrate velocity or yield to impulses. Default for scene volumes. |
+| `motion: 'dynamic'` | Integrates velocity/gravity and yields according to mass. |
+| `motion: 'kinematic'` | Integrates caller-controlled velocity but does not yield to impulses. Can push dynamic bodies. |
+| `mass` | Positive mass; inverse mass controls dynamic response. Default 1. |
+| `velocityX/Y/Z` | World units per second. Zero by default. |
+| `gravityScale` | Multiplies configured gravity for this body. Default 1. |
+| `restitution` | Bounce fraction from 0 through 1. Default 0. A pair uses the lower value. |
+| `friction` | Nonnegative sliding-friction coefficient. Default 0.5. |
+| `sensor` | Reports contact without applying physical response. Default false. |
+| `category` | Unsigned 32-bit category bits. Default 1. |
+| `collisionMask` | Accepted category bits. Default all bits, including new categories. |
+| `ignore` | Optional specific element IDs to exclude deliberately. |
+
+Motion type is fixed for a body's lifetime to preserve static/moving index ownership.
+Recreate an element to change that ownership. Supported body shapes share contact
+algorithms: circle/circle, circle/oriented-box, and oriented-box/oriented-box, combined
+with actual Z interval checks. No pedestrian/car, cat/car, or building/character case exists.
+
+Nearby pairs are found through spatial queries. Exact shape tests reject false
+positives and use a minimum translation to remove penetration. Dynamic mass distributes
+correction; linear impulses handle normal response and friction. Sensors do not push.
+Static/static pairs need no simulation query. Moving/static, moving/moving, and moving
+sensor overlaps use the same candidate pipeline, including offscreen objects.
+
+Gravity is upward-positive Z acceleration and defaults to -240 world units/s². Floors
+and elevated slabs are ordinary static boxes. A body can be below a slab without contact,
+or land on its top, according to the same shared shape and Z interval.
+
+`physics.subscribe(callback)` returns an unsubscribe function. Events expose `type`
+(`begin`, `stay`, `end`), `first`, `second`, and measured `contact` information. Observe
+damage/AI/game reactions here; do not implement ordinary separation in game callbacks.
+Removal releases index/registry ownership before notifying end-contact observers, so
+editing a retained removed transform cannot resurrect the old physical body.
+
+## Bounded work and honest limits
+
+Fast bodies use adaptive subdivisions based on travel versus minimum body extent.
+The configured maximum subdivision budget is explicit. If a step would exceed it,
+physics throws before integrating rather than silently capping and permitting tunneling.
+This is bounded substepping, not a claim of general continuous collision detection.
+
+The solver currently provides linear 2.5D response, not angular impulses, joint
+constraints, full rigid-body rotation dynamics, a general 3D mesh solver, sleeping,
+or a guarantee of stable arbitrary stacks. Externally rotating/teleporting geometry
+updates indexes, but is not a continuously swept rotation.
+
+## Spatial ownership
+
+The Basement spatial-hash implementation serves separate Directory-owned indexes:
+
+- `physics.static`: retained static footprints.
+- `physics.moving`: incrementally updated moving-body footprints.
+- `render.geometry`: projected visual bounds including height, for camera visibility.
+- `render.shadows`: physical ground bounds for opaque light obstruction candidates.
+- `render.lights`: projected source influence, including offscreen-reaching lights.
+
+Each index has its own membership and query stamps. Values returned through different
+indexes never overwrite a stamp on the shared scene object. Entries spanning many cells
+are returned once. Negative coordinates use floor. Sparse cell keys are coordinate
+strings, avoiding the original packed-key range assumptions.
+
+Per-object cell membership is bounded; oversized geometry uses an overflow collection.
+Query traversal has a separate budget: a moderately zoomed-out camera must not trigger
+a full-registry scan merely because it visits more cells than one object may occupy.
+Exceptionally broad queries scan entries when that is cheaper or cell traversal exceeds
+its budget. Dense local overlaps can still generate many real pairs. No universal O(1)
+or “unlimited objects” claim is made.
+
+Asset definitions remain distinct from placed elements. Directory asset libraries provide
+named lookup; spatial indexes apply to placed scene instances, not texture/audio files.
+Asset loading/streaming and resource decoding have not been implemented.
+
+## Depth is geometry, not a list of gameplay concerns
+
+The final Canvas renderer owns the viewport and screen-space composition. The shared
+world renderer produces an internal WebGL2 image with a real depth buffer. An opaque
+fragment appears only if its physical camera depth is nearer than the existing pixel.
+Whole-object Y sorting cannot provide this guarantee for overlapping surfaces.
+
+The current oblique projection is:
+
+- Projected X = world X.
+- Projected Y = world Y - world Z × `heightProjectionScale`.
+- Camera-facing depth = (world Y - camera Y) × `heightProjectionScale` + world Z.
+
+Camera centering/zoom then converts projected coordinates into CSS pixels. Public
+`renderer.worldToScreen(x, y, z)` follows that same formula. Inverting a screen point
+requires choosing a physical height: `renderer.screenToWorld(screenX, screenY, z)`.
+Its default Z is ground zero; one screen point cannot uniquely specify arbitrary 3D space.
+
+Stable IDs decide only exactly coplanar ties, not ordinary visibility. Authors should
+declare a true surface position rather than stack coplanar meshes and depend on a name.
+
+**World features declare scene geometry/materials/lights. They do not stamp arbitrary
+world glow onto the completed image.** Legacy Canvas world callbacks are rejected while
+a depth-aware scene exists, including callbacks registered before the scene was created.
+The separate Canvas-only Loop Study remains supported. Screen-space backgrounds, UI,
+and intentional diagnostic overlays are not physical world surfaces and remain valid.
+
+## Emission, illumination, and shadows
+
+Surface emission belongs to the same depth-tested fragment as its base material. Ground
+emission cannot brighten a roof pixel just because it is processed later. An opaque
+surface in front hides both the underlying color and underlying emission automatically.
+
+A luminous surface and a source casting light are different declarations. `createLight`
+defines a point source with world XYZ, positive `radius`, nonnegative `intensity`, and
+`color`. Reflective surfaces receive it according to actual distance, normal direction,
+and obstruction. A source below a roof cannot directly illuminate its upward-facing top.
+
+Supplying `parent: element` makes source coordinates local offsets. Live getters apply
+the parent's current translation, rotation, and Z. The scene updates source influence
+automatically when that parent moves. Removing the parent removes its attached sources.
+Unattached sources keep fixed world coordinates. Source declarations are frozen;
+remove/recreate a source to change its configuration rather than mutate its index data.
+
+The point-light backend produces six nearest-geometry depth images around a source
+(a depth cubemap). Those views use the same cached opaque meshes as camera rendering,
+including nearby geometry outside the camera view. A receiving surface samples source
+visibility and adds reflected light only under the same camera-depth equality test.
+There is no fixed small blocker array and no per-shop/per-building occlusion handler.
+
+Depth maps have finite resolution and a shared slope-aware numerical bias. This first
+implementation has hard shadows; aliases or small shadow offsets can occur. It does
+not implement transparent light transmission, soft area lights, indirect illumination,
+reflections, textures/alpha cutouts, or blurred bloom. Unsupported alpha material strings
+are rejected instead of silently treated as correctly depth-sorted transparency.
+
+## GPU and cache ownership
+
+World shading requires WebGL2. GPU resources are created lazily; an empty or Canvas-only
+engine creates none. Unsupported devices receive an explicit error, not a falsely
+equivalent painter-order fallback. The harness displays engine errors on the page.
+
+The renderer owns programs/buffers/framebuffer/cubemap lifetime. Mesh generation/cache,
+point-light visibility, and shader definitions live in separate readable modules. The
+light helper retains its parent renderer, then reads current resources when called;
+it does not snapshot null handles during initialization or stale handles after recovery.
+
+Unchanged element meshes are cached through weak references. Stationary scenes/views
+reuse uploaded geometry and the completed world image. A tracked transform, geometry,
+material, visibility, shadow flag, light, or view change invalidates the relevant image.
+Light fragment work is restricted to projected source reach. World shading defaults to
+one pixel per CSS pixel; final Canvas/UI density can be higher. Configure these quality
+budgets explicitly instead of adding object-specific exceptions.
+
+Context-loss events suspend world GPU submission; restoration rebuilds resources from
+the preserved scene. Destruction removes listeners and GPU handles without starting an
+additional scheduler. Original game content remains unmodified and unported.

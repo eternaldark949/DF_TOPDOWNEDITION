@@ -20,6 +20,14 @@ class LevelDirectory {
         this.systems.register('renderer', new RendererSystem(canvas, basement));
         // Register input; its constructor stores references and installs no listeners yet.
         this.systems.register('input', new InputSystem(canvas, browserWindow));
+        // Shared spatial service owns independent indexes rather than one grid for every concern.
+        this.systems.register('spatial', new SpatialSystem());
+        // Scene declarations connect the same geometry to physics and visual indexing.
+        this.systems.register('scene', new SceneSystem(basement));
+        // One contact pipeline handles all supported bodies regardless of gameplay identity.
+        this.systems.register('physics', new PhysicsSystem(basement));
+        // Opaque world visibility and lighting are engine-owned; GPU resources are allocated lazily.
+        this.systems.register('worldRenderer', new WorldRendererSystem(basement));
         // Register per-frame measurements independently of any particular on-screen HUD.
         this.tools.register('profiler', new FrameProfiler());
     }

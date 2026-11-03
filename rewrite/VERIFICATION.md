@@ -1,40 +1,85 @@
-# Foundation verification — 2026-11-03
+# Foundation verification — 0.2.0, 2026-11-03
 
 ## Completed locally
 
-- `node rewrite/tools/build.mjs` generated the standalone HTML.
+- `node rewrite/tools/build.mjs` produced the single HTML artifact.
 - `node rewrite/tools/build.mjs --check` verified exact source/artifact agreement.
-- `node rewrite/tools/test-foundation.cjs` passed seven behavior scenarios.
-- `python rewrite/tools/test-browser.py` passed desktop and touch Chromium scenarios
-  with networking disabled and zero attempted HTTP/HTTPS requests or page errors.
-- Desktop and phone/landscape screenshots were inspected as local evidence.
+- `node rewrite/tools/test-world.cjs` passed the original seven foundation scenarios
+  and ten added spatial/physics/world-contract scenarios.
+- `python rewrite/tools/test-browser.py` passed desktop and touch/rotation checks
+  against the built HTML, with networking disabled and no attempted HTTP/HTTPS requests.
+- `python rewrite/tools/test-world-browser.py` passed actual WebGL2 pixel, shadow,
+  large-scene, and context-restoration checks on desktop and touch viewports.
+- Real neutral-scene screenshots were inspected locally.
 
-The seven deterministic scenarios cover:
+The ten added deterministic scenarios verify:
 
-1. Inert construction, duplicate-safe start, cancellation of request ID zero, and restart baseline.
-2. Exactly 60 simulation updates over one second at simulated 30, 60, 120, and 144 Hz display rates.
-3. Independent pause owners, continued rendering while paused, visibility suspension, and return without catch-up.
-4. Bounded long-frame catch-up, recorded discarded time, and FPS based on raw elapsed duration.
-5. Render order, world camera transforms, CSS-to-world conversion, pixel-density cap, resize, brush batching, and queue clearing.
-6. Live Directory/engine references, Penthouse lifecycle and duplicate protection, input clearing, pointer coordinates, and listener cleanup.
-7. Invalid setting rejection, Canvas state restoration after a throwing pass, and loop termination on failure.
+1. Spatial queries match a seeded brute-force oracle, including negative positions,
+   multi-cell uniqueness, oversized objects, movement/removal, and safe address rejection.
+2. One shared transform/geometry updates physical and projected bounds; materials/visibility
+   invalidate buffers; parent-attached lights follow rotation/height and clean up with owners.
+3. Canvas world callbacks cannot bypass a depth-aware scene, even if registered earlier.
+4. Circle/box, rotated box/box, and circle/circle contacts use generic shape response.
+5. Separated Z ranges permit an underpass; gravity lands another body on an elevated slab.
+6. Unequal masses exchange elastic momentum correctly; kinematic motion pushes dynamics.
+7. Sensors emit begin/stay/end without pushing; default masks accept a new category,
+   while explicit exclusions suppress it.
+8. Removal observers cannot resurrect an unregistered body through a retained transform.
+9. A fast body is stopped by a thin wall; excessive safety work fails explicitly.
+10. Ten thousand static bodies remain registered while local narrow checks stay below 20;
+    a moderate zoomed-out view visits cells; unloading releases body/index/contact references.
 
-Real Chromium checks cover a rendered cream marker pixel, backing pixel density,
-responsive layout, visible start/stop/pause/resume controls, continued paused rendering,
-stopped frame counts, keyboard movement, mouse placement, touch placement, camera zoom,
-resize/rotation, feature removal, and engine destruction.
+The world browser checks read actual final image pixels. They verify that:
 
-## Limits
+- A green elevated surface hides red ground emission, even when declared before it.
+- Emission on the elevated surface still respects the same visibility rule.
+- Material and visibility edits change output without manual mask/cache invalidation.
+- An unchanged scene reuses its completed image without losing depth-correct pixels.
+- Moving an ordinary opaque blocker changes source visibility on a ground receiver.
+- More than 32 nearby shadow casters work without a small fixed uniform-array truncation.
+- Nonzero-Z projection/inversion uses the same coordinate contract.
+- Losing/restoring the actual WebGL context rebuilds the same scene correctly.
+- The real stress control registers 10,000 additional bodies while visible mesh count stays local.
 
-Managed Chromium blocks `file://` navigation. Browser tests therefore load the exact
-built HTML bytes directly into a page with networking disabled. This verifies standalone
-execution and absence of external runtime requests, but does not test opening a file
-through the owner's phone file manager. Actual phone browser performance, app-specific
-file restrictions, and non-Chromium browsers remain unverified.
+## Sparse-scene CPU measurements
 
-Canvas recorder tests establish ordering and API behavior, not pixel equivalence.
-The browser pixel check verifies a visible marker, not every frame's visual correctness.
-Profiler frame cost is synchronous CPU-side work, not GPU completion time.
+`node rewrite/tools/bench-world.cjs rewrite/benchmark-world-local.json` records actual
+registration and simulation costs in this workspace. The workload keeps 100 moving
+circles constant while increasing sparse static boxes; five warmup steps precede
+sixty measured steps. See the retained JSON for exact timings and runtime version.
 
-The original game has not been migrated or modified. Its tests were not run for this
-independent foundation. No equivalence claim is made for unported game features.
+| Static bodies | Moving bodies | Narrow checks / fixed step | Full static scan for final local query |
+|---:|---:|---:|---|
+| 1,000 | 100 | 400 | No |
+| 10,000 | 100 | 400 | No |
+| 25,000 | 100 | 400 | No |
+
+The 400 checks include four solver passes for 100 local contacts. Setup was approximately
+0.06, 0.43, and 0.94 seconds; mean fixed-step CPU cost was approximately 5.7, 7.4, and
+5.3 ms respectively in this run. These numbers are observations, not thresholds or
+proof that larger scenes are inherently faster. Runtime noise/warmup affects timings.
+
+A first per-pixel blocker-loop shadow prototype passed geometry checks but was slow
+under software WebGL. The retained implementation instead uses source depth cubemaps,
+source-area scissoring, cached element meshes, and unchanged-frame image reuse. Its
+camera/light correctness was rechecked after that replacement. No real-phone FPS
+claim is made from headless software-rendering measurements.
+
+## Limits and unverified behavior
+
+Managed Chromium blocks direct `file://` navigation. Tests therefore load the exact built
+HTML bytes into a page with networking disabled. Phone file-manager integration and
+actual device/GPU performance remain unverified, as do Safari/Firefox behavior.
+
+The GPU checks use opaque primitives and finite-resolution hard shadow maps. They are
+not comprehensive visual regression coverage, and finite shadow-map sampling/bias can
+produce aliases or small shadow offsets. No support claim is made for transparency,
+material image textures, alpha-cutout sprites, bloom, reflections, or arbitrary meshes.
+
+Physics is a linear 2.5D contact foundation with bounded substeps. It is not a full
+angular rigid-body/joint solver or general continuous-collision implementation. Dense
+clusters can require many real pair tests. Huge spatial queries can intentionally use
+a bounded entry scan. Sparse benchmark results do not establish universal scalability.
+
+The original game has not been changed or migrated. Its tests were not run for this
+independent engine implementation. No equivalence claim is made for unported features.
