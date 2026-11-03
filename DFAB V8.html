@@ -2748,6 +2748,22 @@
         #msg-splash.on { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity 0.22s ease, visibility 0s; }
         #msg-splash.out { transition: opacity 0.45s ease, visibility 0s linear 0.45s; }
         #msg-splash.on.now { transition: none; }
+        /* Every other app's launch screen (ui/app-launch.js): its glyph and name on a ground lit in its colour */
+        .app-splash { position: absolute; z-index: 40; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; pointer-events: auto;
+            background: radial-gradient(ellipse 70% 55% at 50% 44%, color-mix(in srgb, var(--acc) 26%, transparent), transparent 70%), linear-gradient(180deg, #0c0612, #060309);
+            transition: opacity 0.34s ease; }
+        .app-splash.out { opacity: 0; pointer-events: none; }
+        .app-splash .as-tile { width: 76px; height: 76px; border-radius: 22px; display: flex; align-items: center; justify-content: center; font-size: 38px; color: var(--acc);
+            background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--acc) 30%, #140a1c), #0a0510 80%); border: 1px solid color-mix(in srgb, var(--acc) 55%, transparent);
+            box-shadow: 0 0 26px color-mix(in srgb, var(--acc) 40%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.12); animation: asTile 0.52s cubic-bezier(0.2, 0.9, 0.3, 1.3) both; }
+        .app-splash .as-tile svg { width: 40px; height: 40px; }
+        .app-splash .as-name { font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 13px; letter-spacing: 0.32em; text-transform: uppercase; color: #f6efff; padding-left: 0.32em;
+            text-shadow: 0 0 12px color-mix(in srgb, var(--acc) 70%, transparent); animation: asName 0.5s ease 0.08s both; }
+        .app-splash .as-line { width: 64px; height: 2px; border-radius: 2px; overflow: hidden; background: rgba(255, 255, 255, 0.08); position: relative; }
+        .app-splash .as-line::after { content: ''; position: absolute; inset: 0; width: 40%; background: linear-gradient(90deg, transparent, var(--acc), transparent); animation: asLine 0.7s ease-in-out infinite; }
+        @keyframes asTile { from { transform: scale(0.7); opacity: 0; } to { transform: none; opacity: 1; } }
+        @keyframes asName { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
+        @keyframes asLine { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
         #msg-splash .msp-m { font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: min(26vh, 22vw); line-height: 1; letter-spacing: -0.02em;
             background: linear-gradient(160deg, #ff3d7f 0%, #d4145a 55%, #8a0f4a 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
             filter: drop-shadow(0 6px 18px rgba(212, 20, 90, 0.25)); will-change: transform, opacity; animation: mspBreathe 1.8s ease-in-out infinite; }
@@ -5800,7 +5816,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'ef0abf78cb2f';
+        const DFAB_BUILD = 'eab864ec5504';
     </script>
     <script type="text/dfab" data-src="core/config.js" data-cost="406">
 
@@ -93915,7 +93931,7 @@ engineMixin({
         });
         
     </script>
-    <script type="text/dfab" data-src="ui/app-launch.js" data-cost="83">
+    <script type="text/dfab" data-src="ui/app-launch.js" data-cost="109">
         /* =====================================================================
            APP LAUNCH: phone apps grow out of the icon you tapped
            ---------------------------------------------------------------------
@@ -93943,7 +93959,7 @@ engineMixin({
                     const icon = e.target.closest && e.target.closest('.phone-app-container');
                     if (!icon) return;
                     const circle = icon.querySelector('.phone-app-icon-circle') || icon;
-                    this._tap = { rect: circle.getBoundingClientRect(), at: performance.now() };
+                    this._tap = { rect: circle.getBoundingClientRect(), at: performance.now(), icon };
                 };
                 apps.addEventListener('pointerdown', remember, true);
                 // a press you can feel: the icon or the M button squishes in, then springs back with a warm gold flash
@@ -93981,20 +93997,21 @@ engineMixin({
             _grow(el) {
                 const tap = this._tap;
                 if (!tap || performance.now() - tap.at > 700 || this._still() || !el.animate) return;
-                const box = el.getBoundingClientRect();
+                el.getAnimations().forEach(a => { if (a.id === 'app-launch') a.cancel(); });
+                const box = el.getBoundingClientRect();                 // measured before the grow scales it
                 if (!box.width || !el.offsetWidth) return;
                 const k = box.width / el.offsetWidth;                   // the phone is scaled to fit the window
                 const t = (tap.rect.top - box.top) / k, l = (tap.rect.left - box.left) / k;
                 const b = (box.bottom - tap.rect.bottom) / k, r = (box.right - tap.rect.right) / k;
                 const ox = l + tap.rect.width / k / 2, oy = t + tap.rect.height / k / 2;
                 const R = tap.rect.width / k / 2;
-                el.getAnimations().forEach(a => { if (a.id === 'app-launch') a.cancel(); });
                 const a = el.animate([
                     { clipPath: `inset(${t}px ${r}px ${b}px ${l}px round ${R}px)`, transform: 'scale(0.9)', opacity: 0.35 },
                     { clipPath: 'inset(0px 0px 0px 0px round 14px)', transform: 'none', opacity: 1 }
                 ], { duration: this.MS, easing: 'cubic-bezier(0.2, 0.85, 0.25, 1)' });
                 a.id = 'app-launch';
                 el.style.transformOrigin = `${ox}px ${oy}px`;
+                this._splash(tap.icon, el, box, a.effect.getKeyframes(), { duration: this.MS, easing: 'cubic-bezier(0.2, 0.85, 0.25, 1)' });
                 a.onfinish = a.oncancel = () => { el.style.transformOrigin = ''; };
             },
 
@@ -94015,6 +94032,41 @@ engineMixin({
                 a.id = 'phone-rise';
                 const overlay = document.getElementById('phone-overlay');
                 if (overlay) overlay.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: 'ease-out' });
+            },
+
+            /* Each app's launch screen, after its icon: the glyph on a tile, the name, a line of light
+               sweeping under it, on a ground lit in the app's own colour. (Messages has its own: the M.) */
+            ACCENT: {
+                'app-maps': '#ffc45c', 'app-sticky': '#ff5c9a', 'app-carme': '#ffb347', 'app-skyme': '#6aa9ff',
+                'app-zibme': '#a46bff', 'app-neume': '#ff4fe0', 'app-amber': '#ffb54a', 'app-help': '#c9b6ff', 'app-log': '#e0b25a'
+            },
+            SPLASH_MS: 520,
+            _splash(icon, screen, box, keyframes, opts) {
+                const host = document.getElementById('phone-screen');
+                if (!host || !icon || screen.id === 'screen-contacts') return;
+                host.querySelectorAll('.app-splash').forEach(e => e.remove());
+                const acc = this.ACCENT[icon.id] || '#e8c27a';
+                const glyph = icon.querySelector('.phone-app-icon-circle'), name = icon.querySelector('.phone-app-name');
+                const sp = document.createElement('div');
+                sp.className = 'app-splash';
+                sp.style.setProperty('--acc', acc);
+                const tile = document.createElement('div');
+                tile.className = 'as-tile';
+                if (glyph) glyph.childNodes.forEach(n => { if (!(n.classList && n.classList.contains('app-badge'))) tile.appendChild(n.cloneNode(true)); });
+                const label = document.createElement('div');
+                label.className = 'as-name'; label.textContent = name ? name.textContent : '';
+                const line = document.createElement('div');
+                line.className = 'as-line';
+                sp.append(tile, label, line);
+                // it sits over the app's screen, so it grows out of the icon with it
+                const hb = host.getBoundingClientRect(), k = hb.width / host.offsetWidth || 1;
+                Object.assign(sp.style, { left: (box.left - hb.left) / k + 'px', top: (box.top - hb.top) / k + 'px', width: screen.offsetWidth + 'px', height: screen.offsetHeight + 'px', transformOrigin: screen.style.transformOrigin });
+                host.appendChild(sp);
+                sp.animate(keyframes, opts);
+                setTimeout(() => {
+                    sp.classList.add('out');
+                    setTimeout(() => sp.remove(), 360);
+                }, this.SPLASH_MS);
             },
 
             _settleHome() {
@@ -96728,7 +96780,7 @@ engineMixin({
             if (MP.generateDelivery) MP.generateDelivery = bump(MP.generateDelivery, 'Barista Ren', 1.1);
         })();
     </script>
-    <script type="text/dfab" data-src="ui/screens.js" data-cost="54">
+    <script type="text/dfab" data-src="ui/screens.js" data-cost="69">
         // --- SCREENS: the one way the sidebar-nav screens open and close ---
         // One menu, #freelancer-menu, with one left sidebar (portrait, nav, Back) for every screen.
         // The map (#map-interface) is a full-bleed layer inside it, under the sidebars, with its own
@@ -96761,6 +96813,7 @@ engineMixin({
             mapOpen() { return document.getElementById('map-interface')?.style.display === 'block'; },
 
             open(name) {
+                const was = (this.menuOpen() || this.mapOpen()) ? this.current : null;
                 const main = document.getElementById('inv-main-content');
                 if (name === 'map') {
                     this._showMenu(true);
@@ -96783,9 +96836,23 @@ engineMixin({
                     this._menu().classList.toggle('no-filter', !this.FILTERED[name]);
                     sub[2]();
                 }
+                // switching between screens: the new one fades up into the centre (the sidebar stays put)
+                if (was && was !== name) this._fadeIn(name === 'map' ? document.getElementById('map-interface') : document.getElementById('inv-main-content'), name === 'map' || was === 'map');
                 this.current = name;
                 syncHudInput(game);
                 if (typeof invSidebar !== 'undefined') invSidebar.setActiveNav(name);
+            },
+
+            /** A quick fade (and a small rise, for the screens; the map just fades) for the screen coming in */
+            _fadeIn(el, plain) {
+                if (!el || !el.animate || (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+                el.getAnimations().forEach(a => { if (a.id === 'screen-in') a.cancel(); });
+                const a = el.animate(plain ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }],
+                    { duration: 260, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+                a.id = 'screen-in';
+                // the map's Filter list and the item filter swap too: fade whichever right sidebar is now showing
+                const right = document.getElementById(this.current === 'map' || el.id === 'map-interface' ? 'map-sidebar-right' : 'inv-sidebar-right');
+                if (plain && right && right.animate) right.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: 'ease-out' });
             },
 
             close() {

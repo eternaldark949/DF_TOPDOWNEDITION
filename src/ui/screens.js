@@ -30,6 +30,7 @@
             mapOpen() { return document.getElementById('map-interface')?.style.display === 'block'; },
 
             open(name) {
+                const was = (this.menuOpen() || this.mapOpen()) ? this.current : null;
                 const main = document.getElementById('inv-main-content');
                 if (name === 'map') {
                     this._showMenu(true);
@@ -52,9 +53,23 @@
                     this._menu().classList.toggle('no-filter', !this.FILTERED[name]);
                     sub[2]();
                 }
+                // switching between screens: the new one fades up into the centre (the sidebar stays put)
+                if (was && was !== name) this._fadeIn(name === 'map' ? document.getElementById('map-interface') : document.getElementById('inv-main-content'), name === 'map' || was === 'map');
                 this.current = name;
                 syncHudInput(game);
                 if (typeof invSidebar !== 'undefined') invSidebar.setActiveNav(name);
+            },
+
+            /** A quick fade (and a small rise, for the screens; the map just fades) for the screen coming in */
+            _fadeIn(el, plain) {
+                if (!el || !el.animate || (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+                el.getAnimations().forEach(a => { if (a.id === 'screen-in') a.cancel(); });
+                const a = el.animate(plain ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }],
+                    { duration: 260, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+                a.id = 'screen-in';
+                // the map's Filter list and the item filter swap too: fade whichever right sidebar is now showing
+                const right = document.getElementById(this.current === 'map' || el.id === 'map-interface' ? 'map-sidebar-right' : 'inv-sidebar-right');
+                if (plain && right && right.animate) right.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: 'ease-out' });
             },
 
             close() {
