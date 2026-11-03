@@ -1376,6 +1376,29 @@
         #pause-menu:not(.has-look) .pause-grain { opacity: 0.18; }
         @keyframes plBloom { 0%, 100% { opacity: 0.72; } 50% { opacity: 0.92; } }
 
+        /* The way in (ui/save-slots-pause-menu.js _enter): the treatment lerps up over the still-sharp world (the game's
+           own canvas is under it, frozen), then the menu's items slip in from the right one by one, the left column's
+           from the left, and the lit item's pill fades up last. Transform and opacity only. */
+        #pause-menu.entering .pause-look { animation: pmLook 0.55s cubic-bezier(0.3, 0.6, 0.3, 1) both; }
+        #pause-menu.entering .pl-base { animation: pmBase 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+        #pause-menu.entering .pause-backdrop, #pause-menu.entering .pause-grain { animation: pmFade 0.5s ease both; }
+        #pause-menu.entering .pause-grain { animation-delay: 0.1s; }
+        #pause-menu.entering .pause-right > .pause-header,
+        #pause-menu.entering #pause-nav-main > .pause-menu-item { animation: pmInRight 0.46s cubic-bezier(0.2, 0.85, 0.25, 1) both; animation-delay: calc(0.12s + var(--i, 0) * 0.035s); }
+        #pause-menu.entering .pause-left > * { animation: pmInLeft 0.5s cubic-bezier(0.2, 0.85, 0.25, 1) both; animation-delay: calc(0.18s + var(--i, 0) * 0.07s); }
+        #pause-menu.entering .pause-menu-item.active::before { animation: pmFade 0.32s ease both; animation-delay: 0.62s; }
+        #pause-menu.entering #pause-nav-main > .pause-menu-item.active { animation-name: pmInRight, pmInk; animation-duration: 0.46s, 0.32s; animation-delay: calc(0.12s + var(--i, 0) * 0.035s), 0.62s; animation-fill-mode: both; }
+        @keyframes pmLook { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes pmBase { from { transform: scale(1); } to { transform: scale(1.05); } }
+        @keyframes pmFade { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes pmInRight { from { opacity: 0; transform: translateX(46px); } to { opacity: 1; transform: none; } }
+        @keyframes pmInLeft { from { opacity: 0; transform: translateX(-46px); } to { opacity: 1; transform: none; } }
+        /* the lit item's dark lettering comes with its pill (until then it reads like the rest) */
+        @keyframes pmInk { from { color: var(--df-lilac-grey); } to { color: #120818; } }
+        @media (prefers-reduced-motion: reduce) {
+            #pause-menu.entering * , #pause-menu.entering .pause-look { animation-duration: 0.01s !important; animation-delay: 0s !important; }
+        }
+
         .pause-content {
             position: relative;
             width: 100%;
@@ -5816,7 +5839,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'eab864ec5504';
+        const DFAB_BUILD = '69bebd9b63ff';
     </script>
     <script type="text/dfab" data-src="core/config.js" data-cost="406">
 
@@ -97116,7 +97139,7 @@ engineMixin({
             }
         };
     </script>
-    <script type="text/dfab" data-src="ui/save-slots-pause-menu.js" data-cost="787">
+    <script type="text/dfab" data-src="ui/save-slots-pause-menu.js" data-cost="797">
         // --- PAUSE MENU SYSTEM (Phase 3) ---
         // ─── SAVE SLOT MANAGER ─────────────────────────────────────────────
         //  Multi-slot save system: the imprint cards (Imprint to save, Recall to load).
@@ -97777,6 +97800,7 @@ engineMixin({
                 
                 PauseLook.capture();                                            // the world as it stood, before the menu covers it
                 this.menu.classList.add('active');
+                this._enter();
                 this.isOpen = true;
                 game.pauseSystem.acquire('pause_menu');
                 this._syncCutsceneMenu();
@@ -97838,7 +97862,20 @@ engineMixin({
                 }
             }
             
+            /** The way in: the blur and grade lerp up over the world, the menu's items slip in from the right one after
+             *  another, the left column's from the left, and the lit item's pill fades up just after
+             *  (styles/hud-menus.css, #pause-menu.entering). */
+            _enter() {
+                const m = this.menu;
+                m.querySelectorAll('.pause-right > .pause-header, #pause-nav-main > .pause-menu-item').forEach((el, i) => el.style.setProperty('--i', i));
+                m.querySelectorAll('.pause-left > *:not([hidden])').forEach((el, i) => el.style.setProperty('--i', i));
+                m.classList.remove('entering'); void m.offsetWidth; m.classList.add('entering');
+                clearTimeout(this._enterT);
+                this._enterT = setTimeout(() => m.classList.remove('entering'), 1400);
+            }
+
             close() {
+                clearTimeout(this._enterT); this.menu.classList.remove('entering');
                 this.menu.classList.remove('active');
                 PauseLook.release();
                 this.isOpen = false;
