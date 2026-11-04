@@ -104,6 +104,7 @@
             },
             
             close() {
+                this._closePhotoManager?.();
                 this.isOpen = false;
                 this.currentApp = 'closed';
                 this.overlay.style.display = 'none';
@@ -113,6 +114,7 @@
             },
             
             showHome() {
+                this._closePhotoManager?.();
                 this.currentApp = 'home';
                 this.currentContact = null;
                 document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');

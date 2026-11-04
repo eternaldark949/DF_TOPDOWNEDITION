@@ -13,7 +13,9 @@ e.run(`
 `);
 const flush=()=>{const timers=e.pendingTimers.splice(0).sort((a,b)=>a.ms-b.ms);for(const t of timers)t.f();};
 const get=source=>structuredClone(e.run(source));
+const makeRoom=()=>e.run(`if(phoneSystem._activeSnapshots().length>=6)phoneSystem._deleteSnapshot(phoneSystem._activeSnapshots()[0].rec);`);
 for(let i=0;i<7;i++){
+ makeRoom();
  e.run(`phoneSystem.sendSnapshot({name:'Victoria'});`);
  const scheduled=e.pendingTimers.slice();assert.equal(scheduled.length,2);
  if(i===0){e.run(`phoneSystem.sendSnapshot({name:'Victoria'});`);assert.equal(e.pendingTimers.length,2,'Another photo waits for the current reply');}
@@ -30,12 +32,15 @@ assert.equal(replies[0].text,replies[3].text,'Reused wording still produces a re
 assert.equal(new Set(replies.slice(0,3).map(r=>r.text)).size,3);
 assert.ok(replies.every((r,i)=>r.replyTo===photos[i].id));
 assert.equal(photos.filter(p=>p.data.img).length,6,'Photo storage limit is preserved');
+makeRoom();
 e.run(`phoneSystem.messageHistory=JSON.parse(JSON.stringify(phoneSystem.messageHistory));phoneSystem.sendSnapshot({name:'Victoria'});`);flush();
 assert.equal(e.run(`phoneSystem.messageHistory.Victoria.at(-1).text`),replies[1].text,'Response rotation survives saved history');
 // Existing saves can contain the original untagged response.
+makeRoom();
 e.run(`phoneSystem.messageHistory.Max=[{text:MSG_SNAP_REPLIES.Max[0],from:'them'}];phoneSystem.currentContact='Max';phoneSystem.renderThread({name:'Max'});phoneSystem.sendSnapshot({name:'Max'});`);flush();
 assert.equal(e.run(`phoneSystem.messageHistory.Max.at(-1).text`),e.run(`MSG_SNAP_REPLIES.Max[1]`));
 // Group replies retain their speaker; a closed thread receives a genuine unread message.
+makeRoom();
 e.run(`phoneSystem._someCrew=()=> 'Yenna';phoneSystem.currentContact=MSG_GROUP;phoneSystem.renderThread({name:MSG_GROUP});phoneSystem.sendSnapshot({name:MSG_GROUP,group:true});phoneSystem.currentApp='contacts';`);flush();
 const group=get(`phoneSystem.messageHistory[MSG_GROUP].at(-1)`);
 assert.equal(group.who,'Yenna');assert.ok(group.replyTo);assert.equal(e.run(`phoneSystem.unread[MSG_GROUP]`),1);

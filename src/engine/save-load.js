@@ -13,6 +13,7 @@ engineMixin({
              * Old saves will automatically get the default for any missing properties.
              */
             getSaveSchema() {
+                if(typeof phoneSystem!=='undefined')phoneSystem._expireSnapshots();
                 return {
                     version: this.getSaveVersion(),
                     timestamp: Date.now(),
@@ -683,6 +684,7 @@ engineMixin({
                         // Restore message history (merge with existing to avoid losing data)
                         if (phoneData && phoneData.messageHistory && Object.keys(phoneData.messageHistory).length > 0) {
                             phoneSystem.messageHistory = phoneData.messageHistory;
+                            phoneSystem._expireSnapshots();
                             console.log(`[LOAD] Restored message history for ${Object.keys(phoneData.messageHistory).length} contacts:`, phoneData.messageHistory);
                         } else {
                             console.log('[LOAD] No message history in save file');

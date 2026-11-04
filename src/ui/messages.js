@@ -111,6 +111,7 @@
             Larissa: ['Received.', 'I see it. Thank you.', 'Another for the collection.'],
             Anavia: ['Mm. Come closer next time.', 'You have my attention.', 'Keep showing me what catches your eye.'],
         };
+        const MSG_PHOTOS = { LIMIT: 6, LIFETIME: 1440 }; // one in-game day
         const MSG_SNAP_GENERIC = ['Nice.', 'Good shot.', 'Thanks for sending this.'];
 
         /* ── The group chat ── */
@@ -380,6 +381,7 @@
 
             /* ───────────────────────── the thread ───────────────────────── */
             showContactDetail(contact) {
+                this._closePhotoManager();
                 if (typeof contact === 'string') contact = this._buildContactDefs().find(c => c.name === contact) || { name: contact, role: 'Contact' };
                 this._stopVoice();
                 this.currentApp = 'details';
@@ -443,6 +445,7 @@
             },
 
             renderThread(contact, toBottom = false) {
+                this._expireSnapshots();
                 const feed = document.getElementById('contact-detail-content');
                 if (!feed) return;
                 const stick = toBottom || feed.scrollHeight - feed.scrollTop - feed.clientHeight < 48;
@@ -580,6 +583,7 @@
                 const cam = document.getElementById('contact-reply-snap');
                 if (!box) return;
                 box.innerHTML = '';
+                this._photoStorageStatus();
                 if (cam) cam.disabled = this._awaitingThem;
                 const li = this._lastIncoming;
                 // Only words get worded answers: a card or a photo leaves the chips to the contact's usual lines
@@ -1013,6 +1017,7 @@
                 const d = rec.data || {};
                 const card = document.createElement('div');
                 card.className = 'mb-card mb-snap';
+                if(rec.from==='me'&&!d.img){card.classList.add('mb-photo-unavailable');card.textContent='📷 Image no longer available';return card;}
                 const img = new Image();
                 img.alt = '';
                 if (rec.from === 'me') {
@@ -1024,7 +1029,7 @@
                 card.appendChild(img);
                 const P = d.place && MSG_PLACES[d.place];
                 if (P) { const tag = document.createElement('span'); tag.textContent = `📍 ${P.label}`; card.appendChild(tag); }
-                if (rec.from === 'me' && !d.img) { const tag = document.createElement('span'); tag.textContent = 'Photo no longer kept'; card.appendChild(tag); }
+                if(rec.from==='me'){const expiry=document.createElement('div');expiry.className='mb-photo-expiry';expiry.textContent=`Disappearing photo · Expires in ${this._photoTime(rec)}`;card.append(expiry,this._photoActions(rec));}
                 return card;
             },
             /**
@@ -1132,6 +1137,7 @@
             /** Her snapshot: a frame of the game view (as an imprint keeps one), sent to whoever's open */
             sendSnapshot(contact) {
                 if (!contact || this._awaitingThem) return;
+                if(this._activeSnapshots().length>=MSG_PHOTOS.LIMIT){this._photoStorageStatus();this._showPhotoManager();return;}
                 let img = null;
                 try {
                     const src = document.getElementById('game-canvas');
@@ -1146,8 +1152,7 @@
                 const place = this._whereAmI();
                 const baseId=`snap_me_${Date.now()}`;let id=baseId;
                 for(let n=1;(this.messageHistory[contact.name] || []).some(r=>r.id===id);n++)id=`${baseId}_${n}`;
-                const mine = this.addMessage(contact.name, '', false, 'me', { kind: 'snap', id, awaiting: true, data: { img, place } });
-                this._trimSnaps();
+                const mine = this.addMessage(contact.name, '', false, 'me', { kind: 'snap', id, awaiting: true, data: { img, place, expiresAt:this._now()+MSG_PHOTOS.LIFETIME } });
                 this.lastMessageAt[contact.name] = this._now();
                 audioSys.sfx('ui');
                 this.renderThread(contact, true);
@@ -1165,12 +1170,75 @@
                 }
                 return best;
             },
-            /** Only her newest six photos keep their picture, so the save stays small */
-            _trimSnaps() {
-                const all = [];
-                for (const n in this.messageHistory) for (const r of this.messageHistory[n]) if (r.kind === 'snap' && r.from === 'me' && r.data && r.data.img) all.push(r);
-                all.sort((a, b) => String(b.id).localeCompare(String(a.id)));
-                all.slice(6).forEach(r => { r.data.img = null; });
+            /** Image data expires in game time; conversation records and replies stay intact. */
+            _expireSnapshots(now = this._now()) {
+                let changed=false;
+                for(const history of Object.values(this.messageHistory))for(const r of history){
+                    if(r.kind!=='snap'||r.from!=='me'||!r.data?.img)continue;
+                    const d=r.data;
+                    if(!Number.isFinite(d.expiresAt))d.expiresAt=(Number.isFinite(r.timestamp)?r.timestamp:now)+MSG_PHOTOS.LIFETIME;
+                    if(now>=d.expiresAt){d.img=null;d.removed='expired';changed=true;}
+                }
+                return changed;
+            },
+            _activeSnapshots() {
+                this._expireSnapshots();const all=[];
+                for(const [name,history] of Object.entries(this.messageHistory))for(const rec of history)
+                    if(rec.kind==='snap'&&rec.from==='me'&&rec.data?.img)all.push({name,rec});
+                return all.sort((a,b)=>a.rec.data.expiresAt-b.rec.data.expiresAt);
+            },
+            _photoTime(rec) {
+                const minutes=Math.max(0,Math.ceil(rec.data.expiresAt-this._now()));
+                return `${Math.floor(minutes/60)}h ${minutes%60}m in-game`;
+            },
+            _photoStorageStatus() {
+                const button=document.getElementById('contact-photo-storage');if(!button)return;
+                const count=this._activeSnapshots().length,full=count>=MSG_PHOTOS.LIMIT;
+                button.textContent=full?'Sent photo limit reached. Wait for photos to expire or delete images you no longer need. Manage photos':`Sent photos ${count}/${MSG_PHOTOS.LIMIT} · Manage photos`;
+                button.classList.toggle('full',full);
+            },
+            _refreshPhotoStorage() {
+                if(this.isOpen&&this.currentApp==='details'&&this._activeContact)this.renderThread(this._activeContact);
+                if(this._photoManagerEl)this._showPhotoManager();
+            },
+            tickSnapshots() { if(this._expireSnapshots())this._refreshPhotoStorage(); },
+            _deleteSnapshot(rec) {
+                if(rec?.from!=='me'||rec.kind!=='snap'||!rec.data?.img)return false;
+                rec.data.img=null;rec.data.removed='deleted';this._refreshPhotoStorage();return true;
+            },
+            _downloadSnapshot(rec) {
+                this._expireSnapshots();
+                if(rec?.from!=='me'||rec.kind!=='snap'||!rec.data?.img){this._refreshPhotoStorage();return false;}
+                const a=document.createElement('a');a.href=rec.data.img;
+                a.download=`df-photo-${String(rec.id||rec.timestamp).replace(/[^a-z0-9_-]/gi,'_')}.jpg`;
+                document.body.appendChild(a);a.click();a.remove();return true;
+            },
+            _photoActions(rec) {
+                const row=document.createElement('div');row.className='mb-photo-actions';
+                for(const [label,action] of [['Download',()=>this._downloadSnapshot(rec)],['Delete image',()=>this._deleteSnapshot(rec)]]){
+                    const b=document.createElement('button');b.type='button';b.textContent=label;
+                    b.addEventListener('click',event=>{event.stopPropagation();action();});row.appendChild(b);
+                }
+                return row;
+            },
+            _closePhotoManager() {this._photoManagerEl?.remove();this._photoManagerEl=null;},
+            _showPhotoManager() {
+                this._closePhotoManager();
+                const panel=document.createElement('div');panel.className='msg-photo-manager';
+                panel.setAttribute('role','dialog');panel.setAttribute('aria-label','Sent photos');
+                const head=document.createElement('div');head.className='msg-photo-manager-head';
+                const title=document.createElement('b');const photos=this._activeSnapshots();title.textContent=`Sent photos ${photos.length}/${MSG_PHOTOS.LIMIT}`;
+                const close=document.createElement('button');close.type='button';close.textContent='Done';close.addEventListener('click',()=>this._closePhotoManager());head.append(title,close);panel.appendChild(head);
+                const help=document.createElement('p');help.textContent=(photos.length>=MSG_PHOTOS.LIMIT?'Sent photo limit reached. Wait for photos to expire or delete images you no longer need. ':'')+'Photos disappear after 24 in-game hours. Download any you want to keep. Deleting an image keeps the conversation.';panel.appendChild(help);
+                if(!photos.length){const empty=document.createElement('p');empty.textContent='No sent images stored.';panel.appendChild(empty);}
+                for(const {name,rec}of photos){
+                    const row=document.createElement('div');row.className='msg-photo-storage-row';
+                    const img=new Image();img.src=rec.data.img;img.alt=`Photo sent to ${name}`;
+                    const info=document.createElement('div'),who=document.createElement('b'),expiry=document.createElement('small');
+                    who.textContent=name;expiry.textContent=`Expires in ${this._photoTime(rec)}`;
+                    info.append(who,expiry,this._photoActions(rec));row.append(img,info);panel.appendChild(row);
+                }
+                document.getElementById('screen-contacts').appendChild(panel);this._photoManagerEl=panel;
             },
 
             /* ───────────────────────── the group chat ───────────────────────── */
@@ -1264,5 +1332,6 @@
 
         // Tabs, the camera, and the feed's clock
         document.querySelectorAll('#msg-tabs button').forEach(b => b.addEventListener('click', () => { phoneSystem.msgTab = b.dataset.tab; phoneSystem.renderContacts(); }));
+        document.getElementById('contact-photo-storage').addEventListener('click', () => phoneSystem._showPhotoManager());
         document.getElementById('contact-reply-snap').addEventListener('click', () => phoneSystem.sendSnapshot(phoneSystem._activeContact));
         setInterval(() => { try { phoneSystem._feedTick(); } catch (e) { console.error(e); } }, 1000);

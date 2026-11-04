@@ -758,7 +758,8 @@
                 this._clockTicks = (this._clockTicks || 0) + 1;
                 if (force || this._clockTicks >= CONFIG.LOOP.TICKS_PER_WORLD_MINUTE) { 
                     this._clockTicks = 0;
-                    this.worldMinutes++; this.lastTimeTick = Date.now(); 
+                    this.worldMinutes++; this.lastTimeTick = Date.now();
+                    phoneSystem.tickSnapshots();
                     // worldMinutes is MONOTONIC — it counts up forever. Day-of-cycle
                     // values are derived via `% 1440` at the read site (display,
                     // ambient darkness, window lit-state). Wrapping here would

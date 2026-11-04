@@ -1685,3 +1685,22 @@
         .cm-chip { font: 700 max(6px, 0.42rem - var(--font-trim)) var(--font-ui); letter-spacing: 0.12em; text-transform: uppercase; color: #ffb347; }
         .cm-drive { font: 700 max(6px, 0.44rem - var(--font-trim)) var(--font-ui); letter-spacing: 0.16em; text-transform: uppercase; padding: 5px 10px; border-radius: 99px; cursor: pointer;
                     background: transparent; color: #dfe3ea; border: 1px solid rgba(223, 227, 234, 0.35); }
+
+        /* Sent-photo storage and explicit image lifecycle. */
+        #contact-photo-storage { display:block; width:100%; border:0; border-radius:8px; padding:5px 7px; margin:3px 0; background:rgba(202,176,250,.08); color:#cab0fa; font:11px/1.35 var(--font-ui); text-align:left; cursor:pointer; }
+        #contact-photo-storage.full { color:#f0c878; background:rgba(232,194,122,.1); }
+        .mb-snap.mb-photo-unavailable { width:auto; max-width:210px; padding:9px 11px; font:11px/1.4 var(--font-ui); color:#b9abc9; }
+        .mb-photo-expiry { padding:6px 7px 2px; color:#cab0fa; font:10px/1.4 var(--font-ui); }
+        .mb-photo-actions { display:flex; gap:5px; padding:5px 6px 7px; }
+        .mb-photo-actions button, .msg-photo-manager-head button { border:1px solid rgba(202,176,250,.35); background:#241333; color:#f1e8fe; border-radius:7px; padding:6px; font:11px/1.2 var(--font-ui); cursor:pointer; }
+        .mb-photo-actions button { flex:1; }
+        .mb-snap:has(.mb-photo-expiry) > span { top:6px; bottom:auto; }
+        .msg-photo-manager { position:absolute; inset:0 0 35px; z-index:25; padding:12px; overflow:auto; background:#130b20; color:#f1e8fe; }
+        .msg-photo-manager-head { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+        .msg-photo-manager p { font:11px/1.45 var(--font-ui); color:#cab0fa; margin:9px 0; }
+        .msg-photo-storage-row { display:flex; gap:9px; border-top:1px solid #3d2950; padding:9px 0; }
+        .msg-photo-storage-row > img { width:72px; height:50px; object-fit:cover; align-self:center; border-radius:7px; }
+        .msg-photo-storage-row > div { flex:1; min-width:0; }
+        .msg-photo-storage-row b, .msg-photo-storage-row small { display:block; font:12px/1.4 var(--font-ui); }
+        .msg-photo-storage-row small { font-size:10px; color:#cab0fa; }
+        .msg-photo-storage-row .mb-photo-actions { padding:5px 0 0; }
