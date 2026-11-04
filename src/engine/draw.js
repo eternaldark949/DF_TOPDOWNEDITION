@@ -354,6 +354,11 @@
                 }
                 }
 
+                if (RL.at('ground') && this.activeMap.scrapyard) {
+                    const L=this.activeMap.scrapyard,V=cullBounds.world;
+                    if(L.x+L.w>V.left&&L.x<V.right&&L.y+L.h>V.top&&L.y<V.bottom)Scrapyard.drawGround(this.ctx,L);
+                }
+
                 // Restricted Zone — in-world crimson hazard border
                 if (RL.at('markers') && this.restrictedZone && this.activeMap.id === 'sdc') {
                     const rz = this.restrictedZone;

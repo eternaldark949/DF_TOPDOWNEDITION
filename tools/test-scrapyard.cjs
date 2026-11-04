@@ -1,0 +1,55 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {join}=require('node:path');
+const {runtime}=require('./test-game-runtime.cjs');
+const e=runtime(join(__dirname,'..','DFAB V8.html'),{affine:true});
+const value=s=>structuredClone(e.run(`(()=>{${s}})()`));
+const layout=value(`
+ game._doLoadMap('sdc',null);const L=game.activeMap.scrapyard,nav=NavGrid.for(game.activeMap);
+ const filler=game.activeMap.cityLayout.placedBuildings.filter(p=>p.blockName===HUB_BLOCKS.scrapyard).length;
+ const route=L.route.every((p,i)=>{const q=L.route[(i+1)%L.route.length];return nav.lineWalkable(p.x,p.y,q.x,q.y);});
+ const cuts=L.crosscuts.every(c=>nav.lineWalkable(c.from.x,c.from.y,c.to.x,c.to.y));
+ const spawnClear=L.spawns.every(p=>nav.walkable(p.x,p.y));
+ const connected=L.spawns.every(p=>!!nav.findPath(p.x,p.y,L.x+1420,L.y+300));
+ const cover=game.props.filter(p=>p.decorType?.startsWith('sy_'));
+ const blocksSight=L.cover.every(p=>getOccluders(game.activeMap).includes(p));
+ const blocksShots=cover.every(p=>!hasShotLine(p.x-25,p.y+p.height/2,p.x+p.width+25,p.y+p.height/2,game.activeMap));
+ return {lights:game.activeMap.lamps.filter(l=>l._yardLight).length,blocksSight,connected,filler,route,cuts,spawnClear,blocksShots,count:cover.length};
+`);
+assert.equal(layout.lights,4);assert.equal(layout.filler,0);assert.equal(layout.route,true,'Perimeter loop stays traversable');assert.equal(layout.cuts,true,'Both crosscuts stay open');
+assert.equal(layout.blocksSight,true);assert.equal(layout.connected,true);assert.equal(layout.spawnClear,true);assert.equal(layout.blocksShots,true);assert.equal(layout.count,25);
+const combat=value(`
+ const rz=game.restrictedZone,L=game.activeMap.scrapyard;game.player.x=L.x+L.w/2;game.player.y=L.y+L.h-50;
+ game.enemies=[];rz.update(game);const first=rz.hostiles.map(h=>({x:h.x,y:h.y}));
+ const safe=first.every(p=>Math.hypot(p.x-game.player.x,p.y-game.player.y)>=350&&NavGrid.for(game.activeMap).walkable(p.x,p.y));
+ const separated=first.every((p,i)=>first.every((q,j)=>i===j||Math.hypot(p.x-q.x,p.y-q.y)>=75));
+ const hud=document.getElementById('ui-scrapyard'),initial=hud.innerHTML;
+ const money=game.currency;for(const h of rz.hostiles)h.dead=true;rz.update(game);const paid=game.currency-money;
+ const cleared=hud.innerHTML;rz.update(game);const duplicate=game.currency-money;
+ game.player.y=L.y+L.h+100;const timer=rz.respawnTimer;rz.update(game);const paused=rz.respawnTimer===timer,hidden=!hud.classList.contains('show');
+ game.player.y=L.y+L.h-50;rz.respawnTimer=1;rz.update(game);const second=rz.hostiles.length;
+ // All gates occupied by a new obstacle: pending arrivals cannot count as a clear or spawn inside cover.
+ for(const h of rz.hostiles)h.dead=true;
+ const gates=rz._spawnPoints(game),keep=game.props.slice();
+ game.props.push(...gates.map(p=>new PropEntity({x:p.x-32,y:p.y-32,width:64,height:64,mass:50000})));rz.spawn(game);
+ const pending=rz.pendingSpawns;const before=game.currency;rz.update(game);const unpaid=game.currency===before&&!rz.cleared;
+ game.props=keep;rz._spawnRetry=0;rz.update(game);const retried=rz.hostiles.length;
+ rz.clearCount=6;game.enemies=[];rz.spawn(game);const snipers=rz.hostiles.filter(h=>h.equippedWeaponId==='sniper_sr86').length;
+ rz._hud(game);const escalated=hud.innerHTML;
+ return {size:first.length,safe,separated,initial,paid,cleared,duplicate,paused,hidden,second,pending,unpaid,retried,snipers,escalated};
+`);
+assert.equal(combat.size,8);assert.equal(combat.safe,true);assert.equal(combat.separated,true);assert.match(combat.initial,/Round 1/);
+assert.equal(combat.paid,45);assert.equal(combat.duplicate,45);assert.match(combat.cleared,/Reinforcements in 15s/);
+assert.equal(combat.paused,true);assert.equal(combat.hidden,true);assert.equal(combat.second,8);
+assert.equal(combat.pending,8);assert.equal(combat.unpaid,true);assert.equal(combat.retried,8);assert.equal(combat.snipers,2);assert.match(combat.escalated,/Sniper backup/);
+const lifecycle=value(`
+ const count=game.props.filter(p=>p.decorType?.startsWith('sy_')).length;const rz=game.restrictedZone;
+ game._doLoadMap('apt_949',null);rz.update(game);const hidden=!document.getElementById('ui-scrapyard').classList.contains('show');
+ game._doLoadMap('sdc',null);game.player.x=100;game.player.y=100;rz.update(game);const wait=rz._pendingRespawn;
+ const restoredLights=game.activeMap.lamps.filter(l=>l._yardLight).length;
+ const restored=game.props.filter(p=>p.decorType?.startsWith('sy_')).length;
+ game.resetGameState();game._doLoadMap('sdc',null);return {restoredLights,count,restored,hidden,wait,fresh:!!game.restrictedZone&&game.restrictedZone.clearCount===0};
+`);
+assert.equal(lifecycle.restoredLights,4);assert.equal(lifecycle.restored,lifecycle.count);assert.equal(lifecycle.hidden,true);assert.equal(lifecycle.wait,true);assert.equal(lifecycle.fresh,true);
+assert.deepEqual(e.errors,[]);
+console.log('Scrapyard: authored cover, open loop/crosscuts, safe spawns/retries, rounds/rewards/HUD, escalation and cache/reset passed.');

@@ -437,24 +437,24 @@
         /* Stealth Indicator */
         #ui-stealth-indicator { position: absolute; top: 12%; left: 50%; transform: translateX(-50%); font-family: var(--font-ui); font-size: max(6px, 1.1rem - var(--font-trim)); font-weight: 600; letter-spacing: 4px; pointer-events: none; display: none; z-index: 20; white-space: nowrap; background: linear-gradient(180deg, #FFFFFF 0%, #C0C0C0 40%, #909090 70%, #B0B0B0 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; filter: drop-shadow(0 0 6px rgba(192, 192, 192, 0.6)) drop-shadow(0 0 15px rgba(160, 160, 160, 0.3)); }
         /* The gauntlet's wave readout (HordeGauntlet._hud): champagne caps over a slim draining bar; the stealth word steps down beneath it */
-        #ui-wave { position: absolute; top: 12%; left: 50%; transform: translate(-50%, -6px); z-index: 20; pointer-events: none; opacity: 0; transition: opacity 0.4s ease, transform 0.4s ease;
+        :is(#ui-wave, #ui-scrapyard) { position: absolute; top: 12%; left: 50%; transform: translate(-50%, -6px); z-index: 20; pointer-events: none; opacity: 0; transition: opacity 0.4s ease, transform 0.4s ease;
             display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 6px 16px 7px; border-radius: 999px;
             background: linear-gradient(100deg, rgba(4, 1, 6, 0.62), rgba(22, 6, 46, 0.58)); border: 1px solid rgba(202, 176, 250, 0.32); }
-        #ui-wave.show { opacity: 1; transform: translate(-50%, 0); }
-        #ui-wave .w-line { display: flex; align-items: center; gap: 9px; white-space: nowrap; font: 600 max(6px, 0.72rem - var(--font-trim)) var(--font-ui); letter-spacing: 4px; text-transform: uppercase; }
-        #ui-wave .w-title { color: var(--df-cream); text-shadow: 0 0 8px rgba(255, 236, 200, 0.35); }
-        #ui-wave .w-sep { color: var(--df-gold); font-size: max(6px, 0.5rem - var(--font-trim)); text-shadow: 0 0 6px rgba(255, 194, 72, 0.8); }
-        #ui-wave .w-sub { color: var(--df-lavender-pale); }
-        #ui-wave .w-chip { font-size: max(6px, 0.52rem - var(--font-trim)); letter-spacing: 2px; padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(208, 16, 28, 0.75); color: #ff8a92; }
-        #ui-wave .w-bar { width: 100%; min-width: 120px; height: 2px; border-radius: 1px; background: rgba(202, 176, 250, 0.18); overflow: hidden; }
-        #ui-wave .w-bar i { display: block; height: 100%; transform-origin: left; background: linear-gradient(90deg, var(--df-lavender), #fff); box-shadow: 0 0 6px rgba(241, 232, 254, 0.8); transition: transform 0.35s ease; }
-        #ui-wave.between .w-bar { opacity: 0; }
-        #ui-wave .w-spoils { justify-content: center; gap: 6px; margin-top: 3px; font-size: max(6px, 0.5rem - var(--font-trim)); letter-spacing: 2px; color: rgba(202, 176, 250, 0.6); }
-        #ui-wave .w-tag { color: rgba(202, 176, 250, 0.45); margin-right: 2px; }
-        #ui-wave .w-dot { opacity: 0.5; }
-        #ui-wave .w-spoils.secured { color: var(--df-gold); text-shadow: 0 0 6px rgba(255, 194, 72, 0.45); }
-        #ui-wave .w-spoils.secured .w-tag { color: var(--df-cream); }
-        body.wave-hud #ui-stealth-indicator { top: calc(12% + 52px); }
+        :is(#ui-wave, #ui-scrapyard).show { opacity: 1; transform: translate(-50%, 0); }
+        :is(#ui-wave, #ui-scrapyard) .w-line { display: flex; align-items: center; gap: 9px; white-space: nowrap; font: 600 max(6px, 0.72rem - var(--font-trim)) var(--font-ui); letter-spacing: 4px; text-transform: uppercase; }
+        :is(#ui-wave, #ui-scrapyard) .w-title { color: var(--df-cream); text-shadow: 0 0 8px rgba(255, 236, 200, 0.35); }
+        :is(#ui-wave, #ui-scrapyard) .w-sep { color: var(--df-gold); font-size: max(6px, 0.5rem - var(--font-trim)); text-shadow: 0 0 6px rgba(255, 194, 72, 0.8); }
+        :is(#ui-wave, #ui-scrapyard) .w-sub { color: var(--df-lavender-pale); }
+        :is(#ui-wave, #ui-scrapyard) .w-chip { font-size: max(6px, 0.52rem - var(--font-trim)); letter-spacing: 2px; padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(208, 16, 28, 0.75); color: #ff8a92; }
+        :is(#ui-wave, #ui-scrapyard) .w-bar { width: 100%; min-width: 120px; height: 2px; border-radius: 1px; background: rgba(202, 176, 250, 0.18); overflow: hidden; }
+        :is(#ui-wave, #ui-scrapyard) .w-bar i { display: block; height: 100%; transform-origin: left; background: linear-gradient(90deg, var(--df-lavender), #fff); box-shadow: 0 0 6px rgba(241, 232, 254, 0.8); transition: transform 0.35s ease; }
+        :is(#ui-wave, #ui-scrapyard).between .w-bar { opacity: 0; }
+        :is(#ui-wave, #ui-scrapyard) .w-spoils { justify-content: center; gap: 6px; margin-top: 3px; font-size: max(6px, 0.5rem - var(--font-trim)); letter-spacing: 2px; color: rgba(202, 176, 250, 0.6); }
+        :is(#ui-wave, #ui-scrapyard) .w-tag { color: rgba(202, 176, 250, 0.45); margin-right: 2px; }
+        :is(#ui-wave, #ui-scrapyard) .w-dot { opacity: 0.5; }
+        :is(#ui-wave, #ui-scrapyard) .w-spoils.secured { color: var(--df-gold); text-shadow: 0 0 6px rgba(255, 194, 72, 0.45); }
+        :is(#ui-wave, #ui-scrapyard) .w-spoils.secured .w-tag { color: var(--df-cream); }
+        body:is(.wave-hud, .yard-hud) #ui-stealth-indicator { top: calc(12% + 52px); }
         /* The objective readout (GameEngine._objectiveHud, engine/markers.js): the job in champagne caps with how far in gold,
            the step beneath in lavender, in the wave readout's capsule; the stealth word steps down beneath it */
         #ui-objective { position: absolute; top: 12%; left: 50%; transform: translate(-50%, -6px); z-index: 20; pointer-events: none; opacity: 0; transition: opacity 0.4s ease, transform 0.4s ease;
@@ -1935,6 +1935,11 @@
         #performance-bench-card { max-height: calc(100dvh - 80px); overflow-y: auto; }
         #performance-bench-card:has([data-performance-bench="cancel"]) { top: 8px; bottom: auto; width: min(330px, calc(100vw - 32px)); padding: 8px 12px; }
         #performance-bench-card .bc-body { touch-action: pan-y; overscroll-behavior: contain; user-select: text; }
+
+        #ui-scrapyard { border-radius:18px; max-width:calc(100vw - 28px); gap:3px; }
+        #ui-scrapyard .w-line { white-space:normal; justify-content:center; flex-wrap:wrap; letter-spacing:2px; text-align:center; }
+        body.objective-hud #ui-scrapyard { top:calc(12% + 60px); }
+        body.objective-hud.yard-hud #ui-stealth-indicator { top:calc(12% + 130px); }
         /* =========================================
            PAUSE SETTINGS PANEL
            ========================================= */
@@ -4391,7 +4396,7 @@
         body.landscape #ui-health, body.landscape #ui-shield-bar, body.landscape #ui-flit-bar-container,
         body.landscape #btn-phone, body.landscape #ui-equipment, body.landscape #ui-location,
         body.landscape #btn-pause, body.landscape #ui-stats, body.landscape #ui-ride,
-        body.landscape #ui-stealth-indicator, body.landscape #ui-wave, body.landscape #ui-objective,
+        body.landscape #ui-stealth-indicator, body.landscape #ui-wave, body.landscape #ui-scrapyard, body.landscape #ui-objective,
         body.landscape #btn-fire, body.landscape #btn-emote, body.landscape #btn-heal, body.landscape #emote-smile,
         body.landscape #btn-nv, body.landscape #emote-zany, body.landscape #btn-flit, body.landscape #emote-cry,
         body.landscape #btn-handbrake, body.landscape #btn-autodrive, body.landscape #btn-zib-skip,
@@ -4923,6 +4928,7 @@
             
             <div id="ui-stealth-indicator">HIDDEN (100%)</div>
             <div id="ui-wave" aria-live="polite"></div>
+            <div id="ui-scrapyard" aria-live="polite"></div>
             <div id="ui-objective" aria-live="polite"></div>
             <div id="ui-ride"><div class="r-line"><span class="r-ico"></span><span class="r-name"></span><span class="r-chip"></span></div>
                 <div class="r-sub"><span class="r-arrow">➤</span><span class="r-dist"></span></div></div>
@@ -5839,7 +5845,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '6286e5894040';
+        const DFAB_BUILD = 'a698216207a7';
     </script>
     <script type="text/dfab" data-src="core/config.js" data-cost="406">
 
@@ -8557,7 +8563,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         };
     </script>
-    <script type="text/dfab" data-src="core/draw-helpers.js" data-cost="258">
+    <script type="text/dfab" data-src="core/draw-helpers.js" data-cost="259">
         /* roundRect for browsers without it (Safari before 16.4): on the 2D context and on Path2D, taking a
            single radius or [all], [tl-br, tr-bl], [tl, tr-bl, br] or [tl, tr, br, bl] like the real one. */
         (() => {
@@ -8663,12 +8669,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         /** Everything that blocks sight and light on a map: walls plus building footprints (cached per map). */
         function getOccluders(map) {
             if (!map) return [];
-            const cols = getColliders(map), walls = map.walls || [];
+            const cols = getColliders(map), walls = map.walls || [], yard=map.scrapyard?.cover;
             const c = map._occluderCache;
-            if (c && c.walls === walls && c.cols === cols && c.nw === walls.length && c.nc === cols.length) { _physicsSpatial.track(c.list); return c.list; }
-            const list = walls.concat(cols);
+            if (c && c.walls === walls && c.cols === cols && c.nw === walls.length && c.nc === cols.length && c.yard===yard) { _physicsSpatial.track(c.list); return c.list; }
+            // Authored fixed salvage cover also stops vision cones, street light and headlight beams.
+            const list = walls.concat(cols,yard||[]);
             _physicsSpatial.track(list);
-            map._occluderCache = { walls, cols, nw: walls.length, nc: cols.length, list };
+            map._occluderCache = { walls, cols, yard, nw: walls.length, nc: cols.length, list };
             return list;
         }
 
@@ -18519,7 +18526,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
 
     </script>
-    <script type="text/dfab" data-src="entities/props-decor.js" data-cost="2432">
+    <script type="text/dfab" data-src="entities/props-decor.js" data-cost="2433">
         // One soft, centred ground blob shared by props, pickups and Velvet. It is stamped
         // before artwork transforms and never baked into a rotating furniture sprite.
         function drawGroundContactShadow(ctx, x, y, rx, ry, angle = 0) {
@@ -20932,6 +20939,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
         function drawClinicDecorProp(ctx, p) {
+            if (p.decorType.startsWith('sy_')) return Scrapyard.drawProp(ctx,p);
             if (p.decorType.startsWith('apt_')) return drawApartmentDecorProp(ctx, p);
             if (p.decorType.startsWith('sc_')) return drawSanctumDecorProp(ctx, p);
             if (p.decorType.startsWith('ps_')) return drawSuiteDecorProp(ctx, p);
@@ -29609,7 +29617,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
     </script>
-    <script type="text/dfab" data-src="entities/enemies.js" data-cost="1616">
+    <script type="text/dfab" data-src="entities/enemies.js" data-cost="1639">
         /**
          * =====================================================================
          *  VELVET CAT — Dreampunk Feline Companion
@@ -31184,6 +31192,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (Math.abs(angleDiff) > this.visionFov / 2) return false;
 
                 if (typeof game !== 'undefined' && game.roomSystem.doorBlocks(this.x, this.y, tx, ty)) return false;   // not through a shut door
+                if (this._restrictedZoneId && typeof game !== 'undefined') return hasShotLine(this.x,this.y,tx,ty,game.activeMap);
                 return !isLineBlocked(this.x, this.y, tx, ty, walls, buildings); 
             }
 
@@ -31682,106 +31691,94 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         // ═══════════════════════════════════════════════════════════
         class RestrictedZone {
             constructor(config) {
-                this.id = config.id || 'rz_0';
-                this.name = config.name || 'RESTRICTED ZONE';
-                this.x = config.x;
-                this.y = config.y;
-                this.w = config.w;
-                this.h = config.h;
-                this.hostileCount = config.hostileCount || 8;
-                this.respawnDelay = config.respawnDelay || 600; // 10 seconds at 60fps
-                this.respawnTimer = 0;
-                this.cleared = false;
-                this.clearCount = 0;
-                this.hostiles = [];
-                this.mapId = config.mapId || 'sdc';
-                this.active = false; // Only active when first entered or respawning
+                Object.assign(this,{id:'rz_0',name:'RESTRICTED ZONE',hostileCount:8,respawnDelay:600,mapId:'sdc'},config);
+                this.respawnTimer=0;this.cleared=false;this.clearCount=0;this.hostiles=[];this.active=false;
+                this.pendingSpawns=0;this._spawnIndex=0;this._spawnRetry=0;
             }
-
-            spawn(game) {
-                this.hostiles = [];
-                this.cleared = false;
-                this.active = true;
-                const margin = 50;
-                for (let i = 0; i < this.hostileCount; i++) {
-                    const ex = this.x + margin + Math.random() * (this.w - margin * 2);
-                    const ey = this.y + margin + Math.random() * (this.h - margin * 2);
-                    // Wave 6+: last 2 gangers get sniper rifles
-                    // Wave 3-5: all get RB-98 rapid blasters
-                    let weaponId = null;
-                    if (this.clearCount >= 6 && i >= this.hostileCount - 2) {
-                        weaponId = 'sniper_sr86';
-                    } else if (this.clearCount >= 3) {
-                        weaponId = 'rifle_rb98';
-                    }
-                    const ganger = new Ganger(ex, ey, {
-                        hp: 50 + this.clearCount * 8,
-                        speed: 2.6 + Math.min(this.clearCount * 0.15, 1.2),
-                        visionRange: 360,
-                        weaponId: weaponId
-                    });
-                    ganger._restrictedZoneId = this.id;
-                    this.hostiles.push(ganger);
-                    game.enemies.push(ganger);
-                }
-            }
-
             _playerInside(game) {
-                const p = game.player;
-                return p.x >= this.x && p.x <= this.x + this.w &&
-                       p.y >= this.y && p.y <= this.y + this.h;
+                const p=game.player;
+                return p.x>=this.x&&p.x<=this.x+this.w&&p.y>=this.y&&p.y<=this.y+this.h;
             }
-
+            _spawnPoints(game) {
+                if(game.activeMap.scrapyard)return game.activeMap.scrapyard.spawns;
+                const points=[];
+                for(const u of [.08,.3,.7,.92])for(const v of [.12,.88])points.push({x:this.x+u*this.w,y:this.y+v*this.h});
+                return points;
+            }
+            _safeSpawn(game,p,nav) {
+                if(p.x<this.x+25||p.x>this.x+this.w-25||p.y<this.y+25||p.y>this.y+this.h-25)return false;
+                if(Math.hypot(p.x-game.player.x,p.y-game.player.y)<350||!nav.walkable(p.x,p.y))return false;
+                if(game.enemies.some(h=>!h.dead&&Math.hypot(h.x-p.x,h.y-p.y)<75))return false;
+                const cars=game.traffic?.vehicles||[];
+                return !cars.some(v=>Math.hypot(v.x-p.x,v.y-p.y)<100);
+            }
+            _fillSpawns(game) {
+                const points=this._spawnPoints(game),nav=NavGrid.for(game.activeMap);
+                for(let slot=this.hostileCount-this.pendingSpawns;this.pendingSpawns>0;slot++){
+                    let at=null;
+                    for(let n=0;n<points.length;n++){
+                        const i=(this._spawnIndex+n)%points.length,p=points[i];
+                        if(this._safeSpawn(game,p,nav)){at=p;this._spawnIndex=(i+2)%points.length;break;}
+                    }
+                    if(!at)break; // Never fall back to a wall, the player's feet, or an overlapping enemy.
+                    const weaponId=this.clearCount>=6&&slot>=this.hostileCount-2?'sniper_sr86':this.clearCount>=3?'rifle_rb98':null;
+                    const h=new Ganger(at.x,at.y,{hp:50+this.clearCount*8,speed:2.6+Math.min(this.clearCount*.15,1.2),visionRange:360,weaponId});
+                    h._restrictedZoneId=this.id;
+                    // Reinforcements investigate the intrusion rather than idling at the far end of the yard.
+                    h.state='SEARCHING';h.suspicion=70;h.investigateTarget={x:game.player.x,y:game.player.y};
+                    h.angle=Math.atan2(game.player.y-at.y,game.player.x-at.x);
+                    this.hostiles.push(h);game.enemies.push(h);this.pendingSpawns--;
+                }
+                this._spawnRetry=30;
+            }
+            spawn(game) {
+                this.hostiles=[];this.cleared=false;this.active=true;this.pendingSpawns=this.hostileCount;
+                this._spawnIndex=(this.clearCount*4)%this._spawnPoints(game).length;
+                this._fillSpawns(game);
+            }
             update(game) {
-                if (game.activeMap.id !== this.mapId) {
-                    // Player left the map — mark hostiles as lost (not cleared)
-                    if (this.active && !this.cleared && this.hostiles.length > 0) {
-                        this._pendingRespawn = true;
-                    }
-                    this.hostiles = [];
-                    return;
+                try {this._update(game);}finally{this._hud(game);}
+            }
+            _update(game) {
+                if(game.activeMap.id!==this.mapId){
+                    if(this.active&&!this.cleared)this._pendingRespawn=true;
+                    this.hostiles=[];this.pendingSpawns=0;return;
                 }
-
-                // Returning to map with pending respawn
-                if (this._pendingRespawn) {
-                    this._pendingRespawn = false;
-                    this.spawn(game);
-                    showMessage(`⚠ ${this.name} — HOSTILES REGROUPED`);
-                    return;
+                const inside=this._playerInside(game);
+                if(this._pendingRespawn){
+                    if(!inside)return;
+                    this._pendingRespawn=false;this.spawn(game);showMessage(`⚠ ${this.name} — HOSTILES REGROUPED`);return;
                 }
-
-                // First entry — spawn hostiles when player walks in
-                if (!this.active && this._playerInside(game)) {
-                    this.spawn(game);
-                    showMessage(`⚠ ${this.name} — ${this.hostileCount} HOSTILES`);
-                    return;
+                if(!this.active&&inside){this.spawn(game);showMessage(`⚠ ${this.name} — ROUND ${this.clearCount+1}`);return;}
+                if(!this.active)return;
+                this.hostiles=this.hostiles.filter(h=>!h.dead&&game.enemies.includes(h));
+                if(this.pendingSpawns&&inside&&--this._spawnRetry<=0)this._fillSpawns(game);
+                if(!this.cleared&&!this.pendingSpawns&&this.hostiles.length===0){
+                    this.cleared=true;this.clearCount++;this.respawnTimer=this.respawnDelay;
+                    const bonus=30+this.clearCount*15;this._lastBonus=bonus;
+                    game.currency=(game.currency||0)+bonus;
+                    if(game.resonance)game.earnResonance(60+this.clearCount*15,'ZONE CLEARED');
+                    game.updateUI();showMessage(`${this.name} CLEARED ×${this.clearCount} — +${bonus} PERSONICS`);
                 }
-
-                if (!this.active) return;
-
-                // Prune dead/removed references
-                this.hostiles = this.hostiles.filter(h => !h.dead && game.enemies.includes(h));
-
-                // Check for clear
-                if (!this.cleared && this.hostiles.length === 0) {
-                    this.cleared = true;
-                    this.clearCount++;
-                    this.respawnTimer = this.respawnDelay;
-                    const bonus = 30 + this.clearCount * 15;
-                    game.currency = (game.currency || 0) + bonus;
-                    if (game.resonance) game.earnResonance(60 + this.clearCount * 15, 'ZONE CLEARED');
-                    game.updateUI();
-                    showMessage(`${this.name} CLEARED ×${this.clearCount} — +${bonus} PERSONICS`);
-                }
-
-                // Respawn countdown
-                if (this.cleared) {
-                    this.respawnTimer--;
-                    if (this.respawnTimer <= 0) {
-                        this.spawn(game);
-                        showMessage(`⚠ ${this.name} — HOSTILES REGROUPED`);
-                    }
-                }
+                // Leaving is a real breather: further rounds wait for her return to the yard.
+                if(this.cleared&&inside&&--this.respawnTimer<=0){this.spawn(game);showMessage(`⚠ ${this.name} — HOSTILES REGROUPED`);}
+            }
+            _hud(game) {
+                const el=this._el||(this._el=document.getElementById('ui-scrapyard'));if(!el)return;
+                const hidden=game.activeMap.id!==this.mapId||!this.active||!this._playerInside(game)||game.scenes?.running||game.hordeGauntlet?.active;
+                const left=this.hostiles.filter(h=>!h.dead&&game.enemies.includes(h)).length;
+                const secs=Math.ceil(this.respawnTimer/60),round=this.clearCount+1;
+                const key=hidden?'':`${round}:${left}:${this.pendingSpawns}:${this.cleared}:${secs}:${this._lastBonus||0}`;
+                if(key===this._hudKey)return;this._hudKey=key;
+                el.classList.toggle('show',!hidden);document.body.classList.toggle('yard-hud',!hidden);
+                if(hidden)return;
+                const tier=this.clearCount>=6?'Sniper backup':this.clearCount>=3?'Rapid blasters':'';
+                const title=this.cleared?'Yard cleared':`The Scrapyard · Round ${round}`;
+                const sub=this.cleared?`Reinforcements in ${secs}s`:`${left} ${left===1?'hostile':'hostiles'} remaining`+(this.pendingSpawns?` · ${this.pendingSpawns} inbound`:'');
+                const frac=this.cleared?0:(left+this.pendingSpawns)/this.hostileCount;
+                el.classList.toggle('between',this.cleared);
+                el.innerHTML=`<div class="w-line"><span class="w-title">${title}</span></div><div class="w-line"><span class="w-sub">${sub}</span>${!this.cleared&&tier?`<span class="w-chip">${tier}</span>`:''}</div>`
+                    +`<div class="w-line w-spoils${this.cleared?' secured':''}"><span class="w-tag">${this.cleared?'Secured':'Pays'}</span>${this.cleared?this._lastBonus:30+round*15} personics</div><div class="w-bar"><i style="transform:scaleX(${frac.toFixed(3)})"></i></div>`;
             }
         }
 
@@ -66885,6 +66882,115 @@ Object.assign(TrafficVehicle.prototype, {
         }
         
     </script>
+    <script type="text/dfab" data-src="world/scrapyard.js" data-cost="89">
+        // Hand-laid salvage yard: a continuous perimeter loop, two crosscuts and three combat spaces.
+        // Coordinates are authored for the hub's 1805 x 650 block; collision and art share each footprint.
+        const Scrapyard = {
+            layout(block) {
+                const sx=block.w/1800,sy=block.h/650;
+                const rect=(x,y,w,h)=>({x:block.x+x*sx,y:block.y+y*sy,w:w*sx,h:h*sy});
+                const cover=[];
+                const add=(kind,x,y,w,h)=>cover.push({...rect(x,y,w,h),kind,variant:cover.length%4});
+                add('wreck',140,170,165,64);add('wreck',380,290,150,65);
+                add('wreck',150,410,185,68);add('wreck',420,470,140,60);
+                add('scrap',420,130,100,90);add('scrap',300,310,70,65);
+                add('container',720,155,110,64);add('crane',850,235,110,140);
+                add('crusher',1010,160,120,95);add('scrap',1030,395,140,72);
+                add('scrap',760,460,90,65);
+                // An open-roof workshop: two side entrances and a broad southern loading door.
+                add('wall',1300,135,370,22);add('wall',1300,157,22,78);
+                add('wall',1300,370,22,95);add('wall',1670,135,22,150);
+                add('wall',1300,465,80,22);add('wall',1500,465,192,22);
+                add('bench',1390,190,160,50);add('bench',1480,365,160,50);
+                add('container',1090,495,85,48);add('container',1570,495,130,48);
+                // Staggered perimeter baffles keep the escape loop without a yard-length sniper lane.
+                add('scrap',570,40,45,80);add('container',1130,70,45,85);
+                add('container',660,530,55,85);add('scrap',1450,545,55,70);
+                const spawns=[];
+                // Marked gates feed both directions round the loop; none open into a firing dead end.
+                for(const [u,v] of [[.06,.12],[.28,.12],[.69,.12],[.94,.12],[.06,.88],[.25,.88],[.74,.88],[.94,.88],[.035,.5],[.965,.5]]) {
+                    for(const d of [-44,44])spawns.push({x:block.x+block.w*u+(u<.05||u>.95?0:d),y:block.y+block.h*v+(u<.05||u>.95?d:0)});
+                }
+                return {x:block.x,y:block.y,w:block.w,h:block.h,cover,spawns,
+                    route:[[80,80],[540,80],[540,150],[650,150],[650,80],[1100,80],[1100,40],[1200,40],[1200,80],[1735,80],[1735,585],[1535,585],[1535,510],[1425,510],[1425,585],[735,585],[735,500],[640,500],[640,585],[80,585]].map(([x,y])=>({x:block.x+x*sx,y:block.y+y*sy})),
+                    crosscuts:[{x:650,y0:150,y1:500},{x:1200,y0:80,y1:585}].map(p=>({from:{x:block.x+p.x*sx,y:block.y+p.y0*sy},to:{x:block.x+p.x*sx,y:block.y+p.y1*sy}}))};
+            },
+            populate(map,layout) {
+                map.scrapyard=layout;
+                for(const p of layout.cover)map.props.push(new PropEntity({x:p.x,y:p.y,width:p.w,height:p.h,
+                    decorType:'sy_'+p.kind,variant:p.variant,color:'#72513c',mass:50000,fixedRotation:true}));
+            },
+            addLights(map) {
+                const L=map.scrapyard;if(!L)return;
+                for(const [x,y] of [[620,180],[620,450],[1215,200],[1215,450]]){
+                    const l=new LampEntity({x:L.x+x*L.w/1800,y:L.y+y*L.h/650,lampType:1,color:'#eeb66b',lightRadius:250});
+                    l._yardLight=true;map.lamps.push(l);
+                }
+            },
+            drawProp(c,p) {
+                const x=p.x,y=p.y,w=p.width,h=p.height,kind=p.decorType.slice(3),v=p.decor.variant;
+                c.save();c.beginPath();c.rect(x,y,w,h);c.clip();
+                const box=(X,Y,W,H,color)=>{c.fillStyle=color;c.fillRect(X,Y,W,H);};
+                box(x,y,w,h,'#18191b');box(x+2,y+2,w-4,h-4,'#473e35');
+                box(x+3,y+3,w-6,3,'#a08c6b');box(x+3,y+h-8,w-6,6,'#222326');
+                if(kind==='wreck'){
+                    const colors=['#715044','#4e6770','#77714d','#683b3d'];
+                    for(const yy of [y+2,y+h-12])for(const xx of [x+w*.15,x+w*.74])box(xx,yy,w*.13,10,'#101116');
+                    box(x+8,y+9,w-16,h-22,colors[v]);box(x+w*.35,y+12,w*.33,h-28,'#272e35');
+                    c.strokeStyle='#a5957d';c.lineWidth=1.5;c.beginPath();c.moveTo(x+15,y+12);c.lineTo(x+w*.29,y+h*.6);c.lineTo(x+w*.47,y+15);c.lineTo(x+w*.63,y+h-16);c.stroke();
+                    box(x+w*.05,y+h*.4,w*.12,3,'#b2a797');box(x+w*.85,y+h*.35,w*.06,h*.25,'#b17c51');
+                }else if(kind==='container'||kind==='wall'){
+                    box(x+4,y+5,w-8,h-14,kind==='wall'?'#6f6652':v%2?'#7b4b39':'#4d6460');
+                    c.strokeStyle='rgba(20,19,17,.55)';c.lineWidth=2;
+                    for(let xx=x+11;xx<x+w-6;xx+=12){c.beginPath();c.moveTo(xx,y+5);c.lineTo(xx,y+h-10);c.stroke();}
+                    if(kind==='container'){box(x+w*.72,y+5,3,h-14,'#b59d76');box(x+w*.82,y+h*.4,4,10,'#d1ba83');}
+                }else if(kind==='scrap'){
+                    const rnd=seededRandom(92+v);
+                    for(let i=0;i<20;i++){
+                        const xx=x+5+rnd()*(w-25),yy=y+5+rnd()*(h-25),r=6+rnd()*9;
+                        c.fillStyle=['#85745d','#526467','#814c37','#a18b63'][i%4];c.beginPath();
+                        c.moveTo(xx,yy+3);c.lineTo(xx+r*1.5,yy);c.lineTo(xx+r*1.8,yy+r);c.lineTo(xx+r*.4,yy+r*1.4);c.closePath();c.fill();
+                        c.strokeStyle='#262a2b';c.lineWidth=1.5;c.stroke();
+                        c.strokeStyle='rgba(203,180,135,.5)';c.beginPath();c.moveTo(xx+3,yy+6);c.lineTo(xx+r,yy+3);c.stroke();
+                    }
+                    for(let i=0;i<4;i++){const xx=x+12+rnd()*(w-25),yy=y+12+rnd()*(h-25);c.fillStyle='#171b1d';c.beginPath();c.arc(xx,yy,8,0,Math.PI*2);c.fill();c.strokeStyle='#605e52';c.lineWidth=2;c.beginPath();c.arc(xx,yy,4,0,Math.PI*2);c.stroke();}
+                }else if(kind==='crane'){
+                    box(x+9,y+8,w-18,h-21,'#b28b3c');box(x+18,y+16,w-36,h-40,'#383e40');box(x+14,y+h-42,27,21,'#78918c');box(x+14,y+h-22,27,6,'#574a35');
+                    c.strokeStyle='#dbb95e';c.lineWidth=12;c.beginPath();c.moveTo(x+w*.5,y+h*.75);c.lineTo(x+w*.5,y+15);c.stroke();
+                    c.strokeStyle='#282a2d';c.lineWidth=2;c.beginPath();c.moveTo(x+w*.65,y+12);c.lineTo(x+w*.65,y+h*.6);c.stroke();
+                    c.beginPath();c.arc(x+w*.65,y+h*.63,7,0,Math.PI*1.5);c.stroke();
+                }else if(kind==='crusher'){
+                    box(x+7,y+7,w-14,h-20,'#9e7543');box(x+20,y+17,w-40,h-40,'#12171c');
+                    for(let xx=x+23;xx<x+w-22;xx+=13){box(xx,y+18,6,14,'#aca58c');box(xx,y+h-35,6,13,'#817b69');}
+                }else if(kind==='bench'){
+                    box(x+5,y+5,w-10,h-16,'#94816a');
+                    for(let xx=x+15;xx<x+w-15;xx+=27){box(xx,y+12,16,13,'#414c4e');box(xx+3,y+14,8,3,'#ccab67');}
+                }
+                // Rust freckles and a worn, consistent collision edge.
+                c.strokeStyle='rgba(205,158,93,.3)';c.lineWidth=1;c.strokeRect(x+1,y+1,w-2,h-2);c.restore();
+            },
+            drawGround(ctx,L) {
+                if(!L._ground){
+                    const cv=document.createElement('canvas');cv.width=Math.ceil(L.w);cv.height=Math.ceil(L.h);
+                    const c=cv.getContext('2d'),sx=L.w/1800,sy=L.h/650;c.scale(sx,sy);
+                    c.fillStyle='#292723';c.fillRect(0,0,1800,650);
+                    c.fillStyle='#393730';c.fillRect(90,110,480,440);c.fillStyle='#323639';c.fillRect(680,110,500,440);
+                    c.fillStyle='#49473e';c.fillRect(1280,115,430,390);
+                    const rnd=seededRandom(441);for(let i=0;i<220;i++){c.fillStyle=i%3?'rgba(188,151,92,.13)':'rgba(0,0,0,.22)';c.fillRect(rnd()*1800,rnd()*650,3+rnd()*24,2+rnd()*8);}
+                    c.strokeStyle='rgba(207,174,95,.42)';c.lineWidth=3;c.setLineDash([16,14]);c.beginPath();L.route.forEach((p,i)=>c[i?'lineTo':'moveTo']((p.x-L.x)/sx,(p.y-L.y)/sy));c.closePath();c.stroke();
+                    for(const p of L.crosscuts){c.beginPath();c.moveTo((p.from.x-L.x)/sx,(p.from.y-L.y)/sy);c.lineTo((p.to.x-L.x)/sx,(p.to.y-L.y)/sy);c.stroke();}c.setLineDash([]);
+                    c.strokeStyle='rgba(15,17,19,.6)';c.lineWidth=5;for(const yy of [72,87,565,580]){c.beginPath();c.moveTo(95,yy);c.lineTo(1710,yy);c.stroke();}
+                    c.font='bold 21px sans-serif';c.fillStyle='#b0a17e';c.textAlign='center';
+                    for(const [x,text]of [[330,'01 / WRECK LANES'],[920,'02 / SORTING YARD'],[1500,'03 / WORKSHOP']])c.fillText(text,x,335);
+                    c.font='bold 12px sans-serif';c.fillText('SALVAGE / KEEP ROUTES CLEAR',900,615);
+                    for(const p of L.spawns.filter((_,i)=>i%2===0)){const x=(p.x-L.x)/sx,y=(p.y-L.y)/sy;
+                        c.fillStyle='#ad7a3c';c.beginPath();c.moveTo(x-13,y);c.lineTo(x,y+(y<325?17:-17));c.lineTo(x+13,y);c.closePath();c.fill();}
+                    L._ground=cv;
+                }
+                ctx.drawImage(L._ground,L.x,L.y,L.w,L.h);
+            }
+        };
+    </script>
     <script type="text/dfab" data-src="world/billboards.js" data-cost="93">
         /* =====================================================================
            BILLBOARDS — your artwork on tilted A-frame panels around the city
@@ -81649,7 +81755,7 @@ engineMixin({
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/map-loading.js" data-cost="1088">
+    <script type="text/dfab" data-src="engine/map-loading.js" data-cost="1100">
         // GameEngine — loadMap / _doLoadMap (building every map), baked lighting.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
                 /* Each interior's painted floor (or backdrop) is a big canvas — 2–11 MB apiece. They're painted from
@@ -82049,6 +82155,8 @@ engineMixin({
                         mapData.buildingColliders = c.buildingColliders;
                         mapData.cityLayout = c.cityLayout;
                         mapData.ferrisWheel = c.ferrisWheel;
+                        mapData.scrapyard = c.scrapyard;
+                        if(!this.restrictedZone&&c.scrapyard){const L=c.scrapyard;this.restrictedZone=new RestrictedZone({id:'rz_scrapyard',name:'THE SCRAPYARD',x:L.x+10,y:L.y+10,w:L.w-20,h:L.h-20,hostileCount:8,respawnDelay:900,mapId:'sdc'});}
                         mapData.pavements = c.pavements.map(p => Object.assign(new Pavement(p.x, p.y, p.w, p.h, p.poly), p.road ? { road: p.road } : {}));
                         mapData.crosswalks = [...c.crosswalks];
                         mapData.foliage = [...c.foliage];
@@ -82246,15 +82354,18 @@ engineMixin({
 
                     city._addSafeZone(HUB_OLLO_DOOR.x - 120, HUB_OLLO_DOOR.y - 260, HUB_OLLO_DOOR.w + 240, HUB_OLLO_DOOR.h + 260, 'OllO Plaza door');
                     
+                    // The salvage yard has authored combat cover, not residential/shop filler.
+                    const yardBlock=city.blockMap[HUB_BLOCKS.scrapyard];
+                    if(yardBlock)city._addSafeZone(yardBlock.x,yardBlock.y,yardBlock.w,yardBlock.h,'Scrapyard combat layout');
+
                     // 6. AUTO-FILL REMAINING BLOCKS
                     // Rows along every street a block fronts, facing the road (world/city-layout.js _fillStreetFronts);
-                    // the Scrapyard keeps its scattered cover. fill: how much of each street front gets buildings
+                    // The Scrapyard is reserved above. fill: how much of each street front gets buildings
                     // (lower it if the busier streets cost too much frame on a phone)
                     city.autoFillAll({
                         density: 0.4,
                         fill: 1,
                         categories: ['residential', 'shopping', 'commercial'],
-                        scatter: [HUB_BLOCKS.scrapyard],
                         fillPartial: [HUB_BLOCKS.cafe, HUB_BLOCKS.club, HUB_BLOCKS.clinic, HUB_BLOCKS.ashgrove]   // the shared blocks: rows round their landmarks
                     });
                     
@@ -82350,6 +82461,7 @@ engineMixin({
                     const rzBlock = city.blockMap[HUB_BLOCKS.scrapyard];
                     console.log('[RESTRICTED ZONE]', HUB_BLOCKS.scrapyard, rzBlock ? `${rzBlock.x},${rzBlock.y} ${rzBlock.w}x${rzBlock.h}` : 'NOT FOUND');
                     if (rzBlock) {
+                        Scrapyard.populate(mapData,Scrapyard.layout(rzBlock));
                         this.restrictedZone = new RestrictedZone({
                             id: 'rz_scrapyard',
                             name: 'THE SCRAPYARD',
@@ -82614,6 +82726,8 @@ engineMixin({
                         });
                     });
                     
+                    // Industrial yard routes stay open; no decorative street trees inside the combat space.
+                    if(mapData.scrapyard){const L=mapData.scrapyard;mapData.foliage=mapData.foliage.filter(f=>f.x<L.x-30||f.x>L.x+L.w+30||f.y<L.y-30||f.y>L.y+L.h+30);}
                     // Keep the landmark forecourts (Silver Queen's portico and carpet, Double Nights' drive and fountain) clear of street trees
                     for (const b of mapData.buildings || []) {
                         const court = b.style === 'silver_queen' && b._sqForecourt ? b._sqForecourt() : b.style === 'double_nights' ? b._dnForecourt() : b.style === 'moon_city' ? b._mcForecourt() : b._neuralForecourt ? b._neuralForecourt() : null;
@@ -82791,6 +82905,7 @@ engineMixin({
                         buildingColliders: mapData.buildingColliders,
                         cityLayout: mapData.cityLayout,
                         ferrisWheel: mapData.ferrisWheel || null,
+                        scrapyard: mapData.scrapyard,
                         network: this.traffic.network,
                         sidewalkNetwork: sidewalkNetwork,
                         pavements: mapData.pavements.map(p => ({...p})),
@@ -82805,7 +82920,7 @@ engineMixin({
                             angle: l.angle || 0
                         })),
                         gravestoneConfigs: (() => {
-                            // All props after the initial entity props are graveyard gravestones
+                            // All generated hub props (salvage-yard cover and graveyard stones).
                             const hubPropCount = this._hubCache_hubPropCount;
                             return mapData.props.slice(hubPropCount).map(p => ({
                                 x: p.x, y: p.y, width: p.width, height: p.height,
@@ -82825,6 +82940,7 @@ engineMixin({
                 this.activeMap = maps[mapId] || maps['sdc'];
                 (this.visitedMaps ||= new Set()).add(this.activeMap.id);              // somewhere she's been joins the map screen's list
                 this.uiLocation.textContent = this.activeMap.label;
+                if(this.restrictedZone)this.restrictedZone._hud(this);
 
                 // --- WEATHER: adopt this map's climate ---
                 // Only outdoor maps change the odds table. Indoor maps leave it
@@ -82878,6 +82994,9 @@ engineMixin({
                         this.activeMap.cityLayout.applyBlockLampColors(this.activeMap.lamps);
                     }
                     
+                    // Interior work lights are warm amber; the street outside stays danger crimson.
+                    if(this.activeMap.scrapyard)Scrapyard.addLights(this.activeMap);
+
                     // The Ollo test zone's door (on the city's southern edge, east of the graveyard)
                     if (this.activeMap.id === 'sdc') {
                         this.activeMap.transitions.push({
@@ -86306,7 +86425,7 @@ engineMixin({
             clear() { this.items.length = 0; }
         };
     </script>
-    <script type="text/dfab" data-src="engine/draw.js" data-cost="1008">
+    <script type="text/dfab" data-src="engine/draw.js" data-cost="1011">
         // GameEngine — The frame renderer (draw).
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -86661,6 +86780,11 @@ engineMixin({
                         this.ctx.fillRect(z.x, z.y, z.w, z.h);
                     }
                 }
+                }
+
+                if (RL.at('ground') && this.activeMap.scrapyard) {
+                    const L=this.activeMap.scrapyard,V=cullBounds.world;
+                    if(L.x+L.w>V.left&&L.x<V.right&&L.y+L.h>V.top&&L.y<V.bottom)Scrapyard.drawGround(this.ctx,L);
                 }
 
                 // Restricted Zone — in-world crimson hazard border
@@ -92685,7 +92809,7 @@ engineMixin({
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/loop.js" data-cost="234">
+    <script type="text/dfab" data-src="engine/loop.js" data-cost="236">
         // GameEngine — start / stop / reset and the main loop.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -92799,6 +92923,9 @@ engineMixin({
             resetGameState() {
                 this._cancelQuickDrawHold?.(); this.cancelQuickDraw();
                 this._pendingGauntletLoad = null;
+                this.restrictedZone=null;
+                document.getElementById('ui-scrapyard')?.classList.remove('show');
+                document.body.classList.remove('yard-hud');
                 clearTimeout(this.hordeGauntlet?._endT);
                 this.hordeGauntlet = null;
                 this._releaseLightingBase();

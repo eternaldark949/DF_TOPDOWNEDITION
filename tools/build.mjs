@@ -142,6 +142,7 @@ const SCRIPTS = [
     'ui/crowd-impostors.js',
     'ui/silhouette-fx.js',
     'world/city-layout.js',
+    'world/scrapyard.js',
     'world/billboards.js',
     'ui/inventory-augments.js',
     'ui/action-dock.js',

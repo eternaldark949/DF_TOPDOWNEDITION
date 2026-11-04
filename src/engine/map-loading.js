@@ -397,6 +397,8 @@ engineMixin({
                         mapData.buildingColliders = c.buildingColliders;
                         mapData.cityLayout = c.cityLayout;
                         mapData.ferrisWheel = c.ferrisWheel;
+                        mapData.scrapyard = c.scrapyard;
+                        if(!this.restrictedZone&&c.scrapyard){const L=c.scrapyard;this.restrictedZone=new RestrictedZone({id:'rz_scrapyard',name:'THE SCRAPYARD',x:L.x+10,y:L.y+10,w:L.w-20,h:L.h-20,hostileCount:8,respawnDelay:900,mapId:'sdc'});}
                         mapData.pavements = c.pavements.map(p => Object.assign(new Pavement(p.x, p.y, p.w, p.h, p.poly), p.road ? { road: p.road } : {}));
                         mapData.crosswalks = [...c.crosswalks];
                         mapData.foliage = [...c.foliage];
@@ -594,15 +596,18 @@ engineMixin({
 
                     city._addSafeZone(HUB_OLLO_DOOR.x - 120, HUB_OLLO_DOOR.y - 260, HUB_OLLO_DOOR.w + 240, HUB_OLLO_DOOR.h + 260, 'OllO Plaza door');
                     
+                    // The salvage yard has authored combat cover, not residential/shop filler.
+                    const yardBlock=city.blockMap[HUB_BLOCKS.scrapyard];
+                    if(yardBlock)city._addSafeZone(yardBlock.x,yardBlock.y,yardBlock.w,yardBlock.h,'Scrapyard combat layout');
+
                     // 6. AUTO-FILL REMAINING BLOCKS
                     // Rows along every street a block fronts, facing the road (world/city-layout.js _fillStreetFronts);
-                    // the Scrapyard keeps its scattered cover. fill: how much of each street front gets buildings
+                    // The Scrapyard is reserved above. fill: how much of each street front gets buildings
                     // (lower it if the busier streets cost too much frame on a phone)
                     city.autoFillAll({
                         density: 0.4,
                         fill: 1,
                         categories: ['residential', 'shopping', 'commercial'],
-                        scatter: [HUB_BLOCKS.scrapyard],
                         fillPartial: [HUB_BLOCKS.cafe, HUB_BLOCKS.club, HUB_BLOCKS.clinic, HUB_BLOCKS.ashgrove]   // the shared blocks: rows round their landmarks
                     });
                     
@@ -698,6 +703,7 @@ engineMixin({
                     const rzBlock = city.blockMap[HUB_BLOCKS.scrapyard];
                     console.log('[RESTRICTED ZONE]', HUB_BLOCKS.scrapyard, rzBlock ? `${rzBlock.x},${rzBlock.y} ${rzBlock.w}x${rzBlock.h}` : 'NOT FOUND');
                     if (rzBlock) {
+                        Scrapyard.populate(mapData,Scrapyard.layout(rzBlock));
                         this.restrictedZone = new RestrictedZone({
                             id: 'rz_scrapyard',
                             name: 'THE SCRAPYARD',
@@ -962,6 +968,8 @@ engineMixin({
                         });
                     });
                     
+                    // Industrial yard routes stay open; no decorative street trees inside the combat space.
+                    if(mapData.scrapyard){const L=mapData.scrapyard;mapData.foliage=mapData.foliage.filter(f=>f.x<L.x-30||f.x>L.x+L.w+30||f.y<L.y-30||f.y>L.y+L.h+30);}
                     // Keep the landmark forecourts (Silver Queen's portico and carpet, Double Nights' drive and fountain) clear of street trees
                     for (const b of mapData.buildings || []) {
                         const court = b.style === 'silver_queen' && b._sqForecourt ? b._sqForecourt() : b.style === 'double_nights' ? b._dnForecourt() : b.style === 'moon_city' ? b._mcForecourt() : b._neuralForecourt ? b._neuralForecourt() : null;
@@ -1139,6 +1147,7 @@ engineMixin({
                         buildingColliders: mapData.buildingColliders,
                         cityLayout: mapData.cityLayout,
                         ferrisWheel: mapData.ferrisWheel || null,
+                        scrapyard: mapData.scrapyard,
                         network: this.traffic.network,
                         sidewalkNetwork: sidewalkNetwork,
                         pavements: mapData.pavements.map(p => ({...p})),
@@ -1153,7 +1162,7 @@ engineMixin({
                             angle: l.angle || 0
                         })),
                         gravestoneConfigs: (() => {
-                            // All props after the initial entity props are graveyard gravestones
+                            // All generated hub props (salvage-yard cover and graveyard stones).
                             const hubPropCount = this._hubCache_hubPropCount;
                             return mapData.props.slice(hubPropCount).map(p => ({
                                 x: p.x, y: p.y, width: p.width, height: p.height,
@@ -1173,6 +1182,7 @@ engineMixin({
                 this.activeMap = maps[mapId] || maps['sdc'];
                 (this.visitedMaps ||= new Set()).add(this.activeMap.id);              // somewhere she's been joins the map screen's list
                 this.uiLocation.textContent = this.activeMap.label;
+                if(this.restrictedZone)this.restrictedZone._hud(this);
 
                 // --- WEATHER: adopt this map's climate ---
                 // Only outdoor maps change the odds table. Indoor maps leave it
@@ -1226,6 +1236,9 @@ engineMixin({
                         this.activeMap.cityLayout.applyBlockLampColors(this.activeMap.lamps);
                     }
                     
+                    // Interior work lights are warm amber; the street outside stays danger crimson.
+                    if(this.activeMap.scrapyard)Scrapyard.addLights(this.activeMap);
+
                     // The Ollo test zone's door (on the city's southern edge, east of the graveyard)
                     if (this.activeMap.id === 'sdc') {
                         this.activeMap.transitions.push({

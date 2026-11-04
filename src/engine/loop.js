@@ -111,6 +111,9 @@
             resetGameState() {
                 this._cancelQuickDrawHold?.(); this.cancelQuickDraw();
                 this._pendingGauntletLoad = null;
+                this.restrictedZone=null;
+                document.getElementById('ui-scrapyard')?.classList.remove('show');
+                document.body.classList.remove('yard-hud');
                 clearTimeout(this.hordeGauntlet?._endT);
                 this.hordeGauntlet = null;
                 this._releaseLightingBase();

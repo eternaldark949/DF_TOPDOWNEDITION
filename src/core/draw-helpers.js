@@ -103,12 +103,13 @@
         /** Everything that blocks sight and light on a map: walls plus building footprints (cached per map). */
         function getOccluders(map) {
             if (!map) return [];
-            const cols = getColliders(map), walls = map.walls || [];
+            const cols = getColliders(map), walls = map.walls || [], yard=map.scrapyard?.cover;
             const c = map._occluderCache;
-            if (c && c.walls === walls && c.cols === cols && c.nw === walls.length && c.nc === cols.length) { _physicsSpatial.track(c.list); return c.list; }
-            const list = walls.concat(cols);
+            if (c && c.walls === walls && c.cols === cols && c.nw === walls.length && c.nc === cols.length && c.yard===yard) { _physicsSpatial.track(c.list); return c.list; }
+            // Authored fixed salvage cover also stops vision cones, street light and headlight beams.
+            const list = walls.concat(cols,yard||[]);
             _physicsSpatial.track(list);
-            map._occluderCache = { walls, cols, nw: walls.length, nc: cols.length, list };
+            map._occluderCache = { walls, cols, yard, nw: walls.length, nc: cols.length, list };
             return list;
         }
 

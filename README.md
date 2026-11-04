@@ -51,3 +51,5 @@ Run `node tools/test-lamp-projection.cjs` for raised street-lantern projection, 
 Street trees have projected bark trunks, branches and leaf clusters; palms have separate curved fronds. New city planting checks full canopy clearance against every building section. Run `node tools/test-tree-projection.cjs` for geometry, roof occlusion, canvas restoration and city planting checks.
 
 Tree and street-lamp parts share a height-sorted world pass, so leaves cover bases and lower shafts while higher lanterns remain visible. Run `node tools/test-canopy-lamp-depth.cjs` for ordering, reversed submission and canvas cleanup checks.
+
+The Scrapyard now uses a hand-laid salvage-yard layout with wreck lanes, a sorting yard, and an open-roof workshop. Marked reinforcement gates check walkability, player distance and enemy spacing; its HUD tracks rounds, remaining/inbound hostiles, rewards and the regroup countdown. New rounds wait while you are outside the yard. Run `node tools/test-scrapyard.cjs` for routes, cover, safe spawning, rewards, HUD and map-cache/reset checks.

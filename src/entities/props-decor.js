@@ -2410,6 +2410,7 @@
         }
 
         function drawClinicDecorProp(ctx, p) {
+            if (p.decorType.startsWith('sy_')) return Scrapyard.drawProp(ctx,p);
             if (p.decorType.startsWith('apt_')) return drawApartmentDecorProp(ctx, p);
             if (p.decorType.startsWith('sc_')) return drawSanctumDecorProp(ctx, p);
             if (p.decorType.startsWith('ps_')) return drawSuiteDecorProp(ctx, p);

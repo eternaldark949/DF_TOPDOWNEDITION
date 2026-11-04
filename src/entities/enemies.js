@@ -1572,6 +1572,7 @@
                 if (Math.abs(angleDiff) > this.visionFov / 2) return false;
 
                 if (typeof game !== 'undefined' && game.roomSystem.doorBlocks(this.x, this.y, tx, ty)) return false;   // not through a shut door
+                if (this._restrictedZoneId && typeof game !== 'undefined') return hasShotLine(this.x,this.y,tx,ty,game.activeMap);
                 return !isLineBlocked(this.x, this.y, tx, ty, walls, buildings); 
             }
 
@@ -2070,106 +2071,94 @@
         // ═══════════════════════════════════════════════════════════
         class RestrictedZone {
             constructor(config) {
-                this.id = config.id || 'rz_0';
-                this.name = config.name || 'RESTRICTED ZONE';
-                this.x = config.x;
-                this.y = config.y;
-                this.w = config.w;
-                this.h = config.h;
-                this.hostileCount = config.hostileCount || 8;
-                this.respawnDelay = config.respawnDelay || 600; // 10 seconds at 60fps
-                this.respawnTimer = 0;
-                this.cleared = false;
-                this.clearCount = 0;
-                this.hostiles = [];
-                this.mapId = config.mapId || 'sdc';
-                this.active = false; // Only active when first entered or respawning
+                Object.assign(this,{id:'rz_0',name:'RESTRICTED ZONE',hostileCount:8,respawnDelay:600,mapId:'sdc'},config);
+                this.respawnTimer=0;this.cleared=false;this.clearCount=0;this.hostiles=[];this.active=false;
+                this.pendingSpawns=0;this._spawnIndex=0;this._spawnRetry=0;
             }
-
-            spawn(game) {
-                this.hostiles = [];
-                this.cleared = false;
-                this.active = true;
-                const margin = 50;
-                for (let i = 0; i < this.hostileCount; i++) {
-                    const ex = this.x + margin + Math.random() * (this.w - margin * 2);
-                    const ey = this.y + margin + Math.random() * (this.h - margin * 2);
-                    // Wave 6+: last 2 gangers get sniper rifles
-                    // Wave 3-5: all get RB-98 rapid blasters
-                    let weaponId = null;
-                    if (this.clearCount >= 6 && i >= this.hostileCount - 2) {
-                        weaponId = 'sniper_sr86';
-                    } else if (this.clearCount >= 3) {
-                        weaponId = 'rifle_rb98';
-                    }
-                    const ganger = new Ganger(ex, ey, {
-                        hp: 50 + this.clearCount * 8,
-                        speed: 2.6 + Math.min(this.clearCount * 0.15, 1.2),
-                        visionRange: 360,
-                        weaponId: weaponId
-                    });
-                    ganger._restrictedZoneId = this.id;
-                    this.hostiles.push(ganger);
-                    game.enemies.push(ganger);
-                }
-            }
-
             _playerInside(game) {
-                const p = game.player;
-                return p.x >= this.x && p.x <= this.x + this.w &&
-                       p.y >= this.y && p.y <= this.y + this.h;
+                const p=game.player;
+                return p.x>=this.x&&p.x<=this.x+this.w&&p.y>=this.y&&p.y<=this.y+this.h;
             }
-
+            _spawnPoints(game) {
+                if(game.activeMap.scrapyard)return game.activeMap.scrapyard.spawns;
+                const points=[];
+                for(const u of [.08,.3,.7,.92])for(const v of [.12,.88])points.push({x:this.x+u*this.w,y:this.y+v*this.h});
+                return points;
+            }
+            _safeSpawn(game,p,nav) {
+                if(p.x<this.x+25||p.x>this.x+this.w-25||p.y<this.y+25||p.y>this.y+this.h-25)return false;
+                if(Math.hypot(p.x-game.player.x,p.y-game.player.y)<350||!nav.walkable(p.x,p.y))return false;
+                if(game.enemies.some(h=>!h.dead&&Math.hypot(h.x-p.x,h.y-p.y)<75))return false;
+                const cars=game.traffic?.vehicles||[];
+                return !cars.some(v=>Math.hypot(v.x-p.x,v.y-p.y)<100);
+            }
+            _fillSpawns(game) {
+                const points=this._spawnPoints(game),nav=NavGrid.for(game.activeMap);
+                for(let slot=this.hostileCount-this.pendingSpawns;this.pendingSpawns>0;slot++){
+                    let at=null;
+                    for(let n=0;n<points.length;n++){
+                        const i=(this._spawnIndex+n)%points.length,p=points[i];
+                        if(this._safeSpawn(game,p,nav)){at=p;this._spawnIndex=(i+2)%points.length;break;}
+                    }
+                    if(!at)break; // Never fall back to a wall, the player's feet, or an overlapping enemy.
+                    const weaponId=this.clearCount>=6&&slot>=this.hostileCount-2?'sniper_sr86':this.clearCount>=3?'rifle_rb98':null;
+                    const h=new Ganger(at.x,at.y,{hp:50+this.clearCount*8,speed:2.6+Math.min(this.clearCount*.15,1.2),visionRange:360,weaponId});
+                    h._restrictedZoneId=this.id;
+                    // Reinforcements investigate the intrusion rather than idling at the far end of the yard.
+                    h.state='SEARCHING';h.suspicion=70;h.investigateTarget={x:game.player.x,y:game.player.y};
+                    h.angle=Math.atan2(game.player.y-at.y,game.player.x-at.x);
+                    this.hostiles.push(h);game.enemies.push(h);this.pendingSpawns--;
+                }
+                this._spawnRetry=30;
+            }
+            spawn(game) {
+                this.hostiles=[];this.cleared=false;this.active=true;this.pendingSpawns=this.hostileCount;
+                this._spawnIndex=(this.clearCount*4)%this._spawnPoints(game).length;
+                this._fillSpawns(game);
+            }
             update(game) {
-                if (game.activeMap.id !== this.mapId) {
-                    // Player left the map — mark hostiles as lost (not cleared)
-                    if (this.active && !this.cleared && this.hostiles.length > 0) {
-                        this._pendingRespawn = true;
-                    }
-                    this.hostiles = [];
-                    return;
+                try {this._update(game);}finally{this._hud(game);}
+            }
+            _update(game) {
+                if(game.activeMap.id!==this.mapId){
+                    if(this.active&&!this.cleared)this._pendingRespawn=true;
+                    this.hostiles=[];this.pendingSpawns=0;return;
                 }
-
-                // Returning to map with pending respawn
-                if (this._pendingRespawn) {
-                    this._pendingRespawn = false;
-                    this.spawn(game);
-                    showMessage(`⚠ ${this.name} — HOSTILES REGROUPED`);
-                    return;
+                const inside=this._playerInside(game);
+                if(this._pendingRespawn){
+                    if(!inside)return;
+                    this._pendingRespawn=false;this.spawn(game);showMessage(`⚠ ${this.name} — HOSTILES REGROUPED`);return;
                 }
-
-                // First entry — spawn hostiles when player walks in
-                if (!this.active && this._playerInside(game)) {
-                    this.spawn(game);
-                    showMessage(`⚠ ${this.name} — ${this.hostileCount} HOSTILES`);
-                    return;
+                if(!this.active&&inside){this.spawn(game);showMessage(`⚠ ${this.name} — ROUND ${this.clearCount+1}`);return;}
+                if(!this.active)return;
+                this.hostiles=this.hostiles.filter(h=>!h.dead&&game.enemies.includes(h));
+                if(this.pendingSpawns&&inside&&--this._spawnRetry<=0)this._fillSpawns(game);
+                if(!this.cleared&&!this.pendingSpawns&&this.hostiles.length===0){
+                    this.cleared=true;this.clearCount++;this.respawnTimer=this.respawnDelay;
+                    const bonus=30+this.clearCount*15;this._lastBonus=bonus;
+                    game.currency=(game.currency||0)+bonus;
+                    if(game.resonance)game.earnResonance(60+this.clearCount*15,'ZONE CLEARED');
+                    game.updateUI();showMessage(`${this.name} CLEARED ×${this.clearCount} — +${bonus} PERSONICS`);
                 }
-
-                if (!this.active) return;
-
-                // Prune dead/removed references
-                this.hostiles = this.hostiles.filter(h => !h.dead && game.enemies.includes(h));
-
-                // Check for clear
-                if (!this.cleared && this.hostiles.length === 0) {
-                    this.cleared = true;
-                    this.clearCount++;
-                    this.respawnTimer = this.respawnDelay;
-                    const bonus = 30 + this.clearCount * 15;
-                    game.currency = (game.currency || 0) + bonus;
-                    if (game.resonance) game.earnResonance(60 + this.clearCount * 15, 'ZONE CLEARED');
-                    game.updateUI();
-                    showMessage(`${this.name} CLEARED ×${this.clearCount} — +${bonus} PERSONICS`);
-                }
-
-                // Respawn countdown
-                if (this.cleared) {
-                    this.respawnTimer--;
-                    if (this.respawnTimer <= 0) {
-                        this.spawn(game);
-                        showMessage(`⚠ ${this.name} — HOSTILES REGROUPED`);
-                    }
-                }
+                // Leaving is a real breather: further rounds wait for her return to the yard.
+                if(this.cleared&&inside&&--this.respawnTimer<=0){this.spawn(game);showMessage(`⚠ ${this.name} — HOSTILES REGROUPED`);}
+            }
+            _hud(game) {
+                const el=this._el||(this._el=document.getElementById('ui-scrapyard'));if(!el)return;
+                const hidden=game.activeMap.id!==this.mapId||!this.active||!this._playerInside(game)||game.scenes?.running||game.hordeGauntlet?.active;
+                const left=this.hostiles.filter(h=>!h.dead&&game.enemies.includes(h)).length;
+                const secs=Math.ceil(this.respawnTimer/60),round=this.clearCount+1;
+                const key=hidden?'':`${round}:${left}:${this.pendingSpawns}:${this.cleared}:${secs}:${this._lastBonus||0}`;
+                if(key===this._hudKey)return;this._hudKey=key;
+                el.classList.toggle('show',!hidden);document.body.classList.toggle('yard-hud',!hidden);
+                if(hidden)return;
+                const tier=this.clearCount>=6?'Sniper backup':this.clearCount>=3?'Rapid blasters':'';
+                const title=this.cleared?'Yard cleared':`The Scrapyard · Round ${round}`;
+                const sub=this.cleared?`Reinforcements in ${secs}s`:`${left} ${left===1?'hostile':'hostiles'} remaining`+(this.pendingSpawns?` · ${this.pendingSpawns} inbound`:'');
+                const frac=this.cleared?0:(left+this.pendingSpawns)/this.hostileCount;
+                el.classList.toggle('between',this.cleared);
+                el.innerHTML=`<div class="w-line"><span class="w-title">${title}</span></div><div class="w-line"><span class="w-sub">${sub}</span>${!this.cleared&&tier?`<span class="w-chip">${tier}</span>`:''}</div>`
+                    +`<div class="w-line w-spoils${this.cleared?' secured':''}"><span class="w-tag">${this.cleared?'Secured':'Pays'}</span>${this.cleared?this._lastBonus:30+round*15} personics</div><div class="w-bar"><i style="transform:scaleX(${frac.toFixed(3)})"></i></div>`;
             }
         }
 
