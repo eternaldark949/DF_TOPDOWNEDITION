@@ -100,10 +100,18 @@
         ];
         /** What they say back to her photo */
         const MSG_SNAP_REPLIES = {
-            Victoria: 'Okay, iconic.', Yenna: 'Nice framing.', Sabrina: 'Cute. Don\'t let it go to your head.', Max: 'Why are you sending me this.',
-            Josh: 'Saved to the archive.', '747': 'Looking good, Nine.', Mirabel: 'Don\'t send me pictures, 949. Send me results.',
-            'Dr. Yin': 'You look tired. Come see me.', Larissa: 'Received.', Anavia: 'Mm. Come closer next time.',
+            Victoria: ['Okay, iconic.', 'That one deserves a frame.', 'Keep these coming, Nine.'],
+            Yenna: ['Nice framing.', 'Good shot. Different kind of trigger.', 'You picked a good angle.'],
+            Sabrina: ["Cute. Don't let it go to your head.", 'Fine. That one can stay.', 'Almost makes this city look respectable.'],
+            Max: ['Why are you sending me this.', 'Fine. I looked.', 'Another one? You have a whole city to annoy.'],
+            Josh: ['Saved to the archive.', 'Filed under: Nine being Nine.', 'The archive appreciates your contribution.'],
+            '747': ['Looking good, Nine.', 'Good to hear from you.', 'Save a few sights for when I can join you.'],
+            Mirabel: ["Don't send me pictures, 949. Send me results.", 'I see your camera still works. How is the job?', 'Noted. Keep your eyes open, 949.'],
+            'Dr. Yin': ['You look tired. Come see me.', 'Thank you for checking in. Stay safe out there.', 'Take a break between adventures, please.'],
+            Larissa: ['Received.', 'I see it. Thank you.', 'Another for the collection.'],
+            Anavia: ['Mm. Come closer next time.', 'You have my attention.', 'Keep showing me what catches your eye.'],
         };
+        const MSG_SNAP_GENERIC = ['Nice.', 'Good shot.', 'Thanks for sending this.'];
 
         /* ── The group chat ── */
         const MSG_GROUP_SEED = [
@@ -624,7 +632,11 @@
                     this.setTyping(name, false);
                     delete mine.awaiting;
                     const extra = { ...(resp.who ? { who: resp.who } : {}), ...(resp.extra || {}) };
-                    this.addMessage(name, resp.text, false, 'them', Object.keys(extra).length ? extra : null);
+                    // A reply belongs to this photo, even when the contact has used its wording before.
+                    // Keep story-message text deduplication intact, and keep replayed callbacks idempotent.
+                    if (mine.kind === 'snap' && mine.id) { extra.id=`snap_reply_${mine.id}`;extra.replyTo=mine.id; }
+                    const delivered=this.addMessage(name, resp.text, false, 'them', Object.keys(extra).length ? extra : null);
+                    if (!delivered) { if(viewing())this.renderThread(contact);return; }
                     this.lastMessageAt[name] = this._now();
                     if (viewing()) { this.renderThread(contact); this.renderContacts(); }
                     else {
@@ -1110,6 +1122,13 @@
             sendSnap(who, place, mood, text, id) {
                 this.sendText(who, text, true, 2200, { kind: 'snap', id: id || `snap_${who}_${this._now()}`, data: { place, mood } });
             },
+            _snapshotReply(who, contact) {
+                const pool=MSG_SNAP_REPLIES[who] || MSG_SNAP_GENERIC;
+                // History supplies the rotation, so old saves work and reloads do not reset it.
+                const last=[...(this.messageHistory[contact.name] || [])].reverse()
+                    .find(r=>(r.from || 'them')==='them' && (!contact.group || r.who===who) && pool.includes(r.text));
+                return pool[last ? (pool.indexOf(last.text)+1)%pool.length : 0];
+            },
             /** Her snapshot: a frame of the game view (as an imprint keeps one), sent to whoever's open */
             sendSnapshot(contact) {
                 if (!contact || this._awaitingThem) return;
@@ -1125,13 +1144,15 @@
                 } catch (e) { img = null; }
                 if (!img) { showMessage('NO PICTURE TO SEND'); return; }
                 const place = this._whereAmI();
-                const mine = this.addMessage(contact.name, '', false, 'me', { kind: 'snap', id: `snap_me_${Date.now()}`, awaiting: true, data: { img, place } });
+                const baseId=`snap_me_${Date.now()}`;let id=baseId;
+                for(let n=1;(this.messageHistory[contact.name] || []).some(r=>r.id===id);n++)id=`${baseId}_${n}`;
+                const mine = this.addMessage(contact.name, '', false, 'me', { kind: 'snap', id, awaiting: true, data: { img, place } });
                 this._trimSnaps();
                 this.lastMessageAt[contact.name] = this._now();
                 audioSys.sfx('ui');
                 this.renderThread(contact, true);
                 const who = contact.group ? this._someCrew() : contact.name;
-                this._answer(contact, mine, { text: MSG_SNAP_REPLIES[who] || 'Nice.', who: contact.group ? who : undefined });
+                this._answer(contact, mine, { text: this._snapshotReply(who,contact), who: contact.group ? who : undefined });
             },
             /** Which pinned place she's nearest (for the photo's tag), if she's in the city and close to one */
             _whereAmI() {

@@ -53,3 +53,5 @@ Street trees have projected bark trunks, branches and leaf clusters; palms have 
 Tree and street-lamp parts share a height-sorted world pass, so leaves cover bases and lower shafts while higher lanterns remain visible. Run `node tools/test-canopy-lamp-depth.cjs` for ordering, reversed submission and canvas cleanup checks.
 
 The Scrapyard now uses a hand-laid salvage-yard layout with wreck lanes, a sorting yard, and an open-roof workshop. Marked reinforcement gates check walkability, player distance and enemy spacing; its HUD tracks rounds, remaining/inbound hostiles, rewards and the regroup countdown. New rounds wait while you are outside the yard. Run `node tools/test-scrapyard.cjs` for routes, cover, safe spawning, rewards, HUD and map-cache/reset checks.
+
+Photo replies in Messages are tied to individual snapshots, so contacts can respond to every photo while their wording rotates through a small character-specific pool. Run `node tools/test-photo-replies.cjs` for repeated sends, typing completion, saved-history rotation, group speakers, unread counts and story-message deduplication.
