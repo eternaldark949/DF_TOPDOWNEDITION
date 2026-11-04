@@ -1,0 +1,479 @@
+{
+  "file": "DFAB V8.html",
+  "passed": 117,
+  "failed": 0,
+  "assertions": 1426,
+  "results": [
+    {
+      "name": "Level 50 progression, new node gates and point conservation",
+      "status": "passed"
+    },
+    {
+      "name": "Legacy save/load and cap PP settlement preserve XP without duplicate payouts",
+      "status": "passed"
+    },
+    {
+      "name": "Rejected Flit spends no charge, only the blocked cue; shortened landing clears the actor radius",
+      "status": "passed"
+    },
+    {
+      "name": "Flit VFX draws without shadowBlur and keeps one body per spirit across frames",
+      "status": "passed"
+    },
+    {
+      "name": "Held ring flick requires fresh outward speed, rearms deliberately and preserves standalone flick",
+      "status": "passed"
+    },
+    {
+      "name": "Precise Stick: dead centre, gentle response curve, and steering that grows with the push",
+      "status": "passed"
+    },
+    {
+      "name": "A car turned into a wall or corner can always drive away from it",
+      "status": "passed"
+    },
+    {
+      "name": "Player autodrive follows connected roads and arrives without teleport",
+      "status": "passed"
+    },
+    {
+      "name": "Zib autodrive follows connected roads and arrives without teleport",
+      "status": "passed"
+    },
+    {
+      "name": "Player completes a passed endpoint stop on R0.S0.L2",
+      "status": "passed"
+    },
+    {
+      "name": "Player completes a passed endpoint stop on R1.S1.L2",
+      "status": "passed"
+    },
+    {
+      "name": "Zib completes a passed endpoint stop on R0.S0.L2",
+      "status": "passed"
+    },
+    {
+      "name": "Zib completes a passed endpoint stop on R1.S1.L2",
+      "status": "passed"
+    },
+    {
+      "name": "Map-edge dead ends start no ride, keep her pin, and a failed route is free",
+      "status": "passed"
+    },
+    {
+      "name": "A map switch mid-ride ends the ride uncharged, with no ghost cab",
+      "status": "passed"
+    },
+    {
+      "name": "Player stopped beside the final stop arrives after a still half-second",
+      "status": "passed"
+    },
+    {
+      "name": "Zib stopped beside the final stop arrives after a still half-second",
+      "status": "passed"
+    },
+    {
+      "name": "Arrival without a drive route keeps the direct-distance threshold",
+      "status": "passed"
+    },
+    {
+      "name": "Autodrive keyboard repeat, player takeover and passenger input guards",
+      "status": "passed"
+    },
+    {
+      "name": "Closed profiler samples no clocks or reports; visible profiler and benchmark can sample",
+      "status": "passed"
+    },
+    {
+      "name": "Player marker keeps CSS-pixel size, hides in special views and restores Canvas state",
+      "status": "passed"
+    },
+    {
+      "name": "Mirage rings keep one quarter-resolution snapshot, at most four bends and no outlines",
+      "status": "passed"
+    },
+    {
+      "name": "Every rapid-fire bullet that lands deals damage; a melee swing keeps its i-frames",
+      "status": "passed"
+    },
+    {
+      "name": "Nav grid: once per tick, local invalidation, failed searches back off, steering falls back straight",
+      "status": "passed"
+    },
+    {
+      "name": "Melee steps in only on a target in reach",
+      "status": "passed"
+    },
+    {
+      "name": "Pause \u2192 Equip opens the Weapons tab and lists the equipped gun; furniture waits for the apartment",
+      "status": "passed"
+    },
+    {
+      "name": "Adaptive lighting survives zoom lamp-budget steps and lightning",
+      "status": "passed"
+    },
+    {
+      "name": "Baseline layer panel: each layer gated and billed; with Baseline off nothing is gated or counted",
+      "status": "passed"
+    },
+    {
+      "name": "Velvet routes around walls without teleporting or walking through geometry",
+      "status": "passed"
+    },
+    {
+      "name": "Velvet waits at unreachable routes and leaves rest when the player departs",
+      "status": "passed"
+    },
+    {
+      "name": "Velvet is blended as an animal, not a humanoid, so her walk phase stays finite",
+      "status": "passed"
+    },
+    {
+      "name": "Contact shadows stay on the ground across rotation, bobbing, vector and sprite passes",
+      "status": "passed"
+    },
+    {
+      "name": "Humanoid contact and sun shadows keep their world placement as bodies turn",
+      "status": "passed"
+    },
+    {
+      "name": "Furniture sprites: painted runs never change over time, loops repeat per period, stamps follow state",
+      "status": "passed"
+    },
+    {
+      "name": "A landmark just off screen still throws its beams but skips its roof pass",
+      "status": "passed"
+    },
+    {
+      "name": "A landmark whose body is off screen draws only its beams in the glow pass",
+      "status": "passed"
+    },
+    {
+      "name": "Bulb sprites: baked once per screen scale, stamped the same size in the world",
+      "status": "passed"
+    },
+    {
+      "name": "Apartment lights: each lamp shade and festoon bulb is one stamp, glow and bulb together",
+      "status": "passed"
+    },
+    {
+      "name": "The window city draws nothing while its strip is off screen",
+      "status": "passed"
+    },
+    {
+      "name": "City view: the hub kit seen from a window; its bake leaves the camera as it found it, and each car is one stamp",
+      "status": "passed"
+    },
+    {
+      "name": "City traffic: the cars on a lane share its speed, and never close on each other",
+      "status": "passed"
+    },
+    {
+      "name": "City parallax: the city slides slower than the floor, never past its picture, and sits as laid out at the edge",
+      "status": "passed"
+    },
+    {
+      "name": "Look-out: at the veranda edge the camera leans out over the city; nowhere else",
+      "status": "passed"
+    },
+    {
+      "name": "Camera edge lock: the view stays inside the map, a narrow map is centred, and off it follows her as before",
+      "status": "passed"
+    },
+    {
+      "name": "Ultra reflections: lights at half size, detail at full size and only where it has something, art at the scale it is seen",
+      "status": "passed"
+    },
+    {
+      "name": "Ultra reflections: art repaints on a cadence, crowd bakes are shared and pace-proof, puddles bake once, rects never overlap",
+      "status": "passed"
+    },
+    {
+      "name": "Adaptive reflections: slow frames step Ultra down to High then Medium (never Off), steady frames bring it back, the saved choice untouched",
+      "status": "passed"
+    },
+    {
+      "name": "Device Preset: off by default; on applies this device's tier, a save can't undo it, and off puts every setting back",
+      "status": "passed"
+    },
+    {
+      "name": "Rooftop festoons: every bulb at its own shimmer of the string, in one fill per shimmer",
+      "status": "passed"
+    },
+    {
+      "name": "Landmark roofs: every painted run draws the same at any time and in any wind",
+      "status": "passed"
+    },
+    {
+      "name": "An unmarked plane (the Moon City canopy) stamps as one sprite instead of drawing its art",
+      "status": "passed"
+    },
+    {
+      "name": "Cars live on the hub: after a hijack nothing of hers is drawn, solid or offered indoors, and each is back where she left it",
+      "status": "passed"
+    },
+    {
+      "name": "Out of a hijacked car: lights left on, still hers to Drive; taking another sends it back to traffic, lit, and an empty one has nobody to put out",
+      "status": "passed"
+    },
+    {
+      "name": "Amber's van is sanctioned: never duplicated, parked where she leaves it, home for a new job",
+      "status": "passed"
+    },
+    {
+      "name": "Her car on foot: Drive from behind or in front walks round the corner without a stall; walking into it slides along its side like any car",
+      "status": "passed"
+    },
+    {
+      "name": "Markers: pins over what is on screen after the light; the compass round her for what is not; none indoors",
+      "status": "passed"
+    },
+    {
+      "name": "The package: drawn by the van and lit at night, picked up there or loaded with the van; the readout follows the job",
+      "status": "passed"
+    },
+    {
+      "name": "Hijacking: a ganger at the wheel comes out fighting; a civilian, or an empty car, does not",
+      "status": "passed"
+    },
+    {
+      "name": "Traffic goes round her parked car: a lane change, or a stop and an overtake when both lanes are hers; never a shove",
+      "status": "passed"
+    },
+    {
+      "name": "People in the road: someone crossing is let across, someone standing is stopped for and gone round at a walk; nobody is touched",
+      "status": "passed"
+    },
+    {
+      "name": "Tempers: the calm wait longer and give more room than the pushy; walled in, a car backs up and waits (the pushy on the horn), never pushes",
+      "status": "passed"
+    },
+    {
+      "name": "Street pedestrians: one standing in the lane is gone round; one on the pavement by the kerb never slows a car",
+      "status": "passed"
+    },
+    {
+      "name": "Hit by a car: 10 once, then a moment of grace, not a hit every tick it touches",
+      "status": "passed"
+    },
+    {
+      "name": "Parked on its nose: a car backs up off her car, then goes round it without a touch",
+      "status": "passed"
+    },
+    {
+      "name": "Junction lights follow demand: green rests on its road while the other is empty, and turns for the first car that waits",
+      "status": "passed"
+    },
+    {
+      "name": "Junction lights: a red is stopped for at the line behind the crosswalk; amber stops the calm, the pushy run it",
+      "status": "passed"
+    },
+    {
+      "name": "Junction lights: right turns only from the kerb lane, and a kerb right turn goes with the car going straight beside it",
+      "status": "passed"
+    },
+    {
+      "name": "Junction lights: a left turn waits for what is coming the other way; nobody goes into a box whose way out is full",
+      "status": "passed"
+    },
+    {
+      "name": "Pedestrians walk on: turn back only at a dead end or full crossing, never re-cross straight back, and connect block ends",
+      "status": "passed"
+    },
+    {
+      "name": "Junction lights: a turn arrow lets waiting turns go before the straight-on traffic, and frees a left turn stuck on a green",
+      "status": "passed"
+    },
+    {
+      "name": "Walkers at junction lights wait at the kerb for the walk (asking for it), then cross; crossings join the pavement",
+      "status": "passed"
+    },
+    {
+      "name": "A busy junction moves more cars with the lights than with the old one-at-a-time queue, and nobody touches",
+      "status": "passed"
+    },
+    {
+      "name": "Saves from the old city: a spot where a building stands now loads at the spawn, her car where it waits in a new game",
+      "status": "passed"
+    },
+    {
+      "name": "Saves: her car stays where she parked it through a save made indoors; a hijacked drive loads on foot",
+      "status": "passed"
+    },
+    {
+      "name": "Garage switch while out in a hijacked car keeps her in it, and the old model leaves no invisible wall",
+      "status": "passed"
+    },
+    {
+      "name": "Visibility: her halo by day, by night and in night vision (and off with Player Glow off); only hostiles burn white in night vision",
+      "status": "passed"
+    },
+    {
+      "name": "City: no building, portico, forecourt or drive in the hub reaches a pavement or road",
+      "status": "passed"
+    },
+    {
+      "name": "City helpers: the hand-laid block has its shop parade wall to wall on Hotel Dr., and no building overlaps another",
+      "status": "passed"
+    },
+    {
+      "name": "Doors any side: a building faces the street it is placed on, door, sign, lights, landmark and Zib drop-off with it",
+      "status": "passed"
+    },
+    {
+      "name": "The bigger city: four times the old area, near square, every landmark placed clear of the street and reachable by Zib and autodrive",
+      "status": "passed"
+    },
+    {
+      "name": "Street-front fill: auto-filled blocks grow rows along the streets they front, facing the road",
+      "status": "passed"
+    },
+    {
+      "name": "Angled streets: Lantern Cut joins its roads at shaped junctions, with pavements, crossings, walks and buildings to match",
+      "status": "passed"
+    },
+    {
+      "name": "The newer city's angled and curved streets: Foxglove Cut is built like the first ones",
+      "status": "passed"
+    },
+    {
+      "name": "The newer city's angled and curved streets: Starling Diagonal is built like the first ones",
+      "status": "passed"
+    },
+    {
+      "name": "The newer city's angled and curved streets: Crescent Row is built like the first ones",
+      "status": "passed"
+    },
+    {
+      "name": "The newer city's angled and curved streets: Velvet Hook is built like the first ones",
+      "status": "passed"
+    },
+    {
+      "name": "Curved streets: Halfmoon Bend joins its roads at shaped junctions, with pavements, crossings, walks and buildings round the bend",
+      "status": "passed"
+    },
+    {
+      "name": "Angled streets: cars drive Lantern Cut and turn in and out at both ends",
+      "status": "passed"
+    },
+    {
+      "name": "Curved streets: cars slow for Halfmoon Bend, keep to their lanes round it and turn in and out at both ends",
+      "status": "passed"
+    },
+    {
+      "name": "Junction turns curve straight into the lane out: no swing the other way first, on square, angled and curved streets",
+      "status": "passed"
+    },
+    {
+      "name": "Overhead: a tall thing hides whoever stands behind it, and draws under whoever stands in front",
+      "status": "passed"
+    },
+    {
+      "name": "Overhead: a shelf right beside her draws again over its own footprint, so her arms go behind it",
+      "status": "passed"
+    },
+    {
+      "name": "Every bundled map loads, updates and draws without runtime errors",
+      "status": "passed"
+    },
+    {
+      "name": "Thigh-high finishes buy, replace footwear and persist alongside thigh bands",
+      "status": "passed"
+    },
+    {
+      "name": "Every registered gun hits across muzzle distances and spatial-cell boundaries",
+      "status": "passed"
+    },
+    {
+      "name": "YourGirlSara sweeps a crossed cell and damages each target only once",
+      "status": "passed"
+    },
+    {
+      "name": "A long sniper barrel cannot spawn its shot beyond a point-blank enemy",
+      "status": "passed"
+    },
+    {
+      "name": "A long sniper barrel cannot spawn beyond a solid prop",
+      "status": "passed"
+    },
+    {
+      "name": "Sniper hits remain reliable over long ranges, diagonals, and reversed directions",
+      "status": "passed"
+    },
+    {
+      "name": "Penetration hits the nearest targets first, regardless of enemy-array order",
+      "status": "passed"
+    },
+    {
+      "name": "A nonpenetrating shot stops at its first enemy and records the impact position",
+      "status": "passed"
+    },
+    {
+      "name": "Thin walls stop ordinary rounds in travel order, allowing hits before the wall",
+      "status": "passed"
+    },
+    {
+      "name": "Rotated solid props block crossed shots, and rounded corners do not produce false hits",
+      "status": "passed"
+    },
+    {
+      "name": "Moving enemies are tested at the matching time along the bullet path",
+      "status": "passed"
+    },
+    {
+      "name": "A newly spawned round cannot hit an enemy that crossed its muzzle before the shot existed",
+      "status": "passed"
+    },
+    {
+      "name": "An enemy round hits a player crossing its path during the same tick",
+      "status": "passed"
+    },
+    {
+      "name": "A shot can hit on its last lifetime tick",
+      "status": "passed"
+    },
+    {
+      "name": "Removing a hit projectile does not silently remove a different live round",
+      "status": "passed"
+    },
+    {
+      "name": "A custom impact that destroys a piercing shot stops further contacts",
+      "status": "passed"
+    },
+    {
+      "name": "Swept hits work outside the rendering and physics camera margin",
+      "status": "passed"
+    },
+    {
+      "name": "Enemy callbacks keep bullet i-frame bypass for stationary and moving rounds",
+      "status": "passed"
+    },
+    {
+      "name": "Doors are resolved in travel order and reduce only hits beyond a penetrated leaf",
+      "status": "passed"
+    },
+    {
+      "name": "Glass at a wall surface shatters before the ordinary round stops there",
+      "status": "passed"
+    },
+    {
+      "name": "A swept Golden Child hit attaches one orb and preserves its damage snapshot",
+      "status": "passed"
+    },
+    {
+      "name": "A reused projectile clears its previous swept path and collision tick",
+      "status": "passed"
+    },
+    {
+      "name": "Low render rates and capped catch-up preserve sniper collision hits",
+      "status": "passed"
+    },
+    {
+      "name": "Props are found by cell: a far crate, a moved crate and a turned one still stop a shot",
+      "status": "passed"
+    }
+  ],
+  "sourceCommit": "e597475d679c60d58c8f78121f10a597cc0f2800",
+  "artifactGitBlobSha": "bc4056f5032e9cc955d1a01e4d89a99a66078036",
+  "verificationKind": "Original Node/VM regression suite; not real-browser or phone performance proof"
+}

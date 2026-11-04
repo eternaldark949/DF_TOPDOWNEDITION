@@ -1,0 +1,20 @@
+{
+  "inventoriedFiles": 231,
+  "parsedUnits": 215,
+  "parseFailures": [],
+  "calls": 51479,
+  "callsWithoutStaticTarget": 43874,
+  "runtimeCalls": 48529,
+  "runtimeFunctions": 6657,
+  "verifiedInputFiles": 231,
+  "runtimeExhaustivenessProven": false,
+  "sourceCommit": "e597475d679c60d58c8f78121f10a597cc0f2800",
+  "definitions": 8178,
+  "globalReferences": 5772,
+  "members": 72554,
+  "inheritance": 32,
+  "prototypeContributions": 1124,
+  "lifecycleSites": 501,
+  "domSites": 999,
+  "storageSites": 791
+}

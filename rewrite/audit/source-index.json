@@ -1,0 +1,1231 @@
+{
+  "commit": "e597475d679c60d58c8f78121f10a597cc0f2800",
+  "tree": "28be92fb313c58c4426c2d76effff889fa3c8fcb",
+  "files": [
+    {
+      "path": ".github/workflows/build.yml",
+      "sha": "527b578c31879c2ee7f0bd8f0cc72897e9ea98c8",
+      "size": 1501
+    },
+    {
+      "path": "DFAB V8.html",
+      "sha": "bc4056f5032e9cc955d1a01e4d89a99a66078036",
+      "size": 13531828
+    },
+    {
+      "path": "README.md",
+      "sha": "f6f680eaee0322cd471cf6087823ad9aeb80246b",
+      "size": 4924
+    },
+    {
+      "path": "assets/audio/README.md",
+      "sha": "9f8f02dfe65b3b3003d466c970ef8f94e71888e9",
+      "size": 850
+    },
+    {
+      "path": "assets/audio/grave stories (1).ogg",
+      "sha": "846bd762f97afc5c16bb8cc8ec0e5326dde4aaec",
+      "size": 467912
+    },
+    {
+      "path": "assets/audio/moon city nightclub - swig.ogg",
+      "sha": "4a9ed3c92a63ce71a1985d0df87f53d459ae9614",
+      "size": 472045
+    },
+    {
+      "path": "assets/audio/silver queen tst.ogg",
+      "sha": "0631c8a85978ede7904e8ffe7745353f6f88cc5b",
+      "size": 565063
+    },
+    {
+      "path": "assets/audio/the visitor.ogg",
+      "sha": "494279b99cd929ac7f067f9bc881331be5cd1455",
+      "size": 1132129
+    },
+    {
+      "path": "assets/audio/triumvirate boss fight.ogg",
+      "sha": "1effdbad210cc8ae7e6425db0bef31e4c9a490ba",
+      "size": 953570
+    },
+    {
+      "path": "assets/audio/van 2.ogg",
+      "sha": "3a110a1e6872b4333d7107f16b2e984ed0b260a9",
+      "size": 1095696
+    },
+    {
+      "path": "assets/fonts/Anthropology.ttf",
+      "sha": "88691093d548967fac877103ee280a4f4c23a0ce",
+      "size": 137368
+    },
+    {
+      "path": "assets/fonts/Brooklyn.ttf",
+      "sha": "99cf842b720aec51736590b273b3f3e16fe42c1c",
+      "size": 27292
+    },
+    {
+      "path": "assets/fonts/Feminine.ttf",
+      "sha": "abf5360c2600e9fac6d1ea9bc1ccbe8f2137647b",
+      "size": 22776
+    },
+    {
+      "path": "assets/fonts/README.md",
+      "sha": "513aaca75c90754b5e8392d35b50c4d23439ac43",
+      "size": 391
+    },
+    {
+      "path": "assets/images/README.md",
+      "sha": "376a335d284cc03ba52226777dabbb979255361c",
+      "size": 586
+    },
+    {
+      "path": "assets/images/posters/anavia.webp",
+      "sha": "2c30d76fd44f2ef223dc19f9aa062552551b3412",
+      "size": 37646
+    },
+    {
+      "path": "assets/images/posters/art_builds_freedom.webp",
+      "sha": "c59f57261ccc5134b570edcf94612059ac8a0a73",
+      "size": 29928
+    },
+    {
+      "path": "src/MAP.md",
+      "sha": "d33efd7c5a7d45113740bc4daa5339f9405b4ce0",
+      "size": 158571
+    },
+    {
+      "path": "src/app/boot-loader.js",
+      "sha": "92aa8a49633627a524028231cefef50b1f65122b",
+      "size": 12160
+    },
+    {
+      "path": "src/app/boot.js",
+      "sha": "b971e71a000fb6ecb32703607962ce294045ef8a",
+      "size": 22261
+    },
+    {
+      "path": "src/app/menu-wiring.js",
+      "sha": "aaab7f963a980ac66ea08520ad3a03b9d7f63bfa",
+      "size": 5393
+    },
+    {
+      "path": "src/audio/audio.js",
+      "sha": "70bd0e6f0772512f47adf31bb9828f5efdc9571d",
+      "size": 61397
+    },
+    {
+      "path": "src/buildings/ashgrove.js",
+      "sha": "38d47bf283e554d9965e0d8645d04cc614ec8548",
+      "size": 40167
+    },
+    {
+      "path": "src/buildings/biggs-park.js",
+      "sha": "1fa434eafce842ab1fac62f5adb837c7c8ef5d60",
+      "size": 23600
+    },
+    {
+      "path": "src/buildings/building-v1.js",
+      "sha": "bfe3da7fbee98730d2c56c0ff508038949e35816",
+      "size": 12476
+    },
+    {
+      "path": "src/buildings/building-v2.js",
+      "sha": "b68bb68d289e2add22f844bcc3530a14895d15fd",
+      "size": 111416
+    },
+    {
+      "path": "src/buildings/city-view.js",
+      "sha": "e9237d9fadbff098fae8140f7602c067158bbba5",
+      "size": 27236
+    },
+    {
+      "path": "src/buildings/cozy-cafe.js",
+      "sha": "419429c3cfcdd5c4143de2e7bb55ddb5f4bb29cd",
+      "size": 35651
+    },
+    {
+      "path": "src/buildings/double-nights.js",
+      "sha": "b1f652680fbd5a6412bd4134e602d701b2cdd5b3",
+      "size": 69512
+    },
+    {
+      "path": "src/buildings/dr-yins.js",
+      "sha": "713f3b61c71fa6d7584650b4019804f7590e1f35",
+      "size": 16946
+    },
+    {
+      "path": "src/buildings/enni-cole.js",
+      "sha": "6097778308197977d6e77158e1338c3d6309b51e",
+      "size": 35789
+    },
+    {
+      "path": "src/buildings/entrance-lamps.js",
+      "sha": "efaa97f4e359e4e56db3dc975c5d517855b39b38",
+      "size": 19059
+    },
+    {
+      "path": "src/buildings/factories.js",
+      "sha": "766dfcb11a89a08848e8d830b686075fd6b41459",
+      "size": 9865
+    },
+    {
+      "path": "src/buildings/landmark-kit.js",
+      "sha": "cd847a71e590660507f263a9f7338fbbb31edfc6",
+      "size": 13104
+    },
+    {
+      "path": "src/buildings/moon-city-deco.js",
+      "sha": "588c7d013043b5875d44e41f108211f219e35d0d",
+      "size": 72953
+    },
+    {
+      "path": "src/buildings/moon-city.js",
+      "sha": "945511e99532027ac3ec3e0fba40d038ecc0bbdc",
+      "size": 59895
+    },
+    {
+      "path": "src/buildings/neural-systems.js",
+      "sha": "603748f0414927a18dce60b4ded584b3ccba0e1a",
+      "size": 16752
+    },
+    {
+      "path": "src/buildings/ornament-kit.js",
+      "sha": "a8eeade0ba2cf8a579feb6173aa43779003d2458",
+      "size": 12744
+    },
+    {
+      "path": "src/buildings/registry-v3.js",
+      "sha": "700190c1851150901e48077f50264b43d40bdb01",
+      "size": 33938
+    },
+    {
+      "path": "src/buildings/silver-queen-deco.js",
+      "sha": "d86803303739a41a2f109151c8c3bb6304960356",
+      "size": 59684
+    },
+    {
+      "path": "src/buildings/silver-queen.js",
+      "sha": "1dd686608812f4f29bf1df0e375088a2c82b8d7d",
+      "size": 93480
+    },
+    {
+      "path": "src/buildings/sky-craft.js",
+      "sha": "cddeb5d870649a157f2afce7abd199b735585f98",
+      "size": 21341
+    },
+    {
+      "path": "src/buildings/sky-layer.js",
+      "sha": "8cf0341598b4a374711e8753d7fe5328bfbb0781",
+      "size": 9886
+    },
+    {
+      "path": "src/buildings/street-apartments.js",
+      "sha": "b5011775f425d812d5951e55afde62d0c4174afc",
+      "size": 50349
+    },
+    {
+      "path": "src/buildings/street-arcade.js",
+      "sha": "3b11daebf5709240d8d50d77512c81faae63e1ce",
+      "size": 27583
+    },
+    {
+      "path": "src/buildings/street-variants.js",
+      "sha": "148a7eb83831c0b3562479e1606d439ccbbb6b8b",
+      "size": 58863
+    },
+    {
+      "path": "src/buildings/tiered-kit.js",
+      "sha": "9a1536ab944e84b1bd246653fcf4157fa691c75f",
+      "size": 42202
+    },
+    {
+      "path": "src/buildings/torque-auto.js",
+      "sha": "d305f8c282e21701ad972695768b92b6211c93a7",
+      "size": 21535
+    },
+    {
+      "path": "src/buildings/warehouse-hall.js",
+      "sha": "eae3e175d79ba1049ff1a8ac9dba530248705081",
+      "size": 13302
+    },
+    {
+      "path": "src/core/appearances.js",
+      "sha": "14be03bfacf128e2a6b2def63610c6b3ee45d4e6",
+      "size": 36532
+    },
+    {
+      "path": "src/core/assets.js",
+      "sha": "7450f98c99d99d89179771897d9c3c064272e308",
+      "size": 3535
+    },
+    {
+      "path": "src/core/cache-db.js",
+      "sha": "9cf291ecc2bbb19e06aa3010334e474a22b0426b",
+      "size": 2729
+    },
+    {
+      "path": "src/core/config.js",
+      "sha": "db4d7f7b6400ee2e65bcef682f72c485d1108295",
+      "size": 41072
+    },
+    {
+      "path": "src/core/draw-helpers.js",
+      "sha": "ad288515e1fee64e49d07274f9145dfd9db5f668",
+      "size": 25787
+    },
+    {
+      "path": "src/core/registries.js",
+      "sha": "480203216b854409c79f34b788019306b69a90f5",
+      "size": 56727
+    },
+    {
+      "path": "src/core/resonance.js",
+      "sha": "e286db31439817663fa9db571f520c0f6aa003f4",
+      "size": 12001
+    },
+    {
+      "path": "src/core/settings.js",
+      "sha": "e0fb06ae3dfe2b2882412c5e61fea26b96cac1d5",
+      "size": 28693
+    },
+    {
+      "path": "src/core/utils.js",
+      "sha": "03fbe5a92d7d44cf56e0fc50690b2ef6e0f49737",
+      "size": 23124
+    },
+    {
+      "path": "src/engine/biggs-art.js",
+      "sha": "b4d17149afd4c4471f2a62e48643a6d5bf192441",
+      "size": 5126
+    },
+    {
+      "path": "src/engine/boss-hazards.js",
+      "sha": "6a698204bb33242254dc052a10d56f0d729950a4",
+      "size": 25696
+    },
+    {
+      "path": "src/engine/boss-intro.js",
+      "sha": "00370819e6568c6a20ecfc42a1371b4c53854f89",
+      "size": 10822
+    },
+    {
+      "path": "src/engine/cars.js",
+      "sha": "9f42c28efd4b0bb1a59a2c2a1797dcc7f60d4620",
+      "size": 17596
+    },
+    {
+      "path": "src/engine/combat-effects.js",
+      "sha": "c71b2aeaaf57f53df0b164a9e1f173862c3a7e05",
+      "size": 45943
+    },
+    {
+      "path": "src/engine/combat-fx.js",
+      "sha": "22709c3ae88b5c0d6e50c838e3ecb1ac760ae888",
+      "size": 12972
+    },
+    {
+      "path": "src/engine/daylight.js",
+      "sha": "f912bb8f7fb751742e85ef82d13776d98b176adc",
+      "size": 18366
+    },
+    {
+      "path": "src/engine/daytime-flit.js",
+      "sha": "42f5b495d103186ea03ad8bdeec7c22762d24590",
+      "size": 34646
+    },
+    {
+      "path": "src/engine/draw.js",
+      "sha": "54b59105296d7bb6d6e9f04203e765a193a0d83f",
+      "size": 100710
+    },
+    {
+      "path": "src/engine/dyer.js",
+      "sha": "f254415e8ec164acd4a87241409749afc9a89ac8",
+      "size": 13430
+    },
+    {
+      "path": "src/engine/events.js",
+      "sha": "e96b1f5fa7513e359b37b19b5fe212028499ba4a",
+      "size": 32593
+    },
+    {
+      "path": "src/engine/executions.js",
+      "sha": "1ad5d70aed52f087577d7dceb1b034eda8cd7c84",
+      "size": 7242
+    },
+    {
+      "path": "src/engine/finisher.js",
+      "sha": "26c93c118113afd98cb4160e897424cabddafbe2",
+      "size": 14402
+    },
+    {
+      "path": "src/engine/footsteps.js",
+      "sha": "14312e9614646bd47731743bddaba95536b13fd8",
+      "size": 8245
+    },
+    {
+      "path": "src/engine/furniture.js",
+      "sha": "181f6f5c1abb9bbe3be180dfe769b93b69c6cc96",
+      "size": 15618
+    },
+    {
+      "path": "src/engine/game-engine.js",
+      "sha": "495e0e967e56b80b730ecdebc5aeeb922e85a526",
+      "size": 18402
+    },
+    {
+      "path": "src/engine/interiors.js",
+      "sha": "518c415d1bec9c5efd9c6a2a8ef561267c155765",
+      "size": 136623
+    },
+    {
+      "path": "src/engine/keeper-art.js",
+      "sha": "bf9534d91106e34e13cc296ec42333938752af2e",
+      "size": 34029
+    },
+    {
+      "path": "src/engine/knuckles.js",
+      "sha": "0ca1d6ee9592c4e64e7bed0bbfc463f466184006",
+      "size": 15192
+    },
+    {
+      "path": "src/engine/lighting.js",
+      "sha": "ed0061e6ddb1a1d52704eea96a02d084b37aa45e",
+      "size": 60193
+    },
+    {
+      "path": "src/engine/loop.js",
+      "sha": "067d1ef237e40de80c3ae83b3b6b22d50cb228c1",
+      "size": 23489
+    },
+    {
+      "path": "src/engine/map-loading.js",
+      "sha": "fdd006c165a5d9dd9c9f311ffe0d2076f43f350e",
+      "size": 107955
+    },
+    {
+      "path": "src/engine/markers.js",
+      "sha": "cb106347d7916e0d2dd725c40028f9185057a09f",
+      "size": 20882
+    },
+    {
+      "path": "src/engine/neural-art.js",
+      "sha": "6a21dc1cd0f8771b5fc0386293ee7e8a421f3934",
+      "size": 13565
+    },
+    {
+      "path": "src/engine/noise.js",
+      "sha": "38f8efd7edf831f3c8553b57a8b3ebac7ff3eed6",
+      "size": 12580
+    },
+    {
+      "path": "src/engine/npc-posts.js",
+      "sha": "3f0d7b3c9e11c38c15f1b2585f6140cd62418ff3",
+      "size": 3267
+    },
+    {
+      "path": "src/engine/overhead.js",
+      "sha": "117be825491b302af14e131938d0ecaeba572052",
+      "size": 8090
+    },
+    {
+      "path": "src/engine/palace-art.js",
+      "sha": "bc4d752e9c6ad3b6c9a8a5425b7100c76b1cde33",
+      "size": 39638
+    },
+    {
+      "path": "src/engine/pause-system.js",
+      "sha": "c904d7a3db358eaad0a76baaad7ddcc29b41168c",
+      "size": 3642
+    },
+    {
+      "path": "src/engine/paving-inlays.js",
+      "sha": "f1588f91f6aa93fa9bb47a9a409c928d45addc3c",
+      "size": 12618
+    },
+    {
+      "path": "src/engine/player-draw-input.js",
+      "sha": "10f453eed23c53df409ef507419de564e526b111",
+      "size": 37759
+    },
+    {
+      "path": "src/engine/player-fire.js",
+      "sha": "bcc4377b5750489bec2c714be16648cd103337ac",
+      "size": 4882
+    },
+    {
+      "path": "src/engine/pools.js",
+      "sha": "071eafdcc468d5a487d92d0a48ee4ef3ce234d08",
+      "size": 10938
+    },
+    {
+      "path": "src/engine/quick-draw.js",
+      "sha": "74d6ba3828129e4f545eab455c078cfe1ea039e5",
+      "size": 5626
+    },
+    {
+      "path": "src/engine/reflections.js",
+      "sha": "38aa2a74ef6ce8d0ff22ac843b98aea963e6485c",
+      "size": 89319
+    },
+    {
+      "path": "src/engine/save-load.js",
+      "sha": "df3f8956cc445984716f654fbfcbc97c774f99dc",
+      "size": 51723
+    },
+    {
+      "path": "src/engine/scope.js",
+      "sha": "54af681916067627f4cfb95807b8cdb6dc649025",
+      "size": 9430
+    },
+    {
+      "path": "src/engine/screens-ui.js",
+      "sha": "8ab3283aa62a84f5b85357b740554b123d745f87",
+      "size": 99468
+    },
+    {
+      "path": "src/engine/shopfront-light.js",
+      "sha": "f677a172d4c7056d8da0226dd77d616776708beb",
+      "size": 8324
+    },
+    {
+      "path": "src/engine/shops-menus.js",
+      "sha": "b300f069942c643de326ccd5f67bdc10bc0c150d",
+      "size": 35417
+    },
+    {
+      "path": "src/engine/sneak.js",
+      "sha": "c3bfde0bc11aeaa37ef145a8e241f5a5e349155e",
+      "size": 2115
+    },
+    {
+      "path": "src/engine/spills.js",
+      "sha": "47f5e8093902193513d3470ee11246c2d461bcda",
+      "size": 11878
+    },
+    {
+      "path": "src/engine/status-effects.js",
+      "sha": "529dd0d50391a226cffdbb170bf34e5ab04bbd70",
+      "size": 37114
+    },
+    {
+      "path": "src/engine/street-mist.js",
+      "sha": "b031cc13bff6fad093ab73d79e25b3889986d766",
+      "size": 9127
+    },
+    {
+      "path": "src/engine/torque-art.js",
+      "sha": "3debfd0d91198c162c5176fd6bf29608c9eb4c0d",
+      "size": 30080
+    },
+    {
+      "path": "src/engine/tuning-ui.js",
+      "sha": "5b48d7534d09295c53eaf3363d1ed33ef4effe5f",
+      "size": 11678
+    },
+    {
+      "path": "src/engine/update.js",
+      "sha": "650c1c4b1f962dfd946850d0e90b672b57065683",
+      "size": 82754
+    },
+    {
+      "path": "src/engine/van-art.js",
+      "sha": "e245168f47e4830b39db16efa97789f896d9b9b9",
+      "size": 13436
+    },
+    {
+      "path": "src/engine/world-state.js",
+      "sha": "eef82aa4329cb9420a1e8f206b18f8076af6f11a",
+      "size": 54552
+    },
+    {
+      "path": "src/entities/actors.js",
+      "sha": "d4ecf544d20a7976feb03872f1992d09efe93c54",
+      "size": 60495
+    },
+    {
+      "path": "src/entities/drones.js",
+      "sha": "9a9f3d62de2e43a3a75c8e385cf2a78d93a4d8d3",
+      "size": 31127
+    },
+    {
+      "path": "src/entities/enemies.js",
+      "sha": "0cc3e656b41b5af54007a849842fe9667747c399",
+      "size": 162610
+    },
+    {
+      "path": "src/entities/hunters.js",
+      "sha": "edd02e995c19eb63d0e046c95d6e694ed6f4d834",
+      "size": 29195
+    },
+    {
+      "path": "src/entities/lamps.js",
+      "sha": "45a0ca5c371d63cac930f92c6238e66ea090ab4c",
+      "size": 48964
+    },
+    {
+      "path": "src/entities/npc.js",
+      "sha": "d3e5dbcf6f671117b976c8d3da849b6f1b83c915",
+      "size": 53313
+    },
+    {
+      "path": "src/entities/pedestrians.js",
+      "sha": "6f1372506761b7ac0d3a8a9ac931290ab2d1a4c7",
+      "size": 67344
+    },
+    {
+      "path": "src/entities/performance-bench.js",
+      "sha": "f2b24c4de0193742452211edf572e27809046088",
+      "size": 20274
+    },
+    {
+      "path": "src/entities/prop-sprites.js",
+      "sha": "bfb6d48b67a83526be1ff6a4dfcd098791344f9f",
+      "size": 21594
+    },
+    {
+      "path": "src/entities/props-decor.js",
+      "sha": "9b3a883a64f84c429191aa6ff07d834e7563e22f",
+      "size": 243306
+    },
+    {
+      "path": "src/entities/static-builders-profiler.js",
+      "sha": "2a3af4fccdd120fdba534c7da348b672c847a95e",
+      "size": 24191
+    },
+    {
+      "path": "src/entities/street-objects.js",
+      "sha": "1b4329556ad9d8d0525b8192a88a06b14ed845aa",
+      "size": 25810
+    },
+    {
+      "path": "src/entities/vehicles-minigames.js",
+      "sha": "639a9bc38484e2f7f37c51cf9ddd0f4ed97dc970",
+      "size": 72570
+    },
+    {
+      "path": "src/index.html",
+      "sha": "cd388d23a6b6c4aa4a87bd548c31f7b8d252bf5e",
+      "size": 94874
+    },
+    {
+      "path": "src/physics/collision.js",
+      "sha": "587f664c5b273e07c29309869fb9f330d99cf730",
+      "size": 59325
+    },
+    {
+      "path": "src/physics/game-entity.js",
+      "sha": "f6f7bea2713ec827f090b34e58dc64b9e9fb16ef",
+      "size": 15270
+    },
+    {
+      "path": "src/physics/spatial.js",
+      "sha": "a34b62a29b5af6070c3559a3ff158380f10dcc59",
+      "size": 37377
+    },
+    {
+      "path": "src/story/captions.js",
+      "sha": "cfa347a8a73ab627f2956a6368cc1d209e37fe47",
+      "size": 21621
+    },
+    {
+      "path": "src/story/crew-nights.js",
+      "sha": "321ad556d30a75d6a36ab784154a551f85479c67",
+      "size": 49396
+    },
+    {
+      "path": "src/story/dialogue-bonding.js",
+      "sha": "c5c0f3637a6b03c02464f8ec15851ecee29099c9",
+      "size": 30079
+    },
+    {
+      "path": "src/story/missions.js",
+      "sha": "bcbd12a5cdb607fd17cfb3a9a5bdda3005e84cc7",
+      "size": 34469
+    },
+    {
+      "path": "src/story/narrative-cutscenes.js",
+      "sha": "901526d4b1a818b50bcbc32d0564a54b4c4edee1",
+      "size": 30449
+    },
+    {
+      "path": "src/story/npc-dialogue.js",
+      "sha": "d6a2a4aec5c1a342347c7613bbf14f84ea000621",
+      "size": 15502
+    },
+    {
+      "path": "src/story/scene-runner.js",
+      "sha": "ff24e65d8bcdc27be147de3ee50fbbf71ccf4d26",
+      "size": 20832
+    },
+    {
+      "path": "src/story/scene-vision.js",
+      "sha": "ee68647fd05ad3c2c4ed8566a9a72a9fc11c87ec",
+      "size": 12604
+    },
+    {
+      "path": "src/story/scenes/cast.js",
+      "sha": "d6d3d73fdc076b176498da9b56da686846b3ebb7",
+      "size": 2127
+    },
+    {
+      "path": "src/story/scenes/prologue.js",
+      "sha": "c3c5b59f1eefc7ebe1d6db68b7fef081f7348c9d",
+      "size": 6764
+    },
+    {
+      "path": "src/story/scenes/van.js",
+      "sha": "2bb61fe8a699671edb9cf75dd57888b6ae6e9681",
+      "size": 14753
+    },
+    {
+      "path": "src/story/story-db.js",
+      "sha": "289a88aa2e50ea277fa3207e001317a27954f4c5",
+      "size": 22386
+    },
+    {
+      "path": "src/story/talks.js",
+      "sha": "e92199fa8aee60abf2e692690bab76f6ca5b8051",
+      "size": 48494
+    },
+    {
+      "path": "src/styles/base.css",
+      "sha": "134bbf4d1c29459ec071be9ec33465c5aa8aee96",
+      "size": 14773
+    },
+    {
+      "path": "src/styles/cinematic.css",
+      "sha": "6ddeb88a99465ff8f1bedde3856469eecc587748",
+      "size": 12058
+    },
+    {
+      "path": "src/styles/coach.css",
+      "sha": "6a45a7de41a6a080d6c67693a9e44249efe9d8c9",
+      "size": 8645
+    },
+    {
+      "path": "src/styles/dossier.css",
+      "sha": "9351871d20e0bcd5be8ebd5a68f5875120ad3ae1",
+      "size": 35472
+    },
+    {
+      "path": "src/styles/hud-menus.css",
+      "sha": "9e30bb6d75ce20744380a01fd0c03740566eba12",
+      "size": 101560
+    },
+    {
+      "path": "src/styles/landscape.css",
+      "sha": "a55b6edaccc65370e195bf55a096ab629ebc497e",
+      "size": 8057
+    },
+    {
+      "path": "src/styles/loading-screen.css",
+      "sha": "c100fe820878fa5769d05215e1cb5342a2a2e010",
+      "size": 15220
+    },
+    {
+      "path": "src/styles/panels-phone.css",
+      "sha": "9d211b59f4f23db88e4c3144d6d5f8da4f4a3fec",
+      "size": 141275
+    },
+    {
+      "path": "src/styles/shops.css",
+      "sha": "34d2d1b0cc6b91b9e6e11262587ebf02d02dc719",
+      "size": 15618
+    },
+    {
+      "path": "src/traffic/car-art.js",
+      "sha": "659186dbcfd7e46ae34e9fc2dff2429d1184100f",
+      "size": 54735
+    },
+    {
+      "path": "src/traffic/garage-zib.js",
+      "sha": "42e2a6c2f9c2255dcd96a7fe8c39d36b6fa6e962",
+      "size": 43894
+    },
+    {
+      "path": "src/traffic/roads.js",
+      "sha": "68dddd11e1a836bc38c5eff3d2c6ccce7264b528",
+      "size": 122151
+    },
+    {
+      "path": "src/traffic/traffic-manager.js",
+      "sha": "b0d7702b66296c14a20f88cf0683eb63d25e8f60",
+      "size": 26016
+    },
+    {
+      "path": "src/traffic/traffic-people.js",
+      "sha": "bbeefa93ac23cbbb51e9724d2a5c1be8d1db878a",
+      "size": 19537
+    },
+    {
+      "path": "src/traffic/traffic-profiler.js",
+      "sha": "5ab68a9f6ac8da9646f5b42fb5056bc24f045dfa",
+      "size": 3671
+    },
+    {
+      "path": "src/traffic/traffic-signals.js",
+      "sha": "a26b786037319007dc44211ea5e66680e85c2109",
+      "size": 32728
+    },
+    {
+      "path": "src/traffic/traffic-vehicle.js",
+      "sha": "050edade35ffcbe79ddf5c67dd23a94fd6630bc7",
+      "size": 165419
+    },
+    {
+      "path": "src/traffic/vehicle-occupants.js",
+      "sha": "22fa6322b1e85d21a4c768e0684bcb545864ca80",
+      "size": 6613
+    },
+    {
+      "path": "src/traffic/zen-art.js",
+      "sha": "0bb6dbd6ea06cb36411556886c90f2271e4177f9",
+      "size": 12451
+    },
+    {
+      "path": "src/ui/action-dock.js",
+      "sha": "fe57347e0c87e7ca5441e9fd3779914f0ab2537c",
+      "size": 4894
+    },
+    {
+      "path": "src/ui/amber-app.js",
+      "sha": "9de17a987ed4b1cc8f669aaaa0281c90fdeb0cf2",
+      "size": 14247
+    },
+    {
+      "path": "src/ui/app-launch.js",
+      "sha": "cfd16f7d0effdec8febf8f93ea2f7a6648a54fb4",
+      "size": 10946
+    },
+    {
+      "path": "src/ui/bodies.js",
+      "sha": "b170c617541c9219de303d8ffdfa691d79c88a94",
+      "size": 25574
+    },
+    {
+      "path": "src/ui/cinematic-dialogue.js",
+      "sha": "1f88fde668674bb94bea2992b42a8be1cdea55c2",
+      "size": 20567
+    },
+    {
+      "path": "src/ui/cloth.js",
+      "sha": "d4649b82f09bd3f119e688faca13938d69acefb4",
+      "size": 15424
+    },
+    {
+      "path": "src/ui/coach.js",
+      "sha": "ad3a0f17ae3ca964359c743d978279eb1b6c1620",
+      "size": 8086
+    },
+    {
+      "path": "src/ui/color-picker.js",
+      "sha": "f3ff309e47756b8d20e671ad604a3ab20d216959",
+      "size": 7965
+    },
+    {
+      "path": "src/ui/comms.js",
+      "sha": "010c989b43d90e85b852451320f1ce6dc3c4d1d8",
+      "size": 5443
+    },
+    {
+      "path": "src/ui/crowd-impostors.js",
+      "sha": "8da3f3c9c77f758d2d261793258d31cf0f1cde55",
+      "size": 22032
+    },
+    {
+      "path": "src/ui/dev-overlay.js",
+      "sha": "1126364fd6fcfe700f038821a1c45515c1b8decb",
+      "size": 26858
+    },
+    {
+      "path": "src/ui/expressions.js",
+      "sha": "d5485ce89c7e7dbc89418ab496c582174bca939f",
+      "size": 6125
+    },
+    {
+      "path": "src/ui/face-cache.js",
+      "sha": "f495c57109bbeef9e4d79aab0c8b2daf4b22ce80",
+      "size": 6873
+    },
+    {
+      "path": "src/ui/hud-reveal.js",
+      "sha": "c546173a944262389492677fc0bf66bec166f5d2",
+      "size": 4147
+    },
+    {
+      "path": "src/ui/humanoid-render.js",
+      "sha": "f5287c72579784009d71d68434a2c5c2a75737fa",
+      "size": 202828
+    },
+    {
+      "path": "src/ui/inventory-augments.js",
+      "sha": "818cc4574faaa51c790e6d59519234a44bda7a86",
+      "size": 56664
+    },
+    {
+      "path": "src/ui/map-icons.js",
+      "sha": "19a4c5e05bca497f5dfa3c221a73043ccf37744e",
+      "size": 39017
+    },
+    {
+      "path": "src/ui/messages.js",
+      "sha": "18c1350bc2753c750f2700fe0a8be9ff490709c8",
+      "size": 83366
+    },
+    {
+      "path": "src/ui/music-widget.js",
+      "sha": "89912ceca519720d326b1040ba017c72dd11bf8c",
+      "size": 9952
+    },
+    {
+      "path": "src/ui/pause-look.js",
+      "sha": "1459ca407ab0f3c16551a497c9506f034ba70809",
+      "size": 2496
+    },
+    {
+      "path": "src/ui/phone.js",
+      "sha": "1df78936bd97e173029f1df01cc0cc5720fc0db6",
+      "size": 76681
+    },
+    {
+      "path": "src/ui/portrait-real.js",
+      "sha": "d0f125ef35e69adb667ca4e136db477cf77bb308",
+      "size": 123978
+    },
+    {
+      "path": "src/ui/poses.js",
+      "sha": "40841a9afc55265d35fd70f446e06920b645f689",
+      "size": 10714
+    },
+    {
+      "path": "src/ui/render-layers.js",
+      "sha": "643b429dc0fc9b77dcbfcb2df32ca24dea8f99c8",
+      "size": 10263
+    },
+    {
+      "path": "src/ui/save-slots-pause-menu.js",
+      "sha": "c293d1ae973e58213ef8bf7ce66216cb94240dac",
+      "size": 79991
+    },
+    {
+      "path": "src/ui/screens.js",
+      "sha": "783f32cbcdc9b13144cd151eda9aca6f07f6ee92",
+      "size": 6918
+    },
+    {
+      "path": "src/ui/sidebars.js",
+      "sha": "942d991a0159c7d143ce644e3b260f67a8d1b104",
+      "size": 9606
+    },
+    {
+      "path": "src/ui/silhouette-fx.js",
+      "sha": "e9def6d28f6283d76691137e64132b37ae5a5e0d",
+      "size": 8875
+    },
+    {
+      "path": "src/ui/ui-system.js",
+      "sha": "03a3062ca1fd29fdfeefe0bb405f8dd41edc20dc",
+      "size": 73917
+    },
+    {
+      "path": "src/ui/wardrobe.js",
+      "sha": "fe13090d1e119d28bad75fa2450a53fbe0401467",
+      "size": 83382
+    },
+    {
+      "path": "src/ui/weapon-models.js",
+      "sha": "ae196e5c038f7b5f0d10feafa68601e1fc3a3d39",
+      "size": 25680
+    },
+    {
+      "path": "src/world/billboards.js",
+      "sha": "9f3c67bd48a35240222382e1e0c5f5f6c834bd23",
+      "size": 9323
+    },
+    {
+      "path": "src/world/bokeh.js",
+      "sha": "00be8255e01ecd1a9229e7e017ef360a4eaa8dd9",
+      "size": 4372
+    },
+    {
+      "path": "src/world/cafe-life.js",
+      "sha": "1f95d4c3d140fea0461c198da79641b9631385a4",
+      "size": 10354
+    },
+    {
+      "path": "src/world/city-layout.js",
+      "sha": "c1e41130ad3ad5b73c817b310a2bd7b7fe68ea29",
+      "size": 94551
+    },
+    {
+      "path": "src/world/club-life.js",
+      "sha": "397d9c9c9cf177e35185ff3fa998b9f32ee7afa3",
+      "size": 21841
+    },
+    {
+      "path": "src/world/ground-baker.js",
+      "sha": "032fc0fd4acadb288d9a933c9903ff7069e02144",
+      "size": 23521
+    },
+    {
+      "path": "src/world/lobby-life.js",
+      "sha": "7fdaccadf27daf8c2cf91708ab88f609bc0785ec",
+      "size": 16824
+    },
+    {
+      "path": "src/world/lot-grounds.js",
+      "sha": "f8830dc8e4c8adb4a111b0d0d7846c323d8f2dfc",
+      "size": 13240
+    },
+    {
+      "path": "src/world/map-edge.js",
+      "sha": "2389b89ecd05eeecf6ff46c040ccbc9a83b76c91",
+      "size": 13457
+    },
+    {
+      "path": "src/world/map-entities.js",
+      "sha": "09a98ab3712c482e31d34cd848de245e7eac4c70",
+      "size": 81279
+    },
+    {
+      "path": "src/world/maps.js",
+      "sha": "5506a4c7de2271cba588d33732fe8c448467acaf",
+      "size": 42578
+    },
+    {
+      "path": "src/world/navigation.js",
+      "sha": "6a605ff4ee4fae7550f5cc2973741172f5280dcf",
+      "size": 40979
+    },
+    {
+      "path": "src/world/parks.js",
+      "sha": "4679358650093e4e1c1098e1b7f88c711be8543f",
+      "size": 8571
+    },
+    {
+      "path": "src/world/particles-decals.js",
+      "sha": "f3b78c11012f40f61232f5cc08ff30a45563a708",
+      "size": 24059
+    },
+    {
+      "path": "src/world/rooms.js",
+      "sha": "0fe882f34a100aadd3821d3cd34f5c84e7055bcf",
+      "size": 91309
+    },
+    {
+      "path": "src/world/walker.js",
+      "sha": "04184d4c678709e143450a385c1eb902fceaf3bd",
+      "size": 6993
+    },
+    {
+      "path": "src/world/weather-response.js",
+      "sha": "e96a8fa2288034bf3887068960ff54a846b91b26",
+      "size": 6776
+    },
+    {
+      "path": "src/world/weather.js",
+      "sha": "a6703b6d3c062a8240f9260c322d8a087ff27a55",
+      "size": 76862
+    },
+    {
+      "path": "tools/bench-character-cpu.py",
+      "sha": "022f6bc6de36a7a8b032a67533006e31be5674a7",
+      "size": 14353
+    },
+    {
+      "path": "tools/bench-lighting-live.py",
+      "sha": "d8d63c1cce33f71eabea91a1a9e83b68054e714f",
+      "size": 6088
+    },
+    {
+      "path": "tools/bench-lighting-save.py",
+      "sha": "9b12c267b92b20a97388934a48ceadf928ba7a2f",
+      "size": 10687
+    },
+    {
+      "path": "tools/build.mjs",
+      "sha": "d82d33e97aeaaaabb07e85bcd1dd53d9881f332b",
+      "size": 12956
+    },
+    {
+      "path": "tools/demo-ashgrove.cjs",
+      "sha": "cf7529c236d8367a79b5286fee83db776adfee46",
+      "size": 1889
+    },
+    {
+      "path": "tools/demo-enni-cole.cjs",
+      "sha": "6c6c3b4185e4a04925be1458b108149314ea6368",
+      "size": 2464
+    },
+    {
+      "path": "tools/demo-lamps.cjs",
+      "sha": "2385b0f861afb8f8ed74e5ab9c743c69c4a82352",
+      "size": 1620
+    },
+    {
+      "path": "tools/fixtures/biggs-gameplay.json",
+      "sha": "edd881ddc4e4cc83cbea8bf573b0b43f533670c8",
+      "size": 1644
+    },
+    {
+      "path": "tools/loading-art.mjs",
+      "sha": "ffc56f06bc45ffe519fc9f44c1a3010eded65d6a",
+      "size": 8206
+    },
+    {
+      "path": "tools/measure-landmark-reach.cjs",
+      "sha": "34c82ec8899e24b203b73f591bdab68a022ef1f0",
+      "size": 7213
+    },
+    {
+      "path": "tools/test-biggs-art.cjs",
+      "sha": "a7f0b69e940ce3424d1cdd9be966e28e88279877",
+      "size": 2750
+    },
+    {
+      "path": "tools/test-bumper-balance.cjs",
+      "sha": "59016104e7280e4e4aa08edcff67631854fa7f8a",
+      "size": 4817
+    },
+    {
+      "path": "tools/test-character-rendering.cjs",
+      "sha": "397eb9ffa2d16d7bd8cc28b6efa07b6cf2d5cd8c",
+      "size": 6876
+    },
+    {
+      "path": "tools/test-clothing-dyer.cjs",
+      "sha": "6de91ec13265405cb6a0311ff6de3929310503ad",
+      "size": 6388
+    },
+    {
+      "path": "tools/test-crafted-gear.cjs",
+      "sha": "b0193d78084373307a803fc7d0fabd8ccc67b081",
+      "size": 14066
+    },
+    {
+      "path": "tools/test-crits-blood-pact.cjs",
+      "sha": "81527fcade001beca09ad9bdd09e3e7733d3d828",
+      "size": 8462
+    },
+    {
+      "path": "tools/test-drink-spills.cjs",
+      "sha": "00a6436be53ea9aea89c960a4137154d4c0bd92f",
+      "size": 5508
+    },
+    {
+      "path": "tools/test-flit-feedback.cjs",
+      "sha": "4632ed6a4e7728540941f8e50a1ea98cc9401849",
+      "size": 6418
+    },
+    {
+      "path": "tools/test-game-regressions.cjs",
+      "sha": "076c0a0842e30b473e26e78fec281146d1905c7f",
+      "size": 157264
+    },
+    {
+      "path": "tools/test-game-runtime.cjs",
+      "sha": "45d4ba092ba17b8991f43c64b91f651485e378a0",
+      "size": 14444
+    },
+    {
+      "path": "tools/test-gauntlet-bosses.cjs",
+      "sha": "754c7b258ae6ffcaffdbac8e5d927aa9458c5044",
+      "size": 10644
+    },
+    {
+      "path": "tools/test-gauntlet-saves.cjs",
+      "sha": "796f5d841415d635c85c0bf060ef07708a75e7b7",
+      "size": 6630
+    },
+    {
+      "path": "tools/test-golden-retribution.cjs",
+      "sha": "12938c1840e5897e3ffd6786907047d356baf16a",
+      "size": 8458
+    },
+    {
+      "path": "tools/test-kukri-animation.cjs",
+      "sha": "006832c7d5bddc129e83f054eee28fce1ed67cd2",
+      "size": 5361
+    },
+    {
+      "path": "tools/test-legwear-visual.cjs",
+      "sha": "01a1e5cb76f7ac5cf0b5e5199ca9f1b657a33c71",
+      "size": 4208
+    },
+    {
+      "path": "tools/test-lighting-base.cjs",
+      "sha": "ba704c8de117ef241fd0010e5a129616388d060e",
+      "size": 5312
+    },
+    {
+      "path": "tools/test-neural-systems.cjs",
+      "sha": "22c4edcd8731e651162921ad0dc82dd97d537ba0",
+      "size": 3349
+    },
+    {
+      "path": "tools/test-npc-gait.cjs",
+      "sha": "fa7bfe8281845fff7025141fd5b9a125387777cd",
+      "size": 1262
+    },
+    {
+      "path": "tools/test-palace-redesign.cjs",
+      "sha": "5c63b6e4a3b33d38ea18df2dc32a13437796ac62",
+      "size": 4814
+    },
+    {
+      "path": "tools/test-park-pools.cjs",
+      "sha": "86c6ba92e44a52d9a1d0a92a0a7b2ca89c8a7aa3",
+      "size": 4239
+    },
+    {
+      "path": "tools/test-particle-rendering.cjs",
+      "sha": "9ee5cb9eaf2b809a6e03528bcad5142ca45dbb84",
+      "size": 3083
+    },
+    {
+      "path": "tools/test-performance-bench.cjs",
+      "sha": "4f927f25464b894b5fcf2f31db59c03e0a9bac7b",
+      "size": 9273
+    },
+    {
+      "path": "tools/test-performance-investigation.cjs",
+      "sha": "ec5081ba6c36afe14cc4eda0bd45f2143b4c88f7",
+      "size": 6783
+    },
+    {
+      "path": "tools/test-player-fire.cjs",
+      "sha": "080bda96ec19b790548c1dcba49f348aff98acb3",
+      "size": 7881
+    },
+    {
+      "path": "tools/test-projectile-collisions.cjs",
+      "sha": "2484550fe26e756f8ddb62b35e6f9e2af0cd08c7",
+      "size": 13284
+    },
+    {
+      "path": "tools/test-quick-draw.cjs",
+      "sha": "c5b59f684def2a43f06d0c75725595ba8197bb54",
+      "size": 6654
+    },
+    {
+      "path": "tools/test-stashes-vampiric.cjs",
+      "sha": "ee5781eae69c029b9cc00758e463d23ea46374d3",
+      "size": 5298
+    },
+    {
+      "path": "tools/test-traffic-crossings.cjs",
+      "sha": "5e565092d91be8fdc4b64b0c8a2d55c76a71f38c",
+      "size": 5882
+    },
+    {
+      "path": "tools/test-traffic-efficiency.cjs",
+      "sha": "81ffb239521d0d68871f4c518eafbae29dc3021d",
+      "size": 3147
+    },
+    {
+      "path": "tools/test-vehicle-occupants.cjs",
+      "sha": "bf86f280243d4b7ea5528f01956fe2584e357b3e",
+      "size": 4906
+    }
+  ]
+}

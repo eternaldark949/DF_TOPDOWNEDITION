@@ -1,0 +1,2127 @@
+# Runtime module catalog
+
+Pinned original `e597475d679c60d58c8f78121f10a597cc0f2800`. All 177 runtime JavaScript files are listed. Paths link to the exact original source. Source descriptions below are retained from the original `src/MAP.md` where present; they are orientation, not newly verified behavioral guarantees. Dependencies and counts come from parsed source. Destinations are proposals, not completed migration.
+
+## src/app/boot-loader.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/app/boot-loader.js) · 198 lines · 35 declarations · 109 call/new expressions.
+
+Inspect the linked declaration and relationship records for the responsibilities in this source unit.
+
+**Proposed ownership:** Build/host bootstrap and Game composition; Lobby owns start/stop after dependency connection.
+
+**Cross-file global references:** `GameEngine` (1).
+
+**Declared classes:** None..
+
+## src/app/boot.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/app/boot.js) · 352 lines · 52 declarations · 238 call/new expressions.
+
+Colour grade: presets (`GAME_GRADE_PRESETS`, each with its `GameSettings.colorGrade` key), sliders, `setGameGradeValue` (→ `colorGrade: 'custom'` + `gradeCustom`, saved), `restoreGameGrade` (boot and load), `gradeWash` / `gradePhotoPass` (photos match the screen), `syncGradeDrawer` (Cinematic View's drawer). Settings menu wiring (incl. ambience slider), final start-up
+
+**Proposed ownership:** Build/host bootstrap and Game composition; Lobby owns start/stop after dependency connection.
+
+**Cross-file global references:** `GameSettings` (72), `game` (6), `audioSys` (5), `mainMenuList` (2), `mainMenuDiv` (2), `showMessage` (1), `SaveSlotManager` (1), `PauseMenuController` (1), `FullscreenManager` (1).
+
+**Declared classes:** None..
+
+## src/app/menu-wiring.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/app/menu-wiring.js) · 86 lines · 24 declarations · 53 call/new expressions.
+
+Creates `game`, main-menu buttons
+
+**Proposed ownership:** Build/host bootstrap and Game composition; Lobby owns start/stop after dependency connection.
+
+**Cross-file global references:** `audioSys` (3), `FullscreenManager` (2), `showMessage` (2), `GameEngine` (1), `OrientationManager` (1).
+
+**Declared classes:** None..
+
+## src/audio/audio.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/audio/audio.js) · 884 lines · 72 declarations · 597 call/new expressions.
+
+`AudioSystem` (sound effects, master bus, music bus for the Music slider), `AmbienceSystem` (rain, wind, city, room tone, fireplace, doors) and `MAP_MUSIC` — each map's soundtrack; `engine(state)`, the driven car's electric hum (`ENGINE_HUM` per brand); `sfx('crunch')` for car hits and `tyres(level)`, the driven car's squeal (the apartment plays the Silver Queen track, fullest in the living room; the intro's van plays 'van 2'; a track can belong to one `area` of a map — the city's southern graveyard plays 'grave stories (1)', rising as you come up to its walls) A map's MAP_MUSIC can be a list of area tracks (the nearest wins); `building:` uses a footprint as the area and `lowpass` muffles it — on the hub you hear Moon City's bass through its walls as you approach, and its lights lock to that kick. Clean output: the context opens with `latencyHint` from Settings → Audio Buffer (`AUDIO_BUFFERS`: low / balanced (default) / smooth, read at launch), a limiter (DynamicsCompressor, −1 dB) sits between `masterGain` and the speakers, `softStart` brings every envelope in over 2–3 ms (no step = no click), `SFX_CAP` caps each sound's overlapping voices, and the per-frame beds, motor and tyres only schedule automation when a value changes. `stats` (voices live / peak, started per second, main-thread start ms) feeds the profiler's Audio line
+
+**Proposed ownership:** Directory audio playback/mixing/lifecycle; Game music, ambience and sound bindings.
+
+**Cross-file global references:** `game` (18), `GameSettings` (11), `CONFIG` (2), `_frameTime` (2), `HEARTHS` (1), `loadSound` (1), `HUB_GRAVEYARD` (1), `_profileSampling` (1).
+
+**Declared classes:** `AudioSystem`, `AmbienceSystem`.
+
+## src/buildings/ashgrove.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/ashgrove.js) · 418 lines · 54 declarations · 494 call/new expressions.
+
+**The Ashgrove** (`ashgrove`, block_14_8 across Ashgrove St from Biggs Park, fronting Foundry Rd; `createAshgrove`, a `TieredBuilding`): a mansion block of varying heights. Two brick wings (8 storeys, limestone plinth, slate mansards with dormers, skylights and chimneys, festoon-lit roof terraces in front of them), a brick tower on the street front between them (14 storeys; a limestone ground floor with the door and the name either side of the bay; skylights, air handlers and a water tank on its roof), a teal bay out of its front from the second floor (mullioned windows, a carved crown with a lion's mask in acanthus) under a domed loggia turret, and teal oriels on the wings. It leans harder than the street (`ASH.HERO`). It faces south so its carving reads upright (a front facing north would lie upside down on screen). Its lights are the door's lanterns and the shop arches' spill, light only (`visible = false`: no fixtures). `viewDrift`: out in front of it, the gameplay view drifts toward it (engine/draw.js `_landmarkDriftTarget`). `tools/demo-ashgrove.cjs` takes a shot.
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `Ornament` (7), `seededRandom` (6), `TierKit` (3), `LandmarkKit` (2), `game` (1), `TieredBuilding` (1), `LampEntity` (1), `BuildingV2Registry` (1).
+
+**Declared classes:** `AshgroveBuilding`.
+
+## src/buildings/biggs-park.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/biggs-park.js) · 293 lines · 37 declarations · 293 call/new expressions.
+
+Biggs Park’s lacquer-and-brass pavilion, cached roof and marquee, forecourt ticket booths; shared bumper-car and Ferris cabin art. Original building sections and entry remain authoritative.
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `darkenHex` (4), `lightenHex` (3), `LandmarkKit` (3), `TieredBuilding` (1), `LampEntity` (1), `TierKit` (1).
+
+**Declared classes:** `BiggsParkBuilding`.
+
+## src/buildings/building-v1.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/building-v1.js) · 229 lines · 15 declarations · 82 call/new expressions.
+
+Original `Building` class, lane width constants
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `LampEntity` (6), `NeonSign` (1).
+
+**Declared classes:** `Building`.
+
+## src/buildings/building-v2.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/building-v2.js) · 1616 lines · 110 declarations · 778 call/new expressions.
+
+`BuildingV2` (leaning perspective walls, roofs, windows, signs) and generic apartment styling (street variants hook in through `_pickVariant`, `_vFaceUnder`/`_vFaceOver`, `_vShopRoof`/`_vAptRoof`, `_vGlow` and the window mask: buildings/street-variants.js); by day the window glass holds the sky, with a sun sheen sliding along the faces turned to it; `_drawFaceWindows` batches each face's windows into one path per colour (glass, sky, lit, lavender, TV) and draws sills when `this.sills` is set; neon signs bake their blurred layers once (`_signSprites`) and stamp them with the flicker; with the lean on, each sign draws inside its own building's top pass before the roof (`_paintSign`), so roofs and taller walls hide it; ordinary buildings' signs stand on a cantilevered entrance awning two floors up (`_signAwning`); rounded outer corners (`this.roundR`, `_roundCorners`: short 'C' facets with their own normals; `_roofPath`, `_footprint` for roofs and shadows). Window lighting buckets and roof outlines are retained. Stationary-camera facade paths are cached with geometry/mask checks; movement and zoom changes use the original window renderer, with lighting/flicker still live. **Landmark culling:** `inView(V, cam, reach)`. `emissiveReach` (the searchlight beams) widens only the glow pass; `topReach` (Silver Queen 200, Double Nights 190, Moon City 100: porticos, posts, canopies, signs) is the reach for the base, roof and sign passes, through `entry.topIn`; `_hullK()` takes the leaned hull up to `crownZ` (the Silver Queen's crown ring). **Batching:** same-style shapes go into one `Path2D` and draw once: tar seams (`_seamPath`, cached per section), roof props (`_roofPropDisc`) and fan blades, daytime window sheen grouped by alpha (`_FW_SHEEN_GROUPS`), balcony lights, fire escapes (landings, odd and even stairs, so the joints keep their alpha), garden beds, lanterns, caustics, solar panels. Festoon bulbs each take the string's alpha (they used to multiply it, so the far bulbs vanished). The Silver Queen and Moon City roofs are plane sprites (`_leanRoof`, `PlaneSprites`). The landmarks' `glowReach` (measured: how far their glow draws past the leaned hull without the beams) lets `drawEmissive(ctx, dark, beamsOnly)` draw just the beams when the rest is off screen.
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `game` (22), `CONFIG` (14), `LampEntity` (9), `SQ_THEME` (8), `LandmarkKit` (6), `_gameTimeSec` (6), `PropPass` (5), `_zoomLOD` (4), `darkenHex` (4), `lightenHex` (4), `hexToRgb` (2), `leanCamHeight` (2), `PlaneSprites` (2), `hexToRgba` (2), `sunNow` (2), `paintBoundsIntersect` (2), `NeonSign` (1), `SQ_PORTICO` (1), `_frameTime` (1), `SQ_ROOF` (1), `TierKit` (1), `_FW_DEFAULT_WINDOW_MASK` (1), `paintViewBounds` (1).
+
+**Declared classes:** `BuildingV2`.
+
+## src/buildings/city-view.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/city-view.js) · 373 lines · 46 declarations · 242 call/new expressions.
+
+**`CityView`**: a stretch of the hub's city seen from high up, for any interior with a window or veranda (first user: the street below the Silver Queen's veranda, `apt_949`). Built from the hub's own kit in hub units, drawn `scale` the size: the generic apartments, shops and warehouses (`factories.js`, the hub's mix) leaning away from a camera at the viewer (`_asViewer` swaps `game.camera` in and back), GroundBaker's road, junction, pavement and crossing painters, street lamps, trees. The still city and its night lights (each building's `drawEmissive`, lamp heads and pools) are each baked once (`bakeBase`, `bakeGlow`, warmup jobs in `engine/map-loading.js`); per frame only the traffic (car-art sprites, turned once: `warm`), people, signals and beacons draw, only where they show, nothing while it's off screen (`viewHasRect`). A lane's cars share its speed, spaced round its loop with a bounded sway, so none overtakes another. **Parallax** (options `parallax`, `edgeY`, `over`): the rect is a window onto a bigger picture (`ix, iy, iw, ih`) that `slide()` moves with `game.view` by `parallax`, clamped to what the picture covers, so the city moves slower than the floor; at `edgeY` it sits as laid out, and stepping back the street below slides under the sill. **Look-out** (`lookout`, screen px): `lookoutLean(player, zoom)`, which draw.js eases the camera to (`lookLeanY`) near the edge. The base bake is two warmup jobs (`bakeGround`, `bakeTops`).
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `game` (7), `bulbSprite` (7), `drawBulb` (5), `_zoomLOD` (3), `LAMP_POST_SCALE` (3), `VEHICLE_BRANDS` (2), `CONFIG` (2), `LAMP_STYLES` (2), `viewHasRect` (2), `_frameTime` (2), `createGenericApartment` (1), `createGenericShop` (1), `createGenericWarehouse` (1), `floraSprite` (1), `glowA` (1), `lampSprite` (1), `GroundBaker` (1), `GROUND_LOOK` (1), `carSprite` (1), `CAR_ART` (1).
+
+**Declared classes:** `CityView`.
+
+## src/buildings/cozy-cafe.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/cozy-cafe.js) · 442 lines · 53 declarations · 372 call/new expressions.
+
+**Cozy Cafe** (style `cozy_cafe`): brick corner house with a shingled hip roof leaned plane by plane (`_ccDrawRoof`), the hearth's chimney and smoke on the west slope, a front roof terrace with parasols and string lights (`_ccDrawTerrace`, deck and parasols baked), striped awnings and the "Cozy Cafe" signboard over the door (`_ccAwnings`), and the pavement planter, chalkboard and bistro tables (`_ccDrawBase`, baked). Sections unchanged.
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `LandmarkKit` (8), `TierKit` (5), `_frameTimeSec` (2), `seededRandom` (1), `TieredBuilding` (1), `LampEntity` (1), `game` (1).
+
+**Declared classes:** `CozyCafeBuilding`.
+
+## src/buildings/double-nights.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/double-nights.js) · 828 lines · 103 declarations · 881 call/new expressions.
+
+**Double Nights Hotel** on the tiered kit (`DoubleNightsBuilding`, style `double_nights`, `createDoubleNightsHotel`, registered in buildings/registry-v3.js), after ETERNAL's concept: limestone wings under slate mansards (dormers, zinc tops with skylights and chimney stacks), the core with the penthouse terrace and pool on its attic, the rounded tower out of the front (iron balconies with planters on every floor, the glazed entrance with chandelier and fountain, the DOUBLE NIGHTS HOTEL sign and gold double-crescent emblem: `_dnRotunda`, `_dnEntrance`), a lantern and slate dome with the emblem on top; two curved canopies ("ONE NIGHT" / "ANOTHER NIGHT", iron cresting) with gold-livery doormen (`ROLE_LOOKS.dn_staff`) and cone topiaries; the forecourt painted once (`_dnPaintGround`: marble terrace, basalt drop-off lane with two black cars, granite plaza with the brass emblem medallion, lawns, puddles), lamp posts with crescent banners drawn live (`_dnPosts`), the SAME SKY / DIFFERENT STORIES plinth. At night: wet-stone reflections streaking toward the camera (`_dnStreak`), light pooled under the canopies, two gold searchlights (`_dnBeams`). Wall art helpers: `_dnRuns` (a curve's facets as one wall), `_dnFacade` (windows, balconies, doors per bay and storey), `_dnWin`, `_dnRail`.
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `game` (12), `seededRandom` (7), `glowA` (7), `_zoomLOD` (6), `LandmarkKit` (5), `VEHICLE_BRANDS` (4), `TierKit` (4), `_mcCrescent` (2), `carSprite` (2), `CONFIG` (2), `_gameTimeSec` (2), `TieredBuilding` (1), `CAR_ART` (1), `ROLE_LOOKS` (1), `gaitCommand` (1), `decorativeBodyInView` (1), `tickHiddenDecorativeBody` (1), `drawProceduralHumanoid` (1), `leanCamHeight` (1), `LampEntity` (1).
+
+**Declared classes:** `DoubleNightsBuilding`.
+
+## src/buildings/dr-yins.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/dr-yins.js) · 190 lines · 18 declarations · 150 call/new expressions.
+
+Inspect the linked declaration and relationship records for the responsibilities in this source unit.
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `TieredBuilding` (1), `TierKit` (1).
+
+**Declared classes:** `DrYinsBuilding`.
+
+## src/buildings/enni-cole.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/enni-cole.js) · 381 lines · 44 declarations · 427 call/new expressions.
+
+**Enni Cole** (`enni_cole`, on Clinic Way beside Moon City; `createEnniCole`, a `TieredBuilding` after ETERNAL's reference photo): a two-storey rose-stone podium (pilasters with pink uplights, bronze display windows with an upper window over each, a recessed script panel near each end of every face), the entrance pavilion out of the middle of its front and taller (the name in neon script over a tall arch: fanlight, marquee, glass doors, sconces), the glass floor set back over the podium (black steel piers, amber light, mannequins, lantern skylights on its roof), and the curved-glass showroom on the pavilion with the name in gilt script on its roof (lit at night; the sign the gameplay camera sees). Clipped cypresses in brass planters by the steps (`_ecCypress`). Its script strips and roofs are painted again once the Anthropology webfont is in. Lights are light only (`visible = false`). `viewDrift`: out in front of it, the view drifts toward it. `tools/demo-enni-cole.cjs` takes a shot from the gameplay camera (or `CINE=1`).
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `seededRandom` (3), `LandmarkKit` (2), `TieredBuilding` (1), `game` (1), `TierKit` (1), `_ashPrism` (1), `LampEntity` (1), `BuildingV2Registry` (1).
+
+**Declared classes:** `EnniColeBuilding`.
+
+## src/buildings/entrance-lamps.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/entrance-lamps.js) · 234 lines · 25 declarations · 141 call/new expressions.
+
+**Entrance lamps** (`EntranceLamps`): 3D lamps at the doors of the tiered buildings, in place of the stock building's flat lamps round every roof edge. A building lists them in `_entranceLamps()` (plan frame, front at +y; `TieredBuilding` reads it once its frame is known, and again in `regenerateLights`): `kind`, x, y, z, `out`, `rgb`, `light`. Each kind is projected with the building's lean (`_tkP`/`_tkK`) through a view that draws it `size` × wider and `zsize` × taller about its anchor, so it reads beside the humanoid; the pieces draw after the tiers in `drawTop`, glass and halos in the glow pass, and the light on the street is light-only `LampEntity`s. Kinds: `lantern` (Cozy Cafe), `gooseneck` and `sconce` (Torque Auto), `pylon` (Dr. Yin's), `crystal` (Neural Systems), `carnival` (Biggs Park), `bulkhead` (the warehouse). engine/map-loading.js keeps street trees off them.
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `game` (2), `LampEntity` (1), `glowA` (1), `_zoomLOD` (1).
+
+**Declared classes:** None..
+
+## src/buildings/factories.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/factories.js) · 235 lines · 8 declarations · 8 call/new expressions.
+
+`create…` functions for each named building (Silver Queen, cafe, hotel, club, clinic…; Enni Cole is in buildings/enni-cole.js, the Double Nights Hotel in buildings/double-nights.js).
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `BuildingV2` (4), `createCozyCafeTiered` (1), `createNeuralSystemsTiered` (1), `createTorqueAuto` (1), `createDrYins` (1).
+
+**Declared classes:** None..
+
+## src/buildings/landmark-kit.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/landmark-kit.js) · 212 lines · 17 declarations · 128 call/new expressions.
+
+**`LandmarkKit`**: cheap depth and layers for lean-projected buildings — the template for the landmarks. `k(z)`, `plane`/`flat` (draw in a height's plane from cached `path`/`grad`), `sprite`/`drawSprite` (bake busy flat layers), `rings` (one path stroked per floor), and the depth vocabulary, each batched into a fill or two: `fins`, `ledge` (also plinths), `veranda`, `columns`, `sills`; `rim` — at night details catch the building's lamp colour (`colors.accent`, what its block's street lamps burn); `using(kf, fn)` draws with a building's own lean 
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `game` (6), `leanCamHeight` (1), `hexToRgb` (1).
+
+**Declared classes:** None..
+
+## src/buildings/moon-city-deco.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/moon-city-deco.js) · 828 lines · 91 declarations · 964 call/new expressions.
+
+**Moon City, tiered** (`MoonCityBuilding`, `createMoonCity`, registered as `moon_city`, same footprint, door and apron as before): after ETERNAL's concept art. The hall (arched windows lit pink with dancers' shadows, fluted gold pilasters, black crescent banners, the name panel, bulbs and the chevron frieze, `_mcdHall`); on it the drum (`_mcdDrum`) under the smoked-glass moon dome (`_mcdDome`, the dance floor's beat grid through it at night), the phases, crescent and turrets on the hall roof (`_mcdHallRoof`, `_mcdHallTop`); the VIP wing lower with the door's portal (`_mcdWing`) and its pool terrace (`_mcdWingRoof`, `_mcdWingTop`); over the door the glass drum (`rotunda`, `front: true`, `_mcdRotunda`: a mezzanine rail with people, the gold crescent in a neon ring). The canopy draws round the drum's front, clipped by its hull (`_mcdCanopy`); the sign hangs in front of it. Palms in gold planters (`_mcdPalm`). The ground (`_mcDrawGround`): a black marble plaza with a gold sunburst fading into the paving, the carpet and ropes, a marble terrace along the hall and a valet bay with a black LADY waiting in it (`_mcdCar`, the traffic's car art), the bouncer and a longer queue (`_mcdPeople`). Searchlights from the turrets (`_mcdBeams`).
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `MCX` (23), `game` (13), `_mcCrescent` (12), `LandmarkKit` (12), `seededRandom` (11), `glowA` (11), `_gameTimeSec` (5), `VEHICLE_BRANDS` (4), `_mcLune` (3), `_zoomLOD` (3), `TierKit` (3), `ROLE_LOOKS` (3), `_mcPhase` (2), `sunNow` (2), `_mcFontReady` (2), `CONFIG` (2), `carSprite` (2), `bulbSprite` (1), `_frameTime` (1), `CLUB_PAL` (1), `TieredBuilding` (1), `leanCamHeight` (1), `CAR_ART` (1), `pickFrom` (1), `gaitCommand` (1), `decorativeBodyInView` (1), `tickHiddenDecorativeBody` (1), `drawProceduralHumanoid` (1), `LampEntity` (1), `BuildingV2Registry` (1).
+
+**Declared classes:** `MoonCityBuilding`.
+
+## src/buildings/moon-city.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/moon-city.js) · 689 lines · 48 declarations · 659 call/new expressions.
+
+**Moon City's old BuildingV2 art and its shared pieces** (the tiered building in buildings/moon-city-deco.js still uses the crescent and phase shapes, `_mcBeat`, the canopy `_mcDrawCanopy`/`_mcCanopyPlane` and the sign `_mcDrawSign`; the walls, roof and forecourt below are no longer drawn). Style `moon_city`, in the house brand, art deco: lacquer walls ribbed with violet neon fins between gold pilasters, a chevron frieze under the gold cornice (`_mcFace`); stepped lacquer roof decks in gold parapets, violet neon round the step at night; on the hall the smoked-glass moon dome over the dance floor (its lights on the beat) in a ring of the moon's eight phases (`_mcPhase`, lit one a beat at night) on a gold sunburst, the gold crescent on its plinth, two searchlight turrets (`G.turrets`, where `_mcBeams` start); on the VIP wing a roof terrace: a crescent pool (`_mcLune`) lit violet, rose-velvet cabanas, loungers, topiary, festoon lights (`_mcDrawRoof`); "Moon City" script neon on a gold-framed marquee board over the door (`_mcDrawSign`, `G.sign`), a rising-moon canopy in rose velvet (`_mcDrawCanopy`, `_mcCanopyPlane`), and the forecourt: sunburst marble, red carpet, ropes, topiary planters, crimson pool, mist, bouncer and a moving queue (`_mcDrawGround`, `_mcPeople`). Own lights keep their colours (`keepColor`) `_mcFace` batched (panes, fins grouped by their animated index, pilasters, frieze, cornice). The roof (`_mcDrawRoof`: still, live daytime sky in the dome and pool, still) and the canopy (`_mcCanopyPlane`) are plane sprites; the posts and the night bulbs draw live. The canopy's and terrace's night bulbs are `bulbSprite` stamps.
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `game` (15), `_gameTimeSec` (13), `LandmarkKit` (12), `_zoomLOD` (7), `glowA` (6), `seededRandom` (5), `GLASS_DRINKS` (3), `PropPass` (3), `bulbSprite` (3), `_frameTime` (3), `ROLE_LOOKS` (3), `POSES` (2), `WARDROBE` (2), `clubBeatN` (2), `CONFIG` (2), `drawGlow` (2), `BUILDS` (1), `HAIR_RENDERERS` (1), `RenderStats` (1), `weatherAt` (1), `syncHumanoidGait` (1), `BuildingV2` (1), `LampEntity` (1), `sunNow` (1), `CLUB_PAL` (1), `PlaneSprites` (1), `pickFrom` (1), `gaitCommand` (1), `drawProceduralHumanoid` (1).
+
+**Declared classes:** None..
+
+## src/buildings/neural-systems.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/neural-systems.js) · 226 lines · 30 declarations · 231 call/new expressions.
+
+Neural Systems’ dark sapphire-crystal department-store exterior: broad faceted planes, crystal entry pilasters, engraved serif lettering, lit branding and a clear glazed entrance. Cached roof/entry/emissive planes keep the original T-shaped sections, door and eight-storey silhouette.
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `seededRandom` (2), `LandmarkKit` (2), `TieredBuilding` (1), `TierKit` (1).
+
+**Declared classes:** `NeuralSystemsBuilding`.
+
+## src/buildings/ornament-kit.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/ornament-kit.js) · 145 lines · 21 declarations · 180 call/new expressions.
+
+`Ornament`: carved-stone painters for face strips, `Ornament.use(palette)` then `carve` (a relief: fill, light and shadow edges), `leaf` (acanthus), `scroll`, `rosette`, `lion` (a lion's mask), `console` (a volute bracket) and `window` (mullioned, lit or dark). A palette has `stone, stoneMid, stoneLo, stoneDk, stoneHi, stoneLt, trim, trimLo, trimDk, frame`.
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** None statically identified..
+
+**Declared classes:** None..
+
+## src/buildings/registry-v3.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/registry-v3.js) · 656 lines · 40 declarations · 187 call/new expressions.
+
+`BuildingV3` (editor-exported buildings), the building registry, Biggs amusement park
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `paintViewBounds` (2), `paintBoundsIntersect` (2), `LampEntity` (2), `createCozyCafe` (1), `createDoubleNightsHotel` (1), `doubleNightsSections` (1), `createGenericApartment` (1), `createGenericShop` (1), `createWarehouseHall` (1), `createNeuralSystems` (1), `createDrYinsClinic` (1), `createTorqueAutoShop` (1), `createBiggsPark` (1).
+
+**Declared classes:** `BuildingV3`.
+
+## src/buildings/silver-queen-deco.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/silver-queen-deco.js) · 674 lines · 96 declarations · 759 call/new expressions.
+
+**The Silver Queen, tiered** (`SilverQueenBuilding`, `createSilverQueen`, registered as `silver_queen`): an Art Deco block in pale silver stone on the tiered kit. A 14-floor tower with a setback and a crown, two lower wings either side of a glazed entrance pavilion, a curved marquee (`front: true`, so it draws after its support) reading SILVER QUEEN APARTMENTS on its roof, fan crests, curved balconies with iron railings (`_sqdBalconies`, batched), roof gardens, a pool, cypresses, lanterns (`_sqdLanterns`, live), a monument sign and a forecourt plaza. Keeps the old motor court (`_sqDrawCourt`), the door to `apt_949` and `_sqForecourt`. Searchlights from the crown at night. The palette is painted darker than it reads because the day grade brightens it.
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `glowA` (7), `game` (6), `seededRandom` (5), `_zoomLOD` (3), `TierKit` (3), `Ornament` (2), `_ashPrism` (2), `CONFIG` (2), `LampEntity` (2), `drawGlow` (1), `TieredBuilding` (1), `LandmarkKit` (1), `_gameTimeSec` (1), `leanCamHeight` (1), `_ecCypress` (1), `BuildingV2Registry` (1).
+
+**Declared classes:** `SilverQueenBuilding`.
+
+## src/buildings/silver-queen.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/silver-queen.js) · 1144 lines · 98 declarations · 1181 call/new expressions.
+
+**The Silver Queen's old BuildingV2 art** (its motor court is still used by the tiered building in buildings/silver-queen-deco.js; the portico, roof and facade below are no longer drawn) (`viewDrift`: the gameplay view drifts toward it out front): the motor court in the L between tower and wing (`_sqCourt`, `_sqPaintCourt` painted once at 2 px a unit: fan-laid setts, three bays along the wing with hers, 949, in the middle, parterres, the fountain's basin; `_sqDrawCourt` draws the water live) and its drive out to the pavement (street trees kept off it in engine/map-loading.js), lit by two lamps and the fountain's and bollards' glow; a rayed deck round the eclipse pad; palette, portico, facade, verandas, roof garden, pool, eclipse pad, crown, entrance, roof lights; on the landmark kit (lean via `LandmarkKit.using(_sqK)`): pilasters stand proud as fins, base/belt/cornice as ledges, batched capitals, dentils, verandas and columns, glows as sprites (`sqGlow`), cached roof and pool gradients; sills under every window; ledge lips, sills and veranda rails catch its violet lamp colour at night Edge lights in 8 brightness-band paths; lamp posts, crown ring (a cached ring-local path) and cabana curtains batched. The roof plane is still runs round the live cabanas, ripples and penthouse (`PropPass.seg`), with a break so the pool and the pad are separate sprites; the portico plane (`_sqPorticoPlane`) is one sprite while unfaded. At night the portico's marquee and the pergola lanterns are `bulbSprite` stamps; the column dots and lantern hexes go out in one fill each (all additive).
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `game` (16), `_gameTimeSec` (11), `_zoomLOD` (10), `CONFIG` (7), `_bldHash` (7), `PropPass` (7), `bulbSprite` (6), `glowA` (4), `drawGlow` (4), `BuildingV2` (3), `LandmarkKit` (3), `leanCamHeight` (2), `LAMP_POST_SCALE` (2), `LampEntity` (1), `PlaneSprites` (1), `seededRandom` (1), `_lampBulbEmissionSprite` (1).
+
+**Declared classes:** None..
+
+## src/buildings/sky-craft.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/sky-craft.js) · 274 lines · 33 declarations · 350 call/new expressions.
+
+Hand-drawn sketchbook spaceships used by the sky layer
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** None statically identified..
+
+**Declared classes:** None..
+
+## src/buildings/sky-layer.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/sky-layer.js) · 141 lines · 8 declarations · 114 call/new expressions.
+
+Ad airships and floating shards in the sky
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `SkyCraft` (4), `hexToRgba` (3), `_bldHash` (1), `_gameTimeSec` (1).
+
+**Declared classes:** `SkyLayer`.
+
+## src/buildings/street-apartments.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/street-apartments.js) · 658 lines · 59 declarations · 466 call/new expressions.
+
+Inspect the linked declaration and relationship records for the responsibilities in this source unit.
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `hexToRgba` (10), `_zoomLOD` (6), `LandmarkKit` (6), `lightenHex` (3), `BuildingV2` (1), `_bldHash` (1), `darkenHex` (1).
+
+**Declared classes:** None..
+
+## src/buildings/street-arcade.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/street-arcade.js) · 365 lines · 38 declarations · 285 call/new expressions.
+
+**Street arcades**, the shop variant most generic shops take (`arcade`, weight 18 of 27 in `STREET_SHOPS`): limestone, seven to nine storeys, leaning `ARCADE.HERO` (3.5) times as hard as the street (`leanHero`: BuildingV2 `_leanScale` scales by it, `crownZ` widens the render query, `_vLean` gives the landmark kit the same lean) (`ARCADE`: arcade height `A`, a bay every `BAY` laid out from the door, arch width `AW`, mansard `M`; stone `TONES` cream/honey/pearl). Tall arched shopfronts with voussoirs, keystones and warm glass (`_vArcFace`), a dark awning over each arch and a wide canopy with the name over the door and its neighbours, wall lanterns on the piers (`_vArcFront`), the arcade's cornice, an iron balcony along the front, a second balcony on the top storey, balconettes on the odd storeys between, French windows with hoods, the main cornice, a slate mansard storey with pedimented dormers (`_vArcOver`, LandmarkKit ledges and verandas). Roof (`_vArcPaintRoof`: slate slopes, dormers front and back, chimney stacks on the party walls, zinc flat with two roof lights) and pavement (`_vArcPaintBase`: steps, cone topiaries in iron planters) baked once per tone, frame and door (`_vId`). Generic windows are masked off on every face; night: arches, windows, dormers, lanterns, the name lit, lamp-coloured cornice lips (`_vArcGlow`); warm shopfront spill (`neon: '#ffb45a'`).
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `LandmarkKit` (7), `hexToRgba` (6), `_zoomLOD` (3), `_bldHash` (3), `BuildingV2` (1), `leanCamHeight` (1).
+
+**Declared classes:** None..
+
+## src/buildings/street-variants.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/street-variants.js) · 692 lines · 70 declarations · 658 call/new expressions.
+
+**Street variants** for the generic `shop_small` and `apartment_small` buildings, picked by seed in the constructor (`_pickVariant`; config `variant: 'plain'` keeps the old look, `variant: '<id>'` asks for one). Shops: arcade (about two in three; buildings/street-arcade.js), bakery (brick, striped awnings, wooden signboard, shingled hip roof with chimney), florist (green timber, roof garden and glasshouse, flower buckets), boutique (rose stone, gold frames, black canopy, glass lantern roof, topiaries), lounge (lacquer, neon fins, velvet canopy with marquee bulbs, moon dome, red carpet and ropes). Apartments: brownstone, deco, terrace, loft (wall materials, sills, roof trim, stoops). Each variant draws in its front's frame (`StreetArt.frame`, `_vInFrame`); roofs and the pavement dressing are baked once per variant, frame size and door place (`StreetArt.sprite`) and stamped; walls, shopfronts, awnings and boards are a few projected fills (`_vFaceUnder`, `_vFaceOver`, `_vFront`); night lights are shared `Path2D`s (`_vRoofGlow`, `_vGlow`). The pavement dressing draws in the forecourts pass (`_vBase`, engine/draw.js) and stands past the awning. Sections, doors, lights, block lamp colours and accent colours are unchanged.
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `hexToRgba` (7), `CONFIG` (7), `LandmarkKit` (6), `darkenHex` (4), `game` (3), `_zoomLOD` (2), `BuildingV2` (1), `_bldHash` (1), `APT_KIT` (1).
+
+**Declared classes:** None..
+
+## src/buildings/tiered-kit.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/tiered-kit.js) · 557 lines · 78 declarations · 350 call/new expressions.
+
+**Tiered buildings**: `TieredBuilding` (a BuildingV2) built from tiers, each a plan polygon (`poly`, or `rect`; `TierKit.bay` an open bay, `TierKit.hull`) standing from `z0` to `z1`, optionally `on` another tier. Each tier's walls are one strip painted by its `paint(d, l, t, H, L)` (day and lit canvases) and mapped face by face onto the leaning quads (`_tkMap`); a face back to back with another tier's is drawn only above it. Tiers draw farthest first, then lowest top first (`_tkOrder`); each has mitred `ledges`, a `roof` sprite (day and, with `roofGlow`, lit), and a `top` hook drawn live (domes, tanks; `rise` how far it stands above the tier). Each tier's light is cut out of the tiers drawn over it (`_tkHull`), so a lit window behind the bay doesn't shine through. `facing: 'N'` turns the plan round. It gives the glow pass its occluders (`_glowOccluders`: a hull per tier, so a lower building's glow doesn't paint over it) and daylight its sun-shadow hulls (`_sunShadowHulls`). Collision is the bounding boxes of the solid ground tiers. Faces map in tiles of `t.tile || [40, 14]`; on the main canvas tiles off screen are skipped, and a tier's light is clipped only by later hulls whose boxes overlap it.
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `game` (17), `CONFIG` (9), `LandmarkKit` (5), `EntranceLamps` (4), `_zoomLOD` (4), `leanCamHeight` (2), `RenderTags` (2), `BuildingV2` (1).
+
+**Declared classes:** `TieredBuilding`.
+
+## src/buildings/torque-auto.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/torque-auto.js) · 237 lines · 28 declarations · 240 call/new expressions.
+
+Torque Auto's exterior (`TorqueAutoBuilding`, made by `createTorqueAutoShop`): sawtooth hall roof whose north-light glazing glows amber at night, the Torque script on a lit board along the front, Lady's BlackMark V3 billboard and a skylight on the showroom wing, graphite ribbed walls with an amber pinstripe, roll-up doors and showroom glass on the front, an apron with chevrons, the A-frame and the air station. Roof, glow and apron are baked sprites (`tq_roof`, `tq_glow`, `tq_apron`); the factory's sections, door and collision are unchanged.
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `TorqueArt` (14), `LandmarkKit` (3), `TieredBuilding` (1), `TierKit` (1).
+
+**Declared classes:** `TorqueAutoBuilding`.
+
+## src/buildings/warehouse-hall.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/buildings/warehouse-hall.js) · 146 lines · 21 declarations · 147 call/new expressions.
+
+Inspect the linked declaration and relationship records for the responsibilities in this source unit.
+
+**Proposed ownership:** Penthouse building builders/artwork; Game named building recipes. Directory owns projection, surfaces, contacts and asset lifetime.
+
+**Cross-file global references:** `seededRandom` (2), `LandmarkKit` (2), `TieredBuilding` (1), `TierKit` (1).
+
+**Declared classes:** `WarehouseHall`.
+
+## src/core/appearances.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/core/appearances.js) · 438 lines · 35 declarations · 154 call/new expressions.
+
+**Every character's look in one place**: `APPEARANCES` (949, the crew, staff, the city's cast), `ROLE_LOOKS` (medics, dancers, androids, pedestrians, gangers, spirits, ghosts), `PALETTE`, `ANDROID_FINISHES`; `lookFor(entity)`, `portraitOf(look)`; 747's look; the field mask rule (`withFieldMask`: 949 masked away from home)  `stellaMasked`: a scene's `game.fieldMask` wins, then the player's Neu.Me choice (`cosmetics.maskMode` 'on'/'off'), else 'auto' (masked in the field, bare at home).
+
+**Proposed ownership:** Split Basement reusable helpers, Directory settings/assets/cache/progression services, and Game tuning/registries/appearances.
+
+**Cross-file global references:** `pickFrom` (30), `seededRandom` (2).
+
+**Declared classes:** None..
+
+## src/core/assets.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/core/assets.js) · 65 lines · 8 declarations · 24 call/new expressions.
+
+`getImage`, `drawAsset`, `playSound` / `loadSound` for your assets
+
+**Proposed ownership:** Split Basement reusable helpers, Directory settings/assets/cache/progression services, and Game tuning/registries/appearances.
+
+**Cross-file global references:** `ASSETS` (3), `audioSys` (3).
+
+**Declared classes:** None..
+
+## src/core/cache-db.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/core/cache-db.js) · 49 lines · 10 declarations · 20 call/new expressions.
+
+**CacheDB**: slow, deterministic results kept across sessions in IndexedDB (localStorage stays for saves and settings). Read into memory at boot, so lookups during a map load are synchronous; writes go out in the background; every entry carries a signature of its inputs (and `VERSION`), so changed maps never get stale data. Used for the lamp shadow polygons (`bakeStaticLighting`, key `lampPolys:<map>`)
+
+**Proposed ownership:** Split Basement reusable helpers, Directory settings/assets/cache/progression services, and Game tuning/registries/appearances.
+
+**Cross-file global references:** None statically identified..
+
+**Declared classes:** None..
+
+## src/core/config.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/core/config.js) · 578 lines · 13 declarations · 37 call/new expressions.
+
+Frame-time globals and `CONFIG`: every tunable constant (buildings, weather, loop, lighting…). `HEARTHS`: where each fireplace is (art and ambience share it). `console.log` is silent unless `localStorage.dfab_debug = '1'`; `leanCamHeight()` (the building lean's camera height, normalised to zoom) `HUB_GRAVEYARD`: where the city's graveyard is (its walls, music, candle glow, ghosts, Ms. Jean's spot and her lines all go by it).
+
+**Proposed ownership:** Split Basement reusable helpers, Directory settings/assets/cache/progression services, and Game tuning/registries/appearances.
+
+**Cross-file global references:** `game` (4).
+
+**Declared classes:** None..
+
+## src/core/draw-helpers.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/core/draw-helpers.js) · 415 lines · 46 declarations · 229 call/new expressions.
+
+**Lens glare** (`LENS_GLARE`, `drawLensGlare`): the bloom of ETERNAL's UPBGE renders as two stacked layers over street lanterns and car headlamps, a fog glare (`lensFogSprite`) and a 38°-turned star glare (`lensStarSprite`), baked per colour, upright on screen, each with its own toggle (Settings → Fog Glare / Star Glare). Colour helpers (`darkenHex`, `lightenHex`, `hexToRgba`…), line-of-sight/raycast, `computeVisibilityPoly` (lamp shadows, vision cones, headlights), HP bars, enemy telegraphs, glow sprites (`glowSprite`, `drawGlow`), `lampFlicker`, `lampWake` (street lamps wake one by one at dusk, stuttering on, and go out one by one after dawn), `glowA` (a glow at an alpha: the interiors' light passes)  Polyfills `roundRect` on the 2D context and Path2D for Safari before 16.4 (without it, the building art threw every frame there). Allocation-free sight tests (`segCrossesRect`, `segRectNearest` in traffic/roads.js: same arithmetic as `getLineRectIntersections`, box-rejected first); `computeVisibilityPoly` reuses its scratch arrays. `darkenHex`/`lightenHex` and `glowSprite` cache by nested Maps (a hit builds no key string). `bulbSprite` / `drawBulb`: a bulb (a core and its glow) baked once per screen scale and stamped at its own alpha, for any additive glow pass, indoors or out. `viewHasRect(x, y, w, h)`: could a world rect show this frame (the draw's view, zoom and shake), for set pieces that should cost nothing off screen.
+
+**Proposed ownership:** Split Basement reusable helpers, Directory settings/assets/cache/progression services, and Game tuning/registries/appearances.
+
+**Cross-file global references:** `game` (11), `clamp` (6), `_physicsSpatial` (5), `_frameTime` (3), `segCrossesRect` (2), `segRectNearest` (2), `GameSettings` (2).
+
+**Declared classes:** None..
+
+## src/core/registries.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/core/registries.js) · 642 lines · 47 declarations · 57 call/new expressions.
+
+Notes, consumables, drinks, cosmetics (wigs, skins, outfits including the evening dresses, hats, jewelry…; an outfit piece's `fabric` (sequin, satin, velvet, tulle) and `accent` (an ombré to the hem) show in NEU.ME's full figure); `CosmeticsSystem`, `BuffSystem`
+
+**Proposed ownership:** Split Basement reusable helpers, Directory settings/assets/cache/progression services, and Game tuning/registries/appearances.
+
+**Cross-file global references:** `showMessage` (4), `APPEARANCES` (2).
+
+**Declared classes:** `CosmeticsSystem`, `BuffSystem`.
+
+## src/core/resonance.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/core/resonance.js) · 190 lines · 43 declarations · 63 call/new expressions.
+
+`ResonanceSystem`: 949's progression — earning (style-weighted), level cap 50, Dr. Yin's tuning, and six three-rank upgrades in each Flit / Frame / Arms tree. The level-30 additions are Long Echo, Grounded and Low Signature; old level-30 saves continue leveling. At level 50, tuning exchanges each complete 100 surplus Resonance for 1 PP and saves the remainder
+
+**Proposed ownership:** Split Basement reusable helpers, Directory settings/assets/cache/progression services, and Game tuning/registries/appearances.
+
+**Cross-file global references:** None statically identified..
+
+**Declared classes:** `ResonanceSystem`.
+
+## src/core/settings.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/core/settings.js) · 489 lines · 71 declarations · 119 call/new expressions.
+
+**Base Zoom** (`baseZoom`, Settings → Camera and the main menu's Settings; 100/90/75/60%, `CONFIG.CAMERA.BASE_ZOOMS`; kept with the controls in `dfab_controls` and in saves): multiplies every gameplay camera zoom (engine/update.js); the zoom detail steps (engine/draw.js `_zoomLOD`) are measured against it. **Device Preset** (main menu → Settings, off by default; `devicePreset`, kept per device in `dfab_device_preset`): on, it applies `applyPreset(deviceTier())` (low: ≤ 2 GB or ≤ 2 cores; medium: ≤ 4 GB, ≤ 4 cores, or a phone or tablet; high: no change) and keeps the values it replaced, which off puts back (`setDevicePreset`); while on it's applied again at launch (app/boot.js) and after a save's settings load (`reapplyDevicePreset`, engine/save-load.js). `FullscreenManager` (on by default: the first tap or key press anywhere goes fullscreen, `armFirstGesture`; only the settings toggle changes the saved choice, `dfab_fullscreen_pref`; the tap-to-begin screen — `#tap-to-begin` in index.html, wired in `app/menu-wiring.js` — is that first tap), `OrientationManager` (Settings → Screen Orientation: Landscape by default / Auto / Portrait; locks in fullscreen where supported, saved as `dfab_orientation`), `GameSettings`, object pools, perf utilities, `showMessage`
+
+**Proposed ownership:** Split Basement reusable helpers, Directory settings/assets/cache/progression services, and Game tuning/registries/appearances.
+
+**Cross-file global references:** `game` (11), `CONFIG` (2).
+
+**Declared classes:** `ObjectPool`.
+
+## src/core/utils.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/core/utils.js) · 427 lines · 34 declarations · 71 call/new expressions.
+
+`_gameTimeMs()` (game time from sim ticks, frozen while paused: projectile caps and decal ages use it), maths helpers, humanoid gait/animation helpers, weapon muzzle helpers (`weaponMuzzleLocal` reads the model's `muzzle`), `RenderInterp`
+
+**Proposed ownership:** Split Basement reusable helpers, Directory settings/assets/cache/progression services, and Game tuning/registries/appearances.
+
+**Cross-file global references:** `game` (7), `CONFIG` (6), `GameEntity` (2), `weaponModel` (1), `isLineBlocked` (1), `getColliders` (1).
+
+**Declared classes:** None..
+
+## src/engine/biggs-art.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/biggs-art.js) · 72 lines · 2 declarations · 86 call/new expressions.
+
+Crash Royale’s bounded conductive-floor bake, brass rail, crest and entry carpet; released by `MAP_BAKES` on departure. Lighting fixtures live in `world/map-entities.js`.
+
+**Proposed ownership:** Penthouse reusable painters; Game named interior/decoration recipes; Directory asset preparation.
+
+**Cross-file global references:** `BiggsArt` (10), `engineMixin` (1), `BIGGS` (1), `seededRandom` (1).
+
+**Declared classes:** None..
+
+## src/engine/boss-hazards.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/boss-hazards.js) · 375 lines · 23 declarations · 203 call/new expressions.
+
+**Boss hazards** (`_hazards`, `addHazard`, stepped by `updateBossHazards` each tick, drawn by `drawBossHazards` above the darkness): Lilitu's `sigil`s and `rite`, `fire`, `smoke` (blocks the wardens' sight: `smokeBlocks`), Vesper's `censer`, Matins' `hymn`, Compline's `hook` (drags her: `_hooked`), and `flare`/`gale` looks. `hurtPlayer` (a flit dodges), `burnPlayer` (`_playerBurn`; a flit snuffs it), `shovePlayer`; the duel's dimming (`_duelDimK`); `lilituDuelWon`, `triumvirateFallen`, `dropBossWeapon`
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `drawGlow` (8), `_gameTimeSec` (6), `showMessage` (4), `isLineBlocked` (2), `_frameTime` (2), `_simTick` (2), `engineMixin` (1), `NavGrid` (1), `CollisionSystem` (1), `audioSys` (1), `drawEliteMark` (1), `Drone` (1), `Loot` (1), `createItemFromRegistry` (1), `drawWeapon` (1).
+
+**Declared classes:** None..
+
+## src/engine/boss-intro.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/boss-intro.js) · 139 lines · 25 declarations · 93 call/new expressions.
+
+Boss intros: `bossIntro` spawns the Sanctum's Triumvirate dormant (kneeling), films their awakening (the camera visits each as its eye ignites, frames all three under the title, pans back; skippable; a short version for replays), grace, then wakes them (`opts.subtitle` under the title); `drawBossGlow` (eyes, halo, heat, and each warden's move winding up); `spawnTriumvirate(opts)` (the one place their spawn points live)
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `drawGlow` (6), `engineMixin` (1), `GatlingGunner` (1), `WARDENS` (1), `_gameTimeSec` (1), `_frameTime` (1), `audioSys` (1).
+
+**Declared classes:** None..
+
+## src/engine/cars.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/cars.js) · 318 lines · 21 declarations · 81 call/new expressions.
+
+**Cars**: what each car is to her (`carKind`: `own` her garage car, `sanctioned` Amber's delivery van — hers to use on the job, never stolen — `hijacked` anything taken off the street, a Zib too) and where each one is while she isn't in it. `car` is her **linked** car: the one she's in or last got out of. `toggleVehicle` (in/out of it), `enterCar` (one of hers: the owned car, the van, the linked car; the pill's Drive · Your car / Delivery van / Car), `hijackVehicle` (a stranger's: off its lane and out of any junction; a ganger at the wheel — one car in five, `TrafficVehicle` — comes out hostile; an empty car has nobody to put out). Getting into Amber's van on a delivery loads the package (`pickUpPackage(true)`). Getting out (`_leaveCar`) leaves the lights on (`lampsOn`) and lets it roll to a stop, where it parks itself (`TrafficVehicle.updateManualDriving`) so traffic steers round it; a hijacked car stays linked until she takes another (`_switchCar`), then goes back to traffic, still lit. `parkedCars()`: hers on the map she isn't driving (traffic sees, collides with and goes round them, rolls them to a stop; pedestrians see them; the light gives them beams). **Cars live on the hub**: `_placeCarsForMap` (from `_doLoadMap`) shows each where she left it, at rest, and puts every one away (hidden, out of collision) anywhere else; `_endDrive` gets everyone out first if the map changed under her. `_spawnDeliveryVan` (by the Cozy Cafe's door, its `home`; once — never duplicated), `returnVanHome` (Barista Ren's new job, a load). `_replaceOwnedCar` (another garage model or a load: where the old one stood, the old one destroyed, the link kept). `CAR_START` (a new game's spot). The markers are `engine/markers.js`
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `showMessage` (8), `TrafficVehicle` (2), `resetHumanoidAnim` (2), `engineMixin` (1), `Ganger` (1), `getColliders` (1).
+
+**Declared classes:** None..
+
+## src/engine/combat-effects.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/combat-effects.js) · 750 lines · 34 declarations · 278 call/new expressions.
+
+Screen shake, time slow (`updateTimeSlow(elapsed)` returns a time scale; the loop stretches its tick length by it, so slow motion is evenly spaced, interpolated ticks, and it holds still while paused), death, firing, boosters, player damage; spent casings as glitter (`spawnCasing`/`updateCasings`/`drawCasings`, max 24: flecks in the gun's `brass` colour, each twinkling on its own rhythm with a four-point glint) and the muzzle flash's star (`drawMuzzleStars`, flashes now carry `angle`)  **Weapon FX** (`weaponFx` at every shot: player, crew, gangers): glitter casings linger 25 s (≤ 60), scatter two finer flecks on landing and catch the colour of the lamp they lie under (`_casingLamp`, once; by night via `_lampDaylight`); `shotFx` (≤ 160): barrel smoke and golden wisps (soft `puffSprite`, drifting downwind), embers and gold dust (additive); `drawShotFx` after the muzzle stars.
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `_zoomLOD` (10), `CONFIG` (8), `showMessage` (8), `_gameTimeSec` (4), `_frameTime` (3), `_gameTimeMs` (3), `FIRE_TRAIL_SPACING` (3), `GameSettings` (3), `hexToRgb` (2), `weaponModel` (2), `isLineBlocked` (2), `getColliders` (2), `FIRE_TRAIL_MAX` (2), `phoneSystem` (2), `ProjectileEntity` (2), `hudInputBlocked` (2), `engineMixin` (1), `_getFireTrailSprites` (1), `audioSys` (1).
+
+**Declared classes:** None..
+
+## src/engine/combat-fx.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/combat-fx.js) · 182 lines · 12 declarations · 77 call/new expressions.
+
+What a hit looks like: damage numbers, enemy health bars, blood in each character's own colour (`BLOOD_KINDS`), the hit flinch. **Critical hits** (`CRIT`, `rollCrit`): her shots, punches and blade cuts crit at 10% (a weapon's `critChance`) for ×2 (`critMult`); a crit is a bigger gold number with a "!", sparks, a shake and a ping
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `_gameTimeSec` (6), `GatlingGunner` (4), `audioSys` (3), `ANDROID_FINISHES` (2), `PlayerEntity` (2), `Drone` (2), `drawHPBar` (2), `NPC` (1), `lookFor` (1), `hexToRgb` (1), `darkenHex` (1), `APPEARANCES` (1), `engineMixin` (1), `Loot` (1).
+
+**Declared classes:** None..
+
+## src/engine/daylight.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/daylight.js) · 244 lines · 19 declarations · 141 call/new expressions.
+
+**Daylight**: `sunState()` (the sun's direction, shadow length, colour, golden hour, from `dayCycle`); `drawCastShadows` (buildings swept along the sun, a tiered one by its own hulls, `_sunShadowHulls` and tree canopies, one soft lavender multiply layer; drifting cloud shadows; `_sunShadow` tells foliage to skip its night pool; cars cast short shadows too); `sunNow()` (the light this frame, for paint and glass); `drawDaylight` (warm sun wash, golden-hour haze, violet vignette). Outdoors and the veranda only. Unchanged building shadow hulls and daylight gradients are cached; fully offscreen cloud ellipses skip painting using the actual transform.
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `game` (5), `_bldHash` (4), `_frameTime` (2), `engineMixin` (1), `CONFIG` (1), `foliageCanopyY` (1), `_gameTimeSec` (1).
+
+**Declared classes:** None..
+
+## src/engine/daytime-flit.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/daytime-flit.js) · 598 lines · 23 declarations · 230 call/new expressions.
+
+Daytime exposure, flit teleport, graveyard ghosts. A blocked flit destination searches for the farthest clear landing on its ray using the player's collision circle and walls, buildings, billboard posts and hinged doors. No forward landing means no attunement spend or renewed combat effects. `drawFlitFeedback` draws a rose-red “FLIT BLOCKED” direction marker or a gold “SHORT FLIT” cue above darkness, independent of the joystick ring. Failed attempts also shudder the ring with a soft knock (at most every 0.4 s); Controls → Flit Vibration can disable supported haptics. Cues last 0.55–0.65 s, reset on map/new-game transitions, and use no blur. **Flit VFX** (`drawFlitVFX`) is drawn without `shadowBlur`: the bolts' halo is wide faint strokes and the spark, ghost and arrival glows are `drawGlow` sprites; the ghost and arrival spirits keep one look and one body each for the effect's life (`ghostLook`/`ghostBody`, `arrivalLook`/`arrivalBody`), so hair, cloth and pose state isn't rebuilt every frame; the ring's `flash`/`blocked` animation restarts on the next frame (`_restartRingAnim`) instead of forcing a layout. A flick out of a rested thumb is measured from the resting radius over the whole 120 ms window, so sparse events on a slow phone still need a real flick.
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `_gameTimeSec` (7), `drawGlow` (4), `decorativeBodyInView` (3), `drawProceduralHumanoid` (3), `tickHiddenDecorativeBody` (3), `audioSys` (2), `engineMixin` (1), `SPILL` (1), `resetHumanoidAnim` (1), `showMessage` (1), `tintLook` (1), `APPEARANCES` (1), `CONFIG` (1), `GameSettings` (1).
+
+**Declared classes:** None..
+
+## src/engine/draw.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/draw.js) · 1510 lines · 29 declarations · 626 call/new expressions.
+
+`draw()`: the frame renderer. **The view** (`this.view`, resolved once a frame: cutscene camera, or her position + scope lean + drive look-ahead `driveLeanX/Y`, the look-out over a CityView at a window's edge `lookLeanY`), kept inside the map by `_clampView` (setting Camera Edge Lock, `GameSettings.cameraEdgeLock`; a map's `cameraBounds` moves an edge, apt_949's top up over its city strip; a map smaller than the view is centred; cutscene cameras are clamped and written back, photo mode's pan and the finisher's offset too); `viewTransform(ctx)` and `viewToWorld(sx, sy)` — lighting and mouse aim go through these, never re-deriving the camera. Zoom detail steps with a band (`CONFIG.LOD_ZOOM`); culling never tighter than the screen. **People and cars are culled to the real view** (`cullBounds.bodies` / `cars`: the actual zoom, the finisher's push-in and shake, plus `CULLING.BODIES` 70 / `CARS` 160), not the wide 0.45-zoom rect the world layers use; culled NPCs, crew, pedestrians and lobby/club walkers still tick what their draw did (`tickHidden`: gait and footsteps, quips, facing). Profiler (Full): `Render:Entities` is split end to end by `_entLap(label)` into nested rows — `People` (bodies painted in Entities, baked crowd included; forecourt bodies belong to Buildings), `People extras` (tags, HP bars, loot, orbs, the cat), `Vehicles`, `Props`, `Ground` (grid, walls, doors), `World tops` (roofs, signs, foliage, lamps), `Weather`, `Effects` (markers, corpses, laser, projectiles, debug) — counted through `RenderStats`. Full mode splits People into body/limbs, hair, cloth, shading, held items and crowd stages; Buildings and World tops also have exclusive subrows. Subrows sum to their parent and are not charged again to the frame total. **Baseline** (`GameSettings.baseline`, Settings → Developer → Baseline: Layers, not kept): every layer of the frame sits behind `RL.at('layer')` (`ui/render-layers.js`), which says whether it draws and bills the canvas calls since the last ask to the layer before; outside Baseline it's always true and bills nothing. State the light reads keeps running with a layer off (the lamp loop's wake and fade, `_prepareRenderBuildingLists`, NPC `tickHidden`, foliage `_variant`, `bokeh.update`; Reflections off clears `_refl`). Density (`core/settings.js`): traffic, pedestrian, foliage, rain and crowd quality are this device's (`dfab_density`, `saveDensity()`), never a save's; `PedestrianManager.trimToCap` / `TrafficManager.trimToCap` (every 60 ticks) bring live counts down to the cap, farthest out of view first **Buildings are culled to the real view** (`cullBounds.view`) with `BuildingV2.inView(V, cam)`: footprint ∪ the leaned roof reckoned `CULLING.LEAN_EXTRA` floors up, plus `emissiveReach` + `BUILDINGS_VIEW` — for the base, roof, sign and night-glow passes (non-V2 buildings keep the wide rect). Counted in `RenderStats.bldBase/bldTops`.. **The ride tag** (`_rideHud`, DOM `#ui-ride`, bottom left; under the menu badge on a tall phone): the car's name with a HIJACKED / YOURS / SANCTIONED (Amber's van) / ZIB · PASSENGER chip and, in any car not hers, how far off hers is with a gold arrow pointing to it, in the wave readout's capsule; touches the DOM only when something it shows changes. **Speech bubbles** (her emote, NPC, crew and pedestrian quips) draw after the lighting, with the health bars, so they read at night; `_speakerHidden` keeps back the bubble of anyone under a roof (the leaned building, `segmentHitsRect` in core/draw-helpers.js) or a tree's canopy. The player marker renders after world effects, then the markers and the compass (`drawMarkers`) and the objective readout (`_objectiveHud`, engine/markers.js). Conservative offscreen decorative/scene/ghost/flit-body culling pauses hidden hair/cloth/slosh clocks while movement, lifetime, pose and gameplay continue; armed bodies keep their existing path. **Landmark drift** (`_landmarkDriftTarget`, CONFIG.CAMERA.LANDMARK_DRIFT): out in front of a building with `viewDrift`, the view eases toward its facade by part of the half-screen, fading with her distance and past its ends; the lean's vantage (`camera`) stays on her.
+
+**Proposed ownership:** Split by concern across Lobby and Directory; Game owns named conditions. Do not retain the shared GameEngine method bag.
+
+**Cross-file global references:** `CONFIG` (56), `RenderStats` (43), `_frameTime` (9), `GameSettings` (7), `WorldRenderProfiler` (7), `_zoomLOD` (7), `PerformanceBench` (5), `PerfBench` (4), `Overhead` (4), `PeopleProfiler` (3), `_gameTimeSec` (3), `RenderLayers` (2), `_profileSampling` (2), `SignProfiler` (2), `SilhouetteFX` (2), `ferrisPaintInView` (2), `GameEntity` (2), `_gameGrade` (2), `ACTION_ICONS` (2), `engineMixin` (1), `TrafficProfiler` (1), `segmentHitsRect` (1), `foliageCanopyY` (1), `_worldMatrix` (1), `_worldCanvas` (1), `INTERIOR_ART` (1), `Poly` (1), `drawGraveyardWall` (1), `drawGraveyardPillar` (1), `PropSprites` (1), `drawLampShadowsUnder` (1), `lookFor` (1), `drawProceduralHumanoid` (1), `VEHICLE_OCCUPANT_SCALE` (1), `foliagePaintInView` (1), `_sunShadow` (1), `lampWake` (1), `lampFlicker` (1), `lampPaintInView` (1), `DevOverlay` (1).
+
+**Declared classes:** None..
+
+## src/engine/dyer.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/dyer.js) · 171 lines · 33 declarations · 118 call/new expressions.
+
+**Clothing Dyer.** Crafted at the workbench (`SCHEMATICS` `clothing_dyer`, 1,000 scrap, `furniture: 'hasClothingDyer'` → a questState flag, its own "For the Apartment" section). `ensureDyeStation` (map load, craft) puts its station (`apt_dyer`, `clothing_dyer` → Dye) last in apt_949's props, after the saved layout's pieces. `openDyer`/`renderDyer` (`#dye-shop`): pick an owned outfit, a piece (`dyeSlots`: top/bottom/shoes colour, trim, inner, accent, stripe), a `DYER.PALETTE` swatch or a custom colour; `drawDyePreview` shows her from above as dyed. `applyDyes` charges `DYER.FEE` (20) per changed piece; `resetDyes` is free. Stored in `cosmetics.dyes` (saved) and laid over the outfit by `dyedOutfit` in `getRenderConfig`.
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `COSMETICS_REGISTRY` (7), `audioSys` (5), `dyeSlots` (2), `dyedOutfit` (2), `ColorPicker` (2), `engineMixin` (1), `PropEntity` (1), `showMessage` (1), `drawProceduralHumanoid` (1), `APPEARANCES` (1).
+
+**Declared classes:** None..
+
+## src/engine/events.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/events.js) · 518 lines · 59 declarations · 262 call/new expressions.
+
+Input and UI event wiring; `interact()` — the one action for the pill and the E key; the handbrake button (held: `handbrakeHeld`); Space is the handbrake while driving. On foot, "Drive" (any of her cars) first walks 949 round to the driver's door (`_walkToCar`, `CONFIG.WALK_TO_CAR`): round the nearer end, or the other when that one's against a wall; from behind or in front, round the corner on the door's side; stuck on the way but still beside it, she gets in anyway. With nothing in reach, the pill and E only get her out of a car `onPageHidden` (visibilitychange hidden / pagehide): a quiet save to the Autosave slot (`dfab_save_slot_auto`, Load screen card), radio paused, pause menu opened.
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `audioSys` (9), `showMessage` (5), `hudInputBlocked` (4), `pauseMenu` (4), `NPC` (3), `saveSlotManager` (3), `game` (3), `npcDialogueFor` (2), `TalkStyle` (2), `engineMixin` (1), `Screens` (1), `CONFIG` (1), `NavGrid` (1), `segmentHitsRect` (1), `Walker` (1), `clearGameplayInputs` (1), `FullscreenManager` (1).
+
+**Declared classes:** None..
+
+## src/engine/executions.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/executions.js) · 105 lines · 5 declarations · 46 call/new expressions.
+
+**Executions.** `executionTarget` (each tick, for the interact pill): she has to come quietly — sneaking, or creeping (gait under 2.3, visibility under 0.75); a ganger that's unaware (not ALERT/SUPPRESSING, and `canSeePoint` can't see her — so IDLE, wary or SEARCHING elsewhere), with her at its back (±70°), in reach (56, or 66 with a blade), nothing between; no bosses. `drawExecuteCue`: a gold pulsing reticle under the target. `execute` (the pill, or fire/punch with fists or a blade): she steps in, it freezes (`_execBy`, Ganger.update), `updateExecution` strikes at 0.16 s — bare-handed a blow to the neck, with the Kukri a gold draw-cut and a spray — it falls forward, `+15 EXECUTION`; quiet, not silent (`CONFIG.NOISE.execute` 70 / `executeBlade` 55). Gangers don't sense her within 50 px when she comes from behind sneaking, hidden, or slowly out of the light
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `ambience` (6), `_gameTimeSec` (5), `CONFIG` (3), `Ganger` (2), `engineMixin` (1), `getColliders` (1), `normalizeAngle` (1), `isLineBlocked` (1), `bloodOf` (1).
+
+**Declared classes:** None..
+
+## src/engine/finisher.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/finisher.js) · 212 lines · 15 declarations · 78 call/new expressions.
+
+**Deaths and the finisher.** Bodies: `addCorpse` (from the enemy loop) → `game.corpses` (≤ 24; 12 s, then a 1.5 s fade; cleared on map load); `drawCorpses` under the living: a ganger falls through the `die` pose (ui/poses.js) turned to face the shot and stretched along its length, its gun dropped beside it; other enemies tip, sink and fade. The death burst is a soft puff now. **Finisher**, earned (`finisherReason`, 20 s cooldown): last of a gauntlet wave, a boss (warden or last gunner — replaces the old last-gunner slow), or a stylish execution (the last alerted foe within 900 px, hers: flit-strike, punch, one-shot sniper, or untouched). `startFinisher` → time scale 0.25, `updateFinisher(realMs)` from the loop: `finCam` (offset + push-in, applied in draw.js) to the body ×1.6 for 1.1 s, then to Stella ×1.8 while she twirls (`twirlAngle`, two turns, fed to her weapon draw) and the kill's glitter rises (`finisherBurst`); then `capturePrompt`. Firing or flitting cuts it short. Settings → Finisher: Full / Subtle / Off. Its slow-mo is timed (`triggerTimeSlow(…, ramp)` in `engine/combat-effects.js`): a hard brake in (`FINISHER.RAMP_IN` 150 ms, ease-out cubic), the hold, then time builds back on a smoothstep (`RAMP_OUT` 600 ms); cut short by her acting, `endTimeSlow(CUT_OUT)` (250 ms). A settled body (after `SNAP_AFTER` 0.75 s) is drawn once into its own supersampled canvas, in place (light, sun shadow, hair read the world through a stand-in `_worldMatrix`), and stamped from then on: one `drawImage` instead of ~300 canvas calls
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `_gameTimeSec` (8), `_worldMatrix` (3), `_worldCanvas` (3), `GatlingGunner` (3), `drawProceduralHumanoid` (2), `Ganger` (2), `GameSettings` (2), `weaponModel` (2), `engineMixin` (1), `drawWeapon` (1).
+
+**Declared classes:** None..
+
+## src/engine/footsteps.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/footsteps.js) · 105 lines · 3 declarations · 28 call/new expressions.
+
+**Footsteps.** `materialAt(x, y)` (puddles and water, `FLOOR_MATERIALS` per painted interior, zone `texture`, the city's crossings/pavements/roads/parks/plazas/lawns). `onStep` (fired by `syncHumanoidGait` when a foot lands) plays `ambience.footstep(shoe, floor)` — heels click (ringing on marble), boots thud and scuff, sneakers tap, carpet/grass hush, wood is hollow, metal rings, rain adds a wet slap, a puddle splashes — panned and quieter with distance; her steps also make noise (`CONFIG.NOISE.step*` × floor × pace; a puddle step `puddleStep` with a small ring); guards' hard steps on loud floors ring in ember (heard by her only). Settings → Footsteps
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `ambience` (3), `Poly` (2), `SNEAK` (2), `engineMixin` (1), `CONFIG` (1), `Ganger` (1).
+
+**Declared classes:** None..
+
+## src/engine/furniture.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/furniture.js) · 231 lines · 31 declarations · 110 call/new expressions.
+
+**Grab and move the apartment's furniture** (`FurnitureSystem`, apt_949): the hand pill (G) by a movable piece → four gold side handles (tap / directions, G to confirm) → `Walker.goTo` to that side → holding: 0.4× speed (`player.moveMul`), the piece follows and never enters walls or other pieces (SAT; if it would, neither moves), R / ⟲ ⟳ turn 15°, `push` pose. The layout is saved (`questState.aptLayout`) and reapplied on every visit; long-press the hand to reset
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `showMessage` (4), `audioSys` (4), `Walker` (3), `NavGrid` (1), `resetHumanoidAnim` (1), `setActionPill` (1), `_gameTimeSec` (1), `drawGlow` (1).
+
+**Declared classes:** `FurnitureSystem`.
+
+## src/engine/game-engine.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/game-engine.js) · 312 lines · 9 declarations · 94 call/new expressions.
+
+`class GameEngine`: constructor, companions, and `engineMixin` (how the files below attach)
+
+**Proposed ownership:** Engine assembly only. Move state/implementations to named Directory systems; named cast/starting conditions to Game.
+
+**Cross-file global references:** `NPC` (5), `CONFIG` (2), `PauseSystem` (1), `UISystem` (1), `MusicWidgetSystem` (1), `InventorySystem` (1), `CutsceneManager` (1), `StoryManager` (1), `Profiler` (1), `TransitionGrid` (1), `RoomSystem` (1), `LobbyLife` (1), `ClubLife` (1), `CafeLife` (1), `FurnitureSystem` (1), `WeatherSystem` (1), `DecalSystem` (1), `LeafParticleSystem` (1), `TrafficManager` (1), `PedestrianManager` (1), `PlayerEntity` (1), `TrafficVehicle` (1), `CAR_START` (1), `PlayerGarage` (1), `ZibSystem` (1), `AugmentSystem` (1), `ResonanceSystem` (1), `BumperCarMinigame` (1), `BondingSystem` (1), `DialogueSequence` (1), `DialogueTranscript` (1), `ScenePlayer` (1), `Coach` (1), `HudReveal` (1), `GroundBaker` (1), `CosmeticsSystem` (1), `BokehSystem` (1), `MissionSystem` (1).
+
+**Declared classes:** `GameEngine`.
+
+## src/engine/interiors.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/interiors.js) · 1476 lines · 147 declarations · 1885 call/new expressions.
+
+**`INTERIOR_ART`**: each painted place's `floor` and `glow` (one line per place; draw.js and drawEmissivePass look it up). Enni Cole's two floors (`_paintEnniFloor`, `_paintEnniUpperFloor`, sharing `_enniKit`; `_enniChandelier` hangs over the lobby and, seen from above, in the upper floor's void). Apartment, clinic, House of Death, Double Nights lobby and penthouse (the mirror rift), the Sanctum (rose window, sigil runes), and Moon City Nightclub interiors (floors, glows; the club's light show in time with its track), the graveyard's candle flames, the city seen from the veranda The Cozy Cafe: `_paintCafeFloor` (honey chevron parquet, terracotta behind the counter, kitchen checkers, the hearth rug, the booth runner, the doormat) and `drawCafeGlow` (the fire, pendant lamps, candles, string lights, espresso and cup steam, the windows by day / night / in rain). The apartment (`_drawAptFloorArt`, the Silver Queen refit): a teak veranda edged in travertine, Versailles parquet in a walnut border, the plum deco fan rug in the lounge, a round rug under the dining table, harlequin marble in the kitchen, the SQ crest at the door, mauve trellis carpet and a cream rug in the bedroom, veined marble in the bathroom, shadow along every wall; its glow follows the fire bowl and the dining candles. The apartment's lamp shades and festoon bulbs are `bulbSprite` stamps. The street below the apartment's veranda is a `CityView` (`_makeAptCityView`); its night lights stamp in `drawApartmentGlow`.
+
+**Proposed ownership:** Penthouse reusable painters; Game named interior/decoration recipes; Directory asset preparation.
+
+**Cross-file global references:** `glowA` (18), `seededRandom` (12), `_frameTime` (10), `drawGlow` (4), `clubBeatN` (3), `CLUB_PAL` (3), `Overhead` (3), `CAFE_TABLES` (3), `HEARTHS` (2), `engineMixin` (1), `APT` (1), `LOBBY_PORTALS` (1), `LOBBY_DEPARTURES` (1), `HUB_GRAVEYARD` (1), `gyStoneLayout` (1), `CAFE_BOOTHS` (1), `APT_PENDANTS` (1), `drawLampFixtureLit` (1), `bulbSprite` (1), `drawBulb` (1), `_gameTimeSec` (1), `CityView` (1).
+
+**Declared classes:** None..
+
+## src/engine/keeper-art.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/keeper-art.js) · 379 lines · 28 declarations · 477 call/new expressions.
+
+The prologue's places: `keepers_hill` (the island above the clouds, the path, flowers, the house with its floating gable, portals and planets) and `keepers_parlor` (checkerboard tiles, the red wingback and burgundy chesterfield, the fire and its embers, the window above it); `keeperEmberPop`  `preloadKeeper()` paints the hill, house and parlor and decodes 'the visitor' under the New Game menu fade.
+
+**Proposed ownership:** Penthouse reusable painters; Game named interior/decoration recipes; Directory asset preparation.
+
+**Cross-file global references:** `seededRandom` (7), `_gameTimeSec` (3), `HEARTHS` (1), `engineMixin` (1), `audioSys` (1), `loadSound` (1), `drawGlow` (1), `glowA` (1).
+
+**Declared classes:** None..
+
+## src/engine/knuckles.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/knuckles.js) · 207 lines · 11 declarations · 117 call/new expressions.
+
+**Golden Retribution** (gilded brass knuckles, `weaponMode: 'fists'`; `SCHEMATICS` `golden_retribution`, 400 scrap, locked until `questState.goldenRetributionUnlocked`, set by Lilitu's first solo defeat: `unlock`/`unlockHint` in `schematicNeeds`). `knucklePunch` (fireWeapon): a jab on the punch hitbox, 16 (`punchDamage`, Heavy Hands) × `playerDamageMult` × crit, cooldown `fireCooldown` (Quick Hands) × Reflex Sync; steps her in like a blade (`meleeStepIn`/`_meleeGap`). Every `KNUCKLES.EVERY` (3rd) punch within `COMBO_RESET` s, or any punch in the Flit-Strike window, is a haymaker: ×2.5, `p.knock` 3× a jab's shove (CollisionSystem), and `onKnuckleHit` staggers (`_staggerUntil` 0.5 s; bosses 0.3 s, then `BOSS_RESIST` 1.5 s) — no shot, telegraph, hunter dash/claw or Demoness whip — and arms `_slam`: `updateKnuckleSlams` (each tick) adds +50% if the shove drives the body into a wall or collider. `drawKnuckleFx` (after the slashes): gold afterimages along each punch, a ring burst on a haymaker or slam, plus sparks and `ambience.clink()`. `drawKnuckleDuster`: the bar over each fist (humanoid-render `config.knuckles`) and on the HUD. `punchStanceTicks`: a quicker punch runs the whole strike curve. **Vampiric Fists** (attachment `vampiric_fists`, 350 scrap): `onPunchLanded` (CollisionSystem, any punch of hers: bare fists, the knuckles, fist weapons to come) heals 15% of the damage, a haymaker 30% and a bleed; crimson `drain` motes run from the wound to her (`drawKnuckleFx`); the knuckle bar's studs turn garnet (`config.knuckles === 'vamp'`)
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `_gameTimeSec` (6), `ambience` (6), `CONFIG` (3), `getColliders` (2), `engineMixin` (1), `RenderInterp` (1), `normalizeAngle` (1), `isLineBlocked` (1), `ProjectileEntity` (1), `ITEM_REGISTRY` (1), `_physicsSpatial` (1).
+
+**Declared classes:** None..
+
+## src/engine/lighting.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/lighting.js) · 920 lines · 52 declarations · 437 call/new expressions.
+
+**The city's night** (`NIGHT_DEEPEN`): outdoors the dark goes deeper and nearer black than the hour's darkness (visual only; stealth still reads `dayCycle`), and street lamps light tight pools (`LAMP_POOL_HOLE`, a warm colour pool gone by two thirds of their reach), so the light stands out of real dark instead of one even violet wash. An exact immutable static-base cache reuses settled camera/lamp inputs (bounded to 1M light-buffer pixels); dynamic lights and color remain live, room/effect/unsupported-context cases fall back, and map/reset releases the bitmap. Lighting (tinted darkness layer; cached lamp shapes and gradients, baked interior lights, headlight beam sprites, coloured shot light), bloom, atmosphere; the light layer takes the reflections' lift (engine/reflections.js); both passes sit on the frame's view (`viewTransform`)  Bloom and soft shadows blur by a downscale chain (no `ctx.filter`: slow on phones, missing in Safari); bloom folds its two widths at small size and stretches once.  Soft shadows: a separable box blur (three whole-pixel shifts across, three down) on the half-resolution light layer, the same in every browser. Scratch records and fixed light-falloff tables are reused; bounded nearest-lamp selection preserves stable distance order. High/Medium/Low mask dimensions remain 1/0.75/0.5 of the main canvas per axis, halved again by Soft Shadows. Adaptive light resolution isn't reset by zoom lamp-budget steps or lightning (a flash just pauses its measuring), and each return to full doubles the wait before the next trial (`backoff`, up to 4 min).
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `GameSettings` (10), `drawGlow` (4), `glowSprite` (3), `hexToRgba` (3), `computeVisibilityPoly` (2), `getOccluders` (2), `FIRE_TRAIL_LIGHT_RADIUS` (2), `lampFlicker` (2), `_frameTime` (2), `engineMixin` (1), `_simTick` (1), `hexToRgb` (1), `_gameTimeMs` (1), `FIREBALL_LIGHT_RADIUS` (1), `PerfBench` (1), `lampWake` (1), `LAMP_TYPE_STYLE` (1), `carLampsOn` (1), `drawLampShadowsInto` (1), `darkenHex` (1).
+
+**Declared classes:** None..
+
+## src/engine/loop.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/loop.js) · 414 lines · 21 declarations · 125 call/new expressions.
+
+`enterWorld` (menu → world), `stop`, `resetGameState`, the main loop `stop()` ends a ringing call, the engine/tyre hum, the radio and an open dialogue, then lets the AudioContext sleep (`audioSys.idle`); `resetGameState` aborts any scene, releases floor bakes, ground tiles and crowd bakes, and resets traffic, pedestrians and the last map's lists; `enterWorld` won't start a second loop.
+
+**Proposed ownership:** Lobby scheduling/pause/lifecycle; separate game start/reset policy.
+
+**Cross-file global references:** `phoneSystem` (14), `PerformanceBench` (10), `CONFIG` (10), `audioSys` (6), `RenderInterp` (5), `ambience` (2), `CrowdImpostors` (2), `PropSprites` (2), `GameSettings` (2), `_frameTime` (2), `_simTick` (2), `engineMixin` (1), `LoadingScreen` (1), `_physicsSpatial` (1), `CollisionSystem` (1), `PlaneSprites` (1), `CosmeticsSystem` (1), `MissionSystem` (1), `CAR_START` (1), `_frameTimeSec` (1), `RenderStats` (1), `_gameTimeSec` (1).
+
+**Declared classes:** None..
+
+## src/engine/map-loading.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/map-loading.js) · 1730 lines · 104 declarations · 526 call/new expressions.
+
+`loadMap`: building each map when you enter it; baked lighting; `removeWall(w)` (collision, render grid and shadows follow) On a switch: `_clearMapResidue()` (casings, shot FX, flit trails, ripples, last-known markers, walks, finisher, slow-mo, crowd bakes, caches keyed by the old map) and `_releaseMapBakes(mapId)` (interior floor canvases per `MAP_BAKES`, the apartment's `_aptFloor` among them, repainted on the next visit); the map fade's warmup jobs also pre-paint the arriving map's furniture sprites (`PropSprites.prepare`, entities/prop-sprites.js); her cars are placed by `_placeCarsForMap` (engine/cars.js); fade timers bail if a newer load or a quit came first. Texture warmup, ordered indexes and reflection scratch buffers are cleaned up on map switches and reset; `invalidatePhysicsSpatial()` handles same-tick static collision edits. Visible ordinary sign glows also prepare one job at a time under the map-entry fade, retaining font-readiness checks.
+
+**Proposed ownership:** Lobby scene lifecycle + Directory scene/assets/spatial services; Game city recipes, locations and story hooks.
+
+**Cross-file global references:** `HUB_BLOCKS` (21), `GameEntity` (15), `_physicsSpatial` (7), `Pavement` (7), `NavGrid` (6), `CityLayout` (6), `Foliage` (6), `LampEntity` (5), `HUB_OLLO_DOOR` (5), `PropSprites` (4), `CollisionSystem` (4), `Walker` (4), `HUB_NPC_CLEARANCE` (4), `RenderGrid` (4), `getColliders` (3), `ambience` (3), `MAP_DATA` (3), `ROOM_DEFS` (3), `VelvetCat` (3), `_frameTime` (2), `CrowdImpostors` (2), `humanShadeReset` (2), `PropEntity` (2), `createRoad` (2), `BuildingV2Registry` (2), `HUB_GRAVEYARD` (2), `NPC` (2), `MISSION_TYPES` (2), `resetHumanoidAnim` (2), `CacheDB` (2), `engineMixin` (1), `CONFIG` (1), `PlaneSprites` (1), `createMapEntities` (1), `seededRandom` (1), `HUB_PARKS` (1), `HUB_NPC_ANCHORS` (1), `resetRoadNetworkIds` (1), `RoadNetwork` (1), `Road` (1), `Building` (1), `FerrisWheel` (1), `RestrictedZone` (1), `Poly` (1), `EntranceLamps` (1), `parkLayout` (1), `GY_WALL` (1), `RoomSystem` (1), `ActorEntity` (1), `createStaticEntitiesFromWalls` (1), `createStaticEntitiesFromBuildings` (1), `BILLBOARDS` (1), `Billboard` (1), `HordeGauntlet` (1), `GAUNTLET_MAPS` (1), `showMessage` (1), `APT_IDLE_POSITIONS` (1), `GameSettings` (1), `computeVisibilityPoly` (1).
+
+**Declared classes:** None..
+
+## src/engine/markers.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/markers.js) · 293 lines · 18 declarations · 160 call/new expressions.
+
+**Markers**: where her cars, the job's package and the job's target are. `carryingParcel()` (on foot in the city with a delivery: she carries the box in both hands, `PARCEL_HELD`); the box by the van is a Cozy Cafe box (`drawCozyParcel`, ui/humanoid-render.js). `jobTarget()` (what she's after: the package while a delivery waits to be fetched, then the drop-off; the bounty — the live mark while they're about; the salvage site), `deliveryPackageSpot()` (by the side door of Amber's van), `pickUpPackage(loaded)`. On the street, under the light: `drawDeliveryPackage` (a parcel in amber card, violet ribbon and bow, an address label; a pickup ring breathing out on the pavement, a dashed one turning; gold motes rising), `drawDropZone` (a gold ring the size of the zone, turning, a pulse running in, a gold diamond at its heart); `drawMissionGlow` lights both after the darkness (`drawEmissivePass`). Over it, the HUD stage (`drawMarkers`, after the light, fixed CSS sizes): MapIcons pins over what's on screen — her car (crimson `pin:car`), Amber's van (`amberPin:car`), the package (`amberPin:box`, PICK UP), the job's target (`goldPin:flag` DROP-OFF, `goldPin:target` with the mark's name, `goldPin:wrench` SALVAGE) — each named in the ride tag's capsule, faded out within reach of the action pill; **the compass** round her (round the car she's driving): what she's after that's off screen gets a chevron on a ring, its badge (`badge:`, `amberBadge:`, `crimsonBadge:`) just outside and the distance — the job's target always, her car on foot; kept apart round the ring. Hub only; never in scenes, cutscenes, photo mode, finishers or the bumper cars. **The objective readout** (`_objectiveHud`, DOM `#ui-objective`, top centre, the wave readout's capsule; under the top HUD on a tall phone): the job's title in champagne caps with how far in gold, the step beneath in lavender (`MissionSystem.getObjectiveParts`); `body.objective-hud` steps the stealth word (and on a tall phone the ride tag) down beneath it
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `MISSION_TYPES` (8), `_frameTime` (5), `ACTION_ICONS` (3), `glowSprite` (2), `MapIcons` (2), `engineMixin` (1), `showMessage` (1), `audioSys` (1), `drawCozyParcel` (1), `clamp` (1).
+
+**Declared classes:** None..
+
+## src/engine/neural-art.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/neural-art.js) · 173 lines · 8 declarations · 247 call/new expressions.
+
+Midnight-sapphire marble salon with a pale ice-marble aisle, a compass medallion under a crystal chandelier, and four artificial violet trees (`NEURAL_TREES`: crystal trunk props, glowing canopies baked once and drawn in the glow pass). Crystal retail salon: retained faceted blue floor, a crystal concierge desk, glass vitrines for W.I.G./S.K.I.N./V.O.C.A.L., merchandise islands, private styling, collection cabinets and lounge seating through PropSprites. Neutral key lighting preserves cosmetic colors; the counter’s Consult action starts Prisma’s ordinary dialogue/shop.
+
+**Proposed ownership:** Penthouse reusable painters; Game named interior/decoration recipes; Directory asset preparation.
+
+**Cross-file global references:** `NeuralArt` (16), `glowA` (7), `NEURAL` (2), `seededRandom` (2), `engineMixin` (1), `_frameTime` (1).
+
+**Declared classes:** None..
+
+## src/engine/noise.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/noise.js) · 182 lines · 10 declarations · 81 call/new expressions.
+
+Noise: `emitNoise` — gunshots, flits, punches, struck doors, shattered glass carry (`CONFIG.NOISE`), muffled by walls and shut doors; gangers in earshot hear roughly where and go to look; the ripple she sees: **mirage rings** by default (`drawMirageRings`, PostFX after lighting: a thick band with a jagged rippling edge that bends the lit scene beneath it — one quarter-size copy of the frame per frame while rings live, each band clipped and scaled out from its sound; the newest four bend while young (`t < 0.6`), older ones keep a faint tinted band. Mirage rings have no outline, use twice the original band width, and narrow with radial expansion to 18% of their starting thickness. Strength fades as `(1 - t)²`, with a small initial tint boost; scene displacement is 50% stronger and warped-image opacity is `0.90 × fade`; `t` blended between ticks), Simple (thin tinted ring) or Off (`GameSettings.soundRings`; the low preset uses Simple). The Debug view's Hearing layer logs each noise and who heard it **Per-source rings** (`_spawnRing`): a source is `opts.src` (an enemy), her (a sound at her feet) or a 90 px patch of map; a sound within 0.18 s of that source's last ring swells it (`boost`) instead of stacking, at most 2 rings per source; the four bending slots go to her rings first, then the enemy rings nearest her; enemy glass is tinted ember (no outlines).
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `_gameTimeSec` (5), `GameSettings` (3), `CONFIG` (2), `RenderInterp` (2), `engineMixin` (1), `getColliders` (1), `isLineBlocked` (1).
+
+**Declared classes:** None..
+
+## src/engine/npc-posts.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/npc-posts.js) · 50 lines · 4 declarations · 7 call/new expressions.
+
+**Posts.** `updateNpcPosts` (each tick after `Walker.update`): a map's standing NPCs (not teammates, hired crew or gangers) keep a post — where they stood at load and the way they faced. Shoved more than `NPC_POST.DRIFT` px, once the shoving stops (`SETTLE` s) they walk back with `Walker.goTo` and turn to their old facing; a blocked way back retries after `RETRY` s. During a scene, or on someone else's walk, the post follows them, so where a scene leaves someone becomes their post. (The lobby and club crowds already return to their spots on their own.)
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `Walker` (3), `_gameTimeSec` (2), `engineMixin` (1), `NPC` (1).
+
+**Declared classes:** None..
+
+## src/engine/overhead.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/overhead.js) · 128 lines · 15 declarations · 50 call/new expressions.
+
+**`Overhead`**: one depth rule for anything taller than a person. A prop with `tall: true` (map-entities.js), or bespoke art via `Overhead.add(rect, draw, { hull, above })`, is queued during the frame and drawn farthest from the camera first: `drawUnder` (after the props, before the people) draws what hides no one, so someone in front of a shelf shows over its foot (with someone right beside it, `flush` draws it once more over its own footprint only, so an arm or a held glass reaching into it goes behind it: `cap`); `flush` (after the player, before the roofs) draws what stands between the camera and someone (they're farther out, under its lean, `hull`: `leanHull`) and hides them, and `above` things (hanging signs) over every head; what `flush` draws is veiled again in rooms she isn't in (`drawVeil`, clipped to its hull). First user: the Emporium's tall aisles and aisle signs (`_drawEnniAisles`). Buildings sort the same way in the roof pass (draw.js `_depthSortTops`).
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** None statically identified..
+
+**Declared classes:** None..
+
+## src/engine/palace-art.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/palace-art.js) · 488 lines · 22 declarations · 618 call/new expressions.
+
+Demoness Palace: cached plum-black stone, gold mineral crest, broad embroidered crimson carpet, ivory garden paths, ruby throne and crystal chamber. `palaceFlowers` retains rose/blood-flower layouts; `palaceFlowerGlow` stamps bounded bloom sprites, with no individual flower lights. Local champagne light reveals the main route; galleries keep deep shadow and the hunters’ paired eye glow. Garden beds and lamps: `world/map-entities.js`; a garden/chamber arch: `world/rooms.js`. Floor bake released by `MAP_BAKES`; carpet bounds agree with footsteps and reflections. Hunter dashes and eye cues remain live.
+
+**Proposed ownership:** Penthouse reusable painters; Game named interior/decoration recipes; Directory asset preparation.
+
+**Cross-file global references:** `seededRandom` (4), `engineMixin` (2), `_frameTime` (2), `glowA` (1), `_gameTimeSec` (1), `drawGlow` (1).
+
+**Declared classes:** None..
+
+## src/engine/pause-system.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/pause-system.js) · 87 lines · 7 declarations · 10 call/new expressions.
+
+`PauseSystem`
+
+**Proposed ownership:** Lobby scheduling/pause/lifecycle; separate game start/reset policy.
+
+**Cross-file global references:** `clearGameplayInputs` (1).
+
+**Declared classes:** `PauseSystem`.
+
+## src/engine/paving-inlays.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/paving-inlays.js) · 184 lines · 19 declarations · 184 call/new expressions.
+
+**Paving inlays**, kept for Darklands (not placed on any map yet). Round medallions set in the ground: champagne and bronze in dark polished granite by day (`pavingInlaySprite`), a violet light in the grooves at night that breathes (`pavingGlowSprite`, `drawPavingGlow` in `drawEmissivePass`), and where Stella stands on one a ring of light runs out from her feet (`PAVING.RIPPLE_*`). Motifs in `PAVING_MOTIFS`: `spiral`, `compass`, `vine` (Art Nouveau). A map uses them with `inlays: [{ x, y, r, motif }]` in its data (motif optional: picked by position, `pavingMotif`); `drawPavingInlays` lays them on the ground before the puddles (draw.js). Sprites baked once per motif and size.
+
+**Proposed ownership:** Penthouse reusable painters; Game named interior/decoration recipes; Directory asset preparation.
+
+**Cross-file global references:** `seededRandom` (1), `engineMixin` (1), `_frameTime` (1).
+
+**Declared classes:** None..
+
+## src/engine/player-draw-input.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/player-draw-input.js) · 553 lines · 39 declarations · 208 call/new expressions.
+
+Drawing the player and its small ivory marker (constant screen size, after world effects; hidden in vehicles, cinematics and finishers), emotes, `addPausableTimeout` (game-time timers: they pause with the game and clear on new game/load — use these, not `setTimeout`, for anything in the story or world), joysticks — the touch sticks: the move stick's flit ring requires a deliberate fast outward flick while held, then rearms inside the ring; the standalone flick and two-finger settings stay separate. The fire stick's threshold ring (aim inside, fire past it; sniper fire-on-release) and aim memory
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `GameSettings` (12), `SilhouetteFX` (3), `RenderInterp` (2), `phoneSystem` (2), `NPC_EMOTE_REACTIONS` (2), `engineMixin` (1), `stanceForWeapon` (1), `weatherAt` (1), `drawProceduralHumanoid` (1), `APPEARANCES` (1), `VEHICLE_OCCUPANT_SCALE` (1), `withFieldMask` (1), `PARCEL_HELD` (1), `PARCEL_TUCKED` (1), `CONFIG` (1), `drawCharacterPortrait` (1), `hudInputBlocked` (1).
+
+**Declared classes:** None..
+
+## src/engine/player-fire.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/player-fire.js) · 84 lines · 5 declarations · 45 call/new expressions.
+
+Shared walking/drive-by input, driver-window angle clamp and shot geometry. `updatePlayerFireInput` handles stick/mouse aim, release shots and cooldown in both contexts. `getPlayerShotGeometry` is used by bullets, scope and laser; driving uses the shared `drivingWeaponGrip` and the equipped model’s muzzle, independent of stale on-foot pose. All player shots call the same `weaponFx`, including drive-by trails, casings and barrel effects.
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `aimFromMuzzle` (2), `VEHICLE_SEAT_ARC` (2), `engineMixin` (1), `GameEntity` (1), `CollisionSystem` (1).
+
+**Declared classes:** None..
+
+## src/engine/pools.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/pools.js) · 161 lines · 11 declarations · 90 call/new expressions.
+
+**The parks' moon pools as water.** `map.pools` (map-loading, one per park from `parkLayout`). `poolAt`; `materialAt` → water, so her steps splash (the puddle sound and noise, hushed sneaking) and each rings the water (`poolRipple`); `wadeMul` (her pace ×`POOL.WADE` 0.7, PlayerEntity.applyMovement); `updatePools`: her wake while she moves, the surface stirring on pools in view; `drawPoolRipples` (after the decals, clipped to the water); `carColliders`: the colliders plus a square per pool, for driving only; `drawPoolGlow` (the emissive pass, after dark from `POOL.GLOW_FROM`): a violet sheen, wavering light bands, the reflected crescent glowing and `POOL.MOONS` little moons of different phases drifting (`poolMoon`), the rings lit
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `_gameTimeSec` (4), `engineMixin` (1), `getColliders` (1), `_frameTime` (1).
+
+**Declared classes:** None..
+
+## src/engine/quick-draw.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/quick-draw.js) · 101 lines · 13 declarations · 49 call/new expressions.
+
+Hold Holster/Draw for 450 ms to arm with a firearm on foot; tap exits to normal drawn fire. Fire stick always aims inside and arms beyond the ring; release draws for 7 simulation ticks, fires once through `fireWeapon`, then reholsters after 10 ticks. Existing Quick-Draw and Flit-Strike bonuses apply. Recovery adds 18 ticks to normal weapon cooldown, with a 36-tick minimum, and shows a countdown on the button. Recovery releases are discarded; pause, hidden tab, blur, map/weapon changes and reset cancel pending draws. Desktop: hold the same button, then aim with left mouse and release. Menus, pause, tab hiding and blur clear the armed shot while preserving the selected mode and cooldown; weapon changes, driving, map changes and reset exit the mode. Mode is transient and keeps the normal firing zoom.
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `hudInputBlocked` (4), `clearGameplayInputs` (2), `showMessage` (2), `engineMixin` (1), `_gameTimeSec` (1).
+
+**Declared classes:** None..
+
+## src/engine/reflections.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/reflections.js) · 1250 lines · 81 declarations · 637 call/new expressions.
+
+**Reflections** (Settings → Reflections: Ultra / High / Medium / Off; Cinematic View's own Reflect toggle, `photoReflections`). Wet asphalt and paving mirror through a seeded glitter tile (`_wetGlitter`: a dull wet film broken by glints), and each street lamp throws a wide faint scatter that the glitter breaks into sparkles round its smear. **Ultra** is High's light layer (half size, 30 shimmer bands) plus a full-size detail layer of the actual art (people, cars, trees): it's cleared, masked and laid down only over the rect it drew in (`_refl.Dr`, from each item's mirrored box), its art painted at the scale it's seen (`_ultraArtScale`: 1x up to zoom 1.25), and the crowd's reflections replay their baked walk (`CrowdImpostors.draw`, sharing the walker's own bake, any pace); each reflected body or car keeps its art in a canvas of its own (`_ultraArtFor`) and repaints it every `REFLECT.ULTRA_REPAINT_MS` (45 ms, staggered; Stella every frame), turned and placed live in between with one `setTransform` (`UltraM`); art whose mirrored box lands on nothing wet this frame (`_ultraOnWet`, against the mask's own pieces) isn't painted, and the detail layer is laid down in up to 8 disjoint rects (`_ultraRects`, `_refl.Drs`). Puddles are baked (`_bakedPuddle`: the mask's lobes, and the ground's night/day/rim lobes together, each puddle in a canvas of its own) and re-baked only when their growth or strength moves, on every level. **Adaptive reflections** (`_adaptReflections`, under the Adaptive Lighting setting; sampled every 8th frame from draw.js): frames over budget with reflections a real share step the level down for the session (Ultra → High → Medium, never Off; `reflectQuality()` returns the level in use, the profiler shows it), steady frames bring it back with a back-off; the saved setting is never changed. Fixed puddles (`puddlesFor`, seeded per map: along the city's roads toward the kerbs, on pavements, and under most street lamps; each has a depth, so the deep ones show first and dry last against `weather.wetness`). Each frame `prepareReflections` redraws what stands up from the street — lamp heads (mirrored below the lamp, with a smear and the pole), cars' head and tail lights, muzzle flashes, shots — into a half- (High) or quarter-size (Medium) layer, masked to the puddles plus the wet asphalt and paving. `drawPuddles` + `drawReflections` lay it on the ground before buildings and people (High: in shimmer bands, more in the rain); `liftReflections` lifts the darkness where it shines (lighting.js).  **Stage 2:** lit windows, neon and signs mirror too (each V2 building's `drawEmissive` drawn flipped about where its facade meets the street, ×0.75, softened; billboards about their front edge; High only, at night). The tiered buildings (buildings/tiered-kit.js `drawReflection`) mirror each tier about its own front into a scratch layer, laid in after the softening as long vertical streaks (`_reflTieredStreaks`: `REFLECT.STREAK*` copies falling and fading down the screen, a little shiver), only over their screen box. A building's own forecourt paving counts as wet ground when it says so (`wetGround()` → [x, y, w, h, strength]: Double Nights, Moon City, Silver Queen), flat rather than glittered: polished stone. The landmarks' forecourt paving is drawn before the puddles and reflections, their cars and people after (draw.js `_drawForecourts`, 'floor' / 'top'); whoever stands at the water — Stella, crew, NPCs, gangers, pedestrians, cars (`_reflMovers`) — blocks the lights' reflection with a mirrored shape (`_reflShape`) and shows in the puddle itself (dark at night, against the pale sky the puddles hold by day, a touch of their clothes' colour); `updatePuddles` (per tick) rings the puddles with raindrops by rain intensity and splashes them under footsteps and tyres (rings + spray).  **Stage 3, floors:** `REFLECT_SURFACES` per map — polished rects with a strength, cut-outs where rugs and runners don't shine, water (the lobby's rift fountain, the House's courtyard fountain via its prop) that always mirrors and stirs, `mirror` floors that give back colour (the Ethereal Plane); the room's own glow pass (`INTERIOR_ART[id].glow`: chandeliers, sconces, candles, portals, the club rig) is drawn again, twice, `glowShift` px lower as its reflection; people show softly in the marble. The Ethereal Plane gained a glow (`drawEtherealGlow`: violet pillar crowns, spirit auras, motes) for its mirror to give back. Reflections are drawn after the painted interiors and room floors. Separate retained actor buffers avoid repeated collections; reflected buildings and puddles use pass-specific ordered spatial candidates. Ultra reflects at most the 12 movers nearest her; drones and automata, which have no reflected art, still block lights with their silhouette; Ultra's canvases are freed on leaving Ultra and on map switch.
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `GameSettings` (10), `_frameTime` (7), `Pedestrian` (6), `glowA` (4), `_gameTimeSec` (4), `NPC` (4), `LAMP_POST_SCALE` (3), `Poly` (3), `stanceForWeapon` (3), `Ganger` (3), `ambience` (3), `seededRandom` (2), `LAMP_TYPE_STYLE` (2), `INTERIOR_ART` (2), `CAR_ART` (2), `RenderInterp` (2), `phoneSystem` (2), `shotKick` (2), `_zoomLOD` (2), `SceneActor` (2), `engineMixin` (1), `PerfBench` (1), `puffSprite` (1), `CONFIG` (1), `lampFlicker` (1), `drawCarBody` (1), `drawCarLamps` (1), `foliageCanopyY` (1), `floraSprite` (1), `weatherAt` (1), `APPEARANCES` (1), `withFieldMask` (1), `lookFor` (1), `syncHumanoidGait` (1), `CrowdImpostors` (1), `_drawProceduralHumanoid` (1), `CROWD_BAKE` (1), `topColor` (1).
+
+**Declared classes:** None..
+
+## src/engine/save-load.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/save-load.js) · 845 lines · 33 declarations · 197 call/new expressions.
+
+Saving, loading, migrations. The car saved is her own, where it's parked on the hub; a hijacked drive or a Zib ride loads on foot, her own car linked again and Amber's van home `saveGame({auto})` writes the Autosave slot silently; `loadGame(key)`; a scene in progress is aborted on load; saves from the removed `road_test` load at the hub spawn. Existing level-30 progression saves retain points/upgrades/XP and can reach 50; the surplus PP payout and XP remainder use existing saved currency/XP fields.
+
+**Proposed ownership:** Directory persistence/validation tools; Game versioned schema, defaults, migrations and content IDs.
+
+**Cross-file global references:** `GameSettings` (94), `phoneSystem` (27), `saveSlotManager` (9), `ITEM_REGISTRY` (8), `CAR_START` (7), `showMessage` (5), `audioSys` (4), `CONFIG` (4), `COSMETICS_REGISTRY` (3), `AUGMENT_CATALOG` (2), `NOTE_REGISTRY` (2), `NPC` (2), `createItemFromRegistry` (2), `restoreGameGrade` (2), `syncAmbienceSliders` (2), `engineMixin` (1), `SaveSlotManager` (1).
+
+**Declared classes:** None..
+
+## src/engine/scope.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/scope.js) · 136 lines · 7 declarations · 66 call/new expressions.
+
+Scope view: with a sniper up to her eye, the world darkens to a lit lane along her line of fire (clipped at walls), the camera leans down it, the lane steadies; ambience quiets. Setting: Scope View. **Scope slow-mo** (`GameSettings.scopeSlow`, Settings → Controls → Scope Slow-Mo): `scopeTimeScale(ms)` (once a frame from `loop.js`, which takes the slower of it and `updateTimeSlow`) eases time to `SCOPE.SLOW` (0.35) with `scopeK`; her focus (`SCOPE.FOCUS` 3 real s) drains while slowed and refills at `RECHARGE` with the scope down, the last `FADE` s easing time back; `_drawFocusArc` rings her in lavender (rose when low). `updateScope` eases in real time (`_loopScale`)
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `GameSettings` (3), `engineMixin` (1), `_gameTimeSec` (1), `raycastNearest` (1), `getColliders` (1).
+
+**Declared classes:** None..
+
+## src/engine/screens-ui.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/screens-ui.js) · 1494 lines · 140 declarations · 535 call/new expressions.
+
+HUD update, dialogue and portraits, character/team/story/collection screens, notes, crafting (the workbench's window, `#craft-shop` → `renderCraftingScreen`, styled like Skills and Contacts: a scrap dial, then schematics as calling cards by kind; `craftSchematic(id)`, `schematicOwned`, `schematicNeeds`)  `updateUI` writes the DOM only when a value changed (cached elements, last values); the visualizer runs at ~10 Hz.
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `audioSys` (12), `ITEM_REGISTRY` (10), `COSMETICS_REGISTRY` (8), `FaceCache` (7), `AUGMENT_CATALOG` (6), `SCHEMATICS` (6), `phoneSystem` (5), `showMessage` (5), `APPEARANCES` (4), `NOTE_REGISTRY` (4), `Loot` (3), `GLASS_DRINKS` (3), `STORY_DB` (3), `SPEAKER_COLORS` (2), `Talks` (2), `withFieldMask` (2), `portraitOf` (2), `inferMood` (2), `CHARACTER_TEMPERAMENT` (2), `POSES` (2), `TalkStyle` (2), `engineMixin` (1), `WEAPON_MODELS` (1), `bakeWeapon` (1), `weaponModel` (1), `drawKnuckleDuster` (1), `npcDialogueFor` (1), `lookFor` (1), `weatherAt` (1), `resolveExpression` (1), `blinkAmount` (1), `drawCharacterPortrait` (1), `CONSUMABLES` (1), `DYER` (1), `createItemFromRegistry` (1).
+
+**Declared classes:** None..
+
+## src/engine/shopfront-light.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/shopfront-light.js) · 125 lines · 11 declarations · 65 call/new expressions.
+
+**Shopfront light** (Settings → Shop Light `shopLight`; the Low preset turns it off). After dark every shop (`variant.kind === 'shop'` with a shopfront) spills its light across the pavement: one soft shaft per pane fanning out (`SHOP_LIGHT`: a lamp `SRC` px inside, `DEPTH` px out), dark gaps at the mullions, the door's pane brighter (`shopDoorSprite`), warm interior light with the shop's neon down each shaft's middle (`variant.neon`, else one of `SHOP_LIGHT_NEON` by where it stands), stronger where the street mist is thick (`mistDensity`). The panes come from `_frontGeo` / `_entrance` — OllO's hand-placed walls-under-the-facade look, automatic. Baked once per front width and neon at half size (`shopLightSprite`; soft edges from three offset passes, no `ctx.filter`), stamped in `drawEmissivePass` under the buildings' glow, over the visible V2 list.
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `GameSettings` (2), `engineMixin` (1), `_frameTime` (1), `mistDensity` (1).
+
+**Declared classes:** None..
+
+## src/engine/shops-menus.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/shops-menus.js) · 493 lines · 71 declarations · 235 call/new expressions.
+
+Vending, garage, auto shop (Customize: preset swatches plus a custom colour per row, `ColorPicker`), Zib, sleep. **Lost things** (`searchLostLuggage`, `lost_luggage` props): personics once a day from each, in the prop's `lootMin`–`lootMax` (default 25–80); `lootNoise` makes the search loud (the House of Death's offering bowl and Lilitu's tribute chest). Lobby cases, the club's clutches, coat and purses, the suite's suitcase, and stashes round the city (`ls_*`, art in `drawStashDecorProp`): the cafe's tote 10–35, Torque's cash tin 30–80, Enni Cole's shopping bag and receipt envelope 25–70 each, the offering bowl and the tribute chest 60–150 each
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `showMessage` (12), `audioSys` (9), `CUSTOM_PRICES` (6), `CAR_PRICES` (4), `VEHICLE_BRANDS` (3), `ACTION_ICONS` (3), `carPortraitUrl` (2), `carSpecBarsHtml` (2), `ColorPicker` (2), `engineMixin` (1), `CONSUMABLES` (1), `BLACKMARK_DEFAULTS` (1), `ZIB_DESTINATIONS` (1), `pickFrom` (1), `GAUNTLET_MAPS` (1).
+
+**Declared classes:** None..
+
+## src/engine/sneak.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/sneak.js) · 39 lines · 6 declarations · 7 call/new expressions.
+
+**Sneak.** `SNEAK` (speed ×0.55, step noise ×0.35, puddle noise ×0.6, visibility ×0.75); `setSneak` / `toggleSneak` (the SNEAK button in the paw, lavender when on — C on a keyboard; `body.sneaking`), `updateSneak` drops it when driving, in a scene or holding furniture. Hooks: `PlayerEntity.applyMovement` (speed), `engine/footsteps.js` (reach, softer gain), `world-state.js` (visibility), the `sneak` crouch pose (`ui/poses.js`, `player-draw-input.js`). **The crew sneaks with her:** `crewSneaking()` (her pace ×`SNEAK.SPEED` on their follow speeds, contract companions too; the formation closes 65 → 48 px; the `sneak` crouch in `NPC.drawTeammate`; softer audible steps). `crewMayEngage(e)` gates their targeting (`NPC.updateCombat`, `updateCompanionTactics` in `world/navigation.js`): while quiet they hold fire on anyone not ALERT/SUPPRESSING (stateless enemies count as aware); her gunshot sets `_loudUntil` (+10 s, weapons free)
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `engineMixin` (1), `_gameTimeSec` (1).
+
+**Declared classes:** None..
+
+## src/engine/spills.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/spills.js) · 171 lines · 10 declarations · 78 call/new expressions.
+
+**Spills.** Her glass holds a pour, `cosmetics.drinkLevel` (1 full, saved). `updateSpills` (after her step) slops it on a hard turn or a reversal (`SPILL.JOLT`), the Flit on take-off, `spillOnHit` from `PlayerEntity.takeDamage`; each `spillDrink` loses a few percent (at most one per `COOLDOWN`) and leaves a puddle the drink's colour with drops thrown ahead (`this.spills`, drawn by `drawSpills` after the decals, merged when one lands in another, dried after `LIFE` s, cleared on a map change). `_inSpill` makes footsteps splash (`materialAt` → water). The bar cart in the apartment (`apt_bar_cart`, `bar_cart`) calls `refillGlass`; the held glass draws its level (`drawHeldGlass` `level`). Skills: Steady also cuts spills (`stat('spill')`); Grounded makes gangers slip (`updateSpillSlips`, `_staggerUntil` stops `Ganger.update`); a kill with the glass ≥ 75% earns POISE (`RESONANCE.POISE`, `scoreKill`).
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `_gameTimeSec` (4), `showMessage` (3), `GLASS_DRINKS` (2), `_simTick` (2), `audioSys` (2), `engineMixin` (1), `COSMETICS_REGISTRY` (1), `SNEAK` (1), `Ganger` (1), `hexToRgb` (1).
+
+**Declared classes:** None..
+
+## src/engine/status-effects.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/status-effects.js) · 550 lines · 47 declarations · 215 call/new expressions.
+
+**Status effects and melee.** Damage has a type (`takeDamage(amount, kbX, kbY, {type})`: melee, bleed…; `onActorHit` shows bleed ticks as small crimson numbers with a drip, no flinch). `applyStatus(actor, 'bleed', {dps, secs, by})` — up to 3 stacks, refreshed by a fresh cut, ticked every 0.5 s on game time (`updateStatuses`), marked with blood drops above them (`drawStatusMarks`). `meleeSlash` (weaponMode 'melee', from `fireWeapon`) starts a swing; `updateMeleeSwing` (each tick) cuts whoever the drawn blade (fist to edge tip, `BLADE`) passes through during the cut, at that moment and once per swing, unless behind a wall: the blade's damage and bleeding. Cuts (`opts.cut`) and bleed ticks ignore and don't start i-frames (`ActorEntity.takeDamage`), so quick cuts all land; a gold arc (`drawSlashes`), a swish (`ambience.slash`), a quiet noise; `sampleMeleeSwing` / `slashAngle` share a game-time wind-up, reaching hand, blade angle and recovery with the humanoid renderer. The trail samples past blade-tip positions in that same cut; the right elbow follows the fist after smoothing. Blade perks (`BLADE_PERKS`): Quick Hands and Reflex Sync shorten a blade's cooldown as a gun's; each cut heals 4% of its damage; mid-swing she takes 75% of incoming damage (`swingGuard`, from `PlayerEntity.takeDamage`); a swing inside the Flit-Strike window always crits; the Crimson Edge attachment cuts ×1.5 and lets bleed reach 5 stacks; bleed dps scales with `playerDamageMult`. Golden Child orbs (`stickOrb`): up to 4 per target (another replaces the oldest), each burning a snapshot of its shot's boosts and crit; burn ticks (`{type:'burn'}`) pass and start no i-frames, so orbs stack. Crafted gear (`MIRROR`): `playerDamageMult` (the Mirrored Glass, ×1.35 on everything she deals), `gunDamageMult` (and the Bloodthirsty Muzzle's ×1.75 on bullets); `deflectShots` (each tick before shots move) turns enemy shots that meet the Mirror Blade's cut, or reach her while the Mirrored Glass's 90-damage shield holds (`mirrorShield`; spent, it refills over 3 s), back at the shooter (`reflectShot`), with a silver ring (`drawMirrorShield`). `meleeSlash` retains its existing damage and cadence; it steps in (`meleeStepIn`) only when the blade will meet an enemy; something she already touches blocks the step only if it would take her deeper into it.
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `_gameTimeSec` (13), `ambience` (9), `CollisionSystem` (5), `GameEntity` (5), `getColliders` (3), `ITEM_REGISTRY` (2), `isLineBlocked` (2), `Ganger` (2), `_simTick` (2), `showMessage` (2), `engineMixin` (1), `weaponModel` (1), `CRIT` (1), `CONFIG` (1), `_gameTimeMs` (1).
+
+**Declared classes:** None..
+
+## src/engine/street-mist.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/street-mist.js) · 142 lines · 16 declarations · 72 call/new expressions.
+
+**Street mist and lantern sparks** (Settings → Street Fog `streetFog`, Lamp Sparks `lampSparks`; the Low preset turns both off). After dark (`_mistNightK`, ambient darkness `MIST.FROM`..`FULL`) a pale violet mist drifts on the wind (`drawStreetMist`): puffs on a `MIST.STEP` grid over the view, each as thick as value noise says (`mistDensity`, patches `MIST.SCALE` px across), the whole field drifting at `MIST.DRIFT` plus the weather's `windVec` × `MIST.WIND`; where it passes a lit lantern, the lantern's colour hangs in it (`LAMP_R`, `LAMP_A`). Drawn in `drawEmissivePass` under the lanterns, so their glare and glitter stay crisp in it. `drawLampSparks`: `SPARKS.N` warm motes rise off each lit lantern on screen, swaying, fading in and out (baked `sparkSprite` per colour), drawn just after its glass. Lamps lit this frame carry `_wakeFrame`/`_wakeDay` (engine/draw.js), painted or not. Outdoor maps only.
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `_frameTime` (5), `engineMixin` (1), `GameSettings` (1), `LAMP_TYPE_STYLE` (1).
+
+**Declared classes:** None..
+
+## src/engine/torque-art.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/torque-art.js) · 386 lines · 20 declarations · 404 call/new expressions.
+
+Torque Auto's interior (`auto_shop`): graphite epoxy bay with amber-lined bays 01–03 (`TQ_BAYS`), two cars on lifts and Victoria's wrap bay (`TQ_WRAP`, a live prop: pink vinyl laid over the car back to nose on a 14 s loop, a squeegee working its edge, the roll turning as it feeds, then gone and laid again; a pink work light and a heat gun's glow in `drawTorqueGlow`), the gear-ring floor seal, the walkway to the arch; black porcelain showroom with the turning plinth (`TQ_TURNTABLE`, Lady's V3, a live prop), Torque's steel counter and the rim wall; diamond-plate parts room. `drawTorqueDecorProp` paints the `ta_*` pieces, `drawTorqueGlow` the strip lights, spots, neon script and the bench's sparks. The show cars are real car sprites (`TQ_CARS`), painted at the map's build (`TorqueArt.warm`).
+
+**Proposed ownership:** Penthouse reusable painters; Game named interior/decoration recipes; Directory asset preparation.
+
+**Cross-file global references:** `glowA` (15), `carSprite` (6), `_frameTime` (4), `CAR_ART` (3), `VEHICLE_BRANDS` (1), `engineMixin` (1), `seededRandom` (1).
+
+**Declared classes:** None..
+
+## src/engine/tuning-ui.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/tuning-ui.js) · 143 lines · 18 declarations · 76 call/new expressions.
+
+Resonance on screen: HUD meter, Dr. Yin's tuning overlay, the SKILLS screen. Unchanged HUD values avoid repeated DOM writes; tuning shows level-50 surplus conversion and its saved remainder.
+
+**Proposed ownership:** Directory named concern service; extract named rules/content to Game. Drawing math uses shared renderer; no feature-owned compositor.
+
+**Cross-file global references:** `RESONANCE` (12), `showMessage` (3), `audioSys` (2), `RESONANCE_TREES` (2), `engineMixin` (1).
+
+**Declared classes:** None..
+
+## src/engine/update.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/update.js) · 1295 lines · 19 declarations · 431 call/new expressions.
+
+`update()`: the per-tick simulation  **`_makeWay`**: 949 + her crew on foot, each tick; pedestrians, the lobby's and the club's walkers make way for all of them, and the crew push gently through crowds (standing walkers sway aside). **Crew vs traffic** (`resolveTrafficCollisions` 1b): pushed out of a car's body; over speed 4, 10 damage. **Her vs traffic** likewise: a car over 4 hits her once (10), then 40 ticks' grace (`_carHitCd`), not every tick it touches. **Camera zoom**: driving `CAM_ZOOM` (1 → 0.75 at full speed); on foot 1.0, ×`CAMERA.HOLSTER_ZOOM` 1.18 with the gun away, ×`INDOOR_ZOOM` 1.2 indoors, ×`INTERACT_ZOOM` 1.05 by something to use; landscape ×0.9. Player autodrive passes its occupied car to obstacle sensing so the seated player does not block it.
+
+**Proposed ownership:** Split by concern across Lobby and Directory; Game owns named conditions. Do not retain the shared GameEngine method bag.
+
+**Cross-file global references:** `CONFIG` (18), `showMessage` (11), `audioSys` (7), `captionSystem` (4), `ProjectileEntity` (4), `CollisionSystem` (3), `Ganger` (3), `Walker` (3), `GatlingGunner` (3), `_simTick` (2), `_frameTime` (2), `getColliders` (2), `SNEAK` (2), `companionNavStep` (2), `Demoness` (2), `engineMixin` (1), `_frameTimeSec` (1), `_gameTimeSec` (1), `HUB_GRAVEYARD` (1), `ROLE_LOOKS` (1), `gaitCommand` (1), `ABILITY_REGISTRY` (1), `ITEM_REGISTRY` (1), `NavGrid` (1), `updateCompanionTactics` (1), `resetHumanoidAnim` (1), `Loot` (1), `createItemFromRegistry` (1), `drawGlow` (1), `drawWeapon` (1), `WARDENS` (1), `GameEntity` (1), `_gameTimeMs` (1), `MISSION_TYPES` (1), `BLOOD_KINDS` (1), `transitionAction` (1), `setActionPill` (1), `PropEntity` (1), `GameSettings` (1).
+
+**Declared classes:** None..
+
+## src/engine/van-art.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/van-art.js) · 163 lines · 5 declarations · 139 call/new expressions.
+
+Chapter 1's van: `van_interior` (roof off, nose up: the cab, the partition, benches of violet webbing, the road going by beneath, passing neon), `VAN.SEATS`, and `drawVanExterior` for the street (rear doors open)
+
+**Proposed ownership:** Penthouse reusable painters; Game named interior/decoration recipes; Directory asset preparation.
+
+**Cross-file global references:** `_gameTimeSec` (2), `glowA` (2), `engineMixin` (1).
+
+**Declared classes:** None..
+
+## src/engine/world-state.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/engine/world-state.js) · 878 lines · 35 declarations · 275 call/new expressions.
+
+Emissive pass (buildings' glow in depth order; a building's glow is clipped out of any taller one standing in front of it, from that one's `_glowOccluders`), debug views, transitions, autodrive and nav arrival, visibility, time of day (`dayCycle`: darkness, the colour of the dark, daylight, sun, lamps on), darkness. Ordered building/foliage and radius-aware lamp/puddle candidate indexes serve rendering/effects; `invalidateRenderSpatial()` also invalidates physics and effect indexes. Player autodrive follows legal directional-lane transitions, brakes on arrival, and returns to manual control for unreachable routes. `_prepareRenderBuildingLists` marks each entry `topIn` (inside its `topReach`) for the base, roof and sign passes; `_renderBuildingMaxCrown` widens the broadphase for crowns. It marks `glowIn` (inside its `glowReach`) too: outside it, the emissive pass draws only the landmark's beams.
+
+**Proposed ownership:** Split by concern across Lobby and Directory; Game owns named conditions. Do not retain the shared GameEngine method bag.
+
+**Cross-file global references:** `showMessage` (13), `audioSys` (5), `CONFIG` (4), `TrafficVehicle` (4), `_simTick` (3), `getColliders` (2), `OrderedRenderGrid` (2), `BuildingV2` (2), `engineMixin` (1), `setActionPill` (1), `RenderInterp` (1), `raycastNearest` (1), `EffectRenderGrid` (1), `_frameTime` (1), `foliageCanopyY` (1), `leanCamHeight` (1), `CAR_TAIL_TRAIL` (1), `updateCarTailTrail` (1), `GatlingGunner` (1), `INTERIOR_ART` (1), `GameSettings` (1), `LAMP_TYPE_STYLE` (1), `lampPaintInView` (1), `drawCarTailTrail` (1), `drawCarGlow` (1), `SkyLayer` (1), `NavGrid` (1), `hasShotLine` (1), `clamp` (1), `isLineBlocked` (1), `SNEAK` (1).
+
+**Declared classes:** None..
+
+## src/entities/actors.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/entities/actors.js) · 1225 lines · 53 declarations · 302 call/new expressions.
+
+`ActorEntity`, `PlayerEntity`, projectiles, triggers  Shots with a trail signature keep their last 8 points (`trail`) and draw a flickering jagged crackle/static (`_drawCrackle`) or drop golden wisps as they fly. `takeDamage(…, {shot: true})`: player bullets ignore i-frames and don't start them, so every bullet that lands counts; i-frames still guard melee and bumps.
+
+**Proposed ownership:** Directory element/component behavior and diagnostics; Penthouse optional painters; Game named characters, roles, stats and behavior recipes.
+
+**Cross-file global references:** `GameEntity` (19), `game` (8), `showMessage` (3), `_gameTimeMs` (3), `_gameTimeSec` (2), `MAP_DATA` (2), `_zoomLOD` (2), `drawHPBar` (1), `BuffSystem` (1), `SNEAK` (1), `gaitCommand` (1), `audioSys` (1), `_frameTime` (1).
+
+**Declared classes:** `ActorEntity`, `PlayerEntity`, `ProjectileEntity`, `TriggerEntity`.
+
+## src/entities/drones.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/entities/drones.js) · 443 lines · 23 declarations · 271 call/new expressions.
+
+**Drones** (the Double Nights ambush, story/story-db.js), after ETERNAL's concept sheet: a black armoured bell, a violet sensor-core eye, cable tendrils, two jointed arms ending in energy lances; `DRONE` tunes them. Armour: the shell takes `ARMOR` (a blade `BLADE`; `OPEN` while its lances are stuck after a dive), the eye (`eyePos`) `EYE_MULT`. They drop in from above (`descend`, untouchable, a landing ring) and rise and drop again by her when they've lost her for `LOST` s. Kinds (`DRONE_KINDS`): lancer (a locked line, then a dive that impales and burns), grappler (a tether that drags her in; a flit breaks free), seer (a sensor beam that charges, then fires through walls); the lancer and grappler spit bolts between moves. `drawLights` (eye, crackling lances, tells, tether, beam) runs above the darkness
+
+**Proposed ownership:** Directory element/component behavior and diagnostics; Penthouse optional painters; Game named characters, roles, stats and behavior recipes.
+
+**Cross-file global references:** `_gameTimeSec` (10), `game` (5), `drawGlow` (4), `isLineBlocked` (3), `showMessage` (2), `_frameTime` (2), `ActorEntity` (1), `normalizeAngle` (1), `audioSys` (1), `ProjectileEntity` (1), `CollisionSystem` (1), `NavGrid` (1).
+
+**Declared classes:** `Drone`.
+
+## src/entities/enemies.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/entities/enemies.js) · 2665 lines · 138 declarations · 1003 call/new expressions.
+
+Velvet cat (`VelvetCat`: one bending spine drawn to a width profile per pose (`VELVET_PROFILES`: stand, sit, loaf, sleep curled, stretch), legs stepping in a walk, trot or gallop by speed (`VELVET_GAITS`), a springy nine-segment tail that wraps round her at rest and lashes when her way is blocked, a head that leads turns and watches the player, swivelling ears, slow blinks; she ambles, trots to keep pace and sprints in a burst when left behind; `_animate` holds all the cosmetic state, `draw` only reads it), gunners (and the Sanctum's three wardens, `WARDENS`: personas with their own art, twice her size, sight-gated fire; `WARDEN` tunes them: 1500 HP, 2 s reloads staggered so all three never go quiet, cover fire into where she hid for 0.5 s (`_wardenSense`), one flanker to a `findShotSpot` when she's hidden 2 s (`_wardenFlank`), `enrage` when one falls; their moves (`_wardenMove`, telegraphed; drawn by `drawBossGlow`): Vesper's censer, Matins' hymn through walls (reveals her: `_revealedUntil`), Compline's chain hook; their first defeat drops the Blood Pact, `triumvirateFallen`), gangers, restricted zone, horde gauntlet (`GAUNTLET_MAPS`: its maps — the House of Death, the Demoness Palace (an entry's `waves(w)` hook: hunters, alphas from wave 3, the Demoness with her intro every fifth wave while her hunters wait; `_spawnHunters`), and sealed placeholders — picked from Grum's menu, `openGauntletMenu` in engine/shops-menus.js); `GAUNTLET_SCALE`/`gauntletScale(w)`: from wave 15 HP ×1.04 and damage +2% a wave (`dmgMul`, applied to their shots in update.js), from wave 12 about one in six of the rank and file an elite (`ELITES`, `applyElite`: Armored halves burn and bleed, Swift, Warded turns frontal shots until its ward breaks; `drawEliteMark` above the darkness), the Demoness 1000 + 80w (3000 + 100w alone), a cleared wave 5w scrap and 100 more every fifth; active runs save their wave, countdown, kill count and wounded surviving roster (including hunters, alphas and the Demoness); restoration waits for the map to finish building, while legacy arena saves begin a fresh wave-one run. Both arena exits resolve Grum’s current hub location even when no run is active; the wave readout `#ui-wave` (`HordeGauntlet._hud`: wave, how many left with a draining bar, gunner chip, the countdown between waves, a 6 s summary at the end; a second line, what the wave pays (`_pays`) while it's fought, then gold "Secured" with what she earned (`_secured`, boss drops added by `spoil(name)` from engine/boss-hazards.js) through the countdown, four entries at most then "+N more" (`_spoilText`); the stealth word steps down beneath it via `body.wave-hud`)
+
+**Proposed ownership:** Directory element/component behavior and diagnostics; Penthouse optional painters; Game named characters, roles, stats and behavior recipes.
+
+**Cross-file global references:** `game` (27), `_gameTimeSec` (21), `showMessage` (11), `_simTick` (8), `Demoness` (7), `actorSteer` (6), `NavGrid` (5), `_frameTime` (5), `hasShotLine` (4), `Hunter` (4), `ActorEntity` (3), `ProjectileEntity` (3), `SilhouetteFX` (3), `drawEnemyTelegraph` (3), `normalizeAngle` (3), `CONFIG` (3), `navWaypoint` (2), `findShotSpot` (2), `drawGlow` (2), `ITEM_REGISTRY` (2), `aimFromMuzzle` (2), `detourAroundPlayer` (1), `drawGroundContactShadow` (1), `audioSys` (1), `ROLE_LOOKS` (1), `isLineBlocked` (1), `aimedMuzzleLocal` (1), `gaitCommand` (1), `computeVisibilityPoly` (1), `getOccluders` (1), `seededRandom` (1), `drawProceduralHumanoid` (1), `stanceForWeapon` (1), `shotKick` (1), `Loot` (1).
+
+**Declared classes:** `VelvetCat`, `GatlingGunner`, `LastKnownMarker`, `Ganger`, `RestrictedZone`, `HordeGauntlet`.
+
+## src/entities/hunters.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/entities/hunters.js) · 415 lines · 23 declarations · 190 call/new expressions.
+
+**Hunters** (the Demoness Palace): `Hunter extends Ganger` — night vision (she isn't hidden from it; visibility floored at 0.55; ember eyes, a red sight cone), a crimson dash (`_dash`: ALERT and 150–420 px away, or a sidestep when hit; never through walls or shut doors; a noise she hears), a claw up close (a melee enemy projectile — no flash, no casing), its sidearm. Hunter Alpha: tougher, two dashes. `Demoness extends Hunter` (a boss, `bossName` Lilitu, the Demoness): horns (wardrobe hat `demon_horns`), wings (drawn behind her), a gown; chained dashes, a whip-claw at reach, dashes to what she hears; `makeDormant`/`awaken` for `bossIntro` (`seenFlag: 'demonessIntroSeen'`); can't be executed; her first defeat drops the Maiden's Kukri (update.js). **Lilitu's duel** (`solo`, palace waves 10, 20, 30…; `DUEL`, `_duelStep`): she comes alone and the palace dims; phase I (to 66%) Ember Sigils where she last heard 949 (`hearNoise` → `_heard`) and a fan of ember bolts (enemy shots, so a Mirror Blade turns them); II (to 33%) Shadow Step (red flares, 0.4 s, then behind her and a claw), Wing Gale (a knockback cone; breaks a blade's guard: `guardBrokenUntil`), Blood Mirror (two one-hit `decoy` Demonesses with dead eyes, `_vanish` after 9 s); III Infernal Rite (a `rite` hazard), quicker dashes, the whip twice. A stagger (`_staggerUntil`) cancels her tell. `drawDuelTells` (above the darkness). First solo win: `questState.goldenRetributionUnlocked`; every one: a second Dark Element
+
+**Proposed ownership:** Directory element/component behavior and diagnostics; Penthouse optional painters; Game named characters, roles, stats and behavior recipes.
+
+**Cross-file global references:** `_gameTimeSec` (17), `game` (13), `isLineBlocked` (6), `ProjectileEntity` (5), `NavGrid` (4), `showMessage` (4), `Ganger` (1), `audioSys` (1), `_frameTime` (1), `drawGlow` (1), `getColliders` (1), `normalizeAngle` (1).
+
+**Declared classes:** `Hunter`, `Demoness`.
+
+## src/entities/lamps.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/entities/lamps.js) · 702 lines · 64 declarations · 581 call/new expressions.
+
+`LampEntity` (all lamp types) Plain streets' lamps are amber on one side and `STREET_LAMP_ROSE` (warm rose-champagne) on the other; a lit lantern's glass glows in its own colour, white-hot only at its heart. Lit lantern glass glitters (`_lampGlitterSprite`: a few baked frames of tiny points per colour and size, cross-faded at each bulb's own pace, so each point twinkles), and now and then a bulb flashes (`lampGlint`, `LAMP_GLINT`): the glitter blazes and its star flares. The lens glare (`drawLensGlare`, core/draw-helpers.js) is drawn under the lantern, breathing slowly, so the glitter stays crisp in its haze. Street lamps wear `LAMP_STYLES` (antique cast iron, baked sprites per colour, lit state and zoom size): `antique_twin` (lampType 2, the city's streets) and `antique_crook` (lampType 1, parks and the graveyard), `pillar_lantern` (lampType 6, a lantern on each graveyard wall pillar); add a style for new variations. Indoor fixtures come from the lamp library, `LAMP_FIXTURES` (baked per colour, lit state and size like the street styles): `shade_floor`, `shade_table`, `shade_rose` (pleated fabric shades), `tiffany`, `twin_sconce` (ETERNAL's brass twin sconce with opal glass, seen from above: angle 0 on a west wall, the room to +x; the apartment's wall lights), `dome`, `pendant`, `wall_bar`, `carriage` (shop-door lanterns). A lamp wears one by `fixture`, else its lampType's default (`LAMP_TYPE_FIXTURE`: 3 dome, 4 floor shade, 5 wall bar; `fixture: 'orb'` keeps the old bare glow); its lit glass is drawn after the darkness (`drawEmissive`). Furniture paints one with `drawLampFixture`, and glow passes light it with `drawLampFixtureLit`. `tools/demo-lamps.cjs` shoots any map with the gameplay camera.  Moon City's block (`block_2_2`, engine/map-loading.js) burns hot pink `#ff00aa`; violet `#b48cff` was the first pick (swap back there to revert). Fully offscreen lamp bodies skip painting; wake, flicker, fade and lighting participation remain active.
+
+**Proposed ownership:** Directory element/component behavior and diagnostics; Penthouse optional painters; Game named characters, roles, stats and behavior recipes.
+
+**Cross-file global references:** `glowSprite` (2), `LENS_GLARE` (2), `GameEntity` (2), `_frameTime` (2), `GameSettings` (2), `worldPaintBoxInView` (1), `drawLensGlare` (1), `_zoomLOD` (1).
+
+**Declared classes:** `LampEntity`.
+
+## src/entities/npc.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/entities/npc.js) · 1024 lines · 21 declarations · 125 call/new expressions.
+
+`NPC` companions and characters, quips and emotes (their looks: `core/appearances.js`); `facePlayer` turns an idle one to her, `heldParcel` puts a delivery in their hands (drawn live, `PARCEL_HELD`)
+
+**Proposed ownership:** Directory element/component behavior and diagnostics; Penthouse optional painters; Game named characters, roles, stats and behavior recipes.
+
+**Cross-file global references:** `game` (8), `ABILITY_REGISTRY` (6), `CONFIG` (4), `captionSystem` (4), `ITEM_REGISTRY` (4), `_frameTime` (3), `gaitCommand` (2), `fireWeaponProjectile` (2), `castAbilityProjectile` (2), `syncHumanoidGait` (2), `drawProceduralHumanoid` (2), `SPEAKER_COLORS` (2), `ActorEntity` (1), `APPEARANCES` (1), `actorSteer` (1), `resetHumanoidAnim` (1), `SNEAK` (1), `companionNavStep` (1), `companionNeedsEyeline` (1), `hasShotLine` (1), `_simTick` (1), `aimFromMuzzle` (1), `showMessage` (1), `RenderStats` (1), `lookFor` (1), `PARCEL_HELD` (1), `drawCrowdHumanoid` (1), `drawHPBar` (1), `stanceForWeapon` (1), `shotKick` (1).
+
+**Declared classes:** `NPC`.
+
+## src/entities/pedestrians.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/entities/pedestrians.js) · 1258 lines · 65 declarations · 322 call/new expressions.
+
+Pedestrians and their manager. They walk on (`_pickNextTarget`: never straight back to `prevNodeId`, nor doubling back where the walk goes on; no crossing pull straight after a crossing), so only a dead end turns them round. Crossing queues reserve at most six places per kerb (fewer on short approaches), spaced back along the pavement; overflow and timed-out walkers take another pavement route, with a turn back allowed where no forward pavement exists. People already crossing finish normally. Axis rejection reduces neighbor/traffic/danger distance work; behavior and decision cadence remain active outside drawing limits. At a crossing they look before stepping off the kerb (coming up to it, and again at the kerb with the far side next), and wait while a car sits on it (a queue backed over it, one turning in); at junction lights (`_crossingSignal`, traffic/traffic-signals.js) they wait for the walk, asking for it as they wait (`pedWaiting`), only mind a car actually moving onto the crossing, and hold the next green while out on the road (`_noteOnCrossing`). Spawns draw from the walk nodes near her (`_nodesNear`), not the whole city.
+
+**Proposed ownership:** Directory element/component behavior and diagnostics; Penthouse optional painters; Game named characters, roles, stats and behavior recipes.
+
+**Cross-file global references:** `game` (19), `gaitCommand` (5), `CONFIG` (3), `_frameTime` (2), `JunctionSignal` (2), `syncHumanoidGait` (2), `_zoomLOD` (2), `_simTick` (2), `GameSettings` (2), `ActorEntity` (1), `ROLE_LOOKS` (1), `seededRandom` (1), `PEDESTRIAN_QUIPS` (1), `_quipLineBusy` (1), `_activeQuipLines` (1), `QUIP_LINE_GRACE_MS` (1), `RenderStats` (1), `drawCrowdHumanoid` (1), `getColliders` (1).
+
+**Declared classes:** `Pedestrian`, `OrderedCrowdPointGrid`, `PedestrianManager`.
+
+## src/entities/performance-bench.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/entities/performance-bench.js) · 218 lines · 49 declarations · 174 call/new expressions.
+
+**Whole-Game Bench** (Settings → Developer): 3-second warmup and 30 seconds of ordinary gameplay. Captures accepted-frame intervals, complete simulation timing across catch-up ticks, render submissions, stalls, dropped simulation time, population and device/settings context. Detailed capture reuses Full profiler entity/people/world hooks independently of panel visibility; `run({detailed:false})` retains the summary capture. Reports identify instrumentation overhead, the configured simulation speed and nominal tick rate, and distinguish tiny dropped-time totals from sustained backlog. A scrollable report exports text or JSON through mobile sharing or a download. Pauses and hidden-tab gaps are excluded; settings restore on finish/cancel/reset. CPU timings are not GPU completion measurements.
+
+**Proposed ownership:** Directory element/component behavior and diagnostics; Penthouse optional painters; Game named characters, roles, stats and behavior recipes.
+
+**Cross-file global references:** `game` (27), `GameSettings` (10), `CONFIG` (5), `DevOverlay` (4), `showMessage` (3), `RenderStats` (2), `PerfBench` (1).
+
+**Declared classes:** None..
+
+## src/entities/prop-sprites.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/entities/prop-sprites.js) · 303 lines · 30 declarations · 81 call/new expressions.
+
+**Furniture sprites** (`PropSprites`, `PropPass`). `PropEntity.draw` asks `PropSprites.stamp(ctx, p)` first: a prop painted once onto its own sprite (`p._spr`, S = 2 px a world unit, padded by `PROP_PAD` or 8) is one `drawImage`, five when turned. Repainted when `_searched` / `_switchState` change; the vector art draws while a sprite is pending (3 ms of painting a frame, `frame(zoom)` from draw.js), above zoom 2.2, with Settings → Developer → Prop Sprites off, and for `PROP_LIVE` (animated pieces). `PROP_LOOP`: one-period sways painted as phase frames, each the first time it's due. Split drawers mark segments with `PropPass.seg(live)` (apartment workbench, fireplace, console, tub; MiniSpree; health station): the still runs between live parts become sprites stamped in place, so stacking order holds. Painting goes through a Proxy context: `shadowBlur` scaled to the screen's density (repainted on 25% drift), a non-source-over composite keeps the piece vector (`mc_lost_purse`, `ps_console`, `ps_desk`), a webfont not loaded retries. Pre-painted in the map fade (`_prepareMapTextures`), released in `_clearMapResidue` / `resetGameState` (`clear`), counted in the profiler's image caches. The regression suite proves every painted run of every prop on every map draws the same at any time. **`PlaneSprites`**: the same for a building's flat planes (roof, portico, canopy) under their scale-about-the-camera transform. `PlaneSprites.draw(ctx, owner, key, k, paint, rect)` paints the drawer's still runs once (S = 1.5, padded 24, each trimmed to its ink with one readback) into `owner._planeSpr[key]`, keyed by `_zoomLOD`, and stamps them in place; the live parts between `PropPass.seg(true)` marks keep drawing (Silver Queen cabanas, pool ripples, penthouse; Moon City's daytime sky). A drawer with no marks is one whole run, stamped without running it. Vector while unpainted, above density 1.7 and with the toggle off; shares the furniture's budget and memory count; released by `PlaneSprites.clear(...buildings)` beside `PropSprites.clear`.
+
+**Proposed ownership:** Directory element/component behavior and diagnostics; Penthouse optional painters; Game named characters, roles, stats and behavior recipes.
+
+**Cross-file global references:** `_frameTime` (4), `GameSettings` (3), `game` (3), `_zoomLOD` (2).
+
+**Declared classes:** None..
+
+## src/entities/props-decor.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/entities/props-decor.js) · 2890 lines · 112 declarations · 2934 call/new expressions.
+
+`StaticEntity`, apartment (incl. the crafting workbench, `apt_craft`), clinic, House of Death (`hod_*`), Double Nights lobby (`dn_*`), penthouse suite (`ps_*`), Sanctum (`sc_*`), Moon City Nightclub (`mc_*`) and stash (`ls_*`) furniture art, the graveyard's carved stones (`gy_stone`, 8 variants, cached sprites), the graveyard's walls (`drawGraveyardWall`: grey brick under a stone coping and a black iron fence, pattern tiles; `drawGraveyardPillar`: brick pillars with a stone cap, walls tagged `style: 'gy_wall'`/`'gy_pillar'` and drawn by the walls pass), the MiniSpree vending machine and the health station (one design on every map), `PropEntity`  `PropEntity`: art drawn in the box's rotated frame; `fixedRotation` for fixtures; speed cap, spin cap, NaN restore, sleep counter. Cozy Cafe furniture: `drawCafeDecorProp` (`cc_*`: counter with pastry case, espresso machine, mug shelf, fireplace, armchairs, loveseat, bookshelf, record player, round tables, bentwood chairs, booths, window benches, kitchen and storeroom pieces); seated pieces take `face`. Finite stationary props use a cheaper update path and immediately resume normal integration when they move.
+
+**Proposed ownership:** Directory element/component behavior and diagnostics; Penthouse optional painters; Game named characters, roles, stats and behavior recipes.
+
+**Cross-file global references:** `PropPass` (26), `_frameTime` (12), `GameEntity` (6), `drawLampFixture` (4), `GLASS_DRINKS` (3), `clubBeatN` (1), `drawNeuralDecorProp` (1), `drawTorqueDecorProp` (1), `drawPalaceDecorProp` (1), `PropSprites` (1).
+
+**Declared classes:** `StaticEntity`, `PropEntity`.
+
+## src/entities/static-builders-profiler.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/entities/static-builders-profiler.js) · 510 lines · 39 declarations · 116 call/new expressions.
+
+Turning walls/buildings into colliders, perf bench (`PerfBench`: Settings → Developer → Resolution Bench; its card `#bench-card` shows progress with Cancel, then the verdict with OK), profiler (`Profiler` measures; `ui/dev-overlay.js` shows it). Profiling clocks, wrappers and report construction stay idle when the profiler and benchmark are off; Full uses exclusive parent/substage accounting
+
+**Proposed ownership:** Directory element/component behavior and diagnostics; Penthouse optional painters; Game named characters, roles, stats and behavior recipes.
+
+**Cross-file global references:** `game` (5), `showMessage` (4), `StaticEntity` (3), `GameSettings` (2), `PerformanceBench` (1).
+
+**Declared classes:** `Profiler`.
+
+## src/entities/street-objects.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/entities/street-objects.js) · 465 lines · 27 declarations · 242 call/new expressions.
+
+Neon signs, loot, pavement, foliage; `FLORA_KINDS` / `floraSprite` (each tree, blossom, bush and palm painted once into a sprite)
+
+**Proposed ownership:** Directory element/component behavior and diagnostics; Penthouse optional painters; Game named characters, roles, stats and behavior recipes.
+
+**Cross-file global references:** `_gameTimeSec` (2), `_frameTimeSec` (2), `worldPaintBoxInView` (2), `_sunShadow` (2), `_frameTime` (1), `drawGroundContactShadow` (1), `Poly` (1), `seededRandom` (1), `darkenHex` (1), `lightenHex` (1).
+
+**Declared classes:** `NeonSign`, `Loot`, `Pavement`, `Foliage`.
+
+## src/entities/vehicles-minigames.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/entities/vehicles-minigames.js) · 1402 lines · 52 declarations · 344 call/new expressions.
+
+`VehicleEntity`, bumper cars, Ferris wheel, bumper-car minigame. Bumper scoring requires a closing impact and pair separation/recovery; AI breaks away after scored encounters. Player direction input pivots from rest and has bounded chase assistance. Fully hidden Ferris wheel paint is culled conservatively; rotation and gondola state stay live.
+
+**Proposed ownership:** Directory element/component behavior and diagnostics; Penthouse optional painters; Game named characters, roles, stats and behavior recipes.
+
+**Cross-file global references:** `GameEntity` (8), `clamp` (6), `captionSystem` (4), `BiggsArt` (4), `darkenHex` (3), `showMessage` (2), `LandmarkKit` (1), `APPEARANCES` (1), `GameSettings` (1).
+
+**Declared classes:** `VehicleEntity`, `BumperCar`, `FerrisWheel`, `BumperCarMinigame`.
+
+## src/physics/collision.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/physics/collision.js) · 1065 lines · 60 declarations · 314 call/new expressions.
+
+`CollisionSystem`: circles, boxes, rotated boxes, pushing, hinged-door hook  **Contact solver** (`_solveContact`): position correction past 0.5px slop (80%) shared by inverse mass (0 for static, `immovable` or mass ≥ 1e4), then a normal impulse and Coulomb friction, each with its angular term at the real contact point (`_contactPoint`: the deepest corner(s), ties averaged); props spin from where they're hit (I = m(w²+h²)/12). 3 relaxation passes for props; sleepers (`_still` > 30) skip each other; moving props collide off screen too; cars shove props; car-vs-car is TrafficManager's alone; a car that probed walls this tick (`_wallProbeTick`) skips the wall pass; actors push with `CONFIG.PHYSICS.PUSH_MASS` × their mass and take no velocity back. Collision broadphase retains unchanged static grid cells while refreshing dynamic cells and preserving processor order.
+
+**Proposed ownership:** Basement geometry/spatial algorithms; Directory entity registry and common body/contact lifecycle.
+
+**Cross-file global references:** `GameEntity` (44), `_simTick` (9), `SpatialHashGrid` (4), `CONFIG` (3), `ambience` (2), `clamp` (1), `StaticEntity` (1), `getColliders` (1), `_physicsSpatial` (1), `audioSys` (1), `_gameTimeMs` (1), `PhysicsSystem` (1).
+
+**Declared classes:** `CollisionSystem`.
+
+## src/physics/game-entity.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/physics/game-entity.js) · 376 lines · 31 declarations · 57 call/new expressions.
+
+`GameEntity`, the base class for everything that moves or collides
+
+**Proposed ownership:** Basement geometry/spatial algorithms; Directory entity registry and common body/contact lifecycle.
+
+**Cross-file global references:** None statically identified..
+
+**Declared classes:** `GameEntity`.
+
+## src/physics/spatial.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/physics/spatial.js) · 649 lines · 48 declarations · 186 call/new expressions.
+
+`PhysicsSystem` (`carContact`: car hits push apart by mass, then one rigid-body impulse (`impulseAt`) at the point they meet (`contactPoint`: the deepest corner in) takes out the closing speed with a little bounce and Coulomb scrub and turns each car by where it was struck — the driven car's `yawRate`, traffic's `spin` (`spinOf`/`setSpin`, capped `YAW_SPIN_MAX`, inertia × `SPIN_INERTIA`) — both collision passes and wall hits use it; the driven car gets `onImpact` for the crunch), spatial hash, render/transition grids `SpatialHashGrid`: numeric cell keys, cell arrays kept and emptied, queries de-duplicated by a stamp (no Sets). Ordered map-owned obstacle indexes bound environment/LOS/raycast searches.
+
+**Proposed ownership:** Basement geometry/spatial algorithms; Directory entity registry and common body/contact lifecycle.
+
+**Cross-file global references:** `CONFIG` (3), `_simTick` (3), `CollisionSystem` (1).
+
+**Declared classes:** `PhysicsSystem`, `SpatialHashGrid`, `RenderGrid`, `OrderedRenderGrid`, `EffectRenderGrid`, `TransitionGrid`.
+
+## src/story/captions.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/story/captions.js) · 487 lines · 15 declarations · 58 call/new expressions.
+
+Caption/subtitle system
+
+**Proposed ownership:** Directory reusable scene/dialogue/mission runners; Game authored narrative, rewards, thresholds and triggers.
+
+**Cross-file global references:** `game` (4), `SPEAKER_COLORS` (2), `HUB_GRAVEYARD` (1).
+
+**Declared classes:** None..
+
+## src/story/crew-nights.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/story/crew-nights.js) · 639 lines · 94 declarations · 252 call/new expressions.
+
+**Crew Nights**: time with the crew that isn't a job. Besides the feed's pins, `feedNext` has one of them ask her out again now and then (`CREW_SOLO_ASK`, closer asks more, at most one a night). Invites are `plan` cards in Messages (`CrewNights.invite`: a place from `CREW_VENUES`, a four-hour window of world time, who's coming; I'm in / Can't tonight / Set waypoint): the group asks her to Moon City after a job (`crewGroupInvite`) or when she asks "Drinks tonight?"; one of the crew asks her to their own place (their old feed pins, `crewPlanFromPin`; or her "Want to hang out?"). Turning up in the window (the venue's map; Biggs Park on foot) plays the scene `crew_night`: a group night (hello, a toast each of them likes one of, talk about the last job, who she sits with) or a night with one of them (`CREW_SOLO`: a thing to do together with a choice they care about), then a written moment for how close they are (`CREW_MOMENTS`, three bands, a reply that lands better), and goodnight. Bonds: the one she sat with most, everyone who came a little; standing them up costs the host a point. Perks: a Companion texts what a bounty's mark carries (`onBounty`, the bounty's `weaponId`), a Trusted friend leaves a stim after a rough job (`onJobDone`). State on `phoneSystem.feed.crew`
+
+**Proposed ownership:** Game authored story/cast/dialogue and rules; call Directory scene/dialogue/mission APIs.
+
+**Cross-file global references:** `phoneSystem` (28), `game` (10), `captionSystem` (4), `MissionSystem` (4), `showMessage` (3), `audioSys` (3), `BONDING_TIERS` (2), `MSG_GROUP` (1), `ITEM_REGISTRY` (1), `defineScene` (1), `stellaSceneLook` (1), `APPEARANCES` (1).
+
+**Declared classes:** None..
+
+## src/story/dialogue-bonding.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/story/dialogue-bonding.js) · 550 lines · 40 declarations · 63 call/new expressions.
+
+Bonding dialogues, companion idle spots, `SPEAKER_COLORS` (every speaker's colour, used everywhere incl. the cinematic cast), dialogue transcript/sequence, `BondingSystem`
+
+**Proposed ownership:** Directory reusable scene/dialogue/mission runners; Game authored narrative, rewards, thresholds and triggers.
+
+**Cross-file global references:** `showMessage` (2), `audioSys` (1).
+
+**Declared classes:** `DialogueTranscript`, `DialogueSequence`, `BondingSystem`.
+
+## src/story/missions.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/story/missions.js) · 633 lines · 33 declarations · 161 call/new expressions.
+
+Mission types, `MissionSystem`, crafting schematics (`SCHEMATICS`: an item, or `cosmetic` a piece to wear, with an optional `requires`; Laser Sight, Golden Child, Mirror Blade, Bloodthirsty Muzzle, Crimson Edge, Vampiric Fists, Mirrored Glass); `getObjectiveParts()` (the readout's title and step). Deliveries: `generateDelivery(game, { source, handed, from, express })` (a street address from the nearest road: `targetLabel` "734 Hotel Dr.", `targetKind`; `handed` = Amber's courier brings her the box, no van; `etaMin`, `condition`); the drop-off is on foot: the resident steps out of the door as she nears (`_spawnRecipient`), walks over when she's on foot (`tickRecipients`), takes the box in hand and goes back in; in the car she's told to step out. `knock(strength)` (TrafficVehicle.onImpact) bruises the box; `_tipFor` (Amber orders: time against the estimate, the box's condition, Premium ×1.5); `completedDeliveries`, `amber` (the app's state, saved). Bounties are sited at a building when generated (`sited`, `near`, and the `weaponId` they carry), so the spot can be texted. Residents walk to her round obstacles (`actorSteer`)
+
+**Proposed ownership:** Directory reusable scene/dialogue/mission runners; Game authored narrative, rewards, thresholds and triggers.
+
+**Cross-file global references:** `showMessage` (9), `phoneSystem` (6), `game` (5), `audioSys` (4), `Ganger` (2), `actorSteer` (2), `MAP_DATA` (1), `NPC` (1), `Loot` (1).
+
+**Declared classes:** `MissionSystem`.
+
+## src/story/narrative-cutscenes.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/story/narrative-cutscenes.js) · 625 lines · 46 declarations · 102 call/new expressions.
+
+Cutscene manager, narrative state machine, `StoryManager`. Chapter 1: `VAN_RIDE` → `ENTER_HOTEL` → `TAKE_ELEVATOR` → `SEARCH_SUITE` → `SURVIVE_AMBUSH` → `FIND_NOTE` → `LEAVE_HOTEL` → `REPORT_TO_MIRABEL` → `CHAPTER_COMPLETE`; `story.watch(fn)` for one-off hints; saves keep the step's name (older saves migrate by name). Steps are addressed **by name**: `story.goTo('LEAVE_CLUB')`, `isAt`, `isBefore` (numbers shift when a chapter changes). Conditions: named strings, `TIMER_<ticks>`, `LOC_<map id>`, or a function `(game, ticks) => bool`
+
+**Proposed ownership:** Directory reusable scene/dialogue/mission runners; Game authored narrative, rewards, thresholds and triggers.
+
+**Cross-file global references:** `phoneSystem` (9), `syncHudInput` (2), `STORY_DB` (1), `vanAftermath` (1), `NPC` (1), `Comms` (1), `darkenHex` (1).
+
+**Declared classes:** `CutsceneManager`, `NarrativeStateMachine`, `StoryManager`.
+
+## src/story/npc-dialogue.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/story/npc-dialogue.js) · 201 lines · 50 declarations · 45 call/new expressions.
+
+**`NPC_DIALOGUE`**: what everyone in the world says and what their buttons do — by name, then by role (`@dancer`, `@robot`, `@teammate`…), then `@passing`. `npcDialogueFor(npc)`; the box is `startDialogue` (engine/screens-ui.js)
+
+**Proposed ownership:** Game authored story/cast/dialogue and rules; call Directory scene/dialogue/mission APIs.
+
+**Cross-file global references:** `showMessage` (13), `phoneSystem` (2), `CONFIG` (2).
+
+**Declared classes:** None..
+
+## src/story/scene-runner.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/story/scene-runner.js) · 363 lines · 87 declarations · 135 call/new expressions.
+
+**The story's director.** `defineScene(name, meta, function* (s) {...})` and `ScenePlayer` (`game.scenes.play(name) → Promise`): scripts are generators that `yield` on ticks, lines, camera moves, choices. Verbs: `wait`, `fade`, `card`, `marker`, `map`/`cut`, `cam.to/cut/shake`, `actor` (walk, face, `setPose`), `prop` (anything drawn, e.g. the van), `tween`, `sway`, `bump`, `knock`, `say`/`narrate`/`choose`, `vision`, `memory` (a flashback's grade), `hud`/`coach`/`showHud` (the playable beats), `mask`, `flag`. Locks input, blocks saves and toasts, freezes with pause
+
+**Proposed ownership:** Directory reusable scene/dialogue/mission runners; Game authored narrative, rewards, thresholds and triggers.
+
+**Cross-file global references:** `audioSys` (9), `game` (4), `phoneSystem` (3), `gaitCommand` (2), `NavGrid` (1), `_gameTimeSec` (1), `actorSteer` (1), `normalizeAngle` (1), `syncHumanoidGait` (1), `decorativeBodyInView` (1), `tickHiddenDecorativeBody` (1), `drawProceduralHumanoid` (1), `CinematicDialogue` (1), `SceneVision` (1), `syncHudInput` (1), `APPEARANCES` (1).
+
+**Declared classes:** `SceneActor`, `SceneProp`, `ScenePlayer`.
+
+## src/story/scene-vision.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/story/scene-vision.js) · 173 lines · 15 declarations · 132 call/new expressions.
+
+`SceneVision`: full-screen painted sequences a scene steps through with `beat()` (`vanoga`: the flames, the dark, the golden egg, the burst, the pink orb of the Empereal Lord)
+
+**Proposed ownership:** Directory reusable scene/dialogue/mission runners; Game authored narrative, rewards, thresholds and triggers.
+
+**Cross-file global references:** `seededRandom` (3).
+
+**Declared classes:** `SceneVision`.
+
+## src/story/scenes/cast.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/story/scenes/cast.js) · 23 lines · 1 declarations · 0 call/new expressions.
+
+`SCENE_CAST`: each speaker's subtitle name, look and side (949 left); colours from `SPEAKER_COLORS`
+
+**Proposed ownership:** Game authored story/cast/dialogue and rules; call Directory scene/dialogue/mission APIs.
+
+**Cross-file global references:** `SPEAKER_COLORS` (15).
+
+**Declared classes:** None..
+
+## src/story/scenes/prologue.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/story/scenes/prologue.js) · 130 lines · 3 declarations · 54 call/new expressions.
+
+**The prologue**: the epigraph, the climb up the Keeper's hill ("Somewhere between the realms… 6125"), the parlor by the fire, the vision of Vanoga. New Game plays it, then chapter 1 (`questState.prologueSeen`)
+
+**Proposed ownership:** Game authored story/cast/dialogue and rules; call Directory scene/dialogue/mission APIs.
+
+**Cross-file global references:** `defineScene` (1).
+
+**Declared classes:** None..
+
+## src/story/scenes/van.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/story/scenes/van.js) · 215 lines · 12 declarations · 138 call/new expressions.
+
+**Chapter 1's opening**: the crew in the van (the novel's lines), the push-in to the night before — Mirabel's call, answered by the player (the phone's first reveal), a choice that sets `mirabelFavor`, the deposit — the jolt back, the crew's choice (bonding), five knocks, and the crew pouring out at the Double Nights door. `vanAftermath` hands over (also after a skip)
+
+**Proposed ownership:** Game authored story/cast/dialogue and rules; call Directory scene/dialogue/mission APIs.
+
+**Cross-file global references:** `phoneSystem` (5), `APPEARANCES` (3), `FIELD_MASK_949` (2), `VAN` (2), `defineScene` (1), `drawVanExterior` (1).
+
+**Declared classes:** None..
+
+## src/story/story-db.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/story/story-db.js) · 285 lines · 45 declarations · 100 call/new expressions.
+
+`STORY_DB`: story text and beats
+
+**Proposed ownership:** Game authored story/cast/dialogue and rules; call Directory scene/dialogue/mission APIs.
+
+**Cross-file global references:** `Drone` (3), `phoneSystem` (3), `showMessage` (2).
+
+**Declared classes:** None..
+
+## src/story/talks.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/story/talks.js) · 575 lines · 58 declarations · 158 call/new expressions.
+
+**Talks**: a TALK button on the dialogue box of Anavia, Mirabel, Barista Ren, the Bartender and Dr. Yin (lit when there's something new) plays the `talk` scene where they stand: a hello by rapport, a hub of topics (◆ for the big ones), small talk once a day, goodbye. `TALKS[name].topics` are branching beats (`['@', line]`, `{ choose, gain, mem, then }`, `{ act }`, functions that read `T.mem`); answers are remembered and read back later. Rapport in `questState.talks[name]` (tiers 25/50/75), two new topics a day; follow-up texts. `TALK_PERKS`: Anavia's salvage +20%, Ren's deliveries +10%, the Bartender's bounties +10%, Dr. Yin's daily stim. Cast ids in story/scenes/cast.js.
+
+**Proposed ownership:** Game authored story/cast/dialogue and rules; call Directory scene/dialogue/mission APIs.
+
+**Cross-file global references:** `captionSystem` (4), `CrewNights` (2), `BONDING_TIERS` (2), `showMessage` (2), `audioSys` (1), `phoneSystem` (1), `defineScene` (1), `MissionSystem` (1), `game` (1).
+
+**Declared classes:** None..
+
+## src/traffic/car-art.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/traffic/car-art.js) · 681 lines · 42 declarations · 690 call/new expressions.
+
+**How cars look**: `carSprite` (each body painted once per brand, model, paint: contact shadow, rear tyres and rims, paint shaded round its curve, glass greenhouse, mirrors, lamp housings; LADY BlackMark lacquer, gold pinstripe and rims; the V1 is a coach from ETERNAL's blueprint (`_coachPath`: swelling fenders, a hood spine to the silver `_ladyOrnament` on the nose, round lamps from `coachLamps`, chrome bumpers and grille), ivory hearse cap on a black shell; the V3 (`COACH3`) the same coach body with a roof ringed by windows; lamp pods with a running turn signal (`_coachSignal`); Zenxera bodies from `ZenArt`; Gelfash bumpers, roof rails, pickup bed); `drawCarFrontTyres` (the front wheels, turned by `steer`); `drawCarBody` (the body rides its springs: out of a turn by `bodyRoll`, forward under braking by `load`); `drawCarSheen` (the sun on the paint by day, street light sliding along the roof by night); `carLampsOn` (someone at the wheel, `lampsOn` left on when she got out, or her own car); `drawCarLamps`; `drawCarGlow` (tail, brake, head and signal lamps in the dark, after lighting); `drawCarUnderglow`
+
+**Proposed ownership:** Directory routing, vehicle motion, occupants and traffic systems; Penthouse car artwork; Game models, roads, fares and service rules.
+
+**Cross-file global references:** `drawGlow` (10), `ZenArt` (8), `game` (3), `RenderInterp` (3), `GameSettings` (2), `_frameTime` (2), `sunNow` (1), `_simTick` (1), `drawLensGlare` (1), `LENS_GLARE` (1), `glowSprite` (1).
+
+**Declared classes:** None..
+
+## src/traffic/garage-zib.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/traffic/garage-zib.js) · 855 lines · 63 declarations · 143 call/new expressions.
+
+Vehicle brands (incl. `brake`, px/tick², and `drive`: each brand's handling character — wheel speed, turn-in, front/rear grip, cornering limit, weight) and prices, your garage, Zib rides, AI driving solver (`calculateThrottle` brakes to its target, no dead zone). Passenger controls stay with the cab; companion seats, fare completion, repeated Skip and stuck recovery are handled consistently. A ride the game can't route teleports free (`teleportToDestination(game, {free})`); a map switch mid-ride (death, a scene) ends it uncharged (`abandonRide`, from `_doLoadMap`), the cab left with the old map; `_onFoot` is the shared back-on-foot reset.
+
+**Proposed ownership:** Directory routing, vehicle motion, occupants and traffic systems; Penthouse car artwork; Game models, roads, fares and service rules.
+
+**Cross-file global references:** `showMessage` (6), `CONFIG` (3), `carSprite` (2), `resetHumanoidAnim` (2), `normalizeAngle` (2), `TrafficVehicle` (1), `clamp` (1).
+
+**Declared classes:** `PlayerGarage`, `ZibSystem`, `AIDriverSolver`.
+
+## src/traffic/roads.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/traffic/roads.js) · 2459 lines · 184 declarations · 639 call/new expressions.
+
+Lanes, segments, intersections (lights where two roads cross: `requestEntry` hands over to `signal`, traffic/traffic-signals.js; without them, one car at a time, except movements that can't cross: a platoon from one lane, opposite straight-throughs), angled roads (`Road` from `x1, y1, x2, y2`; traffic keeps right on every road; where one meets another the junction's `poly` is the real shape, the carriageways' overlap widened to each road's full width, with its box as the bounds, and lanes, gates, `containsPoint` and the ground baker follow it; `_angledLamps`), curved roads (`Road` from `path`: a `RoadPath`, the centre line as a chain of straight pieces with mitred joints; `paramToWorld`, `worldToParam`, `getCorners` and `frameAt(t)` follow it, its segments split again at each bend so every lane is a short straight piece linked to the next, and each piece sees the junctions ahead down the chain; cars round it on those links: `_bendAhead` slows them for the bend and shortens their look ahead, AIDriverSolver.getLaneTarget looks on down the linked pieces, and nobody pulls out on it), `Poly` (convex polygon helpers: clip, hull, contains, `hitsRect`, `segHits`, `trace`), **Turns** (`_calculateTurnPathCurve`): each curve through a junction bends round the corner where the lane in, run on, meets the lane out — a cubic as round as a circle's arc, leaving along the lane in and arriving along the lane out, so it never swings out the other way first (a hairpin or a turn whose lanes cross before the box: a cubic eased along both lanes); `TurnPath.radiusFrom(t)`, the tightest radius left on it. `buildDrivePath` (autodrive and Zib routes over the lane graph): besides links and turns, a move across to the lane beside on the same stretch (`change`, while there's `CHANGE_ROOM` left), and a turn from a lane `laneMayTake` doesn't allow costs `WRONG_LANE` extra, so a route gets into the lane its turn goes from on the way. `RoadNetwork` `laneHasExit(lane)`: a lane a car can leave (a straight link or a turn starting from it); the map-edge lanes have neither, so no Zib spawns or pickup uses them and autodrive on one asks her to turn around.
+
+**Proposed ownership:** Directory routing, vehicle motion, occupants and traffic systems; Penthouse car artwork; Game models, roads, fares and service rules.
+
+**Cross-file global references:** `normalizeAngle` (4), `Pavement` (4), `STREET_LAMP_ROSE` (3), `clamp` (3), `LampEntity` (2), `TrafficVehicle` (2).
+
+**Declared classes:** `Lane`, `Segment`, `Gate`, `TurnPath`, `Intersection`, `RoadPath`, `Road`, `RoadNetwork`.
+
+## src/traffic/traffic-manager.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/traffic/traffic-manager.js) · 409 lines · 28 declarations · 129 call/new expressions.
+
+Spawning (clear of cars that couldn't stop for it) and managing traffic; ordered perception grids narrow the main car-sensing and pedestrian-reading scans to their full sensing ranges, preserving source order and updating moved cars during the sequential pass (lane/junction scans retain their complete lists); `update` ticks each junction's lights (made on first run: traffic/traffic-signals.js) and notes her car on them when she drives by hand (`_noteHerCar`); `drawSignals` / `drawSignalGlow` draw the lights in view; `update` takes her crew and the street's pedestrians too and lists everyone on foot as `folk` (with `_tvx`/`_tvy`, measured each tick; a jump isn't walking), what cars look out for (traffic/traffic-people.js); `update`/`resolveCollisions` take `parked`, her cars out of traffic (`GameEngine.parkedCars`: gridded, collided, rolled to a stop, and in what the AI senses, `sensed`); cars frozen 15 s out of sight are despawned (gridlock relief); car-to-car sparks, debris and `'crunch'` scale with the hit  **Fades**: new cars spawn outside the camera's view + 120 px where possible and fade in (`v.fade` 0→1, ~0.6 s); leaving cars (dead end, too far, frozen, wrecked) set `v.fading` and fade out over ~0.5 s before removal, ghosts to collisions below 0.5 (draw.js draws at `globalAlpha = v.fade`). Its `SpatialGrid` likewise (numeric keys, stamps); `resolveCollisions` meets each pair once by list order instead of a pair-key Set. Spawns draw from the lanes passing near her (`_lanesNear`, re-listed as she moves), anywhere along a long straight lane in range (`_spawnAlong`), so a big city fills round her as quickly as a small one.
+
+**Proposed ownership:** Directory routing, vehicle motion, occupants and traffic systems; Penthouse car artwork; Game models, roads, fares and service rules.
+
+**Cross-file global references:** `CONFIG` (9), `game` (6), `_simTick` (5), `TrafficVehicle` (3), `OrderedCrowdPointGrid` (2), `RoadNetwork` (2), `_frameTime` (2), `getColliders` (2), `GameSettings` (2), `SIGNAL` (1), `JunctionSignal` (1), `VEHICLE_BRANDS` (1), `PhysicsSystem` (1).
+
+**Declared classes:** `SpatialGrid`, `TrafficManager`.
+
+## src/traffic/traffic-people.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/traffic/traffic-people.js) · 259 lines · 17 declarations · 82 call/new expressions.
+
+**What a car does about people on foot in the road** (949, her crew, the street's pedestrians: TrafficManager's `folk`, with velocities measured tick to tick, since nobody on foot keeps one a car could read). Only people out on the carriageway count (`_onCarriageway`: our road's band, junctions included, or within reach of our own body where it's strayed over the kerb), not the pavement. Each is read for what they're doing (`_readFolk`): **crossing** (moving into or across our path, still in it when we'd arrive, with the time our `gap` takes to spare: brake to stop `gap` short, go once they'll be clear), **standing** (in the path and staying, or walking along the lane: stop `pull` back, pause, go round), **at the edge** (a step aside within the lane, `sideStep`), **beside** (pass no faster than the room allows, `_passSpeed`: under 4, where a knock hurts, when it's tight). The wait behind someone standing (`_folkLadder`): the horn, then round them (`_goRound`: a clear lane beside, else the oncoming lane, on a side the body clears them before reaching them; too close, back up first), then a squeeze by on the far side if that strip is empty of people and cars (`_stripClear`), backing up a little to try again when stuck (`_backUp`, `_reverseStep`; twice per hold-up). **Tempers** (`TRAFFIC_TEMPERS`): calm (a third of civilians), normal, pushy (the gangers' cars) set the gaps, the pause, pass speed, the horn (the pushy lean on it), and how soon they squeeze or back up, and (traffic-signals.js) the gap they'll turn left across and how hard they'll brake for an amber (`amber`); anyone driving for her (autodrive, Zib) is calm and only waits.
+
+**Proposed ownership:** Directory routing, vehicle motion, occupants and traffic systems; Penthouse car artwork; Game models, roads, fares and service rules.
+
+**Cross-file global references:** `ambience` (4), `game` (4), `TrafficVehicle` (1).
+
+**Declared classes:** None..
+
+## src/traffic/traffic-profiler.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/traffic/traffic-profiler.js) · 60 lines · 11 declarations · 31 call/new expressions.
+
+Optional detailed-only exclusive `Traffic:` and `Signs:` timing trees. They expose static-query validation vs lookup, wall contacts, integration/decisions/sensing/junctions, and street/shopfront/landmark/cold-bake sign work. Hooks restore on cancellation/finish; sign hooks install after and unwind before world-detail hooks.
+
+**Proposed ownership:** Directory routing, vehicle motion, occupants and traffic systems; Penthouse car artwork; Game models, roads, fares and service rules.
+
+**Cross-file global references:** `game` (2), `TrafficManager` (2), `_physicsSpatial` (2), `TrafficVehicle` (1), `Intersection` (1), `JunctionSignal` (1), `WorldRenderProfiler` (1), `NeonSign` (1), `BuildingV2` (1).
+
+**Declared classes:** None..
+
+## src/traffic/traffic-signals.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/traffic/traffic-signals.js) · 459 lines · 40 declarations · 157 call/new expressions.
+
+**Junction lights, gauged by demand** (`JunctionSignal`, one per crossing of two roads; `SIGNAL` holds the timings; `SIGNAL.ON` false brings back the queue). Each car on its way in (`note`, from `SIGNAL.SEE` px out; her car driven by hand too) and each walker waiting at a crossing adds to its road's gauge (`demand`, waits weigh more the longer they get). Green rests on its road while nobody waits on the other; once someone does it runs `MIN_GREEN`, then ends at the first gap in its own arrivals, at its longest (`MAX_GREEN` + `GREEN_PER` a unit of its own demand, up to `MAX_BUSY`), or at once if a car on the red has waited `STARVED`; then `AMBER`, then all red (`clear`) until the box is empty and nobody's still crossing the road about to go (up to `CLEAR_WALK` for walkers). **Turn arrow** (`SIGNAL.ARROW`, state `arrow`): when cars wait at the line to turn on the road about to go (`turners`, `TURN_AT` px out), its green starts with an arrow: its turns go (lefts without waiting for a gap, the far side held on red; rights with nobody walking), straight on waits, from `ARROW_MIN` until nobody's left waiting to turn, at most `ARROW_MAX`; a left turn stood at the front of its lane on a green for `TURN_STALL` (`stalled`) ends that green early (`reArrow`) to get the arrow on the same road. Two turns from different ways in out onto the same side of a road take turns (`merge`). `request` (Intersection.requestEntry with lights): on its green a car goes in unless its turn path crosses one already granted (`_conflict` / `pathsCross`, from the paths' shapes, cached, allowing `CROSS` between centres plus each path's `DRIFT` (how far cars stray off a turn's curve, most mid-way): so opposite left turns take turns; cars side by side from one way in go together when the one on the right turns no further left than the one beside it and they don't come out in the same lane, `sideBySide`: a kerb right turn goes with the straight beside it; one lane's paths take turns), a left turn has something coming the other way within `YIELD` ticks (`_oncoming`, × temper `take`), or the lane out has no room past its queue and everyone already let in that way (`_exitRoom`); on amber it stops if it can at its temper's braking (`_canStop`), else goes, and sticks to it (`_sigStop`, `_sigGo`); one let in but not there yet whose way out fills up waits at the line if it still can; a car in the box (its nose over the edge, or its tail still in) always keeps its grant, so the cross traffic waits for it. Walkers start across a red road for `WALK` ticks into the other road's green, or while it isn't about to end (`walkOK`); `atCrosswalk` finds a crossing's lights. **Looks** (`draw`, on the ground after the sun's shadows, layer Signals; `drawGlow` after dark, from drawEmissivePass): each way in has a stop bar behind the crosswalk in its light, a demand gauge of segments along the centre line (one lit per car waiting or coming: pulsing on red, running in on green), and a three-lamp head on the kerb, with the turn arrow's lamp beside it; LED strips along both kerbs of each crossing (walk, wait, flashing when about to change).
+
+**Proposed ownership:** Directory routing, vehicle motion, occupants and traffic systems; Penthouse car artwork; Game models, roads, fares and service rules.
+
+**Cross-file global references:** `_simTick` (7), `drawGlow` (3), `TrafficVehicle` (1).
+
+**Declared classes:** `JunctionSignal`.
+
+## src/traffic/traffic-vehicle.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/traffic/traffic-vehicle.js) · 2816 lines · 97 declarations · 541 call/new expressions.
+
+`TrafficVehicle`: every car on the road. With nobody at the wheel (she got out), `updateManualDriving` lets it roll and parks it (`PARKED`) at rest. **A parked car in the lane** (hers, or one she left): no swerve inside the lane (`blockingCar`); a lane change into a lane clear past it (`findAdjacentLane(ahead)`), else stop well back (`standOff`, 1.6 car lengths) and overtake by the oncoming lane soon (`waitBriefly`); parked on its nose, it backs up first (`_backUp`); mid-manoeuvre only a parked car in the lane it's moving into is in the way (`parkedInWay`). Lane changes and overtakes steer onto the target lane's line (`_steerOntoLane`: pure pursuit, tighter pulling out from a crawl, `_pullOutLook`) and hold it while passing, so they settle on the line instead of swinging past it. `temper` (calm, normal, pushy: the gangers' cars) is set at spawn. AI: senses cars along its route (`_routeProbe` down the lane, through the planned turn, onto the exit lane; `_probeGap` bumper to bumper) and follows by stopping distance; stops on the line by stopping distance; claims a box only when first in its lane (with lights, or behind one that has the green in) with room on the way out; shows on the lights' gauge from `SIGNAL.SEE` out (`_sigDist`); releases it when the tail clears; slows for a planned turn before the box to what the curve allows (`_turnAhead`, `_turnSpeed`: its tightest radius, and how fast its wheel turns it) and steers through it by pure pursuit of a point a speed-scaled distance down the curve, so it turns in from its lane; through a turn its progress only runs on while it moves, and not far past where it is (so a car that waited in the box doesn't cut the corner moving off); a car starting one of a junction's turns keeps its hold on that junction (on the long boxes, its distance from the centre alone had it let go as it went in); traffic keeps its lane through a junction (`pickTrafficTurn`, `pickCruiseTurn`: right only from the kerb lane, left from the inside lane, straight on from any, `laneMayTake`, checked before what's safe ahead so it never leaves only a wrong-lane turn; out into the matching lane, `_laneRank`); gap-checked lane changes and overtakes; autodrive and Zib make their route's `change` steps as soon as the lane beside has room (`_routeLaneChange`), and too near the line to make one mark the route `missed`, planned again from there (engine/update.js). Physics: `applyDrivePhysics` — the driven car's weighted model: the wheel (`steer`) lags the stick and self-centres when let go, pedals travel in (`pedal`), braking shifts the load forward (`load`); rotation is worked out from two axles (`AXLE_FROM_CENTRE`), each tyre pushing against its end's sideways slide up to its limit (`TYRE_STIFF`, the brand's turnIn on the front, front wheels at the angle that would carry the steering's yaw target): both pushes move the car and, acting ahead of and behind the centre, turn it, so the tail steps out when the rear lets go (braking, the handbrake), the nose pushes wide when the front does, and crash spin carries on until the tyres scrub it; traffic keeps direct steering and the single-grip model plus a knock's `spin` (`KNOCK_SPIN_DECAY`, it barely steers while spinning); a shunted `PARKED` car slides and turns to rest (`_settle`, `PARKED_SCRUB`). walls: the car moves, then is pushed out along each wall it overlaps (`_wallContact`, SAT normal and depth) with an impulse at the struck corner (`WALL_BOUNCE_FACTOR`, `WALL_MU`), so the rear swings round to meet the wall, and only speed into the wall is taken, so one turned into a wall can always pull away; `driverInput` (stick/keys → gas and turn; hauling back is the brake), `onImpact` (a knock: twist, crunch, shake)  **People in the road**: traffic/traffic-people.js (`_readFolk`, `_folkLadder`, `_goRound`); their caps come last with the follow and stop-line caps; `isLaneClear` also wants the lane free of people on foot (`_folkInLane`). **Thinking less where nobody's looking**: beyond `SIM.AI_NEAR_RADIUS` of her, or `SIM.AI_SCREEN_MARGIN` past the edge of the last frame's view, a car decides every `TRAFFIC_AI_FAR_INTERVAL`th tick and rolls on its last inputs between (`aiDriveStep`).
+
+**Proposed ownership:** Directory routing, vehicle motion, occupants and traffic systems; Penthouse car artwork; Game models, roads, fares and service rules.
+
+**Cross-file global references:** `game` (15), `CONFIG` (11), `AIDriverSolver` (9), `clamp` (8), `normalizeAngle` (7), `PhysicsSystem` (5), `CollisionSystem` (4), `_frameTime` (3), `VEHICLE_BRANDS` (2), `VEHICLE_SPAWN_WEIGHTS` (2), `GameSettings` (2), `_physicsSpatial` (2), `showMessage` (2), `VehicleEntity` (1), `VEHICLE_MODEL_WEIGHTS` (1), `drawCarUnderglow` (1), `drawCarBody` (1), `drawCarLamps` (1), `darkenHex` (1), `VEHICLE_SEAT_ARC` (1), `isLineBlocked` (1), `_simTick` (1), `audioSys` (1), `SIGNAL` (1).
+
+**Declared classes:** `TrafficVehicle`.
+
+## src/traffic/vehicle-occupants.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/traffic/vehicle-occupants.js) · 106 lines · 12 declarations · 78 call/new expressions.
+
+Seated vehicle combat: window slots/seat rows from the model’s cabin, 170° side-window arcs, soft player aim limits with opposite-door hysteresis, shared lean/grip/muzzle geometry for driver and passengers. Cached lower/interior and roof/frame partitions of the existing car sprite keep the car's own glass shut and open a window only while its occupant leans out (an evenodd clip on the roof pass); occupants are clipped to their window/outside flank. Seated bodies face the car while head/shoulders/weapon aim outward. Driver arc and amber limit/X marker render above darkness. Passenger target selection filters by its own window before selecting the nearest enemy.
+
+**Proposed ownership:** Directory routing, vehicle motion, occupants and traffic systems; Penthouse car artwork; Game models, roads, fares and service rules.
+
+**Cross-file global references:** `game` (3), `CAR_ART` (3), `carGeo` (2), `TrafficVehicle` (1), `weaponMuzzleLocal` (1), `isLineBlocked` (1), `getColliders` (1), `carSprite` (1), `drawCarFrontTyres` (1), `drawCarSheen` (1).
+
+**Declared classes:** None..
+
+## src/traffic/zen-art.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/traffic/zen-art.js) · 147 lines · 39 declarations · 124 call/new expressions.
+
+**`ZenArt`**: the Zenxera supercars, cut like jewels: one design per model (`arrow` Bolt, `prism` Stratos and Freighter, `gem` Apex), flat planes each one shade of the paint, cyan seams; its outline (`path`), painted body (`paint`, into the car-art sprite), live lamps (`lamps`) and where they glow (`glowAt`), all in the Bolt's 63 × 36 units scaled to the car
+
+**Proposed ownership:** Directory routing, vehicle motion, occupants and traffic systems; Penthouse car artwork; Game models, roads, fares and service rules.
+
+**Cross-file global references:** None statically identified..
+
+**Declared classes:** None..
+
+## src/ui/action-dock.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/action-dock.js) · 59 lines · 6 declarations · 28 call/new expressions.
+
+The action dock: context pills (talk, search, enter, exit…) above the right-hand cluster, clear of the fire ring — `setActionPill`, `transitionAction`, the glyphs; `game.setInteract(verb, name)` sets the interact pill
+
+**Proposed ownership:** Directory UI/input/view services; Game branded layouts, text, applications and progression gates. Isolate DOM from world simulation.
+
+**Cross-file global references:** None statically identified..
+
+**Declared classes:** None..
+
+## src/ui/amber-app.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/amber-app.js) · 234 lines · 33 declarations · 105 call/new expressions.
+
+**Amber Delivery**, extending `phoneSystem`: `jobText` (Ren and the Bartender text the job they hand over in person as a pin: the drop-off, the mark's corner); `afterDelivery` (Ren texts a brief for another, the courier bringing the box to wherever she is, until five runs, then puts her on the app); the app (`#screen-amber`, the home icon once unlocked): her rating, runs, tips and earnings, the order she's on (time against the estimate, the box's condition), orders near her (by distance, kept half an hour), Amber Premium (1,200 PP: tips ×1.5, an Express order, a fourth order), Online pings while she's free
+
+**Proposed ownership:** Directory UI/input/view services; Game branded layouts, text, applications and progression gates. Isolate DOM from world simulation.
+
+**Cross-file global references:** `game` (16), `phoneSystem` (9), `showMessage` (7), `audioSys` (3).
+
+**Declared classes:** None..
+
+## src/ui/app-launch.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/app-launch.js) · 148 lines · 24 declarations · 91 call/new expressions.
+
+Inspect the linked declaration and relationship records for the responsibilities in this source unit.
+
+**Proposed ownership:** Directory UI/input/view services; Game branded layouts, text, applications and progression gates. Isolate DOM from world simulation.
+
+**Cross-file global references:** `phoneSystem` (2).
+
+**Declared classes:** None..
+
+## src/ui/bodies.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/bodies.js) · 384 lines · 43 declarations · 191 call/new expressions.
+
+`BUILDS` (slim, athletic, curvy, broad, heavy) and height. **The body's shape**: `BODY_CANON` per gender (shoulder joints and deltoid caps, torso depth, chest/back, bust, pelvis, leg roots, limb tapers, hand and foot size; the head stays 16 across), `bodyCanon(gender, build)` (the build widens shoulders or pelvis; cached); `bodyTorsoPath` (chest, shoulder blades and spine, ending at the shoulder joints; `band` for tank tops, `inflate` for padding), `bodyHipPath` (hip bones, seat, cleft), `bodyHeadPaths` (an egg from above, ears), `bodyLimbPath` (a segment tapered by `[near r, belly r, belly at, far r]`, round at each joint so knees and elbows stay joined), `bodyLimbRadius`, `bodyForearmReach` (how level a forearm is, from its drawn length), `bodyRingHalf` (half a ring round a limb as seen from above: a band across a level limb, a full ring on one pointing down; bangles, android wrist seams), `drawBodyHand` (turned along the forearm: relaxed and shortened by reach, or a fist), `drawBodyFoot` (heel, arch, ball, toes, turned out; shoes inflate it), `drawBodyCaps` (deltoids over the torso's edge in the sleeve's colour, leaning toward the elbows; padding, stripes, armhole seams). Paths are cached `Path2D`s placed by `_bodyFillAt` (transform and exact inverse, no save/restore). Drawing Double Nights androids (finishes in `core/appearances.js`): plating, visor, emblem, hover
+
+**Proposed ownership:** Penthouse optional character/art builders using Directory assets/rendering; Game appearances, poses and weapon definitions.
+
+**Cross-file global references:** `ANDROID_FINISHES` (2).
+
+**Declared classes:** None..
+
+## src/ui/cinematic-dialogue.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/cinematic-dialogue.js) · 298 lines · 42 declarations · 170 call/new expressions.
+
+`CinematicDialogue`: how scenes look — `say` (typed subtitle, speaker colour, living cameo, dimmed listener), `choose` (keys/taps, timed, weighty ◆), `card`, `marker`, the black layer, `memory` (vignette and grain; the colour grade is in draw.js), hold to skip. Paced by sim ticks  `black(to, frames, ease)` ('out' eases cubic); `card()` returns `leaving()` (true once the tap starts its fade-out).
+
+**Proposed ownership:** Directory UI/input/view services; Game branded layouts, text, applications and progression gates. Isolate DOM from world simulation.
+
+**Cross-file global references:** `SCENE_CAST` (4), `_gameTimeSec` (2), `pauseMenu` (1), `inferMood` (1), `blinkAmount` (1).
+
+**Declared classes:** `CinematicDialogue`.
+
+## src/ui/cloth.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/cloth.js) · 244 lines · 24 declarations · 67 call/new expressions.
+
+Cloth physics: coat hems, skirts and trains swing, trail and settle (same method as the hair) `_simTransform` fills one shared object (world inverse cached per frame); hair and cloth write their output into arrays kept on the sim (`_simOut`). Rest geometry, chain metrics and scratch buffers are retained with numeric checks for edited specifications.
+
+**Proposed ownership:** Penthouse optional character/art builders using Directory assets/rendering; Game appearances, poses and weapon definitions.
+
+**Cross-file global references:** `_worldMatrix` (4), `_gameTimeSec` (3), `_zoomLOD` (2), `_worldCanvas` (1), `_crowdLite` (1).
+
+**Declared classes:** None..
+
+## src/ui/coach.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/coach.js) · 134 lines · 18 declarations · 64 call/new expressions.
+
+**`Coach`** (`game.coach`): points at a piece of UI — spotlight (dim, only the target tappable) the first time, a ring after; a caption card; a ghost thumb for drags. Scenes yield on it. Styles: `styles/coach.css`
+
+**Proposed ownership:** Directory UI/input/view services; Game branded layouts, text, applications and progression gates. Isolate DOM from world simulation.
+
+**Cross-file global references:** None statically identified..
+
+**Declared classes:** `Coach`.
+
+## src/ui/color-picker.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/color-picker.js) · 105 lines · 33 declarations · 118 call/new expressions.
+
+`ColorPicker`: the in-game custom colour picker (styles/shops.css `.cp-*`) shared by the Clothing Dyer's custom swatch and Torque's Customize tab (a Custom swatch ending the paint, underglow and headlight rows). `html(hex)`: a saturation/brightness square, a hue strip, a hex field and the last 8 colours picked (`recent`, localStorage). `bind(root, hex, { onInput, onPick })`: pointer drags (touch too) and arrow keys call onInput for a live preview and onPick on release, Enter or a recent tap. `hsvOf` keeps a hue dragged onto white or black across re-renders
+
+**Proposed ownership:** Directory UI/input/view services; Game branded layouts, text, applications and progression gates. Isolate DOM from world simulation.
+
+**Cross-file global references:** None statically identified..
+
+**Declared classes:** None..
+
+## src/ui/comms.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/comms.js) · 95 lines · 17 declarations · 59 call/new expressions.
+
+**Comms and talk style**: `TalkStyle` (Settings → Developer → Talk Style, kept per device) puts `talk-ribbon` on the body for the gilded panel and comms cameo; the default is the Veil (bust and subtitles, tap the line to go on) and the earpiece thread. `Comms.say` (called by `story.triggerComms`) adds a chip with the speaker's painted face to `#comms-bar`, keeps the newest three (one in Ribbon), dims older ones, and drops each on a pausable timer. Looks: `styles/panels-phone.css`.
+
+**Proposed ownership:** Directory UI/input/view services; Game branded layouts, text, applications and progression gates. Isolate DOM from world simulation.
+
+**Cross-file global references:** `FaceCache` (5), `GameSettings` (3), `APPEARANCES` (3), `SPEAKER_COLORS` (2).
+
+**Declared classes:** None..
+
+## src/ui/crowd-impostors.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/crowd-impostors.js) · 320 lines · 24 declarations · 112 call/new expressions.
+
+**Crowd Quality** (Settings → Graphics; per device). `drawCrowdHumanoid` is the crowd's draw (pedestrians, lobby and club walkers, standing NPCs — never Stella, the crew, enemies or the fallen): **ultra** fully live; **high** (default) `CrowdBakes`: the walking crowd from full bakes — shaded for the sun's side by facing (`LIGHT_STEPS`), rain on them, hair and cloth run through their physics in step with a 12-step walk cycle (a stand-in walking through its own little world: `_worldMatrix`/`_worldCanvas` pointed at a scratch cell, `_bakeRot`/`_bakePed` on the stand-in, no wind), the street-lamp rim drawn live over the bake (`drawHumanRim`); a bake is spread over frames (`BAKE_DRAWS` bodies' worth a frame), someone just stopped (0.6–3.8 s, before the idle pose shifts weight) gets a one-frame still bake, and dancers, the hovering, the lightning-struck, night-vision heat, High lamp silhouettes, longer standers and close-ups (`LIVE_SCALE`) stay live; **medium** live with `_crowdLite` (flat shade, hair and cloth at rest, no rim — read by `humanShade`, `hairGeometry`, `clothGeometry`); **low** `CrowdImpostors`: each member's look baked once into a strip (idle + 8-step walk cycle, `CROWD_BAKE`), replayed by `walkPhase` after a live contact shadow; one bake a frame, up to 64 kept (never evicting someone on screen), dancers stay live. Warm sprite draws reuse parsed signatures and stride while preserving the existing bake budget and invalidation.
+
+**Proposed ownership:** Penthouse optional character/art builders using Directory assets/rendering; Game appearances, poses and weapon definitions.
+
+**Cross-file global references:** `_frameTime` (14), `RenderStats` (10), `_gameTimeSec` (7), `_zoomLOD` (6), `sunNow` (6), `_worldMatrix` (5), `_worldCanvas` (5), `drawProceduralHumanoid` (5), `_bodyRot` (5), `weatherAt` (4), `syncHumanoidGait` (4), `CONFIG` (3), `SilhouetteFX` (3), `_simTick` (2), `drawHumanContactShadow` (2), `Pedestrian` (2), `_lampShadowLevel` (1), `_lampsNear2` (1), `humanoidCadence` (1), `bodyScale` (1), `humanShade` (1), `drawHumanRim` (1), `GameSettings` (1).
+
+**Declared classes:** None..
+
+## src/ui/dev-overlay.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/dev-overlay.js) · 389 lines · 39 declarations · 210 call/new expressions.
+
+**Dev overlay** (Settings → Developer). The profiler pill (`#dev-prof`, DOM so the grade never tints it): FPS, frame ms by tier (mint / gold / crimson), a sparkline; tap for Full: sections slowest first (top three lit), entity counts. The debug view (`#dev-layers`): layer chips kept per device — Nav, Lights, Traffic, Shots, Rooms, Vision, Hearing, Colliders, Labels; `game.dbg(layer)` gates every debug draw; `drawDebugLayers` (rooms and doors, vision cones by state and where they're headed, each noise's reach and who heard it via `emitNoise`'s log, collision boxes, labels). Placement: portrait top-left / low-left, landscape beside the pause button, desktop top corners. Audio: rows `Audio:Ambience` (the beds, music and motor, `loop.js`) and `Audio:Sounds` (starting sounds; nested in other sections, so shown but not summed — `Profiler.add(label, ms, nested)`), and the Audio line (state and buffer, latency, voices, new/s, start ms/s, glitches where the browser reports playback stats). Render line: bodies drawn / culled this frame and canvas calls a frame (a counting shim on the 2D context, installed only while Full is open). The render line sits at the top of Full: browser/GPU (frame time − measured work), ticks/frame (a slow frame runs catch-up ticks, and the update rows add them up), bodies drawn / culled, cars and peds against their caps, crowd quality; canvas calls only with Settings → Developer → Count Canvas Calls (the counting shim slows what it measures) Render line also shows buildings drawn of the map's, ground tiles held (MB), and the big image caches' memory (`_canvasMB`: ground, painted floors, car sprites, baked crowd). The call counter (`_countCalls`, `_wantCalls`) runs for Full with Count Canvas Calls or for Baseline's layer panel; both read it as a running count (`_callMark`), never zeroing it. Both panels sit in one column, `#dev-dock` (`dock()`): portrait low on the left, sharing the column with Full (45 / 55); landscape beside the pause button; desktop top-right.
+
+**Proposed ownership:** Directory UI/input/view services; Game branded layouts, text, applications and progression gates. Isolate DOM from world simulation.
+
+**Cross-file global references:** `RenderStats` (12), `GameSettings` (11), `GameEntity` (7), `audioSys` (5), `MAP_BAKES` (3), `RenderLayers` (2), `_carSprites` (2), `CrowdImpostors` (2), `CrowdBakes` (2), `PropSprites` (2), `CollisionSystem` (2), `game` (1), `engineMixin` (1), `getColliders` (1), `_gameTimeSec` (1).
+
+**Declared classes:** None..
+
+## src/ui/expressions.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/expressions.js) · 85 lines · 6 declarations · 16 call/new expressions.
+
+`EXPRESSIONS`: faces for portraits (smile, sultry, worried…), mood from dialogue text, blinking
+
+**Proposed ownership:** Penthouse optional character/art builders using Directory assets/rendering; Game appearances, poses and weapon definitions.
+
+**Cross-file global references:** None statically identified..
+
+**Declared classes:** None..
+
+## src/ui/face-cache.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/face-cache.js) · 123 lines · 23 declarations · 53 call/new expressions.
+
+Inspect the linked declaration and relationship records for the responsibilities in this source unit.
+
+**Proposed ownership:** Penthouse optional character/art builders using Directory assets/rendering; Game appearances, poses and weapon definitions.
+
+**Cross-file global references:** `game` (6), `CacheDB` (4), `DFAB_BUILD` (2).
+
+**Declared classes:** None..
+
+## src/ui/hud-reveal.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/hud-reveal.js) · 86 lines · 16 declarations · 31 call/new expressions.
+
+**`HudReveal`** (`game.hud`): the HUD appears part by part as the story introduces it (`HUD_PARTS`; `.hud-veiled`). `reveal(key, {title, text})`, `startFresh`, `revealAll`; saved as `hudRevealed` (saves with auto-drive get the handbrake too)
+
+**Proposed ownership:** Directory UI/input/view services; Game branded layouts, text, applications and progression gates. Isolate DOM from world simulation.
+
+**Cross-file global references:** None statically identified..
+
+**Declared classes:** `HudReveal`.
+
+## src/ui/humanoid-render.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/humanoid-render.js) · 3142 lines · 156 declarations · 1676 call/new expressions.
+
+Drawing characters: hair, portraits, bodies (shapes from `ui/bodies.js`; arm roots turn with the torso and leg roots with the pelvis, so the shoulders and hips carry the limbs; a hand closes into a fist round a drawn weapon, a glass or a guard; each limb clears the canvas path after its fill, since the browser re-maps a leftover path through every later transform), held drinks, a carried parcel (`held: PARCEL_HELD`; `PARCEL_TUCKED` under her left arm while her hands are on a gun: both hands forward round a Cozy Cafe box, `drawCozyParcel`: kraft card, cocoa band, the cafe's cup sticker, a heart tab), weapons (`drawWeapon`: the baked model sprite + its lights breathing slowly in a wave down the gun and a spark gliding along its light line). **Shading**: `humanShade` (the light in the body's frame: level by `_zoomLOD`, shine/shade fills cached per frame, the crowd skips the torso; at night the nearest burning street lamp within `HUMAN_SHADE.RIM_R` rims them in its colour, a few pedestrians a frame; indoors the room's lamps do at any hour (`RIM_INDOOR`), a soft wrap plus a bright edge round the hair and shoulder). **Hair finish** (`_hairFinish`, LOD 0): a sprite baked per style and colour (`HAIR_CROWNS`) darkens the crown toward its edge, lays strands (swept back, into a tie, out from a part, or coils) and a sheen band; loose strands get a sheen past the crown, and the rest of each style its own texture (`_hairSecondary`: strands through long curtains, ponytails and tendrils, twisted bands on dreadlocks, lit plait crests on braids, a coil or strand tile clipped to afro and curl lobes and short ruffles, with cluster rims). Matte, no highlights: a smooth wide shade (`_softSpot`, a stretched radial sprite) on the side away from the sun on every limb (`drawLimb`), the torso and head; hair gradients within its own colour (`_hairTone`: dark hair lifts toward the light, light hair deepens away); only glossy fabric (`finish: 'gloss'` on the item or its `WARDROBE` piece, e.g. leggings: `_glossy`) keeps a crisp sheen; `drawHumanContactShadow` (cast along `_sunShadow` by day, a round pool at night and indoors; replaces the pedestrians' own)  Classic portraits (`drawCharacterPortraitClassic`, used where canvas filters are missing or with `config.classic`): a close bust lit like the room (`portraitRimRGB`: the lamp nearest the player, pushed toward its hue): a backdrop glow, and the body, face and each hair layer drawn flat into their own layer then modelled inside their shape (`_portraitLayer`, `_pAtop`, `_pSpot`) with a rim along the left edge (`_pRim`: the shape less itself shifted); faces get form shading, layered eyes (shaded white, iris gradient and fibres, limbal ring, catchlights, crease, liner, lashes), a shaded nose and rose-leaning lips; hair gets depth, strands or coils (curls drawn through `_portraitClusters` so each lobe keeps a rim) and a sheen. The front hair layer is clipped (even-odd) out of a window over the eyes and lower face, so every fringe stops at the brow. Per-owner body/limb/hair buffers and exact repeated-math reuse reduce allocations. Distant hair LOD groups strokes (60/36/24 for long hair) without changing simulated segments; close-up and portrait detail stays full.
+
+**Proposed ownership:** Penthouse optional character/art builders using Directory assets/rendering; Game appearances, poses and weapon definitions.
+
+**Cross-file global references:** `_gameTimeSec` (18), `_zoomLOD` (14), `_frameTime` (13), `CONFIG` (13), `lightenHex` (11), `WARDROBE` (10), `_hairShade` (9), `game` (8), `drawBodyHand` (8), `sunNow` (7), `_sunShadow` (7), `_worldMatrix` (5), `darkenHex` (5), `SilhouetteFX` (5), `hexToRgba` (4), `Pedestrian` (4), `topColor` (4), `bodyTorsoPath` (4), `_crowdLite` (3), `drawBodyCaps` (3), `drawKnuckleDuster` (3), `drawGlow` (3), `_worldCanvas` (2), `androidLook` (2), `glowSprite` (2), `lampWake` (2), `lampFlicker` (2), `GameSettings` (2), `bodyLimbPath` (2), `weaponModel` (2), `POSES` (2), `WIDE_SWING` (2), `weaponMuzzleLocal` (2), `drawBodyFoot` (2), `BOOT_SHAFT` (2), `fillLimbSpan` (2), `drawClothPanel` (2), `GLASS_DRINKS` (2), `_simTransform` (1), `_simSteps` (1), `_simOut` (1), `APPEARANCES` (1), `resolveExpression` (1), `portraitBreadth` (1), `drawAndroidPortraitFace` (1), `blinkAmount` (1), `drawAndroidHead` (1), `bodyHeadPaths` (1), `hexToRgb` (1), `bodyScale` (1), `weatherAt` (1), `bodyCanon` (1), `syncHumanoidGait` (1), `humanoidStrideLength` (1), `RenderInterp` (1), `humanoidPunchCurve` (1), `mapBeatN` (1), `wideGrip` (1), `VEHICLE_OCCUPANT_SCALE` (1), `drivingWeaponGrip` (1), `clothGeometry` (1), `bodyHipPath` (1), `bodyRingHalf` (1), `bodyForearmReach` (1), `drawDNEmblem` (1), `drawUmbrella` (1), `bakeWeapon` (1).
+
+**Declared classes:** None..
+
+## src/ui/inventory-augments.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/inventory-augments.js) · 931 lines · 107 declarations · 306 call/new expressions.
+
+Items, abilities, inventory, augments. Up to two attachments worn at once; attachments don't count toward the carry capacity (`equippedAttachments`, `maxAttachments`; `hasAttachment(effect)`; `equippedAttachmentId` reads/sets the first, for older saves). `toggleMenu` opens/closes through `Screens`; the list shows only equipped items on the EQUIPPED screen Apartment furniture shows under Items once she has been home (`questState.aptVisited`, set by `engine/furniture.js`), with counts taken from the built apartment. The Equipped screen ignores the category filter. Balance: Anavia 8 damage, RB-98 12, dancer fireball 50.
+
+**Proposed ownership:** Directory UI/input/view services; Game branded layouts, text, applications and progression gates. Isolate DOM from world simulation.
+
+**Cross-file global references:** `showMessage` (13), `COSMETICS_REGISTRY` (4), `Screens` (4), `audioSys` (4), `invSidebar` (3), `ProjectileEntity` (2), `_gameTimeSec` (1), `_frameTime` (1), `drawGlow` (1), `drawWeapon` (1).
+
+**Declared classes:** `InventoryItem`, `InventorySystem`, `AugmentSystem`.
+
+## src/ui/map-icons.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/map-icons.js) · 482 lines · 44 declarations · 426 call/new expressions.
+
+**MapIcons**: one icon set for the golden map and the phone map, painted with paths only (no emoji) into cached sprites per kind/size/dpr and stamped at FIXED CSS sizes (`SIZE` table; `zoomK` grows them a touch with zoom, never with the screen): crimson teardrop `pin:<glyph>` (home, cross, cup, wrench, coin, star, flag, sparkle, person, car, box, target, dot) and the same in amber, `amberPin:<glyph>`, and gold, `goldPin:<glyph>` (`TINT`); round compass badges `badge:` (gold), `amberBadge:`, `crimsonBadge:`; violet `player`, `car` (`car:amber` Amber's van), gold `objective`, `danger` (the scrapyard's hazard chevron), `transition`, `client`, `search`, `dest`. **MapArt.paintCity**: the city of light, gold on deep violet (roads as molten gold with an amber halo, pavements and crosswalks in faint gold, lamps as warm specks capped in map units, violet blocks/buildings rimmed in gold, parks with a cobbled grain); `MapArt.bloom` pools the light (downscale and add)
+
+**Proposed ownership:** Directory UI/input/view services; Game branded layouts, text, applications and progression gates. Isolate DOM from world simulation.
+
+**Cross-file global references:** `glowSprite` (7), `seededRandom` (2), `Poly` (2).
+
+**Declared classes:** None..
+
+## src/ui/messages.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/messages.js) · 1248 lines · 186 declarations · 685 call/new expressions.
+
+The Messages app ("Velvet Thread"), extending `phoneSystem`: on its side the inbox rail (All / Crew / Unread, pinned group and Mirabel, painted faces with the bond's ring) beside the thread, upright one or the other (`.has-thread`). Violet bubbles for hers, smoke for theirs, world-time day dividers ("Tonight · 11:38 PM", "Earlier" for authored lines), "Seen", typing dots, gold reply chips and a camera. Rich records (`kind`): `pin` (a place's id, or a spot of its own `{ x, y, label, kind }`; map crop via `MapArt.paintCity`; Set waypoint = the UMaps marker, saved as `feed.pendingPin` outside the city), `brief` (a generated job; Accept → `missions.acceptMission`), `voice` (waveform + an earpiece comm chip subtitle), `snap` (theirs painted from portrait + place backdrop; hers a JPEG of the game view, newest six kept). Hold / right-click / double-click a line to react; a crew member's favourite (`MSG_TASTE`) gives +2 relationship once per line, and they react to hers. The Freelancers group chat: `crewBanter(m, game)` from `completeMission` (who came, who's down, how it went). `feed` (saved with the phone) has contacts write on their own after chapter 1. Styles: styles/panels-phone.css (`.msg-*`, `.mb-*`).
+
+**Proposed ownership:** Directory UI/input/view services; Game branded layouts, text, applications and progression gates. Isolate DOM from world simulation.
+
+**Cross-file global references:** `game` (54), `phoneSystem` (11), `FaceCache` (8), `showMessage` (7), `audioSys` (5), `BONDING_TIERS` (4), `MapArt` (3), `SPEAKER_COLORS` (2), `AppLaunch` (2), `MAP_PAL` (1), `drawCharacterPortrait` (1).
+
+**Declared classes:** None..
+
+## src/ui/music-widget.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/music-widget.js) · 204 lines · 25 declarations · 67 call/new expressions.
+
+The radio/music widget (through the music bus)
+
+**Proposed ownership:** Directory UI/input/view services; Game branded layouts, text, applications and progression gates. Isolate DOM from world simulation.
+
+**Cross-file global references:** `audioSys` (2), `_frameTime` (1).
+
+**Declared classes:** `MusicWidgetSystem`.
+
+## src/ui/pause-look.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/pause-look.js) · 39 lines · 3 declarations · 18 call/new expressions.
+
+Inspect the linked declaration and relationship records for the responsibilities in this source unit.
+
+**Proposed ownership:** Directory UI/input/view services; Game branded layouts, text, applications and progression gates. Isolate DOM from world simulation.
+
+**Cross-file global references:** None statically identified..
+
+**Declared classes:** None..
+
+## src/ui/phone.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/phone.js) · 1276 lines · 142 declarations · 536 call/new expressions.
+
+The phone (contacts, messages, map, apps). `fit()`: on its side (600×300, `body.phone-wide`) whenever the screen is wider than tall, upright otherwise, scaled (`--phone-scale`) to fit with a margin on every resize and browser-bar change; closes from the CLOSE pill, the corner ✕ or a tap on the dimmed backdrop. incoming calls (`ringCall`/`answerCall`/`endCall`: a call card, no pause), NEUME UI, global keys  Neu.Me is her dressing room: a stage painting all of her (`RealPortrait.figure`, repainted on each change and on resize) beside tabs (Outfit, Wig, Skin, Legs, Hat, Jewelry, In hand, Mask, Voice) over cards of what she owns; the glass adds a Pour row, Mask is Auto · Always on · Off → `cosmetics.maskMode` (saved with the cosmetics). Styles in `styles/panels-phone.css` (`.nm-*`).
+
+**Proposed ownership:** Directory UI/input/view services; Game branded layouts, text, applications and progression gates. Isolate DOM from world simulation.
+
+**Cross-file global references:** `game` (146), `audioSys` (16), `pauseMenu` (13), `MapIcons` (12), `showMessage` (9), `Screens` (9), `ZIB_CONFIG` (5), `COSMETICS_REGISTRY` (4), `RealPortrait` (3), `GLASS_DRINKS` (3), `MapArt` (2), `WEATHER_CONDITIONS` (2), `SPEAKER_COLORS` (2), `VEHICLE_BRANDS` (2), `MAP_PAL` (1), `COMPASS_WORDS` (1), `CONFIG` (1), `getColliders` (1), `TrafficVehicle` (1), `carPortraitUrl` (1), `carSpecBarsHtml` (1), `APPEARANCES` (1), `withFieldMask` (1), `dyedOutfit` (1).
+
+**Declared classes:** None..
+
+## src/ui/portrait-real.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/portrait-real.js) · 1612 lines · 126 declarations · 1908 call/new expressions.
+
+**Painted portraits** (`RealPortrait`, behind `drawCharacterPortrait`): a realistic bust painted in a 1000×1000 space (face centre 500,470, radii 158×210) and scaled to the canvas; blurred blobs and lines for soft form (blur radii scaled by hand: canvas filters ignore the transform), hair as hundreds of strands clipped to each style's silhouette (long, demon_dancer, short — combed back on men, a swept pixie on women — ponytail, braids, dreadlocks, curls as ringlets, afro as a lit mass of fine coils), skin grain, a rim of the room's colour (`portraitRimRGB`) on every layer. The still parts (backdrop, back hair, body and clothes, ears, face, nose, front hair, jewelry, hat) are cached per look, size and rim (40 kept); the eyes, brows and mouth carry the expression, blink and talk and are painted on every call. Wardrobe pieces and the android face draw in pixels with a pixel `P`, as in the classic bust. Falls back to the classic renderer without canvas filters. `RealPortrait.figure(ctx, w, h, config)` paints all of her front on in the same space carried down to her feet (soles ~3790): the same head, hat and face/neck jewelry over a painted body dressed from `top`/`bottom`/`shoes`/`train`, legwear (hose patterns, thigh bands, thigh-high boots), bangles and what she `held` (a raised glass or a closed umbrella), the evening bodices and gowns with their `fabric` and `accent`; cached per look and size (12 kept). Used by NEU.ME.
+
+**Proposed ownership:** Penthouse optional character/art builders using Directory assets/rendering; Game appearances, poses and weapon definitions.
+
+**Cross-file global references:** `WARDROBE` (8), `portraitBreadth` (2), `GLASS_DRINKS` (2), `resolveExpression` (2), `androidLook` (1), `APPEARANCES` (1), `portraitRimRGB` (1), `drawAndroidPortraitFace` (1), `drawCharacterPortraitClassic` (1).
+
+**Declared classes:** None..
+
+## src/ui/poses.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/poses.js) · 155 lines · 25 declarations · 68 call/new expressions.
+
+`POSES`: idle life (breathing, weight shift, looking around) and poses: arms crossed, lean, fidget, typing, phone, dance, seated (`sit`, `sit_wrap`, `sit_lean`, `sit_work`, `sit_phone`)…
+
+**Proposed ownership:** Penthouse optional character/art builders using Directory assets/rendering; Game appearances, poses and weapon definitions.
+
+**Cross-file global references:** None statically identified..
+
+**Declared classes:** None..
+
+## src/ui/render-layers.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/render-layers.js) · 166 lines · 26 declarations · 83 call/new expressions.
+
+**Baseline's layer panel** (`RenderLayers`, `#dev-render`, in `#dev-dock`). `RENDER_LAYERS`: 29 chips in draw order — World (Ground, Floors, Walls, Reflections, Decals, Sun shadows, Signals, Buildings, Roofs, Neon, Trees, Lamps), Things (Props, Cars, Markers), People (Crowd, Characters, Stella), Effects (Combat FX, Particles, Sound rings), Light (Lighting, Glow, Map edge), Screen (Bloom, Atmosphere, Rain, Bokeh, HUD); unswitchable buckets frame, debug, outside (calls between frames; a gap over 250 ms, a pause, is dropped). `at(key)` gates and bills (deltas of `RenderStats.calls`); `beginFrame` / `endFrame` in `draw()`; every 30 frames `_show()` puts calls a frame on each chip (top three gold), the total and frame ms in the header, the buckets in the footer, and keeps `last` (`{avg, total, ms}`). Presets All · Base (what Baseline drew before: Ground, Stella, Sound rings, Bloom, Atmosphere, Rain, Bokeh, HUD) · None; the chip set is kept per device (`dfab_render_layers`), Base the first time. `sync(game)` follows `GameSettings.baseline` and runs the call counter while the panel is open.
+
+**Proposed ownership:** Directory UI/input/view services; Game branded layouts, text, applications and progression gates. Isolate DOM from world simulation.
+
+**Cross-file global references:** `RenderStats` (4), `DevOverlay` (3), `GameSettings` (1).
+
+**Declared classes:** None..
+
+## src/ui/save-slots-pause-menu.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/save-slots-pause-menu.js) · 1392 lines · 162 declarations · 738 call/new expressions.
+
+Save slots and the pause/settings menu. Saves are imprints: the Imprint (save) and Recall (load) screen deals one gilded card per slot (plus the autosave when recalling) with a snapshot of the room and 949's face kept in the save (`keepsake()`, called by `saveGame`), the chapter name and last objective from STORY_DB, place, world time, money and date; overwrite and delete turn the card over to ask. Styles: styles/hud-menus.css (`.ks-*`). The pause menu follows ETERNAL's mock-up: right column "Paused" + lit-pill items; left column a Now Playing capsule (mirrors `game.musicWidget`: disc = station, gold chevron = play/pause; hidden for now by `#pause-np { display: none }` in styles/hud-menus.css), the objectives, then QUICK ACCESS (Equip Items → `Screens.open('equipped')`, Drop Items → inventory, Cinematic View → `enterCinematic`: HUD faded, world held under a `cinematic_view` pause, tap/Esc back to the menu). ←/→ switch between the two lists  **Cinematic View = photo mode**: `game.cineCam` keeps `draw()` going while paused; drag pans (≤ `CAMERA.CINE_PAN` 450 world px), pinch/wheel/± zoom (`CINE_ZOOM` 0.5–2.5), ⟲ recentres; a quick tap, ✕ or Esc goes back; 🎨 opens the grade drawer (`#cine-grade`: presets, seven sliders, As seen / Full colour, which lifts the stealth grey for the photo; Settings → Fine-tune Grade opens it too and returns there); `capturePrompt(focus)` shows a "📷 Capture?" pill that opens the view framed on a spot (`enterCinematic({focus, grade, back})`); 📷 SAVE (`saveCinePicture`) copies the canvas with its colour grade, then bakes the temperature/tint wash and vignette in (`gradePhotoPass`), to a PNG (`Dimensions-Freelancer-YYYYMMDD-HHMM.png`): the share sheet on phones, a download elsewhere.  Rain follows the pan: `drawRainOverlay` takes the panned view, and `_cineRain` → `weather.fillView` tops up held drops over ground the real camera never spawned for.  **Settings** are grouped into categories (`.settings-group` sections, each under its label): Controls (flit and firing), Camera & Combat (scope, edge lock, finisher), Visibility (Player Glow, Stealth Grey, sound rings), Graphics (lighting, shadows, bloom, reflections), Colour & Mood (grade, atmosphere, film grain), World Density, Display & Performance (fullscreen, orientation, frame limit), Audio, Developer. A sticky row of category chips (`#settings-jump`) jumps to each (`_jumpToSettingsGroup`) and lights the one in view as the panel scrolls (`_syncSettingsJump`).  **Settings → Developer**: Profiler, Debug View, Weather (Auto / pinned Clear, Drizzle, Rain, Storm), Weapon Mode (Normal / Sniper), Whole-Game Bench, Resolution Bench. The old ⚙ utility dock is gone: everything it held lives in Settings, the pause menu or the sidebar.
+
+**Proposed ownership:** Directory UI/input/view services; Game branded layouts, text, applications and progression gates. Isolate DOM from world simulation.
+
+**Cross-file global references:** `GameSettings` (130), `game` (94), `showMessage` (13), `DevOverlay` (8), `audioSys` (7), `invSidebar` (4), `CONFIG` (4), `saveSlotManager` (4), `TalkStyle` (4), `FullscreenManager` (4), `OrientationManager` (4), `syncGradeDrawer` (3), `Screens` (3), `STORY_DB` (2), `applyGameGradePreset` (2), `PauseLook` (2), `syncHudInput` (2), `GAME_GRADE_PRESETS` (2), `RenderLayers` (2), `PropSprites` (2), `CrowdImpostors` (2), `exportGameGrade` (1), `importGameGrade` (1), `setGameGradeValue` (1), `hudInputBlocked` (1), `clearGameplayInputs` (1), `gradePhotoPass` (1), `syncAmbienceSliders` (1), `PlaneSprites` (1), `PerformanceBench` (1), `PerfBench` (1), `syncMainMenuLabels` (1).
+
+**Declared classes:** `SaveSlotManager`, `PauseMenuController`.
+
+## src/ui/screens.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/screens.js) · 104 lines · 22 declarations · 70 call/new expressions.
+
+**`Screens`**: the one way the sidebar-nav screens open and close. `open(name)` closes the other panel (map ↔ freelancer menu, pause tokens and all), hides every sub-screen, shows the one asked for, sets the title and both nav highlights, and hides the item Filter on screens it doesn't filter (`FILTERED`: inventory, equipped → otherwise `.no-filter`). `close()`, `toggle()`, `current`. The nav, dock, pause menu, armory, `toggleMap`/`toggleMenu`, and Esc / B / M all come through here
+
+**Proposed ownership:** Directory UI/input/view services; Game branded layouts, text, applications and progression gates. Isolate DOM from world simulation.
+
+**Cross-file global references:** `game` (17), `syncHudInput` (2), `invSidebar` (2).
+
+**Declared classes:** None..
+
+## src/ui/sidebars.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/sidebars.js) · 190 lines · 23 declarations · 65 call/new expressions.
+
+Inventory and map sidebars (collapse, filters; nav clicks call `Screens.open`). `checkMobile`: a narrow screen, or a phone on its side narrower than `LANDSCAPE_ROOM` (860 px), tucks them behind their handles (`.overlay`, opened over the content); wider, they stay open beside the content (styles/landscape.css)
+
+**Proposed ownership:** Directory UI/input/view services; Game branded layouts, text, applications and progression gates. Isolate DOM from world simulation.
+
+**Cross-file global references:** `game` (3), `Screens` (1).
+
+**Declared classes:** `SidebarController`.
+
+## src/ui/silhouette-fx.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/silhouette-fx.js) · 146 lines · 8 declarations · 49 call/new expressions.
+
+**Visibility silhouettes.** `SilhouetteFX`: a body is drawn once into a small pooled canvas round it (standing in for the world, like the finisher's corpse snapshots, so hair, cloth and slosh still read where it is), then stamped back where it would have gone; its contact shadow stays on the frame. **Her halo** (`glow`, set by `drawPlayer` while `_playerGlowOn()`: Settings → Visibility → Player Glow, `GameSettings.playerGlow`, kept in saves; on foot and in play, as for her marker): the silhouette tinted pale lavender and kept; `drawPlayerGlow` (draw.js, after the darkness and the emissive pass) blurs it outwards and cuts her shape out, so only a soft rim shows and her clothes read as they are, by day, by night and in night vision. **Hostiles in night vision** (`heat`, set by draw.js round the enemy loop to `nvIntensity`): each ganger (via `drawProceduralHumanoid`) and gatling gunner (`_drawGunnerBody`) gets its silhouette again in white-hot with a white bloom; civilians, crew and the crowd are never captured. Tuning in `SILHOUETTE`
+
+**Proposed ownership:** Directory UI/input/view services; Game branded layouts, text, applications and progression gates. Isolate DOM from world simulation.
+
+**Cross-file global references:** `_worldMatrix` (5), `_worldCanvas` (4), `game` (3), `keepLampSilhouette` (1).
+
+**Declared classes:** None..
+
+## src/ui/ui-system.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/ui-system.js) · 1245 lines · 84 declarations · 503 call/new expressions.
+
+`UISystem`: HUD, banners, prompts  Golden map: canvases in device px (crisp on retina; input converted from CSS px); the static city cached per zoom BAND (0.5/1/2/4, ≤2560 px a side) and stretched between bands, so pinching doesn't repaint; labels collision-culled at fixed sizes; legend and zoom readout from MapIcons inside the free area between the sidebars (`_freeArea`); markers drawn in screen space at fixed sizes (`animateIcons`).
+
+**Proposed ownership:** Directory UI/input/view services; Game branded layouts, text, applications and progression gates. Isolate DOM from world simulation.
+
+**Cross-file global references:** `MapIcons` (27), `_frameTime` (5), `MAP_DATA` (5), `MAP_PAL` (4), `Screens` (3), `mapSidebar` (3), `showMessage` (2), `_frameTimeSec` (2), `MapArt` (2), `MISSION_TYPES` (1).
+
+**Declared classes:** `UISystem`.
+
+## src/ui/wardrobe.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/wardrobe.js) · 1033 lines · 156 declarations · 1000 call/new expressions.
+
+`WARDROBE`: every top, bottom, shoe, hat and piece of jewelry, in the world and in portraits. Evening wear: `corset`, `halter`, `off_shoulder`, `slip` tops; `ball_gown` (the circle skirt's `flutedSkirt`, wider), `mermaid` and `slit_gown` (the long skirt's hem from above), `slip_skirt` bottoms. The character look format is documented at the top. Tops fill the body's torso path (`g.body`, ui/bodies.js) and pelvis overlays its pelvis path; shoes are the foot shape, inflated; tops mark how the renderer's shoulder caps look (`padded`, `armStripe`, `seams`). Wrist jewelry can add an `under` pass, drawn before the forearms so they hide it (the halves of the bangles beneath the wrist); earrings (`underHair`) are drawn before the head. `topColor(top)`: a top's colour, else its piece's default (the lab coat's white)
+
+**Proposed ownership:** Directory UI/input/view services; Game branded layouts, text, applications and progression gates. Isolate DOM from world simulation.
+
+**Cross-file global references:** `_zoomLOD` (13), `fillLimbSpan` (5), `bodyTorsoPath` (4), `drawBodyFoot` (4), `bodyHipPath` (3), `drawClothPanel` (2), `drawDNEmblem` (2), `bodyLimbPath` (2), `bodyLimbRadius` (2), `darkenHex` (1), `_gameTimeSec` (1), `bodyFootPath` (1), `drawGlow` (1), `bodyForearmReach` (1), `bodyRingHalf` (1).
+
+**Declared classes:** None..
+
+## src/ui/weapon-models.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/ui/weapon-models.js) · 319 lines · 37 declarations · 219 call/new expressions.
+
+**Gun models**: `WEAPON_MODELS` in the shapes of ETERNAL's catalog sketches, seen from straight above (rear knob, a ring band bulging both sides, rounded slide or long barrel, slotted collars, side knob and emblem, muzzle nub): `_r`/`_cap` slabs, `_c` faceted gem knobs, `_e`/`_ce` lights, `_g` glass sleeves, `_hole`, `_slots`; each part in a jewel-tone `GUN_MATERIALS` material, plus `muzzle`, `rail`, `brass` (the casings' glitter colour), live `glow` and a gliding spark `run`. Includes the EMPG (`empg`, model only). `weaponModel(id)` falls back by name; `bakeWeapon` paints each model once at 4× as angular metallic glass (hard bevel facets, slanted glints, gem knobs, glass panes, light halos; `_paintGunPart`, `_gunGlints`)  **Signatures** (`fx`): `trail` 'crackle' (Anavia), 'static' (EMP), 'wisp' (Golden Child) behind the shot; `barrel` 'smoke' (SR-86; RB-98 only after `after` quick shots) or 'embers' (YourGirlSara); colours `col`/`core`/`dust`/`hot`.  The Maiden's Kukri (`maiden_kukri`, `melee: true`): a forward-curved gold blade, dark grip, ring pommel, a glint down the edge. Blood Pact (`blood_pact`, `melee: true`, `swing: 'wide'`: a two-handed sweep): a long, gently curved blood-red katana with a glowing edge, black wrapped grip, crimson tsuba; `edge` (the tip the slash trail follows) and `trail` (its colours).
+
+**Proposed ownership:** Penthouse optional character/art builders using Directory assets/rendering; Game appearances, poses and weapon definitions.
+
+**Cross-file global references:** None statically identified..
+
+**Declared classes:** None..
+
+## src/world/billboards.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/world/billboards.js) · 143 lines · 16 declarations · 104 call/new expressions.
+
+`BILLBOARDS`: your artwork on tilted panels around the city. Add one by copying a line
+
+**Proposed ownership:** Directory world/weather/navigation/rooms/crowd services; Penthouse optional procedural scenery; Game location/climate/population recipes.
+
+**Cross-file global references:** `game` (3), `ASSETS` (2), `_zoomLOD` (2), `getImage` (1), `CONFIG` (1), `leanCamHeight` (1), `StaticEntity` (1), `hexToRgb` (1).
+
+**Declared classes:** `Billboard`.
+
+## src/world/bokeh.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/world/bokeh.js) · 93 lines · 5 declarations · 40 call/new expressions.
+
+Screen-space bokeh effect
+
+**Proposed ownership:** Directory world/weather/navigation/rooms/crowd services; Penthouse optional procedural scenery; Game location/climate/population recipes.
+
+**Cross-file global references:** None statically identified..
+
+**Declared classes:** `BokehSystem`.
+
+## src/world/cafe-life.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/world/cafe-life.js) · 137 lines · 18 declarations · 87 call/new expressions.
+
+**The Cozy Cafe's guests** (`CafeLife extends ClubLife`, cozy_cafe_interior only): in from the street, a queue at the counter, a mug at the pick-up end (`give`), then a long sit — round tables (friends take one together), armchairs by the fire, booths, the window bench — sometimes the books, the pastry case or the record player first. A second barista carries cups out and polishes. `CAFE_CROWD` 6/10/14 by density, busiest mornings and late afternoons. Seats from `CAFE_TABLES` / `CAFE_BOOTHS` (world/map-entities.js)
+
+**Proposed ownership:** Directory world/weather/navigation/rooms/crowd services; Penthouse optional procedural scenery; Game location/climate/population recipes.
+
+**Cross-file global references:** `pickFrom` (11), `CAFE_TABLES` (2), `ROLE_LOOKS` (2), `seededRandom` (2), `CAFE_BOOTHS` (1), `ClubLife` (1), `NavGrid` (1), `GameSettings` (1).
+
+**Declared classes:** `CafeLife`.
+
+## src/world/city-layout.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/world/city-layout.js) · 1608 lines · 192 declarations · 442 call/new expressions.
+
+`CityLayout`: blocks, roads and building placement for the city. A landmark is placed by everything it occupies: its sections plus its `apron` (portico, forecourt, drive: `BuildingV2Registry.register`, buildings/registry-v3.js), so nothing it draws reaches the pavement; the placement's `x, y, w, h` is its sections' box, `originX/Y` where the building goes. **Hand-laid blocks:** `row(block, side, ids, {gap, setback, justify})` lines buildings up along a street front (wall to wall at gap 0; the buildings face that street), `corner(block, 'nw'|'ne'|'sw'|'se', id)`, `lot(block, side, {offset, frontage, depth})` (a plot's world rect) and `placeAt(id, x, y)`; `layoutIssues(street)` lists anything on the street or on another building (the City debug layer draws them red). Street trees stay off the pavement in front of a row. A placement's `facing` ('S', 'N', 'E', 'W'; `CityLayout.facing`) goes to the building: BuildingV2 `facing` puts its door, sign awning, entrance lights, front wash and balconies on that side (`_frontGeo`, `_entrance`; a building placed with a facing gets a shopfront even without a door; the landmarks keep their own south fronts), and its landmark and Zib drop-off use the road on that side. **Street-front fill:** `autoFillAll` grows rows along every street a block fronts (`streetSides`, `_fillStreetFronts`: north and south rows, then west and east between them, mostly wall to wall, `fill` for how much of each front), facing the road with a one-light shopfront (`shopfront: 'pool'`); `scatter: [blocks]` keeps the old random placement (the Scrapyard). **Angled streets:** `addAngledRoad(x1, y1, x2, y2, name, lanes)` runs a street at any angle from one road's centre line to another's (a T at each end; `_angledEnd` finds the road there and the `mouth`, how far in its carriageway clears it). Buildings keep off its `corridor` (carriageway and pavements: `_intersectsSafeZone`); street-front fill stops the straight rows either side of it and lines it with a stepped row on each side (`_fillAngledFronts`: each building's nearest corner on its setback line, facing whichever of N, E, S, W looks most onto it). `angledPavements()` gives its two pavements as polygons, `cutPavements(paves)` cuts the other roads' pavements where it joins, its crossings (one at each end, `orientation: 'D'`) carry their `poly`, `axis` (stripes), `kerbs` (walk lights) and `ends` (where people step off), and the pedestrians' walks run down both its pavements and break for its mouths (`_mouthGaps`). The hub's is Lantern Cut, from Clinic Way to East Ave. **Curved streets:** `addCurvedRoad(points, name, lanes, {radius})` is the same along a polyline with its corners rounded off (`RoadPath.rounded`); everything above follows its `path` (`road.path`, a `RoadPath`: `at(s, lat)`, `frame(s)`, `project`, `band`), each end meeting its road square on along its first and last legs (`corridorPieces`: the corridor piece by piece, for the rows either side). The hub's is Halfmoon Bend, a lane each way from Skyline Ave round to East Ave. `generateSidewalkNetwork`: the pavement walks and the crossings; a crossing's two ends sit on the kerbs either side of the road it crosses (a vertical road's crossing runs left to right) and join the pavement walks near them (within 130 px, else the nearest: never a dead end); each walk runs right to its block's end (a node there too, so it joins the corner), and a walk stopped by a diagonal's mouth links on to the nearest crossing or pavement round the corner (only the city's edge, and three wide diagonal mouths, are dead ends) Bigger cities: `ZONE.RESERVED` keeps a block clear and plain (the graveyard's); `autoFillAll({ fillPartial: [blocks] })` builds street rows round the landmarks in those blocks; `setLandmarkLampColors({ id: colour })` gives a landmark's block its lamp colour, and a block holding two landmarks is split, each lamp taking the colour of the landmark nearest it. An angled street's stepped rows are laid before the straight rows round them, and round a bend each faces whichever way meets the street first (`_facingOnto`).
+
+**Proposed ownership:** Directory world/weather/navigation/rooms/crowd services; Penthouse optional procedural scenery; Game location/climate/population recipes.
+
+**Cross-file global references:** `Poly` (16), `RenderStats` (7), `BuildingV2Registry` (5), `CrowdImpostors` (4), `CrowdBakes` (4), `HAIR_RENDERERS` (3), `RoomSystem` (3), `hairGeometry` (2), `clothGeometry` (2), `drawClothPanel` (2), `humanShade` (2), `drawHumanContactShadow` (2), `_softSpot` (2), `drawHeldGlass` (2), `drawWeapon` (2), `drawUmbrella` (2), `bodyLimbPath` (2), `drawBodyHand` (2), `drawBodyFoot` (2), `drawBodyCaps` (2), `bodyTorsoPath` (2), `bodyHipPath` (2), `bodyHeadPaths` (2), `BuildingV2` (2), `BuildingV3` (2), `FerrisWheel` (2), `RenderTags` (2), `RoadPath` (2), `WARDROBE` (1), `GameEngine` (1), `Building` (1), `Billboard` (1), `NeonSign` (1), `Foliage` (1), `LeafParticleSystem` (1), `LampEntity` (1).
+
+**Declared classes:** `CityLayout`.
+
+## src/world/club-life.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/world/club-life.js) · 292 lines · 34 declarations · 164 call/new expressions.
+
+**Moon City's crowd** (`ClubLife`, moon_city_nightclub only): clubgoers (`ROLE_LOOKS.clubgoer`) come in past the bouncer, check a coat, then spend the night dancing (claimed dance-floor cells, beat-synced), at the bar (a stool or the rail, a drink that stays in hand), in the booths and at the high-tops, and in the restrooms (stalls they step into and out of, urinals, mirrors, sinks, the settee), then leave by the gate. Staff (`ROLE_LOOKS.mc_staff`): bouncer, barback, powder-room attendant. Claimable pools so no stall or stool is shared; crowd size by density × the hour (busiest 22:00–03:00). Walkers push the restroom doors (`doorActors`, physics/collision.js) Reusable: `mapId`, steps may `give` (hand something over), `take` (set it down) and `keep` (not finished on the spot); an exit counts within 26 px of the door.
+
+**Proposed ownership:** Directory world/weather/navigation/rooms/crowd services; Penthouse optional procedural scenery; Game location/climate/population recipes.
+
+**Cross-file global references:** `pickFrom` (10), `NavGrid` (2), `ROLE_LOOKS` (2), `seededRandom` (2), `gaitCommand` (2), `GameSettings` (1), `actorSteer` (1), `syncHumanoidGait` (1), `RenderStats` (1), `_byY` (1), `drawCrowdHumanoid` (1).
+
+**Declared classes:** `ClubLife`.
+
+## src/world/ground-baker.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/world/ground-baker.js) · 345 lines · 33 declarations · 253 call/new expressions.
+
+**The city's ground, baked**: lots, lawns, parks, roads (painted from their geometry via `paintRoad`, so any angle, curves later), intersections, paver pavements, worn crossings, into 512 px tiles on first sight (LRU sized by memory; half-res tiles when zoomed out, switched with a band; a missing tile borrows the other resolution; painted within a frame-time budget and ahead of a moving car — `CONFIG.GROUND_BAKE`). `draw.js` blits them in the hub instead of redrawing roads every frame The tile budget is set each frame from the view: twice the tiles it can touch + 4, within `GROUND_BAKE.MIN_TILES`–`MAX_TILES` (12–40; a phone at walking zoom keeps ~16 MB, was a flat 40 MB); least recently seen go first (`_trim`). Ordered per-tile candidates keep the existing painters; map-entry fades prepare visible hub tiles and cached interior floors one canvas per task. Superseding loads, reset and quit cancel preparation.
+
+**Proposed ownership:** Directory world/weather/navigation/rooms/crowd services; Penthouse optional procedural scenery; Game location/climate/population recipes.
+
+**Cross-file global references:** `Poly` (4), `CONFIG` (2), `paintParkGround` (2), `OrderedRenderGrid` (1), `seededRandom` (1), `paintLotGround` (1), `_bldHash` (1).
+
+**Declared classes:** `GroundBaker`.
+
+## src/world/lobby-life.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/world/lobby-life.js) · 215 lines · 20 declarations · 153 call/new expressions.
+
+The Double Nights lobby's crowd: guests (portals, the doors, the desk queue, lounges, elevators, rolling luggage) and AI staff (gold bellhops with carts, Blood Moon concierges, a silver valet) — ambient walkers, not NPCs
+
+**Proposed ownership:** Directory world/weather/navigation/rooms/crowd services; Penthouse optional procedural scenery; Game location/climate/population recipes.
+
+**Cross-file global references:** `pickFrom` (17), `NavGrid` (3), `ROLE_LOOKS` (2), `seededRandom` (2), `GameSettings` (1), `Pedestrian` (1), `actorSteer` (1), `gaitCommand` (1), `_frameTime` (1), `syncHumanoidGait` (1), `RenderStats` (1), `_byY` (1), `drawGlow` (1), `drawCrowdHumanoid` (1).
+
+**Declared classes:** `LobbyLife`.
+
+## src/world/lot-grounds.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/world/lot-grounds.js) · 178 lines · 15 declarations · 155 call/new expressions.
+
+**Lot grounds**: each city block's open ground round its buildings, in the Blood Garden's manner (`paintLotGround`, called per tile by the ground baker; `lotLayout(block)` seeded by name, cached on the block): rain-dark loam, moss and grass, flower clusters in the block's bloom palette (`LOT_BLOOMS`), a stone apron round every building (`LOT_APRON`) and paved courts in its stone (`LOT_STONES`) where the noise field (`lotNoise`) is low, rain pools on the slabs, a clipped hedge along the kerb, petals
+
+**Proposed ownership:** Directory world/weather/navigation/rooms/crowd services; Penthouse optional procedural scenery; Game location/climate/population recipes.
+
+**Cross-file global references:** `seededRandom` (3), `HUB_BLOCKS` (3), `_bldHash` (3).
+
+**Declared classes:** None..
+
+## src/world/map-edge.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/world/map-edge.js) · 190 lines · 8 declarations · 111 call/new expressions.
+
+**The veil** (`drawMapEdge`, world space after the emissive pass): the edge of an outdoor map (`type: 'outdoor'`, opt out with `edge: false`). Past it, a deep indigo void of nebula and stars (one seeded 512 px tile as a pattern, drifting with parallax and shrinking less than the city when zoomed out); along the seam, a thread of light, a violet haze reaching in over the city, a curtain of light and breathing aurora streaks falling out into the void, corners rounded by a matching radial gradient. Each edge is drawn in its own frame (x along the seam, −y outward) so one set of gradients serves all four. Near her the seam brightens and a row of ◆ diamonds shimmers up; moving right at the edge sends ripples running along the seam (`_edgeRipples`, cleared on map switch). Skipped when no edge is near the screen
+
+**Proposed ownership:** Directory world/weather/navigation/rooms/crowd services; Penthouse optional procedural scenery; Game location/climate/population recipes.
+
+**Cross-file global references:** `drawGlow` (4), `seededRandom` (1), `engineMixin` (1), `_gameTimeSec` (1).
+
+**Declared classes:** None..
+
+## src/world/map-entities.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/world/map-entities.js) · 904 lines · 65 declarations · 877 call/new expressions.
+
+`createMapEntities`: props, NPCs and lamps per map (the apartment suite's furniture is here). Shorthands shared by every map: `decorPropsIn(color)`, `softLight`, `areaLight`, `hiddenLamp` (each case aliases them F/S/A/L) `HUB_BLOCKS`: which block each of the city's landmarks and special places (the shared landmark blocks, Biggs Park, the Scrapyard, the graveyard) stands in, and `HUB_OLLO_DOOR`.
+
+**Proposed ownership:** Game map metadata, placed content and factories; Directory scene instantiation and lifecycle.
+
+**Cross-file global references:** `LampEntity` (52), `PropEntity` (43), `NPC` (29), `Ganger` (2), `NEURAL_TREES` (2), `TorqueArt` (1), `PALACE_SCONCES` (1), `BuildingV3` (1), `OLLO_BUILDING_DATA` (1), `MAP_DATA` (1).
+
+**Declared classes:** None..
+
+## src/world/maps.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/world/maps.js) · 494 lines · 2 declarations · 0 call/new expressions.
+
+`MAP_DATA`: every map's size, floor zones, walls, transitions, landmarks (optional `wallStyle`, `navProps` to route paths round big furniture, and `cameraBounds` to move an edge of where the camera may look: engine/draw.js `_clampView`)
+
+**Proposed ownership:** Game map metadata, placed content and factories; Directory scene instantiation and lifecycle.
+
+**Cross-file global references:** `HUB_GRAVEYARD` (1).
+
+**Declared classes:** None..
+
+## src/world/navigation.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/world/navigation.js) · 684 lines · 46 declarations · 265 call/new expressions.
+
+`NavGrid` pathfinding, companion tactics and steering Geometry is re-read once per simulation tick (`_refresh`). Each revision records where it changed (`_changes`), so a cached path re-plans only when a change touches its box (`pathTouched`); a goal that moves ≤32 px re-aims the path's last leg when that's clear; a failed search waits `NAV.FAIL_RETRY_TICKS`. A* runs the exact swept test only between cells marked `_near` geometry (within radius + half a cell diagonal), which gives identical paths. `actorSteer` returns `remaining`, and with no route it edges straight on where a step is clear.
+
+**Proposed ownership:** Directory world/weather/navigation/rooms/crowd services; Penthouse optional procedural scenery; Game location/climate/population recipes.
+
+**Cross-file global references:** `_simTick` (12), `game` (9), `CONFIG` (8), `ITEM_REGISTRY` (3), `ABILITY_REGISTRY` (2), `gaitCommand` (2), `isLineBlocked` (1), `getColliders` (1), `stanceForWeapon` (1).
+
+**Declared classes:** `NavGrid`.
+
+## src/world/parks.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/world/parks.js) · 108 lines · 8 declarations · 123 call/new expressions.
+
+**Parks** (`HUB_PARKS`: Lotus Park, Violet Commons, Moonwell Gardens, Nightshade Green, Starfall Commons, Eclipse Gardens): `parkLayout(block)` (seeded: hedge, gates, gravel walk, moon pool, flower beds, benches, lanterns, trees) and `paintParkGround`
+
+**Proposed ownership:** Directory world/weather/navigation/rooms/crowd services; Penthouse optional procedural scenery; Game location/climate/population recipes.
+
+**Cross-file global references:** `seededRandom` (2).
+
+**Declared classes:** None..
+
+## src/world/particles-decals.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/world/particles-decals.js) · 521 lines · 22 declarations · 149 call/new expressions.
+
+Leaf particles, decals. Leaves ride the full wind vector: they spawn off the upwind edge, ease to the wind's speed and flutter across it (no screen-south fall).
+
+**Proposed ownership:** Directory world/weather/navigation/rooms/crowd services; Penthouse optional procedural scenery; Game location/climate/population recipes.
+
+**Cross-file global references:** `CONFIG` (6), `_gameTimeMs` (2), `_frameTimeSec` (1).
+
+**Declared classes:** `LeafParticleSystem`, `DecalSystem`.
+
+## src/world/rooms.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/world/rooms.js) · 1447 lines · 80 declarations · 370 call/new expressions.
+
+Room System, the standard for indoor maps: per-room visibility (soft violet veil, gentle reveal, light spilling through open doors, dim-through-glass from outside), fading room lights, `outdoorness`, sky light on outdoor rooms, and an indoor room's `fill` (with its lights on its darkness thins to `fill`, back to the lamps alone when switched off: `carveSkyLight`; the Silver Queen suite); windows, doors (hinged doors with swing physics, sliding glass, open arches; bullets strike and push them — `hitDoors`; shut doors block sight — `doorBlocks`), rooms of several rects, silk linens, `RoomSystem`, `ROOM_DEFS` — every indoor map has rooms (arenas and the ethereal plane aside); the checklist for giving a map rooms is in its header
+
+**Proposed ownership:** Directory world/weather/navigation/rooms/crowd services; Penthouse optional procedural scenery; Game location/climate/population recipes.
+
+**Cross-file global references:** `_frameTime` (5), `ambience` (5), `CollisionSystem` (4), `game` (2).
+
+**Declared classes:** `IndoorWindow`, `IndoorDoor`, `SilkLinen`, `RoomSystem`.
+
+## src/world/walker.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/world/walker.js) · 105 lines · 15 declarations · 61 call/new expressions.
+
+**`Walker.goTo(actor, x, y, { face, speed, arrive, timeout, via, onArrive, onFail })`**: walks any procedural humanoid along the nav grid (goals on furniture snap to the nearest free spot; `via` points route round things the grid doesn't know, like cars), eases in, turns to `face`, then onArrive (no progress for `timeout` ticks: onFail). Returns the scene runner's waitable `{ done(), ok(), cancel() }`. The player's walk feeds her movement input (engine/update.js), so collisions and facing behave and any real input takes over; everyone else steps in `Walker.update`
+
+**Proposed ownership:** Directory world/weather/navigation/rooms/crowd services; Penthouse optional procedural scenery; Game location/climate/population recipes.
+
+**Cross-file global references:** `game` (7), `actorSteer` (2), `gaitCommand` (2), `NavGrid` (1), `navWaypoint` (1).
+
+**Declared classes:** None..
+
+## src/world/weather-response.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/world/weather-response.js) · 104 lines · 9 declarations · 57 call/new expressions.
+
+How weather reaches a character: `weatherAt` (wind on hair and cloth, rain, storm), lightning flinches, umbrellas
+
+**Proposed ownership:** Directory world/weather/navigation/rooms/crowd services; Penthouse optional procedural scenery; Game location/climate/population recipes.
+
+**Cross-file global references:** `game` (9), `_gameTimeSec` (1), `darkenHex` (1).
+
+**Declared classes:** None..
+
+## src/world/weather.js
+
+[Original source](https://github.com/eternaldark949/DF_TOPDOWNEDITION/blob/e597475d679c60d58c8f78121f10a597cc0f2800/src/world/weather.js) · 1339 lines · 55 declarations · 287 call/new expressions.
+
+Weather conditions, climates, `WeatherSystem` (rain, wind, lightning, forecast) Wind: `windVec` points where the air travels, the way the rain slants (the city's prevailing wind is a northwesterly, sweeping down-right); rain, cloth, hair, clouds, curtains and leaves all move along it. Sky.ME's arrow points downwind. Rain overlay reuses its band tables and lit-drop buffer (`_RAIN_SCRATCH`), lamp RGB parsed once per lamp, lit colours cached (`_rainLitStyle`); particles' colours parsed once (`_particleStyle`), their life fade folded into globalAlpha. Lit rain (drops near a lamp, one lamp a drop) is batched: each drop goes into a `Path2D` bucket by lamp × band × closeness step (`RAIN_LIT_STEPS` 8), and each bucket is stroked once at its step's colour, alpha and width. A storm overlay is ~165 canvas calls instead of ~1,640, and looks the same.
+
+**Proposed ownership:** Directory world/weather/navigation/rooms/crowd services; Penthouse optional procedural scenery; Game location/climate/population recipes.
+
+**Cross-file global references:** `CONFIG` (17), `game` (5), `audioSys` (3), `RenderInterp` (3), `ObjectPool` (1), `clamp` (1), `GameSettings` (1).
+
+**Declared classes:** `WeatherSystem`.
