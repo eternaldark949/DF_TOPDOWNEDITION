@@ -49,3 +49,5 @@ The [saved-game lighting investigation](docs/performance-investigation/lighting-
 Run `node tools/test-lamp-projection.cjs` for raised street-lantern projection, indoor fixture fallback, canvas state restoration, and shop roof occlusion checks.
 
 Street trees have projected bark trunks, branches and leaf clusters; palms have separate curved fronds. New city planting checks full canopy clearance against every building section. Run `node tools/test-tree-projection.cjs` for geometry, roof occlusion, canvas restoration and city planting checks.
+
+Tree and street-lamp parts share a height-sorted world pass, so leaves cover bases and lower shafts while higher lanterns remain visible. Run `node tools/test-canopy-lamp-depth.cjs` for ordering, reversed submission and canvas cleanup checks.

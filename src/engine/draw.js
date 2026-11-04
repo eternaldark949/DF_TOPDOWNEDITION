@@ -1018,6 +1018,7 @@
                 // Foliage (trees and bushes) - drawn AFTER player so canopy appears overhead
                 // PERFORMANCE: AABB viewport culling + cached frameTime
                 const trees = RL.at('trees');
+                FoliageLampDepth.begin(this.ctx);
                 if (this.activeMap.foliage) {
                     const wind = this.weather ? this.weather.wind : 0.3;
                     const windDir = this.weather ? this.weather.windDirection : 1;
@@ -1038,16 +1039,6 @@
                             if (!_sunShadow.on) this.ctx.fillStyle = 'rgba(0,0,0,0.22)';
                         }
                     }
-                }
-                
-                // Floating leaf particles - drawn after foliage, before weather
-                if (trees && this.leafParticles) {
-                    this.leafParticles.draw(this.ctx);
-                }
-                
-                // Ferris Wheel TOP (rims, gondolas, hub — above buildings, trees, everything)
-                if (RL.at('roofs') && this.activeMap.ferrisWheel && ferrisPaintInView(this.activeMap.ferrisWheel, this.ctx, cullBounds.view, viewZoom, true)) {
-                    this.activeMap.ferrisWheel.drawTop(this.ctx);
                 }
                 
                 // Indoor V2: Silk linens (atmospheric cloth with pooled light)
@@ -1084,6 +1075,18 @@
                     }
                 }
             
+                FoliageLampDepth.flush(this.ctx);
+
+                // Floating leaf particles - drawn after foliage, before weather
+                if (trees && this.leafParticles) {
+                    this.leafParticles.draw(this.ctx);
+                }
+
+                // Ferris Wheel TOP (rims, gondolas, hub — above buildings, trees, everything)
+                if (RL.at('roofs') && this.activeMap.ferrisWheel && ferrisPaintInView(this.activeMap.ferrisWheel, this.ctx, cullBounds.view, viewZoom, true)) {
+                    this.activeMap.ferrisWheel.drawTop(this.ctx);
+                }
+
                 if (RenderStats.timed) this._entLap('Entities: World tops');   // roofs, signs, foliage, lamps
                 if (RenderStats.timed) WorldRenderProfiler.end(this.profiler);
                 // 3. Draw projectiles and weather effects

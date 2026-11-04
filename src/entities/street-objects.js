@@ -213,6 +213,26 @@
             return spr;
         }
 
+        // At a shared projected pixel, greater world height is closer to the overhead camera.
+        // Queue only on the main world pass; standalone art and reflections still paint immediately.
+        const FoliageLampDepth = {
+            ctx: null, parts: [],
+            begin(ctx) { this.ctx=ctx; this.parts.length=0; this.matrix=ctx.getTransform(); },
+            add(ctx,z,paint) {
+                if (ctx!==this.ctx) { paint(); return; }
+                this.parts.push({z,paint,alpha:ctx.globalAlpha,op:ctx.globalCompositeOperation});
+            },
+            flush(ctx) {
+                const parts=this.parts;this.ctx=null;
+                parts.sort((a,b)=>a.z-b.z);
+                ctx.save();
+                try {
+                    const m=this.matrix;ctx.setTransform(m.a,m.b,m.c,m.d,m.e,m.f);
+                    for (const p of parts) {ctx.globalAlpha=p.alpha;ctx.globalCompositeOperation=p.op;p.paint();}
+                } finally {ctx.restore();parts.length=0;}
+            }
+        };
+
         function foliageHeight(f) { return (f.type === 'bush' ? 0 : f.type === 'palm' ? 90 : 65) * f.size; }
         function foliagePoint(f, x, y, z) {
             const C = leanCamHeight(), k = CONFIG.BUILDINGS.LEAN ? C / (C - Math.min(z, C * .86)) : 1;
@@ -239,6 +259,7 @@
         }
         function drawProjectedTree(ctx, f, sway) {
             const s=f.size, H=foliageHeight(f), palm=f.type==='palm';
+            const covers=[];
             // Tall roofs can lean across a clear planting spot. Keep those silhouettes in front
             // of the tree, just as they cover low shop light and other ground-level objects.
             if (CONFIG.BUILDINGS.LEAN && game._cullBounds && game.activeMap.buildings) {
@@ -249,13 +270,21 @@
                     const box=b._glowBox && b._glowBox(game.camera), p=foliagePoint(f,sway,0,H+12*s),r=50*s*p.k;
                     if (box && (box[0]>Math.max(f.x,p.x)+r || box[2]<Math.min(f.x,p.x)-r || box[1]>Math.max(f.y,p.y)+r || box[3]<Math.min(f.y,p.y)-r)) continue;
                     for (const poly of b._glowOccluders(game.camera)) {
-                        ctx.beginPath();ctx.rect(-1e7,-1e7,2e7,2e7);
-                        poly.forEach((p,i)=>ctx[i?'lineTo':'moveTo'](p[0],p[1]));ctx.closePath();ctx.clip('evenodd');
+                        covers.push(poly);
                     }
                 }
             }
-            const point=(x,y,z) => foliagePoint(f,x+sway*z/H,y,z);
-            const polygon=(pts,color) => {ctx.fillStyle=color;ctx.beginPath();pts.forEach((p,i)=>ctx[i?'lineTo':'moveTo'](p.x,p.y));ctx.closePath();ctx.fill();};
+            const paintAt = (z,paint) => FoliageLampDepth.add(ctx,z,()=>{
+                if (!covers.length) {paint();return;}
+                ctx.save();
+                try {
+                    for(const poly of covers){ctx.beginPath();ctx.rect(-1e7,-1e7,2e7,2e7);poly.forEach((p,i)=>ctx[i?'lineTo':'moveTo'](p[0],p[1]));ctx.closePath();ctx.clip('evenodd');}
+                    paint();
+                } finally {ctx.restore();}
+            });
+            const point=(x,y,z) => ({...foliagePoint(f,x+sway*z/H,y,z),z});
+            const polygon=(pts,color) => paintAt(pts.reduce((sum,p)=>sum+p.z,0)/pts.length,()=>{ctx.fillStyle=color;ctx.beginPath();pts.forEach((p,i)=>ctx[i?'lineTo':'moveTo'](p.x,p.y));ctx.closePath();ctx.fill();});
+            const stroke=(a,b,width,color) => paintAt((a.z+b.z)/2,()=>{ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();});
             // A tapered trunk built as a ring of bark faces, with its root flare on the ground.
             const ring=(z,r) => Array.from({length:6},(_,i)=>point(Math.cos(i*Math.PI/3)*r,Math.sin(i*Math.PI/3)*r,z));
             const stem=(z0,r0,z1,r1) => {
@@ -263,9 +292,10 @@
                 const order=a.map((p,i)=>({i,d:(p.x-game.camera.x)**2+(p.y-game.camera.y)**2})).sort((a,b)=>b.d-a.d);
                 for(const {i} of order){const j=(i+1)%6;polygon([a[i],a[j],b[j],b[i]],colors[i]);}
             };
-            stem(0,5*s,14*s,3*s);stem(14*s,3*s,H,1.6*s);
+            stem(0,5*s,14*s,3*s);
+            for(let z=14*s;z<H;z+=8){const end=Math.min(H,z+8),r=t=>3*s-(t-14*s)/(H-14*s)*1.4*s;stem(z,r(z),end,r(end));}
             if(palm){
-                for(let z=20*s;z<H;z+=13*s){const p=point(0,0,z);ctx.strokeStyle='#957653';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(p.x,p.y,2.4*s*p.k,1.5*s*p.k,0,0,Math.PI*2);ctx.stroke();}
+                for(let z=20*s;z<H;z+=13*s){const p=point(0,0,z);paintAt(z,()=>{ctx.strokeStyle='#957653';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(p.x,p.y,2.4*s*p.k,1.5*s*p.k,0,0,Math.PI*2);ctx.stroke();});}
                 // Individual curved fronds rise at the crown and droop toward their tips.
                 for(let i=0;i<8;i++){
                     const a=i*Math.PI/4+f.phaseOffset*.2,pts=[];
@@ -273,15 +303,15 @@
                         pts.push(point(Math.cos(a)*d-Math.sin(a)*w,Math.sin(a)*d+Math.cos(a)*w,H+12*s*Math.sin(u*Math.PI)-14*s*u));}
                     for(let j=12;j>=0;j--){const u=j/12,d=29*s*u,w=5*s*Math.sin(u*Math.PI);pts.push(point(Math.cos(a)*d+Math.sin(a)*w,Math.sin(a)*d-Math.cos(a)*w,H+12*s*Math.sin(u*Math.PI)-14*s*u));}
                     polygon(pts,i%2?'#366a3d':'#54854b');
-                    const p=point(0,0,H),q=point(Math.cos(a)*29*s,Math.sin(a)*29*s,H-14*s);ctx.strokeStyle='#9b9b5c';ctx.lineWidth=.8*s;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y);ctx.stroke();
+                    const p=point(0,0,H),q=point(Math.cos(a)*29*s,Math.sin(a)*29*s,H-14*s);stroke(p,q,.8*s,'#9b9b5c');
                 }
             }else{
                 // Each leafy bough has its own position and height. Leaf texture is cached independently of the trunk.
                 const boughs=Array.from({length:5},(_,i)=>{const a=i*Math.PI*2/5+f.phaseOffset;return {x:Math.cos(a)*12*s,y:Math.sin(a)*12*s,z:H-(i%2?16:9)*s,size:s*.62};});
                 boughs.push({x:0,y:0,z:H+9*s,size:s*.72});
-                for(const b of boughs){const p=point(0,0,H*.62),q=point(b.x,b.y,b.z);ctx.strokeStyle=f.trunkColor;ctx.lineWidth=2.5*s;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y);ctx.stroke();}
+                for(const b of boughs){const p=point(0,0,H*.62),q=point(b.x,b.y,b.z);stroke(p,q,2.5*s,f.trunkColor);}
                 boughs.sort((a,b)=>a.z-b.z);
-                for(let i=0;i<boughs.length;i++){const b=boughs[i],p=point(b.x,b.y,b.z),spr=floraSprite(f.type,b.size,(f._variant+i)%4),w=spr.w*p.k;ctx.drawImage(spr.cv,p.x-w/2,p.y-w/2,w,w);}
+                for(let i=0;i<boughs.length;i++){const b=boughs[i],p=point(b.x,b.y,b.z),spr=floraSprite(f.type,b.size,(f._variant+i)%4),w=spr.w*p.k;paintAt(b.z,()=>ctx.drawImage(spr.cv,p.x-w/2,p.y-w/2,w,w));}
             }
         }
 

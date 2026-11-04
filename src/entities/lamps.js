@@ -85,9 +85,14 @@
         function drawProjectedLamp(ctx, lamp, lit) {
             const style = LAMP_TYPE_STYLE[lamp.lampType], spec = LAMP_STYLES[style], H = lampProjection(lamp).z;
             const poly = (points, color) => {
-                ctx.fillStyle = color; ctx.beginPath();
-                points.forEach((p, i) => { const q = lampPoint(lamp, ...p); ctx[i ? 'lineTo' : 'moveTo'](...q); });
-                ctx.closePath(); ctx.fill();
+                const projected=points.map(p=>lampPoint(lamp,...p));
+                FoliageLampDepth.add(ctx,points.reduce((sum,p)=>sum+p[2],0)/points.length,()=>{
+                    ctx.fillStyle=color;ctx.beginPath();projected.forEach((p,i)=>ctx[i?'lineTo':'moveTo'](...p));ctx.closePath();ctx.fill();
+                });
+            };
+            const stroke = (a,b,width,color) => {
+                const p=lampPoint(lamp,...a),q=lampPoint(lamp,...b);
+                FoliageLampDepth.add(ctx,(a[2]+b[2])/2,()=>{ctx.strokeStyle=color;ctx.lineWidth=width;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(...p);ctx.lineTo(...q);ctx.stroke();});
             };
             const ring = (x, y, z, r, n = 8) => Array.from({length:n}, (_,i) => {
                 const a = Math.PI / 6 + i * Math.PI * 2 / n;
@@ -106,13 +111,17 @@
             if (style !== 'pillar_lantern') {
                 sleeve(ring(0,0,0,7), ring(0,0,9,5), iron);
                 sleeve(ring(0,0,9,5), ring(0,0,15,3), [LAMP_BRASS,'#70532d']);
-                sleeve(ring(0,0,15,2.8), ring(0,0,H + 12,1.7), iron);
+                // Short bands let a canopy cover the lower shaft while its upper section stays in front.
+                for(let z=15;z<H+12;z+=8){const end=Math.min(H+12,z+8),r=t=>2.8-(t-15)/(H-3)*1.1;sleeve(ring(0,0,z,r(z)),ring(0,0,end,r(end)),iron);}
                 for (const z of [20, H * .65, H + 8])
                     sleeve(ring(0,0,z,3), ring(0,0,z+3,3), [LAMP_BRASS,'#70532d']);
                 // Swept arms are curves through height, rather than a flat drawing of the old stem.
                 const arm = (points, width, color) => {
-                    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round'; ctx.beginPath();
-                    points.forEach((p,i) => { const q = lampPoint(lamp,...p); ctx[i?'lineTo':'moveTo'](...q); }); ctx.stroke();
+                    const projected=points.map(p=>lampPoint(lamp,...p));
+                    FoliageLampDepth.add(ctx,points.reduce((sum,p)=>sum+p[2],0)/points.length,()=>{
+                        ctx.strokeStyle=color;ctx.lineWidth=width;ctx.lineCap='round';ctx.beginPath();
+                        projected.forEach((p,i)=>ctx[i?'lineTo':'moveTo'](...p));ctx.stroke();
+                    });
                 };
                 if (style === 'antique_twin') {
                     for (const side of [-1,1]) {
@@ -130,8 +139,7 @@
                 sleeve(ring(b.x,b.y,H-13,r*.35,6), lower, iron);
                 sleeve(lower,upper,lit ? [_lampTint(lamp.color,.25),lamp.color,_lampTint(lamp.color,.1)] : ['#39303f','#241d2d']);
                 // Iron ribs bound each individual glass pane in three dimensions.
-                ctx.strokeStyle = LAMP_IRON; ctx.lineWidth = 1.4;
-                for (let i=0;i<6;i++) { ctx.beginPath();ctx.moveTo(...lampPoint(lamp,...lower[i]));ctx.lineTo(...lampPoint(lamp,...upper[i]));ctx.stroke(); }
+                for (let i=0;i<6;i++) stroke(lower[i],upper[i],1.4,LAMP_IRON);
                 sleeve(upper,ring(b.x,b.y,H+13,r*.35,6),iron);
                 sleeve(ring(b.x,b.y,H+13,1.2,6),ring(b.x,b.y,H+17,.6,6),[LAMP_BRASS,'#70532d']);
             }
