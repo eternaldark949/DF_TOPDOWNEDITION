@@ -208,7 +208,7 @@
                 }
                 for (const e of this.enemies || []) {
                     if (e.solo && e.drawDuelTells) e.drawDuelTells(ctx);              // Lilitu's tells (entities/hunters.js)
-                    else if (e instanceof Drone) e.drawLights(ctx);                    // a drone's eye, lances, tells (entities/drones.js)
+                    else if (e instanceof Drone || e instanceof Marionette) e.drawLights(ctx);   // a drone's eye, lances, tells (entities/drones.js); a marionette's blades (entities/marionettes.js)
                 }
                 const L = this._hazards, B = this._playerBurn, p = this.player;
                 if ((!L || !L.length) && !B) return;
