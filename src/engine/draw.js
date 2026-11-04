@@ -120,8 +120,9 @@
                         const f = entry.item;
                         if (stride > 1 && (entry.index % stride) !== 0) continue;   // thinned out: not drawn
                         const r = (f.type === 'bush' ? 13 : f.type === 'palm' ? 24 : 21) * (f.size || 1) * 0.8;
-                        const dx = x - f.x, dy = y - foliageCanopyY(f);
-                        if (dx * dx + dy * dy < r * r) return true;
+                        const p = foliagePoint(f,0,0,foliageHeight(f));
+                        const dx = x - p.x, dy = y - (f.type === 'bush' ? foliageCanopyY(f) : p.y);
+                        if (dx * dx + dy * dy < r * r * p.k * p.k) return true;
                     }
                 }
                 return false;

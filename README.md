@@ -47,3 +47,5 @@ For repeatable local CPU investigations, see the [controlled character and parti
 The [saved-game lighting investigation](docs/performance-investigation/lighting-local.md) records the cache/texture experiments and the private-save benchmarks (`tools/bench-lighting-save.py`). The retained immutable cache reuses the exact static lighting base when the camera and inputs settle; dynamic effects remain live. Run `node tools/test-lighting-base.cjs` for invalidation, memory ownership and fallback checks.
 
 Run `node tools/test-lamp-projection.cjs` for raised street-lantern projection, indoor fixture fallback, canvas state restoration, and shop roof occlusion checks.
+
+Street trees have projected bark trunks, branches and leaf clusters; palms have separate curved fronds. New city planting checks full canopy clearance against every building section. Run `node tools/test-tree-projection.cjs` for geometry, roof occlusion, canvas restoration and city planting checks.

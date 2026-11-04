@@ -152,7 +152,7 @@
         const _floraCache = new Map();
         /** The sprite for a kind/size (sizes bucketed to 0.2), in 4 variants. */
         /** Where a plant's canopy sits (drawn above its anchor: palms and trees high, bushes low). Shadows centre on it. */
-        function foliageCanopyY(f) { return f.y - (f.type === 'bush' ? 2 : f.type === 'palm' ? 30 : 25) * (f.size || 1); }
+        function foliageCanopyY(f) { return f.y - (f.type === 'bush' ? 2 : 0) * (f.size || 1); }
 
         function floraSprite(type, size, variant) {
             const sz = Math.round(size * 5) / 5, key = type + '|' + sz + '|' + variant;
@@ -213,11 +213,88 @@
             return spr;
         }
 
+        function foliageHeight(f) { return (f.type === 'bush' ? 0 : f.type === 'palm' ? 90 : 65) * f.size; }
+        function foliagePoint(f, x, y, z) {
+            const C = leanCamHeight(), k = CONFIG.BUILDINGS.LEAN ? C / (C - Math.min(z, C * .86)) : 1;
+            return { x: game.camera.x + (f.x + x - game.camera.x) * k,
+                y: game.camera.y + (f.y + y - game.camera.y) * k, k };
+        }
+        // Physical canopy envelope, including the strongest normal wind sway and a wall clearance.
+        function foliageClearance(f) { return (f.type === 'bush' ? 19 : f.type === 'palm' ? 32 : 31) * f.size + 18; }
+        function foliageHitsBuilding(f, b) {
+            const r = foliageClearance(f);
+            if (b.bounds && (f.x+r<b.bounds.left || f.x-r>b.bounds.right || f.y+r<b.bounds.top || f.y-r>b.bounds.bottom)) return false;
+            const polys = b.polys || (b._footprint && b.sections ? b.sections.map((s,i) => b._footprint(s,i))
+                : [[ [b.x,b.y], [b.x+b.w,b.y], [b.x+b.w,b.y+b.h], [b.x,b.y+b.h] ]]);
+            return polys.some(poly => {
+                let inside = false;
+                for (let i=0,j=poly.length-1;i<poly.length;j=i++) {
+                    const a=poly[j], p=poly[i], dx=p[0]-a[0], dy=p[1]-a[1];
+                    if ((p[1]>f.y)!==(a[1]>f.y) && f.x<(a[0]-p[0])*(f.y-p[1])/(a[1]-p[1])+p[0]) inside=!inside;
+                    const t=Math.max(0,Math.min(1,((f.x-a[0])*dx+(f.y-a[1])*dy)/(dx*dx+dy*dy||1)));
+                    if ((f.x-a[0]-dx*t)**2+(f.y-a[1]-dy*t)**2 <= r*r) return true;
+                }
+                return inside;
+            });
+        }
+        function drawProjectedTree(ctx, f, sway) {
+            const s=f.size, H=foliageHeight(f), palm=f.type==='palm';
+            // Tall roofs can lean across a clear planting spot. Keep those silhouettes in front
+            // of the tree, just as they cover low shop light and other ground-level objects.
+            if (CONFIG.BUILDINGS.LEAN && game._cullBounds && game.activeMap.buildings) {
+                for (const entry of game._prepareRenderBuildingLists(game._cullBounds).v2) {
+                    const b=entry.item;
+                    const roofHeight = Number.isFinite(b._tkTop) ? b._tkTop * TierKit.Z_SCALE : Math.min(b.floors || 1, CONFIG.BUILDINGS.MAX_FLOORS) * CONFIG.BUILDINGS.FLOOR_HEIGHT;
+                    if (!b._glowOccluders || roofHeight < H+12*s) continue;
+                    const box=b._glowBox && b._glowBox(game.camera), p=foliagePoint(f,sway,0,H+12*s),r=50*s*p.k;
+                    if (box && (box[0]>Math.max(f.x,p.x)+r || box[2]<Math.min(f.x,p.x)-r || box[1]>Math.max(f.y,p.y)+r || box[3]<Math.min(f.y,p.y)-r)) continue;
+                    for (const poly of b._glowOccluders(game.camera)) {
+                        ctx.beginPath();ctx.rect(-1e7,-1e7,2e7,2e7);
+                        poly.forEach((p,i)=>ctx[i?'lineTo':'moveTo'](p[0],p[1]));ctx.closePath();ctx.clip('evenodd');
+                    }
+                }
+            }
+            const point=(x,y,z) => foliagePoint(f,x+sway*z/H,y,z);
+            const polygon=(pts,color) => {ctx.fillStyle=color;ctx.beginPath();pts.forEach((p,i)=>ctx[i?'lineTo':'moveTo'](p.x,p.y));ctx.closePath();ctx.fill();};
+            // A tapered trunk built as a ring of bark faces, with its root flare on the ground.
+            const ring=(z,r) => Array.from({length:6},(_,i)=>point(Math.cos(i*Math.PI/3)*r,Math.sin(i*Math.PI/3)*r,z));
+            const stem=(z0,r0,z1,r1) => {
+                const a=ring(z0,r0),b=ring(z1,r1),colors=[f.trunkColor,'#604329','#392718','#241a12','#49311e','#755235'];
+                const order=a.map((p,i)=>({i,d:(p.x-game.camera.x)**2+(p.y-game.camera.y)**2})).sort((a,b)=>b.d-a.d);
+                for(const {i} of order){const j=(i+1)%6;polygon([a[i],a[j],b[j],b[i]],colors[i]);}
+            };
+            stem(0,5*s,14*s,3*s);stem(14*s,3*s,H,1.6*s);
+            if(palm){
+                for(let z=20*s;z<H;z+=13*s){const p=point(0,0,z);ctx.strokeStyle='#957653';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(p.x,p.y,2.4*s*p.k,1.5*s*p.k,0,0,Math.PI*2);ctx.stroke();}
+                // Individual curved fronds rise at the crown and droop toward their tips.
+                for(let i=0;i<8;i++){
+                    const a=i*Math.PI/4+f.phaseOffset*.2,pts=[];
+                    for(let j=0;j<=12;j++){const u=j/12,d=29*s*u,w=5*s*Math.sin(u*Math.PI);
+                        pts.push(point(Math.cos(a)*d-Math.sin(a)*w,Math.sin(a)*d+Math.cos(a)*w,H+12*s*Math.sin(u*Math.PI)-14*s*u));}
+                    for(let j=12;j>=0;j--){const u=j/12,d=29*s*u,w=5*s*Math.sin(u*Math.PI);pts.push(point(Math.cos(a)*d+Math.sin(a)*w,Math.sin(a)*d-Math.cos(a)*w,H+12*s*Math.sin(u*Math.PI)-14*s*u));}
+                    polygon(pts,i%2?'#366a3d':'#54854b');
+                    const p=point(0,0,H),q=point(Math.cos(a)*29*s,Math.sin(a)*29*s,H-14*s);ctx.strokeStyle='#9b9b5c';ctx.lineWidth=.8*s;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y);ctx.stroke();
+                }
+            }else{
+                // Each leafy bough has its own position and height. Leaf texture is cached independently of the trunk.
+                const boughs=Array.from({length:5},(_,i)=>{const a=i*Math.PI*2/5+f.phaseOffset;return {x:Math.cos(a)*12*s,y:Math.sin(a)*12*s,z:H-(i%2?16:9)*s,size:s*.62};});
+                boughs.push({x:0,y:0,z:H+9*s,size:s*.72});
+                for(const b of boughs){const p=point(0,0,H*.62),q=point(b.x,b.y,b.z);ctx.strokeStyle=f.trunkColor;ctx.lineWidth=2.5*s;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y);ctx.stroke();}
+                boughs.sort((a,b)=>a.z-b.z);
+                for(let i=0;i<boughs.length;i++){const b=boughs[i],p=point(b.x,b.y,b.z),spr=floraSprite(f.type,b.size,(f._variant+i)%4),w=spr.w*p.k;ctx.drawImage(spr.cv,p.x-w/2,p.y-w/2,w,w);}
+            }
+        }
+
         function foliagePaintInView(f, ctx, view, zoom, wind, windDirection, frameTimeSec) {
             if (!f || f.draw !== Foliage.prototype.draw || !Object.prototype.hasOwnProperty.call(FLORA_KINDS, f.type) ||
                 !Number.isFinite(f.size) || f.size <= 0 || !Number.isFinite(f.phaseOffset) ||
                 !Number.isFinite(f.swayMultiplier) || !Number.isFinite(wind) || !Number.isFinite(windDirection)) return true;
             if (view && f.x >= view.left && f.x <= view.right && f.y >= view.top && f.y <= view.bottom) return true;
+            if (f.type !== 'bush') {
+                const p=foliagePoint(f,0,0,foliageHeight(f)+12*f.size),r=55*f.size*p.k;
+                if (worldPaintBoxInView(ctx,view,zoom,p.x,p.y,-r,-r,r,r,0)) return true;
+                return worldPaintBoxInView(ctx,view,zoom,f.x,f.y,Math.min(0,p.x-f.x)-r,Math.min(0,p.y-f.y)-r,Math.max(0,p.x-f.x)+r,Math.max(0,p.y-f.y)+r,0);
+            }
             const time = frameTimeSec || _frameTimeSec;
             if (!Number.isFinite(time)) return true;
             const sway = Math.sin(time * 2 + f.phaseOffset) * wind * 8 * f.swayMultiplier * windDirection;
@@ -326,6 +403,7 @@
                 }
                 // The canopy: its painted sprite, carried by the wind
                 if (this._variant === undefined) this._variant = Math.floor(this.phaseOffset * 0.637) % 4;
+                if (!bush) { ctx.save(); drawProjectedTree(ctx,this,sway * (palm ? .3 : 1));ctx.restore();return; }
                 const spr = floraSprite(this.type, s, this._variant);
                 if (palm) {
                     ctx.save(); ctx.translate(cx, cy); ctx.rotate(sway * 0.012); ctx.drawImage(spr.cv, -spr.w / 2, -spr.w / 2); ctx.restore();

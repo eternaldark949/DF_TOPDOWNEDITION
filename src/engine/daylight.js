@@ -138,7 +138,7 @@
                 for (const entry of foliageCandidates) {                                        // canopies, thrown along the sun
                     const f = entry.item;
                     if (f.x < cull.left - 120 || f.x > cull.right + 120 || f.y < cull.top - 120 || f.y > cull.bottom + 120) continue;
-                    const s = f.size || 1, ht = (f.type === 'bush' ? 8 : 34) * s, r = (f.type === 'bush' ? 12 : f.type === 'palm' ? 17 : 19) * s;
+                    const s = f.size || 1, ht = f.type === 'bush' ? 8 * s : foliageHeight(f), r = (f.type === 'bush' ? 12 : f.type === 'palm' ? 17 : 19) * s;
                     // Swept from under the canopy out along the sun (tapering back to the tree), so a long shadow stays attached
                     const x0 = f.x, y0 = foliageCanopyY(f), rot = Math.atan2(dy, dx), N = S.len > 0.6 ? 4 : 1;
                     for (let i = N === 1 ? 1 : 0; i <= N; i++) {

@@ -993,6 +993,15 @@ engineMixin({
                         for (const l of P.lamps) mapData.lamps.push(new LampEntity({ x: l.x, y: l.y, lampType: 1, color: '#ffd9a8', lightRadius: 170 }));
                         (mapData.pools || (mapData.pools = [])).push({ x: P.cx, y: P.cy, r: P.pondR, park: P.name });   // its moon pool, wadeable (engine/pools.js)
                     }
+                    // Apply to every street orientation and park tree after generation. Test canopy width,
+                    // not only the trunk point; keep compound building sections and bays clear too.
+                    const treeObstacles = (mapData.buildings || []).map(b => {
+                        const polys = b._footprint && b.sections ? b.sections.map((s,i) => b._footprint(s,i))
+                            : [[[b.x,b.y],[b.x+b.w,b.y],[b.x+b.w,b.y+b.h],[b.x,b.y+b.h]]];
+                        const pts=polys.flat();
+                        return {polys, bounds:{left:Math.min(...pts.map(p=>p[0])),right:Math.max(...pts.map(p=>p[0])),top:Math.min(...pts.map(p=>p[1])),bottom:Math.max(...pts.map(p=>p[1]))}};
+                    });
+                    mapData.foliage = mapData.foliage.filter(f => !treeObstacles.some(b => foliageHitsBuilding(f, b)));
                     console.log(`Generated ${mapData.foliage.length} foliage elements (including glowing trees)`);
                     
                     // 11d. SOUTHERN GRAVEYARD

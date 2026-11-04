@@ -768,6 +768,20 @@
                     if (![f.x, f.y, f.size, f.phaseOffset, f.swayMultiplier].every(Number.isFinite) || f.size <= 0) continue;
                     const bush = f.type === 'bush', palm = f.type === 'palm';
                     const sway = Math.sin(_gameTimeSec * 2 + f.phaseOffset) * wind * 8 * f.swayMultiplier * windDir;
+                    if (!bush) {
+                        const p=foliagePoint(f,sway*(palm ? .3 : 1),0,foliageHeight(f)+9*f.size),r=45*f.size*p.k;
+                        const reflectedY=f.y-.8*(p.y-f.y);
+                        const bx0=Math.min(f.x,p.x)-r,bx1=Math.max(f.x,p.x)+r;
+                        const by0=Math.min(f.y,reflectedY)-r,by1=Math.max(f.y,reflectedY)+r;
+                        if (near && !near((bx0+bx1)/2,(by0+by1)/2,Math.max(bx1-bx0,by1-by0)/2)) continue;
+                        if (!this._ultraOnWet(bx0,by0,bx1,by1)) continue;
+                        ctx.save();ctx.globalAlpha=.52;
+                        UltraM.from(this._ultraView).t(0,f.y).s(1,-.8).t(0,-f.y).put(ctx);
+                        if (f._variant === undefined) f._variant=Math.floor(f.phaseOffset*.637)%4;
+                        drawProjectedTree(ctx,f,sway*(palm ? .3 : 1));ctx.restore();
+                        if(mark)mark(bx0,by0,bx1,by1);
+                        continue;
+                    }
                     const cx = f.x + sway * (bush ? 0.6 : palm ? 0.3 : 1), cy = foliageCanopyY(f);
                     const variant = f._variant === undefined ? Math.floor(f.phaseOffset * 0.637) % 4 : f._variant;
                     const spr = floraSprite(f.type, f.size, variant);
