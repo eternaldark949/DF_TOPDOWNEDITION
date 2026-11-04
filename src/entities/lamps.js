@@ -7,7 +7,7 @@
         /**
          * Lamp Entity - Now supports rotation and proper alignment.
          */
-        /* Street lamps, seen from straight above, in an antiquated cast-iron style. Each style is
+        /* Raised street lanterns in an antiquated cast-iron style, projected above grounded posts. Each style is
            painted once into a sprite (per colour and lit/unlit) and stamped; the glow and the motes
            stay live. `bulbs` are where the light sits (the lighting keys off the lamp itself). To add
            a variation, add a style here and give the lamps that should wear it its `lampType`. */
@@ -63,6 +63,79 @@
         // The plain streets' second lamp colour (opposite the amber side): a warm rose-champagne, not bare white
         const STREET_LAMP_ROSE = '#ffcfae';
         const LAMP_POST_SCALE = 1.5; // Street and entrance posts, scaled around their ground anchors.
+
+        // Same world-height perspective as the tiered buildings. Fixtures stay on their authored plane.
+        function lampProjection(lamp) {
+            const style = LAMP_TYPE_STYLE[lamp.lampType];
+            const z = style === 'antique_twin' ? 150 : style === 'antique_crook' ? 125 : style === 'pillar_lantern' ? 55 : 0;
+            const C = leanCamHeight(), k = CONFIG.BUILDINGS.LEAN && z ? C / (C - Math.min(z, C * .86)) : 1;
+            const cam = game.camera;
+            return { x: cam.x + (lamp.x - cam.x) * k, y: cam.y + (lamp.y - cam.y) * k, k, z };
+        }
+
+        // Project independently authored world points; no whole-lamp sprite is used by this model.
+        function lampPoint(lamp, x, y, z) {
+            const ca = Math.cos(lamp.angle), sa = Math.sin(lamp.angle), C = leanCamHeight();
+            const wx = lamp.x + (x * ca - y * sa) * LAMP_POST_SCALE;
+            const wy = lamp.y + (x * sa + y * ca) * LAMP_POST_SCALE;
+            const k = CONFIG.BUILDINGS.LEAN ? C / (C - Math.min(z, C * .86)) : 1, cam = game.camera;
+            return [cam.x + (wx - cam.x) * k, cam.y + (wy - cam.y) * k];
+        }
+
+        function drawProjectedLamp(ctx, lamp, lit) {
+            const style = LAMP_TYPE_STYLE[lamp.lampType], spec = LAMP_STYLES[style], H = lampProjection(lamp).z;
+            const poly = (points, color) => {
+                ctx.fillStyle = color; ctx.beginPath();
+                points.forEach((p, i) => { const q = lampPoint(lamp, ...p); ctx[i ? 'lineTo' : 'moveTo'](...q); });
+                ctx.closePath(); ctx.fill();
+            };
+            const ring = (x, y, z, r, n = 8) => Array.from({length:n}, (_,i) => {
+                const a = Math.PI / 6 + i * Math.PI * 2 / n;
+                return [x + Math.cos(a) * r, y + Math.sin(a) * r, z];
+            });
+            // Faceted surfaces connect rings at different heights: foot, fluted shaft, collars and caps.
+            const sleeve = (a, b, colors) => {
+                const faces = a.map((p,i) => {
+                    const j = (i + 1) % a.length, q = lampPoint(lamp,(p[0]+a[j][0])/2,(p[1]+a[j][1])/2,0);
+                    return { i, j, d: (q[0]-game.camera.x)**2 + (q[1]-game.camera.y)**2 };
+                }).sort((u,v) => v.d-u.d);
+                for (const {i,j} of faces) poly([a[i], a[j], b[j], b[i]], colors[i % colors.length]);
+                poly(b, colors[0]);
+            };
+            const iron = ['#32293f','#211a2b','#100c17','#18121f'];
+            if (style !== 'pillar_lantern') {
+                sleeve(ring(0,0,0,7), ring(0,0,9,5), iron);
+                sleeve(ring(0,0,9,5), ring(0,0,15,3), [LAMP_BRASS,'#70532d']);
+                sleeve(ring(0,0,15,2.8), ring(0,0,H + 12,1.7), iron);
+                for (const z of [20, H * .65, H + 8])
+                    sleeve(ring(0,0,z,3), ring(0,0,z+3,3), [LAMP_BRASS,'#70532d']);
+                // Swept arms are curves through height, rather than a flat drawing of the old stem.
+                const arm = (points, width, color) => {
+                    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round'; ctx.beginPath();
+                    points.forEach((p,i) => { const q = lampPoint(lamp,...p); ctx[i?'lineTo':'moveTo'](...q); }); ctx.stroke();
+                };
+                if (style === 'antique_twin') {
+                    for (const side of [-1,1]) {
+                        const pts = Array.from({length:13},(_,i) => { const u=i/12; return [0,side*20*u,H+12+12*Math.sin(u*Math.PI)]; });
+                        arm(pts,4,LAMP_IRON); arm(pts,1,LAMP_IRON_HI);
+                    }
+                } else {
+                    const pts = Array.from({length:21},(_,i) => { const u=i/20; return [22*u,0,H+12+24*Math.sin(u*Math.PI)]; });
+                    arm(pts,4,LAMP_IRON); arm(pts,1,LAMP_IRON_HI);
+                }
+            }
+            for (const b of spec.bulbs) {
+                const r = style === 'antique_twin' ? 7 : 6.5;
+                const lower = ring(b.x,b.y,H-10,r*.65,6), upper = ring(b.x,b.y,H+7,r,6);
+                sleeve(ring(b.x,b.y,H-13,r*.35,6), lower, iron);
+                sleeve(lower,upper,lit ? [_lampTint(lamp.color,.25),lamp.color,_lampTint(lamp.color,.1)] : ['#39303f','#241d2d']);
+                // Iron ribs bound each individual glass pane in three dimensions.
+                ctx.strokeStyle = LAMP_IRON; ctx.lineWidth = 1.4;
+                for (let i=0;i<6;i++) { ctx.beginPath();ctx.moveTo(...lampPoint(lamp,...lower[i]));ctx.lineTo(...lampPoint(lamp,...upper[i]));ctx.stroke(); }
+                sleeve(upper,ring(b.x,b.y,H+13,r*.35,6),iron);
+                sleeve(ring(b.x,b.y,H+13,1.2,6),ring(b.x,b.y,H+17,.6,6),[LAMP_BRASS,'#70532d']);
+            }
+        }
 
         // The fluted cast-iron foot of the post, ringed in brass
         function _lampBase(c, x, y, r) {
@@ -488,8 +561,15 @@
                 left = -r; right = r; top = lamp.lampType === 5 ? Math.min(-12, -r) : -r;
                 bottom = lamp.lampType === 5 ? Math.max(12, r) : r;
             } else return true;
-            const scale = style ? LAMP_POST_SCALE : 1;
-            return worldPaintBoxInView(ctx, view, zoom, lamp.x, lamp.y, left * scale, top * scale, right * scale, bottom * scale, lamp.angle);
+            const p = lampProjection(lamp), scale = style ? LAMP_POST_SCALE * p.k : 1;
+            if (style) {
+                const cap = lampPoint(lamp, 0, 0, p.z + 36);
+                if (worldPaintBoxInView(ctx, view, zoom, cap[0], cap[1], -55 * p.k, -55 * p.k, 55 * p.k, 55 * p.k, 0)) return true;
+            }
+            return worldPaintBoxInView(ctx, view, zoom, p.x, p.y, left * scale, top * scale, right * scale, bottom * scale, lamp.angle) ||
+                (style && worldPaintBoxInView(ctx, view, zoom, lamp.x, lamp.y,
+                    Math.min(0, p.x - lamp.x) - 14, Math.min(0, p.y - lamp.y) - 14,
+                    Math.max(0, p.x - lamp.x) + 14, Math.max(0, p.y - lamp.y) + 14, 0));
         }
 
         class LampEntity extends GameEntity {
@@ -530,14 +610,15 @@
                     return;
                 }
                 if (!style || !this.visible || daylight >= .2 || this._forcedOff || k < .02) return;
+                const p = lampProjection(this);
                 const t = (_frameTime + this.animOffset) / 1000;
                 const SG = (() => { const m = ctx.getTransform(), d = Math.hypot(m.a, m.b) * LAMP_POST_SCALE; return d > 1.6 ? 3 : d > .8 ? 2 : 1; })();
                 // The lens's glare first (core/draw-helpers.js: fog under a star), breathing and flaring with the glitter's flashes;
                 // the lantern and its glitter go over it, so the points of light stay crisp in the haze, as in the renders
                 if (GameSettings.fogGlare !== false || GameSettings.starGlare !== false) {
-                    const ca = Math.cos(this.angle) * LAMP_POST_SCALE, sa = Math.sin(this.angle) * LAMP_POST_SCALE;
+                    const ca = Math.cos(this.angle) * LAMP_POST_SCALE * p.k, sa = Math.sin(this.angle) * LAMP_POST_SCALE * p.k;
                     LAMP_STAR_BULBS.length = 0;
-                    for (const b of LAMP_STYLES[style].bulbs) LAMP_STAR_BULBS.push(this.x + b.x * ca - b.y * sa, this.y + b.x * sa + b.y * ca);
+                    for (const b of LAMP_STYLES[style].bulbs) LAMP_STAR_BULBS.push(p.x + b.x * ca - b.y * sa, p.y + b.x * sa + b.y * ca);
                     for (let i = 0; i < LAMP_STAR_BULBS.length; i += 2) {
                         const breathe = 0.86 + 0.14 * Math.sin(t * 1.7 + i * 1.9), glint = lampGlint(t, (i >> 1) * 2.3 + this.animOffset * 0.001);
                         drawLensGlare(ctx, LAMP_STAR_BULBS[i], LAMP_STAR_BULBS[i + 1], this.color,
@@ -545,7 +626,7 @@
                     }
                 }
                 ctx.save();
-                ctx.translate(this.x, this.y); ctx.rotate(this.angle); ctx.scale(LAMP_POST_SCALE, LAMP_POST_SCALE);
+                ctx.translate(p.x, p.y); ctx.rotate(this.angle); ctx.scale(LAMP_POST_SCALE * p.k, LAMP_POST_SCALE * p.k);
                 const m = ctx.getTransform(), density = Math.hypot(m.a, m.b);
                 const S = density > 1.6 ? 3 : density > .8 ? 2 : 1;
                 const radius = style === 'antique_twin' ? 7 : 6.5;
@@ -584,6 +665,13 @@
                 const isOn = daylight < 0.2 && !this._forcedOff;
         
                 ctx.save();
+                const style3D = LAMP_TYPE_STYLE[this.lampType];
+                if (style3D) {
+                    drawProjectedLamp(ctx, this, isOn);
+                    ctx.restore();
+                    return;
+                }
+                const projected = lampProjection(this);
                 ctx.translate(this.x, this.y);
                 ctx.rotate(this.angle);
         
@@ -604,7 +692,7 @@
                     ctx.restore();
                     return;
                 }
-                if (style) ctx.scale(LAMP_POST_SCALE, LAMP_POST_SCALE);
+                if (style) ctx.scale(LAMP_POST_SCALE * projected.k, LAMP_POST_SCALE * projected.k);
                 if (style) { // A street lamp: its antique style, a baked sprite (LAMP_STYLES)
                     bulbs = LAMP_STYLES[style].bulbs;
                     

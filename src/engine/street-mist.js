@@ -124,14 +124,15 @@
                 if (k < 0.02) return;
                 const t = _frameTime / 1000, seed = (l.x * 13 + l.y * 7) % 1000, spr = sparkSprite(_mistHex(l));
                 const prevOp = ctx.globalCompositeOperation, prevA = ctx.globalAlpha;
+                const projected = lampProjection(l);
                 ctx.globalCompositeOperation = 'lighter';
                 for (let i = 0; i < SPARKS.N; i++) {
                     const h = ((i * 37 + seed) % 10) / 10, sp = SPARKS.SPEED[0] + (SPARKS.SPEED[1] - SPARKS.SPEED[0]) * h;
                     const life = (t * sp + i / SPARKS.N + seed * 0.001) % 1;
                     const a = Math.sin(life * Math.PI) * (0.6 + 0.4 * Math.sin(t * 7 + i * 3 + seed));
                     if (a <= 0.02) continue;
-                    const x = l.x + Math.sin(t * 0.6 + i * 2.1 + seed) * SPARKS.SPREAD + (i - (SPARKS.N - 1) / 2) * 6;
-                    const y = l.y + 10 - life * SPARKS.RISE;
+                    const x = projected.x + Math.sin(t * 0.6 + i * 2.1 + seed) * SPARKS.SPREAD + (i - (SPARKS.N - 1) / 2) * 6;
+                    const y = projected.y + 10 - life * SPARKS.RISE;
                     const r = SPARKS.SIZE[0] + (SPARKS.SIZE[1] - SPARKS.SIZE[0]) * (((i * 53 + seed) % 10) / 10);
                     ctx.globalAlpha = a * SPARKS.ALPHA * k;
                     ctx.drawImage(spr, x - r * 5, y - r * 5, r * 10, r * 10);

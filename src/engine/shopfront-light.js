@@ -94,6 +94,19 @@
                 const reach = L.DEPTH * 1.2;
                 ctx.save();
                 ctx.globalCompositeOperation = 'lighter';
+                // Pavement light is at ground height, so every projected building can hide it,
+                // including the emitting shop's own overhanging roof.
+                for (const entry of this._prepareRenderBuildingLists(this._cullBounds).v2) {
+                    const b = entry.item;
+                    if (!b._glowOccluders || !b.inView(v, this.camera)) continue;
+                    const polygons = CONFIG.BUILDINGS.LEAN ? b._glowOccluders(this.camera)
+                        : b.sections.map((s, i) => b._footprint(s, i));
+                    for (const poly of polygons) {
+                        ctx.beginPath(); ctx.rect(-1e7, -1e7, 2e7, 2e7);
+                        poly.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+                        ctx.closePath(); ctx.clip('evenodd');
+                    }
+                }
                 for (const entry of this._prepareRenderBuildingLists(this._cullBounds).v2) {
                     const b = entry.item;
                     if (!b.isV2 || !b.variant || b.variant.kind !== 'shop' || !b._shopfront) continue;
