@@ -22,17 +22,23 @@ const r=e.run(`(()=>{
  game._cullBounds={view:{left:0,top:0,right:1000,bottom:1000}};
  game.activeMap={buildings:[{}]};
  game._prepareRenderBuildingLists=()=>({v2:[{item:{floors:14,_glowOccluders:()=>[[[200,200],[400,200],[400,400],[200,400]]]}}]});
+ let rectMax=0;const oldRect=ctx.rect;ctx.rect=function(x,y,w,h){rectMax=Math.max(rectMax,Math.abs(w),Math.abs(h));return oldRect&&oldRect.apply(this,arguments);};
  f.draw(ctx,.3,1,5);
- ctx.clip=oldClip;game._prepareRenderBuildingLists=oldPrepare;
+ // A roof outline far from the tree hides none of it: no clip at all
+ const nearClips=clips;
+ game._prepareRenderBuildingLists=()=>({v2:[{item:{floors:14,_glowOccluders:()=>[[[3000,3000],[3200,3000],[3200,3200],[3000,3200]]]}}]});
+ f.draw(ctx,.3,1,5);
+ const farClips=clips-nearClips;
+ ctx.clip=oldClip;ctx.rect=oldRect;game._prepareRenderBuildingLists=oldPrepare;
  const m=ctx.getTransform();CONFIG.BUILDINGS.LEAN=false;
  const flat=foliagePoint(f,0,0,H);
  game._doLoadMap('sdc',null);
  const trees=game.activeMap.foliage,buildings=game.activeMap.buildings;
  const overlaps=trees.filter(f=>buildings.some(b=>foliageHitsBuilding(f,b))).length;
- return {clips,root,crown,flat,near,inside,far,bay,heights:zs.size,m:[m.a,m.b,m.c,m.d,m.e,m.f],count:trees.length,overlaps};
+ return {clips:nearClips,farClips,rectMax,root,crown,flat,near,inside,far,bay,heights:zs.size,m:[m.a,m.b,m.c,m.d,m.e,m.f],count:trees.length,overlaps};
 })()`);
 assert.equal(r.root.x,300);assert.ok(r.crown.x>300);assert.equal(r.flat.x,300);
 assert.equal(r.near,true);assert.equal(r.inside,true);assert.equal(r.far,false);assert.equal(r.bay,true);
-assert.ok(r.heights>10);assert.ok(r.clips>0);assert.deepEqual(Array.from(r.m),[1,0,0,1,0,0]);
+assert.ok(r.heights>10);assert.ok(r.clips>0);assert.equal(r.farClips,0);assert.ok(r.rectMax>0&&r.rectMax<2000,`cover clip bounded by the tree (${r.rectMax})`);assert.deepEqual(Array.from(r.m),[1,0,0,1,0,0]);
 assert.ok(r.count>50);assert.equal(r.overlaps,0);assert.deepEqual(e.errors,[]);
 console.log(`Tree parts, projection, state restoration and canopy clearance passed (${r.count} plants, no building overlaps).`);

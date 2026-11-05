@@ -270,15 +270,26 @@
                     const box=b._glowBox && b._glowBox(game.camera), p=foliagePoint(f,sway,0,H+12*s),r=50*s*p.k;
                     if (box && (box[0]>Math.max(f.x,p.x)+r || box[2]<Math.min(f.x,p.x)-r || box[1]>Math.max(f.y,p.y)+r || box[3]<Math.min(f.y,p.y)-r)) continue;
                     for (const poly of b._glowOccluders(game.camera)) {
+                        // Only an outline that reaches the tree can hide any of it (a clip per part costs a mask).
+                        let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+                        for (const q of poly) { if (q[0]<x0) x0=q[0]; if (q[0]>x1) x1=q[0]; if (q[1]<y0) y0=q[1]; if (q[1]>y1) y1=q[1]; }
+                        if (x0>Math.max(f.x,p.x)+r || x1<Math.min(f.x,p.x)-r || y0>Math.max(f.y,p.y)+r || y1<Math.min(f.y,p.y)-r) continue;
                         covers.push(poly);
                     }
                 }
+            }
+            // The even-odd cut-outs are bounded by the tree's own projected box (crown, sway and sprites with a margin):
+            // the tree paints nothing outside it, so the picture is unchanged while each mask covers a few hundred px.
+            let bx=0,by=0,bw=0,bh=0;
+            if (covers.length) {
+                const top=foliagePoint(f,sway*(H+12*s)/H,0,H+12*s), m=60*s*top.k+8;
+                bx=Math.min(f.x,top.x)-m; by=Math.min(f.y,top.y)-m; bw=Math.abs(top.x-f.x)+2*m; bh=Math.abs(top.y-f.y)+2*m;
             }
             const paintAt = (z,paint) => FoliageLampDepth.add(ctx,z,()=>{
                 if (!covers.length) {paint();return;}
                 ctx.save();
                 try {
-                    for(const poly of covers){ctx.beginPath();ctx.rect(-1e7,-1e7,2e7,2e7);poly.forEach((p,i)=>ctx[i?'lineTo':'moveTo'](p[0],p[1]));ctx.closePath();ctx.clip('evenodd');}
+                    for(const poly of covers){ctx.beginPath();ctx.rect(bx,by,bw,bh);poly.forEach((p,i)=>ctx[i?'lineTo':'moveTo'](p[0],p[1]));ctx.closePath();ctx.clip('evenodd');}
                     paint();
                 } finally {ctx.restore();}
             });

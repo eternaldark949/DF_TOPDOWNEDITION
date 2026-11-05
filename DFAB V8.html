@@ -4778,7 +4778,7 @@
                         <div class="row-right"><div class="input-prompt">enter</div></div>
                     </div>
                     <div class="menu-item-row" id="btn-toggle-traffic">
-                        <div class="row-left"><div class="desc-box">Fewer cars improves FPS.<span class="arrow">▶</span></div></div>
+                        <div class="row-left"><div class="desc-box">Fewer cars improves FPS; OFF clears the streets.<span class="arrow">▶</span></div></div>
                         <div class="row-center"><div class="menu-btn" id="lbl-traffic">Traffic: HIGH</div></div>
                         <div class="row-right"><div class="input-prompt">enter</div></div>
                     </div>
@@ -5819,6 +5819,10 @@
                     <span class="settings-value" id="set-performance-bench" data-key="performanceBench">RUN ›</span>
                 </div>
                 <div class="settings-row">
+                    <span class="settings-label">Whole-Game Bench (paint)</span>
+                    <span class="settings-value" id="set-performance-bench-paint" data-key="performanceBenchPaint">RUN ›</span>
+                </div>
+                <div class="settings-row">
                     <span class="settings-label">Resolution Bench</span>
                     <span class="settings-value" id="set-bench" data-key="perfBench">RUN ›</span>
                 </div>
@@ -5865,9 +5869,9 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '6e00c1c31637';
+        const DFAB_BUILD = 'f01254d099d9';
     </script>
-    <script type="text/dfab" data-src="core/config.js" data-cost="406">
+    <script type="text/dfab" data-src="core/config.js" data-cost="410">
 
         // Console chatter (the ~100 [SAVE] / STORY / roads logs) is quiet unless you turn it on:
         // run  localStorage.dfab_debug = '1'  in the console and reload. Warnings and errors always show.
@@ -6439,11 +6443,16 @@
 
         /** The lean's camera height for the current zoom: zoomed out, the camera sits higher, so a
             building's apparent height shrinks with its footprint instead of towering over it. */
+        // Asked thousands of times a frame (every projected point): the last answer is kept while its inputs hold.
+        const _leanCam = { z: NaN, H: NaN, R: NaN, C: 0 };
         function leanCamHeight() {
             const B = CONFIG.BUILDINGS;
             let z = B.REF_ZOOM;
             try { if (game && game.camera && game.camera.zoom) z = game.camera.zoom; } catch (e) { /* before the engine exists */ }
-            return B.CAM_HEIGHT * Math.max(0.7, Math.min(3.2, B.REF_ZOOM / z));
+            const L = _leanCam;
+            if (L.z === z && L.H === B.CAM_HEIGHT && L.R === B.REF_ZOOM) return L.C;
+            L.z = z; L.H = B.CAM_HEIGHT; L.R = B.REF_ZOOM;
+            return (L.C = B.CAM_HEIGHT * Math.max(0.7, Math.min(3.2, B.REF_ZOOM / z)));
         }
     </script>
     <script type="text/dfab" data-src="assets#0" data-cost="1">
@@ -9489,7 +9498,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                      train: p(look.train, t.bottom), hat: p(look.hat, t.hair), jewelry: null, held: null };
         }
     </script>
-    <script type="text/dfab" data-src="core/settings.js" data-cost="286">
+    <script type="text/dfab" data-src="core/settings.js" data-cost="291">
         // ============================================================================
         // GAME SETTINGS — Mutable runtime settings (controlled by Settings UI)
         // These override CONFIG values where applicable. Systems read from here.
@@ -9627,7 +9636,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         const GameSettings = {
             // --- DENSITY --- (kept per device: dfab_density; saveDensity() after a change)
-            trafficDensity: _lvl(_deviceDensity.trafficDensity, 'high'),         // 'low' | 'medium' | 'high'
+            trafficDensity: _deviceDensity.trafficDensity === 'off' ? 'off' : _lvl(_deviceDensity.trafficDensity, 'high'),   // 'off' (no street traffic) | 'low' | 'medium' | 'high'
             pedestrianDensity: _lvl(_deviceDensity.pedestrianDensity, 'high'),   // 'low' | 'medium' | 'high'
             foliageDensity: _lvl(_deviceDensity.foliageDensity, 'high'),         // 'low' | 'medium' | 'high'
             rainDensity: _lvl(_deviceDensity.rainDensity, 'high'),               // 'low' | 'medium' | 'high'
@@ -9781,7 +9790,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             applyPreset(preset) {
                 if (preset === 'low') {
                     this.lightingQuality = 'low';
-                    this.trafficDensity = 'low';
+                    if (this.trafficDensity !== 'off') this.trafficDensity = 'low';      // (traffic switched off stays off)
                     this.pedestrianDensity = 'low';
                     this.foliageDensity = 'low';
                     this.rainDensity = 'low';
@@ -9798,7 +9807,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.soundRings = 'simple';
                 } else if (preset === 'medium') {
                     this.lightingQuality = 'medium';
-                    this.trafficDensity = 'medium';
+                    if (this.trafficDensity !== 'off') this.trafficDensity = 'medium';
                     this.pedestrianDensity = 'medium';
                     this.foliageDensity = 'medium';
                     this.rainDensity = 'medium';
@@ -9813,7 +9822,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
             // --- DENSITY LOOKUP TABLES ---
             _densityValues: {
-                traffic:    { low: 8,  medium: 16, high: 80 },   // high bumped 30 → 80 for crowds
+                traffic:    { off: 0, low: 8,  medium: 16, high: 80 },   // high bumped 30 → 80 for crowds; off: no street traffic
                 pedestrian: { low: 10, medium: 25, high: 100 },  // high bumped 40 → 100 for crowds
                 foliage:    { low: 0.3, medium: 0.6, high: 1.0 }, // fraction of foliage rendered
                 rain: {
@@ -9824,7 +9833,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             },
             
             // --- GETTERS ---
-            getMaxTraffic()     { return this._densityValues.traffic[this.trafficDensity]; },
+            getMaxTraffic()     { return this._densityValues.traffic[this.trafficDensity] ?? this._densityValues.traffic.high; },
+            /** Street traffic switched off: no cars spawn and the ones driving fade away (her cars, Zibs and parked cars stay) */
+            trafficOff()        { return this.trafficDensity === 'off'; },
             getMaxPedestrians() { return this._densityValues.pedestrian[this.pedestrianDensity]; },
             getFoliageScale()   { return this._densityValues.foliage[this.foliageDensity]; },
             getRainConfig()     { return this._densityValues.rain[this.rainDensity]; },
@@ -23145,7 +23156,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
     </script>
-    <script type="text/dfab" data-src="entities/lamps.js" data-cost="552">
+    <script type="text/dfab" data-src="entities/lamps.js" data-cost="555">
         /**
          * Lamp Entity - No collision, just decoration.
          */
@@ -23223,7 +23234,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         // Project independently authored world points; no whole-lamp sprite is used by this model.
         function lampPoint(lamp, x, y, z) {
-            const ca = Math.cos(lamp.angle), sa = Math.sin(lamp.angle), C = leanCamHeight();
+            let r = lamp._ptRot;                                                  // (its turn's cos/sin, kept while the angle holds)
+            if (!r || r.a !== lamp.angle) r = lamp._ptRot = { a: lamp.angle, ca: Math.cos(lamp.angle), sa: Math.sin(lamp.angle) };
+            const ca = r.ca, sa = r.sa, C = leanCamHeight();
             const wx = lamp.x + (x * ca - y * sa) * LAMP_POST_SCALE;
             const wy = lamp.y + (x * sa + y * ca) * LAMP_POST_SCALE;
             const k = CONFIG.BUILDINGS.LEAN ? C / (C - Math.min(z, C * .86)) : 1, cam = game.camera;
@@ -25681,18 +25694,18 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
 
     </script>
-    <script type="text/dfab" data-src="entities/performance-bench.js" data-cost="203">
+    <script type="text/dfab" data-src="entities/performance-bench.js" data-cost="234">
         // Whole-loop benchmark. Times CPU submission and presentation cadence separately;
         // browser/compositor/GPU time cannot be measured by synchronous Canvas timers.
         const PerformanceBench = {
             active: false, detailed: true, results: null, _card: null,
-            run({ durationMs = 30000, warmupMs = 3000, detailed = true } = {}) {
+            run({ durationMs = 30000, warmupMs = 3000, detailed = true, paint = false } = {}) {
                 if (this.active || PerfBench.active) { showMessage('A BENCHMARK IS ALREADY RUNNING'); return false; }
                 if (typeof game === 'undefined' || !game.running || game.paused || document.hidden) {
                     showMessage('START OR RESUME THE GAME FIRST'); return false;
                 }
                 if (!Number.isFinite(durationMs) || !Number.isFinite(warmupMs) || durationMs < 100 || durationMs > 120000 || warmupMs < 0 || warmupMs > 30000) return false;
-                this.detailed = !!detailed;
+                this.detailed = !!detailed; this.paint = !!paint;
                 this.results = null; this.frames = []; this.maps = new Set();
                 this.durationMs = durationMs; this.warmupMs = warmupMs; this.sampledMs = 0;
                 this.interruptions = 0; this._previous = null; this._frame = null;
@@ -25703,6 +25716,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 game.showProfiler = false; GameSettings.profilerMode = 'off';
                 GameSettings.countCalls = false; GameSettings.baseline = false;
                 this.active = true; game._syncProfiler();
+                if (this.paint) this._installPaintSync();
                 if (typeof DevOverlay !== 'undefined') DevOverlay.sync(game);
                 this._visibility = () => { if (document.hidden) { this._previous = null; this.interruptions++; } };
                 document.addEventListener('visibilitychange', this._visibility);
@@ -25763,7 +25777,41 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.maps.add(game.activeMap?.id || 'unknown');
                 if (this.sampledMs >= this.durationMs) this.finish(); else this.draw();
             },
+            /**
+             * Paint mode: Canvas calls only record commands, and the pixels are painted when something next reads the
+             * canvas (in practice the bloom pass, which then looks expensive for everyone). Here each Render: stage and the
+             * tree/lamp depth pass wait for the canvas before their timers stop, so a stage's row includes painting what it
+             * drew. The wait reads one pixel through a tiny canvas, so the game canvas itself is never read back (which
+             * could move it off the GPU). The waits add their own cost: compare paint captures with paint captures.
+             */
+            _paintSync() {
+                const t = this._tiny || (this._tiny = document.createElement('canvas'));
+                if (t.width !== 1) { t.width = 1; t.height = 1; }
+                const c = this._tinyCtx || (this._tinyCtx = t.getContext('2d', { willReadFrequently: true }));
+                try { c.drawImage(game.canvas, 0, 0, 1, 1, 0, 0, 1, 1); c.getImageData(0, 0, 1, 1); } catch (e) { /* (a tainted or lost canvas: no wait) */ }
+            },
+            _installPaintSync() {
+                const prof = game.profiler, start = prof.start, stop = prof.stop, flush = FoliageLampDepth.flush, bench = this;
+                const stage = l => typeof l === 'string' && l.startsWith('Render:') && l !== 'Render:Total';
+                this._paintHooks = { prof, start, stop, flush };
+                prof.start = function (l) { if (stage(l)) bench._paintSync(); return start.apply(this, arguments); };
+                prof.stop = function (l) { if (stage(l)) bench._paintSync(); return stop.apply(this, arguments); };
+                FoliageLampDepth.flush = function () {
+                    bench._paintSync(); const t = performance.now();
+                    try { return flush.apply(this, arguments); }
+                    finally { bench._paintSync(); if (bench._frame) bench._frame.sections['Paint: Trees and lamps'] = (bench._frame.sections['Paint: Trees and lamps'] || 0) + performance.now() - t; }
+                };
+            },
+            _removePaintSync() {
+                const h = this._paintHooks; if (!h) return;
+                h.prof.start = h.start; h.prof.stop = h.stop; FoliageLampDepth.flush = h.flush;
+                // (own properties shadowing the prototype's are removed, so the profiler is exactly as it was)
+                if (h.start === Object.getPrototypeOf(h.prof).start) delete h.prof.start;
+                if (h.stop === Object.getPrototypeOf(h.prof).stop) delete h.prof.stop;
+                this._paintHooks = null;
+            },
             _restore() {
+                this._removePaintSync();
                 this.active = false; this._frame = null;
                 if (this._visibility) document.removeEventListener('visibilitychange', this._visibility);
                 this._visibility = null;
@@ -25821,7 +25869,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const people = sections.find(s => s.mean > 0 && /^People: /.test(s.label));
                     if (people) findings.push(`Largest measured character detail: ${people.label} (${people.mean.toFixed(2)} ms/frame mean).`);
                 }
-                this.results = { version: 2, instrumentation: { mode: this.detailed ? 'detailed' : 'summary', profilerPanel: false, canvasCallCounting: false,
+                if (this.paint) findings.push('Paint mode: each Render: stage waits for the canvas to finish painting before its timer stops, so its row includes painting what it drew. The waits slow the frame; compare only with other paint captures.');
+                this.results = { version: 2, instrumentation: { mode: this.detailed ? 'detailed' : 'summary', paint: !!this.paint, profilerPanel: false, canvasCallCounting: false,
                         note: this.detailed ? 'Full entity, character, world, traffic and sign-detail timing hooks are enabled without the profiler panel. Extra timing calls and wrappers add overhead; compare against another detailed capture.' : 'Summary section timers only; detailed entity/character/world hooks are disabled.' }, createdAt: new Date().toISOString(), sampleCount: frames.length,
                     sampledSeconds: sum('cadence') / 1000, targetFps, fps, cadenceMs: cadence, cpuLoopMs: cpu,
                     outsideLoopMeanMs: Math.max(0, cadence.mean - cpu.mean), slowFrames: slow,
@@ -25842,7 +25891,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const r = this.results; if (!r) return 'No whole-game benchmark report yet.';
                 const n = v => v.toFixed(2);
                 return ['DIMENSIONS: FREELANCER — WHOLE-GAME PERFORMANCE REPORT', r.createdAt,
-                    `Capture mode: ${r.instrumentation.mode.toUpperCase()} | profiler panel OFF | canvas call counting OFF`, r.instrumentation.note,
+                    `Capture mode: ${r.instrumentation.mode.toUpperCase()}${r.instrumentation.paint ? ' + PAINT' : ''} | profiler panel OFF | canvas call counting OFF`, r.instrumentation.note,
                     `${r.sampleCount} frames / ${n(r.sampledSeconds)} s | maps: ${r.maps.join(', ')} | interruptions: ${r.interruptions}`,
                     `Average FPS: ${n(r.fps)} | evaluation target: ${r.targetFps} FPS`,
                     `Frame intervals (ms): median ${n(r.cadenceMs.p50)}, p95 ${n(r.cadenceMs.p95)}, p99 ${n(r.cadenceMs.p99)}, worst ${n(r.cadenceMs.max)}`,
@@ -25900,7 +25949,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         };
         if (typeof window !== 'undefined') window.PerformanceBench = PerformanceBench;
     </script>
-    <script type="text/dfab" data-src="entities/street-objects.js" data-cost="337">
+    <script type="text/dfab" data-src="entities/street-objects.js" data-cost="347">
         /* --- ENTITIES --- */
         // =====================================================================
         //  PROJECTILE CLASS - REMOVED (Now uses ProjectileEntity)
@@ -26173,15 +26222,26 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const box=b._glowBox && b._glowBox(game.camera), p=foliagePoint(f,sway,0,H+12*s),r=50*s*p.k;
                     if (box && (box[0]>Math.max(f.x,p.x)+r || box[2]<Math.min(f.x,p.x)-r || box[1]>Math.max(f.y,p.y)+r || box[3]<Math.min(f.y,p.y)-r)) continue;
                     for (const poly of b._glowOccluders(game.camera)) {
+                        // Only an outline that reaches the tree can hide any of it (a clip per part costs a mask).
+                        let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+                        for (const q of poly) { if (q[0]<x0) x0=q[0]; if (q[0]>x1) x1=q[0]; if (q[1]<y0) y0=q[1]; if (q[1]>y1) y1=q[1]; }
+                        if (x0>Math.max(f.x,p.x)+r || x1<Math.min(f.x,p.x)-r || y0>Math.max(f.y,p.y)+r || y1<Math.min(f.y,p.y)-r) continue;
                         covers.push(poly);
                     }
                 }
+            }
+            // The even-odd cut-outs are bounded by the tree's own projected box (crown, sway and sprites with a margin):
+            // the tree paints nothing outside it, so the picture is unchanged while each mask covers a few hundred px.
+            let bx=0,by=0,bw=0,bh=0;
+            if (covers.length) {
+                const top=foliagePoint(f,sway*(H+12*s)/H,0,H+12*s), m=60*s*top.k+8;
+                bx=Math.min(f.x,top.x)-m; by=Math.min(f.y,top.y)-m; bw=Math.abs(top.x-f.x)+2*m; bh=Math.abs(top.y-f.y)+2*m;
             }
             const paintAt = (z,paint) => FoliageLampDepth.add(ctx,z,()=>{
                 if (!covers.length) {paint();return;}
                 ctx.save();
                 try {
-                    for(const poly of covers){ctx.beginPath();ctx.rect(-1e7,-1e7,2e7,2e7);poly.forEach((p,i)=>ctx[i?'lineTo':'moveTo'](p[0],p[1]));ctx.closePath();ctx.clip('evenodd');}
+                    for(const poly of covers){ctx.beginPath();ctx.rect(bx,by,bw,bh);poly.forEach((p,i)=>ctx[i?'lineTo':'moveTo'](p[0],p[1]));ctx.closePath();ctx.clip('evenodd');}
                     paint();
                 } finally {ctx.restore();}
             });
@@ -33362,7 +33422,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
         
     </script>
-    <script type="text/dfab" data-src="buildings/building-v2.js" data-cost="1114">
+    <script type="text/dfab" data-src="buildings/building-v2.js" data-cost="1125">
         /* =====================================================================
            BUILDING V2 - COMPLEX SHAPES & LAYERED RENDERING
            ---------------------------------------------------------------------
@@ -34211,12 +34271,24 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             /** What it hides of the glow behind it (world): each section, footprint to leaned roof (engine/world-state.js drawEmissivePass). */
             _glowOccluders(cam) {
-                const k = 1 + this._leanScale(), out = [];
+                const k = 1 + this._leanScale();
+                // Asked by the glow pass, the shop light and every tree near it each frame: reuse the hulls while the camera,
+                // the lean and the sections stand where they were (callers only read them).
+                const c = this._glowOcc, S = this.sections;
+                let same = c && c.cx === cam.x && c.cy === cam.y && c.k === k && c.x === this.x && c.y === this.y &&
+                    c.S === S && c.n === S.length && c.roundR === this.roundR && c.rounds === this._roundSec;
+                if (same) for (let i = 0, o = 0; i < S.length; i++, o += 4) {
+                    const s = S[i]; if (c.g[o] !== s.x || c.g[o + 1] !== s.y || c.g[o + 2] !== s.w || c.g[o + 3] !== s.h) { same = false; break; }
+                }
+                if (same) return c.out;
+                const out = [];
                 this.sections.forEach((s, si) => {
                     const fp = this._footprint(s, si), pts = fp.map(p => p.slice());
                     for (const [x, y] of fp) pts.push([cam.x + (x - cam.x) * k, cam.y + (y - cam.y) * k]);
                     out.push(TierKit.hull(pts));
                 });
+                const g = []; for (const sec of S) g.push(sec.x, sec.y, sec.w, sec.h);
+                this._glowOcc = { cx: cam.x, cy: cam.y, k, x: this.x, y: this.y, S, n: S.length, roundR: this.roundR, rounds: this._roundSec, g, out };
                 return out;
             },
 
@@ -53832,7 +53904,7 @@ Object.assign(TrafficVehicle.prototype, {
             },
         });
     </script>
-    <script type="text/dfab" data-src="traffic/traffic-manager.js" data-cost="260">
+    <script type="text/dfab" data-src="traffic/traffic-manager.js" data-cost="266">
         /* --- OPTIMIZATION: SPATIAL GRID ---
            Cells are keyed by number (no strings) and their arrays are kept and emptied, not rebuilt;
            getNearby drops repeats with a per-query stamp instead of a Set (same order as before). */
@@ -54086,7 +54158,8 @@ Object.assign(TrafficVehicle.prototype, {
                 }
         
                 // Over the cap (the setting was turned down): the farthest cars out of view fade away
-                if (_simTick % 60 === 0) this.trimToCap(player, playerCar);
+                if (GameSettings.trafficOff()) this.clearStreetTraffic(playerCar);
+                else if (_simTick % 60 === 0) this.trimToCap(player, playerCar);
                 // 2. SPAWN LOGIC
                 if (this.vehicles.length < GameSettings.getMaxTraffic() && this.spawnTimer <= 0) { 
                     this.spawnTimer = 5;  // Was 20 — 4× faster spawn rate so crowd density actually fills
@@ -54169,6 +54242,15 @@ Object.assign(TrafficVehicle.prototype, {
                 return along >= len * 2 && along <= lane.length - len * 4 ? along : null;
             }
             
+            /** Traffic switched off (Settings → Traffic: OFF): every car driving itself fades out now, in view or not. Her own
+                and linked cars, Zib taxis and anything parked or driverless stay. */
+            clearStreetTraffic(playerCar) {
+                for (const v of this.vehicles) {
+                    if (v.fading || v.dead || v === playerCar || v.isZib) continue;
+                    if (v.controlMode === 'AI' && v.hasDriver && v.driverType !== 'player') v.fading = true;
+                }
+            }
+
             /** Down to GameSettings' cap: the farthest cars out of view fade out (hers are never in the list; one rolling stays) */
             trimToCap(player, playerCar) {
                 const live = this.vehicles.filter(v => !v.fading && !v.dead);
@@ -71126,7 +71208,7 @@ Object.assign(TrafficVehicle.prototype, {
         }
         
     </script>
-    <script type="text/dfab" data-src="engine/game-engine.js" data-cost="184">
+    <script type="text/dfab" data-src="engine/game-engine.js" data-cost="186">
         class GameEngine {
             constructor() {
                 
@@ -71151,7 +71233,9 @@ Object.assign(TrafficVehicle.prototype, {
                 this.useNewCollisionSystem = true;
                 
                 this.canvas = document.getElementById('game-canvas');
-                this.ctx = this.canvas.getContext('2d');
+                // Opaque: every frame starts with a black fill (engine/draw.js), so the page never shows through, and the
+                // browser can composite the canvas (under the colour grade's CSS filter) without blending it.
+                this.ctx = this.canvas.getContext('2d', { alpha: false });
                 
                 // Lighting Layer
                 this.lightingScale = 1.0; // 1.0 = High (Native), 0.75 = Medium, 0.5 = Low (Half-Res)
@@ -97830,7 +97914,7 @@ engineMixin({
             }
         };
     </script>
-    <script type="text/dfab" data-src="ui/save-slots-pause-menu.js" data-cost="797">
+    <script type="text/dfab" data-src="ui/save-slots-pause-menu.js" data-cost="801">
         // --- PAUSE MENU SYSTEM (Phase 3) ---
         // ─── SAVE SLOT MANAGER ─────────────────────────────────────────────
         //  Multi-slot save system: the imprint cards (Imprint to save, Recall to load).
@@ -99166,6 +99250,11 @@ engineMixin({
                     this.closeSettings(); this.close();
                     PerformanceBench.run();
 
+                } else if (key === 'performanceBenchPaint') {
+                    // The same capture, with each render stage waiting for the canvas to paint (entities/performance-bench.js)
+                    this.closeSettings(); this.close();
+                    PerformanceBench.run({ paint: true });
+
                 } else if (key === 'perfBench') {
                     // The resolution sweep (entities/static-builders-profiler.js PerfBench): back in the game to measure it
                     GameSettings.profilerMode = GameSettings.profilerMode === 'off' || !GameSettings.profilerMode ? 'compact' : GameSettings.profilerMode;
@@ -99208,7 +99297,7 @@ engineMixin({
                     
                 } else {
                     // Density settings: cycle LOW → MEDIUM → HIGH
-                    const order = key === 'crowdQuality' ? ['low', 'medium', 'high', 'ultra'] : ['low', 'medium', 'high'];
+                    const order = key === 'crowdQuality' ? ['low', 'medium', 'high', 'ultra'] : key === 'trafficDensity' ? ['off', 'low', 'medium', 'high'] : ['low', 'medium', 'high'];
                     const current = GameSettings[key];
                     const idx = order.indexOf(current);
                     GameSettings[key] = order[(idx + 1) % order.length];
@@ -99223,7 +99312,7 @@ engineMixin({
         }
         
     </script>
-    <script type="text/dfab" data-src="app/boot.js" data-cost="222">
+    <script type="text/dfab" data-src="app/boot.js" data-cost="223">
         // ═══ COLOUR GRADE ═══
         // The grade lives in Cinematic View's drawer (#cine-grade, ui/save-slots-pause-menu.js).
         // Exposure / brightness / contrast / saturation join the canvas filter chain each frame
@@ -99401,9 +99490,9 @@ engineMixin({
         
         // --- SETTINGS CYCLE HELPER ---
         function cycleDensity(key) {
-            const order = ['low', 'medium', 'high'];
+            const order = key === 'trafficDensity' ? ['off', 'low', 'medium', 'high'] : ['low', 'medium', 'high'];
             const idx = order.indexOf(GameSettings[key]);
-            GameSettings[key] = order[(idx + 1) % 3];
+            GameSettings[key] = order[(idx + 1) % order.length];
             GameSettings.saveDensity();
             return GameSettings[key].toUpperCase();
         }
@@ -99413,7 +99502,7 @@ engineMixin({
                 const el = document.getElementById(id);
                 if (el) { el.textContent = text; el.style.color = color || ''; }
             };
-            const dColor = (v) => v === 'low' ? '#4CAF50' : v === 'medium' ? '#FFD700' : '';
+            const dColor = (v) => v === 'off' ? '#666' : v === 'low' ? '#4CAF50' : v === 'medium' ? '#FFD700' : '';
             
             lbl('lbl-devicepreset', `Device Preset: ${GameSettings.devicePreset ? `ON (${GameSettings.deviceTier().toUpperCase()})` : 'OFF'}`,
                 GameSettings.devicePreset ? '#4CAF50' : '#666');

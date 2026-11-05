@@ -569,9 +569,14 @@
 
         /** The lean's camera height for the current zoom: zoomed out, the camera sits higher, so a
             building's apparent height shrinks with its footprint instead of towering over it. */
+        // Asked thousands of times a frame (every projected point): the last answer is kept while its inputs hold.
+        const _leanCam = { z: NaN, H: NaN, R: NaN, C: 0 };
         function leanCamHeight() {
             const B = CONFIG.BUILDINGS;
             let z = B.REF_ZOOM;
             try { if (game && game.camera && game.camera.zoom) z = game.camera.zoom; } catch (e) { /* before the engine exists */ }
-            return B.CAM_HEIGHT * Math.max(0.7, Math.min(3.2, B.REF_ZOOM / z));
+            const L = _leanCam;
+            if (L.z === z && L.H === B.CAM_HEIGHT && L.R === B.REF_ZOOM) return L.C;
+            L.z = z; L.H = B.CAM_HEIGHT; L.R = B.REF_ZOOM;
+            return (L.C = B.CAM_HEIGHT * Math.max(0.7, Math.min(3.2, B.REF_ZOOM / z)));
         }

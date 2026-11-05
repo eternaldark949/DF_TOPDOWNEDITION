@@ -1333,6 +1333,11 @@
                     this.closeSettings(); this.close();
                     PerformanceBench.run();
 
+                } else if (key === 'performanceBenchPaint') {
+                    // The same capture, with each render stage waiting for the canvas to paint (entities/performance-bench.js)
+                    this.closeSettings(); this.close();
+                    PerformanceBench.run({ paint: true });
+
                 } else if (key === 'perfBench') {
                     // The resolution sweep (entities/static-builders-profiler.js PerfBench): back in the game to measure it
                     GameSettings.profilerMode = GameSettings.profilerMode === 'off' || !GameSettings.profilerMode ? 'compact' : GameSettings.profilerMode;
@@ -1375,7 +1380,7 @@
                     
                 } else {
                     // Density settings: cycle LOW → MEDIUM → HIGH
-                    const order = key === 'crowdQuality' ? ['low', 'medium', 'high', 'ultra'] : ['low', 'medium', 'high'];
+                    const order = key === 'crowdQuality' ? ['low', 'medium', 'high', 'ultra'] : key === 'trafficDensity' ? ['off', 'low', 'medium', 'high'] : ['low', 'medium', 'high'];
                     const current = GameSettings[key];
                     const idx = order.indexOf(current);
                     GameSettings[key] = order[(idx + 1) % order.length];

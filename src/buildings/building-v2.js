@@ -846,12 +846,24 @@
 
             /** What it hides of the glow behind it (world): each section, footprint to leaned roof (engine/world-state.js drawEmissivePass). */
             _glowOccluders(cam) {
-                const k = 1 + this._leanScale(), out = [];
+                const k = 1 + this._leanScale();
+                // Asked by the glow pass, the shop light and every tree near it each frame: reuse the hulls while the camera,
+                // the lean and the sections stand where they were (callers only read them).
+                const c = this._glowOcc, S = this.sections;
+                let same = c && c.cx === cam.x && c.cy === cam.y && c.k === k && c.x === this.x && c.y === this.y &&
+                    c.S === S && c.n === S.length && c.roundR === this.roundR && c.rounds === this._roundSec;
+                if (same) for (let i = 0, o = 0; i < S.length; i++, o += 4) {
+                    const s = S[i]; if (c.g[o] !== s.x || c.g[o + 1] !== s.y || c.g[o + 2] !== s.w || c.g[o + 3] !== s.h) { same = false; break; }
+                }
+                if (same) return c.out;
+                const out = [];
                 this.sections.forEach((s, si) => {
                     const fp = this._footprint(s, si), pts = fp.map(p => p.slice());
                     for (const [x, y] of fp) pts.push([cam.x + (x - cam.x) * k, cam.y + (y - cam.y) * k]);
                     out.push(TierKit.hull(pts));
                 });
+                const g = []; for (const sec of S) g.push(sec.x, sec.y, sec.w, sec.h);
+                this._glowOcc = { cx: cam.x, cy: cam.y, k, x: this.x, y: this.y, S, n: S.length, roundR: this.roundR, rounds: this._roundSec, g, out };
                 return out;
             },
 

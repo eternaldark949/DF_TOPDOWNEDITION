@@ -165,4 +165,36 @@ test('Tiny dropped-time totals are distinguished from sustained simulation backl
   assert.ok(simulate(10).some(s=>s.includes('can affect world progression')));
 });
 
+test('Paint mode waits for the canvas in each render stage, bills the tree/lamp pass, and unwinds its hooks', () => {
+  const env=setup();
+  const r=value(env, `
+    const before=[game.profiler.start,game.profiler.stop,FoliageLampDepth.flush];
+    const own=[Object.prototype.hasOwnProperty.call(game.profiler,'start'),Object.prototype.hasOwnProperty.call(game.profiler,'stop')];
+    let syncs=0; const sync=PerformanceBench._paintSync; PerformanceBench._paintSync=function(){syncs++;clock+=2;};
+    PerformanceBench.run({durationMs:200,warmupMs:0,paint:true});
+    const hooked=game.profiler.start!==before[0]&&FoliageLampDepth.flush!==before[2];
+    for(let i=0;i<6 && PerformanceBench.active;i++){
+      clock=1000+i*66.6666667;
+      PerformanceBench.beginFrame(); PerformanceBench.acceptFrame(); PerformanceBench.afterSimulation();
+      game.profiler.beginFrame(); game.profiler.start('Render:Total');
+      game.profiler.start('Render:Entities'); clock+=5;
+      FoliageLampDepth.begin(game.ctx); FoliageLampDepth.flush(game.ctx);
+      game.profiler.stop('Render:Entities'); game.profiler.stop('Render:Total');
+      PerformanceBench.render(game.profiler.frameDeltas()); game.profiler.tick();
+      PerformanceBench.endFrame(1,0);
+    }
+    PerformanceBench._paintSync=sync;
+    const after=[game.profiler.start,game.profiler.stop,FoliageLampDepth.flush];
+    const ownAfter=[Object.prototype.hasOwnProperty.call(game.profiler,'start'),Object.prototype.hasOwnProperty.call(game.profiler,'stop')];
+    const rows=PerformanceBench.results.sections;
+    return {hooked,syncs,restored:after.every((f,i)=>f===before[i]),own,ownAfter,paint:PerformanceBench.results.instrumentation.paint,
+      trees:rows.find(s=>s.label==='Paint: Trees and lamps').mean,entities:rows.find(s=>s.label==='Render:Entities').mean,text:PerformanceBench.reportText()};
+  `);
+  assert.equal(r.hooked,true); assert.equal(r.restored,true); assert.deepEqual(r.ownAfter,r.own);
+  assert.ok(r.syncs>=4*3,'start, stop and both sides of the depth pass wait'); assert.equal(r.paint,true);
+  assert.equal(r.trees,2); assert.equal(r.entities,11);   // 5 drawn + the depth pass's two waits + the stage's closing wait (the opening wait is before its timer)
+  assert.match(r.text,/DETAILED \+ PAINT/); assert.match(r.text,/Paint mode/);
+  assert.deepEqual(env.errors,[]);
+});
+
 console.log(JSON.stringify({passed:results.length,results},null,2));

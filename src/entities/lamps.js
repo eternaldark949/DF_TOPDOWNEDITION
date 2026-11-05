@@ -75,7 +75,9 @@
 
         // Project independently authored world points; no whole-lamp sprite is used by this model.
         function lampPoint(lamp, x, y, z) {
-            const ca = Math.cos(lamp.angle), sa = Math.sin(lamp.angle), C = leanCamHeight();
+            let r = lamp._ptRot;                                                  // (its turn's cos/sin, kept while the angle holds)
+            if (!r || r.a !== lamp.angle) r = lamp._ptRot = { a: lamp.angle, ca: Math.cos(lamp.angle), sa: Math.sin(lamp.angle) };
+            const ca = r.ca, sa = r.sa, C = leanCamHeight();
             const wx = lamp.x + (x * ca - y * sa) * LAMP_POST_SCALE;
             const wy = lamp.y + (x * sa + y * ca) * LAMP_POST_SCALE;
             const k = CONFIG.BUILDINGS.LEAN ? C / (C - Math.min(z, C * .86)) : 1, cam = game.camera;

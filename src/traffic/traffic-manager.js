@@ -251,7 +251,8 @@
                 }
         
                 // Over the cap (the setting was turned down): the farthest cars out of view fade away
-                if (_simTick % 60 === 0) this.trimToCap(player, playerCar);
+                if (GameSettings.trafficOff()) this.clearStreetTraffic(playerCar);
+                else if (_simTick % 60 === 0) this.trimToCap(player, playerCar);
                 // 2. SPAWN LOGIC
                 if (this.vehicles.length < GameSettings.getMaxTraffic() && this.spawnTimer <= 0) { 
                     this.spawnTimer = 5;  // Was 20 — 4× faster spawn rate so crowd density actually fills
@@ -334,6 +335,15 @@
                 return along >= len * 2 && along <= lane.length - len * 4 ? along : null;
             }
             
+            /** Traffic switched off (Settings → Traffic: OFF): every car driving itself fades out now, in view or not. Her own
+                and linked cars, Zib taxis and anything parked or driverless stay. */
+            clearStreetTraffic(playerCar) {
+                for (const v of this.vehicles) {
+                    if (v.fading || v.dead || v === playerCar || v.isZib) continue;
+                    if (v.controlMode === 'AI' && v.hasDriver && v.driverType !== 'player') v.fading = true;
+                }
+            }
+
             /** Down to GameSettings' cap: the farthest cars out of view fade out (hers are never in the list; one rolling stays) */
             trimToCap(player, playerCar) {
                 const live = this.vehicles.filter(v => !v.fading && !v.dead);
