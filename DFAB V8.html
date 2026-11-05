@@ -5865,9 +5865,9 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '791bc1e4801f';
+        const DFAB_BUILD = 'a0d9ff566cc9';
     </script>
-    <script type="text/dfab" data-src="core/config.js" data-cost="406">
+    <script type="text/dfab" data-src="core/config.js" data-cost="410">
 
         // Console chatter (the ~100 [SAVE] / STORY / roads logs) is quiet unless you turn it on:
         // run  localStorage.dfab_debug = '1'  in the console and reload. Warnings and errors always show.
@@ -6439,11 +6439,16 @@
 
         /** The lean's camera height for the current zoom: zoomed out, the camera sits higher, so a
             building's apparent height shrinks with its footprint instead of towering over it. */
+        // Asked thousands of times a frame (every projected point): the last answer is kept while its inputs hold.
+        const _leanCam = { z: NaN, H: NaN, R: NaN, C: 0 };
         function leanCamHeight() {
             const B = CONFIG.BUILDINGS;
             let z = B.REF_ZOOM;
             try { if (game && game.camera && game.camera.zoom) z = game.camera.zoom; } catch (e) { /* before the engine exists */ }
-            return B.CAM_HEIGHT * Math.max(0.7, Math.min(3.2, B.REF_ZOOM / z));
+            const L = _leanCam;
+            if (L.z === z && L.H === B.CAM_HEIGHT && L.R === B.REF_ZOOM) return L.C;
+            L.z = z; L.H = B.CAM_HEIGHT; L.R = B.REF_ZOOM;
+            return (L.C = B.CAM_HEIGHT * Math.max(0.7, Math.min(3.2, B.REF_ZOOM / z)));
         }
     </script>
     <script type="text/dfab" data-src="assets#0" data-cost="1">
@@ -23145,7 +23150,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
     </script>
-    <script type="text/dfab" data-src="entities/lamps.js" data-cost="552">
+    <script type="text/dfab" data-src="entities/lamps.js" data-cost="555">
         /**
          * Lamp Entity - No collision, just decoration.
          */
@@ -23223,7 +23228,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         // Project independently authored world points; no whole-lamp sprite is used by this model.
         function lampPoint(lamp, x, y, z) {
-            const ca = Math.cos(lamp.angle), sa = Math.sin(lamp.angle), C = leanCamHeight();
+            let r = lamp._ptRot;                                                  // (its turn's cos/sin, kept while the angle holds)
+            if (!r || r.a !== lamp.angle) r = lamp._ptRot = { a: lamp.angle, ca: Math.cos(lamp.angle), sa: Math.sin(lamp.angle) };
+            const ca = r.ca, sa = r.sa, C = leanCamHeight();
             const wx = lamp.x + (x * ca - y * sa) * LAMP_POST_SCALE;
             const wy = lamp.y + (x * sa + y * ca) * LAMP_POST_SCALE;
             const k = CONFIG.BUILDINGS.LEAN ? C / (C - Math.min(z, C * .86)) : 1, cam = game.camera;
@@ -33373,7 +33380,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
         
     </script>
-    <script type="text/dfab" data-src="buildings/building-v2.js" data-cost="1114">
+    <script type="text/dfab" data-src="buildings/building-v2.js" data-cost="1125">
         /* =====================================================================
            BUILDING V2 - COMPLEX SHAPES & LAYERED RENDERING
            ---------------------------------------------------------------------
@@ -34222,12 +34229,24 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             /** What it hides of the glow behind it (world): each section, footprint to leaned roof (engine/world-state.js drawEmissivePass). */
             _glowOccluders(cam) {
-                const k = 1 + this._leanScale(), out = [];
+                const k = 1 + this._leanScale();
+                // Asked by the glow pass, the shop light and every tree near it each frame: reuse the hulls while the camera,
+                // the lean and the sections stand where they were (callers only read them).
+                const c = this._glowOcc, S = this.sections;
+                let same = c && c.cx === cam.x && c.cy === cam.y && c.k === k && c.x === this.x && c.y === this.y &&
+                    c.S === S && c.n === S.length && c.roundR === this.roundR && c.rounds === this._roundSec;
+                if (same) for (let i = 0, o = 0; i < S.length; i++, o += 4) {
+                    const s = S[i]; if (c.g[o] !== s.x || c.g[o + 1] !== s.y || c.g[o + 2] !== s.w || c.g[o + 3] !== s.h) { same = false; break; }
+                }
+                if (same) return c.out;
+                const out = [];
                 this.sections.forEach((s, si) => {
                     const fp = this._footprint(s, si), pts = fp.map(p => p.slice());
                     for (const [x, y] of fp) pts.push([cam.x + (x - cam.x) * k, cam.y + (y - cam.y) * k]);
                     out.push(TierKit.hull(pts));
                 });
+                const g = []; for (const sec of S) g.push(sec.x, sec.y, sec.w, sec.h);
+                this._glowOcc = { cx: cam.x, cy: cam.y, k, x: this.x, y: this.y, S, n: S.length, roundR: this.roundR, rounds: this._roundSec, g, out };
                 return out;
             },
 
