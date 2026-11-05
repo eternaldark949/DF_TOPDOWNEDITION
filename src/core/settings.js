@@ -135,7 +135,7 @@
 
         const GameSettings = {
             // --- DENSITY --- (kept per device: dfab_density; saveDensity() after a change)
-            trafficDensity: _lvl(_deviceDensity.trafficDensity, 'high'),         // 'low' | 'medium' | 'high'
+            trafficDensity: _deviceDensity.trafficDensity === 'off' ? 'off' : _lvl(_deviceDensity.trafficDensity, 'high'),   // 'off' (no street traffic) | 'low' | 'medium' | 'high'
             pedestrianDensity: _lvl(_deviceDensity.pedestrianDensity, 'high'),   // 'low' | 'medium' | 'high'
             foliageDensity: _lvl(_deviceDensity.foliageDensity, 'high'),         // 'low' | 'medium' | 'high'
             rainDensity: _lvl(_deviceDensity.rainDensity, 'high'),               // 'low' | 'medium' | 'high'
@@ -289,7 +289,7 @@
             applyPreset(preset) {
                 if (preset === 'low') {
                     this.lightingQuality = 'low';
-                    this.trafficDensity = 'low';
+                    if (this.trafficDensity !== 'off') this.trafficDensity = 'low';      // (traffic switched off stays off)
                     this.pedestrianDensity = 'low';
                     this.foliageDensity = 'low';
                     this.rainDensity = 'low';
@@ -306,7 +306,7 @@
                     this.soundRings = 'simple';
                 } else if (preset === 'medium') {
                     this.lightingQuality = 'medium';
-                    this.trafficDensity = 'medium';
+                    if (this.trafficDensity !== 'off') this.trafficDensity = 'medium';
                     this.pedestrianDensity = 'medium';
                     this.foliageDensity = 'medium';
                     this.rainDensity = 'medium';
@@ -321,7 +321,7 @@
             
             // --- DENSITY LOOKUP TABLES ---
             _densityValues: {
-                traffic:    { low: 8,  medium: 16, high: 80 },   // high bumped 30 → 80 for crowds
+                traffic:    { off: 0, low: 8,  medium: 16, high: 80 },   // high bumped 30 → 80 for crowds; off: no street traffic
                 pedestrian: { low: 10, medium: 25, high: 100 },  // high bumped 40 → 100 for crowds
                 foliage:    { low: 0.3, medium: 0.6, high: 1.0 }, // fraction of foliage rendered
                 rain: {
@@ -332,7 +332,9 @@
             },
             
             // --- GETTERS ---
-            getMaxTraffic()     { return this._densityValues.traffic[this.trafficDensity]; },
+            getMaxTraffic()     { return this._densityValues.traffic[this.trafficDensity] ?? this._densityValues.traffic.high; },
+            /** Street traffic switched off: no cars spawn and the ones driving fade away (her cars, Zibs and parked cars stay) */
+            trafficOff()        { return this.trafficDensity === 'off'; },
             getMaxPedestrians() { return this._densityValues.pedestrian[this.pedestrianDensity]; },
             getFoliageScale()   { return this._densityValues.foliage[this.foliageDensity]; },
             getRainConfig()     { return this._densityValues.rain[this.rainDensity]; },

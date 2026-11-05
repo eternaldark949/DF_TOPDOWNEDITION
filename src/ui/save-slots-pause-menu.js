@@ -1380,7 +1380,7 @@
                     
                 } else {
                     // Density settings: cycle LOW → MEDIUM → HIGH
-                    const order = key === 'crowdQuality' ? ['low', 'medium', 'high', 'ultra'] : ['low', 'medium', 'high'];
+                    const order = key === 'crowdQuality' ? ['low', 'medium', 'high', 'ultra'] : key === 'trafficDensity' ? ['off', 'low', 'medium', 'high'] : ['low', 'medium', 'high'];
                     const current = GameSettings[key];
                     const idx = order.indexOf(current);
                     GameSettings[key] = order[(idx + 1) % order.length];

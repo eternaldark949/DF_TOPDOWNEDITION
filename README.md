@@ -31,6 +31,8 @@ node tools/build.mjs --check  # just check that it's up to date
 
 After building, run `node tools/test-game-regressions.cjs` to check progression and saves, flit controls and landing, autodrive, profiling, rendering limits, and load/update/draw across all maps. The runner needs no dependencies; it executes the game with mocked browser services, so browser visuals and device frame rate still need playtesting.
 
+Traffic can be switched off (Traffic: OFF in the main menu's or pause menu's density settings): no street cars spawn and the driving ones fade out; your cars, Zib taxis and parked cars stay. Run `node tools/test-traffic-off.cjs` to check it.
+
 Run `node tools/test-traffic-crossings.cjs` for spatial traffic-sensing equivalence, candidate counts, and crossing queue spacing, overflow, clearance, and timeout checks.
 
 ## Whole-game performance report

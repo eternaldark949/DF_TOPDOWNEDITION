@@ -175,9 +175,9 @@
         
         // --- SETTINGS CYCLE HELPER ---
         function cycleDensity(key) {
-            const order = ['low', 'medium', 'high'];
+            const order = key === 'trafficDensity' ? ['off', 'low', 'medium', 'high'] : ['low', 'medium', 'high'];
             const idx = order.indexOf(GameSettings[key]);
-            GameSettings[key] = order[(idx + 1) % 3];
+            GameSettings[key] = order[(idx + 1) % order.length];
             GameSettings.saveDensity();
             return GameSettings[key].toUpperCase();
         }
@@ -187,7 +187,7 @@
                 const el = document.getElementById(id);
                 if (el) { el.textContent = text; el.style.color = color || ''; }
             };
-            const dColor = (v) => v === 'low' ? '#4CAF50' : v === 'medium' ? '#FFD700' : '';
+            const dColor = (v) => v === 'off' ? '#666' : v === 'low' ? '#4CAF50' : v === 'medium' ? '#FFD700' : '';
             
             lbl('lbl-devicepreset', `Device Preset: ${GameSettings.devicePreset ? `ON (${GameSettings.deviceTier().toUpperCase()})` : 'OFF'}`,
                 GameSettings.devicePreset ? '#4CAF50' : '#666');

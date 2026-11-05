@@ -4778,7 +4778,7 @@
                         <div class="row-right"><div class="input-prompt">enter</div></div>
                     </div>
                     <div class="menu-item-row" id="btn-toggle-traffic">
-                        <div class="row-left"><div class="desc-box">Fewer cars improves FPS.<span class="arrow">▶</span></div></div>
+                        <div class="row-left"><div class="desc-box">Fewer cars improves FPS; OFF clears the streets.<span class="arrow">▶</span></div></div>
                         <div class="row-center"><div class="menu-btn" id="lbl-traffic">Traffic: HIGH</div></div>
                         <div class="row-right"><div class="input-prompt">enter</div></div>
                     </div>
@@ -5869,7 +5869,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '7d529e5d6529';
+        const DFAB_BUILD = 'f01254d099d9';
     </script>
     <script type="text/dfab" data-src="core/config.js" data-cost="410">
 
@@ -9498,7 +9498,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                      train: p(look.train, t.bottom), hat: p(look.hat, t.hair), jewelry: null, held: null };
         }
     </script>
-    <script type="text/dfab" data-src="core/settings.js" data-cost="286">
+    <script type="text/dfab" data-src="core/settings.js" data-cost="291">
         // ============================================================================
         // GAME SETTINGS — Mutable runtime settings (controlled by Settings UI)
         // These override CONFIG values where applicable. Systems read from here.
@@ -9636,7 +9636,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         const GameSettings = {
             // --- DENSITY --- (kept per device: dfab_density; saveDensity() after a change)
-            trafficDensity: _lvl(_deviceDensity.trafficDensity, 'high'),         // 'low' | 'medium' | 'high'
+            trafficDensity: _deviceDensity.trafficDensity === 'off' ? 'off' : _lvl(_deviceDensity.trafficDensity, 'high'),   // 'off' (no street traffic) | 'low' | 'medium' | 'high'
             pedestrianDensity: _lvl(_deviceDensity.pedestrianDensity, 'high'),   // 'low' | 'medium' | 'high'
             foliageDensity: _lvl(_deviceDensity.foliageDensity, 'high'),         // 'low' | 'medium' | 'high'
             rainDensity: _lvl(_deviceDensity.rainDensity, 'high'),               // 'low' | 'medium' | 'high'
@@ -9790,7 +9790,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             applyPreset(preset) {
                 if (preset === 'low') {
                     this.lightingQuality = 'low';
-                    this.trafficDensity = 'low';
+                    if (this.trafficDensity !== 'off') this.trafficDensity = 'low';      // (traffic switched off stays off)
                     this.pedestrianDensity = 'low';
                     this.foliageDensity = 'low';
                     this.rainDensity = 'low';
@@ -9807,7 +9807,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.soundRings = 'simple';
                 } else if (preset === 'medium') {
                     this.lightingQuality = 'medium';
-                    this.trafficDensity = 'medium';
+                    if (this.trafficDensity !== 'off') this.trafficDensity = 'medium';
                     this.pedestrianDensity = 'medium';
                     this.foliageDensity = 'medium';
                     this.rainDensity = 'medium';
@@ -9822,7 +9822,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
             // --- DENSITY LOOKUP TABLES ---
             _densityValues: {
-                traffic:    { low: 8,  medium: 16, high: 80 },   // high bumped 30 → 80 for crowds
+                traffic:    { off: 0, low: 8,  medium: 16, high: 80 },   // high bumped 30 → 80 for crowds; off: no street traffic
                 pedestrian: { low: 10, medium: 25, high: 100 },  // high bumped 40 → 100 for crowds
                 foliage:    { low: 0.3, medium: 0.6, high: 1.0 }, // fraction of foliage rendered
                 rain: {
@@ -9833,7 +9833,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             },
             
             // --- GETTERS ---
-            getMaxTraffic()     { return this._densityValues.traffic[this.trafficDensity]; },
+            getMaxTraffic()     { return this._densityValues.traffic[this.trafficDensity] ?? this._densityValues.traffic.high; },
+            /** Street traffic switched off: no cars spawn and the ones driving fade away (her cars, Zibs and parked cars stay) */
+            trafficOff()        { return this.trafficDensity === 'off'; },
             getMaxPedestrians() { return this._densityValues.pedestrian[this.pedestrianDensity]; },
             getFoliageScale()   { return this._densityValues.foliage[this.foliageDensity]; },
             getRainConfig()     { return this._densityValues.rain[this.rainDensity]; },
@@ -53902,7 +53904,7 @@ Object.assign(TrafficVehicle.prototype, {
             },
         });
     </script>
-    <script type="text/dfab" data-src="traffic/traffic-manager.js" data-cost="260">
+    <script type="text/dfab" data-src="traffic/traffic-manager.js" data-cost="266">
         /* --- OPTIMIZATION: SPATIAL GRID ---
            Cells are keyed by number (no strings) and their arrays are kept and emptied, not rebuilt;
            getNearby drops repeats with a per-query stamp instead of a Set (same order as before). */
@@ -54156,7 +54158,8 @@ Object.assign(TrafficVehicle.prototype, {
                 }
         
                 // Over the cap (the setting was turned down): the farthest cars out of view fade away
-                if (_simTick % 60 === 0) this.trimToCap(player, playerCar);
+                if (GameSettings.trafficOff()) this.clearStreetTraffic(playerCar);
+                else if (_simTick % 60 === 0) this.trimToCap(player, playerCar);
                 // 2. SPAWN LOGIC
                 if (this.vehicles.length < GameSettings.getMaxTraffic() && this.spawnTimer <= 0) { 
                     this.spawnTimer = 5;  // Was 20 — 4× faster spawn rate so crowd density actually fills
@@ -54239,6 +54242,15 @@ Object.assign(TrafficVehicle.prototype, {
                 return along >= len * 2 && along <= lane.length - len * 4 ? along : null;
             }
             
+            /** Traffic switched off (Settings → Traffic: OFF): every car driving itself fades out now, in view or not. Her own
+                and linked cars, Zib taxis and anything parked or driverless stay. */
+            clearStreetTraffic(playerCar) {
+                for (const v of this.vehicles) {
+                    if (v.fading || v.dead || v === playerCar || v.isZib) continue;
+                    if (v.controlMode === 'AI' && v.hasDriver && v.driverType !== 'player') v.fading = true;
+                }
+            }
+
             /** Down to GameSettings' cap: the farthest cars out of view fade out (hers are never in the list; one rolling stays) */
             trimToCap(player, playerCar) {
                 const live = this.vehicles.filter(v => !v.fading && !v.dead);
@@ -97902,7 +97914,7 @@ engineMixin({
             }
         };
     </script>
-    <script type="text/dfab" data-src="ui/save-slots-pause-menu.js" data-cost="800">
+    <script type="text/dfab" data-src="ui/save-slots-pause-menu.js" data-cost="801">
         // --- PAUSE MENU SYSTEM (Phase 3) ---
         // ─── SAVE SLOT MANAGER ─────────────────────────────────────────────
         //  Multi-slot save system: the imprint cards (Imprint to save, Recall to load).
@@ -99285,7 +99297,7 @@ engineMixin({
                     
                 } else {
                     // Density settings: cycle LOW → MEDIUM → HIGH
-                    const order = key === 'crowdQuality' ? ['low', 'medium', 'high', 'ultra'] : ['low', 'medium', 'high'];
+                    const order = key === 'crowdQuality' ? ['low', 'medium', 'high', 'ultra'] : key === 'trafficDensity' ? ['off', 'low', 'medium', 'high'] : ['low', 'medium', 'high'];
                     const current = GameSettings[key];
                     const idx = order.indexOf(current);
                     GameSettings[key] = order[(idx + 1) % order.length];
@@ -99300,7 +99312,7 @@ engineMixin({
         }
         
     </script>
-    <script type="text/dfab" data-src="app/boot.js" data-cost="222">
+    <script type="text/dfab" data-src="app/boot.js" data-cost="223">
         // ═══ COLOUR GRADE ═══
         // The grade lives in Cinematic View's drawer (#cine-grade, ui/save-slots-pause-menu.js).
         // Exposure / brightness / contrast / saturation join the canvas filter chain each frame
@@ -99478,9 +99490,9 @@ engineMixin({
         
         // --- SETTINGS CYCLE HELPER ---
         function cycleDensity(key) {
-            const order = ['low', 'medium', 'high'];
+            const order = key === 'trafficDensity' ? ['off', 'low', 'medium', 'high'] : ['low', 'medium', 'high'];
             const idx = order.indexOf(GameSettings[key]);
-            GameSettings[key] = order[(idx + 1) % 3];
+            GameSettings[key] = order[(idx + 1) % order.length];
             GameSettings.saveDensity();
             return GameSettings[key].toUpperCase();
         }
@@ -99490,7 +99502,7 @@ engineMixin({
                 const el = document.getElementById(id);
                 if (el) { el.textContent = text; el.style.color = color || ''; }
             };
-            const dColor = (v) => v === 'low' ? '#4CAF50' : v === 'medium' ? '#FFD700' : '';
+            const dColor = (v) => v === 'off' ? '#666' : v === 'low' ? '#4CAF50' : v === 'medium' ? '#FFD700' : '';
             
             lbl('lbl-devicepreset', `Device Preset: ${GameSettings.devicePreset ? `ON (${GameSettings.deviceTier().toUpperCase()})` : 'OFF'}`,
                 GameSettings.devicePreset ? '#4CAF50' : '#666');
