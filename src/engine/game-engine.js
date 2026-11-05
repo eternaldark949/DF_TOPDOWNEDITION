@@ -22,7 +22,9 @@
                 this.useNewCollisionSystem = true;
                 
                 this.canvas = document.getElementById('game-canvas');
-                this.ctx = this.canvas.getContext('2d');
+                // Opaque: every frame starts with a black fill (engine/draw.js), so the page never shows through, and the
+                // browser can composite the canvas (under the colour grade's CSS filter) without blending it.
+                this.ctx = this.canvas.getContext('2d', { alpha: false });
                 
                 // Lighting Layer
                 this.lightingScale = 1.0; // 1.0 = High (Native), 0.75 = Medium, 0.5 = Low (Half-Res)

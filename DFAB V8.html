@@ -5869,7 +5869,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'b9b191e9b17c';
+        const DFAB_BUILD = '7d529e5d6529';
     </script>
     <script type="text/dfab" data-src="core/config.js" data-cost="410">
 
@@ -71196,7 +71196,7 @@ Object.assign(TrafficVehicle.prototype, {
         }
         
     </script>
-    <script type="text/dfab" data-src="engine/game-engine.js" data-cost="184">
+    <script type="text/dfab" data-src="engine/game-engine.js" data-cost="186">
         class GameEngine {
             constructor() {
                 
@@ -71221,7 +71221,9 @@ Object.assign(TrafficVehicle.prototype, {
                 this.useNewCollisionSystem = true;
                 
                 this.canvas = document.getElementById('game-canvas');
-                this.ctx = this.canvas.getContext('2d');
+                // Opaque: every frame starts with a black fill (engine/draw.js), so the page never shows through, and the
+                // browser can composite the canvas (under the colour grade's CSS filter) without blending it.
+                this.ctx = this.canvas.getContext('2d', { alpha: false });
                 
                 // Lighting Layer
                 this.lightingScale = 1.0; // 1.0 = High (Native), 0.75 = Medium, 0.5 = Low (Half-Res)
