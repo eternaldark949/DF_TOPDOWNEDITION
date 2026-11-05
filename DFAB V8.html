@@ -5865,7 +5865,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '5fca23c11fb5';
+        const DFAB_BUILD = '041514907fc9';
     </script>
     <script type="text/dfab" data-src="core/config.js" data-cost="406">
 
@@ -18546,7 +18546,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
 
     </script>
-    <script type="text/dfab" data-src="entities/props-decor.js" data-cost="2460">
+    <script type="text/dfab" data-src="entities/props-decor.js" data-cost="2520">
         // One soft, centred ground blob shared by props, pickups and Velvet. It is stamped
         // before artwork transforms and never baked into a rotating furniture sprite.
         function drawGroundContactShadow(ctx, x, y, rx, ry, angle = 0) {
@@ -19913,21 +19913,21 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const C = leanCamHeight(), k = C / (C - Math.min(z, C * 0.86)), c = game.camera;
             return [c.x + (x - c.x) * k, c.y + (y - c.y) * k];
         }
-        function _gyFence3D(ctx, x0, y0, x1, y1) {
+        function _gyFence3D(ctx, x0, y0, x1, y1, zb = 0) {
             const F = GY_WALL.FENCE, L = Math.hypot(x1 - x0, y1 - y0), ux = (x1 - x0) / L, uy = (y1 - y0) / L, n = Math.max(1, Math.round(L / 10));
             const bars = new Path2D(), heads = new Path2D(), hi = new Path2D(), rings = new Path2D();
             for (let i = 0; i < n; i++) {
                 const s = (i + 0.5) / n, x = x0 + (x1 - x0) * s, y = y0 + (y1 - y0) * s;
-                const a = _gyP(x, y, 0), b = _gyP(x, y, F - 4);
+                const a = _gyP(x, y, zb), b = _gyP(x, y, zb + F - 4);
                 bars.moveTo(a[0], a[1]); bars.lineTo(b[0], b[1]);
                 hi.moveTo(a[0] - 0.6, a[1]); hi.lineTo(b[0] - 0.6, b[1]);
-                const l = _gyP(x - ux * 1.9, y - uy * 1.9, F - 3.4), r = _gyP(x + ux * 1.9, y + uy * 1.9, F - 3.4), tip = _gyP(x, y, F), m = _gyP(x, y, F - 4.6);
+                const l = _gyP(x - ux * 1.9, y - uy * 1.9, zb + F - 3.4), r = _gyP(x + ux * 1.9, y + uy * 1.9, zb + F - 3.4), tip = _gyP(x, y, zb + F), m = _gyP(x, y, zb + F - 4.6);
                 heads.moveTo(m[0], m[1]); heads.lineTo(l[0], l[1]); heads.lineTo(tip[0], tip[1]); heads.lineTo(r[0], r[1]); heads.closePath();
-                const c = _gyP(x, y, F - 9.5), ct = _gyP(x, y, F - 8.2), cr = Math.max(0.9, Math.hypot(ct[0] - c[0], ct[1] - c[1]) + 0.6);   // the collar under the top rail
+                const c = _gyP(x, y, zb + F - 9.5), ct = _gyP(x, y, zb + F - 8.2), cr = Math.max(0.9, Math.hypot(ct[0] - c[0], ct[1] - c[1]) + 0.6);   // the collar under the top rail
                 rings.moveTo(c[0] + cr, c[1]); rings.arc(c[0], c[1], cr, 0, Math.PI * 2);
             }
             const rail = (z) => { const a = _gyP(x0, y0, z), b = _gyP(x1, y1, z); bars.moveTo(a[0], a[1]); bars.lineTo(b[0], b[1]); };
-            rail(4.2); rail(F - 6.8);                                         // the bottom and top rails
+            rail(zb + 4.2); rail(zb + F - 6.8);                                         // the bottom and top rails
             ctx.save(); ctx.lineCap = 'round';
             ctx.strokeStyle = GY_IRON; ctx.lineWidth = 1.6; ctx.stroke(bars);
             ctx.fillStyle = GY_IRON; ctx.fill(heads); ctx.fill(rings);
@@ -19935,7 +19935,90 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             ctx.restore();
         }
 
+        // Heights with the lean (world px): the wall to its coping's top, a pillar's brick and its cap
+        const GY_Z = { WALL: 22, PILLAR: 47, CAP: 6 };
+        /** Fill a vertical face from (ax, ay) to (bx, by), z0 up to z1, with a pattern laid along it (in slices: the lean is a perspective) */
+        function _gyFace(ctx, ax, ay, bx, by, z0, z1, fill, shade) {
+            const L = Math.hypot(bx - ax, by - ay), n = Math.max(1, Math.ceil(L / 40)), H = z1 - z0, ux = (bx - ax) / L, uy = (by - ay) / L;
+            for (let i = 0; i < n; i++) {
+                const u0 = L * i / n, u1 = L * (i + 1) / n, w = u1 - u0;
+                const A = _gyP(ax + ux * u0, ay + uy * u0, z1), B = _gyP(ax + ux * u1, ay + uy * u1, z1), D = _gyP(ax + ux * u0, ay + uy * u0, z0);
+                ctx.save();
+                ctx.transform((B[0] - A[0]) / w, (B[1] - A[1]) / w, (D[0] - A[0]) / H, (D[1] - A[1]) / H, A[0], A[1]);
+                ctx.translate(-u0, 0);                                        // (the pattern runs on along the face)
+                ctx.fillStyle = fill; ctx.fillRect(u0 - 0.4, 0, w + 0.8, H);
+                const g = ctx.createLinearGradient(0, 0, 0, H);                // the foot in the dark, a shadow under the coping
+                g.addColorStop(0, 'rgba(0,0,0,0.28)'); g.addColorStop(0.18, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(10,6,16,0.38)');
+                ctx.fillStyle = g; ctx.fillRect(u0 - 0.4, 0, w + 0.8, H);
+                if (shade) { ctx.fillStyle = `rgba(0,0,0,${shade})`; ctx.fillRect(u0 - 0.4, 0, w + 0.8, H); }
+                ctx.restore();
+            }
+        }
+        /** A box's faces turned to the camera (brick, shaded by their turn), farthest first */
+        function _gyBoxSides(ctx, x0, y0, x1, y1, z0, z1, fill) {
+            const c = game.camera, f = [];
+            if (c.y < y0) f.push([x1, y0, x0, y0, 0.3, y0 - c.y]);
+            if (c.x < x0) f.push([x0, y0, x0, y1, 0.15, x0 - c.x]);
+            if (c.x > x1) f.push([x1, y1, x1, y0, 0.15, c.x - x1]);
+            if (c.y > y1) f.push([x0, y1, x1, y1, 0, c.y - y1]);
+            f.sort((a, b) => b[5] - a[5]);
+            for (const [ax, ay, bx, by, sh] of f) _gyFace(ctx, ax, ay, bx, by, z0, z1, fill, sh);
+        }
+        /** Draw `paint` (world coordinates) at height z: the plane scaled about the camera */
+        function _gyAt(ctx, z, paint) {
+            const C = leanCamHeight(), k = C / (C - Math.min(z, C * 0.86)), c = game.camera;
+            ctx.save(); ctx.translate(c.x * (1 - k), c.y * (1 - k)); ctx.scale(k, k); paint(); ctx.restore();
+        }
+        /** A graveyard wall standing up: its brick sides, its coping on top, then the fence along the coping's middle */
+        function _gyWall3D(ctx, w) {
+            const Z = GY_Z.WALL, T = GY_WALL.T, vertical = w.h > w.w, brick = _gyTile('brick', 78, 22, _gyBrickPaint);
+            ctx.fillStyle = 'rgba(6, 4, 10, 0.4)'; ctx.fillRect(w.x + 3, w.y + 3, w.w, w.h);   // its shadow on the ground
+            _gyBoxSides(ctx, w.x, w.y, w.x + w.w, w.y + w.h, 0, Z, brick);
+            _gyAt(ctx, Z, () => {
+                if (!vertical) {
+                    ctx.save(); ctx.translate(w.x, w.y);
+                    ctx.fillStyle = _gyTile('copeT', 96, T, _gyCopePaint(false)); ctx.fillRect(0, 0, w.w, T);
+                    ctx.fillStyle = 'rgba(225, 218, 240, 0.3)'; ctx.fillRect(0, T - 1.6, w.w, 1.2);
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)'; ctx.fillRect(0, 0, w.w, 1);
+                    ctx.restore();
+                } else {
+                    ctx.save(); ctx.translate(w.x, w.y);
+                    ctx.fillStyle = _gyTile('copeV', T, 96, _gyCopePaint(true)); ctx.fillRect(0, 0, T, w.h);
+                    ctx.fillStyle = 'rgba(225, 218, 240, 0.3)'; ctx.fillRect(1, 0, 1.2, w.h);
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)'; ctx.fillRect(T - 1.2, 0, 1.2, w.h);
+                    ctx.restore();
+                }
+            });
+            if (!vertical) _gyFence3D(ctx, w.x, w.y + T / 2, w.x + w.w, w.y + T / 2, Z);
+            else _gyFence3D(ctx, w.x + T / 2, w.y, w.x + T / 2, w.y + w.h, Z);
+        }
+        /** A pillar standing up: brick to GY_Z.PILLAR, an overhanging stone cap, a raised plinth for the lantern (a LampEntity at z 55) */
+        function _gyPillar3D(ctx, p) {
+            const P = GY_WALL.PILLAR, Z = GY_Z.PILLAR, Zc = Z + GY_Z.CAP, x0 = p.x, y0 = p.y, x1 = x0 + P, y1 = y0 + P, o = 3;
+            ctx.fillStyle = 'rgba(6, 4, 10, 0.45)'; ctx.beginPath(); ctx.roundRect(x0 + 5, y0 + 6, P + 2, P + 1, 3); ctx.fill();
+            _gyBoxSides(ctx, x0, y0, x1, y1, 0, Z, _gyTile('brick', 78, 22, _gyBrickPaint));
+            const stone = (ax, ay, bx, by, z0, z1, col) => {
+                const q = [_gyP(ax, ay, z0), _gyP(bx, by, z0), _gyP(bx, by, z1), _gyP(ax, ay, z1)];
+                ctx.beginPath(); q.forEach((v, i) => i ? ctx.lineTo(v[0], v[1]) : ctx.moveTo(v[0], v[1])); ctx.closePath(); ctx.fillStyle = col; ctx.fill();
+            };
+            const slab = (sx0, sy0, sx1, sy1, z0, z1, top, side) => {
+                const c = game.camera;
+                if (c.y < sy0) stone(sx1, sy0, sx0, sy0, z0, z1, '#4a4754');
+                if (c.x < sx0) stone(sx0, sy0, sx0, sy1, z0, z1, side);
+                if (c.x > sx1) stone(sx1, sy1, sx1, sy0, z0, z1, side);
+                if (c.y > sy1) stone(sx0, sy1, sx1, sy1, z0, z1, '#6a6674');
+                _gyAt(ctx, z1, () => {
+                    const g = ctx.createLinearGradient(sx0, sy0, sx1, sy1); g.addColorStop(0, top[0]); g.addColorStop(1, top[1]);
+                    ctx.fillStyle = g; ctx.fillRect(sx0, sy0, sx1 - sx0, sy1 - sy0);
+                    ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 0.8; ctx.strokeRect(sx0 + 0.4, sy0 + 0.4, sx1 - sx0 - 0.8, sy1 - sy0 - 0.8);
+                });
+            };
+            slab(x0 - o, y0 - o, x1 + o, y1 + o, Z, Zc, ['#aeaab8', '#827e8c'], '#5c5966');
+            slab(x0 + 9, y0 + 9, x1 - 9, y1 - 9, Zc, Zc + 2, ['#9894a2', '#7e7a88'], '#5c5966');
+        }
+
         function drawGraveyardWall(ctx, w) {
+            if (_gyLean()) { _gyWall3D(ctx, w); return; }
             const { T, COPE, FENCE } = GY_WALL, vertical = w.h > w.w;
             const brick = _gyTile('brick', 78, 22, _gyBrickPaint);
             ctx.save(); ctx.translate(w.x, w.y);
@@ -19950,7 +20033,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.fillStyle = 'rgba(225, 218, 240, 0.35)'; ctx.fillRect(0, COPE - 2, L, 1.2);  // its front lip
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.35)'; ctx.fillRect(0, 0, L, 1); ctx.fillRect(0, COPE, L, 1.2);
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.3)'; ctx.fillRect(0, COPE / 2 + 1, L, 2);       // the fence's shadow on the coping
-                if (_gyLean()) { ctx.restore(); _gyFence3D(ctx, w.x, w.y + COPE / 2, w.x + L, w.y + COPE / 2); return; }
                 ctx.translate(0, COPE / 2 - FENCE);
                 ctx.fillStyle = _gyTile('fence', 10, FENCE, _gyFencePaint); ctx.fillRect(0, 0, L, FENCE);
             } else {
@@ -19966,7 +20048,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // The fence end-on: its rails a black bar down the middle (rising the fence's height at the north end), spears along it
                 const cx = T / 2;
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.3)'; ctx.fillRect(cx + 2, 0, 3, L);             // its shadow on the coping
-                if (_gyLean()) { ctx.restore(); _gyFence3D(ctx, w.x + cx, w.y, w.x + cx, w.y + L); return; }
                 ctx.fillStyle = GY_IRON; ctx.fillRect(cx - 1.5, COPE / 2 - FENCE + 6, 3, L - COPE / 2 + FENCE - 6);
                 ctx.fillStyle = GY_IRON_HI; ctx.fillRect(cx - 1.5, COPE / 2 - FENCE + 6, 0.6, L - COPE / 2 + FENCE - 6);
                 ctx.translate(cx - 5, 0);
@@ -19979,6 +20060,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         let _gyPillarSprite = null;
         const GY_PILLAR_PAD = 10;
         function drawGraveyardPillar(ctx, p) {
+            if (_gyLean()) { _gyPillar3D(ctx, p); return; }
             const P = GY_WALL.PILLAR, pad = GY_PILLAR_PAD;
             if (!_gyPillarSprite) {
                 const S = 3, cv = document.createElement('canvas'); cv.width = cv.height = (P + pad * 2) * S;
@@ -83696,7 +83778,7 @@ engineMixin({
                             seen.add(key);
                             graveyardWalls.push({ x: cx - P / 2, y: cy - P / 2, w: P, h: P, style: 'gy_pillar' });
                             const gate = Math.abs(cy - my0) < 1 && Math.abs(Math.abs(cx - gateCX) - (gateW + P) / 2) < 1;
-                            mapData.lamps.push(new LampEntity({ x: cx, y: cy - P / 2 + 9, lampType: 6, color: '#ffaa55', lightRadius: gate ? 350 : 230 }));
+                            mapData.lamps.push(new LampEntity({ x: cx, y: cy, lampType: 6, color: '#ffaa55', lightRadius: gate ? 350 : 230 }));
                         }
                         
                         graveyardWalls.forEach(w => {

@@ -1052,7 +1052,7 @@ engineMixin({
                             seen.add(key);
                             graveyardWalls.push({ x: cx - P / 2, y: cy - P / 2, w: P, h: P, style: 'gy_pillar' });
                             const gate = Math.abs(cy - my0) < 1 && Math.abs(Math.abs(cx - gateCX) - (gateW + P) / 2) < 1;
-                            mapData.lamps.push(new LampEntity({ x: cx, y: cy - P / 2 + 9, lampType: 6, color: '#ffaa55', lightRadius: gate ? 350 : 230 }));
+                            mapData.lamps.push(new LampEntity({ x: cx, y: cy, lampType: 6, color: '#ffaa55', lightRadius: gate ? 350 : 230 }));
                         }
                         
                         graveyardWalls.forEach(w => {
