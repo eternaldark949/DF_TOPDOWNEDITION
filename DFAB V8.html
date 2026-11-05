@@ -5865,7 +5865,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '386148422809';
+        const DFAB_BUILD = '5fca23c11fb5';
     </script>
     <script type="text/dfab" data-src="core/config.js" data-cost="406">
 
@@ -18546,7 +18546,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
 
     </script>
-    <script type="text/dfab" data-src="entities/props-decor.js" data-cost="2433">
+    <script type="text/dfab" data-src="entities/props-decor.js" data-cost="2460">
         // One soft, centred ground blob shared by props, pickups and Velvet. It is stamped
         // before artwork transforms and never baked into a rotating furniture sprite.
         function drawGroundContactShadow(ctx, x, y, rx, ry, angle = 0) {
@@ -19905,6 +19905,36 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             c.fillStyle = GY_IRON_HI; c.beginPath(); c.moveTo(x, 2.3); c.lineTo(x - 1.8, 5); c.lineTo(x - 1, 5.2); c.closePath(); c.fill();
         }
 
+        /* The fence stands up with the lean (as the tiered buildings do: buildings/tiered-kit.js _tkK): each picket from its
+           foot on the coping's middle line to its spear at FENCE px up, both projected away from the camera, so it leans
+           with the view rather than being painted at one angle. Without the lean (CONFIG.BUILDINGS.LEAN off): the tiles. */
+        function _gyLean() { return CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera; }
+        function _gyP(x, y, z) {
+            const C = leanCamHeight(), k = C / (C - Math.min(z, C * 0.86)), c = game.camera;
+            return [c.x + (x - c.x) * k, c.y + (y - c.y) * k];
+        }
+        function _gyFence3D(ctx, x0, y0, x1, y1) {
+            const F = GY_WALL.FENCE, L = Math.hypot(x1 - x0, y1 - y0), ux = (x1 - x0) / L, uy = (y1 - y0) / L, n = Math.max(1, Math.round(L / 10));
+            const bars = new Path2D(), heads = new Path2D(), hi = new Path2D(), rings = new Path2D();
+            for (let i = 0; i < n; i++) {
+                const s = (i + 0.5) / n, x = x0 + (x1 - x0) * s, y = y0 + (y1 - y0) * s;
+                const a = _gyP(x, y, 0), b = _gyP(x, y, F - 4);
+                bars.moveTo(a[0], a[1]); bars.lineTo(b[0], b[1]);
+                hi.moveTo(a[0] - 0.6, a[1]); hi.lineTo(b[0] - 0.6, b[1]);
+                const l = _gyP(x - ux * 1.9, y - uy * 1.9, F - 3.4), r = _gyP(x + ux * 1.9, y + uy * 1.9, F - 3.4), tip = _gyP(x, y, F), m = _gyP(x, y, F - 4.6);
+                heads.moveTo(m[0], m[1]); heads.lineTo(l[0], l[1]); heads.lineTo(tip[0], tip[1]); heads.lineTo(r[0], r[1]); heads.closePath();
+                const c = _gyP(x, y, F - 9.5), ct = _gyP(x, y, F - 8.2), cr = Math.max(0.9, Math.hypot(ct[0] - c[0], ct[1] - c[1]) + 0.6);   // the collar under the top rail
+                rings.moveTo(c[0] + cr, c[1]); rings.arc(c[0], c[1], cr, 0, Math.PI * 2);
+            }
+            const rail = (z) => { const a = _gyP(x0, y0, z), b = _gyP(x1, y1, z); bars.moveTo(a[0], a[1]); bars.lineTo(b[0], b[1]); };
+            rail(4.2); rail(F - 6.8);                                         // the bottom and top rails
+            ctx.save(); ctx.lineCap = 'round';
+            ctx.strokeStyle = GY_IRON; ctx.lineWidth = 1.6; ctx.stroke(bars);
+            ctx.fillStyle = GY_IRON; ctx.fill(heads); ctx.fill(rings);
+            ctx.strokeStyle = GY_IRON_HI; ctx.lineWidth = 0.5; ctx.stroke(hi);    // moonlight down the left of the iron
+            ctx.restore();
+        }
+
         function drawGraveyardWall(ctx, w) {
             const { T, COPE, FENCE } = GY_WALL, vertical = w.h > w.w;
             const brick = _gyTile('brick', 78, 22, _gyBrickPaint);
@@ -19920,6 +19950,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.fillStyle = 'rgba(225, 218, 240, 0.35)'; ctx.fillRect(0, COPE - 2, L, 1.2);  // its front lip
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.35)'; ctx.fillRect(0, 0, L, 1); ctx.fillRect(0, COPE, L, 1.2);
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.3)'; ctx.fillRect(0, COPE / 2 + 1, L, 2);       // the fence's shadow on the coping
+                if (_gyLean()) { ctx.restore(); _gyFence3D(ctx, w.x, w.y + COPE / 2, w.x + L, w.y + COPE / 2); return; }
                 ctx.translate(0, COPE / 2 - FENCE);
                 ctx.fillStyle = _gyTile('fence', 10, FENCE, _gyFencePaint); ctx.fillRect(0, 0, L, FENCE);
             } else {
@@ -19935,6 +19966,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // The fence end-on: its rails a black bar down the middle (rising the fence's height at the north end), spears along it
                 const cx = T / 2;
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.3)'; ctx.fillRect(cx + 2, 0, 3, L);             // its shadow on the coping
+                if (_gyLean()) { ctx.restore(); _gyFence3D(ctx, w.x + cx, w.y, w.x + cx, w.y + L); return; }
                 ctx.fillStyle = GY_IRON; ctx.fillRect(cx - 1.5, COPE / 2 - FENCE + 6, 3, L - COPE / 2 + FENCE - 6);
                 ctx.fillStyle = GY_IRON_HI; ctx.fillRect(cx - 1.5, COPE / 2 - FENCE + 6, 0.6, L - COPE / 2 + FENCE - 6);
                 ctx.translate(cx - 5, 0);
