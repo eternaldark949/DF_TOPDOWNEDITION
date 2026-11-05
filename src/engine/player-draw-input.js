@@ -238,50 +238,9 @@
                 // NOTE: age++ and lifetime check moved to tickPlayerEmote() (called from
                 // update()) so the bubble doesn't keep counting down during pause.
                 if (this.playerEmote.age >= this.playerEmote.duration) return;
-                const POP_IN = 8;
-                const POP_OUT = 10;
-                const age = this.playerEmote.age;
-                const dur = this.playerEmote.duration;
-                let scale;
-                if (age < POP_IN) {
-                    scale = 1 - Math.pow(1 - age / POP_IN, 3);
-                } else if (age < dur - POP_OUT) {
-                    scale = 1;
-                } else {
-                    const t = Math.max(0, (dur - age) / POP_OUT);
-                    scale = t * t;
-                }
-                if (scale < 0.01) return;
-                const ctx = this.ctx;
-                ctx.save();
-                ctx.translate(this.player.x, this.player.y - 32);
-                ctx.scale(scale, scale);
-                ctx.font = '600 18px sans-serif';
-                const w = 28, h = 26, r = 7;
-                const x = -w / 2, y = -h / 2;
-                ctx.fillStyle = 'rgba(8, 6, 18, 0.86)';
-                ctx.strokeStyle = 'rgba(255, 170, 68, 0.55)'; // amber tint to match holster family
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(x + r, y);
-                ctx.lineTo(x + w - r, y);
-                ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-                ctx.lineTo(x + w, y + h - r);
-                ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-                ctx.lineTo(x + w / 2 + 4, y + h);
-                ctx.lineTo(x + w / 2, y + h + 4);
-                ctx.lineTo(x + w / 2 - 4, y + h);
-                ctx.lineTo(x + r, y + h);
-                ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-                ctx.lineTo(x, y + r);
-                ctx.quadraticCurveTo(x, y, x + r, y);
-                ctx.closePath();
-                ctx.fill();
-                ctx.stroke();
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(this.playerEmote.text, 0, 1);
-                ctx.restore();
+                // Her bubble wears deep bronze-gold; passersby wear smoky silver (drawSpeechBubble: entities/npc.js)
+                drawSpeechBubble(this.ctx, this.player.x, this.player.y - 34, this.playerEmote.text,
+                    speechBubbleScale(this.playerEmote.age, this.playerEmote.duration), { metal: 'bronzeDeep', emoji: true });
             },
             
             renderSidebarPortrait() {

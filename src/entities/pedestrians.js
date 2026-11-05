@@ -900,62 +900,9 @@
              */
             drawQuipBubble(ctx) {
                 if (!this.quipText) return;
-                
-                const POP_IN = 8;
-                const POP_OUT = 10;
-                let scale;
-                if (this.quipAge < POP_IN) {
-                    const t = this.quipAge / POP_IN;
-                    scale = 1 - Math.pow(1 - t, 3);                  // ease-out cubic
-                } else if (this.quipAge < this.quipDuration - POP_OUT) {
-                    scale = 1;                                        // hold
-                } else {
-                    const t = Math.max(0, (this.quipDuration - this.quipAge) / POP_OUT);
-                    scale = t * t;                                    // ease-in shrink
-                }
-                if (scale <= 0.01) return;
-                
-                ctx.save();
-                ctx.translate(this.x, this.y - 30);  // above head, screen-aligned
-                ctx.scale(scale, scale);
-                
-                ctx.font = '600 8px Montserrat, sans-serif';
-                const textW = ctx.measureText(this.quipText).width;
-                const padX = 7;
-                const padY = 3;
-                const w = Math.max(28, textW + padX * 2);
-                const h = 16 + padY * 2;
-                const r = 6;
-                const x = -w / 2;
-                const y = -h / 2;
-                
-                // Rounded-rect bubble with a small downward tail
-                ctx.fillStyle = 'rgba(8, 6, 18, 0.86)';
-                ctx.strokeStyle = 'rgba(164, 105, 255, 0.4)';   // subtle purple-neon edge
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(x + r, y);
-                ctx.lineTo(x + w - r, y);
-                ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-                ctx.lineTo(x + w, y + h - r);
-                ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-                ctx.lineTo(x + w / 2 + 4, y + h);
-                ctx.lineTo(x + w / 2,     y + h + 4);            // tail tip
-                ctx.lineTo(x + w / 2 - 4, y + h);
-                ctx.lineTo(x + r, y + h);
-                ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-                ctx.lineTo(x, y + r);
-                ctx.quadraticCurveTo(x, y, x + r, y);
-                ctx.closePath();
-                ctx.fill();
-                ctx.stroke();
-                
-                ctx.fillStyle = '#e8e4ff';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(this.quipText, 0, 0);
-                
-                ctx.restore();
+                // Black bubble, smoky silver double-line frame (drawSpeechBubble: entities/npc.js)
+                drawSpeechBubble(ctx, this.x, this.y - 31, this.quipText, speechBubbleScale(this.quipAge, this.quipDuration),
+                    { metal: 'silverDeep' });
             }
         }
         
