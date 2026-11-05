@@ -108,7 +108,7 @@ const SCRIPTS = [
     'buildings/torque-auto.js',
     'buildings/dr-yins.js',
     'buildings/warehouse-hall.js',
-    'buildings/suburb-house.js',
+    'buildings/suburb-house.js', 'buildings/town-gate.js',
     'buildings/ashgrove.js',
     'buildings/enni-cole.js',
     'buildings/silver-queen-deco.js',
