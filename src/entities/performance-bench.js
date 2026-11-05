@@ -2,13 +2,13 @@
         // browser/compositor/GPU time cannot be measured by synchronous Canvas timers.
         const PerformanceBench = {
             active: false, detailed: true, results: null, _card: null,
-            run({ durationMs = 30000, warmupMs = 3000, detailed = true } = {}) {
+            run({ durationMs = 30000, warmupMs = 3000, detailed = true, paint = false } = {}) {
                 if (this.active || PerfBench.active) { showMessage('A BENCHMARK IS ALREADY RUNNING'); return false; }
                 if (typeof game === 'undefined' || !game.running || game.paused || document.hidden) {
                     showMessage('START OR RESUME THE GAME FIRST'); return false;
                 }
                 if (!Number.isFinite(durationMs) || !Number.isFinite(warmupMs) || durationMs < 100 || durationMs > 120000 || warmupMs < 0 || warmupMs > 30000) return false;
-                this.detailed = !!detailed;
+                this.detailed = !!detailed; this.paint = !!paint;
                 this.results = null; this.frames = []; this.maps = new Set();
                 this.durationMs = durationMs; this.warmupMs = warmupMs; this.sampledMs = 0;
                 this.interruptions = 0; this._previous = null; this._frame = null;
@@ -19,6 +19,7 @@
                 game.showProfiler = false; GameSettings.profilerMode = 'off';
                 GameSettings.countCalls = false; GameSettings.baseline = false;
                 this.active = true; game._syncProfiler();
+                if (this.paint) this._installPaintSync();
                 if (typeof DevOverlay !== 'undefined') DevOverlay.sync(game);
                 this._visibility = () => { if (document.hidden) { this._previous = null; this.interruptions++; } };
                 document.addEventListener('visibilitychange', this._visibility);
@@ -79,7 +80,41 @@
                 this.maps.add(game.activeMap?.id || 'unknown');
                 if (this.sampledMs >= this.durationMs) this.finish(); else this.draw();
             },
+            /**
+             * Paint mode: Canvas calls only record commands, and the pixels are painted when something next reads the
+             * canvas (in practice the bloom pass, which then looks expensive for everyone). Here each Render: stage and the
+             * tree/lamp depth pass wait for the canvas before their timers stop, so a stage's row includes painting what it
+             * drew. The wait reads one pixel through a tiny canvas, so the game canvas itself is never read back (which
+             * could move it off the GPU). The waits add their own cost: compare paint captures with paint captures.
+             */
+            _paintSync() {
+                const t = this._tiny || (this._tiny = document.createElement('canvas'));
+                if (t.width !== 1) { t.width = 1; t.height = 1; }
+                const c = this._tinyCtx || (this._tinyCtx = t.getContext('2d', { willReadFrequently: true }));
+                try { c.drawImage(game.canvas, 0, 0, 1, 1, 0, 0, 1, 1); c.getImageData(0, 0, 1, 1); } catch (e) { /* (a tainted or lost canvas: no wait) */ }
+            },
+            _installPaintSync() {
+                const prof = game.profiler, start = prof.start, stop = prof.stop, flush = FoliageLampDepth.flush, bench = this;
+                const stage = l => typeof l === 'string' && l.startsWith('Render:') && l !== 'Render:Total';
+                this._paintHooks = { prof, start, stop, flush };
+                prof.start = function (l) { if (stage(l)) bench._paintSync(); return start.apply(this, arguments); };
+                prof.stop = function (l) { if (stage(l)) bench._paintSync(); return stop.apply(this, arguments); };
+                FoliageLampDepth.flush = function () {
+                    bench._paintSync(); const t = performance.now();
+                    try { return flush.apply(this, arguments); }
+                    finally { bench._paintSync(); if (bench._frame) bench._frame.sections['Paint: Trees and lamps'] = (bench._frame.sections['Paint: Trees and lamps'] || 0) + performance.now() - t; }
+                };
+            },
+            _removePaintSync() {
+                const h = this._paintHooks; if (!h) return;
+                h.prof.start = h.start; h.prof.stop = h.stop; FoliageLampDepth.flush = h.flush;
+                // (own properties shadowing the prototype's are removed, so the profiler is exactly as it was)
+                if (h.start === Object.getPrototypeOf(h.prof).start) delete h.prof.start;
+                if (h.stop === Object.getPrototypeOf(h.prof).stop) delete h.prof.stop;
+                this._paintHooks = null;
+            },
             _restore() {
+                this._removePaintSync();
                 this.active = false; this._frame = null;
                 if (this._visibility) document.removeEventListener('visibilitychange', this._visibility);
                 this._visibility = null;
@@ -137,7 +172,8 @@
                     const people = sections.find(s => s.mean > 0 && /^People: /.test(s.label));
                     if (people) findings.push(`Largest measured character detail: ${people.label} (${people.mean.toFixed(2)} ms/frame mean).`);
                 }
-                this.results = { version: 2, instrumentation: { mode: this.detailed ? 'detailed' : 'summary', profilerPanel: false, canvasCallCounting: false,
+                if (this.paint) findings.push('Paint mode: each Render: stage waits for the canvas to finish painting before its timer stops, so its row includes painting what it drew. The waits slow the frame; compare only with other paint captures.');
+                this.results = { version: 2, instrumentation: { mode: this.detailed ? 'detailed' : 'summary', paint: !!this.paint, profilerPanel: false, canvasCallCounting: false,
                         note: this.detailed ? 'Full entity, character, world, traffic and sign-detail timing hooks are enabled without the profiler panel. Extra timing calls and wrappers add overhead; compare against another detailed capture.' : 'Summary section timers only; detailed entity/character/world hooks are disabled.' }, createdAt: new Date().toISOString(), sampleCount: frames.length,
                     sampledSeconds: sum('cadence') / 1000, targetFps, fps, cadenceMs: cadence, cpuLoopMs: cpu,
                     outsideLoopMeanMs: Math.max(0, cadence.mean - cpu.mean), slowFrames: slow,
@@ -158,7 +194,7 @@
                 const r = this.results; if (!r) return 'No whole-game benchmark report yet.';
                 const n = v => v.toFixed(2);
                 return ['DIMENSIONS: FREELANCER — WHOLE-GAME PERFORMANCE REPORT', r.createdAt,
-                    `Capture mode: ${r.instrumentation.mode.toUpperCase()} | profiler panel OFF | canvas call counting OFF`, r.instrumentation.note,
+                    `Capture mode: ${r.instrumentation.mode.toUpperCase()}${r.instrumentation.paint ? ' + PAINT' : ''} | profiler panel OFF | canvas call counting OFF`, r.instrumentation.note,
                     `${r.sampleCount} frames / ${n(r.sampledSeconds)} s | maps: ${r.maps.join(', ')} | interruptions: ${r.interruptions}`,
                     `Average FPS: ${n(r.fps)} | evaluation target: ${r.targetFps} FPS`,
                     `Frame intervals (ms): median ${n(r.cadenceMs.p50)}, p95 ${n(r.cadenceMs.p95)}, p99 ${n(r.cadenceMs.p99)}, worst ${n(r.cadenceMs.max)}`,

@@ -1333,6 +1333,11 @@
                     this.closeSettings(); this.close();
                     PerformanceBench.run();
 
+                } else if (key === 'performanceBenchPaint') {
+                    // The same capture, with each render stage waiting for the canvas to paint (entities/performance-bench.js)
+                    this.closeSettings(); this.close();
+                    PerformanceBench.run({ paint: true });
+
                 } else if (key === 'perfBench') {
                     // The resolution sweep (entities/static-builders-profiler.js PerfBench): back in the game to measure it
                     GameSettings.profilerMode = GameSettings.profilerMode === 'off' || !GameSettings.profilerMode ? 'compact' : GameSettings.profilerMode;
