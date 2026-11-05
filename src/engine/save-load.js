@@ -495,6 +495,7 @@ engineMixin({
                     this.boosterCount = playerData.boosters ?? defaults.player.boosters;
                     
                     // Restore buff system from save data
+                    this.player.buffSystem.active = {};                 // only the save's buffs: none carried in from the run before
                     this.player.buffSystem.deserialize(playerData.buffs || {});
                     
                     // Re-apply persistent buff side-effects (e.g. Stellar Lemonade halved maxHP)

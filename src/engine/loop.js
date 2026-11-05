@@ -33,6 +33,7 @@
                 const ok = await this.loadIntoWorld([
                     { label: 'Reading your imprint', weight: 1, run: () => {} },
                     { label: 'Rebuilding the world', weight: 6, run: () => {
+                        if (!this.running) this.resetGameState();      // from a clean slate: nothing the save leaves out comes from the run before
                         loaded = !!load();
                         if (!loaded) throw new Error('That save could not be loaded.');
                     } },
@@ -211,8 +212,10 @@
                     this.story.completedOptional = [];
                 }
                 
-                // --- NOTES ---
+                // --- NOTES, THE TRANSCRIPT, BUFFS ---
                 this.foundNotes = [];
+                if (typeof DialogueTranscript !== 'undefined') this.transcript = new DialogueTranscript();   // the last run's lines aren't this run's
+                if (this.player && this.player.buffSystem) this.player.buffSystem.active = {};          // nor its drinks (maxHP is reset above)
                 
                 // --- BONDING ---
                 if (this.bonding) {
@@ -225,6 +228,7 @@
                     this.missions.activeMission = null;
                     this.missions.completedCount = 0;
                     this.missions.completedDeliveries = 0;
+                    this.missions.completedBounties = 0;                   // (Anavia's salvage opens at 5: a new run earns them again)
                     this.missions.amber = MissionSystem.freshAmber();
                     this.missions._recipients = [];
                     if (this.missions.missionLog) this.missions.missionLog = [];
@@ -234,6 +238,7 @@
                 this._endDrive();
                 this.car = this.ownedCar;                               // her car, back where a new game starts (engine/cars.js)
                 Object.assign(this.ownedCar, CAR_START, { vx: 0, vy: 0, speed: 0, controlMode: 'PARKED' });
+                if (typeof PlayerGarage !== 'undefined') { this.garage = new PlayerGarage(); this.garage.applyToVehicle(this.ownedCar); }   // only the BlackMark again: the last run's cars and paint stay in it
                 this.deliveryVehicle = null;                            // Amber's van parks by the cafe again on the next hub load
                 
                 // --- COMPANIONS ---
@@ -252,6 +257,7 @@
                         t.recruited = false; t.inCar = false; 
                         t.hp = t.maxHp; t.dead = false;
                         t.downed = false; t.active = true; t.visible = true;
+                        if (typeof t.startRelationship === 'number') t.relationship = t.startRelationship;   // the crew's bonds start over
                         if (t.maxTeammateStims) t.teammateStims = t.maxTeammateStims;
                     });
                 }

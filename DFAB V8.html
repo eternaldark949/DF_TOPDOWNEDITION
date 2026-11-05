@@ -5865,7 +5865,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '041514907fc9';
+        const DFAB_BUILD = 'd3225b1f5c74';
     </script>
     <script type="text/dfab" data-src="core/config.js" data-cost="406">
 
@@ -26588,7 +26588,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
     </script>
-    <script type="text/dfab" data-src="entities/npc.js" data-cost="532">
+    <script type="text/dfab" data-src="entities/npc.js" data-cost="533">
         /**
          * =====================================================================
          *  NPC CLASS (Extends ActorEntity)
@@ -26692,6 +26692,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.hireDuration = 0;
                     this.downed = false;  // True when HP hits 0 — revive at apartment
                     this.relationship = combatConfig.relationship ?? 0;
+                    this.startRelationship = this.relationship;           // where New Game puts the bond back (engine/loop.js resetGameState)
                     this.bio = combatConfig.bio || '';
                     
                     // Override shared combat defaults with teammate config
@@ -68101,7 +68102,7 @@ Object.assign(TrafficVehicle.prototype, {
         }
 
     </script>
-    <script type="text/dfab" data-src="ui/inventory-augments.js" data-cost="562">
+    <script type="text/dfab" data-src="ui/inventory-augments.js" data-cost="564">
         /* =====================================================================
            INVENTORY SYSTEM
            ---------------------------------------------------------------------
@@ -68492,9 +68493,10 @@ Object.assign(TrafficVehicle.prototype, {
             
             // Load default new-game items from ITEM_REGISTRY
             loadDefaultLoadout() {
+                // (quietly: no OBTAINED toasts while the main menu is up, where this runs at boot and on New Game)
                 for (const id of DEFAULT_LOADOUT) {
                     const item = createItemFromRegistry(id, this.game);
-                    if (item) this.addItem(item);
+                    if (item) this.items.push(item);
                 }
             }
             
@@ -81875,7 +81877,7 @@ engineMixin({
 
         });
     </script>
-    <script type="text/dfab" data-src="engine/save-load.js" data-cost="513">
+    <script type="text/dfab" data-src="engine/save-load.js" data-cost="514">
         // GameEngine — Save schema, migrations, saveGame / loadGame.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
                 const AUTOSAVE_KEY = 'dfab_save_slot_auto';   // written when the app goes to the background (onPageHidden)
@@ -82373,6 +82375,7 @@ engineMixin({
                     this.boosterCount = playerData.boosters ?? defaults.player.boosters;
                     
                     // Restore buff system from save data
+                    this.player.buffSystem.active = {};                 // only the save's buffs: none carried in from the run before
                     this.player.buffSystem.deserialize(playerData.buffs || {});
                     
                     // Re-apply persistent buff side-effects (e.g. Stellar Lemonade halved maxHP)
@@ -93778,7 +93781,7 @@ engineMixin({
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/loop.js" data-cost="236">
+    <script type="text/dfab" data-src="engine/loop.js" data-cost="245">
         // GameEngine — start / stop / reset and the main loop.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -93814,6 +93817,7 @@ engineMixin({
                 const ok = await this.loadIntoWorld([
                     { label: 'Reading your imprint', weight: 1, run: () => {} },
                     { label: 'Rebuilding the world', weight: 6, run: () => {
+                        if (!this.running) this.resetGameState();      // from a clean slate: nothing the save leaves out comes from the run before
                         loaded = !!load();
                         if (!loaded) throw new Error('That save could not be loaded.');
                     } },
@@ -93992,8 +93996,10 @@ engineMixin({
                     this.story.completedOptional = [];
                 }
                 
-                // --- NOTES ---
+                // --- NOTES, THE TRANSCRIPT, BUFFS ---
                 this.foundNotes = [];
+                if (typeof DialogueTranscript !== 'undefined') this.transcript = new DialogueTranscript();   // the last run's lines aren't this run's
+                if (this.player && this.player.buffSystem) this.player.buffSystem.active = {};          // nor its drinks (maxHP is reset above)
                 
                 // --- BONDING ---
                 if (this.bonding) {
@@ -94006,6 +94012,7 @@ engineMixin({
                     this.missions.activeMission = null;
                     this.missions.completedCount = 0;
                     this.missions.completedDeliveries = 0;
+                    this.missions.completedBounties = 0;                   // (Anavia's salvage opens at 5: a new run earns them again)
                     this.missions.amber = MissionSystem.freshAmber();
                     this.missions._recipients = [];
                     if (this.missions.missionLog) this.missions.missionLog = [];
@@ -94015,6 +94022,7 @@ engineMixin({
                 this._endDrive();
                 this.car = this.ownedCar;                               // her car, back where a new game starts (engine/cars.js)
                 Object.assign(this.ownedCar, CAR_START, { vx: 0, vy: 0, speed: 0, controlMode: 'PARKED' });
+                if (typeof PlayerGarage !== 'undefined') { this.garage = new PlayerGarage(); this.garage.applyToVehicle(this.ownedCar); }   // only the BlackMark again: the last run's cars and paint stay in it
                 this.deliveryVehicle = null;                            // Amber's van parks by the cafe again on the next hub load
                 
                 // --- COMPANIONS ---
@@ -94033,6 +94041,7 @@ engineMixin({
                         t.recruited = false; t.inCar = false; 
                         t.hp = t.maxHp; t.dead = false;
                         t.downed = false; t.active = true; t.visible = true;
+                        if (typeof t.startRelationship === 'number') t.relationship = t.startRelationship;   // the crew's bonds start over
                         if (t.maxTeammateStims) t.teammateStims = t.maxTeammateStims;
                     });
                 }

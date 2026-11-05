@@ -101,6 +101,7 @@
                     this.hireDuration = 0;
                     this.downed = false;  // True when HP hits 0 — revive at apartment
                     this.relationship = combatConfig.relationship ?? 0;
+                    this.startRelationship = this.relationship;           // where New Game puts the bond back (engine/loop.js resetGameState)
                     this.bio = combatConfig.bio || '';
                     
                     // Override shared combat defaults with teammate config

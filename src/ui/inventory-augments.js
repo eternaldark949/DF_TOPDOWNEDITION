@@ -388,9 +388,10 @@
             
             // Load default new-game items from ITEM_REGISTRY
             loadDefaultLoadout() {
+                // (quietly: no OBTAINED toasts while the main menu is up, where this runs at boot and on New Game)
                 for (const id of DEFAULT_LOADOUT) {
                     const item = createItemFromRegistry(id, this.game);
-                    if (item) this.addItem(item);
+                    if (item) this.items.push(item);
                 }
             }
             
