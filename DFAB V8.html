@@ -5868,7 +5868,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '28627c0d32fe';
+        const DFAB_BUILD = 'cc2fa448e9aa';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="26">
         // ===== LV0 BASEMENT =====
@@ -5886,7 +5886,7 @@
         // pretend it's another moment, crowd baking and prop sprites, save and restore them in place.)
         let _frameTime = performance.now();
         let _frameTimeSec = _frameTime / 1000;
-        /** Sim tick counter: advanced once per fixed simulation step (frame_clock.advanceTick, from GameEngine.update()). */
+        /** Sim tick counter: advanced once per fixed simulation step (frame_clock.advanceTick: the Lobby, or GameEngine.update() called directly). */
         let _simTick = 0;
         /** Smooth GAME time in seconds for draw code: advances with sim ticks (so it
          *  follows CONFIG.LOOP.GAME_SPEED and stops while paused), blended between
@@ -72024,7 +72024,7 @@ Object.assign(TrafficVehicle.prototype, {
             yield 120;
         });
     </script>
-    <script type="text/dfab" data-src="lobby/level-lobby.js" data-cost="72">
+    <script type="text/dfab" data-src="lobby/level-lobby.js" data-cost="81">
         // ===== LV1 LOBBY =====
         // The engine's game loop. The Lobby keeps the clock and nothing else: it knows when a frame is due,
         // how many fixed simulation steps that frame owes, and how far the drawn frame sits between two steps.
@@ -72043,7 +72043,9 @@ Object.assign(TrafficVehicle.prototype, {
         //   frameRateLimit()            -> number  frames per second to draw at, 0 = as fast as the display
         //   acceptFrame()                          a frame the limiter let through (the frame clock is stamped right after)
         //   timeScale(elapsed_ms)       -> number  1 = normal, 0.4 = slow-mo; stretches each step in real time
-        //   simulateStep()                         one fixed step of the world
+        //   isPaused()                  -> bool    hold the world: step slots pass, the tick and the world stay put
+        //   beforeStep()                           every step slot, held or not (e.g. an interpolation snapshot)
+        //   simulateStep()                         one fixed step of the world; the frame clock's tick has advanced
         //   afterSimulation(steps)                 after this frame's steps
         //   renderFrame(blend)                     draw; blend 0..1 = how far between the last two steps
         //   endFrame(steps, dropped_ms)            after drawing
@@ -72120,9 +72122,15 @@ Object.assign(TrafficVehicle.prototype, {
                 const step_ms = this.step_ms = L.STEP_MS / Math.max(0.05, (L.GAME_SPEED || 1) * scale);
 
                 // --- SIMULATION ---
+                // While paused (or stopped mid-frame) the step slots still pass, so time doesn't bank up
+                // and burst out on unpause; the tick and the world simply don't move.
                 let steps = 0;
                 while (this.accumulator >= step_ms && steps < L.MAX_STEPS) {
-                    if (J.simulateStep) J.simulateStep();
+                    if (J.beforeStep) J.beforeStep();
+                    if (this.isStepping()) {
+                        if (this.frame_clock) this.frame_clock.advanceTick();
+                        if (J.simulateStep) J.simulateStep();
+                    }
                     this.accumulator -= step_ms;
                     steps++;
                 }
@@ -72136,6 +72144,12 @@ Object.assign(TrafficVehicle.prototype, {
                 if (J.renderFrame) J.renderFrame(this.accumulator / step_ms);
                 if (J.endFrame) J.endFrame(steps, dropped_ms);
                 this.scheduleNextFrame();
+            }
+
+            /** Does a step slot move the world right now? */
+            isStepping () {
+                const J = this.jacks;
+                return !(J.isRunning && !J.isRunning()) && !(J.isPaused && J.isPaused());
             }
 
             scheduleNextFrame () {
@@ -86323,7 +86337,7 @@ engineMixin({
             },
         });
     </script>
-    <script type="text/dfab" data-src="engine/update.js" data-cost="827">
+    <script type="text/dfab" data-src="engine/update.js" data-cost="831">
         // GameEngine — The per-tick simulation (update) and traffic collision helpers.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         /** Props you can use, and what the action pill says for them: type → [verb, name, name from the prop's own label].
@@ -86351,13 +86365,19 @@ engineMixin({
                Handles all logic updates for the current frame.
                Instrumented with Profiler to track performance bottlenecks.
                ===================================================================== */
+            /** One tick, called directly (tests, tools): skipped while stopped or paused, like a Lobby step.
+             *  The Lobby itself advances the tick and calls stepWorld() (engine/loop.js). */
             update() {
                 if (!this.running || this.paused) return;
-                this._syncProfiler();
-                
                 // Gait clock — advances only when the world actually steps, so
                 // walk animation freezes with everything else while paused.
                 frame_clock.advanceTick();
+                this.stepWorld();
+            },
+
+            /** The world's simulation for one tick. The tick (_simTick) has already advanced. */
+            stepWorld() {
+                this._syncProfiler();
                 CollisionSystem.beginProjectileStep(this);
                 
                 // Pausable systems — must tick before any logic that might
@@ -94427,7 +94447,7 @@ engineMixin({
             
         });
     </script>
-    <script type="text/dfab" data-src="engine/loop.js" data-cost="47">
+    <script type="text/dfab" data-src="engine/loop.js" data-cost="50">
         // GameEngine — the game's side of the main loop: what it plugs into the Lobby's jacks (the clock is the Lobby's: lobby/level-lobby.js).
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -94454,10 +94474,12 @@ engineMixin({
                     },
                     // update() is written in per-tick units (acceleration 0.35/tick, cooldowns in ticks), so the
                     // Lobby runs it in fixed steps and every constant means the same thing on every display.
-                    simulateStep: () => {
-                        if (CONFIG.LOOP.INTERPOLATE) RenderInterp.snapshot(this);
-                        this.update();
-                    },
+                    // Every step slot, held or not: interpolation blends from here, so while paused the
+                    // drawn frame rests on the latest state.
+                    beforeStep: () => { if (CONFIG.LOOP.INTERPOLATE) RenderInterp.snapshot(this); },
+                    // Pause is the game's pause registry (engine/pause-system.js), mirrored to game.paused
+                    isPaused: () => this.paused,
+                    simulateStep: () => this.stepWorld(),
                     afterSimulation: (steps) => {
                         RenderStats.ticks = steps;   // sim ticks this frame (the profiler: a slow frame runs several, and its update rows add them up)
                         if (PerformanceBench.active) PerformanceBench.afterSimulation();

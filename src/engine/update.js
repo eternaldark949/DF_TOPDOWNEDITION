@@ -25,13 +25,19 @@
                Handles all logic updates for the current frame.
                Instrumented with Profiler to track performance bottlenecks.
                ===================================================================== */
+            /** One tick, called directly (tests, tools): skipped while stopped or paused, like a Lobby step.
+             *  The Lobby itself advances the tick and calls stepWorld() (engine/loop.js). */
             update() {
                 if (!this.running || this.paused) return;
-                this._syncProfiler();
-                
                 // Gait clock — advances only when the world actually steps, so
                 // walk animation freezes with everything else while paused.
                 frame_clock.advanceTick();
+                this.stepWorld();
+            },
+
+            /** The world's simulation for one tick. The tick (_simTick) has already advanced. */
+            stepWorld() {
+                this._syncProfiler();
                 CollisionSystem.beginProjectileStep(this);
                 
                 // Pausable systems — must tick before any logic that might

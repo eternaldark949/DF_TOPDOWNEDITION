@@ -13,7 +13,7 @@
         // pretend it's another moment, crowd baking and prop sprites, save and restore them in place.)
         let _frameTime = performance.now();
         let _frameTimeSec = _frameTime / 1000;
-        /** Sim tick counter: advanced once per fixed simulation step (frame_clock.advanceTick, from GameEngine.update()). */
+        /** Sim tick counter: advanced once per fixed simulation step (frame_clock.advanceTick: the Lobby, or GameEngine.update() called directly). */
         let _simTick = 0;
         /** Smooth GAME time in seconds for draw code: advances with sim ticks (so it
          *  follows CONFIG.LOOP.GAME_SPEED and stops while paused), blended between

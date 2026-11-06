@@ -24,10 +24,12 @@
                     },
                     // update() is written in per-tick units (acceleration 0.35/tick, cooldowns in ticks), so the
                     // Lobby runs it in fixed steps and every constant means the same thing on every display.
-                    simulateStep: () => {
-                        if (CONFIG.LOOP.INTERPOLATE) RenderInterp.snapshot(this);
-                        this.update();
-                    },
+                    // Every step slot, held or not: interpolation blends from here, so while paused the
+                    // drawn frame rests on the latest state.
+                    beforeStep: () => { if (CONFIG.LOOP.INTERPOLATE) RenderInterp.snapshot(this); },
+                    // Pause is the game's pause registry (engine/pause-system.js), mirrored to game.paused
+                    isPaused: () => this.paused,
+                    simulateStep: () => this.stepWorld(),
                     afterSimulation: (steps) => {
                         RenderStats.ticks = steps;   // sim ticks this frame (the profiler: a slow frame runs several, and its update rows add them up)
                         if (PerformanceBench.active) PerformanceBench.afterSimulation();

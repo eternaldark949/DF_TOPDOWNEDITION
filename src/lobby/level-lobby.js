@@ -16,7 +16,9 @@
         //   frameRateLimit()            -> number  frames per second to draw at, 0 = as fast as the display
         //   acceptFrame()                          a frame the limiter let through (the frame clock is stamped right after)
         //   timeScale(elapsed_ms)       -> number  1 = normal, 0.4 = slow-mo; stretches each step in real time
-        //   simulateStep()                         one fixed step of the world
+        //   isPaused()                  -> bool    hold the world: step slots pass, the tick and the world stay put
+        //   beforeStep()                           every step slot, held or not (e.g. an interpolation snapshot)
+        //   simulateStep()                         one fixed step of the world; the frame clock's tick has advanced
         //   afterSimulation(steps)                 after this frame's steps
         //   renderFrame(blend)                     draw; blend 0..1 = how far between the last two steps
         //   endFrame(steps, dropped_ms)            after drawing
@@ -93,9 +95,15 @@
                 const step_ms = this.step_ms = L.STEP_MS / Math.max(0.05, (L.GAME_SPEED || 1) * scale);
 
                 // --- SIMULATION ---
+                // While paused (or stopped mid-frame) the step slots still pass, so time doesn't bank up
+                // and burst out on unpause; the tick and the world simply don't move.
                 let steps = 0;
                 while (this.accumulator >= step_ms && steps < L.MAX_STEPS) {
-                    if (J.simulateStep) J.simulateStep();
+                    if (J.beforeStep) J.beforeStep();
+                    if (this.isStepping()) {
+                        if (this.frame_clock) this.frame_clock.advanceTick();
+                        if (J.simulateStep) J.simulateStep();
+                    }
                     this.accumulator -= step_ms;
                     steps++;
                 }
@@ -109,6 +117,12 @@
                 if (J.renderFrame) J.renderFrame(this.accumulator / step_ms);
                 if (J.endFrame) J.endFrame(steps, dropped_ms);
                 this.scheduleNextFrame();
+            }
+
+            /** Does a step slot move the world right now? */
+            isStepping () {
+                const J = this.jacks;
+                return !(J.isRunning && !J.isRunning()) && !(J.isPaused && J.isPaused());
             }
 
             scheduleNextFrame () {
