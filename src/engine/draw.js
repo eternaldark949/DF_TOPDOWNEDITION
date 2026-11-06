@@ -1169,6 +1169,7 @@
                 
                 if (RenderStats.timed) this._entLap('Entities: Effects');
                 if (RL.at('particles')) this.weather.draw(this.ctx, cullBounds.view, viewZoom);
+                if (RL.at('combat')) this.drawBreachUnder(this.ctx, cullBounds.view);   // scorch, debris, smoke (engine/breach-fx.js)
                 if (RenderStats.timed) this._entLap('Entities: Weather');
                 
                 // Graveyard humanoid ghosts
@@ -1208,6 +1209,7 @@
                     this.drawGunnerHeat(this.ctx, cullBounds.entities);
                     this.drawBossHazards(this.ctx, cullBounds.view);   // the duel's dimming, sigils, fire, hooks (engine/boss-hazards.js)
                     this.drawFireTrail(this.ctx, cullBounds.view);
+                    this.drawBreachGlow(this.ctx, cullBounds.view);
                     for (const p of this.projectiles) if (p.isFireball) p.draw(this.ctx);
                 }
                 // The veil at the edge of an outdoor map (world/map-edge.js), above the darkness

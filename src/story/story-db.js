@@ -112,10 +112,8 @@
                                                 // Break the back wall
                                                 const w = game.activeMap.walls.find(w => w.breach);   // tagged in world/maps.js
                                                 if (w) {
-                                                    for (let ex = w.x; ex < w.x + w.w; ex += 40) {
-                                                        game.weather.spawnExplosion(ex, w.y, '#ff8800');
-                                                        game.weather.spawnExplosion(ex + 20, w.y + 10, '#ff4500');
-                                                    }
+                                                    game.spawnBreachBlast(w, -1);   // fire, light, debris, smoke (engine/breach-fx.js)
+                                                    audioSys.sfx('explode');
                                                     game.removeWall(w);
                                                 }
                                                 // The drones drop in through the breach: a lancer, a seer, a grappler (entities/drones.js)

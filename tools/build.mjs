@@ -162,6 +162,7 @@ const SCRIPTS = [
     'engine/game-engine.js',
     'engine/events.js',
     'engine/combat-effects.js',
+    'engine/breach-fx.js',
     'engine/quick-draw.js',
     'engine/player-fire.js',
     'engine/combat-fx.js',
