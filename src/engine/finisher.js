@@ -57,7 +57,7 @@
 
             updateCorpses() {
                 const C = this.corpses; if (!C || !C.length) return;
-                for (let i = C.length - 1; i >= 0; i--) if (_gameTimeSec - C[i].t0 > FINISHER.LIE + FINISHER.FADE) C.splice(i, 1);
+                lifeKit.sweep(C, (c) => _gameTimeSec - c.t0 > FINISHER.LIE + FINISHER.FADE);
             },
 
             /**

@@ -348,11 +348,11 @@
                     glow(450, 84, 26, '255, 90, 30', 0.35);
                     // Sparks from a popped ember
                     const S = this._keeperSparks || [];
-                    for (let i = S.length - 1; i >= 0; i--) {
-                        const p = S[i]; p.x += p.vx; p.y += p.vy; p.vy *= 0.97; p.vx *= 0.98; p.life--;
-                        if (p.life <= 0) { S.splice(i, 1); continue; }
+                    lifeKit.sweep(S, (p) => {
+                        p.x += p.vx; p.y += p.vy; p.vy *= 0.97; p.vx *= 0.98; p.life--;
+                        if (p.life <= 0) return true;
                         glow(p.x, p.y, 4, '255, 200, 110', Math.min(1, p.life / 25));
-                    }
+                    });
                     if (this._keeperSurge) this._keeperSurge = Math.max(0, this._keeperSurge - 0.012);
                     // Candles
                     for (const [x, y] of [[374, 40], [526, 40], [96, 618], [564, 200]]) glow(x, y, 16, '255, 200, 130', 0.35 * (0.85 + 0.15 * Math.sin(t * 9 + x)));

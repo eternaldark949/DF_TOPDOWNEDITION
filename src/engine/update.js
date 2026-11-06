@@ -61,10 +61,7 @@
                 this.profiler.start('Logic:Systems');
                 
                 // Cleanup old muzzle flashes
-                for(let i=this.muzzleFlashes.length-1; i>=0; i--) {
-                    this.muzzleFlashes[i].life--;
-                    if(this.muzzleFlashes[i].life <= 0) this.muzzleFlashes.splice(i, 1);
-                }
+                lifeKit.sweep(this.muzzleFlashes, (f) => --f.life <= 0);
                 this.updateCasings();
                 this.updateCorpses();
                 this.updateStatuses();                                 // bleeding and the rest (engine/status-effects.js)
@@ -585,10 +582,7 @@
                 });
                 } // end bumper minigame guard
                 // Ghosts/Markers
-                for (let i = this.lastKnownMarkers.length - 1; i >= 0; i--) {
-                    this.lastKnownMarkers[i].update();
-                    if (!this.lastKnownMarkers[i].active) this.lastKnownMarkers.splice(i, 1);
-                }
+                lifeKit.sweep(this.lastKnownMarkers, (m) => { m.update(); return !m.active; });
             
                 // Enemies (Gangers, Bosses)
                 let trafficCars = null;                                         // the cars they dodge: one list a tick, shared (read only)

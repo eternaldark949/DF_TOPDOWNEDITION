@@ -2637,11 +2637,7 @@
                 this.active = false;
                 this.waveDelay = 0;
                 // Clean up
-                for (let i = game.enemies.length - 1; i >= 0; i--) {
-                    if (game.enemies[i]._gauntletWave) {
-                        game.enemies.splice(i, 1);
-                    }
-                }
+                lifeKit.sweep(game.enemies, (e) => e._gauntletWave);
                 this.hostiles = [];
                 if (this.wave > 0) {
                     showMessage(`GAUNTLET OVER — WAVE ${this.wave} — ${this.totalKills} KILLS`);

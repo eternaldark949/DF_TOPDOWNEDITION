@@ -1136,7 +1136,7 @@
              */
             updatePuddles() {
                 const R = this._ripples || (this._ripples = []);
-                for (let i = R.length - 1; i >= 0; i--) if (++R[i].t >= R[i].life) R.splice(i, 1);
+                lifeKit.sweep(R, (r) => ++r.t >= r.life);
                 const wet = this._wetHere(), surf = this._surfaces();
                 if (!this.reflectQuality() || !this.view) return;
                 // the fountains and pools stir by themselves

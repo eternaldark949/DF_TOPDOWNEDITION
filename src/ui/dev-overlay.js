@@ -359,9 +359,9 @@
 
                 if (this.dbg('hearing') && this._dbgNoises) {
                     const N = this._dbgNoises, now = _gameTimeSec;
-                    for (let i = N.length - 1; i >= 0; i--) {
-                        const n = N[i], age = now - n.t;
-                        if (age > 2.5) { N.splice(i, 1); continue; }
+                    lifeKit.sweep(N, (n) => {
+                        const age = now - n.t;
+                        if (age > 2.5) return true;
                         const a = 1 - age / 2.5;
                         ctx.strokeStyle = DEBUG_COLOUR.hearing; ctx.globalAlpha = 0.55 * a;
                         ctx.setLineDash([5 * px, 5 * px]);
@@ -371,7 +371,7 @@
                         for (const h of n.heard) { ctx.beginPath(); ctx.moveTo(n.x, n.y); ctx.lineTo(h.x, h.y); ctx.stroke(); }
                         ctx.globalAlpha = a;
                         label(`${n.kind || 'noise'} ${n.reach} · heard ${n.heard.length}`, n.x, n.y - 14 * px, DEBUG_COLOUR.hearing);
-                    }
+                    });
                     ctx.globalAlpha = 1;
                 }
 

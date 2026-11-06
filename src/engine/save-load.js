@@ -541,9 +541,7 @@ engineMixin({
                     const savedTeammates = save.teammates || rawSave.teammates || [];
                     
                     // First, clear any existing contract companions
-                    for (let i = this.teammates.length - 1; i >= 0; i--) {
-                        if (this.teammates[i].hireType === 'contract') this.teammates.splice(i, 1);
-                    }
+                    lifeKit.sweep(this.teammates, (tm) => tm.hireType === 'contract');
                     
                     savedTeammates.forEach(savedTm => {
                         if (savedTm.hireType === 'contract' && savedTm.hired) {

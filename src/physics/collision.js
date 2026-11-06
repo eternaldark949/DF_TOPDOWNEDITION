@@ -373,12 +373,11 @@
             }
 
             static resolveProjectiles(game) {
-                for (let i = game.projectiles.length - 1; i >= 0; i--) {
-                    const p = game.projectiles[i];
+                lifeKit.sweep(game.projectiles, (p) => {
                     this.resolveProjectile(p, game);
                     if (p.life <= 0 && p.active) p.destroy();
-                    if (!p.active || p.markedForDestroy) game.projectiles.splice(i, 1);
-                }
+                    return !p.active || p.markedForDestroy;
+                });
             }
 
             static _processProjectiles(onScreen, game, candidates = null) {

@@ -140,7 +140,7 @@
             drawPoolRipples(ctx, cull) {
                 const L = this.poolRings; if (!L || !L.length) return;
                 const map = this.activeMap, now = _gameTimeSec;
-                for (let i = L.length - 1; i >= 0; i--) if (now - L[i].t0 > POOL.RING_LIFE) L.splice(i, 1);
+                lifeKit.sweep(L, (r) => now - r.t0 > POOL.RING_LIFE);
                 ctx.save();
                 ctx.lineWidth = 1.1;
                 for (const f of L) {

@@ -659,19 +659,18 @@
                     Q.out = now + 8 + Math.random() * 10;
                 }
                 let slot = 0;
-                for (let i = Q.people.length - 1; i >= 0; i--) {
-                    const p = Q.people[i];
+                lifeKit.sweep(Q.people, (p) => {
                     let tx, ty;
                     if (p.state === 'queue') { const s = G.queue[Math.min(G.queue.length - 1, Q.people.filter(o => o.state === 'queue').indexOf(p))]; tx = s[0]; ty = s[1]; slot++; p.life = Math.min(1, p.life + dt * 1.5); }
                     else if (p.state === 'enter') { tx = G.door.x; ty = G.door.y + 2; if (Math.hypot(tx - p.x, ty - p.y) < 8) p.life -= dt * 2; else p.life = Math.min(1, p.life + dt); }
                     else { tx = G.door.x; ty = G.court.y + G.court.h + 30; p.life = ty - p.y < 30 ? p.life - dt * 1.5 : Math.min(1, p.life + dt * 2); }
-                    if (p.life <= 0 && p.state !== 'queue') { Q.people.splice(i, 1); continue; }
+                    if (p.life <= 0 && p.state !== 'queue') return true;
                     const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy), sp = 1.1 * dt * 60;
                     let vx = 0, vy = 0;
                     if (d > 2) { vx = dx / d * Math.min(sp, d); vy = dy / d * Math.min(sp, d); p.x += vx; p.y += vy; p.angle = Math.atan2(vy, vx); p.look.pose = undefined; }
                     else { p.angle = p.state === 'queue' ? -Math.PI / 2 : p.angle; p.look.pose = pickFrom(seededRandom(p.look.skinColor + slot), ['idle', 'phone', 'fidget', 'breathe']); }
                     gaitCommand(p, vx, vy);
-                }
+                });
                 // the bouncer turns to whoever's at the front
                 const front = Q.people.find(o => o.state !== 'leave');
                 Q.bouncer.angle = front ? Math.atan2(front.y - Q.bouncer.y, front.x - Q.bouncer.x) : Math.PI / 2;

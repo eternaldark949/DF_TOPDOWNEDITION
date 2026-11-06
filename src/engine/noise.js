@@ -73,7 +73,7 @@
             /** Ripples grow to their reach and fade over half a second. */
             updateNoiseRipples() {
                 const R = this.noiseRipples; if (!R || !R.length) return;
-                for (let i = R.length - 1; i >= 0; i--) if ((R[i].t += 1 / 30) >= 1) R.splice(i, 1);
+                lifeKit.sweep(R, (r) => (r.t += 1 / 30) >= 1);
             },
 
             /** The ring's progress this frame: blended between ticks so it glides at any refresh rate */

@@ -299,9 +299,9 @@
             drawHunterDashes(ctx) {
                 const L = this.hunterDashes; if (!L || !L.length) return;
                 const now = _gameTimeSec;
-                for (let i = L.length - 1; i >= 0; i--) {
-                    const D = L[i], age = now - D.t0;
-                    if (age > 0.6) { L.splice(i, 1); continue; }
+                lifeKit.sweep(L, (D) => {
+                    const age = now - D.t0;
+                    if (age > 0.6) return true;
                     const k = 1 - age / 0.6;
                     // the ghost: a silhouette in crimson, fading
                     ctx.save(); ctx.globalAlpha = 0.45 * k; ctx.fillStyle = D.boss ? '#ff2a4a' : '#c0142e';
@@ -321,7 +321,7 @@
                         ctx.lineTo(D.x1, D.y1); ctx.stroke();
                     }
                     ctx.restore();
-                }
+                });
             },
 
             /** After the darkness: hunters' eyes burn ember (night vision's tell) */

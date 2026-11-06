@@ -5868,7 +5868,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '0f30e6e9b5c8';
+        const DFAB_BUILD = '880a2bd72f52';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="26">
         // ===== LV0 BASEMENT =====
@@ -5988,6 +5988,21 @@
              *  Set what you read (font, fillStyle) before you read it. */
             get measure () {
                 return this._measure || (this._measure = document.createElement('canvas').getContext('2d'));
+            }
+        };
+    </script>
+    <script type="text/dfab" data-src="basement/life-kit.js" data-cost="7">
+        // ===== LV0 BASEMENT =====
+        // The life kit: lists of short-lived things (shot smoke, ripples, damage numbers, flashes, markers)
+        // that tick or age every frame and drop out when they're done.
+        //
+        //   lifeKit.sweep(list, (item, i) => done);   // walk the list, drop each item whose step returns true
+        //
+        // The walk goes from the end to the start, so dropping an item never skips the next one, and items
+        // added during the walk wait for the next one. Return nothing (or false) to keep an item.
+        const lifeKit = {
+            sweep (list, each) {
+                for (let i = list.length - 1; i >= 0; i--) if (each(list[i], i)) list.splice(i, 1);
             }
         };
     </script>
@@ -17591,7 +17606,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
 
     </script>
-    <script type="text/dfab" data-src="physics/collision.js" data-cost="590">
+    <script type="text/dfab" data-src="physics/collision.js" data-cost="589">
         // =====================================================================
         //  COLLISION SYSTEM (Unified Manager)
         // =====================================================================
@@ -17967,12 +17982,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
 
             static resolveProjectiles(game) {
-                for (let i = game.projectiles.length - 1; i >= 0; i--) {
-                    const p = game.projectiles[i];
+                lifeKit.sweep(game.projectiles, (p) => {
                     this.resolveProjectile(p, game);
                     if (p.life <= 0 && p.active) p.destroy();
-                    if (!p.active || p.markedForDestroy) game.projectiles.splice(i, 1);
-                }
+                    return !p.active || p.markedForDestroy;
+                });
             }
 
             static _processProjectiles(onScreen, game, candidates = null) {
@@ -29829,7 +29843,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
     </script>
-    <script type="text/dfab" data-src="entities/enemies.js" data-cost="1638">
+    <script type="text/dfab" data-src="entities/enemies.js" data-cost="1637">
         /**
          * =====================================================================
          *  VELVET CAT — Dreampunk Feline Companion
@@ -32469,11 +32483,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.active = false;
                 this.waveDelay = 0;
                 // Clean up
-                for (let i = game.enemies.length - 1; i >= 0; i--) {
-                    if (game.enemies[i]._gauntletWave) {
-                        game.enemies.splice(i, 1);
-                    }
-                }
+                lifeKit.sweep(game.enemies, (e) => e._gauntletWave);
                 this.hostiles = [];
                 if (this.wave > 0) {
                     showMessage(`GAUNTLET OVER — WAVE ${this.wave} — ${this.totalKills} KILLS`);
@@ -38553,7 +38563,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             return b;
         }
     </script>
-    <script type="text/dfab" data-src="buildings/moon-city.js" data-cost="599">
+    <script type="text/dfab" data-src="buildings/moon-city.js" data-cost="598">
         /* =====================================================================
            MOON CITY — the nightclub on the hub (style 'moon_city')
            ---------------------------------------------------------------------
@@ -39215,19 +39225,18 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     Q.out = now + 8 + Math.random() * 10;
                 }
                 let slot = 0;
-                for (let i = Q.people.length - 1; i >= 0; i--) {
-                    const p = Q.people[i];
+                lifeKit.sweep(Q.people, (p) => {
                     let tx, ty;
                     if (p.state === 'queue') { const s = G.queue[Math.min(G.queue.length - 1, Q.people.filter(o => o.state === 'queue').indexOf(p))]; tx = s[0]; ty = s[1]; slot++; p.life = Math.min(1, p.life + dt * 1.5); }
                     else if (p.state === 'enter') { tx = G.door.x; ty = G.door.y + 2; if (Math.hypot(tx - p.x, ty - p.y) < 8) p.life -= dt * 2; else p.life = Math.min(1, p.life + dt); }
                     else { tx = G.door.x; ty = G.court.y + G.court.h + 30; p.life = ty - p.y < 30 ? p.life - dt * 1.5 : Math.min(1, p.life + dt * 2); }
-                    if (p.life <= 0 && p.state !== 'queue') { Q.people.splice(i, 1); continue; }
+                    if (p.life <= 0 && p.state !== 'queue') return true;
                     const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy), sp = 1.1 * dt * 60;
                     let vx = 0, vy = 0;
                     if (d > 2) { vx = dx / d * Math.min(sp, d); vy = dy / d * Math.min(sp, d); p.x += vx; p.y += vy; p.angle = Math.atan2(vy, vx); p.look.pose = undefined; }
                     else { p.angle = p.state === 'queue' ? -Math.PI / 2 : p.angle; p.look.pose = pickFrom(seededRandom(p.look.skinColor + slot), ['idle', 'phone', 'fidget', 'breathe']); }
                     gaitCommand(p, vx, vy);
-                }
+                });
                 // the bouncer turns to whoever's at the front
                 const front = Q.people.find(o => o.state !== 'leave');
                 Q.bouncer.angle = front ? Math.atan2(front.y - Q.bouncer.y, front.x - Q.bouncer.x) : Math.PI / 2;
@@ -46247,7 +46256,7 @@ function createNeuralSystemsTiered(x, y, config = {}) {
             apron: { x: -40, y: 880, w: 430, h: 150 }   // the forecourt: paving, steps, beds, cypresses, the sign (SilverQueenBuilding._sqdPaintForecourt)
         });
     </script>
-    <script type="text/dfab" data-src="buildings/moon-city-deco.js" data-cost="729">
+    <script type="text/dfab" data-src="buildings/moon-city-deco.js" data-cost="728">
         /* =====================================================================
            MOON CITY — the nightclub, on the tiered kit
            ---------------------------------------------------------------------
@@ -46995,8 +47004,7 @@ function createNeuralSystemsTiered(x, y, config = {}) {
                 if (now > Q.next && queued.length) { queued[0].state = 'enter'; Q.next = now + (night ? 5 + Math.random() * 6 : 14); }
                 if (night && now > Q.out) { Q.people.push({ x: G.door.x, y: G.door.y + 4, angle: Math.PI / 2, walkPhase: 0, look: ROLE_LOOKS.clubgoer(seededRandom('mco' + Math.random())), life: 0, state: 'leave' }); Q.out = now + 8 + Math.random() * 10; }
                 let slot = 0;
-                for (let i = Q.people.length - 1; i >= 0; i--) {
-                    const p = Q.people[i];
+                lifeKit.sweep(Q.people, (p) => {
                     let tx, ty;
                     if (p.state === 'queue') { const s = G.queue[Math.min(G.queue.length - 1, Q.people.filter(o => o.state === 'queue').indexOf(p))]; tx = s[0]; ty = s[1]; slot++; p.life = Math.min(1, p.life + dt * 1.5); }
                     else if (p.state === 'enter') {                                                    // round the rope's head, then up the carpet
@@ -47004,13 +47012,13 @@ function createNeuralSystemsTiered(x, y, config = {}) {
                         if (Math.hypot(G.door.x - p.x, G.door.y + 2 - p.y) < 8) p.life -= dt * 2; else p.life = Math.min(1, p.life + dt);
                     }
                     else { tx = G.exit.x; ty = G.exit.y; p.life = ty - p.y < 30 ? p.life - dt * 1.5 : Math.min(1, p.life + dt * 2); }
-                    if (p.life <= 0 && p.state !== 'queue') { Q.people.splice(i, 1); continue; }
+                    if (p.life <= 0 && p.state !== 'queue') return true;
                     const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy), sp = 1.1 * dt * 60;
                     let vx = 0, vy = 0;
                     if (d > 2) { vx = dx / d * Math.min(sp, d); vy = dy / d * Math.min(sp, d); p.x += vx; p.y += vy; p.angle = Math.atan2(vy, vx); p.look.pose = undefined; }
                     else { p.angle = p.state === 'queue' ? -Math.PI / 2 : p.angle; p.look.pose = pickFrom(seededRandom(p.look.skinColor + slot), ['idle', 'phone', 'fidget', 'breathe']); }
                     gaitCommand(p, vx, vy);
-                }
+                });
                 const front = Q.people.find(o => o.state !== 'leave');
                 Q.bouncer.angle = front ? Math.atan2(front.y - Q.bouncer.y, front.x - Q.bouncer.x) : Math.PI / 2;
                 Q.bouncer.look.pose = 'arms_crossed';
@@ -54403,7 +54411,7 @@ Object.assign(TrafficVehicle.prototype, {
             },
         });
     </script>
-    <script type="text/dfab" data-src="traffic/traffic-signals.js" data-cost="327">
+    <script type="text/dfab" data-src="traffic/traffic-signals.js" data-cost="326">
         // ============================================================================
         //  JUNCTION LIGHTS — demand-gauged signals, one set per crossing of two roads
         // ============================================================================
@@ -54505,10 +54513,7 @@ Object.assign(TrafficVehicle.prototype, {
             update() {
                 const now = _simTick, ix = this.ix, occ = ix.occupants;
                 // Off the list: anyone gone, or who moved on without saying and isn't in the box
-                for (let i = occ.length - 1; i >= 0; i--) {
-                    const o = occ[i];
-                    if (o.dead || o.markedForDestroy || (o.currentIntersection !== ix && !ix.isVehicleInside(o))) occ.splice(i, 1);
-                }
+                lifeKit.sweep(occ, (o) => o.dead || o.markedForDestroy || (o.currentIntersection !== ix && !ix.isVehicleInside(o)));
 
                 // The gauges
                 const dem = this.demand, load = this.load, cnt = this._cnt || (this._cnt = [0, 0, 0, 0]);
@@ -73094,7 +73099,7 @@ Object.assign(TrafficVehicle.prototype, {
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/combat-effects.js" data-cost="456">
+    <script type="text/dfab" data-src="engine/combat-effects.js" data-cost="455">
         // GameEngine — Screen shake, time slow, death, resize, firing, boosters, player damage.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         const _muzzleStars = new Map();
@@ -73322,17 +73327,17 @@ Object.assign(TrafficVehicle.prototype, {
                 const F = this.shotFx;
                 if (!F || !F.length) return;
                 const W = this.weather && this.weather.windVec ? this.weather.windVec : { x: 0, y: 0 };
-                for (let i = F.length - 1; i >= 0; i--) {
-                    const p = F[i]; p.t++;
-                    if (p.t <= 0) continue;                                              // (a smoke puff still waiting its turn)
-                    if (p.t > p.life) { F.splice(i, 1); continue; }
+                lifeKit.sweep(F, (p) => {
+                    p.t++;
+                    if (p.t <= 0) return;                                              // (a smoke puff still waiting its turn)
+                    if (p.t > p.life) return true;
                     if (p.k === 'smoke' || p.k === 'wisp') {                             // drifts downwind, curls, swells
                         p.vx = p.vx * 0.94 + W.x * 0.012 + Math.cos(p.t * 0.15 + p.ph) * 0.03;
                         p.vy = p.vy * 0.94 + W.y * 0.012 + Math.sin(p.t * 0.15 + p.ph) * 0.03;
                         p.r += p.k === 'smoke' ? 0.055 : 0.14;
                     } else { p.vx *= 0.93; p.vy *= 0.93; p.vx += W.x * 0.004; p.vy += W.y * 0.004; }
                     p.x += p.vx; p.y += p.vy;
-                }
+                });
             },
             /** Barrel smoke and wisps (soft, normal blend), then embers and gold dust (additive). After the muzzle stars. */
             drawShotFx(ctx, cb) {
@@ -74228,7 +74233,7 @@ engineMixin({
     }
 });
     </script>
-    <script type="text/dfab" data-src="engine/combat-fx.js" data-cost="130">
+    <script type="text/dfab" data-src="engine/combat-fx.js" data-cost="129">
         // GameEngine — Combat feedback: what a hit looks like. Every hit that lands
         // (ActorEntity.takeDamage) comes through onActorHit: a floating damage number,
         // the target's health bar, blood in the character's own colour, and a flinch.
@@ -74393,20 +74398,20 @@ engineMixin({
                 if (!texts || !texts.length) return;
                 ctx.save();
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
-                for (let i = texts.length - 1; i >= 0; i--) {
-                    const t = texts[i], age = now - t.t0;
+                lifeKit.sweep(texts, (t) => {
+                    const age = now - t.t0;
                     const life = t.big ? 1.6 : t.crit ? 1.1 : 0.85;
-                    if (age > life || age < -1) { texts.splice(i, 1); continue; }
+                    if (age > life || age < -1) return true;
                     if (t.target && !t.target.dead) { t.x = t.target.x; t.y = t.target.y - 16; }
                     const x = t.x + t.drift * age * 14, y = t.y - age * 30;
-                    if (!inView(x, y)) continue;
+                    if (!inView(x, y)) return;
                     const pop = Math.max(0, 1 - (now - t.pop) / 0.12);
                     ctx.globalAlpha = 1 - Math.pow(age / life, 2);
                     ctx.font = `bold ${Math.round((t.big ? 10 : t.bleed ? 8 : t.crit ? 15 : 11) + pop * (t.bleed ? 1 : t.crit ? 9 : 4) + Math.min(5, t.value / 20))}px Orbitron, sans-serif`;
                     const s = t.text || String(Math.round(t.value)) + (t.crit ? '!' : '');
                     ctx.lineWidth = t.crit ? 4 : 3; ctx.strokeStyle = t.crit ? 'rgba(90, 10, 0, 0.85)' : 'rgba(0,0,0,0.75)'; ctx.strokeText(s, x, y);
                     ctx.fillStyle = t.color; ctx.fillText(s, x, y);
-                }
+                });
                 ctx.restore();
             },
         });
@@ -75003,7 +75008,7 @@ engineMixin({
             /** Ripples grow to their reach and fade over half a second. */
             updateNoiseRipples() {
                 const R = this.noiseRipples; if (!R || !R.length) return;
-                for (let i = R.length - 1; i >= 0; i--) if ((R[i].t += 1 / 30) >= 1) R.splice(i, 1);
+                lifeKit.sweep(R, (r) => (r.t += 1 / 30) >= 1);
             },
 
             /** The ring's progress this frame: blended between ticks so it glides at any refresh rate */
@@ -75110,7 +75115,7 @@ engineMixin({
             },
         });
     </script>
-    <script type="text/dfab" data-src="world/map-edge.js" data-cost="134">
+    <script type="text/dfab" data-src="world/map-edge.js" data-cost="133">
         /* =====================================================================
            THE VEIL — the edge of an outdoor map. The city doesn't stop in black: past
            its last stretch the dimension thins out into a deep indigo void of drifting
@@ -75287,15 +75292,15 @@ engineMixin({
                     if (fn < 26 && moved && t - (st[id + 'T'] || -9) > E.RIPPLE_EVERY && R.length < 6) { R.push({ id, u: fu, t0: t }); st[id + 'T'] = t; }
                 }
                 const R = this._edgeRipples;
-                if (R && R.length) for (let i = R.length - 1; i >= 0; i--) {
-                    const r = R[i], age = t - r.t0;
-                    if (age > E.RIPPLE_LIFE || age < 0) { R.splice(i, 1); continue; }
-                    if (r.id !== id) continue;
+                if (R && R.length) lifeKit.sweep(R, (r) => {
+                    const age = t - r.t0;
+                    if (age > E.RIPPLE_LIFE || age < 0) return true;
+                    if (r.id !== id) return;
                     const k = 1 - age / E.RIPPLE_LIFE, d = 20 + age * E.RIPPLE_SPEED;
                     ctx.globalAlpha = 0.55 * k * k; drawGlow(ctx, r.u, 0, 40 + 40 * (1 - k), '214, 196, 255', 0);
                     ctx.globalAlpha = 0.85 * k;
                     drawGlow(ctx, r.u - d, 0, 22, '241, 232, 254', 0.3); drawGlow(ctx, r.u + d, 0, 22, '241, 232, 254', 0.3);
-                }
+                });
                 ctx.restore();
             }
         });
@@ -75360,7 +75365,7 @@ engineMixin({
 
             updateCorpses() {
                 const C = this.corpses; if (!C || !C.length) return;
-                for (let i = C.length - 1; i >= 0; i--) if (_gameTimeSec - C[i].t0 > FINISHER.LIE + FINISHER.FADE) C.splice(i, 1);
+                lifeKit.sweep(C, (c) => _gameTimeSec - c.t0 > FINISHER.LIE + FINISHER.FADE);
             },
 
             /**
@@ -75513,7 +75518,7 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/reflections.js" data-cost="899">
+    <script type="text/dfab" data-src="engine/reflections.js" data-cost="898">
         // GameEngine — Reflections. Methods are added to GameEngine.prototype
         // (see engineMixin in game-engine.js).
         //
@@ -76652,7 +76657,7 @@ engineMixin({
              */
             updatePuddles() {
                 const R = this._ripples || (this._ripples = []);
-                for (let i = R.length - 1; i >= 0; i--) if (++R[i].t >= R[i].life) R.splice(i, 1);
+                lifeKit.sweep(R, (r) => ++r.t >= r.life);
                 const wet = this._wetHere(), surf = this._surfaces();
                 if (!this.reflectQuality() || !this.view) return;
                 // the fountains and pools stir by themselves
@@ -77216,16 +77221,16 @@ engineMixin({
                     // where she steps on it, a ring of light runs out from her feet
                     const R = q._ripples || (q._ripples = []);
                     if (p && Math.hypot(p.x - q.x, p.y - q.y) < q.r && !(t - (q._rippleAt || -1e9) < P.RIPPLE_EVERY)) { R.push({ x: p.x, y: p.y, t0: t }); q._rippleAt = t; }
-                    for (let i = R.length - 1; i >= 0; i--) {
-                        const w = R[i], age = t - w.t0, a = 1 - age / P.RIPPLE_LIFE;
-                        if (a <= 0 || age < 0) { R.splice(i, 1); continue; }
+                    lifeKit.sweep(R, (w) => {
+                        const age = t - w.t0, a = 1 - age / P.RIPPLE_LIFE;
+                        if (a <= 0 || age < 0) return true;
                         const rad = age * q.r * P.RIPPLE_SPEED;
                         ctx.save();
                         ctx.beginPath(); ctx.arc(w.x, w.y, rad + P.RIPPLE_BAND, 0, _PTAU); ctx.arc(w.x, w.y, Math.max(0, rad - P.RIPPLE_BAND), 0, _PTAU, true); ctx.clip();
                         ctx.globalAlpha = night * a;
                         ctx.drawImage(G.cv, gx, gy); ctx.drawImage(G.cv, gx, gy);
                         ctx.restore();
-                    }
+                    });
                 }
                 ctx.restore();
             }
@@ -77337,7 +77342,7 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/status-effects.js" data-cost="371">
+    <script type="text/dfab" data-src="engine/status-effects.js" data-cost="369">
         // GameEngine — Status effects and melee. Methods are added to GameEngine.prototype (see
         // engineMixin in game-engine.js).
         //
@@ -77707,13 +77712,8 @@ engineMixin({
 
             /** Golden Child burns once per simulation tick, after projectile hits attach or refresh orbs. */
             updateStickyOrbs() {
-                for (let i = this.stickyOrbs.length - 1; i >= 0; i--) {
-                    const orb = this.stickyOrbs[i];
-
-                    if (!orb.target || orb.target.dead || orb.ticksLeft <= 0) {
-                        this.stickyOrbs.splice(i, 1);
-                        continue;
-                    }
+                lifeKit.sweep(this.stickyOrbs, (orb) => {
+                    if (!orb.target || orb.target.dead || orb.ticksLeft <= 0) return true;
 
                     orb.tickTimer++;
                     if (orb.tickTimer >= orb.tickInterval) {
@@ -77730,7 +77730,7 @@ engineMixin({
                             );
                         }
                     }
-                }
+                });
             },
 
             /** Damage that reaches her mid-swing (a blade drawn and moving) is cut to BLADE_PERKS.GUARD of itself */
@@ -78780,7 +78780,7 @@ engineMixin({
             drawPoolRipples(ctx, cull) {
                 const L = this.poolRings; if (!L || !L.length) return;
                 const map = this.activeMap, now = _gameTimeSec;
-                for (let i = L.length - 1; i >= 0; i--) if (now - L[i].t0 > POOL.RING_LIFE) L.splice(i, 1);
+                lifeKit.sweep(L, (r) => now - r.t0 > POOL.RING_LIFE);
                 ctx.save();
                 ctx.lineWidth = 1.1;
                 for (const f of L) {
@@ -79161,9 +79161,9 @@ engineMixin({
 
                 if (this.dbg('hearing') && this._dbgNoises) {
                     const N = this._dbgNoises, now = _gameTimeSec;
-                    for (let i = N.length - 1; i >= 0; i--) {
-                        const n = N[i], age = now - n.t;
-                        if (age > 2.5) { N.splice(i, 1); continue; }
+                    lifeKit.sweep(N, (n) => {
+                        const age = now - n.t;
+                        if (age > 2.5) return true;
                         const a = 1 - age / 2.5;
                         ctx.strokeStyle = DEBUG_COLOUR.hearing; ctx.globalAlpha = 0.55 * a;
                         ctx.setLineDash([5 * px, 5 * px]);
@@ -79173,7 +79173,7 @@ engineMixin({
                         for (const h of n.heard) { ctx.beginPath(); ctx.moveTo(n.x, n.y); ctx.lineTo(h.x, h.y); ctx.stroke(); }
                         ctx.globalAlpha = a;
                         label(`${n.kind || 'noise'} ${n.reach} · heard ${n.heard.length}`, n.x, n.y - 14 * px, DEBUG_COLOUR.hearing);
-                    }
+                    });
                     ctx.globalAlpha = 1;
                 }
 
@@ -82224,7 +82224,7 @@ engineMixin({
 
         });
     </script>
-    <script type="text/dfab" data-src="engine/save-load.js" data-cost="514">
+    <script type="text/dfab" data-src="engine/save-load.js" data-cost="513">
         // GameEngine — Save schema, migrations, saveGame / loadGame.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
                 const AUTOSAVE_KEY = 'dfab_save_slot_auto';   // written when the app goes to the background (onPageHidden)
@@ -82768,9 +82768,7 @@ engineMixin({
                     const savedTeammates = save.teammates || rawSave.teammates || [];
                     
                     // First, clear any existing contract companions
-                    for (let i = this.teammates.length - 1; i >= 0; i--) {
-                        if (this.teammates[i].hireType === 'contract') this.teammates.splice(i, 1);
-                    }
+                    lifeKit.sweep(this.teammates, (tm) => tm.hireType === 'contract');
                     
                     savedTeammates.forEach(savedTm => {
                         if (savedTm.hireType === 'contract' && savedTm.hired) {
@@ -86319,7 +86317,7 @@ engineMixin({
             },
         });
     </script>
-    <script type="text/dfab" data-src="engine/update.js" data-cost="831">
+    <script type="text/dfab" data-src="engine/update.js" data-cost="828">
         // GameEngine — The per-tick simulation (update) and traffic collision helpers.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         /** Props you can use, and what the action pill says for them: type → [verb, name, name from the prop's own label].
@@ -86383,10 +86381,7 @@ engineMixin({
                 this.profiler.start('Logic:Systems');
                 
                 // Cleanup old muzzle flashes
-                for(let i=this.muzzleFlashes.length-1; i>=0; i--) {
-                    this.muzzleFlashes[i].life--;
-                    if(this.muzzleFlashes[i].life <= 0) this.muzzleFlashes.splice(i, 1);
-                }
+                lifeKit.sweep(this.muzzleFlashes, (f) => --f.life <= 0);
                 this.updateCasings();
                 this.updateCorpses();
                 this.updateStatuses();                                 // bleeding and the rest (engine/status-effects.js)
@@ -86907,10 +86902,7 @@ engineMixin({
                 });
                 } // end bumper minigame guard
                 // Ghosts/Markers
-                for (let i = this.lastKnownMarkers.length - 1; i >= 0; i--) {
-                    this.lastKnownMarkers[i].update();
-                    if (!this.lastKnownMarkers[i].active) this.lastKnownMarkers.splice(i, 1);
-                }
+                lifeKit.sweep(this.lastKnownMarkers, (m) => { m.update(); return !m.active; });
             
                 // Enemies (Gangers, Bosses)
                 let trafficCars = null;                                         // the cars they dodge: one list a tick, shared (read only)
@@ -91118,9 +91110,9 @@ engineMixin({
             drawHunterDashes(ctx) {
                 const L = this.hunterDashes; if (!L || !L.length) return;
                 const now = _gameTimeSec;
-                for (let i = L.length - 1; i >= 0; i--) {
-                    const D = L[i], age = now - D.t0;
-                    if (age > 0.6) { L.splice(i, 1); continue; }
+                lifeKit.sweep(L, (D) => {
+                    const age = now - D.t0;
+                    if (age > 0.6) return true;
                     const k = 1 - age / 0.6;
                     // the ghost: a silhouette in crimson, fading
                     ctx.save(); ctx.globalAlpha = 0.45 * k; ctx.fillStyle = D.boss ? '#ff2a4a' : '#c0142e';
@@ -91140,7 +91132,7 @@ engineMixin({
                         ctx.lineTo(D.x1, D.y1); ctx.stroke();
                     }
                     ctx.restore();
-                }
+                });
             },
 
             /** After the darkness: hunters' eyes burn ember (night vision's tell) */
@@ -91864,7 +91856,7 @@ engineMixin({
     }
 });
     </script>
-    <script type="text/dfab" data-src="engine/keeper-art.js" data-cost="339">
+    <script type="text/dfab" data-src="engine/keeper-art.js" data-cost="338">
         // GameEngine — the Keeper's hill and parlor (the prologue's fireside). Scene-only places:
         // everything is painted here, with no props to bump into.
         //   keepers_hill   a lone hill above a sea of clouds, deep green with pink flowers, the house at the top
@@ -92215,11 +92207,11 @@ engineMixin({
                     glow(450, 84, 26, '255, 90, 30', 0.35);
                     // Sparks from a popped ember
                     const S = this._keeperSparks || [];
-                    for (let i = S.length - 1; i >= 0; i--) {
-                        const p = S[i]; p.x += p.vx; p.y += p.vy; p.vy *= 0.97; p.vx *= 0.98; p.life--;
-                        if (p.life <= 0) { S.splice(i, 1); continue; }
+                    lifeKit.sweep(S, (p) => {
+                        p.x += p.vx; p.y += p.vy; p.vy *= 0.97; p.vx *= 0.98; p.life--;
+                        if (p.life <= 0) return true;
                         glow(p.x, p.y, 4, '255, 200, 110', Math.min(1, p.life / 25));
-                    }
+                    });
                     if (this._keeperSurge) this._keeperSurge = Math.max(0, this._keeperSurge - 0.012);
                     // Candles
                     for (const [x, y] of [[374, 40], [526, 40], [96, 618], [564, 200]]) glow(x, y, 16, '255, 200, 130', 0.35 * (0.85 + 0.15 * Math.sin(t * 9 + x)));
