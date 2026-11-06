@@ -5868,7 +5868,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'b3bd8660dbe5';
+        const DFAB_BUILD = 'b8f4fe4e241d';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="26">
         // ===== LV0 BASEMENT =====
@@ -7394,6 +7394,66 @@
         }
 
 
+    </script>
+    <script type="text/dfab" data-src="basement/ui-kit.js" data-cost="29">
+        // ===== LV0 BASEMENT =====
+        // The UI kit: building and showing DOM panels, and nothing about any game. The HUD, menus and
+        // phone apps are this game's own (Directory); the kit is what they're built with.
+        //
+        // EL PACKET: [tag, className, text]   a new element; leave out what you don't set
+        //   tag               'div', 'span', 'button' ...
+        //   className         its class (set even when empty, as an assignment would)
+        //   text              its textContent
+        //
+        // A REF is an element or an element's id. show / hide also take a list of refs. A ref that
+        // finds nothing is skipped.
+        //
+        //   const row = uiKit.make(['div', 'msg-sec', 'Pinned'], list);   // made, filled and appended
+        //   uiKit.show('map-interface');            // display: block
+        //   uiKit.show(this.interactBtn, 'flex');   // or any display value
+        //   uiKit.hide(['inventory-list-container', 'stats-container']);
+        //   uiKit.toggle(el, on, 'flex');           // shown as flex when on, hidden when not
+        //   if (uiKit.isShown(this.dialogueBox)) ...
+        const uiKit = {
+            /** The element for a ref (an element, or an id). */
+            find (ref) {
+                return typeof ref === 'string' ? document.getElementById(ref) : ref;
+            },
+
+            /** A new element from a packet, appended to `parent` when one is given. */
+            make (el_packet, parent) {
+                const e = document.createElement(el_packet[0]);
+                if (el_packet.length > 1) e.className = el_packet[1];
+                if (el_packet.length > 2) e.textContent = el_packet[2];
+                if (parent) parent.appendChild(e);
+                return e;
+            },
+
+            /** Show a ref (or a list of refs) with a display value: 'block' unless told, '' to fall back to the stylesheet. */
+            show (refs, display = 'block') {
+                if (Array.isArray(refs)) { for (const r of refs) this.show(r, display); return; }
+                const e = this.find(refs);
+                if (e) e.style.display = display;
+            },
+
+            /** Hide a ref (or a list of refs). */
+            hide (refs) {
+                if (Array.isArray(refs)) { for (const r of refs) this.hide(r); return; }
+                const e = this.find(refs);
+                if (e) e.style.display = 'none';
+            },
+
+            /** Show (with `display`) when `on`, hide when not. */
+            toggle (refs, on, display = 'block') {
+                if (on) this.show(refs, display); else this.hide(refs);
+            },
+
+            /** Is it shown? (Not hidden with display: none.) */
+            isShown (ref) {
+                const e = this.find(ref);
+                return !!e && e.style.display !== 'none';
+            }
+        };
     </script>
     <script type="text/dfab" data-src="core/config.js" data-cost="406">
 
@@ -65738,9 +65798,7 @@ Object.assign(TrafficVehicle.prototype, {
                 const sig = document.createElement('span');
                 sig.className = 'comm-sig'; sig.innerHTML = '<i></i><i></i><i></i>';
                 name.appendChild(sig);
-                const line = document.createElement('div');
-                line.className = 'comm-text';
-                line.textContent = text;
+                const line = uiKit.make(['div', 'comm-text', text]);
                 body.append(name, line);
                 chip.append(face, body);
                 bar.appendChild(chip);
@@ -68107,7 +68165,7 @@ Object.assign(TrafficVehicle.prototype, {
         }
 
     </script>
-    <script type="text/dfab" data-src="ui/inventory-augments.js" data-cost="564">
+    <script type="text/dfab" data-src="ui/inventory-augments.js" data-cost="561">
         /* =====================================================================
            INVENTORY SYSTEM
            ---------------------------------------------------------------------
@@ -68678,8 +68736,7 @@ Object.assign(TrafficVehicle.prototype, {
             }
 
             _renderEntry(entry) {
-                const el = document.createElement('div');
-                el.className = `ui-pill type-${entry.type}${entry.isEquipped ? ' active-item' : ''}`;
+                const el = uiKit.make(['div', `ui-pill type-${entry.type}${entry.isEquipped ? ' active-item' : ''}`]);
                 el.dataset.id = entry.id;
                 el.dataset.source = entry.source;
                 el.dataset.category = entry.category;
@@ -68717,10 +68774,8 @@ Object.assign(TrafficVehicle.prototype, {
 
                 const qty = document.createElement('div');
                 qty.className = 'pill-qty';
-                const qtyLabel = document.createElement('span');
-                qtyLabel.className = 'pill-qty-label'; qtyLabel.textContent = 'QTY';
-                const qtyValue = document.createElement('span');
-                qtyValue.className = 'pill-qty-value'; qtyValue.textContent = String(entry.quantity ?? entry.item?.quantity ?? 1);
+                const qtyLabel = uiKit.make(['span', 'pill-qty-label', 'QTY']);
+                const qtyValue = uiKit.make(['span', 'pill-qty-value', String(entry.quantity ?? entry.item?.quantity ?? 1)]);
                 qty.append(qtyLabel, qtyValue);
                 el.appendChild(qty);
 
@@ -68947,8 +69002,7 @@ Object.assign(TrafficVehicle.prototype, {
                 for (const [category, label] of Object.entries(labels)) {
                     const group = this._ordered(entries.filter(entry => entry.category === category));
                     if (!group.length) continue;
-                    const heading = document.createElement('h2');
-                    heading.className = 'inventory-section-title';
+                    const heading = uiKit.make(['h2', 'inventory-section-title']);
                     heading.dataset.category = category;
                     heading.textContent = `${label} · ${group.length}`;
                     this.uiList.appendChild(heading);
@@ -70163,7 +70217,7 @@ Object.assign(TrafficVehicle.prototype, {
                 g.pauseSystem.acquire('dialogue');
                 g.dialogueBox.style.display = 'block';
                 g.dialogueBox.classList.remove('peeking');
-                document.getElementById('dialogue-caption').style.display = 'none';
+                uiKit.hide('dialogue-caption');
 
                 g.btnAccept.textContent = options.continueText || 'Continue ▶';
                 g.btnAccept.style.display = '';
@@ -70755,7 +70809,7 @@ Object.assign(TrafficVehicle.prototype, {
             }
         };
     </script>
-    <script type="text/dfab" data-src="ui/cinematic-dialogue.js" data-cost="199">
+    <script type="text/dfab" data-src="ui/cinematic-dialogue.js" data-cost="197">
         /* =====================================================================
            CINEMATIC DIALOGUE — how scenes look (styles/cinematic.css)
            ---------------------------------------------------------------------
@@ -70931,14 +70985,14 @@ Object.assign(TrafficVehicle.prototype, {
                 const ch = this.choice = { picked: -1, timer: opts.timer || 0, left: opts.timer || 0, def: opts.def ?? 0 };
                 this.choicesEl.innerHTML = '';
                 options.forEach((o, i) => {
-                    const row = document.createElement('button'); row.className = 'cine-choice';
+                    const row = uiKit.make(['button', 'cine-choice']);
                     const weighty = (opts.weighty || []).includes(i);
                     row.innerHTML = `<b>${i + 1}</b><span></span>${weighty ? '<i>◆</i>' : ''}`;
                     row.querySelector('span').textContent = o;
                     row.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); this._pick(i); });
                     this.choicesEl.appendChild(row);
                 });
-                if (ch.timer) { const bar = document.createElement('div'); bar.className = 'cine-timer'; bar.innerHTML = '<i></i>'; this.choicesEl.appendChild(bar); ch.bar = bar.firstChild; }
+                if (ch.timer) { const bar = uiKit.make(['div', 'cine-timer']); bar.innerHTML = '<i></i>'; this.choicesEl.appendChild(bar); ch.bar = bar.firstChild; }
                 this.choicesEl.classList.add('show');
                 this.tapEl.classList.remove('on');
                 return { done: () => ch.picked >= 0, value: () => ch.picked };
@@ -70957,8 +71011,8 @@ Object.assign(TrafficVehicle.prototype, {
                 this._build();
                 this.cardEl.innerHTML = '';
                 this.cardEl.className = opts.style ? 'show ' + opts.style : 'show';
-                const els = lines.map(t => { const d = document.createElement('div'); d.className = t === '' ? 'gap' : 'ln'; d.textContent = t; this.cardEl.appendChild(d); return d; });
-                if (opts.sign) { const s = document.createElement('div'); s.className = 'sign'; s.textContent = opts.sign; this.cardEl.appendChild(s); els.push(s); }
+                const els = lines.map(t => uiKit.make(['div', t === '' ? 'gap' : 'ln', t], this.cardEl));
+                if (opts.sign) els.push(uiKit.make(['div', 'sign', opts.sign], this.cardEl));
                 const hint = document.createElement('div'); hint.className = 'hint'; hint.textContent = 'tap to continue'; this.cardEl.appendChild(hint);
                 const S = this.cardS = { els, i: 0, t: 0, every: opts.every || 70, hold: opts.hold || 0, held: 0, out: 0, done: false, hint };
                 this.tapped = false;
@@ -79461,7 +79515,7 @@ engineMixin({
             },
         });
     </script>
-    <script type="text/dfab" data-src="engine/tuning-ui.js" data-cost="117">
+    <script type="text/dfab" data-src="engine/tuning-ui.js" data-cost="116">
         // GameEngine — Resonance on screen: the HUD meter, Dr. Yin's tuning overlay, the
         // SKILLS screen, and applying installed ranks to 949's stats (see core/resonance.js).
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
@@ -79562,7 +79616,7 @@ engineMixin({
             },
 
             closeTuning() {
-                document.getElementById('tuning-overlay').style.display = 'none';
+                uiKit.hide('tuning-overlay');
                 this.pauseSystem.release('tuning');
                 this._tuneReveal = null;
             },
@@ -79605,7 +79659,7 @@ engineMixin({
             },
         });
     </script>
-    <script type="text/dfab" data-src="engine/shops-menus.js" data-cost="354">
+    <script type="text/dfab" data-src="engine/shops-menus.js" data-cost="353">
         // GameEngine — Vending, garage, auto shop, Zib rides, sleep menu.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -79642,7 +79696,7 @@ engineMixin({
             },
             
             closeVendingMenu() {
-                document.getElementById('vending-menu').style.display = 'none';
+                uiKit.hide('vending-menu');
                 this.pauseSystem.release('vending');
             },
             
@@ -80007,7 +80061,7 @@ engineMixin({
             },
 
             closeGauntletMenu() {
-                document.getElementById('gauntlet-menu').style.display = 'none';
+                uiKit.hide('gauntlet-menu');
                 this.pauseSystem.release('gauntlet_menu');
             },
 
@@ -80698,7 +80752,7 @@ engineMixin({
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/screens-ui.js" data-cost="980">
+    <script type="text/dfab" data-src="engine/screens-ui.js" data-cost="979">
         // GameEngine — HUD update, dialogue and portraits, shops, character/team/story/collection screens, notes, crafting.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -80842,7 +80896,7 @@ engineMixin({
                         this.npcNameEl.textContent = entity.name;
                         this.npcNameEl.style.color = SPEAKER_COLORS[entity.name] || '#ff0055';
                         this.renderDialoguePortrait(entity.name);
-                        document.getElementById('dialogue-caption').style.display = 'none';
+                        uiKit.hide('dialogue-caption');
                         const cooldownLines = {
                             'Victoria': "We already talked. Go shoot something.",
                             'Yenna': "We've spoken. I'll be here.",
@@ -80867,7 +80921,7 @@ engineMixin({
                 this.npcNameEl.style.color = SPEAKER_COLORS[entity.name] || '#ff0055';
                 
                 // 1. HIDE RANDOM CAPTIONS (Cleanup the screen)
-                document.getElementById('dialogue-caption').style.display = 'none';
+                uiKit.hide('dialogue-caption');
                 
                 // 2. Track Meeting (For Phone Contacts)
                 if (typeof phoneSystem !== 'undefined') {
@@ -81179,7 +81233,7 @@ engineMixin({
                 this.dialogueBox.style.display = 'none'; 
                 
                 // 1. RESTORE RANDOM CAPTIONS
-                document.getElementById('dialogue-caption').style.display = 'block';
+                uiKit.show('dialogue-caption');
                 
                 // 2. RESTORE DIALOGUE BUTTON DEFAULTS
                 this.btnAccept.textContent = 'Accept';
@@ -94257,7 +94311,7 @@ engineMixin({
             },
         });
     </script>
-    <script type="text/dfab" data-src="directory/world-session.js" data-cost="71">
+    <script type="text/dfab" data-src="directory/world-session.js" data-cost="69">
         // ===== LV2 DIRECTORY =====
         // GameEngine: the game's session flow. Menu -> world (enterWorld, the loading screen steps, loading a
         // save from the menu) and world -> menu (stop). Game-specific: it knows this game's DOM, audio and
@@ -94269,8 +94323,8 @@ engineMixin({
                 if (this.running) return;                                      // a second tap during the fade: one loop only
                 if (typeof audioSys !== 'undefined') audioSys.wake();
                 const ttb = document.getElementById('tap-to-begin'); if (ttb) ttb.remove();
-                document.getElementById('ui-layer').style.display = 'none';
-                document.getElementById('game-container').style.display = 'block';
+                uiKit.hide('ui-layer');
+                uiKit.show('game-container');
                 this.running = true;
                 this.loop();
             },
@@ -94356,8 +94410,8 @@ engineMixin({
                 if (this.musicWidget && this.musicWidget.isPlaying) this.musicWidget.togglePlay(false);
                 if (this.dialogueBox && this.dialogueBox.style.display !== 'none') this.endDialogue();
                 this.pauseSystem.clear();
-                document.getElementById('game-container').style.display = 'none'; 
-                document.getElementById('ui-layer').style.display = 'flex'; 
+                uiKit.hide('game-container'); 
+                uiKit.show('ui-layer', 'flex'); 
                 document.getElementById('main-menu').style.opacity = '1'; 
                 document.getElementById('main-menu-list').classList.remove('hidden'); 
                 document.getElementById('story-mode-list').classList.add('hidden');
@@ -94530,7 +94584,7 @@ engineMixin({
         document.getElementById('btn-exit').addEventListener('click', () => showMessage("TERMINATING SESSION"));
         
     </script>
-    <script type="text/dfab" data-src="ui/phone.js" data-cost="766">
+    <script type="text/dfab" data-src="ui/phone.js" data-cost="765">
         /* --- PHONE SYSTEM --- */
         const phoneSystem = {
             overlay: document.getElementById('phone-overlay'),
@@ -94999,7 +95053,7 @@ engineMixin({
                 this.currentApp = 'maps';
                 this.broadcast('APP_OPENED', { app: 'maps' }); // Report Event
                 this.homeScreen.style.display = 'none';
-                document.getElementById('screen-maps').style.display = 'flex';
+                uiKit.show('screen-maps', 'flex');
                 this.mapView.zoom = 1.2; this.mapView.offsetX = 0; this.mapView.offsetY = 0;
                 this.drawMap(true); 
             },
@@ -95039,13 +95093,13 @@ engineMixin({
                 ctx.fillText(`${this.mapView.zoom.toFixed(1)}×`, 28 * D, canvas.height - 14 * D);
             },
             
-            showHelp() { this.currentApp = 'help'; this.homeScreen.style.display = 'none'; document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none'); document.getElementById('screen-help').style.display = 'flex'; },
+            showHelp() { this.currentApp = 'help'; this.homeScreen.style.display = 'none'; document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none'); uiKit.show('screen-help', 'flex'); },
 
             showSkyMe() {
                 this.currentApp = 'skyme';
                 this.homeScreen.style.display = 'none';
                 document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
-                document.getElementById('screen-skyme').style.display = 'flex';
+                uiKit.show('screen-skyme', 'flex');
                 this._renderSkyMe();
             },
 
@@ -95226,7 +95280,7 @@ engineMixin({
                 this.currentApp = 'log';
                 this.homeScreen.style.display = 'none';
                 document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
-                document.getElementById('screen-log').style.display = 'flex';
+                uiKit.show('screen-log', 'flex');
                 this._renderLog();
             },
 
@@ -95438,7 +95492,7 @@ engineMixin({
                 this.currentApp = 'carme';
                 this.homeScreen.style.display = 'none';
                 document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
-                document.getElementById('screen-carme').style.display = 'flex';
+                uiKit.show('screen-carme', 'flex');
 
                 const container = document.getElementById('carme-content'), G = game.garage;
                 const isIndoor = game.activeMap.type === 'indoor';
@@ -95544,7 +95598,7 @@ engineMixin({
         // --- NEU.ME APP LOGIC ---
         document.getElementById('app-neume').addEventListener('click', () => {
             phoneSystem.homeScreen.style.display = 'none';
-            document.getElementById('screen-neume').style.display = 'flex';
+            uiKit.show('screen-neume', 'flex');
             updateNeumeUI();
         });
         
@@ -95809,7 +95863,7 @@ engineMixin({
         });
         
     </script>
-    <script type="text/dfab" data-src="ui/app-launch.js" data-cost="109">
+    <script type="text/dfab" data-src="ui/app-launch.js" data-cost="108">
         /* =====================================================================
            APP LAUNCH: phone apps grow out of the icon you tapped
            ---------------------------------------------------------------------
@@ -95925,14 +95979,12 @@ engineMixin({
                 host.querySelectorAll('.app-splash').forEach(e => e.remove());
                 const acc = this.ACCENT[icon.id] || '#e8c27a';
                 const glyph = icon.querySelector('.phone-app-icon-circle'), name = icon.querySelector('.phone-app-name');
-                const sp = document.createElement('div');
-                sp.className = 'app-splash';
+                const sp = uiKit.make(['div', 'app-splash']);
                 sp.style.setProperty('--acc', acc);
                 const tile = document.createElement('div');
                 tile.className = 'as-tile';
                 if (glyph) glyph.childNodes.forEach(n => { if (!(n.classList && n.classList.contains('app-badge'))) tile.appendChild(n.cloneNode(true)); });
-                const label = document.createElement('div');
-                label.className = 'as-name'; label.textContent = name ? name.textContent : '';
+                const label = uiKit.make(['div', 'as-name', name ? name.textContent : '']);
                 const line = document.createElement('div');
                 line.className = 'as-line';
                 sp.append(tile, label, line);
@@ -95958,7 +96010,7 @@ engineMixin({
             else AppLaunch.init();
         }
     </script>
-    <script type="text/dfab" data-src="ui/messages.js" data-cost="896">
+    <script type="text/dfab" data-src="ui/messages.js" data-cost="885">
         /* =====================================================================
            MESSAGES — the phone's Messages app ("Velvet Thread")
            ---------------------------------------------------------------------
@@ -96173,8 +96225,7 @@ engineMixin({
             },
             /** A round painted face (or the name's initial), with the bond's ring for the crew */
             _face(name, cls = 'mav') {
-                const el = document.createElement('div');
-                el.className = cls;
+                const el = uiKit.make(['div', cls]);
                 const url = this._faceReady(name);
                 if (url) { const img = new Image(); img.alt = ''; img.src = url; el.appendChild(img); }
                 else {
@@ -96189,8 +96240,7 @@ engineMixin({
             },
             /** The group's avatar: three of the crew, stacked */
             _groupFace(cls = 'mav') {
-                const el = document.createElement('div');
-                el.className = cls + ' stack';
+                const el = uiKit.make(['div', cls + ' stack']);
                 for (const n of ['Victoria', '747', 'Max']) el.appendChild(this._face(n, 'mav-mini'));
                 return el;
             },
@@ -96296,17 +96346,12 @@ engineMixin({
                 if (this.msgTab === 'crew') rows = rows.filter(c => c.crew || c.group);
                 if (this.msgTab === 'unread') rows = rows.filter(c => this.unread[c.name]);
 
-                const label = (t) => { const el = document.createElement('div'); el.className = 'msg-sec'; el.textContent = t; list.appendChild(el); };
+                const label = (t) => uiKit.make(['div', 'msg-sec', t], list);
                 const pinned = this.msgTab === 'all' ? rows.filter(c => c.pinned) : [];
                 const rest = rows.filter(c => !pinned.includes(c));
                 if (pinned.length) { label('Pinned'); pinned.forEach(c => list.appendChild(this._row(c))); label('Recent'); }
                 rest.forEach(c => list.appendChild(this._row(c)));
-                if (!rows.length) {
-                    const e = document.createElement('div');
-                    e.className = 'msg-none';
-                    e.textContent = this.msgTab === 'unread' ? 'All caught up.' : 'No one yet.';
-                    list.appendChild(e);
-                }
+                if (!rows.length) uiKit.make(['div', 'msg-none', this.msgTab === 'unread' ? 'All caught up.' : 'No one yet.'], list);
             },
 
             _row(c) {
@@ -96326,7 +96371,7 @@ engineMixin({
                 meta.className = 'msg-meta';
                 const t = document.createElement('small'); t.textContent = this._railTime(this._recency(c.name));
                 meta.appendChild(t);
-                if (n) { const k = document.createElement('span'); k.className = 'msg-count'; k.textContent = n > 99 ? '99+' : n; meta.appendChild(k); }
+                if (n) uiKit.make(['span', 'msg-count', n > 99 ? '99+' : n], meta);
                 item.append(who, meta);
                 item.addEventListener('click', () => this.showContactDetail(c));
                 return item;
@@ -96446,17 +96491,11 @@ engineMixin({
                     feed.appendChild(this._message(contact, rec, key === prevKey));
                     prevKey = key;
 
-                    if (i === lastMine && i === hist.length - 1 && rec.seen) {
-                        const s = document.createElement('div');
-                        s.className = 'mb-seen';
-                        s.textContent = `Seen ${this._clock(rec.seen)}`;
-                        feed.appendChild(s);
-                    }
+                    if (i === lastMine && i === hist.length - 1 && rec.seen) uiKit.make(['div', 'mb-seen', `Seen ${this._clock(rec.seen)}`], feed);
                 });
 
                 if (this.typingState[contact.name]) {
-                    const t = document.createElement('div');
-                    t.className = 'mb-typing';
+                    const t = uiKit.make(['div', 'mb-typing']);
                     t.innerHTML = '<i></i><i></i><i></i>';
                     feed.appendChild(t);
                 }
@@ -96472,9 +96511,7 @@ engineMixin({
             },
 
             _divider(text, cls = '') {
-                const d = document.createElement('div');
-                d.className = 'mb-day' + (cls ? ' ' + cls : '');
-                d.textContent = text;
+                const d = uiKit.make(['div', 'mb-day' + (cls ? ' ' + cls : ''), text]);
                 return d;
             },
 
@@ -96491,8 +96528,7 @@ engineMixin({
                 const col = document.createElement('div');
                 col.className = 'mb-col';
                 if (contact.group && !mine && !cont && rec.who) {
-                    const w = document.createElement('div');
-                    w.className = 'mb-who';
+                    const w = uiKit.make(['div', 'mb-who']);
                     w.style.color = this._color(rec.who);
                     w.textContent = rec.who;
                     col.appendChild(w);
@@ -96500,12 +96536,7 @@ engineMixin({
                 const wrap = document.createElement('div');
                 wrap.className = 'mb-wrap';
                 const kind = rec.kind;
-                if (rec.text && kind !== 'voice') {
-                    const b = document.createElement('div');
-                    b.className = 'mb';
-                    b.textContent = rec.text;
-                    wrap.appendChild(b);
-                }
+                if (rec.text && kind !== 'voice') uiKit.make(['div', 'mb', rec.text], wrap);
                 if (kind === 'pin') wrap.appendChild(this._pinCard(rec));
                 else if (kind === 'brief') wrap.appendChild(this._briefCard(rec));
                 else if (kind === 'plan' && this._planCard) wrap.appendChild(this._planCard(rec));   // story/crew-nights.js
@@ -96514,10 +96545,7 @@ engineMixin({
 
                 const pip = mine ? rec.theirReact : rec.react;
                 if (pip) {
-                    const p = document.createElement('span');
-                    p.className = 'mb-pip';
-                    p.textContent = pip;
-                    wrap.appendChild(p);
+                    uiKit.make(['span', 'mb-pip', pip], wrap);
                     wrap.classList.add('has-pip');
                 }
                 if (this._glint === rec) wrap.classList.add('glint');
@@ -96654,8 +96682,7 @@ engineMixin({
             },
             _openPicker(wrap, rec, contact) {
                 this._closePicker();
-                const p = document.createElement('div');
-                p.className = 'mb-picker';
+                const p = uiKit.make(['div', 'mb-picker']);
                 for (const e of MSG_REACTIONS) {
                     const b = document.createElement('button');
                     b.textContent = e;
@@ -96877,8 +96904,7 @@ engineMixin({
             _voiceSecs(lines) { return Math.max(3, Math.round(lines.reduce((s, l) => s + 0.9 + l.length * 0.065, 0))); },
             _voiceBubble(contact, rec) {
                 const d = rec.data || {}, secs = d.secs || this._voiceSecs(d.lines || [rec.text]);
-                const v = document.createElement('div');
-                v.className = 'mb-voice' + (d.heard ? '' : ' fresh');
+                const v = uiKit.make(['div', 'mb-voice' + (d.heard ? '' : ' fresh')]);
                 v.dataset.vid = rec.id;
                 const play = document.createElement('button');
                 play.className = 'mb-play';
@@ -96963,7 +96989,7 @@ engineMixin({
                 const name = document.createElement('div'); name.className = 'comm-name'; name.textContent = speaker;
                 const sig = document.createElement('span'); sig.className = 'comm-sig'; sig.innerHTML = '<i></i><i></i><i></i>';
                 name.appendChild(sig);
-                const line = document.createElement('div'); line.className = 'comm-text';
+                const line = uiKit.make(['div', 'comm-text']);
                 body.append(name, line);
                 chip.append(face, body);
                 return chip;
@@ -97381,7 +97407,7 @@ engineMixin({
                 this.currentApp = 'amber';
                 this.homeScreen.style.display = 'none';
                 document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
-                document.getElementById('screen-amber').style.display = 'flex';
+                uiKit.show('screen-amber', 'flex');
                 A.fresh = false; this._amberIcon();
                 this._amberOrders(false);
                 this.renderAmber();
@@ -97898,7 +97924,7 @@ engineMixin({
                 if (url) map.style.backgroundImage = `url(${url})`; else map.classList.add('sketch');
                 map.appendChild(document.createElement('i'));
                 const row = document.createElement('div'); row.className = 'row';
-                const btn = (label, fn, cls = '') => { const x = document.createElement('button'); x.className = 'mb-btn ' + cls; x.textContent = label; x.addEventListener('click', e => { e.stopPropagation(); fn(); }); row.appendChild(x); };
+                const btn = (label, fn, cls = '') => { const x = uiKit.make(['button', 'mb-btn ' + cls, label]); x.addEventListener('click', e => { e.stopPropagation(); fn(); }); row.appendChild(x); };
                 if (st === 'open') { btn('I\'m in', () => this.rsvp(true)); btn('Can\'t tonight', () => this.rsvp(false), 'ghost'); }
                 else {
                     const em = document.createElement('em');
@@ -100607,7 +100633,7 @@ engineMixin({
             const P = box.querySelector('.cg-presets'), S = box.querySelector('.cg-sliders');
             if (P && !P.childElementCount) {
                 GAME_GRADE_PRESETS.forEach((p, i) => {
-                    const b = document.createElement('button'); b.className = 'df-chip cg-preset'; b.dataset.preset = i; b.textContent = p.name; P.appendChild(b);
+                    const b = uiKit.make(['button', 'df-chip cg-preset']); b.dataset.preset = i; b.textContent = p.name; P.appendChild(b);
                 });
             }
             if (S && !S.childElementCount) {

@@ -173,14 +173,14 @@
                 const ch = this.choice = { picked: -1, timer: opts.timer || 0, left: opts.timer || 0, def: opts.def ?? 0 };
                 this.choicesEl.innerHTML = '';
                 options.forEach((o, i) => {
-                    const row = document.createElement('button'); row.className = 'cine-choice';
+                    const row = uiKit.make(['button', 'cine-choice']);
                     const weighty = (opts.weighty || []).includes(i);
                     row.innerHTML = `<b>${i + 1}</b><span></span>${weighty ? '<i>◆</i>' : ''}`;
                     row.querySelector('span').textContent = o;
                     row.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); this._pick(i); });
                     this.choicesEl.appendChild(row);
                 });
-                if (ch.timer) { const bar = document.createElement('div'); bar.className = 'cine-timer'; bar.innerHTML = '<i></i>'; this.choicesEl.appendChild(bar); ch.bar = bar.firstChild; }
+                if (ch.timer) { const bar = uiKit.make(['div', 'cine-timer']); bar.innerHTML = '<i></i>'; this.choicesEl.appendChild(bar); ch.bar = bar.firstChild; }
                 this.choicesEl.classList.add('show');
                 this.tapEl.classList.remove('on');
                 return { done: () => ch.picked >= 0, value: () => ch.picked };
@@ -199,8 +199,8 @@
                 this._build();
                 this.cardEl.innerHTML = '';
                 this.cardEl.className = opts.style ? 'show ' + opts.style : 'show';
-                const els = lines.map(t => { const d = document.createElement('div'); d.className = t === '' ? 'gap' : 'ln'; d.textContent = t; this.cardEl.appendChild(d); return d; });
-                if (opts.sign) { const s = document.createElement('div'); s.className = 'sign'; s.textContent = opts.sign; this.cardEl.appendChild(s); els.push(s); }
+                const els = lines.map(t => uiKit.make(['div', t === '' ? 'gap' : 'ln', t], this.cardEl));
+                if (opts.sign) els.push(uiKit.make(['div', 'sign', opts.sign], this.cardEl));
                 const hint = document.createElement('div'); hint.className = 'hint'; hint.textContent = 'tap to continue'; this.cardEl.appendChild(hint);
                 const S = this.cardS = { els, i: 0, t: 0, every: opts.every || 70, hold: opts.hold || 0, held: 0, out: 0, done: false, hint };
                 this.tapped = false;

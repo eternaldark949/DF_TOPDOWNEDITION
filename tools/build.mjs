@@ -50,6 +50,7 @@ const SCRIPTS = [
     'basement/entity-base.js',     // LV0 Basement: GameEntity (the base of everything that moves or collides)
     'basement/shape-kit.js',       // LV0 Basement: shapeKit (collision geometry)
     'basement/spatial-grid.js',    // LV0 Basement: SpatialHashGrid and the render / transition grids
+    'basement/ui-kit.js',          // LV0 Basement: uiKit (making, showing and hiding DOM panels)
     'core/config.js',
     '@assets',              // generated from the assets/ folder
     'core/assets.js',

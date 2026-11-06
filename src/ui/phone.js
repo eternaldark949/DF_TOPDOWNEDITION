@@ -466,7 +466,7 @@
                 this.currentApp = 'maps';
                 this.broadcast('APP_OPENED', { app: 'maps' }); // Report Event
                 this.homeScreen.style.display = 'none';
-                document.getElementById('screen-maps').style.display = 'flex';
+                uiKit.show('screen-maps', 'flex');
                 this.mapView.zoom = 1.2; this.mapView.offsetX = 0; this.mapView.offsetY = 0;
                 this.drawMap(true); 
             },
@@ -506,13 +506,13 @@
                 ctx.fillText(`${this.mapView.zoom.toFixed(1)}×`, 28 * D, canvas.height - 14 * D);
             },
             
-            showHelp() { this.currentApp = 'help'; this.homeScreen.style.display = 'none'; document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none'); document.getElementById('screen-help').style.display = 'flex'; },
+            showHelp() { this.currentApp = 'help'; this.homeScreen.style.display = 'none'; document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none'); uiKit.show('screen-help', 'flex'); },
 
             showSkyMe() {
                 this.currentApp = 'skyme';
                 this.homeScreen.style.display = 'none';
                 document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
-                document.getElementById('screen-skyme').style.display = 'flex';
+                uiKit.show('screen-skyme', 'flex');
                 this._renderSkyMe();
             },
 
@@ -693,7 +693,7 @@
                 this.currentApp = 'log';
                 this.homeScreen.style.display = 'none';
                 document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
-                document.getElementById('screen-log').style.display = 'flex';
+                uiKit.show('screen-log', 'flex');
                 this._renderLog();
             },
 
@@ -905,7 +905,7 @@
                 this.currentApp = 'carme';
                 this.homeScreen.style.display = 'none';
                 document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
-                document.getElementById('screen-carme').style.display = 'flex';
+                uiKit.show('screen-carme', 'flex');
 
                 const container = document.getElementById('carme-content'), G = game.garage;
                 const isIndoor = game.activeMap.type === 'indoor';
@@ -1011,7 +1011,7 @@
         // --- NEU.ME APP LOGIC ---
         document.getElementById('app-neume').addEventListener('click', () => {
             phoneSystem.homeScreen.style.display = 'none';
-            document.getElementById('screen-neume').style.display = 'flex';
+            uiKit.show('screen-neume', 'flex');
             updateNeumeUI();
         });
         

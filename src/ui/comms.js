@@ -51,9 +51,7 @@
                 const sig = document.createElement('span');
                 sig.className = 'comm-sig'; sig.innerHTML = '<i></i><i></i><i></i>';
                 name.appendChild(sig);
-                const line = document.createElement('div');
-                line.className = 'comm-text';
-                line.textContent = text;
+                const line = uiKit.make(['div', 'comm-text', text]);
                 body.append(name, line);
                 chip.append(face, body);
                 bar.appendChild(chip);

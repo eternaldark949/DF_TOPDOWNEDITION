@@ -332,7 +332,7 @@
                 g.pauseSystem.acquire('dialogue');
                 g.dialogueBox.style.display = 'block';
                 g.dialogueBox.classList.remove('peeking');
-                document.getElementById('dialogue-caption').style.display = 'none';
+                uiKit.hide('dialogue-caption');
 
                 g.btnAccept.textContent = options.continueText || 'Continue ▶';
                 g.btnAccept.style.display = '';

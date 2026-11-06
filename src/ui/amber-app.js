@@ -82,7 +82,7 @@
                 this.currentApp = 'amber';
                 this.homeScreen.style.display = 'none';
                 document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
-                document.getElementById('screen-amber').style.display = 'flex';
+                uiKit.show('screen-amber', 'flex');
                 A.fresh = false; this._amberIcon();
                 this._amberOrders(false);
                 this.renderAmber();

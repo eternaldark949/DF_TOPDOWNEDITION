@@ -30,6 +30,7 @@ For editor/runtime batches that change static building or foliage geometry, reac
 | `basement/entity-base.js` | `GameEntity`, the base class for everything that moves or collides: position, size, velocity, collision shape (CIRCLE / AABB / OBB), layer bitmask, queued registration, screen culling |
 | `basement/shape-kit.js` | **`shapeKit`**: collision geometry, nothing about the game. `sat(obbA, obbB)`, `circleVsCircle`, `circleVsRect`, `circleVsObb` and `overlaps(a, b)` → a contact packet `{ nx, ny, depth }` or null; `sweepCircle` / `sweepRect` / `sweepRoundedBox` (where along a path it first touches); `segmentDistanceSq`; box and OBB corners, axes, contact points; `impulseAt` (one rigid-body impulse at a contact point). `CollisionSystem` and `PhysicsSystem` still answer to the old names. |
 | `basement/spatial-grid.js` | `SpatialHashGrid` (collision broad phase), `RenderGrid`, `OrderedRenderGrid`, `_physicsSpatial`, `EffectRenderGrid`, `TransitionGrid` |
+| `basement/ui-kit.js` | **`uiKit`**: DOM panels, nothing about the game. `make([tag, className, text], parent)` → a new element, appended when a parent is given; `show(ref, display = 'block')`, `hide(ref)` (a ref is an element or an id, or a list of them; one that finds nothing is skipped), `toggle(ref, on, display)`, `isShown(ref)`, `find(ref)`. Legacy UI code switches to it as it's touched. |
 
 ## core/ (loaded first)
 | File | What's in it |

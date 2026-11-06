@@ -364,7 +364,7 @@
                 if (url) map.style.backgroundImage = `url(${url})`; else map.classList.add('sketch');
                 map.appendChild(document.createElement('i'));
                 const row = document.createElement('div'); row.className = 'row';
-                const btn = (label, fn, cls = '') => { const x = document.createElement('button'); x.className = 'mb-btn ' + cls; x.textContent = label; x.addEventListener('click', e => { e.stopPropagation(); fn(); }); row.appendChild(x); };
+                const btn = (label, fn, cls = '') => { const x = uiKit.make(['button', 'mb-btn ' + cls, label]); x.addEventListener('click', e => { e.stopPropagation(); fn(); }); row.appendChild(x); };
                 if (st === 'open') { btn('I\'m in', () => this.rsvp(true)); btn('Can\'t tonight', () => this.rsvp(false), 'ghost'); }
                 else {
                     const em = document.createElement('em');

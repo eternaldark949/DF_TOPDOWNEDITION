@@ -9,8 +9,8 @@
                 if (this.running) return;                                      // a second tap during the fade: one loop only
                 if (typeof audioSys !== 'undefined') audioSys.wake();
                 const ttb = document.getElementById('tap-to-begin'); if (ttb) ttb.remove();
-                document.getElementById('ui-layer').style.display = 'none';
-                document.getElementById('game-container').style.display = 'block';
+                uiKit.hide('ui-layer');
+                uiKit.show('game-container');
                 this.running = true;
                 this.loop();
             },
@@ -96,8 +96,8 @@
                 if (this.musicWidget && this.musicWidget.isPlaying) this.musicWidget.togglePlay(false);
                 if (this.dialogueBox && this.dialogueBox.style.display !== 'none') this.endDialogue();
                 this.pauseSystem.clear();
-                document.getElementById('game-container').style.display = 'none'; 
-                document.getElementById('ui-layer').style.display = 'flex'; 
+                uiKit.hide('game-container'); 
+                uiKit.show('ui-layer', 'flex'); 
                 document.getElementById('main-menu').style.opacity = '1'; 
                 document.getElementById('main-menu-list').classList.remove('hidden'); 
                 document.getElementById('story-mode-list').classList.add('hidden');

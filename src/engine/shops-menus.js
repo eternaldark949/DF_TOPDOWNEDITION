@@ -34,7 +34,7 @@
             },
             
             closeVendingMenu() {
-                document.getElementById('vending-menu').style.display = 'none';
+                uiKit.hide('vending-menu');
                 this.pauseSystem.release('vending');
             },
             
@@ -399,7 +399,7 @@
             },
 
             closeGauntletMenu() {
-                document.getElementById('gauntlet-menu').style.display = 'none';
+                uiKit.hide('gauntlet-menu');
                 this.pauseSystem.release('gauntlet_menu');
             },
 
