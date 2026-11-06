@@ -11,6 +11,14 @@ Unzip it with your Files app, then open `DFAB V8.html` in Chrome.
 ## Quick draw
 Hold **Holster/Draw** for about half a second with a firearm equipped. Drag the fire stick past its ring and release to draw, fire once, and reholster. Drag back inside the ring to cancel. The button shows recovery time; tap it to return to regular drawn fire. Menus and pause preserve the mode but cancel the armed shot, requiring a fresh aim and release. On desktop, aim with the left mouse button held and release to shoot.
 
+## Controller (gamepad)
+Plug in or pair any standard controller (Xbox, PlayStation, most Bluetooth pads), then press a button so the browser notices it.
+- **Left stick** move / steer · **Right stick** aim · **RT** fire
+- **A** interact · **B** flit · **X** holster/draw · **Y** doors and exits
+- **LB** sneak · **RB** booster (hold: on an ally) · **LT** handbrake · **L3** auto-drive
+- **Back** map · **D-pad ↑** phone · **D-pad ↓** night vision · **Start** pause
+- In menus, dialogue and the title screen: **D-pad / left stick** moves the highlight, **A** selects, **B** goes back, **right stick** scrolls.
+
 ## How the project is organised
 - `DFAB V8.html` is the **playable game**. It's generated, so don't edit it directly; changes go in `src/`.
 - `src/` holds the game's source, split by topic. **[`src/MAP.md`](src/MAP.md)** lists every file and what's in it.
