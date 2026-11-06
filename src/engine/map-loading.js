@@ -275,7 +275,7 @@ engineMixin({
                 this.finCam = null;
                 this.timeSlowState = { active: false, scale: 1.0, targetScale: 1.0, duration: 0, transitionSpeed: 0.05 };
                 this.casings = []; this.shotFx = []; this.muzzleFlashes = []; this.flitVFX = []; this._resetFlitFeedback();
-                this._fireTrail = []; this._fireTrailSerial = 0;
+                this._fireTrail = []; this._fireTrailSerial = 0; this._breachFx = null;
                 this.noiseRipples = []; this.lastKnownMarkers = [];
                 this._edgeRipples = null; this._edgeTouch = null;                       // the veil's ripples (world/map-edge.js)
                 if (typeof Walker !== 'undefined') {                                   // walks are across the old floor
