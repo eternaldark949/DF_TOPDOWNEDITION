@@ -5868,7 +5868,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'b8f4fe4e241d';
+        const DFAB_BUILD = 'ec3d7dafefc9';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="26">
         // ===== LV0 BASEMENT =====
@@ -72199,47 +72199,30 @@ Object.assign(TrafficVehicle.prototype, {
             }
         }
     </script>
-    <script type="text/dfab" data-src="engine/pause-system.js" data-cost="36">
-        /**
-         * PauseSystem — token-based pause registry.
-         *
-         * Why this exists:
-         *   Multiple subsystems need to pause the world (dialogue, shops, menus,
-         *   cinematic transitions). Each one used to do `game.paused = true` on
-         *   open and `game.paused = false` on close. That works in isolation but
-         *   creates pairwise bugs when subsystems overlap: open the pause menu
-         *   over an active dialogue, close the pause menu, and the world resumes
-         *   while the dialogue box is still up. Three different incarnations of
-         *   that same bug were patched piecemeal before the registry was added.
-         *
-         * How it works:
-         *   Each subsystem acquires a unique token (`'dialogue'`, `'augment_shop'`,
-         *   etc.) when it opens, and releases the same token when it closes. The
-         *   world is paused if and only if at least one token is held. Subsystems
-         *   are independent — releasing one doesn't affect the others.
-         *
-         * Compatibility:
-         *   `game.paused` is kept in sync with the token set on every change, so
-         *   read-only consumers (game loop, AI, render checks) don't need to be
-         *   updated. The boolean stays the source of truth for *reading*; the
-         *   token registry is the source of truth for *writing*.
-         *
-         * Adding a new pause-holding subsystem:
-         *   On open:   game.pauseSystem.acquire('your_token_name');
-         *   On close:  game.pauseSystem.release('your_token_name');
-         *   That's it — no other coordination required, no other systems affected.
-         */
-        class PauseSystem {
-            constructor(game) {
-                this.game = game;
+    <script type="text/dfab" data-src="lobby/level-pause.js" data-cost="23">
+        // ===== LV1 LOBBY =====
+        // The pause registry: the world holds still while any part of the game holds a pause token.
+        //
+        // Several things pause the world (dialogue, shops, menus, cinematic cuts), and they overlap: open
+        // the pause menu over a dialogue, close the pause menu, and the world must stay paused while the
+        // dialogue is up. So nobody sets "paused" directly. Each one acquires its own token when it opens
+        // and releases it when it closes; the world is paused while at least one is held. Releasing one
+        // never touches the others.
+        //
+        //   pause.acquire('dialogue');   pause.release('dialogue');
+        //   pause.clear();               // drop every token: only for a reset or leaving the world
+        //   pause.paused                 // true while any token is held
+        //
+        // A subclass (or a game) reacts to a change by overriding onChange(paused, was_paused).
+        class levelPause {
+            constructor () {
                 this.tokens = new Set();
             }
 
-            /**
-             * Register a subsystem's need to pause the world. Idempotent — calling
-             * acquire('x') twice without a release between is harmless.
-             */
-            acquire(token) {
+            get paused () { return this.tokens.size > 0; }
+
+            /** Hold the world still for `token`. Holding the same token twice is harmless. */
+            acquire (token) {
                 if (typeof token !== 'string' || !token) {
                     console.warn('[PauseSystem] acquire requires a non-empty string token');
                     return;
@@ -72248,46 +72231,91 @@ Object.assign(TrafficVehicle.prototype, {
                 this._sync();
             }
 
-            /**
-             * Release a subsystem's pause hold. World remains paused if any other
-             * tokens are still held. Releasing a token that wasn't held is a no-op.
-             */
-            release(token) {
+            /** Let go of `token`. The world stays paused while others are held; an unheld token is a no-op. */
+            release (token) {
                 this.tokens.delete(token);
                 this._sync();
             }
 
-            /**
-             * Drop ALL pause tokens. Reserved for game state reset and stop —
-             * regular subsystems should release their own tokens, not call clear.
-             */
-            clear() {
+            /** Drop every token. Only for a reset or leaving the world; a part of the game releases its own. */
+            clear () {
                 this.tokens.clear();
                 this._sync();
             }
 
+            /** The tokens held now (diagnostics). */
+            debug () { return Array.from(this.tokens); }
 
-            /** Diagnostic: returns array of currently-held tokens. */
-            debug() {
-                return Array.from(this.tokens);
+            _sync () { this.onChange(this.paused); }
+
+            /** Override: called after every acquire / release / clear with the paused state. */
+            onChange (paused) {}
+        }
+    </script>
+    <script type="text/dfab" data-src="lobby/level-stages.js" data-cost="21">
+        // ===== LV1 LOBBY =====
+        // The stage switch: which stage the engine is on, and the one place that changes it. A stage is a
+        // name ('menu', 'loading', 'world', or any the game adds); the game plugs in what happens on the
+        // way into and out of each. The pause registry (levelPause, lobby/level-pause.js) holds the world
+        // still while a stage is up; the two together are the game's screen state.
+        //
+        // STAGE JACKS (each optional):  { enter(from), leave(to) }
+        //
+        //   game.level_stages.plugIn({ world: { enter: () => showCanvas(), leave: () => tidyUp() } });
+        //   game.level_stages.go('world');            // leave the current stage, enter this one (no-op if already on it)
+        //   if (game.level_stages.is('menu', 'loading')) ...
+        class levelStages {
+            constructor (first_stage) {
+                this.stage = first_stage;              // the stage the engine is on
+                this.previous = null;                  // the one before it
+                this.jacks = {};
             }
 
-            /**
-             * Mirror token state to game.paused so legacy read sites continue to
-             * work. The boolean is the public read interface; the token Set is the
-             * authoritative write interface.
-             */
-            _sync() {
+            /** Plug in stages: { name: { enter(from), leave(to) } }. Later calls add to or replace earlier ones. */
+            plugIn (stage_jacks) {
+                for (const name of Object.keys(stage_jacks)) this.jacks[name] = Object.assign(this.jacks[name] || {}, stage_jacks[name]);
+                return this;
+            }
+
+            /** Move to a stage: the current one's leave(to), then the new one's enter(from). False if already there. */
+            go (name) {
+                const from = this.stage;
+                if (from === name) return false;
+                const out = this.jacks[from], into = this.jacks[name];
+                if (out && out.leave) out.leave(name);
+                this.previous = from;
+                this.stage = name;
+                if (into && into.enter) into.enter(from);
+                return true;
+            }
+
+            /** Is the engine on (one of) these stage(s)? */
+            is (...names) { return names.includes(this.stage); }
+        }
+    </script>
+    <script type="text/dfab" data-src="engine/pause-system.js" data-cost="9">
+        // ===== LV2 DIRECTORY =====
+        // PauseSystem: the Lobby's pause registry (lobby/level-pause.js) wired to this game. Every change is
+        // mirrored to game.paused, which the loop, AI and draw code read; the token registry is where pauses
+        // are written. Pausing also lets go of every held gameplay input, so nothing is stuck down on resume.
+        //
+        //   On open:   game.pauseSystem.acquire('your_token_name');
+        //   On close:  game.pauseSystem.release('your_token_name');
+        class PauseSystem extends levelPause {
+            constructor(game) {
+                super();
+                this.game = game;
+            }
+
+            onChange(paused) {
                 if (this.game) {
-                    const paused = this.tokens.size > 0;
                     if (paused && !this.game.paused) clearGameplayInputs(this.game);
                     this.game.paused = paused;
                 }
             }
         }
-        
     </script>
-    <script type="text/dfab" data-src="engine/game-engine.js" data-cost="186">
+    <script type="text/dfab" data-src="engine/game-engine.js" data-cost="187">
         class GameEngine {
             constructor() {
                 
@@ -72299,6 +72327,7 @@ Object.assign(TrafficVehicle.prototype, {
                 // The Lobby: the game loop's clock (lobby/level-lobby.js). The game plugs in at the end of the
                 // constructor (_plugIntoLobby, engine/loop.js).
                 this.level_lobby = new levelLobby(CONFIG.LOOP, frame_clock);
+                this.level_stages = new levelStages('menu');   // the game is built behind the main menu
                 
                 this.ui = new UISystem(this);
                 this.musicWidget = new MusicWidgetSystem(this);
@@ -72553,6 +72582,7 @@ Object.assign(TrafficVehicle.prototype, {
 
                 this.initEvents(); this.initJoystick(); this.initFireJoystick(); this.initLookZone();
                 this._plugIntoLobby();
+                this._plugInStages();
             }
 
             // ── UNIFIED COMPANION HELPERS ──
@@ -94311,7 +94341,7 @@ engineMixin({
             },
         });
     </script>
-    <script type="text/dfab" data-src="directory/world-session.js" data-cost="69">
+    <script type="text/dfab" data-src="directory/world-session.js" data-cost="83">
         // ===== LV2 DIRECTORY =====
         // GameEngine: the game's session flow. Menu -> world (enterWorld, the loading screen steps, loading a
         // save from the menu) and world -> menu (stop). Game-specific: it knows this game's DOM, audio and
@@ -94321,6 +94351,19 @@ engineMixin({
             /** From the menu into the world: hide the menu layer, show the canvas, start the loop. */
             enterWorld() {
                 if (this.running) return;                                      // a second tap during the fade: one loop only
+                if (!this.level_stages.go('world')) this._enterWorldStage();
+            },
+
+            /** The Lobby's stages (lobby/level-stages.js), as this game plays them. 'loading' has no jacks:
+             *  the loading screen (app/boot-loader.js) covers the switch on its own. */
+            _plugInStages() {
+                this.level_stages.plugIn({
+                    world: { enter: () => this._enterWorldStage(), leave: () => this._leaveWorldStage() }
+                });
+            },
+
+            /** Into the world: hide the menu layer, show the canvas, start the loop. */
+            _enterWorldStage() {
                 if (typeof audioSys !== 'undefined') audioSys.wake();
                 const ttb = document.getElementById('tap-to-begin'); if (ttb) ttb.remove();
                 uiKit.hide('ui-layer');
@@ -94337,9 +94380,14 @@ engineMixin({
             async loadIntoWorld(steps) {
                 if (this._loadingIntoWorld) return false;                      // a second tap while one is under way
                 this._loadingIntoWorld = true;
+                const back = this.level_stages.stage;
+                this.level_stages.go('loading');
                 try { await LoadingScreen.run(steps); return true; }
                 catch (e) { return false; }                                     // (the loading screen says what broke)
-                finally { this._loadingIntoWorld = false; }
+                finally {
+                    this._loadingIntoWorld = false;
+                    if (this.level_stages.is('loading')) this.level_stages.go(back);   // it never reached the world
+                }
             },
 
             /** Load Saved Game from the menu: `load` runs the slot's load (true if it worked) under the loading screen */
@@ -94401,7 +94449,17 @@ engineMixin({
                 });
             },
 
+            /** Back to the menu: leave the world (from anywhere, as it always could be called), then a fresh game state. */
             stop() {
+                const from = this.level_stages.stage;
+                this.level_stages.go('menu');
+                if (from !== 'world') this._leaveWorldStage();                  // (the world's leave jack did it otherwise)
+                // Reset all gameplay state so New Game starts fresh
+                this.resetGameState();
+            },
+
+            /** Out of the world: stop the loop and everything of the run, then show the menu layer. */
+            _leaveWorldStage() {
                 this.running = false;
                 ambience.silence();
                 // Nothing of the run keeps going behind the menu: a ringing call, the car's hum, the radio, an open dialogue
@@ -94415,9 +94473,6 @@ engineMixin({
                 document.getElementById('main-menu').style.opacity = '1'; 
                 document.getElementById('main-menu-list').classList.remove('hidden'); 
                 document.getElementById('story-mode-list').classList.add('hidden');
-                
-                // Reset all gameplay state so New Game starts fresh
-                this.resetGameState();
             },
             
         });

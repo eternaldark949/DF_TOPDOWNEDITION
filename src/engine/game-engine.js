@@ -9,6 +9,7 @@
                 // The Lobby: the game loop's clock (lobby/level-lobby.js). The game plugs in at the end of the
                 // constructor (_plugIntoLobby, engine/loop.js).
                 this.level_lobby = new levelLobby(CONFIG.LOOP, frame_clock);
+                this.level_stages = new levelStages('menu');   // the game is built behind the main menu
                 
                 this.ui = new UISystem(this);
                 this.musicWidget = new MusicWidgetSystem(this);
@@ -263,6 +264,7 @@
 
                 this.initEvents(); this.initJoystick(); this.initFireJoystick(); this.initLookZone();
                 this._plugIntoLobby();
+                this._plugInStages();
             }
 
             // ── UNIFIED COMPANION HELPERS ──

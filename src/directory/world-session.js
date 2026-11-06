@@ -7,6 +7,19 @@
             /** From the menu into the world: hide the menu layer, show the canvas, start the loop. */
             enterWorld() {
                 if (this.running) return;                                      // a second tap during the fade: one loop only
+                if (!this.level_stages.go('world')) this._enterWorldStage();
+            },
+
+            /** The Lobby's stages (lobby/level-stages.js), as this game plays them. 'loading' has no jacks:
+             *  the loading screen (app/boot-loader.js) covers the switch on its own. */
+            _plugInStages() {
+                this.level_stages.plugIn({
+                    world: { enter: () => this._enterWorldStage(), leave: () => this._leaveWorldStage() }
+                });
+            },
+
+            /** Into the world: hide the menu layer, show the canvas, start the loop. */
+            _enterWorldStage() {
                 if (typeof audioSys !== 'undefined') audioSys.wake();
                 const ttb = document.getElementById('tap-to-begin'); if (ttb) ttb.remove();
                 uiKit.hide('ui-layer');
@@ -23,9 +36,14 @@
             async loadIntoWorld(steps) {
                 if (this._loadingIntoWorld) return false;                      // a second tap while one is under way
                 this._loadingIntoWorld = true;
+                const back = this.level_stages.stage;
+                this.level_stages.go('loading');
                 try { await LoadingScreen.run(steps); return true; }
                 catch (e) { return false; }                                     // (the loading screen says what broke)
-                finally { this._loadingIntoWorld = false; }
+                finally {
+                    this._loadingIntoWorld = false;
+                    if (this.level_stages.is('loading')) this.level_stages.go(back);   // it never reached the world
+                }
             },
 
             /** Load Saved Game from the menu: `load` runs the slot's load (true if it worked) under the loading screen */
@@ -87,7 +105,17 @@
                 });
             },
 
+            /** Back to the menu: leave the world (from anywhere, as it always could be called), then a fresh game state. */
             stop() {
+                const from = this.level_stages.stage;
+                this.level_stages.go('menu');
+                if (from !== 'world') this._leaveWorldStage();                  // (the world's leave jack did it otherwise)
+                // Reset all gameplay state so New Game starts fresh
+                this.resetGameState();
+            },
+
+            /** Out of the world: stop the loop and everything of the run, then show the menu layer. */
+            _leaveWorldStage() {
                 this.running = false;
                 ambience.silence();
                 // Nothing of the run keeps going behind the menu: a ringing call, the car's hum, the radio, an open dialogue
@@ -101,9 +129,6 @@
                 document.getElementById('main-menu').style.opacity = '1'; 
                 document.getElementById('main-menu-list').classList.remove('hidden'); 
                 document.getElementById('story-mode-list').classList.add('hidden');
-                
-                // Reset all gameplay state so New Game starts fresh
-                this.resetGameState();
             },
             
         });
