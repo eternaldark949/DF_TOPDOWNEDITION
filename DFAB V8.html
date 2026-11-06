@@ -5868,7 +5868,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'ec3d7dafefc9';
+        const DFAB_BUILD = '6e1ed7527bd1';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="26">
         // ===== LV0 BASEMENT =====
@@ -8246,7 +8246,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             neon:       { name: 'Neon Cocktail', glass: 'coupe',   rim: 4.6, liquid: '#17dcff', liquid2: '#ff2bd6', glow: true, garnish: 'citrus' },
             cream_soda: { name: 'Ms. Jean Cream Soda', glass: 'soda', rim: 3.8, liquid: '#f4b0c4', bubbles: true, foam: true, straw: '#d4447c' },
             stellar_lemonade: { name: 'Stellar Lemonade', glass: 'tumbler', rim: 4.0, liquid: '#f3dc6a', ice: true, garnish: 'citrus' },   // JJ's
-            // The Cozy Cafe's mugs (its guests, world/cafe-life.js; `cafe`: not one of the Crystal Glass's pours)
+            // The Cozy Cafe's mugs (its guests, directory/cafe-life.js; `cafe`: not one of the Crystal Glass's pours)
             latte:      { name: 'Honey Latte',   glass: 'mug', rim: 4.4, liquid: '#a9784e', cup: '#efe4d0', art: true, cafe: true },
             tea:        { name: 'Chai',          glass: 'mug', rim: 4.2, liquid: '#b07a3c', cup: '#6d8a64', cafe: true },
             cocoa:      { name: 'Cocoa',         glass: 'mug', rim: 4.4, liquid: '#5a3424', cup: '#c0903a', foam: true, cafe: true },
@@ -10814,7 +10814,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return { gender: 'androgynous', body: { kind: 'android', finish: 'silver' }, top: { type: 'dn_uniform', ...PALETTE.dnSilver },
                          bottom: { type: 'pants', color: '#1a1a1a' }, shoes: { type: 'loafers', color: '#111111' }, pose: 'concierge', faceRoom: true };
             },
-            // Double Nights floor staff (the lobby's crowd, world/lobby-life.js): plating in the house
+            // Double Nights floor staff (the lobby's crowd, directory/lobby-life.js): plating in the house
             // finishes — gold bellhops, Blood Moon concierges, silver valets — uniforms to match
             dn_staff(finish, r) {
                 const uni = finish === 'gold' ? PALETTE.dnGold : finish === 'bloodmoon' ? PALETTE.dnCrimson : PALETTE.dnSilver;
@@ -10822,7 +10822,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                          body: { kind: 'android', finish }, top: { type: 'dn_uniform', ...uni },
                          bottom: { type: 'pants', color: '#141216' }, shoes: { type: 'loafers', color: '#0e0e10' }, pose: 'concierge' };
             },
-            // Moon City's clubgoers (world/club-life.js): evening wear in the house colours —
+            // Moon City's clubgoers (directory/club-life.js): evening wear in the house colours —
             // black lacquer, plum and wine velvet, violet, lavender, rose, champagne gold, chrome
             clubgoer(r) {
                 const pick = l => pickFrom(r, l), P = PALETTE;
@@ -10850,7 +10850,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 return look;
             },
-            // The Cozy Cafe's guests (world/cafe-life.js): knitwear and coats in warm, muted tones —
+            // The Cozy Cafe's guests (directory/cafe-life.js): knitwear and coats in warm, muted tones —
             // oat, cream, rust, mustard, sage, camel, cocoa, denim — beanies and berets, a scarf-red here and there
             cafegoer(r) {
                 const pick = l => pickFrom(r, l), P = PALETTE;
@@ -16379,7 +16379,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         };
 
     </script>
-    <script type="text/dfab" data-src="world/maps.js" data-cost="425">
+    <script type="text/dfab" data-src="world/maps.js" data-cost="426">
         // ============================================================================
         //  MAP_DATA — Static map metadata (geometry, walls, zones, transitions)
         //  Entity instances (props, npcs, lamps) are created by createMapEntities()
@@ -16436,7 +16436,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             },
             // Double Nights Hotel — "Think excellence, think Double Nights." A grand interdimensional
             // hotel: black marble and gold, a rift fountain, a chandelier over the twin crescents,
-            // guests and AI staff coming and going (world/lobby-life.js). Floor: drawLobbyInterior;
+            // guests and AI staff coming and going (directory/lobby-life.js). Floor: drawLobbyInterior;
             // glows, the motto and the elevator doors: drawLobbyGlow; furniture: dn_* (props-decor.js).
             'hotel_lobby': {
                 id: 'hotel_lobby', width: 1000, height: 1200, type: 'indoor',
@@ -16627,7 +16627,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 id: 'cozy_cafe_interior', width: 1200, height: 1000, type: 'indoor',
                 label: 'Cozy Cafe', floorColor: '#2a1a0e',
                 ambientDarkness: 0.5,                               // warm and lamp-lit, never dark
-                navProps: 'all',                                    // the guests walk round the furniture (world/cafe-life.js)
+                navProps: 'all',                                    // the guests walk round the furniture (directory/cafe-life.js)
                 wallStyle: { fill: '#2b1a12', stroke: 'rgba(240,190,120,0.35)' },   // dark walnut panelling, honey trim
                 spawn: { x: 600, y: 900 },
                 zones: [],
@@ -16874,7 +16874,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         //  Called once per loadMap() to lazily create only the current map's entities.
         const OLLO_BUILDING_DATA = {"name":"ollo_exp","category":"commercial","w":500,"h":400,"hasCollision":true,"footprint":[{"x":-700,"y":-480,"w":1400,"h":480,"fill":"#000000","stroke":"#ffffff","strokeWidth":1,"opacity":1,"rotation":0,"cornerRadius":4,"name":"","type":"roundrect","level":"top"},{"x":-120,"y":0,"w":20,"h":10,"fill":"#000000","stroke":"#ffffff","strokeWidth":1,"opacity":1,"rotation":0,"cornerRadius":4,"name":"","type":"roundrect","level":"lv_78685"},{"x":-60,"y":0,"w":20,"h":10,"fill":"#000000","stroke":"#ffffff","strokeWidth":1,"opacity":1,"rotation":0,"cornerRadius":4,"name":"","type":"roundrect","level":"lv_78685"},{"x":-180,"y":0,"w":20,"h":10,"fill":"#000000","stroke":"#ffffff","strokeWidth":1,"opacity":1,"rotation":0,"cornerRadius":4,"name":"","type":"roundrect","level":"lv_78685"},{"x":40,"y":0,"w":20,"h":10,"fill":"#000000","stroke":"#ffffff","strokeWidth":1,"opacity":1,"rotation":0,"cornerRadius":4,"name":"","type":"roundrect","level":"lv_78685"},{"x":100,"y":0,"w":20,"h":10,"fill":"#000000","stroke":"#ffffff","strokeWidth":1,"opacity":1,"rotation":0,"cornerRadius":4,"name":"","type":"roundrect","level":"lv_78685"},{"x":160,"y":0,"w":20,"h":10,"fill":"#000000","stroke":"#ffffff","strokeWidth":1,"opacity":1,"rotation":0,"cornerRadius":4,"name":"","type":"roundrect","level":"lv_78685"},{"x":-40,"y":0,"w":40,"h":10,"fill":"#000000","stroke":"#ffffff","strokeWidth":1,"opacity":1,"rotation":0,"name":"","type":"rect","level":"lv_29826"},{"x":0,"y":0,"w":40,"h":10,"fill":"#000000","stroke":"#ffffff","strokeWidth":1,"opacity":1,"rotation":0,"name":"","type":"rect","level":"lv_29826"},{"x":-250,"y":0,"w":500,"h":130,"fill":"#5c1e1f","stroke":"#3d2510","strokeWidth":1,"opacity":1,"rotation":0,"name":"","type":"rect","level":"lv_66877","inset":false},{"x":-250,"y":130,"w":500,"h":20,"fill":"#d8b388","stroke":"#ffffff","strokeWidth":1,"opacity":1,"rotation":0,"name":"","type":"rect","level":"lv_66877","inset":false}],"details":[{"x":-40,"y":10,"w":80,"h":44,"target":"","name":"","type":"entrance","level":"base"},{"x":-110,"y":10,"color":"#ffeebb","intensity":0.6,"radius":60,"shape":"square","edge":"bottom","name":"","type":"wall_lamp","level":"lv_29826"},{"x":0,"y":-50,"text":"OllO","color":"#ffdc8a","fontSize":60,"name":"","type":"neon_sign","level":"lv_27173"},{"x":-80,"y":-20,"r":5,"color":"#ffcc44","name":"","type":"roof_light","level":"top"},{"x":-50,"y":10,"color":"#ffeebb","intensity":0.6,"radius":60,"shape":"square","edge":"bottom","name":"","type":"wall_lamp","level":"lv_29826"},{"x":-170,"y":10,"color":"#ffeebb","intensity":0.6,"radius":60,"shape":"square","edge":"bottom","name":"","type":"wall_lamp","level":"lv_29826"},{"x":0,"y":-110,"radius":120,"color":"#ffeebb","intensity":0.8,"lampType":3,"angle":0,"name":"","type":"lamp","level":"lv_27173","animOffset":2901.979257161702},{"x":0,"y":-20,"radius":120,"color":"#ffbb33","intensity":0.8,"lampType":3,"angle":0,"name":"","type":"lamp","level":"lv_27173","animOffset":2260.7082197626737},{"x":-60,"y":0,"x2":-40,"y2":0,"color":"#8a7a6a","name":"","type":"interior_wall","level":"base"},{"x":-120,"y":0,"x2":-100,"y2":0,"color":"#8a7a6a","name":"","type":"interior_wall","level":"base"},{"x":-180,"y":0,"x2":-160,"y2":0,"color":"#8a7a6a","name":"","type":"interior_wall","level":"base"},{"x":-240,"y":-100,"color":"#ffac47","intensity":0.7,"radius":200,"name":"","type":"interior_lamp","level":"base"},{"x":-140,"y":-70,"color":"#ffac47","intensity":1,"radius":400,"name":"","type":"interior_lamp","level":"base"},{"x":-170,"y":80,"radius":120,"color":"#ffeebb","intensity":0.8,"lampType":2,"angle":0,"name":"","type":"lamp","level":"base","animOffset":2706.428559465008},{"x":-50,"y":80,"radius":120,"color":"#ffeebb","intensity":0.8,"lampType":2,"angle":0,"name":"","type":"lamp","level":"base","animOffset":2706.428559465008},{"x":50,"y":80,"radius":120,"color":"#ffeebb","intensity":0.8,"lampType":2,"angle":0,"name":"","type":"lamp","level":"base","animOffset":2706.428559465008},{"x":170,"y":80,"radius":120,"color":"#ffeebb","intensity":0.8,"lampType":2,"angle":0,"name":"","type":"lamp","level":"base","animOffset":2706.428559465008},{"x":50,"y":10,"color":"#ffeebb","intensity":0.6,"radius":60,"shape":"square","edge":"bottom","name":"","type":"wall_lamp","level":"lv_29826"},{"x":110,"y":10,"color":"#ffeebb","intensity":0.6,"radius":60,"shape":"square","edge":"bottom","name":"","type":"wall_lamp","level":"lv_29826"},{"x":170,"y":10,"color":"#ffeebb","intensity":0.6,"radius":60,"shape":"square","edge":"bottom","name":"","type":"wall_lamp","level":"lv_29826"},{"x":80,"y":-20,"r":5,"color":"#ffcc44","name":"","type":"roof_light","level":"top"},{"x":-40,"y":-250,"w":80,"h":160,"color":"#ffb566","name":"","type":"skylight","level":"lv_37888"},{"x":-80,"y":-250,"w":40,"h":160,"curveX":30,"curveY":0,"color":"#ffb566","name":"","type":"skylight_corner","level":"lv_37888"},{"x":40,"y":-250,"w":40,"h":160,"curveX":30,"curveY":0,"color":"#ffb566","name":"","type":"skylight_corner","level":"lv_37888","rotation":0,"scaleX":-1},{"x":-40,"y":-410,"w":80,"h":160,"color":"#ffb566","name":"","type":"skylight","level":"lv_37888"},{"x":-120,"y":-410,"w":80,"h":160,"color":"#ffb566","name":"","type":"skylight","level":"lv_37888"},{"x":40,"y":-410,"w":80,"h":160,"color":"#ffb566","name":"","type":"skylight","level":"lv_37888"},{"x":100,"y":-70,"radius":120,"color":"#ff3d3d","intensity":0.8,"lampType":3,"angle":0,"name":"","type":"lamp","level":"lv_27173","animOffset":2260.7082197626737},{"x":-100,"y":-70,"radius":120,"color":"#ff3d3d","intensity":0.8,"lampType":3,"angle":0,"name":"","type":"lamp","level":"lv_27173","animOffset":2260.7082197626737},{"x":40,"y":0,"x2":60,"y2":0,"color":"#8a7a6a","name":"","type":"interior_wall","level":"base"},{"x":100,"y":0,"x2":120,"y2":0,"color":"#8a7a6a","name":"","type":"interior_wall","level":"base"},{"x":160,"y":0,"x2":180,"y2":0,"color":"#8a7a6a","name":"","type":"interior_wall","level":"base"},{"x":140,"y":-70,"color":"#ffac47","intensity":1,"radius":400,"name":"","type":"interior_lamp","level":"base"},{"x":0,"y":-330,"radius":120,"color":"#ffeebb","intensity":0.8,"lampType":3,"angle":0,"name":"","type":"lamp","level":"lv_1755","animOffset":2384.3235611068035},{"x":120,"y":-330,"radius":120,"color":"#ffeebb","intensity":0.8,"lampType":3,"angle":0,"name":"","type":"lamp","level":"lv_1755","animOffset":2384.3235611068035},{"x":-120,"y":-330,"radius":120,"color":"#ffeebb","intensity":0.8,"lampType":3,"angle":0,"name":"","type":"lamp","level":"lv_1755","animOffset":2384.3235611068035}],"type":"building","levels":[{"id":"lv_66877","name":"Ground Details","visible":true},{"id":"base","name":"Base","visible":true},{"id":"lv_78685","name":"Base Details","visible":true},{"id":"lv_29826","name":"Base Details Lights","visible":true},{"id":"top","name":"Top","visible":true},{"id":"lv_37888","name":"Top Details","visible":true},{"id":"lv_27173","name":"Neon Sign","visible":true},{"id":"lv_1755","name":"Level 6","visible":true}],"version":"1.0"};
     </script>
-    <script type="text/dfab" data-src="world/map-entities.js" data-cost="812">
+    <script type="text/dfab" data-src="world/map-entities.js" data-cost="813">
         // ============================================================================
         //  HUB SCRIPTED NPC ANCHORS
         //  sdc's buildings are NOT authored — they're generated at load time by
@@ -16906,7 +16906,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         const HUB_OLLO_DOOR = { x: 8640, y: 13080, w: 80, h: 60 };   // the OllO Plaza door, on the southern edge east of the graveyard
 
         // The Cozy Cafe's round tables (centres) and booth rows (centre y): the props, the lamps and
-        // the guests' seats (world/cafe-life.js) all come from these
+        // the guests' seats (directory/cafe-life.js) all come from these
         const CAFE_TABLES = [[505, 385], [628, 470], [505, 560], [628, 650], [505, 740]];
         const CAFE_BOOTHS = [385, 500, 615];
 
@@ -17059,7 +17059,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
                 case 'hotel_lobby': {
                     // Double Nights: furniture in drawLobbyDecorProp (dn_*), floor in drawLobbyInterior,
-                    // glows and the motto in drawLobbyGlow, the crowd in world/lobby-life.js.
+                    // glows and the motto in drawLobbyGlow, the crowd in directory/lobby-life.js.
                     const F = decorPropsIn('#1a1216');
                     const both = (x, y, w, h, t, extra) => [F(x, y, w, h, t, extra), F(1000 - x - w, y, w, h, t, extra)];   // mirrored east–west
                     e.props = [
@@ -17426,7 +17426,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
                 case 'cozy_cafe_interior': {
                     // Cozy Cafe: the furniture art in drawCafeDecorProp (cc_*), the floor in drawCafeInterior,
-                    // the hearth, candles, pendants and steam in drawCafeGlow. Guests: world/cafe-life.js (CAFE).
+                    // the hearth, candles, pendants and steam in drawCafeGlow. Guests: directory/cafe-life.js (CAFE).
                     const F = decorPropsIn('#3a2418');
                     e.props = [
                         // The counter: a long walnut bar with the pastry case at its end, the espresso machine,
@@ -28993,15 +28993,214 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
     </script>
-    <script type="text/dfab" data-src="world/lobby-life.js" data-cost="168">
+    <script type="text/dfab" data-src="directory/venue-crowd.js" data-cost="135">
+        // ===== LV2 DIRECTORY =====
+        // VENUE CROWD: the walker loop that every venue's ambient crowd runs on. The Double Nights lobby
+        // (lobby-life.js), Moon City (club-life.js) and the Cozy Cafe (cafe-life.js) are this class with
+        // their own spots, staff and itineraries. Walkers are not NPCs: no dialogue, no prompts, no
+        // minimap dots. They're cheap, and they can't trip the story. Updated from engine/update.js,
+        // drawn with the characters (engine/draw.js) by Crowd Quality.
+        //
+        // A WALKER has a list of steps. A step with `go` walks there, then holds a pose for `wait` ticks
+        // (`face` to look somewhere, `seatAt` / `seatFace` to sit down on arrival and stand up after,
+        // `hide` to step into a stall). A step without `go` is an ACTIVITY ({ dance }, { seat: 'booth' },
+        // { order }...): the venue's _expand() turns it into stops, claiming what it needs (a stool, a
+        // queue place) from the venue's pools. `exit` steps leave.
+        //
+        // WHAT A VENUE SETS (class fields):
+        //   START_ANGLE      which way a new walker faces
+        //   WALKER_RADIUS    a radius for the walkers, or 0 for none
+        //   PREFILL          share of the crowd target already inside when the venue is entered
+        //   SPAWN_PACE       [thin_share, thin_gap, gap, jitter]: ticks to the next arrival (quicker while thin)
+        //   LEAVE_FADE       how fast a walker with nothing left to do fades out
+        //   EXIT_REACH       how near an exit counts as there (someone may be standing in the door)
+        //   ARRIVE_ONCE      once at a stop, stay put there (true), or walk back if pushed off it (false)
+        //   DRINKS           what a `drink` step fetches
+        // AND WHAT IT WRITES: _setUp(game) (spots, staff), _target(game), _spawnGuest(mid_visit),
+        //   _expand(w, step), _staffThink(w, game); optionally _leave, _abandonStep, _finishStep,
+        //   _afterUpdate and draw.
+        class VenueCrowd {
+            START_ANGLE = -Math.PI / 2;
+            WALKER_RADIUS = 9;
+            PREFILL = 0.8;
+            SPAWN_PACE = [0.7, 40, 90, 80];
+            LEAVE_FADE = -0.05;
+            EXIT_REACH = 26;
+            ARRIVE_ONCE = true;
+            DRINKS = [];
+
+            constructor(map_id) { this.walkers = []; this.map = null; this.taken = new Map(); this.mapId = map_id; }
+
+            /** A fresh crowd for a (re)entered venue: its staff, and a visit already under way. */
+            reset(game) {
+                this.walkers = []; this.map = game.activeMap; this._spawnTimer = 0; this.taken = new Map();
+                const nav = NavGrid.for(this.map);
+                this._snap = ([x, y]) => { const f = nav && nav.nearestFree(x, y, 4); return f !== null && f !== undefined ? [nav.cx(f), nav.cy(f)] : [x, y]; };
+                this._setUp(game);
+                const n = this._target(game);
+                for (let i = 0; i < Math.round(n * this.PREFILL); i++) this._spawnGuest(true);
+            }
+
+            _make(kind, x, y, look) {
+                const w = { kind, x, y, angle: this.START_ANGLE, walkPhase: 0, look, life: 0, fade: 0, steps: [], timer: 0, speed: 1.5, stuck: 0, lastD: Infinity };
+                if (this.WALKER_RADIUS) w.radius = this.WALKER_RADIUS;
+                return w;
+            }
+
+            /** A guest who is already mid-visit when the venue is entered starts where the visit is: in the
+             *  seat their first stop sits them in (so they're seated, cup in hand), or at that stop's spot. */
+            _settleMidVisit(g) {
+                const first = g.steps[0];
+                if (!first || first.go || first.exit) return;
+                g.steps.splice(0, 1, ...this._expand(g, first));
+                const s = g.steps[0];
+                if (!s || !s.go) return;
+                if (s.seatAt) { g.x = s.seatAt[0]; g.y = s.seatAt[1]; g.angle = s.seatFace; g.seated = true; s._arrived = true; s._back = [s.go[0], s.go[1]]; }
+                else { g.x = s.go[0]; g.y = s.go[1]; }
+            }
+
+            // --- POOLS: stools, stalls, queue places, dance-floor cells, one walker each ---
+            /** A free item from a claimable pool, or -1. */
+            _claim(pool, n, w) {
+                let set = this.taken.get(pool); if (!set) this.taken.set(pool, set = new Map());
+                const free = []; for (let i = 0; i < n; i++) if (!set.has(i)) free.push(i);
+                if (!free.length) return -1;
+                const i = free[Math.random() * free.length | 0]; set.set(i, w); return i;
+            }
+            _release(w) { for (const set of this.taken.values()) for (const [k, o] of set) if (o === w) set.delete(k); }
+            _releaseStep(w, step) {
+                if (!step || !step.pool) return;
+                const set = this.taken.get(step.pool); if (!set) return;
+                for (const [k, o] of set) if (o === w) set.delete(k);
+            }
+
+            // --- HOOKS a venue may replace ---
+            /** At an exit: fade out. */
+            _leave(w, step) { if (w.fade >= 0) { w.fade = -0.05; w.angle = Math.PI / 2; } }
+            /** Stuck on the way to a stop for too long: given up. */
+            _abandonStep(w, step) { this._releaseStep(w, step); }
+            /** A stop's wait is over. Glasses get finished; some go back for another (`keep`: not this one, it was just handed over). */
+            _finishStep(w, step) {
+                this._releaseStep(w, step);
+                if (w.look.held && !step.keep && Math.random() < 0.25) w.look.held = null;
+            }
+            _afterUpdate() {}
+
+            update(game) {
+                if (!game.activeMap || game.activeMap.id !== this.mapId) { if (this.walkers.length) { this.walkers = []; this.map = null; } return; }
+                if (this.map !== game.activeMap) this.reset(game);
+                let guests = 0; for (const w of this.walkers) if (w.kind === 'guest') guests++;
+                const target = this._target(game), P = this.SPAWN_PACE;
+                if (--this._spawnTimer <= 0 && guests < target) { this._spawnGuest(false); this._spawnTimer = (guests < target * P[0] ? P[1] : P[2]) + Math.random() * P[3] | 0; }
+                const pl = game.player, M = game.activeMap, nav = NavGrid.for(M);
+                for (let i = this.walkers.length - 1; i >= 0; i--) {
+                    const w = this.walkers[i];
+                    // Fading in (arrival) or out (departure)
+                    if (w.fade > 0) { w.life = Math.min(1, w.life + w.fade); if (w.life >= 1) w.fade = 0; }
+                    if (w.fade < 0) { w.life += w.fade; if (w.life <= 0) { this._release(w); this.walkers.splice(i, 1); continue; } }
+                    // Settling onto a seat (or into a stall), or getting up again: a short glide, no steering
+                    if (w.glide) {
+                        const G = w.glide, k = ++G.t / G.n;
+                        w.x = G.x0 + (G.x1 - G.x0) * Math.min(1, k); w.y = G.y0 + (G.y1 - G.y0) * Math.min(1, k);
+                        if (G.hide) w.life = G.up ? Math.min(1, k) : Math.max(0, 1 - k);
+                        gaitCommand(w, 0, 0);
+                        if (k >= 1) { w.glide = null; if (G.done) G.done(); }
+                        continue;
+                    }
+                    if (w.kind !== 'guest') this._staffThink(w, game);
+                    let step = w.steps[0];
+                    if (!step) { if (w.kind === 'guest' && w.fade >= 0) w.fade = this.LEAVE_FADE; continue; }
+                    for (let k = 0; k < 3 && step && !step.go && !step.exit; k++) {     // an activity: work out where (a fallback may be another activity)
+                        w.steps.splice(0, 1, ...this._expand(w, step));
+                        step = w.steps[0];
+                    }
+                    if (!step) continue;
+                    if (!step.go && !step.exit) { w.steps.shift(); continue; }
+                    const [gx, gy] = step.go, d = Math.hypot(gx - w.x, gy - w.y);
+                    if (d > (step.exit ? this.EXIT_REACH : 6) && !(this.ARRIVE_ONCE && step._arrived)) {
+                        let s = actorSteer(w, gx, gy, w.speed, M), vx = s.x, vy = s.y;
+                        for (const mw of game._makeWay || [pl]) {                          // make way for 949 and her crew
+                            const px = w.x - mw.x, py = w.y - mw.y, pd = Math.hypot(px, py);
+                            if (pd < 34 && pd > 0.1) { vx += (px / pd) * 0.9 - (py / pd) * 0.5; vy += (py / pd) * 0.9 + (px / pd) * 0.5; }
+                        }
+                        for (const o of this.walkers) {                                    // and keep a little room from one another
+                            if (o === w || o.life < 0.5 || o.seated) continue;
+                            const ox = w.x - o.x, oy = w.y - o.y;
+                            if (ox > 20 || ox < -20 || oy > 20 || oy < -20) continue;
+                            const od = Math.hypot(ox, oy);
+                            if (od < 20 && od > 0.1) { vx += (ox / od) * 0.35; vy += (oy / od) * 0.35; }
+                        }
+                        if (nav && !nav.lineWalkable(w.x, w.y, w.x + vx, w.y + vy)) { vx = s.x; vy = s.y; }     // never shoved into furniture
+                        gaitCommand(w, vx, vy); w.x += vx; w.y += vy;
+                        if (Math.abs(vx) + Math.abs(vy) > 0.05) w.angle = Math.atan2(vy, vx);
+                        // Stuck? (blocked by a crowd): give up on this stop after a while
+                        const remaining = s.remaining;                                     // (from this tick's steer: no second route walk)
+                        if (remaining < w.lastD - 0.2) { w.lastD = remaining; w.stuck = 0; }
+                        else if (++w.stuck > 360) { w.steps.shift(); this._abandonStep(w, step); w.stuck = 0; w.lastD = Infinity; }
+                        w.look.pose = undefined;
+                        continue;
+                    }
+                    // Arrived
+                    w.lastD = Infinity; w.stuck = 0;
+                    if (step.exit) { this._leave(w, step); continue; }
+                    if (!step._arrived) {
+                        step._arrived = true;
+                        if (step.seatAt) {                                             // sit down / step into the stall
+                            const back = [w.x, w.y];
+                            w.angle = step.seatFace; w.seated = true;
+                            w.glide = { x0: w.x, y0: w.y, x1: step.seatAt[0], y1: step.seatAt[1], t: 0, n: step.hide ? 26 : 16, hide: step.hide };
+                            step._back = back;
+                            continue;
+                        }
+                    }
+                    if (step.face) w.angle = Math.atan2(step.face[1] - w.y, step.face[0] - w.x);
+                    else if (step.seatFace !== undefined) w.angle = step.seatFace;
+                    w.look.pose = step.hide ? undefined : step.pose;
+                    w.waiting = true;
+                    // A drink, fetched at the bar (the bartender's had it poured); or something handed over here (`give`)
+                    if (step.drink && !w.look.held && step.wait < 200) w.look.held = { type: 'glass', drink: pickFrom(Math.random, this.DRINKS), hand: 'right' };
+                    if (step.give && !w.look.held && step.wait < (step.giveAt || 200)) w.look.held = step.give;
+                    if (step.take && w.look.held && step.wait < (step.takeAt || 30)) w.look.held = null;   // (and set down here)
+                    if (--step.wait <= 0) {
+                        if (step._back) {                                              // get up / come out
+                            const b = step._back; step._back = null;
+                            w.glide = { x0: w.x, y0: w.y, x1: b[0], y1: b[1], t: 0, n: step.hide ? 26 : 14, hide: step.hide, up: true,
+                                        done: () => { w.seated = false; w.steps.shift(); this._releaseStep(w, step); } };
+                            w.look.pose = undefined;
+                            continue;
+                        }
+                        w.steps.shift(); this._finishStep(w, step);
+                    }
+                }
+                this._afterUpdate();
+            }
+
+            /** Walkers for door physics: anyone up and about (not seated or tucked in a stall). */
+            doorActors() { return this.walkers.filter(w => w.life > 0.5 && !w.seated); }
+
+            draw(ctx, cb) {
+                if (!this.walkers.length) return;
+                // In view only (one reused list, sorted by depth); the rest keep their gait (footsteps) ticking
+                const list = this._drawList || (this._drawList = []); list.length = 0;
+                for (const w of this.walkers) { if (w.life <= 0.01) continue; if (!cb || (w.x > cb.left && w.x < cb.right && w.y > cb.top && w.y < cb.bottom)) list.push(w); else { syncHumanoidGait(w); RenderStats.culled++; } }
+                list.sort(_byY);
+                for (const w of list) {
+                    ctx.save(); ctx.translate(w.x, w.y); ctx.rotate(w.angle); ctx.globalAlpha = w.life;
+                    drawCrowdHumanoid(ctx, w, { stance: 'idle', ...w.look });                // by Crowd Quality (ui/crowd-impostors.js)
+                    ctx.restore();
+                }
+            }
+        }
+    </script>
+    <script type="text/dfab" data-src="directory/lobby-life.js" data-cost="127">
+        // ===== LV2 DIRECTORY =====
         // ============================================================================
         //  LOBBY LIFE — the Double Nights lobby's guests and AI staff (hotel_lobby only)
         //  Guests step out of the portals or in at the doors, check in at the desk, then
         //  take the elevators, sit a while in the lounges, or leave the way they came.
         //  Gold bellhops push luggage carts, Blood Moon concierges attend the waiting,
-        //  a silver valet carries cases. They're ambient walkers, not NPCs: no dialogue,
-        //  no prompts, no minimap dots — cheap, and they can't trip the story.
-        //  Updated from engine/update.js, drawn with the characters (engine/draw.js).
+        //  a silver valet carries cases. A VenueCrowd (directory/venue-crowd.js): its walker
+        //  loop; the lobby draws its own (portal blooms, luggage, carts).
         // ============================================================================
         const LOBBY_PORTALS = [[215, 185], [785, 185]];
         const LOBBY_DEPARTURES = [
@@ -29020,14 +29219,19 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         // Population by the pedestrian density setting
         const LOBBY_GUESTS = { low: 8, medium: 14, high: 20 };
 
-        class LobbyLife {
-            constructor() { this.walkers = []; this.map = null; this.spots = null; }
+        class LobbyLife extends VenueCrowd {
+            START_ANGLE = Math.PI / 2;
+            WALKER_RADIUS = 0;
+            PREFILL = 0.7;
+            SPAWN_PACE = [0.75, 25, 60, 50];                                         // arrivals keep pace with departures
+            LEAVE_FADE = -0.04;
+            EXIT_REACH = 6;
+            ARRIVE_ONCE = false;
+            constructor() { super('hotel_lobby'); this.spots = null; }
 
-            /** Fresh crowd for a (re)entered lobby. */
-            reset(game) {
-                this.walkers = []; this.map = game.activeMap; this._spawnTimer = 0;
-                const nav = NavGrid.for(this.map), snap = ([x, y]) => { const f = nav && nav.nearestFree(x, y, 4); return f !== null && f !== undefined ? [nav.cx(f), nav.cy(f)] : [x, y]; };
-                const S = LOBBY_SPOTS;
+            /** The spots (snapped to the walkable floor), and the staff on shift. */
+            _setUp(game) {
+                const S = LOBBY_SPOTS, snap = this._snap;
                 this.spots = { door: snap(S.door), elevators: S.elevators.map(snap), desk: S.desk.map(snap), lounge: S.lounge.map(snap), mill: S.mill.map(snap), posts: S.posts.map(snap), portals: LOBBY_PORTALS.map(snap) };
                 const r = Math.random;
                 // Staff: two gold bellhops with carts, two Blood Moon concierges, a silver valet
@@ -29038,19 +29242,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (kind === 'valet') w.bag = { type: 'case', color: '#2a2a34' };
                     this.walkers.push(w);
                 }
-                // Guests already about the place
-                const n = this._target();
-                for (let i = 0; i < Math.round(n * 0.7); i++) this._spawnGuest(true);
             }
-
-            /** The nearest walkable spot to (x, y). */
-            _free(x, y) { const nav = NavGrid.for(this.map), f = nav && nav.nearestFree(x, y, 4); return f !== null && f !== undefined ? [nav.cx(f), nav.cy(f)] : [x, y]; }
 
             _target() { return LOBBY_GUESTS[GameSettings.pedestrianDensity] || LOBBY_GUESTS.medium; }
-
-            _make(kind, x, y, look) {
-                return { kind, x, y, angle: Math.PI / 2, walkPhase: 0, look, life: 0, fade: 0, steps: [], timer: 0, speed: 1.5, stuck: 0, lastD: Infinity };
-            }
 
             /** A guest arrives: from a portal (in a bloom), through the doors, or (at start) already mid-visit. */
             _spawnGuest(midVisit) {
@@ -29079,63 +29273,23 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.walkers.push(g);
             }
 
-            update(game) {
-                if (!game.activeMap || game.activeMap.id !== 'hotel_lobby') { if (this.walkers.length) { this.walkers = []; this.map = null; } return; }
-                if (this.map !== game.activeMap) this.reset(game);
-                let guests = 0; for (const w of this.walkers) if (w.kind === 'guest') guests++;
-                // Arrivals keep pace with departures: quicker when the lobby is thin
-                if (--this._spawnTimer <= 0 && guests < this._target()) { this._spawnGuest(false); this._spawnTimer = (guests < this._target() * 0.75 ? 25 : 60) + Math.random() * 50 | 0; }
-                const pl = game.player, M = game.activeMap;
-                for (let i = this.walkers.length - 1; i >= 0; i--) {
-                    const w = this.walkers[i];
-                    // Fading in (arrival) or out (departure)
-                    if (w.fade > 0) { w.life = Math.min(1, w.life + w.fade); if (w.life >= 1) w.fade = 0; }
-                    if (w.fade < 0) { w.life += w.fade; if (w.life <= 0) { this.walkers.splice(i, 1); continue; } }
-                    if (w.kind !== 'guest') this._staffThink(w);
-                    const step = w.steps[0];
-                    if (!step) { if (w.kind === 'guest' && w.fade >= 0) w.fade = -0.04; continue; }
-                    // The desk: take a free place in the queue, or skip it when the queue is full
-                    if (step.desk && !step.go) {
-                        const S = this.spots.desk, taken = new Set(this.walkers.filter(o => o !== w && o._slot !== undefined).map(o => o._slot));
-                        const slot = S.findIndex((_, k) => !taken.has(k));
-                        if (slot < 0) { w.steps.shift(); continue; }
-                        w._slot = slot; step.go = S[slot]; step.face = [500, 590];
-                    }
-                    const [gx, gy] = step.go, d = Math.hypot(gx - w.x, gy - w.y);
-                    if (d > 6) {
-                        let s = actorSteer(w, gx, gy, w.speed, M), vx = s.x, vy = s.y;
-                        // Make way for 949, and keep a little room from one another
-                        for (const mw of game._makeWay || [pl]) {                          // make way for 949 and her crew
-                            const px = w.x - mw.x, py = w.y - mw.y, pd = Math.hypot(px, py);
-                            if (pd < 34 && pd > 0.1) { vx += (px / pd) * 0.9 - (py / pd) * 0.5; vy += (py / pd) * 0.9 + (px / pd) * 0.5; }
-                        }
-                        for (const o of this.walkers) {
-                            if (o === w || o.life < 0.5) continue;
-                            const ox = w.x - o.x, oy = w.y - o.y, od = Math.hypot(ox, oy);
-                            if (od < 20 && od > 0.1) { vx += (ox / od) * 0.35; vy += (oy / od) * 0.35; }
-                        }
-                        const nav = NavGrid.for(M);
-                        if (nav && !nav.lineWalkable(w.x, w.y, w.x + vx, w.y + vy)) { vx = s.x; vy = s.y; }     // never shoved into furniture
-                        gaitCommand(w, vx, vy); w.x += vx; w.y += vy;
-                        if (Math.abs(vx) + Math.abs(vy) > 0.05) w.angle = Math.atan2(vy, vx);
-                        // Stuck? (blocked by a crowd): give up on this stop after a while
-                        const remaining = s.remaining;                                     // (from this tick's steer: no second route walk)
-                        if (remaining < w.lastD - 0.2) { w.lastD = remaining; w.stuck = 0; } else if (++w.stuck > 360) { w.steps.shift(); w._slot = undefined; w.stuck = 0; w.lastD = Infinity; }
-                        w.look.pose = undefined;
-                        continue;
-                    }
-                    // Arrived
-                    w.lastD = Infinity; w.stuck = 0;
-                    if (step.exit) {                                                   // gone: into the lift, the portal, the night
-                        if (w.fade >= 0) { w.fade = step.exit === 'portal' ? -0.025 : -0.05; w.exitKind = step.exit; if (step.exit === 'elevator') w.angle = w.x < 500 ? Math.PI : 0; }
-                        continue;
-                    }
-                    if (step.face) w.angle = Math.atan2(step.face[1] - w.y, step.face[0] - w.x);
-                    w.look.pose = step.pose;
-                    w.waiting = true;
-                    if (--step.wait <= 0) { w.steps.shift(); w.waiting = false; w.attended = false; if (step.desk) w._slot = undefined; }
-                }
-                // Luggage follows its owner (rollers trail behind)
+            /** The desk: a free place in the queue, or (when the queue is full) an empty stop, dropped next: skipped. */
+            _expand(w, step) {
+                if (!step.desk) return [step];
+                const S = this.spots.desk, taken = new Set(this.walkers.filter(o => o !== w && o._slot !== undefined).map(o => o._slot));
+                const slot = S.findIndex((_, k) => !taken.has(k));
+                if (slot < 0) return [{}];
+                w._slot = slot; step.go = S[slot]; step.face = [500, 590];
+                return [step];
+            }
+
+            /** Gone: into the lift, the portal, the night. */
+            _leave(w, step) { if (w.fade >= 0) { w.fade = step.exit === 'portal' ? -0.025 : -0.05; w.exitKind = step.exit; if (step.exit === 'elevator') w.angle = w.x < 500 ? Math.PI : 0; } }
+            _abandonStep(w, step) { w._slot = undefined; }
+            _finishStep(w, step) { w.waiting = false; w.attended = false; if (step.desk) w._slot = undefined; }
+
+            /** Luggage follows its owner (rollers trail behind). */
+            _afterUpdate() {
                 for (const w of this.walkers) if (w.bag && w.bag.type === 'roller') {
                     const tx = w.x - Math.cos(w.angle) * 16 + Math.cos(w.angle + Math.PI / 2) * 7, ty = w.y - Math.sin(w.angle) * 16 + Math.sin(w.angle + Math.PI / 2) * 7;
                     if (w.bag.bx === undefined) { w.bag.bx = tx; w.bag.by = ty; }
@@ -29152,7 +29306,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (guest) {
                         guest.attended = true;
                         const side = Math.cos(guest.angle + Math.PI / 2) > 0 ? 1 : -1;
-                        w.steps.push({ go: this._free(guest.x + side * 26, guest.y + 10), face: [guest.x, guest.y], wait: 220, pose: 'concierge' });
+                        w.steps.push({ go: this._snap([guest.x + side * 26, guest.y + 10]), face: [guest.x, guest.y], wait: 220, pose: 'concierge' });
                     } else w.steps.push({ go: S.posts[this.walkers.indexOf(w) % 2], face: [500, 1000], wait: 90, pose: 'concierge' });
                 } else if (w.kind === 'bellhop') {
                     w.steps.push({ go: pickFrom(r, S.portals.concat([S.door])), wait: 80, pose: 'polish' },
@@ -29209,17 +29363,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
     </script>
-    <script type="text/dfab" data-src="world/club-life.js" data-cost="218">
+    <script type="text/dfab" data-src="directory/club-life.js" data-cost="124">
+        // ===== LV2 DIRECTORY =====
         // ============================================================================
         //  CLUB LIFE — Moon City's crowd (moon_city_nightclub only)
         //  Clubgoers come in past the bouncer, check a coat, then spend the night between
         //  the dance floor, the bar (a stool or the rail, and a drink that stays in hand),
         //  the booths and high-tops, and the restrooms (a stall, the urinals, the mirrors),
         //  and leave the way they came. A barback works the floor, an attendant keeps the
-        //  powder room. Like the lobby's guests (world/lobby-life.js) they're ambient
-        //  walkers, not NPCs: no dialogue, no prompts — cheap, and they can't trip the story.
+        //  powder room. A VenueCrowd (directory/venue-crowd.js): its walker loop, pools and draw.
         //  Busiest late (22:00–03:00), a handful by day. They push the restroom doors.
-        //  Updated from engine/update.js, drawn with the characters (engine/draw.js).
         // ============================================================================
         const CLUB_GATE = [800, 1150];
         const CLUB_STOOLS = [280, 343, 406, 595, 658, 721];                       // bar stool centres (x 510)
@@ -29251,14 +29404,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         const CLUB_CROWD = { low: 14, medium: 24, high: 34 };
         const CLUB_DRINKS = ['neon', 'neon', 'martini', 'champagne', 'rose', 'cream_soda', 'whiskey', 'red_wine', 'stellar_lemonade'];
 
-        class ClubLife {
-            constructor() { this.walkers = []; this.map = null; this.taken = new Map(); this.mapId = 'moon_city_nightclub'; }
+        class ClubLife extends VenueCrowd {
+            DRINKS = CLUB_DRINKS;
+            constructor() { super('moon_city_nightclub'); }
 
-            /** Fresh crowd for a (re)entered club. */
-            reset(game) {
-                this.walkers = []; this.map = game.activeMap; this._spawnTimer = 0; this.taken = new Map();
-                const nav = NavGrid.for(this.map), snap = ([x, y]) => { const f = nav && nav.nearestFree(x, y, 4); return f !== null && f !== undefined ? [nav.cx(f), nav.cy(f)] : [x, y]; };
-                this._snap = snap;
+            /** The dance floor, and the staff on shift. */
+            _setUp(game) {
                 // Dance-floor cells (40 px grid), clear of the poles and the club's own dancers
                 const dancers = (this.map.npcs || []).filter(n => n.role === 'dancer' || n.role === 'red_demon_dancer').map(n => [n.x, n.y]);
                 const block = CLUB_POLES.concat(dancers);
@@ -29275,9 +29426,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     w.life = 1; w.speed = kind === 'barback' ? 1.8 : 1.4;
                     this.walkers.push(w);
                 }
-                // A night already under way
-                const n = this._target(game);
-                for (let i = 0; i < Math.round(n * 0.8); i++) this._spawnGuest(true);
             }
 
             /** How full the club is: the density setting, scaled by the hour (busiest 22:00–03:00). */
@@ -29287,19 +29435,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const k = h >= 22 || h < 3 ? 1 : h >= 20 ? 0.6 + (h - 20) * 0.2 : h < 5 ? 1 - (h - 3) * 0.3 : h >= 17 ? 0.35 : 0.2;
                 return Math.max(3, Math.round(base * k));
             }
-
-            _make(kind, x, y, look) {
-                return { kind, x, y, angle: -Math.PI / 2, walkPhase: 0, look, life: 0, fade: 0, steps: [], timer: 0, speed: 1.5, stuck: 0, lastD: Infinity, radius: 9 };
-            }
-
-            /** A free item from a claimable pool (stalls, stools, cells…), or -1. */
-            _claim(pool, n, w) {
-                let set = this.taken.get(pool); if (!set) this.taken.set(pool, set = new Map());
-                const free = []; for (let i = 0; i < n; i++) if (!set.has(i)) free.push(i);
-                if (!free.length) return -1;
-                const i = free[Math.random() * free.length | 0]; set.set(i, w); return i;
-            }
-            _release(w) { for (const set of this.taken.values()) for (const [k, o] of set) if (o === w) set.delete(k); }
 
             /** A clubgoer walks in, or (when the club is entered) is already somewhere in the night. */
             _spawnGuest(midVisit) {
@@ -29375,99 +29510,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return [step];
             }
 
-            update(game) {
-                if (!game.activeMap || game.activeMap.id !== this.mapId) { if (this.walkers.length) { this.walkers = []; this.map = null; } return; }
-                if (this.map !== game.activeMap) this.reset(game);
-                let guests = 0; for (const w of this.walkers) if (w.kind === 'guest') guests++;
-                const target = this._target(game);
-                if (--this._spawnTimer <= 0 && guests < target) { this._spawnGuest(false); this._spawnTimer = (guests < target * 0.7 ? 40 : 90) + Math.random() * 80 | 0; }
-                const pl = game.player, M = game.activeMap, nav = NavGrid.for(M);
-                for (let i = this.walkers.length - 1; i >= 0; i--) {
-                    const w = this.walkers[i];
-                    if (w.fade > 0) { w.life = Math.min(1, w.life + w.fade); if (w.life >= 1) w.fade = 0; }
-                    if (w.fade < 0) { w.life += w.fade; if (w.life <= 0) { this._release(w); this.walkers.splice(i, 1); continue; } }
-                    // Settling onto a seat (or into a stall), or getting up again: a short glide, no steering
-                    if (w.glide) {
-                        const G = w.glide, k = ++G.t / G.n;
-                        w.x = G.x0 + (G.x1 - G.x0) * Math.min(1, k); w.y = G.y0 + (G.y1 - G.y0) * Math.min(1, k);
-                        if (G.hide) w.life = G.up ? Math.min(1, k) : Math.max(0, 1 - k);
-                        gaitCommand(w, 0, 0);
-                        if (k >= 1) { w.glide = null; if (G.done) G.done(); }
-                        continue;
-                    }
-                    if (w.kind !== 'guest') this._staffThink(w, game);
-                    let step = w.steps[0];
-                    if (!step) { if (w.kind === 'guest' && w.fade >= 0) w.fade = -0.05; continue; }
-                    for (let k = 0; k < 3 && step && !step.go && !step.exit; k++) {     // an activity: work out where (a fallback may be another activity)
-                        w.steps.splice(0, 1, ...this._expand(w, step));
-                        step = w.steps[0];
-                    }
-                    if (!step) continue;
-                    if (!step.go && !step.exit) { w.steps.shift(); continue; }
-                    const [gx, gy] = step.go, d = Math.hypot(gx - w.x, gy - w.y);
-                    if (d > (step.exit ? 26 : 6) && !step._arrived) {                       // (the door: near enough, someone may be standing in it)
-                        let s = actorSteer(w, gx, gy, w.speed, M), vx = s.x, vy = s.y;
-                        for (const mw of game._makeWay || [pl]) {                          // make way for 949 and her crew
-                            const px = w.x - mw.x, py = w.y - mw.y, pd = Math.hypot(px, py);
-                            if (pd < 34 && pd > 0.1) { vx += (px / pd) * 0.9 - (py / pd) * 0.5; vy += (py / pd) * 0.9 + (px / pd) * 0.5; }
-                        }
-                        for (const o of this.walkers) {
-                            if (o === w || o.life < 0.5 || o.seated) continue;
-                            const ox = w.x - o.x, oy = w.y - o.y;
-                            if (ox > 20 || ox < -20 || oy > 20 || oy < -20) continue;
-                            const od = Math.hypot(ox, oy);
-                            if (od < 20 && od > 0.1) { vx += (ox / od) * 0.35; vy += (oy / od) * 0.35; }
-                        }
-                        if (nav && !nav.lineWalkable(w.x, w.y, w.x + vx, w.y + vy)) { vx = s.x; vy = s.y; }
-                        gaitCommand(w, vx, vy); w.x += vx; w.y += vy;
-                        if (Math.abs(vx) + Math.abs(vy) > 0.05) w.angle = Math.atan2(vy, vx);
-                        const remaining = s.remaining;                                     // (from this tick's steer: no second route walk)
-                        if (remaining < w.lastD - 0.2) { w.lastD = remaining; w.stuck = 0; }
-                        else if (++w.stuck > 360) { w.steps.shift(); this._releaseStep(w, step); w.stuck = 0; w.lastD = Infinity; }
-                        w.look.pose = undefined;
-                        continue;
-                    }
-                    // Arrived
-                    w.lastD = Infinity; w.stuck = 0;
-                    if (step.exit) { if (w.fade >= 0) { w.fade = -0.05; w.angle = Math.PI / 2; } continue; }
-                    if (!step._arrived) {
-                        step._arrived = true;
-                        if (step.seatAt) {                                             // sit down / step into the stall
-                            const back = [w.x, w.y];
-                            w.angle = step.seatFace; w.seated = true;
-                            w.glide = { x0: w.x, y0: w.y, x1: step.seatAt[0], y1: step.seatAt[1], t: 0, n: step.hide ? 26 : 16, hide: step.hide };
-                            step._back = back;
-                            continue;
-                        }
-                    }
-                    if (step.face) w.angle = Math.atan2(step.face[1] - w.y, step.face[0] - w.x);
-                    else if (step.seatFace !== undefined) w.angle = step.seatFace;
-                    w.look.pose = step.hide ? undefined : step.pose;
-                    // A drink, fetched at the bar (the bartender's had it poured); or something handed over here (`give`)
-                    if (step.drink && !w.look.held && step.wait < 200) w.look.held = { type: 'glass', drink: pickFrom(Math.random, CLUB_DRINKS), hand: 'right' };
-                    if (step.give && !w.look.held && step.wait < (step.giveAt || 200)) w.look.held = step.give;
-                    if (step.take && w.look.held && step.wait < (step.takeAt || 30)) w.look.held = null;   // (and set down here)
-                    if (--step.wait <= 0) {
-                        if (step._back) {                                              // get up / come out
-                            const b = step._back; step._back = null;
-                            w.glide = { x0: w.x, y0: w.y, x1: b[0], y1: b[1], t: 0, n: step.hide ? 26 : 14, hide: step.hide, up: true,
-                                        done: () => { w.seated = false; w.steps.shift(); this._releaseStep(w, step); } };
-                            w.look.pose = undefined;
-                            continue;
-                        }
-                        w.steps.shift(); this._releaseStep(w, step);
-                        // Glasses get finished; some go back for another (`keep`: not this one, it was just handed over)
-                        if (w.look.held && !step.keep && Math.random() < 0.25) w.look.held = null;
-                    }
-                }
-            }
-
-            _releaseStep(w, step) {
-                if (!step || !step.pool) return;
-                const set = this.taken.get(step.pool); if (!set) return;
-                for (const [k, o] of set) if (o === w) set.delete(k);
-            }
-
             /** Staff: the bouncer turns to each arrival, the barback clears glasses, the attendant tidies. */
             _staffThink(w, game) {
                 if (w.kind === 'bouncer') {
@@ -29484,25 +29526,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 else w.steps.push({ go: this._snap(S.attendant), face: [150, 30], wait: 300, pose: pickFrom(r, ['concierge', 'arms_crossed']) },
                                   { go: this._snap(pickFrom(r, S.mirrors)), face: [150, 30], wait: 120, pose: 'polish' });
             }
-
-            /** Walkers for door physics: anyone up and about (not seated or tucked in a stall). */
-            doorActors() { return this.walkers.filter(w => w.life > 0.5 && !w.seated); }
-
-            draw(ctx, cb) {
-                if (!this.walkers.length) return;
-                // In view only (one reused list, sorted by depth); the rest keep their gait (footsteps) ticking
-                const list = this._drawList || (this._drawList = []); list.length = 0;
-                for (const w of this.walkers) { if (w.life <= 0.01) continue; if (!cb || (w.x > cb.left && w.x < cb.right && w.y > cb.top && w.y < cb.bottom)) list.push(w); else { syncHumanoidGait(w); RenderStats.culled++; } }
-                list.sort(_byY);
-                for (const w of list) {
-                    ctx.save(); ctx.translate(w.x, w.y); ctx.rotate(w.angle); ctx.globalAlpha = w.life;
-                    drawCrowdHumanoid(ctx, w, { stance: 'idle', ...w.look });                // by Crowd Quality (ui/crowd-impostors.js)
-                    ctx.restore();
-                }
-            }
         }
     </script>
-    <script type="text/dfab" data-src="world/cafe-life.js" data-cost="103">
+    <script type="text/dfab" data-src="directory/cafe-life.js" data-cost="101">
+        // ===== LV2 DIRECTORY =====
         // ============================================================================
         //  CAFE LIFE — the Cozy Cafe's guests (cozy_cafe_interior only)
         //  They come in from the street, queue at the counter, order, wait for their cup
@@ -29511,9 +29538,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         //  pastry case first; friends come in pairs and share a table. Visits are long and
         //  calm (a minute or two seated), the walk unhurried. A second barista carries
         //  cups out to the tables and polishes. Busy in the morning and late afternoon,
-        //  a few night owls after dark. Built on ClubLife's walker loop (world/club-life.js):
-        //  ambient walkers, not NPCs — no dialogue, no prompts. Updated from update.js,
-        //  drawn with the characters (draw.js), by Crowd Quality.
+        //  a few night owls after dark. A VenueCrowd (directory/venue-crowd.js): its walker
+        //  loop, pools and draw. Whoever is already in when you walk in starts in their seat.
         // ============================================================================
         const CAFE_GATE = [600, 896];
         const CAFE_SPOTS = {
@@ -29539,19 +29565,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             bench: [[105, 926], [222, 926], [288, 926], [398, 926], [792, 926], [892, 926]].map(([x, y]) => ({ at: [x, y], from: [x, 878], face: -Math.PI / 2 }))
         };
 
-        class CafeLife extends ClubLife {
-            constructor() { super(); this.mapId = 'cozy_cafe_interior'; }
+        class CafeLife extends VenueCrowd {
+            PREFILL = 0.75;
+            DRINKS = CAFE_DRINKS;
+            constructor() { super('cozy_cafe_interior'); }
 
-            /** A fresh café: the barista on shift, and the day's regulars already settled in. */
-            reset(game) {
-                this.walkers = []; this.map = game.activeMap; this._spawnTimer = 0; this.taken = new Map();
-                const nav = NavGrid.for(this.map);
-                this._snap = ([x, y]) => { const f = nav && nav.nearestFree(x, y, 4); return f !== null && f !== undefined ? [nav.cx(f), nav.cy(f)] : [x, y]; };
+            /** The barista on shift. (The day's regulars are already settled in: VenueCrowd.reset.) */
+            _setUp(game) {
                 const staff = this._make('runner', CAFE_SPOTS.staffHome[0], CAFE_SPOTS.staffHome[1], ROLE_LOOKS.cafe_staff(seededRandom('cafe_staff')));
                 staff.life = 1; staff.speed = 1.2;
                 this.walkers.push(staff);
-                const n = this._target(game);
-                for (let i = 0; i < Math.round(n * 0.75); i++) this._spawnGuest(true);
             }
 
             /** How full: the density setting, scaled by the hour (mornings and late afternoons are busy). */
@@ -29597,6 +29620,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                     if (!pairChairs && r() < 0.2) g.steps.push({ browse: 'record' });
                     g.steps.push({ exit: true, go: CAFE_GATE });
+                    if (midVisit) this._settleMidVisit(g);                              // in their seat already, not at the door
                     this.walkers.push(g);
                 });
             }
@@ -72404,9 +72428,9 @@ Object.assign(TrafficVehicle.prototype, {
                 };
                 this.flitVFX = []; // Active flit visual effects (ghost afterimages, lightning trails)
                 this.graveyardGhosts = []; // Procedural humanoid ghosts in the cemetery
-                this.lobbyLife = new LobbyLife(); // The Double Nights lobby's guests and staff (world/lobby-life.js)
-                this.clubLife = new ClubLife();   // Moon City's crowd (world/club-life.js)
-                this.cafeLife = new CafeLife();   // the Cozy Cafe's guests (world/cafe-life.js)
+                this.lobbyLife = new LobbyLife(); // The Double Nights lobby's guests and staff (directory/lobby-life.js)
+                this.clubLife = new ClubLife();   // Moon City's crowd (directory/club-life.js)
+                this.cafeLife = new CafeLife();   // the Cozy Cafe's guests (directory/cafe-life.js)
                 this.furniture = new FurnitureSystem(this);   // grab and move the apartment's furniture (engine/furniture.js)
                 
                 // Time slow system for dramatic moments (boss kills, etc.)

@@ -1,11 +1,11 @@
+        // ===== LV2 DIRECTORY =====
         // ============================================================================
         //  LOBBY LIFE — the Double Nights lobby's guests and AI staff (hotel_lobby only)
         //  Guests step out of the portals or in at the doors, check in at the desk, then
         //  take the elevators, sit a while in the lounges, or leave the way they came.
         //  Gold bellhops push luggage carts, Blood Moon concierges attend the waiting,
-        //  a silver valet carries cases. They're ambient walkers, not NPCs: no dialogue,
-        //  no prompts, no minimap dots — cheap, and they can't trip the story.
-        //  Updated from engine/update.js, drawn with the characters (engine/draw.js).
+        //  a silver valet carries cases. A VenueCrowd (directory/venue-crowd.js): its walker
+        //  loop; the lobby draws its own (portal blooms, luggage, carts).
         // ============================================================================
         const LOBBY_PORTALS = [[215, 185], [785, 185]];
         const LOBBY_DEPARTURES = [
@@ -24,14 +24,19 @@
         // Population by the pedestrian density setting
         const LOBBY_GUESTS = { low: 8, medium: 14, high: 20 };
 
-        class LobbyLife {
-            constructor() { this.walkers = []; this.map = null; this.spots = null; }
+        class LobbyLife extends VenueCrowd {
+            START_ANGLE = Math.PI / 2;
+            WALKER_RADIUS = 0;
+            PREFILL = 0.7;
+            SPAWN_PACE = [0.75, 25, 60, 50];                                         // arrivals keep pace with departures
+            LEAVE_FADE = -0.04;
+            EXIT_REACH = 6;
+            ARRIVE_ONCE = false;
+            constructor() { super('hotel_lobby'); this.spots = null; }
 
-            /** Fresh crowd for a (re)entered lobby. */
-            reset(game) {
-                this.walkers = []; this.map = game.activeMap; this._spawnTimer = 0;
-                const nav = NavGrid.for(this.map), snap = ([x, y]) => { const f = nav && nav.nearestFree(x, y, 4); return f !== null && f !== undefined ? [nav.cx(f), nav.cy(f)] : [x, y]; };
-                const S = LOBBY_SPOTS;
+            /** The spots (snapped to the walkable floor), and the staff on shift. */
+            _setUp(game) {
+                const S = LOBBY_SPOTS, snap = this._snap;
                 this.spots = { door: snap(S.door), elevators: S.elevators.map(snap), desk: S.desk.map(snap), lounge: S.lounge.map(snap), mill: S.mill.map(snap), posts: S.posts.map(snap), portals: LOBBY_PORTALS.map(snap) };
                 const r = Math.random;
                 // Staff: two gold bellhops with carts, two Blood Moon concierges, a silver valet
@@ -42,19 +47,9 @@
                     if (kind === 'valet') w.bag = { type: 'case', color: '#2a2a34' };
                     this.walkers.push(w);
                 }
-                // Guests already about the place
-                const n = this._target();
-                for (let i = 0; i < Math.round(n * 0.7); i++) this._spawnGuest(true);
             }
-
-            /** The nearest walkable spot to (x, y). */
-            _free(x, y) { const nav = NavGrid.for(this.map), f = nav && nav.nearestFree(x, y, 4); return f !== null && f !== undefined ? [nav.cx(f), nav.cy(f)] : [x, y]; }
 
             _target() { return LOBBY_GUESTS[GameSettings.pedestrianDensity] || LOBBY_GUESTS.medium; }
-
-            _make(kind, x, y, look) {
-                return { kind, x, y, angle: Math.PI / 2, walkPhase: 0, look, life: 0, fade: 0, steps: [], timer: 0, speed: 1.5, stuck: 0, lastD: Infinity };
-            }
 
             /** A guest arrives: from a portal (in a bloom), through the doors, or (at start) already mid-visit. */
             _spawnGuest(midVisit) {
@@ -83,63 +78,23 @@
                 this.walkers.push(g);
             }
 
-            update(game) {
-                if (!game.activeMap || game.activeMap.id !== 'hotel_lobby') { if (this.walkers.length) { this.walkers = []; this.map = null; } return; }
-                if (this.map !== game.activeMap) this.reset(game);
-                let guests = 0; for (const w of this.walkers) if (w.kind === 'guest') guests++;
-                // Arrivals keep pace with departures: quicker when the lobby is thin
-                if (--this._spawnTimer <= 0 && guests < this._target()) { this._spawnGuest(false); this._spawnTimer = (guests < this._target() * 0.75 ? 25 : 60) + Math.random() * 50 | 0; }
-                const pl = game.player, M = game.activeMap;
-                for (let i = this.walkers.length - 1; i >= 0; i--) {
-                    const w = this.walkers[i];
-                    // Fading in (arrival) or out (departure)
-                    if (w.fade > 0) { w.life = Math.min(1, w.life + w.fade); if (w.life >= 1) w.fade = 0; }
-                    if (w.fade < 0) { w.life += w.fade; if (w.life <= 0) { this.walkers.splice(i, 1); continue; } }
-                    if (w.kind !== 'guest') this._staffThink(w);
-                    const step = w.steps[0];
-                    if (!step) { if (w.kind === 'guest' && w.fade >= 0) w.fade = -0.04; continue; }
-                    // The desk: take a free place in the queue, or skip it when the queue is full
-                    if (step.desk && !step.go) {
-                        const S = this.spots.desk, taken = new Set(this.walkers.filter(o => o !== w && o._slot !== undefined).map(o => o._slot));
-                        const slot = S.findIndex((_, k) => !taken.has(k));
-                        if (slot < 0) { w.steps.shift(); continue; }
-                        w._slot = slot; step.go = S[slot]; step.face = [500, 590];
-                    }
-                    const [gx, gy] = step.go, d = Math.hypot(gx - w.x, gy - w.y);
-                    if (d > 6) {
-                        let s = actorSteer(w, gx, gy, w.speed, M), vx = s.x, vy = s.y;
-                        // Make way for 949, and keep a little room from one another
-                        for (const mw of game._makeWay || [pl]) {                          // make way for 949 and her crew
-                            const px = w.x - mw.x, py = w.y - mw.y, pd = Math.hypot(px, py);
-                            if (pd < 34 && pd > 0.1) { vx += (px / pd) * 0.9 - (py / pd) * 0.5; vy += (py / pd) * 0.9 + (px / pd) * 0.5; }
-                        }
-                        for (const o of this.walkers) {
-                            if (o === w || o.life < 0.5) continue;
-                            const ox = w.x - o.x, oy = w.y - o.y, od = Math.hypot(ox, oy);
-                            if (od < 20 && od > 0.1) { vx += (ox / od) * 0.35; vy += (oy / od) * 0.35; }
-                        }
-                        const nav = NavGrid.for(M);
-                        if (nav && !nav.lineWalkable(w.x, w.y, w.x + vx, w.y + vy)) { vx = s.x; vy = s.y; }     // never shoved into furniture
-                        gaitCommand(w, vx, vy); w.x += vx; w.y += vy;
-                        if (Math.abs(vx) + Math.abs(vy) > 0.05) w.angle = Math.atan2(vy, vx);
-                        // Stuck? (blocked by a crowd): give up on this stop after a while
-                        const remaining = s.remaining;                                     // (from this tick's steer: no second route walk)
-                        if (remaining < w.lastD - 0.2) { w.lastD = remaining; w.stuck = 0; } else if (++w.stuck > 360) { w.steps.shift(); w._slot = undefined; w.stuck = 0; w.lastD = Infinity; }
-                        w.look.pose = undefined;
-                        continue;
-                    }
-                    // Arrived
-                    w.lastD = Infinity; w.stuck = 0;
-                    if (step.exit) {                                                   // gone: into the lift, the portal, the night
-                        if (w.fade >= 0) { w.fade = step.exit === 'portal' ? -0.025 : -0.05; w.exitKind = step.exit; if (step.exit === 'elevator') w.angle = w.x < 500 ? Math.PI : 0; }
-                        continue;
-                    }
-                    if (step.face) w.angle = Math.atan2(step.face[1] - w.y, step.face[0] - w.x);
-                    w.look.pose = step.pose;
-                    w.waiting = true;
-                    if (--step.wait <= 0) { w.steps.shift(); w.waiting = false; w.attended = false; if (step.desk) w._slot = undefined; }
-                }
-                // Luggage follows its owner (rollers trail behind)
+            /** The desk: a free place in the queue, or (when the queue is full) an empty stop, dropped next: skipped. */
+            _expand(w, step) {
+                if (!step.desk) return [step];
+                const S = this.spots.desk, taken = new Set(this.walkers.filter(o => o !== w && o._slot !== undefined).map(o => o._slot));
+                const slot = S.findIndex((_, k) => !taken.has(k));
+                if (slot < 0) return [{}];
+                w._slot = slot; step.go = S[slot]; step.face = [500, 590];
+                return [step];
+            }
+
+            /** Gone: into the lift, the portal, the night. */
+            _leave(w, step) { if (w.fade >= 0) { w.fade = step.exit === 'portal' ? -0.025 : -0.05; w.exitKind = step.exit; if (step.exit === 'elevator') w.angle = w.x < 500 ? Math.PI : 0; } }
+            _abandonStep(w, step) { w._slot = undefined; }
+            _finishStep(w, step) { w.waiting = false; w.attended = false; if (step.desk) w._slot = undefined; }
+
+            /** Luggage follows its owner (rollers trail behind). */
+            _afterUpdate() {
                 for (const w of this.walkers) if (w.bag && w.bag.type === 'roller') {
                     const tx = w.x - Math.cos(w.angle) * 16 + Math.cos(w.angle + Math.PI / 2) * 7, ty = w.y - Math.sin(w.angle) * 16 + Math.sin(w.angle + Math.PI / 2) * 7;
                     if (w.bag.bx === undefined) { w.bag.bx = tx; w.bag.by = ty; }
@@ -156,7 +111,7 @@
                     if (guest) {
                         guest.attended = true;
                         const side = Math.cos(guest.angle + Math.PI / 2) > 0 ? 1 : -1;
-                        w.steps.push({ go: this._free(guest.x + side * 26, guest.y + 10), face: [guest.x, guest.y], wait: 220, pose: 'concierge' });
+                        w.steps.push({ go: this._snap([guest.x + side * 26, guest.y + 10]), face: [guest.x, guest.y], wait: 220, pose: 'concierge' });
                     } else w.steps.push({ go: S.posts[this.walkers.indexOf(w) % 2], face: [500, 1000], wait: 90, pose: 'concierge' });
                 } else if (w.kind === 'bellhop') {
                     w.steps.push({ go: pickFrom(r, S.portals.concat([S.door])), wait: 80, pose: 'polish' },

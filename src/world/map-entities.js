@@ -29,7 +29,7 @@
         const HUB_OLLO_DOOR = { x: 8640, y: 13080, w: 80, h: 60 };   // the OllO Plaza door, on the southern edge east of the graveyard
 
         // The Cozy Cafe's round tables (centres) and booth rows (centre y): the props, the lamps and
-        // the guests' seats (world/cafe-life.js) all come from these
+        // the guests' seats (directory/cafe-life.js) all come from these
         const CAFE_TABLES = [[505, 385], [628, 470], [505, 560], [628, 650], [505, 740]];
         const CAFE_BOOTHS = [385, 500, 615];
 
@@ -182,7 +182,7 @@
 
                 case 'hotel_lobby': {
                     // Double Nights: furniture in drawLobbyDecorProp (dn_*), floor in drawLobbyInterior,
-                    // glows and the motto in drawLobbyGlow, the crowd in world/lobby-life.js.
+                    // glows and the motto in drawLobbyGlow, the crowd in directory/lobby-life.js.
                     const F = decorPropsIn('#1a1216');
                     const both = (x, y, w, h, t, extra) => [F(x, y, w, h, t, extra), F(1000 - x - w, y, w, h, t, extra)];   // mirrored east–west
                     e.props = [
@@ -549,7 +549,7 @@
 
                 case 'cozy_cafe_interior': {
                     // Cozy Cafe: the furniture art in drawCafeDecorProp (cc_*), the floor in drawCafeInterior,
-                    // the hearth, candles, pendants and steam in drawCafeGlow. Guests: world/cafe-life.js (CAFE).
+                    // the hearth, candles, pendants and steam in drawCafeGlow. Guests: directory/cafe-life.js (CAFE).
                     const F = decorPropsIn('#3a2418');
                     e.props = [
                         // The counter: a long walnut bar with the pastry case at its end, the espresso machine,
