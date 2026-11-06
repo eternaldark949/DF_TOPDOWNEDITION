@@ -47,6 +47,9 @@ const SCRIPTS = [
     'basement/canvas-kit.js',      // LV0 Basement: canvasKit (off-screen layers)
     'basement/life-kit.js',        // LV0 Basement: lifeKit (lists of short-lived things)
     'basement/sound-kit.js',       // LV0 Basement: soundKit (Web Audio building blocks)
+    'basement/entity-base.js',     // LV0 Basement: GameEntity (the base of everything that moves or collides)
+    'basement/shape-kit.js',       // LV0 Basement: shapeKit (collision geometry)
+    'basement/spatial-grid.js',    // LV0 Basement: SpatialHashGrid and the render / transition grids
     'core/config.js',
     '@assets',              // generated from the assets/ folder
     'core/assets.js',
@@ -68,9 +71,8 @@ const SCRIPTS = [
     'world/rooms.js',
     'world/maps.js',
     'world/map-entities.js',
-    'physics/spatial.js',
-    'physics/game-entity.js',
-    'physics/collision.js',
+    'directory/car-contact.js',
+    'directory/collision-system.js',
     'entities/props-decor.js',
     'entities/prop-sprites.js',
     'entities/vehicles-minigames.js',

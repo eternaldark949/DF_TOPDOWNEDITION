@@ -5868,7 +5868,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '41b471875e18';
+        const DFAB_BUILD = 'b3bd8660dbe5';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="26">
         // ===== LV0 BASEMENT =====
@@ -6174,6 +6174,1226 @@
                 return true;
             }
         };
+    </script>
+    <script type="text/dfab" data-src="basement/entity-base.js" data-cost="150">
+        // ===== LV0 BASEMENT =====
+        // =====================================================================
+        //  GAME ENTITY (Base Class)
+        // =====================================================================
+        /**
+         * All game objects inherit from this.
+         * Provides position, collision config, screen culling, and queue-based registration.
+         * 
+         * REGISTRATION FLOW:
+         * 1. Entity constructor adds self to registrationQueue
+         * 2. CollisionSystem.processQueue() processes all queued entities
+         * 3. Entities get added to registry.all, registry.collidable, etc.
+         * 4. Queue is cleared after processing
+         */
+                // ╔══════════════════════════════════════════════════════════════════╗
+        // ║                      ENTITY SYSTEM                                ║
+        // ╚══════════════════════════════════════════════════════════════════╝
+        class GameEntity {
+            // === REGISTRATION QUEUE ===
+            static registrationQueue = [];   // Entities waiting to be registered
+            static queueEnabled = true;      // When false, register immediately (legacy support)
+            
+            // === STATIC REGISTRY ===
+            static registry = {
+                all: [],              // Every entity
+                collidable: [],       // Entities with hasCollision: true
+                byLayer: {},          // Grouped by collision layer name
+                byType: {}            // Grouped by entity type (for targeted updates)
+            };
+            
+            // === COLLISION LAYERS (Bitmask) ===
+            static LAYER = {
+                NONE:       0,
+                STATIC:     1,
+                DYNAMIC:    2,
+                ACTOR:      4,
+                VEHICLE:    8,
+                PROJECTILE: 16,
+                TRIGGER:    32
+            };
+            
+            // === COLLISION SHAPES ===
+            static SHAPE = {
+                AABB:   'AABB',       // Axis-aligned bounding box
+                CIRCLE: 'CIRCLE',     // Circle (uses radius)
+                OBB:    'OBB'         // Oriented bounding box (rotated rect)
+            };
+            
+            // Auto-increment ID
+            static _nextId = 1;
+            
+            constructor(config = {}) {
+                // --- IDENTITY ---
+                this.id = GameEntity._nextId++;
+                this.type = config.type || 'entity';
+                this.name = config.name || null;
+                
+                // --- TRANSFORM ---
+                this.x = config.x ?? 0;
+                this.y = config.y ?? 0;
+                this.angle = config.angle ?? 0;
+                
+                // --- DIMENSIONS ---
+                this.width = config.width ?? config.w ?? 20;
+                this.height = config.height ?? config.h ?? 20;
+                this.radius = config.radius ?? Math.max(this.width, this.height) / 2;
+                
+                // --- PHYSICS ---
+                this.vx = config.vx ?? 0;
+                this.vy = config.vy ?? 0;
+                this.angularVel = config.angularVel ?? 0;
+                this.mass = config.mass ?? 1;
+                this.friction = config.friction ?? 0.8;
+                this.restitution = config.restitution ?? 0.3;  // Bounciness
+                this.isStatic = config.isStatic ?? false;
+                
+                // --- COLLISION CONFIG ---
+                this.hasCollision = config.hasCollision ?? false;
+                this.collisionShape = config.collisionShape ?? GameEntity.SHAPE.AABB;
+                this.collisionLayer = config.collisionLayer ?? GameEntity.LAYER.NONE;
+                this.collisionMask = config.collisionMask ?? 0xFFFF;
+                this.isTrigger = config.isTrigger ?? false;
+                
+                // --- LIFECYCLE ---
+                this.active = true;
+                this.visible = config.visible ?? true;
+                this.markedForDestroy = false;
+                
+                // --- CUSTOM DATA ---
+                this.data = config.data || {};
+                
+                // --- ENQUEUE FOR REGISTRATION ---
+                this._enqueue();
+            }
+            
+            // =====================
+            //  REGISTRATION (Queue-Based)
+            // =====================
+            
+            /**
+             * Add entity to registration queue.
+             * If queue is disabled, register immediately (legacy/runtime spawns).
+             */
+            _enqueue() {
+                if (GameEntity.queueEnabled) {
+                    GameEntity.registrationQueue.push(this);
+                } else {
+                    this._doRegister();
+                }
+            }
+            
+            /**
+             * Actually register entity in registry.
+             * Called by CollisionSystem.processQueue() or immediately if queue disabled.
+             */
+            _doRegister() {
+                // Avoid double registration
+                if (GameEntity.registry.all.includes(this)) return;
+                
+                GameEntity.registry.all.push(this);
+                
+                if (!GameEntity.registry.byType[this.type]) {
+                    GameEntity.registry.byType[this.type] = [];
+                }
+                GameEntity.registry.byType[this.type].push(this);
+                
+                if (this.hasCollision) {
+                    this._registerCollision();
+                }
+            }
+            
+            /**
+             * Legacy method - now calls _doRegister
+             */
+            _register() {
+                this._doRegister();
+            }
+            
+            _registerCollision() {
+                if (GameEntity.registry.collidable.includes(this)) return;
+                
+                GameEntity.registry.collidable.push(this);
+                
+                const layerName = this._getLayerName();
+                if (!GameEntity.registry.byLayer[layerName]) {
+                    GameEntity.registry.byLayer[layerName] = [];
+                }
+                GameEntity.registry.byLayer[layerName].push(this);
+            }
+            
+            _unregister() {
+                let idx = GameEntity.registry.all.indexOf(this);
+                if (idx > -1) GameEntity.registry.all.splice(idx, 1);
+                
+                if (GameEntity.registry.byType[this.type]) {
+                    idx = GameEntity.registry.byType[this.type].indexOf(this);
+                    if (idx > -1) GameEntity.registry.byType[this.type].splice(idx, 1);
+                }
+                
+                if (this.hasCollision) {
+                    this._unregisterCollision();
+                }
+            }
+            
+            _unregisterCollision() {
+                let idx = GameEntity.registry.collidable.indexOf(this);
+                if (idx > -1) GameEntity.registry.collidable.splice(idx, 1);
+                
+                const layerName = this._getLayerName();
+                if (GameEntity.registry.byLayer[layerName]) {
+                    idx = GameEntity.registry.byLayer[layerName].indexOf(this);
+                    if (idx > -1) GameEntity.registry.byLayer[layerName].splice(idx, 1);
+                }
+            }
+            
+            _getLayerName() {
+                for (let name in GameEntity.LAYER) {
+                    if (GameEntity.LAYER[name] === this.collisionLayer) return name;
+                }
+                return 'NONE';
+            }
+            
+            // =====================
+            //  STATIC QUEUE METHODS
+            // =====================
+            
+            /**
+             * Process all entities in registration queue.
+             * Called once after map load to batch-register all entities.
+             */
+            static processQueue() {
+                const count = GameEntity.registrationQueue.length;
+                for (let entity of GameEntity.registrationQueue) {
+                    entity._doRegister();
+                }
+                GameEntity.registrationQueue = [];
+                return count;
+            }
+            
+            /**
+             * Clear queue without registering (used when discarding entities).
+             */
+            static clearQueue() {
+                GameEntity.registrationQueue = [];
+            }
+            
+            // =====================
+            //  COLLISION GEOMETRY
+            // =====================
+            
+            getBoundingBox() {
+                if (this.collisionShape === GameEntity.SHAPE.OBB) {
+                    const cos = Math.abs(Math.cos(this.angle));
+                    const sin = Math.abs(Math.sin(this.angle));
+                    const w = this.width * cos + this.height * sin;
+                    const h = this.width * sin + this.height * cos;
+                    return { x: this.x - w / 2, y: this.y - h / 2, w: w, h: h };
+                }
+                
+                if (this.collisionShape === GameEntity.SHAPE.CIRCLE) {
+                    return { x: this.x - this.radius, y: this.y - this.radius, w: this.radius * 2, h: this.radius * 2 };
+                }
+                
+                return { x: this.x, y: this.y, w: this.width, h: this.height };
+            }
+            
+            getCenter() {
+                if (this.collisionShape === GameEntity.SHAPE.OBB || 
+                    this.collisionShape === GameEntity.SHAPE.CIRCLE) {
+                    return { x: this.x, y: this.y };
+                }
+                return { x: this.x + this.width / 2, y: this.y + this.height / 2 };
+            }
+            
+            getOBB() {
+                const center = this.getCenter();
+                return {
+                    x: center.x, y: center.y,
+                    length: this.width, width: this.height,
+                    angle: this.angle, mass: this.mass,
+                    speed: Math.hypot(this.vx, this.vy),
+                    vx: this.vx, vy: this.vy
+                };
+            }
+            
+            getCorners() {
+                const center = this.getCenter();
+                const cos = Math.cos(this.angle);
+                const sin = Math.sin(this.angle);
+                const hw = this.width / 2;
+                const hh = this.height / 2;
+                
+                return [
+                    { x: center.x + (hw * cos - (-hh) * sin), y: center.y + (hw * sin + (-hh) * cos) },
+                    { x: center.x + (hw * cos - hh * sin),    y: center.y + (hw * sin + hh * cos) },
+                    { x: center.x + ((-hw) * cos - hh * sin), y: center.y + ((-hw) * sin + hh * cos) },
+                    { x: center.x + ((-hw) * cos - (-hh) * sin), y: center.y + ((-hw) * sin + (-hh) * cos) }
+                ];
+            }
+            
+            // =====================
+            //  SCREEN CULLING
+            // =====================
+            
+            isOnScreen(camera, canvas, margin = 100) {
+                const center = this.getCenter();
+                const screenX = (center.x - camera.x) * camera.zoom + canvas.width / 2;
+                const screenY = (center.y - camera.y) * camera.zoom + canvas.height / 2;
+                const size = Math.max(this.width, this.height, this.radius * 2);
+                const screenSize = (size / 2 + margin) * camera.zoom;
+                
+                return (
+                    screenX + screenSize > 0 &&
+                    screenX - screenSize < canvas.width &&
+                    screenY + screenSize > 0 &&
+                    screenY - screenSize < canvas.height
+                );
+            }
+            
+            // =====================
+            //  LIFECYCLE
+            // =====================
+            
+            update(dt = 1) {
+                if (!this.active || this.isStatic) return;
+                
+                this.x += this.vx * dt;
+                this.y += this.vy * dt;
+                this.angle += this.angularVel * dt;
+                
+                this.vx *= this.friction;
+                this.vy *= this.friction;
+                
+                if (Math.abs(this.vx) < 0.01) this.vx = 0;
+                if (Math.abs(this.vy) < 0.01) this.vy = 0;
+            }
+            
+            draw(ctx) {
+                if (!this.visible) return;
+                
+                ctx.save();
+                const center = this.getCenter();
+                ctx.translate(center.x, center.y);
+                ctx.rotate(this.angle);
+                
+                ctx.strokeStyle = '#ff00ff';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(-this.width/2, -this.height/2, this.width, this.height);
+                
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(this.width/2, 0);
+                ctx.stroke();
+                
+                ctx.restore();
+            }
+            
+            destroy() {
+                this.markedForDestroy = true;
+                this.active = false;
+                this.vx = 0;
+                this.vy = 0;
+            }
+            
+            _finalDestroy() {
+                this._unregister();
+            }
+            
+            // =====================
+            //  STATIC UTILITIES
+            // =====================
+            
+            static getByType(type) {
+                return GameEntity.registry.byType[type] || [];
+            }
+            
+            static getByLayer(layerName) {
+                return GameEntity.registry.byLayer[layerName] || [];
+            }
+            
+            static getOnScreen(camera, canvas, margin = 200) {
+                return GameEntity.registry.collidable.filter(e => 
+                    e.active && e.isOnScreen(camera, canvas, margin)
+                );
+            }
+            
+            static clearAll() {
+                GameEntity.registry.all = [];
+                GameEntity.registry.collidable = [];
+                GameEntity.registry.byLayer = {};
+                GameEntity.registry.byType = {};
+            }
+            
+            /**
+             * Re-register an entity after registry has been cleared.
+             * Used during map transitions when props persist but registry is reset.
+             */
+            reregister() {
+                // Only re-register if not already in registry
+                if (!GameEntity.registry.all.includes(this)) {
+                    this._register();
+                }
+            }
+            
+            static clearType(type) {
+                const entities = GameEntity.registry.byType[type] || [];
+                entities.forEach(e => e.destroy());
+            }
+            
+            static cleanup() {
+                const destroyed = GameEntity.registry.all.filter(e => e.markedForDestroy);
+                destroyed.forEach(e => e._finalDestroy());
+            }
+        }
+
+
+    </script>
+    <script type="text/dfab" data-src="basement/shape-kit.js" data-cost="223">
+        // ===== LV0 BASEMENT =====
+        // The shape kit: collision geometry, and nothing about any game. Points, segments, circles,
+        // boxes (axis-aligned rects { x, y, w, h }) and oriented boxes (OBBs: centre x, y, `length` along
+        // `angle`, `width` across). Overlap tests return a contact packet or null.
+        //
+        // CONTACT PACKET: { nx, ny, depth }   the normal points from the second shape to the first; move the
+        //                                     first by depth along it (or share it out by mass) to separate them
+        // RIGID BODY (impulseAt): { invM, invI, x, y, vx, vy, w }   w = turn rate; invM 0 = immovable
+        //
+        //   const hit = shapeKit.sat(obb_a, obb_b);           // { nx, ny, depth } or null
+        //   const t = shapeKit.sweepCircle(ax, ay, bx, by, cx, cy, r);   // 0..1 along a->b where it first touches, or null
+        //   if (shapeKit.overlaps(entity_a, entity_b)) ...    // any two GameEntity shapes
+        // narrow_checks counts the narrow-phase tests that touched (for a profiler; reset it when you like).
+        const shapeKit = {
+            narrow_checks: 0,
+
+            // Math helper: distance from a point (circle center) to a line segment (bullet path)
+            segmentDistanceSq (px, py, l1x, l1y, l2x, l2y) {
+                const l2 = (l1x - l2x) ** 2 + (l1y - l2y) ** 2;
+                if (l2 === 0) return (px - l1x) ** 2 + (py - l1y) ** 2;
+                let t = ((px - l1x) * (l2x - l1x) + (py - l1y) * (l2y - l1y)) / l2;
+                t = Math.max(0, Math.min(1, t));
+                return (px - (l1x + t * (l2x - l1x))) ** 2 + (py - (l1y + t * (l2y - l1y))) ** 2;
+            },
+
+            sweepCircle (ax, ay, bx, by, cx, cy, radius) {
+                if (Math.max(ax, bx) < cx - radius || Math.min(ax, bx) > cx + radius ||
+                    Math.max(ay, by) < cy - radius || Math.min(ay, by) > cy + radius) return null;
+                const ox = ax - cx, oy = ay - cy, dx = bx - ax, dy = by - ay;
+                const c = ox * ox + oy * oy - radius * radius;
+                if (c <= 0) return 0;
+                const a = dx * dx + dy * dy;
+                if (!a) return null;
+                const b = ox * dx + oy * dy, disc = b * b - a * c;
+                if (disc < 0) return null;
+                const t = (-b - Math.sqrt(disc)) / a;
+                return t >= 0 && t <= 1 ? t : null;
+            },
+
+            sweepRect (ax, ay, bx, by, left, top, right, bottom) {
+                let lo = 0, hi = 1;
+                for (const [v, step, min, max] of [[ax, bx - ax, left, right], [ay, by - ay, top, bottom]]) {
+                    if (!step) { if (v < min || v > max) return null; continue; }
+                    const a = (min - v) / step, b = (max - v) / step;
+                    lo = Math.max(lo, Math.min(a, b)); hi = Math.min(hi, Math.max(a, b));
+                    if (lo > hi) return null;
+                }
+                return lo;
+            },
+
+            // Exact circle-vs-box sweep: two strips plus round corners, avoiding false corner hits.
+            sweepRoundedBox (ax, ay, bx, by, hw, hh, radius) {
+                if (Math.max(ax, bx) < -hw - radius || Math.min(ax, bx) > hw + radius ||
+                    Math.max(ay, by) < -hh - radius || Math.min(ay, by) > hh + radius) return null;
+                let best = null;
+                const keep = t => { if (t !== null && (best === null || t < best)) best = t; };
+                keep(shapeKit.sweepRect(ax, ay, bx, by, -hw - radius, -hh, hw + radius, hh));
+                keep(shapeKit.sweepRect(ax, ay, bx, by, -hw, -hh - radius, hw, hh + radius));
+                for (const x of [-hw, hw]) for (const y of [-hh, hh]) keep(shapeKit.sweepCircle(ax, ay, bx, by, x, y, radius));
+                return best;
+            },
+
+            /**
+             * Point-in-AABB test (for UI/triggers).
+             */
+            pointInRect (px, py, rect) {
+                return (px >= rect.x && px <= rect.x + rect.w && 
+                        py >= rect.y && py <= rect.y + rect.h);
+            },
+
+            /** The four corners of a box: centre x, y; `length` along `angle`, `width` across. */
+            boxCorners (b) {
+                const a = b.angle || 0, fx = Math.cos(a), fy = Math.sin(a), hl = (b.length || 0) / 2, hw = (b.width || 0) / 2;
+                return [[b.x + fx * hl - fy * hw, b.y + fy * hl + fx * hw], [b.x + fx * hl + fy * hw, b.y + fy * hl - fx * hw],
+                        [b.x - fx * hl + fy * hw, b.y - fy * hl - fx * hw], [b.x - fx * hl - fy * hw, b.y - fy * hl + fx * hw]];
+            },
+
+            insideBox (b, px, py, pad = 0.5) {
+                const a = b.angle || 0, dx = px - b.x, dy = py - b.y;
+                return Math.abs(dx * Math.cos(a) + dy * Math.sin(a)) <= (b.length || 0) / 2 + pad
+                    && Math.abs(-dx * Math.sin(a) + dy * Math.cos(a)) <= (b.width || 0) / 2 + pad;
+            },
+
+            /**
+             * Where two overlapping boxes touch, with the normal (nx, ny) pointing from b to a: the
+             * corners of each that are inside the other (a corner into a flat side, the usual
+             * crash); averaged when several are, so a flat-on hit lands mid-face and twists nothing.
+             */
+            boxContactPoint (a, b, nx, ny) {
+                // Each with how deep it went (a's corners against the normal, b's along it): a fast car is
+                // well in by the time it's caught, so only the deepest (the corner that struck first) counts
+                const pts = [];
+                if (b.length) for (const [x, y] of shapeKit.boxCorners(a)) if (shapeKit.insideBox(b, x, y)) pts.push([x, y, -(x * nx + y * ny)]);
+                if (a.length) for (const [x, y] of shapeKit.boxCorners(b)) if (shapeKit.insideBox(a, x, y)) pts.push([x, y, x * nx + y * ny]);
+                if (pts.length > 1) {
+                    let deepest = -Infinity;
+                    for (const p of pts) if (p[2] > deepest) deepest = p[2];
+                    for (let i = pts.length - 1; i >= 0; i--) if (pts[i][2] < deepest - 2) pts.splice(i, 1);
+                }
+                if (!pts.length) {       // edge to edge: a's deepest corner along the normal
+                    let best = null, bd = Infinity;
+                    for (const c of shapeKit.boxCorners(a)) { const d = c[0] * nx + c[1] * ny; if (d < bd) { bd = d; best = c; } }
+                    return best || [(a.x + b.x) / 2, (a.y + b.y) / 2];
+                }
+                let x = 0, y = 0;
+                for (const p of pts) { x += p[0]; y += p[1]; }
+                return [x / pts.length, y / pts.length];
+            },
+
+            /**
+             * One rigid-body impulse at a contact point P between bodies a and b (b may be
+             * immovable: invM 0), normal n from b to a. Each body is { invM, invI, x, y, vx, vy, w }
+             * (w = turn rate, rad/tick); velocities are changed in place. Bounce e along the normal,
+             * Coulomb friction mu along the face. Because the push lands at P, not at the centre,
+             * it turns the body as well as moving it: a front corner into a wall swings the tail
+             * round to meet it, a shove on a rear quarter sends that end away.
+             * Returns the closing speed it took out (0 when they were already parting).
+             */
+            impulseAt (a, b, px, py, nx, ny, e, mu) {
+                const r1x = px - a.x, r1y = py - a.y, r2x = px - b.x, r2y = py - b.y;
+                const vpx = (a.vx - a.w * r1y) - (b.vx - b.w * r2y), vpy = (a.vy + a.w * r1x) - (b.vy + b.w * r2x);
+                const vn = vpx * nx + vpy * ny;
+                if (vn >= 0) return 0;
+                const c1n = r1x * ny - r1y * nx, c2n = r2x * ny - r2y * nx;
+                const kn = a.invM + b.invM + a.invI * c1n * c1n + b.invI * c2n * c2n;
+                if (!(kn > 0)) return 0;
+                const jn = -(1 + e) * vn / kn;
+                const tx = -ny, ty = nx, vt = vpx * tx + vpy * ty;
+                const c1t = r1x * ty - r1y * tx, c2t = r2x * ty - r2y * tx;
+                const kt = a.invM + b.invM + a.invI * c1t * c1t + b.invI * c2t * c2t;
+                const jt = Math.max(-mu * jn, Math.min(mu * jn, kt > 0 ? -vt / kt : 0));
+                const Jx = jn * nx + jt * tx, Jy = jn * ny + jt * ty;
+                a.vx += Jx * a.invM; a.vy += Jy * a.invM; a.w += a.invI * (r1x * Jy - r1y * Jx);
+                b.vx -= Jx * b.invM; b.vy -= Jy * b.invM; b.w -= b.invI * (r2x * Jy - r2y * Jx);
+                return -(1 + e) * vn;
+            },
+
+            obbCorners (obb) {
+                const cos = Math.cos(obb.angle || 0);
+                const sin = Math.sin(obb.angle || 0);
+                const hw = (obb.length || obb.width || 20) / 2;
+                const hh = (obb.width || obb.height || 20) / 2;
+                
+                return [
+                    { x: obb.x + (hw * cos - (-hh) * sin), y: obb.y + (hw * sin + (-hh) * cos) },
+                    { x: obb.x + (hw * cos - hh * sin),    y: obb.y + (hw * sin + hh * cos) },
+                    { x: obb.x + ((-hw) * cos - hh * sin), y: obb.y + ((-hw) * sin + hh * cos) },
+                    { x: obb.x + ((-hw) * cos - (-hh) * sin), y: obb.y + ((-hw) * sin + (-hh) * cos) }
+                ];
+            },
+
+            obbAxes (obb) {
+                const cos = Math.cos(obb.angle || 0);
+                const sin = Math.sin(obb.angle || 0);
+                return [
+                    { x: cos, y: sin },
+                    { x: -sin, y: cos }
+                ];
+            },
+
+            projectOnAxis (corners, axis) {
+                let min = Infinity;
+                let max = -Infinity;
+                for (let c of corners) {
+                    const dot = c.x * axis.x + c.y * axis.y;
+                    if (dot < min) min = dot;
+                    if (dot > max) max = dot;
+                }
+                return { min, max };
+            },
+
+            entityToObb (entity) {
+                const center = entity.getCenter ? entity.getCenter() : { x: entity.x, y: entity.y };
+                return {
+                    x: center.x, 
+                    y: center.y,
+                    length: entity.width || 20, 
+                    width: entity.height || 20,
+                    angle: entity.angle || 0,
+                    mass: entity.mass || 1,
+                    vx: entity.vx || 0,
+                    vy: entity.vy || 0
+                };
+            },
+
+            rectToObb (aabb) {
+                return {
+                    x: aabb.x + (aabb.width || aabb.w) / 2,
+                    y: aabb.y + (aabb.height || aabb.h) / 2,
+                    length: aabb.width || aabb.w,
+                    width: aabb.height || aabb.h,
+                    angle: 0,
+                    mass: aabb.mass || 1
+                };
+            },
+
+            /** Is point p inside the OBB (a little tolerance)? */
+            insideObb (p, o, tol = 0.6) {
+                const c = Math.cos(-(o.angle || 0)), s = Math.sin(-(o.angle || 0)), dx = p.x - o.x, dy = p.y - o.y;
+                const lx = dx * c - dy * s, ly = dx * s + dy * c;
+                return Math.abs(lx) <= (o.length || o.width || 20) / 2 + tol && Math.abs(ly) <= (o.width || o.height || 20) / 2 + tol;
+            },
+
+            /**
+             * Where two OBBs touch (n from o2 to o1): the deepest corner(s) of each into the other, averaging
+             * corners that tie (face to face, so a flush push doesn't twist), preferring the one that's inside.
+             */
+            obbContactPoint (o1, o2, nx, ny) {
+                const pick = (corners, sign) => {
+                    let best = Infinity; for (const c of corners) best = Math.min(best, sign * (c.x * nx + c.y * ny));
+                    let x = 0, y = 0, k = 0;
+                    for (const c of corners) if (sign * (c.x * nx + c.y * ny) <= best + 0.5) { x += c.x; y += c.y; k++; }
+                    return { x: x / k, y: y / k };
+                };
+                const p1 = pick(shapeKit.obbCorners(o1), 1), p2 = pick(shapeKit.obbCorners(o2), -1);
+                const in1 = shapeKit.insideObb(p1, o2), in2 = shapeKit.insideObb(p2, o1);
+                if (in1 && !in2) return p1;
+                if (in2 && !in1) return p2;
+                return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+            },
+
+            /**
+             * SAT collision detection with MTV (Minimum Translation Vector).
+             * Returns collision packet or null if no collision.
+             */
+            sat (obb1, obb2) {
+                const corners1 = shapeKit.obbCorners(obb1);
+                const corners2 = shapeKit.obbCorners(obb2);
+                const axes = [...shapeKit.obbAxes(obb1), ...shapeKit.obbAxes(obb2)];
+                
+                let minOverlap = Infinity;
+                let mtv = null;
+                
+                for (let axis of axes) {
+                    const p1 = shapeKit.projectOnAxis(corners1, axis);
+                    const p2 = shapeKit.projectOnAxis(corners2, axis);
+                    
+                    if (p1.max < p2.min || p2.max < p1.min) {
+                        return null; // Gap found, no collision
+                    }
+                    
+                    const overlap = Math.min(p1.max, p2.max) - Math.max(p1.min, p2.min);
+                    if (overlap < minOverlap) {
+                        minOverlap = overlap;
+                        mtv = { x: axis.x, y: axis.y };
+                    }
+                }
+                
+                // Ensure MTV points from obb2 to obb1
+                const dx = obb1.x - obb2.x;
+                const dy = obb1.y - obb2.y;
+                if (dx * mtv.x + dy * mtv.y < 0) {
+                    mtv.x = -mtv.x;
+                    mtv.y = -mtv.y;
+                }
+                
+                shapeKit.narrow_checks++;
+                return { nx: mtv.x, ny: mtv.y, depth: minOverlap };
+            },
+
+            /**
+             * Circle vs Circle collision.
+             * Returns collision packet with normal pointing from b to a.
+             */
+            circleVsCircle (a, b) {
+                const dx = a.x - b.x;
+                const dy = a.y - b.y;
+                const dist = Math.hypot(dx, dy);
+                const minDist = a.radius + b.radius;
+                
+                if (dist >= minDist) return null;
+                
+                shapeKit.narrow_checks++;
+                
+                if (dist > 0) {
+                    return { 
+                        nx: dx / dist, 
+                        ny: dy / dist, 
+                        depth: minDist - dist 
+                    };
+                }
+                
+                // Circles perfectly overlapping - push in arbitrary direction
+                return { nx: 1, ny: 0, depth: minDist };
+            },
+
+            /**
+             * Circle vs AABB collision.
+             */
+            circleVsRect (circle, rect, mapBounds) {
+                const bb = rect.getBoundingBox();
+                const closestX = Math.max(bb.x, Math.min(bb.x + bb.w, circle.x));
+                const closestY = Math.max(bb.y, Math.min(bb.y + bb.h, circle.y));
+                
+                const dx = circle.x - closestX;
+                const dy = circle.y - closestY;
+                const dist = Math.hypot(dx, dy);
+                
+                if (dist >= circle.radius) return null;
+                
+                shapeKit.narrow_checks++;
+                
+                if (dist > 0) {
+                    return { nx: dx / dist, ny: dy / dist, depth: circle.radius - dist };
+                }
+                
+                // Circle center is inside the AABB. Evaluate pushout to each of the four
+                // faces and pick the smallest valid one. "Valid" = the resulting position
+                // stays inside the playable map area (when mapBounds is supplied).
+                //
+                // This is critical for thick perimeter walls (e.g. the gauntlet's 80px
+                // outer ring): the geometric shortest face on the LEFT wall is west, but
+                // pushing west goes off the map and the bound-clamp yanks the actor back
+                // into the wall — wobble loop. Filtering to in-bounds candidates first
+                // makes the resolver pick "east" for the left wall, "south" for the top
+                // wall, etc., automatically.
+                const r = circle.radius;
+                const candidates = [
+                    { nx: -1, ny:  0, depth: (circle.x - bb.x) + r,        outX: bb.x - r,        outY: circle.y },
+                    { nx:  1, ny:  0, depth: (bb.x + bb.w - circle.x) + r, outX: bb.x + bb.w + r, outY: circle.y },
+                    { nx:  0, ny: -1, depth: (circle.y - bb.y) + r,        outX: circle.x,        outY: bb.y - r },
+                    { nx:  0, ny:  1, depth: (bb.y + bb.h - circle.y) + r, outX: circle.x,        outY: bb.y + bb.h + r }
+                ];
+                candidates.sort((a, b) => a.depth - b.depth);
+                
+                if (mapBounds) {
+                    const m = mapBounds.margin || 0;
+                    for (const c of candidates) {
+                        if (c.outX >= m && c.outX <= mapBounds.w - m
+                         && c.outY >= m && c.outY <= mapBounds.h - m) {
+                            return { nx: c.nx, ny: c.ny, depth: c.depth };
+                        }
+                    }
+                }
+                
+                // No bounds info, or every face's pushout exits the map — fall back to
+                // the geometrically smallest pushout (degenerate case).
+                const c0 = candidates[0];
+                return { nx: c0.nx, ny: c0.ny, depth: c0.depth };
+            },
+
+            /**
+             * Circle vs OBB collision.
+             * Transforms circle to OBB local space for accurate collision.
+             */
+            circleVsObb (circle, obbEntity) {
+                const obb = obbEntity.getOBB ? obbEntity.getOBB() : shapeKit.entityToObb(obbEntity);
+                
+                // Transform circle center to OBB local space
+                const cos = Math.cos(-obb.angle);
+                const sin = Math.sin(-obb.angle);
+                const dx = circle.x - obb.x;
+                const dy = circle.y - obb.y;
+                const localX = dx * cos - dy * sin;
+                const localY = dx * sin + dy * cos;
+                
+                // Find closest point on local AABB
+                const hw = obb.length / 2;
+                const hh = obb.width / 2;
+                const closestX = Math.max(-hw, Math.min(hw, localX));
+                const closestY = Math.max(-hh, Math.min(hh, localY));
+                
+                const distX = localX - closestX;
+                const distY = localY - closestY;
+                const dist = Math.hypot(distX, distY);
+                
+                if (dist >= circle.radius) return null;
+                
+                shapeKit.narrow_checks++;
+                
+                // Transform normal back to world space
+                let nx, ny;
+                if (dist > 0) {
+                    const localNx = distX / dist;
+                    const localNy = distY / dist;
+                    const cosBack = Math.cos(obb.angle);
+                    const sinBack = Math.sin(obb.angle);
+                    nx = localNx * cosBack - localNy * sinBack;
+                    ny = localNx * sinBack + localNy * cosBack;
+                } else {
+                    // Circle centre inside the box: out through the nearest face, the whole way
+                    const cosBack = Math.cos(obb.angle);
+                    const sinBack = Math.sin(obb.angle);
+                    const ex = hw - Math.abs(localX), ey = hh - Math.abs(localY);
+                    const lnx = ex < ey ? Math.sign(localX) || 1 : 0, lny = ex < ey ? 0 : Math.sign(localY) || 1;
+                    nx = lnx * cosBack - lny * sinBack;
+                    ny = lnx * sinBack + lny * cosBack;
+                    return { nx, ny, depth: Math.min(ex, ey) + circle.radius };
+                }
+                
+                return { nx, ny, depth: circle.radius - dist };
+            },
+
+            /** Do two GameEntity shapes (CIRCLE, AABB, OBB) overlap? */
+            overlaps (a, b) {
+                // Quick AABB early-out before expensive shape checks
+                const aBox = a.getBoundingBox();
+                const bBox = b.getBoundingBox();
+                if (aBox.x + aBox.w < bBox.x || bBox.x + bBox.w < aBox.x ||
+                    aBox.y + aBox.h < bBox.y || bBox.y + bBox.h < aBox.y) {
+                    return false;
+                }
+
+                const shapeA = a.collisionShape;
+                const shapeB = b.collisionShape;
+                
+                if (shapeA === GameEntity.SHAPE.CIRCLE && shapeB === GameEntity.SHAPE.CIRCLE) {
+                    const dist = Math.hypot(a.x - b.x, a.y - b.y);
+                    return dist < a.radius + b.radius;
+                }
+                
+                if (shapeA === GameEntity.SHAPE.CIRCLE && shapeB === GameEntity.SHAPE.AABB) {
+                    return shapeKit.circleVsRect(a, b) !== null;
+                }
+                if (shapeA === GameEntity.SHAPE.AABB && shapeB === GameEntity.SHAPE.CIRCLE) {
+                    return shapeKit.circleVsRect(b, a) !== null;
+                }
+                
+                if (shapeA === GameEntity.SHAPE.CIRCLE && shapeB === GameEntity.SHAPE.OBB) {
+                    return shapeKit.circleVsObb(a, b) !== null;
+                }
+                if (shapeA === GameEntity.SHAPE.OBB && shapeB === GameEntity.SHAPE.CIRCLE) {
+                    return shapeKit.circleVsObb(b, a) !== null;
+                }
+                
+                // Treat everything else as OBB
+                const obbA = a.getOBB ? a.getOBB() : shapeKit.entityToObb(a);
+                const obbB = b.getOBB ? b.getOBB() : shapeKit.entityToObb(b);
+                return shapeKit.sat(obbA, obbB) !== null;
+            }
+        };
+    </script>
+    <script type="text/dfab" data-src="basement/spatial-grid.js" data-cost="216">
+        // ===== LV0 BASEMENT =====
+        // Spatial grids: broad-phase lookups that know nothing about any game. SpatialHashGrid (collision
+        // neighbours), RenderGrid / OrderedRenderGrid (what's in view, in draw order), the physics item
+        // cache, EffectRenderGrid, and TransitionGrid (exit zones by position).
+        // =====================================================================
+        //  SPATIAL HASH GRID (Broad-Phase Optimization)
+        // =====================================================================
+        /**
+         * Divides the world into cells for O(1) neighbor lookups.
+         * Dramatically reduces collision checks from O(n²) to O(n*k) where k = avg neighbors.
+         */
+                // ╔══════════════════════════════════════════════════════════════════╗
+        // ║                    SPATIAL HASH GRID                              ║
+        // ╚══════════════════════════════════════════════════════════════════╝
+        /* Broad-phase grid for collisions. Cells keyed by number, their arrays kept and emptied each clear;
+           queries drop repeats with a per-query stamp instead of a Set (results in the same order). */
+        class SpatialHashGrid {
+            constructor(cellSize = 200) {
+                this.cellSize = cellSize;
+                this.cells = new Map();     // key → entities (arrays kept between frames)
+                this._used = [];            // the arrays filled since the last clear
+                this._stamp = 0;
+            }
+            
+            // Cell key (a number) for cell (cx, cy)
+            _ckey(cx, cy) { return (cx + 32768) * 65536 + (cy + 32768); }
+            // Get cell key from world position
+            _key(x, y) {
+                return this._ckey(Math.floor(x / this.cellSize), Math.floor(y / this.cellSize));
+            }
+            
+            // Clear all cells (call at start of each frame)
+            clear() {
+                for (let i = 0; i < this._used.length; i++) this._used[i].length = 0;
+                this._used.length = 0;
+            }
+            
+            // Insert entity into appropriate cell(s)
+            insert(entity) {
+                const bb = entity.getBoundingBox();
+                
+                // Get all cells this entity overlaps
+                const minCX = Math.floor(bb.x / this.cellSize);
+                const maxCX = Math.floor((bb.x + bb.w) / this.cellSize);
+                const minCY = Math.floor(bb.y / this.cellSize);
+                const maxCY = Math.floor((bb.y + bb.h) / this.cellSize);
+                
+                for (let cx = minCX; cx <= maxCX; cx++) {
+                    for (let cy = minCY; cy <= maxCY; cy++) {
+                        const key = this._ckey(cx, cy);
+                        let cell = this.cells.get(key);
+                        if (!cell) { cell = []; this.cells.set(key, cell); }
+                        if (!cell.length) this._used.push(cell);
+                        cell.push(entity);
+                    }
+                }
+            }
+            
+            // Get potential collision candidates for an entity
+            getNearby(entity) {
+                const bb = entity.getBoundingBox();
+                const stamp = ++this._stamp, candidates = [];
+                
+                const minCX = Math.floor(bb.x / this.cellSize);
+                const maxCX = Math.floor((bb.x + bb.w) / this.cellSize);
+                const minCY = Math.floor(bb.y / this.cellSize);
+                const maxCY = Math.floor((bb.y + bb.h) / this.cellSize);
+                
+                for (let cx = minCX; cx <= maxCX; cx++) {
+                    for (let cy = minCY; cy <= maxCY; cy++) {
+                        this._collectCell(this._ckey(cx, cy), stamp, candidates, entity);
+                    }
+                }
+                
+                return candidates;
+            }
+
+            // Cached static and refreshed dynamic cells retain the original insertion
+            // order within each cell; concatenating two grids would change contacts.
+            _collectCell(key, stamp, out, exclude = null) {
+                const moving = this.cells.get(key), fixed = this._staticCells && this._staticCells.get(key);
+                let i = 0, j = 0;
+                const n = moving ? moving.length : 0, m = fixed ? fixed.length : 0;
+                while (i < n || j < m) {
+                    const e = j >= m || (i < n && moving[i]._collisionOrder < fixed[j]._collisionOrder) ? moving[i++] : fixed[j++];
+                    if (e !== exclude && e._hashStamp !== stamp) { e._hashStamp = stamp; out.push(e); }
+                }
+            }
+            
+            // Get all entities in a radius (for explosions, etc.)
+            getInRadius(x, y, radius) {
+                const stamp = ++this._stamp, results = [], candidates = [];
+                
+                const minCX = Math.floor((x - radius) / this.cellSize);
+                const maxCX = Math.floor((x + radius) / this.cellSize);
+                const minCY = Math.floor((y - radius) / this.cellSize);
+                const maxCY = Math.floor((y + radius) / this.cellSize);
+                
+                for (let cx = minCX; cx <= maxCX; cx++) {
+                    for (let cy = minCY; cy <= maxCY; cy++) {
+                        this._collectCell(this._ckey(cx, cy), stamp, candidates);
+                    }
+                }
+                for (const e of candidates) if (Math.hypot(e.x - x, e.y - y) <= radius + e.radius) results.push(e);
+                
+                return results;
+            }
+        }
+
+        // ============================================================================
+        // RENDER GRID — Spatial hash for static geometry (walls, floors, crosswalks)
+        // Built once on map load. Query by viewport bounds → O(visible cells) not O(N).
+        // Items must have { x, y, w, h } properties.
+        // ============================================================================
+        class RenderGrid {
+            constructor(cellSize = 400) {
+                this.cellSize = cellSize;
+                this.cells = new Map();
+            }
+            
+            /**
+             * Build the grid from an array of rect-like items.
+             * Each item must have { x, y, w, h }.
+             */
+            build(items) {
+                this.cells.clear();
+                if (!items) return;
+                
+                for (let i = 0; i < items.length; i++) {
+                    const item = items[i];
+                    const iw = item.w || 200;
+                    const ih = item.h || 200;
+                    
+                    const minCX = Math.floor(item.x / this.cellSize);
+                    const maxCX = Math.floor((item.x + iw) / this.cellSize);
+                    const minCY = Math.floor(item.y / this.cellSize);
+                    const maxCY = Math.floor((item.y + ih) / this.cellSize);
+                    
+                    for (let cx = minCX; cx <= maxCX; cx++) {
+                        for (let cy = minCY; cy <= maxCY; cy++) {
+                            const key = (cx << 16) ^ cy; // Numeric key — faster than string
+                            let cell = this.cells.get(key);
+                            if (!cell) {
+                                cell = [];
+                                this.cells.set(key, cell);
+                            }
+                            cell.push(item);
+                        }
+                    }
+                }
+            }
+            
+            /**
+             * Query all items overlapping the given viewport bounds.
+             * Returns a Set (auto-deduplicates items spanning multiple cells).
+             * @param {object} bounds - { left, right, top, bottom }
+             * @param {Set} [results] - Optional caller-owned scratch set, cleared before use.
+             */
+            query(bounds, results = new Set()) {
+                results.clear();
+                
+                const minCX = Math.floor(bounds.left / this.cellSize);
+                const maxCX = Math.floor(bounds.right / this.cellSize);
+                const minCY = Math.floor(bounds.top / this.cellSize);
+                const maxCY = Math.floor(bounds.bottom / this.cellSize);
+                
+                for (let cx = minCX; cx <= maxCX; cx++) {
+                    for (let cy = minCY; cy <= maxCY; cy++) {
+                        const key = (cx << 16) ^ cy;
+                        const cell = this.cells.get(key);
+                        if (cell) {
+                            for (let i = 0; i < cell.length; i++) {
+                                results.add(cell[i]);
+                            }
+                        }
+                    }
+                }
+                
+                return results;
+            }
+        }
+
+
+        // Ordered broadphase for static buildings/foliage. Deduplicate ARRAY SLOTS,
+        // so duplicate references still draw twice and foliage density keeps its original index.
+        // Exact existing pass predicates run after the query; the grid never changes their margins.
+        class OrderedRenderGrid {
+            constructor(cellSize = 400) {
+                this.cellSize = cellSize;
+                this.cells = new Map();
+                this.entries = [];
+                this.always = [];
+                this.stamp = 0;
+            }
+
+            build(items, boundsFor) {
+                this.cells.clear(); this.entries.length = 0; this.always.length = 0;
+                if (!items) return;
+                items.forEach((item, index) => {
+                    const entry = { item, index, stamp: 0, standardV2: false };
+                    this.entries.push(entry);
+                    const b = boundsFor(item, entry);
+                    if (!b || ![b.left, b.right, b.top, b.bottom].every(Number.isFinite)) {
+                        this.always.push(entry); return;
+                    }
+                    const x0 = Math.floor(Math.min(b.left, b.right) / this.cellSize), x1 = Math.floor(Math.max(b.left, b.right) / this.cellSize);
+                    const y0 = Math.floor(Math.min(b.top, b.bottom) / this.cellSize), y1 = Math.floor(Math.max(b.top, b.bottom) / this.cellSize);
+                    // Huge/invalid editor objects remain candidates without allocating a map-sized grid.
+                    if (![x0, x1, y0, y1].every(Number.isSafeInteger) || (x1 - x0 + 1) * (y1 - y0 + 1) > 8192) { this.always.push(entry); return; }
+                    for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
+                        const key = x + ',' + y;
+                        let cell = this.cells.get(key);
+                        if (!cell) { cell = []; this.cells.set(key, cell); }
+                        cell.push(entry);
+                    }
+                });
+            }
+
+            query(bounds, results) {
+                results.length = 0;
+                if (!bounds || ![bounds.left, bounds.right, bounds.top, bounds.bottom].every(Number.isFinite)) {
+                    for (const entry of this.entries) results.push(entry);
+                    return results;
+                }
+                const x0 = Math.floor(bounds.left / this.cellSize), x1 = Math.floor(bounds.right / this.cellSize);
+                const y0 = Math.floor(bounds.top / this.cellSize), y1 = Math.floor(bounds.bottom / this.cellSize);
+                if (![x0, x1, y0, y1].every(Number.isSafeInteger) || x1 < x0 || y1 < y0 || (x1 - x0 + 1) * (y1 - y0 + 1) > 8192) {
+                    for (const entry of this.entries) results.push(entry);
+                    return results;
+                }
+                const stamp = ++this.stamp;
+                for (const entry of this.always) { entry.stamp = stamp; results.push(entry); }
+                for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
+                    const cell = this.cells.get(x + ',' + y);
+                    if (cell) for (const entry of cell) if (entry.stamp !== stamp) {
+                        entry.stamp = stamp; results.push(entry);
+                    }
+                }
+                results.sort((a, b) => a.index - b.index);
+                return results;
+            }
+        }
+
+        // Static rectangle searches share an ordered, map-owned broadphase. Arbitrary
+        // caller arrays keep their original linear path. Registered arrays validate
+        // slots/geometry once per simulation tick, never once per car or sight ray.
+        // Known same-tick edits explicitly invalidate; replacement/length changes
+        // rebuild immediately. Entries keep duplicate slots and original hit order.
+        const _physicsSpatial = {
+            records: new WeakMap(),
+            track(items) {
+                if (!items || this.records.has(items)) return;
+                this.records.set(items, { grid: new OrderedRenderGrid(400), slots: [], geometry: [], epoch: -1, dirty: true, linear: false, entries: [], items: [], cellQueries: new Map(), cachedSlots: 0 });
+            },
+            invalidate(items) {
+                if (!items) { this.clear(); return; }
+                const c = this.records.get(items);
+                if (c) c.dirty = true;
+            },
+            clear() { this.records = new WeakMap(); },
+            refresh(items, c) {
+                let changed = c.dirty || c.slots.length !== items.length;
+                if (!changed && c.epoch !== _simTick) {
+                    for (let i = 0; i < items.length; i++) {
+                        const o = items[i], at = i * 4;
+                        if (c.slots[i] !== o || !o || !Object.is(c.geometry[at], o.x) || !Object.is(c.geometry[at + 1], o.y) || !Object.is(c.geometry[at + 2], o.w) || !Object.is(c.geometry[at + 3], o.h)) { changed = true; break; }
+                    }
+                }
+                if (changed) {
+                    c.cellQueries.clear(); c.cachedSlots = 0;
+                    c.slots.length = items.length; c.geometry.length = items.length * 4;
+                    c.linear = false;
+                    for (let i = 0; i < items.length; i++) {
+                        const o = items[i], at = i * 4;
+                        if (!(i in items)) c.linear = true;
+                        c.slots[i] = o;
+                        c.geometry[at] = o && o.x; c.geometry[at + 1] = o && o.y; c.geometry[at + 2] = o && o.w; c.geometry[at + 3] = o && o.h;
+                    }
+                    c.grid.build(items, o => o && ({ left: o.x, right: o.x + o.w, top: o.y, bottom: o.y + o.h }));
+                    c.dirty = false;
+                }
+                c.epoch = _simTick;
+            },
+            query(items, bounds) {
+                if (!items) return items;
+                const c = this.records.get(items);
+                if (!c) return items;
+                if (c.dirty || c.slots.length !== items.length || c.epoch !== _simTick) this.refresh(items, c);
+                if (c.linear) return items;
+                // Grid candidates depend on cell range, not the precise query rectangle.
+                // Cars and sight rays repeatedly visit the same static cells. Cache their
+                // ordered slot lists until geometry changes, with a bounded per-source FIFO.
+                let key = null;
+                if (bounds && Number.isFinite(bounds.left) && Number.isFinite(bounds.right) &&
+                    Number.isFinite(bounds.top) && Number.isFinite(bounds.bottom)) {
+                    const S = c.grid.cellSize, x0 = Math.floor(bounds.left / S), x1 = Math.floor(bounds.right / S);
+                    const y0 = Math.floor(bounds.top / S), y1 = Math.floor(bounds.bottom / S);
+                    if (Number.isSafeInteger(x0) && Number.isSafeInteger(x1) && Number.isSafeInteger(y0) && Number.isSafeInteger(y1) &&
+                        x1 >= x0 && y1 >= y0 && (x1 - x0 + 1) * (y1 - y0 + 1) <= 8192) key = x0 + ':' + x1 + ':' + y0 + ':' + y1;
+                }
+                const cached = key === null ? null : c.cellQueries.get(key);
+                if (cached) {
+                    c.items.length = cached.length;
+                    for (let i = 0; i < cached.length; i++) c.items[i] = cached[i];
+                    return c.items;
+                }
+                c.grid.query(bounds, c.entries);
+                c.items.length = c.entries.length;
+                for (let i = 0; i < c.entries.length; i++) c.items[i] = c.entries[i].item;
+                if (key !== null && c.items.length <= 1024) {
+                    while (c.cellQueries.size && (c.cellQueries.size >= 256 || c.cachedSlots + c.items.length > 16384)) {
+                        const oldest = c.cellQueries.keys().next().value;
+                        c.cachedSlots -= c.cellQueries.get(oldest).length; c.cellQueries.delete(oldest);
+                    }
+                    c.cellQueries.set(key, c.items.slice()); c.cachedSlots += c.items.length;
+                }
+                return c.items;
+            }
+        };
+
+
+        // Mutable static effect geometry is verified once per tick/draw. Every source slot
+        // is retained, including duplicates and invisible lamp emitters. Unknown bounds stay live.
+        class EffectRenderGrid extends OrderedRenderGrid {
+            constructor() {
+                super(); this.source = null; this.kind = null; this.checkedTick = this.checkedDraw = this.checkedTime = null;
+                this.revision = -1;
+            }
+            refresh(items, kind, tick, draw, time, revision) {
+                let changed = this.source !== items || this.kind !== kind || this.revision !== revision || this.entries.length !== items.length;
+                if (!changed && this.checkedTick === tick && this.checkedDraw === draw && this.checkedTime === time) return;
+                if (!changed) {
+                    for (let i = 0; i < items.length; i++) {
+                        const e = this.entries[i], item = items[i], r = kind === 'puddles' ? item.r : item.radius;
+                        if (!e || e.item !== item || e.ex !== item.x || e.ey !== item.y || e.er !== r) { changed = true; break; }
+                    }
+                }
+                if (changed) {
+                    this.build(items, (item, e) => {
+                        const r = kind === 'puddles' ? item.r : item.radius;
+                        e.ex = item.x; e.ey = item.y; e.er = r;
+                        if (!Number.isFinite(item.x) || !Number.isFinite(item.y) || (r != null && !Number.isFinite(r))) return null;
+                        // Lamp body queries use anchors; light/material/rain queries retain their
+                        // own radii. A missing lamp radius still has the original 200px fallback.
+                        const reach = kind === 'puddles' ? Math.abs(r || 0) + 10 : Math.max(0, r || 0, Math.abs((r || 200) * 0.6));
+                        return { left: item.x - reach, right: item.x + reach, top: item.y - reach, bottom: item.y + reach };
+                    });
+                    this.source = items; this.kind = kind; this.revision = revision;
+                }
+                this.checkedTick = tick; this.checkedDraw = draw; this.checkedTime = time;
+            }
+        }
+
+        /**
+         * TransitionGrid — O(1) spatial lookup for map transition zones.
+         * Replaces per-frame Array.find() scans with cell-based hash lookup.
+         */
+        class TransitionGrid {
+            constructor(cellSize = 100) {
+                this.cellSize = cellSize;
+                this.cells = new Map();
+                this._targetMap = new Map(); // O(1) lookup by target name
+            }
+            
+            build(transitions) {
+                this.cells.clear();
+                this._targetMap.clear();
+                if (!transitions) return;
+                for (const t of transitions) {
+                    // Spatial cells
+                    const minCX = Math.floor(t.x / this.cellSize);
+                    const maxCX = Math.floor((t.x + t.w) / this.cellSize);
+                    const minCY = Math.floor(t.y / this.cellSize);
+                    const maxCY = Math.floor((t.y + t.h) / this.cellSize);
+                    for (let cx = minCX; cx <= maxCX; cx++) {
+                        for (let cy = minCY; cy <= maxCY; cy++) {
+                            const key = (cx << 16) | (cy & 0xFFFF);
+                            let cell = this.cells.get(key);
+                            if (!cell) { cell = []; this.cells.set(key, cell); }
+                            cell.push(t);
+                        }
+                    }
+                    // Target name index
+                    if (t.target) this._targetMap.set(t.target, t);
+                }
+            }
+            
+            /** Find transition containing point (px, py). Returns transition or null. */
+            query(px, py) {
+                const cx = Math.floor(px / this.cellSize);
+                const cy = Math.floor(py / this.cellSize);
+                const key = (cx << 16) | (cy & 0xFFFF);
+                const cell = this.cells.get(key);
+                if (!cell) return null;
+                for (const t of cell) {
+                    if (px > t.x && px < t.x + t.w && py > t.y && py < t.y + t.h) return t;
+                }
+                return null;
+            }
+            
+            /** Find transition by target map name. O(1). */
+            findByTarget(targetName) {
+                return this._targetMap.get(targetName) || null;
+            }
+        }
+
+
     </script>
     <script type="text/dfab" data-src="core/config.js" data-cost="406">
 
@@ -16499,7 +17719,114 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         
     </script>
-    <script type="text/dfab" data-src="physics/spatial.js" data-cost="363">
+    <script type="text/dfab" data-src="directory/car-contact.js" data-cost="59">
+        // ===== LV2 DIRECTORY =====
+        // Car contact: how this game's cars hit each other and walls (mass, spin, the driven car's jolt).
+        // The geometry and the rigid-body impulse are the Basement's shape kit (basement/shape-kit.js).
+        /**
+         * Provides backward compatibility for traffic vehicle collisions.
+         * Delegates to CollisionSystem's unified SAT solver.
+         */
+        class PhysicsSystem {
+            // --- SHAPE MATHS: basement/shape-kit.js, under the names the game already calls ---
+            static corners = shapeKit.boxCorners;
+            static _inside = shapeKit.insideBox;
+            static contactPoint = shapeKit.boxContactPoint;
+            static impulseAt = shapeKit.impulseAt;
+            static checkPointAABB = shapeKit.pointInRect;
+
+            /**
+             * Resolve OBB collision between two vehicles.
+             * Used by traffic system for vehicle-vehicle and vehicle-wall collisions.
+             */
+            static resolveOBBCollision(c1, c2) {
+                // Use CollisionSystem's SAT solver
+                const packet = CollisionSystem._satCollision(c1, c2);
+                if (!packet) return false;
+                PhysicsSystem.carContact(c1, c2, packet.nx, packet.ny, packet.depth);
+                return true;
+            }
+
+            /** How fast a car is turning (rad/tick): the driven car's yawRate, traffic's spin from a knock */
+            static spinOf(c) { return c.controlMode === 'PLAYER' ? (c.yawRate || 0) : (c.spin || 0); }
+            static setSpin(c, w) {
+                const M = CONFIG.VEHICLE_DRIVE.YAW_SPIN_MAX;
+                w = Math.max(-M, Math.min(M, w));
+                if (c.controlMode === 'PLAYER') c.yawRate = w; else c.spin = w;
+            }
+
+            /** A car as a rigid body for impulseAt (live: whether it can move at all) */
+            static body(c, live) {
+                if (!live) return { invM: 0, invI: 0, x: c.x, y: c.y, vx: 0, vy: 0, w: 0 };
+                const m = c.mass || 1000, spins = !!(c.applyDrivePhysics && c.length);
+                const L = c.length || 60, W = c.width || 30;
+                const hasV = c.vx !== undefined;
+                const vx = hasV ? c.vx : Math.cos(c.angle || 0) * (c.speed || 0), vy = hasV ? c.vy : Math.sin(c.angle || 0) * (c.speed || 0);
+                return { invM: 1 / m, invI: spins ? 1 / (m * (L * L + W * W) / 12 * CONFIG.VEHICLE_DRIVE.SPIN_INERTIA) : 0,
+                         x: c.x, y: c.y, vx, vy, w: spins ? PhysicsSystem.spinOf(c) : 0 };
+            }
+            /** Write a body's new velocity and turn back onto its car */
+            static _store(c, B) {
+                if (c.vx !== undefined) {
+                    c.vx = B.vx; c.vy = B.vy;
+                    c.speed = c.vx * Math.cos(c.angle) + c.vy * Math.sin(c.angle);
+                } else if (c.speed !== undefined) c.speed = B.vx * Math.cos(c.angle || 0) + B.vy * Math.sin(c.angle || 0);
+                if (B.invI > 0) PhysicsSystem.setSpin(c, B.w);
+            }
+
+            /**
+             * Two cars (or a car and something immovable: mass Infinity) touching along normal (nx, ny),
+             * pointing from c2 to c1, overlapping by depth. Pushes them apart by mass, then resolves the
+             * hit as rigid bodies at the point where they meet (impulseAt): the closing speed comes out
+             * with a little bounce and some scrub, and each car turns by where it was struck.
+             */
+            static carContact(c1, c2, nx, ny, depth) {
+                const m1 = c1.isStatic ? Infinity : (c1.mass || 1000), m2 = c2.isStatic ? Infinity : (c2.mass || 1000);
+                const w1 = isFinite(m1) ? (isFinite(m2) ? m2 / (m1 + m2) : 1) : 0;
+                const w2 = isFinite(m2) ? (isFinite(m1) ? m1 / (m1 + m2) : 1) : 0;
+                const [px, py] = PhysicsSystem.contactPoint(c1, c2, nx, ny);
+                c1.x += nx * depth * w1; c1.y += ny * depth * w1;
+                c2.x -= nx * depth * w2; c2.y -= ny * depth * w2;
+                c1._lastImpact = c2._lastImpact = 0;
+                const B1 = PhysicsSystem.body(c1, w1 > 0), B2 = PhysicsSystem.body(c2, w2 > 0);
+                const v1x = B1.vx, v1y = B1.vy, v2x = B2.vx, v2y = B2.vy;
+                const hit = PhysicsSystem.impulseAt(B1, B2, px + nx * depth * w1, py + ny * depth * w1, nx, ny, 0.2, 0.3);
+                if (!hit) return;                                      // already separating
+                // A nudge between two traffic cars (queues, merges) is driven out of; a real knock spins them
+                const soft = hit < CONFIG.VEHICLE_DRIVE.KNOCK_MIN_HIT && c1.controlMode !== 'PLAYER' && c2.controlMode !== 'PLAYER';
+                if (soft) B1.invI = B2.invI = 0;
+                if (w1 > 0) PhysicsSystem._store(c1, B1);
+                if (w2 > 0) PhysicsSystem._store(c2, B2);
+                c1._lastContact = c2; c2._lastContact = c1;
+                c1._lastImpact = c2._lastImpact = hit;
+                // The driven car feels it (the spin is already in its yawRate)
+                if (w1 > 0 && c1.controlMode === 'PLAYER' && c1.onImpact) c1.onImpact(Math.hypot(B1.vx - v1x, B1.vy - v1y));
+                if (w2 > 0 && c2.controlMode === 'PLAYER' && c2.onImpact) c2.onImpact(Math.hypot(B2.vx - v2x, B2.vy - v2y));
+                return hit;
+            }
+            
+            /**
+             * OBB vs AABB collision (treats AABB as infinite-mass OBB).
+             */
+            static checkOBBvsAABB(obb, aabb) {
+                const aabbAsOBB = {
+                    x: aabb.x + aabb.w / 2,
+                    y: aabb.y + aabb.h / 2,
+                    length: aabb.w,
+                    width: aabb.h,
+                    angle: 0,
+                    mass: 10000000
+                };
+                return this.resolveOBBCollision(obb, aabbAsOBB);
+            }
+        }
+    </script>
+    <script type="text/dfab" data-src="directory/collision-system.js" data-cost="485">
+        // ===== LV2 DIRECTORY =====
+        // The game's collision system: who collides with whom each step (projectiles, vehicles, actors,
+        // pushable props) and how this game resolves it (knockback, companions yielding, prop pushes).
+        // The shape tests are the Basement's shape kit (basement/shape-kit.js); entities are
+        // basement/entity-base.js, the broad-phase grid basement/spatial-grid.js.
         /* =====================================================================
            PHYSICS SYSTEM (OPTIMIZATION START)
            ---------------------------------------------------------------------
@@ -16579,955 +17906,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
            ===================================================================== */
 
         // =====================================================================
-        //  PHYSICS SYSTEM (Legacy Compatibility Wrapper)
-        // =====================================================================
-        /**
-         * Provides backward compatibility for traffic vehicle collisions.
-         * Delegates to CollisionSystem's unified SAT solver.
-         */
-        class PhysicsSystem {
-            /**
-             * Resolve OBB collision between two vehicles.
-             * Used by traffic system for vehicle-vehicle and vehicle-wall collisions.
-             */
-            static resolveOBBCollision(c1, c2) {
-                // Use CollisionSystem's SAT solver
-                const packet = CollisionSystem._satCollision(c1, c2);
-                if (!packet) return false;
-                PhysicsSystem.carContact(c1, c2, packet.nx, packet.ny, packet.depth);
-                return true;
-            }
-
-            /** The four corners of a box: centre x, y; `length` along `angle`, `width` across. */
-            static corners(b) {
-                const a = b.angle || 0, fx = Math.cos(a), fy = Math.sin(a), hl = (b.length || 0) / 2, hw = (b.width || 0) / 2;
-                return [[b.x + fx * hl - fy * hw, b.y + fy * hl + fx * hw], [b.x + fx * hl + fy * hw, b.y + fy * hl - fx * hw],
-                        [b.x - fx * hl + fy * hw, b.y - fy * hl - fx * hw], [b.x - fx * hl - fy * hw, b.y - fy * hl + fx * hw]];
-            }
-            static _inside(b, px, py, pad = 0.5) {
-                const a = b.angle || 0, dx = px - b.x, dy = py - b.y;
-                return Math.abs(dx * Math.cos(a) + dy * Math.sin(a)) <= (b.length || 0) / 2 + pad
-                    && Math.abs(-dx * Math.sin(a) + dy * Math.cos(a)) <= (b.width || 0) / 2 + pad;
-            }
-            /**
-             * Where two overlapping boxes touch, with the normal (nx, ny) pointing from b to a: the
-             * corners of each that are inside the other (a corner into a flat side, the usual
-             * crash); averaged when several are, so a flat-on hit lands mid-face and twists nothing.
-             */
-            static contactPoint(a, b, nx, ny) {
-                // Each with how deep it went (a's corners against the normal, b's along it): a fast car is
-                // well in by the time it's caught, so only the deepest (the corner that struck first) counts
-                const pts = [];
-                if (b.length) for (const [x, y] of PhysicsSystem.corners(a)) if (PhysicsSystem._inside(b, x, y)) pts.push([x, y, -(x * nx + y * ny)]);
-                if (a.length) for (const [x, y] of PhysicsSystem.corners(b)) if (PhysicsSystem._inside(a, x, y)) pts.push([x, y, x * nx + y * ny]);
-                if (pts.length > 1) {
-                    let deepest = -Infinity;
-                    for (const p of pts) if (p[2] > deepest) deepest = p[2];
-                    for (let i = pts.length - 1; i >= 0; i--) if (pts[i][2] < deepest - 2) pts.splice(i, 1);
-                }
-                if (!pts.length) {       // edge to edge: a's deepest corner along the normal
-                    let best = null, bd = Infinity;
-                    for (const c of PhysicsSystem.corners(a)) { const d = c[0] * nx + c[1] * ny; if (d < bd) { bd = d; best = c; } }
-                    return best || [(a.x + b.x) / 2, (a.y + b.y) / 2];
-                }
-                let x = 0, y = 0;
-                for (const p of pts) { x += p[0]; y += p[1]; }
-                return [x / pts.length, y / pts.length];
-            }
-
-            /** How fast a car is turning (rad/tick): the driven car's yawRate, traffic's spin from a knock */
-            static spinOf(c) { return c.controlMode === 'PLAYER' ? (c.yawRate || 0) : (c.spin || 0); }
-            static setSpin(c, w) {
-                const M = CONFIG.VEHICLE_DRIVE.YAW_SPIN_MAX;
-                w = Math.max(-M, Math.min(M, w));
-                if (c.controlMode === 'PLAYER') c.yawRate = w; else c.spin = w;
-            }
-
-            /**
-             * One rigid-body impulse at a contact point P between bodies a and b (b may be
-             * immovable: invM 0), normal n from b to a. Each body is { invM, invI, x, y, vx, vy, w }
-             * (w = turn rate, rad/tick); velocities are changed in place. Bounce e along the normal,
-             * Coulomb friction mu along the face. Because the push lands at P, not at the centre,
-             * it turns the body as well as moving it: a front corner into a wall swings the tail
-             * round to meet it, a shove on a rear quarter sends that end away.
-             * Returns the closing speed it took out (0 when they were already parting).
-             */
-            static impulseAt(a, b, px, py, nx, ny, e, mu) {
-                const r1x = px - a.x, r1y = py - a.y, r2x = px - b.x, r2y = py - b.y;
-                const vpx = (a.vx - a.w * r1y) - (b.vx - b.w * r2y), vpy = (a.vy + a.w * r1x) - (b.vy + b.w * r2x);
-                const vn = vpx * nx + vpy * ny;
-                if (vn >= 0) return 0;
-                const c1n = r1x * ny - r1y * nx, c2n = r2x * ny - r2y * nx;
-                const kn = a.invM + b.invM + a.invI * c1n * c1n + b.invI * c2n * c2n;
-                if (!(kn > 0)) return 0;
-                const jn = -(1 + e) * vn / kn;
-                const tx = -ny, ty = nx, vt = vpx * tx + vpy * ty;
-                const c1t = r1x * ty - r1y * tx, c2t = r2x * ty - r2y * tx;
-                const kt = a.invM + b.invM + a.invI * c1t * c1t + b.invI * c2t * c2t;
-                const jt = Math.max(-mu * jn, Math.min(mu * jn, kt > 0 ? -vt / kt : 0));
-                const Jx = jn * nx + jt * tx, Jy = jn * ny + jt * ty;
-                a.vx += Jx * a.invM; a.vy += Jy * a.invM; a.w += a.invI * (r1x * Jy - r1y * Jx);
-                b.vx -= Jx * b.invM; b.vy -= Jy * b.invM; b.w -= b.invI * (r2x * Jy - r2y * Jx);
-                return -(1 + e) * vn;
-            }
-
-            /** A car as a rigid body for impulseAt (live: whether it can move at all) */
-            static body(c, live) {
-                if (!live) return { invM: 0, invI: 0, x: c.x, y: c.y, vx: 0, vy: 0, w: 0 };
-                const m = c.mass || 1000, spins = !!(c.applyDrivePhysics && c.length);
-                const L = c.length || 60, W = c.width || 30;
-                const hasV = c.vx !== undefined;
-                const vx = hasV ? c.vx : Math.cos(c.angle || 0) * (c.speed || 0), vy = hasV ? c.vy : Math.sin(c.angle || 0) * (c.speed || 0);
-                return { invM: 1 / m, invI: spins ? 1 / (m * (L * L + W * W) / 12 * CONFIG.VEHICLE_DRIVE.SPIN_INERTIA) : 0,
-                         x: c.x, y: c.y, vx, vy, w: spins ? PhysicsSystem.spinOf(c) : 0 };
-            }
-            /** Write a body's new velocity and turn back onto its car */
-            static _store(c, B) {
-                if (c.vx !== undefined) {
-                    c.vx = B.vx; c.vy = B.vy;
-                    c.speed = c.vx * Math.cos(c.angle) + c.vy * Math.sin(c.angle);
-                } else if (c.speed !== undefined) c.speed = B.vx * Math.cos(c.angle || 0) + B.vy * Math.sin(c.angle || 0);
-                if (B.invI > 0) PhysicsSystem.setSpin(c, B.w);
-            }
-
-            /**
-             * Two cars (or a car and something immovable: mass Infinity) touching along normal (nx, ny),
-             * pointing from c2 to c1, overlapping by depth. Pushes them apart by mass, then resolves the
-             * hit as rigid bodies at the point where they meet (impulseAt): the closing speed comes out
-             * with a little bounce and some scrub, and each car turns by where it was struck.
-             */
-            static carContact(c1, c2, nx, ny, depth) {
-                const m1 = c1.isStatic ? Infinity : (c1.mass || 1000), m2 = c2.isStatic ? Infinity : (c2.mass || 1000);
-                const w1 = isFinite(m1) ? (isFinite(m2) ? m2 / (m1 + m2) : 1) : 0;
-                const w2 = isFinite(m2) ? (isFinite(m1) ? m1 / (m1 + m2) : 1) : 0;
-                const [px, py] = PhysicsSystem.contactPoint(c1, c2, nx, ny);
-                c1.x += nx * depth * w1; c1.y += ny * depth * w1;
-                c2.x -= nx * depth * w2; c2.y -= ny * depth * w2;
-                c1._lastImpact = c2._lastImpact = 0;
-                const B1 = PhysicsSystem.body(c1, w1 > 0), B2 = PhysicsSystem.body(c2, w2 > 0);
-                const v1x = B1.vx, v1y = B1.vy, v2x = B2.vx, v2y = B2.vy;
-                const hit = PhysicsSystem.impulseAt(B1, B2, px + nx * depth * w1, py + ny * depth * w1, nx, ny, 0.2, 0.3);
-                if (!hit) return;                                      // already separating
-                // A nudge between two traffic cars (queues, merges) is driven out of; a real knock spins them
-                const soft = hit < CONFIG.VEHICLE_DRIVE.KNOCK_MIN_HIT && c1.controlMode !== 'PLAYER' && c2.controlMode !== 'PLAYER';
-                if (soft) B1.invI = B2.invI = 0;
-                if (w1 > 0) PhysicsSystem._store(c1, B1);
-                if (w2 > 0) PhysicsSystem._store(c2, B2);
-                c1._lastContact = c2; c2._lastContact = c1;
-                c1._lastImpact = c2._lastImpact = hit;
-                // The driven car feels it (the spin is already in its yawRate)
-                if (w1 > 0 && c1.controlMode === 'PLAYER' && c1.onImpact) c1.onImpact(Math.hypot(B1.vx - v1x, B1.vy - v1y));
-                if (w2 > 0 && c2.controlMode === 'PLAYER' && c2.onImpact) c2.onImpact(Math.hypot(B2.vx - v2x, B2.vy - v2y));
-                return hit;
-            }
-            
-            /**
-             * Point-in-AABB test (for UI/triggers).
-             */
-            static checkPointAABB(px, py, rect) {
-                return (px >= rect.x && px <= rect.x + rect.w && 
-                        py >= rect.y && py <= rect.y + rect.h);
-            }
-            
-            /**
-             * OBB vs AABB collision (treats AABB as infinite-mass OBB).
-             */
-            static checkOBBvsAABB(obb, aabb) {
-                const aabbAsOBB = {
-                    x: aabb.x + aabb.w / 2,
-                    y: aabb.y + aabb.h / 2,
-                    length: aabb.w,
-                    width: aabb.h,
-                    angle: 0,
-                    mass: 10000000
-                };
-                return this.resolveOBBCollision(obb, aabbAsOBB);
-            }
-        }
-
-        // =====================================================================
-        //  SPATIAL HASH GRID (Broad-Phase Optimization)
-        // =====================================================================
-        /**
-         * Divides the world into cells for O(1) neighbor lookups.
-         * Dramatically reduces collision checks from O(n²) to O(n*k) where k = avg neighbors.
-         */
-                // ╔══════════════════════════════════════════════════════════════════╗
-        // ║                    SPATIAL HASH GRID                              ║
-        // ╚══════════════════════════════════════════════════════════════════╝
-        /* Broad-phase grid for collisions. Cells keyed by number, their arrays kept and emptied each clear;
-           queries drop repeats with a per-query stamp instead of a Set (results in the same order). */
-        class SpatialHashGrid {
-            constructor(cellSize = 200) {
-                this.cellSize = cellSize;
-                this.cells = new Map();     // key → entities (arrays kept between frames)
-                this._used = [];            // the arrays filled since the last clear
-                this._stamp = 0;
-            }
-            
-            // Cell key (a number) for cell (cx, cy)
-            _ckey(cx, cy) { return (cx + 32768) * 65536 + (cy + 32768); }
-            // Get cell key from world position
-            _key(x, y) {
-                return this._ckey(Math.floor(x / this.cellSize), Math.floor(y / this.cellSize));
-            }
-            
-            // Clear all cells (call at start of each frame)
-            clear() {
-                for (let i = 0; i < this._used.length; i++) this._used[i].length = 0;
-                this._used.length = 0;
-            }
-            
-            // Insert entity into appropriate cell(s)
-            insert(entity) {
-                const bb = entity.getBoundingBox();
-                
-                // Get all cells this entity overlaps
-                const minCX = Math.floor(bb.x / this.cellSize);
-                const maxCX = Math.floor((bb.x + bb.w) / this.cellSize);
-                const minCY = Math.floor(bb.y / this.cellSize);
-                const maxCY = Math.floor((bb.y + bb.h) / this.cellSize);
-                
-                for (let cx = minCX; cx <= maxCX; cx++) {
-                    for (let cy = minCY; cy <= maxCY; cy++) {
-                        const key = this._ckey(cx, cy);
-                        let cell = this.cells.get(key);
-                        if (!cell) { cell = []; this.cells.set(key, cell); }
-                        if (!cell.length) this._used.push(cell);
-                        cell.push(entity);
-                    }
-                }
-            }
-            
-            // Get potential collision candidates for an entity
-            getNearby(entity) {
-                const bb = entity.getBoundingBox();
-                const stamp = ++this._stamp, candidates = [];
-                
-                const minCX = Math.floor(bb.x / this.cellSize);
-                const maxCX = Math.floor((bb.x + bb.w) / this.cellSize);
-                const minCY = Math.floor(bb.y / this.cellSize);
-                const maxCY = Math.floor((bb.y + bb.h) / this.cellSize);
-                
-                for (let cx = minCX; cx <= maxCX; cx++) {
-                    for (let cy = minCY; cy <= maxCY; cy++) {
-                        this._collectCell(this._ckey(cx, cy), stamp, candidates, entity);
-                    }
-                }
-                
-                return candidates;
-            }
-
-            // Cached static and refreshed dynamic cells retain the original insertion
-            // order within each cell; concatenating two grids would change contacts.
-            _collectCell(key, stamp, out, exclude = null) {
-                const moving = this.cells.get(key), fixed = this._staticCells && this._staticCells.get(key);
-                let i = 0, j = 0;
-                const n = moving ? moving.length : 0, m = fixed ? fixed.length : 0;
-                while (i < n || j < m) {
-                    const e = j >= m || (i < n && moving[i]._collisionOrder < fixed[j]._collisionOrder) ? moving[i++] : fixed[j++];
-                    if (e !== exclude && e._hashStamp !== stamp) { e._hashStamp = stamp; out.push(e); }
-                }
-            }
-            
-            // Get all entities in a radius (for explosions, etc.)
-            getInRadius(x, y, radius) {
-                const stamp = ++this._stamp, results = [], candidates = [];
-                
-                const minCX = Math.floor((x - radius) / this.cellSize);
-                const maxCX = Math.floor((x + radius) / this.cellSize);
-                const minCY = Math.floor((y - radius) / this.cellSize);
-                const maxCY = Math.floor((y + radius) / this.cellSize);
-                
-                for (let cx = minCX; cx <= maxCX; cx++) {
-                    for (let cy = minCY; cy <= maxCY; cy++) {
-                        this._collectCell(this._ckey(cx, cy), stamp, candidates);
-                    }
-                }
-                for (const e of candidates) if (Math.hypot(e.x - x, e.y - y) <= radius + e.radius) results.push(e);
-                
-                return results;
-            }
-        }
-
-        // ============================================================================
-        // RENDER GRID — Spatial hash for static geometry (walls, floors, crosswalks)
-        // Built once on map load. Query by viewport bounds → O(visible cells) not O(N).
-        // Items must have { x, y, w, h } properties.
-        // ============================================================================
-        class RenderGrid {
-            constructor(cellSize = 400) {
-                this.cellSize = cellSize;
-                this.cells = new Map();
-            }
-            
-            /**
-             * Build the grid from an array of rect-like items.
-             * Each item must have { x, y, w, h }.
-             */
-            build(items) {
-                this.cells.clear();
-                if (!items) return;
-                
-                for (let i = 0; i < items.length; i++) {
-                    const item = items[i];
-                    const iw = item.w || 200;
-                    const ih = item.h || 200;
-                    
-                    const minCX = Math.floor(item.x / this.cellSize);
-                    const maxCX = Math.floor((item.x + iw) / this.cellSize);
-                    const minCY = Math.floor(item.y / this.cellSize);
-                    const maxCY = Math.floor((item.y + ih) / this.cellSize);
-                    
-                    for (let cx = minCX; cx <= maxCX; cx++) {
-                        for (let cy = minCY; cy <= maxCY; cy++) {
-                            const key = (cx << 16) ^ cy; // Numeric key — faster than string
-                            let cell = this.cells.get(key);
-                            if (!cell) {
-                                cell = [];
-                                this.cells.set(key, cell);
-                            }
-                            cell.push(item);
-                        }
-                    }
-                }
-            }
-            
-            /**
-             * Query all items overlapping the given viewport bounds.
-             * Returns a Set (auto-deduplicates items spanning multiple cells).
-             * @param {object} bounds - { left, right, top, bottom }
-             * @param {Set} [results] - Optional caller-owned scratch set, cleared before use.
-             */
-            query(bounds, results = new Set()) {
-                results.clear();
-                
-                const minCX = Math.floor(bounds.left / this.cellSize);
-                const maxCX = Math.floor(bounds.right / this.cellSize);
-                const minCY = Math.floor(bounds.top / this.cellSize);
-                const maxCY = Math.floor(bounds.bottom / this.cellSize);
-                
-                for (let cx = minCX; cx <= maxCX; cx++) {
-                    for (let cy = minCY; cy <= maxCY; cy++) {
-                        const key = (cx << 16) ^ cy;
-                        const cell = this.cells.get(key);
-                        if (cell) {
-                            for (let i = 0; i < cell.length; i++) {
-                                results.add(cell[i]);
-                            }
-                        }
-                    }
-                }
-                
-                return results;
-            }
-        }
-
-
-        // Ordered broadphase for static buildings/foliage. Deduplicate ARRAY SLOTS,
-        // so duplicate references still draw twice and foliage density keeps its original index.
-        // Exact existing pass predicates run after the query; the grid never changes their margins.
-        class OrderedRenderGrid {
-            constructor(cellSize = 400) {
-                this.cellSize = cellSize;
-                this.cells = new Map();
-                this.entries = [];
-                this.always = [];
-                this.stamp = 0;
-            }
-
-            build(items, boundsFor) {
-                this.cells.clear(); this.entries.length = 0; this.always.length = 0;
-                if (!items) return;
-                items.forEach((item, index) => {
-                    const entry = { item, index, stamp: 0, standardV2: false };
-                    this.entries.push(entry);
-                    const b = boundsFor(item, entry);
-                    if (!b || ![b.left, b.right, b.top, b.bottom].every(Number.isFinite)) {
-                        this.always.push(entry); return;
-                    }
-                    const x0 = Math.floor(Math.min(b.left, b.right) / this.cellSize), x1 = Math.floor(Math.max(b.left, b.right) / this.cellSize);
-                    const y0 = Math.floor(Math.min(b.top, b.bottom) / this.cellSize), y1 = Math.floor(Math.max(b.top, b.bottom) / this.cellSize);
-                    // Huge/invalid editor objects remain candidates without allocating a map-sized grid.
-                    if (![x0, x1, y0, y1].every(Number.isSafeInteger) || (x1 - x0 + 1) * (y1 - y0 + 1) > 8192) { this.always.push(entry); return; }
-                    for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
-                        const key = x + ',' + y;
-                        let cell = this.cells.get(key);
-                        if (!cell) { cell = []; this.cells.set(key, cell); }
-                        cell.push(entry);
-                    }
-                });
-            }
-
-            query(bounds, results) {
-                results.length = 0;
-                if (!bounds || ![bounds.left, bounds.right, bounds.top, bounds.bottom].every(Number.isFinite)) {
-                    for (const entry of this.entries) results.push(entry);
-                    return results;
-                }
-                const x0 = Math.floor(bounds.left / this.cellSize), x1 = Math.floor(bounds.right / this.cellSize);
-                const y0 = Math.floor(bounds.top / this.cellSize), y1 = Math.floor(bounds.bottom / this.cellSize);
-                if (![x0, x1, y0, y1].every(Number.isSafeInteger) || x1 < x0 || y1 < y0 || (x1 - x0 + 1) * (y1 - y0 + 1) > 8192) {
-                    for (const entry of this.entries) results.push(entry);
-                    return results;
-                }
-                const stamp = ++this.stamp;
-                for (const entry of this.always) { entry.stamp = stamp; results.push(entry); }
-                for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
-                    const cell = this.cells.get(x + ',' + y);
-                    if (cell) for (const entry of cell) if (entry.stamp !== stamp) {
-                        entry.stamp = stamp; results.push(entry);
-                    }
-                }
-                results.sort((a, b) => a.index - b.index);
-                return results;
-            }
-        }
-
-        // Static rectangle searches share an ordered, map-owned broadphase. Arbitrary
-        // caller arrays keep their original linear path. Registered arrays validate
-        // slots/geometry once per simulation tick, never once per car or sight ray.
-        // Known same-tick edits explicitly invalidate; replacement/length changes
-        // rebuild immediately. Entries keep duplicate slots and original hit order.
-        const _physicsSpatial = {
-            records: new WeakMap(),
-            track(items) {
-                if (!items || this.records.has(items)) return;
-                this.records.set(items, { grid: new OrderedRenderGrid(400), slots: [], geometry: [], epoch: -1, dirty: true, linear: false, entries: [], items: [], cellQueries: new Map(), cachedSlots: 0 });
-            },
-            invalidate(items) {
-                if (!items) { this.clear(); return; }
-                const c = this.records.get(items);
-                if (c) c.dirty = true;
-            },
-            clear() { this.records = new WeakMap(); },
-            refresh(items, c) {
-                let changed = c.dirty || c.slots.length !== items.length;
-                if (!changed && c.epoch !== _simTick) {
-                    for (let i = 0; i < items.length; i++) {
-                        const o = items[i], at = i * 4;
-                        if (c.slots[i] !== o || !o || !Object.is(c.geometry[at], o.x) || !Object.is(c.geometry[at + 1], o.y) || !Object.is(c.geometry[at + 2], o.w) || !Object.is(c.geometry[at + 3], o.h)) { changed = true; break; }
-                    }
-                }
-                if (changed) {
-                    c.cellQueries.clear(); c.cachedSlots = 0;
-                    c.slots.length = items.length; c.geometry.length = items.length * 4;
-                    c.linear = false;
-                    for (let i = 0; i < items.length; i++) {
-                        const o = items[i], at = i * 4;
-                        if (!(i in items)) c.linear = true;
-                        c.slots[i] = o;
-                        c.geometry[at] = o && o.x; c.geometry[at + 1] = o && o.y; c.geometry[at + 2] = o && o.w; c.geometry[at + 3] = o && o.h;
-                    }
-                    c.grid.build(items, o => o && ({ left: o.x, right: o.x + o.w, top: o.y, bottom: o.y + o.h }));
-                    c.dirty = false;
-                }
-                c.epoch = _simTick;
-            },
-            query(items, bounds) {
-                if (!items) return items;
-                const c = this.records.get(items);
-                if (!c) return items;
-                if (c.dirty || c.slots.length !== items.length || c.epoch !== _simTick) this.refresh(items, c);
-                if (c.linear) return items;
-                // Grid candidates depend on cell range, not the precise query rectangle.
-                // Cars and sight rays repeatedly visit the same static cells. Cache their
-                // ordered slot lists until geometry changes, with a bounded per-source FIFO.
-                let key = null;
-                if (bounds && Number.isFinite(bounds.left) && Number.isFinite(bounds.right) &&
-                    Number.isFinite(bounds.top) && Number.isFinite(bounds.bottom)) {
-                    const S = c.grid.cellSize, x0 = Math.floor(bounds.left / S), x1 = Math.floor(bounds.right / S);
-                    const y0 = Math.floor(bounds.top / S), y1 = Math.floor(bounds.bottom / S);
-                    if (Number.isSafeInteger(x0) && Number.isSafeInteger(x1) && Number.isSafeInteger(y0) && Number.isSafeInteger(y1) &&
-                        x1 >= x0 && y1 >= y0 && (x1 - x0 + 1) * (y1 - y0 + 1) <= 8192) key = x0 + ':' + x1 + ':' + y0 + ':' + y1;
-                }
-                const cached = key === null ? null : c.cellQueries.get(key);
-                if (cached) {
-                    c.items.length = cached.length;
-                    for (let i = 0; i < cached.length; i++) c.items[i] = cached[i];
-                    return c.items;
-                }
-                c.grid.query(bounds, c.entries);
-                c.items.length = c.entries.length;
-                for (let i = 0; i < c.entries.length; i++) c.items[i] = c.entries[i].item;
-                if (key !== null && c.items.length <= 1024) {
-                    while (c.cellQueries.size && (c.cellQueries.size >= 256 || c.cachedSlots + c.items.length > 16384)) {
-                        const oldest = c.cellQueries.keys().next().value;
-                        c.cachedSlots -= c.cellQueries.get(oldest).length; c.cellQueries.delete(oldest);
-                    }
-                    c.cellQueries.set(key, c.items.slice()); c.cachedSlots += c.items.length;
-                }
-                return c.items;
-            }
-        };
-
-
-        // Mutable static effect geometry is verified once per tick/draw. Every source slot
-        // is retained, including duplicates and invisible lamp emitters. Unknown bounds stay live.
-        class EffectRenderGrid extends OrderedRenderGrid {
-            constructor() {
-                super(); this.source = null; this.kind = null; this.checkedTick = this.checkedDraw = this.checkedTime = null;
-                this.revision = -1;
-            }
-            refresh(items, kind, tick, draw, time, revision) {
-                let changed = this.source !== items || this.kind !== kind || this.revision !== revision || this.entries.length !== items.length;
-                if (!changed && this.checkedTick === tick && this.checkedDraw === draw && this.checkedTime === time) return;
-                if (!changed) {
-                    for (let i = 0; i < items.length; i++) {
-                        const e = this.entries[i], item = items[i], r = kind === 'puddles' ? item.r : item.radius;
-                        if (!e || e.item !== item || e.ex !== item.x || e.ey !== item.y || e.er !== r) { changed = true; break; }
-                    }
-                }
-                if (changed) {
-                    this.build(items, (item, e) => {
-                        const r = kind === 'puddles' ? item.r : item.radius;
-                        e.ex = item.x; e.ey = item.y; e.er = r;
-                        if (!Number.isFinite(item.x) || !Number.isFinite(item.y) || (r != null && !Number.isFinite(r))) return null;
-                        // Lamp body queries use anchors; light/material/rain queries retain their
-                        // own radii. A missing lamp radius still has the original 200px fallback.
-                        const reach = kind === 'puddles' ? Math.abs(r || 0) + 10 : Math.max(0, r || 0, Math.abs((r || 200) * 0.6));
-                        return { left: item.x - reach, right: item.x + reach, top: item.y - reach, bottom: item.y + reach };
-                    });
-                    this.source = items; this.kind = kind; this.revision = revision;
-                }
-                this.checkedTick = tick; this.checkedDraw = draw; this.checkedTime = time;
-            }
-        }
-
-        /**
-         * TransitionGrid — O(1) spatial lookup for map transition zones.
-         * Replaces per-frame Array.find() scans with cell-based hash lookup.
-         */
-        class TransitionGrid {
-            constructor(cellSize = 100) {
-                this.cellSize = cellSize;
-                this.cells = new Map();
-                this._targetMap = new Map(); // O(1) lookup by target name
-            }
-            
-            build(transitions) {
-                this.cells.clear();
-                this._targetMap.clear();
-                if (!transitions) return;
-                for (const t of transitions) {
-                    // Spatial cells
-                    const minCX = Math.floor(t.x / this.cellSize);
-                    const maxCX = Math.floor((t.x + t.w) / this.cellSize);
-                    const minCY = Math.floor(t.y / this.cellSize);
-                    const maxCY = Math.floor((t.y + t.h) / this.cellSize);
-                    for (let cx = minCX; cx <= maxCX; cx++) {
-                        for (let cy = minCY; cy <= maxCY; cy++) {
-                            const key = (cx << 16) | (cy & 0xFFFF);
-                            let cell = this.cells.get(key);
-                            if (!cell) { cell = []; this.cells.set(key, cell); }
-                            cell.push(t);
-                        }
-                    }
-                    // Target name index
-                    if (t.target) this._targetMap.set(t.target, t);
-                }
-            }
-            
-            /** Find transition containing point (px, py). Returns transition or null. */
-            query(px, py) {
-                const cx = Math.floor(px / this.cellSize);
-                const cy = Math.floor(py / this.cellSize);
-                const key = (cx << 16) | (cy & 0xFFFF);
-                const cell = this.cells.get(key);
-                if (!cell) return null;
-                for (const t of cell) {
-                    if (px > t.x && px < t.x + t.w && py > t.y && py < t.y + t.h) return t;
-                }
-                return null;
-            }
-            
-            /** Find transition by target map name. O(1). */
-            findByTarget(targetName) {
-                return this._targetMap.get(targetName) || null;
-            }
-        }
-
-
-    </script>
-    <script type="text/dfab" data-src="physics/game-entity.js" data-cost="150">
-        // =====================================================================
-        //  GAME ENTITY (Base Class)
-        // =====================================================================
-        /**
-         * All game objects inherit from this.
-         * Provides position, collision config, screen culling, and queue-based registration.
-         * 
-         * REGISTRATION FLOW:
-         * 1. Entity constructor adds self to registrationQueue
-         * 2. CollisionSystem.processQueue() processes all queued entities
-         * 3. Entities get added to registry.all, registry.collidable, etc.
-         * 4. Queue is cleared after processing
-         */
-                // ╔══════════════════════════════════════════════════════════════════╗
-        // ║                      ENTITY SYSTEM                                ║
-        // ╚══════════════════════════════════════════════════════════════════╝
-        class GameEntity {
-            // === REGISTRATION QUEUE ===
-            static registrationQueue = [];   // Entities waiting to be registered
-            static queueEnabled = true;      // When false, register immediately (legacy support)
-            
-            // === STATIC REGISTRY ===
-            static registry = {
-                all: [],              // Every entity
-                collidable: [],       // Entities with hasCollision: true
-                byLayer: {},          // Grouped by collision layer name
-                byType: {}            // Grouped by entity type (for targeted updates)
-            };
-            
-            // === COLLISION LAYERS (Bitmask) ===
-            static LAYER = {
-                NONE:       0,
-                STATIC:     1,
-                DYNAMIC:    2,
-                ACTOR:      4,
-                VEHICLE:    8,
-                PROJECTILE: 16,
-                TRIGGER:    32
-            };
-            
-            // === COLLISION SHAPES ===
-            static SHAPE = {
-                AABB:   'AABB',       // Axis-aligned bounding box
-                CIRCLE: 'CIRCLE',     // Circle (uses radius)
-                OBB:    'OBB'         // Oriented bounding box (rotated rect)
-            };
-            
-            // Auto-increment ID
-            static _nextId = 1;
-            
-            constructor(config = {}) {
-                // --- IDENTITY ---
-                this.id = GameEntity._nextId++;
-                this.type = config.type || 'entity';
-                this.name = config.name || null;
-                
-                // --- TRANSFORM ---
-                this.x = config.x ?? 0;
-                this.y = config.y ?? 0;
-                this.angle = config.angle ?? 0;
-                
-                // --- DIMENSIONS ---
-                this.width = config.width ?? config.w ?? 20;
-                this.height = config.height ?? config.h ?? 20;
-                this.radius = config.radius ?? Math.max(this.width, this.height) / 2;
-                
-                // --- PHYSICS ---
-                this.vx = config.vx ?? 0;
-                this.vy = config.vy ?? 0;
-                this.angularVel = config.angularVel ?? 0;
-                this.mass = config.mass ?? 1;
-                this.friction = config.friction ?? 0.8;
-                this.restitution = config.restitution ?? 0.3;  // Bounciness
-                this.isStatic = config.isStatic ?? false;
-                
-                // --- COLLISION CONFIG ---
-                this.hasCollision = config.hasCollision ?? false;
-                this.collisionShape = config.collisionShape ?? GameEntity.SHAPE.AABB;
-                this.collisionLayer = config.collisionLayer ?? GameEntity.LAYER.NONE;
-                this.collisionMask = config.collisionMask ?? 0xFFFF;
-                this.isTrigger = config.isTrigger ?? false;
-                
-                // --- LIFECYCLE ---
-                this.active = true;
-                this.visible = config.visible ?? true;
-                this.markedForDestroy = false;
-                
-                // --- CUSTOM DATA ---
-                this.data = config.data || {};
-                
-                // --- ENQUEUE FOR REGISTRATION ---
-                this._enqueue();
-            }
-            
-            // =====================
-            //  REGISTRATION (Queue-Based)
-            // =====================
-            
-            /**
-             * Add entity to registration queue.
-             * If queue is disabled, register immediately (legacy/runtime spawns).
-             */
-            _enqueue() {
-                if (GameEntity.queueEnabled) {
-                    GameEntity.registrationQueue.push(this);
-                } else {
-                    this._doRegister();
-                }
-            }
-            
-            /**
-             * Actually register entity in registry.
-             * Called by CollisionSystem.processQueue() or immediately if queue disabled.
-             */
-            _doRegister() {
-                // Avoid double registration
-                if (GameEntity.registry.all.includes(this)) return;
-                
-                GameEntity.registry.all.push(this);
-                
-                if (!GameEntity.registry.byType[this.type]) {
-                    GameEntity.registry.byType[this.type] = [];
-                }
-                GameEntity.registry.byType[this.type].push(this);
-                
-                if (this.hasCollision) {
-                    this._registerCollision();
-                }
-            }
-            
-            /**
-             * Legacy method - now calls _doRegister
-             */
-            _register() {
-                this._doRegister();
-            }
-            
-            _registerCollision() {
-                if (GameEntity.registry.collidable.includes(this)) return;
-                
-                GameEntity.registry.collidable.push(this);
-                
-                const layerName = this._getLayerName();
-                if (!GameEntity.registry.byLayer[layerName]) {
-                    GameEntity.registry.byLayer[layerName] = [];
-                }
-                GameEntity.registry.byLayer[layerName].push(this);
-            }
-            
-            _unregister() {
-                let idx = GameEntity.registry.all.indexOf(this);
-                if (idx > -1) GameEntity.registry.all.splice(idx, 1);
-                
-                if (GameEntity.registry.byType[this.type]) {
-                    idx = GameEntity.registry.byType[this.type].indexOf(this);
-                    if (idx > -1) GameEntity.registry.byType[this.type].splice(idx, 1);
-                }
-                
-                if (this.hasCollision) {
-                    this._unregisterCollision();
-                }
-            }
-            
-            _unregisterCollision() {
-                let idx = GameEntity.registry.collidable.indexOf(this);
-                if (idx > -1) GameEntity.registry.collidable.splice(idx, 1);
-                
-                const layerName = this._getLayerName();
-                if (GameEntity.registry.byLayer[layerName]) {
-                    idx = GameEntity.registry.byLayer[layerName].indexOf(this);
-                    if (idx > -1) GameEntity.registry.byLayer[layerName].splice(idx, 1);
-                }
-            }
-            
-            _getLayerName() {
-                for (let name in GameEntity.LAYER) {
-                    if (GameEntity.LAYER[name] === this.collisionLayer) return name;
-                }
-                return 'NONE';
-            }
-            
-            // =====================
-            //  STATIC QUEUE METHODS
-            // =====================
-            
-            /**
-             * Process all entities in registration queue.
-             * Called once after map load to batch-register all entities.
-             */
-            static processQueue() {
-                const count = GameEntity.registrationQueue.length;
-                for (let entity of GameEntity.registrationQueue) {
-                    entity._doRegister();
-                }
-                GameEntity.registrationQueue = [];
-                return count;
-            }
-            
-            /**
-             * Clear queue without registering (used when discarding entities).
-             */
-            static clearQueue() {
-                GameEntity.registrationQueue = [];
-            }
-            
-            // =====================
-            //  COLLISION GEOMETRY
-            // =====================
-            
-            getBoundingBox() {
-                if (this.collisionShape === GameEntity.SHAPE.OBB) {
-                    const cos = Math.abs(Math.cos(this.angle));
-                    const sin = Math.abs(Math.sin(this.angle));
-                    const w = this.width * cos + this.height * sin;
-                    const h = this.width * sin + this.height * cos;
-                    return { x: this.x - w / 2, y: this.y - h / 2, w: w, h: h };
-                }
-                
-                if (this.collisionShape === GameEntity.SHAPE.CIRCLE) {
-                    return { x: this.x - this.radius, y: this.y - this.radius, w: this.radius * 2, h: this.radius * 2 };
-                }
-                
-                return { x: this.x, y: this.y, w: this.width, h: this.height };
-            }
-            
-            getCenter() {
-                if (this.collisionShape === GameEntity.SHAPE.OBB || 
-                    this.collisionShape === GameEntity.SHAPE.CIRCLE) {
-                    return { x: this.x, y: this.y };
-                }
-                return { x: this.x + this.width / 2, y: this.y + this.height / 2 };
-            }
-            
-            getOBB() {
-                const center = this.getCenter();
-                return {
-                    x: center.x, y: center.y,
-                    length: this.width, width: this.height,
-                    angle: this.angle, mass: this.mass,
-                    speed: Math.hypot(this.vx, this.vy),
-                    vx: this.vx, vy: this.vy
-                };
-            }
-            
-            getCorners() {
-                const center = this.getCenter();
-                const cos = Math.cos(this.angle);
-                const sin = Math.sin(this.angle);
-                const hw = this.width / 2;
-                const hh = this.height / 2;
-                
-                return [
-                    { x: center.x + (hw * cos - (-hh) * sin), y: center.y + (hw * sin + (-hh) * cos) },
-                    { x: center.x + (hw * cos - hh * sin),    y: center.y + (hw * sin + hh * cos) },
-                    { x: center.x + ((-hw) * cos - hh * sin), y: center.y + ((-hw) * sin + hh * cos) },
-                    { x: center.x + ((-hw) * cos - (-hh) * sin), y: center.y + ((-hw) * sin + (-hh) * cos) }
-                ];
-            }
-            
-            // =====================
-            //  SCREEN CULLING
-            // =====================
-            
-            isOnScreen(camera, canvas, margin = 100) {
-                const center = this.getCenter();
-                const screenX = (center.x - camera.x) * camera.zoom + canvas.width / 2;
-                const screenY = (center.y - camera.y) * camera.zoom + canvas.height / 2;
-                const size = Math.max(this.width, this.height, this.radius * 2);
-                const screenSize = (size / 2 + margin) * camera.zoom;
-                
-                return (
-                    screenX + screenSize > 0 &&
-                    screenX - screenSize < canvas.width &&
-                    screenY + screenSize > 0 &&
-                    screenY - screenSize < canvas.height
-                );
-            }
-            
-            // =====================
-            //  LIFECYCLE
-            // =====================
-            
-            update(dt = 1) {
-                if (!this.active || this.isStatic) return;
-                
-                this.x += this.vx * dt;
-                this.y += this.vy * dt;
-                this.angle += this.angularVel * dt;
-                
-                this.vx *= this.friction;
-                this.vy *= this.friction;
-                
-                if (Math.abs(this.vx) < 0.01) this.vx = 0;
-                if (Math.abs(this.vy) < 0.01) this.vy = 0;
-            }
-            
-            draw(ctx) {
-                if (!this.visible) return;
-                
-                ctx.save();
-                const center = this.getCenter();
-                ctx.translate(center.x, center.y);
-                ctx.rotate(this.angle);
-                
-                ctx.strokeStyle = '#ff00ff';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(-this.width/2, -this.height/2, this.width, this.height);
-                
-                ctx.beginPath();
-                ctx.moveTo(0, 0);
-                ctx.lineTo(this.width/2, 0);
-                ctx.stroke();
-                
-                ctx.restore();
-            }
-            
-            destroy() {
-                this.markedForDestroy = true;
-                this.active = false;
-                this.vx = 0;
-                this.vy = 0;
-            }
-            
-            _finalDestroy() {
-                this._unregister();
-            }
-            
-            // =====================
-            //  STATIC UTILITIES
-            // =====================
-            
-            static getByType(type) {
-                return GameEntity.registry.byType[type] || [];
-            }
-            
-            static getByLayer(layerName) {
-                return GameEntity.registry.byLayer[layerName] || [];
-            }
-            
-            static getOnScreen(camera, canvas, margin = 200) {
-                return GameEntity.registry.collidable.filter(e => 
-                    e.active && e.isOnScreen(camera, canvas, margin)
-                );
-            }
-            
-            static clearAll() {
-                GameEntity.registry.all = [];
-                GameEntity.registry.collidable = [];
-                GameEntity.registry.byLayer = {};
-                GameEntity.registry.byType = {};
-            }
-            
-            /**
-             * Re-register an entity after registry has been cleared.
-             * Used during map transitions when props persist but registry is reset.
-             */
-            reregister() {
-                // Only re-register if not already in registry
-                if (!GameEntity.registry.all.includes(this)) {
-                    this._register();
-                }
-            }
-            
-            static clearType(type) {
-                const entities = GameEntity.registry.byType[type] || [];
-                entities.forEach(e => e.destroy());
-            }
-            
-            static cleanup() {
-                const destroyed = GameEntity.registry.all.filter(e => e.markedForDestroy);
-                destroyed.forEach(e => e._finalDestroy());
-            }
-        }
-
-
-    </script>
-    <script type="text/dfab" data-src="physics/collision.js" data-cost="589">
-        // =====================================================================
         //  COLLISION SYSTEM (Unified Manager)
         // =====================================================================
         /**
@@ -17547,6 +17925,24 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             static _staticRows = [];
             static _staticMembers = [];
             static _layers = { projectile: [], vehicle: [], actor: [], dynamic: [] };
+
+            // --- SHAPE MATHS: basement/shape-kit.js, under the names the game already calls ---
+            static distToSegmentSquared = shapeKit.segmentDistanceSq;
+            static _sweepCircle = shapeKit.sweepCircle;
+            static _sweepRect = shapeKit.sweepRect;
+            static _sweepRoundedBox = shapeKit.sweepRoundedBox;
+            static _inOBB = shapeKit.insideObb;
+            static _contactPoint = shapeKit.obbContactPoint;
+            static _checkCollision = shapeKit.overlaps;
+            static _satCollision = shapeKit.sat;
+            static _circleVsCircle = shapeKit.circleVsCircle;
+            static _circleVsAABB = shapeKit.circleVsRect;
+            static _circleVsOBB = shapeKit.circleVsObb;
+            static _getOBBCorners = shapeKit.obbCorners;
+            static _getOBBAxes = shapeKit.obbAxes;
+            static _projectShape = shapeKit.projectOnAxis;
+            static _entityToOBB = shapeKit.entityToObb;
+            static _aabbToOBB = shapeKit.rectToObb;
 
             static _prepareStaticGrid(items) {
                 const rows = this._staticRows;
@@ -17574,15 +17970,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return items;
             }
             
-            // Math helper: distance from a point (circle center) to a line segment (bullet path)
-            static distToSegmentSquared(px, py, l1x, l1y, l2x, l2y) {
-                const l2 = (l1x - l2x) ** 2 + (l1y - l2y) ** 2;
-                if (l2 === 0) return (px - l1x) ** 2 + (py - l1y) ** 2;
-                let t = ((px - l1x) * (l2x - l1x) + (py - l1y) * (l2y - l1y)) / l2;
-                t = clamp(t, 0, 1);
-                return (px - (l1x + t * (l2x - l1x))) ** 2 + (py - (l1y + t * (l2y - l1y))) ** 2;
-            }
-            
             /**
              * Clear the spatial grid. Call during map transitions.
              */
@@ -17597,7 +17984,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
             static stats = {
                 totalChecks: 0,
-                narrowChecks: 0,
+                get narrowChecks() { return shapeKit.narrow_checks; },          // counted by the shape kit
+                set narrowChecks(n) { shapeKit.narrow_checks = n; },
                 collisionsResolved: 0,
                 registered: 0
             };
@@ -17691,43 +18079,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 for (const a of GameEntity.getByLayer('ACTOR')) remember(a);
                 for (const a of game.enemies) remember(a);
                 remember(game.player);
-            }
-
-            static _sweepCircle(ax, ay, bx, by, cx, cy, radius) {
-                if (Math.max(ax, bx) < cx - radius || Math.min(ax, bx) > cx + radius ||
-                    Math.max(ay, by) < cy - radius || Math.min(ay, by) > cy + radius) return null;
-                const ox = ax - cx, oy = ay - cy, dx = bx - ax, dy = by - ay;
-                const c = ox * ox + oy * oy - radius * radius;
-                if (c <= 0) return 0;
-                const a = dx * dx + dy * dy;
-                if (!a) return null;
-                const b = ox * dx + oy * dy, disc = b * b - a * c;
-                if (disc < 0) return null;
-                const t = (-b - Math.sqrt(disc)) / a;
-                return t >= 0 && t <= 1 ? t : null;
-            }
-
-            static _sweepRect(ax, ay, bx, by, left, top, right, bottom) {
-                let lo = 0, hi = 1;
-                for (const [v, step, min, max] of [[ax, bx - ax, left, right], [ay, by - ay, top, bottom]]) {
-                    if (!step) { if (v < min || v > max) return null; continue; }
-                    const a = (min - v) / step, b = (max - v) / step;
-                    lo = Math.max(lo, Math.min(a, b)); hi = Math.min(hi, Math.max(a, b));
-                    if (lo > hi) return null;
-                }
-                return lo;
-            }
-
-            // Exact circle-vs-box sweep: two strips plus round corners, avoiding false corner hits.
-            static _sweepRoundedBox(ax, ay, bx, by, hw, hh, radius) {
-                if (Math.max(ax, bx) < -hw - radius || Math.min(ax, bx) > hw + radius ||
-                    Math.max(ay, by) < -hh - radius || Math.min(ay, by) > hh + radius) return null;
-                let best = null;
-                const keep = t => { if (t !== null && (best === null || t < best)) best = t; };
-                keep(this._sweepRect(ax, ay, bx, by, -hw - radius, -hh, hw + radius, hh));
-                keep(this._sweepRect(ax, ay, bx, by, -hw, -hh - radius, hw, hh + radius));
-                for (const x of [-hw, hw]) for (const y of [-hh, hh]) keep(this._sweepCircle(ax, ay, bx, by, x, y, radius));
-                return best;
             }
 
             /** Entities of `list` bucketed by cell, for the projectile sweep: only those near the path get tested.
@@ -18191,246 +18542,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (b && IB) b.angularVel = (b.angularVel || 0) - (rBx * Jy - rBy * Jx) * IB;
             }
 
-            /** Is point p inside the OBB (a little tolerance)? */
-            static _inOBB(p, o, tol = 0.6) {
-                const c = Math.cos(-(o.angle || 0)), s = Math.sin(-(o.angle || 0)), dx = p.x - o.x, dy = p.y - o.y;
-                const lx = dx * c - dy * s, ly = dx * s + dy * c;
-                return Math.abs(lx) <= (o.length || o.width || 20) / 2 + tol && Math.abs(ly) <= (o.width || o.height || 20) / 2 + tol;
-            }
-            /**
-             * Where two OBBs touch (n from o2 to o1): the deepest corner(s) of each into the other, averaging
-             * corners that tie (face to face, so a flush push doesn't twist), preferring the one that's inside.
-             */
-            static _contactPoint(o1, o2, nx, ny) {
-                const pick = (corners, sign) => {
-                    let best = Infinity; for (const c of corners) best = Math.min(best, sign * (c.x * nx + c.y * ny));
-                    let x = 0, y = 0, k = 0;
-                    for (const c of corners) if (sign * (c.x * nx + c.y * ny) <= best + 0.5) { x += c.x; y += c.y; k++; }
-                    return { x: x / k, y: y / k };
-                };
-                const p1 = pick(this._getOBBCorners(o1), 1), p2 = pick(this._getOBBCorners(o2), -1);
-                const in1 = this._inOBB(p1, o2), in2 = this._inOBB(p2, o1);
-                if (in1 && !in2) return p1;
-                if (in2 && !in1) return p2;
-                return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
-            }
-
-            // =====================
-            //  COLLISION DETECTION
-            // =====================
-            
-            /**
-             * Generic collision check dispatching to appropriate method.
-             */
-            static _checkCollision(a, b) {
-            // Quick AABB early-out before expensive shape checks
-            const aBox = a.getBoundingBox();
-            const bBox = b.getBoundingBox();
-            if (aBox.x + aBox.w < bBox.x || bBox.x + bBox.w < aBox.x ||
-                aBox.y + aBox.h < bBox.y || bBox.y + bBox.h < aBox.y) {
-                return false;
-            }
-
-                const shapeA = a.collisionShape;
-                const shapeB = b.collisionShape;
-                
-                if (shapeA === GameEntity.SHAPE.CIRCLE && shapeB === GameEntity.SHAPE.CIRCLE) {
-                    const dist = Math.hypot(a.x - b.x, a.y - b.y);
-                    return dist < a.radius + b.radius;
-                }
-                
-                if (shapeA === GameEntity.SHAPE.CIRCLE && shapeB === GameEntity.SHAPE.AABB) {
-                    return this._circleVsAABB(a, b) !== null;
-                }
-                if (shapeA === GameEntity.SHAPE.AABB && shapeB === GameEntity.SHAPE.CIRCLE) {
-                    return this._circleVsAABB(b, a) !== null;
-                }
-                
-                if (shapeA === GameEntity.SHAPE.CIRCLE && shapeB === GameEntity.SHAPE.OBB) {
-                    return this._circleVsOBB(a, b) !== null;
-                }
-                if (shapeA === GameEntity.SHAPE.OBB && shapeB === GameEntity.SHAPE.CIRCLE) {
-                    return this._circleVsOBB(b, a) !== null;
-                }
-                
-                // Treat everything else as OBB
-                const obbA = a.getOBB ? a.getOBB() : this._entityToOBB(a);
-                const obbB = b.getOBB ? b.getOBB() : this._entityToOBB(b);
-                return this._satCollision(obbA, obbB) !== null;
-            }
-            
-            /**
-             * SAT collision detection with MTV (Minimum Translation Vector).
-             * Returns collision packet or null if no collision.
-             */
-            static _satCollision(obb1, obb2) {
-                const corners1 = this._getOBBCorners(obb1);
-                const corners2 = this._getOBBCorners(obb2);
-                const axes = [...this._getOBBAxes(obb1), ...this._getOBBAxes(obb2)];
-                
-                let minOverlap = Infinity;
-                let mtv = null;
-                
-                for (let axis of axes) {
-                    const p1 = this._projectShape(corners1, axis);
-                    const p2 = this._projectShape(corners2, axis);
-                    
-                    if (p1.max < p2.min || p2.max < p1.min) {
-                        return null; // Gap found, no collision
-                    }
-                    
-                    const overlap = Math.min(p1.max, p2.max) - Math.max(p1.min, p2.min);
-                    if (overlap < minOverlap) {
-                        minOverlap = overlap;
-                        mtv = { x: axis.x, y: axis.y };
-                    }
-                }
-                
-                // Ensure MTV points from obb2 to obb1
-                const dx = obb1.x - obb2.x;
-                const dy = obb1.y - obb2.y;
-                if (dx * mtv.x + dy * mtv.y < 0) {
-                    mtv.x = -mtv.x;
-                    mtv.y = -mtv.y;
-                }
-                
-                this.stats.narrowChecks++;
-                return { nx: mtv.x, ny: mtv.y, depth: minOverlap };
-            }
-            
-            /**
-             * Circle vs Circle collision.
-             * Returns collision packet with normal pointing from b to a.
-             */
-            static _circleVsCircle(a, b) {
-                const dx = a.x - b.x;
-                const dy = a.y - b.y;
-                const dist = Math.hypot(dx, dy);
-                const minDist = a.radius + b.radius;
-                
-                if (dist >= minDist) return null;
-                
-                this.stats.narrowChecks++;
-                
-                if (dist > 0) {
-                    return { 
-                        nx: dx / dist, 
-                        ny: dy / dist, 
-                        depth: minDist - dist 
-                    };
-                }
-                
-                // Circles perfectly overlapping - push in arbitrary direction
-                return { nx: 1, ny: 0, depth: minDist };
-            }
-            
-            /**
-             * Circle vs AABB collision.
-             */
-            static _circleVsAABB(circle, rect, mapBounds) {
-                const bb = rect.getBoundingBox();
-                const closestX = Math.max(bb.x, Math.min(bb.x + bb.w, circle.x));
-                const closestY = Math.max(bb.y, Math.min(bb.y + bb.h, circle.y));
-                
-                const dx = circle.x - closestX;
-                const dy = circle.y - closestY;
-                const dist = Math.hypot(dx, dy);
-                
-                if (dist >= circle.radius) return null;
-                
-                this.stats.narrowChecks++;
-                
-                if (dist > 0) {
-                    return { nx: dx / dist, ny: dy / dist, depth: circle.radius - dist };
-                }
-                
-                // Circle center is inside the AABB. Evaluate pushout to each of the four
-                // faces and pick the smallest valid one. "Valid" = the resulting position
-                // stays inside the playable map area (when mapBounds is supplied).
-                //
-                // This is critical for thick perimeter walls (e.g. the gauntlet's 80px
-                // outer ring): the geometric shortest face on the LEFT wall is west, but
-                // pushing west goes off the map and the bound-clamp yanks the actor back
-                // into the wall — wobble loop. Filtering to in-bounds candidates first
-                // makes the resolver pick "east" for the left wall, "south" for the top
-                // wall, etc., automatically.
-                const r = circle.radius;
-                const candidates = [
-                    { nx: -1, ny:  0, depth: (circle.x - bb.x) + r,        outX: bb.x - r,        outY: circle.y },
-                    { nx:  1, ny:  0, depth: (bb.x + bb.w - circle.x) + r, outX: bb.x + bb.w + r, outY: circle.y },
-                    { nx:  0, ny: -1, depth: (circle.y - bb.y) + r,        outX: circle.x,        outY: bb.y - r },
-                    { nx:  0, ny:  1, depth: (bb.y + bb.h - circle.y) + r, outX: circle.x,        outY: bb.y + bb.h + r }
-                ];
-                candidates.sort((a, b) => a.depth - b.depth);
-                
-                if (mapBounds) {
-                    const m = mapBounds.margin || 0;
-                    for (const c of candidates) {
-                        if (c.outX >= m && c.outX <= mapBounds.w - m
-                         && c.outY >= m && c.outY <= mapBounds.h - m) {
-                            return { nx: c.nx, ny: c.ny, depth: c.depth };
-                        }
-                    }
-                }
-                
-                // No bounds info, or every face's pushout exits the map — fall back to
-                // the geometrically smallest pushout (degenerate case).
-                const c0 = candidates[0];
-                return { nx: c0.nx, ny: c0.ny, depth: c0.depth };
-            }
-            
-            /**
-             * Circle vs OBB collision.
-             * Transforms circle to OBB local space for accurate collision.
-             */
-            static _circleVsOBB(circle, obbEntity) {
-                const obb = obbEntity.getOBB ? obbEntity.getOBB() : this._entityToOBB(obbEntity);
-                
-                // Transform circle center to OBB local space
-                const cos = Math.cos(-obb.angle);
-                const sin = Math.sin(-obb.angle);
-                const dx = circle.x - obb.x;
-                const dy = circle.y - obb.y;
-                const localX = dx * cos - dy * sin;
-                const localY = dx * sin + dy * cos;
-                
-                // Find closest point on local AABB
-                const hw = obb.length / 2;
-                const hh = obb.width / 2;
-                const closestX = Math.max(-hw, Math.min(hw, localX));
-                const closestY = Math.max(-hh, Math.min(hh, localY));
-                
-                const distX = localX - closestX;
-                const distY = localY - closestY;
-                const dist = Math.hypot(distX, distY);
-                
-                if (dist >= circle.radius) return null;
-                
-                this.stats.narrowChecks++;
-                
-                // Transform normal back to world space
-                let nx, ny;
-                if (dist > 0) {
-                    const localNx = distX / dist;
-                    const localNy = distY / dist;
-                    const cosBack = Math.cos(obb.angle);
-                    const sinBack = Math.sin(obb.angle);
-                    nx = localNx * cosBack - localNy * sinBack;
-                    ny = localNx * sinBack + localNy * cosBack;
-                } else {
-                    // Circle centre inside the box: out through the nearest face, the whole way
-                    const cosBack = Math.cos(obb.angle);
-                    const sinBack = Math.sin(obb.angle);
-                    const ex = hw - Math.abs(localX), ey = hh - Math.abs(localY);
-                    const lnx = ex < ey ? Math.sign(localX) || 1 : 0, lny = ex < ey ? 0 : Math.sign(localY) || 1;
-                    nx = lnx * cosBack - lny * sinBack;
-                    ny = lnx * sinBack + lny * cosBack;
-                    return { nx, ny, depth: Math.min(ex, ey) + circle.radius };
-                }
-                
-                return { nx, ny, depth: circle.radius - dist };
-            }
-            
             // =====================
             //  COLLISION RESOLUTION
             // =====================
@@ -18525,68 +18636,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._solveContact(actor, prop, packet, cp, 0, 0.5, 1 / ((actor.mass || 10) * CONFIG.PHYSICS.PUSH_MASS));
             }
             
-            // =====================
-            //  SAT HELPERS
-            // =====================
-            
-            static _getOBBCorners(obb) {
-                const cos = Math.cos(obb.angle || 0);
-                const sin = Math.sin(obb.angle || 0);
-                const hw = (obb.length || obb.width || 20) / 2;
-                const hh = (obb.width || obb.height || 20) / 2;
-                
-                return [
-                    { x: obb.x + (hw * cos - (-hh) * sin), y: obb.y + (hw * sin + (-hh) * cos) },
-                    { x: obb.x + (hw * cos - hh * sin),    y: obb.y + (hw * sin + hh * cos) },
-                    { x: obb.x + ((-hw) * cos - hh * sin), y: obb.y + ((-hw) * sin + hh * cos) },
-                    { x: obb.x + ((-hw) * cos - (-hh) * sin), y: obb.y + ((-hw) * sin + (-hh) * cos) }
-                ];
-            }
-            
-            static _getOBBAxes(obb) {
-                const cos = Math.cos(obb.angle || 0);
-                const sin = Math.sin(obb.angle || 0);
-                return [
-                    { x: cos, y: sin },
-                    { x: -sin, y: cos }
-                ];
-            }
-            
-            static _projectShape(corners, axis) {
-                let min = Infinity;
-                let max = -Infinity;
-                for (let c of corners) {
-                    const dot = c.x * axis.x + c.y * axis.y;
-                    if (dot < min) min = dot;
-                    if (dot > max) max = dot;
-                }
-                return { min, max };
-            }
-            
-            static _entityToOBB(entity) {
-                const center = entity.getCenter ? entity.getCenter() : { x: entity.x, y: entity.y };
-                return {
-                    x: center.x, 
-                    y: center.y,
-                    length: entity.width || 20, 
-                    width: entity.height || 20,
-                    angle: entity.angle || 0,
-                    mass: entity.mass || 1,
-                    vx: entity.vx || 0,
-                    vy: entity.vy || 0
-                };
-            }
-            
-            static _aabbToOBB(aabb) {
-                return {
-                    x: aabb.x + (aabb.width || aabb.w) / 2,
-                    y: aabb.y + (aabb.height || aabb.h) / 2,
-                    length: aabb.width || aabb.w,
-                    width: aabb.height || aabb.h,
-                    angle: 0,
-                    mass: aabb.mass || 1
-                };
-            }
         }
 
 
