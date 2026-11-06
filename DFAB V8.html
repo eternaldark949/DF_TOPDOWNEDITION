@@ -5868,7 +5868,51 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'd0386c48079a';
+        const DFAB_BUILD = '28627c0d32fe';
+    </script>
+    <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="26">
+        // ===== LV0 BASEMENT =====
+        // The frame clock: the engine's four time values, and the only code meant to move them.
+        //
+        //   _frameTime / _frameTimeSec  REAL time (Date.now) of the frame being drawn. Light flicker, UI.
+        //                               Stamped once per accepted frame by the Lobby (lobby/level-lobby.js).
+        //   _simTick                    SIMULATION steps taken. Frozen while paused. Gait, AI timers, lifetimes.
+        //   _gameTimeSec                Smooth GAME time for draw code: follows the sim ticks (so it follows
+        //                               GAME_SPEED and stops while paused), blended between ticks. Foliage sway, bobbing.
+        //
+        // They stay plain globals because hundreds of draw and update lines read them every frame; a global
+        // read is the cheapest thing there is. Reading them anywhere is fine. Writing them goes through
+        // frame_clock, so there is one place to look for who moves time. (A few render helpers that briefly
+        // pretend it's another moment, crowd baking and prop sprites, save and restore them in place.)
+        let _frameTime = performance.now();
+        let _frameTimeSec = _frameTime / 1000;
+        /** Sim tick counter: advanced once per fixed simulation step (frame_clock.advanceTick, from GameEngine.update()). */
+        let _simTick = 0;
+        /** Smooth GAME time in seconds for draw code: advances with sim ticks (so it
+         *  follows CONFIG.LOOP.GAME_SPEED and stops while paused), blended between
+         *  ticks. Use it for world motion drawn from a clock (foliage sway, bobbing);
+         *  keep _frameTime for real-time effects like light flicker and UI. */
+        let _gameTimeSec = 0;
+
+        class frameClock {
+            // --- WRITERS ---
+            /** A new frame is being drawn: stamp real time. */
+            stampFrame () {
+                _frameTime = Date.now();
+                _frameTimeSec = _frameTime / 1000;
+            }
+            /** One simulation step has begun. */
+            advanceTick () { _simTick++; }
+            /** Where this drawn frame sits in game time, in seconds. */
+            setGameTime (seconds) { _gameTimeSec = seconds; }
+
+            // --- READERS (for new code; old code reads the globals) ---
+            get frame_time () { return _frameTime; }
+            get frame_time_sec () { return _frameTimeSec; }
+            get sim_tick () { return _simTick; }
+            get game_time_sec () { return _gameTimeSec; }
+        }
+        const frame_clock = new frameClock();
     </script>
     <script type="text/dfab" data-src="core/config.js" data-cost="406">
 
@@ -5933,8 +5977,7 @@
         // GLOBAL FRAME TIME CACHE — Set once per frame, used everywhere
         // Replaces scattered Date.now() calls to eliminate redundant syscalls + GC
         // ============================================================================
-        let _frameTime = performance.now();
-        let _frameTimeSec = _frameTime / 1000;
+        // (_frameTime and _frameTimeSec are declared in basement/frame-clock.js)
         let _profileSampling = false;   // detailed clocks are idle when the profiler and benchmark are off
         let _zoomLOD = 0; // 0 = full quality, 1 = reduced, 2 = minimal (updated per frame)
         
@@ -7367,7 +7410,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
     </script>
-    <script type="text/dfab" data-src="core/utils.js" data-cost="231">
+    <script type="text/dfab" data-src="core/utils.js" data-cost="227">
         // ============================================================================
         //  SHARED UTILITIES — Consolidated from repeated inline patterns
         // ============================================================================
@@ -7401,16 +7444,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         //  An entity that has never reported a command falls back to measured
         //  displacement, so any mover that isn't hooked up still animates.
 
-        /** Sim tick counter — advanced once per fixed update step in GameEngine.update(). */
-        let _simTick = 0;
+        // (_simTick and _gameTimeSec are declared in basement/frame-clock.js)
         /** Game time in ms from sim ticks: frozen while paused, so lifetimes measured with it (projectiles, decals) survive a pause */
         function _gameTimeMs() { return _simTick * CONFIG.LOOP.STEP_MS; }
 
-        /** Smooth GAME time in seconds for draw code: advances with sim ticks (so it
-         *  follows CONFIG.LOOP.GAME_SPEED and stops while paused), blended between
-         *  ticks. Use it for world motion drawn from a clock (foliage sway, bobbing);
-         *  keep _frameTime for real-time effects like light flicker and UI. */
-        let _gameTimeSec = 0;
 
         /** Stand-in for throwaway render proxies with no position (VFX silhouettes). */
         const _STATIC_GAIT = Object.freeze({ speed: 0, dirX: 1, dirY: 0 });
@@ -71987,7 +72024,7 @@ Object.assign(TrafficVehicle.prototype, {
             yield 120;
         });
     </script>
-    <script type="text/dfab" data-src="lobby/level-lobby.js" data-cost="69">
+    <script type="text/dfab" data-src="lobby/level-lobby.js" data-cost="72">
         // ===== LV1 LOBBY =====
         // The engine's game loop. The Lobby keeps the clock and nothing else: it knows when a frame is due,
         // how many fixed simulation steps that frame owes, and how far the drawn frame sits between two steps.
@@ -72004,7 +72041,7 @@ Object.assign(TrafficVehicle.prototype, {
         //   isRunning()                 -> bool    the loop stops re-arming itself when false
         //   beginFrame()                           every display frame, before the FPS limiter
         //   frameRateLimit()            -> number  frames per second to draw at, 0 = as fast as the display
-        //   acceptFrame()                          a frame the limiter let through
+        //   acceptFrame()                          a frame the limiter let through (the frame clock is stamped right after)
         //   timeScale(elapsed_ms)       -> number  1 = normal, 0.4 = slow-mo; stretches each step in real time
         //   simulateStep()                         one fixed step of the world
         //   afterSimulation(steps)                 after this frame's steps
@@ -72012,8 +72049,9 @@ Object.assign(TrafficVehicle.prototype, {
         //   endFrame(steps, dropped_ms)            after drawing
         //   scheduleNextFrame(run)                 arm the next frame (default: requestAnimationFrame)
         class levelLobby {
-            constructor (loop_config) {
+            constructor (loop_config, frame_clock) {
                 this.loop_config = loop_config;          // read live every frame: { STEP_MS, MAX_FRAME_MS, MAX_STEPS, GAME_SPEED }
+                this.frame_clock = frame_clock;          // the Basement's frame clock (basement/frame-clock.js)
                 this.jacks = {};
 
                 // --- CLOCK STATE ---
@@ -72061,6 +72099,7 @@ Object.assign(TrafficVehicle.prototype, {
                     this.next_draw_due = undefined;
                 }
                 if (J.acceptFrame) J.acceptFrame();
+                if (this.frame_clock) this.frame_clock.stampFrame();   // real time of the frame being drawn
 
                 // --- ELAPSED TIME ---
                 const now_ms = performance.now();
@@ -72204,7 +72243,7 @@ Object.assign(TrafficVehicle.prototype, {
 
                 // The Lobby: the game loop's clock (lobby/level-lobby.js). The game plugs in at the end of the
                 // constructor (_plugIntoLobby, engine/loop.js).
-                this.level_lobby = new levelLobby(CONFIG.LOOP);
+                this.level_lobby = new levelLobby(CONFIG.LOOP, frame_clock);
                 
                 this.ui = new UISystem(this);
                 this.musicWidget = new MusicWidgetSystem(this);
@@ -86318,7 +86357,7 @@ engineMixin({
                 
                 // Gait clock — advances only when the world actually steps, so
                 // walk animation freezes with everything else while paused.
-                _simTick++;
+                frame_clock.advanceTick();
                 CollisionSystem.beginProjectileStep(this);
                 
                 // Pausable systems — must tick before any logic that might
@@ -94388,7 +94427,7 @@ engineMixin({
             
         });
     </script>
-    <script type="text/dfab" data-src="engine/loop.js" data-cost="48">
+    <script type="text/dfab" data-src="engine/loop.js" data-cost="47">
         // GameEngine — the game's side of the main loop: what it plugs into the Lobby's jacks (the clock is the Lobby's: lobby/level-lobby.js).
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -94406,10 +94445,7 @@ engineMixin({
                     },
                     frameRateLimit: () => GameSettings.fpsLimit,
                     acceptFrame: () => {
-                        if (PerformanceBench.active) PerformanceBench.acceptFrame();
-                        // Sync global frame time cache (used by all draw methods)
-                        _frameTime = Date.now();
-                        _frameTimeSec = _frameTime / 1000;
+                        if (PerformanceBench.active) PerformanceBench.acceptFrame();   // (the Lobby stamps the frame clock next)
                     },
                     // A finisher's slow, or the scope's: they stretch each tick in real time (engine/finisher.js, engine/scope.js)
                     timeScale: (elapsed) => {
@@ -94431,9 +94467,9 @@ engineMixin({
                         const interp = CONFIG.LOOP.INTERPOLATE;
                         if (interp) RenderInterp.apply(this, blend);
                         const tickSec = CONFIG.LOOP.STEP_MS / 1000;
-                        _gameTimeSec = (interp && RenderInterp.stepAdvanced)
+                        frame_clock.setGameTime((interp && RenderInterp.stepAdvanced)
                             ? (_simTick - 1 + RenderInterp.alpha) * tickSec
-                            : _simTick * tickSec;
+                            : _simTick * tickSec);
                         try {
                             this.draw();
                         } finally {

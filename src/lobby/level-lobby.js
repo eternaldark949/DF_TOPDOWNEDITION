@@ -14,7 +14,7 @@
         //   isRunning()                 -> bool    the loop stops re-arming itself when false
         //   beginFrame()                           every display frame, before the FPS limiter
         //   frameRateLimit()            -> number  frames per second to draw at, 0 = as fast as the display
-        //   acceptFrame()                          a frame the limiter let through
+        //   acceptFrame()                          a frame the limiter let through (the frame clock is stamped right after)
         //   timeScale(elapsed_ms)       -> number  1 = normal, 0.4 = slow-mo; stretches each step in real time
         //   simulateStep()                         one fixed step of the world
         //   afterSimulation(steps)                 after this frame's steps
@@ -22,8 +22,9 @@
         //   endFrame(steps, dropped_ms)            after drawing
         //   scheduleNextFrame(run)                 arm the next frame (default: requestAnimationFrame)
         class levelLobby {
-            constructor (loop_config) {
+            constructor (loop_config, frame_clock) {
                 this.loop_config = loop_config;          // read live every frame: { STEP_MS, MAX_FRAME_MS, MAX_STEPS, GAME_SPEED }
+                this.frame_clock = frame_clock;          // the Basement's frame clock (basement/frame-clock.js)
                 this.jacks = {};
 
                 // --- CLOCK STATE ---
@@ -71,6 +72,7 @@
                     this.next_draw_due = undefined;
                 }
                 if (J.acceptFrame) J.acceptFrame();
+                if (this.frame_clock) this.frame_clock.stampFrame();   // real time of the frame being drawn
 
                 // --- ELAPSED TIME ---
                 const now_ms = performance.now();

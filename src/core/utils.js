@@ -31,16 +31,10 @@
         //  An entity that has never reported a command falls back to measured
         //  displacement, so any mover that isn't hooked up still animates.
 
-        /** Sim tick counter — advanced once per fixed update step in GameEngine.update(). */
-        let _simTick = 0;
+        // (_simTick and _gameTimeSec are declared in basement/frame-clock.js)
         /** Game time in ms from sim ticks: frozen while paused, so lifetimes measured with it (projectiles, decals) survive a pause */
         function _gameTimeMs() { return _simTick * CONFIG.LOOP.STEP_MS; }
 
-        /** Smooth GAME time in seconds for draw code: advances with sim ticks (so it
-         *  follows CONFIG.LOOP.GAME_SPEED and stops while paused), blended between
-         *  ticks. Use it for world motion drawn from a clock (foliage sway, bobbing);
-         *  keep _frameTime for real-time effects like light flicker and UI. */
-        let _gameTimeSec = 0;
 
         /** Stand-in for throwaway render proxies with no position (VFX silhouettes). */
         const _STATIC_GAIT = Object.freeze({ speed: 0, dirX: 1, dirY: 0 });

@@ -43,6 +43,7 @@ const STYLES = [
 ];
 
 const SCRIPTS = [
+    'basement/frame-clock.js',     // LV0 Basement: the frame clock's globals (_frameTime, _simTick, _gameTimeSec), first
     'core/config.js',
     '@assets',              // generated from the assets/ folder
     'core/assets.js',

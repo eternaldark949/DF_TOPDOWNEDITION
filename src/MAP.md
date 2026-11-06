@@ -20,6 +20,11 @@ For editor/runtime batches that change static building or foliage geometry, reac
 | `styles/dossier.css` | **Dossier**: the sidebar screens (Story, Contacts, Team, Character, Augments, Skills, Collection) in ETERNAL's menu scheme (`--df-*`). Shared pieces: `.df-screen` (the sub-screen container), `.df-section` (cream caps, champagne hairline, `.count`), `.df-card` (dotted lavender, ink→violet; `.lit` pale lavender, `.locked` crimson, `.gold` champagne, `.accent` with `--acc` left rule, `.clickable`/`.selected`), `.df-chip` (active/done/locked/available/gold/mint/crimson/info), `.df-tabs`/`.df-tab` (the sidebar's lit pill), `.df-bar` (violet/gold/crimson/mint, diamond at the tip, `--v` width), `.df-rows`/`.df-row` (k/v), `.df-btn` (ghost/danger; `.confirm` for double-tap), `.df-avatar` (painted bust via `_dfAvatar` → `getPortraitDataURL`, monogram fallback), `.df-person`, `.df-empty`, `.df-tile`, `.df-pips`/`.df-node` (Skills ranks as diamonds). `body.screen-menu-open` (ui/screens.js) hides the HUD behind the menu. |
 | `styles/shops.css` | **Shops**: one frame (`.df-shop`) for Dr. Yin's augments, the workbench, Torque, Neural Systems and Zib.ME — wine-haze panel, script title, balance capsule (`_shopBalance`), the Back pill (in the header on landscape phones), backdrop tap / Esc to close; cards, chips, tabs and buttons from dossier.css; swatch pickers and Torque's car preview. JS helpers in engine/screens-ui.js: `_shopShow`, `_confirmTap` (double-tap buys), `_shopFlash` (the bought card glows), `_priceHtml` |
 
+## basement/ (LV0 Basement: core engine pieces, loaded first)
+| File | What's in it |
+|---|---|
+| `basement/frame-clock.js` | **The frame clock**: declares the four time globals (`_frameTime` / `_frameTimeSec`, real time of the drawn frame; `_simTick`, simulation steps, frozen while paused; `_gameTimeSec`, smooth game time for draw code) and `frame_clock` (`frameClock`), their writer: `stampFrame()` (the Lobby, each accepted frame), `advanceTick()` (`GameEngine.update()`), `setGameTime(sec)` (the game's render jack); readers `frame_time`, `sim_tick`, `game_time_sec` for new code. Reading the globals stays fine everywhere. |
+
 ## core/ (loaded first)
 | File | What's in it |
 |---|---|
@@ -192,7 +197,7 @@ For editor/runtime batches that change static building or foliage geometry, reac
 The rebuild into four levels: Basement (LV0, core engine pieces), Lobby (LV1, the game loop), Directory (LV2, game-specific libraries), Penthouse (LV3, specialised engine toys). New-level code is written in ETERNAL's ETRNL9 style: `levelLobby` classes, `snake_case` fields, `camelCase` methods, `UPPER_SNAKE` constants, `// ===== LV1 LOBBY =====` banners. It knows nothing about the game; the game plugs into its jacks.
 | File | What's in it |
 |---|---|
-| `lobby/level-lobby.js` | **`levelLobby`**: the main loop's clock. `runEngine()` is one display frame: the FPS limiter (a running due-time), elapsed time clamped to `MAX_FRAME_MS`, the accumulator, fixed steps of `STEP_MS / (GAME_SPEED × timeScale)` up to `MAX_STEPS` (the backlog dropped past that), then a draw blended between the last two steps. The game plugs in with `plugIn({ isRunning, beginFrame, frameRateLimit, acceptFrame, timeScale, simulateStep, afterSimulation, renderFrame, endFrame, scheduleNextFrame })`. `GameEngine` keeps one as `level_lobby` (engine/loop.js `_plugIntoLobby`). |
+| `lobby/level-lobby.js` | **`levelLobby`**: the main loop's clock. `runEngine()` is one display frame: the FPS limiter (a running due-time), elapsed time clamped to `MAX_FRAME_MS`, the accumulator, fixed steps of `STEP_MS / (GAME_SPEED × timeScale)` up to `MAX_STEPS` (the backlog dropped past that), then a draw blended between the last two steps. The game plugs in with `plugIn({ isRunning, beginFrame, frameRateLimit, acceptFrame, timeScale, simulateStep, afterSimulation, renderFrame, endFrame, scheduleNextFrame })`. It stamps the Basement's `frame_clock` right after `acceptFrame`. `GameEngine` keeps one as `level_lobby` (engine/loop.js `_plugIntoLobby`). |
 
 ## engine/
 | File | What's in it |

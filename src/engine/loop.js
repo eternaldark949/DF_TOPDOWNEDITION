@@ -15,10 +15,7 @@
                     },
                     frameRateLimit: () => GameSettings.fpsLimit,
                     acceptFrame: () => {
-                        if (PerformanceBench.active) PerformanceBench.acceptFrame();
-                        // Sync global frame time cache (used by all draw methods)
-                        _frameTime = Date.now();
-                        _frameTimeSec = _frameTime / 1000;
+                        if (PerformanceBench.active) PerformanceBench.acceptFrame();   // (the Lobby stamps the frame clock next)
                     },
                     // A finisher's slow, or the scope's: they stretch each tick in real time (engine/finisher.js, engine/scope.js)
                     timeScale: (elapsed) => {
@@ -40,9 +37,9 @@
                         const interp = CONFIG.LOOP.INTERPOLATE;
                         if (interp) RenderInterp.apply(this, blend);
                         const tickSec = CONFIG.LOOP.STEP_MS / 1000;
-                        _gameTimeSec = (interp && RenderInterp.stepAdvanced)
+                        frame_clock.setGameTime((interp && RenderInterp.stepAdvanced)
                             ? (_simTick - 1 + RenderInterp.alpha) * tickSec
-                            : _simTick * tickSec;
+                            : _simTick * tickSec);
                         try {
                             this.draw();
                         } finally {

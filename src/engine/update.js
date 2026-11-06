@@ -31,7 +31,7 @@
                 
                 // Gait clock — advances only when the world actually steps, so
                 // walk animation freezes with everything else while paused.
-                _simTick++;
+                frame_clock.advanceTick();
                 CollisionSystem.beginProjectileStep(this);
                 
                 // Pausable systems — must tick before any logic that might
