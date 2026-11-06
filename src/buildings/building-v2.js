@@ -533,7 +533,7 @@
             _signAwning(ctx, text, size) {
                 if (!this._awn || this._awn.text !== text) {
                     const E = this._entrance();
-                    const m = document.createElement('canvas').getContext('2d'); m.font = `${size}px "Great Vibes", cursive`;
+                    const m = canvasKit.measure; m.font = `${size}px "Great Vibes", cursive`;
                     const tw = Math.min((E.nx ? this.h : this.w) - 20, m.measureText(text).width + 34), d = Math.round(size * 0.95);
                     this._awn = { text, a: [E.cx - E.ux * tw / 2, E.cy - E.uy * tw / 2], b: [E.cx + E.ux * tw / 2, E.cy + E.uy * tw / 2],
                                   nx: E.nx, ny: E.ny, x: E.cx + E.nx * d / 2, y: E.cy + E.ny * d / 2, d, z: 2 * CONFIG.BUILDINGS.FLOOR_HEIGHT };
@@ -561,7 +561,7 @@
 
             /** Cold glyph/glow generation is separate from the warm lookup for diagnostics. */
             _bakeSignSprites(text, size, lampColor, rgb, key) {
-                const R = 2, pad = 60, m = document.createElement('canvas').getContext('2d');
+                const R = 2, pad = 60, m = canvasKit.measure;
                 m.font = `${size}px "Great Vibes", cursive`;
                 const w = Math.ceil(m.measureText(text).width) + pad * 2, h = Math.ceil(size * 1.6) + pad * 2;
                 const layer = (paint) => {

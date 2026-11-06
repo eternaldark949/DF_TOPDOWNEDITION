@@ -48,9 +48,7 @@
             // ── Layers ── each part is painted flat in its own layer, shaded inside its own shape, then laid down
             const pool = [];
             function layer(i) {
-                let c = pool[i];
-                if (!c) c = pool[i] = document.createElement('canvas');
-                canvasKit.fitLayer(c, W, H);
+                const c = canvasKit.scratch(pool, i, W, H);
                 const x = c.getContext('2d');
                 x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1; x.filter = 'none';
                 x.clearRect(0, 0, W, H);

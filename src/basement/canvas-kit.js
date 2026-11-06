@@ -14,6 +14,8 @@
         //   canvasKit.fitLayer(canvas, w, h);   // resize only if the size changed (a resize clears the layer)
         //   const halo = canvasKit.glow([64, [[0, 'rgba(255,255,255,1)'], [1, 'rgba(255,255,255,0)']]]);
         //   const sprite = canvasKit.bake(cache, key, () => paintIt());   // made the first time, kept after
+        //   const buf = canvasKit.scratch(this, '_shadowCv', W, H);       // kept on its holder, fitted each use
+        //   canvasKit.measure.font = '12px serif'; canvasKit.measure.measureText(text);   // one shared context
         const canvasKit = {
             /** A new layer from a packet: { canvas, ctx }. */
             createLayer (layer_packet) {
@@ -55,5 +57,19 @@
                     return v;
                 }
                 return cache[key] || (cache[key] = make());
+            },
+
+            /** A scratch buffer kept on `holder` under `name` (an object and a key, or an array and an index),
+             *  made the first time and fitted to width x height on every use. Returns the canvas. */
+            scratch (holder, name, width, height) {
+                const canvas = holder[name] || (holder[name] = document.createElement('canvas'));
+                this.fitLayer(canvas, width, height);
+                return canvas;
+            },
+
+            /** One shared context for measuring text, parsing colours and making gradients, never drawn on.
+             *  Set what you read (font, fillStyle) before you read it. */
+            get measure () {
+                return this._measure || (this._measure = document.createElement('canvas').getContext('2d'));
             }
         };

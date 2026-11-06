@@ -577,8 +577,7 @@
                 }
                 x0 = Math.max(0, Math.floor(x0)); y0 = Math.max(0, Math.floor(y0)); x1 = Math.min(rw, Math.ceil(x1)); y1 = Math.min(rh, Math.ceil(y1));
                 if (x1 <= x0 || y1 <= y0) return;
-                const T = this._reflTierCv || (this._reflTierCv = document.createElement('canvas'));
-                canvasKit.fitLayer(T, rw, rh);
+                const T = canvasKit.scratch(this, '_reflTierCv', rw, rh);
                 const tc = T.getContext('2d');
                 tc.setTransform(1, 0, 0, 1, 0, 0); tc.clearRect(x0, y0, x1 - x0, y1 - y0); toView(tc);
                 for (const b of list) { try { b.drawReflection(tc, dark); } catch (e) { /* a facade that can't mirror is left out */ } }

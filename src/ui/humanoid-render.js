@@ -860,9 +860,7 @@
            so every wardrobe piece and hair style picks the light up without knowing about it. */
         const _portraitLayers = [];
         function _portraitLayer(i, w, h) {
-            let c = _portraitLayers[i];
-            if (!c) c = _portraitLayers[i] = document.createElement('canvas');
-            canvasKit.fitLayer(c, w, h);
+            const c = canvasKit.scratch(_portraitLayers, i, w, h);
             const x = c.getContext('2d');
             x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1;
             x.clearRect(0, 0, w, h);

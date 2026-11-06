@@ -72,7 +72,7 @@
             PITCH_PX: 1.1           // body shift forward under full braking
         };
         const _carSprites = new Map();
-        const _carColorCv = document.createElement('canvas').getContext('2d');
+        const _carColorCv = canvasKit.measure;
 
         /** Any CSS colour → [r, g, b]. */
         function _carRGB(col) {

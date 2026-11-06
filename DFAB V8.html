@@ -5868,7 +5868,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'b0aaa0a432c9';
+        const DFAB_BUILD = '0f30e6e9b5c8';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="26">
         // ===== LV0 BASEMENT =====
@@ -5914,7 +5914,7 @@
         }
         const frame_clock = new frameClock();
     </script>
-    <script type="text/dfab" data-src="basement/canvas-kit.js" data-cost="34">
+    <script type="text/dfab" data-src="basement/canvas-kit.js" data-cost="44">
         // ===== LV0 BASEMENT =====
         // The canvas kit: off-screen drawing layers (sprite bakes, caches, light and bloom buffers, portraits).
         // A free-standing tool, so code that runs while the game is still loading can use it, and the
@@ -5931,6 +5931,8 @@
         //   canvasKit.fitLayer(canvas, w, h);   // resize only if the size changed (a resize clears the layer)
         //   const halo = canvasKit.glow([64, [[0, 'rgba(255,255,255,1)'], [1, 'rgba(255,255,255,0)']]]);
         //   const sprite = canvasKit.bake(cache, key, () => paintIt());   // made the first time, kept after
+        //   const buf = canvasKit.scratch(this, '_shadowCv', W, H);       // kept on its holder, fitted each use
+        //   canvasKit.measure.font = '12px serif'; canvasKit.measure.measureText(text);   // one shared context
         const canvasKit = {
             /** A new layer from a packet: { canvas, ctx }. */
             createLayer (layer_packet) {
@@ -5972,6 +5974,20 @@
                     return v;
                 }
                 return cache[key] || (cache[key] = make());
+            },
+
+            /** A scratch buffer kept on `holder` under `name` (an object and a key, or an array and an index),
+             *  made the first time and fitted to width x height on every use. Returns the canvas. */
+            scratch (holder, name, width, height) {
+                const canvas = holder[name] || (holder[name] = document.createElement('canvas'));
+                this.fitLayer(canvas, width, height);
+                return canvas;
+            },
+
+            /** One shared context for measuring text, parsing colours and making gradients, never drawn on.
+             *  Set what you read (font, fillStyle) before you read it. */
+            get measure () {
+                return this._measure || (this._measure = document.createElement('canvas').getContext('2d'));
             }
         };
     </script>
@@ -13073,7 +13089,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
         
     </script>
-    <script type="text/dfab" data-src="world/weather-response.js" data-cost="68">
+    <script type="text/dfab" data-src="world/weather-response.js" data-cost="67">
         /* =====================================================================
            WEATHER RESPONSE — how the weather reaches a character
            ---------------------------------------------------------------------
@@ -13139,7 +13155,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         function _umbrellaSheen(R) {
             const k = Math.round(R * 4) / 4; let g = _sheens.get(k);
             if (!g) {
-                const c = (_sheens._c || (_sheens._c = document.createElement('canvas').getContext('2d')));
+                const c = canvasKit.measure;
                 g = c.createRadialGradient(-k * 0.35, -k * 0.35, 0, 0, 0, k);
                 g.addColorStop(0, 'rgba(255,255,255,0.22)'); g.addColorStop(1, 'rgba(255,255,255,0)');
                 _sheens.set(k, g);
@@ -34334,7 +34350,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             _signAwning(ctx, text, size) {
                 if (!this._awn || this._awn.text !== text) {
                     const E = this._entrance();
-                    const m = document.createElement('canvas').getContext('2d'); m.font = `${size}px "Great Vibes", cursive`;
+                    const m = canvasKit.measure; m.font = `${size}px "Great Vibes", cursive`;
                     const tw = Math.min((E.nx ? this.h : this.w) - 20, m.measureText(text).width + 34), d = Math.round(size * 0.95);
                     this._awn = { text, a: [E.cx - E.ux * tw / 2, E.cy - E.uy * tw / 2], b: [E.cx + E.ux * tw / 2, E.cy + E.uy * tw / 2],
                                   nx: E.nx, ny: E.ny, x: E.cx + E.nx * d / 2, y: E.cy + E.ny * d / 2, d, z: 2 * CONFIG.BUILDINGS.FLOOR_HEIGHT };
@@ -34362,7 +34378,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             /** Cold glyph/glow generation is separate from the warm lookup for diagnostics. */
             _bakeSignSprites(text, size, lampColor, rgb, key) {
-                const R = 2, pad = 60, m = document.createElement('canvas').getContext('2d');
+                const R = 2, pad = 60, m = canvasKit.measure;
                 m.font = `${size}px "Great Vibes", cursive`;
                 const w = Math.ceil(m.measureText(text).width) + pad * 2, h = Math.ceil(size * 1.6) + pad * 2;
                 const layer = (paint) => {
@@ -50523,7 +50539,7 @@ function createNeuralSystemsTiered(x, y, config = {}) {
             };
         })();
     </script>
-    <script type="text/dfab" data-src="traffic/car-art.js" data-cost="547">
+    <script type="text/dfab" data-src="traffic/car-art.js" data-cost="546">
         /* =====================================================================
            CAR ART — how every car looks (TrafficVehicle: traffic, your garage,
            Zib rides, the delivery van)
@@ -50598,7 +50614,7 @@ function createNeuralSystemsTiered(x, y, config = {}) {
             PITCH_PX: 1.1           // body shift forward under full braking
         };
         const _carSprites = new Map();
-        const _carColorCv = document.createElement('canvas').getContext('2d');
+        const _carColorCv = canvasKit.measure;
 
         /** Any CSS colour → [r, g, b]. */
         function _carRGB(col) {
@@ -60832,7 +60848,7 @@ Object.assign(TrafficVehicle.prototype, {
             return out;
         }
     </script>
-    <script type="text/dfab" data-src="ui/humanoid-render.js" data-cost="2016">
+    <script type="text/dfab" data-src="ui/humanoid-render.js" data-cost="2015">
         const HAIR_SIM = {
             STEP: 1 / 120,          // game seconds per physics slice
             MAX_STEPS: 12,          // catch-up cap after a stall
@@ -61695,9 +61711,7 @@ Object.assign(TrafficVehicle.prototype, {
            so every wardrobe piece and hair style picks the light up without knowing about it. */
         const _portraitLayers = [];
         function _portraitLayer(i, w, h) {
-            let c = _portraitLayers[i];
-            if (!c) c = _portraitLayers[i] = document.createElement('canvas');
-            canvasKit.fitLayer(c, w, h);
+            const c = canvasKit.scratch(_portraitLayers, i, w, h);
             const x = c.getContext('2d');
             x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1;
             x.clearRect(0, 0, w, h);
@@ -63962,7 +63976,7 @@ Object.assign(TrafficVehicle.prototype, {
         }
         
     </script>
-    <script type="text/dfab" data-src="ui/portrait-real.js" data-cost="1234">
+    <script type="text/dfab" data-src="ui/portrait-real.js" data-cost="1233">
         /* =====================================================================
            PAINTED PORTRAITS — the realistic bust behind drawCharacterPortrait()
            ---------------------------------------------------------------------
@@ -64013,9 +64027,7 @@ Object.assign(TrafficVehicle.prototype, {
             // ── Layers ── each part is painted flat in its own layer, shaded inside its own shape, then laid down
             const pool = [];
             function layer(i) {
-                let c = pool[i];
-                if (!c) c = pool[i] = document.createElement('canvas');
-                canvasKit.fitLayer(c, W, H);
+                const c = canvasKit.scratch(pool, i, W, H);
                 const x = c.getContext('2d');
                 x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1; x.filter = 'none';
                 x.clearRect(0, 0, W, H);
@@ -75501,7 +75513,7 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/reflections.js" data-cost="900">
+    <script type="text/dfab" data-src="engine/reflections.js" data-cost="899">
         // GameEngine — Reflections. Methods are added to GameEngine.prototype
         // (see engineMixin in game-engine.js).
         //
@@ -76081,8 +76093,7 @@ engineMixin({
                 }
                 x0 = Math.max(0, Math.floor(x0)); y0 = Math.max(0, Math.floor(y0)); x1 = Math.min(rw, Math.ceil(x1)); y1 = Math.min(rh, Math.ceil(y1));
                 if (x1 <= x0 || y1 <= y0) return;
-                const T = this._reflTierCv || (this._reflTierCv = document.createElement('canvas'));
-                canvasKit.fitLayer(T, rw, rh);
+                const T = canvasKit.scratch(this, '_reflTierCv', rw, rh);
                 const tc = T.getContext('2d');
                 tc.setTransform(1, 0, 0, 1, 0, 0); tc.clearRect(x0, y0, x1 - x0, y1 - y0); toView(tc);
                 for (const b of list) { try { b.drawReflection(tc, dark); } catch (e) { /* a facade that can't mirror is left out */ } }
@@ -79345,7 +79356,7 @@ engineMixin({
             }
         };
     </script>
-    <script type="text/dfab" data-src="engine/scope.js" data-cost="94">
+    <script type="text/dfab" data-src="engine/scope.js" data-cost="93">
         // GameEngine — Scope view: with a sniper up to her eye, the world darkens and only a soft
         // lane about her width stays lit along her line of fire, out to where the shot would
         // land. Eases in and out; the lane sways a little, then steadies (the cue to take the
@@ -79450,8 +79461,7 @@ engineMixin({
                     [...(this.activeMap.walls || []), ...getColliders(this.activeMap)], SCOPE.RANGE);
                 // The veil on its own half-resolution layer (it's all soft), with the lane cut out of it
                 const R = 0.5, W = Math.ceil(this.canvas.width * R), H = Math.ceil(this.canvas.height * R);
-                const v = this._scopeVeil || (this._scopeVeil = document.createElement('canvas'));
-                canvasKit.fitLayer(v, W, H);
+                const v = canvasKit.scratch(this, '_scopeVeil', W, H);
                 const vc = v.getContext('2d');
                 vc.setTransform(1, 0, 0, 1, 0, 0);
                 vc.clearRect(0, 0, W, H);
@@ -93307,7 +93317,7 @@ engineMixin({
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/daylight.js" data-cost="183">
+    <script type="text/dfab" data-src="engine/daylight.js" data-cost="182">
         // GameEngine — Daylight: the sun, the shadows it casts, drifting cloud shadows, and the
         // day's warm grade. Night belongs to the lighting layer (lighting.js); from dawn to
         // dusk this takes over: the city in peach-rose morning, clear warm noon and an
@@ -93381,8 +93391,7 @@ engineMixin({
                 _sunShadow = { on: strength > 0.02, dx: S.dx, dy: S.dy, len: S.len, k: strength };
                 if (strength <= 0.02) return;
                 const R = 0.5, W = Math.ceil(this.canvas.width * R), H = Math.ceil(this.canvas.height * R);
-                const cv = this._shadowCv || (this._shadowCv = document.createElement('canvas'));
-                canvasKit.fitLayer(cv, W, H);
+                const cv = canvasKit.scratch(this, '_shadowCv', W, H);
                 const c = cv.getContext('2d'), m = ctx.getTransform();
                 c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, W, H);
                 c.setTransform(m.a * R, m.b * R, m.c * R, m.d * R, m.e * R, m.f * R);

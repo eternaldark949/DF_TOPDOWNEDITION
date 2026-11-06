@@ -71,8 +71,7 @@
                 _sunShadow = { on: strength > 0.02, dx: S.dx, dy: S.dy, len: S.len, k: strength };
                 if (strength <= 0.02) return;
                 const R = 0.5, W = Math.ceil(this.canvas.width * R), H = Math.ceil(this.canvas.height * R);
-                const cv = this._shadowCv || (this._shadowCv = document.createElement('canvas'));
-                canvasKit.fitLayer(cv, W, H);
+                const cv = canvasKit.scratch(this, '_shadowCv', W, H);
                 const c = cv.getContext('2d'), m = ctx.getTransform();
                 c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, W, H);
                 c.setTransform(m.a * R, m.b * R, m.c * R, m.d * R, m.e * R, m.f * R);
