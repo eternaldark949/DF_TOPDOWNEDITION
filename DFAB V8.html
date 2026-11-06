@@ -5868,7 +5868,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'cbe6319ec129';
+        const DFAB_BUILD = 'af6acf69024c';
     </script>
     <script type="text/dfab" data-src="core/config.js" data-cost="406">
 
@@ -71987,6 +71987,124 @@ Object.assign(TrafficVehicle.prototype, {
             yield 120;
         });
     </script>
+    <script type="text/dfab" data-src="lobby/level-lobby.js" data-cost="69">
+        // ===== LV1 LOBBY =====
+        // The engine's game loop. The Lobby keeps the clock and nothing else: it knows when a frame is due,
+        // how many fixed simulation steps that frame owes, and how far the drawn frame sits between two steps.
+        // It knows nothing about the game. Whatever the game wants done in a frame (profiling, audio,
+        // slow-mo, the simulation itself, drawing) is plugged into its jacks with plugIn().
+        //
+        // FIXED TIMESTEP: the simulation advances in steps of loop_config.STEP_MS of game time, and the
+        // screen is drawn whenever the display allows. Leftover time carries over in the accumulator, so
+        // steps land at a true rate on average on any monitor. A stall (alt-tab, GC, debugger) is clamped
+        // to MAX_FRAME_MS, and a frame never runs more than MAX_STEPS steps: past that the backlog is
+        // dropped rather than letting the world fast-forward or spiral.
+        //
+        // JACKS (each optional; an empty jack does nothing):
+        //   isRunning()                 -> bool    the loop stops re-arming itself when false
+        //   beginFrame()                           every display frame, before the FPS limiter
+        //   frameRateLimit()            -> number  frames per second to draw at, 0 = as fast as the display
+        //   acceptFrame()                          a frame the limiter let through
+        //   timeScale(elapsed_ms)       -> number  1 = normal, 0.4 = slow-mo; stretches each step in real time
+        //   simulateStep()                         one fixed step of the world
+        //   afterSimulation(steps)                 after this frame's steps
+        //   renderFrame(blend)                     draw; blend 0..1 = how far between the last two steps
+        //   endFrame(steps, dropped_ms)            after drawing
+        //   scheduleNextFrame(run)                 arm the next frame (default: requestAnimationFrame)
+        class levelLobby {
+            constructor (loop_config) {
+                this.loop_config = loop_config;          // read live every frame: { STEP_MS, MAX_FRAME_MS, MAX_STEPS, GAME_SPEED }
+                this.jacks = {};
+
+                // --- CLOCK STATE ---
+                this.last_frame_time = undefined;        // performance.now() of the last accepted frame
+                this.next_draw_due = undefined;          // when the FPS limiter lets the next frame through
+                this.accumulator = 0;                    // real ms owed to the simulation
+                this.frame_ms = 0;                       // raw time between accepted frames (render cadence)
+                this.time_scale = 1;                     // this frame's slow-mo scale
+                this.step_ms = 0;                        // this frame's real length of one step
+                this.steps_taken = 0;                    // steps run in the last frame
+
+                this.engine_clock = this.runEngine.bind(this);
+            }
+
+            /** Plug the game into the Lobby: { jackName: function }. Later calls add to or replace earlier ones. */
+            plugIn (jacks) {
+                Object.assign(this.jacks, jacks);
+                return this;
+            }
+
+            /** One display frame. */
+            runEngine () {
+                const J = this.jacks, L = this.loop_config;
+                if (J.isRunning && !J.isRunning()) return;
+                if (J.beginFrame) J.beginFrame();
+
+                // --- FPS LIMITER ---
+                // Scheduled against a running due-time rather than the last drawn frame. Comparing to the last
+                // frame overshoots whenever the display period doesn't divide the target evenly: on a 144Hz panel
+                // (6.94ms) a 16.67ms target could only land every 3rd frame, so "60 FPS" delivered 48.
+                const fps_limit = J.frameRateLimit ? J.frameRateLimit() : 0;
+                if (fps_limit > 0) {
+                    const now = performance.now();
+                    const min_interval = 1000 / fps_limit;
+                    if (this.next_draw_due === undefined) this.next_draw_due = now;
+                    if (now < this.next_draw_due) {
+                        this.scheduleNextFrame();
+                        return;
+                    }
+                    // Carry the schedule forward; resync if we've fallen far behind.
+                    this.next_draw_due = (now - this.next_draw_due > min_interval)
+                        ? now + min_interval
+                        : this.next_draw_due + min_interval;
+                } else {
+                    this.next_draw_due = undefined;
+                }
+                if (J.acceptFrame) J.acceptFrame();
+
+                // --- ELAPSED TIME ---
+                const now_ms = performance.now();
+                if (this.last_frame_time === undefined) this.last_frame_time = now_ms;
+                let elapsed = now_ms - this.last_frame_time;
+                this.frame_ms = elapsed;                 // raw render cadence; never changes the fixed step
+                this.last_frame_time = now_ms;
+
+                const clamped_ms = Math.max(0, elapsed - L.MAX_FRAME_MS);
+                if (elapsed > L.MAX_FRAME_MS) elapsed = L.MAX_FRAME_MS;
+                if (elapsed < 0) elapsed = 0;
+                this.accumulator = (this.accumulator || 0) + elapsed;
+
+                // --- STEP LENGTH ---
+                // Real-time length of one step. GAME_SPEED 0.5 -> 33.3ms -> 30 steps/sec. A time scale stretches
+                // it the same way: evenly spaced, interpolated steps.
+                const scale = this.time_scale = J.timeScale ? J.timeScale(elapsed) : 1;
+                const step_ms = this.step_ms = L.STEP_MS / Math.max(0.05, (L.GAME_SPEED || 1) * scale);
+
+                // --- SIMULATION ---
+                let steps = 0;
+                while (this.accumulator >= step_ms && steps < L.MAX_STEPS) {
+                    if (J.simulateStep) J.simulateStep();
+                    this.accumulator -= step_ms;
+                    steps++;
+                }
+                // Machine can't keep up: drop the backlog rather than spiral.
+                const dropped_ms = clamped_ms + (steps >= L.MAX_STEPS ? this.accumulator : 0);
+                if (steps >= L.MAX_STEPS) this.accumulator = 0;
+                this.steps_taken = steps;
+                if (J.afterSimulation) J.afterSimulation(steps);
+
+                // --- RENDER ---
+                if (J.renderFrame) J.renderFrame(this.accumulator / step_ms);
+                if (J.endFrame) J.endFrame(steps, dropped_ms);
+                this.scheduleNextFrame();
+            }
+
+            scheduleNextFrame () {
+                if (this.jacks.scheduleNextFrame) this.jacks.scheduleNextFrame(this.engine_clock);
+                else requestAnimationFrame(this.engine_clock);
+            }
+        }
+    </script>
     <script type="text/dfab" data-src="engine/pause-system.js" data-cost="36">
         /**
          * PauseSystem — token-based pause registry.
@@ -72075,7 +72193,7 @@ Object.assign(TrafficVehicle.prototype, {
         }
         
     </script>
-    <script type="text/dfab" data-src="engine/game-engine.js" data-cost="184">
+    <script type="text/dfab" data-src="engine/game-engine.js" data-cost="187">
         class GameEngine {
             constructor() {
                 
@@ -72083,6 +72201,10 @@ Object.assign(TrafficVehicle.prototype, {
                 // (dialogues, shops, menus, cinematic transitions) acquires/releases
                 // tokens here. Initialized first so anything that follows can use it.
                 this.pauseSystem = new PauseSystem(this);
+
+                // The Lobby: the game loop's clock (lobby/level-lobby.js). The game plugs in at the end of the
+                // constructor (_plugIntoLobby, engine/loop.js).
+                this.level_lobby = new levelLobby(CONFIG.LOOP);
                 
                 this.ui = new UISystem(this);
                 this.musicWidget = new MusicWidgetSystem(this);
@@ -72338,6 +72460,7 @@ Object.assign(TrafficVehicle.prototype, {
                 this.activeInteraction = null;
 
                 this.initEvents(); this.initJoystick(); this.initFireJoystick(); this.initLookZone();
+                this._plugIntoLobby();
             }
 
             // ── UNIFIED COMPANION HELPERS ──
@@ -93932,8 +94055,8 @@ engineMixin({
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/loop.js" data-cost="245">
-        // GameEngine — start / stop / reset and the main loop.
+    <script type="text/dfab" data-src="engine/loop.js" data-cost="230">
+        // GameEngine — start / stop / reset, and the game's side of the main loop (the clock is the Lobby's: lobby/level-lobby.js).
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
             /** From the menu into the world: hide the menu layer, show the canvas, start the loop. */
@@ -94252,107 +94375,75 @@ engineMixin({
                 
                 console.log('[RESET] Game state cleared to defaults');
             },
-            loop() {
-                if (!this.running) return;
-                this._syncProfiler();
-                if (PerformanceBench.active) PerformanceBench.beginFrame();
-                const _a0 = this.profiler.enabled ? performance.now() : 0;
-                ambience.update(this);                                   // the beds, the music, the motor (Audio:Ambience in the profiler)
-                if (this.profiler.enabled) this.profiler.add('Audio:Ambience', performance.now() - _a0);
-                
-                /* FPS LIMITER — skip frame if too soon.
-                   Scheduled against a running due-time rather than the last
-                   drawn frame. Comparing to the last frame overshoots whenever
-                   the display period doesn't divide the target evenly: on a
-                   144Hz panel (6.94ms) a 16.67ms target could only land every
-                   3rd frame, so the "60 FPS" setting actually delivered 48. */
-                if (GameSettings.fpsLimit > 0) {
-                    const now = performance.now();
-                    const minInterval = 1000 / GameSettings.fpsLimit;
-                    if (this._nextDrawDue === undefined) this._nextDrawDue = now;
-                    if (now < this._nextDrawDue) {
-                        requestAnimationFrame(() => this.loop());
-                        return;
-                    }
-                    // Carry the schedule forward; resync if we've fallen far behind.
-                    this._nextDrawDue = (now - this._nextDrawDue > minInterval)
-                        ? now + minInterval
-                        : this._nextDrawDue + minInterval;
-                } else {
-                    this._nextDrawDue = undefined;
-                }
-                
-                if (PerformanceBench.active) PerformanceBench.acceptFrame();
-
-                // Sync global frame time cache (used by all draw methods)
-                _frameTime = Date.now();
-                _frameTimeSec = _frameTime / 1000;
-
-                /* ─── FIXED TIMESTEP ────────────────────────────────────────────
-                   update() is written entirely in per-frame units: acceleration
-                   0.35/frame, drag 0.96/frame, cooldowns counted in frames. With
-                   a raw requestAnimationFrame loop that made the whole game run
-                   at the speed of the monitor — a 144Hz player drove 2.4× faster
-                   than a 60Hz one, and 240Hz was 4×.
-
-                   Rather than thread a `dt` through thousands of lines (and
-                   re-tune every constant that was dialled in by feel), the loop
-                   now advances the simulation in fixed 1/60s steps and renders
-                   whenever it can. Every per-frame constant in the codebase —
-                   driving, weather fades, gust cycles, lightning cooldowns, AI
-                   timers, animation counters — keeps its meaning and its tuning,
-                   and now means the same thing on every display.
-
-                   Leftover time carries in the accumulator, so steps land at a
-                   true 60/sec on average rather than drifting.               */
-                const nowMs = performance.now();
-                if (this._lastLoopTime === undefined) this._lastLoopTime = nowMs;
-                let elapsed = nowMs - this._lastLoopTime;
-                this._renderFrameMs = elapsed;   // raw render cadence; never changes the fixed simulation step
-                this._lastLoopTime = nowMs;
-
-                // Clamp so a stall (alt-tab, GC pause, debugger) doesn't queue a
-                // huge backlog and fast-forward the world when focus returns.
-                const clampedMs = Math.max(0, elapsed - CONFIG.LOOP.MAX_FRAME_MS);
-                if (elapsed > CONFIG.LOOP.MAX_FRAME_MS) elapsed = CONFIG.LOOP.MAX_FRAME_MS;
-                if (elapsed < 0) elapsed = 0;
-                this._accumulator = (this._accumulator || 0) + elapsed;
-
-                // Real-time length of one tick. GAME_SPEED 0.5 → 33.3ms → 30 ticks/sec.
-                // A time slow (triggerTimeSlow) stretches it the same way: evenly spaced, interpolated ticks.
-                if (this.finisher || this.finCam) this.updateFinisher(elapsed);   // the finisher's beats run on real time (engine/finisher.js)
-                const slow = this._loopScale = Math.min(this.updateTimeSlow(elapsed), this.scopeTimeScale(elapsed));   // a finisher's slow, or the scope's (engine/scope.js)
-                const stepMs = CONFIG.LOOP.STEP_MS / Math.max(0.05, (CONFIG.LOOP.GAME_SPEED || 1) * slow);
-                const interp = CONFIG.LOOP.INTERPOLATE;
-
-                let steps = 0;
-                while (this._accumulator >= stepMs && steps < CONFIG.LOOP.MAX_STEPS) {
-                    if (interp) RenderInterp.snapshot(this);
-                    this.update();
-                    this._accumulator -= stepMs;
-                    steps++;
-                }
-                // Machine can't keep up — drop the backlog rather than spiral.
-                const droppedMs = clampedMs + (steps >= CONFIG.LOOP.MAX_STEPS ? this._accumulator : 0);
-                if (steps >= CONFIG.LOOP.MAX_STEPS) this._accumulator = 0;
-                RenderStats.ticks = steps;   // sim ticks this frame (the profiler: a slow frame runs several, and its update rows add them up)
-                
-                if (PerformanceBench.active) PerformanceBench.afterSimulation();
-
-                // Always draw for smooth visuals — blended between the last two ticks
-                if (interp) RenderInterp.apply(this, this._accumulator / stepMs);
-                const tickSec = CONFIG.LOOP.STEP_MS / 1000;
-                _gameTimeSec = (interp && RenderInterp.stepAdvanced)
-                    ? (_simTick - 1 + RenderInterp.alpha) * tickSec
-                    : _simTick * tickSec;
-                try {
-                    this.draw();
-                } finally {
-                    if (interp) RenderInterp.restore(this);
-                }
-                if (PerformanceBench.active) PerformanceBench.endFrame(steps, droppedMs);
-                requestAnimationFrame(() => this.loop()); 
+            /** Plug the game into the Lobby's jacks (lobby/level-lobby.js). The Lobby keeps the clock;
+             *  everything game-specific about a frame happens here. */
+            _plugIntoLobby() {
+                this.level_lobby.plugIn({
+                    isRunning: () => this.running,
+                    beginFrame: () => {
+                        this._syncProfiler();
+                        if (PerformanceBench.active) PerformanceBench.beginFrame();
+                        const _a0 = this.profiler.enabled ? performance.now() : 0;
+                        ambience.update(this);                           // the beds, the music, the motor (Audio:Ambience in the profiler)
+                        if (this.profiler.enabled) this.profiler.add('Audio:Ambience', performance.now() - _a0);
+                    },
+                    frameRateLimit: () => GameSettings.fpsLimit,
+                    acceptFrame: () => {
+                        if (PerformanceBench.active) PerformanceBench.acceptFrame();
+                        // Sync global frame time cache (used by all draw methods)
+                        _frameTime = Date.now();
+                        _frameTimeSec = _frameTime / 1000;
+                    },
+                    // A finisher's slow, or the scope's: they stretch each tick in real time (engine/finisher.js, engine/scope.js)
+                    timeScale: (elapsed) => {
+                        if (this.finisher || this.finCam) this.updateFinisher(elapsed);   // the finisher's beats run on real time
+                        return Math.min(this.updateTimeSlow(elapsed), this.scopeTimeScale(elapsed));
+                    },
+                    // update() is written in per-tick units (acceleration 0.35/tick, cooldowns in ticks), so the
+                    // Lobby runs it in fixed steps and every constant means the same thing on every display.
+                    simulateStep: () => {
+                        if (CONFIG.LOOP.INTERPOLATE) RenderInterp.snapshot(this);
+                        this.update();
+                    },
+                    afterSimulation: (steps) => {
+                        RenderStats.ticks = steps;   // sim ticks this frame (the profiler: a slow frame runs several, and its update rows add them up)
+                        if (PerformanceBench.active) PerformanceBench.afterSimulation();
+                    },
+                    // Always draw for smooth visuals, blended between the last two ticks
+                    renderFrame: (blend) => {
+                        const interp = CONFIG.LOOP.INTERPOLATE;
+                        if (interp) RenderInterp.apply(this, blend);
+                        const tickSec = CONFIG.LOOP.STEP_MS / 1000;
+                        _gameTimeSec = (interp && RenderInterp.stepAdvanced)
+                            ? (_simTick - 1 + RenderInterp.alpha) * tickSec
+                            : _simTick * tickSec;
+                        try {
+                            this.draw();
+                        } finally {
+                            if (interp) RenderInterp.restore(this);
+                        }
+                    },
+                    endFrame: (steps, droppedMs) => { if (PerformanceBench.active) PerformanceBench.endFrame(steps, droppedMs); },
+                    // Through game.loop(), so replacing it (as the test runners do) stops the loop
+                    scheduleNextFrame: () => requestAnimationFrame(() => this.loop()),
+                });
             },
+
+            /** One frame of the main loop: the Lobby's clock (lobby/level-lobby.js). */
+            loop() { this.level_lobby.runEngine(); },
+
+            // The loop's clock lives in the Lobby; these keep the old names working for the code
+            // (lighting, reflections, scope) and tests that read or reset them.
+            get _accumulator() { return this.level_lobby.accumulator; },
+            set _accumulator(v) { this.level_lobby.accumulator = v; },
+            get _lastLoopTime() { return this.level_lobby.last_frame_time; },
+            set _lastLoopTime(v) { this.level_lobby.last_frame_time = v; },
+            get _nextDrawDue() { return this.level_lobby.next_draw_due; },
+            set _nextDrawDue(v) { this.level_lobby.next_draw_due = v; },
+            get _renderFrameMs() { return this.level_lobby.frame_ms; },
+            set _renderFrameMs(v) { this.level_lobby.frame_ms = v; },
+            get _loopScale() { return this.level_lobby.time_scale; },
+            set _loopScale(v) { this.level_lobby.time_scale = v; },
         });
 
     </script>

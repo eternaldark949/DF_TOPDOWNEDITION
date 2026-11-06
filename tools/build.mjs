@@ -160,6 +160,7 @@ const SCRIPTS = [
     'story/scenes/cast.js',
     'story/scenes/prologue.js',
     'story/scenes/van.js',
+    'lobby/level-lobby.js',        // LV1 Lobby: the game loop's clock (GameEngine builds one)
     'engine/pause-system.js',
     'engine/game-engine.js',
     'engine/events.js',
