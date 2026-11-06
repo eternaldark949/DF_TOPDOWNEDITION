@@ -220,6 +220,7 @@ const SCRIPTS = [
     'ui/pause-look.js',
     'ui/save-slots-pause-menu.js',
     'app/boot.js',
+    'ui/gamepad.js',        // controller support: after boot, so game, pauseMenu and Screens exist
 ];
 
 const MIME = {

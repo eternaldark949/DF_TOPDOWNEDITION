@@ -1548,3 +1548,6 @@
         #ui-scrapyard .w-line { white-space:normal; justify-content:center; flex-wrap:wrap; letter-spacing:2px; text-align:center; }
         body.objective-hud #ui-scrapyard { top:calc(12% + 60px); }
         body.objective-hud.yard-hud #ui-stealth-indicator { top:calc(12% + 130px); }
+
+        /* Gamepad (ui/gamepad.js): the highlight the D-pad moves between menu items */
+        .pad-focus { outline: 2px solid var(--df-champagne, #e8c27a) !important; outline-offset: 2px; box-shadow: 0 0 14px rgba(232, 194, 122, 0.45) !important; }
