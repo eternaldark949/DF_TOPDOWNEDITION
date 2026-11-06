@@ -46,6 +46,7 @@ const SCRIPTS = [
     'basement/frame-clock.js',     // LV0 Basement: the frame clock's globals (_frameTime, _simTick, _gameTimeSec), first
     'basement/canvas-kit.js',      // LV0 Basement: canvasKit (off-screen layers)
     'basement/life-kit.js',        // LV0 Basement: lifeKit (lists of short-lived things)
+    'basement/sound-kit.js',       // LV0 Basement: soundKit (Web Audio building blocks)
     'core/config.js',
     '@assets',              // generated from the assets/ folder
     'core/assets.js',
@@ -60,7 +61,7 @@ const SCRIPTS = [
     'core/settings.js',
     'story/story-db.js',
     'story/captions.js',
-    'audio/audio.js',
+    'directory/game-sound.js',
     'world/weather.js',
     'world/weather-response.js',
     'world/particles-decals.js',

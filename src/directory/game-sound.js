@@ -1,8 +1,9 @@
         /* =====================================================================
            AUDIO SYSTEM
            ---------------------------------------------------------------------
-           Procedural sound effects using Web Audio API. No external audio
-           files needed - everything is synthesized with oscillators.
+           The game's sounds, written with the Basement's sound kit
+           (basement/sound-kit.js): what a shot, a footstep or the rain is made of.
+           No external audio files needed - everything is synthesized.
            
            Shares a single AudioContext with MusicWidgetSystem to minimize
            memory overhead on mobile (~2-4MB savings).
@@ -22,73 +23,29 @@
            ===================================================================== */
         /** The Audio Buffer setting → the context's latencyHint (read once, at launch) */
         const AUDIO_BUFFERS = { low: 'interactive', balanced: 'balanced', smooth: 'playback' };
-        /** sfx(): how long each one rings (s) and how many may ring at once */
+        /** sfx(): the recipes there are, how long each one rings (s) and how many may ring at once (default 6) */
         const SFX_DUR = { shoot: 0.16, explode: 0.31, thunder: 2.8, knock: 0.14, bump: 0.32, crunch: 0.3, ui: 0.06, flit: 0.21, crit: 0.14 };
         const SFX_CAP = { shoot: 4, explode: 3, thunder: 2, ui: 3, crunch: 3, crit: 3 };
-
-        /** Bring a gain in over a few ms instead of jumping to it — a jump is a click */
-        function softStart(param, t, amp, ramp = 0.003) {
-            param.setValueAtTime(0.0001, t);
-            param.exponentialRampToValueAtTime(Math.max(0.0002, amp), t + ramp);
-        }
 
         class AudioSystem {
             constructor() {
                 // Shared Web Audio API context - used by SFX and MusicWidgetSystem
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
                 // The output buffer (Settings → Audio Buffer): 'balanced' by default. The smallest
                 // ('interactive') underruns on mid-range phones while the game is busy — the crackles
                 // and pops — so it trades ~10–20 ms of latency for a steady stream. Read at launch.
                 this.bufferMode = AUDIO_BUFFERS[GameSettings.audioBuffer] ? GameSettings.audioBuffer : 'balanced';
-                try { this.ctx = new AudioContext({ latencyHint: AUDIO_BUFFERS[this.bufferMode] }); }
-                catch (e) { this.ctx = new AudioContext(); }
-                this._countVoices();
-                
-                // MASTER GAIN BUS — single point of mute for ALL audio (SFX + music).
-                // Both sfx() oscillators and MusicWidgetSystem.trackSource route through
-                // this node instead of connecting directly to ctx.destination, so flipping
-                // masterGain.gain silences the entire game in one place.
-                this.masterGain = this.ctx.createGain();
-                this.masterGain.gain.value = GameSettings.audioEnabled ? 1.0 : 0.0;
-                // A brick-wall limiter on the way out: a stack of shots over the music and rain
-                // would otherwise sum past full scale and clip (a harsh crackle)
-                this.limiter = this.ctx.createDynamicsCompressor();
-                const L = this.limiter;
-                L.threshold.value = -1; L.knee.value = 0; L.ratio.value = 20; L.attack.value = 0.001; L.release.value = 0.1;   // near-transparent below full scale
-                this.masterGain.connect(L); L.connect(this.ctx.destination);
+                this.ctx = soundKit.open(AUDIO_BUFFERS[this.bufferMode]);
+                this.stats = soundKit.countVoices(this.ctx);   // live voices, sounds per second and the peak, for the profiler
 
-                // MUSIC BUS — all music (the apartment's track, the phone radio) goes through
-                // here into the master, so the Music slider sets it apart from sound effects.
-                this.musicGain = this.ctx.createGain();
-                this.musicGain.gain.value = GameSettings.musicVolume ?? 0.7;
-                this.musicGain.connect(this.masterGain);
-            }
-
-            /**
-             * Live voices for the profiler: every oscillator and buffer source counts while it plays
-             * (loops included). `stats` also counts sounds started per second and the peak.
-             */
-            _countVoices() {
-                const c = this.ctx, S = this.stats = { live: 0, peak: 0, started: 0, perSec: 0, _t: 0, _n: 0, ms: 0, _ms: 0 };
-                for (const name of ['createOscillator', 'createBufferSource']) {
-                    const make = c[name].bind(c);
-                    c[name] = () => {
-                        const n = make(), start = n.start.bind(n);
-                        n.start = (...a) => {
-                            S.live++; S.started++; if (S.live > S.peak) S.peak = S.live;
-                            n.addEventListener('ended', () => { S.live--; }, { once: true });
-                            return start(...a);
-                        };
-                        return n;
-                    };
-                }
+                // MASTER GAIN BUS: the single point of mute for ALL audio (SFX + music), through a limiter.
+                // MUSIC BUS: all music (the apartment's track, the phone radio) goes through here into the
+                // master, so the Music slider sets it apart from sound effects.
+                const mix = soundKit.mixer(this.ctx, [GameSettings.audioEnabled ? 1.0 : 0.0, GameSettings.musicVolume ?? 0.7]);
+                this.masterGain = mix.master; this.limiter = mix.limiter; this.musicGain = mix.music;
             }
 
             /** Once a frame (ambience.update): roll the per-second counters */
-            _tickStats() {
-                const S = this.stats, now = performance.now();
-                if (now - S._t >= 1000) { S.perSec = S.started - S._n; S._n = S.started; S.ms = S._ms; S._ms = 0; S._t = now; S.peakSec = S.peak; S.peak = S.live; }
-            }
+            _tickStats() { soundKit.tickStats(this.stats); }
 
             /** Music slider (0..1). */
             setMusicVolume(v) {
@@ -118,173 +75,55 @@
                 this.masterGain.gain.setTargetAtTime(GameSettings.audioEnabled ? 1.0 : 0.0, this.ctx.currentTime, 0.02);   // a fade, not a click
             }
         
-            /* ---------------------------------------------------------------
-               PROCEDURAL SFX GENERATOR
-               ---------------------------------------------------------------
-               Creates sounds using oscillators and gain envelopes.
-               No external audio files needed - everything is synthesized.
-               
-               Anatomy of a procedural sound:
-               1. Create oscillator (waveform generator)
-               2. Create gain node (volume control)
-               3. Connect: oscillator → gain → speakers
-               4. Set frequency/volume envelopes over time
-               5. Start and stop at precise times
-               --------------------------------------------------------------- */
+            /** A one-shot sound effect: `type` names the recipe. opts.muffled = heard through a wall, opts.gain = how hard (crunch). */
             sfx(type, opts = {}) {
                 // Ensure audio context is active (not from a timer while the app is in the background)
                 if (this.ctx.state !== 'running' && !document.hidden) this.ctx.resume();
+                if (!(type in SFX_DUR)) return;                                    // no such recipe: nothing to play
                 // Rapid fire: a few shots ringing at once is plenty; more only stacks into clipping
-                const dur = SFX_DUR[type] || 0.3, V = this._sfxV || (this._sfxV = {});
-                if ((V[type] || 0) >= (SFX_CAP[type] || 6)) return;
-                V[type] = (V[type] || 0) + 1; setTimeout(() => { V[type]--; }, dur * 1000 + 30);
+                const dur = SFX_DUR[type];
+                if (!soundKit.cap(this._sfxV || (this._sfxV = {}), type, SFX_CAP[type] || 6, dur * 1000 + 30)) return;
 
                 // Muffled = heard through walls: a lowpass in front of the master bus
+                const c = this.ctx, now = c.currentTime;
                 let out = this.masterGain;
-                if (opts.muffled) {
-                    out = this.ctx.createBiquadFilter(); out.type = 'lowpass'; out.frequency.value = 160;
-                    const trim = this.ctx.createGain(); trim.gain.value = 0.6;
-                    out.connect(trim); trim.connect(this.masterGain);
-                }
+                if (opts.muffled) { out = soundKit.filter(c, ['lowpass', 160]); out.connect(soundKit.gain(c, 0.6, this.masterGain)); }
+                const tone = (tone_packet, t = now) => soundKit.tone(c, out, t, tone_packet);
 
-                // Create audio nodes
-                const osc = this.ctx.createOscillator();  // Generates the tone
-                const gain = this.ctx.createGain();       // Controls volume
-                osc.connect(gain);
-                gain.connect(out);                        // Route through master mute bus
-
-                const now = this.ctx.currentTime;
-
-                if (type === 'shoot') {
-                    // LASER SHOT: Square wave dropping from high to low pitch
-                    osc.type = 'square';
-                    osc.frequency.setValueAtTime(800, now);
-                    osc.frequency.exponentialRampToValueAtTime(100, now + 0.15);
-                    softStart(gain.gain, now, 0.1);
-                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
-                    osc.start(now);
-                    osc.stop(now + 0.16);
-                } 
-                else if (type === 'explode') {
-                    // EXPLOSION: Harsh sawtooth rumbling down
-                    osc.type = 'sawtooth';
-                    osc.frequency.setValueAtTime(100, now);
-                    osc.frequency.exponentialRampToValueAtTime(10, now + 0.3);
-                    softStart(gain.gain, now, 0.2);
-                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
-                    osc.start(now);
-                    osc.stop(now + 0.31);
-                }
+                // Tone packets: [wave, f0, f1, glide, amp, attack, decay, stop] (basement/sound-kit.js)
+                if (type === 'shoot') tone(['square', 800, 100, 0.15, 0.1]);                     // LASER SHOT: a square wave dropping
+                else if (type === 'explode') tone(['sawtooth', 100, 10, 0.3, 0.2]);               // EXPLOSION: a harsh sawtooth rumbling down
                 else if (type === 'thunder') {
-                    // THUNDER: low sawtooth rumble with a slow decay. Two detuned
-                    // sweeps layered so it reads as a rolling boom rather than a
-                    // single tone. Pitch is randomised per strike so repeated
-                    // lightning in a long storm never sounds looped.
+                    // THUNDER: a low sawtooth rumble with a slow decay, and a lower triangle body for weight.
+                    // Pitch is randomised per strike so repeated lightning in a long storm never sounds looped.
                     const base = 48 + Math.random() * 26;
                     const dur = 1.4 + Math.random() * 1.3;
-                    osc.type = 'sawtooth';
-                    osc.frequency.setValueAtTime(base, now);
-                    osc.frequency.exponentialRampToValueAtTime(base * 0.32, now + dur);
-                    gain.gain.setValueAtTime(0.0001, now);
-                    gain.gain.exponentialRampToValueAtTime(0.16, now + 0.08);
-                    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-                    osc.start(now);
-                    osc.stop(now + dur);
-
-                    // Second, lower body for weight
-                    const sub = this.ctx.createOscillator();
-                    const subGain = this.ctx.createGain();
-                    sub.connect(subGain);
-                    subGain.connect(out);
-                    sub.type = 'triangle';
-                    sub.frequency.setValueAtTime(base * 0.5, now);
-                    sub.frequency.exponentialRampToValueAtTime(base * 0.2, now + dur);
-                    subGain.gain.setValueAtTime(0.0001, now);
-                    subGain.gain.exponentialRampToValueAtTime(0.11, now + 0.14);
-                    subGain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-                    sub.start(now);
-                    sub.stop(now + dur);
+                    tone(['sawtooth', base, base * 0.32, dur, 0.16, 0.08, dur, dur]);
+                    tone(['triangle', base * 0.5, base * 0.2, dur, 0.11, 0.14, dur, dur]);
                 }
-                else if (type === 'knock') {
-                    // KNOCK: a gloved fist on the van's partition — a short, dull metal thud
-                    osc.type = 'triangle';
-                    osc.frequency.setValueAtTime(150, now);
-                    osc.frequency.exponentialRampToValueAtTime(70, now + 0.09);
-                    gain.gain.setValueAtTime(0.0001, now);
-                    gain.gain.exponentialRampToValueAtTime(0.22, now + 0.006);
-                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.13);
-                    osc.start(now);
-                    osc.stop(now + 0.14);
-                }
+                else if (type === 'knock') tone(['triangle', 150, 70, 0.09, 0.22, 0.006, 0.13]);  // KNOCK: a gloved fist on the van's partition, a dull metal thud
                 else if (type === 'bump') {
-                    // BUMP: the van hitting a seam in the road — a low thump with a rattle after
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(90, now);
-                    osc.frequency.exponentialRampToValueAtTime(38, now + 0.25);
-                    gain.gain.setValueAtTime(0.0001, now);
-                    gain.gain.exponentialRampToValueAtTime(0.3, now + 0.015);
-                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
-                    osc.start(now);
-                    osc.stop(now + 0.32);
-                    const r = this.ctx.createOscillator(), rg = this.ctx.createGain();
+                    // BUMP: the van hitting a seam in the road, a low thump with a rattle after
+                    tone(['sine', 90, 38, 0.25, 0.3, 0.015, 0.3, 0.32]);
+                    const r = c.createOscillator(), rg = c.createGain();
                     r.type = 'square'; r.frequency.setValueAtTime(420, now + 0.05); r.connect(rg); rg.connect(out);
                     rg.gain.setValueAtTime(0.0001, now); rg.gain.exponentialRampToValueAtTime(0.018, now + 0.06); rg.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
                     r.start(now + 0.04); r.stop(now + 0.22);
                 }
                 else if (type === 'crunch') {
-                    // CRUNCH: a car hit — a body thump under a short burst of torn metal and glass.
+                    // CRUNCH: a car hit, a body thump under a short burst of torn metal and glass.
                     // opts.gain (0..1) scales it with the impact.
                     const v = Math.max(0.15, Math.min(1, opts.gain ?? 0.6));
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(120, now);
-                    osc.frequency.exponentialRampToValueAtTime(42, now + 0.22);
-                    gain.gain.setValueAtTime(0.0001, now);
-                    gain.gain.exponentialRampToValueAtTime(0.32 * v, now + 0.01);
-                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
-                    osc.start(now);
-                    osc.stop(now + 0.3);
-                    const n = this.ctx.createBufferSource(); n.buffer = this._noise();
-                    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1400 + Math.random() * 900; bp.Q.value = 1.1;
-                    const ng = this.ctx.createGain(); n.connect(bp); bp.connect(ng); ng.connect(out);
-                    ng.gain.setValueAtTime(0.0001, now); ng.gain.exponentialRampToValueAtTime(0.22 * v, now + 0.006);
-                    ng.gain.exponentialRampToValueAtTime(0.0001, now + 0.09 + 0.1 * v);
-                    n.start(now, Math.random() * 0.5, 0.25);
+                    tone(['sine', 120, 42, 0.22, 0.32 * v, 0.01, 0.28, 0.3]);
+                    soundKit.burst(c, out, now, [this._noise(), ['bandpass', 1400 + Math.random() * 900, 1.1], 0.22 * v, 0.006, 0.09 + 0.1 * v, Math.random() * 0.5, 0.25]);
                     if (v > 0.5) for (let i = 0; i < 3; i++) {             // glass settling
-                        const t = now + 0.05 + Math.random() * 0.12, o = this.ctx.createOscillator(), og = this.ctx.createGain();
-                        o.type = 'triangle'; o.frequency.value = 3200 + Math.random() * 2400; o.connect(og); og.connect(out);
-                        og.gain.setValueAtTime(0.0001, t); og.gain.exponentialRampToValueAtTime(0.03 * v, t + 0.004); og.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
-                        o.start(t); o.stop(t + 0.06);
+                        const t = now + 0.05 + Math.random() * 0.12;
+                        tone(['triangle', 3200 + Math.random() * 2400, null, 0, 0.03 * v, 0.004, 0.05, 0.06], t);
                     }
                 }
-                else if (type === 'ui') {
-                    // UI BLIP: Clean sine tone, short and high
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(1200, now);
-                    softStart(gain.gain, now, 0.05);
-                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
-                    osc.start(now);
-                    osc.stop(now + 0.06);
-                }
-                else if (type === 'crit') {
-                    // CRITICAL HIT: a bright ping that rises, over the hit itself
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(1500, now);
-                    osc.frequency.exponentialRampToValueAtTime(2600, now + 0.05);
-                    softStart(gain.gain, now, 0.09);
-                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.13);
-                    osc.start(now);
-                    osc.stop(now + 0.14);
-                }
-                else if (type === 'flit') {
-                    // TELEPORT: Smooth triangle wave rising in pitch
-                    osc.type = 'triangle';
-                    osc.frequency.setValueAtTime(200, now);
-                    osc.frequency.linearRampToValueAtTime(600, now + 0.2);
-                    softStart(gain.gain, now, 0.1);
-                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
-                    osc.start(now);
-                    osc.stop(now + 0.21);
-                }
+                else if (type === 'ui') tone(['sine', 1200, null, 0.05, 0.05]);                   // UI BLIP: a clean sine tone, short and high
+                else if (type === 'crit') tone(['sine', 1500, 2600, 0.05, 0.09, 0.003, 0.13]);    // CRITICAL HIT: a bright ping that rises, over the hit itself
+                else if (type === 'flit') tone(['triangle', 200, null, 0.2, 0.1]).frequency.linearRampToValueAtTime(600, now + 0.2);   // TELEPORT: a smooth triangle rising
             }
 
             /**
@@ -299,12 +138,12 @@
                 const on = !!(st && st.on);
                 if (!this._eng) {
                     if (!on) return;
-                    const c = this.ctx, bus = c.createGain(); bus.gain.value = 0; bus.connect(this.masterGain);
+                    const c = this.ctx, bus = soundKit.gain(c, 0, this.masterGain);
                     const osc = (type, g0) => { const o = c.createOscillator(), g = c.createGain(); o.type = type; g.gain.value = g0; o.connect(g); o.start(); return { o, g }; };
                     const body1 = osc('sine', 0.5), body2 = osc('sine', 0.3), fifth = osc('triangle', 0.09), whine = osc('sine', 0);
-                    const saw = osc('sawtooth', 0.07), lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.8; lp.frequency.value = 300;
+                    const saw = osc('sawtooth', 0.07), lp = soundKit.filter(c, ['lowpass', 300, 0.8]);
                     saw.g.connect(lp);
-                    const tone = c.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 2600;   // rounds off the whole bank
+                    const tone = soundKit.filter(c, ['lowpass', 2600]);   // rounds off the whole bank
                     for (const n of [body1.g, body2.g, fifth.g, whine.g, lp]) n.connect(tone);
                     tone.connect(bus);
                     const chorus = c.createOscillator(), cg = c.createGain(); chorus.frequency.value = 0.23; cg.gain.value = 5;   // ±5 cents, slowly
@@ -331,12 +170,7 @@
             }
 
             /** One second of white noise, made once. */
-            _noise() {
-                if (this._noiseBuf) return this._noiseBuf;
-                const sr = this.ctx.sampleRate, buf = this.ctx.createBuffer(1, sr, sr), d = buf.getChannelData(0);
-                for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-                return (this._noiseBuf = buf);
-            }
+            _noise() { return this._noiseBuf || (this._noiseBuf = soundKit.whiteNoise(this.ctx, 1)); }
 
             /**
              * The driven car's tyres: a looped squeal whose level (0..1) follows how hard they're
@@ -347,12 +181,11 @@
                 if (!this._tyre) {
                     if (L <= 0) return;
                     const c = this.ctx, src = c.createBufferSource(); src.buffer = this._noise(); src.loop = true;
-                    const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1500; bp.Q.value = 9;
-                    const bp2 = c.createBiquadFilter(); bp2.type = 'bandpass'; bp2.frequency.value = 2250; bp2.Q.value = 6;
-                    const g = c.createGain(); g.gain.value = 0;
+                    const bp = soundKit.filter(c, ['bandpass', 1500, 9]), bp2 = soundKit.filter(c, ['bandpass', 2250, 6]);
+                    const g = soundKit.gain(c, 0, this.masterGain);
                     const lfo = c.createOscillator(), lg = c.createGain(); lfo.frequency.value = 6.5; lg.gain.value = 90;
                     lfo.connect(lg); lg.connect(bp.frequency); lfo.start();
-                    src.connect(bp); src.connect(bp2); bp.connect(g); bp2.connect(g); g.connect(this.masterGain);
+                    src.connect(bp); src.connect(bp2); bp.connect(g); bp2.connect(g);
                     src.start();
                     this._tyre = { g, bp };
                 }
@@ -395,27 +228,12 @@
             }
 
             _build() {
-                const ctx = this.audio.ctx, sr = ctx.sampleRate, len = Math.floor(sr * 3);
-                const pink = ctx.createBuffer(1, len, sr), brown = ctx.createBuffer(1, len, sr);
-                const pd = pink.getChannelData(0), bd = brown.getChannelData(0);
-                let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0, last = 0;
-                for (let i = 0; i < len; i++) {
-                    const w = Math.random() * 2 - 1;                  // Paul Kellet's pink filter
-                    b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.969 * b2 + w * 0.153852;
-                    b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898;
-                    pd[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11; b6 = w * 0.115926;
-                    last = (last + 0.02 * w) / 1.02; bd[i] = last * 3.5;   // brown: leaky integrated white
-                }
+                const ctx = this.audio.ctx;
+                const { pink, brown } = soundKit.noiseBeds(ctx, 3);
                 this.pink = pink; this.brown = brown;
-                this.bus = ctx.createGain(); this.bus.gain.value = 0; this.bus.connect(this.audio.masterGain);
-                const bq = (type, f, Q = 0.7) => { const n = ctx.createBiquadFilter(); n.type = type; n.frequency.value = f; n.Q.value = Q; return n; };
-                const layer = (buf, filters, rate) => {
-                    const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true; src.playbackRate.value = rate;
-                    let node = src; for (const f of filters) { node.connect(f); node = f; }
-                    const g = ctx.createGain(); g.gain.value = 0; node.connect(g); g.connect(this.bus);
-                    src.start(0, Math.random() * 2.5);
-                    return { g, t: 0 };
-                };
+                this.bus = soundKit.gain(ctx, 0, this.audio.masterGain);
+                const bq = (type, f, Q = 0.7) => soundKit.filter(ctx, [type, f, Q]);
+                const layer = (buf, filters, rate) => ({ g: soundKit.loop(ctx, this.bus, buf, filters, rate, Math.random() * 2.5), t: 0 });
                 const windBand = bq('bandpass', 600, 0.9);
                 this.L = {
                     rain: layer(pink, [bq('highpass', 400), bq('lowpass', 7000)], 1),
@@ -582,26 +400,15 @@
                 return loops * perLoop + ((el - loops * M.dur) - (spec.beat0 || 0)) * spec.bpm / 60;
             }
 
-            _voice(nodes, dur) {
-                if (this.voices >= 6) return false;
-                this.voices++; setTimeout(() => { this.voices--; }, dur * 1000 + 50);
-                return true;
-            }
+            /** One more ambient one-shot, if fewer than 6 are ringing */
+            _voice(nodes, dur) { return soundKit.cap(this, 'voices', 6, dur * 1000 + 50); }
 
-            _burst(buf, dur, filter, gain, env) {
-                const ctx = this.audio.ctx, now = ctx.currentTime;
-                const src = ctx.createBufferSource(); src.buffer = buf;
-                const g = ctx.createGain(); src.connect(filter); filter.connect(g); g.connect(this.bus);
-                env(g.gain, now, gain);
-                src.start(now, Math.random() * 2.5, dur + 0.05);
-                return { src, filter, g, now };
-            }
-
+            /** A short click of noise from the fire: [filter, amp, decay] go into a burst packet on the bed's bus */
             _crackle(v) {
                 if (!this._voice(null, 0.05)) return;
-                const ctx = this.audio.ctx, f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 2000 + Math.random() * 3000; f.Q.value = 1.5;
+                const ctx = this.audio.ctx, f = soundKit.filter(ctx, ['bandpass', 2000 + Math.random() * 3000, 1.5]);
                 const d = 0.005 + Math.random() * 0.035;
-                this._burst(this.pink, d, f, v * (0.4 + Math.random() * 0.6), (g, t, a) => { softStart(g, t, a, 0.002); g.exponentialRampToValueAtTime(0.0001, t + d); });
+                soundKit.burst(ctx, this.bus, ctx.currentTime, [this.pink, f, v * (0.4 + Math.random() * 0.6), 0.002, d, Math.random() * 2.5, d + 0.05]);
             }
 
             _carPass(v) {
@@ -623,8 +430,8 @@
 
             _horn(v) {
                 if (!this._voice(null, 0.8)) return;
-                const ctx = this.audio.ctx, now = ctx.currentTime, lp = ctx.createBiquadFilter(), g = ctx.createGain();
-                lp.type = 'lowpass'; lp.frequency.value = 900; lp.connect(g); g.connect(this.bus);
+                const ctx = this.audio.ctx, now = ctx.currentTime, lp = soundKit.filter(ctx, ['lowpass', 900]), g = ctx.createGain();
+                lp.connect(g); g.connect(this.bus);
                 for (const f of [392, 397]) { const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = f * (0.9 + Math.random() * 0.2); o.connect(lp); o.start(now); o.stop(now + 0.75); }
                 g.gain.setValueAtTime(0.0001, now);
                 g.gain.exponentialRampToValueAtTime(v, now + 0.03); g.gain.setValueAtTime(v, now + 0.22); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
@@ -633,11 +440,8 @@
 
             _drip(v) {
                 if (!this._voice(null, 0.1)) return;
-                const ctx = this.audio.ctx, now = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
-                o.type = 'sine'; o.frequency.setValueAtTime(1800 + Math.random() * 900, now); o.frequency.exponentialRampToValueAtTime(900, now + 0.05);
-                o.connect(g); g.connect(this.bus);
-                softStart(g.gain, now, v); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
-                o.start(now); o.stop(now + 0.07);
+                const ctx = this.audio.ctx;
+                soundKit.tone(ctx, this.bus, ctx.currentTime, ['sine', 1800 + Math.random() * 900, 900, 0.05, v, 0.003, 0.06, 0.07]);
             }
 
             /**
@@ -649,28 +453,12 @@
             footstep(shoe, mat, o = {}) {
                 if (!this.ready || GameSettings.footsteps === false) return;
                 const near = o.near ?? 1; if (near <= 0.03) return;
-                if ((this.stepVoices || 0) >= 6) return;
-                this.stepVoices = (this.stepVoices || 0) + 1; setTimeout(() => { this.stepVoices--; }, 160);
+                if (!soundKit.cap(this, 'stepVoices', 6, 160)) return;
                 const ctx = this.audio.ctx, now = ctx.currentTime;
-                if (!this.foley) { this.foley = ctx.createGain(); this.foley.gain.value = 0.9; this.foley.connect(this.audio.masterGain); }
-                let out = this.foley;
-                if (ctx.createStereoPanner && o.pan) { const pn = ctx.createStereoPanner(); pn.pan.value = Math.max(-1, Math.min(1, o.pan)); pn.connect(this.foley); out = pn; }
+                const out = soundKit.pan(ctx, this._foley(), o.pan);
                 const v = near * (0.55 + 0.45 * (o.gain ?? 0.7));
-                const burst = (type, f, Q, dur, amp, rate = 1, buf = this.pink) => {
-                    const src = ctx.createBufferSource(); src.buffer = buf; src.playbackRate.value = rate;
-                    const bf = ctx.createBiquadFilter(); bf.type = type; bf.frequency.value = f; bf.Q.value = Q;
-                    const g = ctx.createGain(); src.connect(bf); bf.connect(g); g.connect(out);
-                    g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, amp), now + 0.004);
-                    g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-                    src.start(now, _sndRand() * 2.5, dur + 0.03);
-                };
-                const tone = (f0, f1, dur, amp, type = 'sine') => {
-                    const os = ctx.createOscillator(), g = ctx.createGain(); os.type = type;
-                    os.frequency.setValueAtTime(f0, now); os.frequency.exponentialRampToValueAtTime(f1, now + dur);
-                    os.connect(g); g.connect(out);
-                    softStart(g.gain, now, amp); g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-                    os.start(now); os.stop(now + dur + 0.02);
-                };
+                const burst = (type, f, Q, dur, amp, rate = 1, buf = this.pink) => soundKit.burst(ctx, out, now, [buf, [type, f, Q], amp, 0.004, dur, _sndRand() * 2.5, dur + 0.03, rate]);
+                const tone = (f0, f1, dur, amp, type = 'sine') => soundKit.tone(ctx, out, now, [type, f0, f1, dur, amp, 0.003, dur, dur + 0.02]);
                 const soft = mat === 'carpet' ? 0.35 : mat === 'grass' ? 0.5 : 1, j = 0.9 + _sndRand() * 0.2;
                 if (mat === 'water') {                                   // into a puddle: a slap and a spray
                     burst('lowpass', 900 * j, 0.7, 0.14, 0.32 * v, 0.9);
@@ -698,52 +486,33 @@
                 if (o.wet && mat !== 'carpet') burst('bandpass', 2600 * j, 0.8, 0.08, 0.09 * v);            // rain on the ground
             }
 
+            /** The foley bus (footsteps, blades, fists), made on first use */
+            _foley() { return this.foley || (this.foley = soundKit.gain(this.audio.ctx, 0.9, this.audio.masterGain)); }
+
             /** A blade through the air (and, on a hit, into someone) */
             slash(hit) {
                 if (!this.ready) return;
                 const ctx = this.audio.ctx, now = ctx.currentTime;
-                if (!this.foley) { this.foley = ctx.createGain(); this.foley.gain.value = 0.9; this.foley.connect(this.audio.masterGain); }
-                const src = ctx.createBufferSource(); src.buffer = this.pink;
                 const bf = ctx.createBiquadFilter(); bf.type = 'bandpass'; bf.Q.value = 1.4;
                 bf.frequency.setValueAtTime(1800, now); bf.frequency.exponentialRampToValueAtTime(5200, now + 0.14);
-                const g = ctx.createGain(); src.connect(bf); bf.connect(g); g.connect(this.foley);
-                g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(0.22, now + 0.05); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.17);
-                src.start(now, _sndRand() * 2.5, 0.2);
+                soundKit.burst(ctx, this._foley(), now, [this.pink, bf, 0.22, 0.05, 0.17, _sndRand() * 2.5, 0.2]);
                 if (hit) this.cut(0.05);
             }
 
             /** The cut: a wet thud and a bright ring off the blade, `delay` seconds from now */
             cut(delay = 0) {
                 if (!this.ready) return;
-                const ctx = this.audio.ctx, t = ctx.currentTime + delay;
-                if (!this.foley) { this.foley = ctx.createGain(); this.foley.gain.value = 0.9; this.foley.connect(this.audio.masterGain); }
-                const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700;
-                const s2 = ctx.createBufferSource(); s2.buffer = this.brown; const g2 = ctx.createGain();
-                s2.connect(lp); lp.connect(g2); g2.connect(this.foley);
-                g2.gain.setValueAtTime(0.0001, t); g2.gain.exponentialRampToValueAtTime(0.3, t + 0.01); g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.11);
-                s2.start(t, _sndRand() * 2.5, 0.15);
-                const o = ctx.createOscillator(), g3 = ctx.createGain(); o.type = 'sine';
-                o.frequency.setValueAtTime(3400, t); o.frequency.exponentialRampToValueAtTime(3100, t + 0.35);
-                o.connect(g3); g3.connect(this.foley); softStart(g3.gain, t, 0.025); g3.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
-                o.start(t); o.stop(t + 0.37);
+                const ctx = this.audio.ctx, t = ctx.currentTime + delay, out = this._foley();
+                soundKit.burst(ctx, out, t, [this.brown, ['lowpass', 700], 0.3, 0.01, 0.11, _sndRand() * 2.5, 0.15]);
+                soundKit.tone(ctx, out, t, ['sine', 3400, 3100, 0.35, 0.025, 0.003, 0.35, 0.37]);
             }
 
             /** Brass on bone: a knuckle-duster's haymaker lands — a dull knock and two bright metal partials */
             clink() {
                 if (!this.ready) return;
-                const ctx = this.audio.ctx, t = ctx.currentTime;
-                if (!this.foley) { this.foley = ctx.createGain(); this.foley.gain.value = 0.9; this.foley.connect(this.audio.masterGain); }
-                const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 500;
-                const s2 = ctx.createBufferSource(); s2.buffer = this.brown; const g2 = ctx.createGain();
-                s2.connect(lp); lp.connect(g2); g2.connect(this.foley);
-                g2.gain.setValueAtTime(0.0001, t); g2.gain.exponentialRampToValueAtTime(0.34, t + 0.008); g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
-                s2.start(t, _sndRand() * 2.5, 0.15);
-                for (const [f, v, d] of [[2350, 0.07, 0.42], [3920, 0.04, 0.3]]) {
-                    const o = ctx.createOscillator(), g3 = ctx.createGain(); o.type = 'triangle';
-                    o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 0.985, t + d);
-                    o.connect(g3); g3.connect(this.foley); softStart(g3.gain, t, v); g3.gain.exponentialRampToValueAtTime(0.0001, t + d);
-                    o.start(t); o.stop(t + d + 0.02);
-                }
+                const ctx = this.audio.ctx, t = ctx.currentTime, out = this._foley();
+                soundKit.burst(ctx, out, t, [this.brown, ['lowpass', 500], 0.34, 0.008, 0.12, _sndRand() * 2.5, 0.15]);
+                for (const [f, v, d] of [[2350, 0.07, 0.42], [3920, 0.04, 0.3]]) soundKit.tone(ctx, out, t, ['triangle', f, f * 0.985, d, v, 0.003, d, d + 0.02]);
             }
 
             /** A car's tyres through a puddle: a long hiss-splash, quieter with distance */
@@ -751,15 +520,9 @@
                 if (!this.ready || GameSettings.footsteps === false || near <= 0.03) return;
                 if (!this._voice(null, 0.5)) return;
                 const ctx = this.audio.ctx, now = ctx.currentTime;
-                let out = this.audio.masterGain;
-                if (ctx.createStereoPanner && pan) { const pn = ctx.createStereoPanner(); pn.pan.value = Math.max(-1, Math.min(1, pan)); pn.connect(out); out = pn; }
-                const src = ctx.createBufferSource(); src.buffer = this.pink;
                 const bf = ctx.createBiquadFilter(); bf.type = 'bandpass'; bf.Q.value = 0.7;
                 bf.frequency.setValueAtTime(big ? 1400 : 2200, now); bf.frequency.exponentialRampToValueAtTime(big ? 600 : 1200, now + 0.4);
-                const g = ctx.createGain(); src.connect(bf); bf.connect(g); g.connect(out);
-                const a = (big ? 0.3 : 0.18) * near;
-                g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(a, now + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, now + (big ? 0.45 : 0.25));
-                src.start(now, _sndRand() * 2.5, 0.5);
+                soundKit.burst(ctx, soundKit.pan(ctx, this.audio.masterGain, pan), now, [this.pink, bf, (big ? 0.3 : 0.18) * near, 0.03, big ? 0.45 : 0.25, _sndRand() * 2.5, 0.5]);
             }
 
             /** Door sounds: 'creak' | 'latch' | 'whoosh', quieter with distance from the player. */
@@ -772,8 +535,8 @@
                 const ctx = this.audio.ctx, now = ctx.currentTime;
                 if (kind === 'creak') {
                     if (!this._voice(null, 0.6)) return;
-                    const o = ctx.createOscillator(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
-                    o.type = 'sawtooth'; bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 4;
+                    const o = ctx.createOscillator(), bp = soundKit.filter(ctx, ['bandpass', 900, 4]), g = ctx.createGain();
+                    o.type = 'sawtooth';
                     const f0 = 170 + Math.random() * 60;
                     o.frequency.setValueAtTime(f0, now); o.frequency.linearRampToValueAtTime(f0 * 1.25, now + 0.18);
                     o.frequency.linearRampToValueAtTime(f0 * 0.95, now + 0.34); o.frequency.linearRampToValueAtTime(f0 * 1.15, now + 0.5);
@@ -782,33 +545,21 @@
                     o.start(now); o.stop(now + 0.56);
                 } else if (kind === 'latch') {
                     if (!this._voice(null, 0.1)) return;
-                    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 3200; f.Q.value = 3;
-                    this._burst(this.pink, 0.025, f, 0.18 * near, (gg, t, amp) => { softStart(gg, t, amp, 0.002); gg.exponentialRampToValueAtTime(0.0001, t + 0.025); });
-                    const o = ctx.createOscillator(), g = ctx.createGain();
-                    o.frequency.setValueAtTime(140, now); o.frequency.exponentialRampToValueAtTime(70, now + 0.07);
-                    o.connect(g); g.connect(this.bus); softStart(g.gain, now, 0.09 * near); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
-                    o.start(now); o.stop(now + 0.09);
+                    soundKit.burst(ctx, this.bus, now, [this.pink, ['bandpass', 3200, 3], 0.18 * near, 0.002, 0.025, Math.random() * 2.5, 0.075]);
+                    soundKit.tone(ctx, this.bus, now, ['sine', 140, 70, 0.07, 0.09 * near, 0.003, 0.08, 0.09]);
                 } else if (kind === 'thud') {                                 // a round into a wooden leaf
                     if (!this._voice(null, 0.12)) return;
-                    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 520;
-                    this._burst(this.pink, 0.06, f, 0.22 * near, (gg, t, amp) => { softStart(gg, t, amp, 0.002); gg.exponentialRampToValueAtTime(0.0001, t + 0.06); });
-                    const o = ctx.createOscillator(), g = ctx.createGain();
-                    o.frequency.setValueAtTime(120, now); o.frequency.exponentialRampToValueAtTime(60, now + 0.1);
-                    o.connect(g); g.connect(this.bus); softStart(g.gain, now, 0.12 * near); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.11);
-                    o.start(now); o.stop(now + 0.12);
+                    soundKit.burst(ctx, this.bus, now, [this.pink, ['lowpass', 520], 0.22 * near, 0.002, 0.06, Math.random() * 2.5, 0.11]);
+                    soundKit.tone(ctx, this.bus, now, ['sine', 120, 60, 0.1, 0.12 * near, 0.003, 0.11, 0.12]);
                 } else if (kind === 'tink') {                                 // a round glancing off glass
                     if (!this._voice(null, 0.3)) return;
-                    const o = ctx.createOscillator(), g = ctx.createGain();
-                    o.type = 'sine'; o.frequency.setValueAtTime(2600 + Math.random() * 500, now);
-                    o.connect(g); g.connect(this.bus); softStart(g.gain, now, 0.06 * near); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
-                    o.start(now); o.stop(now + 0.3);
-                    const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 4000;
-                    this._burst(this.pink, 0.03, f, 0.12 * near, (gg, t, amp) => { softStart(gg, t, amp, 0.002); gg.exponentialRampToValueAtTime(0.0001, t + 0.03); });
+                    soundKit.tone(ctx, this.bus, now, ['sine', 2600 + Math.random() * 500, null, 0.28, 0.06 * near, 0.003, 0.28, 0.3]);
+                    soundKit.burst(ctx, this.bus, now, [this.pink, ['highpass', 4000], 0.12 * near, 0.002, 0.03, Math.random() * 2.5, 0.08]);
                 } else if (kind === 'whoosh') {
                     if (!this._voice(null, 0.4)) return;
                     const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 0.8;
                     f.frequency.setValueAtTime(700, now); f.frequency.exponentialRampToValueAtTime(2600, now + 0.3);
-                    this._burst(this.pink, 0.35, f, 0.07 * near, (gg, t, amp) => { gg.setValueAtTime(0.0001, t); gg.exponentialRampToValueAtTime(amp, t + 0.1); gg.exponentialRampToValueAtTime(0.0001, t + 0.35); });
+                    soundKit.burst(ctx, this.bus, now, [this.pink, f, 0.07 * near, 0.1, 0.35, Math.random() * 2.5, 0.4]);
                 }
             }
         }

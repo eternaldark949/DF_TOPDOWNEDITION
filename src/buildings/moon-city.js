@@ -15,7 +15,7 @@
            on gold stanchions, topiary, a crimson pool of light, a little low
            mist, a bouncer in black and gold, and a queue that moves.
            The lights keep time with the club (clubBeatN; the real kick when the
-           muffled track can be heard outside, audio/audio.js MAP_MUSIC).
+           muffled track can be heard outside, directory/game-sound.js MAP_MUSIC).
            Same footprint and door as the old block, so nothing else moves.
            Hooks: building-v2.js (_applyStyle, lights, faces, roof, sign,
            emissive), engine/draw.js (ground), engine/map-loading.js (forecourt).
