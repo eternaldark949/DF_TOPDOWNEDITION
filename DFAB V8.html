@@ -5868,7 +5868,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '3ca0f3cebbe1';
+        const DFAB_BUILD = 'cbe6319ec129';
     </script>
     <script type="text/dfab" data-src="core/config.js" data-cost="406">
 
@@ -18547,7 +18547,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
 
     </script>
-    <script type="text/dfab" data-src="entities/props-decor.js" data-cost="2433">
+    <script type="text/dfab" data-src="entities/props-decor.js" data-cost="2520">
         // One soft, centred ground blob shared by props, pickups and Velvet. It is stamped
         // before artwork transforms and never baked into a rotating furniture sprite.
         function drawGroundContactShadow(ctx, x, y, rx, ry, angle = 0) {
@@ -19906,7 +19906,120 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             c.fillStyle = GY_IRON_HI; c.beginPath(); c.moveTo(x, 2.3); c.lineTo(x - 1.8, 5); c.lineTo(x - 1, 5.2); c.closePath(); c.fill();
         }
 
+        /* The fence stands up with the lean (as the tiered buildings do: buildings/tiered-kit.js _tkK): each picket from its
+           foot on the coping's middle line to its spear at FENCE px up, both projected away from the camera, so it leans
+           with the view rather than being painted at one angle. Without the lean (CONFIG.BUILDINGS.LEAN off): the tiles. */
+        function _gyLean() { return CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera; }
+        function _gyP(x, y, z) {
+            const C = leanCamHeight(), k = C / (C - Math.min(z, C * 0.86)), c = game.camera;
+            return [c.x + (x - c.x) * k, c.y + (y - c.y) * k];
+        }
+        function _gyFence3D(ctx, x0, y0, x1, y1, zb = 0) {
+            const F = GY_WALL.FENCE, L = Math.hypot(x1 - x0, y1 - y0), ux = (x1 - x0) / L, uy = (y1 - y0) / L, n = Math.max(1, Math.round(L / 10));
+            const bars = new Path2D(), heads = new Path2D(), hi = new Path2D(), rings = new Path2D();
+            for (let i = 0; i < n; i++) {
+                const s = (i + 0.5) / n, x = x0 + (x1 - x0) * s, y = y0 + (y1 - y0) * s;
+                const a = _gyP(x, y, zb), b = _gyP(x, y, zb + F - 4);
+                bars.moveTo(a[0], a[1]); bars.lineTo(b[0], b[1]);
+                hi.moveTo(a[0] - 0.6, a[1]); hi.lineTo(b[0] - 0.6, b[1]);
+                const l = _gyP(x - ux * 1.9, y - uy * 1.9, zb + F - 3.4), r = _gyP(x + ux * 1.9, y + uy * 1.9, zb + F - 3.4), tip = _gyP(x, y, zb + F), m = _gyP(x, y, zb + F - 4.6);
+                heads.moveTo(m[0], m[1]); heads.lineTo(l[0], l[1]); heads.lineTo(tip[0], tip[1]); heads.lineTo(r[0], r[1]); heads.closePath();
+                const c = _gyP(x, y, zb + F - 9.5), ct = _gyP(x, y, zb + F - 8.2), cr = Math.max(0.9, Math.hypot(ct[0] - c[0], ct[1] - c[1]) + 0.6);   // the collar under the top rail
+                rings.moveTo(c[0] + cr, c[1]); rings.arc(c[0], c[1], cr, 0, Math.PI * 2);
+            }
+            const rail = (z) => { const a = _gyP(x0, y0, z), b = _gyP(x1, y1, z); bars.moveTo(a[0], a[1]); bars.lineTo(b[0], b[1]); };
+            rail(zb + 4.2); rail(zb + F - 6.8);                                         // the bottom and top rails
+            ctx.save(); ctx.lineCap = 'round';
+            ctx.strokeStyle = GY_IRON; ctx.lineWidth = 1.6; ctx.stroke(bars);
+            ctx.fillStyle = GY_IRON; ctx.fill(heads); ctx.fill(rings);
+            ctx.strokeStyle = GY_IRON_HI; ctx.lineWidth = 0.5; ctx.stroke(hi);    // moonlight down the left of the iron
+            ctx.restore();
+        }
+
+        // Heights with the lean (world px): the wall to its coping's top, a pillar's brick and its cap
+        const GY_Z = { WALL: 22, PILLAR: 47, CAP: 6 };
+        /** Fill a vertical face from (ax, ay) to (bx, by), z0 up to z1, with a pattern laid along it (in slices: the lean is a perspective) */
+        function _gyFace(ctx, ax, ay, bx, by, z0, z1, fill, shade) {
+            const L = Math.hypot(bx - ax, by - ay), n = Math.max(1, Math.ceil(L / 40)), H = z1 - z0, ux = (bx - ax) / L, uy = (by - ay) / L;
+            for (let i = 0; i < n; i++) {
+                const u0 = L * i / n, u1 = L * (i + 1) / n, w = u1 - u0;
+                const A = _gyP(ax + ux * u0, ay + uy * u0, z1), B = _gyP(ax + ux * u1, ay + uy * u1, z1), D = _gyP(ax + ux * u0, ay + uy * u0, z0);
+                ctx.save();
+                ctx.transform((B[0] - A[0]) / w, (B[1] - A[1]) / w, (D[0] - A[0]) / H, (D[1] - A[1]) / H, A[0], A[1]);
+                ctx.translate(-u0, 0);                                        // (the pattern runs on along the face)
+                ctx.fillStyle = fill; ctx.fillRect(u0 - 0.4, 0, w + 0.8, H);
+                const g = ctx.createLinearGradient(0, 0, 0, H);                // the foot in the dark, a shadow under the coping
+                g.addColorStop(0, 'rgba(0,0,0,0.28)'); g.addColorStop(0.18, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(10,6,16,0.38)');
+                ctx.fillStyle = g; ctx.fillRect(u0 - 0.4, 0, w + 0.8, H);
+                if (shade) { ctx.fillStyle = `rgba(0,0,0,${shade})`; ctx.fillRect(u0 - 0.4, 0, w + 0.8, H); }
+                ctx.restore();
+            }
+        }
+        /** A box's faces turned to the camera (brick, shaded by their turn), farthest first */
+        function _gyBoxSides(ctx, x0, y0, x1, y1, z0, z1, fill) {
+            const c = game.camera, f = [];
+            if (c.y < y0) f.push([x1, y0, x0, y0, 0.3, y0 - c.y]);
+            if (c.x < x0) f.push([x0, y0, x0, y1, 0.15, x0 - c.x]);
+            if (c.x > x1) f.push([x1, y1, x1, y0, 0.15, c.x - x1]);
+            if (c.y > y1) f.push([x0, y1, x1, y1, 0, c.y - y1]);
+            f.sort((a, b) => b[5] - a[5]);
+            for (const [ax, ay, bx, by, sh] of f) _gyFace(ctx, ax, ay, bx, by, z0, z1, fill, sh);
+        }
+        /** Draw `paint` (world coordinates) at height z: the plane scaled about the camera */
+        function _gyAt(ctx, z, paint) {
+            const C = leanCamHeight(), k = C / (C - Math.min(z, C * 0.86)), c = game.camera;
+            ctx.save(); ctx.translate(c.x * (1 - k), c.y * (1 - k)); ctx.scale(k, k); paint(); ctx.restore();
+        }
+        /** A graveyard wall standing up: its brick sides, its coping on top, then the fence along the coping's middle */
+        function _gyWall3D(ctx, w) {
+            const Z = GY_Z.WALL, T = GY_WALL.T, vertical = w.h > w.w, brick = _gyTile('brick', 78, 22, _gyBrickPaint);
+            ctx.fillStyle = 'rgba(6, 4, 10, 0.4)'; ctx.fillRect(w.x + 3, w.y + 3, w.w, w.h);   // its shadow on the ground
+            _gyBoxSides(ctx, w.x, w.y, w.x + w.w, w.y + w.h, 0, Z, brick);
+            _gyAt(ctx, Z, () => {
+                if (!vertical) {
+                    ctx.save(); ctx.translate(w.x, w.y);
+                    ctx.fillStyle = _gyTile('copeT', 96, T, _gyCopePaint(false)); ctx.fillRect(0, 0, w.w, T);
+                    ctx.fillStyle = 'rgba(225, 218, 240, 0.3)'; ctx.fillRect(0, T - 1.6, w.w, 1.2);
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)'; ctx.fillRect(0, 0, w.w, 1);
+                    ctx.restore();
+                } else {
+                    ctx.save(); ctx.translate(w.x, w.y);
+                    ctx.fillStyle = _gyTile('copeV', T, 96, _gyCopePaint(true)); ctx.fillRect(0, 0, T, w.h);
+                    ctx.fillStyle = 'rgba(225, 218, 240, 0.3)'; ctx.fillRect(1, 0, 1.2, w.h);
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)'; ctx.fillRect(T - 1.2, 0, 1.2, w.h);
+                    ctx.restore();
+                }
+            });
+            if (!vertical) _gyFence3D(ctx, w.x, w.y + T / 2, w.x + w.w, w.y + T / 2, Z);
+            else _gyFence3D(ctx, w.x + T / 2, w.y, w.x + T / 2, w.y + w.h, Z);
+        }
+        /** A pillar standing up: brick to GY_Z.PILLAR, an overhanging stone cap, a raised plinth for the lantern (a LampEntity at z 55) */
+        function _gyPillar3D(ctx, p) {
+            const P = GY_WALL.PILLAR, Z = GY_Z.PILLAR, Zc = Z + GY_Z.CAP, x0 = p.x, y0 = p.y, x1 = x0 + P, y1 = y0 + P, o = 3;
+            ctx.fillStyle = 'rgba(6, 4, 10, 0.45)'; ctx.beginPath(); ctx.roundRect(x0 + 5, y0 + 6, P + 2, P + 1, 3); ctx.fill();
+            _gyBoxSides(ctx, x0, y0, x1, y1, 0, Z, _gyTile('brick', 78, 22, _gyBrickPaint));
+            const stone = (ax, ay, bx, by, z0, z1, col) => {
+                const q = [_gyP(ax, ay, z0), _gyP(bx, by, z0), _gyP(bx, by, z1), _gyP(ax, ay, z1)];
+                ctx.beginPath(); q.forEach((v, i) => i ? ctx.lineTo(v[0], v[1]) : ctx.moveTo(v[0], v[1])); ctx.closePath(); ctx.fillStyle = col; ctx.fill();
+            };
+            const slab = (sx0, sy0, sx1, sy1, z0, z1, top, side) => {
+                const c = game.camera;
+                if (c.y < sy0) stone(sx1, sy0, sx0, sy0, z0, z1, '#4a4754');
+                if (c.x < sx0) stone(sx0, sy0, sx0, sy1, z0, z1, side);
+                if (c.x > sx1) stone(sx1, sy1, sx1, sy0, z0, z1, side);
+                if (c.y > sy1) stone(sx0, sy1, sx1, sy1, z0, z1, '#6a6674');
+                _gyAt(ctx, z1, () => {
+                    const g = ctx.createLinearGradient(sx0, sy0, sx1, sy1); g.addColorStop(0, top[0]); g.addColorStop(1, top[1]);
+                    ctx.fillStyle = g; ctx.fillRect(sx0, sy0, sx1 - sx0, sy1 - sy0);
+                    ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 0.8; ctx.strokeRect(sx0 + 0.4, sy0 + 0.4, sx1 - sx0 - 0.8, sy1 - sy0 - 0.8);
+                });
+            };
+            slab(x0 - o, y0 - o, x1 + o, y1 + o, Z, Zc, ['#aeaab8', '#827e8c'], '#5c5966');
+            slab(x0 + 9, y0 + 9, x1 - 9, y1 - 9, Zc, Zc + 2, ['#9894a2', '#7e7a88'], '#5c5966');
+        }
+
         function drawGraveyardWall(ctx, w) {
+            if (_gyLean()) { _gyWall3D(ctx, w); return; }
             const { T, COPE, FENCE } = GY_WALL, vertical = w.h > w.w;
             const brick = _gyTile('brick', 78, 22, _gyBrickPaint);
             ctx.save(); ctx.translate(w.x, w.y);
@@ -19948,6 +20061,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         let _gyPillarSprite = null;
         const GY_PILLAR_PAD = 10;
         function drawGraveyardPillar(ctx, p) {
+            if (_gyLean()) { _gyPillar3D(ctx, p); return; }
             const P = GY_WALL.PILLAR, pad = GY_PILLAR_PAD;
             if (!_gyPillarSprite) {
                 const S = 3, cv = document.createElement('canvas'); cv.width = cv.height = (P + pad * 2) * S;
@@ -26475,7 +26589,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
     </script>
-    <script type="text/dfab" data-src="entities/npc.js" data-cost="557">
+    <script type="text/dfab" data-src="entities/npc.js" data-cost="559">
         /**
          * =====================================================================
          *  NPC CLASS (Extends ActorEntity)
@@ -26579,6 +26693,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.hireDuration = 0;
                     this.downed = false;  // True when HP hits 0 — revive at apartment
                     this.relationship = combatConfig.relationship ?? 0;
+                    this.startRelationship = this.relationship;           // where New Game puts the bond back (engine/loop.js resetGameState)
                     this.bio = combatConfig.bio || '';
                     
                     // Override shared combat defaults with teammate config
@@ -33128,6 +33243,247 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         ctx.globalAlpha = a * (1 - u); ctx.strokeStyle = w > 4 ? '#a469ff' : '#ffffff'; ctx.lineWidth = w;
                         ctx.beginPath(); ctx.moveTo(B.x0, B.y0 - lift); ctx.lineTo(B.x1, B.y1); ctx.stroke();
                     }
+                }
+                ctx.restore();
+            }
+        }
+    </script>
+    <script type="text/dfab" data-src="entities/marionettes.js" data-cost="185">
+        /* =====================================================================
+           MARIONETTES — the Dark Maker's puppets (Darklands; DRAFT)
+           ---------------------------------------------------------------------
+           Little wooden marionettes with porcelain faces and blades for hands,
+           hung from strings that rise out of sight. They come as a swarm (the
+           corrupted safe haven's basement) and they make no sound at all:
+           no footsteps, no voice, nothing for her to hear coming.
+             · the body: a jointed wooden doll about two-thirds her height, a
+               soft, smiling porcelain face (the jaw hinged on two lines), ball
+               joints, a curved blade where each hand should be
+             · the strings: five of them up to a wooden control bar hanging high
+               over it, swaying; the strings fade into the dark above the bar
+             · how it moves: never walks, it's carried. It's yanked forward in
+               jerks (`YANK`), its limbs swinging after it, its feet barely
+               brushing the ground
+             · how it fights: it closes in, its arms jerk up (the tell: the
+               blades catch the light, `TELL` s), then it lunges and scissors
+               both blades across her (`HIT`), then hangs limp a
+               moment (`RECOVER`, the opening)
+             · a swarm: each keeps a little room from the others (`SPACE`) and
+               they come at her from around her, not in a line
+             · cut down: the strings go slack and it drops in a heap
+           Wood: bullets do less (`SHOT`), blades and fists the full hit.
+           ===================================================================== */
+        const MARIONETTE = {
+            HP: 30, RADIUS: 11, SCALE: 0.72, SHOT: 0.7,
+            YANK: 0.55, YANK_SPEED: 7.5, DRIFT: 0.5,                 // s between jerks forward, how hard, how much it drifts between them
+            SPACE: 34, SIGHT: 900, CIRCLE: 60,                       // room it keeps from the others; how far it knows where she is; how wide they fan round her
+            REACH: 46, TELL: 0.38, LUNGE: 9, HIT: 9, RECOVER: 0.7, COOLDOWN: 1.4,
+            BAR_Z: 96,                                               // how high its control bar hangs (px, drawn upward)
+            WOOD: '#7a5534', WOOD_HI: '#a07548', WOOD_LO: '#4a3220', JOINT: '#2c1d12',
+            FACE: '#efe2d4', FACE_LO: '#cdb8a6', BLUSH: 'rgba(214,110,120,.55)', BLADE: '#d9dde4', BLADE_LO: '#8d939c',
+            STRING: 'rgba(230,226,214,', CLOTH: ['#5b2340', '#2d3b5c', '#3e2a52', '#5c3a1e']
+        };
+
+        class Marionette extends ActorEntity {
+            constructor(x, y, opts = {}) {
+                super({ x, y, radius: MARIONETTE.RADIUS, type: 'marionette', alliance: 'hostile', hp: MARIONETTE.HP, mass: 6, friction: 0.88, speed: 3,
+                        hasCollision: true, invincibleDuration: 6 });
+                this.angle = Math.PI / 2;
+                this.state = 'stalk'; this._stateT = _gameTimeSec;
+                this._seed = Math.random() * 1000;
+                this._yankAt = _gameTimeSec + Math.random() * MARIONETTE.YANK;
+                this._yank = 0;                                          // 1 just after a jerk, easing to 0: the limbs swing with it
+                this._attackAt = _gameTimeSec + 0.6 + Math.random();
+                this._slot = Math.random() * Math.PI * 2;               // where round her it means to come from
+                this.cloth = opts.cloth || MARIONETTE.CLOTH[Math.floor(Math.random() * MARIONETTE.CLOTH.length)];
+                this.silent = true;                                      // no footsteps, no noise (it's carried)
+            }
+
+            _setState(s) { this.state = s; this._stateT = _gameTimeSec; }
+
+            update(playerX, playerY, walls) {
+                if (this.dead) return null;
+                const M = MARIONETTE, g = typeof game !== 'undefined' ? game : null, now = _gameTimeSec, age = now - this._stateT;
+                if (this.invincibleTimer > 0) this.invincibleTimer--;
+                if (this.knockbackVx || this.knockbackVy) {
+                    this.vx += this.knockbackVx; this.vy += this.knockbackVy;
+                    this.knockbackVx *= this.knockbackFriction; this.knockbackVy *= this.knockbackFriction;
+                    if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
+                    if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
+                }
+                const dx = playerX - this.x, dy = playerY - this.y, dist = Math.hypot(dx, dy), toHer = Math.atan2(dy, dx);
+                const turn = (to, k) => { this.angle += normalizeAngle(to - this.angle) * k; };
+                this._yank *= 0.9;
+                switch (this.state) {
+                    case 'tell':                                             // arms up, blades catching the light
+                        turn(toHer, 0.3);
+                        this.vx *= 0.7; this.vy *= 0.7;
+                        if (age >= M.TELL) { this._setState('lunge'); this._lungeA = this.angle; this._hit = false; this._yank = 1; }
+                        break;
+                    case 'lunge': {
+                        const ux = Math.cos(this._lungeA), uy = Math.sin(this._lungeA);
+                        if (age < 0.16) { this.vx = ux * M.LUNGE; this.vy = uy * M.LUNGE; }
+                        if (!this._hit && g && dist < M.REACH * 0.7 + 14) {
+                            this._hit = true;
+                            if (g.hurtPlayer(M.HIT)) g.shovePlayer(ux * 14, uy * 14);
+                        }
+                        if (age >= 0.3) this._setState('recover');
+                        break;
+                    }
+                    case 'recover':                                          // limp on its strings: the opening
+                        this.vx *= 0.8; this.vy *= 0.8;
+                        if (age >= M.RECOVER) { this._setState('stalk'); this._attackAt = now + M.COOLDOWN * (0.7 + Math.random() * 0.6); }
+                        break;
+                    default: {                                               // stalk: jerked toward a spot round her
+                        if (dist > M.SIGHT) { this.vx *= 0.9; this.vy *= 0.9; break; }
+                        turn(toHer, 0.18);
+                        const close = dist < M.REACH + M.CIRCLE;
+                        const tx = close ? playerX : playerX + Math.cos(this._slot) * M.CIRCLE, ty = close ? playerY : playerY + Math.sin(this._slot) * M.CIRCLE;
+                        if (now >= this._yankAt) {                           // a jerk forward
+                            this._yankAt = now + M.YANK * (0.75 + Math.random() * 0.5);
+                            const a = Math.atan2(ty - this.y, tx - this.x) + (Math.random() - 0.5) * 0.5;
+                            this.vx += Math.cos(a) * M.YANK_SPEED; this.vy += Math.sin(a) * M.YANK_SPEED; this._yank = 1;
+                        } else {
+                            const a = Math.atan2(ty - this.y, tx - this.x);
+                            this.vx += Math.cos(a) * M.DRIFT * 0.1; this.vy += Math.sin(a) * M.DRIFT * 0.1;
+                        }
+                        if (dist < M.REACH && now >= this._attackAt && g && !g.isDriving) this._setState('tell');
+                    }
+                }
+                // A little room from the rest of the swarm
+                if (g && g.enemies) for (const o of g.enemies) {
+                    if (o === this || o.dead || !(o instanceof Marionette)) continue;
+                    const ox = this.x - o.x, oy = this.y - o.y, d = Math.hypot(ox, oy);
+                    if (d > 0 && d < M.SPACE) { const k = (M.SPACE - d) / M.SPACE * 0.6; this.vx += ox / d * k; this.vy += oy / d * k; }
+                }
+                this.vx *= 0.86; this.vy *= 0.86;
+                const nx = this.x + this.vx, ny = this.y + this.vy, r = this.radius;
+                const hits = (x, y) => walls.some(w => x + r > w.x && x - r < w.x + w.w && y + r > w.y && y - r < w.y + w.h);
+                if (!hits(nx, this.y)) this.x = nx; else this.vx *= -0.3;
+                if (!hits(this.x, ny)) this.y = ny; else this.vy *= -0.3;
+                return null;
+            }
+
+            /** Wood: bullets bite less than blades and fists */
+            takeDamage(amount, knockbackX = 0, knockbackY = 0, opts = null) {
+                const melee = opts && (opts.cut || opts.punch || opts.type === 'melee');
+                if (opts && opts.shot && !melee) amount *= MARIONETTE.SHOT;
+                const r = super.takeDamage(Math.max(1, Math.round(amount)), knockbackX, knockbackY, opts);
+                if (this.state === 'tell' && !this.dead) this._setState('recover');   // a hit knocks it off its strike
+                this._yank = 1;
+                return r;
+            }
+
+            onProjectileHit(projectile, game) {
+                if (projectile.isEnemy) return;
+                this.lastHitBy = projectile.owner; this.lastHitMelee = !!projectile.melee;
+                const speed = Math.hypot(projectile.vx, projectile.vy), kb = speed ? Math.min(((projectile.mass || 1) * speed * projectile.damage / 20) / this.mass, 24) : 0;
+                if (game && game.weather) game.weather.spawnSparks(projectile.x, projectile.y, 4);
+                this.takeDamage(projectile.damage, speed ? projectile.vx / speed * kb : 0, speed ? projectile.vy / speed * kb : 0,
+                                { shot: !projectile.melee, punch: !!projectile.melee, crit: !!projectile.crit });
+            }
+
+            takeDamageOld(amount, bulletAngle) { this.takeDamage(amount, Math.cos(bulletAngle) * 8, Math.sin(bulletAngle) * 8); }
+
+            /** How it hangs: a bob on its strings, a sag while it recovers, a hop as it's yanked */
+            _pose(t) {
+                const s = this._seed, st = this.state, age = _gameTimeSec - this._stateT;
+                const bob = Math.sin(t * 3.1 + s) * 1.5 + this._yank * 4;
+                const sag = st === 'recover' ? Math.min(1, age / 0.15) * (1 - Math.max(0, (age - MARIONETTE.RECOVER + 0.25) / 0.25)) : 0;
+                const raise = st === 'tell' ? Math.min(1, age / (MARIONETTE.TELL * 0.6)) : st === 'lunge' ? 1 - Math.min(1, age / 0.18) : 0;
+                const swing = Math.sin(t * 5 + s) * (0.25 + this._yank * 0.6);
+                return { lift: 5 + bob - sag * 3, sag, raise, swing, lunge: st === 'lunge' ? 1 - age / 0.3 : 0 };
+            }
+
+            draw(ctx) {
+                if (this.dead) return;
+                if (this.invincibleTimer > 0 && this.invincibleTimer % 4 < 2) return;
+                const t = _frameTime / 1000, P = this._pose(t), S = MARIONETTE.SCALE * 1.4;
+                ctx.save();
+                // Its shadow: small and soft, it hardly touches the ground
+                ctx.fillStyle = 'rgba(0,0,0,.32)'; ctx.beginPath(); ctx.ellipse(this.x, this.y + 3, 10, 6, 0, 0, Math.PI * 2); ctx.fill();
+                this._drawStrings(ctx, t, P);
+                ctx.translate(this.x, this.y - P.lift);
+                ctx.scale(S, S);
+                ctx.rotate(this.angle - Math.PI / 2);                   // its front is local +y
+                this._drawBody(ctx, t, P);
+                ctx.restore();
+            }
+
+            /** The control bar high over it and five strings down to head, hands and knees; faded into the dark above */
+            _drawStrings(ctx, t, P) {
+                const M = MARIONETTE, sway = Math.sin(t * 1.3 + this._seed) * 6, bx = this.x + sway, by = this.y - M.BAR_Z - P.lift;
+                const S = M.SCALE * 1.4, a = this.angle - Math.PI / 2, c = Math.cos(a), s = Math.sin(a);
+                const at = (lx, ly) => [this.x + (lx * c - ly * s) * S, this.y - P.lift + (lx * s + ly * c) * S];
+                const ends = [at(0, 2), at(-11, 6 + P.raise * 8), at(11, 6 + P.raise * 8), at(-5, -8), at(5, -8)];
+                const tips = [[bx, by], [bx - 16, by + 2], [bx + 16, by + 2], [bx - 6, by - 10], [bx + 6, by - 10]];
+                ctx.lineWidth = 0.6;
+                for (let i = 0; i < ends.length; i++) {
+                    const [ex, ey] = ends[i], [tx, ty] = tips[i];
+                    const gr = ctx.createLinearGradient(tx, ty, ex, ey); gr.addColorStop(0, M.STRING + '0)'); gr.addColorStop(0.35, M.STRING + '.3)'); gr.addColorStop(1, M.STRING + '.55)');
+                    ctx.strokeStyle = gr; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(ex, ey); ctx.stroke();
+                }
+                // The bar: a wooden cross, half lost in the dark
+                ctx.save(); ctx.globalAlpha = 0.55; ctx.translate(bx, by); ctx.rotate(Math.sin(t * 1.1 + this._seed) * 0.15);
+                ctx.fillStyle = M.WOOD_LO; ctx.fillRect(-18, -1.5, 36, 3); ctx.fillRect(-1.5, -12, 3, 20);
+                ctx.fillStyle = M.WOOD; ctx.fillRect(-18, -1.5, 36, 1.2);
+                ctx.restore();
+            }
+
+            /** The doll from above: legs dangling behind, the jointed body, arms with their blades, the porcelain face */
+            _drawBody(ctx, t, P) {
+                const M = MARIONETTE, TAU = Math.PI * 2;
+                const joint = (x, y, r) => { ctx.fillStyle = M.JOINT; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); };
+                const limb = (x0, y0, x1, y1, w, col) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); };
+                // Legs: dangling back and swinging
+                for (const sd of [-1, 1]) {
+                    const sw = P.swing * sd * 3, kx = sd * 4 + sw * 0.5, ky = -9, fx = sd * 4.5 + sw, fy = -16 - P.sag * 2;
+                    limb(sd * 3.5, -5, kx, ky, 3.2, M.WOOD_LO); joint(kx, ky, 1.7); limb(kx, ky, fx, fy, 2.8, M.WOOD);
+                    ctx.fillStyle = M.JOINT; ctx.beginPath(); ctx.ellipse(fx, fy - 1, 1.9, 2.6, 0, 0, TAU); ctx.fill();
+                }
+                // The torso: a little coat over carved wood, the belly joint
+                ctx.fillStyle = M.WOOD_LO; ctx.beginPath(); ctx.ellipse(0, -2, 6, 5, 0, 0, TAU); ctx.fill(); joint(0, -1, 2);
+                ctx.fillStyle = this.cloth; ctx.beginPath(); ctx.ellipse(0, 3, 8, 6.5, 0, 0, TAU); ctx.fill();
+                ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.beginPath(); ctx.ellipse(-2, 1.5, 4, 3, -0.4, 0, TAU); ctx.fill();
+                ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(0, -2); ctx.lineTo(0, 9); ctx.stroke();
+                ctx.fillStyle = '#c9a85a'; for (const by of [1, 4.5]) { ctx.beginPath(); ctx.arc(0.9, by, 0.6, 0, TAU); ctx.fill(); }
+                // Arms: shoulders, elbows, the blades. Raised for the tell, scissoring through the lunge
+                for (const sd of [-1, 1]) {
+                    const up = P.raise, cut = P.lunge;
+                    const sx = sd * 8, sy = 4;
+                    const ex = sd * (11 - up * 3) + P.swing * sd * 2, ey = 9 + up * 6 - P.sag * 4;
+                    const hx = sd * (9 - up * 5 - cut * 12), hy = 13 + up * 10 + cut * 4 - P.sag * 6;
+                    limb(sx, sy, ex, ey, 2.6, M.WOOD); joint(sx, sy, 1.9); joint(ex, ey, 1.6); limb(ex, ey, hx, hy, 2.3, M.WOOD_HI);
+                    // The blade: a curved sickle out of the wrist
+                    const a = Math.atan2(hy - ey, hx - ex) - sd * (0.35 + cut * 0.6);
+                    ctx.save(); ctx.translate(hx, hy); ctx.rotate(a);
+                    ctx.fillStyle = M.BLADE_LO; ctx.beginPath(); ctx.moveTo(0, -1.2); ctx.quadraticCurveTo(9, -3 * sd, 15, sd * 2); ctx.quadraticCurveTo(8, 0.5 * sd, 0, 1.2); ctx.closePath(); ctx.fill();
+                    ctx.fillStyle = M.BLADE; ctx.beginPath(); ctx.moveTo(0, -0.8); ctx.quadraticCurveTo(9, -2.6 * sd, 15, sd * 2); ctx.quadraticCurveTo(8, -0.6 * sd, 0, 0); ctx.closePath(); ctx.fill();
+                    ctx.fillStyle = M.JOINT; ctx.fillRect(-1.2, -1.6, 2.4, 3.2);
+                    ctx.restore();
+                }
+                // The head: a porcelain face turned up toward the strings, soft and smiling; the jaw on its two lines
+                const hy = 13;
+                ctx.fillStyle = M.JOINT; ctx.beginPath(); ctx.arc(0, 9, 2, 0, TAU); ctx.fill();
+                const fg = ctx.createRadialGradient(-1.5, hy - 1.5, 1, 0, hy, 7); fg.addColorStop(0, M.FACE); fg.addColorStop(1, M.FACE_LO);
+                ctx.fillStyle = fg; ctx.beginPath(); ctx.ellipse(0, hy, 6, 6.6, 0, 0, TAU); ctx.fill();
+                ctx.fillStyle = '#2a1a14'; ctx.beginPath(); ctx.ellipse(0, hy - 3.2, 6.2, 3.8, 0, Math.PI, TAU); ctx.fill();   // painted hair, a little cap of it
+                ctx.fillStyle = M.BLUSH; for (const sd of [-1, 1]) { ctx.beginPath(); ctx.arc(sd * 3.4, hy + 2.2, 1.3, 0, TAU); ctx.fill(); }
+                ctx.fillStyle = '#1a1010'; for (const sd of [-1, 1]) { ctx.beginPath(); ctx.ellipse(sd * 2.2, hy + 0.6, 0.9, 0.5, 0, 0, TAU); ctx.fill(); }
+                ctx.strokeStyle = 'rgba(120,40,50,.75)'; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.arc(0, hy + 2.8, 1.6, 0.2, Math.PI - 0.2); ctx.stroke();   // the smile
+                ctx.strokeStyle = 'rgba(60,40,30,.5)'; ctx.lineWidth = 0.35; ctx.beginPath(); for (const sd of [-1, 1]) { ctx.moveTo(sd * 1.9, hy + 3.2); ctx.lineTo(sd * 1.9, hy + 6.2); } ctx.stroke();   // the jaw's hinge lines
+            }
+
+            /** Above the darkness: the blades' glint as it winds up, so a swarm in the dark can still be read */
+            drawLights(ctx) {
+                if (this.dead || this.state !== 'tell') return;
+                const age = _gameTimeSec - this._stateT, k = Math.min(1, age / MARIONETTE.TELL), P = this._pose(_frameTime / 1000);
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                for (const sd of [-1, 1]) {
+                    const a = this.angle - Math.PI / 2, lx = sd * 6, ly = 22, S = MARIONETTE.SCALE * 1.4;
+                    const x = this.x + (lx * Math.cos(a) - ly * Math.sin(a)) * S, y = this.y - P.lift + (lx * Math.sin(a) + ly * Math.cos(a)) * S;
+                    const gr = ctx.createRadialGradient(x, y, 0, x, y, 9 + 5 * k); gr.addColorStop(0, `rgba(235,240,255,${0.55 * k})`); gr.addColorStop(1, 'rgba(235,240,255,0)');
+                    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, 14, 0, Math.PI * 2); ctx.fill();
                 }
                 ctx.restore();
             }
@@ -43737,6 +44093,597 @@ function createNeuralSystemsTiered(x, y, config = {}) {
                 ...config
             });
         }
+    </script>
+    <script type="text/dfab" data-src="buildings/suburb-house.js" data-cost="246">
+        /* =====================================================================
+           SUBURB HOUSE — a Darklands home (DRAFT)
+           ---------------------------------------------------------------------
+           A two-storey American house on the tiered kit (buildings/tiered-kit.js),
+           for the gated suburb in Darklands. Too neat, and too quiet:
+             · the house: clapboard siding over a brick foundation, white corner
+               boards and trim, sash windows with black shutters, the front door
+               in the middle under a fanlight; some windows boarded over, one or
+               two lit a weak amber that doesn't look like anyone's home;
+             · a covered porch across the front on four white posts, its own
+               light by the door;
+             · the garage on one side (`garage: 'E' | 'W'`), a paneled door, its
+               own low hip roof;
+             · over the house, drawn with the kit's lean (its `top`): a side-
+               gabled shingle roof with siding in the gables, the chimney on one
+               end, and the garage's hip roof;
+             · out front (drawBase): the lawn gone long, a concrete walk to the
+               porch steps, the drive to the garage, a mailbox, dead shrubs.
+           SUBURB_SCHEMES are the paint jobs; a house picks one by `scheme`, and
+           `boarded` / `lit` say which windows are which.
+           ===================================================================== */
+        const SUBURB_PLAN = {
+            W: 230, D: 140, HOUSE: 28, EAVE: 6, RISE: 46,
+            GARAGE: { W: 110, Y: 24, D: 116, H: 15, RISE: 20 },
+            PORCH: { X: 50, W: 130, D: 34, Z: 13 },
+            CHIM: { w: 20, h: 22, up: 12 }
+        };
+        const SUBURB_SCHEMES = {
+            ash:   { siding: '#8f9498', sidingLo: '#5f6468', trim: '#e7e4dc', shutter: '#1d2024', door: '#3b1f22', roof: ['#3a3d42', '#2c2e33', '#33363b', '#30333a'], ridge: '#1d1f23' },
+            sage:  { siding: '#7f8d7a', sidingLo: '#56634f', trim: '#e9e6da', shutter: '#20261d', door: '#5a1e1e', roof: ['#463c36', '#342c27', '#3d342f', '#392f2a'], ridge: '#221b17' },
+            blue:  { siding: '#7488a0', sidingLo: '#4c5d72', trim: '#ecebe4', shutter: '#161b24', door: '#2a2f45', roof: ['#3b3a40', '#2b2a30', '#333238', '#2f2e35'], ridge: '#1b1a1f' },
+            cream: { siding: '#c9bc9c', sidingLo: '#91856b', trim: '#f2efe6', shutter: '#2b2621', door: '#1f3324', roof: ['#4a3b32', '#372b24', '#40332b', '#3b2f27'], ridge: '#241b16' }
+        };
+        const _shFront = (t) => t.mitre.find(e => e && !e.hidden && e.ny > 0.99);
+
+        /** Clapboard, corner boards, the foundation; the sash windows (shuttered, boarded or lit) in two storeys; the door on the front */
+        function _shWall(d, l, t, H, L) {
+            const C = t.scheme, front = _shFront(t), b = t.house, r = seededRandom(b.seed);
+            const g = d.createLinearGradient(0, 0, 0, H); g.addColorStop(0, C.siding); g.addColorStop(1, C.sidingLo); d.fillStyle = g; d.fillRect(0, 0, L, H);
+            for (let y = 1.1; y < H - 2.5; y += 1.1) { d.fillStyle = 'rgba(0,0,0,.18)'; d.fillRect(0, y, L, 0.25); d.fillStyle = 'rgba(255,255,255,.07)'; d.fillRect(0, y + 0.25, L, 0.2); }
+            for (let i = 0; i < L / 6; i++) { d.fillStyle = `rgba(30,32,30,${0.05 + r() * 0.1})`; d.fillRect(r() * L, r() * H * 0.6, 0.6 + r(), 2 + r() * 8); }   // weather streaks
+            d.fillStyle = '#4a2c24'; d.fillRect(0, H - 2.5, L, 2.5); d.fillStyle = 'rgba(0,0,0,.3)'; d.fillRect(0, H - 2.5, L, 0.4);   // brick foundation
+            d.fillStyle = C.trim; d.fillRect(0, 0, L, 1.1);                                               // the frieze under the eaves
+            const door = front ? front.u0 + b.doorU : -1e4, rows = [[H - 12.5, H - 5], [H - 25, H - 17.5]];
+            let k = 0;
+            for (const e of t.mitre) {
+                if (!e || e.hidden) continue;
+                d.fillStyle = C.trim; d.fillRect(e.u0, 0, 2.2, H - 2.5); d.fillRect(e.u0 + e.L - 2.2, 0, 2.2, H - 2.5);   // corner boards
+                const n = Math.max(1, Math.round(e.L / 48));
+                for (const [y0, y1] of rows) for (let i = 0; i < n; i++, k++) {
+                    const cx = e.u0 + e.L * (i + 0.5) / n, w = 9;
+                    if (e === front && Math.abs(cx - door) < 20 && y0 > H - 14) continue;                // the door's place
+                    const boarded = b.boarded.includes(k), lit = b.lit.includes(k);
+                    d.fillStyle = C.shutter; d.fillRect(cx - w / 2 - 4.4, y0 - 0.3, 3.6, y1 - y0 + 0.6); d.fillRect(cx + w / 2 + 0.8, y0 - 0.3, 3.6, y1 - y0 + 0.6);
+                    d.fillStyle = 'rgba(255,255,255,.08)'; for (let y = y0 + 1; y < y1; y += 1.2) { d.fillRect(cx - w / 2 - 4.2, y, 3.2, 0.3); d.fillRect(cx + w / 2 + 1, y, 3.2, 0.3); }
+                    d.fillStyle = C.trim; d.fillRect(cx - w / 2 - 0.8, y0 - 0.8, w + 1.6, y1 - y0 + 1.6);
+                    d.fillStyle = '#14181c'; d.fillRect(cx - w / 2, y0, w, y1 - y0);
+                    if (boarded) {
+                        d.fillStyle = '#6e5a44'; for (const [a, yy] of [[-0.25, y0 + 1.6], [0.2, y0 + 3.6], [-0.1, y1 - 1.8]]) { d.save(); d.translate(cx, yy); d.rotate(a * 0.5); d.fillRect(-w / 2 - 1.5, -0.8, w + 3, 1.6); d.fillStyle = 'rgba(0,0,0,.3)'; d.fillRect(-w / 2 - 1.5, 0.5, w + 3, 0.3); d.restore(); d.fillStyle = '#6e5a44'; }
+                    } else {
+                        d.fillStyle = 'rgba(160,180,200,.14)'; d.fillRect(cx - w / 2, y0, w, (y1 - y0) / 2);
+                        if (lit) { l.fillStyle = 'rgba(255,190,110,.55)'; l.fillRect(cx - w / 2, y0, w, y1 - y0); d.fillStyle = 'rgba(255,200,130,.18)'; d.fillRect(cx - w / 2, y0, w, y1 - y0); }
+                        d.fillStyle = C.trim; d.fillRect(cx - 0.3, y0, 0.6, y1 - y0); d.fillRect(cx - w / 2, (y0 + y1) / 2 - 0.35, w, 0.7);   // the sash bars
+                        if (lit) { l.fillStyle = '#000'; l.fillRect(cx - 0.3, y0, 0.6, y1 - y0); l.fillRect(cx - w / 2, (y0 + y1) / 2 - 0.35, w, 0.7); }
+                    }
+                    d.fillStyle = C.trim; d.fillRect(cx - w / 2 - 1.4, y1 + 0.6, w + 2.8, 0.8);         // the sill
+                }
+            }
+            if (!front) return;
+            // The door: paneled, under a fanlight, in a white surround
+            const dt = H - 13.5;
+            d.fillStyle = C.trim; d.fillRect(door - 8, dt - 3.4, 16, H - 2.5 - dt + 3.4);
+            d.fillStyle = '#1c2024'; d.beginPath(); d.ellipse(door, dt - 0.2, 5.6, 2.6, 0, Math.PI, Math.PI * 2); d.fill();
+            l.fillStyle = 'rgba(255,200,130,.45)'; l.beginPath(); l.ellipse(door, dt - 0.2, 5.6, 2.6, 0, Math.PI, Math.PI * 2); l.fill();
+            d.fillStyle = C.door; d.fillRect(door - 5.6, dt, 11.2, H - 2.5 - dt);
+            d.strokeStyle = 'rgba(0,0,0,.35)'; d.lineWidth = 0.4; for (const [px, py] of [[-4.4, 1.2], [0.6, 1.2], [-4.4, 6], [0.6, 6]]) d.strokeRect(door + px, dt + py, 3.8, 4);
+            d.fillStyle = '#c9a85a'; d.fillRect(door + 3.6, dt + 6, 0.8, 0.8);
+        }
+
+        /** The garage: the same siding, a wide paneled door on the front, a small window on the side */
+        function _shGarage(d, l, t, H, L) {
+            const C = t.scheme, front = _shFront(t);
+            const g = d.createLinearGradient(0, 0, 0, H); g.addColorStop(0, C.siding); g.addColorStop(1, C.sidingLo); d.fillStyle = g; d.fillRect(0, 0, L, H);
+            for (let y = 1.1; y < H - 2; y += 1.1) { d.fillStyle = 'rgba(0,0,0,.18)'; d.fillRect(0, y, L, 0.25); }
+            d.fillStyle = '#4a2c24'; d.fillRect(0, H - 2, L, 2); d.fillStyle = C.trim; d.fillRect(0, 0, L, 1);
+            for (const e of t.mitre) { if (!e || e.hidden) continue; d.fillStyle = C.trim; d.fillRect(e.u0, 0, 2, H - 2); d.fillRect(e.u0 + e.L - 2, 0, 2, H - 2); }
+            if (!front) return;
+            const x0 = front.u0 + 14, w = front.L - 28, y0 = 3.2, y1 = H - 2;
+            d.fillStyle = C.trim; d.fillRect(x0 - 1.4, y0 - 1.4, w + 2.8, y1 - y0 + 1.4);
+            d.fillStyle = '#d8d5cc'; d.fillRect(x0, y0, w, y1 - y0);
+            d.fillStyle = 'rgba(0,0,0,.16)'; for (let y = y0 + (y1 - y0) / 4; y < y1 - 0.5; y += (y1 - y0) / 4) d.fillRect(x0, y - 0.2, w, 0.4);
+            for (let i = 0; i < 8; i++) { d.strokeStyle = 'rgba(0,0,0,.1)'; d.lineWidth = 0.3; d.strokeRect(x0 + 1 + i * w / 8, y0 + 0.8, w / 8 - 2, (y1 - y0) / 4 - 1.6); }
+            d.fillStyle = 'rgba(40,30,20,.35)'; d.fillRect(x0, y1 - 2.2, w, 2.2);                  // rust and dirt at its foot
+        }
+
+        /** The porch roof's fascia, and its posts: white */
+        function _shPorch(d, l, t, H, L) { d.fillStyle = t.scheme.trim; d.fillRect(0, 0, L, H); d.fillStyle = 'rgba(0,0,0,.2)'; d.fillRect(0, H - 0.3, L, 0.3); }
+        function _shPost(d, l, t, H, L) { const g = d.createLinearGradient(0, 0, L, 0); g.addColorStop(0, '#f2efe6'); g.addColorStop(1, '#b9b5ab'); d.fillStyle = g; d.fillRect(0, 0, L, H); }
+        function _shFlatRoof(c, glow, t) { if (glow) return; const [x0, y0, x1, y1] = t.box; c.fillStyle = t.scheme.ridge; c.fillRect(x0, y0, x1 - x0, y1 - y0); }
+        function _shPorchRoof(c, glow, t) {
+            if (glow) return; const [x0, y0, x1, y1] = t.box, R = t.scheme.roof;
+            c.fillStyle = R[0]; c.fillRect(x0, y0, x1 - x0, y1 - y0);
+            c.strokeStyle = 'rgba(0,0,0,.3)'; c.lineWidth = 1; c.beginPath(); for (let y = y0 + 5; y < y1; y += 5) { c.moveTo(x0, y); c.lineTo(x1, y); } c.stroke();
+            c.strokeStyle = t.scheme.trim; c.lineWidth = 1.4; c.beginPath(); c.moveTo(x0, y1 - 0.7); c.lineTo(x1, y1 - 0.7); c.stroke();
+        }
+        function _shTop(ctx, emissive, t, b) { ctx.save(); b._shDrawRoofs(ctx, emissive); ctx.restore(); }
+        function _shGarageTop(ctx, emissive, t, b) { ctx.save(); b._shDrawRoof(ctx, b._shRoofs().garage, emissive); ctx.restore(); }
+
+        class SuburbHouse extends TieredBuilding {
+            constructor(config) {
+                super(config);
+                this._sh = config._sh;
+                this.crownZ = (SUBURB_PLAN.HOUSE * TierKit.Z_SCALE + SUBURB_PLAN.RISE + SUBURB_PLAN.CHIM.up + 20) * this.hero;
+            }
+            _setupSign() { this.attachedSign = null; }
+            _generateLights() { this.topReach = 40; }
+            drawSign() {}
+            /** The porch light: one lantern by the door, under the porch roof */
+            _entranceLamps() {
+                const P = SUBURB_PLAN, du = this._shDoorU();
+                return [{ kind: 'lantern', x: du + 14, y: P.D, z: 10, out: 4, rgb: '255, 196, 120', light: [90, '#ffc477'] }];
+            }
+            drawBase(c) { super.drawBase(c); this._shDrawGround(c); }
+        }
+        TierKit.profile(SuburbHouse);
+
+        /**
+         * A Darklands house: x, y its corner, its front south. config: scheme (a SUBURB_SCHEMES key), garage 'E' | 'W',
+         * boarded / lit (window numbers, counted along the walls), seed.
+         */
+        function createSuburbHouse(x, y, config = {}) {
+            const P = SUBURB_PLAN, scheme = SUBURB_SCHEMES[config.scheme] || SUBURB_SCHEMES.ash, G = P.GARAGE, west = config.garage === 'W';
+            const ox = west ? G.W : 0;                                            // the house shifts right when the garage is on the west
+            const house = { seed: config.seed || 7, boarded: config.boarded || [], lit: config.lit || [], doorU: P.PORCH.X + P.PORCH.W / 2 };
+            const tier = (o) => Object.assign({ scheme, house, S: 2, shade: [16, 16, 18] }, o);
+            const ledge = (z, top) => ({ z, out: 1.5, th: 1.2, top, band: [60, 60, 60], lip: 'rgba(240,236,226,.55)' });
+            const posts = [0, 1, 2, 3].map(i => tier({ id: 'post' + i, solid: false, rect: [ox + P.PORCH.X + 3 + i * (P.PORCH.W - 8) / 3, P.D + P.PORCH.D - 5, 3, 3], z0: 0, z1: P.PORCH.Z, S: 4, fill: '#e8e4da', paint: _shPost, roofRes: 1, roof: _shFlatRoof }));
+            return new SuburbHouse({
+                id: config.id || 'suburb_house', x, y, label: config.label || 'House', type: 'house', facing: 'S', hero: 1.2,
+                plan: { W: P.W + G.W, D: P.D },
+                roofColor: scheme.roof[0], roofLightColor: scheme.roof[0], wallColor: scheme.siding, wallLightColor: scheme.siding, accentColor: scheme.trim,
+                windowColor: '#14181c', windowLitColor: '#ffc477', windowFrameColor: scheme.trim, balconies: [], roofProps: [], sign: null,
+                _sh: { ox, west, scheme, seed: house.seed },
+                tiers: [
+                    tier({ id: 'house', rect: [ox, 0, P.W, P.D], z0: 0, z1: P.HOUSE, fill: scheme.siding, paint: _shWall, ledges: [ledge(P.HOUSE, scheme.trim)], roofRes: 1, roof: _shFlatRoof, top: _shTop }),
+                    tier({ id: 'garage', rect: [west ? 0 : P.W, G.Y, G.W, G.D], z0: 0, z1: G.H, fill: scheme.siding, paint: _shGarage, ledges: [ledge(G.H, scheme.trim)], roofRes: 1, roof: _shFlatRoof, top: _shGarageTop }),
+                    // (a px off the wall: a tier back to back with a wall hides it below its top, _tkGeo)
+                    tier({ id: 'porch', solid: false, rect: [ox + P.PORCH.X, P.D + 1, P.PORCH.W, P.PORCH.D], z0: P.PORCH.Z, z1: P.PORCH.Z + 1.4, S: 4, fill: scheme.trim, paint: _shPorch, roofRes: 1, roof: _shPorchRoof }),
+                    ...posts
+                ],
+                ...config
+            });
+        }
+
+        Object.assign(SuburbHouse.prototype, {
+            // (heights here are world px; the kit's are design units, Z_SCALE times smaller)
+            _shP(x, y, z) { return this._tkP(x, y, z / TierKit.Z_SCALE); },
+            _shK(z) { return this._tkK(z / TierKit.Z_SCALE); },
+            _shDoorU() { return (this._sh ? this._sh.ox : 0) + SUBURB_PLAN.PORCH.X + SUBURB_PLAN.PORCH.W / 2; },
+
+            /** The roofs' planes as world points with heights: the house's side gable (two slopes, two gable walls), the garage's hip */
+            _shRoofs() {
+                if (this._shGeo && this._shGeo.x === this.x && this._shGeo.y === this.y) return this._shGeo;
+                const P = SUBURB_PLAN, G = P.GARAGE, S = this._sh.scheme, e = P.EAVE, Z = TierKit.Z_SCALE;
+                const hx0 = this.x + this._sh.ox - e, hx1 = hx0 + P.W + 2 * e, y0 = this.y - e, y1 = this.y + P.D + e, H = P.HOUSE * Z, zr = H + P.RISE, ry = (y0 + y1) / 2;
+                const A = [hx0, y0, H], B = [hx1, y0, H], C = [hx1, y1, H], D = [hx0, y1, H], R0 = [hx0, ry, zr], R1 = [hx1, ry, zr];
+                const gx0 = this.x + (this._sh.west ? 0 : P.W) - (this._sh.west ? e : 0), gx1 = gx0 + G.W + e, gy0 = this.y + G.Y - e, gy1 = this.y + G.Y + G.D + e, GH = G.H * Z, gzr = GH + G.RISE;
+                const half = Math.min((gx1 - gx0), (gy1 - gy0)) / 2, gry = (gy0 + gy1) / 2;
+                const gA = [gx0, gy0, GH], gB = [gx1, gy0, GH], gC = [gx1, gy1, GH], gD = [gx0, gy1, GH], gR0 = [gx0 + half, gry, gzr], gR1 = [gx1 - half, gry, gzr];
+                return (this._shGeo = {
+                    x: this.x, y: this.y, H, zr, ry, hx0, hx1,
+                    house: [
+                        { kind: 'slope', pts: [A, B, R1, R0], fill: S.roof[1] },
+                        { kind: 'slope', pts: [C, D, R0, R1], fill: S.roof[0] },
+                        { kind: 'gable', pts: [D, A, R0], fill: S.siding },
+                        { kind: 'gable', pts: [B, C, R1], fill: S.sidingLo }
+                    ],
+                    garage: [
+                        { kind: 'slope', pts: [gA, gB, gR1, gR0], fill: S.roof[1] },
+                        { kind: 'slope', pts: [gD, gA, gR0], fill: S.roof[3] },
+                        { kind: 'slope', pts: [gB, gC, gR1], fill: S.roof[2] },
+                        { kind: 'slope', pts: [gC, gD, gR0, gR1], fill: S.roof[0] }
+                    ]
+                });
+            },
+
+            /** One roof: planes turned away first, then those facing the camera; shingle courses on the slopes, siding in the gables */
+            _shDrawRoof(ctx, planes, emissive) {
+                const S = this._sh.scheme;
+                const proj = planes.map(pl => ({ pl, q: pl.pts.map(p => this._shP(p[0], p[1], p[2])) }));
+                const area = q => { let s = 0; for (let i = 0; i < q.length; i++) { const a = q[i], b = q[(i + 1) % q.length]; s += a[0] * b[1] - b[0] * a[1]; } return s; };
+                const lerp3 = (a, b, f) => [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
+                if (emissive) return;
+                proj.sort((a, b) => (area(a.q) > 0) - (area(b.q) > 0));
+                for (const { pl, q } of proj) {
+                    const path = new Path2D(); q.forEach((v, i) => i ? path.lineTo(v[0], v[1]) : path.moveTo(v[0], v[1])); path.closePath();
+                    ctx.fillStyle = pl.fill; ctx.fill(path);
+                    // Courses: lines from the eave (pts 0–1) up to the top (pts 3–2, or the apex)
+                    const p = pl.pts, top0 = p[p.length - 1], top1 = p.length === 4 ? p[2] : p[2], n = pl.kind === 'gable' ? 14 : 9, lines = new Path2D();
+                    for (let i = 1; i < n; i++) {
+                        const f = i / n, a = lerp3(p[0], top0, f), b = lerp3(p[1], top1, f), pa = this._shP(...a), pb = this._shP(...b);
+                        lines.moveTo(pa[0], pa[1]); lines.lineTo(pb[0], pb[1]);
+                    }
+                    ctx.save(); ctx.clip(path);
+                    ctx.strokeStyle = pl.kind === 'gable' ? 'rgba(0,0,0,.2)' : 'rgba(10,10,12,.35)'; ctx.lineWidth = pl.kind === 'gable' ? 0.6 : 1; ctx.stroke(lines);
+                    if (pl.kind === 'gable') {                                       // a little attic vent in the gable
+                        const c = lerp3(lerp3(p[0], p[1], 0.5), p[2], 0.42), v = this._shP(...c);
+                        ctx.fillStyle = S.trim; ctx.beginPath(); ctx.arc(v[0], v[1], 4.5, 0, Math.PI * 2); ctx.fill();
+                        ctx.fillStyle = '#16181b'; ctx.beginPath(); ctx.arc(v[0], v[1], 3.2, 0, Math.PI * 2); ctx.fill();
+                    } else {
+                        // moss and stains, seeded so they don't crawl
+                        const r = seededRandom(this._shSeed()), ctr = this._shP(...lerp3(lerp3(p[0], p[1], 0.5), top0, 0.4));
+                        for (let i = 0; i < 4; i++) { ctx.fillStyle = `rgba(${r() < 0.5 ? '60,70,40' : '20,20,22'},${0.12 + r() * 0.1})`; ctx.beginPath(); ctx.ellipse(ctr[0] + (r() - 0.5) * 120, ctr[1] + (r() - 0.5) * 30, 10 + r() * 22, 5 + r() * 8, 0, 0, Math.PI * 2); ctx.fill(); }
+                    }
+                    ctx.restore();
+                    ctx.strokeStyle = pl.kind === 'gable' ? S.trim : S.ridge; ctx.lineWidth = pl.kind === 'gable' ? 1.4 : 1.6; ctx.stroke(path);
+                }
+            },
+            _shSeed() { return this._sh.seed || 7; },
+
+            /** The chimney: brick, standing out of the gable end on the garage's far side */
+            _shDrawChimney(ctx) {
+                const P = SUBURB_PLAN, c = P.CHIM, g = this._shRoofs(), atW = !this._sh.west;
+                const x0 = atW ? g.hx0 + 28 : g.hx1 - 28 - c.w, x1 = x0 + c.w, y0 = g.ry - c.h / 2, y1 = y0 + c.h;
+                const zb = g.zr - 8, zt = g.zr + c.up, cam = game.camera;
+                const side = (ax, ay, bx, by, fill) => {
+                    const p = [this._shP(ax, ay, zb), this._shP(bx, by, zb), this._shP(bx, by, zt), this._shP(ax, ay, zt)];
+                    ctx.beginPath(); p.forEach((v, i) => i ? ctx.lineTo(v[0], v[1]) : ctx.moveTo(v[0], v[1])); ctx.closePath(); ctx.fillStyle = fill; ctx.fill();
+                    ctx.strokeStyle = 'rgba(232,190,140,.12)'; ctx.lineWidth = 0.6; ctx.stroke();
+                };
+                if (cam.y > y1) side(x0, y1, x1, y1, '#4e2c22'); if (cam.y < y0) side(x0, y0, x1, y0, '#2e1914');
+                if (cam.x > x1) side(x1, y0, x1, y1, '#3e2419'); if (cam.x < x0) side(x0, y0, x0, y1, '#3e2419');
+                const top = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(([x, y]) => this._shP(x, y, zt));
+                ctx.beginPath(); top.forEach((v, i) => i ? ctx.lineTo(v[0], v[1]) : ctx.moveTo(v[0], v[1])); ctx.closePath();
+                ctx.fillStyle = '#44271d'; ctx.fill(); ctx.strokeStyle = '#2a1712'; ctx.lineWidth = 1.5; ctx.stroke();
+                const m = this._shP((x0 + x1) / 2, (y0 + y1) / 2, zt); ctx.fillStyle = '#120b08'; ctx.beginPath(); ctx.ellipse(m[0], m[1], 5, 6, 0, 0, Math.PI * 2); ctx.fill();
+            },
+
+            _shDrawRoofs(ctx, emissive) {
+                const g = this._shRoofs();
+                this._shDrawRoof(ctx, g.house, emissive);
+                if (!emissive) this._shDrawChimney(ctx);
+            },
+
+            /** Out front: the lawn gone long, the walk, the drive, the porch floor and steps, a mailbox, dead shrubs */
+            _shDrawGround(ctx) {
+                const P = SUBURB_PLAN, G = P.GARAGE, W = P.W + G.W, Y = 90;
+                const s = LandmarkKit.sprite(this, 'sh_ground', this.x - 20, this.y + P.D - 4, W + 40, Y + 24, 1, c => {
+                    const x = this.x, y = this.y + P.D, r = seededRandom(this._shSeed() + 3), du = this.x + this._shDoorU();
+                    const gx = this.x + (this._sh.west ? 0 : P.W);
+                    // The lawn
+                    c.fillStyle = '#26301f'; c.fillRect(x - 16, y, W + 32, Y);
+                    for (let i = 0; i < 420; i++) { c.fillStyle = r() < 0.5 ? 'rgba(70,86,48,.5)' : 'rgba(18,22,14,.5)'; const gx2 = x - 16 + r() * (W + 32), gy = y + r() * Y; c.fillRect(gx2, gy, 1, 2 + r() * 4); }
+                    for (let i = 0; i < 6; i++) { c.fillStyle = 'rgba(90,80,50,.25)'; c.beginPath(); c.ellipse(x + r() * W, y + 20 + r() * (Y - 30), 10 + r() * 16, 5 + r() * 6, 0, 0, Math.PI * 2); c.fill(); }   // dead patches
+                    // The drive: cracked concrete out to the street
+                    c.fillStyle = '#5b5a55'; c.fillRect(gx + 12, y - 4, G.W - 24, Y + 4);
+                    c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 0.8; c.beginPath(); for (let yy = y + 26; yy < y + Y; yy += 30) { c.moveTo(gx + 12, yy); c.lineTo(gx + G.W - 12, yy); } c.moveTo(gx + 40, y + 10); c.lineTo(gx + 52, y + 34); c.lineTo(gx + 47, y + 58); c.stroke();
+                    c.fillStyle = 'rgba(30,26,20,.35)'; c.beginPath(); c.ellipse(gx + G.W / 2, y + 40, 18, 9, 0, 0, Math.PI * 2); c.fill();   // an old oil stain
+                    // The porch floor and its steps, then the walk
+                    c.fillStyle = '#6b6258'; c.fillRect(this.x + this._sh.ox + P.PORCH.X, y, P.PORCH.W, P.PORCH.D);
+                    c.strokeStyle = 'rgba(0,0,0,.25)'; c.beginPath(); for (let xx = this.x + this._sh.ox + P.PORCH.X + 6; xx < this.x + this._sh.ox + P.PORCH.X + P.PORCH.W; xx += 6) { c.moveTo(xx, y); c.lineTo(xx, y + P.PORCH.D); } c.stroke();
+                    c.fillStyle = '#7d766c'; for (let i = 0; i < 2; i++) c.fillRect(du - 16, y + P.PORCH.D + i * 4, 32, 4);
+                    c.fillStyle = '#6f6c66'; c.fillRect(du - 9, y + P.PORCH.D + 8, 18, Y - P.PORCH.D - 8);
+                    c.strokeStyle = 'rgba(0,0,0,.3)'; c.beginPath(); for (let yy = y + P.PORCH.D + 20; yy < y + Y; yy += 12) { c.moveTo(du - 9, yy); c.lineTo(du + 9, yy); } c.stroke();
+                    // Dead shrubs along the front
+                    for (const sx of [this.x + this._sh.ox + 14, this.x + this._sh.ox + P.PORCH.X - 14, this.x + this._sh.ox + P.PORCH.X + P.PORCH.W + 14, this.x + this._sh.ox + P.W - 16]) {
+                        c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.ellipse(sx + 3, y + 10, 12, 7, 0, 0, Math.PI * 2); c.fill();
+                        c.strokeStyle = '#4a3a28'; c.lineWidth = 1; c.beginPath(); for (let k = 0; k < 9; k++) { const a = k / 9 * Math.PI * 2; c.moveTo(sx, y + 8); c.lineTo(sx + Math.cos(a) * (6 + r() * 6), y + 8 + Math.sin(a) * (4 + r() * 4)); } c.stroke();
+                        c.fillStyle = 'rgba(70,60,36,.6)'; for (let k = 0; k < 6; k++) { c.beginPath(); c.arc(sx + (r() - 0.5) * 12, y + 8 + (r() - 0.5) * 8, 1.6, 0, Math.PI * 2); c.fill(); }
+                    }
+                    // The mailbox at the curb, its flag down
+                    const mx = du + 34, my = y + Y - 8;
+                    c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(mx + 2, my + 2, 12, 7);
+                    c.fillStyle = '#2b2d30'; c.beginPath(); c.roundRect(mx, my, 12, 7, [3, 3, 1, 1]); c.fill();
+                    c.fillStyle = '#7a1e1e'; c.fillRect(mx + 11, my + 3, 3, 1.2);
+                });
+                ctx.drawImage(s.cv, s.x, s.y, s.w, s.h);
+            }
+        });
+    </script>
+    <script type="text/dfab" data-src="buildings/town-gate.js" data-cost="244">
+        /* =====================================================================
+           TOWN GATE — the way into Darklands' gated suburb (DRAFT)
+           ---------------------------------------------------------------------
+           The classic gated-community entrance, on the tiered kit
+           (buildings/tiered-kit.js), so every piece stands up with the lean:
+             · two tall red-brick piers either side of the road, each with sunk
+               panels and a stone plinth, a stepped stone cap and an iron lantern
+               on top that lights the road at night;
+             · the wings: a low brick wall under a stone coping, broken by
+               shorter brick posts with stone caps and ball finials;
+             · a black iron fence set into the coping along each wing: spear-
+               topped pickets between two rails, a band of rings under the top
+               rail. Each picket is a real upright: its foot on the coping, its
+               head projected at its own height (_gtP), so the fence leans with
+               the camera like the walls do, and doesn't sit at one baked angle;
+             · in the gap, a pair of iron gates (open 0..1, swinging inward, to
+               the north) under a bowed top, and above them an iron arch between
+               the piers with the town's name on a plate.
+           The plan is laid out with its front (outside the town) to the south,
+           +y; config.wing is how far each wing runs out from the piers.
+           ===================================================================== */
+        const GATE_PLAN = {
+            GAP: 150, PIER: 44, PIER_Z: 34,             // the road's width; the piers' side and height (design units)
+            T: 16, WALL_Z: 7, FENCE: 17,                // the wing wall's thickness and height; the fence above its coping
+            POST: 24, POST_Z: 20, BAY: 112,             // the wings' posts, and how far apart
+            GATE: [24, 34],                             // the gates' height at the piers and in the middle (the bow)
+            ARCH: [3, 15]                               // the arch over them: its springing above the piers' caps, and its crown
+        };
+        const GATE_COL = {
+            brick: '#7b3427', brickHi: '#93432f', brickLo: '#5a241b', mortar: '#3a2420',
+            stone: '#77726a', stoneHi: '#8c877d', stoneLo: '#55514b',
+            iron: '#121315', ironHi: 'rgba(150,160,175,.45)', glass: '#2a2a22'
+        };
+
+        /** Brick: courses with staggered joints, a few bricks off-colour, a stone plinth; on the piers a sunk panel on each face */
+        function _gtBrick(d, l, t, H, L) {
+            const C = GATE_COL, r = seededRandom(t.seed || 5), bh = 1.5, bw = 8;
+            d.fillStyle = C.brick; d.fillRect(0, 0, L, H);
+            for (let row = 0, y = 0; y < H; row++, y += bh) {
+                const off = row % 2 ? bw / 2 : 0;
+                for (let x = -off; x < L; x += bw) {
+                    const v = r();
+                    if (v < 0.22) { d.fillStyle = v < 0.08 ? C.brickLo : C.brickHi; d.fillRect(x + 0.3, y + 0.15, bw - 0.6, bh - 0.3); }
+                    d.fillStyle = C.mortar; d.fillRect(x, y, 0.45, bh);
+                }
+                d.fillStyle = C.mortar; d.fillRect(0, y, L, 0.22);
+            }
+            for (let i = 0; i < L / 5; i++) { d.fillStyle = `rgba(20,14,12,${0.06 + r() * 0.1})`; d.fillRect(r() * L, r() * H * 0.7, 0.5 + r() * 1.5, 1 + r() * 5); }   // weathering
+            const pl = Math.min(3, H * 0.3);
+            d.fillStyle = C.stone; d.fillRect(0, H - pl, L, pl);
+            d.fillStyle = C.stoneHi; d.fillRect(0, H - pl, L, 0.35); d.fillStyle = 'rgba(0,0,0,.25)'; d.fillRect(0, H - 0.5, L, 0.5);
+            if (!t.panel) return;
+            for (const e of t.mitre) {
+                if (!e) continue;
+                const x0 = e.u0 + 5, w = e.L - 10, y0 = 6, y1 = H - pl - 4;
+                d.fillStyle = C.stone; d.fillRect(x0 - 1, y0 - 1, w + 2, y1 - y0 + 2);
+                d.fillStyle = C.brickLo; d.fillRect(x0, y0, w, y1 - y0);
+                for (let y = y0 + bh; y < y1; y += bh) { d.fillStyle = 'rgba(30,16,14,.7)'; d.fillRect(x0, y, w, 0.22); }
+                d.fillStyle = 'rgba(0,0,0,.35)'; d.fillRect(x0, y0, w, 0.8); d.fillRect(x0, y0, 0.8, y1 - y0);   // the panel's sunk edge in shadow
+            }
+        }
+        function _gtIronStrip(d, l, t, H, L) { d.fillStyle = GATE_COL.iron; d.fillRect(0, 0, L, H); }
+        function _gtStoneRoof(c, glow, t) {
+            if (glow) return; const [x0, y0, x1, y1] = t.box, C = GATE_COL;
+            c.fillStyle = C.stone; c.fillRect(x0, y0, x1 - x0, y1 - y0);
+            c.fillStyle = 'rgba(0,0,0,.14)'; for (let x = x0 + 22; x < x1; x += 22) c.fillRect(x, y0, 1, y1 - y0);   // the coping's joints
+        }
+        function _gtNone() {}
+        function _gtFenceTop(ctx, emissive, t, b) { if (!emissive) b._gtFence(ctx, t); }
+        function _gtPierTop(ctx, emissive, t, b) { b._gtPierCap(ctx, t, emissive); }
+        function _gtPostTop(ctx, emissive, t, b) { if (!emissive) b._gtPostCap(ctx, t); }
+        function _gtGateTop(ctx, emissive, t, b) { if (!emissive) b._gtGates(ctx); }
+
+        class TownGate extends TieredBuilding {
+            constructor(config) {
+                super(config);
+                this._gt = config._gt;
+                this.crownZ = (GATE_PLAN.PIER_Z + 18) * TierKit.Z_SCALE * this.hero;
+                this.regenerateLights();                    // (the lanterns need _gt, set after the stock constructor made the lights)
+            }
+            _setupSign() { this.attachedSign = null; }
+            _generateLights() {
+                this.topReach = 30;
+                if (!this._gt) return;
+                for (const px of this._gt.piers) {
+                    const [x, y] = this._tkLocal(px + GATE_PLAN.PIER / 2, GATE_PLAN.PIER / 2);
+                    const l = new LampEntity({ x: this.x + x, y: this.y + y + 30, lampType: 3, color: '#ffcf8a', lightRadius: 230 });
+                    l.visible = false; l.keepColor = true; this.attachedLights.push(l);
+                }
+            }
+            drawSign() {}
+            /** Closed gates are solid too */
+            getCollisionShapes() {
+                const s = super.getCollisionShapes(), g = this._gt;
+                if (g && g.open < 0.05) { const [x0] = this._tkLocal(g.gapX, 0); s.push({ x: this.x + Math.min(x0, this._tkLocal(g.gapX + GATE_PLAN.GAP, 0)[0]), y: this.y + GATE_PLAN.PIER / 2 - 3, w: GATE_PLAN.GAP, h: 6 }); }
+                return s;
+            }
+        }
+        TierKit.profile(TownGate);
+
+        /**
+         * The gate: x, y its corner (the far end of the west wing, its back), the road through the middle running north–south.
+         * config: wing (each wing's length, px; 0 for the piers alone), open (the gates, 0 shut .. 1 wide), name (on the arch), seed.
+         */
+        function createTownGate(x, y, config = {}) {
+            const P = GATE_PLAN, wing = config.wing ?? P.BAY * 3, W = wing * 2 + P.PIER * 2 + P.GAP, D = P.PIER, yc = D / 2;
+            const piers = [wing, wing + P.PIER + P.GAP], gapX = wing + P.PIER;
+            const ledge = (z, out, th, top) => ({ z, out, th, top, band: [112, 107, 99], lip: 'rgba(220,214,200,.5)' });
+            const tiers = [];
+            piers.forEach((px, i) => tiers.push({
+                id: 'pier' + i, rect: [px, 0, P.PIER, P.PIER], z0: 0, z1: P.PIER_Z, S: 3, seed: 11 + i, panel: true, fill: GATE_COL.brick, paint: _gtBrick,
+                shade: [20, 10, 8], ledges: [ledge(4.5, 1.2, 1.2, GATE_COL.stone), ledge(P.PIER_Z - 1.6, 1.6, 1.4, GATE_COL.stone), ledge(P.PIER_Z, 3, 1.6, GATE_COL.stoneHi)],
+                roofRes: 1, roof: _gtStoneRoof, top: _gtPierTop
+            }));
+            // Each wing: its posts every BAY from the far end, and the wall (with its fence) between them
+            for (const side of [0, 1]) {
+                if (wing <= 0) break;
+                const a = side ? piers[1] + P.PIER : 0, b = side ? W : wing;
+                const posts = [];
+                for (let k = 0; ; k++) { const px = side ? b - P.POST - k * P.BAY : a + k * P.BAY; if (side ? px < a + P.BAY * 0.5 : px > b - P.BAY * 0.5) break; posts.push(px); }
+                posts.sort((p, q) => p - q);
+                posts.forEach((px, k) => tiers.push({
+                    id: `post${side}_${k}`, rect: [px, yc - P.POST / 2, P.POST, P.POST], z0: 0, z1: P.POST_Z, S: 3, seed: 30 + side * 10 + k, fill: GATE_COL.brick, paint: _gtBrick,
+                    shade: [20, 10, 8], ledges: [ledge(P.POST_Z, 2.2, 1.4, GATE_COL.stoneHi)], roofRes: 1, roof: _gtStoneRoof, top: _gtPostTop
+                }));
+                // the runs of wall between the posts and the pier
+                const stops = posts.map(px => [px, px + P.POST]);
+                if (side) stops.unshift([a - P.PIER, a]); else stops.push([b, b + P.PIER]);
+                for (let k = 0; k < stops.length - 1; k++) {
+                    const x0 = stops[k][1], x1 = stops[k + 1][0];
+                    if (x1 - x0 < 4) continue;
+                    tiers.push({
+                        id: `wall${side}_${k}`, rect: [x0, yc - P.T / 2, x1 - x0, P.T], z0: 0, z1: P.WALL_Z, S: 3, seed: 50 + side * 10 + k, fill: GATE_COL.brick, paint: _gtBrick,
+                        shade: [20, 10, 8], ledges: [ledge(P.WALL_Z, 1.8, 1.3, GATE_COL.stoneHi)], roofRes: 1, roof: _gtStoneRoof, top: _gtFenceTop, run: [x0, x1]
+                    });
+                }
+            }
+            // The gates and arch: drawn from a sill across the road (the threshold, an iron strip)
+            tiers.push({ id: 'gate', solid: false, rect: [gapX, yc - 1.5, P.GAP, 3], z0: 0, z1: 0.6, S: 2, fill: GATE_COL.iron, paint: _gtIronStrip, roofRes: 1, roof: _gtNone, top: _gtGateTop });
+            return new TownGate({
+                id: config.id || 'town_gate', x, y, label: config.label || 'Gate', type: 'gate', facing: 'S', hero: 1.1,
+                plan: { W, D },
+                roofColor: GATE_COL.stone, roofLightColor: GATE_COL.stone, wallColor: GATE_COL.brick, wallLightColor: GATE_COL.brick, accentColor: GATE_COL.stone,
+                windowColor: '#000', windowLitColor: '#ffcf8a', windowFrameColor: GATE_COL.stone, balconies: [], roofProps: [], sign: null,
+                _gt: { piers, gapX, open: Math.max(0, Math.min(1, config.open ?? 0.15)), name: config.name ?? 'DARKLANDS', seed: config.seed || 3 },
+                tiers,
+                ...config
+            });
+        }
+
+        Object.assign(TownGate.prototype, {
+            // (plan → world, then the lean; heights in design units)
+            _gtW(x, y) { const [wx, wy] = this._tkLocal(x, y); return [this.x + wx, this.y + wy]; },
+            _gtP(x, y, z) { const [wx, wy] = this._gtW(x, y); return this._tkP(wx, wy, z); },
+            _gtPx() { return Math.max(0.6, (game.camera && game.camera.zoom) ? 1 / Math.sqrt(game.camera.zoom) : 1); },
+
+            /** A polyline of plan points at heights: [[x, y, z], ...] */
+            _gtLine(ctx, pts, w, col) {
+                ctx.beginPath(); pts.forEach(([x, y, z], i) => { const p = this._gtP(x, y, z); i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); });
+                ctx.strokeStyle = col; ctx.lineWidth = w; ctx.stroke();
+            },
+            /** One upright of iron from z0 to z1 with a spear head on top (the head flat in the fence's line, dx dy along it) */
+            _gtPicket(ctx, x, y, z0, z1, dx, dy, w, head) {
+                // (x, y world, not plan)
+                const a = this._tkP(x, y, z0), b = this._tkP(x, y, z1);
+                ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
+                if (head) {
+                    const l = this._tkP(x - dx * 1.6, y - dy * 1.6, z1), r = this._tkP(x + dx * 1.6, y + dy * 1.6, z1), tip = this._tkP(x, y, z1 + 2.6), n = this._tkP(x, y, z1 + 0.8);
+                    head.moveTo(n[0], n[1]); head.lineTo(l[0], l[1]); head.lineTo(tip[0], tip[1]); head.lineTo(r[0], r[1]); head.closePath();
+                }
+            },
+
+            /** A wing's fence: pickets set into the coping, a bottom and a top rail, a band of rings under the top rail */
+            _gtFence(ctx, t) {
+                const P = GATE_PLAN, C = GATE_COL, [x0, x1] = t.run, yc = P.PIER / 2, zb = P.WALL_Z + 0.4, zt = zb + P.FENCE, px = this._gtPx();
+                const [ux, uy] = (() => { const a = this._gtW(0, 0), b = this._gtW(1, 0); return [b[0] - a[0], b[1] - a[1]]; })();
+                ctx.save(); ctx.lineCap = 'round';
+                const bars = new Path2D(), heads = new Path2D();
+                const n = Math.max(2, Math.round((x1 - x0 - 6) / 7));
+                for (let i = 0; i <= n; i++) { const x = x0 + 3 + (x1 - x0 - 6) * i / n, [wx, wy] = this._gtW(x, yc); this._gtPicket(bars, wx, wy, zb, zt, ux, uy, 0, heads); }
+                // the uprights (drawn in world points: _gtPicket takes world x, y)
+                ctx.strokeStyle = C.iron; ctx.lineWidth = 1.7 * px; ctx.stroke(bars);
+                ctx.strokeStyle = C.ironHi; ctx.lineWidth = 0.5 * px; ctx.save(); ctx.translate(-0.5, 0); ctx.stroke(bars); ctx.restore();
+                ctx.fillStyle = C.iron; ctx.fill(heads);
+                for (const z of [zb + 1.6, zt - 2.4, zt - 0.4]) this._gtLine(ctx, [[x0, yc, z], [x1, yc, z]], (z === zb + 1.6 ? 2 : 1.6) * px, C.iron);
+                // the rings between the two upper rails, one in every bay of pickets
+                ctx.strokeStyle = C.iron; ctx.lineWidth = 0.9 * px; ctx.beginPath();
+                for (let i = 0; i < n; i++) {
+                    const x = x0 + 3 + (x1 - x0 - 6) * (i + 0.5) / n, c = this._gtP(x, yc, zt - 1.4), top = this._gtP(x, yc, zt - 0.4);
+                    const rr = Math.max(1, Math.hypot(top[0] - c[0], top[1] - c[1])); ctx.moveTo(c[0] + rr, c[1]); ctx.arc(c[0], c[1], rr, 0, Math.PI * 2);
+                }
+                ctx.stroke();
+                ctx.restore();
+            },
+
+            /** A box of plan coordinates (x0, y0)–(x1, y1), z0..z1 */
+            _gtBox(ctx, x0, y0, x1, y1, z0, z1, wall, cap) {
+                const [ax, ay] = this._gtW(x0, y0), [bx, by] = this._gtW(x1, y1);
+                EntranceLamps.prism(ctx, this, Math.min(ax, bx), Math.min(ay, by), Math.max(ax, bx), Math.max(ay, by), z0, z1, wall, cap);
+            },
+            /** A pyramid on a square of plan coordinates from z0 to an apex at z1: the far faces first */
+            _gtPyramid(ctx, x0, y0, x1, y1, z0, z1, cols) {
+                const c = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(([x, y]) => this._gtP(x, y, z0)), apex = this._gtP((x0 + x1) / 2, (y0 + y1) / 2, z1);
+                const tris = [0, 1, 2, 3].map(i => ({ q: [c[i], c[(i + 1) % 4], apex], col: cols[i] }));
+                const area = q => (q[1][0] - q[0][0]) * (q[2][1] - q[0][1]) - (q[2][0] - q[0][0]) * (q[1][1] - q[0][1]);
+                tris.sort((a, b) => (area(a.q) > 0) - (area(b.q) > 0));
+                for (const { q, col } of tris) { ctx.beginPath(); ctx.moveTo(...q[0]); ctx.lineTo(...q[1]); ctx.lineTo(...q[2]); ctx.closePath(); ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 0.6; ctx.stroke(); }
+            },
+
+            /** On a pier: the stone cap's low pyramid, a plinth, and the iron lantern (its glass lit in the glow pass) */
+            _gtPierCap(ctx, t, emissive) {
+                const P = GATE_PLAN, C = GATE_COL, i = +t.id.slice(4), px = this._gt.piers[i], x0 = px, x1 = px + P.PIER, z = P.PIER_Z, m = (x0 + x1) / 2, yc = P.PIER / 2;
+                if (!emissive) {
+                    this._gtPyramid(ctx, x0 - 1, -1, x1 + 1, P.PIER + 1, z, z + 4, [C.stoneLo, C.stone, C.stoneHi, C.stone]);
+                    this._gtBox(ctx, m - 6, yc - 6, m + 6, yc + 6, z + 2.5, z + 5, C.stone, C.stoneHi);
+                    // the lantern: a post, a cage of four iron corners round the glass, a pointed roof
+                    this._gtBox(ctx, m - 2, yc - 2, m + 2, yc + 2, z + 5, z + 7, C.iron, C.iron);
+                    this._gtBox(ctx, m - 4.5, yc - 4.5, m + 4.5, yc + 4.5, z + 7, z + 15, C.glass, null);
+                    ctx.save(); ctx.lineCap = 'round'; ctx.beginPath();
+                    for (const [cx, cy] of [[-4.5, -4.5], [4.5, -4.5], [4.5, 4.5], [-4.5, 4.5]]) { const [wx, wy] = this._gtW(m + cx, yc + cy); this._gtPicket(ctx, wx, wy, z + 7, z + 15, 0, 0, 0, null); }
+                    ctx.strokeStyle = C.iron; ctx.lineWidth = 1.4; ctx.stroke(); ctx.restore();
+                    this._gtPyramid(ctx, m - 6, yc - 6, m + 6, yc + 6, z + 15, z + 19, [C.iron, '#1d1f22', '#2a2c30', '#1d1f22']);
+                } else {
+                    // the glass, warm, and a halo round it
+                    const c = this._gtP(m, yc, z + 11), top = this._gtP(m, yc, z + 15), r = Math.max(4, Math.hypot(top[0] - c[0], top[1] - c[1]) * 1.4);
+                    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                    this._gtBox(ctx, m - 4, yc - 4, m + 4, yc + 4, z + 7.5, z + 14.5, 'rgba(255,190,110,.75)', 'rgba(255,215,150,.6)');
+                    const g = ctx.createRadialGradient(c[0], c[1], 0, c[0], c[1], r * 5); g.addColorStop(0, 'rgba(255,200,120,.45)'); g.addColorStop(1, 'rgba(255,170,90,0)');
+                    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(c[0], c[1], r * 5, 0, Math.PI * 2); ctx.fill();
+                    ctx.restore();
+                }
+            },
+
+            /** On a wing post: its stone cap's pyramid and a ball */
+            _gtPostCap(ctx, t) {
+                const P = GATE_PLAN, C = GATE_COL, [[x0, y0], , [x1, y1]] = TierKit.rect(...t.rect), z = P.POST_Z;
+                this._gtPyramid(ctx, x0 - 1, y0 - 1, x1 + 1, y1 + 1, z, z + 3, [C.stoneLo, C.stone, C.stoneHi, C.stone]);
+                const m = (x0 + x1) / 2, yc = (y0 + y1) / 2, c = this._gtP(m, yc, z + 6.5), top = this._gtP(m, yc, z + 9), r = Math.max(2.5, Math.hypot(top[0] - c[0], top[1] - c[1]) + 3.5);
+                const n = this._gtP(m, yc, z + 3); ctx.fillStyle = C.stoneLo; ctx.fillRect(n[0] - 2, Math.min(n[1], c[1]), 4, Math.abs(c[1] - n[1]) + 0.1);
+                const g = ctx.createRadialGradient(c[0] - r * 0.35, c[1] - r * 0.4, r * 0.1, c[0], c[1], r); g.addColorStop(0, C.stoneHi); g.addColorStop(1, C.stoneLo);
+                ctx.fillStyle = g; ctx.beginPath(); ctx.arc(c[0], c[1], r, 0, Math.PI * 2); ctx.fill();
+            },
+
+            /** The pair of gates in the road, then the arch over them with the name on its plate */
+            _gtGates(ctx) {
+                const P = GATE_PLAN, C = GATE_COL, g = this._gt, yc = P.PIER / 2, half = P.GAP / 2, px = this._gtPx();
+                const ang = g.open * Math.PI * 0.42;
+                ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                for (const side of [-1, 1]) {
+                    // hinged at the pier, swinging north into town; s runs 0 (hinge) .. 1 (the meeting stile)
+                    const hx = side < 0 ? g.gapX + 2 : g.gapX + P.GAP - 2, len = half - 3;
+                    const at = (s) => [hx - side * len * s * Math.cos(ang), yc - len * s * Math.sin(ang)];
+                    const zTop = (s) => P.GATE[0] + (P.GATE[1] - P.GATE[0]) * Math.sin(Math.PI / 2 * s);   // the bow: up toward the middle of the road
+                    const [dx, dy] = (() => { const a = this._gtW(...at(0)), b = this._gtW(...at(1)); const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; })();
+                    const bars = new Path2D(), heads = new Path2D(), n = 11;
+                    for (let i = 1; i < n; i++) { const s = i / n, [wx, wy] = this._gtW(...at(s)); this._gtPicket(bars, wx, wy, 1, zTop(s) + 1.2, dx, dy, 0, heads); }
+                    ctx.strokeStyle = C.iron; ctx.lineWidth = 1.5 * px; ctx.stroke(bars); ctx.fillStyle = C.iron; ctx.fill(heads);
+                    // the stiles, the rails (the top one bowed), the band of rings and the dog bars at the foot
+                    const stile = new Path2D();
+                    for (const s of [0, 1]) { const [wx, wy] = this._gtW(...at(s)); this._gtPicket(stile, wx, wy, 0.5, zTop(s) + (s ? 0 : 0.5), 0, 0, 0, null); }
+                    ctx.lineWidth = 2.6 * px; ctx.stroke(stile);
+                    const curve = (f) => Array.from({ length: 13 }, (_, i) => { const s = i / 12; return [...at(s), f(s)]; });
+                    this._gtLine(ctx, curve(s => zTop(s)), 2.2 * px, C.iron);
+                    this._gtLine(ctx, curve(s => zTop(s) - 3.2), 1.6 * px, C.iron);
+                    this._gtLine(ctx, curve(() => 9), 1.8 * px, C.iron);
+                    this._gtLine(ctx, curve(() => 2), 2 * px, C.iron);
+                    ctx.lineWidth = 0.9 * px; ctx.beginPath();
+                    for (let i = 0; i < n; i++) {
+                        const s = (i + 0.5) / n, z = zTop(s) - 1.6, c = this._gtP(...at(s), z), tp = this._gtP(...at(s), z + 1.1), rr = Math.max(1, Math.hypot(tp[0] - c[0], tp[1] - c[1]));
+                        ctx.moveTo(c[0] + rr, c[1]); ctx.arc(c[0], c[1], rr, 0, Math.PI * 2);
+                    }
+                    ctx.stroke();
+                    // a scroll in the lower panel by the hinge, and the highlight down the stiles
+                    const sc = this._gtP(...at(0.16), 5.5), st = this._gtP(...at(0.16), 8.2), sr = Math.max(2, Math.hypot(st[0] - sc[0], st[1] - sc[1]));
+                    ctx.lineWidth = 1.1 * px; ctx.beginPath(); ctx.arc(sc[0], sc[1], sr, 0.2, Math.PI * 1.7); ctx.arc(sc[0] + sr * 0.3, sc[1], sr * 0.5, Math.PI * 1.7, Math.PI * 3.1); ctx.stroke();
+                    ctx.strokeStyle = C.ironHi; ctx.lineWidth = 0.5 * px; ctx.save(); ctx.translate(-0.6, 0); ctx.stroke(stile); ctx.restore();
+                }
+                // The arch: two bowed iron bands from pier to pier, rings between, and the plate with the name at its crown
+                const ax0 = g.gapX - 4, ax1 = g.gapX + P.GAP + 4, z0 = P.PIER_Z + P.ARCH[0], z1 = P.PIER_Z + P.ARCH[1];
+                const arch = (dz) => Array.from({ length: 25 }, (_, i) => { const s = i / 24; return [ax0 + (ax1 - ax0) * s, yc, z0 + (z1 - z0) * Math.sin(Math.PI * s) - dz]; });
+                this._gtLine(ctx, arch(0), 2.6 * px, C.iron);
+                this._gtLine(ctx, arch(4.2), 2 * px, C.iron);
+                ctx.strokeStyle = C.iron; ctx.lineWidth = 1 * px; ctx.beginPath();
+                for (let i = 1; i < 16; i++) {
+                    const s = i / 16; if (Math.abs(s - 0.5) < 0.16) continue;
+                    const x = ax0 + (ax1 - ax0) * s, z = z0 + (z1 - z0) * Math.sin(Math.PI * s) - 2.1, c = this._gtP(x, yc, z), tp = this._gtP(x, yc, z + 1.6), rr = Math.max(1.2, Math.hypot(tp[0] - c[0], tp[1] - c[1]));
+                    ctx.moveTo(c[0] + rr, c[1]); ctx.arc(c[0], c[1], rr, 0, Math.PI * 2);
+                }
+                ctx.stroke();
+                if (g.name) this._gtPlate(ctx, (ax0 + ax1) / 2, yc, z1 - 6.2, z1 + 2.4, 44, g.name);
+                ctx.restore();
+            },
+
+            /** A plate standing in the arch (a vertical plane along x at plan y), its letters drawn in its own plane */
+            _gtPlate(ctx, cx, y, zb, zt, w, text) {
+                const C = GATE_COL, x0 = cx - w / 2, x1 = cx + w / 2;
+                const A = this._gtP(x0, y, zt), B = this._gtP(x1, y, zt), D = this._gtP(x0, y, zb), Bb = this._gtP(x1, y, zb), h = (zt - zb);
+                ctx.beginPath(); ctx.moveTo(...A); ctx.lineTo(...B); ctx.lineTo(...Bb); ctx.lineTo(...D); ctx.closePath();
+                ctx.fillStyle = C.iron; ctx.fill(); ctx.strokeStyle = 'rgba(180,170,150,.5)'; ctx.lineWidth = 0.8; ctx.stroke();
+                // (an affine map of the plate's own frame: u along it, v down it, onto its quad on screen)
+                ctx.save();
+                ctx.transform((B[0] - A[0]) / w, (B[1] - A[1]) / w, (D[0] - A[0]) / h, (D[1] - A[1]) / h, A[0], A[1]);
+                ctx.fillStyle = '#b9b2a2'; ctx.font = `bold ${h * 0.62}px Georgia, serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                const tw = ctx.measureText(text).width, sx = Math.min(1, (w - 4) / Math.max(1, tw));
+                ctx.translate(w / 2, h / 2 + h * 0.04); ctx.scale(sx, 1); ctx.fillText(text, 0, 0);
+                ctx.restore();
+            }
+        });
     </script>
     <script type="text/dfab" data-src="buildings/ashgrove.js" data-cost="401">
         /* =====================================================================
@@ -67136,7 +68083,7 @@ Object.assign(TrafficVehicle.prototype, {
         }
 
     </script>
-    <script type="text/dfab" data-src="ui/inventory-augments.js" data-cost="562">
+    <script type="text/dfab" data-src="ui/inventory-augments.js" data-cost="564">
         /* =====================================================================
            INVENTORY SYSTEM
            ---------------------------------------------------------------------
@@ -67527,9 +68474,10 @@ Object.assign(TrafficVehicle.prototype, {
             
             // Load default new-game items from ITEM_REGISTRY
             loadDefaultLoadout() {
+                // (quietly: no OBTAINED toasts while the main menu is up, where this runs at boot and on New Game)
                 for (const id of DEFAULT_LOADOUT) {
                     const item = createItemFromRegistry(id, this.game);
-                    if (item) this.addItem(item);
+                    if (item) this.items.push(item);
                 }
             }
             
@@ -73639,7 +74587,7 @@ engineMixin({
                 }
                 for (const e of this.enemies || []) {
                     if (e.solo && e.drawDuelTells) e.drawDuelTells(ctx);              // Lilitu's tells (entities/hunters.js)
-                    else if (e instanceof Drone) e.drawLights(ctx);                    // a drone's eye, lances, tells (entities/drones.js)
+                    else if (e instanceof Drone || e instanceof Marionette) e.drawLights(ctx);   // a drone's eye, lances, tells (entities/drones.js); a marionette's blades (entities/marionettes.js)
                 }
                 const L = this._hazards, B = this._playerBurn, p = this.player;
                 if ((!L || !L.length) && !B) return;
@@ -81118,7 +82066,7 @@ engineMixin({
 
         });
     </script>
-    <script type="text/dfab" data-src="engine/save-load.js" data-cost="513">
+    <script type="text/dfab" data-src="engine/save-load.js" data-cost="514">
         // GameEngine — Save schema, migrations, saveGame / loadGame.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
                 const AUTOSAVE_KEY = 'dfab_save_slot_auto';   // written when the app goes to the background (onPageHidden)
@@ -81616,6 +82564,7 @@ engineMixin({
                     this.boosterCount = playerData.boosters ?? defaults.player.boosters;
                     
                     // Restore buff system from save data
+                    this.player.buffSystem.active = {};                 // only the save's buffs: none carried in from the run before
                     this.player.buffSystem.deserialize(playerData.buffs || {});
                     
                     // Re-apply persistent buff side-effects (e.g. Stellar Lemonade halved maxHP)
@@ -83021,7 +83970,7 @@ engineMixin({
                             seen.add(key);
                             graveyardWalls.push({ x: cx - P / 2, y: cy - P / 2, w: P, h: P, style: 'gy_pillar' });
                             const gate = Math.abs(cy - my0) < 1 && Math.abs(Math.abs(cx - gateCX) - (gateW + P) / 2) < 1;
-                            mapData.lamps.push(new LampEntity({ x: cx, y: cy - P / 2 + 9, lampType: 6, color: '#ffaa55', lightRadius: gate ? 350 : 230 }));
+                            mapData.lamps.push(new LampEntity({ x: cx, y: cy, lampType: 6, color: '#ffaa55', lightRadius: gate ? 350 : 230 }));
                         }
                         
                         graveyardWalls.forEach(w => {
@@ -92983,7 +93932,7 @@ engineMixin({
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/loop.js" data-cost="236">
+    <script type="text/dfab" data-src="engine/loop.js" data-cost="245">
         // GameEngine — start / stop / reset and the main loop.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -93019,6 +93968,7 @@ engineMixin({
                 const ok = await this.loadIntoWorld([
                     { label: 'Reading your imprint', weight: 1, run: () => {} },
                     { label: 'Rebuilding the world', weight: 6, run: () => {
+                        if (!this.running) this.resetGameState();      // from a clean slate: nothing the save leaves out comes from the run before
                         loaded = !!load();
                         if (!loaded) throw new Error('That save could not be loaded.');
                     } },
@@ -93197,8 +94147,10 @@ engineMixin({
                     this.story.completedOptional = [];
                 }
                 
-                // --- NOTES ---
+                // --- NOTES, THE TRANSCRIPT, BUFFS ---
                 this.foundNotes = [];
+                if (typeof DialogueTranscript !== 'undefined') this.transcript = new DialogueTranscript();   // the last run's lines aren't this run's
+                if (this.player && this.player.buffSystem) this.player.buffSystem.active = {};          // nor its drinks (maxHP is reset above)
                 
                 // --- BONDING ---
                 if (this.bonding) {
@@ -93211,6 +94163,7 @@ engineMixin({
                     this.missions.activeMission = null;
                     this.missions.completedCount = 0;
                     this.missions.completedDeliveries = 0;
+                    this.missions.completedBounties = 0;                   // (Anavia's salvage opens at 5: a new run earns them again)
                     this.missions.amber = MissionSystem.freshAmber();
                     this.missions._recipients = [];
                     if (this.missions.missionLog) this.missions.missionLog = [];
@@ -93220,6 +94173,7 @@ engineMixin({
                 this._endDrive();
                 this.car = this.ownedCar;                               // her car, back where a new game starts (engine/cars.js)
                 Object.assign(this.ownedCar, CAR_START, { vx: 0, vy: 0, speed: 0, controlMode: 'PARKED' });
+                if (typeof PlayerGarage !== 'undefined') { this.garage = new PlayerGarage(); this.garage.applyToVehicle(this.ownedCar); }   // only the BlackMark again: the last run's cars and paint stay in it
                 this.deliveryVehicle = null;                            // Amber's van parks by the cafe again on the next hub load
                 
                 // --- COMPANIONS ---
@@ -93238,6 +94192,7 @@ engineMixin({
                         t.recruited = false; t.inCar = false; 
                         t.hp = t.maxHp; t.dead = false;
                         t.downed = false; t.active = true; t.visible = true;
+                        if (typeof t.startRelationship === 'number') t.relationship = t.startRelationship;   // the crew's bonds start over
                         if (t.maxTeammateStims) t.teammateStims = t.maxTeammateStims;
                     });
                 }
