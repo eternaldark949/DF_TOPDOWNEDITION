@@ -1649,16 +1649,7 @@
         function drawHumanContactShadow(ctx, entity) {
             if (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2) return;
             const C = CONFIG.HUMAN_SHADE, a0 = ctx.globalAlpha;
-            if (!_humanContactSprite) {
-                const cv = _humanContactSprite = document.createElement('canvas');
-                cv.width = cv.height = 96;
-                const c = cv.getContext('2d'), g = c.createRadialGradient(48, 48, 0, 48, 48, 48);
-                g.addColorStop(0, 'rgba(0,0,0,.58)');
-                g.addColorStop(.55, 'rgba(0,0,0,.40)');
-                g.addColorStop(.8, 'rgba(0,0,0,.18)');
-                g.addColorStop(1, 'rgba(0,0,0,0)');
-                c.fillStyle = g; c.fillRect(0, 0, 96, 96);
-            }
+            if (!_humanContactSprite) _humanContactSprite = canvasKit.glow([96, [[0, 'rgba(0,0,0,.58)'], [.55, 'rgba(0,0,0,.40)'], [.8, 'rgba(0,0,0,.18)'], [1, 'rgba(0,0,0,0)']]]);
             // Lamp shadows from dusk, while the sun's cast fades.
             if (entity && entity.x !== undefined && _lampShadowLevel() && sunNow().night > 0.3) _noteLampShadowBody(entity, C);
             ctx.save();
@@ -1701,11 +1692,7 @@
         }
         /** A firmer blob than the contact shadow's: a person's length of shade with a soft rim, so it reads as a shape. */
         function _lampShadowSprite(rgb, cv) {
-            cv = cv || document.createElement('canvas'); cv.width = cv.height = 64;
-            const c = cv.getContext('2d'), g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
-            g.addColorStop(0, `rgba(${rgb}, 1)`); g.addColorStop(0.55, `rgba(${rgb}, 0.85)`); g.addColorStop(1, `rgba(${rgb}, 0)`);
-            c.fillStyle = g; c.fillRect(0, 0, 64, 64);
-            return cv;
+            return canvasKit.glow([64, [[0, `rgba(${rgb}, 1)`], [0.55, `rgba(${rgb}, 0.85)`], [1, `rgba(${rgb}, 0)`]]], cv);
         }
         function _noteLampShadowBody(entity, C) {
             const S = LampShadows;

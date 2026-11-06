@@ -48,31 +48,23 @@
         // A soft puff in one colour (any CSS colour), baked once per colour: a white puff, then tinted
         const _mistPuffs = new Map();
         function mistPuff(color) {
-            let c = _mistPuffs.get(color);
-            if (c) return c;
-            c = document.createElement('canvas'); c.width = c.height = 128;
-            const x = c.getContext('2d'), g = x.createRadialGradient(64, 64, 0, 64, 64, 64);
-            g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.5, 'rgba(255,255,255,0.45)'); g.addColorStop(1, 'rgba(255,255,255,0)');
-            x.fillStyle = g; x.fillRect(0, 0, 128, 128);
-            x.globalCompositeOperation = 'source-in'; x.fillStyle = color; x.fillRect(0, 0, 128, 128);
-            _mistPuffs.set(color, c);
-            return c;
+            return canvasKit.bake(_mistPuffs, color, () => {
+                const c = canvasKit.glow([128, [[0, 'rgba(255,255,255,1)'], [0.5, 'rgba(255,255,255,0.45)'], [1, 'rgba(255,255,255,0)']]]);
+                const x = c.getContext('2d');
+                x.globalCompositeOperation = 'source-in'; x.fillStyle = color; x.fillRect(0, 0, 128, 128);
+                return c;
+            });
         }
         // A spark: a hot core in a small halo of its lantern's colour, baked once per colour
         const _sparkSprites = new Map();
         function sparkSprite(hex) {
-            let c = _sparkSprites.get(hex);
-            if (c) return c;
-            const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
-            c = document.createElement('canvas'); c.width = c.height = 32;
-            const x = c.getContext('2d'), gr = x.createRadialGradient(16, 16, 0, 16, 16, 16);
-            gr.addColorStop(0, `rgba(${Math.min(255, r + 60)},${Math.min(255, g + 50)},${Math.min(255, b + 40)},1)`);
-            gr.addColorStop(0.18, `rgba(${Math.min(255, r + 40)},${Math.min(255, g + 30)},${Math.min(255, b + 20)},0.9)`);
-            gr.addColorStop(0.3, `rgba(${r},${g},${b},0.3)`);
-            gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
-            x.fillStyle = gr; x.fillRect(0, 0, 32, 32);
-            _sparkSprites.set(hex, c);
-            return c;
+            return canvasKit.bake(_sparkSprites, hex, () => {
+                const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+                return canvasKit.glow([32, [
+                    [0, `rgba(${Math.min(255, r + 60)},${Math.min(255, g + 50)},${Math.min(255, b + 40)},1)`],
+                    [0.18, `rgba(${Math.min(255, r + 40)},${Math.min(255, g + 30)},${Math.min(255, b + 20)},0.9)`],
+                    [0.3, `rgba(${r},${g},${b},0.3)`], [1, `rgba(${r},${g},${b},0)`]]]);
+            });
         }
         const _mistHex = (l) => /^#[0-9a-f]{6}$/i.test(l.color || '') ? l.color : '#ffeebb';
 

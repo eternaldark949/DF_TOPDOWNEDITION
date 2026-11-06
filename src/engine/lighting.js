@@ -18,15 +18,9 @@
         // One warm, wide falloff reused for the fireball and its dying flame stream.
         let _fireballLightSprite = null;
         function _getFireballLightSprite() {
-            if (_fireballLightSprite) return _fireballLightSprite;
-            const { canvas: cv, ctx: c } = canvasKit.createLayer([256, 256]), g = c.createRadialGradient(128, 128, 0, 128, 128, 128);
-            g.addColorStop(0, 'rgba(255, 177, 65, 1)');
-            g.addColorStop(0.12, 'rgba(255, 151, 36, 0.96)');
-            g.addColorStop(0.35, 'rgba(255, 112, 20, 0.68)');
-            g.addColorStop(0.64, 'rgba(255, 83, 12, 0.27)');
-            g.addColorStop(1, 'rgba(255, 70, 8, 0)');
-            c.fillStyle = g; c.fillRect(0, 0, 256, 256);
-            return (_fireballLightSprite = cv);
+            return _fireballLightSprite || (_fireballLightSprite = canvasKit.glow([256, [
+                [0, 'rgba(255, 177, 65, 1)'], [0.12, 'rgba(255, 151, 36, 0.96)'], [0.35, 'rgba(255, 112, 20, 0.68)'],
+                [0.64, 'rgba(255, 83, 12, 0.27)'], [1, 'rgba(255, 70, 8, 0)']]]));
         }
 
         // GameEngine — Lighting, bloom, wet reflections, atmosphere.

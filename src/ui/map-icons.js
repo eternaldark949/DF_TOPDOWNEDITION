@@ -142,22 +142,16 @@
             _magicCache: new Map(),
             /** A soft round glow, white-hot at the heart (64 px, stretched as needed). */
             _magicGlow(rgb) {
-                const key = 'g' + rgb; let cv = this._magicCache.get(key); if (cv) return cv;
-                cv = document.createElement('canvas'); cv.width = cv.height = 64; const c = cv.getContext('2d');
-                const g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
-                g.addColorStop(0, `rgba(${rgb}, 0.9)`); g.addColorStop(0.35, `rgba(${rgb}, 0.35)`); g.addColorStop(1, `rgba(${rgb}, 0)`);
-                c.fillStyle = g; c.fillRect(0, 0, 64, 64);
-                this._magicCache.set(key, cv); return cv;
+                return canvasKit.bake(this._magicCache, 'g' + rgb, () =>
+                    canvasKit.glow([64, [[0, `rgba(${rgb}, 0.9)`], [0.35, `rgba(${rgb}, 0.35)`], [1, `rgba(${rgb}, 0)`]]]));
             },
             /** A twinkling mote: a four-point star in a small halo (32 px). */
             _magicStar(rgb) {
-                const key = 's' + rgb; let cv = this._magicCache.get(key); if (cv) return cv;
-                cv = document.createElement('canvas'); cv.width = cv.height = 32; const c = cv.getContext('2d');
-                const g = c.createRadialGradient(16, 16, 0, 16, 16, 16);
-                g.addColorStop(0, `rgba(${rgb}, 0.8)`); g.addColorStop(1, `rgba(${rgb}, 0)`);
-                c.fillStyle = g; c.fillRect(0, 0, 32, 32);
-                this._star(c, 16, 16, 14, `rgba(${rgb}, 1)`); this._star(c, 16, 16, 6, 'rgba(255, 255, 255, 0.95)');
-                this._magicCache.set(key, cv); return cv;
+                return canvasKit.bake(this._magicCache, 's' + rgb, () => {
+                    const cv = canvasKit.glow([32, [[0, `rgba(${rgb}, 0.8)`], [1, `rgba(${rgb}, 0)`]]]), c = cv.getContext('2d');
+                    this._star(c, 16, 16, 14, `rgba(${rgb}, 1)`); this._star(c, 16, 16, 6, 'rgba(255, 255, 255, 0.95)');
+                    return cv;
+                });
             },
 
             // ── Painters: each draws inside an S×S box (0..S), soft glows baked in (once), returns the anchor y ──

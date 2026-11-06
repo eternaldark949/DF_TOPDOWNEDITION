@@ -5868,7 +5868,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '055108797009';
+        const DFAB_BUILD = 'b0aaa0a432c9';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="26">
         // ===== LV0 BASEMENT =====
@@ -5914,7 +5914,7 @@
         }
         const frame_clock = new frameClock();
     </script>
-    <script type="text/dfab" data-src="basement/canvas-kit.js" data-cost="17">
+    <script type="text/dfab" data-src="basement/canvas-kit.js" data-cost="34">
         // ===== LV0 BASEMENT =====
         // The canvas kit: off-screen drawing layers (sprite bakes, caches, light and bloom buffers, portraits).
         // A free-standing tool, so code that runs while the game is still loading can use it, and the
@@ -5924,8 +5924,13 @@
         //   width, height     pixels; leave both out for an unsized layer that is sized later
         //   context_options   passed to getContext('2d', ...), e.g. { willReadFrequently: true }
         //
+        // GLOW PACKET: [size, stops]   a size x size square, filled with a radial falloff from its centre
+        //   stops             [[offset, color], ...] as for addColorStop, 0 = the centre, 1 = the edge
+        //
         //   const { canvas, ctx } = canvasKit.createLayer([w, h]);
         //   canvasKit.fitLayer(canvas, w, h);   // resize only if the size changed (a resize clears the layer)
+        //   const halo = canvasKit.glow([64, [[0, 'rgba(255,255,255,1)'], [1, 'rgba(255,255,255,0)']]]);
+        //   const sprite = canvasKit.bake(cache, key, () => paintIt());   // made the first time, kept after
         const canvasKit = {
             /** A new layer from a packet: { canvas, ctx }. */
             createLayer (layer_packet) {
@@ -5944,6 +5949,29 @@
                 canvas.width = width;
                 canvas.height = height;
                 return true;
+            },
+
+            /** A soft radial sprite from a glow packet. Pass `layer` to repaint an existing canvas instead. */
+            glow (glow_packet, layer) {
+                const size = glow_packet[0], stops = glow_packet[1], half = size / 2;
+                let canvas = layer, ctx;
+                if (canvas) { canvas.width = canvas.height = size; ctx = canvas.getContext('2d'); }
+                else ({ canvas, ctx } = this.createLayer([size, size]));
+                const g = ctx.createRadialGradient(half, half, 0, half, half, half);
+                for (let i = 0; i < stops.length; i++) g.addColorStop(stops[i][0], stops[i][1]);
+                ctx.fillStyle = g; ctx.fillRect(0, 0, size, size);
+                return canvas;
+            },
+
+            /** Bake once, keep forever: the cached value for `key` in `cache` (a Map or a plain object),
+             *  made with make() the first time it's asked for. */
+            bake (cache, key, make) {
+                if (cache instanceof Map) {
+                    let v = cache.get(key);
+                    if (!v) cache.set(key, v = make());
+                    return v;
+                }
+                return cache[key] || (cache[key] = make());
             }
         };
     </script>
@@ -8656,7 +8684,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         };
     </script>
-    <script type="text/dfab" data-src="core/draw-helpers.js" data-cost="259">
+    <script type="text/dfab" data-src="core/draw-helpers.js" data-cost="257">
         /* roundRect for browsers without it (Safari before 16.4): on the 2D context and on Path2D, taking a
            single radius or [all], [tl-br, tr-bl], [tl, tr-bl, br] or [tl, tr, br, bl] like the real one. */
         (() => {
@@ -8910,17 +8938,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         function glowSprite(color, core = 0.35) {
             let byCore = _glowSprites.get(color);                              // colour → core → sprite (a hit builds no key string)
             if (!byCore) _glowSprites.set(color, byCore = new Map());
-            let cv = byCore.get(core);
-            if (cv) return cv;
-            const rgb = color[0] === '#' ? hexToRgb(color) : color;
-            cv = document.createElement('canvas'); cv.width = cv.height = 64;
-            const c = cv.getContext('2d'), g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
-            g.addColorStop(0, `rgba(${rgb}, 1)`);
-            if (core > 0) g.addColorStop(core, `rgba(${rgb}, 0.45)`);        // core 0: a plain linear falloff
-            g.addColorStop(1, `rgba(${rgb}, 0)`);
-            c.fillStyle = g; c.fillRect(0, 0, 64, 64);
-            byCore.set(core, cv);
-            return cv;
+            return canvasKit.bake(byCore, core, () => {
+                const rgb = color[0] === '#' ? hexToRgb(color) : color;
+                const stops = [[0, `rgba(${rgb}, 1)`]];
+                if (core > 0) stops.push([core, `rgba(${rgb}, 0.45)`]);        // core 0: a plain linear falloff
+                stops.push([1, `rgba(${rgb}, 0)`]);
+                return canvasKit.glow([64, stops]);
+            });
         }
         /* ---------------------------------------------------------------------
            LENS GLARE — the bloom of ETERNAL's UPBGE renders, two stacked layers
@@ -18617,21 +18641,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
 
     </script>
-    <script type="text/dfab" data-src="entities/props-decor.js" data-cost="2520">
+    <script type="text/dfab" data-src="entities/props-decor.js" data-cost="2516">
         // One soft, centred ground blob shared by props, pickups and Velvet. It is stamped
         // before artwork transforms and never baked into a rotating furniture sprite.
         function drawGroundContactShadow(ctx, x, y, rx, ry, angle = 0) {
             let cv = drawGroundContactShadow.sprite;
-            if (!cv) {
-                cv = drawGroundContactShadow.sprite = document.createElement('canvas');
-                cv.width = cv.height = 64;
-                const c = cv.getContext('2d'), g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
-                g.addColorStop(0, 'rgba(0,0,0,0.30)');
-                g.addColorStop(0.65, 'rgba(0,0,0,0.24)');
-                g.addColorStop(0.85, 'rgba(0,0,0,0.12)');
-                g.addColorStop(1, 'rgba(0,0,0,0)');
-                c.fillStyle = g; c.fillRect(0, 0, 64, 64);
-            }
+            if (!cv) cv = drawGroundContactShadow.sprite = canvasKit.glow([64, [[0, 'rgba(0,0,0,0.30)'], [0.65, 'rgba(0,0,0,0.24)'], [0.85, 'rgba(0,0,0,0.12)'], [1, 'rgba(0,0,0,0)']]]);
             if (angle) {
                 // The contact footprint follows the base. Its centre never gains a
                 // facing-dependent light offset like the old displaced silhouette.
@@ -55935,7 +55950,7 @@ Object.assign(TrafficVehicle.prototype, {
             }
         }
     </script>
-    <script type="text/dfab" data-src="ui/map-icons.js" data-cost="389">
+    <script type="text/dfab" data-src="ui/map-icons.js" data-cost="383">
         /* =====================================================================
            MAP ICONS & MAP ART — one icon set and one city look for the golden map
            (ui/ui-system.js) and the phone's map (ui/phone.js).
@@ -56080,22 +56095,16 @@ Object.assign(TrafficVehicle.prototype, {
             _magicCache: new Map(),
             /** A soft round glow, white-hot at the heart (64 px, stretched as needed). */
             _magicGlow(rgb) {
-                const key = 'g' + rgb; let cv = this._magicCache.get(key); if (cv) return cv;
-                cv = document.createElement('canvas'); cv.width = cv.height = 64; const c = cv.getContext('2d');
-                const g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
-                g.addColorStop(0, `rgba(${rgb}, 0.9)`); g.addColorStop(0.35, `rgba(${rgb}, 0.35)`); g.addColorStop(1, `rgba(${rgb}, 0)`);
-                c.fillStyle = g; c.fillRect(0, 0, 64, 64);
-                this._magicCache.set(key, cv); return cv;
+                return canvasKit.bake(this._magicCache, 'g' + rgb, () =>
+                    canvasKit.glow([64, [[0, `rgba(${rgb}, 0.9)`], [0.35, `rgba(${rgb}, 0.35)`], [1, `rgba(${rgb}, 0)`]]]));
             },
             /** A twinkling mote: a four-point star in a small halo (32 px). */
             _magicStar(rgb) {
-                const key = 's' + rgb; let cv = this._magicCache.get(key); if (cv) return cv;
-                cv = document.createElement('canvas'); cv.width = cv.height = 32; const c = cv.getContext('2d');
-                const g = c.createRadialGradient(16, 16, 0, 16, 16, 16);
-                g.addColorStop(0, `rgba(${rgb}, 0.8)`); g.addColorStop(1, `rgba(${rgb}, 0)`);
-                c.fillStyle = g; c.fillRect(0, 0, 32, 32);
-                this._star(c, 16, 16, 14, `rgba(${rgb}, 1)`); this._star(c, 16, 16, 6, 'rgba(255, 255, 255, 0.95)');
-                this._magicCache.set(key, cv); return cv;
+                return canvasKit.bake(this._magicCache, 's' + rgb, () => {
+                    const cv = canvasKit.glow([32, [[0, `rgba(${rgb}, 0.8)`], [1, `rgba(${rgb}, 0)`]]]), c = cv.getContext('2d');
+                    this._star(c, 16, 16, 14, `rgba(${rgb}, 1)`); this._star(c, 16, 16, 6, 'rgba(255, 255, 255, 0.95)');
+                    return cv;
+                });
             },
 
             // ── Painters: each draws inside an S×S box (0..S), soft glows baked in (once), returns the anchor y ──
@@ -60823,7 +60832,7 @@ Object.assign(TrafficVehicle.prototype, {
             return out;
         }
     </script>
-    <script type="text/dfab" data-src="ui/humanoid-render.js" data-cost="2022">
+    <script type="text/dfab" data-src="ui/humanoid-render.js" data-cost="2016">
         const HAIR_SIM = {
             STEP: 1 / 120,          // game seconds per physics slice
             MAX_STEPS: 12,          // catch-up cap after a stall
@@ -62475,16 +62484,7 @@ Object.assign(TrafficVehicle.prototype, {
         function drawHumanContactShadow(ctx, entity) {
             if (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2) return;
             const C = CONFIG.HUMAN_SHADE, a0 = ctx.globalAlpha;
-            if (!_humanContactSprite) {
-                const cv = _humanContactSprite = document.createElement('canvas');
-                cv.width = cv.height = 96;
-                const c = cv.getContext('2d'), g = c.createRadialGradient(48, 48, 0, 48, 48, 48);
-                g.addColorStop(0, 'rgba(0,0,0,.58)');
-                g.addColorStop(.55, 'rgba(0,0,0,.40)');
-                g.addColorStop(.8, 'rgba(0,0,0,.18)');
-                g.addColorStop(1, 'rgba(0,0,0,0)');
-                c.fillStyle = g; c.fillRect(0, 0, 96, 96);
-            }
+            if (!_humanContactSprite) _humanContactSprite = canvasKit.glow([96, [[0, 'rgba(0,0,0,.58)'], [.55, 'rgba(0,0,0,.40)'], [.8, 'rgba(0,0,0,.18)'], [1, 'rgba(0,0,0,0)']]]);
             // Lamp shadows from dusk, while the sun's cast fades.
             if (entity && entity.x !== undefined && _lampShadowLevel() && sunNow().night > 0.3) _noteLampShadowBody(entity, C);
             ctx.save();
@@ -62527,11 +62527,7 @@ Object.assign(TrafficVehicle.prototype, {
         }
         /** A firmer blob than the contact shadow's: a person's length of shade with a soft rim, so it reads as a shape. */
         function _lampShadowSprite(rgb, cv) {
-            cv = cv || document.createElement('canvas'); cv.width = cv.height = 64;
-            const c = cv.getContext('2d'), g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
-            g.addColorStop(0, `rgba(${rgb}, 1)`); g.addColorStop(0.55, `rgba(${rgb}, 0.85)`); g.addColorStop(1, `rgba(${rgb}, 0)`);
-            c.fillStyle = g; c.fillRect(0, 0, 64, 64);
-            return cv;
+            return canvasKit.glow([64, [[0, `rgba(${rgb}, 1)`], [0.55, `rgba(${rgb}, 0.85)`], [1, `rgba(${rgb}, 0)`]]], cv);
         }
         function _noteLampShadowBody(entity, C) {
             const S = LampShadows;
@@ -73086,7 +73082,7 @@ Object.assign(TrafficVehicle.prototype, {
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/combat-effects.js" data-cost="458">
+    <script type="text/dfab" data-src="engine/combat-effects.js" data-cost="456">
         // GameEngine — Screen shake, time slow, death, resize, firing, boosters, player damage.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         const _muzzleStars = new Map();
@@ -73113,15 +73109,10 @@ Object.assign(TrafficVehicle.prototype, {
         const _puffs = new Map();
         /** A soft round puff (64×64) in `color`, for barrel smoke and golden wisps. */
         function puffSprite(color) {
-            let cv = _puffs.get(color);
-            if (cv) return cv;
-            cv = document.createElement('canvas'); cv.width = cv.height = 64;
-            const c = cv.getContext('2d'), rgb = /^#[0-9a-f]{6}$/i.test(color) ? hexToRgb(color) : '220, 210, 225';
-            const g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
-            g.addColorStop(0, `rgba(${rgb}, 0.9)`); g.addColorStop(0.45, `rgba(${rgb}, 0.45)`); g.addColorStop(1, `rgba(${rgb}, 0)`);
-            c.fillStyle = g; c.fillRect(0, 0, 64, 64);
-            _puffs.set(color, cv);
-            return cv;
+            return canvasKit.bake(_puffs, color, () => {
+                const rgb = /^#[0-9a-f]{6}$/i.test(color) ? hexToRgb(color) : '220, 210, 225';
+                return canvasKit.glow([64, [[0, `rgba(${rgb}, 0.9)`], [0.45, `rgba(${rgb}, 0.45)`], [1, `rgba(${rgb}, 0)`]]]);
+            });
         }
 
         engineMixin({
@@ -73837,7 +73828,7 @@ Object.assign(TrafficVehicle.prototype, {
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/breach-fx.js" data-cost="148">
+    <script type="text/dfab" data-src="engine/breach-fx.js" data-cost="145">
         // GameEngine — The breach blast: a wall blown in (the Double Nights penthouse ambush, story step 4).
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         //
@@ -73859,14 +73850,7 @@ Object.assign(TrafficVehicle.prototype, {
         const _breachSprites = new Map();
         /** A soft radial sprite (128×128) from gradient stops, cached by key. */
         function breachSprite(key, stops) {
-            let cv = _breachSprites.get(key);
-            if (cv) return cv;
-            cv = document.createElement('canvas'); cv.width = cv.height = 128;
-            const c = cv.getContext('2d'), g = c.createRadialGradient(64, 64, 0, 64, 64, 64);
-            for (const [o, col] of stops) g.addColorStop(o, col);
-            c.fillStyle = g; c.fillRect(0, 0, 128, 128);
-            _breachSprites.set(key, cv);
-            return cv;
+            return canvasKit.bake(_breachSprites, key, () => canvasKit.glow([128, stops]));
         }
         const _bFire = () => breachSprite('fire', [[0, 'rgba(255,250,235,1)'], [0.18, 'rgba(255,224,150,0.95)'], [0.42, 'rgba(255,140,50,0.6)'], [0.7, 'rgba(200,60,30,0.22)'], [1, 'rgba(120,20,40,0)']]);
         const _bCore = () => breachSprite('core', [[0, 'rgba(255,255,255,1)'], [0.4, 'rgba(255,240,210,0.6)'], [1, 'rgba(255,220,180,0)']]);
@@ -75517,7 +75501,7 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/reflections.js" data-cost="902">
+    <script type="text/dfab" data-src="engine/reflections.js" data-cost="900">
         // GameEngine — Reflections. Methods are added to GameEngine.prototype
         // (see engineMixin in game-engine.js).
         //
@@ -75594,18 +75578,14 @@ engineMixin({
         // Shared feathered ellipses: four tiny sprites for every puddle, with no live blur.
         const _puddleEdgeSprites = new Map();
         function _puddleEdgeSprite(kind = 'mask') {
-            let cv = _puddleEdgeSprites.get(kind);
-            if (cv) return cv;
-            const colors = { mask: '255,255,255', night: '6,4,18', day: '178,190,226', rim: '214,196,255' };
-            const rgb = colors[kind] || colors.mask;
-            cv = document.createElement('canvas'); cv.width = cv.height = 96;
-            const c = cv.getContext('2d'), g = c.createRadialGradient(48, 48, 0, 48, 48, 48);
-            const stops = kind === 'rim'
-                ? [[0,0],[.74,0],[.84,.12],[.9,1],[.95,.3],[1,0]]
-                : [[0,1],[.72,1],[.83,.96],[.93,.5],[1,0]];
-            for (const [at,a] of stops) g.addColorStop(at, `rgba(${rgb},${a})`);
-            c.fillStyle = g; c.fillRect(0, 0, 96, 96);
-            _puddleEdgeSprites.set(kind, cv); return cv;
+            return canvasKit.bake(_puddleEdgeSprites, kind, () => {
+                const colors = { mask: '255,255,255', night: '6,4,18', day: '178,190,226', rim: '214,196,255' };
+                const rgb = colors[kind] || colors.mask;
+                const stops = kind === 'rim'
+                    ? [[0,0],[.74,0],[.84,.12],[.9,1],[.95,.3],[1,0]]
+                    : [[0,1],[.72,1],[.83,.96],[.93,.5],[1,0]];
+                return canvasKit.glow([96, stops.map(([at, a]) => [at, `rgba(${rgb},${a})`])]);
+            });
         }
 
         function _paintPuddleLobes(ctx, p, growth, sprite, alpha, ox = p.x, oy = p.y) {
@@ -76782,7 +76762,7 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/street-mist.js" data-cost="92">
+    <script type="text/dfab" data-src="engine/street-mist.js" data-cost="87">
         // GameEngine — Street mist and lantern sparks. Methods are added to GameEngine.prototype
         // (see engineMixin in game-engine.js).
         //
@@ -76833,31 +76813,23 @@ engineMixin({
         // A soft puff in one colour (any CSS colour), baked once per colour: a white puff, then tinted
         const _mistPuffs = new Map();
         function mistPuff(color) {
-            let c = _mistPuffs.get(color);
-            if (c) return c;
-            c = document.createElement('canvas'); c.width = c.height = 128;
-            const x = c.getContext('2d'), g = x.createRadialGradient(64, 64, 0, 64, 64, 64);
-            g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.5, 'rgba(255,255,255,0.45)'); g.addColorStop(1, 'rgba(255,255,255,0)');
-            x.fillStyle = g; x.fillRect(0, 0, 128, 128);
-            x.globalCompositeOperation = 'source-in'; x.fillStyle = color; x.fillRect(0, 0, 128, 128);
-            _mistPuffs.set(color, c);
-            return c;
+            return canvasKit.bake(_mistPuffs, color, () => {
+                const c = canvasKit.glow([128, [[0, 'rgba(255,255,255,1)'], [0.5, 'rgba(255,255,255,0.45)'], [1, 'rgba(255,255,255,0)']]]);
+                const x = c.getContext('2d');
+                x.globalCompositeOperation = 'source-in'; x.fillStyle = color; x.fillRect(0, 0, 128, 128);
+                return c;
+            });
         }
         // A spark: a hot core in a small halo of its lantern's colour, baked once per colour
         const _sparkSprites = new Map();
         function sparkSprite(hex) {
-            let c = _sparkSprites.get(hex);
-            if (c) return c;
-            const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
-            c = document.createElement('canvas'); c.width = c.height = 32;
-            const x = c.getContext('2d'), gr = x.createRadialGradient(16, 16, 0, 16, 16, 16);
-            gr.addColorStop(0, `rgba(${Math.min(255, r + 60)},${Math.min(255, g + 50)},${Math.min(255, b + 40)},1)`);
-            gr.addColorStop(0.18, `rgba(${Math.min(255, r + 40)},${Math.min(255, g + 30)},${Math.min(255, b + 20)},0.9)`);
-            gr.addColorStop(0.3, `rgba(${r},${g},${b},0.3)`);
-            gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
-            x.fillStyle = gr; x.fillRect(0, 0, 32, 32);
-            _sparkSprites.set(hex, c);
-            return c;
+            return canvasKit.bake(_sparkSprites, hex, () => {
+                const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+                return canvasKit.glow([32, [
+                    [0, `rgba(${Math.min(255, r + 60)},${Math.min(255, g + 50)},${Math.min(255, b + 40)},1)`],
+                    [0.18, `rgba(${Math.min(255, r + 40)},${Math.min(255, g + 30)},${Math.min(255, b + 20)},0.9)`],
+                    [0.3, `rgba(${r},${g},${b},0.3)`], [1, `rgba(${r},${g},${b},0)`]]]);
+            });
         }
         const _mistHex = (l) => /^#[0-9a-f]{6}$/i.test(l.color || '') ? l.color : '#ffeebb';
 
@@ -92422,7 +92394,7 @@ engineMixin({
             },
         });
     </script>
-    <script type="text/dfab" data-src="engine/lighting.js" data-cost="598">
+    <script type="text/dfab" data-src="engine/lighting.js" data-cost="595">
         // Shared immutable falloff tables; softArea only reads these stops.
         const HOLE_AREA = [[0, 'rgba(255,255,255,1)'], [0.5, 'rgba(255,255,255,0.9)'], [1, 'rgba(255,255,255,0)']];
         const HOLE_AREA_SOFT = [[0, 'rgba(255,255,255,1)'], [0.3, 'rgba(255,255,255,0.85)'], [0.7, 'rgba(255,255,255,0.35)'], [1, 'rgba(255,255,255,0)']];   // long, gentle edge
@@ -92443,15 +92415,9 @@ engineMixin({
         // One warm, wide falloff reused for the fireball and its dying flame stream.
         let _fireballLightSprite = null;
         function _getFireballLightSprite() {
-            if (_fireballLightSprite) return _fireballLightSprite;
-            const { canvas: cv, ctx: c } = canvasKit.createLayer([256, 256]), g = c.createRadialGradient(128, 128, 0, 128, 128, 128);
-            g.addColorStop(0, 'rgba(255, 177, 65, 1)');
-            g.addColorStop(0.12, 'rgba(255, 151, 36, 0.96)');
-            g.addColorStop(0.35, 'rgba(255, 112, 20, 0.68)');
-            g.addColorStop(0.64, 'rgba(255, 83, 12, 0.27)');
-            g.addColorStop(1, 'rgba(255, 70, 8, 0)');
-            c.fillStyle = g; c.fillRect(0, 0, 256, 256);
-            return (_fireballLightSprite = cv);
+            return _fireballLightSprite || (_fireballLightSprite = canvasKit.glow([256, [
+                [0, 'rgba(255, 177, 65, 1)'], [0.12, 'rgba(255, 151, 36, 0.96)'], [0.35, 'rgba(255, 112, 20, 0.68)'],
+                [0.64, 'rgba(255, 83, 12, 0.27)'], [1, 'rgba(255, 70, 8, 0)']]]));
         }
 
         // GameEngine — Lighting, bloom, wet reflections, atmosphere.

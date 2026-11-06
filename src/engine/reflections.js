@@ -74,18 +74,14 @@
         // Shared feathered ellipses: four tiny sprites for every puddle, with no live blur.
         const _puddleEdgeSprites = new Map();
         function _puddleEdgeSprite(kind = 'mask') {
-            let cv = _puddleEdgeSprites.get(kind);
-            if (cv) return cv;
-            const colors = { mask: '255,255,255', night: '6,4,18', day: '178,190,226', rim: '214,196,255' };
-            const rgb = colors[kind] || colors.mask;
-            cv = document.createElement('canvas'); cv.width = cv.height = 96;
-            const c = cv.getContext('2d'), g = c.createRadialGradient(48, 48, 0, 48, 48, 48);
-            const stops = kind === 'rim'
-                ? [[0,0],[.74,0],[.84,.12],[.9,1],[.95,.3],[1,0]]
-                : [[0,1],[.72,1],[.83,.96],[.93,.5],[1,0]];
-            for (const [at,a] of stops) g.addColorStop(at, `rgba(${rgb},${a})`);
-            c.fillStyle = g; c.fillRect(0, 0, 96, 96);
-            _puddleEdgeSprites.set(kind, cv); return cv;
+            return canvasKit.bake(_puddleEdgeSprites, kind, () => {
+                const colors = { mask: '255,255,255', night: '6,4,18', day: '178,190,226', rim: '214,196,255' };
+                const rgb = colors[kind] || colors.mask;
+                const stops = kind === 'rim'
+                    ? [[0,0],[.74,0],[.84,.12],[.9,1],[.95,.3],[1,0]]
+                    : [[0,1],[.72,1],[.83,.96],[.93,.5],[1,0]];
+                return canvasKit.glow([96, stops.map(([at, a]) => [at, `rgba(${rgb},${a})`])]);
+            });
         }
 
         function _paintPuddleLobes(ctx, p, growth, sprite, alpha, ox = p.x, oy = p.y) {

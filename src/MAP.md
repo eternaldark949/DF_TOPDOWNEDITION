@@ -24,7 +24,7 @@ For editor/runtime batches that change static building or foliage geometry, reac
 | File | What's in it |
 |---|---|
 | `basement/frame-clock.js` | **The frame clock**: declares the four time globals (`_frameTime` / `_frameTimeSec`, real time of the drawn frame; `_simTick`, simulation steps, frozen while paused; `_gameTimeSec`, smooth game time for draw code) and `frame_clock` (`frameClock`), their writer: `stampFrame()` (the Lobby, each accepted frame), `advanceTick()` (the Lobby each step; `GameEngine.update()` when called directly), `setGameTime(sec)` (the game's render jack); readers `frame_time`, `sim_tick`, `game_time_sec` for new code. Reading the globals stays fine everywhere. |
-| `basement/canvas-kit.js` | **`canvasKit`**: off-screen drawing layers. `createLayer([w, h, ctxOptions])` → `{ canvas, ctx }` (leave the size out for a layer sized later); `fitLayer(canvas, w, h)` resizes only when the size changed (a resize clears it). Free-standing, so load-time sprite bakes can use it; the renderer is one more user. Legacy canvas sites switch to it as they're touched. |
+| `basement/canvas-kit.js` | **`canvasKit`**: off-screen drawing layers. `createLayer([w, h, ctxOptions])` → `{ canvas, ctx }` (leave the size out for a layer sized later); `fitLayer(canvas, w, h)` resizes only when the size changed (a resize clears it). `glow([size, stops], layer?)`: a soft radial sprite (every glow, puff, halo and contact shadow sprite is one); `bake(cache, key, make)`: made the first time it's asked for, kept after (a Map or a plain object). Free-standing, so load-time sprite bakes can use it; the renderer is one more user. Legacy canvas sites switch to it as they're touched. |
 
 ## core/ (loaded first)
 | File | What's in it |
