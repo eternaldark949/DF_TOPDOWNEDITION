@@ -613,8 +613,7 @@
         function _getFireTrailSprites() {
             if (_fireTrailSprites) return _fireTrailSprites;
             const K = 4, frames = 16, cols = 4, w = 32, h = 36, TAU = Math.PI * 2;
-            const atlas = document.createElement('canvas'); atlas.width = w * cols * K; atlas.height = h * cols * K;
-            const c = atlas.getContext('2d');
+            const { canvas: atlas, ctx: c } = canvasKit.createLayer([w * cols * K, h * cols * K]);
             for (let i = 0; i < frames; i++) {
                 const p = i / frames * TAU, sway = Math.sin(p), curl = Math.cos(p);
                 c.setTransform(K, 0, 0, K, ((i % cols) * w + 22) * K, (Math.floor(i / cols) * h + 18) * K);
@@ -741,8 +740,7 @@
                 }
                 c.fillStyle = '#fffdeb'; c.beginPath(); c.arc(0, 0, 4.1, 0, TAU); c.fill();
             }
-            const halo = document.createElement('canvas'); halo.width = halo.height = 48 * K;
-            const h = halo.getContext('2d'); h.setTransform(K, 0, 0, K, 24 * K, 24 * K);
+            const { canvas: halo, ctx: h } = canvasKit.createLayer([48 * K, 48 * K]); h.setTransform(K, 0, 0, K, 24 * K, 24 * K);
             const glow = h.createRadialGradient(0, 0, 3, 0, 0, 23);
             glow.addColorStop(0, 'rgba(255,158,21,0.42)'); glow.addColorStop(0.35, 'rgba(255,97,10,0.23)');
             glow.addColorStop(0.7, 'rgba(255,55,8,0.065)'); glow.addColorStop(1, 'rgba(255,55,8,0)');

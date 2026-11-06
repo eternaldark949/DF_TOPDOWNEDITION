@@ -74,9 +74,7 @@
             sprite(key, x0, y0, w, h, res, paint) {
                 let s = this.sprites.get(key);
                 if (s) return s;
-                const cv = document.createElement('canvas');
-                cv.width = Math.max(1, Math.ceil(w * res)); cv.height = Math.max(1, Math.ceil(h * res));
-                const c = cv.getContext('2d');
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([Math.max(1, Math.ceil(w * res)), Math.max(1, Math.ceil(h * res))]);
                 c.setTransform(res, 0, 0, res, -x0 * res, -y0 * res);
                 paint(c);
                 this.stats.baked++; this.stats.bytes += cv.width * cv.height * 4;

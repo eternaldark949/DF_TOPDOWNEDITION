@@ -1043,7 +1043,7 @@
                 const r = cv.getBoundingClientRect(), k = Math.min(window.devicePixelRatio || 1, 2);
                 const w = Math.round(r.width * k), h = Math.min(1600, Math.round(r.height * k));
                 if (w < 8 || h < 8) return;
-                if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+                canvasKit.fitLayer(cv, w, h);
                 const x = cv.getContext('2d');
                 x.clearRect(0, 0, w, h);
                 RealPortrait.figure(x, w, h, neumeFigureConfig());

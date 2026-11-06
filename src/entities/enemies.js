@@ -1168,8 +1168,7 @@
                     ['rgba(90,14,3,0)', '#8e2108', '#ee6913', '#ffc34d'],
                     ['rgba(110,25,4,0)', '#ad420d', '#ffc245', '#fff1ba']
                 ].map((colors,stage) => {
-                    const cv = document.createElement('canvas'); cv.width = 120; cv.height = 16;
-                    const c = cv.getContext('2d'), g = c.createLinearGradient(0,0,120,0);
+                    const { canvas: cv, ctx: c } = canvasKit.createLayer([120, 16]), g = c.createLinearGradient(0,0,120,0);
                     for (const [i,stop] of [0,0.22,0.72,1].entries()) g.addColorStop(stop,colors[i]);
                     c.fillStyle = g; c.fillRect(0,0,120,16);
                     c.fillStyle = stage === 2 ? 'rgba(255,250,214,0.85)' : stage === 1 ? 'rgba(255,204,100,0.55)' : 'rgba(255,100,24,0.35)';

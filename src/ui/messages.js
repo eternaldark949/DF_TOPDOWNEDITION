@@ -795,8 +795,7 @@
                 let url = null;
                 try {
                     const W = 400, H = 160, span = 4200, fs = W / span;
-                    const c = document.createElement('canvas'); c.width = W; c.height = H;
-                    const ctx = c.getContext('2d');
+                    const { canvas: c, ctx: ctx } = canvasKit.createLayer([W, H]);
                     ctx.fillStyle = MAP_PAL.base; ctx.fillRect(0, 0, W, H);
                     const ox = W / 2 - (P.x + P.w / 2) * fs, oy = H / 2 - (P.y + P.h / 2) * fs;
                     ctx.setTransform(fs, 0, 0, fs, ox, oy);

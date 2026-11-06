@@ -19,8 +19,7 @@
         let _fireballLightSprite = null;
         function _getFireballLightSprite() {
             if (_fireballLightSprite) return _fireballLightSprite;
-            const cv = document.createElement('canvas'); cv.width = cv.height = 256;
-            const c = cv.getContext('2d'), g = c.createRadialGradient(128, 128, 0, 128, 128, 128);
+            const { canvas: cv, ctx: c } = canvasKit.createLayer([256, 256]), g = c.createRadialGradient(128, 128, 0, 128, 128, 128);
             g.addColorStop(0, 'rgba(255, 177, 65, 1)');
             g.addColorStop(0.12, 'rgba(255, 151, 36, 0.96)');
             g.addColorStop(0.35, 'rgba(255, 112, 20, 0.68)');
@@ -175,8 +174,7 @@
                     wedges.lineTo(seg.x2, seg.y2); wedges.closePath();
                 }
                 const bake = paint => {
-                    const cv = document.createElement('canvas'); cv.width = cv.height = size;
-                    const c = cv.getContext('2d');
+                    const { canvas: cv, ctx: c } = canvasKit.createLayer([size, size]);
                     c.scale(S, S); c.translate(R - lamp.x, R - lamp.y);
                     paint(c);
                     c.globalCompositeOperation = 'destination-out'; c.fillStyle = '#000'; c.fill(wedges);
@@ -248,7 +246,7 @@
                 try {
                     if (typeof OffscreenCanvas !== 'function') throw new Error('Lighting bitmap cache unavailable');
                     const cv = cache.canvas || (cache.canvas = new OffscreenCanvas(w, h));
-                    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+                    canvasKit.fitLayer(cv, w, h);
                     const c = cache.ctx || (cache.ctx = cv.getContext('2d'));
                     if (!c || c.isContextLost?.()) throw new Error('Lighting base context unavailable');
                     c.globalCompositeOperation = 'copy'; c.drawImage(this.lightCanvas, 0, 0);
@@ -432,7 +430,7 @@
                 // Layer resolution: lighting quality, halved for soft shadows (the upscale softens edges)
                 const LS = this.lightingScale * (GameSettings.softShadows ? 0.5 : 1) * (this._adaptiveLighting?.factor || 1);
                 const lw = Math.max(1, Math.round(this.canvas.width * LS)), lh = Math.max(1, Math.round(this.canvas.height * LS));
-                if (this.lightCanvas.width !== lw || this.lightCanvas.height !== lh) { this.lightCanvas.width = lw; this.lightCanvas.height = lh; }
+                canvasKit.fitLayer(this.lightCanvas, lw, lh);
                 const lc = this.lightCtx;
                 const rs = this.roomSystem, rsOn = rs && rs.active;
                 const dc = this.dayCycle();
@@ -802,7 +800,7 @@
                     let src = this.lightCanvas;
                     for (let pass = 0; pass < 2; pass++) {
                         const cv = pair[pass];
-                        if (cv.width !== lw || cv.height !== lh) { cv.width = lw; cv.height = lh; }
+                        canvasKit.fitLayer(cv, lw, lh);
                         const sx = cv.getContext('2d');
                         sx.globalCompositeOperation = 'copy'; sx.globalAlpha = 1 / 3;
                         sx.drawImage(src, 0, 0);
@@ -878,7 +876,7 @@
                 let src = this.bloomCanvas;
                 blurred.forEach((cv, i) => {
                     const [w, h] = sizes[i];
-                    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+                    canvasKit.fitLayer(cv, w, h);
                     const c = cv.getContext('2d'); c.imageSmoothingEnabled = true;
                     c.clearRect(0, 0, w, h); c.drawImage(src, 0, 0, w, h);
                     src = cv;

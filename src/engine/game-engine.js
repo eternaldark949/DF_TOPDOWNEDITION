@@ -30,10 +30,8 @@
                 
                 // Lighting Layer
                 this.lightingScale = 1.0; // 1.0 = High (Native), 0.75 = Medium, 0.5 = Low (Half-Res)
-                this.lightCanvas = document.createElement('canvas');
-                this.lightCtx = this.lightCanvas.getContext('2d');
-                this.bloomCanvas = document.createElement('canvas');
-                this.bloomCtx = this.bloomCanvas.getContext('2d');
+                ({ canvas: this.lightCanvas, ctx: this.lightCtx } = canvasKit.createLayer());
+                ({ canvas: this.bloomCanvas, ctx: this.bloomCtx } = canvasKit.createLayer());
                 this.neonSigns = [];
                 
                 // In GameEngine constructor

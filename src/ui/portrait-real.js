@@ -38,8 +38,7 @@
             function supported() {
                 if (_ok !== null) return _ok;
                 try {
-                    const c = document.createElement('canvas'); c.width = c.height = 9;
-                    const x = c.getContext('2d');
+                    const { canvas: c, ctx: x } = canvasKit.createLayer([9, 9]);
                     x.filter = 'blur(2px)'; x.fillStyle = '#000'; x.fillRect(4, 0, 1, 9);
                     _ok = x.getImageData(1, 4, 1, 1).data[3] > 0;
                 } catch (e) { _ok = false; }
@@ -51,7 +50,7 @@
             function layer(i) {
                 let c = pool[i];
                 if (!c) c = pool[i] = document.createElement('canvas');
-                if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+                canvasKit.fitLayer(c, W, H);
                 const x = c.getContext('2d');
                 x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1; x.filter = 'none';
                 x.clearRect(0, 0, W, H);
@@ -1581,7 +1580,7 @@
                 }
                 setSpace(w, h);
                 if (!frame) frame = document.createElement('canvas');
-                if (frame.width !== w || frame.height !== h) { frame.width = w; frame.height = h; }
+                canvasKit.fitLayer(frame, w, h);
                 const c = frame.getContext('2d');
                 c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; c.filter = 'none';
                 c.clearRect(0, 0, w, h);

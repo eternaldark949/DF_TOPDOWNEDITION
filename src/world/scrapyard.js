@@ -86,8 +86,7 @@
             },
             drawGround(ctx,L) {
                 if(!L._ground){
-                    const cv=document.createElement('canvas');cv.width=Math.ceil(L.w);cv.height=Math.ceil(L.h);
-                    const c=cv.getContext('2d'),sx=L.w/1800,sy=L.h/650;c.scale(sx,sy);
+                    const { canvas: cv, ctx: c } = canvasKit.createLayer([Math.ceil(L.w), Math.ceil(L.h)]),sx=L.w/1800,sy=L.h/650;c.scale(sx,sy);
                     c.fillStyle='#292723';c.fillRect(0,0,1800,650);
                     c.fillStyle='#393730';c.fillRect(90,110,480,440);c.fillStyle='#323639';c.fillRect(680,110,500,440);
                     c.fillStyle='#49473e';c.fillRect(1280,115,430,390);

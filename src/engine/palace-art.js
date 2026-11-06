@@ -37,8 +37,7 @@
 
         function palaceFlowerGlow(c,p,t) {
             if(!p._flowerGlow){
-                const cv=document.createElement('canvas');cv.width=Math.ceil(p.width+24);cv.height=Math.ceil(p.height+24);
-                const g=cv.getContext('2d');
+                const { canvas: cv, ctx: g } = canvasKit.createLayer([Math.ceil(p.width+24), Math.ceil(p.height+24)]);
                 for(const f of palaceFlowers(p))if(f.blood){
                     const x=f.x+12,y=f.y+12,halo=g.createRadialGradient(x,y,0,x,y,11);
                     halo.addColorStop(0,'rgba(255,65,90,.88)');halo.addColorStop(.25,'rgba(255,10,55,.52)');halo.addColorStop(1,'rgba(190,0,45,0)');
@@ -63,8 +62,7 @@
             },
 
             _paintPalaceFloor() {
-                const cv=document.createElement('canvas');cv.width=1800;cv.height=1400;
-                const c=cv.getContext('2d'),r=seededRandom(666);
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([1800, 1400]),r=seededRandom(666);
                 const box=(x,y,w,h,col,edge,rad=0)=>{c.beginPath();c.roundRect(x,y,w,h,rad);c.fillStyle=col;c.fill();if(edge){c.strokeStyle=edge;c.lineWidth=1;c.stroke();}};
                 // Polished stone: each slab its own shade, faint grout, crimson and gold veins through it.
                 const slabs=(x,y,w,h,size,base,vein='rgba(255,70,95,.11)',fleck='rgba(255,196,96,.09)')=>{

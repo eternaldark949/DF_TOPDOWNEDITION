@@ -42,9 +42,7 @@
             sprite(owner, key, x, y, w, h, res, paint) {
                 const store = owner._lkSprites || (owner._lkSprites = {});
                 if (store[key]) return store[key];
-                const cv = document.createElement('canvas');
-                cv.width = Math.max(1, Math.ceil(w * res)); cv.height = Math.max(1, Math.ceil(h * res));
-                const c = cv.getContext('2d');
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([Math.max(1, Math.ceil(w * res)), Math.max(1, Math.ceil(h * res))]);
                 c.setTransform(res, 0, 0, res, -x * res, -y * res);
                 paint(c);
                 LandmarkKit.stats.baked++;

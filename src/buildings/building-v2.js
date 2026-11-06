@@ -565,8 +565,7 @@
                 m.font = `${size}px "Great Vibes", cursive`;
                 const w = Math.ceil(m.measureText(text).width) + pad * 2, h = Math.ceil(size * 1.6) + pad * 2;
                 const layer = (paint) => {
-                    const cv = document.createElement('canvas'); cv.width = w * R; cv.height = h * R;
-                    const c = cv.getContext('2d'); c.scale(R, R);
+                    const { canvas: cv, ctx: c } = canvasKit.createLayer([w * R, h * R]); c.scale(R, R);
                     c.font = `${size}px "Great Vibes", cursive`; c.textAlign = 'center'; c.textBaseline = 'middle';
                     paint(c, w / 2, h / 2); return cv;
                 };

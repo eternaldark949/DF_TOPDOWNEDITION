@@ -212,8 +212,7 @@
             },
 
             _paintHouseFloor() {
-                const cv = document.createElement('canvas'); cv.width = 1800; cv.height = 1500;
-                const c = cv.getContext('2d');
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([1800, 1500]);
                 const fill = (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
                 const grid = (x0, y0, x1, y1, sx, sy, col, stagger = 0) => {
                     c.strokeStyle = col; c.lineWidth = 1; c.beginPath();
@@ -323,8 +322,7 @@
             },
 
             _paintLobbyFloor() {
-                const cv = document.createElement('canvas'); cv.width = 1000; cv.height = 1200;
-                const c = cv.getContext('2d'), r = seededRandom(949), GOLD = '#e8c27a', SILVER = '#dfe6ff';
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([1000, 1200]), r = seededRandom(949), GOLD = '#e8c27a', SILVER = '#dfe6ff';
                 c.fillStyle = '#0c0a0c'; c.fillRect(0, 0, 1000, 1200);
                 // Black marble slabs, each a touch different, veined in silver
                 for (let y = 50; y < 1150; y += 100) for (let x = 50; x < 950; x += 100) {
@@ -365,7 +363,7 @@
                 c.lineWidth = 1; c.beginPath(); c.arc(M.x, M.y, 128, 0, Math.PI * 2); c.stroke();
                 for (let k = 0; k < 24; k++) { const a = k * Math.PI / 12; c.fillStyle = k % 2 ? SILVER : GOLD; c.beginPath(); c.arc(M.x + Math.cos(a) * 142, M.y + Math.sin(a) * 142, 2, 0, Math.PI * 2); c.fill(); }
                 const crescent = (cx, cy, R, off, color) => {                 // a disc less an offset disc
-                    const t = document.createElement('canvas'); t.width = t.height = R * 2 + 8; const k = t.getContext('2d');
+                    const { canvas: t, ctx: k } = canvasKit.createLayer([R * 2 + 8, R * 2 + 8]);
                     const g = k.createLinearGradient(0, 0, t.width, t.height); g.addColorStop(0, '#fff1c2'); g.addColorStop(0.5, color); g.addColorStop(1, '#a8823e');
                     k.fillStyle = g; k.beginPath(); k.arc(R + 4, R + 4, R, 0, Math.PI * 2); k.fill();
                     k.globalCompositeOperation = 'destination-out'; k.beginPath(); k.arc(R + 4 + off, R + 4, R * 0.82, 0, Math.PI * 2); k.fill();
@@ -465,8 +463,7 @@
             },
 
             _paintSanctumFloor() {
-                const cv = document.createElement('canvas'); cv.width = 1200; cv.height = 1400;
-                const c = cv.getContext('2d'), r = seededRandom(333), GOLD = '#c9a46a';
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([1200, 1400]), r = seededRandom(333), GOLD = '#c9a46a';
                 c.fillStyle = '#16121a'; c.fillRect(0, 0, 1200, 1400);
                 // Flagstones, staggered and uneven, each a touch different
                 for (let row = 0, y = 50; y < 1350; y += 44, row++) for (let x = 50 - (row % 2) * 34; x < 1150; x += 68) {
@@ -551,8 +548,7 @@
             },
 
             _paintSuiteFloor() {
-                const cv = document.createElement('canvas'); cv.width = 1400; cv.height = 1010;
-                const c = cv.getContext('2d'), r = seededRandom(1919), GOLD = '#e8c27a';
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([1400, 1010]), r = seededRandom(1919), GOLD = '#e8c27a';
                 c.fillStyle = '#0c0a0e'; c.fillRect(0, 0, 1400, 1010);
                 const clip = (x, y, w, h, fn) => { c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip(); fn(); c.restore(); };
                 // Living room: black marble slabs, gold grout, a white diamond at each crossing, silver veins
@@ -658,8 +654,7 @@
             },
 
             _paintClubFloor() {
-                const cv = document.createElement('canvas'); cv.width = 1600; cv.height = 1200;
-                const c = cv.getContext('2d'), r = seededRandom(949), GOLD = '#e8c27a';
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([1600, 1200]), r = seededRandom(949), GOLD = '#e8c27a';
                 c.fillStyle = '#08060b'; c.fillRect(0, 0, 1600, 1200);
                 const veins = (x0, y0, w, h, n, rgba) => {
                     for (let i = 0; i < n; i++) {
@@ -708,7 +703,7 @@
                 const M = { x: 800, y: 1093 };
                 c.fillStyle = '#0c0910'; c.beginPath(); c.arc(M.x, M.y, 52, 0, Math.PI * 2); c.fill();
                 c.strokeStyle = GOLD; c.lineWidth = 2; c.stroke(); c.lineWidth = 0.8; c.beginPath(); c.arc(M.x, M.y, 46, 0, Math.PI * 2); c.stroke();
-                const t = document.createElement('canvas'); t.width = t.height = 90; const k = t.getContext('2d');
+                const { canvas: t, ctx: k } = canvasKit.createLayer([90, 90]);
                 const gg = k.createLinearGradient(0, 0, 90, 90); gg.addColorStop(0, '#fff1c2'); gg.addColorStop(0.5, GOLD); gg.addColorStop(1, '#a8823e');
                 k.fillStyle = gg; k.beginPath(); k.arc(45, 45, 36, 0, Math.PI * 2); k.fill();
                 k.globalCompositeOperation = 'destination-out'; k.beginPath(); k.arc(60, 38, 32, 0, Math.PI * 2); k.fill();
@@ -914,7 +909,7 @@
             _enniAisleArt(p) {
                 const d=p.decor||{},L=p.height,D=p.width,HH=60,S=1.6,r=seededRandom(4000+(d.aisle|0)*31+(d.run|0)*7);
                 const WOOD='#5b331d',DARK='#2a140a',MID='#7d4727',LIGHT='#b07443',BRASS='#b98b4e';
-                const mk=(W,H)=>{const cv=document.createElement('canvas');cv.width=Math.ceil(W*S);cv.height=Math.ceil(H*S);const c=cv.getContext('2d');c.scale(S,S);return [cv,c];};
+                const mk=(W,H)=>{const { canvas: cv, ctx: c } = canvasKit.createLayer([Math.ceil(W*S), Math.ceil(H*S)]);c.scale(S,S);return [cv,c];};
                 const pick=a=>a[r()*a.length|0];
                 // goods on one shelf, front view: x0..x1, the shelf top at y (goods stand on it), h tall at most
                 const goods=(c,kind,x0,x1,y,h)=>{let X=x0+1;
@@ -1046,8 +1041,7 @@
             },
 
             _paintEnniFloor() {
-                const cv = document.createElement('canvas'); cv.width=3250; cv.height=1400;
-                const c=cv.getContext('2d'),r=seededRandom(1849),K=this._enniKit(c,r),GOLD=K.GOLD,CH='#cdb48a';
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([3250, 1400]),r=seededRandom(1849),K=this._enniKit(c,r),GOLD=K.GOLD,CH='#cdb48a';
                 c.fillStyle='#121014';c.fillRect(0,0,2000,1400);
                 // The lobby: obsidian granite in bronze-lined slabs, a champagne band, the medallion under the chandelier
                 K.granite(640,50,720,1300,K.OBSIDIAN,120);
@@ -1107,8 +1101,7 @@
             },
 
             _paintEnniUpperFloor() {
-                const cv = document.createElement('canvas'); cv.width=2000; cv.height=1100;
-                const c=cv.getContext('2d'),r=seededRandom(2203),K=this._enniKit(c,r),GOLD=K.GOLD;
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([2000, 1100]),r=seededRandom(2203),K=this._enniKit(c,r),GOLD=K.GOLD;
                 c.fillStyle='#432630';c.fillRect(0,0,2000,1100);
                 // The gallery round the void, and the stairwell falling away north to the lobby
                 K.marble(640,50,720,590,[212,201,186]);K.border(640,50,720,590);

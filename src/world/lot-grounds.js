@@ -90,8 +90,7 @@
             c.fillStyle = '#211822'; c.fillRect(x0, y0, x1 - x0, y1 - y0);
             // 2. Lawn: a moss-green field over the loam, thinning to bare earth at the courts' edges.
             //    One pixel per field cell, scaled up smoothed, so its edges come out soft.
-            const lawn = document.createElement('canvas'); lawn.width = fw; lawn.height = fh;
-            const lc = lawn.getContext('2d'), img = lc.createImageData(fw, fh), px = img.data;
+            const { canvas: lawn, ctx: lc } = canvasKit.createLayer([fw, fh]), img = lc.createImageData(fw, fh), px = img.data;
             for (let q = 0; q < fw * fh; q++) {
                 const n = FN[q], e = FD[q] < LOT_APRON ? 0 : Math.min(1, (n - L.court) / 0.08);
                 if (e <= 0) continue;

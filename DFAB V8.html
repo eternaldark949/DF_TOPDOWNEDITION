@@ -5868,7 +5868,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'cc2fa448e9aa';
+        const DFAB_BUILD = '055108797009';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="26">
         // ===== LV0 BASEMENT =====
@@ -5913,6 +5913,39 @@
             get game_time_sec () { return _gameTimeSec; }
         }
         const frame_clock = new frameClock();
+    </script>
+    <script type="text/dfab" data-src="basement/canvas-kit.js" data-cost="17">
+        // ===== LV0 BASEMENT =====
+        // The canvas kit: off-screen drawing layers (sprite bakes, caches, light and bloom buffers, portraits).
+        // A free-standing tool, so code that runs while the game is still loading can use it, and the
+        // renderer is one more user of it rather than its owner.
+        //
+        // LAYER PACKET: [width, height] or [width, height, context_options]
+        //   width, height     pixels; leave both out for an unsized layer that is sized later
+        //   context_options   passed to getContext('2d', ...), e.g. { willReadFrequently: true }
+        //
+        //   const { canvas, ctx } = canvasKit.createLayer([w, h]);
+        //   canvasKit.fitLayer(canvas, w, h);   // resize only if the size changed (a resize clears the layer)
+        const canvasKit = {
+            /** A new layer from a packet: { canvas, ctx }. */
+            createLayer (layer_packet) {
+                const canvas = document.createElement('canvas');
+                if (layer_packet && layer_packet.length >= 2) {
+                    canvas.width = layer_packet[0];
+                    canvas.height = layer_packet[1];
+                }
+                const ctx = canvas.getContext('2d', layer_packet && layer_packet[2]);
+                return { canvas, ctx };
+            },
+
+            /** Resize a layer only when its size changed. Returns true if it was resized (and so cleared). */
+            fitLayer (canvas, width, height) {
+                if (canvas.width === width && canvas.height === height) return false;
+                canvas.width = width;
+                canvas.height = height;
+                return true;
+            }
+        };
     </script>
     <script type="text/dfab" data-src="core/config.js" data-cost="406">
 
@@ -19762,9 +19795,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         function paintGraveStone(p) {
             const L = gyStoneLayout(p), w = p.width, h = p.height, r = L.rnd;
-            const cv = document.createElement('canvas');
-            cv.width = Math.ceil((w + GY_PAD * 2) * GY_SCALE); cv.height = Math.ceil((h + GY_PAD * 2) * GY_SCALE);
-            const c = cv.getContext('2d'); c.scale(GY_SCALE, GY_SCALE); c.translate(GY_PAD, GY_PAD);
+            const { canvas: cv, ctx: c } = canvasKit.createLayer([Math.ceil((w + GY_PAD * 2) * GY_SCALE), Math.ceil((h + GY_PAD * 2) * GY_SCALE)]); c.scale(GY_SCALE, GY_SCALE); c.translate(GY_PAD, GY_PAD);
             const TONES = {
                 grey:  ['#9a96a6', '#5e5a6a', '#34303e'], blue: ['#8e98b0', '#56607a', '#2e3446'],
                 rose:  ['#a8949c', '#6e5a62', '#3a2e36'], black: ['#4a4658', '#24222e', '#121018']
@@ -21590,7 +21621,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
     </script>
-    <script type="text/dfab" data-src="entities/prop-sprites.js" data-cost="216">
+    <script type="text/dfab" data-src="entities/prop-sprites.js" data-cost="215">
         // ═══ PROP SPRITES — furniture painted once, stamped every frame ═══
         // A piece of furniture's vector art (entities/props-decor.js) is about 30 canvas calls; its sprite is one
         // drawImage, five when it's turned. Each prop keeps its own sprite (p._spr), so art seeded from where it
@@ -21855,8 +21886,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const t0 = performance.now(), B = PropSprites._bake, S = PLANE_SPRITE.S, b = rect || owner.getBounds(), P = PLANE_SPRITE.PAD;
                 const x = b.x - P, y = b.y - P, w = b.w + 2 * P, h = b.h + 2 * P, W = Math.ceil(w * S), H = Math.ceil(h * S);
                 if (PropSprites.bytes + W * H * 4 > PROP_SPRITE.MAX_BYTES) { s.never = true; return; }
-                const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
-                const c = cv.getContext('2d'); c.setTransform(S, 0, 0, S, -x * S, -y * S);
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([W, H]); c.setTransform(S, 0, 0, S, -x * S, -y * S);
                 B.k = S / Math.max(0.5, density); B.blur = false; B.bad = false; B.retry = false;
                 const run = s.runs.length;
                 PropPass._begin(1, run);
@@ -24096,7 +24126,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
     </script>
-    <script type="text/dfab" data-src="entities/actors.js" data-cost="605">
+    <script type="text/dfab" data-src="entities/actors.js" data-cost="604">
         /**
          * =====================================================================
          *  ACTOR ENTITY (Base Class for NPCs & Enemies)
@@ -24712,8 +24742,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         function _getFireTrailSprites() {
             if (_fireTrailSprites) return _fireTrailSprites;
             const K = 4, frames = 16, cols = 4, w = 32, h = 36, TAU = Math.PI * 2;
-            const atlas = document.createElement('canvas'); atlas.width = w * cols * K; atlas.height = h * cols * K;
-            const c = atlas.getContext('2d');
+            const { canvas: atlas, ctx: c } = canvasKit.createLayer([w * cols * K, h * cols * K]);
             for (let i = 0; i < frames; i++) {
                 const p = i / frames * TAU, sway = Math.sin(p), curl = Math.cos(p);
                 c.setTransform(K, 0, 0, K, ((i % cols) * w + 22) * K, (Math.floor(i / cols) * h + 18) * K);
@@ -24840,8 +24869,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 c.fillStyle = '#fffdeb'; c.beginPath(); c.arc(0, 0, 4.1, 0, TAU); c.fill();
             }
-            const halo = document.createElement('canvas'); halo.width = halo.height = 48 * K;
-            const h = halo.getContext('2d'); h.setTransform(K, 0, 0, K, 24 * K, 24 * K);
+            const { canvas: halo, ctx: h } = canvasKit.createLayer([48 * K, 48 * K]); h.setTransform(K, 0, 0, K, 24 * K, 24 * K);
             const glow = h.createRadialGradient(0, 0, 3, 0, 0, 23);
             glow.addColorStop(0, 'rgba(255,158,21,0.42)'); glow.addColorStop(0.35, 'rgba(255,97,10,0.23)');
             glow.addColorStop(0.7, 'rgba(255,55,8,0.065)'); glow.addColorStop(1, 'rgba(255,55,8,0)');
@@ -29770,7 +29798,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
     </script>
-    <script type="text/dfab" data-src="entities/enemies.js" data-cost="1639">
+    <script type="text/dfab" data-src="entities/enemies.js" data-cost="1638">
         /**
          * =====================================================================
          *  VELVET CAT — Dreampunk Feline Companion
@@ -30941,8 +30969,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ['rgba(90,14,3,0)', '#8e2108', '#ee6913', '#ffc34d'],
                     ['rgba(110,25,4,0)', '#ad420d', '#ffc245', '#fff1ba']
                 ].map((colors,stage) => {
-                    const cv = document.createElement('canvas'); cv.width = 120; cv.height = 16;
-                    const c = cv.getContext('2d'), g = c.createLinearGradient(0,0,120,0);
+                    const { canvas: cv, ctx: c } = canvasKit.createLayer([120, 16]), g = c.createLinearGradient(0,0,120,0);
                     for (const [i,stop] of [0,0.22,0.72,1].entries()) g.addColorStop(stop,colors[i]);
                     c.fillStyle = g; c.fillRect(0,0,120,16);
                     c.fillStyle = stage === 2 ? 'rgba(255,250,214,0.85)' : stage === 1 ? 'rgba(255,204,100,0.55)' : 'rgba(255,100,24,0.35)';
@@ -33756,7 +33783,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
         
     </script>
-    <script type="text/dfab" data-src="buildings/building-v2.js" data-cost="1114">
+    <script type="text/dfab" data-src="buildings/building-v2.js" data-cost="1113">
         /* =====================================================================
            BUILDING V2 - COMPLEX SHAPES & LAYERED RENDERING
            ---------------------------------------------------------------------
@@ -34324,8 +34351,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 m.font = `${size}px "Great Vibes", cursive`;
                 const w = Math.ceil(m.measureText(text).width) + pad * 2, h = Math.ceil(size * 1.6) + pad * 2;
                 const layer = (paint) => {
-                    const cv = document.createElement('canvas'); cv.width = w * R; cv.height = h * R;
-                    const c = cv.getContext('2d'); c.scale(R, R);
+                    const { canvas: cv, ctx: c } = canvasKit.createLayer([w * R, h * R]); c.scale(R, R);
                     c.font = `${size}px "Great Vibes", cursive`; c.textAlign = 'center'; c.textBaseline = 'middle';
                     paint(c, w / 2, h / 2); return cv;
                 };
@@ -35373,7 +35399,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
 
     </script>
-    <script type="text/dfab" data-src="buildings/landmark-kit.js" data-cost="131">
+    <script type="text/dfab" data-src="buildings/landmark-kit.js" data-cost="130">
         /* =====================================================================
            LANDMARK KIT — cheap depth and baked layers for lean-projected buildings
            ---------------------------------------------------------------------
@@ -35418,9 +35444,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             sprite(owner, key, x, y, w, h, res, paint) {
                 const store = owner._lkSprites || (owner._lkSprites = {});
                 if (store[key]) return store[key];
-                const cv = document.createElement('canvas');
-                cv.width = Math.max(1, Math.ceil(w * res)); cv.height = Math.max(1, Math.ceil(h * res));
-                const c = cv.getContext('2d');
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([Math.max(1, Math.ceil(w * res)), Math.max(1, Math.ceil(h * res))]);
                 c.setTransform(res, 0, 0, res, -x * res, -y * res);
                 paint(c);
                 LandmarkKit.stats.baked++;
@@ -35732,7 +35756,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         Object.assign(Ornament, { carve: _ornCarve, ellipse: _ornEllipse, leaf: _ornLeaf, scroll: _ornScroll, rosette: _ornRosette, lion: _ornLion, console: _ornConsole, window: _ornWindow });
     </script>
-    <script type="text/dfab" data-src="buildings/tiered-kit.js" data-cost="422">
+    <script type="text/dfab" data-src="buildings/tiered-kit.js" data-cost="421">
         /* =====================================================================
            TIERED KIT — buildings of several heights, on any plan
            ---------------------------------------------------------------------
@@ -35807,8 +35831,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             litMask(cv, S) {
                 let px;
                 try {                                                                   // (read from a throwaway copy: reading the strip itself could move it off the GPU)
-                    const tmp = document.createElement('canvas'); tmp.width = cv.width; tmp.height = cv.height;
-                    const tc = tmp.getContext('2d', { willReadFrequently: true }); tc.drawImage(cv, 0, 0);
+                    const { canvas: tmp, ctx: tc } = canvasKit.createLayer([cv.width, cv.height, { willReadFrequently: true }]); tc.drawImage(cv, 0, 0);
                     px = tc.getImageData(0, 0, cv.width, cv.height).data;
                 } catch (e) { return null; }
                 const W = cv.width, Hh = cv.height, cw = TierKit.LIT_CU * S, ch = TierKit.LIT_CZ * S;
@@ -35990,7 +36013,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             _tkArt(t) {
                 if (t.art) return t.art;
                 const S = t.S || 2, H = t.z1 - t.z0, L = t.perimeter;
-                const mk = () => { const cv = document.createElement('canvas'); cv.width = Math.max(1, Math.ceil(L * S)); cv.height = Math.max(1, Math.ceil(H * S)); const c = cv.getContext('2d'); c.scale(S, S); return [cv, c]; };
+                const mk = () => { const { canvas: cv, ctx: c } = canvasKit.createLayer([Math.max(1, Math.ceil(L * S)), Math.max(1, Math.ceil(H * S))]); c.scale(S, S); return [cv, c]; };
                 const [dcv, d] = mk(), [lcv, l] = mk();
                 t.paint(d, l, t, H, L);
                 TierKit.litLater(lcv, S);
@@ -38734,7 +38757,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             _mcFaceArt(f, L, n) {
                 const C = MCX.C, S = MCX.S, H = Math.min(this.floors, CONFIG.BUILDINGS.MAX_FLOORS) * CONFIG.BUILDINGS.FLOOR_HEIGHT;
                 const G = this._mcGeo(), door = f.side === 'S' && Math.abs(f.y1 - G.door.y) < 1 && G.door.x > Math.min(f.x1, f.x2) && G.door.x < Math.max(f.x1, f.x2);
-                const mk = () => { const cv = document.createElement('canvas'); cv.width = Math.ceil(L * S); cv.height = Math.ceil(H * S); const c = cv.getContext('2d'); c.scale(S, S); return [cv, c]; };
+                const mk = () => { const { canvas: cv, ctx: c } = canvasKit.createLayer([Math.ceil(L * S), Math.ceil(H * S)]); c.scale(S, S); return [cv, c]; };
                 const [dcv, d] = mk(), [lcv, l] = mk(), bw = L / n;
                 const PAR = 5, BULB = 7.5, FR0 = 9.5, FR1 = 14, GL0 = 17, GL1 = H - 7;
                 // lacquer, a breath of plum low down; the black marble plinth
@@ -39632,7 +39655,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             },
         });
     </script>
-    <script type="text/dfab" data-src="buildings/street-variants.js" data-cost="589">
+    <script type="text/dfab" data-src="buildings/street-variants.js" data-cost="588">
         /* =====================================================================
            STREET VARIANTS — the city's own shops and apartments, in the style
            of the landmarks (Enni Cole, the Cozy Cafe, Moon City)
@@ -39709,9 +39732,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             sprite(key, x0, y0, w, h, res, paint) {
                 let s = this.sprites.get(key);
                 if (s) return s;
-                const cv = document.createElement('canvas');
-                cv.width = Math.max(1, Math.ceil(w * res)); cv.height = Math.max(1, Math.ceil(h * res));
-                const c = cv.getContext('2d');
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([Math.max(1, Math.ceil(w * res)), Math.max(1, Math.ceil(h * res))]);
                 c.setTransform(res, 0, 0, res, -x0 * res, -y0 * res);
                 paint(c);
                 this.stats.baked++; this.stats.bytes += cv.width * cv.height * 4;
@@ -42003,7 +42024,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
     </script>
-    <script type="text/dfab" data-src="buildings/city-view.js" data-cost="272">
+    <script type="text/dfab" data-src="buildings/city-view.js" data-cost="271">
         /* =====================================================================
            CITY VIEW — a stretch of the hub's city seen from high up: the street
            below the Silver Queen's veranda (apt_949), or any interior's window.
@@ -42236,8 +42257,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 let st = this._stamps.get(key);
                 if (st) return st;
                 const P = CAR_ART.PAD, Lw = sp.L + P * 2, Ww = sp.W + P * 2, r = this.scale * 2, side = rot > 1;
-                const cv = document.createElement('canvas'); cv.width = Math.ceil((side ? Ww : Lw) * r); cv.height = Math.ceil((side ? Lw : Ww) * r);
-                const c = cv.getContext('2d');
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([Math.ceil((side ? Ww : Lw) * r), Math.ceil((side ? Lw : Ww) * r)]);
                 c.translate(cv.width / 2, cv.height / 2); c.rotate([0, Math.PI, Math.PI / 2, -Math.PI / 2][rot]); c.scale(r, r);
                 c.drawImage(sp.cv, -Lw / 2, -Ww / 2, Lw, Ww);
                 st = { cv, w: (side ? Ww : Lw) * this.scale, h: (side ? Lw : Ww) * this.scale, L: sp.L };
@@ -42258,8 +42278,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const key = 'ped' + tint;
                 let st = this._stamps.get(key);
                 if (st) return st;
-                const cv = document.createElement('canvas'); cv.width = cv.height = 16;
-                const c = cv.getContext('2d');
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([16, 16]);
                 c.fillStyle = 'rgba(0,0,0,0.4)'; c.beginPath(); c.ellipse(9.5, 10, 4.5, 3.5, 0, 0, Math.PI * 2); c.fill();
                 c.fillStyle = `rgb(${tint})`; c.beginPath(); c.arc(8, 8, 3.6, 0, Math.PI * 2); c.fill();
                 c.fillStyle = 'rgba(20,14,26,0.85)'; c.beginPath(); c.arc(8, 7.6, 1.8, 0, Math.PI * 2); c.fill();    // a head of dark hair, seen from above
@@ -43034,7 +43053,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         });
 
     </script>
-    <script type="text/dfab" data-src="buildings/biggs-park.js" data-cost="235">
+    <script type="text/dfab" data-src="buildings/biggs-park.js" data-cost="234">
         // Biggs: a lacquer-and-brass fairground pavilion. The original footprint and door
         // remain authoritative. All busy ornament is baked in its own bounded plane.
         const BIGGS = { wine: '#692735', dark: '#23131f', cream: '#ead8b1', brass: '#bc945b',
@@ -43043,8 +43062,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             cabin(wheel, i, color) {
                 const cabins=wheel._biggsCabins || (wheel._biggsCabins=[]);
                 if(cabins[i] && cabins[i].color===color)return cabins[i].cv;
-                const cv=document.createElement('canvas');cv.width=96;cv.height=112;
-                const c=cv.getContext('2d');c.scale(4,4);
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([96, 112]);c.scale(4,4);
                 const g=c.createLinearGradient(0,0,24,22);
                 g.addColorStop(0,lightenHex(color,35));g.addColorStop(.5,color);g.addColorStop(1,darkenHex(color,45));
                 BiggsArt.box(c,2,2,20,24,g,'#d2b689',5,.45);
@@ -49487,7 +49505,7 @@ function createNeuralSystemsTiered(x, y, config = {}) {
         
 
     </script>
-    <script type="text/dfab" data-src="traffic/garage-zib.js" data-cost="439">
+    <script type="text/dfab" data-src="traffic/garage-zib.js" data-cost="438">
         /* --- VEHICLE BRANDS DATA STRUCTURE --- */
         /* --- UPDATED VEHICLE DATA --- */
         const VEHICLE_BRANDS = {
@@ -49567,8 +49585,7 @@ function createNeuralSystemsTiered(x, y, config = {}) {
             if (_carPortraits.has(key)) return _carPortraits.get(key);
             const sp = carSprite({ brand, model, visualStyle: B.visualStyle, length: m.length, width: m.width,
                 noHearseCap: !!m.noHearseCap, color: color || B.colors[0], glowColor: glow || null });
-            const cv = document.createElement('canvas'); cv.width = sp.cv.height; cv.height = sp.cv.width;
-            const c = cv.getContext('2d'); c.translate(cv.width / 2, cv.height / 2); c.rotate(-Math.PI / 2);
+            const { canvas: cv, ctx: c } = canvasKit.createLayer([sp.cv.height, sp.cv.width]); c.translate(cv.width / 2, cv.height / 2); c.rotate(-Math.PI / 2);
             c.drawImage(sp.cv, -sp.cv.width / 2, -sp.cv.height / 2);
             const url = cv.toDataURL();
             _carPortraits.set(key, url);
@@ -50670,9 +50687,7 @@ function createNeuralSystemsTiered(x, y, config = {}) {
             let sp = _carSprites.get(key);
             if (sp) return sp;
             const { SCALE: S, PAD: P } = CAR_ART, L = g.L, W = g.W;
-            const cv = document.createElement('canvas');
-            cv.width = Math.ceil((L + P * 2) * S); cv.height = Math.ceil((W + P * 2) * S);
-            const c = cv.getContext('2d');
+            const { canvas: cv, ctx: c } = canvasKit.createLayer([Math.ceil((L + P * 2) * S), Math.ceil((W + P * 2) * S)]);
             c.setTransform(S, 0, 0, S, (L / 2 + P) * S, (W / 2 + P) * S);
             _paintCar(c, v, g);
             sp = { cv, L, W };
@@ -55490,8 +55505,7 @@ Object.assign(TrafficVehicle.prototype, {
             c.fillStyle = '#211822'; c.fillRect(x0, y0, x1 - x0, y1 - y0);
             // 2. Lawn: a moss-green field over the loam, thinning to bare earth at the courts' edges.
             //    One pixel per field cell, scaled up smoothed, so its edges come out soft.
-            const lawn = document.createElement('canvas'); lawn.width = fw; lawn.height = fh;
-            const lc = lawn.getContext('2d'), img = lc.createImageData(fw, fh), px = img.data;
+            const { canvas: lawn, ctx: lc } = canvasKit.createLayer([fw, fh]), img = lc.createImageData(fw, fh), px = img.data;
             for (let q = 0; q < fw * fh; q++) {
                 const n = FN[q], e = FD[q] < LOT_APRON ? 0 : Math.min(1, (n - L.court) / 0.08);
                 if (e <= 0) continue;
@@ -55737,8 +55751,7 @@ Object.assign(TrafficVehicle.prototype, {
 
             _bake(i, j, lod = 0) {
                 const S = this.S, g = this.game, map = g.activeMap, k = 1 / (1 << lod);
-                const cv = document.createElement('canvas'); cv.width = S * k; cv.height = S * k;
-                const c = cv.getContext('2d');
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([S * k, S * k]);
                 c.scale(k, k);
                 const x0 = i * S, y0 = j * S, R = { left: x0, top: y0, right: x0 + S, bottom: y0 + S };
                 const hits = (x, y, w, h) => x < R.right && x + w > R.left && y < R.bottom && y + h > R.top;
@@ -55922,7 +55935,7 @@ Object.assign(TrafficVehicle.prototype, {
             }
         }
     </script>
-    <script type="text/dfab" data-src="ui/map-icons.js" data-cost="390">
+    <script type="text/dfab" data-src="ui/map-icons.js" data-cost="389">
         /* =====================================================================
            MAP ICONS & MAP ART — one icon set and one city look for the golden map
            (ui/ui-system.js) and the phone's map (ui/phone.js).
@@ -55982,8 +55995,7 @@ Object.assign(TrafficVehicle.prototype, {
                 let s = this._cache.get(key);
                 if (s) return s;
                 const S = Math.max(4, Math.round(css * dpr)), pad = Math.ceil(S * 0.45), W = S + pad * 2;
-                const cv = document.createElement('canvas'); cv.width = cv.height = W;
-                const c = cv.getContext('2d');
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([W, W]);
                 c.translate(pad, pad);
                 const [base, glyph] = kind.split(':');
                 const ay = (this._paint[base] || this._paint.client).call(this, c, S, glyph) ?? 0.5;   // painters return the anchor's y (0..1 of S)
@@ -56231,8 +56243,7 @@ Object.assign(TrafficVehicle.prototype, {
             /** A tiny cobbled-grain tile (parks and open ground). */
             grain() {
                 if (this._grain) return this._grain;
-                const cv = document.createElement('canvas'); cv.width = cv.height = 40;
-                const c = cv.getContext('2d'), rnd = seededRandom(949);
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([40, 40]), rnd = seededRandom(949);
                 for (let i = 0; i < 46; i++) { c.fillStyle = `rgba(${rnd() < 0.5 ? MAP_PAL.grain[0] : MAP_PAL.grain[1]}, ${0.05 + rnd() * 0.08})`; c.beginPath(); c.arc(rnd() * 40, rnd() * 40, 1.2 + rnd() * 2.6, 0, Math.PI * 2); c.fill(); }
                 return (this._grain = cv);
             },
@@ -56405,7 +56416,7 @@ Object.assign(TrafficVehicle.prototype, {
             }
         };
     </script>
-    <script type="text/dfab" data-src="ui/ui-system.js" data-cost="739">
+    <script type="text/dfab" data-src="ui/ui-system.js" data-cost="738">
         class UISystem {
             constructor(gameEngine) {
                 this.game = gameEngine;
@@ -56428,8 +56439,7 @@ Object.assign(TrafficVehicle.prototype, {
                 //
                 // Dynamic icons (player, NPCs, nav markers) live on a separate
                 // canvas layer and update independently at 60fps.
-                this.cacheCanvas = document.createElement('canvas');
-                this.cacheCtx = this.cacheCanvas.getContext('2d');
+                ({ canvas: this.cacheCanvas, ctx: this.cacheCtx } = canvasKit.createLayer());
                 this.isCacheDirty = true;          // External "force rebuild" flag
                 this.cacheMapId = null;
                 this.cacheBoundsMap = null;        // {x, y, w, h} in map-space
@@ -56456,8 +56466,7 @@ Object.assign(TrafficVehicle.prototype, {
                 
                 // --- ANIMATION LAYER ---
                 // Separate canvas for animated icons (runs at 60fps when map is open)
-                this.iconCanvas = document.createElement('canvas');
-                this.iconCtx = this.iconCanvas.getContext('2d');
+                ({ canvas: this.iconCanvas, ctx: this.iconCtx } = canvasKit.createLayer());
                 this.mapContainer = document.getElementById('map-interface');
                 this.iconCanvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:2;';
                 this.mapContainer.appendChild(this.iconCanvas);
@@ -60814,7 +60823,7 @@ Object.assign(TrafficVehicle.prototype, {
             return out;
         }
     </script>
-    <script type="text/dfab" data-src="ui/humanoid-render.js" data-cost="2023">
+    <script type="text/dfab" data-src="ui/humanoid-render.js" data-cost="2022">
         const HAIR_SIM = {
             STEP: 1 / 120,          // game seconds per physics slice
             MAX_STEPS: 12,          // catch-up cap after a stall
@@ -61679,7 +61688,7 @@ Object.assign(TrafficVehicle.prototype, {
         function _portraitLayer(i, w, h) {
             let c = _portraitLayers[i];
             if (!c) c = _portraitLayers[i] = document.createElement('canvas');
-            if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+            canvasKit.fitLayer(c, w, h);
             const x = c.getContext('2d');
             x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1;
             x.clearRect(0, 0, w, h);
@@ -63957,7 +63966,7 @@ Object.assign(TrafficVehicle.prototype, {
         }
         
     </script>
-    <script type="text/dfab" data-src="ui/portrait-real.js" data-cost="1236">
+    <script type="text/dfab" data-src="ui/portrait-real.js" data-cost="1234">
         /* =====================================================================
            PAINTED PORTRAITS — the realistic bust behind drawCharacterPortrait()
            ---------------------------------------------------------------------
@@ -63998,8 +64007,7 @@ Object.assign(TrafficVehicle.prototype, {
             function supported() {
                 if (_ok !== null) return _ok;
                 try {
-                    const c = document.createElement('canvas'); c.width = c.height = 9;
-                    const x = c.getContext('2d');
+                    const { canvas: c, ctx: x } = canvasKit.createLayer([9, 9]);
                     x.filter = 'blur(2px)'; x.fillStyle = '#000'; x.fillRect(4, 0, 1, 9);
                     _ok = x.getImageData(1, 4, 1, 1).data[3] > 0;
                 } catch (e) { _ok = false; }
@@ -64011,7 +64019,7 @@ Object.assign(TrafficVehicle.prototype, {
             function layer(i) {
                 let c = pool[i];
                 if (!c) c = pool[i] = document.createElement('canvas');
-                if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+                canvasKit.fitLayer(c, W, H);
                 const x = c.getContext('2d');
                 x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1; x.filter = 'none';
                 x.clearRect(0, 0, W, H);
@@ -65541,7 +65549,7 @@ Object.assign(TrafficVehicle.prototype, {
                 }
                 setSpace(w, h);
                 if (!frame) frame = document.createElement('canvas');
-                if (frame.width !== w || frame.height !== h) { frame.width = w; frame.height = h; }
+                canvasKit.fitLayer(frame, w, h);
                 const c = frame.getContext('2d');
                 c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; c.filter = 'none';
                 c.clearRect(0, 0, w, h);
@@ -65790,7 +65798,7 @@ Object.assign(TrafficVehicle.prototype, {
             },
         };
     </script>
-    <script type="text/dfab" data-src="ui/crowd-impostors.js" data-cost="220">
+    <script type="text/dfab" data-src="ui/crowd-impostors.js" data-cost="219">
         // ═══ CROWD QUALITY — how the crowd is drawn (Settings → Graphics → Crowd Quality) ═══
         // The crowd: pedestrians, the lobby's and club's guests and staff, and a map's standing
         // NPCs. Never Stella, the crew, enemies or the fallen (they're always drawn live).
@@ -65839,8 +65847,7 @@ Object.assign(TrafficVehicle.prototype, {
             /** Bake the strip: frame 0 standing, 1..FRAMES the walk cycle, in the body's own frame (facing +x) */
             _bake(e, c, sig) {
                 const F = CROWD_BAKE.FRAMES, R = CROWD_BAKE.R, Q = CROWD_BAKE.Q, cell = Math.ceil(R * 2 * Q);
-                const cv = document.createElement('canvas'); cv.width = cell * (F + 1); cv.height = cell;
-                const g = cv.getContext('2d'); if (!g) return null;
+                const { canvas: cv, ctx: g } = canvasKit.createLayer([cell * (F + 1), cell]); if (!g) return null;
                 const parts = sig.split('|'), sp = +parts[4] || 0;
                 // a stand-in body: same look and place, its gait pinned (no ticks pass, so syncHumanoidGait keeps it)
                 const B = { x: e.x, y: e.y, angle: 0, look: e.look, walkPhase: 0 };
@@ -65985,8 +65992,7 @@ Object.assign(TrafficVehicle.prototype, {
 
             _startJob(owner, e, c, look, env, light, sp, rot) {
                 const F = CROWD_HQ.FRAMES, R = CROWD_HQ.R, Q = CROWD_HQ.Q, cell = Math.ceil(R * 2 * Q);
-                const cv = document.createElement('canvas'); cv.width = cell * (sp > 0 ? F : 1); cv.height = cell;
-                const g = cv.getContext('2d'); if (!g) return null;
+                const { canvas: cv, ctx: g } = canvasKit.createLayer([cell * (sp > 0 ? F : 1), cell]); if (!g) return null;
                 // A stand-in walker: their look, walking along +x through its own little world
                 const B = { x: 0, y: 0, angle: 0, look: e.look, walkPhase: 0, _bakePed: typeof Pedestrian !== 'undefined' && e instanceof Pedestrian, _wxSeed: 0 };
                 syncHumanoidGait(B);
@@ -67956,8 +67962,7 @@ Object.assign(TrafficVehicle.prototype, {
             },
             drawGround(ctx,L) {
                 if(!L._ground){
-                    const cv=document.createElement('canvas');cv.width=Math.ceil(L.w);cv.height=Math.ceil(L.h);
-                    const c=cv.getContext('2d'),sx=L.w/1800,sy=L.h/650;c.scale(sx,sy);
+                    const { canvas: cv, ctx: c } = canvasKit.createLayer([Math.ceil(L.w), Math.ceil(L.h)]),sx=L.w/1800,sy=L.h/650;c.scale(sx,sy);
                     c.fillStyle='#292723';c.fillRect(0,0,1800,650);
                     c.fillStyle='#393730';c.fillRect(90,110,480,440);c.fillStyle='#323639';c.fillRect(680,110,500,440);
                     c.fillStyle='#49473e';c.fillRect(1280,115,430,390);
@@ -70657,7 +70662,7 @@ Object.assign(TrafficVehicle.prototype, {
                 const P = SCENE_VISION_PAINT[this.name];
                 if (P) {
                     const cv = this.cv, k = Math.min(1.5, window.devicePixelRatio || 1), w = Math.round(innerWidth * k), h = Math.round(innerHeight * k);
-                    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+                    canvasKit.fitLayer(cv, w, h);
                     P.call(this, cv.getContext('2d'), w, h, this.t, this.S);
                 }
             }
@@ -72246,7 +72251,7 @@ Object.assign(TrafficVehicle.prototype, {
         }
         
     </script>
-    <script type="text/dfab" data-src="engine/game-engine.js" data-cost="187">
+    <script type="text/dfab" data-src="engine/game-engine.js" data-cost="186">
         class GameEngine {
             constructor() {
                 
@@ -72279,10 +72284,8 @@ Object.assign(TrafficVehicle.prototype, {
                 
                 // Lighting Layer
                 this.lightingScale = 1.0; // 1.0 = High (Native), 0.75 = Medium, 0.5 = Low (Half-Res)
-                this.lightCanvas = document.createElement('canvas');
-                this.lightCtx = this.lightCanvas.getContext('2d');
-                this.bloomCanvas = document.createElement('canvas');
-                this.bloomCtx = this.bloomCanvas.getContext('2d');
+                ({ canvas: this.lightCanvas, ctx: this.lightCtx } = canvasKit.createLayer());
+                ({ canvas: this.bloomCanvas, ctx: this.bloomCtx } = canvasKit.createLayer());
                 this.neonSigns = [];
                 
                 // In GameEngine constructor
@@ -74928,7 +74931,7 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/noise.js" data-cost="126">
+    <script type="text/dfab" data-src="engine/noise.js" data-cost="125">
         // GameEngine — Noise: sounds that give 949 (and fights) away. Methods are added to
         // GameEngine.prototype (see engineMixin in game-engine.js). Enemies hear by sound and
         // see by light (calculatePlayerVisibility); there's no radar. See CONFIG.NOISE.
@@ -75040,7 +75043,7 @@ engineMixin({
                 let cv = this._mirageCv;
                 if (!cv) { cv = this._mirageCv = document.createElement('canvas'); this._mirageCtx = cv.getContext('2d'); }
                 const sw = Math.max(1, W >> 2), sh = Math.max(1, H >> 2);
-                if (cv.width !== sw || cv.height !== sh) { cv.width = sw; cv.height = sh; }
+                canvasKit.fitLayer(cv, sw, sh);
                 let copied = false;
                 const N = 72, TAU = Math.PI * 2;
                 ctx.save();
@@ -75168,8 +75171,7 @@ engineMixin({
         /** An aurora streak: a soft upright blade of light, brightest at its foot (the seam). */
         function _edgeStreakSprite() {
             if (_edgeStreak) return _edgeStreak;
-            const cv = document.createElement('canvas'); cv.width = 32; cv.height = 128;
-            const c = cv.getContext('2d');
+            const { canvas: cv, ctx: c } = canvasKit.createLayer([32, 128]);
             const h = c.createLinearGradient(0, 0, 32, 0);
             h.addColorStop(0, 'rgba(214, 196, 255, 0)'); h.addColorStop(0.5, 'rgba(214, 196, 255, 1)'); h.addColorStop(1, 'rgba(214, 196, 255, 0)');
             c.fillStyle = h; c.fillRect(0, 0, 32, 128);
@@ -75515,7 +75517,7 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/reflections.js" data-cost="903">
+    <script type="text/dfab" data-src="engine/reflections.js" data-cost="902">
         // GameEngine — Reflections. Methods are added to GameEngine.prototype
         // (see engineMixin in game-engine.js).
         //
@@ -75632,7 +75634,7 @@ engineMixin({
             const T = PUDDLE_BAKE_TOL, al = b.al;
             if (b.q === q && Math.abs(b.g - g) <= T && Math.abs(al[0] - a1) <= T && Math.abs(al[1] - a2) <= T && Math.abs(al[2] - a3) <= T) return b;
             const size = Math.max(2, Math.ceil((p.r + 2) * 2 * q));
-            if (b.cv.width !== size || b.cv.height !== size) { b.cv.width = size; b.cv.height = size; }
+            canvasKit.fitLayer(b.cv, size, size);
             const c = b.cv.getContext('2d');
             c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
             c.clearRect(0, 0, size, size);
@@ -76100,7 +76102,7 @@ engineMixin({
                 x0 = Math.max(0, Math.floor(x0)); y0 = Math.max(0, Math.floor(y0)); x1 = Math.min(rw, Math.ceil(x1)); y1 = Math.min(rh, Math.ceil(y1));
                 if (x1 <= x0 || y1 <= y0) return;
                 const T = this._reflTierCv || (this._reflTierCv = document.createElement('canvas'));
-                if (T.width !== rw || T.height !== rh) { T.width = rw; T.height = rh; }
+                canvasKit.fitLayer(T, rw, rh);
                 const tc = T.getContext('2d');
                 tc.setTransform(1, 0, 0, 1, 0, 0); tc.clearRect(x0, y0, x1 - x0, y1 - y0); toView(tc);
                 for (const b of list) { try { b.drawReflection(tc, dark); } catch (e) { /* a facade that can't mirror is left out */ } }
@@ -76924,7 +76926,7 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/shopfront-light.js" data-cost="92">
+    <script type="text/dfab" data-src="engine/shopfront-light.js" data-cost="91">
         // GameEngine — Shopfront light. Methods are added to GameEngine.prototype (see engineMixin in
         // game-engine.js).
         //
@@ -76982,9 +76984,7 @@ engineMixin({
             let s = _shopLightBakes.get(key);
             if (s) return s;
             const L = SHOP_LIGHT, D = L.DEPTH, W = w + D * 1.2, ox = W / 2;
-            const cv = document.createElement('canvas');
-            cv.width = Math.ceil(W * L.K); cv.height = Math.ceil(D * L.K);
-            const c = cv.getContext('2d');
+            const { canvas: cv, ctx: c } = canvasKit.createLayer([Math.ceil(W * L.K), Math.ceil(D * L.K)]);
             c.scale(L.K, L.K); c.globalCompositeOperation = 'lighter';
             const n = Math.max(2, Math.floor((w - 24) / (L.PANE + L.MULL))), span = n * (L.PANE + L.MULL) - L.MULL, x0 = -span / 2;
             const neonRGB = _shopRGB(neon), panes = [];
@@ -79479,7 +79479,7 @@ engineMixin({
                 // The veil on its own half-resolution layer (it's all soft), with the lane cut out of it
                 const R = 0.5, W = Math.ceil(this.canvas.width * R), H = Math.ceil(this.canvas.height * R);
                 const v = this._scopeVeil || (this._scopeVeil = document.createElement('canvas'));
-                if (v.width !== W || v.height !== H) { v.width = W; v.height = H; }
+                canvasKit.fitLayer(v, W, H);
                 const vc = v.getContext('2d');
                 vc.setTransform(1, 0, 0, 1, 0, 0);
                 vc.clearRect(0, 0, W, H);
@@ -89291,7 +89291,7 @@ engineMixin({
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/interiors.js" data-cost="1365">
+    <script type="text/dfab" data-src="engine/interiors.js" data-cost="1360">
         // GameEngine — Apartment and clinic interiors, the city backdrop from the veranda, mission marker.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         /* =====================================================================
@@ -89506,8 +89506,7 @@ engineMixin({
             },
 
             _paintHouseFloor() {
-                const cv = document.createElement('canvas'); cv.width = 1800; cv.height = 1500;
-                const c = cv.getContext('2d');
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([1800, 1500]);
                 const fill = (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
                 const grid = (x0, y0, x1, y1, sx, sy, col, stagger = 0) => {
                     c.strokeStyle = col; c.lineWidth = 1; c.beginPath();
@@ -89617,8 +89616,7 @@ engineMixin({
             },
 
             _paintLobbyFloor() {
-                const cv = document.createElement('canvas'); cv.width = 1000; cv.height = 1200;
-                const c = cv.getContext('2d'), r = seededRandom(949), GOLD = '#e8c27a', SILVER = '#dfe6ff';
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([1000, 1200]), r = seededRandom(949), GOLD = '#e8c27a', SILVER = '#dfe6ff';
                 c.fillStyle = '#0c0a0c'; c.fillRect(0, 0, 1000, 1200);
                 // Black marble slabs, each a touch different, veined in silver
                 for (let y = 50; y < 1150; y += 100) for (let x = 50; x < 950; x += 100) {
@@ -89659,7 +89657,7 @@ engineMixin({
                 c.lineWidth = 1; c.beginPath(); c.arc(M.x, M.y, 128, 0, Math.PI * 2); c.stroke();
                 for (let k = 0; k < 24; k++) { const a = k * Math.PI / 12; c.fillStyle = k % 2 ? SILVER : GOLD; c.beginPath(); c.arc(M.x + Math.cos(a) * 142, M.y + Math.sin(a) * 142, 2, 0, Math.PI * 2); c.fill(); }
                 const crescent = (cx, cy, R, off, color) => {                 // a disc less an offset disc
-                    const t = document.createElement('canvas'); t.width = t.height = R * 2 + 8; const k = t.getContext('2d');
+                    const { canvas: t, ctx: k } = canvasKit.createLayer([R * 2 + 8, R * 2 + 8]);
                     const g = k.createLinearGradient(0, 0, t.width, t.height); g.addColorStop(0, '#fff1c2'); g.addColorStop(0.5, color); g.addColorStop(1, '#a8823e');
                     k.fillStyle = g; k.beginPath(); k.arc(R + 4, R + 4, R, 0, Math.PI * 2); k.fill();
                     k.globalCompositeOperation = 'destination-out'; k.beginPath(); k.arc(R + 4 + off, R + 4, R * 0.82, 0, Math.PI * 2); k.fill();
@@ -89759,8 +89757,7 @@ engineMixin({
             },
 
             _paintSanctumFloor() {
-                const cv = document.createElement('canvas'); cv.width = 1200; cv.height = 1400;
-                const c = cv.getContext('2d'), r = seededRandom(333), GOLD = '#c9a46a';
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([1200, 1400]), r = seededRandom(333), GOLD = '#c9a46a';
                 c.fillStyle = '#16121a'; c.fillRect(0, 0, 1200, 1400);
                 // Flagstones, staggered and uneven, each a touch different
                 for (let row = 0, y = 50; y < 1350; y += 44, row++) for (let x = 50 - (row % 2) * 34; x < 1150; x += 68) {
@@ -89845,8 +89842,7 @@ engineMixin({
             },
 
             _paintSuiteFloor() {
-                const cv = document.createElement('canvas'); cv.width = 1400; cv.height = 1010;
-                const c = cv.getContext('2d'), r = seededRandom(1919), GOLD = '#e8c27a';
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([1400, 1010]), r = seededRandom(1919), GOLD = '#e8c27a';
                 c.fillStyle = '#0c0a0e'; c.fillRect(0, 0, 1400, 1010);
                 const clip = (x, y, w, h, fn) => { c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip(); fn(); c.restore(); };
                 // Living room: black marble slabs, gold grout, a white diamond at each crossing, silver veins
@@ -89952,8 +89948,7 @@ engineMixin({
             },
 
             _paintClubFloor() {
-                const cv = document.createElement('canvas'); cv.width = 1600; cv.height = 1200;
-                const c = cv.getContext('2d'), r = seededRandom(949), GOLD = '#e8c27a';
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([1600, 1200]), r = seededRandom(949), GOLD = '#e8c27a';
                 c.fillStyle = '#08060b'; c.fillRect(0, 0, 1600, 1200);
                 const veins = (x0, y0, w, h, n, rgba) => {
                     for (let i = 0; i < n; i++) {
@@ -90002,7 +89997,7 @@ engineMixin({
                 const M = { x: 800, y: 1093 };
                 c.fillStyle = '#0c0910'; c.beginPath(); c.arc(M.x, M.y, 52, 0, Math.PI * 2); c.fill();
                 c.strokeStyle = GOLD; c.lineWidth = 2; c.stroke(); c.lineWidth = 0.8; c.beginPath(); c.arc(M.x, M.y, 46, 0, Math.PI * 2); c.stroke();
-                const t = document.createElement('canvas'); t.width = t.height = 90; const k = t.getContext('2d');
+                const { canvas: t, ctx: k } = canvasKit.createLayer([90, 90]);
                 const gg = k.createLinearGradient(0, 0, 90, 90); gg.addColorStop(0, '#fff1c2'); gg.addColorStop(0.5, GOLD); gg.addColorStop(1, '#a8823e');
                 k.fillStyle = gg; k.beginPath(); k.arc(45, 45, 36, 0, Math.PI * 2); k.fill();
                 k.globalCompositeOperation = 'destination-out'; k.beginPath(); k.arc(60, 38, 32, 0, Math.PI * 2); k.fill();
@@ -90208,7 +90203,7 @@ engineMixin({
             _enniAisleArt(p) {
                 const d=p.decor||{},L=p.height,D=p.width,HH=60,S=1.6,r=seededRandom(4000+(d.aisle|0)*31+(d.run|0)*7);
                 const WOOD='#5b331d',DARK='#2a140a',MID='#7d4727',LIGHT='#b07443',BRASS='#b98b4e';
-                const mk=(W,H)=>{const cv=document.createElement('canvas');cv.width=Math.ceil(W*S);cv.height=Math.ceil(H*S);const c=cv.getContext('2d');c.scale(S,S);return [cv,c];};
+                const mk=(W,H)=>{const { canvas: cv, ctx: c } = canvasKit.createLayer([Math.ceil(W*S), Math.ceil(H*S)]);c.scale(S,S);return [cv,c];};
                 const pick=a=>a[r()*a.length|0];
                 // goods on one shelf, front view: x0..x1, the shelf top at y (goods stand on it), h tall at most
                 const goods=(c,kind,x0,x1,y,h)=>{let X=x0+1;
@@ -90340,8 +90335,7 @@ engineMixin({
             },
 
             _paintEnniFloor() {
-                const cv = document.createElement('canvas'); cv.width=3250; cv.height=1400;
-                const c=cv.getContext('2d'),r=seededRandom(1849),K=this._enniKit(c,r),GOLD=K.GOLD,CH='#cdb48a';
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([3250, 1400]),r=seededRandom(1849),K=this._enniKit(c,r),GOLD=K.GOLD,CH='#cdb48a';
                 c.fillStyle='#121014';c.fillRect(0,0,2000,1400);
                 // The lobby: obsidian granite in bronze-lined slabs, a champagne band, the medallion under the chandelier
                 K.granite(640,50,720,1300,K.OBSIDIAN,120);
@@ -90401,8 +90395,7 @@ engineMixin({
             },
 
             _paintEnniUpperFloor() {
-                const cv = document.createElement('canvas'); cv.width=2000; cv.height=1100;
-                const c=cv.getContext('2d'),r=seededRandom(2203),K=this._enniKit(c,r),GOLD=K.GOLD;
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([2000, 1100]),r=seededRandom(2203),K=this._enniKit(c,r),GOLD=K.GOLD;
                 c.fillStyle='#432630';c.fillRect(0,0,2000,1100);
                 // The gallery round the void, and the stairwell falling away north to the lobby
                 K.marble(640,50,720,590,[212,201,186]);K.border(640,50,720,590);
@@ -90841,7 +90834,7 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/palace-art.js" data-cost="396">
+    <script type="text/dfab" data-src="engine/palace-art.js" data-cost="395">
         // The Demoness Palace: its floor (painted once), its glow after the darkness, and its decor
         // (dp_*). Obsidian and gold, crimson silk, ember light. Methods are added to
         // GameEngine.prototype (see engineMixin in game-engine.js); the decor drawer is a plain
@@ -90881,8 +90874,7 @@ engineMixin({
 
         function palaceFlowerGlow(c,p,t) {
             if(!p._flowerGlow){
-                const cv=document.createElement('canvas');cv.width=Math.ceil(p.width+24);cv.height=Math.ceil(p.height+24);
-                const g=cv.getContext('2d');
+                const { canvas: cv, ctx: g } = canvasKit.createLayer([Math.ceil(p.width+24), Math.ceil(p.height+24)]);
                 for(const f of palaceFlowers(p))if(f.blood){
                     const x=f.x+12,y=f.y+12,halo=g.createRadialGradient(x,y,0,x,y,11);
                     halo.addColorStop(0,'rgba(255,65,90,.88)');halo.addColorStop(.25,'rgba(255,10,55,.52)');halo.addColorStop(1,'rgba(190,0,45,0)');
@@ -90907,8 +90899,7 @@ engineMixin({
             },
 
             _paintPalaceFloor() {
-                const cv=document.createElement('canvas');cv.width=1800;cv.height=1400;
-                const c=cv.getContext('2d'),r=seededRandom(666);
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([1800, 1400]),r=seededRandom(666);
                 const box=(x,y,w,h,col,edge,rad=0)=>{c.beginPath();c.roundRect(x,y,w,h,rad);c.fillStyle=col;c.fill();if(edge){c.strokeStyle=edge;c.lineWidth=1;c.stroke();}};
                 // Polished stone: each slab its own shade, faint grout, crimson and gold veins through it.
                 const slabs=(x,y,w,h,size,base,vein='rgba(255,70,95,.11)',fleck='rgba(255,196,96,.09)')=>{
@@ -91330,7 +91321,7 @@ engineMixin({
             }
         }
     </script>
-    <script type="text/dfab" data-src="engine/neural-art.js" data-cost="136">
+    <script type="text/dfab" data-src="engine/neural-art.js" data-cost="135">
 // A sapphire-crystal department store: vitrines, polished facets and private styling suites.
 function drawNeuralDecorProp(c,p){
     const x=p.x,y=p.y,w=p.width,h=p.height,B=NeuralArt.box,T=NEURAL;
@@ -91402,7 +91393,7 @@ function neuralCanopy(){
 engineMixin({
     drawNeuralInterior(c){if(!this._neuralFloor)this._neuralFloor=this._paintNeuralFloor();c.drawImage(this._neuralFloor,0,0);},
     _paintNeuralFloor(){
-        const cv=document.createElement('canvas');cv.width=1000;cv.height=800;const c=cv.getContext('2d'),B=NeuralArt.box,T=NEURAL,r=seededRandom(808);
+        const { canvas: cv, ctx: c } = canvasKit.createLayer([1000, 800]),B=NeuralArt.box,T=NEURAL,r=seededRandom(808);
         // Veined marble: each slab its own shade, silver-white veins, a polished diagonal sheen.
         const marble=(x,y,w,h,cw,ch,a,b,vein,n)=>{
             c.save();c.beginPath();c.rect(x,y,w,h);c.clip();
@@ -91891,7 +91882,7 @@ engineMixin({
     }
 });
     </script>
-    <script type="text/dfab" data-src="engine/keeper-art.js" data-cost="340">
+    <script type="text/dfab" data-src="engine/keeper-art.js" data-cost="339">
         // GameEngine — the Keeper's hill and parlor (the prologue's fireside). Scene-only places:
         // everything is painted here, with no props to bump into.
         //   keepers_hill   a lone hill above a sea of clouds, deep green with pink flowers, the house at the top
@@ -91945,8 +91936,7 @@ engineMixin({
 
             _paintKeeperHill() {
                 const W = KEEPER.HILL.w, H = KEEPER.HILL.h, k = 0.5;                 // painted at half size, drawn at full
-                const cv = document.createElement('canvas'); cv.width = W * k; cv.height = H * k;
-                const c = cv.getContext('2d'), r = seededRandom(6125);
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([W * k, H * k]), r = seededRandom(6125);
                 c.scale(k, k);
                 // The sea of clouds far below: deep violet, rolling bands of lighter mist
                 const sky = c.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#140a26'); sky.addColorStop(0.5, '#1c0f33'); sky.addColorStop(1, '#241238'); c.fillStyle = sky; c.fillRect(0, 0, W, H);
@@ -91995,8 +91985,7 @@ engineMixin({
 
             /** The house, from above: a country home made strange. Canvas origin = world (540, 320). */
             _paintKeeperHouse() {
-                const cv = document.createElement('canvas'); cv.width = 720; cv.height = 560;
-                const c = cv.getContext('2d'), r = seededRandom(747), O = { x: 540, y: 320 };
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([720, 560]), r = seededRandom(747), O = { x: 540, y: 320 };
                 c.translate(-O.x, -O.y);
                 // Shadow on the lawn
                 c.fillStyle = 'rgba(4,2,10,0.55)'; c.fillRect(708, 452, 450, 250);
@@ -92103,8 +92092,7 @@ engineMixin({
 
             _paintKeeperParlor() {
                 const { w: W, h: H } = KEEPER.PARLOR;
-                const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
-                const c = cv.getContext('2d'), r = seededRandom(212), GOLD = '#e8c27a';
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([W, H]), r = seededRandom(212), GOLD = '#e8c27a';
                 // Checkerboard tiles, black and ivory, a soft sheen across them
                 const T = 44;
                 for (let y = 0; y < H; y += T) for (let x = 0; x < W; x += T) {
@@ -92341,8 +92329,7 @@ engineMixin({
             },
 
             _paintVanCabin() {
-                const cv = document.createElement('canvas'); cv.width = VAN.W; cv.height = VAN.H;
-                const c = cv.getContext('2d'), B = VAN.BODY, C = VAN.CABIN;
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([VAN.W, VAN.H]), B = VAN.BODY, C = VAN.CABIN;
                 // The body, its shadow on the road, the gold pinstripe
                 c.fillStyle = 'rgba(0,0,0,0.55)'; c.beginPath(); c.roundRect(B.x + 8, B.y + 10, B.w, B.h, 26); c.fill();
                 c.fillStyle = '#17111f'; c.beginPath(); c.roundRect(B.x, B.y, B.w, B.h, 26); c.fill();
@@ -92435,7 +92422,7 @@ engineMixin({
             },
         });
     </script>
-    <script type="text/dfab" data-src="engine/lighting.js" data-cost="602">
+    <script type="text/dfab" data-src="engine/lighting.js" data-cost="598">
         // Shared immutable falloff tables; softArea only reads these stops.
         const HOLE_AREA = [[0, 'rgba(255,255,255,1)'], [0.5, 'rgba(255,255,255,0.9)'], [1, 'rgba(255,255,255,0)']];
         const HOLE_AREA_SOFT = [[0, 'rgba(255,255,255,1)'], [0.3, 'rgba(255,255,255,0.85)'], [0.7, 'rgba(255,255,255,0.35)'], [1, 'rgba(255,255,255,0)']];   // long, gentle edge
@@ -92457,8 +92444,7 @@ engineMixin({
         let _fireballLightSprite = null;
         function _getFireballLightSprite() {
             if (_fireballLightSprite) return _fireballLightSprite;
-            const cv = document.createElement('canvas'); cv.width = cv.height = 256;
-            const c = cv.getContext('2d'), g = c.createRadialGradient(128, 128, 0, 128, 128, 128);
+            const { canvas: cv, ctx: c } = canvasKit.createLayer([256, 256]), g = c.createRadialGradient(128, 128, 0, 128, 128, 128);
             g.addColorStop(0, 'rgba(255, 177, 65, 1)');
             g.addColorStop(0.12, 'rgba(255, 151, 36, 0.96)');
             g.addColorStop(0.35, 'rgba(255, 112, 20, 0.68)');
@@ -92613,8 +92599,7 @@ engineMixin({
                     wedges.lineTo(seg.x2, seg.y2); wedges.closePath();
                 }
                 const bake = paint => {
-                    const cv = document.createElement('canvas'); cv.width = cv.height = size;
-                    const c = cv.getContext('2d');
+                    const { canvas: cv, ctx: c } = canvasKit.createLayer([size, size]);
                     c.scale(S, S); c.translate(R - lamp.x, R - lamp.y);
                     paint(c);
                     c.globalCompositeOperation = 'destination-out'; c.fillStyle = '#000'; c.fill(wedges);
@@ -92686,7 +92671,7 @@ engineMixin({
                 try {
                     if (typeof OffscreenCanvas !== 'function') throw new Error('Lighting bitmap cache unavailable');
                     const cv = cache.canvas || (cache.canvas = new OffscreenCanvas(w, h));
-                    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+                    canvasKit.fitLayer(cv, w, h);
                     const c = cache.ctx || (cache.ctx = cv.getContext('2d'));
                     if (!c || c.isContextLost?.()) throw new Error('Lighting base context unavailable');
                     c.globalCompositeOperation = 'copy'; c.drawImage(this.lightCanvas, 0, 0);
@@ -92870,7 +92855,7 @@ engineMixin({
                 // Layer resolution: lighting quality, halved for soft shadows (the upscale softens edges)
                 const LS = this.lightingScale * (GameSettings.softShadows ? 0.5 : 1) * (this._adaptiveLighting?.factor || 1);
                 const lw = Math.max(1, Math.round(this.canvas.width * LS)), lh = Math.max(1, Math.round(this.canvas.height * LS));
-                if (this.lightCanvas.width !== lw || this.lightCanvas.height !== lh) { this.lightCanvas.width = lw; this.lightCanvas.height = lh; }
+                canvasKit.fitLayer(this.lightCanvas, lw, lh);
                 const lc = this.lightCtx;
                 const rs = this.roomSystem, rsOn = rs && rs.active;
                 const dc = this.dayCycle();
@@ -93240,7 +93225,7 @@ engineMixin({
                     let src = this.lightCanvas;
                     for (let pass = 0; pass < 2; pass++) {
                         const cv = pair[pass];
-                        if (cv.width !== lw || cv.height !== lh) { cv.width = lw; cv.height = lh; }
+                        canvasKit.fitLayer(cv, lw, lh);
                         const sx = cv.getContext('2d');
                         sx.globalCompositeOperation = 'copy'; sx.globalAlpha = 1 / 3;
                         sx.drawImage(src, 0, 0);
@@ -93316,7 +93301,7 @@ engineMixin({
                 let src = this.bloomCanvas;
                 blurred.forEach((cv, i) => {
                     const [w, h] = sizes[i];
-                    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+                    canvasKit.fitLayer(cv, w, h);
                     const c = cv.getContext('2d'); c.imageSmoothingEnabled = true;
                     c.clearRect(0, 0, w, h); c.drawImage(src, 0, 0, w, h);
                     src = cv;
@@ -93356,7 +93341,7 @@ engineMixin({
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/daylight.js" data-cost="184">
+    <script type="text/dfab" data-src="engine/daylight.js" data-cost="183">
         // GameEngine — Daylight: the sun, the shadows it casts, drifting cloud shadows, and the
         // day's warm grade. Night belongs to the lighting layer (lighting.js); from dawn to
         // dusk this takes over: the city in peach-rose morning, clear warm noon and an
@@ -93431,7 +93416,7 @@ engineMixin({
                 if (strength <= 0.02) return;
                 const R = 0.5, W = Math.ceil(this.canvas.width * R), H = Math.ceil(this.canvas.height * R);
                 const cv = this._shadowCv || (this._shadowCv = document.createElement('canvas'));
-                if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+                canvasKit.fitLayer(cv, W, H);
                 const c = cv.getContext('2d'), m = ctx.getTransform();
                 c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, W, H);
                 c.setTransform(m.a * R, m.b * R, m.c * R, m.d * R, m.e * R, m.f * R);
@@ -94609,7 +94594,7 @@ engineMixin({
         document.getElementById('btn-exit').addEventListener('click', () => showMessage("TERMINATING SESSION"));
         
     </script>
-    <script type="text/dfab" data-src="ui/phone.js" data-cost="767">
+    <script type="text/dfab" data-src="ui/phone.js" data-cost="766">
         /* --- PHONE SYSTEM --- */
         const phoneSystem = {
             overlay: document.getElementById('phone-overlay'),
@@ -95655,7 +95640,7 @@ engineMixin({
                 const r = cv.getBoundingClientRect(), k = Math.min(window.devicePixelRatio || 1, 2);
                 const w = Math.round(r.width * k), h = Math.min(1600, Math.round(r.height * k));
                 if (w < 8 || h < 8) return;
-                if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+                canvasKit.fitLayer(cv, w, h);
                 const x = cv.getContext('2d');
                 x.clearRect(0, 0, w, h);
                 RealPortrait.figure(x, w, h, neumeFigureConfig());
@@ -96037,7 +96022,7 @@ engineMixin({
             else AppLaunch.init();
         }
     </script>
-    <script type="text/dfab" data-src="ui/messages.js" data-cost="897">
+    <script type="text/dfab" data-src="ui/messages.js" data-cost="896">
         /* =====================================================================
            MESSAGES — the phone's Messages app ("Velvet Thread")
            ---------------------------------------------------------------------
@@ -96835,8 +96820,7 @@ engineMixin({
                 let url = null;
                 try {
                     const W = 400, H = 160, span = 4200, fs = W / span;
-                    const c = document.createElement('canvas'); c.width = W; c.height = H;
-                    const ctx = c.getContext('2d');
+                    const { canvas: c, ctx: ctx } = canvasKit.createLayer([W, H]);
                     ctx.fillStyle = MAP_PAL.base; ctx.fillRect(0, 0, W, H);
                     const ox = W / 2 - (P.x + P.w / 2) * fs, oy = H / 2 - (P.y + P.h / 2) * fs;
                     ctx.setTransform(fs, 0, 0, fs, ox, oy);
@@ -99145,7 +99129,7 @@ engineMixin({
                 const w = Math.max(64, Math.round(src.width * this.SCALE)), h = Math.max(36, Math.round(src.height * this.SCALE));
                 let ok = true;
                 for (const cv of host.querySelectorAll('canvas')) {
-                    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+                    canvasKit.fitLayer(cv, w, h);
                     const ctx = cv.getContext('2d');
                     try { ctx.clearRect(0, 0, w, h); ctx.drawImage(src, 0, 0, w, h); } catch (e) { ok = false; }
                 }

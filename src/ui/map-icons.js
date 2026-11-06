@@ -57,8 +57,7 @@
                 let s = this._cache.get(key);
                 if (s) return s;
                 const S = Math.max(4, Math.round(css * dpr)), pad = Math.ceil(S * 0.45), W = S + pad * 2;
-                const cv = document.createElement('canvas'); cv.width = cv.height = W;
-                const c = cv.getContext('2d');
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([W, W]);
                 c.translate(pad, pad);
                 const [base, glyph] = kind.split(':');
                 const ay = (this._paint[base] || this._paint.client).call(this, c, S, glyph) ?? 0.5;   // painters return the anchor's y (0..1 of S)
@@ -306,8 +305,7 @@
             /** A tiny cobbled-grain tile (parks and open ground). */
             grain() {
                 if (this._grain) return this._grain;
-                const cv = document.createElement('canvas'); cv.width = cv.height = 40;
-                const c = cv.getContext('2d'), rnd = seededRandom(949);
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([40, 40]), rnd = seededRandom(949);
                 for (let i = 0; i < 46; i++) { c.fillStyle = `rgba(${rnd() < 0.5 ? MAP_PAL.grain[0] : MAP_PAL.grain[1]}, ${0.05 + rnd() * 0.08})`; c.beginPath(); c.arc(rnd() * 40, rnd() * 40, 1.2 + rnd() * 2.6, 0, Math.PI * 2); c.fill(); }
                 return (this._grain = cv);
             },

@@ -109,7 +109,7 @@
                 let cv = this._mirageCv;
                 if (!cv) { cv = this._mirageCv = document.createElement('canvas'); this._mirageCtx = cv.getContext('2d'); }
                 const sw = Math.max(1, W >> 2), sh = Math.max(1, H >> 2);
-                if (cv.width !== sw || cv.height !== sh) { cv.width = sw; cv.height = sh; }
+                canvasKit.fitLayer(cv, sw, sh);
                 let copied = false;
                 const N = 72, TAU = Math.PI * 2;
                 ctx.save();

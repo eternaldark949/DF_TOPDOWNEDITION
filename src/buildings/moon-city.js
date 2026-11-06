@@ -232,7 +232,7 @@
             _mcFaceArt(f, L, n) {
                 const C = MCX.C, S = MCX.S, H = Math.min(this.floors, CONFIG.BUILDINGS.MAX_FLOORS) * CONFIG.BUILDINGS.FLOOR_HEIGHT;
                 const G = this._mcGeo(), door = f.side === 'S' && Math.abs(f.y1 - G.door.y) < 1 && G.door.x > Math.min(f.x1, f.x2) && G.door.x < Math.max(f.x1, f.x2);
-                const mk = () => { const cv = document.createElement('canvas'); cv.width = Math.ceil(L * S); cv.height = Math.ceil(H * S); const c = cv.getContext('2d'); c.scale(S, S); return [cv, c]; };
+                const mk = () => { const { canvas: cv, ctx: c } = canvasKit.createLayer([Math.ceil(L * S), Math.ceil(H * S)]); c.scale(S, S); return [cv, c]; };
                 const [dcv, d] = mk(), [lcv, l] = mk(), bw = L / n;
                 const PAR = 5, BULB = 7.5, FR0 = 9.5, FR1 = 14, GL0 = 17, GL1 = H - 7;
                 // lacquer, a breath of plum low down; the black marble plinth

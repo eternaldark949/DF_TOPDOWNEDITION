@@ -1175,9 +1175,7 @@
 
         function paintGraveStone(p) {
             const L = gyStoneLayout(p), w = p.width, h = p.height, r = L.rnd;
-            const cv = document.createElement('canvas');
-            cv.width = Math.ceil((w + GY_PAD * 2) * GY_SCALE); cv.height = Math.ceil((h + GY_PAD * 2) * GY_SCALE);
-            const c = cv.getContext('2d'); c.scale(GY_SCALE, GY_SCALE); c.translate(GY_PAD, GY_PAD);
+            const { canvas: cv, ctx: c } = canvasKit.createLayer([Math.ceil((w + GY_PAD * 2) * GY_SCALE), Math.ceil((h + GY_PAD * 2) * GY_SCALE)]); c.scale(GY_SCALE, GY_SCALE); c.translate(GY_PAD, GY_PAD);
             const TONES = {
                 grey:  ['#9a96a6', '#5e5a6a', '#34303e'], blue: ['#8e98b0', '#56607a', '#2e3446'],
                 rose:  ['#a8949c', '#6e5a62', '#3a2e36'], black: ['#4a4658', '#24222e', '#121018']
