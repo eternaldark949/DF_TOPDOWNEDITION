@@ -612,66 +612,10 @@
              */
             drawQuipBubble(ctx) {
                 if (!this.quipText || this.dead || this.inCar) return;
-                
-                const POP_IN = 8;
-                const POP_OUT = 10;
-                let scale;
-                if (this.quipAge < POP_IN) {
-                    const t = this.quipAge / POP_IN;
-                    scale = 1 - Math.pow(1 - t, 3);
-                } else if (this.quipAge < this.quipDuration - POP_OUT) {
-                    scale = 1;
-                } else {
-                    const t = Math.max(0, (this.quipDuration - this.quipAge) / POP_OUT);
-                    scale = t * t;
-                }
-                if (scale <= 0.01) return;
-                
-                ctx.save();
-                ctx.translate(this.x, this.y - 35);
-                ctx.scale(scale, scale);
-                
-                ctx.font = '600 8px Montserrat, sans-serif';
-                const textW = ctx.measureText(this.quipText).width;
-                const padX = 7;
-                const padY = 3;
-                const w = Math.max(28, textW + padX * 2);
-                const h = 16 + padY * 2;
-                const r = 6;
-                const x = -w / 2;
-                const y = -h / 2;
-                
-                // Character-colored outline. SPEAKER_COLORS may be missing
-                // this NPC — fall back to the existing pedestrian-bubble
-                // purple so the bubble still reads correctly.
+                // Smoky silver frame; the character's colour (SPEAKER_COLORS) runs as the inner line
                 const charColor = (typeof SPEAKER_COLORS !== 'undefined' && SPEAKER_COLORS[this.name]) || '#a469ff';
-                
-                ctx.fillStyle = 'rgba(8, 6, 18, 0.86)';
-                ctx.strokeStyle = charColor;
-                ctx.lineWidth = 1.2;
-                ctx.beginPath();
-                ctx.moveTo(x + r, y);
-                ctx.lineTo(x + w - r, y);
-                ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-                ctx.lineTo(x + w, y + h - r);
-                ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-                ctx.lineTo(x + w / 2 + 4, y + h);
-                ctx.lineTo(x + w / 2,     y + h + 4);
-                ctx.lineTo(x + w / 2 - 4, y + h);
-                ctx.lineTo(x + r, y + h);
-                ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-                ctx.lineTo(x, y + r);
-                ctx.quadraticCurveTo(x, y, x + r, y);
-                ctx.closePath();
-                ctx.fill();
-                ctx.stroke();
-                
-                ctx.fillStyle = '#e8e4ff';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(this.quipText, 0, 0);
-                
-                ctx.restore();
+                drawSpeechBubble(ctx, this.x, this.y - 35, this.quipText, speechBubbleScale(this.quipAge, this.quipDuration),
+                    { metal: 'silverDeep', accent: charColor });
             }
             
             /** Prisma is crystalline: faceted highlights play over her. */
@@ -731,6 +675,95 @@
                 
                 // (The weapon is drawn by drawProceduralHumanoid, in hand.)
             }
+        }
+
+        // =====================================================================
+        //  SPEECH BUBBLES — black fill, metallic double-line frame
+        // =====================================================================
+        // Shared by pedestrians, named NPCs and 949's emote. Polished but dark
+        // metals so the frame sits back in the night: smoky silver for passersby,
+        // deep bronze-gold for her. A named character keeps their SPEAKER_COLORS
+        // hue as the inner line (accent) so you can still tell who is talking.
+        const BUBBLE_METALS = {
+            silverDeep: { stops: ['#aab0ba', '#6b717c', '#24282f', '#80868f', '#b2b8c1', '#3b4048'], text: '#e2e6ec' },
+            bronzeDeep: { stops: ['#d9aa62', '#8f5c24', '#3a210a', '#a8743a', '#d2a160', '#55330f'], text: '#f6e2c2' }
+        };
+
+        /** Pop-in (ease-out cubic) → hold → pop-out (ease-in) scale for a bubble `age` frames into `dur`. */
+        function speechBubbleScale(age, dur) {
+            const POP_IN = 8, POP_OUT = 10;
+            if (age < POP_IN) return 1 - Math.pow(1 - age / POP_IN, 3);
+            if (age < dur - POP_OUT) return 1;
+            const t = Math.max(0, (dur - age) / POP_OUT);
+            return t * t;
+        }
+
+        function _speechBubblePath(ctx, x, y, w, h, r, tailW, tailH) {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.arcTo(x + w, y, x + w, y + r, r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+            ctx.lineTo(x + w / 2 + tailW, y + h);
+            ctx.lineTo(x + w / 2, y + h + tailH);             // tail tip
+            ctx.lineTo(x + w / 2 - tailW, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.arcTo(x, y + h, x, y + h - r, r);
+            ctx.lineTo(x, y + r);
+            ctx.arcTo(x, y, x + r, y, r);
+            ctx.closePath();
+        }
+
+        function _metalGradient(ctx, x, y, w, h, stops, reverse) {
+            // A diagonal sweep (bright, shadow, bright again) like a bevel catching light
+            const g = reverse ? ctx.createLinearGradient(x + w, y + h, x, y)
+                              : ctx.createLinearGradient(x, y, x + w * 0.35, y + h * 1.4);
+            for (let i = 0; i < stops.length; i++) g.addColorStop(i / (stops.length - 1), stops[i]);
+            return g;
+        }
+
+        /**
+         * Draw a speech bubble centred at (cx, cy) in world space, scaled by `scale`.
+         * opts: { metal: key of BUBBLE_METALS, emoji: true for the larger emote box, accent: inner-line colour }
+         */
+        function drawSpeechBubble(ctx, cx, cy, text, scale, opts = {}) {
+            if (!text || scale <= 0.01) return;
+            const metal = BUBBLE_METALS[opts.metal] || BUBBLE_METALS.silverDeep;
+            const emoji = !!opts.emoji, accent = opts.accent || null;
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.scale(scale, scale);
+            ctx.font = emoji ? '600 18px sans-serif' : '600 8px Montserrat, sans-serif';
+            const w = emoji ? 30 : Math.max(32, ctx.measureText(text).width + 18);
+            const h = emoji ? 28 : 23, r = 7;
+            const x = -w / 2, y = -h / 2;
+            // Black body, lifted off the street by a soft shadow
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.6)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 1.5;
+            ctx.fillStyle = 'rgba(4, 3, 8, 0.92)';
+            _speechBubblePath(ctx, x, y, w, h, r, 4.5, 5);
+            ctx.fill();
+            ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+            // Outer rule
+            ctx.strokeStyle = _metalGradient(ctx, x, y, w, h, metal.stops, false);
+            ctx.lineWidth = 1.3;
+            ctx.stroke();
+            // Inner rule: inset, thinner, light swept the other way (or the speaker's colour)
+            const i = 2.4;
+            ctx.strokeStyle = accent || _metalGradient(ctx, x, y, w, h, metal.stops, true);
+            ctx.lineWidth = accent ? 0.8 : 0.65;
+            if (accent) { ctx.shadowColor = accent; ctx.shadowBlur = 3; }
+            _speechBubblePath(ctx, x + i, y + i, w - i * 2, h - i * 2, r - i * 0.8, 2.6, 2.2);
+            ctx.stroke();
+            ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+            // A small glint on the top-left shoulder
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+            ctx.beginPath(); ctx.ellipse(x + r + 2, y + 0.6, 2.4, 0.5, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = metal.text;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, 0, emoji ? 1 : 0.3);
+            ctx.restore();
         }
 
         // =====================================================================

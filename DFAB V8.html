@@ -1940,6 +1940,9 @@
         #ui-scrapyard .w-line { white-space:normal; justify-content:center; flex-wrap:wrap; letter-spacing:2px; text-align:center; }
         body.objective-hud #ui-scrapyard { top:calc(12% + 60px); }
         body.objective-hud.yard-hud #ui-stealth-indicator { top:calc(12% + 130px); }
+
+        /* Gamepad (ui/gamepad.js): the highlight the D-pad moves between menu items */
+        .pad-focus { outline: 2px solid var(--df-champagne, #e8c27a) !important; outline-offset: 2px; box-shadow: 0 0 14px rgba(232, 194, 122, 0.45) !important; }
         /* =========================================
            PAUSE SETTINGS PANEL
            ========================================= */
@@ -5865,7 +5868,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'd3225b1f5c74';
+        const DFAB_BUILD = 'cbe6319ec129';
     </script>
     <script type="text/dfab" data-src="core/config.js" data-cost="406">
 
@@ -9979,7 +9982,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
         
     </script>
-    <script type="text/dfab" data-src="story/story-db.js" data-cost="224">
+    <script type="text/dfab" data-src="story/story-db.js" data-cost="222">
         /* =====================================================================
            NARRATIVE DATABASE (The Repository)
            ---------------------------------------------------------------------
@@ -10094,10 +10097,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                                 // Break the back wall
                                                 const w = game.activeMap.walls.find(w => w.breach);   // tagged in world/maps.js
                                                 if (w) {
-                                                    for (let ex = w.x; ex < w.x + w.w; ex += 40) {
-                                                        game.weather.spawnExplosion(ex, w.y, '#ff8800');
-                                                        game.weather.spawnExplosion(ex + 20, w.y + 10, '#ff4500');
-                                                    }
+                                                    game.spawnBreachBlast(w, -1);   // fire, light, debris, smoke (engine/breach-fx.js)
+                                                    audioSys.sfx('explode');
                                                     game.removeWall(w);
                                                 }
                                                 // The drones drop in through the breach: a lancer, a seer, a grappler (entities/drones.js)
@@ -26588,7 +26589,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
     </script>
-    <script type="text/dfab" data-src="entities/npc.js" data-cost="533">
+    <script type="text/dfab" data-src="entities/npc.js" data-cost="559">
         /**
          * =====================================================================
          *  NPC CLASS (Extends ActorEntity)
@@ -27203,66 +27204,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              */
             drawQuipBubble(ctx) {
                 if (!this.quipText || this.dead || this.inCar) return;
-                
-                const POP_IN = 8;
-                const POP_OUT = 10;
-                let scale;
-                if (this.quipAge < POP_IN) {
-                    const t = this.quipAge / POP_IN;
-                    scale = 1 - Math.pow(1 - t, 3);
-                } else if (this.quipAge < this.quipDuration - POP_OUT) {
-                    scale = 1;
-                } else {
-                    const t = Math.max(0, (this.quipDuration - this.quipAge) / POP_OUT);
-                    scale = t * t;
-                }
-                if (scale <= 0.01) return;
-                
-                ctx.save();
-                ctx.translate(this.x, this.y - 35);
-                ctx.scale(scale, scale);
-                
-                ctx.font = '600 8px Montserrat, sans-serif';
-                const textW = ctx.measureText(this.quipText).width;
-                const padX = 7;
-                const padY = 3;
-                const w = Math.max(28, textW + padX * 2);
-                const h = 16 + padY * 2;
-                const r = 6;
-                const x = -w / 2;
-                const y = -h / 2;
-                
-                // Character-colored outline. SPEAKER_COLORS may be missing
-                // this NPC — fall back to the existing pedestrian-bubble
-                // purple so the bubble still reads correctly.
+                // Smoky silver frame; the character's colour (SPEAKER_COLORS) runs as the inner line
                 const charColor = (typeof SPEAKER_COLORS !== 'undefined' && SPEAKER_COLORS[this.name]) || '#a469ff';
-                
-                ctx.fillStyle = 'rgba(8, 6, 18, 0.86)';
-                ctx.strokeStyle = charColor;
-                ctx.lineWidth = 1.2;
-                ctx.beginPath();
-                ctx.moveTo(x + r, y);
-                ctx.lineTo(x + w - r, y);
-                ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-                ctx.lineTo(x + w, y + h - r);
-                ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-                ctx.lineTo(x + w / 2 + 4, y + h);
-                ctx.lineTo(x + w / 2,     y + h + 4);
-                ctx.lineTo(x + w / 2 - 4, y + h);
-                ctx.lineTo(x + r, y + h);
-                ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-                ctx.lineTo(x, y + r);
-                ctx.quadraticCurveTo(x, y, x + r, y);
-                ctx.closePath();
-                ctx.fill();
-                ctx.stroke();
-                
-                ctx.fillStyle = '#e8e4ff';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(this.quipText, 0, 0);
-                
-                ctx.restore();
+                drawSpeechBubble(ctx, this.x, this.y - 35, this.quipText, speechBubbleScale(this.quipAge, this.quipDuration),
+                    { metal: 'silverDeep', accent: charColor });
             }
             
             /** Prisma is crystalline: faceted highlights play over her. */
@@ -27322,6 +27267,95 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // (The weapon is drawn by drawProceduralHumanoid, in hand.)
             }
+        }
+
+        // =====================================================================
+        //  SPEECH BUBBLES — black fill, metallic double-line frame
+        // =====================================================================
+        // Shared by pedestrians, named NPCs and 949's emote. Polished but dark
+        // metals so the frame sits back in the night: smoky silver for passersby,
+        // deep bronze-gold for her. A named character keeps their SPEAKER_COLORS
+        // hue as the inner line (accent) so you can still tell who is talking.
+        const BUBBLE_METALS = {
+            silverDeep: { stops: ['#aab0ba', '#6b717c', '#24282f', '#80868f', '#b2b8c1', '#3b4048'], text: '#e2e6ec' },
+            bronzeDeep: { stops: ['#d9aa62', '#8f5c24', '#3a210a', '#a8743a', '#d2a160', '#55330f'], text: '#f6e2c2' }
+        };
+
+        /** Pop-in (ease-out cubic) → hold → pop-out (ease-in) scale for a bubble `age` frames into `dur`. */
+        function speechBubbleScale(age, dur) {
+            const POP_IN = 8, POP_OUT = 10;
+            if (age < POP_IN) return 1 - Math.pow(1 - age / POP_IN, 3);
+            if (age < dur - POP_OUT) return 1;
+            const t = Math.max(0, (dur - age) / POP_OUT);
+            return t * t;
+        }
+
+        function _speechBubblePath(ctx, x, y, w, h, r, tailW, tailH) {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.arcTo(x + w, y, x + w, y + r, r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+            ctx.lineTo(x + w / 2 + tailW, y + h);
+            ctx.lineTo(x + w / 2, y + h + tailH);             // tail tip
+            ctx.lineTo(x + w / 2 - tailW, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.arcTo(x, y + h, x, y + h - r, r);
+            ctx.lineTo(x, y + r);
+            ctx.arcTo(x, y, x + r, y, r);
+            ctx.closePath();
+        }
+
+        function _metalGradient(ctx, x, y, w, h, stops, reverse) {
+            // A diagonal sweep (bright, shadow, bright again) like a bevel catching light
+            const g = reverse ? ctx.createLinearGradient(x + w, y + h, x, y)
+                              : ctx.createLinearGradient(x, y, x + w * 0.35, y + h * 1.4);
+            for (let i = 0; i < stops.length; i++) g.addColorStop(i / (stops.length - 1), stops[i]);
+            return g;
+        }
+
+        /**
+         * Draw a speech bubble centred at (cx, cy) in world space, scaled by `scale`.
+         * opts: { metal: key of BUBBLE_METALS, emoji: true for the larger emote box, accent: inner-line colour }
+         */
+        function drawSpeechBubble(ctx, cx, cy, text, scale, opts = {}) {
+            if (!text || scale <= 0.01) return;
+            const metal = BUBBLE_METALS[opts.metal] || BUBBLE_METALS.silverDeep;
+            const emoji = !!opts.emoji, accent = opts.accent || null;
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.scale(scale, scale);
+            ctx.font = emoji ? '600 18px sans-serif' : '600 8px Montserrat, sans-serif';
+            const w = emoji ? 30 : Math.max(32, ctx.measureText(text).width + 18);
+            const h = emoji ? 28 : 23, r = 7;
+            const x = -w / 2, y = -h / 2;
+            // Black body, lifted off the street by a soft shadow
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.6)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 1.5;
+            ctx.fillStyle = 'rgba(4, 3, 8, 0.92)';
+            _speechBubblePath(ctx, x, y, w, h, r, 4.5, 5);
+            ctx.fill();
+            ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+            // Outer rule
+            ctx.strokeStyle = _metalGradient(ctx, x, y, w, h, metal.stops, false);
+            ctx.lineWidth = 1.3;
+            ctx.stroke();
+            // Inner rule: inset, thinner, light swept the other way (or the speaker's colour)
+            const i = 2.4;
+            ctx.strokeStyle = accent || _metalGradient(ctx, x, y, w, h, metal.stops, true);
+            ctx.lineWidth = accent ? 0.8 : 0.65;
+            if (accent) { ctx.shadowColor = accent; ctx.shadowBlur = 3; }
+            _speechBubblePath(ctx, x + i, y + i, w - i * 2, h - i * 2, r - i * 0.8, 2.6, 2.2);
+            ctx.stroke();
+            ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+            // A small glint on the top-left shoulder
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+            ctx.beginPath(); ctx.ellipse(x + r + 2, y + 0.6, 2.4, 0.5, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = metal.text;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, 0, emoji ? 1 : 0.3);
+            ctx.restore();
         }
 
         // =====================================================================
@@ -27614,7 +27648,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         };
 
     </script>
-    <script type="text/dfab" data-src="entities/pedestrians.js" data-cost="672">
+    <script type="text/dfab" data-src="entities/pedestrians.js" data-cost="650">
         /**
          * =====================================================================
          *  PEDESTRIAN CLASS (Roaming City Civilian)
@@ -28517,62 +28551,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              */
             drawQuipBubble(ctx) {
                 if (!this.quipText) return;
-                
-                const POP_IN = 8;
-                const POP_OUT = 10;
-                let scale;
-                if (this.quipAge < POP_IN) {
-                    const t = this.quipAge / POP_IN;
-                    scale = 1 - Math.pow(1 - t, 3);                  // ease-out cubic
-                } else if (this.quipAge < this.quipDuration - POP_OUT) {
-                    scale = 1;                                        // hold
-                } else {
-                    const t = Math.max(0, (this.quipDuration - this.quipAge) / POP_OUT);
-                    scale = t * t;                                    // ease-in shrink
-                }
-                if (scale <= 0.01) return;
-                
-                ctx.save();
-                ctx.translate(this.x, this.y - 30);  // above head, screen-aligned
-                ctx.scale(scale, scale);
-                
-                ctx.font = '600 8px Montserrat, sans-serif';
-                const textW = ctx.measureText(this.quipText).width;
-                const padX = 7;
-                const padY = 3;
-                const w = Math.max(28, textW + padX * 2);
-                const h = 16 + padY * 2;
-                const r = 6;
-                const x = -w / 2;
-                const y = -h / 2;
-                
-                // Rounded-rect bubble with a small downward tail
-                ctx.fillStyle = 'rgba(8, 6, 18, 0.86)';
-                ctx.strokeStyle = 'rgba(164, 105, 255, 0.4)';   // subtle purple-neon edge
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(x + r, y);
-                ctx.lineTo(x + w - r, y);
-                ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-                ctx.lineTo(x + w, y + h - r);
-                ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-                ctx.lineTo(x + w / 2 + 4, y + h);
-                ctx.lineTo(x + w / 2,     y + h + 4);            // tail tip
-                ctx.lineTo(x + w / 2 - 4, y + h);
-                ctx.lineTo(x + r, y + h);
-                ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-                ctx.lineTo(x, y + r);
-                ctx.quadraticCurveTo(x, y, x + r, y);
-                ctx.closePath();
-                ctx.fill();
-                ctx.stroke();
-                
-                ctx.fillStyle = '#e8e4ff';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(this.quipText, 0, 0);
-                
-                ctx.restore();
+                // Black bubble, smoky silver double-line frame (drawSpeechBubble: entities/npc.js)
+                drawSpeechBubble(ctx, this.x, this.y - 31, this.quipText, speechBubbleScale(this.quipAge, this.quipDuration),
+                    { metal: 'silverDeep' });
             }
         }
         
@@ -73677,6 +73658,214 @@ Object.assign(TrafficVehicle.prototype, {
         });
 
     </script>
+    <script type="text/dfab" data-src="engine/breach-fx.js" data-cost="148">
+        // GameEngine — The breach blast: a wall blown in (the Double Nights penthouse ambush, story step 4).
+        // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        //
+        // Charges ripple along the wall; each is a white-hot core, a lumpy fireball and a thin gold shock ring.
+        // Warm light spills across the floor and flickers out; black-lacquer panels (some gold-trimmed) and
+        // glass are thrown into the room and stay as debris; violet-grey smoke and embers linger.
+        // Two passes: drawBreachUnder (scorch, debris, smoke) before the darkness, so the room's light
+        // and the blast's own spill light them; drawBreachGlow (additive light, fire, sparks) after it.
+        const BREACH = {
+            CHARGES_PER_PX: 1 / 85,  // one charge per this much wall (at least 2, at most 8)
+            RIPPLE_MS: 70,           // between charges, along the wall
+            FIRE_MS: 650,            // a charge's fireball
+            SPILL_MS: 1400,          // the warm light on the floor
+            SPILL_R: 430,
+            LIP_MS: 3500,            // the burning edge where the wall was
+            DEBRIS_MS: 20000,        // debris lies this long, then fades over the last second
+            SMOKE_MAX: 48, SPARK_MAX: 140
+        };
+        const _breachSprites = new Map();
+        /** A soft radial sprite (128×128) from gradient stops, cached by key. */
+        function breachSprite(key, stops) {
+            let cv = _breachSprites.get(key);
+            if (cv) return cv;
+            cv = document.createElement('canvas'); cv.width = cv.height = 128;
+            const c = cv.getContext('2d'), g = c.createRadialGradient(64, 64, 0, 64, 64, 64);
+            for (const [o, col] of stops) g.addColorStop(o, col);
+            c.fillStyle = g; c.fillRect(0, 0, 128, 128);
+            _breachSprites.set(key, cv);
+            return cv;
+        }
+        const _bFire = () => breachSprite('fire', [[0, 'rgba(255,250,235,1)'], [0.18, 'rgba(255,224,150,0.95)'], [0.42, 'rgba(255,140,50,0.6)'], [0.7, 'rgba(200,60,30,0.22)'], [1, 'rgba(120,20,40,0)']]);
+        const _bCore = () => breachSprite('core', [[0, 'rgba(255,255,255,1)'], [0.4, 'rgba(255,240,210,0.6)'], [1, 'rgba(255,220,180,0)']]);
+        const _bPool = () => breachSprite('pool', [[0, 'rgba(255,196,120,0.9)'], [0.35, 'rgba(255,140,60,0.45)'], [0.75, 'rgba(180,70,90,0.12)'], [1, 'rgba(90,40,120,0)']]);
+        const _bSmoke = () => breachSprite('smoke', [[0, 'rgba(46,34,58,0.95)'], [0.5, 'rgba(38,28,52,0.55)'], [1, 'rgba(30,22,44,0)']]);
+        const _bScorch = () => breachSprite('scorch', [[0, 'rgba(8,5,8,0.92)'], [0.55, 'rgba(14,8,12,0.55)'], [1, 'rgba(14,8,12,0)']]);
+        const _bEmber = () => breachSprite('ember', [[0, 'rgba(255,170,80,0.9)'], [1, 'rgba(255,90,40,0)']]);
+
+        engineMixin({
+            /**
+             * Blow `wall` ({x, y, w, h}) in. `inward` is the side of the room, +1 (down) or -1 (up, the
+             * default: a wall on a room's far edge). Call before removeWall(wall).
+             */
+            spawnBreachBlast(wall, inward = -1) {
+                const r = (a, b) => a + Math.random() * (b - a);
+                const horiz = wall.w >= wall.h, len = horiz ? wall.w : wall.h;
+                const n = Math.max(2, Math.min(8, Math.round(len * BREACH.CHARGES_PER_PX)));
+                const S = CONFIG.LOOP.STEP_MS;
+                const dir = horiz ? (inward < 0 ? -Math.PI / 2 : Math.PI / 2) : (inward < 0 ? Math.PI : 0);
+                const at = (u, depth) => horiz
+                    ? { x: wall.x + u, y: wall.y + wall.h / 2 + inward * depth }
+                    : { x: wall.x + wall.w / 2 + inward * depth, y: wall.y + u };
+                const B = { wall, horiz, inward, dir, t: 0, charges: [], scorch: [], debris: [], sparks: [], smoke: [], embers: [] };
+                for (let i = 0; i < n; i++) {
+                    const p = at((i + 0.5) * len / n + r(-14, 14), r(4, 14));
+                    const d = Math.round((i * BREACH.RIPPLE_MS + r(0, 30)) / S);   // its delay, in ticks
+                    B.charges.push({ x: p.x, y: p.y, d, r: r(70, 95),
+                        lobes: Array.from({ length: 4 }, () => ({ a: dir + r(-0.95, 0.95), s: r(0.35, 0.6), k: r(0.5, 0.8) })) });
+                    const sc = at((i + 0.5) * len / n, r(10, 30));
+                    B.scorch.push({ x: sc.x, y: sc.y, r: r(55, 80), d });
+                    for (let k = 0; k < 7; k++) {
+                        const a = dir + r(-1.1, 1.1), v = r(2.5, 9), q = at((i + 0.5) * len / n + r(-20, 20), 6);
+                        B.debris.push({ x: q.x, y: q.y, px: q.x, py: q.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, rot: r(0, 6.28), vr: r(-0.4, 0.4),
+                            w: r(8, 20), h: r(4, 9), d, gold: Math.random() < 0.35, glass: Math.random() < 0.3 });
+                    }
+                    for (let k = 0; k < 16; k++) {
+                        const a = dir + r(-1.4, 1.4), v = r(5, 15);
+                        B.sparks.push({ x: p.x, y: p.y, px: p.x, py: p.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: Math.round(r(260, 620) / S), d });
+                    }
+                    for (let k = 0; k < 5; k++) {
+                        const q = at((i + 0.5) * len / n + r(-30, 30), r(10, 60));
+                        B.smoke.push({ x: q.x, y: q.y, px: q.x, py: q.y, vx: Math.cos(dir) * r(0.15, 0.55) + r(-0.25, 0.25), vy: Math.sin(dir) * r(0.15, 0.55) + r(-0.25, 0.25),
+                            r0: r(40, 60), life: Math.round(r(2600, 4200) / S), d: d + Math.round(r(80, 260) / S) });
+                    }
+                    for (let k = 0; k < 6; k++) {
+                        const q = at((i + 0.5) * len / n + r(-40, 40), r(4, 90));
+                        B.embers.push({ x: q.x, y: q.y, px: q.x, py: q.y, vx: Math.cos(dir) * r(0.1, 0.6), vy: Math.sin(dir) * r(0.1, 0.6),
+                            life: Math.round(r(1600, 3200) / S), ph: r(0, 6.28), d: d + Math.round(r(60, 300) / S) });
+                    }
+                }
+                B.sparks.length = Math.min(B.sparks.length, BREACH.SPARK_MAX);
+                B.smoke.length = Math.min(B.smoke.length, BREACH.SMOKE_MAX);
+                this._breachFx = B;
+            },
+
+            /** One sim tick: everything moves in game time, so pause and slow motion hold it. */
+            updateBreachFx() {
+                const B = this._breachFx;
+                if (!B) return;
+                const t = ++B.t, W = this.weather && this.weather.windVec ? this.weather.windVec : { x: 0, y: 0 };
+                const move = (p, damp) => { p.px = p.x; p.py = p.y; if (t <= p.d) return; p.x += p.vx; p.y += p.vy; p.vx *= damp; p.vy *= damp; };
+                for (const p of B.debris) { move(p, 0.9); if (t > p.d) { p.rot += p.vr; p.vr *= 0.92; } }
+                for (const p of B.sparks) move(p, 0.88);
+                for (const p of B.smoke) { move(p, 0.99); p.vx += W.x * 0.004; p.vy += W.y * 0.004; }
+                for (const p of B.embers) { move(p, 1); p.x += Math.sin(t * 0.07 + p.ph) * 0.25; }
+                if (t * CONFIG.LOOP.STEP_MS > BREACH.DEBRIS_MS) this._breachFx = null;
+            },
+
+            _breachClock(B) {
+                const ip = RenderInterp, a = ip._drawActive && ip.alpha < 1 ? ip.alpha : 1;
+                return { a, ms: (B.t - 1 + a) * CONFIG.LOOP.STEP_MS };
+            },
+
+            /** Before the darkness: scorch, debris and smoke. */
+            drawBreachUnder(ctx, cb) {
+                const B = this._breachFx;
+                if (!B) return;
+                const { a, ms } = this._breachClock(B), S = CONFIG.LOOP.STEP_MS;
+                const L = (p) => p.px + (p.x - p.px) * a, T = (p) => p.py + (p.y - p.py) * a;
+                const out = (x, y, m) => cb && (x < cb.left - m || x > cb.right + m || y < cb.top - m || y > cb.bottom + m);
+                const linger = Math.min(1, (BREACH.DEBRIS_MS - ms) / 1000);
+                ctx.save();
+                for (const s of B.scorch) {
+                    const age = ms - s.d * S; if (age < 0 || out(s.x, s.y, s.r * 1.3)) continue;
+                    ctx.globalAlpha = Math.min(1, age / 120) * 0.9 * linger;
+                    const sx = B.horiz ? 1.3 : 1, sy = B.horiz ? 1 : 1.3;
+                    ctx.drawImage(_bScorch(), s.x - s.r * sx, s.y - s.r * sy, s.r * 2 * sx, s.r * 2 * sy);
+                }
+                for (const p of B.debris) {
+                    if (ms < p.d * S) continue;
+                    const x = L(p), y = T(p); if (out(x, y, 20)) continue;
+                    ctx.save(); ctx.translate(x, y); ctx.rotate(p.rot); ctx.globalAlpha = linger;
+                    if (p.glass) {
+                        ctx.fillStyle = 'rgba(190, 200, 255, 0.55)';
+                        ctx.beginPath(); ctx.moveTo(-p.w / 2, p.h / 2); ctx.lineTo(0, -p.h / 2); ctx.lineTo(p.w / 2, p.h / 3); ctx.closePath(); ctx.fill();
+                    } else {
+                        ctx.fillStyle = '#0e0c10'; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+                        if (p.gold) { ctx.fillStyle = 'rgba(232, 194, 122, 0.9)'; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, 1.4); }
+                    }
+                    ctx.restore();
+                }
+                for (const p of B.smoke) {
+                    const age = ms - p.d * S, life = p.life * S; if (age < 0 || age > life) continue;
+                    const R = p.r0 * (1 + age / 1000 * 0.45), x = L(p), y = T(p); if (out(x, y, R)) continue;
+                    ctx.globalAlpha = 0.95 * Math.min(1, age / 260) * Math.pow(1 - age / life, 1.2);
+                    ctx.drawImage(_bSmoke(), x - R, y - R, R * 2, R * 2);
+                }
+                ctx.restore();
+            },
+
+            /** After the darkness (additive): the light spill, fireballs, shock rings, sparks, embers, the burning lip. */
+            drawBreachGlow(ctx, cb) {
+                const B = this._breachFx;
+                if (!B) return;
+                const { a, ms } = this._breachClock(B), S = CONFIG.LOOP.STEP_MS, w = B.wall;
+                const L = (p) => p.px + (p.x - p.px) * a, T = (p) => p.py + (p.y - p.py) * a;
+                if (ms > Math.max(BREACH.LIP_MS, 4500)) return;   // only scorch and debris remain (drawn under)
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                const cx = w.x + w.w / 2, cy = w.y + w.h / 2;
+                const spill = Math.max(0, 1 - ms / BREACH.SPILL_MS);
+                if (spill > 0) {
+                    const flick = 0.85 + 0.15 * Math.sin(ms * 0.05) * Math.sin(ms * 0.031), R = BREACH.SPILL_R;
+                    ctx.globalAlpha = 0.42 * Math.pow(spill, 1.8) * flick;
+                    if (B.horiz) ctx.drawImage(_bPool(), cx - R * 1.25, cy - R, R * 2.5, R * 2);
+                    else ctx.drawImage(_bPool(), cx - R, cy - R * 1.25, R * 2, R * 2.5);
+                }
+                for (const c of B.charges) {
+                    const age = ms - c.d * S; if (age < 0 || age > BREACH.FIRE_MS) continue;
+                    const u = age / BREACH.FIRE_MS, grow = 1 - Math.pow(1 - Math.min(1, age / 160), 3), fade = Math.pow(1 - u, 1.8);
+                    if (age < 70) { ctx.globalAlpha = 0.85 * (1 - age / 70); const R = 36 + age * 0.6; ctx.drawImage(_bCore(), c.x - R, c.y - R, R * 2, R * 2); }
+                    const R = c.r * (0.45 + 0.75 * grow);
+                    ctx.globalAlpha = 0.65 * fade; ctx.drawImage(_bFire(), c.x - R, c.y - R, R * 2, R * 2);
+                    ctx.globalAlpha = 0.38 * fade;
+                    for (const l of c.lobes) {
+                        const rr = R * l.k, ox = Math.cos(l.a) * R * l.s, oy = Math.sin(l.a) * R * l.s;
+                        ctx.drawImage(_bFire(), c.x + ox - rr, c.y + oy - rr, rr * 2, rr * 2);
+                    }
+                    const ra = Math.min(1, age / 380);
+                    if (ra < 1) {                                              // the shock ring: a thin gold line, half, into the room
+                        ctx.globalAlpha = (1 - ra) * 0.7; ctx.strokeStyle = 'rgb(255, 214, 140)'; ctx.lineWidth = 3 * (1 - ra) + 0.6;
+                        const a0 = B.dir - Math.PI / 2;
+                        ctx.beginPath(); ctx.ellipse(c.x, c.y, (B.horiz ? 20 : 14) + ra * (B.horiz ? 150 : 110), (B.horiz ? 14 : 20) + ra * (B.horiz ? 110 : 150), 0, a0, a0 + Math.PI); ctx.stroke();
+                    }
+                }
+                ctx.lineCap = 'round'; ctx.lineWidth = 1.8;
+                for (const p of B.sparks) {
+                    const age = ms - p.d * S, life = p.life * S; if (age < 0 || age > life) continue;
+                    const u = age / life, x = L(p), y = T(p);
+                    if (cb && (x < cb.left - 40 || x > cb.right + 40 || y < cb.top - 40 || y > cb.bottom + 40)) continue;
+                    ctx.globalAlpha = 1 - u; ctx.strokeStyle = u < 0.35 ? 'rgb(255, 245, 210)' : 'rgb(255, 170, 70)';
+                    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - p.vx * 2.6, y - p.vy * 2.6); ctx.stroke();
+                }
+                ctx.fillStyle = 'rgb(255, 230, 170)';
+                for (const p of B.embers) {
+                    const age = ms - p.d * S, life = p.life * S; if (age < 0 || age > life) continue;
+                    const x = L(p), y = T(p);
+                    ctx.globalAlpha = (1 - age / life) * (0.6 + 0.4 * Math.sin(age * 0.02 + p.ph * 5));
+                    ctx.drawImage(_bEmber(), x - 5, y - 5, 10, 10); ctx.fillRect(x - 0.8, y - 0.8, 1.6, 1.6);
+                }
+                for (const p of B.debris) {                                    // hot edges, the first moments
+                    const age = ms - p.d * S; if (age < 0 || age > 900 || p.glass) continue;
+                    ctx.globalAlpha = (1 - age / 900) * 0.6; ctx.drawImage(_bEmber(), L(p) - 6, T(p) - 6, 12, 12);
+                }
+                const lip = Math.max(0, 1 - ms / BREACH.LIP_MS);
+                if (lip > 0) for (const s of B.scorch) {
+                    if (ms < s.d * S) continue;
+                    ctx.globalAlpha = lip * (0.35 + 0.15 * Math.sin(ms * 0.03 + s.x + s.y));
+                    if (B.horiz) ctx.drawImage(_bEmber(), s.x - 40, cy - 11, 80, 22); else ctx.drawImage(_bEmber(), cx - 11, s.y - 40, 22, 80);
+                }
+                ctx.restore();
+                if (ms < 120) {                                                // a brief warm flash over the frame
+                    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'lighter';
+                    ctx.globalAlpha = 0.14 * (1 - ms / 120); ctx.fillStyle = '#ffd9a0';
+                    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); ctx.restore();
+                }
+            }
+        });
+    </script>
     <script type="text/dfab" data-src="engine/quick-draw.js" data-cost="56">
 // Quick draw is a transient combat mode. Shots still use fireWeapon and its normal bonuses.
 engineMixin({
@@ -83004,7 +83193,7 @@ engineMixin({
                 this.finCam = null;
                 this.timeSlowState = { active: false, scale: 1.0, targetScale: 1.0, duration: 0, transitionSpeed: 0.05 };
                 this.casings = []; this.shotFx = []; this.muzzleFlashes = []; this.flitVFX = []; this._resetFlitFeedback();
-                this._fireTrail = []; this._fireTrailSerial = 0;
+                this._fireTrail = []; this._fireTrailSerial = 0; this._breachFx = null;
                 this.noiseRipples = []; this.lastKnownMarkers = [];
                 this._edgeRipples = null; this._edgeTouch = null;                       // the veil's ripples (world/map-edge.js)
                 if (typeof Walker !== 'undefined') {                                   // walks are across the old floor
@@ -85972,7 +86161,7 @@ engineMixin({
             },
         });
     </script>
-    <script type="text/dfab" data-src="engine/update.js" data-cost="826">
+    <script type="text/dfab" data-src="engine/update.js" data-cost="827">
         // GameEngine — The per-tick simulation (update) and traffic collision helpers.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         /** Props you can use, and what the action pill says for them: type → [verb, name, name from the prop's own label].
@@ -86043,6 +86232,7 @@ engineMixin({
                 this.updateSneak();
                 this.updatePuddles();                                  // raindrop rings and splashes (engine/reflections.js)
                 this.updateFireTrail();
+                this.updateBreachFx();                                 // a wall blown in (engine/breach-fx.js)
                 this.updateShotFx();
             
                 this.updateTime();
@@ -87397,7 +87587,7 @@ engineMixin({
             clear() { this.items.length = 0; }
         };
     </script>
-    <script type="text/dfab" data-src="engine/draw.js" data-cost="1011">
+    <script type="text/dfab" data-src="engine/draw.js" data-cost="1013">
         // GameEngine — The frame renderer (draw).
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -88569,6 +88759,7 @@ engineMixin({
                 
                 if (RenderStats.timed) this._entLap('Entities: Effects');
                 if (RL.at('particles')) this.weather.draw(this.ctx, cullBounds.view, viewZoom);
+                if (RL.at('combat')) this.drawBreachUnder(this.ctx, cullBounds.view);   // scorch, debris, smoke (engine/breach-fx.js)
                 if (RenderStats.timed) this._entLap('Entities: Weather');
                 
                 // Graveyard humanoid ghosts
@@ -88608,6 +88799,7 @@ engineMixin({
                     this.drawGunnerHeat(this.ctx, cullBounds.entities);
                     this.drawBossHazards(this.ctx, cullBounds.view);   // the duel's dimming, sigils, fire, hooks (engine/boss-hazards.js)
                     this.drawFireTrail(this.ctx, cullBounds.view);
+                    this.drawBreachGlow(this.ctx, cullBounds.view);
                     for (const p of this.projectiles) if (p.isFireball) p.draw(this.ctx);
                 }
                 // The veil at the edge of an outdoor map (world/map-edge.js), above the darkness
@@ -93227,7 +93419,7 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/player-draw-input.js" data-cost="377">
+    <script type="text/dfab" data-src="engine/player-draw-input.js" data-cost="361">
         // GameEngine — Drawing the player, emotes, pausable timers, sidebar portrait, joysticks.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -93468,50 +93660,9 @@ engineMixin({
                 // NOTE: age++ and lifetime check moved to tickPlayerEmote() (called from
                 // update()) so the bubble doesn't keep counting down during pause.
                 if (this.playerEmote.age >= this.playerEmote.duration) return;
-                const POP_IN = 8;
-                const POP_OUT = 10;
-                const age = this.playerEmote.age;
-                const dur = this.playerEmote.duration;
-                let scale;
-                if (age < POP_IN) {
-                    scale = 1 - Math.pow(1 - age / POP_IN, 3);
-                } else if (age < dur - POP_OUT) {
-                    scale = 1;
-                } else {
-                    const t = Math.max(0, (dur - age) / POP_OUT);
-                    scale = t * t;
-                }
-                if (scale < 0.01) return;
-                const ctx = this.ctx;
-                ctx.save();
-                ctx.translate(this.player.x, this.player.y - 32);
-                ctx.scale(scale, scale);
-                ctx.font = '600 18px sans-serif';
-                const w = 28, h = 26, r = 7;
-                const x = -w / 2, y = -h / 2;
-                ctx.fillStyle = 'rgba(8, 6, 18, 0.86)';
-                ctx.strokeStyle = 'rgba(255, 170, 68, 0.55)'; // amber tint to match holster family
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(x + r, y);
-                ctx.lineTo(x + w - r, y);
-                ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-                ctx.lineTo(x + w, y + h - r);
-                ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-                ctx.lineTo(x + w / 2 + 4, y + h);
-                ctx.lineTo(x + w / 2, y + h + 4);
-                ctx.lineTo(x + w / 2 - 4, y + h);
-                ctx.lineTo(x + r, y + h);
-                ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-                ctx.lineTo(x, y + r);
-                ctx.quadraticCurveTo(x, y, x + r, y);
-                ctx.closePath();
-                ctx.fill();
-                ctx.stroke();
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(this.playerEmote.text, 0, 1);
-                ctx.restore();
+                // Her bubble wears deep bronze-gold; passersby wear smoky silver (drawSpeechBubble: entities/npc.js)
+                drawSpeechBubble(this.ctx, this.player.x, this.player.y - 34, this.playerEmote.text,
+                    speechBubbleScale(this.playerEmote.age, this.playerEmote.duration), { metal: 'bronzeDeep', emoji: true });
             },
             
             renderSidebarPortrait() {
@@ -94064,7 +94215,7 @@ engineMixin({
                 this.projectiles = [];
                 this.stickyOrbs = [];
                 this.muzzleFlashes = []; this.casings = []; this.shotFx = [];
-                this._fireTrail = []; this._fireTrailSerial = 0;
+                this._fireTrail = []; this._fireTrailSerial = 0; this._breachFx = null;
                 this.loot = [];
                 this.npcs = []; this.props = []; this.lamps = []; this.enemies = []; this.corpses = [];   // the last map's (loading a map sets them)
                 this.lastKnownMarkers = []; this.noiseRipples = []; this.flitVFX = [];
@@ -100591,6 +100742,274 @@ engineMixin({
         // On at launch: again, as lighting, bloom and reflections start from their defaults each time
         if (GameSettings.devicePreset) { GameSettings.reapplyDevicePreset(); applyPresetSettings(); }
 
+    </script>
+    <script type="text/dfab" data-src="ui/gamepad.js" data-cost="187">
+        /* =========================================================================
+           GAMEPAD — controller support through the browser Gamepad API.
+
+           It writes into the same input state the touch sticks use, so movement,
+           aiming, driving and firing need no new paths in the engine:
+             left stick  → game.joystick       (analog walk / steer, like the move stick)
+             right stick → game.fireJoystick   (aim; RT fires, like pushing past the ring)
+           Buttons call the same methods as the HUD buttons and keyboard keys.
+
+           Its own requestAnimationFrame loop runs whether or not the game is paused,
+           so the pad also works the title screen and every menu: the D-pad or left
+           stick moves a highlight between the visible things you can click, A clicks
+           it, B goes back (Escape), Start pauses. Standard mapping (Xbox names):
+
+             A  interact / confirm        B  flit / back          X  holster · draw
+             Y  doors & exits             LB sneak                RB booster (hold: ally)
+             LT handbrake (driving)       RT fire                 L3 auto-drive (driving)
+             Back  map                    Start pause             D-pad ↑ phone · ↓ night vision
+           ========================================================================= */
+        const GamepadInput = (() => {
+            const B = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, BACK: 8, START: 9, L3: 10, R3: 11, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
+            const MOVE_DEAD = 0.18, AIM_DEAD = 0.3, TRIGGER = 0.4, NAV_DEAD = 0.55;
+            const REPEAT_FIRST = 380, REPEAT_NEXT = 110;          // ms: held D-pad / stick in menus
+            const HOLD_ALLY = 300;                               // ms: RB held → booster on the nearest ally (as the HUD button)
+
+            const state = { index: null, prev: [], raf: 0, focus: null, navDir: null, navAt: 0, autoAt: 0, aDown: null, rbAt: 0, rbHeld: false, ownsMove: false, ownsAim: false, lastMode: null };
+
+            const pressed = (pad, i) => { const b = pad.buttons[i]; return !!b && (b.pressed || b.value > TRIGGER); };
+            const down = (pad, i) => pressed(pad, i) && !state.prev[i];
+            const up = (pad, i) => !pressed(pad, i) && state.prev[i];
+            /** A stick with a radial dead zone, rescaled so the edge of the dead zone is 0. */
+            const stick = (x, y, dead) => {
+                const m = Math.hypot(x, y);
+                if (m < dead) return { x: 0, y: 0, m: 0 };
+                const k = Math.min(1, (m - dead) / (1 - dead)) / m;
+                return { x: x * k, y: y * k, m: Math.min(1, (m - dead) / (1 - dead)) };
+            };
+            const key = (k) => {                                // the keyboard paths already handle Escape, Enter …
+                const target = document.activeElement && document.activeElement !== document.body ? document.activeElement : document.body;
+                target.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+                target.dispatchEvent(new KeyboardEvent('keyup', { key: k, bubbles: true, cancelable: true }));
+            };
+            /** Half of a mouse click on el's centre: 'down' (pointerdown, mousedown) or 'up' (pointerup, mouseup, click). */
+            const mouse = (el, phase) => {
+                const r = el.getBoundingClientRect(), o = { bubbles: true, cancelable: true, composed: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, button: 0, buttons: phase === 'down' ? 1 : 0, pointerId: 99, pointerType: 'mouse', isPrimary: true };
+                if (phase === 'down') { el.dispatchEvent(new PointerEvent('pointerdown', o)); el.dispatchEvent(new MouseEvent('mousedown', o)); }
+                else { el.dispatchEvent(new PointerEvent('pointerup', o)); el.dispatchEvent(new MouseEvent('mouseup', o)); el.dispatchEvent(new MouseEvent('click', o)); }
+            };
+            const visibleBtn = (el) => !!el && el.offsetParent !== null && getComputedStyle(el).display !== 'none';
+            const rumble = (ms, strength) => {
+                const pad = state.index !== null && navigator.getGamepads ? navigator.getGamepads()[state.index] : null;
+                try { pad?.vibrationActuator?.playEffect('dual-rumble', { duration: ms, strongMagnitude: strength, weakMagnitude: strength }); } catch (e) { /* no rumble */ }
+            };
+
+            // ── Gameplay ────────────────────────────────────────────────────────
+            function releaseSticks(g) {
+                if (state.ownsMove && g.joystick.id === 'pad') Object.assign(g.joystick, { active: false, dx: 0, dy: 0, id: null });
+                if (state.ownsAim && g.fireJoystick.id === 'pad') {
+                    Object.assign(g.fireJoystick, { active: false, dx: 0, dy: 0, id: null, aimed: false, firing: false, armed: false });
+                    document.getElementById('game-ui')?.classList.remove('aiming');
+                }
+                state.ownsMove = state.ownsAim = false;
+                g.handbrakeHeld = false;
+            }
+
+            function gameplay(g, pad) {
+                const J = g.joystick, F = g.fireJoystick;
+                // Left stick: walk / steer — unless a finger already has the move stick
+                const L = stick(pad.axes[0] || 0, pad.axes[1] || 0, MOVE_DEAD);
+                if (J.id === null || J.id === 'pad') {
+                    if (L.m > 0) { Object.assign(J, { active: true, id: 'pad', dx: L.x, dy: L.y }); state.ownsMove = true; }
+                    else if (state.ownsMove) { Object.assign(J, { active: false, id: null, dx: 0, dy: 0 }); state.ownsMove = false; }
+                }
+
+                // Right stick aims; RT fires (along the stick, or straight ahead with no stick)
+                const R = stick(pad.axes[2] || 0, pad.axes[3] || 0, AIM_DEAD);
+                const rt = pressed(pad, B.RT), canAim = !g.weaponHolstered || g._quickDraw || g.isDriving;
+                if (F.id === null || F.id === 'pad') {
+                    if (canAim && (R.m > 0 || rt)) {
+                        let dx = R.x, dy = R.y;
+                        if (!R.m) {                              // no stick: keep the last pad aim, or face where she faces
+                            if (state.ownsAim && F.aimed) { dx = F.dx; dy = F.dy; }
+                            else { dx = Math.cos(g.player.angle); dy = Math.sin(g.player.angle); }
+                        }
+                        const m = Math.hypot(dx, dy) || 1;
+                        const quick = !!g._quickDraw;
+                        Object.assign(F, { active: true, id: 'pad', aimed: true, dx: dx / m, dy: dy / m, firing: rt && !quick, armed: rt && quick });
+                        if (!state.ownsAim) document.getElementById('game-ui')?.classList.add('aiming');
+                        state.ownsAim = true;
+                    } else if (state.ownsAim) {
+                        Object.assign(F, { active: false, id: null, aimed: false, firing: false, armed: false, dx: 0, dy: 0 });
+                        document.getElementById('game-ui')?.classList.remove('aiming');
+                        state.ownsAim = false;
+                    }
+                    // Quick draw fires on release, like lifting the thumb off the fire stick
+                    if (g._quickDraw && up(pad, B.RT)) g.requestQuickDraw(Math.atan2(F.dy || Math.sin(g.player.angle), F.dx || Math.cos(g.player.angle)));
+                }
+
+                // Driving: LT is the handbrake, L3 auto-drive
+                g.handbrakeHeld = !!(g.isDriving && pressed(pad, B.LT));
+                document.getElementById('btn-handbrake')?.classList.toggle('held', g.handbrakeHeld);
+                if (g.isDriving && down(pad, B.L3)) g.toggleAutoDrive();
+
+                if (down(pad, B.A)) g.interact();
+                if (down(pad, B.B) && !g.isDriving) { if (g.triggerFlit(undefined, 'pad')) rumble(90, 0.5); }
+                if (down(pad, B.X) && !g.isDriving) {
+                    if (g._quickDraw) { g.cancelQuickDraw(); g.setWeaponHolstered(false); }
+                    else g.setWeaponHolstered(!g.weaponHolstered);
+                }
+                if (down(pad, B.Y) && visibleBtn(g.transitionBtn)) g.triggerTransition();
+                if (down(pad, B.LB) && !g.isDriving) g.toggleSneak();
+                // RB: tap = booster, hold = booster on the nearest damaged ally
+                if (down(pad, B.RB)) { state.rbAt = performance.now(); state.rbHeld = false; }
+                if (pressed(pad, B.RB) && !state.rbHeld && performance.now() - state.rbAt > HOLD_ALLY) { state.rbHeld = true; g.useBoosterOnAlly(); }
+                if (up(pad, B.RB) && !state.rbHeld) g.useBooster();
+
+                if (down(pad, B.BACK)) Screens.open('map');
+                if (down(pad, B.UP)) phoneSystem.open();
+                if (down(pad, B.DOWN)) document.getElementById('btn-nv')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+                if (down(pad, B.START)) key('Escape');
+            }
+
+            // ── Menus: a highlight that moves between the visible clickable things ──
+            const CLICKABLE = 'button, a[href], [role="button"], [tabindex]:not([tabindex="-1"]), input:not([type="hidden"]), select, .menu-item-row, .df-chip, .game-btn';
+            /** Shown, enabled, on screen and on top at its centre (so the HUD behind a menu is skipped). */
+            function isLive(el) {
+                if (!el || !el.isConnected || el.disabled || el.inert || el.closest('[inert]')) return false;
+                const W = window.innerWidth, H = window.innerHeight, r = el.getBoundingClientRect();
+                if (r.width < 4 || r.height < 4 || r.right < 0 || r.bottom < 0 || r.left > W || r.top > H) return false;
+                const cx = Math.min(W - 1, Math.max(0, r.left + r.width / 2)), cy = Math.min(H - 1, Math.max(0, r.top + r.height / 2));
+                const hit = document.elementFromPoint(cx, cy);
+                return !!hit && (hit === el || el.contains(hit) || hit.contains(el));
+            }
+            function candidates() {
+                const out = [];
+                for (const el of document.querySelectorAll('body *')) {
+                    if (el.closest('#game-canvas, svg, canvas')) continue;
+                    if (!el.matches(CLICKABLE) && getComputedStyle(el).cursor !== 'pointer') continue;
+                    if (!isLive(el)) continue;
+                    if (out.some(o => o.contains(el))) continue;  // the outermost clickable wins (a row, not its label)
+                    out.push(el);
+                }
+                return out;
+            }
+            const readingOrder = (a, b) => { const p = a.getBoundingClientRect(), q = b.getBoundingClientRect(); return (p.top - q.top) || (p.left - q.left); };
+            /** A menu just opened (or the highlighted item went away): highlight its first item. A story scene keeps
+                no highlight, so A advances the line; a dialogue box starts on its "next" arrow. */
+            function autoFocus(g) {
+                const next = document.getElementById('btn-dialogue-next');
+                if (isLive(next)) { setFocus(next); return; }
+                if (g && g.running && !g.paused && g.scenes && g.scenes.running) { setFocus(null); return; }
+                const list = candidates().sort(readingOrder);
+                setFocus(list[0] || null);
+            }
+            function setFocus(el) {
+                if (state.focus) state.focus.classList.remove('pad-focus');
+                state.focus = el;
+                if (!el) return;
+                el.classList.add('pad-focus');
+                try { el.focus({ preventScroll: true }); } catch (e) { /* not focusable */ }
+                el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            }
+            function move(dx, dy) {
+                const list = candidates();
+                if (!list.length) { setFocus(null); return; }
+                const cur = state.focus && list.includes(state.focus) ? state.focus : null;
+                if (!cur) { setFocus(list.sort(readingOrder)[0]); return; }
+                // A slider takes left/right itself
+                if (cur.matches('input[type="range"]') && dx) {
+                    const step = +cur.step || 1; cur.value = +cur.value + dx * step;
+                    cur.dispatchEvent(new Event('input', { bubbles: true })); cur.dispatchEvent(new Event('change', { bubbles: true }));
+                    return;
+                }
+                const c = cur.getBoundingClientRect(), cx = c.left + c.width / 2, cy = c.top + c.height / 2;
+                let best = null, bestScore = Infinity;
+                for (const el of list) {
+                    if (el === cur) continue;
+                    const r = el.getBoundingClientRect(), ox = r.left + r.width / 2 - cx, oy = r.top + r.height / 2 - cy;
+                    const along = ox * dx + oy * dy, across = Math.abs(ox * dy - oy * dx);
+                    if (along <= 1) continue;                   // only things in that direction
+                    const score = along + across * 2.5;
+                    if (score < bestScore) { bestScore = score; best = el; }
+                }
+                if (best) setFocus(best);
+            }
+            function menus(g, pad) {
+                // Direction: D-pad, or the left stick past halfway; held → repeats
+                const ax = pad.axes[0] || 0, ay = pad.axes[1] || 0;
+                let dir = null;
+                if (pressed(pad, B.UP) || ay < -NAV_DEAD) dir = 'up';
+                else if (pressed(pad, B.DOWN) || ay > NAV_DEAD) dir = 'down';
+                else if (pressed(pad, B.LEFT) || ax < -NAV_DEAD) dir = 'left';
+                else if (pressed(pad, B.RIGHT) || ax > NAV_DEAD) dir = 'right';
+                const now = performance.now();
+                if (!dir && now >= state.autoAt) { state.autoAt = now + 200; if (!isLive(state.focus)) autoFocus(g); }
+                if (dir && (dir !== state.navDir || now >= state.navAt)) {
+                    state.navAt = now + (dir !== state.navDir ? REPEAT_FIRST : REPEAT_NEXT);
+                    const D = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[dir];
+                    move(D[0], D[1]);
+                }
+                state.navDir = dir;
+                // Right stick scrolls whatever list is under the highlight
+                const ry = pad.axes[3] || 0;
+                if (Math.abs(ry) > AIM_DEAD) {
+                    let s = state.focus || document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
+                    while (s && s !== document.body && !(s.scrollHeight > s.clientHeight + 2 && /auto|scroll/.test(getComputedStyle(s).overflowY))) s = s.parentElement;
+                    if (s && s !== document.body) s.scrollTop += ry * 14;
+                }
+                // A presses the highlighted item the way a mouse does (down on press, up + click on release),
+                // so buttons wired to pointerdown, mousedown, pointerup or click all answer, and hold buttons hold
+                if (down(pad, B.A)) {
+                    const el = state.focus;
+                    if (isLive(el) && el.matches('input:not([type="checkbox"]):not([type="radio"]), select, textarea')) el.focus();
+                    else if (isLive(el)) { state.aDown = el; mouse(el, 'down'); }
+                    else key('Enter');                          // nothing highlighted: advance a line
+                }
+                if (up(pad, B.A) && state.aDown) { const el = state.aDown; state.aDown = null; if (el.isConnected) mouse(el, 'up'); }
+                if (down(pad, B.B) || down(pad, B.START)) key('Escape');
+                if (down(pad, B.BACK) && (Screens.mapOpen() || Screens.menuOpen())) Screens.close();
+            }
+
+            // ── The loop ────────────────────────────────────────────────────────
+            function frame() {
+                state.raf = requestAnimationFrame(frame);
+                const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+                let pad = state.index !== null ? pads[state.index] : null;
+                if (!pad || !pad.connected) { pad = [...pads].find(p => p && p.connected) || null; state.index = pad ? pad.index : null; }
+                if (!pad) return;
+                const g = typeof game !== 'undefined' ? game : null;
+                const menuMode = !g || !g.running || g.paused || hudInputBlocked() || !!(g.scenes && g.scenes.running);
+                if (menuMode !== state.lastMode) {
+                    if (menuMode && g) releaseSticks(g);
+                    if (!menuMode) setFocus(null);
+                    state.lastMode = menuMode; state.navDir = null;
+                }
+                // Escape/Start in a scene opens the pause menu; everything else in a scene is the dialogue (A = next line)
+                if (menuMode) menus(g, pad); else gameplay(g, pad);
+                state.prev = pad.buttons.map(b => b.pressed || b.value > TRIGGER);
+            }
+
+            function start() {
+                if (!('getGamepads' in navigator)) return;
+                window.addEventListener('gamepadconnected', (e) => {
+                    if (state.index === null) state.index = e.gamepad.index;
+                    document.body.classList.add('gamepad-active');
+                    if (typeof showMessage === 'function') showMessage('CONTROLLER CONNECTED');
+                    if (!state.raf) state.raf = requestAnimationFrame(frame);
+                });
+                window.addEventListener('gamepaddisconnected', (e) => {
+                    if (e.gamepad.index !== state.index) return;
+                    state.index = null; state.prev = [];
+                    if (typeof game !== 'undefined') releaseSticks(game);
+                    setFocus(null);
+                    if (![...navigator.getGamepads()].some(p => p && p.connected)) {
+                        document.body.classList.remove('gamepad-active');
+                        cancelAnimationFrame(state.raf); state.raf = 0;
+                        if (typeof showMessage === 'function') showMessage('CONTROLLER DISCONNECTED');
+                    }
+                });
+                // A pad already plugged in before the page loaded only reports itself on its first button press,
+                // which fires gamepadconnected above; nothing else to do here.
+            }
+
+            return { start, state, _frame: frame };
+        })();
+        GamepadInput.start();
     </script>
     <script>
         /* =====================================================================

@@ -164,6 +164,7 @@ const SCRIPTS = [
     'engine/game-engine.js',
     'engine/events.js',
     'engine/combat-effects.js',
+    'engine/breach-fx.js',
     'engine/quick-draw.js',
     'engine/player-fire.js',
     'engine/combat-fx.js',
@@ -222,6 +223,7 @@ const SCRIPTS = [
     'ui/pause-look.js',
     'ui/save-slots-pause-menu.js',
     'app/boot.js',
+    'ui/gamepad.js',        // controller support: after boot, so game, pauseMenu and Screens exist
 ];
 
 const MIME = {
