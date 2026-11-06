@@ -212,6 +212,8 @@ const SCRIPTS = [
     'engine/lighting.js',
     'engine/daylight.js',
     'engine/player-draw-input.js',
+    'directory/new-game-state.js',   // LV2 Directory: resetGameState, the game's new-game defaults
+    'directory/world-session.js',    // LV2 Directory: menu <-> world (enterWorld, the loading screen, stop)
     'engine/loop.js',
     'app/menu-wiring.js',
     'ui/phone.js',
