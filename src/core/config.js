@@ -472,6 +472,16 @@
                 TWIST: 0.75,            // Torso twist in radians (~43°)
                 BODY_LEAN: 3            // px the body shifts back at full extension
             },
+            // The knuckles' haymaker: an arcing hook in place of the jab (humanoidHookPose, penthouse/procedural-humanoid.js).
+            // KEYS [tick, sweep°, reach, twist, lunge]: the fist rides an arc round her chest, 90° out to her side and 0° dead
+            // ahead, `reach` px from it; twist turns the torso into it (negative winds away), lunge carries the body forward
+            // (negative sits back). Cocked out wide, swung round and across, carried through.
+            HAYMAKER: {
+                KEYS: [[0, 55, 14, 0, 0], [3, 92, 19, -0.45, -0.4], [6, -2, 26, 1.1, 1], [8, -16, 24, 1.25, 1]],
+                RECOVER_TICKS: 7,       // after the last key, back to guard (smoothstep)
+                LUNGE: 4,               // px the body drives forward at full lunge
+                OFFHAND_PULL: 3         // px the other fist tucks back to the chin
+            },
 
             VEHICLE_AI: {
                 TURN_SPEED_SHARP: 0.3,          // maxSpeed multiplier for 90°+ turns

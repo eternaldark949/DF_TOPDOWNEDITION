@@ -62,7 +62,7 @@
                 const px = pl.x + Math.cos(ang) * 20, py = pl.y + Math.sin(ang) * 20;
                 const p = new ProjectileEntity({ x: px, y: py, angle: ang, isEnemy: false, owner: pl, color: 'rgba(0,0,0,0)',
                     radius: 15, speed: 10, life: 5, damage: Math.round(dmg * crit), mass: 50, melee: true });
-                p.crit = crit > 1; p.knuckles = true; p.haymaker = hay;
+                p.crit = crit > 1; p.knuckles = true; p.haymaker = hay; pl.punchHay = hay;   // the body throws the hook (procedural-humanoid.js)
                 p.knock = hay ? KNUCKLES.HAY_KNOCK : KNUCKLES.JAB_KNOCK; p.knockDmg = st.damage || 16;
                 this.projectiles.push(p);
                 // The fist's afterimages: gold copies along its path, fading
@@ -168,7 +168,9 @@
                         ctx.save();
                         for (let j = 0; j < n; j++) {
                             const u = (j + 1) / n, d = 12 + R * u * 1.1, a = (1 - age / life) * (0.18 + 0.42 * u);
-                            const x = f.x + c * d + ox, y = f.y + s * d + oy, rr = (f.hay ? 5.4 : 4.4) * (0.7 + 0.3 * u);
+                            // a haymaker's copies ride the hook's arc (CONFIG.HAYMAKER), a jab's the straight line
+                            const ph = (92 - 100 * u) * Math.PI / 180, H = 19 + 7 * u, lx = Math.cos(ph) * H, ly = Math.sin(ph) * H * side;
+                            const x = f.hay ? f.x + c * lx - s * ly : f.x + c * d + ox, y = f.hay ? f.y + s * lx + c * ly : f.y + s * d + oy, rr = (f.hay ? 5.4 : 4.4) * (0.7 + 0.3 * u);
                             const g = ctx.createRadialGradient(x, y, 0, x, y, rr * 2.2);
                             g.addColorStop(0, `rgba(255, 238, 170, ${a})`); g.addColorStop(0.45, `rgba(255, 196, 72, ${a * 0.7})`); g.addColorStop(1, 'rgba(255, 170, 40, 0)');
                             ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, rr * 2.2, 0, TAU); ctx.fill();

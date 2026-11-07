@@ -263,9 +263,11 @@
 
                 // Punch strike 0..1 (null unless the caller passes punchTicks). Applied after
                 // smoothing in step 6; the body lean follows the same curve.
-                const punchStrike = (stance === 'punch' && typeof config.punchTicks === 'number')
-                    ? humanoidPunchCurve(config.punchTicks) : null;
-                let bodyRecoil = punchStrike !== null ? punchStrike * CONFIG.PUNCH.BODY_LEAN : recoil * 2;
+                // A haymaker (entity.punchHay, the knuckles) throws the hook instead: its weight stands in for the strike.
+                const ticked = stance === 'punch' && typeof config.punchTicks === 'number';
+                const hook = this.hook = ticked && entity.punchHay ? humanoidHookPose(config.punchTicks, this.hook_pose || (this.hook_pose = [0, 0, 0, 0, 0])) : null;
+                const punchStrike = ticked ? (hook ? hook[0] : humanoidPunchCurve(config.punchTicks)) : null;
+                let bodyRecoil = punchStrike === null ? recoil * 2 : hook ? -hook[4] * CONFIG.HAYMAKER.LUNGE : punchStrike * CONFIG.PUNCH.BODY_LEAN;
                 const driveOffset = isDriving ? 14 : 0;
                 const hipAnchorX = -3 + walkBounce - bodyRecoil + driveOffset;
                 const shoulderX = hipAnchorX;
@@ -559,7 +561,19 @@
                     // Hands move with the body lean (shoulders already have it via hipAnchorX)
                     lFistX -= bodyRecoil; rFistX -= bodyRecoil;
                     lElbowX -= bodyRecoil; rElbowX -= bodyRecoil;
-                    if ((entity.punchSide || 'right') === 'right') {
+                    const hook = this.hook;
+                    if (hook) {
+                        // The hook: the fist swings round her chest on an arc (wound out wide, across, through),
+                        // the elbow bent out to its own side, the torso turning through it, the other fist at the chin
+                        const H = CONFIG.HAYMAKER, s = (entity.punchSide || 'right') === 'right' ? 1 : -1, w = hook[0];
+                        const tx = walkBounce - bodyRecoil + Math.cos(hook[1]) * hook[2], ty = s * Math.sin(hook[1]) * hook[2];
+                        torsoRotation -= s * hook[3] * w;
+                        const shY = s > 0 ? rShoulderY : lShoulderY, sx = shoulderX - shY * Math.sin(torsoRotation), sy = shY * Math.cos(torsoRotation);
+                        const dx = tx - sx, dy = ty - sy, d = Math.max(.001, Math.hypot(dx, dy)), bend = Math.sqrt(Math.max(0, 14 * 14 - d * d / 4)) * s;
+                        const ex = (sx + tx) / 2 - dy / d * bend, ey = (sy + ty) / 2 + dx / d * bend, pull = w * H.OFFHAND_PULL;
+                        if (s > 0) { rFistX += (tx - rFistX) * w; rFistY += (ty - rFistY) * w; rElbowX += (ex - rElbowX) * w; rElbowY += (ey - rElbowY) * w; lFistX -= pull; lElbowX -= pull * .5; }
+                        else { lFistX += (tx - lFistX) * w; lFistY += (ty - lFistY) * w; lElbowX += (ex - lElbowX) * w; lElbowY += (ey - lElbowY) * w; rFistX -= pull; rElbowX -= pull * .5; }
+                    } else if ((entity.punchSide || 'right') === 'right') {
                         rFistX += reach;  rFistY -= reach * P.CROSS;              // jab crosses inward
                         rElbowX += reach * 0.5; rElbowY -= reach * P.CROSS * 0.5;
                         lFistX -= pull;   lElbowX -= pull * 0.5;                  // other fist pulls back

@@ -454,7 +454,7 @@
                 if (this.weaponMode === 'none') {
                     this.shootCooldown = this._punchDur = CONFIG.PUNCH.DURATION_TICKS;
                     // Toggle Punch Side
-                    this.player.punchSide = (this.player.punchSide === 'right') ? 'left' : 'right';
+                    this.player.punchSide = (this.player.punchSide === 'right') ? 'left' : 'right'; this.player.punchHay = false;
                     const punchAngle = this.player.angle;
                     
                     const px = this.player.x + Math.cos(punchAngle) * 20;

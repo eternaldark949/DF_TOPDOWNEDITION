@@ -5868,7 +5868,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '7b614487aa80';
+        const DFAB_BUILD = '9a82b9fdaff1';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="26">
         // ===== LV0 BASEMENT =====
@@ -7576,7 +7576,7 @@
             }
         }
     </script>
-    <script type="text/dfab" data-src="core/config.js" data-cost="406">
+    <script type="text/dfab" data-src="core/config.js" data-cost="415">
 
         // Console chatter (the ~100 [SAVE] / STORY / roads logs) is quiet unless you turn it on:
         // run  localStorage.dfab_debug = '1'  in the console and reload. Warnings and errors always show.
@@ -8050,6 +8050,16 @@
                 OFFHAND_PULL: 4.5,      // px the other fist pulls back
                 TWIST: 0.75,            // Torso twist in radians (~43°)
                 BODY_LEAN: 3            // px the body shifts back at full extension
+            },
+            // The knuckles' haymaker: an arcing hook in place of the jab (humanoidHookPose, penthouse/procedural-humanoid.js).
+            // KEYS [tick, sweep°, reach, twist, lunge]: the fist rides an arc round her chest, 90° out to her side and 0° dead
+            // ahead, `reach` px from it; twist turns the torso into it (negative winds away), lunge carries the body forward
+            // (negative sits back). Cocked out wide, swung round and across, carried through.
+            HAYMAKER: {
+                KEYS: [[0, 55, 14, 0, 0], [3, 92, 19, -0.45, -0.4], [6, -2, 26, 1.1, 1], [8, -16, 24, 1.25, 1]],
+                RECOVER_TICKS: 7,       // after the last key, back to guard (smoothstep)
+                LUNGE: 4,               // px the body drives forward at full lunge
+                OFFHAND_PULL: 3         // px the other fist tucks back to the chin
             },
 
             VEHICLE_AI: {
@@ -9102,7 +9112,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
     </script>
-    <script type="text/dfab" data-src="core/utils.js" data-cost="226">
+    <script type="text/dfab" data-src="core/utils.js" data-cost="236">
         // ============================================================================
         //  SHARED UTILITIES — Consolidated from repeated inline patterns
         // ============================================================================
@@ -9225,6 +9235,20 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const a = RenderInterp.stepAdvanced ? RenderInterp.alpha : 1;
             const s = Math.max(0, _simTick - ent._shotTick - 1 + a);
             return Math.max(0, 1 - s / ticks);
+        }
+
+        /** The haymaker's hook from ticks since the punch started: out = [weight 0..1, sweep (rad), reach, twist, lunge].
+         *  Keys ease into each other (smoothstep); the weight snaps in over the first key and fades over RECOVER_TICKS. */
+        function humanoidHookPose(t, out = [0, 0, 0, 0, 0]) {
+            const H = CONFIG.HAYMAKER, K = H.KEYS, last = K[K.length - 1];
+            t = Math.max(0, t || 0);
+            let i = 0; while (i < K.length - 2 && t >= K[i + 1][0]) i++;
+            const a = K[i], b = K[i + 1], u = Math.min(1, Math.max(0, (t - a[0]) / (b[0] - a[0]))), e = u * u * (3 - 2 * u);
+            for (let j = 1; j < 5; j++) out[j] = a[j] + (b[j] - a[j]) * e;
+            out[1] *= Math.PI / 180;
+            const w1 = K[1][0], r = (t - last[0]) / H.RECOVER_TICKS;
+            out[0] = t < w1 ? 1 - (1 - t / w1) ** 2 : r <= 0 ? 1 : r >= 1 ? 0 : 1 - r * r * (3 - 2 * r);
+            return out;
         }
 
         /** Punch strike 0..1 from ticks since the punch started (fractional ticks OK). */
@@ -63273,7 +63297,7 @@ Object.assign(TrafficVehicle.prototype, {
         }
         
     </script>
-    <script type="text/dfab" data-src="penthouse/procedural-humanoid.js" data-cost="863">
+    <script type="text/dfab" data-src="penthouse/procedural-humanoid.js" data-cost="881">
         // ===== LV3 PENTHOUSE =====
         // THE PROCEDURAL HUMANOID: every person in the game, drawn from code each frame (no sprites).
         // One instance per person (proceduralHumanoid.of(entity)), kept for as long as the person is,
@@ -63539,9 +63563,11 @@ Object.assign(TrafficVehicle.prototype, {
 
                 // Punch strike 0..1 (null unless the caller passes punchTicks). Applied after
                 // smoothing in step 6; the body lean follows the same curve.
-                const punchStrike = (stance === 'punch' && typeof config.punchTicks === 'number')
-                    ? humanoidPunchCurve(config.punchTicks) : null;
-                let bodyRecoil = punchStrike !== null ? punchStrike * CONFIG.PUNCH.BODY_LEAN : recoil * 2;
+                // A haymaker (entity.punchHay, the knuckles) throws the hook instead: its weight stands in for the strike.
+                const ticked = stance === 'punch' && typeof config.punchTicks === 'number';
+                const hook = this.hook = ticked && entity.punchHay ? humanoidHookPose(config.punchTicks, this.hook_pose || (this.hook_pose = [0, 0, 0, 0, 0])) : null;
+                const punchStrike = ticked ? (hook ? hook[0] : humanoidPunchCurve(config.punchTicks)) : null;
+                let bodyRecoil = punchStrike === null ? recoil * 2 : hook ? -hook[4] * CONFIG.HAYMAKER.LUNGE : punchStrike * CONFIG.PUNCH.BODY_LEAN;
                 const driveOffset = isDriving ? 14 : 0;
                 const hipAnchorX = -3 + walkBounce - bodyRecoil + driveOffset;
                 const shoulderX = hipAnchorX;
@@ -63835,7 +63861,19 @@ Object.assign(TrafficVehicle.prototype, {
                     // Hands move with the body lean (shoulders already have it via hipAnchorX)
                     lFistX -= bodyRecoil; rFistX -= bodyRecoil;
                     lElbowX -= bodyRecoil; rElbowX -= bodyRecoil;
-                    if ((entity.punchSide || 'right') === 'right') {
+                    const hook = this.hook;
+                    if (hook) {
+                        // The hook: the fist swings round her chest on an arc (wound out wide, across, through),
+                        // the elbow bent out to its own side, the torso turning through it, the other fist at the chin
+                        const H = CONFIG.HAYMAKER, s = (entity.punchSide || 'right') === 'right' ? 1 : -1, w = hook[0];
+                        const tx = walkBounce - bodyRecoil + Math.cos(hook[1]) * hook[2], ty = s * Math.sin(hook[1]) * hook[2];
+                        torsoRotation -= s * hook[3] * w;
+                        const shY = s > 0 ? rShoulderY : lShoulderY, sx = shoulderX - shY * Math.sin(torsoRotation), sy = shY * Math.cos(torsoRotation);
+                        const dx = tx - sx, dy = ty - sy, d = Math.max(.001, Math.hypot(dx, dy)), bend = Math.sqrt(Math.max(0, 14 * 14 - d * d / 4)) * s;
+                        const ex = (sx + tx) / 2 - dy / d * bend, ey = (sy + ty) / 2 + dx / d * bend, pull = w * H.OFFHAND_PULL;
+                        if (s > 0) { rFistX += (tx - rFistX) * w; rFistY += (ty - rFistY) * w; rElbowX += (ex - rElbowX) * w; rElbowY += (ey - rElbowY) * w; lFistX -= pull; lElbowX -= pull * .5; }
+                        else { lFistX += (tx - lFistX) * w; lFistY += (ty - lFistY) * w; lElbowX += (ex - lElbowX) * w; lElbowY += (ey - lElbowY) * w; rFistX -= pull; rElbowX -= pull * .5; }
+                    } else if ((entity.punchSide || 'right') === 'right') {
                         rFistX += reach;  rFistY -= reach * P.CROSS;              // jab crosses inward
                         rElbowX += reach * 0.5; rElbowY -= reach * P.CROSS * 0.5;
                         lFistX -= pull;   lElbowX -= pull * 0.5;                  // other fist pulls back
@@ -74060,7 +74098,7 @@ Object.assign(TrafficVehicle.prototype, {
                 if (this.weaponMode === 'none') {
                     this.shootCooldown = this._punchDur = CONFIG.PUNCH.DURATION_TICKS;
                     // Toggle Punch Side
-                    this.player.punchSide = (this.player.punchSide === 'right') ? 'left' : 'right';
+                    this.player.punchSide = (this.player.punchSide === 'right') ? 'left' : 'right'; this.player.punchHay = false;
                     const punchAngle = this.player.angle;
                     
                     const px = this.player.x + Math.cos(punchAngle) * 20;
@@ -78933,7 +78971,7 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/knuckles.js" data-cost="152">
+    <script type="text/dfab" data-src="engine/knuckles.js" data-cost="156">
         // GameEngine — Golden Retribution, the gilded brass knuckles (weaponMode 'fists'). Methods are added to
         // GameEngine.prototype (see engineMixin in game-engine.js).
         //
@@ -78998,7 +79036,7 @@ engineMixin({
                 const px = pl.x + Math.cos(ang) * 20, py = pl.y + Math.sin(ang) * 20;
                 const p = new ProjectileEntity({ x: px, y: py, angle: ang, isEnemy: false, owner: pl, color: 'rgba(0,0,0,0)',
                     radius: 15, speed: 10, life: 5, damage: Math.round(dmg * crit), mass: 50, melee: true });
-                p.crit = crit > 1; p.knuckles = true; p.haymaker = hay;
+                p.crit = crit > 1; p.knuckles = true; p.haymaker = hay; pl.punchHay = hay;   // the body throws the hook (procedural-humanoid.js)
                 p.knock = hay ? KNUCKLES.HAY_KNOCK : KNUCKLES.JAB_KNOCK; p.knockDmg = st.damage || 16;
                 this.projectiles.push(p);
                 // The fist's afterimages: gold copies along its path, fading
@@ -79104,7 +79142,9 @@ engineMixin({
                         ctx.save();
                         for (let j = 0; j < n; j++) {
                             const u = (j + 1) / n, d = 12 + R * u * 1.1, a = (1 - age / life) * (0.18 + 0.42 * u);
-                            const x = f.x + c * d + ox, y = f.y + s * d + oy, rr = (f.hay ? 5.4 : 4.4) * (0.7 + 0.3 * u);
+                            // a haymaker's copies ride the hook's arc (CONFIG.HAYMAKER), a jab's the straight line
+                            const ph = (92 - 100 * u) * Math.PI / 180, H = 19 + 7 * u, lx = Math.cos(ph) * H, ly = Math.sin(ph) * H * side;
+                            const x = f.hay ? f.x + c * lx - s * ly : f.x + c * d + ox, y = f.hay ? f.y + s * lx + c * ly : f.y + s * d + oy, rr = (f.hay ? 5.4 : 4.4) * (0.7 + 0.3 * u);
                             const g = ctx.createRadialGradient(x, y, 0, x, y, rr * 2.2);
                             g.addColorStop(0, `rgba(255, 238, 170, ${a})`); g.addColorStop(0.45, `rgba(255, 196, 72, ${a * 0.7})`); g.addColorStop(1, 'rgba(255, 170, 40, 0)');
                             ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, rr * 2.2, 0, TAU); ctx.fill();

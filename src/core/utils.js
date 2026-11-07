@@ -122,6 +122,20 @@
             return Math.max(0, 1 - s / ticks);
         }
 
+        /** The haymaker's hook from ticks since the punch started: out = [weight 0..1, sweep (rad), reach, twist, lunge].
+         *  Keys ease into each other (smoothstep); the weight snaps in over the first key and fades over RECOVER_TICKS. */
+        function humanoidHookPose(t, out = [0, 0, 0, 0, 0]) {
+            const H = CONFIG.HAYMAKER, K = H.KEYS, last = K[K.length - 1];
+            t = Math.max(0, t || 0);
+            let i = 0; while (i < K.length - 2 && t >= K[i + 1][0]) i++;
+            const a = K[i], b = K[i + 1], u = Math.min(1, Math.max(0, (t - a[0]) / (b[0] - a[0]))), e = u * u * (3 - 2 * u);
+            for (let j = 1; j < 5; j++) out[j] = a[j] + (b[j] - a[j]) * e;
+            out[1] *= Math.PI / 180;
+            const w1 = K[1][0], r = (t - last[0]) / H.RECOVER_TICKS;
+            out[0] = t < w1 ? 1 - (1 - t / w1) ** 2 : r <= 0 ? 1 : r >= 1 ? 0 : 1 - r * r * (3 - 2 * r);
+            return out;
+        }
+
         /** Punch strike 0..1 from ticks since the punch started (fractional ticks OK). */
         function humanoidPunchCurve(t) {
             const P = CONFIG.PUNCH;
