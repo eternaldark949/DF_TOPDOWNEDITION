@@ -9,6 +9,9 @@
         //   kind 1  ellipse centred on a, half-axis vector b, other half-axis ra: torso, feet, head, hair
         //   kind 2  soft shadow ellipse (as kind 1, edge `soft` px wide)
         //   sheen   how much a highlight it takes (the material kit's rule)
+        //   (slot 14: the surface, set by this.tex: 0 cloth or skin, 1 hair fibres, 2 coils)
+        // STYLE: 'painterly' (default) keeps the Canvas bodies' look: two soft tone bands, a brush grain
+        // along each stroke, hair fibres or coils, and an ink edge. 'lit' shades them as rounded solids.
         // Each shape is lit as a rounded solid: its depth comes from the distance to its edge, so a light
         // from the upper left shades every limb, head and torso the same way.
         //
@@ -22,10 +25,13 @@
                 if (!gl) throw new Error('WebGL2 is not available');
                 this.canvas = canvas; this.count = 0; this.capacity = 0; this.data = null;
                 this.cam = [0, 0, 1];
+                this.style = 'painterly';                                   // 'painterly' (like the Canvas bodies) or 'lit' (rounded solids)
+                this.tex = 0;                                                // surface of the next shapes: 0 cloth or skin, 1 hair fibres, 2 coils
                 this.program = this._program(glHumanoidRenderer.VERT, glHumanoidRenderer.FRAG);
                 this.u_view = gl.getUniformLocation(this.program, 'u_view');
                 this.u_light = gl.getUniformLocation(this.program, 'u_light');
                 this.u_size = gl.getUniformLocation(this.program, 'u_size');
+                this.u_style = gl.getUniformLocation(this.program, 'u_style');
                 this.vao = gl.createVertexArray(); gl.bindVertexArray(this.vao);
                 this.buffer = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
                 for (let i = 0; i < 4; i++) {                               // four vec4 per instance
@@ -71,7 +77,7 @@
                 d[o] = ax; d[o + 1] = ay; d[o + 2] = bx; d[o + 3] = by;
                 d[o + 4] = ra; d[o + 5] = rb; d[o + 6] = kind; d[o + 7] = sheen;
                 d[o + 8] = rgb[0]; d[o + 9] = rgb[1]; d[o + 10] = rgb[2]; d[o + 11] = a;
-                d[o + 12] = soft; d[o + 13] = this.count; d[o + 14] = 0; d[o + 15] = 0;
+                d[o + 12] = soft; d[o + 13] = this.count; d[o + 14] = this.tex; d[o + 15] = 0;
             }
 
             /** A person: pose the skeleton (no drawing), then lay down their shapes back to front. */
@@ -115,14 +121,21 @@
                 for (const sy of [-BC.sh, BC.sh]) ellipse(sx - sy * torS + 0.4, sy * torC, BC.del * 1.06, 0, BC.del * 0.8, upperRgb, topSheen);
                 // Head and hair: the crown from the Canvas hair's own table (HAIR_CROWNS), long styles hanging behind
                 const headX = g.headX, hr = 7.4, crown = hair && typeof HAIR_CROWNS !== 'undefined' ? HAIR_CROWNS[C.hair.type] : null;
+                const coil = C.hair && (C.hair.type === 'afro' || C.hair.type === 'curls');
+                this.tex = coil ? 2 : 1;
                 if (hair && (C.hair.type === 'ponytail' || C.hair.type === 'long' || C.hair.type === 'braids' || C.hair.type === 'dreadlocks'))
                     capsule(headX - 4, 0, headX - (C.hair.type === 'ponytail' ? 17 : 13), 0, C.hair.type === 'ponytail' ? 3.2 : 8.5, C.hair.type === 'ponytail' ? 1.8 : 6.5, hair, 0.5);
-                ellipse(headX + 0.5, 0, hr, 0, hr * 0.92, skin, 0);
+                { const t = this.tex; this.tex = 0; ellipse(headX + 0.5, 0, hr, 0, hr * 0.92, skin, 0); this.tex = t; }
                 if (crown) ellipse(headX + crown[0] - 0.8, 0, crown[1] * 0.92, 0, crown[2] * 0.92, hair, crown[3] === 'coil' ? 0.12 : 0.6);
-                if (C.hat && C.hat.color) {                                     // a hat: brim, then crown
+                this.tex = 0;
+                const hat = C.hat && C.hat.color ? C.hat.type : null;          // hats by shape (ui/wardrobe.js hats)
+                if (hat === 'wide_brim' || hat === 'cap' || hat === 'beanie' || hat === 'beret' || hat === 'hood_up') {
                     const hc = this.rgb(C.hat.color), hb = this.rgb(C.hat.band || C.hat.color);
-                    ellipse(headX - 0.5, 0, hr + 3.6, 0, hr + 3.2, hc, 0.3);
-                    ellipse(headX - 0.5, 0, hr * 0.85, 0, hr * 0.8, hb, 0.5);
+                    if (hat === 'wide_brim') { ellipse(headX - 0.5, 0, hr + 3.6, 0, hr + 3.2, hc, 0.3); ellipse(headX - 0.5, 0, hr * 0.85, 0, hr * 0.8, hb, 0.5); }
+                    else if (hat === 'cap') { capsule(headX + hr * 0.4, 0, headX + hr + 3, 0, hr * 0.75, hr * 0.6, hc, 0.2); ellipse(headX - 0.6, 0, hr * 0.98, 0, hr * 0.92, hc, 0.35); }
+                    else if (hat === 'beanie') { this.tex = 1; ellipse(headX - 0.8, 0, hr * 1.0, 0, hr * 0.95, hc, 0); this.tex = 0; }
+                    else if (hat === 'beret') ellipse(headX - 1, 2.2, hr * 0.95, 0, hr * 0.8, hc, 0.1);
+                    else ellipse(headX - 2, 0, hr + 2.6, 0, hr + 2, hc, 0.1);   // hood up
                 }
             }
 
@@ -133,7 +146,7 @@
                 gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
                 gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
                 gl.useProgram(this.program); gl.bindVertexArray(this.vao);
-                gl.uniform4f(this.u_view, cx, cy, z, 0); gl.uniform3f(this.u_light, -0.45, -0.55, 0.7); gl.uniform2f(this.u_size, W, H);
+                gl.uniform4f(this.u_view, cx, cy, z, 0); gl.uniform3f(this.u_light, -0.45, -0.55, 0.7); gl.uniform2f(this.u_size, W, H); gl.uniform1f(this.u_style, this.style === 'painterly' ? 1 : 0);
                 gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
                 gl.bufferData(gl.ARRAY_BUFFER, this.data.subarray(0, this.count * glHumanoidRenderer.FLOATS), gl.DYNAMIC_DRAW);
                 gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, this.count);
@@ -166,8 +179,14 @@
         in vec2 v_p; flat in vec4 v_ab; flat in vec4 v_shape; flat in vec4 v_color; flat in vec4 v_extra;
         uniform vec3 u_light;
         out vec4 o;
+        uniform float u_style;
+        float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+        float vnoise(vec2 p) {
+            vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+            return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
+        }
         void main() {
-            float kind = v_shape.z, d, r, across;
+            float kind = v_shape.z, d, r, across, along, side;
             vec2 dir;
             if (kind < 0.5) {                                   // tapered capsule
                 vec2 a = v_ab.xy, ba = v_ab.zw - a, pa = v_p - a;
@@ -175,12 +194,14 @@
                 vec2 off = pa - ba * t; r = mix(v_shape.x, v_shape.y, t);
                 float l = length(off); d = l - r; dir = l > 1e-5 ? off / l : vec2(0.0);
                 across = clamp(l / r, 0.0, 1.0);
+                vec2 u = ba / max(length(ba), 1e-6); along = dot(pa, u); side = dot(off, vec2(-u.y, u.x)) / r;
             } else {                                            // ellipse: half-axis vector, other half-axis
                 vec2 ax = v_ab.zw; float ra = length(ax); vec2 u = ax / max(ra, 1e-6), w = vec2(-u.y, u.x);
                 vec2 q = vec2(dot(v_p - v_ab.xy, u), dot(v_p - v_ab.xy, w));
                 vec2 qn = q / vec2(ra, v_shape.x); float e = length(qn);
                 r = min(ra, v_shape.x); d = (e - 1.0) * r; across = clamp(e, 0.0, 1.0);
                 vec2 g = qn / vec2(ra, v_shape.x); dir = length(g) > 1e-6 ? normalize(g.x * u + g.y * w) : vec2(0.0);
+                along = q.x; side = qn.y;
             }
             float aa = fwidth(d) + 1e-4;
             if (kind > 1.5) {                                   // soft shadow
@@ -190,12 +211,37 @@
             float cover = 1.0 - smoothstep(-aa, aa, d);
             if (cover <= 0.0) discard;
             vec3 n = normalize(vec3(dir * across, sqrt(max(1.0 - across * across, 0.0)) + 0.15));
-            vec3 L = normalize(u_light);
-            float diff = max(dot(n, L), 0.0);
-            vec3 h = normalize(L + vec3(0.0, 0.0, 1.0));
-            float spec = pow(max(dot(n, h), 0.0), 28.0) * v_shape.w;
-            vec3 col = v_color.rgb * (0.55 + 0.55 * diff) + vec3(spec * 0.55);
-            col *= 1.0 - 0.25 * smoothstep(0.75, 1.0, across);  // a darker rim where it turns away
+            vec3 L = normalize(u_light), base = v_color.rgb, col;
+            float diff = dot(n, L), tex = v_extra.z, seed = v_extra.y * 7.31;
+            if (u_style > 0.5) {
+                // PAINTERLY: flat colour in two soft tone bands (like the Canvas body's shade spots),
+                // a brush grain stretched along each stroke, fibres or coils in hair, and an ink edge
+                float tone = smoothstep(-0.1, 0.35, diff);
+                col = mix(base * 0.74, base, tone);
+                col = mix(col, base * 1.1 + 0.025, smoothstep(0.72, 0.92, diff) * 0.55);
+                col *= 0.94 + 0.11 * vnoise(vec2(along * 0.45, side * 2.2) + seed);
+                if (tex > 1.5) {                                 // coils: a scatter of small C-shaped curls, inked
+                    vec2 cp = v_p * 0.42 + seed, ci = floor(cp); float ink = 0.0, lift = 0.0;
+                    for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+                        vec2 cell = ci + vec2(x, y), c = cell + 0.2 + 0.6 * vec2(hash(cell), hash(cell + 3.7)), dv = cp - c;
+                        float rr = 0.3 + 0.12 * hash(cell + 9.1), dist = length(dv), gap = hash(cell + 5.3) * 6.283;
+                        float open = smoothstep(0.6, 1.2, abs(mod(atan(dv.y, dv.x) - gap + 3.1416, 6.283) - 3.1416));
+                        ink = max(ink, (1.0 - smoothstep(0.03, 0.09, abs(dist - rr))) * open);
+                        lift = max(lift, (1.0 - smoothstep(0.0, rr, dist)) * 0.5);
+                    }
+                    col *= (0.86 + 0.22 * lift) * (1.0 - 0.45 * ink);
+                } else if (tex > 0.5) {                          // fibres: strands running back from the crown
+                    float f = vnoise(vec2(along * 0.18, side * 9.0) + seed), f2 = vnoise(vec2(along * 0.3, side * 23.0) + seed * 2.3);
+                    col *= 0.78 + 0.3 * f + 0.12 * f2;
+                }
+                col += vec3(v_shape.w * 0.22) * smoothstep(0.55, 0.0, abs(side + 0.35)) * tone;   // a soft sheen streak
+                col *= mix(1.0, 0.6, smoothstep(0.8, 1.0, across));                                // the ink edge
+            } else {
+                vec3 h = normalize(L + vec3(0.0, 0.0, 1.0));
+                float spec = pow(max(dot(n, h), 0.0), 28.0) * v_shape.w;
+                col = base * (0.55 + 0.55 * max(diff, 0.0)) + vec3(spec * 0.55);
+                col *= 1.0 - 0.25 * smoothstep(0.75, 1.0, across);
+            }
             float a = v_color.a * cover;
             o = vec4(col * a, a);
         }`;
