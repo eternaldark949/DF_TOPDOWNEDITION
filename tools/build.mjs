@@ -51,10 +51,12 @@ const SCRIPTS = [
     'basement/shape-kit.js',       // LV0 Basement: shapeKit (collision geometry)
     'basement/spatial-grid.js',    // LV0 Basement: SpatialHashGrid and the render / transition grids
     'basement/ui-kit.js',          // LV0 Basement: uiKit (making, showing and hiding DOM panels)
+    'basement/material-kit.js',    // LV0 Basement: materialKit (linked materials and finish rules)
     'core/config.js',
     '@assets',              // generated from the assets/ folder
     'core/assets.js',
     'core/registries.js',
+    'directory/game-materials.js',    // LV2 Directory: the game's finishes and named materials (links the cosmetics)
     'core/resonance.js',
     'core/utils.js',
     'world/navigation.js',

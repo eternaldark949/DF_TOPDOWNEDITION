@@ -1524,7 +1524,7 @@
             return t;
         }
         /** Is this piece of clothing glossy? The item's own finish wins, else the wardrobe piece's. */
-        function _glossy(piece, item) { return !!item && (item.finish ? item.finish === 'gloss' : !!(piece && piece.finish === 'gloss')); }
+        function _glossy(piece, item) { return !!item && (item.finish ? materialKit.finishOf(item).sheen : !!(piece && piece.finish === 'gloss')); }
         let _shadeFrame = -1, _shadeRims = 0, _lampGrid = null, _shadeCols = null, _bodyRot = 0;
         const _SHADOW_RGB = '12, 6, 28';
 

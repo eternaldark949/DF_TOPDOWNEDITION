@@ -851,8 +851,7 @@
                     // Paint the entire boot AFTER both bare leg segments: the rounded thigh end must
                     // not cover the calf's knee cap. Extend the thigh span by the actual joint radius,
                     // not a fraction of the projected length (which approaches zero mid-step).
-                    const shoe = clothes.shoes, finish = shoe.finish || 'gloss', gloss = finish === 'gloss' || finish === 'sparkle';
-                    const shade = finish === 'velvet' ? 0.16 : shoe.finish ? 0.22 : 0.45;
+                    const shoe = clothes.shoes, F = materialKit.finishOf(shoe), gloss = F.boot_shine, shade = F.boot_shade;   // (directory/game-materials.js)
                     const bootColor = darken(shoe.color, shade), welt = darken(shoe.color, shade + 0.12), t0 = 1 - shoeP.thigh;
                     const T = BC.calf, S = [T[0] + 0.3, T[1] + 0.3, T[2], T[3] + 0.3];
                     // A limb seen end-on collapses its tapered outline. Keep the complete knee
