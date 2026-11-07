@@ -480,7 +480,9 @@
                 KEYS: [[0, 55, 14, 0, 0], [3, 92, 19, -0.45, -0.4], [6, -2, 26, 1.1, 1], [8, -16, 24, 1.25, 1]],
                 RECOVER_TICKS: 7,       // after the last key, back to guard (smoothstep)
                 LUNGE: 4,               // px the body drives forward at full lunge
-                OFFHAND_PULL: 3         // px the other fist tucks back to the chin
+                OFFHAND_PULL: 5,        // px the other fist draws back as the body drives in (with the lunge)
+                OFFHAND_ELBOW: 1.4,     // its elbow draws back this much more than the fist (driving past the ribs)
+                OFFHAND_TURN: 0.6       // how much of the torso's twist the other arm turns with
             },
 
             VEHICLE_AI: {

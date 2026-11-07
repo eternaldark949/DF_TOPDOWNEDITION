@@ -570,9 +570,18 @@
                         torsoRotation -= s * hook[3] * w;
                         const shY = s > 0 ? rShoulderY : lShoulderY, sx = shoulderX - shY * Math.sin(torsoRotation), sy = shY * Math.cos(torsoRotation);
                         const dx = tx - sx, dy = ty - sy, d = Math.max(.001, Math.hypot(dx, dy)), bend = Math.sqrt(Math.max(0, 14 * 14 - d * d / 4)) * s;
-                        const ex = (sx + tx) / 2 - dy / d * bend, ey = (sy + ty) / 2 + dx / d * bend, pull = w * H.OFFHAND_PULL;
-                        if (s > 0) { rFistX += (tx - rFistX) * w; rFistY += (ty - rFistY) * w; rElbowX += (ex - rElbowX) * w; rElbowY += (ey - rElbowY) * w; lFistX -= pull; lElbowX -= pull * .5; }
-                        else { lFistX += (tx - lFistX) * w; lFistY += (ty - lFistY) * w; lElbowX += (ex - lElbowX) * w; lElbowY += (ey - lElbowY) * w; rFistX -= pull; rElbowX -= pull * .5; }
+                        const ex = (sx + tx) / 2 - dy / d * bend, ey = (sy + ty) / 2 + dx / d * bend, pull = w * Math.max(0, hook[4]) * H.OFFHAND_PULL;
+                        // The other arm turns with the torso about the chest (forward on the wind-up, driven back
+                        // as the hook lands) and its elbow drives back past the ribs: the whole body throws it
+                        const ra = -s * hook[3] * w * H.OFFHAND_TURN, rc = Math.cos(ra), rs = Math.sin(ra), cx = shoulderX;
+                        const turn = (x, y) => [cx + (x - cx) * rc - y * rs, (x - cx) * rs + y * rc];
+                        if (s > 0) {
+                            rFistX += (tx - rFistX) * w; rFistY += (ty - rFistY) * w; rElbowX += (ex - rElbowX) * w; rElbowY += (ey - rElbowY) * w;
+                            [lFistX, lFistY] = turn(lFistX - pull, lFistY); [lElbowX, lElbowY] = turn(lElbowX - pull * H.OFFHAND_ELBOW, lElbowY);
+                        } else {
+                            lFistX += (tx - lFistX) * w; lFistY += (ty - lFistY) * w; lElbowX += (ex - lElbowX) * w; lElbowY += (ey - lElbowY) * w;
+                            [rFistX, rFistY] = turn(rFistX - pull, rFistY); [rElbowX, rElbowY] = turn(rElbowX - pull * H.OFFHAND_ELBOW, rElbowY);
+                        }
                     } else if ((entity.punchSide || 'right') === 'right') {
                         rFistX += reach;  rFistY -= reach * P.CROSS;              // jab crosses inward
                         rElbowX += reach * 0.5; rElbowY -= reach * P.CROSS * 0.5;

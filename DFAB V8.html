@@ -5868,7 +5868,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '9a82b9fdaff1';
+        const DFAB_BUILD = 'd272dede15dc';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="26">
         // ===== LV0 BASEMENT =====
@@ -7576,7 +7576,7 @@
             }
         }
     </script>
-    <script type="text/dfab" data-src="core/config.js" data-cost="415">
+    <script type="text/dfab" data-src="core/config.js" data-cost="417">
 
         // Console chatter (the ~100 [SAVE] / STORY / roads logs) is quiet unless you turn it on:
         // run  localStorage.dfab_debug = '1'  in the console and reload. Warnings and errors always show.
@@ -8059,7 +8059,9 @@
                 KEYS: [[0, 55, 14, 0, 0], [3, 92, 19, -0.45, -0.4], [6, -2, 26, 1.1, 1], [8, -16, 24, 1.25, 1]],
                 RECOVER_TICKS: 7,       // after the last key, back to guard (smoothstep)
                 LUNGE: 4,               // px the body drives forward at full lunge
-                OFFHAND_PULL: 3         // px the other fist tucks back to the chin
+                OFFHAND_PULL: 5,        // px the other fist draws back as the body drives in (with the lunge)
+                OFFHAND_ELBOW: 1.4,     // its elbow draws back this much more than the fist (driving past the ribs)
+                OFFHAND_TURN: 0.6       // how much of the torso's twist the other arm turns with
             },
 
             VEHICLE_AI: {
@@ -63297,7 +63299,7 @@ Object.assign(TrafficVehicle.prototype, {
         }
         
     </script>
-    <script type="text/dfab" data-src="penthouse/procedural-humanoid.js" data-cost="881">
+    <script type="text/dfab" data-src="penthouse/procedural-humanoid.js" data-cost="889">
         // ===== LV3 PENTHOUSE =====
         // THE PROCEDURAL HUMANOID: every person in the game, drawn from code each frame (no sprites).
         // One instance per person (proceduralHumanoid.of(entity)), kept for as long as the person is,
@@ -63870,9 +63872,18 @@ Object.assign(TrafficVehicle.prototype, {
                         torsoRotation -= s * hook[3] * w;
                         const shY = s > 0 ? rShoulderY : lShoulderY, sx = shoulderX - shY * Math.sin(torsoRotation), sy = shY * Math.cos(torsoRotation);
                         const dx = tx - sx, dy = ty - sy, d = Math.max(.001, Math.hypot(dx, dy)), bend = Math.sqrt(Math.max(0, 14 * 14 - d * d / 4)) * s;
-                        const ex = (sx + tx) / 2 - dy / d * bend, ey = (sy + ty) / 2 + dx / d * bend, pull = w * H.OFFHAND_PULL;
-                        if (s > 0) { rFistX += (tx - rFistX) * w; rFistY += (ty - rFistY) * w; rElbowX += (ex - rElbowX) * w; rElbowY += (ey - rElbowY) * w; lFistX -= pull; lElbowX -= pull * .5; }
-                        else { lFistX += (tx - lFistX) * w; lFistY += (ty - lFistY) * w; lElbowX += (ex - lElbowX) * w; lElbowY += (ey - lElbowY) * w; rFistX -= pull; rElbowX -= pull * .5; }
+                        const ex = (sx + tx) / 2 - dy / d * bend, ey = (sy + ty) / 2 + dx / d * bend, pull = w * Math.max(0, hook[4]) * H.OFFHAND_PULL;
+                        // The other arm turns with the torso about the chest (forward on the wind-up, driven back
+                        // as the hook lands) and its elbow drives back past the ribs: the whole body throws it
+                        const ra = -s * hook[3] * w * H.OFFHAND_TURN, rc = Math.cos(ra), rs = Math.sin(ra), cx = shoulderX;
+                        const turn = (x, y) => [cx + (x - cx) * rc - y * rs, (x - cx) * rs + y * rc];
+                        if (s > 0) {
+                            rFistX += (tx - rFistX) * w; rFistY += (ty - rFistY) * w; rElbowX += (ex - rElbowX) * w; rElbowY += (ey - rElbowY) * w;
+                            [lFistX, lFistY] = turn(lFistX - pull, lFistY); [lElbowX, lElbowY] = turn(lElbowX - pull * H.OFFHAND_ELBOW, lElbowY);
+                        } else {
+                            lFistX += (tx - lFistX) * w; lFistY += (ty - lFistY) * w; lElbowX += (ex - lElbowX) * w; lElbowY += (ey - lElbowY) * w;
+                            [rFistX, rFistY] = turn(rFistX - pull, rFistY); [rElbowX, rElbowY] = turn(rElbowX - pull * H.OFFHAND_ELBOW, rElbowY);
+                        }
                     } else if ((entity.punchSide || 'right') === 'right') {
                         rFistX += reach;  rFistY -= reach * P.CROSS;              // jab crosses inward
                         rElbowX += reach * 0.5; rElbowY -= reach * P.CROSS * 0.5;
