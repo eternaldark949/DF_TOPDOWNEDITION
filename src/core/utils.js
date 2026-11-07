@@ -92,9 +92,7 @@
          *  centre if no weapon has been drawn). The renderer records ent._muzzleLocal each
          *  frame in the actor's own frame (x forward, y to its right). */
         function muzzleWorld(ent, dirAngle, m = ent._muzzleLocal) {
-            if (!m) return { x: ent.x, y: ent.y };
-            const c = Math.cos(dirAngle), s = Math.sin(dirAngle);
-            return { x: ent.x + m.x * c - m.y * s, y: ent.y + m.x * s + m.y * c };
+            return m ? virtualChild.toWorld(ent, [m.x, m.y], dirAngle) : { x: ent.x, y: ent.y };   // basement/virtual-child.js
         }
 
         /** Shot origin + direction for an actor facing `dirAngle`: leaves from the muzzle and

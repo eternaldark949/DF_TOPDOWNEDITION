@@ -15,6 +15,9 @@
         // (x forward, y to the right). The skeleton's feet, knees and hip points live in `geometry`,
         // which the wardrobe draws from (ui/wardrobe.js `g`).
         //
+        // ATTACHMENT POINTS: point('hand_l' | 'hand_r' | 'head' | 'muzzle') → a virtualChild of the
+        // person, for anything in the world that rides on them (a thrown glass leaving the hand).
+        //
         // The shapes come from ui/bodies.js, the clothes from ui/wardrobe.js, the hair and heads from
         // ui/humanoid-render.js. drawProceduralHumanoid (ui/humanoid-render.js) is still the way in:
         // it picks the silhouette, timing and scale, then hands the body to this class.
@@ -40,6 +43,7 @@
                 this.punch_guard = null;
                 this.fists = [0, 0, 0, 0];
                 this.elbows = [0, 0, 0, 0];
+                this.points = null;                            // attachment points, made when first asked for (point)
                 // This frame: who, and how (configure, dress)
                 this.ctx = null; this.entity = entity; this.config = null; this.scale = null; this.android = null;
                 this.skin = null; this.wet = 0; this.shade = null; this.body = null;
@@ -78,6 +82,18 @@
                 this.drawTorso();
                 this.drawHead();
                 this.drawHeld();
+            }
+
+            /** An attachment point on this person as a virtualChild (basement/virtual-child.js), placed from
+             *  this frame's skeleton: 'hand_l', 'hand_r', 'head', or 'muzzle' (null while no gun is drawn).
+             *    body.point('hand_r').updatePosition()   → world_x, world_y: her right hand in the world */
+            point (name) {
+                const S = this.scale, kx = S ? S.x : 1, ky = S ? S.y : 1, F = this.fists, m = this.entity._muzzleLocal;
+                const local = name === 'hand_l' ? [F[0] * kx, F[1] * ky] : name === 'hand_r' ? [F[2] * kx, F[3] * ky]
+                    : name === 'head' ? [this.head_x * kx, 0] : name === 'muzzle' ? (m && [m.x, m.y]) : null;
+                if (!local) return null;
+                const P = this.points || (this.points = {}), child = P[name] || (P[name] = new virtualChild(this.entity, local));
+                child.init_position = local; return child;
             }
 
             // --- HELPERS ---

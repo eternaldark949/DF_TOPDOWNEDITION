@@ -52,6 +52,7 @@ const SCRIPTS = [
     'basement/spatial-grid.js',    // LV0 Basement: SpatialHashGrid and the render / transition grids
     'basement/ui-kit.js',          // LV0 Basement: uiKit (making, showing and hiding DOM panels)
     'basement/material-kit.js',    // LV0 Basement: materialKit (linked materials and finish rules)
+    'basement/virtual-child.js',   // LV0 Basement: virtualChild (things that ride on a parent without being its child)
     'core/config.js',
     '@assets',              // generated from the assets/ folder
     'core/assets.js',

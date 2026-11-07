@@ -93,13 +93,9 @@
             _abandonStep(w, step) { w._slot = undefined; }
             _finishStep(w, step) { w.waiting = false; w.attended = false; if (step.desk) w._slot = undefined; }
 
-            /** Luggage follows its owner (rollers trail behind). */
+            /** Luggage follows its owner: a roller trails on its strap, behind and to the right (basement/virtual-child.js). */
             _afterUpdate() {
-                for (const w of this.walkers) if (w.bag && w.bag.type === 'roller') {
-                    const tx = w.x - Math.cos(w.angle) * 16 + Math.cos(w.angle + Math.PI / 2) * 7, ty = w.y - Math.sin(w.angle) * 16 + Math.sin(w.angle + Math.PI / 2) * 7;
-                    if (w.bag.bx === undefined) { w.bag.bx = tx; w.bag.by = ty; }
-                    w.bag.bx += (tx - w.bag.bx) * 0.25; w.bag.by += (ty - w.bag.by) * 0.25;
-                }
+                for (const w of this.walkers) if (w.bag && w.bag.type === 'roller') (w.bag.strap ??= new virtualChild(w, [-16, 7], { follow: 'trail', ease: 0.25 })).updatePosition();
             }
 
             /** Staff: bellhops and the valet do rounds; concierges attend whoever is waiting. */
@@ -138,14 +134,15 @@
                         ctx.restore();
                     }
                     const b = w.bag;
-                    if (b && b.type === 'roller' && b.bx !== undefined) {                // a suitcase rolled behind
-                        ctx.save(); ctx.globalAlpha = w.life; ctx.translate(b.bx, b.by); ctx.rotate(w.angle);
+                    if (b && b.type === 'roller' && b.strap) {                        // a suitcase rolled behind
+                        const bx = b.strap.world_x, by = b.strap.world_y;
+                        ctx.save(); ctx.globalAlpha = w.life; ctx.translate(bx, by); ctx.rotate(w.angle);
                         ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(-5, -6, 12, 14);
                         ctx.fillStyle = b.color; ctx.beginPath(); ctx.roundRect(-7, -7, 12, 14, 2); ctx.fill();
                         ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(-6, -1, 10, 1);
                         ctx.restore();
                         ctx.save(); ctx.globalAlpha = w.life * 0.8; ctx.strokeStyle = '#8a90a8'; ctx.lineWidth = 1;
-                        ctx.beginPath(); ctx.moveTo(b.bx + Math.cos(w.angle) * 5, b.by + Math.sin(w.angle) * 5); ctx.lineTo(w.x + Math.cos(w.angle + Math.PI / 2) * 7, w.y + Math.sin(w.angle + Math.PI / 2) * 7); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(bx + Math.cos(w.angle) * 5, by + Math.sin(w.angle) * 5); ctx.lineTo(w.x + Math.cos(w.angle + Math.PI / 2) * 7, w.y + Math.sin(w.angle + Math.PI / 2) * 7); ctx.stroke();
                         ctx.restore();
                     }
                     ctx.save(); ctx.translate(w.x, w.y); ctx.rotate(w.angle); ctx.globalAlpha = w.life;

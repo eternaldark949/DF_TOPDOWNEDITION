@@ -5868,7 +5868,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '8c2fbcb4c98b';
+        const DFAB_BUILD = '044fbfbda7a7';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="26">
         // ===== LV0 BASEMENT =====
@@ -7519,6 +7519,63 @@
             }
         };
     </script>
+    <script type="text/dfab" data-src="basement/virtual-child.js" data-cost="34">
+        // ===== LV0 BASEMENT =====
+        // The virtual child: a "non-object" that behaves as a child of a parent without being one.
+        // It has no body, no update of its own and no place in any list: it holds where it sits in
+        // its parent's frame and works out where that is in the world when asked. A hat, a held glass,
+        // a muzzle, a suitcase on a strap: anything that rides on something else.
+        // (From the V2 engine design: init_position, parent_object, updatePosition() → worldPosition.)
+        //
+        // INIT POSITION PACKET: [x, y, angle]   in the parent's frame
+        //   x                 forward (along the parent's angle)
+        //   y                 to the parent's right
+        //   angle             turn on top of the parent's (radians, 0 = same way)
+        //
+        // A parent is anything with x, y and angle (an entity, a walker, a plain object).
+        //
+        //   const bag = new virtualChild(walker, [-16, 7], { follow: 'trail', ease: 0.25 });
+        //   bag.updatePosition();                              // each step: world_x, world_y, world_angle
+        //   ctx.translate(bag.world_x, bag.world_y);            // draw it there
+        //   virtualChild.toWorld(ent, [15, 5], angle)           // one-off: a local point in the world
+        //
+        // FOLLOW
+        //   'rigid'  (default) sits exactly where the parent's frame puts it
+        //   'trail'  eases toward that spot by `ease` a step, so it lags behind and swings round turns
+        class virtualChild {
+            constructor(parent_object, init_position = [0, 0, 0], options = {}) {
+                this.parent_object = parent_object;
+                this.init_position = init_position;
+                this.follow = options.follow || 'rigid';
+                this.ease = options.ease ?? 0.25;
+                this.world_x = undefined;                  // undefined until the first updatePosition()
+                this.world_y = undefined;
+                this.world_angle = 0;
+            }
+
+            /** Placed in the world yet (a trailing child has nothing to ease from before its first update). */
+            get placed() { return this.world_x !== undefined; }
+
+            /** Where it is now, from the parent's frame. `angle` stands in for the parent's (a gun aimed
+             *  off the facing). A trailing child starts on its spot, then eases toward it. */
+            updatePosition(angle = this.parent_object.angle || 0) {
+                const p = this.parent_object, [lx, ly = 0, la = 0] = this.init_position;
+                const c = Math.cos(angle), s = Math.sin(angle);
+                const tx = p.x + lx * c - ly * s, ty = p.y + lx * s + ly * c;
+                if (this.follow === 'trail' && this.world_x !== undefined) {
+                    this.world_x += (tx - this.world_x) * this.ease; this.world_y += (ty - this.world_y) * this.ease;
+                } else { this.world_x = tx; this.world_y = ty; }
+                this.world_angle = angle + la;
+                return this;
+            }
+
+            /** A local point [x, y] of a parent in the world, facing `angle`: no child kept. */
+            static toWorld(parent, local, angle = parent.angle || 0) {
+                const c = Math.cos(angle), s = Math.sin(angle), lx = local[0], ly = local[1];
+                return { x: parent.x + lx * c - ly * s, y: parent.y + lx * s + ly * c };
+            }
+        }
+    </script>
     <script type="text/dfab" data-src="core/config.js" data-cost="406">
 
         // Console chatter (the ~100 [SAVE] / STORY / roads logs) is quiet unless you turn it on:
@@ -9045,7 +9102,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
     </script>
-    <script type="text/dfab" data-src="core/utils.js" data-cost="227">
+    <script type="text/dfab" data-src="core/utils.js" data-cost="226">
         // ============================================================================
         //  SHARED UTILITIES — Consolidated from repeated inline patterns
         // ============================================================================
@@ -9140,9 +9197,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
          *  centre if no weapon has been drawn). The renderer records ent._muzzleLocal each
          *  frame in the actor's own frame (x forward, y to its right). */
         function muzzleWorld(ent, dirAngle, m = ent._muzzleLocal) {
-            if (!m) return { x: ent.x, y: ent.y };
-            const c = Math.cos(dirAngle), s = Math.sin(dirAngle);
-            return { x: ent.x + m.x * c - m.y * s, y: ent.y + m.x * s + m.y * c };
+            return m ? virtualChild.toWorld(ent, [m.x, m.y], dirAngle) : { x: ent.x, y: ent.y };   // basement/virtual-child.js
         }
 
         /** Shot origin + direction for an actor facing `dirAngle`: leaves from the muzzle and
@@ -29286,7 +29341,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
     </script>
-    <script type="text/dfab" data-src="directory/lobby-life.js" data-cost="127">
+    <script type="text/dfab" data-src="directory/lobby-life.js" data-cost="126">
         // ===== LV2 DIRECTORY =====
         // ============================================================================
         //  LOBBY LIFE — the Double Nights lobby's guests and AI staff (hotel_lobby only)
@@ -29382,13 +29437,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             _abandonStep(w, step) { w._slot = undefined; }
             _finishStep(w, step) { w.waiting = false; w.attended = false; if (step.desk) w._slot = undefined; }
 
-            /** Luggage follows its owner (rollers trail behind). */
+            /** Luggage follows its owner: a roller trails on its strap, behind and to the right (basement/virtual-child.js). */
             _afterUpdate() {
-                for (const w of this.walkers) if (w.bag && w.bag.type === 'roller') {
-                    const tx = w.x - Math.cos(w.angle) * 16 + Math.cos(w.angle + Math.PI / 2) * 7, ty = w.y - Math.sin(w.angle) * 16 + Math.sin(w.angle + Math.PI / 2) * 7;
-                    if (w.bag.bx === undefined) { w.bag.bx = tx; w.bag.by = ty; }
-                    w.bag.bx += (tx - w.bag.bx) * 0.25; w.bag.by += (ty - w.bag.by) * 0.25;
-                }
+                for (const w of this.walkers) if (w.bag && w.bag.type === 'roller') (w.bag.strap ??= new virtualChild(w, [-16, 7], { follow: 'trail', ease: 0.25 })).updatePosition();
             }
 
             /** Staff: bellhops and the valet do rounds; concierges attend whoever is waiting. */
@@ -29427,14 +29478,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         ctx.restore();
                     }
                     const b = w.bag;
-                    if (b && b.type === 'roller' && b.bx !== undefined) {                // a suitcase rolled behind
-                        ctx.save(); ctx.globalAlpha = w.life; ctx.translate(b.bx, b.by); ctx.rotate(w.angle);
+                    if (b && b.type === 'roller' && b.strap) {                        // a suitcase rolled behind
+                        const bx = b.strap.world_x, by = b.strap.world_y;
+                        ctx.save(); ctx.globalAlpha = w.life; ctx.translate(bx, by); ctx.rotate(w.angle);
                         ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(-5, -6, 12, 14);
                         ctx.fillStyle = b.color; ctx.beginPath(); ctx.roundRect(-7, -7, 12, 14, 2); ctx.fill();
                         ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(-6, -1, 10, 1);
                         ctx.restore();
                         ctx.save(); ctx.globalAlpha = w.life * 0.8; ctx.strokeStyle = '#8a90a8'; ctx.lineWidth = 1;
-                        ctx.beginPath(); ctx.moveTo(b.bx + Math.cos(w.angle) * 5, b.by + Math.sin(w.angle) * 5); ctx.lineTo(w.x + Math.cos(w.angle + Math.PI / 2) * 7, w.y + Math.sin(w.angle + Math.PI / 2) * 7); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(bx + Math.cos(w.angle) * 5, by + Math.sin(w.angle) * 5); ctx.lineTo(w.x + Math.cos(w.angle + Math.PI / 2) * 7, w.y + Math.sin(w.angle + Math.PI / 2) * 7); ctx.stroke();
                         ctx.restore();
                     }
                     ctx.save(); ctx.translate(w.x, w.y); ctx.rotate(w.angle); ctx.globalAlpha = w.life;
@@ -63156,7 +63208,7 @@ Object.assign(TrafficVehicle.prototype, {
         }
         
     </script>
-    <script type="text/dfab" data-src="penthouse/procedural-humanoid.js" data-cost="816">
+    <script type="text/dfab" data-src="penthouse/procedural-humanoid.js" data-cost="829">
         // ===== LV3 PENTHOUSE =====
         // THE PROCEDURAL HUMANOID: every person in the game, drawn from code each frame (no sprites).
         // One instance per person (proceduralHumanoid.of(entity)), kept for as long as the person is,
@@ -63173,6 +63225,9 @@ Object.assign(TrafficVehicle.prototype, {
         // JOINT PACKETS: fists [lx, ly, rx, ry] and elbows [lx, ly, rx, ry], in the body's frame
         // (x forward, y to the right). The skeleton's feet, knees and hip points live in `geometry`,
         // which the wardrobe draws from (ui/wardrobe.js `g`).
+        //
+        // ATTACHMENT POINTS: point('hand_l' | 'hand_r' | 'head' | 'muzzle') → a virtualChild of the
+        // person, for anything in the world that rides on them (a thrown glass leaving the hand).
         //
         // The shapes come from ui/bodies.js, the clothes from ui/wardrobe.js, the hair and heads from
         // ui/humanoid-render.js. drawProceduralHumanoid (ui/humanoid-render.js) is still the way in:
@@ -63199,6 +63254,7 @@ Object.assign(TrafficVehicle.prototype, {
                 this.punch_guard = null;
                 this.fists = [0, 0, 0, 0];
                 this.elbows = [0, 0, 0, 0];
+                this.points = null;                            // attachment points, made when first asked for (point)
                 // This frame: who, and how (configure, dress)
                 this.ctx = null; this.entity = entity; this.config = null; this.scale = null; this.android = null;
                 this.skin = null; this.wet = 0; this.shade = null; this.body = null;
@@ -63237,6 +63293,18 @@ Object.assign(TrafficVehicle.prototype, {
                 this.drawTorso();
                 this.drawHead();
                 this.drawHeld();
+            }
+
+            /** An attachment point on this person as a virtualChild (basement/virtual-child.js), placed from
+             *  this frame's skeleton: 'hand_l', 'hand_r', 'head', or 'muzzle' (null while no gun is drawn).
+             *    body.point('hand_r').updatePosition()   → world_x, world_y: her right hand in the world */
+            point (name) {
+                const S = this.scale, kx = S ? S.x : 1, ky = S ? S.y : 1, F = this.fists, m = this.entity._muzzleLocal;
+                const local = name === 'hand_l' ? [F[0] * kx, F[1] * ky] : name === 'hand_r' ? [F[2] * kx, F[3] * ky]
+                    : name === 'head' ? [this.head_x * kx, 0] : name === 'muzzle' ? (m && [m.x, m.y]) : null;
+                if (!local) return null;
+                const P = this.points || (this.points = {}), child = P[name] || (P[name] = new virtualChild(this.entity, local));
+                child.init_position = local; return child;
             }
 
             // --- HELPERS ---
