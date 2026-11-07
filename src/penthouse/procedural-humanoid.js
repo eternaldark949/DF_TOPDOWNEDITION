@@ -353,13 +353,13 @@
 
                         if (punchSide === 'right') {
                             // -- RIGHT PUNCH --
-                            torsoRotation += recoil * 0.5; // Twist Left
+                            torsoRotation -= recoil * 0.5; // twist left: the right shoulder comes forward (+ turns clockwise, toward the right)
                             rFistX += punchExt;
                             rFistY -= punchExt * 0.2; // Cross inward
                             lFistX -= recoil * 3;     // Retract Left
                         } else {
                             // -- LEFT PUNCH --
-                            torsoRotation -= recoil * 0.5; // Twist Right
+                            torsoRotation += recoil * 0.5; // twist right: the left shoulder comes forward
                             lFistX += punchExt;
                             lFistY += punchExt * 0.2; // Cross inward (Positive Y moves from -8 towards 0)
                             rFistX -= recoil * 3;     // Retract Right
@@ -563,12 +563,12 @@
                         rFistX += reach;  rFistY -= reach * P.CROSS;              // jab crosses inward
                         rElbowX += reach * 0.5; rElbowY -= reach * P.CROSS * 0.5;
                         lFistX -= pull;   lElbowX -= pull * 0.5;                  // other fist pulls back
-                        torsoRotation += punchStrike * P.TWIST;                   // twist into the punch
+                        torsoRotation -= punchStrike * P.TWIST;                   // twist into the punch: right shoulder forward
                     } else {
                         lFistX += reach;  lFistY += reach * P.CROSS;
                         lElbowX += reach * 0.5; lElbowY += reach * P.CROSS * 0.5;
                         rFistX -= pull;   rElbowX -= pull * 0.5;
-                        torsoRotation -= punchStrike * P.TWIST;
+                        torsoRotation += punchStrike * P.TWIST;                   // left shoulder forward
                     }
                 }
 
