@@ -5868,7 +5868,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '51a89aec5308';
+        const DFAB_BUILD = '0156d7c72498';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="26">
         // ===== LV0 BASEMENT =====
@@ -63248,7 +63248,7 @@ Object.assign(TrafficVehicle.prototype, {
         }
         
     </script>
-    <script type="text/dfab" data-src="penthouse/procedural-humanoid.js" data-cost="856">
+    <script type="text/dfab" data-src="penthouse/procedural-humanoid.js" data-cost="862">
         // ===== LV3 PENTHOUSE =====
         // THE PROCEDURAL HUMANOID: every person in the game, drawn from code each frame (no sprites).
         // One instance per person (proceduralHumanoid.of(entity)), kept for as long as the person is,
@@ -63334,6 +63334,18 @@ Object.assign(TrafficVehicle.prototype, {
                 this.drawTorso();
                 this.drawHead();
                 this.drawHeld();
+            }
+
+            /** The skeleton only, no drawing: every set-up stage and the rig, for a renderer that isn't Canvas 2D
+             *  (penthouse/gl-humanoid.js). Reads back from fists, elbows, geometry and the pose fields. */
+            skeleton (entity, config) {
+                this.configure(null, entity, config, null, null);
+                this.stride();
+                this.strikePose();
+                this.placeHands();
+                this.settle();
+                this.rig();
+                return this;
             }
 
             /** An attachment point on this person as a virtualChild (basement/virtual-child.js), placed from

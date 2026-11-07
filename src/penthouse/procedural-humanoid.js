@@ -85,6 +85,18 @@
                 this.drawHeld();
             }
 
+            /** The skeleton only, no drawing: every set-up stage and the rig, for a renderer that isn't Canvas 2D
+             *  (penthouse/gl-humanoid.js). Reads back from fists, elbows, geometry and the pose fields. */
+            skeleton (entity, config) {
+                this.configure(null, entity, config, null, null);
+                this.stride();
+                this.strikePose();
+                this.placeHands();
+                this.settle();
+                this.rig();
+                return this;
+            }
+
             /** An attachment point on this person as a virtualChild (basement/virtual-child.js), placed from
              *  this frame's skeleton: 'hand_l', 'hand_r', 'head', or 'muzzle' (null while no gun is drawn).
              *    body.point('hand_r').updatePosition()   → world_x, world_y: her right hand in the world */
