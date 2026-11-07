@@ -93,8 +93,9 @@ test('Map-entry warmup prepares ordinary signs only when their font is ready and
  const env=runtime(file);
  const r=value(env,`
   game.story.update=()=>{};game._doLoadMap('sdc');
-  const b=game.activeMap.buildings.find(b=>b.isV2&&b.attachedSign&&!b.variant&&b.style!=='double_nights'&&b.style!=='moon_city');
-  game.activeMap.buildings=[b];game.props=[];game.groundBaker.activeFor=()=>false;b.inView=()=>true;delete b._signSpr;
+  // every signed street building in sdc has a variant now; one stood in as an ordinary sign
+  const b=game.activeMap.buildings.find(b=>b.isV2&&b.attachedSign&&b.style!=='double_nights'&&b.style!=='moon_city');
+  b.variant=null;game.activeMap.buildings=[b];game.props=[];game.groundBaker.activeFor=()=>false;b.inView=()=>true;delete b._signSpr;
   let ready=false;document.fonts.check=()=>ready;
   game._prepareMapTextures(()=>{},game._loadSeq);
   const pendingJobs=game._mapTextureWarmup.jobs.length;
