@@ -114,31 +114,56 @@
         /** The torso: chest across the front, shoulder blades and a shallow spine behind, ending at the
          *  shoulder joints (the deltoid caps go on top). `band` keeps only |y| ≤ band of it (a tank top). */
         function bodyTorsoPath(C, inflate = 0, band = 0) {
-            return _bodyCached(C, 't' + inflate + '|' + band, () => {
-                const { tf, tb, chest, back, sh, del } = C, lim = band || Infinity;
-                const side = [
-                    [tf - 0.9, chest * 0.55],               // the chest
-                    [tf - 2.6, chest],                      // where it turns into the shoulder
-                    [del * 0.35, sh + del * 0.28],          // shoulder joint, front
-                    [-del * 0.65, sh + del * 0.12],         // shoulder joint, back
-                    [tb + 2.0, back],                       // shoulder blade
-                    [tb, back * 0.42],
-                ].map(([x, y]) => [x, Math.min(y, lim)]);
-                return _bodySpline(_bodyMirror([tf, 0], side, [tb + 0.35, 0]), inflate);
-            });
+            return _bodyCached(C, 't' + inflate + '|' + band, () => _bodySpline(bodyTorsoOutline(C, band), inflate));
+        }
+        /** The torso's outline control points (bodyTorsoPath splines through them; other renderers sample them). */
+        function bodyTorsoOutline(C, band = 0) {
+            const { tf, tb, chest, back, sh, del } = C, lim = band || Infinity;
+            const side = [
+                [tf - 0.9, chest * 0.55],               // the chest
+                [tf - 2.6, chest],                      // where it turns into the shoulder
+                [del * 0.35, sh + del * 0.28],          // shoulder joint, front
+                [-del * 0.65, sh + del * 0.12],         // shoulder joint, back
+                [tb + 2.0, back],                       // shoulder blade
+                [tb, back * 0.42],
+            ].map(([x, y]) => [x, Math.min(y, lim)]);
+            return _bodyMirror([tf, 0], side, [tb + 0.35, 0]);
         }
         /** The pelvis: widest at the hip bones, rounding into the seat, a soft cleft behind. */
         function bodyHipPath(C, inflate = 0) {
-            return _bodyCached(C, 'h' + inflate, () => {
-                const { hf, hb, hw, cleft } = C;
-                return _bodySpline(_bodyMirror([hf, 0], [
-                    [hf - 0.8, hw * 0.55],
-                    [hf - 3.2, hw * 0.93],
-                    [(hf + hb) / 2 - 0.6, hw],              // hip bones
-                    [hb + 2.4, hw * 0.86],
-                    [hb + 0.25, hw * 0.42],                 // the seat
-                ], [hb + cleft, 0]), inflate);
+            return _bodyCached(C, 'h' + inflate, () => _bodySpline(bodyHipOutline(C), inflate));
+        }
+        function bodyHipOutline(C) {
+            const { hf, hb, hw, cleft } = C;
+            return _bodyMirror([hf, 0], [
+                [hf - 0.8, hw * 0.55],
+                [hf - 3.2, hw * 0.93],
+                [(hf + hb) / 2 - 0.6, hw],              // hip bones
+                [hb + 2.4, hw * 0.86],
+                [hb + 0.25, hw * 0.42],                 // the seat
+            ], [hb + cleft, 0]);
+        }
+        /** The points of a _bodySpline outline, sampled `segs` to each span (for renderers without paths). */
+        function bodySplinePoints(pts, inflate = 0, segs = 4) {
+            const n = pts.length;
+            let area = 0;
+            for (let i = 0; i < n; i++) { const a = pts[i], b = pts[(i + 1) % n]; area += a[0] * b[1] - b[0] * a[1]; }
+            if (area < 0) pts = pts.slice().reverse();
+            const P = i => pts[(i % n + n) % n];
+            const q = !inflate ? pts : pts.map((p, i) => {
+                const a = P(i - 1), b = P(i + 1), tx = b[0] - a[0], ty = b[1] - a[1], l = Math.hypot(tx, ty) || 1;
+                return [p[0] + ty / l * inflate, p[1] - tx / l * inflate];
             });
+            const Q = i => q[(i % n + n) % n], out = [];
+            for (let i = 0; i < n; i++) {
+                const p0 = Q(i - 1), p1 = Q(i), p2 = Q(i + 1), p3 = Q(i + 2);
+                const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6], c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+                for (let k = 0; k < segs; k++) {
+                    const t = k / segs, u = 1 - t, a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, d = t * t * t;
+                    out.push([a * p1[0] + b * c1[0] + c * c2[0] + d * p2[0], a * p1[1] + b * c1[1] + c * c2[1] + d * p2[1]]);
+                }
+            }
+            return out;
         }
 
         /** The head from above: an egg, longer than wide and fuller behind; the ears as one path. */

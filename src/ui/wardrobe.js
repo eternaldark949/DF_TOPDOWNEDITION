@@ -1021,7 +1021,7 @@
                     ctx.stroke();
                 } }
             };
-            return { tops, bottoms, shoes, hats, jewelry, trains };
+            return { tops, bottoms, shoes, hats, jewelry, trains, specs: { pieceSpec, pleatedSpec } };   // (specs: for the garment kit)
         })();
 
         /** A top's colour: the look's own, else its WARDROBE piece's default (the lab coat's white), else null. */

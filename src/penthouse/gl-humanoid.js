@@ -88,6 +88,12 @@
                 d[o + 12] = soft; d[o + 13] = this.count; d[o + 14] = this.tex; d[o + 15] = 0;
             }
 
+            /** A filled outline (world points), as a fan of triangles from its centre: only the rim is anti-aliased. */
+            polygon(pts, rgb, sheen, a) {
+                let cx = 0, cy = 0; for (const p of pts) { cx += p[0]; cy += p[1]; } cx /= pts.length; cy /= pts.length;
+                for (let i = 0; i < pts.length; i++) { const p = pts[i], q = pts[(i + 1) % pts.length]; this.shape(cx, cy, p[0], p[1], q[0], q[1], 3, sheen, rgb, a); }
+            }
+
             /** A person: pose the skeleton (no drawing), then lay down their shapes back to front. */
             addBody(entity, config) {
                 const h = proceduralHumanoid.of(entity).skeleton(entity, config), BC = h.body, g = h.geometry, C = h.clothes;
@@ -97,33 +103,43 @@
                 const capsule = (x1, y1, x2, y2, r1, r2, rgb, sheen) => this.shape(wx(x1, y1), wy(x1, y1), wx(x2, y2), wy(x2, y2), r1, r2, 0, sheen, rgb, alpha);
                 const ellipse = (cx, cy, axx, axy, rb, rgb, sheen, kind = 1, a = alpha, soft = 0) =>
                     this.shape(wx(cx, cy), wy(cx, cy), axx * ca - axy * sa, axx * sa + axy * ca, rb, 0, kind, sheen, rgb, a, soft);
+                // A frame inside the body (the hips', the torso's: offset forward by ox, turned by rot), for garments
+                const frame = (ox, rot) => {
+                    const c = Math.cos(rot), s = Math.sin(rot), fx = (x, y) => ox + x * c - y * s, fy = (x, y) => x * s + y * c;
+                    return {
+                        capsule: (x1, y1, x2, y2, r1, r2, rgb, sh) => capsule(fx(x1, y1), fy(x1, y1), fx(x2, y2), fy(x2, y2), r1, r2, rgb, sh),
+                        ellipse: (cx, cy, axx, axy, rb, rgb, sh, a = 1) => ellipse(fx(cx, cy), fy(cx, cy), axx * c - axy * s, axx * s + axy * c, rb, rgb, sh, 1, alpha * a),
+                        polygon: (pts, rgb, sh, a = 1) => this.polygon(pts.map(([x, y]) => { const bx = fx(x, y), by = fy(x, y); return [wx(bx, by), wy(bx, by)]; }), rgb, sh, alpha * a),
+                    };
+                };
+                const dataOf = (item) => item && typeof GARMENTS !== 'undefined' ? GARMENTS[item.type] : null;
                 const F = (item) => (typeof materialKit !== 'undefined' && item ? materialKit.finishOf(item).sheen || 0 : 0);
                 const skin = this.rgb(h.skin), top = C.top ? this.rgb(C.top.color) : skin, bottom = C.bottom ? this.rgb(C.bottom.under || C.bottom.color) : skin;
                 const botPiece = h.bottom_piece, legs = botPiece && botPiece.legs === 'bare' ? skin : bottom;
                 const shoe = this.rgb(C.shoes ? h.darken(C.shoes.color, 0.35) : '#1a1a1a'), hair = C.hair && C.hair.color ? this.rgb(C.hair.color) : null;
                 const topSheen = F(C.top), botSheen = F(C.bottom), sleeve = h.sleeve, sleeveRgb = h.sleeve_color ? this.rgb(h.sleeve_color) : top;
-                const upperRgb = sleeve && sleeve !== 'none' ? sleeveRgb : skin, foreRgb = sleeve === 'long' ? sleeveRgb : skin;
+                // The same tones the Canvas body uses for each part (procedural-humanoid.js drawArms, drawLegs, drawTorso)
+                const D = (hex, k) => this.rgb(h.darken(hex, k)), sc = h.sleeve_color;
+                const upperRgb = sleeve && sleeve !== 'none' ? D(sc, 0.15) : D(h.skin, 0.15), foreRgb = sleeve === 'long' ? D(sc, 0.3) : D(h.skin, 0.3);
+                const capRgb = sleeve && sleeve !== 'none' ? D(sc, 0.12) : D(h.skin, 0.12), handRgb = D(h.skin, 0.4);
+                const legFull = botPiece && botPiece.legs === 'full', legTone = legFull ? D(C.bottom.under || C.bottom.color, botPiece.shade || 0.45) : (legs === skin ? D(h.skin, 0.15) : legs);
+                const thighTone = legs !== skin ? (C.bottom ? D(C.bottom.under || C.bottom.color, 0.35) : legs) : D(h.skin, 0.05);
 
                 ellipse(-2, 0, 13, 0, 11, this.SHADOW, 0, 2, 0.32 * alpha, 5);   // contact shadow
                 // Legs: thigh and calf each side, then the feet
                 for (let i = 0; i < 2; i++) {
                     const [hx, hy] = g.hipPt[i], [kx, ky] = g.knees[i], [fx, fy] = g.feet[i];
-                    capsule(fx, fy, kx, ky, BC.calf[3], BC.calf[1], legs, legs === skin ? 0 : botSheen);
-                    capsule(kx, ky, hx, hy, BC.calf[1], BC.thigh[0], legs, legs === skin ? 0 : botSheen);
-                    ellipse(fx + 2.6, fy, 4.2 * BC.foot, 0, 2.4 * BC.foot, shoe, 0.4);
+                    capsule(fx, fy, kx, ky, BC.calf[3], BC.calf[1], legTone, legs === skin ? 0 : botSheen);
+                    capsule(kx, ky, hx, hy, BC.calf[1], BC.thigh[0], thighTone, legs === skin ? 0 : botSheen);
+                    if (!dataOf(C.shoes)) ellipse(fx + 2.6, fy, 4.2 * BC.foot, 0, 2.4 * BC.foot, shoe, 0.4);
                 }
+                if (dataOf(C.shoes)) garmentKit.gl(this, g, dataOf(C.shoes), C.shoes, frame(0, 0), 0);
                 // Hips, in the hips' own frame (as the wardrobe draws them): a garment written as data
                 // (penthouse/garment-kit.js) when the bottom has one, else the hip shape in its colour
                 {
-                    const ax = h.hip_anchor_x, hc = Math.cos(h.hip_rotation), hs = Math.sin(h.hip_rotation);
-                    const bx = (x, y) => ax + x * hc - y * hs, by = (x, y) => x * hs + y * hc;
-                    const put = {
-                        capsule: (x1, y1, x2, y2, r1, r2, rgb, sh) => capsule(bx(x1, y1), by(x1, y1), bx(x2, y2), by(x2, y2), r1, r2, rgb, sh),
-                        ellipse: (cx, cy, axx, axy, rb, rgb, sh) => ellipse(bx(cx, cy), by(cx, cy), axx * hc - axy * hs, axx * hs + axy * hc, rb, rgb, sh),
-                    };
-                    const data = C.bottom && typeof GARMENTS !== 'undefined' ? GARMENTS[C.bottom.type] : null;
+                    const put = frame(h.hip_anchor_x, h.hip_rotation), data = dataOf(C.bottom);
                     if (data) garmentKit.gl(this, g, data, C.bottom, put, botSheen);
-                    else put.ellipse((BC.hf + BC.hb) / 2, 0, (BC.hf - BC.hb) / 2, 0, BC.hw, bottom, botSheen);
+                    else put.polygon(bodySplinePoints(bodyHipOutline(BC)), bottom, botSheen);
                 }
                 if (this.lower_only) return;                                 // (a look at the legs and hips alone)
                 // Arms: hands, forearms, upper arms (from the shoulders, turned with the torso)
@@ -131,22 +147,30 @@
                 for (let i = 0; i < 2; i++) {
                     const shY = i ? BC.sh : -BC.sh, shx = sx - shY * torS, shy = shY * torC;
                     const exn = h.elbows[i * 2], eyn = h.elbows[i * 2 + 1], fxn = h.fists[i * 2], fyn = h.fists[i * 2 + 1];
-                    ellipse(fxn, fyn, 2.1 * BC.hand, 0, 1.8 * BC.hand, skin, 0);
+                    ellipse(fxn, fyn, 2.1 * BC.hand, 0, 1.8 * BC.hand, handRgb, 0);
                     capsule(fxn, fyn, exn, eyn, BC.fore[3], BC.fore[0], foreRgb, sleeve === 'long' ? topSheen : 0);
                     capsule(exn, eyn, shx, shy, BC.upper[3], BC.upper[0], upperRgb, sleeve !== 'none' ? topSheen : 0);
                 }
+                if (C.jewelry) for (const j of C.jewelry) { const d = dataOf(j); if (d) garmentKit.gl(this, g, d, j, frame(0, 0), 0); }
                 // Torso: the chest and back, turned with the torso
                 const hx = h.hip_anchor_x;
-                const cx = hx + (BC.tf + BC.tb) / 2, half = (BC.tf - BC.tb) / 2;
-                ellipse(cx, 0, half * torC, half * torS, BC.sh + 1.2, top, topSheen);
+                {
+                    const put = frame(hx, h.torso_rotation), data = dataOf(C.top);
+                    if (data) garmentKit.gl(this, g, data, C.top, put, topSheen);
+                    else put.polygon(bodySplinePoints(bodyTorsoOutline(BC)), top, topSheen);
+                }
                 // Shoulder caps over the arm roots, the sleeve's colour
-                for (const sy of [-BC.sh, BC.sh]) ellipse(sx - sy * torS + 0.4, sy * torC, BC.del * 1.06, 0, BC.del * 0.8, upperRgb, topSheen);
+                for (const sy of [-BC.sh, BC.sh]) ellipse(sx - sy * torS + 0.4, sy * torC, BC.del * 1.06, 0, BC.del * 0.8, capRgb, topSheen);
                 // Head and hair: the crown from the Canvas hair's own table (HAIR_CROWNS), long styles hanging behind
                 const headX = g.headX, hr = 7.4, crown = hair && typeof HAIR_CROWNS !== 'undefined' ? HAIR_CROWNS[C.hair.type] : null;
                 const coil = C.hair && (C.hair.type === 'afro' || C.hair.type === 'curls');
                 this.tex = coil ? 2 : 1;
                 if (hair && (C.hair.type === 'ponytail' || C.hair.type === 'long' || C.hair.type === 'braids' || C.hair.type === 'dreadlocks'))
-                    capsule(headX - 4, 0, headX - (C.hair.type === 'ponytail' ? 17 : 13), 0, C.hair.type === 'ponytail' ? 3.2 : 8.5, C.hair.type === 'ponytail' ? 1.8 : 6.5, hair, 0.5);
+                    {
+                        const tail = C.hair.type === 'ponytail', sw = tail ? Math.sin(h.walk_cycle || 0) * 2.5 : 0;   // a ponytail swings with the walk
+                        if (tail) { capsule(headX - 5, 0, headX - 15, sw * 0.5, 3.0, 2.6, hair, 0.5); capsule(headX - 15, sw * 0.5, headX - 25, sw, 2.6, 1.2, hair, 0.5); }
+                        else capsule(headX - 4, 0, headX - 13, 0, 8.5, 6.5, hair, 0.5);
+                    }
                 { const t = this.tex; this.tex = 0; ellipse(headX + 0.5, 0, hr, 0, hr * 0.92, skin, 0); this.tex = t; }
                 if (crown) ellipse(headX + crown[0] - 0.8, 0, crown[1] * 0.92, 0, crown[2] * 0.92, hair, crown[3] === 'coil' ? 0.12 : 0.6);
                 this.tex = 0;
@@ -190,6 +214,7 @@
             float kind = i_shape.z, pad = 1.5 / u_view.z + i_extra.x;
             vec2 lo, hi;
             if (kind < 0.5) { float r = max(i_shape.x, i_shape.y) + pad; lo = min(i_ab.xy, i_ab.zw) - r; hi = max(i_ab.xy, i_ab.zw) + r; }
+            else if (kind > 2.5) { lo = min(min(i_ab.xy, i_ab.zw), i_shape.xy) - pad; hi = max(max(i_ab.xy, i_ab.zw), i_shape.xy) + pad; }
             else { float r = max(length(i_ab.zw), i_shape.x) + pad; lo = i_ab.xy - r; hi = i_ab.xy + r; }
             vec2 p = mix(lo, hi, corner * 0.5 + 0.5);
             v_p = p; v_ab = i_ab; v_shape = i_shape; v_color = i_color; v_extra = i_extra;
@@ -217,6 +242,17 @@
                 float l = length(off); d = l - r; dir = l > 1e-5 ? off / l : vec2(0.0);
                 across = clamp(l / r, 0.0, 1.0);
                 vec2 u = ba / max(length(ba), 1e-6); along = dot(pa, u); side = dot(off, vec2(-u.y, u.x)) / r;
+            } else if (kind > 2.5) {                            // a fan triangle: centre A, rim edge B→C
+                vec2 A = v_ab.xy, B = v_ab.zw, Cc = v_shape.xy;
+                float o = sign((B.x - A.x) * (Cc.y - A.y) - (B.y - A.y) * (Cc.x - A.x));
+                vec2 eb = B - A, ec = Cc - B, ea = A - Cc, pa = v_p - A, pb = v_p - B, pc = v_p - Cc;
+                float dAB = -o * (eb.x * pa.y - eb.y * pa.x) / max(length(eb), 1e-6);
+                float dBC = -o * (ec.x * pb.y - ec.y * pb.x) / max(length(ec), 1e-6);
+                float dCA = -o * (ea.x * pc.y - ea.y * pc.x) / max(length(ea), 1e-6);
+                float px = length(fwidth(v_p));
+                if (dAB > px || dCA > px) discard;              // the inner edges overlap their neighbours a pixel
+                d = dBC; r = 3.0; across = clamp(1.0 + dBC / 3.0, 0.0, 1.0);
+                dir = length(pa) > 1e-5 ? normalize(pa) : vec2(0.0); along = v_p.x; side = v_p.y * 0.35;
             } else {                                            // ellipse: half-axis vector, other half-axis
                 vec2 ax = v_ab.zw; float ra = length(ax); vec2 u = ax / max(ra, 1e-6), w = vec2(-u.y, u.x);
                 vec2 q = vec2(dot(v_p - v_ab.xy, u), dot(v_p - v_ab.xy, w));
@@ -226,7 +262,7 @@
                 along = q.x; side = qn.y;
             }
             float aa = fwidth(d) + 1e-4;
-            if (kind > 1.5) {                                   // soft shadow
+            if (kind > 1.5 && kind < 2.5) {                   // soft shadow
                 float s = 1.0 - smoothstep(-v_extra.x, 0.0, d);
                 o = vec4(0.0, 0.0, 0.0, 1.0) * v_color.a * s; return;
             }
