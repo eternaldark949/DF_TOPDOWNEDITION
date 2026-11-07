@@ -26,7 +26,8 @@
                 this.canvas = canvas; this.count = 0; this.capacity = 0; this.data = null;
                 this.cam = [0, 0, 1];
                 this.style = 'painterly';                                   // 'painterly' (like the Canvas bodies) or 'lit' (rounded solids)
-                this.tex = 0;                                                // surface of the next shapes: 0 cloth or skin, 1 hair fibres, 2 coils
+                this.tex = 0;                                                // surface of the next shapes: 0 cloth or skin, 1 hair fibres, 2 coils, 3 a plain stitch
+                this.lower_only = false;                                     // draw only the legs and hips (to see a skirt from above)
                 this.program = this._program(glHumanoidRenderer.VERT, glHumanoidRenderer.FRAG);
                 this.u_view = gl.getUniformLocation(this.program, 'u_view');
                 this.u_light = gl.getUniformLocation(this.program, 'u_light');
@@ -58,11 +59,18 @@
                 if (old) this.data.set(old);
             }
 
-            rgb(hex) {
-                let c = this.colors.get(hex);
+            /** A colour as [r, g, b] 0..1: '#rgb', '#rrggbb' or 'rgb(r, g, b)' (what darkenHex gives). Cached. */
+            rgb(col) {
+                let c = this.colors.get(col);
                 if (!c) {
-                    const n = parseInt(String(hex || '#888888').replace('#', '').padEnd(6, '0').slice(0, 6), 16);
-                    this.colors.set(hex, c = [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]);
+                    const str = String(col || '#888888'), m = /rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/.exec(str);
+                    if (m) c = [m[1] / 255, m[2] / 255, m[3] / 255];
+                    else {
+                        let h = str.replace('#', ''); if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+                        const n = parseInt(h.padEnd(6, '0').slice(0, 6), 16) || 0;
+                        c = [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+                    }
+                    this.colors.set(col, c);
                 }
                 return c;
             }
@@ -91,7 +99,8 @@
                     this.shape(wx(cx, cy), wy(cx, cy), axx * ca - axy * sa, axx * sa + axy * ca, rb, 0, kind, sheen, rgb, a, soft);
                 const F = (item) => (typeof materialKit !== 'undefined' && item ? materialKit.finishOf(item).sheen || 0 : 0);
                 const skin = this.rgb(h.skin), top = C.top ? this.rgb(C.top.color) : skin, bottom = C.bottom ? this.rgb(C.bottom.under || C.bottom.color) : skin;
-                const shoe = this.rgb(C.shoes ? C.shoes.color : '#1a1a1a'), hair = C.hair && C.hair.color ? this.rgb(C.hair.color) : null;
+                const botPiece = h.bottom_piece, legs = botPiece && botPiece.legs === 'bare' ? skin : bottom;
+                const shoe = this.rgb(C.shoes ? h.darken(C.shoes.color, 0.35) : '#1a1a1a'), hair = C.hair && C.hair.color ? this.rgb(C.hair.color) : null;
                 const topSheen = F(C.top), botSheen = F(C.bottom), sleeve = h.sleeve, sleeveRgb = h.sleeve_color ? this.rgb(h.sleeve_color) : top;
                 const upperRgb = sleeve && sleeve !== 'none' ? sleeveRgb : skin, foreRgb = sleeve === 'long' ? sleeveRgb : skin;
 
@@ -99,10 +108,24 @@
                 // Legs: thigh and calf each side, then the feet
                 for (let i = 0; i < 2; i++) {
                     const [hx, hy] = g.hipPt[i], [kx, ky] = g.knees[i], [fx, fy] = g.feet[i];
-                    capsule(fx, fy, kx, ky, BC.calf[3], BC.calf[1], bottom, botSheen);
-                    capsule(kx, ky, hx, hy, BC.calf[1], BC.thigh[0], bottom, botSheen);
-                    ellipse(fx + 2.2, fy, 3.2 * BC.foot, 0, 1.9 * BC.foot, shoe, 0.4);
+                    capsule(fx, fy, kx, ky, BC.calf[3], BC.calf[1], legs, legs === skin ? 0 : botSheen);
+                    capsule(kx, ky, hx, hy, BC.calf[1], BC.thigh[0], legs, legs === skin ? 0 : botSheen);
+                    ellipse(fx + 2.6, fy, 4.2 * BC.foot, 0, 2.4 * BC.foot, shoe, 0.4);
                 }
+                // Hips, in the hips' own frame (as the wardrobe draws them): a garment written as data
+                // (penthouse/garment-kit.js) when the bottom has one, else the hip shape in its colour
+                {
+                    const ax = h.hip_anchor_x, hc = Math.cos(h.hip_rotation), hs = Math.sin(h.hip_rotation);
+                    const bx = (x, y) => ax + x * hc - y * hs, by = (x, y) => x * hs + y * hc;
+                    const put = {
+                        capsule: (x1, y1, x2, y2, r1, r2, rgb, sh) => capsule(bx(x1, y1), by(x1, y1), bx(x2, y2), by(x2, y2), r1, r2, rgb, sh),
+                        ellipse: (cx, cy, axx, axy, rb, rgb, sh) => ellipse(bx(cx, cy), by(cx, cy), axx * hc - axy * hs, axx * hs + axy * hc, rb, rgb, sh),
+                    };
+                    const data = C.bottom && typeof GARMENTS !== 'undefined' ? GARMENTS[C.bottom.type] : null;
+                    if (data) garmentKit.gl(this, g, data, C.bottom, put, botSheen);
+                    else put.ellipse((BC.hf + BC.hb) / 2, 0, (BC.hf - BC.hb) / 2, 0, BC.hw, bottom, botSheen);
+                }
+                if (this.lower_only) return;                                 // (a look at the legs and hips alone)
                 // Arms: hands, forearms, upper arms (from the shoulders, turned with the torso)
                 const torC = Math.cos(h.torso_rotation), torS = Math.sin(h.torso_rotation), sx = h.shoulder_x;
                 for (let i = 0; i < 2; i++) {
@@ -112,9 +135,8 @@
                     capsule(fxn, fyn, exn, eyn, BC.fore[3], BC.fore[0], foreRgb, sleeve === 'long' ? topSheen : 0);
                     capsule(exn, eyn, shx, shy, BC.upper[3], BC.upper[0], upperRgb, sleeve !== 'none' ? topSheen : 0);
                 }
-                // Torso: hips, then the chest and back, turned with the torso
+                // Torso: the chest and back, turned with the torso
                 const hx = h.hip_anchor_x;
-                ellipse(hx + (BC.hf + BC.hb) / 2, 0, (BC.hf - BC.hb) / 2, 0, BC.hw * 0.62, bottom, botSheen);
                 const cx = hx + (BC.tf + BC.tb) / 2, half = (BC.tf - BC.tb) / 2;
                 ellipse(cx, 0, half * torC, half * torS, BC.sh + 1.2, top, topSheen);
                 // Shoulder caps over the arm roots, the sleeve's colour
@@ -213,7 +235,8 @@
             vec3 n = normalize(vec3(dir * across, sqrt(max(1.0 - across * across, 0.0)) + 0.15));
             vec3 L = normalize(u_light), base = v_color.rgb, col;
             float diff = dot(n, L), tex = v_extra.z, seed = v_extra.y * 7.31;
-            if (u_style > 0.5) {
+            if (tex > 2.5) col = base;                           // a stitched line: plain
+            else if (u_style > 0.5) {
                 // PAINTERLY: flat colour in two soft tone bands (like the Canvas body's shade spots),
                 // a brush grain stretched along each stroke, fibres or coils in hair, and an ink edge
                 float tone = smoothstep(-0.1, 0.35, diff);
