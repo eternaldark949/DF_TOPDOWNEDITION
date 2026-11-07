@@ -5868,7 +5868,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '044fbfbda7a7';
+        const DFAB_BUILD = '27bcb33c21da';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="26">
         // ===== LV0 BASEMENT =====
@@ -61053,7 +61053,7 @@ Object.assign(TrafficVehicle.prototype, {
             return out;
         }
     </script>
-    <script type="text/dfab" data-src="ui/humanoid-render.js" data-cost="1386">
+    <script type="text/dfab" data-src="ui/humanoid-render.js" data-cost="1384">
         const HAIR_SIM = {
             STEP: 1 / 120,          // game seconds per physics slice
             MAX_STEPS: 12,          // catch-up cap after a stall
@@ -61527,21 +61527,18 @@ Object.assign(TrafficVehicle.prototype, {
         }
         /** Clip to a set of circles [x, y, r] and fill them with a texture tile, then mark where they meet. */
         function _hairLobes(ctx, lobes, pattern, edge) {
-            ctx.save();
+            // Filled as one path (a clip and a covering rect cost a mask each time, for the same pixels)
             ctx.beginPath();
             for (const [x, y, r] of lobes) { ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, Math.PI * 2); }
-            ctx.clip();
-            ctx.fillStyle = pattern;
-            let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-            for (const [x, y, r] of lobes) { x0 = Math.min(x0, x - r); y0 = Math.min(y0, y - r); x1 = Math.max(x1, x + r); y1 = Math.max(y1, y + r); }
-            ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
-            if (!edge) { ctx.restore(); return; }
+            ctx.fillStyle = pattern; ctx.fill();
+            if (!edge) return;
             // Each lobe's rim shades where it tucks under its neighbours: clusters, not one blob
-            ctx.strokeStyle = edge; ctx.lineWidth = 0.9; ctx.globalAlpha *= 0.4;
+            const a0 = ctx.globalAlpha;
+            ctx.strokeStyle = edge; ctx.lineWidth = 0.9; ctx.globalAlpha = a0 * 0.4;
             ctx.beginPath();
             for (const [x, y, r] of lobes) { ctx.moveTo(x + r - 0.3, y); ctx.arc(x, y, r - 0.3, 0, Math.PI * 2); }
             ctx.stroke();
-            ctx.restore();
+            ctx.globalAlpha = a0;
         }
         /** The rest of each style beyond the crown: curtains, tails, locks, braids, lobes and ruffles. */
         function _hairSecondary(ctx, type, color, headX, geo, cx, cy, C) {
