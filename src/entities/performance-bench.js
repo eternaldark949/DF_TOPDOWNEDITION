@@ -149,7 +149,7 @@
                     limitations: ['CPU timers measure synchronous work and Canvas submission, not GPU completion.',
                         'Section totals include parent and child rows; do not add every row together.',
                         'Profiling and sampling add overhead. Detailed captures are diagnostic and may run slower than ordinary gameplay or summary captures. This is a current-scene capture, not a repeatable hardware score.',
-                        'People: Body and limbs and world Other rows are residual categories, including uninstrumented work and timing overhead.',
+                        'People: Other and world Other rows are residual categories, including uninstrumented work and timing overhead.',
                         'Warmup, paused/hidden frames and the first interval after resuming are excluded. Long visible stalls are retained.',
                         'Adaptive visual effects remain enabled as configured; the start/end settings and scene mix affect comparisons.'] };
                 this.frames = []; this.draw();

@@ -30,7 +30,7 @@ test('The weapon stays in the right fist while the arm reaches and the elbow fol
  const samples=[];
  for(const side of [-1,1])for(const age of [0,.0264,.0924,.1584,.22]){
   game._slashT=10-age;game._slashSide=side;drawProceduralHumanoid(game.ctx,game.player,config);
-  const g=_humanoidDrawBuffer(game.player).geometry;
+  const g=proceduralHumanoid.of(game.player).geometry;
   samples.push({side,age,hand:g.fists[1].slice(),elbow:g.elbows[1].slice(),weapon:records.at(-1)});
  }drawWeapon=weapon;return samples;`);
  for(const s of r){assert.ok(Math.abs(s.weapon.x-s.hand[0])<1e-10);assert.ok(Math.abs(s.weapon.y-s.hand[1])<1e-10);assert.ok(Math.abs(Math.hypot(s.hand[0]-s.elbow[0],s.hand[1]-s.elbow[1])-14)<1e-8,JSON.stringify(s));}
@@ -41,7 +41,7 @@ test('Low and high rendering rates reach the same timed hand and blade pose',e=>
  const run=hz=>{delete game.player._animState;game._slashT=10;game._slashSide=1;
   for(let i=0;i/hz<.0924;i++){_gameTimeSec=10+i/hz;drawProceduralHumanoid(game.ctx,game.player,config);}
   _gameTimeSec=10.0924;drawProceduralHumanoid(game.ctx,game.player,config);
-  return {hand:_humanoidDrawBuffer(game.player).geometry.fists[1].slice(),pose:{...game.slashAngle()}};
+  return {hand:proceduralHumanoid.of(game.player).geometry.fists[1].slice(),pose:{...game.slashAngle()}};
  };return [run(16),run(60)];`);assert.deepEqual(r[0],r[1]);
 });
 test('The trail ends at the shared blade tip and only samples past cut positions',e=>{
@@ -59,7 +59,7 @@ test('The trail ends at the shared blade tip and only samples past cut positions
 test('Holstering suppresses the attack pose and trails expire without leaking canvas state',e=>{
  const r=value(e,setup+`
  game._slashT=10-.0924;game._slashSide=1;game.weaponHolstered=true;game.holsterAnim=game.holsterAnimTarget=0;
- drawProceduralHumanoid(game.ctx,game.player,config);const hand=_humanoidDrawBuffer(game.player).geometry.fists[1].slice();
+ drawProceduralHumanoid(game.ctx,game.player,config);const hand=proceduralHumanoid.of(game.player).geometry.fists[1].slice();
  game.slashes=[{x:0,y:0,a:0,t0:9,side:1,reach:36,arc:1.4}];
  game.ctx.setTransform(.5,.2,-.1,2,10,20);game.ctx.globalAlpha=.4;game.ctx.globalCompositeOperation='source-over';game.drawSlashes(game.ctx);
  const m=game.ctx.getTransform();return {hand,left:game.slashes.length,m:[m.a,m.b,m.c,m.d,m.e,m.f],alpha:game.ctx.globalAlpha,mode:game.ctx.globalCompositeOperation};`);

@@ -146,6 +146,7 @@ const SCRIPTS = [
     'ui/color-picker.js',
     'ui/weapon-models.js',
     'ui/humanoid-render.js',
+    'penthouse/procedural-humanoid.js',
     'ui/portrait-real.js',
     'ui/face-cache.js',
     'ui/comms.js',

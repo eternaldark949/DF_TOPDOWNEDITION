@@ -102,7 +102,7 @@ test('Blood Pact swings wide in both hands: wound back, swept across, both fists
   const wound=at(WIDE_SWING.windup),mid=at((WIDE_SWING.windup+WIDE_SWING.cutEnd)/2),done=at(WIDE_SWING.cutEnd),rest=at(1);
   game._slashT=_gameTimeSec-secs*(WIDE_SWING.windup+WIDE_SWING.cutEnd)/2;
   drawProceduralHumanoid(game.ctx,game.player,{gender:'female',stance:'idle',pose:'none',noShadow:true});
-  const g=_humanoidDrawBuffer(game.player).geometry;
+  const g=proceduralHumanoid.of(game.player).geometry;
   return {style,wound,mid,done,rest,fists:g.fists.map(f=>f.slice()),kukri:weaponModel('maiden_kukri').swing||null,grip:WIDE_SWING.grip,guard:WIDE_SWING.guard.a};`);
  assert.equal(r.style,'wide');assert.equal(r.kukri,null);
  assert.ok(Math.abs(r.wound.a-r.done.a)>3.9,'the blade sweeps a wide arc (over 220 degrees)');

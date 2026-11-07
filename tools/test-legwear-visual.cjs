@@ -15,9 +15,12 @@ const { chromium } = require('playwright');
     await page.goto(pathToFileURL(resolve(process.argv[2] || 'DFAB V8.html')).href);
     const result = await page.evaluate(() => {
       // Isolate existing leg passes without changing their geometry or draw order.
-      const source = _drawHumanoidBody.toString(), marker = '// 4. Hips & Skirt';
-      if (!source.includes(marker)) throw new Error('Leg render boundary missing');
-      _drawHumanoidBody = eval('(' + source.replace(marker, 'if (config._legsOnly) return;\n' + marker) + ')');
+      // (the stages after the legs: penthouse/procedural-humanoid.js)
+      const H = proceduralHumanoid.prototype;
+      for (const name of ['drawHips', 'drawArms', 'drawTorso', 'drawHead', 'drawHeld']) {
+        const stage = H[name]; if (typeof stage !== 'function') throw new Error('Leg render boundary missing');
+        H[name] = function () { if (!this.config._legsOnly) return stage.apply(this, arguments); };
+      }
       const cv = document.createElement('canvas'); cv.width = cv.height = 300;
       const ctx = cv.getContext('2d', { willReadFrequently: true });
       const items = Object.values(COSMETICS_REGISTRY).filter(e => e.data.shoes?.type === 'thigh_heels');
@@ -29,7 +32,7 @@ const { chromium } = require('playwright');
         ctx.setTransform(4, 0, 0, 4, 150, 150);
         drawProceduralHumanoid(ctx, e, { gender: 'female', skinColor, shoes: item.data.shoes,
           hair: null, top: null, bottom: null, noShadow: true, pose: 'none', _legsOnly: true });
-        return { pixels: ctx.getImageData(0, 0, 300, 300).data, geometry: _humanoidDrawBuffers.get(e).geometry };
+        return { pixels: ctx.getImageData(0, 0, 300, 300).data, geometry: proceduralHumanoid.of(e).geometry };
       }
       // Change only the skin color. A covered knee must not change with it. Probe inside
       // the joint radius, avoiding silhouette antialiasing and the intentionally bare cuff.

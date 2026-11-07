@@ -101,7 +101,7 @@ test('Limb shading reuses outline geometry and preserves collapsed-joint length'
  const r=value(env,`
   const ctx=game.ctx,T=BODY_CANON.female.fore,out={},counts={hypot:0,atan2:0,cos:0,sin:0},original={};
   for(const k of Object.keys(counts)){original[k]=Math[k];Math[k]=(...a)=>{counts[k]++;return original[k](...a);};}
-  const h=_humanoidDrawBuffer({});h.ctx=ctx;h.shade={lx:0,ly:0,hl2:'#ffffff'};
+  const h=proceduralHumanoid.of({});h.ctx=ctx;h.shade={lx:0,ly:0,hl2:'#ffffff'};
   let matte,gloss;
   try{
    h.drawLimb(0,0,10,5,T,'#204060',false);matte={...counts};
