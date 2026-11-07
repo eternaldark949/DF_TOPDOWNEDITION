@@ -44,6 +44,7 @@
                 this.fists = [0, 0, 0, 0];
                 this.elbows = [0, 0, 0, 0];
                 this.points = null;                            // attachment points, made when first asked for (point)
+                this.skin_chain = null;                        // [root, joint, end] for a skinned limb (drawSkinnedArm)
                 // This frame: who, and how (configure, dress)
                 this.ctx = null; this.entity = entity; this.config = null; this.scale = null; this.android = null;
                 this.skin = null; this.wet = 0; this.shade = null; this.body = null;
@@ -121,7 +122,12 @@
                 }
                 const shaded = gloss || SH.lx || SH.ly, geometry = shaded ? this.limb_geometry : null;
                 ctx.fillStyle = color; bodyLimbPath(ctx, x1, y1, x2, y2, T, geometry); ctx.fill(); ctx.beginPath();
-                if (!shaded) return;
+                if (shaded) this.shadeLimb(x1, y1, x2, y2, T, gloss);
+            }
+
+            /** The light across one limb segment: a gloss streak, or the soft shade on its far side (limb_geometry already set). */
+            shadeLimb (x1, y1, x2, y2, T, gloss) {
+                const ctx = this.ctx, SH = this.shade, geometry = this.limb_geometry;
                 const len = geometry.length/2 + 2, ang = geometry.angle, width = Math.max(T[0], T[1]);
                 const c = Math.cos(ang), s = Math.sin(ang), ly = -s * SH.lx + c * SH.ly, lx = (c * SH.lx + s * SH.ly) * len * 0.1;
                 ctx.save(); ctx.translate((x1+x2)/2, (y1+y2)/2); ctx.rotate(ang);
@@ -132,6 +138,24 @@
                     _softSpot(ctx, -lx, -ly * width * 0.75, len * 1.6, width * 1.3, _SHADOW_RGB, SH.shA * 1.3);
                 }
                 ctx.restore();
+            }
+
+            /** A whole arm as one skinned outline (BODY_SKIN.arms, ui/bodies.js): the forearm's colour down the
+             *  chain, the upper arm over it from the shoulder, each segment shaded as before. */
+            drawSkinnedArm (sx, sy, ex, ey, fx, fy, upperColor, foreColor, upperGloss, foreGloss) {
+                const ctx = this.ctx, SH = this.shade, BC = this.body, P = this.skin_chain || (this.skin_chain = [0, 0, 0, 0, 0, 0]);
+                const ux = ex - sx, uy = ey - sy, fx2 = fx - ex, fy2 = fy - ey;
+                if (ux * fx2 + uy * fy2 < -0.5 * Math.hypot(ux, uy) * Math.hypot(fx2, fy2)) {    // folded past 120°: no bend to skin, two segments
+                    this.drawLimb(ex, ey, fx, fy, BC.fore, foreColor, foreGloss);
+                    return this.drawLimb(sx, sy, ex, ey, BC.upper, upperColor, upperGloss);
+                }
+                P[0] = sx; P[1] = sy; P[2] = ex; P[3] = ey; P[4] = fx; P[5] = fy;
+                ctx.fillStyle = foreColor; bodySkinnedLimbPath(ctx, P, BC.upper, BC.fore); ctx.fill();
+                ctx.fillStyle = upperColor; bodySkinnedLimbPath(ctx, P, BC.upper, BC.fore, true); ctx.fill(); ctx.beginPath();
+                if (!SH) return;
+                const G = this.limb_geometry;
+                if (foreGloss || SH.lx || SH.ly) { G.length = Math.hypot(fx - ex, fy - ey); G.angle = Math.atan2(fy - ey, fx - ex); this.shadeLimb(ex, ey, fx, fy, BC.fore, foreGloss); }
+                if (upperGloss || SH.lx || SH.ly) { G.length = Math.hypot(ex - sx, ey - sy); G.angle = Math.atan2(ey - sy, ex - sx); this.shadeLimb(sx, sy, ex, ey, BC.upper, upperGloss); }
             }
 
             // --- SET UP ---
@@ -961,8 +985,17 @@
                     const p = WD.jewelry[j.type]; if (p && p.under) p.under(ctx, g, j);
                 }
                 const foreColor = sleeve === 'long' ? darken(sleeveCol, 0.3) : darken(skinColor, 0.3);
-                this.drawLimb(lElbowX, lElbowY, lFistX, lFistY, BC.fore, foreColor, sleeve === 'long' && topGloss);
-                this.drawLimb(rElbowX, rElbowY, rFistX, rFistY, BC.fore, foreColor, sleeve === 'long' && topGloss);
+                const upperColor = sleeve !== 'none' ? darken(sleeveCol, 0.15) : darken(skinColor, 0.15);
+                const torC = Math.cos(torsoRotation), torS = Math.sin(torsoRotation);
+                const lShX = shoulderX - lShoulderY * torS, lShY = lShoulderY * torC, rShX = shoulderX - rShoulderY * torS, rShY = rShoulderY * torC;
+                const skinned = BODY_SKIN.arms;
+                if (skinned) {                                                  // each arm as one skinned outline (ui/bodies.js)
+                    this.drawSkinnedArm(lShX, lShY, lElbowX, lElbowY, lFistX, lFistY, upperColor, foreColor, sleeve !== 'none' && topGloss, sleeve === 'long' && topGloss);
+                    this.drawSkinnedArm(rShX, rShY, rElbowX, rElbowY, rFistX, rFistY, upperColor, foreColor, sleeve !== 'none' && topGloss, sleeve === 'long' && topGloss);
+                } else {
+                    this.drawLimb(lElbowX, lElbowY, lFistX, lFistY, BC.fore, foreColor, sleeve === 'long' && topGloss);
+                    this.drawLimb(rElbowX, rElbowY, rFistX, rFistY, BC.fore, foreColor, sleeve === 'long' && topGloss);
+                }
                 if (clothes.jewelry && WD) for (const j of clothes.jewelry) {
                     const p = WD.jewelry[j.type]; if (p && p.at === 'wrists') p.draw(ctx, g, j);
                 }
@@ -984,11 +1017,10 @@
 
                 // 8. Upper Arms (fabric under short or long sleeves). They hang from the shoulders, so their
                 // roots turn with the torso: forward with the opposite leg on a step, into the blow in a punch.
-                const upperColor = sleeve !== 'none' ? darken(sleeveCol, 0.15) : darken(skinColor, 0.15);
-                const torC = Math.cos(torsoRotation), torS = Math.sin(torsoRotation);
-                const lShX = shoulderX - lShoulderY * torS, lShY = lShoulderY * torC, rShX = shoulderX - rShoulderY * torS, rShY = rShoulderY * torC;
-                this.drawLimb(lShX, lShY, lElbowX, lElbowY, BC.upper, upperColor, sleeve !== 'none' && topGloss);
-                this.drawLimb(rShX, rShY, rElbowX, rElbowY, BC.upper, upperColor, sleeve !== 'none' && topGloss);
+                if (!skinned) {
+                    this.drawLimb(lShX, lShY, lElbowX, lElbowY, BC.upper, upperColor, sleeve !== 'none' && topGloss);
+                    this.drawLimb(rShX, rShY, rElbowX, rElbowY, BC.upper, upperColor, sleeve !== 'none' && topGloss);
+                }
                 if (A) {                                                        // android elbows: a round joint plate on each
                     ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6;
                     for (const [x, y] of [[lElbowX, lElbowY], [rElbowX, rElbowY]]) { ctx.beginPath(); ctx.arc(x, y, 1.9, 0, Math.PI * 2); ctx.stroke(); }

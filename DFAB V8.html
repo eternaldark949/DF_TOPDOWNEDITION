@@ -5868,7 +5868,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '27bcb33c21da';
+        const DFAB_BUILD = '51a89aec5308';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="26">
         // ===== LV0 BASEMENT =====
@@ -58962,7 +58962,7 @@ Object.assign(TrafficVehicle.prototype, {
             return t < d ? Math.sin(t / d * Math.PI) : 0;
         }
     </script>
-    <script type="text/dfab" data-src="ui/bodies.js" data-cost="253">
+    <script type="text/dfab" data-src="ui/bodies.js" data-cost="288">
         /* =====================================================================
            BODIES — builds, height, the body's shape, and Double Nights androids
            ---------------------------------------------------------------------
@@ -59132,6 +59132,49 @@ Object.assign(TrafficVehicle.prototype, {
             ctx.bezierCurveTo(x1 + ux * c1 - nx * w1, y1 + uy * c1 - ny * w1, x1 + ux * c2 - nx * w2, y1 + uy * c2 - ny * w2, x2 - nx * r1, y2 - ny * r1);
             ctx.arc(x2, y2, r1, a - Math.PI / 2, a + Math.PI / 2);
             ctx.bezierCurveTo(x1 + ux * c2 + nx * w2, y1 + uy * c2 + ny * w2, x1 + ux * c1 + nx * w1, y1 + uy * c1 + ny * w1, x1 + nx * r0, y1 + ny * r0);
+            ctx.closePath();
+        }
+        /** SKINNED LIMBS (trial): a whole arm or leg as one outline through its joints, the way a mesh is
+         *  skinned to bones. Each side is sampled down both segments at their taper (bodyLimbRadius); near
+         *  the joint the samples' normals blend toward the bend's bisector (linear blend skinning), so the
+         *  outside of an elbow rounds smoothly and the inside creases, instead of two capsules overlapping.
+         *  P = [x0, y0, x1, y1, x2, y2] (root, joint, end); Ta, Tb the two segments' thickness packets.
+         *  upper: only the root segment, ending in a round end at the joint (a sleeve, a darker upper arm). */
+        const BODY_SKIN = { arms: false, SAMPLES: 5, BLEND: 0.4 };
+        const _skinL = [], _skinR = [];
+        function bodySkinnedLimbPath(ctx, P, Ta, Tb, upper = false) {
+            const [x0, y0, x1, y1, x2, y2] = P, N = BODY_SKIN.SAMPLES, B = BODY_SKIN.BLEND;
+            const d1x = x1 - x0, d1y = y1 - y0, L1 = Math.hypot(d1x, d1y) || 1e-6, d2x = x2 - x1, d2y = y2 - y1, L2 = Math.hypot(d2x, d2y) || 1e-6;
+            const n1x = -d1y / L1, n1y = d1x / L1, n2x = -d2y / L2, n2y = d2x / L2;
+            let bx = n1x + n2x, by = n1y + n2y; const bl = Math.hypot(bx, by);
+            if (bl < 0.2) { bx = n1x; by = n1y; } else { bx /= bl; by /= bl; }
+            const miter = 1 / Math.max(0.6, n1x * bx + n1y * by);           // keeps the width through the bend
+            let k = 0;
+            const put = (x, y, nx, ny, r) => {
+                const l = Math.hypot(nx, ny) || 1; nx /= l; ny /= l;
+                const L = _skinL[k] || (_skinL[k] = [0, 0]), R = _skinR[k] || (_skinR[k] = [0, 0]);
+                L[0] = x - nx * r; L[1] = y - ny * r; R[0] = x + nx * r; R[1] = y + ny * r; k++;
+            };
+            for (let i = 0; i < N; i++) {                                     // the root segment, up to the joint
+                const t = i / (N - 1), w = t > 1 - B ? (t - (1 - B)) / B : 0, r = bodyLimbRadius(Ta, t) * (1 + (miter - 1) * w);
+                put(x0 + d1x * t, y0 + d1y * t, n1x + (bx - n1x) * w, n1y + (by - n1y) * w, r);
+            }
+            if (!upper) for (let i = 1; i < N; i++) {                        // on down the end segment
+                const t = i / (N - 1), w = t < B ? 1 - t / B : 0, r = bodyLimbRadius(Tb, t) * (1 + (miter - 1) * w);
+                put(x1 + d2x * t, y1 + d2y * t, n2x + (bx - n2x) * w, n2y + (by - n2y) * w, r);
+            }
+            const side = (S, from, to, step) => {                             // smooth through the samples
+                for (let i = from; i !== to; i += step) { const a = S[i], b = S[i + step]; ctx.quadraticCurveTo(a[0], a[1], (a[0] + b[0]) / 2, (a[1] + b[1]) / 2); }
+                ctx.lineTo(S[to][0], S[to][1]);
+            };
+            const a0 = Math.atan2(d1y, d1x), aE = upper ? a0 : Math.atan2(d2y, d2x), ex = upper ? x1 : x2, ey = upper ? y1 : y2;
+            const rE = upper ? bodyLimbRadius(Ta, 1) * miter : Tb[3];
+            ctx.beginPath();
+            ctx.arc(x0, y0, Ta[0], a0 + Math.PI / 2, a0 + Math.PI * 1.5);   // round root
+            ctx.lineTo(_skinL[0][0], _skinL[0][1]); side(_skinL, 0, k - 1, 1);
+            const eL = _skinL[k - 1], eR = _skinR[k - 1];
+            ctx.arc(ex, ey, Math.hypot(eL[0] - ex, eL[1] - ey) || rE, Math.atan2(eL[1] - ey, eL[0] - ex), Math.atan2(eR[1] - ey, eR[0] - ex), false);   // round end
+            side(_skinR, k - 1, 0, -1);
             ctx.closePath();
         }
         /** Fill the stretch of a limb from t0 to t1 of the way along it (a band, a stocking's top), cut square
@@ -63205,7 +63248,7 @@ Object.assign(TrafficVehicle.prototype, {
         }
         
     </script>
-    <script type="text/dfab" data-src="penthouse/procedural-humanoid.js" data-cost="829">
+    <script type="text/dfab" data-src="penthouse/procedural-humanoid.js" data-cost="856">
         // ===== LV3 PENTHOUSE =====
         // THE PROCEDURAL HUMANOID: every person in the game, drawn from code each frame (no sprites).
         // One instance per person (proceduralHumanoid.of(entity)), kept for as long as the person is,
@@ -63252,6 +63295,7 @@ Object.assign(TrafficVehicle.prototype, {
                 this.fists = [0, 0, 0, 0];
                 this.elbows = [0, 0, 0, 0];
                 this.points = null;                            // attachment points, made when first asked for (point)
+                this.skin_chain = null;                        // [root, joint, end] for a skinned limb (drawSkinnedArm)
                 // This frame: who, and how (configure, dress)
                 this.ctx = null; this.entity = entity; this.config = null; this.scale = null; this.android = null;
                 this.skin = null; this.wet = 0; this.shade = null; this.body = null;
@@ -63329,7 +63373,12 @@ Object.assign(TrafficVehicle.prototype, {
                 }
                 const shaded = gloss || SH.lx || SH.ly, geometry = shaded ? this.limb_geometry : null;
                 ctx.fillStyle = color; bodyLimbPath(ctx, x1, y1, x2, y2, T, geometry); ctx.fill(); ctx.beginPath();
-                if (!shaded) return;
+                if (shaded) this.shadeLimb(x1, y1, x2, y2, T, gloss);
+            }
+
+            /** The light across one limb segment: a gloss streak, or the soft shade on its far side (limb_geometry already set). */
+            shadeLimb (x1, y1, x2, y2, T, gloss) {
+                const ctx = this.ctx, SH = this.shade, geometry = this.limb_geometry;
                 const len = geometry.length/2 + 2, ang = geometry.angle, width = Math.max(T[0], T[1]);
                 const c = Math.cos(ang), s = Math.sin(ang), ly = -s * SH.lx + c * SH.ly, lx = (c * SH.lx + s * SH.ly) * len * 0.1;
                 ctx.save(); ctx.translate((x1+x2)/2, (y1+y2)/2); ctx.rotate(ang);
@@ -63340,6 +63389,24 @@ Object.assign(TrafficVehicle.prototype, {
                     _softSpot(ctx, -lx, -ly * width * 0.75, len * 1.6, width * 1.3, _SHADOW_RGB, SH.shA * 1.3);
                 }
                 ctx.restore();
+            }
+
+            /** A whole arm as one skinned outline (BODY_SKIN.arms, ui/bodies.js): the forearm's colour down the
+             *  chain, the upper arm over it from the shoulder, each segment shaded as before. */
+            drawSkinnedArm (sx, sy, ex, ey, fx, fy, upperColor, foreColor, upperGloss, foreGloss) {
+                const ctx = this.ctx, SH = this.shade, BC = this.body, P = this.skin_chain || (this.skin_chain = [0, 0, 0, 0, 0, 0]);
+                const ux = ex - sx, uy = ey - sy, fx2 = fx - ex, fy2 = fy - ey;
+                if (ux * fx2 + uy * fy2 < -0.5 * Math.hypot(ux, uy) * Math.hypot(fx2, fy2)) {    // folded past 120°: no bend to skin, two segments
+                    this.drawLimb(ex, ey, fx, fy, BC.fore, foreColor, foreGloss);
+                    return this.drawLimb(sx, sy, ex, ey, BC.upper, upperColor, upperGloss);
+                }
+                P[0] = sx; P[1] = sy; P[2] = ex; P[3] = ey; P[4] = fx; P[5] = fy;
+                ctx.fillStyle = foreColor; bodySkinnedLimbPath(ctx, P, BC.upper, BC.fore); ctx.fill();
+                ctx.fillStyle = upperColor; bodySkinnedLimbPath(ctx, P, BC.upper, BC.fore, true); ctx.fill(); ctx.beginPath();
+                if (!SH) return;
+                const G = this.limb_geometry;
+                if (foreGloss || SH.lx || SH.ly) { G.length = Math.hypot(fx - ex, fy - ey); G.angle = Math.atan2(fy - ey, fx - ex); this.shadeLimb(ex, ey, fx, fy, BC.fore, foreGloss); }
+                if (upperGloss || SH.lx || SH.ly) { G.length = Math.hypot(ex - sx, ey - sy); G.angle = Math.atan2(ey - sy, ex - sx); this.shadeLimb(sx, sy, ex, ey, BC.upper, upperGloss); }
             }
 
             // --- SET UP ---
@@ -64169,8 +64236,17 @@ Object.assign(TrafficVehicle.prototype, {
                     const p = WD.jewelry[j.type]; if (p && p.under) p.under(ctx, g, j);
                 }
                 const foreColor = sleeve === 'long' ? darken(sleeveCol, 0.3) : darken(skinColor, 0.3);
-                this.drawLimb(lElbowX, lElbowY, lFistX, lFistY, BC.fore, foreColor, sleeve === 'long' && topGloss);
-                this.drawLimb(rElbowX, rElbowY, rFistX, rFistY, BC.fore, foreColor, sleeve === 'long' && topGloss);
+                const upperColor = sleeve !== 'none' ? darken(sleeveCol, 0.15) : darken(skinColor, 0.15);
+                const torC = Math.cos(torsoRotation), torS = Math.sin(torsoRotation);
+                const lShX = shoulderX - lShoulderY * torS, lShY = lShoulderY * torC, rShX = shoulderX - rShoulderY * torS, rShY = rShoulderY * torC;
+                const skinned = BODY_SKIN.arms;
+                if (skinned) {                                                  // each arm as one skinned outline (ui/bodies.js)
+                    this.drawSkinnedArm(lShX, lShY, lElbowX, lElbowY, lFistX, lFistY, upperColor, foreColor, sleeve !== 'none' && topGloss, sleeve === 'long' && topGloss);
+                    this.drawSkinnedArm(rShX, rShY, rElbowX, rElbowY, rFistX, rFistY, upperColor, foreColor, sleeve !== 'none' && topGloss, sleeve === 'long' && topGloss);
+                } else {
+                    this.drawLimb(lElbowX, lElbowY, lFistX, lFistY, BC.fore, foreColor, sleeve === 'long' && topGloss);
+                    this.drawLimb(rElbowX, rElbowY, rFistX, rFistY, BC.fore, foreColor, sleeve === 'long' && topGloss);
+                }
                 if (clothes.jewelry && WD) for (const j of clothes.jewelry) {
                     const p = WD.jewelry[j.type]; if (p && p.at === 'wrists') p.draw(ctx, g, j);
                 }
@@ -64192,11 +64268,10 @@ Object.assign(TrafficVehicle.prototype, {
 
                 // 8. Upper Arms (fabric under short or long sleeves). They hang from the shoulders, so their
                 // roots turn with the torso: forward with the opposite leg on a step, into the blow in a punch.
-                const upperColor = sleeve !== 'none' ? darken(sleeveCol, 0.15) : darken(skinColor, 0.15);
-                const torC = Math.cos(torsoRotation), torS = Math.sin(torsoRotation);
-                const lShX = shoulderX - lShoulderY * torS, lShY = lShoulderY * torC, rShX = shoulderX - rShoulderY * torS, rShY = rShoulderY * torC;
-                this.drawLimb(lShX, lShY, lElbowX, lElbowY, BC.upper, upperColor, sleeve !== 'none' && topGloss);
-                this.drawLimb(rShX, rShY, rElbowX, rElbowY, BC.upper, upperColor, sleeve !== 'none' && topGloss);
+                if (!skinned) {
+                    this.drawLimb(lShX, lShY, lElbowX, lElbowY, BC.upper, upperColor, sleeve !== 'none' && topGloss);
+                    this.drawLimb(rShX, rShY, rElbowX, rElbowY, BC.upper, upperColor, sleeve !== 'none' && topGloss);
+                }
                 if (A) {                                                        // android elbows: a round joint plate on each
                     ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6;
                     for (const [x, y] of [[lElbowX, lElbowY], [rElbowX, rElbowY]]) { ctx.beginPath(); ctx.arc(x, y, 1.9, 0, Math.PI * 2); ctx.stroke(); }
