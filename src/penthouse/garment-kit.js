@@ -134,60 +134,55 @@
                 for (const op of packet) {
                     if (op[0] === 'band') {
                         const [x1, y1, x2, y2] = this.band(g, op[1], op[2], op[3]);
-                        put.capsule(x1, y1, x2, y2, op[4], op[4], R.rgb(g.darken(item.color, op[5])), sheen);
+                        put.capsule(x1, y1, x2, y2, op[4], op[4], R.tone(g, item.color, op[5]), sheen);
                     } else if (op[0] === 'hips') {
                         const B = g.body, grow = op[1];                          // the hip outline, as its ellipse
-                        put.ellipse((B.hf + B.hb) / 2 + B.cleft * 0.25, 0, (B.hf - B.hb) / 2 + grow, 0, B.hw + grow, R.rgb(g.darken(item.color, op[2])), sheen);
+                        put.ellipse((B.hf + B.hb) / 2 + B.cleft * 0.25, 0, (B.hf - B.hb) / 2 + grow, 0, B.hw + grow, R.tone(g, item.color, op[2]), sheen);
                     } else if (op[0] === 'seam') {
-                        const rgb = R.rgb(g.darken(item.color, op[1])), pts = op[3].map(p => this.point(g, p)), r = op[2] / 2, t = R.tex;
+                        const rgb = R.tone(g, item.color, op[1]), pts = op[3].map(p => this.point(g, p)), r = op[2] / 2, t = R.tex;
                         R.tex = 3;                                               // a stitched line: no grain, no ink edge
                         for (let k = 1; k < pts.length; k++) put.capsule(pts[k - 1][0], pts[k - 1][1], pts[k][0], pts[k][1], r, r, rgb, 0);
                         R.tex = t;
                     } else if (op[0] === 'body') {
                         const B = g.body, reach = Math.min(-op[2], op[3]);
-                        const pts = reach < 10 ? bodySplinePoints(bodyTorsoOutline(B, Math.round(reach / 10 * B.sh * 4) / 4)) : bodySplinePoints(bodyTorsoOutline(B), (reach - 10) * 0.8);
-                        put.polygon(pts, R.rgb(g.darken(item.color, op[1])), sheen);
+                        const pts = reach < 10 ? R.outline(B, 'torso', Math.round(reach / 10 * B.sh * 4) / 4) : R.outline(B, 'torso', 0, (reach - 10) * 0.8);
+                        put.polygon(pts, R.tone(g, item.color, op[1]), sheen);
                     } else if (op[0] === 'bust') {
                         const B = g.body.bust; if (!B) continue;
-                        const r = B.r * (op[2] + 0.4) / 3.5, rgb = R.rgb(g.darken(item.color, op[1]));
+                        const r = B.r * (op[2] + 0.4) / 3.5, rgb = R.tone(g, item.color, op[1]);
                         for (const sy of [-1, 1]) put.ellipse(B.x + 0.15, sy * B.y, r, 0, r, rgb, sheen);
                     } else if (op[0] === 'pleats') {
                         const ch = this.pleatChains(g, op[1]), N = op[1], tip = k => ch[k % N][ch[k % N].length - 1], root = k => ch[k % N][0];
-                        const base = R.rgb(g.darken(item.color, op[2])), deep = R.rgb(item.stripe ? g.darken(item.stripe, op[3]) : g.darken(item.color, op[4])), trim = R.rgb(item.trim || '#f4eee6');
+                        const base = R.tone(g, item.color, op[2]), deep = item.stripe ? R.tone(g, item.stripe, op[3]) : R.tone(g, item.color, op[4]), trim = R.rgb(item.trim || '#f4eee6');
                         for (let i = 0; i < N; i++) {
                             const a0 = root(i), a1 = root(i + 1), t0 = tip(i), t1 = tip(i + 1);
-                            put.polygon([[a0.x, a0.y], [t0.x, t0.y], [t1.x, t1.y], [a1.x, a1.y]], i % 2 ? deep : base, sheen);
+                            // two triangles from the waist: the hem edge t0→t1 and the side t1→a1 are their rims
+                            put.tri(a0.x, a0.y, t0.x, t0.y, t1.x, t1.y, i % 2 ? deep : base, sheen);
+                            put.tri(a0.x, a0.y, t1.x, t1.y, a1.x, a1.y, i % 2 ? deep : base, sheen);
                         }
-                        const tt = R.tex; R.tex = 3;
+                        const tt = R.tex, f = op[5], fr = op[6], hem = R.tone(g, item.color, op[7]); R.tex = 3;
                         for (let i = 0; i < N; i++) {                             // the trim band
-                            const p = (k) => { const t = tip(k), a = root(k); return [a.x + (t.x - a.x) * op[5], a.y + (t.y - a.y) * op[5]]; };
-                            const [x1, y1] = p(i), [x2, y2] = p(i + 1); put.capsule(x1, y1, x2, y2, 0.45, 0.45, trim, 0);
+                            const t0 = tip(i), a0 = root(i), t1 = tip(i + 1), a1 = root(i + 1);
+                            put.capsule(a0.x + (t0.x - a0.x) * f, a0.y + (t0.y - a0.y) * f, a1.x + (t1.x - a1.x) * f, a1.y + (t1.y - a1.y) * f, 0.45, 0.45, trim, 0);
                         }
                         for (let i = 0; i < N; i++) {                             // the frill, then the hem line over it
-                            const t0 = tip(i), t1 = tip(i + 1);
-                            for (const f of [0.25, 0.75]) put.ellipse(t0.x + (t1.x - t0.x) * f, t0.y + (t1.y - t0.y) * f, op[6], 0, op[6], trim, 0);
+                            const t0 = tip(i), t1 = tip(i + 1), dx = t1.x - t0.x, dy = t1.y - t0.y;
+                            put.ellipse(t0.x + dx * 0.25, t0.y + dy * 0.25, fr, 0, fr, trim, 0); put.ellipse(t0.x + dx * 0.75, t0.y + dy * 0.75, fr, 0, fr, trim, 0);
                         }
-                        const hem = R.rgb(g.darken(item.color, op[7]));
                         for (let i = 0; i < N; i++) { const a = tip(i), b = tip(i + 1); put.capsule(a.x, a.y, b.x, b.y, 0.25, 0.25, hem, 0); }
                         R.tex = tt;
                         const [wx, wy, wd] = op[8];
-                        put.ellipse(g.hip.x + g.hip.w / 2, 0, wx, 0, wy, R.rgb(g.darken(item.color, wd)), sheen);
+                        put.ellipse(g.hip.x + g.hip.w / 2, 0, wx, 0, wy, R.tone(g, item.color, wd), sheen);
                     } else if (op[0] === 'soles') {
-                        const rgb = R.rgb(g.darken(item.color, op[1]));
+                        const rgb = R.tone(g, item.color, op[1]);
                         for (let i = 0; i < 2; i++) { const [x, y] = g.feet[i]; put.ellipse(x + 2.6, y, 4.2 * g.body.foot, 0, 2.4 * g.body.foot, rgb, 0.4); }
                     } else if (op[0] === 'toe_shine') {
                         for (let i = 0; i < 2; i++) { const [x, y] = g.feet[i]; put.ellipse(x + op[2] + op[3] / 2, y + (i ? 0.45 : -0.45), op[3] / 2, 0, op[4] / 2, [1, 1, 1], 0, 0.18); }
                     } else if (op[0] === 'wrist_rings') {
                         const rgb = R.rgb(item.color || '#e8c27a'), tt = R.tex; R.tex = 3;
-                        this.wristRings(g, op, (x, y, Rr, a, k) => {             // a ring seen from above: an ellipse's outline, as short strokes
-                            const tilt = Math.max(0.28, Math.sqrt(1 - k * k)), ca = Math.cos(a), sa = Math.sin(a);
-                            let px = null, py = null;
-                            for (let s = 0; s <= 8; s++) {
-                                const th = -Math.PI / 2 + s / 8 * Math.PI, lx = Math.cos(th) * Rr * tilt, ly = Math.sin(th) * Rr;
-                                const qx = x + lx * ca - ly * sa, qy = y + lx * sa + ly * ca;
-                                if (px !== null) put.capsule(px, py, qx, qy, op[3] / 2, op[3] / 2, rgb, 0.8);
-                                px = qx; py = qy;
-                            }
+                        this.wristRings(g, op, (x, y, Rr, a, k) => {             // a ring seen from above: half an ellipse's outline, one shape
+                            const tilt = Math.max(0.28, Math.sqrt(1 - k * k));
+                            put.ring(x, y, Math.cos(a) * Rr * tilt, Math.sin(a) * Rr * tilt, Rr, op[3], rgb);
                         }, () => {}, () => {});
                         R.tex = tt;
                     }
