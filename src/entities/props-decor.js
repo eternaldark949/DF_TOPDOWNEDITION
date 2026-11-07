@@ -2,16 +2,7 @@
         // before artwork transforms and never baked into a rotating furniture sprite.
         function drawGroundContactShadow(ctx, x, y, rx, ry, angle = 0) {
             let cv = drawGroundContactShadow.sprite;
-            if (!cv) {
-                cv = drawGroundContactShadow.sprite = document.createElement('canvas');
-                cv.width = cv.height = 64;
-                const c = cv.getContext('2d'), g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
-                g.addColorStop(0, 'rgba(0,0,0,0.30)');
-                g.addColorStop(0.65, 'rgba(0,0,0,0.24)');
-                g.addColorStop(0.85, 'rgba(0,0,0,0.12)');
-                g.addColorStop(1, 'rgba(0,0,0,0)');
-                c.fillStyle = g; c.fillRect(0, 0, 64, 64);
-            }
+            if (!cv) cv = drawGroundContactShadow.sprite = canvasKit.glow([64, [[0, 'rgba(0,0,0,0.30)'], [0.65, 'rgba(0,0,0,0.24)'], [0.85, 'rgba(0,0,0,0.12)'], [1, 'rgba(0,0,0,0)']]]);
             if (angle) {
                 // The contact footprint follows the base. Its centre never gains a
                 // facing-dependent light offset like the old displaced silhouette.
@@ -1175,9 +1166,7 @@
 
         function paintGraveStone(p) {
             const L = gyStoneLayout(p), w = p.width, h = p.height, r = L.rnd;
-            const cv = document.createElement('canvas');
-            cv.width = Math.ceil((w + GY_PAD * 2) * GY_SCALE); cv.height = Math.ceil((h + GY_PAD * 2) * GY_SCALE);
-            const c = cv.getContext('2d'); c.scale(GY_SCALE, GY_SCALE); c.translate(GY_PAD, GY_PAD);
+            const { canvas: cv, ctx: c } = canvasKit.createLayer([Math.ceil((w + GY_PAD * 2) * GY_SCALE), Math.ceil((h + GY_PAD * 2) * GY_SCALE)]); c.scale(GY_SCALE, GY_SCALE); c.translate(GY_PAD, GY_PAD);
             const TONES = {
                 grey:  ['#9a96a6', '#5e5a6a', '#34303e'], blue: ['#8e98b0', '#56607a', '#2e3446'],
                 rose:  ['#a8949c', '#6e5a62', '#3a2e36'], black: ['#4a4658', '#24222e', '#121018']

@@ -24,15 +24,10 @@
         const _puffs = new Map();
         /** A soft round puff (64×64) in `color`, for barrel smoke and golden wisps. */
         function puffSprite(color) {
-            let cv = _puffs.get(color);
-            if (cv) return cv;
-            cv = document.createElement('canvas'); cv.width = cv.height = 64;
-            const c = cv.getContext('2d'), rgb = /^#[0-9a-f]{6}$/i.test(color) ? hexToRgb(color) : '220, 210, 225';
-            const g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
-            g.addColorStop(0, `rgba(${rgb}, 0.9)`); g.addColorStop(0.45, `rgba(${rgb}, 0.45)`); g.addColorStop(1, `rgba(${rgb}, 0)`);
-            c.fillStyle = g; c.fillRect(0, 0, 64, 64);
-            _puffs.set(color, cv);
-            return cv;
+            return canvasKit.bake(_puffs, color, () => {
+                const rgb = /^#[0-9a-f]{6}$/i.test(color) ? hexToRgb(color) : '220, 210, 225';
+                return canvasKit.glow([64, [[0, `rgba(${rgb}, 0.9)`], [0.45, `rgba(${rgb}, 0.45)`], [1, `rgba(${rgb}, 0)`]]]);
+            });
         }
 
         engineMixin({
@@ -230,17 +225,17 @@
                 const F = this.shotFx;
                 if (!F || !F.length) return;
                 const W = this.weather && this.weather.windVec ? this.weather.windVec : { x: 0, y: 0 };
-                for (let i = F.length - 1; i >= 0; i--) {
-                    const p = F[i]; p.t++;
-                    if (p.t <= 0) continue;                                              // (a smoke puff still waiting its turn)
-                    if (p.t > p.life) { F.splice(i, 1); continue; }
+                lifeKit.sweep(F, (p) => {
+                    p.t++;
+                    if (p.t <= 0) return;                                              // (a smoke puff still waiting its turn)
+                    if (p.t > p.life) return true;
                     if (p.k === 'smoke' || p.k === 'wisp') {                             // drifts downwind, curls, swells
                         p.vx = p.vx * 0.94 + W.x * 0.012 + Math.cos(p.t * 0.15 + p.ph) * 0.03;
                         p.vy = p.vy * 0.94 + W.y * 0.012 + Math.sin(p.t * 0.15 + p.ph) * 0.03;
                         p.r += p.k === 'smoke' ? 0.055 : 0.14;
                     } else { p.vx *= 0.93; p.vy *= 0.93; p.vx += W.x * 0.004; p.vy += W.y * 0.004; }
                     p.x += p.vx; p.y += p.vy;
-                }
+                });
             },
             /** Barrel smoke and wisps (soft, normal blend), then embers and gold dust (additive). After the muzzle stars. */
             drawShotFx(ctx, cb) {

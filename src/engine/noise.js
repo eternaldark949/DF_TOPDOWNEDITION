@@ -73,7 +73,7 @@
             /** Ripples grow to their reach and fade over half a second. */
             updateNoiseRipples() {
                 const R = this.noiseRipples; if (!R || !R.length) return;
-                for (let i = R.length - 1; i >= 0; i--) if ((R[i].t += 1 / 30) >= 1) R.splice(i, 1);
+                lifeKit.sweep(R, (r) => (r.t += 1 / 30) >= 1);
             },
 
             /** The ring's progress this frame: blended between ticks so it glides at any refresh rate */
@@ -109,7 +109,7 @@
                 let cv = this._mirageCv;
                 if (!cv) { cv = this._mirageCv = document.createElement('canvas'); this._mirageCtx = cv.getContext('2d'); }
                 const sw = Math.max(1, W >> 2), sh = Math.max(1, H >> 2);
-                if (cv.width !== sw || cv.height !== sh) { cv.width = sw; cv.height = sh; }
+                canvasKit.fitLayer(cv, sw, sh);
                 let copied = false;
                 const N = 72, TAU = Math.PI * 2;
                 ctx.save();

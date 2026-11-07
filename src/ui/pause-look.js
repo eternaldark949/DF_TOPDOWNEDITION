@@ -19,7 +19,7 @@
                 const w = Math.max(64, Math.round(src.width * this.SCALE)), h = Math.max(36, Math.round(src.height * this.SCALE));
                 let ok = true;
                 for (const cv of host.querySelectorAll('canvas')) {
-                    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+                    canvasKit.fitLayer(cv, w, h);
                     const ctx = cv.getContext('2d');
                     try { ctx.clearRect(0, 0, w, h); ctx.drawImage(src, 0, 0, w, h); } catch (e) { ok = false; }
                 }

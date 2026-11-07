@@ -67,8 +67,7 @@
             },
 
             _paintVanCabin() {
-                const cv = document.createElement('canvas'); cv.width = VAN.W; cv.height = VAN.H;
-                const c = cv.getContext('2d'), B = VAN.BODY, C = VAN.CABIN;
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([VAN.W, VAN.H]), B = VAN.BODY, C = VAN.CABIN;
                 // The body, its shadow on the road, the gold pinstripe
                 c.fillStyle = 'rgba(0,0,0,0.55)'; c.beginPath(); c.roundRect(B.x + 8, B.y + 10, B.w, B.h, 26); c.fill();
                 c.fillStyle = '#17111f'; c.beginPath(); c.roundRect(B.x, B.y, B.w, B.h, 26); c.fill();

@@ -230,8 +230,7 @@
                 let st = this._stamps.get(key);
                 if (st) return st;
                 const P = CAR_ART.PAD, Lw = sp.L + P * 2, Ww = sp.W + P * 2, r = this.scale * 2, side = rot > 1;
-                const cv = document.createElement('canvas'); cv.width = Math.ceil((side ? Ww : Lw) * r); cv.height = Math.ceil((side ? Lw : Ww) * r);
-                const c = cv.getContext('2d');
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([Math.ceil((side ? Ww : Lw) * r), Math.ceil((side ? Lw : Ww) * r)]);
                 c.translate(cv.width / 2, cv.height / 2); c.rotate([0, Math.PI, Math.PI / 2, -Math.PI / 2][rot]); c.scale(r, r);
                 c.drawImage(sp.cv, -Lw / 2, -Ww / 2, Lw, Ww);
                 st = { cv, w: (side ? Ww : Lw) * this.scale, h: (side ? Lw : Ww) * this.scale, L: sp.L };
@@ -252,8 +251,7 @@
                 const key = 'ped' + tint;
                 let st = this._stamps.get(key);
                 if (st) return st;
-                const cv = document.createElement('canvas'); cv.width = cv.height = 16;
-                const c = cv.getContext('2d');
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([16, 16]);
                 c.fillStyle = 'rgba(0,0,0,0.4)'; c.beginPath(); c.ellipse(9.5, 10, 4.5, 3.5, 0, 0, Math.PI * 2); c.fill();
                 c.fillStyle = `rgb(${tint})`; c.beginPath(); c.arc(8, 8, 3.6, 0, Math.PI * 2); c.fill();
                 c.fillStyle = 'rgba(20,14,26,0.85)'; c.beginPath(); c.arc(8, 7.6, 1.8, 0, Math.PI * 2); c.fill();    // a head of dark hair, seen from above

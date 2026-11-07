@@ -120,7 +120,7 @@ test('Detailed capture reuses entity/character/world hooks without the Full pane
   `);
   assert.deepEqual(r.during,{people:true,world:true,panel:false,mode:'off',wrapped:true});
   for(const label of ['Entities: People','Entities: Vehicles','Entities: Props','Entities: Effects','Entities: World tops',
-      'People: Hair physics','People: Hair drawing','People: Cloth physics','People: Body and limbs','World tops: Foliage','Buildings: Base']) {
+      'People: Hair physics','People: Hair drawing','People: Cloth physics','People: Legs','People: Head','People: Other','World tops: Foliage','Buildings: Base']) {
     assert.ok(r.report.sections.some(s=>s.label===label),label);
   }
   assert.ok(r.report.sections.find(s=>s.label==='Entities: People').mean>0);

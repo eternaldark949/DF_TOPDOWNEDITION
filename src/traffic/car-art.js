@@ -72,7 +72,7 @@
             PITCH_PX: 1.1           // body shift forward under full braking
         };
         const _carSprites = new Map();
-        const _carColorCv = document.createElement('canvas').getContext('2d');
+        const _carColorCv = canvasKit.measure;
 
         /** Any CSS colour → [r, g, b]. */
         function _carRGB(col) {
@@ -176,9 +176,7 @@
             let sp = _carSprites.get(key);
             if (sp) return sp;
             const { SCALE: S, PAD: P } = CAR_ART, L = g.L, W = g.W;
-            const cv = document.createElement('canvas');
-            cv.width = Math.ceil((L + P * 2) * S); cv.height = Math.ceil((W + P * 2) * S);
-            const c = cv.getContext('2d');
+            const { canvas: cv, ctx: c } = canvasKit.createLayer([Math.ceil((L + P * 2) * S), Math.ceil((W + P * 2) * S)]);
             c.setTransform(S, 0, 0, S, (L / 2 + P) * S, (W / 2 + P) * S);
             _paintCar(c, v, g);
             sp = { cv, L, W };

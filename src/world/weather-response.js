@@ -63,7 +63,7 @@
         function _umbrellaSheen(R) {
             const k = Math.round(R * 4) / 4; let g = _sheens.get(k);
             if (!g) {
-                const c = (_sheens._c || (_sheens._c = document.createElement('canvas').getContext('2d')));
+                const c = canvasKit.measure;
                 g = c.createRadialGradient(-k * 0.35, -k * 0.35, 0, 0, 0, k);
                 g.addColorStop(0, 'rgba(255,255,255,0.22)'); g.addColorStop(1, 'rgba(255,255,255,0)');
                 _sheens.set(k, g);

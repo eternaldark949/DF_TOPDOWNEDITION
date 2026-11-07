@@ -25,13 +25,19 @@
                Handles all logic updates for the current frame.
                Instrumented with Profiler to track performance bottlenecks.
                ===================================================================== */
+            /** One tick, called directly (tests, tools): skipped while stopped or paused, like a Lobby step.
+             *  The Lobby itself advances the tick and calls stepWorld() (engine/loop.js). */
             update() {
                 if (!this.running || this.paused) return;
-                this._syncProfiler();
-                
                 // Gait clock — advances only when the world actually steps, so
                 // walk animation freezes with everything else while paused.
-                _simTick++;
+                frame_clock.advanceTick();
+                this.stepWorld();
+            },
+
+            /** The world's simulation for one tick. The tick (_simTick) has already advanced. */
+            stepWorld() {
+                this._syncProfiler();
                 CollisionSystem.beginProjectileStep(this);
                 
                 // Pausable systems — must tick before any logic that might
@@ -55,10 +61,7 @@
                 this.profiler.start('Logic:Systems');
                 
                 // Cleanup old muzzle flashes
-                for(let i=this.muzzleFlashes.length-1; i>=0; i--) {
-                    this.muzzleFlashes[i].life--;
-                    if(this.muzzleFlashes[i].life <= 0) this.muzzleFlashes.splice(i, 1);
-                }
+                lifeKit.sweep(this.muzzleFlashes, (f) => --f.life <= 0);
                 this.updateCasings();
                 this.updateCorpses();
                 this.updateStatuses();                                 // bleeding and the rest (engine/status-effects.js)
@@ -579,10 +582,7 @@
                 });
                 } // end bumper minigame guard
                 // Ghosts/Markers
-                for (let i = this.lastKnownMarkers.length - 1; i >= 0; i--) {
-                    this.lastKnownMarkers[i].update();
-                    if (!this.lastKnownMarkers[i].active) this.lastKnownMarkers.splice(i, 1);
-                }
+                lifeKit.sweep(this.lastKnownMarkers, (m) => { m.update(); return !m.active; });
             
                 // Enemies (Gangers, Bosses)
                 let trafficCars = null;                                         // the cars they dodge: one list a tick, shared (read only)

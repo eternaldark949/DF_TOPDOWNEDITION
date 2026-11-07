@@ -31,16 +31,10 @@
         //  An entity that has never reported a command falls back to measured
         //  displacement, so any mover that isn't hooked up still animates.
 
-        /** Sim tick counter — advanced once per fixed update step in GameEngine.update(). */
-        let _simTick = 0;
+        // (_simTick and _gameTimeSec are declared in basement/frame-clock.js)
         /** Game time in ms from sim ticks: frozen while paused, so lifetimes measured with it (projectiles, decals) survive a pause */
         function _gameTimeMs() { return _simTick * CONFIG.LOOP.STEP_MS; }
 
-        /** Smooth GAME time in seconds for draw code: advances with sim ticks (so it
-         *  follows CONFIG.LOOP.GAME_SPEED and stops while paused), blended between
-         *  ticks. Use it for world motion drawn from a clock (foliage sway, bobbing);
-         *  keep _frameTime for real-time effects like light flicker and UI. */
-        let _gameTimeSec = 0;
 
         /** Stand-in for throwaway render proxies with no position (VFX silhouettes). */
         const _STATIC_GAIT = Object.freeze({ speed: 0, dirX: 1, dirY: 0 });
@@ -98,9 +92,7 @@
          *  centre if no weapon has been drawn). The renderer records ent._muzzleLocal each
          *  frame in the actor's own frame (x forward, y to its right). */
         function muzzleWorld(ent, dirAngle, m = ent._muzzleLocal) {
-            if (!m) return { x: ent.x, y: ent.y };
-            const c = Math.cos(dirAngle), s = Math.sin(dirAngle);
-            return { x: ent.x + m.x * c - m.y * s, y: ent.y + m.x * s + m.y * c };
+            return m ? virtualChild.toWorld(ent, [m.x, m.y], dirAngle) : { x: ent.x, y: ent.y };   // basement/virtual-child.js
         }
 
         /** Shot origin + direction for an actor facing `dirAngle`: leaves from the muzzle and

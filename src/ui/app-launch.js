@@ -113,14 +113,12 @@
                 host.querySelectorAll('.app-splash').forEach(e => e.remove());
                 const acc = this.ACCENT[icon.id] || '#e8c27a';
                 const glyph = icon.querySelector('.phone-app-icon-circle'), name = icon.querySelector('.phone-app-name');
-                const sp = document.createElement('div');
-                sp.className = 'app-splash';
+                const sp = uiKit.make(['div', 'app-splash']);
                 sp.style.setProperty('--acc', acc);
                 const tile = document.createElement('div');
                 tile.className = 'as-tile';
                 if (glyph) glyph.childNodes.forEach(n => { if (!(n.classList && n.classList.contains('app-badge'))) tile.appendChild(n.cloneNode(true)); });
-                const label = document.createElement('div');
-                label.className = 'as-name'; label.textContent = name ? name.textContent : '';
+                const label = uiKit.make(['div', 'as-name', name ? name.textContent : '']);
                 const line = document.createElement('div');
                 line.className = 'as-line';
                 sp.append(tile, label, line);

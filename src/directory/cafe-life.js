@@ -1,3 +1,4 @@
+        // ===== LV2 DIRECTORY =====
         // ============================================================================
         //  CAFE LIFE — the Cozy Cafe's guests (cozy_cafe_interior only)
         //  They come in from the street, queue at the counter, order, wait for their cup
@@ -6,9 +7,8 @@
         //  pastry case first; friends come in pairs and share a table. Visits are long and
         //  calm (a minute or two seated), the walk unhurried. A second barista carries
         //  cups out to the tables and polishes. Busy in the morning and late afternoon,
-        //  a few night owls after dark. Built on ClubLife's walker loop (world/club-life.js):
-        //  ambient walkers, not NPCs — no dialogue, no prompts. Updated from update.js,
-        //  drawn with the characters (draw.js), by Crowd Quality.
+        //  a few night owls after dark. A VenueCrowd (directory/venue-crowd.js): its walker
+        //  loop, pools and draw. Whoever is already in when you walk in starts in their seat.
         // ============================================================================
         const CAFE_GATE = [600, 896];
         const CAFE_SPOTS = {
@@ -34,19 +34,16 @@
             bench: [[105, 926], [222, 926], [288, 926], [398, 926], [792, 926], [892, 926]].map(([x, y]) => ({ at: [x, y], from: [x, 878], face: -Math.PI / 2 }))
         };
 
-        class CafeLife extends ClubLife {
-            constructor() { super(); this.mapId = 'cozy_cafe_interior'; }
+        class CafeLife extends VenueCrowd {
+            PREFILL = 0.75;
+            DRINKS = CAFE_DRINKS;
+            constructor() { super('cozy_cafe_interior'); }
 
-            /** A fresh café: the barista on shift, and the day's regulars already settled in. */
-            reset(game) {
-                this.walkers = []; this.map = game.activeMap; this._spawnTimer = 0; this.taken = new Map();
-                const nav = NavGrid.for(this.map);
-                this._snap = ([x, y]) => { const f = nav && nav.nearestFree(x, y, 4); return f !== null && f !== undefined ? [nav.cx(f), nav.cy(f)] : [x, y]; };
+            /** The barista on shift. (The day's regulars are already settled in: VenueCrowd.reset.) */
+            _setUp(game) {
                 const staff = this._make('runner', CAFE_SPOTS.staffHome[0], CAFE_SPOTS.staffHome[1], ROLE_LOOKS.cafe_staff(seededRandom('cafe_staff')));
                 staff.life = 1; staff.speed = 1.2;
                 this.walkers.push(staff);
-                const n = this._target(game);
-                for (let i = 0; i < Math.round(n * 0.75); i++) this._spawnGuest(true);
             }
 
             /** How full: the density setting, scaled by the hour (mornings and late afternoons are busy). */
@@ -92,6 +89,7 @@
                     }
                     if (!pairChairs && r() < 0.2) g.steps.push({ browse: 'record' });
                     g.steps.push({ exit: true, go: CAFE_GATE });
+                    if (midVisit) this._settleMidVisit(g);                              // in their seat already, not at the door
                     this.walkers.push(g);
                 });
             }

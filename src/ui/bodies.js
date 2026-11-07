@@ -169,6 +169,49 @@
             ctx.bezierCurveTo(x1 + ux * c2 + nx * w2, y1 + uy * c2 + ny * w2, x1 + ux * c1 + nx * w1, y1 + uy * c1 + ny * w1, x1 + nx * r0, y1 + ny * r0);
             ctx.closePath();
         }
+        /** SKINNED LIMBS (trial): a whole arm or leg as one outline through its joints, the way a mesh is
+         *  skinned to bones. Each side is sampled down both segments at their taper (bodyLimbRadius); near
+         *  the joint the samples' normals blend toward the bend's bisector (linear blend skinning), so the
+         *  outside of an elbow rounds smoothly and the inside creases, instead of two capsules overlapping.
+         *  P = [x0, y0, x1, y1, x2, y2] (root, joint, end); Ta, Tb the two segments' thickness packets.
+         *  upper: only the root segment, ending in a round end at the joint (a sleeve, a darker upper arm). */
+        const BODY_SKIN = { arms: false, SAMPLES: 5, BLEND: 0.4 };
+        const _skinL = [], _skinR = [];
+        function bodySkinnedLimbPath(ctx, P, Ta, Tb, upper = false) {
+            const [x0, y0, x1, y1, x2, y2] = P, N = BODY_SKIN.SAMPLES, B = BODY_SKIN.BLEND;
+            const d1x = x1 - x0, d1y = y1 - y0, L1 = Math.hypot(d1x, d1y) || 1e-6, d2x = x2 - x1, d2y = y2 - y1, L2 = Math.hypot(d2x, d2y) || 1e-6;
+            const n1x = -d1y / L1, n1y = d1x / L1, n2x = -d2y / L2, n2y = d2x / L2;
+            let bx = n1x + n2x, by = n1y + n2y; const bl = Math.hypot(bx, by);
+            if (bl < 0.2) { bx = n1x; by = n1y; } else { bx /= bl; by /= bl; }
+            const miter = 1 / Math.max(0.6, n1x * bx + n1y * by);           // keeps the width through the bend
+            let k = 0;
+            const put = (x, y, nx, ny, r) => {
+                const l = Math.hypot(nx, ny) || 1; nx /= l; ny /= l;
+                const L = _skinL[k] || (_skinL[k] = [0, 0]), R = _skinR[k] || (_skinR[k] = [0, 0]);
+                L[0] = x - nx * r; L[1] = y - ny * r; R[0] = x + nx * r; R[1] = y + ny * r; k++;
+            };
+            for (let i = 0; i < N; i++) {                                     // the root segment, up to the joint
+                const t = i / (N - 1), w = t > 1 - B ? (t - (1 - B)) / B : 0, r = bodyLimbRadius(Ta, t) * (1 + (miter - 1) * w);
+                put(x0 + d1x * t, y0 + d1y * t, n1x + (bx - n1x) * w, n1y + (by - n1y) * w, r);
+            }
+            if (!upper) for (let i = 1; i < N; i++) {                        // on down the end segment
+                const t = i / (N - 1), w = t < B ? 1 - t / B : 0, r = bodyLimbRadius(Tb, t) * (1 + (miter - 1) * w);
+                put(x1 + d2x * t, y1 + d2y * t, n2x + (bx - n2x) * w, n2y + (by - n2y) * w, r);
+            }
+            const side = (S, from, to, step) => {                             // smooth through the samples
+                for (let i = from; i !== to; i += step) { const a = S[i], b = S[i + step]; ctx.quadraticCurveTo(a[0], a[1], (a[0] + b[0]) / 2, (a[1] + b[1]) / 2); }
+                ctx.lineTo(S[to][0], S[to][1]);
+            };
+            const a0 = Math.atan2(d1y, d1x), aE = upper ? a0 : Math.atan2(d2y, d2x), ex = upper ? x1 : x2, ey = upper ? y1 : y2;
+            const rE = upper ? bodyLimbRadius(Ta, 1) * miter : Tb[3];
+            ctx.beginPath();
+            ctx.arc(x0, y0, Ta[0], a0 + Math.PI / 2, a0 + Math.PI * 1.5);   // round root
+            ctx.lineTo(_skinL[0][0], _skinL[0][1]); side(_skinL, 0, k - 1, 1);
+            const eL = _skinL[k - 1], eR = _skinR[k - 1];
+            ctx.arc(ex, ey, Math.hypot(eL[0] - ex, eL[1] - ey) || rE, Math.atan2(eL[1] - ey, eL[0] - ex), Math.atan2(eR[1] - ey, eR[0] - ex), false);   // round end
+            side(_skinR, k - 1, 0, -1);
+            ctx.closePath();
+        }
         /** Fill the stretch of a limb from t0 to t1 of the way along it (a band, a stocking's top), cut square
          *  across at both ends: the limb's outline grown by `grow`, clipped to the span. t outside 0..1 takes
          *  in the joint's round end. gloss: a soft sheen down the span. */

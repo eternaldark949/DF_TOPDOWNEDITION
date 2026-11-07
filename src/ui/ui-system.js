@@ -20,8 +20,7 @@
                 //
                 // Dynamic icons (player, NPCs, nav markers) live on a separate
                 // canvas layer and update independently at 60fps.
-                this.cacheCanvas = document.createElement('canvas');
-                this.cacheCtx = this.cacheCanvas.getContext('2d');
+                ({ canvas: this.cacheCanvas, ctx: this.cacheCtx } = canvasKit.createLayer());
                 this.isCacheDirty = true;          // External "force rebuild" flag
                 this.cacheMapId = null;
                 this.cacheBoundsMap = null;        // {x, y, w, h} in map-space
@@ -48,8 +47,7 @@
                 
                 // --- ANIMATION LAYER ---
                 // Separate canvas for animated icons (runs at 60fps when map is open)
-                this.iconCanvas = document.createElement('canvas');
-                this.iconCtx = this.iconCanvas.getContext('2d');
+                ({ canvas: this.iconCanvas, ctx: this.iconCtx } = canvasKit.createLayer());
                 this.mapContainer = document.getElementById('map-interface');
                 this.iconCanvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:2;';
                 this.mapContainer.appendChild(this.iconCanvas);

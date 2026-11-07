@@ -60,8 +60,7 @@
         // GLOBAL FRAME TIME CACHE — Set once per frame, used everywhere
         // Replaces scattered Date.now() calls to eliminate redundant syscalls + GC
         // ============================================================================
-        let _frameTime = performance.now();
-        let _frameTimeSec = _frameTime / 1000;
+        // (_frameTime and _frameTimeSec are declared in basement/frame-clock.js)
         let _profileSampling = false;   // detailed clocks are idle when the profiler and benchmark are off
         let _zoomLOD = 0; // 0 = full quality, 1 = reduced, 2 = minimal (updated per frame)
         

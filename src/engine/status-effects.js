@@ -367,13 +367,8 @@
 
             /** Golden Child burns once per simulation tick, after projectile hits attach or refresh orbs. */
             updateStickyOrbs() {
-                for (let i = this.stickyOrbs.length - 1; i >= 0; i--) {
-                    const orb = this.stickyOrbs[i];
-
-                    if (!orb.target || orb.target.dead || orb.ticksLeft <= 0) {
-                        this.stickyOrbs.splice(i, 1);
-                        continue;
-                    }
+                lifeKit.sweep(this.stickyOrbs, (orb) => {
+                    if (!orb.target || orb.target.dead || orb.ticksLeft <= 0) return true;
 
                     orb.tickTimer++;
                     if (orb.tickTimer >= orb.tickInterval) {
@@ -390,7 +385,7 @@
                             );
                         }
                     }
-                }
+                });
             },
 
             /** Damage that reaches her mid-swing (a blade drawn and moving) is cut to BLADE_PERKS.GUARD of itself */

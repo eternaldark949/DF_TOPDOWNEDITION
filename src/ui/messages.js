@@ -212,8 +212,7 @@
             },
             /** A round painted face (or the name's initial), with the bond's ring for the crew */
             _face(name, cls = 'mav') {
-                const el = document.createElement('div');
-                el.className = cls;
+                const el = uiKit.make(['div', cls]);
                 const url = this._faceReady(name);
                 if (url) { const img = new Image(); img.alt = ''; img.src = url; el.appendChild(img); }
                 else {
@@ -228,8 +227,7 @@
             },
             /** The group's avatar: three of the crew, stacked */
             _groupFace(cls = 'mav') {
-                const el = document.createElement('div');
-                el.className = cls + ' stack';
+                const el = uiKit.make(['div', cls + ' stack']);
                 for (const n of ['Victoria', '747', 'Max']) el.appendChild(this._face(n, 'mav-mini'));
                 return el;
             },
@@ -335,17 +333,12 @@
                 if (this.msgTab === 'crew') rows = rows.filter(c => c.crew || c.group);
                 if (this.msgTab === 'unread') rows = rows.filter(c => this.unread[c.name]);
 
-                const label = (t) => { const el = document.createElement('div'); el.className = 'msg-sec'; el.textContent = t; list.appendChild(el); };
+                const label = (t) => uiKit.make(['div', 'msg-sec', t], list);
                 const pinned = this.msgTab === 'all' ? rows.filter(c => c.pinned) : [];
                 const rest = rows.filter(c => !pinned.includes(c));
                 if (pinned.length) { label('Pinned'); pinned.forEach(c => list.appendChild(this._row(c))); label('Recent'); }
                 rest.forEach(c => list.appendChild(this._row(c)));
-                if (!rows.length) {
-                    const e = document.createElement('div');
-                    e.className = 'msg-none';
-                    e.textContent = this.msgTab === 'unread' ? 'All caught up.' : 'No one yet.';
-                    list.appendChild(e);
-                }
+                if (!rows.length) uiKit.make(['div', 'msg-none', this.msgTab === 'unread' ? 'All caught up.' : 'No one yet.'], list);
             },
 
             _row(c) {
@@ -365,7 +358,7 @@
                 meta.className = 'msg-meta';
                 const t = document.createElement('small'); t.textContent = this._railTime(this._recency(c.name));
                 meta.appendChild(t);
-                if (n) { const k = document.createElement('span'); k.className = 'msg-count'; k.textContent = n > 99 ? '99+' : n; meta.appendChild(k); }
+                if (n) uiKit.make(['span', 'msg-count', n > 99 ? '99+' : n], meta);
                 item.append(who, meta);
                 item.addEventListener('click', () => this.showContactDetail(c));
                 return item;
@@ -485,17 +478,11 @@
                     feed.appendChild(this._message(contact, rec, key === prevKey));
                     prevKey = key;
 
-                    if (i === lastMine && i === hist.length - 1 && rec.seen) {
-                        const s = document.createElement('div');
-                        s.className = 'mb-seen';
-                        s.textContent = `Seen ${this._clock(rec.seen)}`;
-                        feed.appendChild(s);
-                    }
+                    if (i === lastMine && i === hist.length - 1 && rec.seen) uiKit.make(['div', 'mb-seen', `Seen ${this._clock(rec.seen)}`], feed);
                 });
 
                 if (this.typingState[contact.name]) {
-                    const t = document.createElement('div');
-                    t.className = 'mb-typing';
+                    const t = uiKit.make(['div', 'mb-typing']);
                     t.innerHTML = '<i></i><i></i><i></i>';
                     feed.appendChild(t);
                 }
@@ -511,9 +498,7 @@
             },
 
             _divider(text, cls = '') {
-                const d = document.createElement('div');
-                d.className = 'mb-day' + (cls ? ' ' + cls : '');
-                d.textContent = text;
+                const d = uiKit.make(['div', 'mb-day' + (cls ? ' ' + cls : ''), text]);
                 return d;
             },
 
@@ -530,8 +515,7 @@
                 const col = document.createElement('div');
                 col.className = 'mb-col';
                 if (contact.group && !mine && !cont && rec.who) {
-                    const w = document.createElement('div');
-                    w.className = 'mb-who';
+                    const w = uiKit.make(['div', 'mb-who']);
                     w.style.color = this._color(rec.who);
                     w.textContent = rec.who;
                     col.appendChild(w);
@@ -539,12 +523,7 @@
                 const wrap = document.createElement('div');
                 wrap.className = 'mb-wrap';
                 const kind = rec.kind;
-                if (rec.text && kind !== 'voice') {
-                    const b = document.createElement('div');
-                    b.className = 'mb';
-                    b.textContent = rec.text;
-                    wrap.appendChild(b);
-                }
+                if (rec.text && kind !== 'voice') uiKit.make(['div', 'mb', rec.text], wrap);
                 if (kind === 'pin') wrap.appendChild(this._pinCard(rec));
                 else if (kind === 'brief') wrap.appendChild(this._briefCard(rec));
                 else if (kind === 'plan' && this._planCard) wrap.appendChild(this._planCard(rec));   // story/crew-nights.js
@@ -553,10 +532,7 @@
 
                 const pip = mine ? rec.theirReact : rec.react;
                 if (pip) {
-                    const p = document.createElement('span');
-                    p.className = 'mb-pip';
-                    p.textContent = pip;
-                    wrap.appendChild(p);
+                    uiKit.make(['span', 'mb-pip', pip], wrap);
                     wrap.classList.add('has-pip');
                 }
                 if (this._glint === rec) wrap.classList.add('glint');
@@ -693,8 +669,7 @@
             },
             _openPicker(wrap, rec, contact) {
                 this._closePicker();
-                const p = document.createElement('div');
-                p.className = 'mb-picker';
+                const p = uiKit.make(['div', 'mb-picker']);
                 for (const e of MSG_REACTIONS) {
                     const b = document.createElement('button');
                     b.textContent = e;
@@ -795,8 +770,7 @@
                 let url = null;
                 try {
                     const W = 400, H = 160, span = 4200, fs = W / span;
-                    const c = document.createElement('canvas'); c.width = W; c.height = H;
-                    const ctx = c.getContext('2d');
+                    const { canvas: c, ctx: ctx } = canvasKit.createLayer([W, H]);
                     ctx.fillStyle = MAP_PAL.base; ctx.fillRect(0, 0, W, H);
                     const ox = W / 2 - (P.x + P.w / 2) * fs, oy = H / 2 - (P.y + P.h / 2) * fs;
                     ctx.setTransform(fs, 0, 0, fs, ox, oy);
@@ -917,8 +891,7 @@
             _voiceSecs(lines) { return Math.max(3, Math.round(lines.reduce((s, l) => s + 0.9 + l.length * 0.065, 0))); },
             _voiceBubble(contact, rec) {
                 const d = rec.data || {}, secs = d.secs || this._voiceSecs(d.lines || [rec.text]);
-                const v = document.createElement('div');
-                v.className = 'mb-voice' + (d.heard ? '' : ' fresh');
+                const v = uiKit.make(['div', 'mb-voice' + (d.heard ? '' : ' fresh')]);
                 v.dataset.vid = rec.id;
                 const play = document.createElement('button');
                 play.className = 'mb-play';
@@ -1003,7 +976,7 @@
                 const name = document.createElement('div'); name.className = 'comm-name'; name.textContent = speaker;
                 const sig = document.createElement('span'); sig.className = 'comm-sig'; sig.innerHTML = '<i></i><i></i><i></i>';
                 name.appendChild(sig);
-                const line = document.createElement('div'); line.className = 'comm-text';
+                const line = uiKit.make(['div', 'comm-text']);
                 body.append(name, line);
                 chip.append(face, body);
                 return chip;

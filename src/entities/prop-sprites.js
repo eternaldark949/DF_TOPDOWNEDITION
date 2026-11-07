@@ -262,8 +262,7 @@
                 const t0 = performance.now(), B = PropSprites._bake, S = PLANE_SPRITE.S, b = rect || owner.getBounds(), P = PLANE_SPRITE.PAD;
                 const x = b.x - P, y = b.y - P, w = b.w + 2 * P, h = b.h + 2 * P, W = Math.ceil(w * S), H = Math.ceil(h * S);
                 if (PropSprites.bytes + W * H * 4 > PROP_SPRITE.MAX_BYTES) { s.never = true; return; }
-                const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
-                const c = cv.getContext('2d'); c.setTransform(S, 0, 0, S, -x * S, -y * S);
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([W, H]); c.setTransform(S, 0, 0, S, -x * S, -y * S);
                 B.k = S / Math.max(0.5, density); B.blur = false; B.bad = false; B.retry = false;
                 const run = s.runs.length;
                 PropPass._begin(1, run);

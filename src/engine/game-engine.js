@@ -5,6 +5,11 @@
                 // (dialogues, shops, menus, cinematic transitions) acquires/releases
                 // tokens here. Initialized first so anything that follows can use it.
                 this.pauseSystem = new PauseSystem(this);
+
+                // The Lobby: the game loop's clock (lobby/level-lobby.js). The game plugs in at the end of the
+                // constructor (_plugIntoLobby, engine/loop.js).
+                this.level_lobby = new levelLobby(CONFIG.LOOP, frame_clock);
+                this.level_stages = new levelStages('menu');   // the game is built behind the main menu
                 
                 this.ui = new UISystem(this);
                 this.musicWidget = new MusicWidgetSystem(this);
@@ -26,10 +31,8 @@
                 
                 // Lighting Layer
                 this.lightingScale = 1.0; // 1.0 = High (Native), 0.75 = Medium, 0.5 = Low (Half-Res)
-                this.lightCanvas = document.createElement('canvas');
-                this.lightCtx = this.lightCanvas.getContext('2d');
-                this.bloomCanvas = document.createElement('canvas');
-                this.bloomCtx = this.bloomCanvas.getContext('2d');
+                ({ canvas: this.lightCanvas, ctx: this.lightCtx } = canvasKit.createLayer());
+                ({ canvas: this.bloomCanvas, ctx: this.bloomCtx } = canvasKit.createLayer());
                 this.neonSigns = [];
                 
                 // In GameEngine constructor
@@ -83,9 +86,9 @@
                 };
                 this.flitVFX = []; // Active flit visual effects (ghost afterimages, lightning trails)
                 this.graveyardGhosts = []; // Procedural humanoid ghosts in the cemetery
-                this.lobbyLife = new LobbyLife(); // The Double Nights lobby's guests and staff (world/lobby-life.js)
-                this.clubLife = new ClubLife();   // Moon City's crowd (world/club-life.js)
-                this.cafeLife = new CafeLife();   // the Cozy Cafe's guests (world/cafe-life.js)
+                this.lobbyLife = new LobbyLife(); // The Double Nights lobby's guests and staff (directory/lobby-life.js)
+                this.clubLife = new ClubLife();   // Moon City's crowd (directory/club-life.js)
+                this.cafeLife = new CafeLife();   // the Cozy Cafe's guests (directory/cafe-life.js)
                 this.furniture = new FurnitureSystem(this);   // grab and move the apartment's furniture (engine/furniture.js)
                 
                 // Time slow system for dramatic moments (boss kills, etc.)
@@ -260,6 +263,8 @@
                 this.activeInteraction = null;
 
                 this.initEvents(); this.initJoystick(); this.initFireJoystick(); this.initLookZone();
+                this._plugIntoLobby();
+                this._plugInStages();
             }
 
             // ── UNIFIED COMPANION HELPERS ──
