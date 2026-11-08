@@ -1,6 +1,7 @@
         // GameEngine — Noise: sounds that give 949 (and fights) away. Methods are added to
         // GameEngine.prototype (see engineMixin in game-engine.js). Enemies hear by sound and
         // see by light (calculatePlayerVisibility); there's no radar. See CONFIG.NOISE.
+        const PED_ALARM = new Set(['shot', 'enemyShot', 'glass', 'execute']);   // the sounds that alarm passers-by
         engineMixin({
             /**
              * A sound at (x, y) that carries `reach` px in the open. Every ganger in earshot
@@ -22,6 +23,11 @@
                     if (d > r) continue;
                     const k = d / r;                                          // 0 close … 1 at the edge of hearing
                     if (e.hearNoise(x, y, 1 - k, N.ERR_NEAR + (N.ERR_FAR - N.ERR_NEAR) * k)) { heard++; if (this.debugMode) (this._dbgHeard || (this._dbgHeard = [])).push(e); }
+                }
+                // The street hears the loud ones too (entities/pedestrians.js hearNoise): they flinch and hurry off
+                if (opts.hear !== false && PED_ALARM.has(kind) && this.pedestrians) for (const p of this.pedestrians.pedestrians) {
+                    const d = Math.hypot(p.x - x, p.y - y);
+                    if (d <= reach) p.hearNoise(x, y, 1 - d / reach, kind);
                 }
                 // Debug view's Hearing layer: what this sound reached and who heard it
                 if (this.debugMode) {

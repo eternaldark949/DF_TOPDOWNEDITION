@@ -1490,8 +1490,9 @@
                 this.visionRange = cfg.visionRange || 320;
                 this.visionFov = Math.PI / 2.5;
                 // What they know of what's around them (basement/awareness-kit.js): up close (50) they sense her unless
-                // she comes from behind; past that, only what's in the cone, in range and in plain sight
-                this.awareness = new awarenessMatrix(this, { evaluation_radius: () => this.visionRange, personal_space: 50, fov: () => this.visionFov, sight: (x, y, walls, buildings) => this._sightClear(x, y, walls, buildings) });
+                // she comes from behind; past that, only what's in the cone, in range and in plain sight. Bumping into him
+                // (touch: their bodies, 15 + 15) gives her away whatever the light or the angle
+                this.awareness = new awarenessMatrix(this, { evaluation_radius: () => this.visionRange, personal_space: 50, touch: 32, fov: () => this.visionFov, sight: (x, y, walls, buildings) => this._sightClear(x, y, walls, buildings) });
                 this.state = 'IDLE';
                 this.suspicion = 0;
                 this.suspicionDrainDelay = 0;
@@ -1603,6 +1604,15 @@
                 const pg = player._gait, hg = typeof game !== 'undefined' ? game : null;
                 const sneaking = her[AWARE.BEHIND]
                     && ((hg && hg.sneaking && player === hg.player) || player.isHidden || ((pg ? pg.speed : 0) < 2.3 && (player.visibility ?? 0) < 0.75));
+                if (her[AWARE.TOUCHING] && isVisible && !this._bumped) {
+                    // She bumped into him (in the dark, from behind, sneaking or not): he startles round to face her
+                    this._bumped = true;
+                    if (typeof game !== 'undefined' && game.emitNoise) game.emitNoise(player.x, player.y, 140, 'bump', false, { ring: false });   // "hey!": he and the ones close by hear where she is
+                    this.angle = her[AWARE.BEARING];
+                    this.investigateTarget = { x: player.x, y: player.y }; this.sweep = null;
+                    this.suspicion = Math.max(this.suspicion, 70);
+                    this.suspicionDrainDelay = 180;
+                } else if (!her[AWARE.TOUCHING]) this._bumped = false;
                 if (her[AWARE.CLOSE] && isVisible && !sneaking) {
                     canSee = true;
                     this.suspicion += 5;
@@ -1913,6 +1923,7 @@
                 this.suspicionDrainDelay = 180;
                 this.state = 'SEARCHING';
                 this.angle = Math.atan2(ny - this.y, nx - this.x);
+                this.awareness.hear(nx, ny, strength);   // what he heard, and where (the matrix keeps it)
                 return true;
             }
 

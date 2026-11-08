@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '38a308723a61';
+        const DFAB_BUILD = '2a97536650f6';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -8471,7 +8471,7 @@
             }
         }
     </script>
-    <script type="text/dfab" data-src="basement/awareness-kit.js" data-cost="55">
+    <script type="text/dfab" data-src="basement/awareness-kit.js" data-cost="65">
         // ===== LV0 BASEMENT =====
         // The awareness matrix: what one character knows of what's around them, in one place, the same way for
         // everyone (a guard, a passer-by, the crew). The owner keeps one, and asks it instead of measuring by hand.
@@ -8482,11 +8482,15 @@
         //   personal_space      inside this, they can't miss you (default: evaluation_radius × 0.05)
         //   fov                 the sight cone's full width, radians (default: all round)
         //   behind              how far off their facing counts as behind them (radians; default 0.6π)
+        //   facing()            which way they face (default: owner.angle)
+        //   touch               bodies touching: inside this they feel it, whatever the light or the angle (default 0: never)
         //   sight(x, y, ...ctx) whether the way from them to (x, y) is clear (walls, shut doors); default: always
         //
-        // ENTRY (one per thing noticed, by id):  [id, kind, distance, bearing, seen, heard, close, behind]
+        // ENTRY (one per thing noticed, by id):  [id, kind, distance, bearing, seen, heard, close, behind, touching]
         //   bearing   world angle from them to it;  seen   null until looked at, then true/false
-        //   heard     the loudest sound it made this tick (0 = none);  close   inside personal space;  behind   off their back
+        //   heard     how loud it was when last heard (0..1, 0 = not heard: hear());  close   inside personal space;  behind   off their back
+        //   touching  bumped into them (inside `touch`)
+        //   hear(x, y, strength, kind) -> ENTRY  a sound: where it came from and how loud (kept as a 'sound' entry)
         // awarenessMatrix(owner, packet)
         //   observe(thing, kind) -> ENTRY        where it is from them (cheap: no sight line yet)
         //   look(entry, range, ...ctx) -> bool   can they see it: in range, in the cone, the way clear (sets entry.seen)
@@ -8494,13 +8498,14 @@
         //   analyzeSurroundings(things, kind)    observe each one within evaluation_radius; entries holds them
         //   forwards_point, backwards_point      [x, y] a personal space ahead of and behind them
         //   entries (Map id -> ENTRY), forget(id), clear()
-        const AWARE = { ID: 0, KIND: 1, DIST: 2, BEARING: 3, SEEN: 4, HEARD: 5, CLOSE: 6, BEHIND: 7 };
+        const AWARE = { ID: 0, KIND: 1, DIST: 2, BEARING: 3, SEEN: 4, HEARD: 5, CLOSE: 6, BEHIND: 7, TOUCHING: 8 };
 
         class awarenessMatrix {
-            constructor(owner, { evaluation_radius = 400, personal_space = null, fov = Math.PI * 2, behind = Math.PI * 0.6, sight = null } = {}) {
-                Object.assign(this, { owner, evaluation_radius, personal_space, fov, behind, sight, entries: new Map(), forwards_point: [0, 0], backwards_point: [0, 0] });
+            constructor(owner, { evaluation_radius = 400, personal_space = null, fov = Math.PI * 2, behind = Math.PI * 0.6, touch = 0, sight = null, facing = null } = {}) {
+                Object.assign(this, { owner, evaluation_radius, personal_space, fov, behind, touch, sight, facing, heard: null, entries: new Map(), forwards_point: [0, 0], backwards_point: [0, 0] });
             }
             static wrap(a) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
+            get face() { return this.facing ? this.facing() : (this.owner.angle || 0); }
             _val(v) { return typeof v === 'function' ? v() : v; }
             get radius() { return this._val(this.evaluation_radius); }
             get space() { const s = this._val(this.personal_space); return s == null ? this.radius * 0.05 : s; }
@@ -8509,9 +8514,9 @@
             /** Where `thing` is from them: an ENTRY (kept under thing.id, or the thing itself without one). */
             observe(thing, kind = null) {
                 const o = this.owner, dx = thing.x - o.x, dy = thing.y - o.y, dist = Math.hypot(dx, dy), bearing = Math.atan2(dy, dx);
-                const key = thing.id ?? thing, e = this.entries.get(key) || [key, kind, 0, 0, null, 0, false, false];
-                e[1] = kind ?? e[1]; e[2] = dist; e[3] = bearing; e[4] = null; e[5] = thing._noise || 0;
-                e[6] = dist < this.space; e[7] = Math.abs(awarenessMatrix.wrap(bearing - (o.angle || 0))) > this.behind;
+                const key = thing.id ?? thing, e = this.entries.get(key) || [key, kind, 0, 0, null, 0, false, false, false];
+                e[1] = kind ?? e[1]; e[2] = dist; e[3] = bearing; e[4] = null;
+                e[6] = dist < this.space; e[7] = Math.abs(awarenessMatrix.wrap(bearing - this.face)) > this.behind; e[8] = dist < this._val(this.touch);
                 e.at = [thing.x, thing.y];   // where it was (the sight line is drawn to it)
                 this.entries.set(key, e);
                 return e;
@@ -8519,19 +8524,19 @@
             /** Can they see it: within `range` (default: the evaluation radius), inside the cone, the way clear. */
             look(e, range = this.radius, ...ctx) {
                 const o = this.owner;
-                if (e[2] > range || Math.abs(awarenessMatrix.wrap(e[3] - (o.angle || 0))) > this.cone / 2) return e[4] = false;
+                if (e[2] > range || Math.abs(awarenessMatrix.wrap(e[3] - this.face)) > this.cone / 2) return e[4] = false;
                 return e[4] = !this.sight || !!this.sight(e.at[0], e.at[1], ...ctx);
             }
             /** The same for a point (no entry kept). */
             canSee(x, y, ...ctx) {
                 const o = this.owner, dist = Math.hypot(x - o.x, y - o.y);
                 if (dist > this.radius) return false;
-                if (Math.abs(awarenessMatrix.wrap(Math.atan2(y - o.y, x - o.x) - (o.angle || 0))) > this.cone / 2) return false;
+                if (Math.abs(awarenessMatrix.wrap(Math.atan2(y - o.y, x - o.x) - this.face)) > this.cone / 2) return false;
                 return !this.sight || !!this.sight(x, y, ...ctx);
             }
             /** Observe every one of `things` within the evaluation radius (the rest are forgotten); the points ahead and behind. */
             analyzeSurroundings(things = [], kind = null) {
-                const o = this.owner, r = this.radius, s = this.space, a = o.angle || 0, seen = new Set();
+                const o = this.owner, r = this.radius, s = this.space, a = this.face, seen = new Set();
                 this.forwards_point[0] = o.x + Math.cos(a) * s; this.forwards_point[1] = o.y + Math.sin(a) * s;
                 this.backwards_point[0] = o.x - Math.cos(a) * s; this.backwards_point[1] = o.y - Math.sin(a) * s;
                 for (const t of things) {
@@ -8541,8 +8546,13 @@
                 for (const [k, e] of this.entries) if ((kind == null || e[1] === kind) && !seen.has(k)) this.entries.delete(k);
                 return this.entries;
             }
+            /** A sound at (x, y), `strength` 0..1: kept as the matrix's `heard` entry (the latest), and returned. */
+            hear(x, y, strength = 1, kind = 'sound') {
+                const e = this.observe({ id: 'sound', x, y }, 'sound'); e[5] = strength; e.kind_of = kind; e.at_time = typeof _gameTimeSec !== 'undefined' ? _gameTimeSec : 0;
+                return this.heard = e;
+            }
             forget(id) { this.entries.delete(id); }
-            clear() { this.entries.clear(); }
+            clear() { this.entries.clear(); this.heard = null; }
         }
     </script>
     <script type="text/dfab" data-src="core/config.js" data-cost="416">
@@ -28036,7 +28046,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
     </script>
-    <script type="text/dfab" data-src="entities/npc.js" data-cost="560">
+    <script type="text/dfab" data-src="entities/npc.js" data-cost="563">
         /**
          * =====================================================================
          *  NPC CLASS (Extends ActorEntity)
@@ -28896,6 +28906,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 "JESUS!",
                 "Fucking — !"
             ],
+            bumpedOnFoot: [
+                "Excuse YOU.",
+                "Watch where you're going!",
+                "Hey — personal space?",
+                "Ow. Rude.",
+                "Do you mind?!",
+                "Eyes up, lady."
+            ],
             aftermathBumped: [
                 "HEY, you could've killed me.",
                 "You trying to murder me?!",
@@ -29096,7 +29114,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         };
 
     </script>
-    <script type="text/dfab" data-src="entities/pedestrians.js" data-cost="653">
+    <script type="text/dfab" data-src="entities/pedestrians.js" data-cost="673">
         /**
          * =====================================================================
          *  PEDESTRIAN CLASS (Roaming City Civilian)
@@ -29199,6 +29217,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.quipAge = 0;        // Frames since current quip began
                 this.quipDuration = 0;   // Frames the current quip lasts
                 this.quipCooldown = 60 + Math.floor(Math.random() * 240); // Stagger first quips so the city doesn't all speak at once on spawn
+                // What they know of what's around them (basement/awareness-kit.js): they notice her weapon only when it's
+                // in front of them (a wide cone), feel it when she bumps into them, and hear gunfire (hearNoise)
+                this.awareness = new awarenessMatrix(this, { evaluation_radius: 500, personal_space: 180, touch: 29, fov: Math.PI * 1.3, facing: () => this.facingAngle });
+                this._startleUntil = 0;
                 
                 // Find nearest node to start
                 this._findNearestNode();
@@ -29295,6 +29317,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              * spamming. Skips entirely if a quip is already active.
              */
             tryQuip(player, weaponOut, enemies) {
+                // Bumped into on foot: they feel it (whatever else they were saying) and say so
+                const her = player && !(typeof game !== 'undefined' && game.isDriving) ? this.awareness.observe(player, 'her') : null;
+                if (her && her[AWARE.TOUCHING]) {
+                    if (!this._bumped) { this._bumped = true; if (!this.quipText) this._setQuip(this._pickQuip('bumpedOnFoot')); }
+                } else this._bumped = false;
                 if (this.quipText || this.quipCooldown > 0) return;
                 
                 const QUIP_DANGER_RANGE = 500;
@@ -29318,10 +29345,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 
                 // 2. SEES WEAPON — player nearby with weapon out
-                if (weaponOut && player) {
-                    const dx = player.x - this.x, dy = player.y - this.y;
-                    if (Math.abs(dx) < QUIP_WEAPON_RANGE && Math.abs(dy) < QUIP_WEAPON_RANGE
-                        && Math.hypot(dx, dy) < QUIP_WEAPON_RANGE) {
+                if (weaponOut && her) {
+                    if (her[AWARE.CLOSE] && this.awareness.look(her, QUIP_WEAPON_RANGE)) {   // close, and in front of them
                         if (Math.random() < 0.012) {
                             this._setQuip(this._pickQuip('seesWeapon'));
                         }
@@ -29335,6 +29360,23 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
             }
             
+            /**
+             * A sound (engine/noise.js: gunfire, glass, a takedown): they flinch, say so, and hurry away from it
+             * (back the way they came, if the way on leads toward it). `strength` 0…1, louder or closer.
+             */
+            hearNoise(nx, ny, strength) {
+                if (this.dead || this.state === 'sprawled' || this.state === 'recovering') return false;
+                this.awareness.hear(nx, ny, strength);
+                this._startleUntil = _simTick + Math.round(120 + 120 * strength);
+                if (!this.quipText && Math.random() < 0.25 + 0.6 * strength) this._setQuip(this._pickQuip('danger'));
+                const t = this._getNode(this.targetNodeId), c = this._getNode(this.currentNodeId);
+                if (this.state === 'walking' && t && c && (t.x - this.x) * (nx - this.x) + (t.y - this.y) * (ny - this.y) > 0) {
+                    this.prevNodeId = this.targetNodeId; this.targetNodeId = this.currentNodeId; this.currentNodeId = this.prevNodeId;   // turn back
+                }
+                return true;
+            }
+            get startled() { return _simTick < this._startleUntil; }
+
             _pickQuip(category) {
                 const arr = PEDESTRIAN_QUIPS[category];
                 if (!arr || arr.length === 0) return null;
@@ -29686,7 +29728,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Move towards target
                 if (dist > 5) {
                     this._noteOnCrossing(targetNode);
-                    const pace = this.speed * (this._raining() ? (this.look.hurry || 1.25) : 1);   // hurrying in the rain
+                    const pace = this.speed * (this.startled ? 1.8 : this._raining() ? (this.look.hurry || 1.25) : 1);   // hurrying from gunfire, or in the rain
                     let moveX = (dx / dist) * pace;
                     let moveY = (dy / dist) * pace;
                     
@@ -31204,7 +31246,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
     </script>
-    <script type="text/dfab" data-src="entities/enemies.js" data-cost="1638">
+    <script type="text/dfab" data-src="entities/enemies.js" data-cost="1648">
         /**
          * =====================================================================
          *  VELVET CAT — Dreampunk Feline Companion
@@ -32697,8 +32739,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.visionRange = cfg.visionRange || 320;
                 this.visionFov = Math.PI / 2.5;
                 // What they know of what's around them (basement/awareness-kit.js): up close (50) they sense her unless
-                // she comes from behind; past that, only what's in the cone, in range and in plain sight
-                this.awareness = new awarenessMatrix(this, { evaluation_radius: () => this.visionRange, personal_space: 50, fov: () => this.visionFov, sight: (x, y, walls, buildings) => this._sightClear(x, y, walls, buildings) });
+                // she comes from behind; past that, only what's in the cone, in range and in plain sight. Bumping into him
+                // (touch: their bodies, 15 + 15) gives her away whatever the light or the angle
+                this.awareness = new awarenessMatrix(this, { evaluation_radius: () => this.visionRange, personal_space: 50, touch: 32, fov: () => this.visionFov, sight: (x, y, walls, buildings) => this._sightClear(x, y, walls, buildings) });
                 this.state = 'IDLE';
                 this.suspicion = 0;
                 this.suspicionDrainDelay = 0;
@@ -32810,6 +32853,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const pg = player._gait, hg = typeof game !== 'undefined' ? game : null;
                 const sneaking = her[AWARE.BEHIND]
                     && ((hg && hg.sneaking && player === hg.player) || player.isHidden || ((pg ? pg.speed : 0) < 2.3 && (player.visibility ?? 0) < 0.75));
+                if (her[AWARE.TOUCHING] && isVisible && !this._bumped) {
+                    // She bumped into him (in the dark, from behind, sneaking or not): he startles round to face her
+                    this._bumped = true;
+                    if (typeof game !== 'undefined' && game.emitNoise) game.emitNoise(player.x, player.y, 140, 'bump', false, { ring: false });   // "hey!": he and the ones close by hear where she is
+                    this.angle = her[AWARE.BEARING];
+                    this.investigateTarget = { x: player.x, y: player.y }; this.sweep = null;
+                    this.suspicion = Math.max(this.suspicion, 70);
+                    this.suspicionDrainDelay = 180;
+                } else if (!her[AWARE.TOUCHING]) this._bumped = false;
                 if (her[AWARE.CLOSE] && isVisible && !sneaking) {
                     canSee = true;
                     this.suspicion += 5;
@@ -33120,6 +33172,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.suspicionDrainDelay = 180;
                 this.state = 'SEARCHING';
                 this.angle = Math.atan2(ny - this.y, nx - this.x);
+                this.awareness.hear(nx, ny, strength);   // what he heard, and where (the matrix keeps it)
                 return true;
             }
 
@@ -76338,10 +76391,11 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/noise.js" data-cost="125">
+    <script type="text/dfab" data-src="engine/noise.js" data-cost="130">
         // GameEngine — Noise: sounds that give 949 (and fights) away. Methods are added to
         // GameEngine.prototype (see engineMixin in game-engine.js). Enemies hear by sound and
         // see by light (calculatePlayerVisibility); there's no radar. See CONFIG.NOISE.
+        const PED_ALARM = new Set(['shot', 'enemyShot', 'glass', 'execute']);   // the sounds that alarm passers-by
         engineMixin({
             /**
              * A sound at (x, y) that carries `reach` px in the open. Every ganger in earshot
@@ -76363,6 +76417,11 @@ engineMixin({
                     if (d > r) continue;
                     const k = d / r;                                          // 0 close … 1 at the edge of hearing
                     if (e.hearNoise(x, y, 1 - k, N.ERR_NEAR + (N.ERR_FAR - N.ERR_NEAR) * k)) { heard++; if (this.debugMode) (this._dbgHeard || (this._dbgHeard = [])).push(e); }
+                }
+                // The street hears the loud ones too (entities/pedestrians.js hearNoise): they flinch and hurry off
+                if (opts.hear !== false && PED_ALARM.has(kind) && this.pedestrians) for (const p of this.pedestrians.pedestrians) {
+                    const d = Math.hypot(p.x - x, p.y - y);
+                    if (d <= reach) p.hearNoise(x, y, 1 - d / reach, kind);
                 }
                 // Debug view's Hearing layer: what this sound reached and who heard it
                 if (this.debugMode) {

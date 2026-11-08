@@ -857,6 +857,14 @@
                 "JESUS!",
                 "Fucking — !"
             ],
+            bumpedOnFoot: [
+                "Excuse YOU.",
+                "Watch where you're going!",
+                "Hey — personal space?",
+                "Ow. Rude.",
+                "Do you mind?!",
+                "Eyes up, lady."
+            ],
             aftermathBumped: [
                 "HEY, you could've killed me.",
                 "You trying to murder me?!",
