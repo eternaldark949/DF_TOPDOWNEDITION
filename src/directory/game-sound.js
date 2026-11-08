@@ -592,7 +592,8 @@
             hall:     [2.0, 22, 5200, 0.22],   // a lobby, a club's floor
             stone:    [3.2, 32, 4000, 0.30],   // a church, a palace: long and dark
             cabin:    [0.25, 2, 2800, 0.10],   // the van: boxed in
-            void:     [5.5, 60, 2600, 0.38]    // the ethereal plane
+            void:     [5.5, 60, 2600, 0.38],   // the ethereal plane
+            valley:   [1.2, 40, 3500, 0.10, 0.45, 0.4, 0.32]   // open ground under cliffs: echoes coming back off the far side
         };
         /** Each map's room (indoor maps default to `room`, outdoor ones to `street`) and rooms that differ inside them. */
         const MAP_REVERB = {

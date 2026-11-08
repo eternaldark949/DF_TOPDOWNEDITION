@@ -14,11 +14,14 @@
         // LEVELS PACKET: { master, dialogue, music, sfx }   0..1 each (volumeControl)
         // DIAL PACKET:   [music_lowering_percentage, music_lowering_speed]   how far the music dips under
         //                dialogue, and how fast (s) it goes down and comes back
-        // ROOM PACKET:   [decay, predelay, damp, wet]   the reverb of a place
+        // ROOM PACKET:   [decay, predelay, damp, wet, echo, feedback, echo_level]   the reverb of a place
         //   decay             s for the tail to die away (60 dB)
-        //   predelay          ms before the first reflections (the room's size)
+        //   predelay          ms before the tail starts (the room's size; up to 2000: a delayed reverb)
         //   damp              Hz the highs fall to by the end of the tail (soft rooms, low; tile and glass, high)
         //   wet               how much of the sends reach the speakers (0: no reverb at all)
+        //   echo              s between echoes (0 or left out: none): a far wall, a canyon, a tunnel
+        //   feedback          how much of each echo comes back again (0..0.9: one repeat .. a long train)
+        //   echo_level        how loud the echoes are against the dry sound (each one also rings in the tail)
         // SOUND PACKET:  [channel, name, layer, volume, options]   a sound file, through soundSystem.playSound
         //   channel           'dialogue' | 'music' | 'sfx'
         //   layer             a slot in the channel: one sound per layer; another one waits for it unless
@@ -159,10 +162,16 @@
             constructor(ctx, dest) {
                 this.ctx = ctx;
                 this.input = ctx.createGain();
+                // A slot: input → predelay → convolver → g, and the echoes: input → echo delay ⟲ (damped
+                // feedback) → echo level → g, each echo fed into the convolver too, so it rings in the room
                 this.slots = [0, 1].map(() => {
-                    const delay = ctx.createDelay(0.2), conv = ctx.createConvolver(), g = ctx.createGain();
+                    const delay = ctx.createDelay(2), conv = ctx.createConvolver(), g = ctx.createGain();
                     g.gain.value = 0; this.input.connect(delay); delay.connect(conv); conv.connect(g); g.connect(dest);
-                    return { delay, conv, g, key: null };
+                    const echo = ctx.createDelay(4), damp = soundKit.filter(ctx, ['lowpass', 6000]), fb = ctx.createGain(), level = ctx.createGain();
+                    fb.gain.value = 0; level.gain.value = 0;
+                    this.input.connect(echo); echo.connect(damp); damp.connect(fb); fb.connect(echo);
+                    damp.connect(level); level.connect(g); level.connect(delay);
+                    return { delay, conv, g, echo, damp, fb, level, key: null };
                 });
                 this.live = 0; this.key = null; this.room = null;
                 this.impulses = new Map();                                // tails already made, by packet
@@ -179,9 +188,13 @@
                 this.live ^= 1;
                 const s = this.slots[this.live];
                 if (s.key !== key) {
-                    const predelay = room_packet[1] || 0;
+                    const [, predelay = 0, damp = 6000, , echo = 0, feedback = 0, echo_level = 0] = room_packet, on = echo > 0;
                     s.conv.buffer = this.impulse(room_packet); s.key = key;
-                    s.delay.delayTime.setValueAtTime(Math.min(0.2, predelay / 1000), now);
+                    s.delay.delayTime.setValueAtTime(Math.min(2, predelay / 1000), now);
+                    s.echo.delayTime.setValueAtTime(on ? Math.min(4, echo) : 0.01, now);
+                    s.damp.frequency.setValueAtTime(damp, now);
+                    s.fb.gain.setValueAtTime(on ? Math.min(0.9, feedback) : 0, now);
+                    s.level.gain.setValueAtTime(on ? echo_level / Math.max(0.01, room_packet[3]) : 0, now);   // (g carries `wet`: undo it, so echo_level is its own)
                 }
                 s.g.gain.cancelScheduledValues(now); s.g.gain.setValueAtTime(s.g.gain.value, now);
                 s.g.gain.setTargetAtTime(room_packet[3], now, fade);
@@ -190,7 +203,7 @@
             /** A room's tail: stereo noise dying away over `decay` s (60 dB), its brightness closing from
              *  full to `damp` Hz along the way (a one-pole lowpass whose corner falls), each side its own. */
             impulse(room_packet) {
-                const key = room_packet.join('|');
+                const key = room_packet.slice(0, 3).join('|');                // the tail depends only on decay and damp (and predelay, kept with them)
                 if (this.impulses.has(key)) return this.impulses.get(key);
                 const [decay, , damp = 6000] = room_packet, ctx = this.ctx, sr = ctx.sampleRate;
                 const len = Math.max(1, Math.floor(sr * Math.min(6, decay * 1.1))), buf = ctx.createBuffer(2, len, sr);
