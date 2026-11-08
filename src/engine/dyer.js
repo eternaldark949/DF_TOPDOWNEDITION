@@ -9,7 +9,7 @@
 
         const DYER = {
             FEE: GAME_DB.shops.dyer.fee,                                 // directory/game-db/shops.json, with the palette
-            STATION: { x: 1176, y: 214, width: 58, height: 30 },       // apt_949: the bedroom wall between the nightstand and the wardrobe
+            STATION: GAME_DB.places.dyer_station,                      // directory/game-db/places.json: apt_949, the bedroom wall by the wardrobe
             PALETTE: GAME_DB.shops.dyer.palette
         };
         const DYE_PIECES = { top: 'Top', bottom: 'Bottom', shoes: 'Shoes' };

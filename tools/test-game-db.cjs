@@ -209,4 +209,37 @@ test('Vehicles: every car is whole, the Zib and BlackMark are real cars, each tu
  assert.deepEqual(e.errors,[]);
 });
 
+test('Places: maps, rooms, doors, fireplaces and notes point at things that exist, and the game reads them',()=>{
+ const pl=load('places.json'), maps=new Set(Object.keys(pl.maps)), areas=new Set(['hub_graveyard']);
+ const at=(o,path)=>path.replace(/\[(\d+)\]/g,'.$1').split('.').reduce((a,k)=>a==null?a:a[k],o);
+ for(const [id,m] of Object.entries(pl.maps)){
+  assert.equal(m.id,id,`maps.${id}: its id differs from its key`);
+  assert.ok(m.width>0&&m.height>0&&m.label,`maps.${id}: width, height, label`);
+  if(m.spawn) assert.ok(m.spawn.x>=0&&m.spawn.y>=0&&m.spawn.x<=m.width&&m.spawn.y<=m.height,`maps.${id}: spawn is off the map`);
+  for(const t of m.transitions||[]) assert.ok(maps.has(t.target),`maps.${id}: a transition goes to '${t.target}', which is no map`);
+  for(const z of m.floorZones||[]) if('area' in z) assert.ok(areas.has(z.area),`maps.${id}: floor zone area '${z.area}' (MAP_AREAS, world/maps.js)`);
+ }
+ for(const [id,r] of Object.entries(pl.rooms)){
+  assert.ok(maps.has(id),`rooms.${id}: no such map`);
+  for(const d of r.doors||[]) for(const room of d.rooms||[]) assert.ok(r.rooms[room],`rooms.${id}: a door opens on '${room}', which is no room there`);
+ }
+ for(const id of Object.keys(pl.hearths)) assert.ok(maps.has(id),`hearths.${id}: no such map`);
+ for(const b of Object.values(pl.hub.blocks)) assert.match(b,/^block_\d+_\d+$/);
+ const S=pl.dyer_station, apt=pl.maps.apt_949;
+ assert.ok(S.x>=0&&S.y>=0&&S.x+S.width<=apt.width&&S.y+S.height<=apt.height,'dyer_station is outside apt_949');
+ for(const path of Object.keys(pl._about.notes)) assert.notEqual(at(pl,path),undefined,`_about.notes: '${path}' is nothing in the chapter`);
+ const e=runtime(join(ROOT,'DFAB V8.html'),{affine:true});
+ const got=JSON.parse(e.run(`JSON.stringify({same:MAP_DATA===GAME_DB.places.maps&&ROOM_DEFS===GAME_DB.places.rooms&&HEARTHS===GAME_DB.places.hearths
+   &&HUB_BLOCKS===GAME_DB.places.hub.blocks&&HUB_NPC_ANCHORS===GAME_DB.places.hub.npc_anchors&&HUB_OLLO_DOOR===GAME_DB.places.hub.ollo_door
+   &&HUB_GRAVEYARD===GAME_DB.places.hub.graveyard&&DYER.STATION===GAME_DB.places.dyer_station,
+  clearance:HUB_NPC_CLEARANCE, frozen:Object.isFrozen(HUB_GRAVEYARD),
+  grave:MAP_DATA.sdc.floorZones.find(z=>z.x===HUB_GRAVEYARD.x&&z.y===HUB_GRAVEYARD.y&&z.w===HUB_GRAVEYARD.w&&z.h===HUB_GRAVEYARD.h)||null,
+  named:MAP_DATA.sdc.floorZones.filter(z=>'area' in z).length})`));
+ assert.equal(got.same,true,'an old name no longer reads the chapter');
+ assert.deepEqual([got.clearance,got.frozen,got.named],[pl.hub.npc_clearance,true,0]);
+ const named=pl.maps.sdc.floorZones.find(z=>z.area==='hub_graveyard');
+ assert.deepEqual(got.grave,{...pl.hub.graveyard,color:named.color},'the graveyard floor zone takes the graveyard\'s rectangle');
+ assert.deepEqual(e.errors,[]);
+});
+
 console.log(`test-game-db: ${tests.length} passed`);
