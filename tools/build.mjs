@@ -44,6 +44,7 @@ const STYLES = [
 
 const SCRIPTS = [
     'basement/frame-clock.js',     // LV0 Basement: the frame clock's globals (_frameTime, _simTick, _gameTimeSec), first
+    'basement/timer-kit.js',       // LV0 Basement: gTimer and game_timers (timers in game time, on the sim ticks)
     'basement/canvas-kit.js',      // LV0 Basement: canvasKit (off-screen layers)
     'basement/life-kit.js',        // LV0 Basement: lifeKit (lists of short-lived things)
     'basement/sound-kit.js',       // LV0 Basement: soundKit (Web Audio building blocks)

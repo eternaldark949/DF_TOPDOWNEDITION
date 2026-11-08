@@ -378,7 +378,7 @@
                     if (this.weather.lightningCooldown <= 0) {
                         this.weather.triggerLightning();
                         this.triggerShake(8);
-                        setTimeout(() => audioSys.sfx('explode'), 50);
+                        game_timers.after(0.05, () => audioSys.sfx('explode'));
                     }
                 }
             

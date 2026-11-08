@@ -420,7 +420,7 @@
                     showMessage(`ZIB REROUTING...`);
                     const ride = this.passengerRide;
                     // our routing failed, not her ride: the teleport is on the house
-                    setTimeout(() => { if (this.passengerRide === ride) this.teleportToDestination(game, { free: true }); }, 500);
+                    game_timers.after(0.5, () => { if (this.passengerRide === ride) this.teleportToDestination(game, { free: true }); });
                 }
                 // Ensure driverType stays 'zib' after enableAutoDrive
                 zib.driverType = 'zib';

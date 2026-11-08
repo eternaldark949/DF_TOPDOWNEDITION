@@ -10,6 +10,7 @@
              * Resets: inventory, quest progress, health, currency, driving, entities.
              */
             resetGameState() {
+                game_timers.cancel();   // nothing pending from the last game (basement/timer-kit.js; standing timers stay)
                 this._cancelQuickDrawHold?.(); this.cancelQuickDraw();
                 this._pendingGauntletLoad = null;
                 this.restrictedZone=null;

@@ -29,7 +29,7 @@
                 _frameTimeSec = _frameTime / 1000;
             }
             /** One simulation step has begun. */
-            advanceTick () { _simTick++; }
+            advanceTick () { _simTick++; if (typeof game_timers !== 'undefined') game_timers.tick(); }   // the game's timers (basement/timer-kit.js) move with it
             /** Where this drawn frame sits in game time, in seconds. */
             setGameTime (seconds) { _gameTimeSec = seconds; }
 

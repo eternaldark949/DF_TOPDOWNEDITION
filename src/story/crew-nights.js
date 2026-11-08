@@ -584,11 +584,11 @@
                 if (opt.crewAsk === 'group') {
                     const who = CrewNights._pick(CrewNights._crewHere(game));
                     _crewBaseSend.call(this, contact, { text: opt.text, response: { who, text: 'Moon City. Booth\'s ours.' } });
-                    setTimeout(() => CrewNights.invite(who, 'moon_city', 'Here\'s the plan.', { mine: true, delay: 1400 }), 3200);
+                    game_timers.after(3.2, () => CrewNights.invite(who, 'moon_city', 'Here\'s the plan.', { mine: true, delay: 1400 }), 'crew');
                 } else {
                     const who = opt.crewAsk;
                     _crewBaseSend.call(this, contact, { text: opt.text, response: CREW_ASK_BACK[who] });
-                    setTimeout(() => CrewNights.invite(who, CREW_HOME_VENUE[who], 'Here.', { solo: true, mine: true, delay: 1400 }), 3200);
+                    game_timers.after(3.2, () => CrewNights.invite(who, CREW_HOME_VENUE[who], 'Here.', { solo: true, mine: true, delay: 1400 }), 'crew');
                 }
             },
             resetFeed() { _crewBaseReset.call(this); this.feed.crew = { plan: null, seen: {}, nights: 0, lastAsk: {} }; },
@@ -635,4 +635,4 @@
             MissionSystem.prototype.acceptMission = function (m, g) { const ok = acc.call(this, m, g); if (ok) try { CrewNights.onBounty(g, m); } catch (e) { console.error(e); } return ok; };
             MissionSystem.prototype.completeMission = function (g) { const had = !!this.activeMission; done.call(this, g); if (had) try { CrewNights.onJobDone(g); } catch (e) { console.error(e); } };
         }
-        setInterval(() => { try { CrewNights.tick(); } catch (e) { console.error(e); } }, 1000);
+        game_timers.every(1, () => CrewNights.tick(), 'crew_nights').keep = true;   // in game time: it waits while paused

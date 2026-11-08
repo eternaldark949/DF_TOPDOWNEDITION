@@ -834,7 +834,7 @@
                         this.triggerLightning();
                         if (typeof audioSys !== 'undefined' && audioSys.sfx) {
                             // Thunder trails the flash slightly — light before sound.
-                            setTimeout(() => audioSys.sfx('thunder', { muffled: this.indoorSuppressed }), 220 + Math.random() * 500);
+                            game_timers.after(0.22 + Math.random() * 0.5, () => audioSys.sfx('thunder', { muffled: this.indoorSuppressed }));
                         }
                     }
                 }
