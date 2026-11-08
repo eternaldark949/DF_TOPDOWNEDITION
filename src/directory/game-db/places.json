@@ -1,0 +1,1739 @@
+{
+  "_about": {
+    "chapter": "Places: every map's size, floors, walls, zones, landmarks and ways in and out; the rooms and doors inside them; where the city's landmark blocks are; the fireplaces; and where the dyer stands.",
+    "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.places and checked by tools/test-game-db.cjs. Positions and sizes are world px, from the map's top-left; angles radians. Keys in camelCase or UPPER_SNAKE are read by the code under those names. Map ids and room ids are in save files and story steps: never rename one. _about.notes keeps the explanations that were comments in the code, keyed by where they apply (maps.apt_949.cameraBounds, rooms.apt_949.doors[0], …); they're for people only.",
+    "tables": {
+      "maps": "Every map (MAP_DATA, world/maps.js): id, width and height, type (outdoor, indoor), label, floorColor, spawn, and its floorZones, zones, walls, landmarks and transitions (a transition's target is another map's id). engine/map-loading.js builds the city's streets, buildings and props on top and fills each map's lists when it loads. A floor zone can name an area (hub_graveyard) instead of giving its own x, y, w and h.",
+      "rooms": "The rooms inside a map (ROOM_DEFS, world/rooms.js, passed to RoomSystem.build when the map loads): each map's rooms (x, y, w, h, type, label, fill), doors (sliding, hinged or arch, between two rooms), and windows.",
+      "hub": "The city (sdc): blocks says which block each landmark stands on (HUB_BLOCKS; the Silver Queen and the Double Nights stay in the north-west corner, block_0_0 and block_0_2); graveyard is the graveyard's rectangle (HUB_GRAVEYARD: engine/map-loading.js builds it, and its music, candle glow, ghosts and Ms. Jean go by it); ollo_door is the OllO Plaza door (HUB_OLLO_DOOR); npc_anchors are the people who stand on the hub, each keeping npc_clearance px free of buildings (HUB_NPC_ANCHORS, HUB_NPC_CLEARANCE).",
+      "hearths": "The fireplaces (HEARTHS, core/config.js), per map: where the art draws the fire, and where the ambience hears it crackle.",
+      "dyer_station": "Where the Clothing Dyer stands once it's crafted (DYER.STATION, engine/dyer.js): x, y, width and height in apt_949."
+    },
+    "notes": {
+      "maps.sdc.climate": "Rain-heavy: clear sky is rare and short here",
+      "maps.sdc.floorZones[4]": "(Biggs Park's dark forecourt goes with it: engine/map-loading.js) The graveyard (hub.graveyard): area names a place in places.json, and the zone takes its x, y, w and h.",
+      "maps.apt_949.cameraBounds": "the camera may rise over the city strip above the railing (engine/interiors.js _makeAptCityView)",
+      "maps.hotel_lobby": "Double Nights Hotel — \"Think excellence, think Double Nights.\" A grand interdimensional hotel: black marble and gold, a rift fountain, a chandelier over the twin crescents, guests and AI staff coming and going (directory/lobby-life.js). Floor: drawLobbyInterior; glows, the motto and the elevator doors: drawLobbyGlow; furniture: dn_* (props-decor.js).",
+      "maps.hotel_lobby.ambientDarkness": "warm and lit, not a dark room",
+      "maps.hotel_lobby.navProps": "the crowd walks round the furniture (lamps and palms too)",
+      "maps.hotel_lobby.wallStyle": "black lacquer, gold trim",
+      "maps.hotel_lobby.landmarks[5]": "story step 11 points here",
+      "maps.keepers_hill": "The Double Nights penthouse — the Dark Maker's suite, left with a flourish. Furniture: createMapEntities (ps_*, drawSuiteDecorProp); floors: drawSuiteInterior; glows and the mirror rift he left through: drawSuiteGlow. Living room (elevator, pit, piano, bar, dining for two) | Bedroom (L) | Bath (the rift) | Balcony (pool) — the breach wall The prologue's fireside (engine/keeper-art.js paints both; story/scenes/prologue.js plays them)",
+      "maps.van_interior": "Chapter 1 opens here: the crew's van, roof off, nose up (engine/van-art.js paints it; story/scenes/van.js plays it)",
+      "maps.hotel_suite.wallStyle": "black lacquer, gold trim",
+      "maps.hotel_suite.walls": "the balcony edge the drones blow through (story step 13)",
+      "maps.medbay_sw.ambientDarkness": "clinics are lit, not pitch black — lamps add pools on top",
+      "maps.medbay_sw.respawn": "beside the recovery bed (see PlayerEntity.die)",
+      "maps.moon_city_nightclub": "Moon City Nightclub. Furniture: createMapEntities (mc_*, drawClubDecorProp); floors: drawClubInterior; the light show: drawClubGlow. Powder room | Hall (DJ stage, dance floor, poles) | Mirabel's lounge | Bar (west side) | VIP corridor | Suites 1-3 Gents | Foyer |",
+      "maps.moon_city_nightclub.wallStyle": "black lacquer, violet neon trim",
+      "maps.moon_city_nightclub.walls[0]": "Outer shell, the door in the middle of the south wall",
+      "maps.moon_city_nightclub.walls[5]": "Interior (doors are cut through these by ROOM_DEFS)",
+      "maps.moon_city_nightclub.walls[6]": "west and east spines",
+      "maps.moon_city_nightclub.walls[7]": "powder room | gents",
+      "maps.moon_city_nightclub.walls[8]": "hall | foyer",
+      "maps.moon_city_nightclub.walls[9]": "lounge | VIP",
+      "maps.moon_city_nightclub.walls[10]": "corridor | suites",
+      "maps.moon_city_nightclub.walls[12]": "suite walls",
+      "maps.church_boss.climate": "Boss arena: effectively never clears",
+      "maps.church_boss.navProps": "The Sanctum, open to the storm: the apse (dais, altar, rose window, ruined organ) where the Triumvirate kneel; the nave and its gold sigil (the arena); pillared aisles for cover; the narthex at the door. Furniture: sc_* (drawSanctumDecorProp); floor: drawSanctumInterior; glows: drawSanctumGlow and the wardens' eyes (drawBossGlow).",
+      "maps.enni_cole_interior": "Enni Cole, ground floor: a double-height lobby under the crystal chandelier, the grand staircase up to the salons at its head, Fashion and the Food Hall to the west, Electronics and Furniture to the east, each its own room behind a wide arch (world/rooms.js). Floor: _paintEnniFloor; chandelier and pendants: drawEnniGlow; displays: drawEnniDecorProp (ec_*). Food Hall | | Furniture -----------| Lobby + staircase |----------- Fashion | (chandelier) | Electronics",
+      "maps.enni_cole_interior.walls[5]": "The Emporium behind Furniture and Electronics, an arch from each",
+      "maps.enni_cole_interior.walls[6]": "The wings: a wall down each side of the lobby, each wing split in two",
+      "maps.enni_cole_interior.landmarks[5]": "The original IDs remain aliases for scenes and existing saves.",
+      "maps.enni_cole_upper": "Enni Cole, upper floor: the gallery round the lobby's void (the chandelier hangs in it), the couture showroom in the curved glass over the entrance under a ceiling of tiny lights, the Cuisine restaurant and its kitchen to the west, the accessories salon and fitting rooms east. Floor: _paintEnniUpperFloor; lights: drawEnniUpperGlow; displays: drawEnniDecorProp (ec_*).",
+      "maps.enni_cole_upper.walls[6]": "the kitchen",
+      "maps.enni_cole_upper.walls[7]": "the showroom",
+      "maps.enni_cole_upper.walls[9]": "the fitting rooms",
+      "maps.cozy_cafe_interior.id": "The Cozy Cafe: honey herringbone under pendant lamps, a brick hearth with armchairs, round candlelit tables, booths along the east wall, window benches either side of the door. Floor in drawCafeInterior, furniture in drawCafeDecorProp (cc_*), glow in drawCafeGlow.",
+      "maps.cozy_cafe_interior.ambientDarkness": "warm and lamp-lit, never dark",
+      "maps.cozy_cafe_interior.navProps": "the guests walk round the furniture (directory/cafe-life.js)",
+      "maps.cozy_cafe_interior.wallStyle": "dark walnut panelling, honey trim",
+      "maps.auto_shop.id": "Torque Auto: a graphite epoxy service bay with two lifts and the wrap bay, a black porcelain showroom with the plinth and the counter, the parts room on diamond plate. Floor in drawTorqueInterior, furniture in drawTorqueDecorProp (ta_*), light in drawTorqueGlow (engine/torque-art.js).",
+      "maps.auto_shop.ambientDarkness": "a working garage: bright under the strips",
+      "maps.auto_shop.wallStyle": "graphite panelling, an amber trim line",
+      "maps.auto_shop.walls[0]": "Outer walls",
+      "maps.auto_shop.walls[5]": "Divider wall: bay vs showroom (with gap for walkthrough)",
+      "maps.auto_shop.walls[7]": "Backroom wall, and its west wall onto the bay (a door is cut through it: ROOM_DEFS)",
+      "maps.neural_sys_interior.lightingTint": "Midnight-sapphire shadows rather than periwinkle haze.",
+      "maps.neural_sys_interior.zones[0]": "Main showroom — dark blue-black with faint grid feel",
+      "maps.neural_sys_interior.zones[1]": "Consultation alcove (left)",
+      "maps.neural_sys_interior.zones[2]": "Server room (right, behind counter)",
+      "maps.neural_sys_interior.walls[0]": "Outer walls",
+      "maps.neural_sys_interior.walls[5]": "Divider: consultation alcove wall (with gap)",
+      "maps.neural_sys_interior.walls[7]": "Divider: server room wall (with gap)",
+      "maps.neural_sys_interior.walls[9]": "Alcove ceilings-to-walls: the consultation and server rooms are rooms now",
+      "maps.neural_sys_interior.walls[11]": "Back wall accent strip",
+      "maps.biggs_arena.ambientDarkness": "Carnival arena — enough darkness for headlight beams",
+      "maps.biggs_arena.zones[0]": "Main arena floor — dark violet",
+      "maps.biggs_arena.zones[1]": "Center circle — amber glow zone",
+      "maps.biggs_arena.zones[2]": "Entry corridor",
+      "maps.biggs_arena.zones[3]": "Corner accent zones",
+      "maps.biggs_arena.walls[0]": "Outer perimeter (thick bouncy walls)",
+      "maps.biggs_arena.walls[5]": "Corner fillets (angled walls for deflection)",
+      "maps.biggs_arena.walls[9]": "Center obstacles — two pillars for chaos",
+      "maps.house_of_death": "The House of Death — the gauntlet's first map (GAUNTLET_MAPS, entities/enemies.js). A modern glass-and-steel villa inside a gothic shell. Rooms and doors: ROOM_DEFS; furniture: createMapEntities; floor art: drawHouseInterior; glows: drawHouseGlow. Library | Chapel | Bedroom | Bath Dining | Grand hall | Courtyard (open to the sky) Kitchen | Foyer | Gallery (L) / Reliquary",
+      "maps.house_of_death.navProps": "furniture is routed around, not walked into (stools and chairs too)",
+      "maps.house_of_death.wallStyle": "black marble, gold trim",
+      "maps.house_of_death.zones[0]": "library: walnut",
+      "maps.house_of_death.zones[1]": "chapel: dark flags",
+      "maps.house_of_death.zones[2]": "bedroom: plum",
+      "maps.house_of_death.zones[3]": "bath: white marble",
+      "maps.house_of_death.zones[4]": "dining: parquet",
+      "maps.house_of_death.zones[5]": "grand hall: black marble",
+      "maps.house_of_death.zones[6]": "courtyard: wet stone",
+      "maps.house_of_death.zones[7]": "kitchen: concrete",
+      "maps.house_of_death.zones[8]": "foyer: marble checker",
+      "maps.house_of_death.zones[9]": "gallery",
+      "maps.house_of_death.walls[0]": "Outer shell (the front door in the middle of the south wall)",
+      "maps.house_of_death.walls[5]": "Interior (doors are cut through these by ROOM_DEFS)",
+      "maps.house_of_death.walls[6]": "west and east spines",
+      "maps.house_of_death.walls[8]": "north and south cross walls",
+      "maps.house_of_death.walls[9]": "bedroom | bath",
+      "maps.house_of_death.walls[11]": "the reliquary inside the gallery's L",
+      "maps.demoness_palace": "The Demoness Palace (a gauntlet): obsidian and gold, ember-lit; her hunters see in the dark",
+      "maps.demoness_palace.ambientDarkness": "Local warm pools; the hunters keep their shadowed galleries.",
+      "maps.demoness_palace.lightingTint": "Wine-black shadows preserve the crimson palette.",
+      "maps.demoness_palace.wallStyle": "obsidian, ember-gold trim",
+      "maps.demoness_palace.zones[0]": "Blood Garden: dark earth",
+      "maps.demoness_palace.zones[1]": "Crystal Chamber",
+      "maps.demoness_palace.zones[2]": "Bath of Embers",
+      "maps.demoness_palace.zones[3]": "West Gallery",
+      "maps.demoness_palace.zones[4]": "Throne Hall: obsidian",
+      "maps.demoness_palace.zones[5]": "East Gallery",
+      "maps.demoness_palace.zones[6]": "Dressing Room",
+      "maps.demoness_palace.zones[7]": "Entrance Hall",
+      "maps.demoness_palace.zones[8]": "the Kennels",
+      "maps.demoness_palace.walls[6]": "the two cross walls",
+      "maps.demoness_palace.walls[8]": "the spines",
+      "maps.demoness_palace.walls[10]": "garden | crystal chamber | bath",
+      "maps.ollo_test.climate": "Driest profile in the game",
+      "rooms.apt_949.rooms.main_room": "fill: lit, the suite reads warm and lamp-lit like the cafe; a switch puts the room back in the dark",
+      "rooms.apt_949.rooms.bathroom": "(white marble, and its own ceiling light: lit less)",
+      "rooms.apt_949.doors[0]": "Veranda → Main room: 3 sliding glass doors across the veranda wall (y:200)",
+      "rooms.apt_949.doors[3]": "Main room → Bedroom: hinged door in vertical divider (x:900)",
+      "rooms.apt_949.doors[4]": "Bedroom → Bathroom: hinged door in horizontal divider (y:548)",
+      "rooms.apt_949.windows[0]": "Veranda wall (y:200) — segmented windows between sliding door gaps The auto-cutter leaves wall segments between doors; these windows fill in",
+      "rooms.apt_949.windows[4]": "Left exterior wall",
+      "rooms.apt_949.windows[6]": "Right exterior wall",
+      "rooms.apt_949.windows[8]": "Veranda open-air edges (bright sky)",
+      "rooms.apt_949.linens[0]": "Sheer curtains flanking each sliding door on the veranda wall",
+      "rooms.apt_949.linens[6]": "Bedroom drape near window",
+      "rooms.hotel_suite": "── The rest of the indoor maps ───────────────────────────────────────── Penthouse suite (hotel): the living room opens west–east through a wide arch; a lounge wraps the bathroom (L-shaped); glass doors onto the balcony.",
+      "rooms.hotel_suite.doors[1]": "black lacquer",
+      "rooms.hotel_suite.windows[0]": "glass onto the balcony",
+      "rooms.cozy_cafe_interior": "Cozy café: the floor wraps round the kitchen (north-east) and the storeroom (south-east), each now behind a door — the kitchen used to be sealed, Chef Koda out of reach.",
+      "rooms.auto_shop": "Torque Auto: the bay, the showroom through an open bay door, the parts room behind its own door.",
+      "rooms.enni_cole_interior": "Enni Cole: the lobby under the chandelier, a department behind a wide arch in each corner; upstairs the gallery, the couture showroom, the Cuisine restaurant (its kitchen behind a swing door) and the accessories salon (its fitting rooms behind another).",
+      "rooms.neural_sys_interior": "Neural Systems: the showroom, a small foyer at the door, the consultation and server rooms off it.",
+      "rooms.hotel_lobby": "One-room interiors: no veil to draw, but they share the room lighting (eased lamps, lightAt), and any doors they gain later take bullets and block sight.",
+      "rooms.moon_city_nightclub": "Moon City Nightclub: the hall and its bar, powder room and gents off the bar, the foyer, and the VIP wing (a curtained corridor, three suites, Mirabel's lounge at its head). Velvet drapes hung either side of the way into the VIP wing",
+      "rooms.demoness_palace": "The House of Death (gauntlet). Three loops round the grand hall, so no one gets cornered: foyer–kitchen–dining–hall, foyer–gallery–courtyard–hall, dining–library–chapel–bedroom–courtyard. a red moon through the throne hall's oculus, rose glass in the galleries crimson silks hanging in the galleries oxblood leaves (light enough to read), violet glass",
+      "rooms.house_of_death": "The chapel's double doors onto the grand hall Lancet windows of stained glass: violet and rose (facing = the way the light falls) Glass walls onto the courtyard Velvet drapes by the chapel lancets and the hall's glass wall",
+      "hub.blocks.cafe": "the Cozy Cafe and Torque Auto, side by side on Crimson Blvd",
+      "hub.blocks.club": "Moon City and Enni Cole, the middle of the city, on Clinic Way",
+      "hub.blocks.clinic": "Dr. Yin's and Neural Systems, the east edge, on Commerce Blvd",
+      "hub.blocks.biggs": "Biggs Amusement Park and its wheel",
+      "hub.blocks.ashgrove": "The Ashgrove, across Ashgrove St from the park, fronting Foundry Rd",
+      "hub.blocks.scrapyard": "the Scrapyard (restricted zone), the far south-east",
+      "hub.blocks.graveyard": "the graveyard (HUB_GRAVEYARD), the middle of the southern edge",
+      "hub.npc_anchors[0]": "Mirabel: off the hub for now — she's in her lounge at Moon City (moon_city_nightclub)",
+      "dyer_station": "apt_949: the bedroom wall between the nightstand and the wardrobe",
+      "hub.ollo_door": "The OllO Plaza door, on the southern edge east of the graveyard"
+    }
+  },
+  "maps": {
+    "sdc": {
+      "id": "sdc",
+      "width": 13200,
+      "height": 13200,
+      "type": "outdoor",
+      "label": "Southern Dimensions City",
+      "floorColor": "#2a262e",
+      "climate": "city",
+      "spawn": {"x":1200,"y":550},
+      "pavements": [],
+      "crosswalks": [],
+      "floorZones": [
+        {"x":2600,"y":5800,"w":1000,"h":800,"color":"#1a2b1a"},
+        {"x":2000,"y":900,"w":1800,"h":1200,"color":"#4a2a2a"},
+        {"x":50,"y":80,"w":800,"h":600,"color":"#1a2518"},
+        {"x":200,"y":4500,"w":1500,"h":1200,"color":"#3d3d3d"},
+        {"area":"hub_graveyard","color":"#1a2e1a"}
+      ],
+      "zones": [],
+      "buildings": [],
+      "walls": [],
+      "transitions": []
+    },
+    "ethereal_plane": {
+      "id": "ethereal_plane",
+      "width": 1200,
+      "height": 1200,
+      "type": "indoor",
+      "label": "The Ethereal Plane",
+      "floorColor": "#0a001a",
+      "spawn": {"x":600,"y":1000},
+      "zones": [{"x":100,"y":100,"w":1000,"h":1000,"color":"#150025"}],
+      "walls": [
+        {"x":0,"y":0,"w":1200,"h":50},
+        {"x":0,"y":1150,"w":1200,"h":50},
+        {"x":0,"y":0,"w":50,"h":1200},
+        {"x":1150,"y":0,"w":50,"h":1200}
+      ],
+      "transitions": [{"x":550,"y":1100,"w":100,"h":50,"target":"sdc","label":"Return to Body"}]
+    },
+    "apt_949": {
+      "id": "apt_949",
+      "width": 1400,
+      "height": 900,
+      "type": "indoor",
+      "cameraBounds": {"top":-394},
+      "label": "Silver Queen Apartments",
+      "floorColor": "#1a0a0a",
+      "spawn": {"x":1050,"y":370},
+      "zones": [
+        {"x":0,"y":0,"w":1400,"h":200,"color":"#2a3035"},
+        {"x":8,"y":208,"w":892,"h":684,"color":"#3a1520","texture":"carpet"},
+        {"x":908,"y":208,"w":484,"h":340,"color":"#1a1520"},
+        {"x":908,"y":556,"w":484,"h":336,"color":"#bfb7b4"}
+      ],
+      "walls": [
+        {"x":0,"y":0,"w":1400,"h":8},
+        {"x":0,"y":0,"w":8,"h":200},
+        {"x":1392,"y":0,"w":8,"h":200},
+        {"x":0,"y":200,"w":1400,"h":8},
+        {"x":0,"y":200,"w":8,"h":700},
+        {"x":1392,"y":200,"w":8,"h":700},
+        {"x":0,"y":892,"w":620,"h":8},
+        {"x":780,"y":892,"w":620,"h":8},
+        {"x":900,"y":208,"w":8,"h":684},
+        {"x":908,"y":548,"w":484,"h":8}
+      ],
+      "transitions": [{"x":620,"y":860,"w":160,"h":40,"target":"sdc","label":"Exit to City"}],
+      "landmarks": [
+        {"id":"apt_door","x":700,"y":880},
+        {"id":"apt_bed","x":1050,"y":350},
+        {"id":"apt_terminal","x":700,"y":100},
+        {"id":"apt_balcony","x":700,"y":100},
+        {"id":"apt_armory","x":52,"y":365}
+      ]
+    },
+    "hotel_lobby": {
+      "id": "hotel_lobby",
+      "width": 1000,
+      "height": 1200,
+      "type": "indoor",
+      "label": "Double Nights Hotel | Lobby",
+      "floorColor": "#0c0a0c",
+      "ambientDarkness": 0.62,
+      "navProps": "all",
+      "wallStyle": {"fill":"#0e0c10","stroke":"rgba(232,194,122,0.55)"},
+      "spawn": {"x":500,"y":1100},
+      "zones": [],
+      "walls": [
+        {"x":0,"y":0,"w":1000,"h":50},
+        {"x":0,"y":1150,"w":400,"h":50},
+        {"x":600,"y":1150,"w":400,"h":50},
+        {"x":0,"y":0,"w":50,"h":1200},
+        {"x":950,"y":0,"w":50,"h":1200},
+        {"x":350,"y":100,"w":300,"h":50},
+        {"x":0,"y":300,"w":80,"h":100},
+        {"x":0,"y":500,"w":80,"h":100},
+        {"x":0,"y":700,"w":80,"h":100},
+        {"x":920,"y":300,"w":80,"h":100},
+        {"x":920,"y":500,"w":80,"h":100},
+        {"x":920,"y":700,"w":80,"h":100}
+      ],
+      "transitions": [
+        {"x":400,"y":1150,"w":200,"h":50,"target":"sdc","label":"Exit Hotel"},
+        {"x":50,"y":300,"w":100,"h":500,"target":"hotel_suite","label":"Use Elevator","quiet":true},
+        {"x":850,"y":300,"w":100,"h":500,"target":"hotel_suite","label":"Use Elevator","quiet":true}
+      ],
+      "landmarks": [
+        {"id":"hotel_exit","x":500,"y":1175},
+        {"id":"hotel_desk","x":500,"y":125},
+        {"id":"hotel_elevator_left","x":100,"y":500},
+        {"id":"hotel_elevator_right","x":900,"y":500},
+        {"id":"luvshade","x":500,"y":540},
+        {"id":"suite_elevator","x":110,"y":450}
+      ]
+    },
+    "keepers_hill": {
+      "id": "keepers_hill",
+      "width": 1800,
+      "height": 2800,
+      "type": "indoor",
+      "label": "Somewhere between the realms",
+      "floorColor": "#140a26",
+      "ambientDarkness": 0.4,
+      "zones": [],
+      "walls": [],
+      "transitions": [],
+      "spawn": {"x":900,"y":2450},
+      "landmarks": [
+        {"id":"hill_foot","x":900,"y":2330},
+        {"id":"hill_low","x":900,"y":2120},
+        {"id":"hill_mid","x":900,"y":1500},
+        {"id":"keeper_house","x":900,"y":600},
+        {"id":"keeper_porch","x":900,"y":760}
+      ]
+    },
+    "keepers_parlor": {
+      "id": "keepers_parlor",
+      "width": 900,
+      "height": 700,
+      "type": "indoor",
+      "label": "The Keeper's parlor",
+      "floorColor": "#140c10",
+      "ambientDarkness": 0.78,
+      "zones": [],
+      "walls": [],
+      "transitions": [],
+      "spawn": {"x":450,"y":600},
+      "landmarks": [
+        {"id":"hearth","x":450,"y":70},
+        {"id":"parlor_mid","x":520,"y":260},
+        {"id":"keeper_seat","x":450,"y":262},
+        {"id":"traveler_seat","x":648,"y":306},
+        {"id":"parlor_window","x":450,"y":20}
+      ]
+    },
+    "van_interior": {
+      "id": "van_interior",
+      "width": 400,
+      "height": 820,
+      "type": "indoor",
+      "label": "En route to Double Nights",
+      "floorColor": "#0b0a10",
+      "ambientDarkness": 0.62,
+      "zones": [],
+      "walls": [],
+      "transitions": [],
+      "spawn": {"x":200,"y":460},
+      "landmarks": [
+        {"id":"van_center","x":200,"y":450},
+        {"id":"van_949","x":136,"y":404},
+        {"id":"van_747","x":264,"y":404},
+        {"id":"van_rear","x":200,"y":700},
+        {"id":"van_partition","x":200,"y":186}
+      ]
+    },
+    "hotel_suite": {
+      "id": "hotel_suite",
+      "width": 1400,
+      "height": 1000,
+      "type": "indoor",
+      "label": "Penthouse Suite",
+      "floorColor": "#0c0a0e",
+      "ambientDarkness": 0.72,
+      "navProps": "all",
+      "wallStyle": {"fill":"#0e0c10","stroke":"rgba(232,194,122,0.5)"},
+      "spawn": {"x":200,"y":500},
+      "zones": [],
+      "walls": [
+        {"x":0,"y":0,"w":1400,"h":50},
+        {"x":0,"y":0,"w":50,"h":1000},
+        {"x":1350,"y":0,"w":50,"h":1000},
+        {"x":0,"y":950,"w":800,"h":50},
+        {"x":1300,"y":950,"w":100,"h":50},
+        {"x":700,"y":0,"w":20,"h":300},
+        {"x":700,"y":500,"w":20,"h":500},
+        {"x":1100,"y":0,"w":20,"h":300},
+        {"x":1100,"y":300,"w":150,"h":20},
+        {"x":1350,"y":300,"w":50,"h":20},
+        {"x":700,"y":800,"w":300,"h":10},
+        {"x":1150,"y":800,"w":250,"h":10},
+        {"x":800,"y":1000,"w":500,"h":10,"breach":true}
+      ],
+      "transitions": [
+        {"x":50,"y":400,"w":50,"h":200,"target":"hotel_lobby","label":"Elevator"},
+        {"x":1120,"y":50,"w":120,"h":200,"target":"church_boss","label":"Strange Portal"}
+      ],
+      "landmarks": [
+        {"id":"suite_elevator","x":75,"y":500},
+        {"id":"suite_portal","x":1180,"y":150},
+        {"id":"suite_bathroom","x":1200,"y":150},
+        {"id":"suite_balcony","x":1050,"y":900},
+        {"id":"dark_maker_note","x":1096,"y":959}
+      ]
+    },
+    "medbay_sw": {
+      "id": "medbay_sw",
+      "width": 800,
+      "height": 800,
+      "type": "indoor",
+      "label": "Dr. Yin's Clinic",
+      "floorColor": "#76828a",
+      "ambientDarkness": 0.5,
+      "spawn": {"x":400,"y":600},
+      "respawn": {"x":212,"y":328},
+      "zones": [],
+      "walls": [
+        {"x":0,"y":0,"w":800,"h":50},
+        {"x":0,"y":750,"w":350,"h":50},
+        {"x":450,"y":750,"w":350,"h":50},
+        {"x":0,"y":0,"w":50,"h":800},
+        {"x":750,"y":0,"w":50,"h":800}
+      ],
+      "transitions": [{"x":350,"y":720,"w":100,"h":80,"target":"sdc","label":"Exit Clinic"}],
+      "landmarks": [
+        {"id":"clinic_exit","x":400,"y":760},
+        {"id":"clinic_dr_yin","x":400,"y":200},
+        {"id":"clinic_bed_left","x":200,"y":400},
+        {"id":"clinic_bed_right","x":600,"y":400},
+        {"id":"clinic_respawn","x":212,"y":328},
+        {"id":"clinic_scanner","x":400,"y":480}
+      ]
+    },
+    "moon_city_nightclub": {
+      "id": "moon_city_nightclub",
+      "width": 1600,
+      "height": 1200,
+      "type": "indoor",
+      "label": "Moon City Nightclub",
+      "floorColor": "#08060b",
+      "ambientDarkness": 0.72,
+      "navProps": "all",
+      "wallStyle": {"fill":"#0b0810","stroke":"rgba(190,140,255,0.55)"},
+      "spawn": {"x":800,"y":1130},
+      "zones": [],
+      "walls": [
+        {"x":0,"y":0,"w":1600,"h":14},
+        {"x":0,"y":0,"w":14,"h":1200},
+        {"x":1586,"y":0,"w":14,"h":1200},
+        {"x":0,"y":1186,"w":740,"h":14},
+        {"x":860,"y":1186,"w":740,"h":14},
+        {"x":360,"y":14,"w":14,"h":1172},
+        {"x":1226,"y":14,"w":14,"h":1172},
+        {"x":14,"y":560,"w":346,"h":14},
+        {"x":374,"y":986,"w":852,"h":14},
+        {"x":1240,"y":276,"w":346,"h":14},
+        {"x":1330,"y":290,"w":14,"h":896},
+        {"x":1344,"y":580,"w":242,"h":14},
+        {"x":1344,"y":884,"w":242,"h":14}
+      ],
+      "transitions": [{"x":740,"y":1170,"w":120,"h":30,"target":"sdc","label":"Exit Nightclub"}],
+      "landmarks": [
+        {"id":"club_exit","x":800,"y":1165},
+        {"id":"mirabel_booth","x":1470,"y":200},
+        {"id":"club_bar","x":530,"y":500},
+        {"id":"club_dancefloor","x":800,"y":500},
+        {"id":"club_dj_booth","x":800,"y":150}
+      ]
+    },
+    "church_boss": {
+      "id": "church_boss",
+      "width": 1200,
+      "height": 1400,
+      "type": "outdoor",
+      "climate": "tempest",
+      "label": "Abandoned Church",
+      "floorColor": "#0e0c12",
+      "navProps": "all",
+      "wallStyle": {"fill":"#16121a","stroke":"rgba(170,120,255,0.35)"},
+      "spawn": {"x":600,"y":1250},
+      "zones": [],
+      "walls": [
+        {"x":0,"y":0,"w":1200,"h":50},
+        {"x":0,"y":1350,"w":550,"h":50},
+        {"x":650,"y":1350,"w":550,"h":50},
+        {"x":0,"y":0,"w":50,"h":1400},
+        {"x":1150,"y":0,"w":50,"h":1400}
+      ],
+      "transitions": [{"x":550,"y":1320,"w":100,"h":80,"target":"hotel_suite","label":"Exit Church"}],
+      "landmarks": [{"id":"church_exit","x":600,"y":1370},{"id":"church_altar","x":600,"y":175},{"id":"boss_spawn","x":600,"y":400}]
+    },
+    "enni_cole_interior": {
+      "id": "enni_cole_interior",
+      "width": 3250,
+      "height": 1400,
+      "type": "indoor",
+      "label": "Enni Cole",
+      "floorColor": "#2a2528",
+      "ambientDarkness": 0.36,
+      "navProps": "all",
+      "wallStyle": {"fill":"#151217","stroke":"rgba(176,132,76,0.85)"},
+      "spawn": {"x":1000,"y":1300},
+      "zones": [],
+      "walls": [
+        {"x":0,"y":0,"w":3250,"h":50},
+        {"x":0,"y":1350,"w":850,"h":50},
+        {"x":1150,"y":1350,"w":2100,"h":50},
+        {"x":0,"y":0,"w":50,"h":1400},
+        {"x":3200,"y":0,"w":50,"h":1400},
+        {"x":1950,"y":50,"w":20,"h":1300},
+        {"x":620,"y":50,"w":20,"h":1300},
+        {"x":1360,"y":50,"w":20,"h":1300},
+        {"x":50,"y":680,"w":570,"h":20},
+        {"x":1380,"y":680,"w":570,"h":20}
+      ],
+      "transitions": [
+        {"x":850,"y":1320,"w":300,"h":80,"target":"sdc","label":"Exit to City"},
+        {"x":880,"y":50,"w":240,"h":60,"target":"enni_cole_upper","label":"Upstairs","quiet":true}
+      ],
+      "landmarks": [
+        {"id":"enni_cole_exit","x":1000,"y":1370},
+        {"id":"enni_cole_atrium","x":1000,"y":820},
+        {"id":"enni_cole_stairs","x":1000,"y":470},
+        {"id":"enni_cole_fashion","x":330,"y":1000},
+        {"id":"enni_cole_food","x":540,"y":600},
+        {"id":"enni_cole_couture","x":330,"y":1000},
+        {"id":"enni_cole_accessories","x":1665,"y":1000},
+        {"id":"enni_cole_checkout","x":1000,"y":1150},
+        {"id":"enni_cole_gallery","x":1000,"y":470},
+        {"id":"enni_cole_groceries","x":540,"y":600},
+        {"id":"enni_cole_electronics","x":1665,"y":1000},
+        {"id":"enni_cole_furniture","x":1665,"y":360},
+        {"id":"enni_cole_emporium","x":2585,"y":1180}
+      ]
+    },
+    "enni_cole_upper": {
+      "id": "enni_cole_upper",
+      "width": 2000,
+      "height": 1100,
+      "type": "indoor",
+      "label": "Enni Cole | Upper Floor",
+      "floorColor": "#d2c4b0",
+      "ambientDarkness": 0.4,
+      "navProps": "all",
+      "wallStyle": {"fill":"#44232f","stroke":"rgba(229,192,131,0.65)"},
+      "spawn": {"x":1000,"y":200},
+      "zones": [],
+      "walls": [
+        {"x":0,"y":0,"w":2000,"h":50},
+        {"x":0,"y":1050,"w":2000,"h":50},
+        {"x":0,"y":0,"w":50,"h":1100},
+        {"x":1950,"y":0,"w":50,"h":1100},
+        {"x":620,"y":50,"w":20,"h":1000},
+        {"x":1360,"y":50,"w":20,"h":1000},
+        {"x":50,"y":300,"w":570,"h":20},
+        {"x":640,"y":640,"w":720,"h":20},
+        {"x":1640,"y":50,"w":20,"h":290},
+        {"x":1640,"y":340,"w":310,"h":20}
+      ],
+      "transitions": [{"x":900,"y":50,"w":200,"h":70,"target":"enni_cole_interior","label":"Downstairs","quiet":true}],
+      "landmarks": [
+        {"id":"enni_cole_upper_stairs","x":1000,"y":160},
+        {"id":"enni_cole_showroom","x":880,"y":880},
+        {"id":"enni_cole_cuisine","x":410,"y":790},
+        {"id":"enni_cole_kitchen","x":450,"y":200},
+        {"id":"enni_cole_salon","x":1510,"y":800},
+        {"id":"enni_cole_fitting","x":1800,"y":200}
+      ]
+    },
+    "cozy_cafe_interior": {
+      "id": "cozy_cafe_interior",
+      "width": 1200,
+      "height": 1000,
+      "type": "indoor",
+      "label": "Cozy Cafe",
+      "floorColor": "#2a1a0e",
+      "ambientDarkness": 0.5,
+      "navProps": "all",
+      "wallStyle": {"fill":"#2b1a12","stroke":"rgba(240,190,120,0.35)"},
+      "spawn": {"x":600,"y":900},
+      "zones": [],
+      "walls": [
+        {"x":0,"y":0,"w":1200,"h":50},
+        {"x":0,"y":950,"w":500,"h":50},
+        {"x":700,"y":950,"w":500,"h":50},
+        {"x":0,"y":0,"w":50,"h":1000},
+        {"x":1150,"y":0,"w":50,"h":1000},
+        {"x":700,"y":300,"w":450,"h":15},
+        {"x":690,"y":60,"w":15,"h":240},
+        {"x":950,"y":700,"w":200,"h":15},
+        {"x":940,"y":700,"w":15,"h":250}
+      ],
+      "transitions": [{"x":500,"y":920,"w":200,"h":80,"target":"sdc","label":"Exit to City"}],
+      "landmarks": [
+        {"id":"cafe_exit","x":600,"y":960},
+        {"id":"cafe_counter","x":250,"y":200},
+        {"id":"cafe_dining","x":560,"y":550},
+        {"id":"cafe_booths","x":1040,"y":500},
+        {"id":"cafe_hearth","x":190,"y":535},
+        {"id":"cafe_kitchen","x":900,"y":150}
+      ]
+    },
+    "auto_shop": {
+      "id": "auto_shop",
+      "width": 1400,
+      "height": 1000,
+      "type": "indoor",
+      "label": "Torque Auto — Service Bay",
+      "floorColor": "#1d1d22",
+      "ambientDarkness": 0.45,
+      "wallStyle": {"fill":"#1c1c22","stroke":"rgba(255,154,42,0.4)"},
+      "spawn": {"x":700,"y":900},
+      "zones": [],
+      "walls": [
+        {"x":0,"y":0,"w":1400,"h":50},
+        {"x":0,"y":950,"w":600,"h":50},
+        {"x":800,"y":950,"w":600,"h":50},
+        {"x":0,"y":0,"w":50,"h":1000},
+        {"x":1350,"y":0,"w":50,"h":1000},
+        {"x":880,"y":50,"w":20,"h":280},
+        {"x":880,"y":430,"w":20,"h":220},
+        {"x":880,"y":690,"w":470,"h":20},
+        {"x":880,"y":650,"w":20,"h":40},
+        {"x":880,"y":710,"w":20,"h":240}
+      ],
+      "transitions": [{"x":600,"y":920,"w":200,"h":80,"target":"sdc","label":"Exit to City"}],
+      "landmarks": [
+        {"id":"shop_exit","x":700,"y":960},
+        {"id":"shop_counter","x":1100,"y":300},
+        {"id":"shop_bay_1","x":250,"y":200},
+        {"id":"shop_bay_2","x":250,"y":450},
+        {"id":"shop_lift","x":600,"y":350},
+        {"id":"shop_parts","x":1100,"y":800}
+      ]
+    },
+    "neural_sys_interior": {
+      "id": "neural_sys_interior",
+      "width": 1000,
+      "height": 800,
+      "type": "indoor",
+      "label": "Neural Systems — Identity Atelier",
+      "floorColor": "#070f22",
+      "ambientDarkness": 0.5,
+      "navProps": "all",
+      "lightingTint": "6, 10, 34",
+      "wallStyle": {"fill":"#0c1b32","stroke":"rgba(152,178,204,.55)"},
+      "spawn": {"x":500,"y":700},
+      "zones": [
+        {"x":50,"y":50,"w":900,"h":500,"color":"#0e0e20"},
+        {"x":50,"y":550,"w":350,"h":200,"color":"#101028"},
+        {"x":600,"y":550,"w":350,"h":200,"color":"#08081a"}
+      ],
+      "walls": [
+        {"x":0,"y":0,"w":1000,"h":50},
+        {"x":0,"y":750,"w":400,"h":50},
+        {"x":600,"y":750,"w":400,"h":50},
+        {"x":0,"y":0,"w":50,"h":800},
+        {"x":950,"y":0,"w":50,"h":800},
+        {"x":400,"y":550,"w":15,"h":80},
+        {"x":400,"y":700,"w":15,"h":50},
+        {"x":585,"y":550,"w":15,"h":80},
+        {"x":585,"y":700,"w":15,"h":50},
+        {"x":50,"y":550,"w":365,"h":15},
+        {"x":585,"y":550,"w":365,"h":15},
+        {"x":200,"y":50,"w":600,"h":8}
+      ],
+      "transitions": [{"x":400,"y":720,"w":200,"h":80,"target":"sdc","label":"Exit Neural Systems"}],
+      "landmarks": [
+        {"id":"neural_exit","x":500,"y":760},
+        {"id":"neural_counter","x":500,"y":250},
+        {"id":"neural_console_left","x":200,"y":200},
+        {"id":"neural_console_right","x":800,"y":200},
+        {"id":"neural_server","x":775,"y":650}
+      ]
+    },
+    "biggs_arena": {
+      "id": "biggs_arena",
+      "width": 900,
+      "height": 900,
+      "type": "indoor",
+      "label": "Biggs Amusement Park — Crash Royale",
+      "floorColor": "#1a0a20",
+      "paintedGrid": true,
+      "wallStyle": {"fill":"#35232e","stroke":"#997957"},
+      "ambientDarkness": 0.65,
+      "spawn": {"x":450,"y":820},
+      "zones": [
+        {"x":80,"y":80,"w":740,"h":700,"color":"#1e0e28"},
+        {"x":350,"y":330,"w":200,"h":200,"color":"#2a1a08"},
+        {"x":350,"y":780,"w":200,"h":100,"color":"#120818"},
+        {"x":80,"y":80,"w":120,"h":120,"color":"#250a30"},
+        {"x":700,"y":80,"w":120,"h":120,"color":"#250a30"},
+        {"x":80,"y":660,"w":120,"h":120,"color":"#250a30"},
+        {"x":700,"y":660,"w":120,"h":120,"color":"#250a30"}
+      ],
+      "walls": [
+        {"x":0,"y":0,"w":900,"h":60},
+        {"x":0,"y":0,"w":60,"h":900},
+        {"x":840,"y":0,"w":60,"h":900},
+        {"x":0,"y":840,"w":350,"h":60},
+        {"x":550,"y":840,"w":350,"h":60},
+        {"x":60,"y":60,"w":40,"h":40},
+        {"x":800,"y":60,"w":40,"h":40},
+        {"x":60,"y":800,"w":40,"h":40},
+        {"x":800,"y":800,"w":40,"h":40},
+        {"x":350,"y":350,"w":40,"h":40},
+        {"x":510,"y":470,"w":40,"h":40}
+      ],
+      "transitions": [{"x":350,"y":840,"w":200,"h":60,"target":"sdc","label":"Exit Biggs Park"}],
+      "landmarks": [{"id":"biggs_entrance","x":450,"y":850},{"id":"biggs_center","x":450,"y":450}]
+    },
+    "house_of_death": {
+      "id": "house_of_death",
+      "width": 1800,
+      "height": 1500,
+      "type": "indoor",
+      "label": "The House of Death",
+      "floorColor": "#0d0a10",
+      "ambientDarkness": 0.9,
+      "navProps": "all",
+      "wallStyle": {"fill":"#16111b","stroke":"rgba(201,164,106,0.4)"},
+      "spawn": {"x":900,"y":1420},
+      "zones": [
+        {"x":14,"y":14,"w":546,"h":416,"color":"#241812"},
+        {"x":574,"y":14,"w":652,"h":416,"color":"#16131a"},
+        {"x":1240,"y":14,"w":320,"h":416,"color":"#23152a"},
+        {"x":1574,"y":14,"w":212,"h":416,"color":"#d9d4d8"},
+        {"x":14,"y":444,"w":546,"h":556,"color":"#221610"},
+        {"x":574,"y":444,"w":652,"h":556,"color":"#141018"},
+        {"x":1240,"y":444,"w":546,"h":556,"color":"#1c211f"},
+        {"x":14,"y":1014,"w":546,"h":472,"color":"#2a2a30"},
+        {"x":574,"y":1014,"w":652,"h":472,"color":"#1a1620"},
+        {"x":1240,"y":1014,"w":546,"h":472,"color":"#1a1216"}
+      ],
+      "walls": [
+        {"x":0,"y":0,"w":1800,"h":14},
+        {"x":0,"y":0,"w":14,"h":1500},
+        {"x":1786,"y":0,"w":14,"h":1500},
+        {"x":0,"y":1486,"w":830,"h":14},
+        {"x":970,"y":1486,"w":830,"h":14},
+        {"x":560,"y":14,"w":14,"h":1472},
+        {"x":1226,"y":14,"w":14,"h":1472},
+        {"x":14,"y":430,"w":1772,"h":14},
+        {"x":14,"y":1000,"w":1772,"h":14},
+        {"x":1560,"y":14,"w":14,"h":416},
+        {"x":1240,"y":1164,"w":396,"h":14},
+        {"x":1622,"y":1178,"w":14,"h":308}
+      ],
+      "transitions": [{"x":830,"y":1470,"w":140,"h":30,"target":"sdc","label":"Leave the House"}],
+      "landmarks": [
+        {"id":"house_foyer","x":900,"y":1300},
+        {"id":"house_hall","x":900,"y":720},
+        {"id":"house_chapel","x":900,"y":200},
+        {"id":"house_courtyard","x":1510,"y":720}
+      ]
+    },
+    "demoness_palace": {
+      "id": "demoness_palace",
+      "width": 1800,
+      "height": 1400,
+      "type": "indoor",
+      "label": "The Demoness Palace",
+      "floorColor": "#0c0508",
+      "ambientDarkness": 0.88,
+      "paintedGrid": true,
+      "lightingTint": "28, 10, 24",
+      "navProps": "all",
+      "wallStyle": {"fill":"#16070f","stroke":"rgba(255,184,90,0.6)"},
+      "spawn": {"x":900,"y":1320},
+      "zones": [
+        {"x":14,"y":14,"w":872,"h":352,"color":"#160a0c"},
+        {"x":900,"y":14,"w":486,"h":352,"color":"#120810"},
+        {"x":1400,"y":14,"w":386,"h":352,"color":"#1a0c0c"},
+        {"x":14,"y":380,"w":572,"h":606,"color":"#110710"},
+        {"x":600,"y":380,"w":600,"h":606,"color":"#0b0509"},
+        {"x":1214,"y":380,"w":572,"h":606,"color":"#110710"},
+        {"x":14,"y":1000,"w":572,"h":386,"color":"#160a10"},
+        {"x":600,"y":1000,"w":600,"h":386,"color":"#0e070b"},
+        {"x":1214,"y":1000,"w":572,"h":386,"color":"#140a08"}
+      ],
+      "walls": [
+        {"x":0,"y":0,"w":1800,"h":14},
+        {"x":0,"y":0,"w":14,"h":1400},
+        {"x":1786,"y":0,"w":14,"h":1400},
+        {"x":0,"y":1386,"w":830,"h":14},
+        {"x":970,"y":1386,"w":830,"h":14},
+        {"x":14,"y":366,"w":1772,"h":14},
+        {"x":14,"y":986,"w":1772,"h":14},
+        {"x":586,"y":380,"w":14,"h":1006},
+        {"x":1200,"y":380,"w":14,"h":1006},
+        {"x":886,"y":14,"w":14,"h":352},
+        {"x":1386,"y":14,"w":14,"h":352}
+      ],
+      "transitions": [{"x":830,"y":1370,"w":140,"h":30,"target":"sdc","label":"Leave the Palace"}],
+      "landmarks": [{"id":"palace_throne","x":900,"y":520},{"id":"palace_garden","x":450,"y":190}]
+    },
+    "ollo_test": {
+      "id": "ollo_test",
+      "width": 2000,
+      "height": 1500,
+      "type": "outdoor",
+      "climate": "plaza",
+      "label": "OllO Plaza",
+      "floorColor": "#1a1215",
+      "spawn": {"x":1000,"y":1200},
+      "floorZones": [
+        {"x":400,"y":200,"w":1200,"h":800,"color":"#4a2020"},
+        {"x":500,"y":1000,"w":1000,"h":300,"color":"#3d3030"},
+        {"x":0,"y":0,"w":2000,"h":200,"color":"#1a1018"}
+      ],
+      "zones": [],
+      "buildings": [],
+      "walls": [
+        {"x":0,"y":0,"w":2000,"h":30},
+        {"x":0,"y":1470,"w":400,"h":30},
+        {"x":1600,"y":1470,"w":400,"h":30},
+        {"x":0,"y":0,"w":30,"h":1500},
+        {"x":1970,"y":0,"w":30,"h":1500}
+      ],
+      "transitions": [{"x":400,"y":1450,"w":1200,"h":50,"target":"sdc","label":"Return to City"}],
+      "pavements": [],
+      "crosswalks": [],
+      "landmarks": [{"id":"ollo_entrance","x":1000,"y":700}]
+    },
+    "ollo_interior": {
+      "id": "ollo_interior",
+      "width": 800,
+      "height": 600,
+      "type": "indoor",
+      "label": "OllO Lounge",
+      "floorColor": "#1a0a0a",
+      "spawn": {"x":400,"y":500},
+      "zones": [{"x":50,"y":50,"w":700,"h":500,"color":"#2a1515"},{"x":300,"y":200,"w":200,"h":250,"color":"#3d1a1a"}],
+      "walls": [
+        {"x":0,"y":0,"w":800,"h":30},
+        {"x":0,"y":570,"w":300,"h":30},
+        {"x":500,"y":570,"w":300,"h":30},
+        {"x":0,"y":0,"w":30,"h":600},
+        {"x":770,"y":0,"w":30,"h":600}
+      ],
+      "transitions": [{"x":300,"y":560,"w":200,"h":40,"target":"ollo_test","label":"Exit to Plaza"}],
+      "landmarks": [{"id":"ollo_bar","x":400,"y":100}]
+    }
+  },
+  "rooms": {
+    "apt_949": {
+      "rooms": {
+        "veranda": {"x":0,"y":0,"w":1400,"h":200,"type":"outdoor","label":"Veranda"},
+        "main_room": {"x":8,"y":208,"w":892,"h":684,"type":"indoor","label":"Living Room","fill":0.5},
+        "bedroom": {"x":908,"y":208,"w":484,"h":340,"type":"indoor","label":"Bedroom","fill":0.56},
+        "bathroom": {"x":908,"y":556,"w":484,"h":336,"type":"indoor","label":"Bathroom","fill":0.64}
+      },
+      "doors": [
+        {
+          "x": 150,
+          "y": 200,
+          "w": 120,
+          "h": 8,
+          "type": "sliding",
+          "orientation": "H",
+          "rooms": ["veranda","main_room"],
+          "color": "rgba(150, 200, 220, 0.25)",
+          "speed": 0.06,
+          "triggerRadius": 90
+        },
+        {
+          "x": 500,
+          "y": 200,
+          "w": 120,
+          "h": 8,
+          "type": "sliding",
+          "orientation": "H",
+          "rooms": ["veranda","main_room"],
+          "color": "rgba(150, 200, 220, 0.25)",
+          "speed": 0.06,
+          "triggerRadius": 90
+        },
+        {
+          "x": 800,
+          "y": 200,
+          "w": 120,
+          "h": 8,
+          "type": "sliding",
+          "orientation": "H",
+          "rooms": ["veranda","main_room"],
+          "color": "rgba(150, 200, 220, 0.25)",
+          "speed": 0.06,
+          "triggerRadius": 90
+        },
+        {
+          "x": 900,
+          "y": 320,
+          "w": 8,
+          "h": 70,
+          "type": "hinged",
+          "orientation": "V",
+          "rooms": ["main_room","bedroom"],
+          "color": "#4a3a30",
+          "hingeSide": "left",
+          "triggerRadius": 60
+        },
+        {
+          "x": 1050,
+          "y": 548,
+          "w": 70,
+          "h": 8,
+          "type": "hinged",
+          "orientation": "H",
+          "rooms": ["bedroom","bathroom"],
+          "color": "#4a3a30",
+          "hingeSide": "left",
+          "triggerRadius": 60
+        }
+      ],
+      "windows": [
+        {"x":30,"y":200,"w":110,"h":8,"facing":"S","projectionLength":100,"tint":"200, 220, 255"},
+        {"x":280,"y":200,"w":210,"h":8,"facing":"S","projectionLength":100,"tint":"200, 220, 255"},
+        {"x":630,"y":200,"w":160,"h":8,"facing":"S","projectionLength":100,"tint":"200, 220, 255"},
+        {"x":930,"y":200,"w":460,"h":8,"facing":"S","projectionLength":100,"tint":"200, 220, 255"},
+        {"x":0,"y":400,"w":8,"h":60,"facing":"E","projectionLength":80},
+        {"x":0,"y":650,"w":8,"h":60,"facing":"E","projectionLength":80},
+        {"x":1392,"y":350,"w":8,"h":60,"facing":"W","projectionLength":80},
+        {"x":1392,"y":700,"w":8,"h":60,"facing":"W","projectionLength":80},
+        {"x":200,"y":0,"w":300,"h":6,"facing":"S","projectionLength":50,"tint":"180, 210, 255"},
+        {"x":800,"y":0,"w":300,"h":6,"facing":"S","projectionLength":50,"tint":"180, 210, 255"}
+      ],
+      "linens": [
+        {
+          "x": 145,
+          "y": 195,
+          "length": 100,
+          "width": 18,
+          "anchor": "top",
+          "color": "rgba(255, 245, 235, 0.09)",
+          "lightColor": "rgba(255, 240, 220, 0.03)",
+          "segments": 5
+        },
+        {
+          "x": 275,
+          "y": 195,
+          "length": 100,
+          "width": 18,
+          "anchor": "top",
+          "color": "rgba(255, 245, 235, 0.09)",
+          "lightColor": "rgba(255, 240, 220, 0.03)",
+          "segments": 5
+        },
+        {
+          "x": 495,
+          "y": 195,
+          "length": 110,
+          "width": 20,
+          "anchor": "top",
+          "color": "rgba(240, 230, 225, 0.08)",
+          "lightColor": "rgba(255, 235, 215, 0.03)",
+          "segments": 5
+        },
+        {
+          "x": 625,
+          "y": 195,
+          "length": 110,
+          "width": 20,
+          "anchor": "top",
+          "color": "rgba(240, 230, 225, 0.08)",
+          "lightColor": "rgba(255, 235, 215, 0.03)",
+          "segments": 5
+        },
+        {
+          "x": 795,
+          "y": 195,
+          "length": 105,
+          "width": 16,
+          "anchor": "top",
+          "color": "rgba(255, 240, 240, 0.07)",
+          "lightColor": "rgba(255, 220, 200, 0.03)",
+          "segments": 4
+        },
+        {
+          "x": 925,
+          "y": 195,
+          "length": 105,
+          "width": 16,
+          "anchor": "top",
+          "color": "rgba(255, 240, 240, 0.07)",
+          "lightColor": "rgba(255, 220, 200, 0.03)",
+          "segments": 4
+        },
+        {
+          "x": 1388,
+          "y": 340,
+          "length": 75,
+          "width": 12,
+          "anchor": "top",
+          "color": "rgba(220, 200, 230, 0.08)",
+          "lightColor": "rgba(200, 180, 220, 0.03)",
+          "segments": 3
+        }
+      ]
+    },
+    "hotel_suite": {
+      "rooms": {
+        "living": {"x":50,"y":50,"w":650,"h":900,"type":"indoor","label":"Living Room"},
+        "lounge": {
+          "rects": [{"x":720,"y":50,"w":380,"h":750},{"x":1100,"y":320,"w":250,"h":480}],
+          "type": "indoor",
+          "label": "Master Bedroom"
+        },
+        "bathroom": {"x":1120,"y":50,"w":230,"h":250,"type":"indoor","label":"Bathroom"},
+        "balcony": {"x":720,"y":810,"w":630,"h":190,"type":"outdoor","label":"Balcony"}
+      },
+      "doors": [
+        {"x":700,"y":300,"w":20,"h":200,"type":"arch","orientation":"V","rooms":["living","lounge"]},
+        {
+          "x": 1255,
+          "y": 300,
+          "w": 90,
+          "h": 20,
+          "type": "hinged",
+          "orientation": "H",
+          "rooms": ["lounge","bathroom"],
+          "color": "#2a1a24",
+          "hingeSide": "left",
+          "triggerRadius": 60
+        },
+        {
+          "x": 1000,
+          "y": 800,
+          "w": 150,
+          "h": 10,
+          "type": "sliding",
+          "orientation": "H",
+          "rooms": ["lounge","balcony"],
+          "color": "rgba(200, 190, 255, 0.28)",
+          "speed": 0.06,
+          "triggerRadius": 100
+        }
+      ],
+      "windows": [
+        {"x":720,"y":800,"w":270,"h":10,"facing":"N","projectionLength":110,"tint":"200, 220, 255"},
+        {"x":1160,"y":800,"w":190,"h":10,"facing":"N","projectionLength":110,"tint":"200, 220, 255"},
+        {"x":250,"y":0,"w":200,"h":50,"facing":"S","projectionLength":120,"tint":"190, 170, 255"}
+      ]
+    },
+    "cozy_cafe_interior": {
+      "rooms": {
+        "cafe": {
+          "rects": [{"x":0,"y":0,"w":690,"h":315},{"x":0,"y":315,"w":1200,"h":385},{"x":0,"y":700,"w":940,"h":300}],
+          "type": "indoor",
+          "label": "Café"
+        },
+        "kitchen": {"x":705,"y":0,"w":495,"h":300,"type":"indoor","label":"Kitchen"},
+        "storeroom": {"x":955,"y":715,"w":245,"h":285,"type":"indoor","label":"Storeroom"}
+      },
+      "doors": [
+        {
+          "x": 760,
+          "y": 300,
+          "w": 80,
+          "h": 15,
+          "type": "hinged",
+          "orientation": "H",
+          "rooms": ["cafe","kitchen"],
+          "color": "#5d3a1a",
+          "hingeSide": "left",
+          "triggerRadius": 60
+        },
+        {
+          "x": 940,
+          "y": 790,
+          "w": 15,
+          "h": 80,
+          "type": "hinged",
+          "orientation": "V",
+          "rooms": ["cafe","storeroom"],
+          "color": "#4a3020",
+          "hingeSide": "left",
+          "triggerRadius": 60
+        }
+      ]
+    },
+    "auto_shop": {
+      "rooms": {
+        "bay": {"x":0,"y":0,"w":880,"h":1000,"type":"indoor","label":"Service Bay"},
+        "showroom": {"x":900,"y":0,"w":500,"h":690,"type":"indoor","label":"Showroom"},
+        "parts": {"x":900,"y":710,"w":500,"h":290,"type":"indoor","label":"Parts Room"}
+      },
+      "doors": [
+        {"x":880,"y":330,"w":20,"h":100,"type":"arch","orientation":"V","rooms":["bay","showroom"]},
+        {
+          "x": 880,
+          "y": 790,
+          "w": 20,
+          "h": 80,
+          "type": "hinged",
+          "orientation": "V",
+          "rooms": ["bay","parts"],
+          "color": "#555a60",
+          "hingeSide": "left",
+          "triggerRadius": 60
+        }
+      ]
+    },
+    "enni_cole_interior": {
+      "rooms": {
+        "lobby": {"x":640,"y":50,"w":720,"h":1300,"type":"indoor","label":"Lobby"},
+        "food": {"x":50,"y":50,"w":570,"h":630,"type":"indoor","label":"Food Hall"},
+        "fashion": {"x":50,"y":700,"w":570,"h":650,"type":"indoor","label":"Fashion"},
+        "furniture": {"x":1380,"y":50,"w":570,"h":630,"type":"indoor","label":"Furniture"},
+        "electronics": {"x":1380,"y":700,"w":570,"h":650,"type":"indoor","label":"Electronics"},
+        "emporium": {"x":1970,"y":50,"w":1230,"h":1300,"type":"indoor","label":"The Emporium"}
+      },
+      "doors": [
+        {"x":620,"y":300,"w":20,"h":160,"type":"arch","orientation":"V","rooms":["lobby","food"]},
+        {"x":620,"y":950,"w":20,"h":160,"type":"arch","orientation":"V","rooms":["lobby","fashion"]},
+        {"x":1360,"y":300,"w":20,"h":160,"type":"arch","orientation":"V","rooms":["lobby","furniture"]},
+        {"x":1360,"y":950,"w":20,"h":160,"type":"arch","orientation":"V","rooms":["lobby","electronics"]},
+        {"x":440,"y":680,"w":160,"h":20,"type":"arch","orientation":"H","rooms":["food","fashion"]},
+        {"x":1400,"y":680,"w":160,"h":20,"type":"arch","orientation":"H","rooms":["furniture","electronics"]},
+        {"x":1950,"y":300,"w":20,"h":160,"type":"arch","orientation":"V","rooms":["furniture","emporium"]},
+        {"x":1950,"y":950,"w":20,"h":160,"type":"arch","orientation":"V","rooms":["electronics","emporium"]}
+      ],
+      "windows": [
+        {"x":80,"y":1334,"w":520,"h":16,"facing":"N","projectionLength":160,"tint":"255, 216, 164"},
+        {"x":1400,"y":1334,"w":520,"h":16,"facing":"N","projectionLength":160,"tint":"255, 216, 164"},
+        {"x":1990,"y":1334,"w":1190,"h":16,"facing":"N","projectionLength":160,"tint":"255, 216, 164"}
+      ]
+    },
+    "enni_cole_upper": {
+      "rooms": {
+        "gallery": {"x":640,"y":50,"w":720,"h":590,"type":"indoor","label":"Gallery"},
+        "showroom": {"x":640,"y":660,"w":720,"h":390,"type":"indoor","label":"Couture Showroom"},
+        "cuisine": {"x":50,"y":320,"w":570,"h":730,"type":"indoor","label":"Cuisine"},
+        "kitchen": {"x":50,"y":50,"w":570,"h":250,"type":"indoor","label":"Kitchen"},
+        "salon": {
+          "rects": [{"x":1380,"y":50,"w":260,"h":1000},{"x":1640,"y":360,"w":310,"h":690}],
+          "type": "indoor",
+          "label": "Accessories Salon"
+        },
+        "fitting": {"x":1660,"y":50,"w":290,"h":290,"type":"indoor","label":"Fitting Rooms"}
+      },
+      "doors": [
+        {"x":620,"y":380,"w":20,"h":160,"type":"arch","orientation":"V","rooms":["gallery","cuisine"]},
+        {"x":1360,"y":380,"w":20,"h":160,"type":"arch","orientation":"V","rooms":["gallery","salon"]},
+        {"x":880,"y":640,"w":240,"h":20,"type":"arch","orientation":"H","rooms":["gallery","showroom"]},
+        {"x":620,"y":820,"w":20,"h":150,"type":"arch","orientation":"V","rooms":["showroom","cuisine"]},
+        {"x":1360,"y":820,"w":20,"h":150,"type":"arch","orientation":"V","rooms":["showroom","salon"]},
+        {
+          "x": 420,
+          "y": 300,
+          "w": 90,
+          "h": 20,
+          "type": "hinged",
+          "orientation": "H",
+          "rooms": ["cuisine","kitchen"],
+          "color": "#5a3442",
+          "hingeSide": "left",
+          "triggerRadius": 60
+        },
+        {
+          "x": 1750,
+          "y": 340,
+          "w": 90,
+          "h": 20,
+          "type": "hinged",
+          "orientation": "H",
+          "rooms": ["salon","fitting"],
+          "color": "#5a3442",
+          "hingeSide": "left",
+          "triggerRadius": 60
+        }
+      ],
+      "windows": [
+        {"x":680,"y":1034,"w":640,"h":16,"facing":"N","projectionLength":170,"tint":"255, 214, 170"},
+        {"x":34,"y":420,"w":16,"h":560,"facing":"E","projectionLength":150,"tint":"255, 216, 164"},
+        {"x":1950,"y":420,"w":16,"h":560,"facing":"W","projectionLength":150,"tint":"255, 216, 164"}
+      ]
+    },
+    "neural_sys_interior": {
+      "rooms": {
+        "showroom": {"x":0,"y":0,"w":1000,"h":550,"type":"indoor","label":"Showroom"},
+        "foyer": {"x":415,"y":565,"w":170,"h":235,"type":"indoor","label":"Foyer"},
+        "consult": {"x":0,"y":565,"w":400,"h":235,"type":"indoor","label":"Consultation"},
+        "server": {"x":600,"y":565,"w":400,"h":235,"type":"indoor","label":"Server Room"}
+      },
+      "doors": [
+        {"x":415,"y":550,"w":170,"h":15,"type":"arch","orientation":"H","rooms":["showroom","foyer"]},
+        {
+          "x": 400,
+          "y": 630,
+          "w": 15,
+          "h": 70,
+          "type": "hinged",
+          "orientation": "V",
+          "rooms": ["foyer","consult"],
+          "color": "#2a2a50",
+          "hingeSide": "left",
+          "triggerRadius": 60
+        },
+        {
+          "x": 585,
+          "y": 630,
+          "w": 15,
+          "h": 70,
+          "type": "hinged",
+          "orientation": "V",
+          "rooms": ["foyer","server"],
+          "color": "#2a2a50",
+          "hingeSide": "right",
+          "triggerRadius": 60
+        }
+      ]
+    },
+    "hotel_lobby": {"rooms":{"lobby":{"x":0,"y":0,"w":1000,"h":1200,"type":"indoor","label":"Lobby"}}},
+    "medbay_sw": {"rooms":{"clinic":{"x":0,"y":0,"w":800,"h":800,"type":"indoor","label":"Clinic"}}},
+    "ollo_interior": {"rooms":{"shop":{"x":0,"y":0,"w":800,"h":600,"type":"indoor","label":"Shop"}}},
+    "moon_city_nightclub": {
+      "rooms": {
+        "powder": {"x":14,"y":14,"w":346,"h":546,"type":"indoor","label":"Powder Room"},
+        "gents": {"x":14,"y":574,"w":346,"h":612,"type":"indoor","label":"Gents"},
+        "hall": {"x":374,"y":14,"w":852,"h":972,"type":"indoor","label":"The Floor"},
+        "foyer": {"x":374,"y":1000,"w":852,"h":186,"type":"indoor","label":"Foyer"},
+        "lounge": {"x":1240,"y":14,"w":346,"h":262,"type":"indoor","label":"Mirabel's Lounge"},
+        "corridor": {"x":1240,"y":290,"w":90,"h":896,"type":"indoor","label":"VIP"},
+        "suite1": {"x":1344,"y":290,"w":242,"h":290,"type":"indoor","label":"Suite I"},
+        "suite2": {"x":1344,"y":594,"w":242,"h":290,"type":"indoor","label":"Suite II"},
+        "suite3": {"x":1344,"y":898,"w":242,"h":288,"type":"indoor","label":"Suite III"}
+      },
+      "doors": [
+        {"x":730,"y":986,"w":140,"h":14,"type":"arch","orientation":"H","rooms":["foyer","hall"]},
+        {
+          "x": 360,
+          "y": 90,
+          "w": 14,
+          "h": 80,
+          "type": "hinged",
+          "orientation": "V",
+          "rooms": ["powder","hall"],
+          "color": "#3a1e4a",
+          "hingeSide": "left",
+          "triggerRadius": 60
+        },
+        {
+          "x": 360,
+          "y": 880,
+          "w": 14,
+          "h": 80,
+          "type": "hinged",
+          "orientation": "V",
+          "rooms": ["gents","hall"],
+          "color": "#3a1e4a",
+          "hingeSide": "right",
+          "triggerRadius": 60
+        },
+        {"x":1226,"y":560,"w":14,"h":120,"type":"arch","orientation":"V","rooms":["hall","corridor"]},
+        {"x":1240,"y":276,"w":90,"h":14,"type":"arch","orientation":"H","rooms":["corridor","lounge"]},
+        {
+          "x": 1330,
+          "y": 390,
+          "w": 14,
+          "h": 90,
+          "type": "sliding",
+          "orientation": "V",
+          "rooms": ["corridor","suite1"],
+          "color": "rgba(150, 30, 80, 0.62)",
+          "speed": 0.06,
+          "triggerRadius": 80
+        },
+        {
+          "x": 1330,
+          "y": 694,
+          "w": 14,
+          "h": 90,
+          "type": "sliding",
+          "orientation": "V",
+          "rooms": ["corridor","suite2"],
+          "color": "rgba(150, 30, 80, 0.62)",
+          "speed": 0.06,
+          "triggerRadius": 80
+        },
+        {
+          "x": 1330,
+          "y": 1000,
+          "w": 14,
+          "h": 90,
+          "type": "sliding",
+          "orientation": "V",
+          "rooms": ["corridor","suite3"],
+          "color": "rgba(150, 30, 80, 0.62)",
+          "speed": 0.06,
+          "triggerRadius": 80
+        }
+      ],
+      "linens": [
+        {
+          "x": 1222,
+          "y": 546,
+          "length": 50,
+          "width": 12,
+          "anchor": "right",
+          "color": "rgba(150, 30, 80, 0.2)",
+          "lightColor": "rgba(255, 120, 170, 0.04)",
+          "segments": 3
+        },
+        {
+          "x": 1222,
+          "y": 694,
+          "length": 50,
+          "width": 12,
+          "anchor": "right",
+          "color": "rgba(150, 30, 80, 0.2)",
+          "lightColor": "rgba(255, 120, 170, 0.04)",
+          "segments": 3
+        }
+      ]
+    },
+    "demoness_palace": {
+      "rooms": {
+        "garden": {"x":14,"y":14,"w":872,"h":352,"type":"outdoor","label":"Blood Garden"},
+        "shrine": {"x":900,"y":14,"w":486,"h":352,"type":"indoor","label":"Crystal Chamber"},
+        "bath": {"x":1400,"y":14,"w":386,"h":352,"type":"indoor","label":"Bath of Embers"},
+        "westgal": {"x":14,"y":380,"w":572,"h":606,"type":"indoor","label":"West Gallery"},
+        "throne": {"x":600,"y":380,"w":600,"h":606,"type":"indoor","label":"Throne Hall"},
+        "eastgal": {"x":1214,"y":380,"w":572,"h":606,"type":"indoor","label":"East Gallery"},
+        "dressing": {"x":14,"y":1000,"w":572,"h":386,"type":"indoor","label":"Dressing Room"},
+        "entrance": {"x":600,"y":1000,"w":600,"h":400,"type":"indoor","label":"Entrance Hall"},
+        "kennels": {"x":1214,"y":1000,"w":572,"h":386,"type":"indoor","label":"The Kennels"}
+      },
+      "doors": [
+        {"x":820,"y":986,"w":160,"h":14,"type":"arch","orientation":"H","rooms":["entrance","throne"]},
+        {"x":886,"y":130,"w":14,"h":120,"type":"arch","orientation":"V","rooms":["garden","shrine"]},
+        {
+          "x": 586,
+          "y": 1150,
+          "w": 14,
+          "h": 80,
+          "type": "hinged",
+          "orientation": "V",
+          "rooms": ["entrance","dressing"],
+          "color": "#3a0e16",
+          "hingeSide": "left",
+          "triggerRadius": 60
+        },
+        {
+          "x": 1200,
+          "y": 1150,
+          "w": 14,
+          "h": 80,
+          "type": "hinged",
+          "orientation": "V",
+          "rooms": ["entrance","kennels"],
+          "color": "#3a0e16",
+          "hingeSide": "right",
+          "triggerRadius": 60
+        },
+        {
+          "x": 586,
+          "y": 640,
+          "w": 14,
+          "h": 80,
+          "type": "hinged",
+          "orientation": "V",
+          "rooms": ["throne","westgal"],
+          "color": "#3a0e16",
+          "hingeSide": "left",
+          "triggerRadius": 60
+        },
+        {
+          "x": 1200,
+          "y": 640,
+          "w": 14,
+          "h": 80,
+          "type": "hinged",
+          "orientation": "V",
+          "rooms": ["throne","eastgal"],
+          "color": "#3a0e16",
+          "hingeSide": "right",
+          "triggerRadius": 60
+        },
+        {"x":220,"y":986,"w":140,"h":14,"type":"arch","orientation":"H","rooms":["westgal","dressing"]},
+        {"x":1440,"y":986,"w":140,"h":14,"type":"arch","orientation":"H","rooms":["eastgal","kennels"]},
+        {
+          "x": 700,
+          "y": 366,
+          "w": 90,
+          "h": 14,
+          "type": "hinged",
+          "orientation": "H",
+          "rooms": ["garden","throne"],
+          "color": "#3a0e16",
+          "hingeSide": "left",
+          "triggerRadius": 60
+        },
+        {
+          "x": 1040,
+          "y": 366,
+          "w": 80,
+          "h": 14,
+          "type": "hinged",
+          "orientation": "H",
+          "rooms": ["shrine","throne"],
+          "color": "#3a0e16",
+          "hingeSide": "right",
+          "triggerRadius": 60
+        },
+        {"x":260,"y":366,"w":140,"h":14,"type":"arch","orientation":"H","rooms":["garden","westgal"]},
+        {
+          "x": 1386,
+          "y": 180,
+          "w": 14,
+          "h": 80,
+          "type": "hinged",
+          "orientation": "V",
+          "rooms": ["shrine","bath"],
+          "color": "#3a0e16",
+          "hingeSide": "left",
+          "triggerRadius": 60
+        },
+        {
+          "x": 1560,
+          "y": 366,
+          "w": 80,
+          "h": 14,
+          "type": "hinged",
+          "orientation": "H",
+          "rooms": ["bath","eastgal"],
+          "color": "#3a0e16",
+          "hingeSide": "left",
+          "triggerRadius": 60
+        }
+      ],
+      "windows": [
+        {"x":0,"y":560,"w":14,"h":80,"facing":"E","projectionLength":140,"tint":"255, 80, 120"},
+        {"x":1786,"y":560,"w":14,"h":80,"facing":"W","projectionLength":140,"tint":"255, 80, 120"},
+        {"x":1520,"y":0,"w":80,"h":14,"facing":"S","projectionLength":120,"tint":"255, 110, 70"},
+        {"x":1060,"y":0,"w":80,"h":14,"facing":"S","projectionLength":140,"tint":"255, 80, 120"}
+      ],
+      "linens": [
+        {
+          "x": 18,
+          "y": 480,
+          "length": 70,
+          "width": 14,
+          "anchor": "left",
+          "color": "rgba(150, 10, 40, 0.18)",
+          "lightColor": "rgba(255, 90, 90, 0.03)",
+          "segments": 4
+        },
+        {
+          "x": 18,
+          "y": 620,
+          "length": 70,
+          "width": 14,
+          "anchor": "left",
+          "color": "rgba(150, 10, 40, 0.18)",
+          "lightColor": "rgba(255, 90, 90, 0.03)",
+          "segments": 4
+        },
+        {
+          "x": 18,
+          "y": 760,
+          "length": 70,
+          "width": 14,
+          "anchor": "left",
+          "color": "rgba(150, 10, 40, 0.18)",
+          "lightColor": "rgba(255, 90, 90, 0.03)",
+          "segments": 4
+        },
+        {
+          "x": 18,
+          "y": 900,
+          "length": 70,
+          "width": 14,
+          "anchor": "left",
+          "color": "rgba(150, 10, 40, 0.18)",
+          "lightColor": "rgba(255, 90, 90, 0.03)",
+          "segments": 4
+        },
+        {
+          "x": 1782,
+          "y": 480,
+          "length": 70,
+          "width": 14,
+          "anchor": "right",
+          "color": "rgba(150, 10, 40, 0.18)",
+          "lightColor": "rgba(255, 90, 90, 0.03)",
+          "segments": 4
+        },
+        {
+          "x": 1782,
+          "y": 620,
+          "length": 70,
+          "width": 14,
+          "anchor": "right",
+          "color": "rgba(150, 10, 40, 0.18)",
+          "lightColor": "rgba(255, 90, 90, 0.03)",
+          "segments": 4
+        },
+        {
+          "x": 1782,
+          "y": 760,
+          "length": 70,
+          "width": 14,
+          "anchor": "right",
+          "color": "rgba(150, 10, 40, 0.18)",
+          "lightColor": "rgba(255, 90, 90, 0.03)",
+          "segments": 4
+        },
+        {
+          "x": 1782,
+          "y": 900,
+          "length": 70,
+          "width": 14,
+          "anchor": "right",
+          "color": "rgba(150, 10, 40, 0.18)",
+          "lightColor": "rgba(255, 90, 90, 0.03)",
+          "segments": 4
+        }
+      ]
+    },
+    "house_of_death": {
+      "rooms": {
+        "library": {"x":14,"y":14,"w":546,"h":416,"type":"indoor","label":"Library"},
+        "chapel": {"x":574,"y":14,"w":652,"h":416,"type":"indoor","label":"Chapel"},
+        "bedroom": {"x":1240,"y":14,"w":320,"h":416,"type":"indoor","label":"Master Bedroom"},
+        "bath": {"x":1574,"y":14,"w":212,"h":416,"type":"indoor","label":"Bath"},
+        "dining": {"x":14,"y":444,"w":546,"h":556,"type":"indoor","label":"Dining Room"},
+        "hall": {"x":574,"y":444,"w":652,"h":556,"type":"indoor","label":"Grand Hall"},
+        "courtyard": {"x":1240,"y":444,"w":546,"h":556,"type":"outdoor","label":"Rain Courtyard"},
+        "kitchen": {"x":14,"y":1014,"w":546,"h":472,"type":"indoor","label":"Kitchen"},
+        "foyer": {"x":574,"y":1014,"w":652,"h":486,"type":"indoor","label":"Foyer"},
+        "gallery": {
+          "rects": [{"x":1240,"y":1014,"w":546,"h":150},{"x":1636,"y":1164,"w":150,"h":322}],
+          "type": "indoor",
+          "label": "Gallery"
+        },
+        "reliquary": {"x":1240,"y":1178,"w":382,"h":308,"type":"indoor","label":"Reliquary"}
+      },
+      "doors": [
+        {"x":820,"y":1000,"w":160,"h":14,"type":"arch","orientation":"H","rooms":["foyer","hall"]},
+        {
+          "x": 560,
+          "y": 1210,
+          "w": 14,
+          "h": 80,
+          "type": "hinged",
+          "orientation": "V",
+          "rooms": ["foyer","kitchen"],
+          "color": "#6b3a45",
+          "hingeSide": "left",
+          "triggerRadius": 60
+        },
+        {
+          "x": 1226,
+          "y": 1060,
+          "w": 14,
+          "h": 80,
+          "type": "hinged",
+          "orientation": "V",
+          "rooms": ["foyer","gallery"],
+          "color": "#6b3a45",
+          "hingeSide": "right",
+          "triggerRadius": 60
+        },
+        {
+          "x": 1226,
+          "y": 1340,
+          "w": 14,
+          "h": 80,
+          "type": "hinged",
+          "orientation": "V",
+          "rooms": ["foyer","reliquary"],
+          "color": "#6b3a45",
+          "hingeSide": "left",
+          "triggerRadius": 60
+        },
+        {
+          "x": 1622,
+          "y": 1300,
+          "w": 14,
+          "h": 80,
+          "type": "hinged",
+          "orientation": "V",
+          "rooms": ["reliquary","gallery"],
+          "color": "#6b3a45",
+          "hingeSide": "right",
+          "triggerRadius": 60
+        },
+        {"x":180,"y":1000,"w":150,"h":14,"type":"arch","orientation":"H","rooms":["kitchen","dining"]},
+        {
+          "x": 560,
+          "y": 680,
+          "w": 14,
+          "h": 80,
+          "type": "hinged",
+          "orientation": "V",
+          "rooms": ["dining","hall"],
+          "color": "#6b3a45",
+          "hingeSide": "left",
+          "triggerRadius": 60
+        },
+        {
+          "x": 240,
+          "y": 430,
+          "w": 80,
+          "h": 14,
+          "type": "hinged",
+          "orientation": "H",
+          "rooms": ["dining","library"],
+          "color": "#6b3a45",
+          "hingeSide": "left",
+          "triggerRadius": 60
+        },
+        {
+          "x": 560,
+          "y": 200,
+          "w": 14,
+          "h": 80,
+          "type": "hinged",
+          "orientation": "V",
+          "rooms": ["library","chapel"],
+          "color": "#6b3a45",
+          "hingeSide": "right",
+          "triggerRadius": 60
+        },
+        {
+          "x": 830,
+          "y": 430,
+          "w": 70,
+          "h": 14,
+          "type": "hinged",
+          "orientation": "H",
+          "rooms": ["chapel","hall"],
+          "color": "#6b3a45",
+          "hingeSide": "left",
+          "triggerRadius": 60
+        },
+        {
+          "x": 900,
+          "y": 430,
+          "w": 70,
+          "h": 14,
+          "type": "hinged",
+          "orientation": "H",
+          "rooms": ["chapel","hall"],
+          "color": "#6b3a45",
+          "hingeSide": "right",
+          "triggerRadius": 60
+        },
+        {
+          "x": 1226,
+          "y": 200,
+          "w": 14,
+          "h": 80,
+          "type": "hinged",
+          "orientation": "V",
+          "rooms": ["chapel","bedroom"],
+          "color": "#6b3a45",
+          "hingeSide": "left",
+          "triggerRadius": 60
+        },
+        {
+          "x": 1560,
+          "y": 250,
+          "w": 14,
+          "h": 70,
+          "type": "hinged",
+          "orientation": "V",
+          "rooms": ["bedroom","bath"],
+          "color": "#6b3a45",
+          "hingeSide": "left",
+          "triggerRadius": 60
+        },
+        {
+          "x": 1340,
+          "y": 430,
+          "w": 120,
+          "h": 14,
+          "type": "sliding",
+          "orientation": "H",
+          "rooms": ["bedroom","courtyard"],
+          "color": "rgba(170, 150, 230, 0.32)",
+          "speed": 0.07,
+          "triggerRadius": 90
+        },
+        {
+          "x": 1226,
+          "y": 660,
+          "w": 14,
+          "h": 120,
+          "type": "sliding",
+          "orientation": "V",
+          "rooms": ["hall","courtyard"],
+          "color": "rgba(170, 150, 230, 0.32)",
+          "speed": 0.07,
+          "triggerRadius": 90
+        },
+        {
+          "x": 1450,
+          "y": 1000,
+          "w": 120,
+          "h": 14,
+          "type": "sliding",
+          "orientation": "H",
+          "rooms": ["courtyard","gallery"],
+          "color": "rgba(170, 150, 230, 0.32)",
+          "speed": 0.07,
+          "triggerRadius": 90
+        }
+      ],
+      "windows": [
+        {"x":640,"y":0,"w":60,"h":14,"facing":"S","projectionLength":150,"tint":"190, 130, 255"},
+        {"x":870,"y":0,"w":60,"h":14,"facing":"S","projectionLength":170,"tint":"255, 120, 170"},
+        {"x":1100,"y":0,"w":60,"h":14,"facing":"S","projectionLength":150,"tint":"190, 130, 255"},
+        {"x":0,"y":150,"w":14,"h":60,"facing":"E","projectionLength":120,"tint":"255, 120, 170"},
+        {"x":0,"y":650,"w":14,"h":60,"facing":"E","projectionLength":120,"tint":"190, 130, 255"},
+        {"x":1330,"y":0,"w":70,"h":14,"facing":"S","projectionLength":120,"tint":"255, 120, 170"},
+        {"x":1786,"y":150,"w":14,"h":70,"facing":"W","projectionLength":110,"tint":"220, 230, 255"},
+        {"x":1260,"y":430,"w":70,"h":14,"facing":"N","projectionLength":90,"tint":"200, 210, 255"},
+        {"x":1226,"y":480,"w":14,"h":160,"facing":"W","projectionLength":110,"tint":"200, 210, 255"},
+        {"x":1226,"y":800,"w":14,"h":170,"facing":"W","projectionLength":110,"tint":"200, 210, 255"},
+        {"x":1260,"y":1000,"w":170,"h":14,"facing":"S","projectionLength":90,"tint":"200, 210, 255"},
+        {"x":1786,"y":1260,"w":14,"h":80,"facing":"W","projectionLength":110,"tint":"190, 130, 255"}
+      ],
+      "linens": [
+        {
+          "x": 632,
+          "y": 16,
+          "length": 70,
+          "width": 14,
+          "anchor": "top",
+          "color": "rgba(120, 40, 90, 0.16)",
+          "lightColor": "rgba(190, 120, 255, 0.03)",
+          "segments": 4
+        },
+        {
+          "x": 1168,
+          "y": 16,
+          "length": 70,
+          "width": 14,
+          "anchor": "top",
+          "color": "rgba(120, 40, 90, 0.16)",
+          "lightColor": "rgba(190, 120, 255, 0.03)",
+          "segments": 4
+        },
+        {
+          "x": 1222,
+          "y": 470,
+          "length": 60,
+          "width": 12,
+          "anchor": "right",
+          "color": "rgba(90, 30, 70, 0.16)",
+          "lightColor": "rgba(255, 120, 170, 0.03)",
+          "segments": 3
+        },
+        {
+          "x": 1222,
+          "y": 950,
+          "length": 60,
+          "width": 12,
+          "anchor": "right",
+          "color": "rgba(90, 30, 70, 0.16)",
+          "lightColor": "rgba(255, 120, 170, 0.03)",
+          "segments": 3
+        }
+      ]
+    }
+  },
+  "hub": {
+    "blocks": {
+      "cafe": "block_2_6",
+      "club": "block_8_6",
+      "clinic": "block_4_12",
+      "biggs": "block_12_8",
+      "ashgrove": "block_14_8",
+      "scrapyard": "block_16_12",
+      "graveyard": "block_18_6"
+    },
+    "graveyard": {"x":4750,"y":11360,"w":2700,"h":1760},
+    "ollo_door": {"x":8640,"y":13080,"w":80,"h":60},
+    "npc_anchors": [{"name":"Anavia","x":550,"y":1650,"role":"vip"}],
+    "npc_clearance": 90
+  },
+  "hearths": {"apt_949":{"x":580,"y":432},"keepers_parlor":{"x":450,"y":62},"cozy_cafe_interior":{"x":90,"y":535}},
+  "dyer_station": {"x":1176,"y":214,"width":58,"height":30}
+}
