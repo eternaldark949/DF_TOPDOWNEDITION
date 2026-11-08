@@ -11,10 +11,10 @@ const setup=`game._doLoadMap('ollo_test');game.running=true;game.paused=false;ga
  game.currentWeapon=createItemFromRegistry('sniper_sara',game);game.weaponMode='sniper';game.shootCooldown=0;
  game.rollCrit=()=>1;// crits are random (engine/combat-fx.js); these compare exact damage
  game.car.x=1000;game.car.y=1000;game.car.angle=0;game.car.length=100;
- _zoomLOD=0;game.weaponHolstered=false;game.projectiles=[];game.muzzleFlashes=[];game.shotFx=[];game.casings=[];
+ _zoomLOD=0;game.weaponHolstered=false;game.projectiles=[];game.effects.clear();
  const fire=(id,drive)=>{game.currentWeapon=createItemFromRegistry(id,game);game.weaponMode=id.startsWith('sniper')?'sniper':'normal';
  game.isDriving=drive;game.shootCooldown=0;game.fireWeapon();const p=game.projectiles.at(-1);
- return {damage:p.damage,life:p.life,color:p.color,speed:Math.hypot(p.vx,p.vy),sniper:p.isSniper,trail:p.fxTrail?.trail,flash:game.muzzleFlashes.at(-1).color};};
+ return {damage:p.damage,life:p.life,color:p.color,speed:Math.hypot(p.vx,p.vy),sniper:p.isSniper,trail:p.fxTrail?.trail,flash:game.effects.of('muzzle').at(-1).color};};
 `;
 for(const id of ['pistol_anavia','sniper_sara','sniper_sr86','golden_child']){
  test(`${id}: walking and driving share projectile stats and signature effects`,`
@@ -23,7 +23,7 @@ for(const id of ['pistol_anavia','sniper_sara','sniper_sr86','golden_child']){
  });
 }
 test('Drive-by shot and muzzle flash start at shared scope/laser geometry, ignoring stale foot pose',`
- game.isDriving=true;game.player._muzzleLocal={x:999,y:999};const g=game.getPlayerShotGeometry();game.fireWeapon();const p=game.projectiles.at(-1),flash=game.muzzleFlashes.at(-1);
+ game.isDriving=true;game.player._muzzleLocal={x:999,y:999};const g=game.getPlayerShotGeometry();game.fireWeapon();const p=game.projectiles.at(-1),flash=game.effects.of('muzzle').at(-1);
  return {g,shot:{x:p.x,y:p.y,angle:p.angle},flash:{x:flash.x,y:flash.y,angle:flash.angle}};`,r=>{
  assert.deepEqual(r.shot,r.g);assert.deepEqual(r.flash,r.g);assert.ok(Math.hypot(r.g.x-1000,r.g.y-1000)<110);
 });

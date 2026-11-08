@@ -685,7 +685,7 @@
                 // 3. DYNAMIC LIGHT BONUSES
             
                 // Muzzle Flashes (High Intensity, Instant)
-                for (let flash of this.muzzleFlashes) {
+                for (let flash of this.effects.of('muzzle')) {
                     const dist = Math.hypot(this.player.x - flash.x, this.player.y - flash.y);
                     if (dist < flash.radius) {
                         const intensity = (1.0 - (dist / flash.radius));

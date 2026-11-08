@@ -245,7 +245,7 @@
                     ['entities', R ? R.all.length : 0], ['collidable', R ? R.collidable.length : 0],
                     ['enemies', game.enemies.length], ['peds', game.pedestrians ? game.pedestrians.pedestrians.length : 0],
                     ['cars', game.traffic ? game.traffic.vehicles.length : 0], ['shots', game.projectiles.length],
-                    ['decals', game.decals ? game.decals.decals.length : 0], ['glitter', (game.casings || []).length], ['fx', (game.shotFx || []).length]
+                    ['decals', game.decals ? game.decals.decals.length : 0], ['glitter', game.effects.of('casing').length], ['fx', game.effects.of('barrel').length]
                 ];
                 return parts.map(([k, v]) => `<span>${k} <b>${v}</b></span>`).join('');
             },

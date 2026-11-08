@@ -122,7 +122,7 @@
                     const pulse = 0.96 + 0.04 * Math.sin(now * 0.023 + (p.id || 0));
                     stamp(p, p.x, p.y, FIREBALL_LIGHT_RADIUS, (color ? 0.32 : 0.98) * pulse);
                 }
-                const trail = this._fireTrail || [], cells = this._fireCells || (this._fireCells = new Set());
+                const trail = this.effects.of('flame'), cells = this._fireCells || (this._fireCells = new Set());
                 cells.clear();   // (one reused set, numeric cell keys: no strings or sets per pass)
                 let lit = 0;
                 for (let i = trail.length - 1; i >= 0 && lit < 48; i--) {
@@ -139,7 +139,7 @@
 
             /** Warm orange spill also reads by day or in a map with no ambient-darkness layer. */
             drawFireLightGlow(ctx) {
-                if (!this.projectiles.some(p => p.isFireball) && !(this._fireTrail && this._fireTrail.length)) return;
+                if (!this.projectiles.some(p => p.isFireball) && !this.effects.of('flame').length) return;
                 const V = this.view || this.camera, x = V.x, y = V.y;
                 const zoom = V.zoom || this.camera.zoom;
                 const hw = this.canvas.width / (2 * zoom), hh = this.canvas.height / (2 * zoom);
@@ -529,7 +529,7 @@
                 const white = glowSprite('255, 255, 255', 0.3);
                 for (const p of this.projectiles) if (!p.isFireball && inView(p.x, p.y, 50)) lc.drawImage(white, p.x - 50, p.y - 50, 100, 100);
                 this._drawFireLights(lc, 'hole', inView);
-                for (const f of this.muzzleFlashes) {
+                for (const f of this.effects.of('muzzle')) {
                     const r = f.radius * 1.6;
                     if (inView(f.x, f.y, r)) lc.drawImage(white, f.x - r, f.y - r, r * 2, r * 2);
                 }
@@ -759,7 +759,7 @@
                     if (p.isFireball || !inView(p.x, p.y, 40)) continue;
                     lc.globalAlpha = 0.3; drawGlow(lc, p.x, p.y, 40, hexOr(p.color, '#ffd9a0'), 0.25);
                 }
-                for (const f of this.muzzleFlashes) {
+                for (const f of this.effects.of('muzzle')) {
                     const r = f.radius * 1.4;
                     if (!inView(f.x, f.y, r)) continue;
                     lc.globalAlpha = 0.45 * Math.min(1, (f.life || 3) / 3); drawGlow(lc, f.x, f.y, r, hexOr(f.color, '#ffcc88'), 0.25);

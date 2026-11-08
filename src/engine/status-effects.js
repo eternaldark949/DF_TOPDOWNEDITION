@@ -254,10 +254,9 @@
                 L.push(swing.slash = { x: pl.x, y: pl.y, a: ang, side, t0: _gameTimeSec, reach, arc, hit: false, secs: this._slashSecs, style: this._slashStyle, edge: swing.edge, cols: trail.cols });
                 if (L.length > 8) L.shift();
                 swing.dust = trail.dust;
-                const fx = this.shotFx || (this.shotFx = []);
-                for (let i = 0; i < 3; i++) {
+                                for (let i = 0; i < 3; i++) {
                     const a = ang + (Math.random() - 0.5) * arc, r = reach * (0.5 + Math.random() * 0.5);
-                    fx.push({ k: 'dust', x: pl.x + Math.cos(a) * r, y: pl.y + Math.sin(a) * r, vx: Math.cos(a) * 0.4, vy: Math.sin(a) * 0.4, t: -i, life: 30, col: trail.dust, ph: Math.random() * 6.28 });
+                    this.effects.spawn('barrel', { k: 'dust', x: pl.x + Math.cos(a) * r, y: pl.y + Math.sin(a) * r, vx: Math.cos(a) * 0.4, vy: Math.sin(a) * 0.4, t: -i, life: 30, col: trail.dust, ph: Math.random() * 6.28 });
                 }
                 if (typeof ambience !== 'undefined' && ambience.slash) ambience.slash(false);
                 this.emitNoise(pl.x, pl.y, st.noise || 60, 'slash');
@@ -336,10 +335,9 @@
                 if (!e.dead && e.interruptMelee) e.interruptMelee();
                 if (st.bleedDps) this.applyStatus(e, 'bleed', { dps: st.bleedDps * this.playerDamageMult(), secs: st.bleedSecs || 3, by: pl, max: S.bleedMax });
                 if (!e.dead && typeof Ganger !== 'undefined' && e instanceof Ganger) { e.suspicion = 100; e.state = 'ALERT'; e.angle = Math.atan2(-dy, -dx); }
-                const fx = this.shotFx || (this.shotFx = []);
-                for (let i = 0; i < 5; i++) {
+                                for (let i = 0; i < 5; i++) {
                     const a = Math.atan2(dy, dx) + (Math.random() - 0.5) * 1.2;
-                    fx.push({ k: 'dust', x: e.x - Math.cos(a) * 6, y: e.y - Math.sin(a) * 6, vx: Math.cos(a) * 0.5, vy: Math.sin(a) * 0.5, t: -i, life: 30, col: S.dust, ph: Math.random() * 6.28 });
+                    this.effects.spawn('barrel', { k: 'dust', x: e.x - Math.cos(a) * 6, y: e.y - Math.sin(a) * 6, vx: Math.cos(a) * 0.5, vy: Math.sin(a) * 0.5, t: -i, life: 30, col: S.dust, ph: Math.random() * 6.28 });
                 }
                 if (!S.hits++) {
                     if (S.slash) S.slash.hit = true;

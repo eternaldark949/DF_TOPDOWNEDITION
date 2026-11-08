@@ -58,8 +58,8 @@
                 this.profiler.start('Logic:Systems');
                 
                 // Cleanup old muzzle flashes
-                lifeKit.sweep(this.muzzleFlashes, (f) => --f.life <= 0);
-                this.updateCasings();
+                this.effects.update('muzzle');
+                this.effects.update('casing');                          // spent brass and glitter (directory/effects-system.js)
                 this.updateCorpses();
                 this.updateStatuses();                                 // bleeding and the rest (engine/status-effects.js)
                 this.updateBossHazards();                              // sigils, fire, censers, hooks; her burn (engine/boss-hazards.js)
@@ -67,9 +67,9 @@
                 this.updateExecution();                                // a takedown in progress (engine/executions.js)
                 this.updateSneak();
                 this.updatePuddles();                                  // raindrop rings and splashes (engine/reflections.js)
-                this.updateFireTrail();
+                this.effects.update('flame');
                 this.updateBreachFx();                                 // a wall blown in (engine/breach-fx.js)
-                this.updateShotFx();
+                this.effects.update('barrel');
             
                 this.updateTime();
                 this.updateUI();
@@ -466,7 +466,7 @@
                         const flashRadius = (weaponDef?.stats?.flashRadius) || (abilityDef?.stats?.flashRadius) || 40;
                         this.projectiles.push(shot);
                         const shotAng = Math.atan2(shot.vy, shot.vx);
-                        this.muzzleFlashes.push({ x: shot.x, y: shot.y, radius: flashRadius, color: flashColor, life: 3, angle: shotAng });
+                        this.effects.spawn('muzzle', { x: shot.x, y: shot.y, radius: flashRadius, color: flashColor, life: 3, angle: shotAng });
                         this.weaponFx(shot.x, shot.y, shotAng, tm.equippedWeaponId, shot, tm);
                         if (tm.hireType === 'permanent') captionSystem.teammateCombatQuip(tm.name);
                         else captionSystem.dancerFollowQuip(tm.name);
@@ -602,7 +602,7 @@
                             if (shot instanceof ProjectileEntity) {
                                 this.projectiles.push(shot);
                                 const shotAng = Math.atan2(shot.vy, shot.vx);
-                                this.muzzleFlashes.push({ x: shot.x, y: shot.y, radius: 50, color: shot.color, life: 3, angle: shotAng });
+                                this.effects.spawn('muzzle', { x: shot.x, y: shot.y, radius: 50, color: shot.color, life: 3, angle: shotAng });
                                 if (enemy.equippedWeaponId !== undefined) this.weaponFx(shot.x, shot.y, shotAng, enemy.equippedWeaponId || 'pistol_ganger', shot, enemy);
                             }
                         }

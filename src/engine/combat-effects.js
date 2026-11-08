@@ -40,78 +40,11 @@
             spawnCasing(x, y, angle, weaponId) {
                 const col = weaponId ? weaponModel(weaponId).brass : null;
                 if (!col || (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2)) return;
-                const L = this.casings || (this.casings = []), c = Math.cos(angle), s = Math.sin(angle);
+                const c = Math.cos(angle), s = Math.sin(angle);
                 const sniper = weaponId.includes('sniper'), back = sniper ? 30 : 8, v = 1.7 + Math.random() * 1.1;
-                L.push({ x: x - c * back, y: y - s * back, vx: -s * v - c * (0.35 + Math.random() * 0.4), vy: c * v - s * (0.35 + Math.random() * 0.4),
+                this.effects.spawn('casing', { x: x - c * back, y: y - s * back, vx: -s * v - c * (0.35 + Math.random() * 0.4), vy: c * v - s * (0.35 + Math.random() * 0.4),
                          a: angle, spin: (Math.random() - 0.5) * 0.9, t: 0, big: sniper, col, ph: Math.random() * 6.28, rate: 0.004 + Math.random() * 0.005 });
-                while (L.length > 60) L.shift();
             },
-            updateCasings() {
-                const L = this.casings;
-                if (!L || !L.length) return;
-                lifeKit.sweep(L, k => {
-                    k.t++;
-                    if (k.t < 26) { k.x += k.vx; k.y += k.vy; k.vx *= 0.86; k.vy *= 0.86; k.a += k.spin; k.spin *= 0.9; }
-                    else if (k.t === 26) {                                               // landed: two finer flecks, and the lamp it lies under
-                        k.sub = [(Math.random() - 0.5) * 5, (Math.random() - 0.5) * 5, (Math.random() - 0.5) * 5, (Math.random() - 0.5) * 5];
-                        this._casingLamp(k);
-                    }
-                    if (k.t > 1500) return true;
-                });
-            },
-            /** Once, as a casing lands: the nearest lamp whose pool it lies in lends it its colour (k.lc) and strength (k.lk). */
-            _casingLamp(k) {
-                let best = null, bk = 0;
-                const consider = (l) => {
-                    if (!l || l._forcedOff) return;
-                    const r = (l.radius || 200) * 0.6, d = Math.hypot(l.x - k.x, l.y - k.y);
-                    if (d < r) { const s = 1 - d / r; if (s > bk) { bk = s; best = l; } }
-                };
-                for (const entry of this._queryLampCandidates({ left: k.x, right: k.x, top: k.y, bottom: k.y }, 'lampCasings')) consider(entry.item);
-                if (this.activeMap && this.activeMap._interiorLights) {
-                    for (const entry of this._queryEffectCandidates('interiorLamps', this.activeMap._interiorLights,
-                        { left: k.x, right: k.x, top: k.y, bottom: k.y }, 'interiorLampCasings')) consider(entry.item);
-                }
-                if (best && /^#[0-9a-f]{6}$/i.test(best.color || '')) { k.lc = best.color; k.lk = bk; }
-            },
-            /**
-             * Casings on the ground (after decals, under everyone) as glitter: a fleck in the gun's colour
-             * that twinkles on its own rhythm, and at the top of each twinkle a four-point glint. Under a
-             * burning lamp it catches that lamp's light: it twinkles brighter and oftener, the glint in the lamp's colour.
-             */
-            drawCasings(ctx, cb) {
-                const L = this.casings;
-                if (!L || !L.length || _zoomLOD >= 1) return;
-                const day = this._lampDaylight ?? 0, night = Math.max(0, Math.min(1, (0.35 - day) / 0.15));
-                ctx.save();
-                ctx.globalCompositeOperation = 'lighter';
-                ctx.lineCap = 'round';
-                for (const k of L) {
-                    if (k.x < cb.left || k.x > cb.right || k.y < cb.top || k.y > cb.bottom) continue;
-                    const fade = k.t > 1380 ? (1500 - k.t) / 120 : 1, spin = k.t < 26 ? 1 : 0;
-                    const lit = k.lc ? k.lk * night : 0;                                // how much lamp light it catches
-                    const tw = Math.pow(Math.abs(Math.sin(_frameTime * k.rate * (1 + lit * 1.5) + k.ph)), 6 - lit * 3), s = k.big ? 1.3 : 1;
-                    ctx.globalAlpha = fade * (0.45 + 0.55 * Math.max(tw, spin * 0.7)) * (1 + lit * 0.4);
-                    ctx.fillStyle = k.col;
-                    ctx.fillRect(k.x - 0.6 * s, k.y - 0.6 * s, 1.2 * s, 1.2 * s);        // the fleck
-                    if (k.sub) {                                                         // its two finer flecks, twinkling out of step
-                        const tw2 = Math.pow(Math.abs(Math.sin(_frameTime * k.rate * 1.3 + k.ph + 2)), 4);
-                        ctx.globalAlpha = fade * (0.3 + 0.6 * tw2) * (1 + lit * 0.5);
-                        ctx.fillRect(k.x + k.sub[0] - 0.35, k.y + k.sub[1] - 0.35, 0.7, 0.7);
-                        ctx.fillStyle = lit > 0.2 ? k.lc : k.col;
-                        ctx.fillRect(k.x + k.sub[2] - 0.35, k.y + k.sub[3] - 0.35, 0.7, 0.7);
-                    }
-                    if (tw > 0.35) {                                                     // the glint
-                        const r = (1.2 + 2.6 * tw) * s * (1 + lit * 0.6);
-                        ctx.globalAlpha = fade * Math.min(1, tw * (1 + lit * 0.5));
-                        ctx.fillStyle = '#ffffff'; ctx.fillRect(k.x - 0.35, k.y - 0.35, 0.7, 0.7);
-                        ctx.strokeStyle = lit > 0.15 ? k.lc : k.col; ctx.lineWidth = 0.45;
-                        ctx.beginPath(); ctx.moveTo(k.x - r, k.y); ctx.lineTo(k.x + r, k.y); ctx.moveTo(k.x, k.y - r); ctx.lineTo(k.x, k.y + r); ctx.stroke();
-                    }
-                }
-                ctx.restore();
-            },
-
             /**
              * A gun's signature beyond the flash (its model's `fx`, ui/weapon-models.js), at every shot:
              * casings for the guns that throw them, a trail tag on the shot for the guns that don't
@@ -128,24 +61,22 @@
                         o._streak = (now - (o._streakT || -9) < 0.6 ? (o._streak || 0) : 0) + 1; o._streakT = now;
                         if (o._streak < fx.after) return;
                     }
-                    const c = Math.cos(angle), s = Math.sin(angle), F = this.shotFx || (this.shotFx = []);
+                    const c = Math.cos(angle), s = Math.sin(angle), E = this.effects;
                     if (fx.barrel === 'smoke') {
-                        for (let i = 0; i < 6; i++) F.push({ k: 'smoke', x: x + c * (2 + i * 1.5), y: y + s * (2 + i * 1.5), vx: c * 0.22 + (Math.random() - 0.5) * 0.2, vy: s * 0.22 + (Math.random() - 0.5) * 0.2,
+                        for (let i = 0; i < 6; i++) E.spawn('barrel', { k: 'smoke', x: x + c * (2 + i * 1.5), y: y + s * (2 + i * 1.5), vx: c * 0.22 + (Math.random() - 0.5) * 0.2, vy: s * 0.22 + (Math.random() - 0.5) * 0.2,
                                                              t: -i * 7, life: 64, r: 0.9, col: fx.col, ph: Math.random() * 6.28 });
                     } else if (fx.barrel === 'embers') {
                         for (let i = 0; i < 7; i++) { const a = angle + (Math.random() - 0.5) * 1.6, v = 0.4 + Math.random() * 1.1;
-                            F.push({ k: 'ember', x: x + c * 2, y: y + s * 2, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: 30 + Math.random() * 25, col: Math.random() < 0.35 ? fx.hot : fx.col, ph: Math.random() * 6.28 }); }
+                            E.spawn('barrel', { k: 'ember', x: x + c * 2, y: y + s * 2, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: 30 + Math.random() * 25, col: Math.random() < 0.35 ? fx.hot : fx.col, ph: Math.random() * 6.28 }); }
                     }
-                    while (F.length > 160) F.shift();
                 }
             },
             /** A golden wisp puff behind a 'wisp' shot (called by the shot as it flies). */
             spawnWisp(x, y, fx) {
                 if (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2) return;
-                const F = this.shotFx || (this.shotFx = []);
-                F.push({ k: 'wisp', x, y, vx: (Math.random() - 0.5) * 0.2, vy: (Math.random() - 0.5) * 0.2, t: 0, life: 50, r: 3, col: fx.col, ph: Math.random() * 6.28 });
-                if (Math.random() < 0.85) F.push({ k: 'dust', x: x + (Math.random() - 0.5) * 4, y: y + (Math.random() - 0.5) * 4, vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3, t: 0, life: 36, col: fx.dust, ph: Math.random() * 6.28 });
-                while (F.length > 160) F.shift();
+                const E = this.effects;
+                E.spawn('barrel', { k: 'wisp', x, y, vx: (Math.random() - 0.5) * 0.2, vy: (Math.random() - 0.5) * 0.2, t: 0, life: 50, r: 3, col: fx.col, ph: Math.random() * 6.28 });
+                if (Math.random() < 0.85) E.spawn('barrel', { k: 'dust', x: x + (Math.random() - 0.5) * 4, y: y + (Math.random() - 0.5) * 4, vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3, t: 0, life: 36, col: fx.dust, ph: Math.random() * 6.28 });
             },
             /** Lay flames along the distance actually flown, including the hand's starting point. */
             emitFireTrail(shot, x0, y0, x1, y1) {
@@ -159,12 +90,12 @@
                 }
                 const dx = x1 - x0, dy = y1 - y0, distance = Math.hypot(dx, dy);
                 if (distance < 0.001) return;
-                const F = this._fireTrail || (this._fireTrail = []), now = _gameTimeMs();
+                const now = _gameTimeMs();
                 const angle = Math.atan2(dy, dx);
                 const add = (x, y, born) => {
                     this._fireTrailSerial = ((this._fireTrailSerial || 0) + 1) >>> 0;
                     const seed = (this._fireTrailSerial * 0.61803398875) % 1;
-                    F.push({ x, y, born, life: 1500 + seed * 300, seed, angle });
+                    this.effects.spawn('flame', { x, y, born, life: 1500 + seed * 300, seed, angle });
                 };
                 if (!shot._fireTrailStarted) {
                     shot._fireTrailStarted = true; shot._fireTrailGap = 0;
@@ -177,109 +108,7 @@
                     add(x0 + dx * u, y0 + dy * u, now - CONFIG.LOOP.STEP_MS * (1 - u));
                 }
                 shot._fireTrailGap = (gap + distance) % FIRE_TRAIL_SPACING;
-                if (F.length > FIRE_TRAIL_MAX) F.splice(0, F.length - FIRE_TRAIL_MAX);
             },
-            updateFireTrail() {
-                const F = this._fireTrail;
-                if (!F || !F.length) return;
-                const now = _gameTimeMs(); let write = 0;
-                for (let i = 0; i < F.length; i++) {
-                    const p = F[i]; if (now - p.born < p.life) F[write++] = p;
-                }
-                F.length = write;
-            },
-            /** World-space flames keep burning after the projectile disappears; game time freezes them. */
-            drawFireTrail(ctx, cb) {
-                const F = this._fireTrail;
-                if (!F || !F.length) return;
-                const sprites = _getFireTrailSprites(), now = _gameTimeMs(), baseAlpha = ctx.globalAlpha;
-                const stride = typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2 ? 2 : 1;
-                ctx.save(); ctx.globalCompositeOperation = 'lighter';
-                for (let i = 0; i < F.length; i += stride) {
-                    const p = F[i], age = now - p.born;
-                    if (age < 0 || age >= p.life) continue;
-                    if (cb && (p.x < cb.left - 26 || p.x > cb.right + 26 || p.y < cb.top - 26 || p.y > cb.bottom + 26)) continue;
-                    const u = age / p.life, fade = Math.pow(1 - u, 1.45);
-                    const phase = ((age / 720 + p.seed) % 1) * sprites.frames;
-                    const frame = Math.floor(phase), blend = phase - frame, next = (frame + 1) % sprites.frames;
-                    const drift = Math.sin(age * 0.009 + p.seed * 6.28) * u * 3.2;
-                    const size = (0.85 + p.seed * 0.3) * (1 + Math.sin(u * Math.PI) * 0.25) * (1 - u * 0.55);
-                    ctx.save();
-                    ctx.translate(p.x - Math.sin(p.angle) * drift, p.y + Math.cos(p.angle) * drift);
-                    ctx.rotate(p.angle + Math.sin(age * 0.012 + p.seed * 9) * (0.12 + u * 0.28));
-                    ctx.scale(size, size * (0.9 + 0.25 * Math.sin(age * 0.016 + p.seed * 6.28)));
-                    ctx.globalAlpha = baseAlpha * 0.68 * fade * (1 - blend);
-                    ctx.drawImage(sprites.atlas, (frame % sprites.cols) * sprites.w * sprites.K,
-                        Math.floor(frame / sprites.cols) * sprites.h * sprites.K, sprites.w * sprites.K, sprites.h * sprites.K,
-                        -22, -18, sprites.w, sprites.h);
-                    ctx.globalAlpha = baseAlpha * 0.68 * fade * blend;
-                    ctx.drawImage(sprites.atlas, (next % sprites.cols) * sprites.w * sprites.K,
-                        Math.floor(next / sprites.cols) * sprites.h * sprites.K, sprites.w * sprites.K, sprites.h * sprites.K,
-                        -22, -18, sprites.w, sprites.h);
-                    ctx.restore();
-                }
-                ctx.restore();
-            },
-
-            updateShotFx() {
-                const F = this.shotFx;
-                if (!F || !F.length) return;
-                const W = this.weather && this.weather.windVec ? this.weather.windVec : { x: 0, y: 0 };
-                lifeKit.sweep(F, (p) => {
-                    p.t++;
-                    if (p.t <= 0) return;                                              // (a smoke puff still waiting its turn)
-                    if (p.t > p.life) return true;
-                    if (p.k === 'smoke' || p.k === 'wisp') {                             // drifts downwind, curls, swells
-                        p.vx = p.vx * 0.94 + W.x * 0.012 + Math.cos(p.t * 0.15 + p.ph) * 0.03;
-                        p.vy = p.vy * 0.94 + W.y * 0.012 + Math.sin(p.t * 0.15 + p.ph) * 0.03;
-                        p.r += p.k === 'smoke' ? 0.055 : 0.14;
-                    } else { p.vx *= 0.93; p.vy *= 0.93; p.vx += W.x * 0.004; p.vy += W.y * 0.004; }
-                    p.x += p.vx; p.y += p.vy;
-                });
-            },
-            /** Barrel smoke and wisps (soft, normal blend), then embers and gold dust (additive). After the muzzle stars. */
-            drawShotFx(ctx, cb) {
-                const F = this.shotFx;
-                if (!F || !F.length || _zoomLOD >= 2) return;
-                ctx.save();
-                for (const p of F) {
-                    if (p.t <= 0 || (p.k !== 'smoke' && p.k !== 'wisp')) continue;
-                    if (p.x < cb.left || p.x > cb.right || p.y < cb.top || p.y > cb.bottom) continue;
-                    const u = p.t / p.life, a = (p.k === 'smoke' ? 0.2 : 0.55) * Math.sin(Math.min(1, u * 4) * Math.PI / 2) * (1 - u);
-                    ctx.globalAlpha = a;
-                    const R = p.r * 2.2;
-                    ctx.drawImage(puffSprite(p.col), p.x - R, p.y - R, R * 2, R * 2);
-                }
-                ctx.globalCompositeOperation = 'lighter';
-                for (const p of F) {
-                    if (p.t <= 0 || (p.k !== 'ember' && p.k !== 'dust')) continue;
-                    if (p.x < cb.left || p.x > cb.right || p.y < cb.top || p.y > cb.bottom) continue;
-                    const u = p.t / p.life, fl = 0.55 + 0.45 * Math.sin(_frameTime * 0.03 + p.ph);
-                    ctx.globalAlpha = (1 - u) * fl;
-                    ctx.fillStyle = p.col;
-                    const z = p.k === 'ember' ? 0.9 * (1 - u * 0.5) : 0.75;
-                    ctx.fillRect(p.x - z / 2, p.y - z / 2, z, z);
-                    if (p.k === 'ember' && u < 0.4) { ctx.globalAlpha *= 0.35; ctx.fillRect(p.x - p.vx * 2 - z / 2, p.y - p.vy * 2 - z / 2, z, z); }   // its streak
-                }
-                ctx.restore();
-            },
-            /** The star of each fresh muzzle flash, at the muzzle along the shot (its light is the lighting pass's). */
-            drawMuzzleStars(ctx) {
-                const F = this.muzzleFlashes;
-                if (!F || !F.length) return;
-                ctx.save(); ctx.globalCompositeOperation = 'lighter';
-                const base = ctx.getTransform();
-                for (const f of F) {
-                    if (f.angle === undefined) continue;
-                    const k = Math.min(1, (f.life || 0) / 3), s = (f.radius || 50) / 170 * (0.7 + 0.3 * k);
-                    ctx.setTransform(base);
-                    ctx.translate(f.x, f.y); ctx.rotate(f.angle); ctx.scale(s, s * (0.8 + 0.4 * ((f.x * 7 + f.life) % 1)));
-                    ctx.globalAlpha = 0.35 + 0.65 * k;
-                    ctx.drawImage(muzzleStarSprite(f.color), -24, -24);
-                }
-                ctx.restore();
-            },
-
             triggerShake(amount) {
                 if (amount > this.camera.shake) {
                     this.camera.shake = amount;
@@ -551,7 +380,7 @@
                 this._loudUntil = _gameTimeSec + 10;                     // she's fired: the crew is weapons free (engine/sneak.js)
 
                 // 5. Spawn Muzzle Flash
-                this.muzzleFlashes.push({ 
+                this.effects.spawn('muzzle', { 
                     x: px, 
                     y: py, 
                     radius: stats.flashRadius || 50, 

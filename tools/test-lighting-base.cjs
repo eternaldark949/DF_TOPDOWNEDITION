@@ -59,7 +59,7 @@ test('A cache owns one bounded canvas, reuses it and releases its pixels explici
 });
 test('Dynamic vehicles, projectiles and fire never enter the static cache key',e=>{
  const r=value(e,fixture+`
-  warm();g.projectiles.push({x:20,y:30,isFireball:true});g._fireTrail=[{x:40,y:50}];g.car.x+=10;
+  warm();g.projectiles.push({x:20,y:30,isFireball:true});g.effects.of('flame').push({x:40,y:50});g.car.x+=10;
   return {hit:prepare().hit};
  `);assert.equal(r.hit,true);
 });

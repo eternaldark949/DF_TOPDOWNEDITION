@@ -161,7 +161,7 @@ test('Golden Child: every Quick Hands rank and Reflex Sync improve sustained DPS
     if(tick%cooldown===0){
      game.shootCooldown=0;game.fireWeapon();const p=game.projectiles.pop();
      target.takeDamage(p.damage);game.stickOrb(target,p);p.destroy();
-     game.muzzleFlashes=[];game.shotFx=[];game.casings=[];game.noiseRipples=[];
+     game.effects.clear();game.noiseRipples=[];
     }
     maxOrbs=Math.max(maxOrbs,game.stickyOrbs.length);game.updateStickyOrbs();
    }

@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '73c3a0d8b72a';
+        const DFAB_BUILD = '508170eba680';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9512,6 +9512,81 @@
             isShown (ref) {
                 const e = this.find(ref);
                 return !!e && e.style.display !== 'none';
+            }
+        };
+    </script>
+    <script type="text/dfab" data-src="basement/draw-list.js" data-cost="48">
+        // ===== LV0 BASEMENT =====
+        // The draw list: WHAT to draw, apart from HOW. A system fills a list with shape packets and never
+        // touches a canvas; a renderer draws the list. canvasRenderer (below) draws it with Canvas 2D, and a
+        // WebGL renderer can read the very same list, so nothing above the renderer changes when one is added.
+        // (Baked sprites stay baked: they are plain images, and a GPU renderer uploads them as textures.)
+        //
+        // SHAPE PACKETS (world space, drawn in order; alpha 0..1, times the context's own alpha at the flush,
+        // a product past 1 is ignored as Canvas 2D does):
+        //   ['blend', mode]                              'source-over' | 'lighter' for what follows
+        //   ['cap', cap]                                 line ends for what follows: 'butt' | 'round' | 'square'
+        //   ['rect', x, y, w, h, color, alpha]
+        //   ['lines', width, color, alpha, x1, y1, x2, y2, ...]    segments, stroked as one path
+        //   ['image', image, x, y, w, h, alpha]          a whole image (a baked sprite) into a rect
+        //   ['sprite', image, sx, sy, sw, sh, dx, dy, dw, dh, alpha, tx, ty, rot, scx, scy]
+        //                                                part of an image (sw 0: all of it, at its own size) at
+        //                                                dx, dy in a frame moved to tx, ty, turned by rot, then scaled
+        //
+        //   const out = new drawList();
+        //   out.clear(); out.blend('lighter'); out.rect(x, y, 2, 2, '#ffd76a', 0.8);
+        //   const o = out.lines(0.5, '#fff', 1); out.seg(o, x - r, y, x + r, y); out.seg(o, x, y - r, x, y + r);
+        //   canvasRenderer.flush(ctx, out);
+        //
+        // The list keeps its packets from frame to frame (clear() only rewinds it), so filling it every
+        // frame makes no garbage once it has grown to its size.
+        class drawList {
+            constructor() { this.ops = []; this.n = 0; }
+            clear() { this.n = 0; }
+            /** The next packet slot, emptied (an array kept from earlier frames). */
+            _op() { let o = this.ops[this.n]; if (!o) o = this.ops[this.n] = []; else o.length = 0; this.n++; return o; }
+            blend(mode) { this._op().push('blend', mode); }
+            cap(cap) { this._op().push('cap', cap); }
+            rect(x, y, w, h, color, alpha) { this._op().push('rect', x, y, w, h, color, alpha); }
+            /** A path of segments (add them with seg): returns the packet. */
+            lines(width, color, alpha) { const o = this._op(); o.push('lines', width, color, alpha); return o; }
+            seg(o, x1, y1, x2, y2) { o.push(x1, y1, x2, y2); }
+            image(image, x, y, w, h, alpha) { this._op().push('image', image, x, y, w, h, alpha); }
+            sprite(image, sx, sy, sw, sh, dx, dy, dw, dh, alpha, tx, ty, rot, scx, scy) {
+                this._op().push('sprite', image, sx, sy, sw, sh, dx, dy, dw, dh, alpha, tx, ty, rot, scx, scy);
+            }
+        }
+
+        /** Canvas 2D: a draw list onto a context, in the context's current (world) transform. */
+        const canvasRenderer = {
+            flush(ctx, list) {
+                if (!list.n) return;
+                const A = ctx.globalAlpha;
+                ctx.save();
+                for (let i = 0; i < list.n; i++) {
+                    const o = list.ops[i];
+                    switch (o[0]) {
+                        case 'blend': ctx.globalCompositeOperation = o[1]; break;
+                        case 'cap': ctx.lineCap = o[1]; break;
+                        case 'rect': ctx.globalAlpha = A * o[6]; ctx.fillStyle = o[5]; ctx.fillRect(o[1], o[2], o[3], o[4]); break;
+                        case 'lines':
+                            ctx.globalAlpha = A * o[3]; ctx.strokeStyle = o[2]; ctx.lineWidth = o[1];
+                            ctx.beginPath();
+                            for (let k = 4; k < o.length; k += 4) { ctx.moveTo(o[k], o[k + 1]); ctx.lineTo(o[k + 2], o[k + 3]); }
+                            ctx.stroke();
+                            break;
+                        case 'image': ctx.globalAlpha = A * o[6]; ctx.drawImage(o[1], o[2], o[3], o[4], o[5]); break;
+                        case 'sprite':
+                            ctx.save();
+                            ctx.translate(o[11], o[12]); ctx.rotate(o[13]); ctx.scale(o[14], o[15]);
+                            ctx.globalAlpha = A * o[10];
+                            if (o[4]) ctx.drawImage(o[1], o[2], o[3], o[4], o[5], o[6], o[7], o[8], o[9]);
+                            else ctx.drawImage(o[1], o[6], o[7]);
+                            ctx.restore();
+                            break;
+                    }
+                }
+                ctx.restore();
             }
         };
     </script>
@@ -74357,7 +74432,205 @@ Object.assign(TrafficVehicle.prototype, {
             }
         }
     </script>
-    <script type="text/dfab" data-src="engine/game-engine.js" data-cost="182">
+    <script type="text/dfab" data-src="directory/effects-system.js" data-cost="130">
+        // ===== LV2 DIRECTORY =====
+        // The effects system: the world's short-lived effects in one place. Each EFFECT TYPE (EFFECTS, below)
+        // has one list here; the system ages it on the life kit (basement/life-kit.js) and has the type say
+        // what it looks like as shape packets in a draw list (basement/draw-list.js). Nothing here draws:
+        // canvasRenderer does, and a WebGL renderer can read the same list.
+        //
+        // EFFECT TYPE: { max, cull, step(item, game) → true when done, tick(list, game), look(list, out, view, game) }
+        //   max        how many at once: past it the oldest go (optional)
+        //   cull       true: drop with lifeKit.cull (order shuffles), else lifeKit.sweep (order kept)
+        //   step       one tick of one item; return true when it is done
+        //   tick       one tick of the whole list, in place of step (optional)
+        //   look       fill `out` with what the list looks like now (`view`: the world rect in view)
+        //
+        //   game.effects.spawn('casing', item)       // add one (the item is the type's own packet object)
+        //   game.effects.of('flame')                 // its list (lighting reads flames and flashes from here)
+        //   game.effects.update('casing')            // one tick of one type (each in its place in engine/update.js)
+        //   game.effects.draw('casing', ctx, view)   // look, then the renderer
+        //   game.effects.clear()                     // a new map or a new game
+        class effectsSystem {
+            constructor(game, types) {
+                this.game = game; this.types = types; this.lists = {}; this.out = new drawList();
+                for (const k in types) this.lists[k] = [];
+            }
+            of(type) { return this.lists[type]; }
+            spawn(type, item) {
+                const L = this.lists[type], max = this.types[type].max;
+                L.push(item);
+                if (max && L.length > max) L.splice(0, L.length - max);
+                return item;
+            }
+            update(type) {
+                const T = this.types[type], L = this.lists[type], game = this.game;
+                if (!L.length) return;
+                if (T.tick) T.tick(L, game);
+                else if (T.cull) lifeKit.cull(L, item => T.step(item, game));
+                else lifeKit.sweep(L, item => T.step(item, game));
+            }
+            draw(type, ctx, view) {
+                const L = this.lists[type];
+                if (!L.length) return;
+                const out = this.out;
+                out.clear();
+                this.types[type].look(L, out, view, this.game);
+                canvasRenderer.flush(ctx, out);
+            }
+            clear() { for (const k in this.lists) this.lists[k].length = 0; }
+        }
+
+        const EFFECTS = {
+            /**
+             * Spent brass, and a kill's glitter: it flies, spins and settles, then lies there glinting like a
+             * fleck of glitter in the gun's colour (25 s, at most 60, oldest first). As it lands it scatters two
+             * finer flecks and takes the colour of the lamp whose pool it lies in (lc, lk). On the ground after
+             * decals, under everyone: a fleck that twinkles on its own rhythm, a four-point glint at the top of each
+             * twinkle, brighter and oftener under a burning lamp, the glint in the lamp's colour.
+             * ITEM: { x, y, vx, vy, a, spin, t, big, col, ph, rate }
+             */
+            casing: {
+                max: 60,
+                step(k, game) {
+                    k.t++;
+                    if (k.t < 26) { k.x += k.vx; k.y += k.vy; k.vx *= 0.86; k.vy *= 0.86; k.a += k.spin; k.spin *= 0.9; }
+                    else if (k.t === 26) {
+                        k.sub = [(Math.random() - 0.5) * 5, (Math.random() - 0.5) * 5, (Math.random() - 0.5) * 5, (Math.random() - 0.5) * 5];
+                        EFFECTS.casing.lamp(k, game);
+                    }
+                    return k.t > 1500;
+                },
+                /** The nearest lamp whose pool it lies in lends it its colour (k.lc) and strength (k.lk). */
+                lamp(k, game) {
+                    let best = null, bk = 0;
+                    const consider = (l) => {
+                        if (!l || l._forcedOff) return;
+                        const r = (l.radius || 200) * 0.6, d = Math.hypot(l.x - k.x, l.y - k.y);
+                        if (d < r) { const s = 1 - d / r; if (s > bk) { bk = s; best = l; } }
+                    };
+                    for (const entry of game._queryLampCandidates({ left: k.x, right: k.x, top: k.y, bottom: k.y }, 'lampCasings')) consider(entry.item);
+                    if (game.activeMap && game.activeMap._interiorLights) {
+                        for (const entry of game._queryEffectCandidates('interiorLamps', game.activeMap._interiorLights,
+                            { left: k.x, right: k.x, top: k.y, bottom: k.y }, 'interiorLampCasings')) consider(entry.item);
+                    }
+                    if (best && /^#[0-9a-f]{6}$/i.test(best.color || '')) { k.lc = best.color; k.lk = bk; }
+                },
+                look(L, out, cb, game) {
+                    if (_zoomLOD >= 1) return;
+                    const day = game._lampDaylight ?? 0, night = Math.max(0, Math.min(1, (0.35 - day) / 0.15));
+                    out.blend('lighter'); out.cap('round');
+                    for (const k of L) {
+                        if (k.x < cb.left || k.x > cb.right || k.y < cb.top || k.y > cb.bottom) continue;
+                        const fade = k.t > 1380 ? (1500 - k.t) / 120 : 1, spin = k.t < 26 ? 1 : 0;
+                        const lit = k.lc ? k.lk * night : 0;                                // how much lamp light it catches
+                        const tw = Math.pow(Math.abs(Math.sin(_frameTime * k.rate * (1 + lit * 1.5) + k.ph)), 6 - lit * 3), s = k.big ? 1.3 : 1;
+                        out.rect(k.x - 0.6 * s, k.y - 0.6 * s, 1.2 * s, 1.2 * s, k.col, fade * (0.45 + 0.55 * Math.max(tw, spin * 0.7)) * (1 + lit * 0.4));   // the fleck
+                        if (k.sub) {                                                         // its two finer flecks, twinkling out of step
+                            const tw2 = Math.pow(Math.abs(Math.sin(_frameTime * k.rate * 1.3 + k.ph + 2)), 4), a = fade * (0.3 + 0.6 * tw2) * (1 + lit * 0.5);
+                            out.rect(k.x + k.sub[0] - 0.35, k.y + k.sub[1] - 0.35, 0.7, 0.7, k.col, a);
+                            out.rect(k.x + k.sub[2] - 0.35, k.y + k.sub[3] - 0.35, 0.7, 0.7, lit > 0.2 ? k.lc : k.col, a);
+                        }
+                        if (tw > 0.35) {                                                     // the glint
+                            const r = (1.2 + 2.6 * tw) * s * (1 + lit * 0.6), a = fade * Math.min(1, tw * (1 + lit * 0.5));
+                            out.rect(k.x - 0.35, k.y - 0.35, 0.7, 0.7, '#ffffff', a);
+                            const o = out.lines(0.45, lit > 0.15 ? k.lc : k.col, a);
+                            out.seg(o, k.x - r, k.y, k.x + r, k.y); out.seg(o, k.x, k.y - r, k.x, k.y + r);
+                        }
+                    }
+                }
+            },
+
+            /**
+             * Off the barrel (a gun's model `fx`, ui/weapon-models.js) and off a blade: smoke and golden wisps that
+             * drift downwind, curl and swell (soft, normal blend), then embers and gold dust (additive).
+             * After the muzzle stars. ITEM: { k: 'smoke' | 'wisp' | 'ember' | 'dust', x, y, vx, vy, t, life, r, col, ph }
+             * (t below 0: a puff still waiting its turn)
+             */
+            barrel: {
+                max: 160,
+                tick(L, game) {
+                    const W = game.weather && game.weather.windVec ? game.weather.windVec : { x: 0, y: 0 };
+                    lifeKit.sweep(L, (p) => {
+                        p.t++;
+                        if (p.t <= 0) return;
+                        if (p.t > p.life) return true;
+                        if (p.k === 'smoke' || p.k === 'wisp') {
+                            p.vx = p.vx * 0.94 + W.x * 0.012 + Math.cos(p.t * 0.15 + p.ph) * 0.03;
+                            p.vy = p.vy * 0.94 + W.y * 0.012 + Math.sin(p.t * 0.15 + p.ph) * 0.03;
+                            p.r += p.k === 'smoke' ? 0.055 : 0.14;
+                        } else { p.vx *= 0.93; p.vy *= 0.93; p.vx += W.x * 0.004; p.vy += W.y * 0.004; }
+                        p.x += p.vx; p.y += p.vy;
+                    });
+                },
+                look(F, out, cb) {
+                    if (_zoomLOD >= 2) return;
+                    for (const p of F) {
+                        if (p.t <= 0 || (p.k !== 'smoke' && p.k !== 'wisp')) continue;
+                        if (p.x < cb.left || p.x > cb.right || p.y < cb.top || p.y > cb.bottom) continue;
+                        const u = p.t / p.life, a = (p.k === 'smoke' ? 0.2 : 0.55) * Math.sin(Math.min(1, u * 4) * Math.PI / 2) * (1 - u), R = p.r * 2.2;
+                        out.image(puffSprite(p.col), p.x - R, p.y - R, R * 2, R * 2, a);
+                    }
+                    out.blend('lighter');
+                    for (const p of F) {
+                        if (p.t <= 0 || (p.k !== 'ember' && p.k !== 'dust')) continue;
+                        if (p.x < cb.left || p.x > cb.right || p.y < cb.top || p.y > cb.bottom) continue;
+                        const u = p.t / p.life, a = (1 - u) * (0.55 + 0.45 * Math.sin(_frameTime * 0.03 + p.ph));
+                        const z = p.k === 'ember' ? 0.9 * (1 - u * 0.5) : 0.75;
+                        out.rect(p.x - z / 2, p.y - z / 2, z, z, p.col, a);
+                        if (p.k === 'ember' && u < 0.4) out.rect(p.x - p.vx * 2 - z / 2, p.y - p.vy * 2 - z / 2, z, z, p.col, a * 0.35);   // its streak
+                    }
+                }
+            },
+
+            /**
+             * A fireball's flames, laid along the way it flew (emitFireTrail, engine/combat-effects.js); they keep
+             * burning after it's gone, and game time freezes them. ITEM: { x, y, born, life, seed, angle } (ms)
+             */
+            flame: {
+                max: FIRE_TRAIL_MAX,
+                tick(L) { const now = _gameTimeMs(); lifeKit.sweep(L, p => now - p.born >= p.life); },
+                look(F, out, cb) {
+                    const sprites = _getFireTrailSprites(), now = _gameTimeMs();
+                    const stride = typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2 ? 2 : 1;
+                    const S = sprites, sw = S.w * S.K, sh = S.h * S.K;
+                    out.blend('lighter');
+                    for (let i = 0; i < F.length; i += stride) {
+                        const p = F[i], age = now - p.born;
+                        if (age < 0 || age >= p.life) continue;
+                        if (cb && (p.x < cb.left - 26 || p.x > cb.right + 26 || p.y < cb.top - 26 || p.y > cb.bottom + 26)) continue;
+                        const u = age / p.life, fade = Math.pow(1 - u, 1.45);
+                        const phase = ((age / 720 + p.seed) % 1) * S.frames;
+                        const frame = Math.floor(phase), blend = phase - frame, next = (frame + 1) % S.frames;
+                        const drift = Math.sin(age * 0.009 + p.seed * 6.28) * u * 3.2;
+                        const size = (0.85 + p.seed * 0.3) * (1 + Math.sin(u * Math.PI) * 0.25) * (1 - u * 0.55);
+                        const tx = p.x - Math.sin(p.angle) * drift, ty = p.y + Math.cos(p.angle) * drift;
+                        const rot = p.angle + Math.sin(age * 0.012 + p.seed * 9) * (0.12 + u * 0.28);
+                        const sy = size * (0.9 + 0.25 * Math.sin(age * 0.016 + p.seed * 6.28));
+                        out.sprite(S.atlas, (frame % S.cols) * sw, Math.floor(frame / S.cols) * sh, sw, sh, -22, -18, S.w, S.h, 0.68 * fade * (1 - blend), tx, ty, rot, size, sy);
+                        out.sprite(S.atlas, (next % S.cols) * sw, Math.floor(next / S.cols) * sh, sw, sh, -22, -18, S.w, S.h, 0.68 * fade * blend, tx, ty, rot, size, sy);
+                    }
+                }
+            },
+
+            /**
+             * Muzzle flashes: three ticks of light (the lighting pass draws that) and the flash's star at the
+             * muzzle, along the shot. ITEM: { x, y, radius, color, life, angle }
+             */
+            muzzle: {
+                step(f) { return --f.life <= 0; },
+                look(F, out) {
+                    out.blend('lighter');
+                    for (const f of F) {
+                        if (f.angle === undefined) continue;
+                        const k = Math.min(1, (f.life || 0) / 3), s = (f.radius || 50) / 170 * (0.7 + 0.3 * k);
+                        out.sprite(muzzleStarSprite(f.color), 0, 0, 0, 0, -24, -24, 0, 0, 0.35 + 0.65 * k, f.x, f.y, f.angle, s, s * (0.8 + 0.4 * ((f.x * 7 + f.life) % 1)));
+                    }
+                }
+            }
+        };
+    </script>
+    <script type="text/dfab" data-src="engine/game-engine.js" data-cost="183">
         class GameEngine {
             constructor() {
                 
@@ -74504,7 +74777,8 @@ Object.assign(TrafficVehicle.prototype, {
                 this.decals = new DecalSystem();
                 this.puddles = null; // PuddleSystem disabled for performance (will revisit)
                 this.leafParticles = new LeafParticleSystem(this); // Floating leaves
-                this.projectiles = []; this.props = []; this.npcs = []; this.enemies = []; this.loot = []; this.lamps = []; this.lastKnownMarkers = []; this.muzzleFlashes = []; this.casings = []; this.shotFx = [];
+                this.projectiles = []; this.props = []; this.npcs = []; this.enemies = []; this.loot = []; this.lamps = []; this.lastKnownMarkers = [];
+                this.effects = new effectsSystem(this, EFFECTS);   // casings, barrel smoke, flames, muzzle stars (directory/effects-system.js)
                 this.stickyOrbs = []; // Golden Child DOT orbs attached to enemies
                 this.traffic = new TrafficManager(); // <--- ADD THIS LINE
                 this.pedestrians = new PedestrianManager(); // Roaming civilians
@@ -74920,7 +75194,7 @@ Object.assign(TrafficVehicle.prototype, {
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/combat-effects.js" data-cost="455">
+    <script type="text/dfab" data-src="engine/combat-effects.js" data-cost="342">
         // GameEngine — Screen shake, time slow, death, resize, firing, boosters, player damage.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         const _muzzleStars = new Map();
@@ -74963,78 +75237,11 @@ Object.assign(TrafficVehicle.prototype, {
             spawnCasing(x, y, angle, weaponId) {
                 const col = weaponId ? weaponModel(weaponId).brass : null;
                 if (!col || (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2)) return;
-                const L = this.casings || (this.casings = []), c = Math.cos(angle), s = Math.sin(angle);
+                const c = Math.cos(angle), s = Math.sin(angle);
                 const sniper = weaponId.includes('sniper'), back = sniper ? 30 : 8, v = 1.7 + Math.random() * 1.1;
-                L.push({ x: x - c * back, y: y - s * back, vx: -s * v - c * (0.35 + Math.random() * 0.4), vy: c * v - s * (0.35 + Math.random() * 0.4),
+                this.effects.spawn('casing', { x: x - c * back, y: y - s * back, vx: -s * v - c * (0.35 + Math.random() * 0.4), vy: c * v - s * (0.35 + Math.random() * 0.4),
                          a: angle, spin: (Math.random() - 0.5) * 0.9, t: 0, big: sniper, col, ph: Math.random() * 6.28, rate: 0.004 + Math.random() * 0.005 });
-                while (L.length > 60) L.shift();
             },
-            updateCasings() {
-                const L = this.casings;
-                if (!L || !L.length) return;
-                lifeKit.sweep(L, k => {
-                    k.t++;
-                    if (k.t < 26) { k.x += k.vx; k.y += k.vy; k.vx *= 0.86; k.vy *= 0.86; k.a += k.spin; k.spin *= 0.9; }
-                    else if (k.t === 26) {                                               // landed: two finer flecks, and the lamp it lies under
-                        k.sub = [(Math.random() - 0.5) * 5, (Math.random() - 0.5) * 5, (Math.random() - 0.5) * 5, (Math.random() - 0.5) * 5];
-                        this._casingLamp(k);
-                    }
-                    if (k.t > 1500) return true;
-                });
-            },
-            /** Once, as a casing lands: the nearest lamp whose pool it lies in lends it its colour (k.lc) and strength (k.lk). */
-            _casingLamp(k) {
-                let best = null, bk = 0;
-                const consider = (l) => {
-                    if (!l || l._forcedOff) return;
-                    const r = (l.radius || 200) * 0.6, d = Math.hypot(l.x - k.x, l.y - k.y);
-                    if (d < r) { const s = 1 - d / r; if (s > bk) { bk = s; best = l; } }
-                };
-                for (const entry of this._queryLampCandidates({ left: k.x, right: k.x, top: k.y, bottom: k.y }, 'lampCasings')) consider(entry.item);
-                if (this.activeMap && this.activeMap._interiorLights) {
-                    for (const entry of this._queryEffectCandidates('interiorLamps', this.activeMap._interiorLights,
-                        { left: k.x, right: k.x, top: k.y, bottom: k.y }, 'interiorLampCasings')) consider(entry.item);
-                }
-                if (best && /^#[0-9a-f]{6}$/i.test(best.color || '')) { k.lc = best.color; k.lk = bk; }
-            },
-            /**
-             * Casings on the ground (after decals, under everyone) as glitter: a fleck in the gun's colour
-             * that twinkles on its own rhythm, and at the top of each twinkle a four-point glint. Under a
-             * burning lamp it catches that lamp's light: it twinkles brighter and oftener, the glint in the lamp's colour.
-             */
-            drawCasings(ctx, cb) {
-                const L = this.casings;
-                if (!L || !L.length || _zoomLOD >= 1) return;
-                const day = this._lampDaylight ?? 0, night = Math.max(0, Math.min(1, (0.35 - day) / 0.15));
-                ctx.save();
-                ctx.globalCompositeOperation = 'lighter';
-                ctx.lineCap = 'round';
-                for (const k of L) {
-                    if (k.x < cb.left || k.x > cb.right || k.y < cb.top || k.y > cb.bottom) continue;
-                    const fade = k.t > 1380 ? (1500 - k.t) / 120 : 1, spin = k.t < 26 ? 1 : 0;
-                    const lit = k.lc ? k.lk * night : 0;                                // how much lamp light it catches
-                    const tw = Math.pow(Math.abs(Math.sin(_frameTime * k.rate * (1 + lit * 1.5) + k.ph)), 6 - lit * 3), s = k.big ? 1.3 : 1;
-                    ctx.globalAlpha = fade * (0.45 + 0.55 * Math.max(tw, spin * 0.7)) * (1 + lit * 0.4);
-                    ctx.fillStyle = k.col;
-                    ctx.fillRect(k.x - 0.6 * s, k.y - 0.6 * s, 1.2 * s, 1.2 * s);        // the fleck
-                    if (k.sub) {                                                         // its two finer flecks, twinkling out of step
-                        const tw2 = Math.pow(Math.abs(Math.sin(_frameTime * k.rate * 1.3 + k.ph + 2)), 4);
-                        ctx.globalAlpha = fade * (0.3 + 0.6 * tw2) * (1 + lit * 0.5);
-                        ctx.fillRect(k.x + k.sub[0] - 0.35, k.y + k.sub[1] - 0.35, 0.7, 0.7);
-                        ctx.fillStyle = lit > 0.2 ? k.lc : k.col;
-                        ctx.fillRect(k.x + k.sub[2] - 0.35, k.y + k.sub[3] - 0.35, 0.7, 0.7);
-                    }
-                    if (tw > 0.35) {                                                     // the glint
-                        const r = (1.2 + 2.6 * tw) * s * (1 + lit * 0.6);
-                        ctx.globalAlpha = fade * Math.min(1, tw * (1 + lit * 0.5));
-                        ctx.fillStyle = '#ffffff'; ctx.fillRect(k.x - 0.35, k.y - 0.35, 0.7, 0.7);
-                        ctx.strokeStyle = lit > 0.15 ? k.lc : k.col; ctx.lineWidth = 0.45;
-                        ctx.beginPath(); ctx.moveTo(k.x - r, k.y); ctx.lineTo(k.x + r, k.y); ctx.moveTo(k.x, k.y - r); ctx.lineTo(k.x, k.y + r); ctx.stroke();
-                    }
-                }
-                ctx.restore();
-            },
-
             /**
              * A gun's signature beyond the flash (its model's `fx`, ui/weapon-models.js), at every shot:
              * casings for the guns that throw them, a trail tag on the shot for the guns that don't
@@ -75051,24 +75258,22 @@ Object.assign(TrafficVehicle.prototype, {
                         o._streak = (now - (o._streakT || -9) < 0.6 ? (o._streak || 0) : 0) + 1; o._streakT = now;
                         if (o._streak < fx.after) return;
                     }
-                    const c = Math.cos(angle), s = Math.sin(angle), F = this.shotFx || (this.shotFx = []);
+                    const c = Math.cos(angle), s = Math.sin(angle), E = this.effects;
                     if (fx.barrel === 'smoke') {
-                        for (let i = 0; i < 6; i++) F.push({ k: 'smoke', x: x + c * (2 + i * 1.5), y: y + s * (2 + i * 1.5), vx: c * 0.22 + (Math.random() - 0.5) * 0.2, vy: s * 0.22 + (Math.random() - 0.5) * 0.2,
+                        for (let i = 0; i < 6; i++) E.spawn('barrel', { k: 'smoke', x: x + c * (2 + i * 1.5), y: y + s * (2 + i * 1.5), vx: c * 0.22 + (Math.random() - 0.5) * 0.2, vy: s * 0.22 + (Math.random() - 0.5) * 0.2,
                                                              t: -i * 7, life: 64, r: 0.9, col: fx.col, ph: Math.random() * 6.28 });
                     } else if (fx.barrel === 'embers') {
                         for (let i = 0; i < 7; i++) { const a = angle + (Math.random() - 0.5) * 1.6, v = 0.4 + Math.random() * 1.1;
-                            F.push({ k: 'ember', x: x + c * 2, y: y + s * 2, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: 30 + Math.random() * 25, col: Math.random() < 0.35 ? fx.hot : fx.col, ph: Math.random() * 6.28 }); }
+                            E.spawn('barrel', { k: 'ember', x: x + c * 2, y: y + s * 2, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: 30 + Math.random() * 25, col: Math.random() < 0.35 ? fx.hot : fx.col, ph: Math.random() * 6.28 }); }
                     }
-                    while (F.length > 160) F.shift();
                 }
             },
             /** A golden wisp puff behind a 'wisp' shot (called by the shot as it flies). */
             spawnWisp(x, y, fx) {
                 if (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2) return;
-                const F = this.shotFx || (this.shotFx = []);
-                F.push({ k: 'wisp', x, y, vx: (Math.random() - 0.5) * 0.2, vy: (Math.random() - 0.5) * 0.2, t: 0, life: 50, r: 3, col: fx.col, ph: Math.random() * 6.28 });
-                if (Math.random() < 0.85) F.push({ k: 'dust', x: x + (Math.random() - 0.5) * 4, y: y + (Math.random() - 0.5) * 4, vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3, t: 0, life: 36, col: fx.dust, ph: Math.random() * 6.28 });
-                while (F.length > 160) F.shift();
+                const E = this.effects;
+                E.spawn('barrel', { k: 'wisp', x, y, vx: (Math.random() - 0.5) * 0.2, vy: (Math.random() - 0.5) * 0.2, t: 0, life: 50, r: 3, col: fx.col, ph: Math.random() * 6.28 });
+                if (Math.random() < 0.85) E.spawn('barrel', { k: 'dust', x: x + (Math.random() - 0.5) * 4, y: y + (Math.random() - 0.5) * 4, vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3, t: 0, life: 36, col: fx.dust, ph: Math.random() * 6.28 });
             },
             /** Lay flames along the distance actually flown, including the hand's starting point. */
             emitFireTrail(shot, x0, y0, x1, y1) {
@@ -75082,12 +75287,12 @@ Object.assign(TrafficVehicle.prototype, {
                 }
                 const dx = x1 - x0, dy = y1 - y0, distance = Math.hypot(dx, dy);
                 if (distance < 0.001) return;
-                const F = this._fireTrail || (this._fireTrail = []), now = _gameTimeMs();
+                const now = _gameTimeMs();
                 const angle = Math.atan2(dy, dx);
                 const add = (x, y, born) => {
                     this._fireTrailSerial = ((this._fireTrailSerial || 0) + 1) >>> 0;
                     const seed = (this._fireTrailSerial * 0.61803398875) % 1;
-                    F.push({ x, y, born, life: 1500 + seed * 300, seed, angle });
+                    this.effects.spawn('flame', { x, y, born, life: 1500 + seed * 300, seed, angle });
                 };
                 if (!shot._fireTrailStarted) {
                     shot._fireTrailStarted = true; shot._fireTrailGap = 0;
@@ -75100,109 +75305,7 @@ Object.assign(TrafficVehicle.prototype, {
                     add(x0 + dx * u, y0 + dy * u, now - CONFIG.LOOP.STEP_MS * (1 - u));
                 }
                 shot._fireTrailGap = (gap + distance) % FIRE_TRAIL_SPACING;
-                if (F.length > FIRE_TRAIL_MAX) F.splice(0, F.length - FIRE_TRAIL_MAX);
             },
-            updateFireTrail() {
-                const F = this._fireTrail;
-                if (!F || !F.length) return;
-                const now = _gameTimeMs(); let write = 0;
-                for (let i = 0; i < F.length; i++) {
-                    const p = F[i]; if (now - p.born < p.life) F[write++] = p;
-                }
-                F.length = write;
-            },
-            /** World-space flames keep burning after the projectile disappears; game time freezes them. */
-            drawFireTrail(ctx, cb) {
-                const F = this._fireTrail;
-                if (!F || !F.length) return;
-                const sprites = _getFireTrailSprites(), now = _gameTimeMs(), baseAlpha = ctx.globalAlpha;
-                const stride = typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2 ? 2 : 1;
-                ctx.save(); ctx.globalCompositeOperation = 'lighter';
-                for (let i = 0; i < F.length; i += stride) {
-                    const p = F[i], age = now - p.born;
-                    if (age < 0 || age >= p.life) continue;
-                    if (cb && (p.x < cb.left - 26 || p.x > cb.right + 26 || p.y < cb.top - 26 || p.y > cb.bottom + 26)) continue;
-                    const u = age / p.life, fade = Math.pow(1 - u, 1.45);
-                    const phase = ((age / 720 + p.seed) % 1) * sprites.frames;
-                    const frame = Math.floor(phase), blend = phase - frame, next = (frame + 1) % sprites.frames;
-                    const drift = Math.sin(age * 0.009 + p.seed * 6.28) * u * 3.2;
-                    const size = (0.85 + p.seed * 0.3) * (1 + Math.sin(u * Math.PI) * 0.25) * (1 - u * 0.55);
-                    ctx.save();
-                    ctx.translate(p.x - Math.sin(p.angle) * drift, p.y + Math.cos(p.angle) * drift);
-                    ctx.rotate(p.angle + Math.sin(age * 0.012 + p.seed * 9) * (0.12 + u * 0.28));
-                    ctx.scale(size, size * (0.9 + 0.25 * Math.sin(age * 0.016 + p.seed * 6.28)));
-                    ctx.globalAlpha = baseAlpha * 0.68 * fade * (1 - blend);
-                    ctx.drawImage(sprites.atlas, (frame % sprites.cols) * sprites.w * sprites.K,
-                        Math.floor(frame / sprites.cols) * sprites.h * sprites.K, sprites.w * sprites.K, sprites.h * sprites.K,
-                        -22, -18, sprites.w, sprites.h);
-                    ctx.globalAlpha = baseAlpha * 0.68 * fade * blend;
-                    ctx.drawImage(sprites.atlas, (next % sprites.cols) * sprites.w * sprites.K,
-                        Math.floor(next / sprites.cols) * sprites.h * sprites.K, sprites.w * sprites.K, sprites.h * sprites.K,
-                        -22, -18, sprites.w, sprites.h);
-                    ctx.restore();
-                }
-                ctx.restore();
-            },
-
-            updateShotFx() {
-                const F = this.shotFx;
-                if (!F || !F.length) return;
-                const W = this.weather && this.weather.windVec ? this.weather.windVec : { x: 0, y: 0 };
-                lifeKit.sweep(F, (p) => {
-                    p.t++;
-                    if (p.t <= 0) return;                                              // (a smoke puff still waiting its turn)
-                    if (p.t > p.life) return true;
-                    if (p.k === 'smoke' || p.k === 'wisp') {                             // drifts downwind, curls, swells
-                        p.vx = p.vx * 0.94 + W.x * 0.012 + Math.cos(p.t * 0.15 + p.ph) * 0.03;
-                        p.vy = p.vy * 0.94 + W.y * 0.012 + Math.sin(p.t * 0.15 + p.ph) * 0.03;
-                        p.r += p.k === 'smoke' ? 0.055 : 0.14;
-                    } else { p.vx *= 0.93; p.vy *= 0.93; p.vx += W.x * 0.004; p.vy += W.y * 0.004; }
-                    p.x += p.vx; p.y += p.vy;
-                });
-            },
-            /** Barrel smoke and wisps (soft, normal blend), then embers and gold dust (additive). After the muzzle stars. */
-            drawShotFx(ctx, cb) {
-                const F = this.shotFx;
-                if (!F || !F.length || _zoomLOD >= 2) return;
-                ctx.save();
-                for (const p of F) {
-                    if (p.t <= 0 || (p.k !== 'smoke' && p.k !== 'wisp')) continue;
-                    if (p.x < cb.left || p.x > cb.right || p.y < cb.top || p.y > cb.bottom) continue;
-                    const u = p.t / p.life, a = (p.k === 'smoke' ? 0.2 : 0.55) * Math.sin(Math.min(1, u * 4) * Math.PI / 2) * (1 - u);
-                    ctx.globalAlpha = a;
-                    const R = p.r * 2.2;
-                    ctx.drawImage(puffSprite(p.col), p.x - R, p.y - R, R * 2, R * 2);
-                }
-                ctx.globalCompositeOperation = 'lighter';
-                for (const p of F) {
-                    if (p.t <= 0 || (p.k !== 'ember' && p.k !== 'dust')) continue;
-                    if (p.x < cb.left || p.x > cb.right || p.y < cb.top || p.y > cb.bottom) continue;
-                    const u = p.t / p.life, fl = 0.55 + 0.45 * Math.sin(_frameTime * 0.03 + p.ph);
-                    ctx.globalAlpha = (1 - u) * fl;
-                    ctx.fillStyle = p.col;
-                    const z = p.k === 'ember' ? 0.9 * (1 - u * 0.5) : 0.75;
-                    ctx.fillRect(p.x - z / 2, p.y - z / 2, z, z);
-                    if (p.k === 'ember' && u < 0.4) { ctx.globalAlpha *= 0.35; ctx.fillRect(p.x - p.vx * 2 - z / 2, p.y - p.vy * 2 - z / 2, z, z); }   // its streak
-                }
-                ctx.restore();
-            },
-            /** The star of each fresh muzzle flash, at the muzzle along the shot (its light is the lighting pass's). */
-            drawMuzzleStars(ctx) {
-                const F = this.muzzleFlashes;
-                if (!F || !F.length) return;
-                ctx.save(); ctx.globalCompositeOperation = 'lighter';
-                const base = ctx.getTransform();
-                for (const f of F) {
-                    if (f.angle === undefined) continue;
-                    const k = Math.min(1, (f.life || 0) / 3), s = (f.radius || 50) / 170 * (0.7 + 0.3 * k);
-                    ctx.setTransform(base);
-                    ctx.translate(f.x, f.y); ctx.rotate(f.angle); ctx.scale(s, s * (0.8 + 0.4 * ((f.x * 7 + f.life) % 1)));
-                    ctx.globalAlpha = 0.35 + 0.65 * k;
-                    ctx.drawImage(muzzleStarSprite(f.color), -24, -24);
-                }
-                ctx.restore();
-            },
-
             triggerShake(amount) {
                 if (amount > this.camera.shake) {
                     this.camera.shake = amount;
@@ -75474,7 +75577,7 @@ Object.assign(TrafficVehicle.prototype, {
                 this._loudUntil = _gameTimeSec + 10;                     // she's fired: the crew is weapons free (engine/sneak.js)
 
                 // 5. Spawn Muzzle Flash
-                this.muzzleFlashes.push({ 
+                this.effects.spawn('muzzle', { 
                     x: px, 
                     y: py, 
                     radius: stats.flashRadius || 50, 
@@ -77115,7 +77218,7 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/finisher.js" data-cost="143">
+    <script type="text/dfab" data-src="engine/finisher.js" data-cost="142">
         // GameEngine — Deaths and the finisher. Methods are added to GameEngine.prototype
         // (see engineMixin in game-engine.js).
         //
@@ -77262,7 +77365,7 @@ engineMixin({
                 this.triggerTimeSlow(subtle ? 0.5 : FINISHER.SLOW, (this.finisher.tBody + this.finisher.tStella) / 1000, true,
                                      { inMs: FINISHER.RAMP_IN, outMs: FINISHER.RAMP_OUT });
                 this._finShot = this.shotsFired || 0;
-                if (this.muzzleFlashes && this.muzzleFlashes.length) this.muzzleFlashes[this.muzzleFlashes.length - 1].life += 6;   // the last star lingers
+                { const M = this.effects.of('muzzle'); if (M.length) M[M.length - 1].life += 6; }   // the last star lingers
             },
 
             /** Once per rendered frame (real ms, loop.js): the beats, the camera, the twirl */
@@ -77303,18 +77406,15 @@ engineMixin({
 
             /** The kill's glitter rises from the body and settles as lamp-catching flecks */
             finisherBurst(F) {
-                const L = this.casings || (this.casings = []);
                 const n = F.subtle ? 14 : 26;
                 for (let i = 0; i < n; i++) {
                     const a = Math.random() * Math.PI * 2, v = 1.2 + Math.random() * 2.6;
-                    L.push({ x: F.x, y: F.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, a, spin: (Math.random() - 0.5) * 0.9, t: 0,
+                    this.effects.spawn('casing', { x: F.x, y: F.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, a, spin: (Math.random() - 0.5) * 0.9, t: 0,
                              big: false, col: F.col, ph: Math.random() * 6.28, rate: 0.006 + Math.random() * 0.006 });
                 }
-                while (L.length > 60) L.shift();
-                const fx = this.shotFx || (this.shotFx = []);
                 for (let i = 0; i < 10; i++) {
                     const a = Math.random() * Math.PI * 2, v = 0.4 + Math.random() * 0.9;
-                    fx.push({ k: 'dust', x: F.x, y: F.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 0.3, t: -i, life: 70, col: F.col, ph: Math.random() * 6.28 });
+                    this.effects.spawn('barrel', { k: 'dust', x: F.x, y: F.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 0.3, t: -i, life: 70, col: F.col, ph: Math.random() * 6.28 });
                 }
                 while (fx.length > 160) fx.shift();
             },
@@ -77811,7 +77911,7 @@ engineMixin({
                     }
                     rc.globalCompositeOperation = 'lighter';
                 }
-                for (const fl of this.muzzleFlashes || []) glow(fl.x, fl.y + 16, fl.color && /^#[0-9a-f]{6}$/i.test(fl.color) ? fl.color : '#fff1d0', 40, 60, 0.8);
+                for (const fl of this.effects.of('muzzle')) glow(fl.x, fl.y + 16, fl.color && /^#[0-9a-f]{6}$/i.test(fl.color) ? fl.color : '#fff1d0', 40, 60, 0.8);
                 for (const pj of this.projectiles || []) if (pj.active !== false) glow(pj.x, pj.y + 12, /^#[0-9a-f]{6}$/i.test(pj.color || '') ? pj.color : '#ffffff', 12, 26, 0.6);
                 // Whoever stands between a light and its reflection blocks it: their mirrored shape
                 rc.globalCompositeOperation = 'destination-out';
@@ -79148,7 +79248,7 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/status-effects.js" data-cost="368">
+    <script type="text/dfab" data-src="engine/status-effects.js" data-cost="367">
         // GameEngine — Status effects and melee. Methods are added to GameEngine.prototype (see
         // engineMixin in game-engine.js).
         //
@@ -79405,10 +79505,9 @@ engineMixin({
                 L.push(swing.slash = { x: pl.x, y: pl.y, a: ang, side, t0: _gameTimeSec, reach, arc, hit: false, secs: this._slashSecs, style: this._slashStyle, edge: swing.edge, cols: trail.cols });
                 if (L.length > 8) L.shift();
                 swing.dust = trail.dust;
-                const fx = this.shotFx || (this.shotFx = []);
-                for (let i = 0; i < 3; i++) {
+                                for (let i = 0; i < 3; i++) {
                     const a = ang + (Math.random() - 0.5) * arc, r = reach * (0.5 + Math.random() * 0.5);
-                    fx.push({ k: 'dust', x: pl.x + Math.cos(a) * r, y: pl.y + Math.sin(a) * r, vx: Math.cos(a) * 0.4, vy: Math.sin(a) * 0.4, t: -i, life: 30, col: trail.dust, ph: Math.random() * 6.28 });
+                    this.effects.spawn('barrel', { k: 'dust', x: pl.x + Math.cos(a) * r, y: pl.y + Math.sin(a) * r, vx: Math.cos(a) * 0.4, vy: Math.sin(a) * 0.4, t: -i, life: 30, col: trail.dust, ph: Math.random() * 6.28 });
                 }
                 if (typeof ambience !== 'undefined' && ambience.slash) ambience.slash(false);
                 this.emitNoise(pl.x, pl.y, st.noise || 60, 'slash');
@@ -79487,10 +79586,9 @@ engineMixin({
                 if (!e.dead && e.interruptMelee) e.interruptMelee();
                 if (st.bleedDps) this.applyStatus(e, 'bleed', { dps: st.bleedDps * this.playerDamageMult(), secs: st.bleedSecs || 3, by: pl, max: S.bleedMax });
                 if (!e.dead && typeof Ganger !== 'undefined' && e instanceof Ganger) { e.suspicion = 100; e.state = 'ALERT'; e.angle = Math.atan2(-dy, -dx); }
-                const fx = this.shotFx || (this.shotFx = []);
-                for (let i = 0; i < 5; i++) {
+                                for (let i = 0; i < 5; i++) {
                     const a = Math.atan2(dy, dx) + (Math.random() - 0.5) * 1.2;
-                    fx.push({ k: 'dust', x: e.x - Math.cos(a) * 6, y: e.y - Math.sin(a) * 6, vx: Math.cos(a) * 0.5, vy: Math.sin(a) * 0.5, t: -i, life: 30, col: S.dust, ph: Math.random() * 6.28 });
+                    this.effects.spawn('barrel', { k: 'dust', x: e.x - Math.cos(a) * 6, y: e.y - Math.sin(a) * 6, vx: Math.cos(a) * 0.5, vy: Math.sin(a) * 0.5, t: -i, life: 30, col: S.dust, ph: Math.random() * 6.28 });
                 }
                 if (!S.hits++) {
                     if (S.slash) S.slash.hit = true;
@@ -80855,7 +80953,7 @@ engineMixin({
                     ['entities', R ? R.all.length : 0], ['collidable', R ? R.collidable.length : 0],
                     ['enemies', game.enemies.length], ['peds', game.pedestrians ? game.pedestrians.pedestrians.length : 0],
                     ['cars', game.traffic ? game.traffic.vehicles.length : 0], ['shots', game.projectiles.length],
-                    ['decals', game.decals ? game.decals.decals.length : 0], ['glitter', (game.casings || []).length], ['fx', (game.shotFx || []).length]
+                    ['decals', game.decals ? game.decals.decals.length : 0], ['glitter', game.effects.of('casing').length], ['fx', game.effects.of('barrel').length]
                 ];
                 return parts.map(([k, v]) => `<span>${k} <b>${v}</b></span>`).join('');
             },
@@ -84877,7 +84975,7 @@ engineMixin({
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/map-loading.js" data-cost="1099">
+    <script type="text/dfab" data-src="engine/map-loading.js" data-cost="1098">
         // GameEngine — loadMap / _doLoadMap (building every map), baked lighting.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
                 /* Each interior's painted floor (or backdrop) is a big canvas — 2–11 MB apiece. They're painted from
@@ -85154,8 +85252,8 @@ engineMixin({
                 if (this.finisher) this.endFinisher(true);
                 this.finCam = null;
                 this.timeSlowState = { active: false, scale: 1.0, targetScale: 1.0, duration: 0, transitionSpeed: 0.05 };
-                this.casings = []; this.shotFx = []; this.muzzleFlashes = []; this.flitVFX = []; this._resetFlitFeedback();
-                this._fireTrail = []; this._fireTrailSerial = 0; this._breachFx = null;
+                this.effects.clear(); this.flitVFX = []; this._resetFlitFeedback();
+                this._fireTrailSerial = 0; this._breachFx = null;
                 this.noiseRipples = []; this.lastKnownMarkers = [];
                 this._edgeRipples = null; this._edgeTouch = null;                       // the veil's ripples (world/map-edge.js)
                 if (typeof Walker !== 'undefined') {                                   // walks are across the old floor
@@ -87316,7 +87414,7 @@ engineMixin({
                 // 3. DYNAMIC LIGHT BONUSES
             
                 // Muzzle Flashes (High Intensity, Instant)
-                for (let flash of this.muzzleFlashes) {
+                for (let flash of this.effects.of('muzzle')) {
                     const dist = Math.hypot(this.player.x - flash.x, this.player.y - flash.y);
                     if (dist < flash.radius) {
                         const intensity = (1.0 - (dist / flash.radius));
@@ -88110,7 +88208,7 @@ engineMixin({
             },
         });
     </script>
-    <script type="text/dfab" data-src="engine/update.js" data-cost="733">
+    <script type="text/dfab" data-src="engine/update.js" data-cost="734">
         // GameEngine — The per-tick simulation (update) and traffic collision helpers.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         /** Props you can use, and what the action pill says for them: type → [verb, name, name from the prop's own label].
@@ -88171,8 +88269,8 @@ engineMixin({
                 this.profiler.start('Logic:Systems');
                 
                 // Cleanup old muzzle flashes
-                lifeKit.sweep(this.muzzleFlashes, (f) => --f.life <= 0);
-                this.updateCasings();
+                this.effects.update('muzzle');
+                this.effects.update('casing');                          // spent brass and glitter (directory/effects-system.js)
                 this.updateCorpses();
                 this.updateStatuses();                                 // bleeding and the rest (engine/status-effects.js)
                 this.updateBossHazards();                              // sigils, fire, censers, hooks; her burn (engine/boss-hazards.js)
@@ -88180,9 +88278,9 @@ engineMixin({
                 this.updateExecution();                                // a takedown in progress (engine/executions.js)
                 this.updateSneak();
                 this.updatePuddles();                                  // raindrop rings and splashes (engine/reflections.js)
-                this.updateFireTrail();
+                this.effects.update('flame');
                 this.updateBreachFx();                                 // a wall blown in (engine/breach-fx.js)
-                this.updateShotFx();
+                this.effects.update('barrel');
             
                 this.updateTime();
                 this.updateUI();
@@ -88579,7 +88677,7 @@ engineMixin({
                         const flashRadius = (weaponDef?.stats?.flashRadius) || (abilityDef?.stats?.flashRadius) || 40;
                         this.projectiles.push(shot);
                         const shotAng = Math.atan2(shot.vy, shot.vx);
-                        this.muzzleFlashes.push({ x: shot.x, y: shot.y, radius: flashRadius, color: flashColor, life: 3, angle: shotAng });
+                        this.effects.spawn('muzzle', { x: shot.x, y: shot.y, radius: flashRadius, color: flashColor, life: 3, angle: shotAng });
                         this.weaponFx(shot.x, shot.y, shotAng, tm.equippedWeaponId, shot, tm);
                         if (tm.hireType === 'permanent') captionSystem.teammateCombatQuip(tm.name);
                         else captionSystem.dancerFollowQuip(tm.name);
@@ -88715,7 +88813,7 @@ engineMixin({
                             if (shot instanceof ProjectileEntity) {
                                 this.projectiles.push(shot);
                                 const shotAng = Math.atan2(shot.vy, shot.vx);
-                                this.muzzleFlashes.push({ x: shot.x, y: shot.y, radius: 50, color: shot.color, life: 3, angle: shotAng });
+                                this.effects.spawn('muzzle', { x: shot.x, y: shot.y, radius: 50, color: shot.color, life: 3, angle: shotAng });
                                 if (enemy.equippedWeaponId !== undefined) this.weaponFx(shot.x, shot.y, shotAng, enemy.equippedWeaponId || 'pistol_ganger', shot, enemy);
                             }
                         }
@@ -89920,7 +90018,7 @@ engineMixin({
                     this.decals.draw(this.ctx, cullBounds.world);
                     this.drawSpills(this.ctx, cullBounds.world);              // spilt drinks (engine/spills.js)
                     this.drawPoolRipples(this.ctx, cullBounds.world);         // rings on the parks' pools (engine/pools.js)
-                    this.drawCasings(this.ctx, cullBounds.world);             // spent brass (engine/combat-effects.js)
+                    this.effects.draw('casing', this.ctx, cullBounds.world);  // spent brass (directory/effects-system.js)
                 }
                 // The sun's shadows (engine/daylight.js): buildings and trees thrown across the ground by day
                 if (RL.at('shadows')) this.drawCastShadows(this.ctx, cullBounds.world);
@@ -90271,8 +90369,8 @@ engineMixin({
                 }
                 
                 if (RL.at('combat')) {
-                    this.drawMuzzleStars(this.ctx);                          // the flash's star at each muzzle
-                    this.drawShotFx(this.ctx, cullBounds.world);             // barrel smoke, embers, golden wisps (engine/combat-effects.js)
+                    this.effects.draw('muzzle', this.ctx);                   // the flash's star at each muzzle
+                    this.effects.draw('barrel', this.ctx, cullBounds.world);  // barrel smoke, embers, golden wisps (directory/effects-system.js)
                     this.drawSlashes(this.ctx);                              // a blade's gold arc (engine/status-effects.js)
                     this.drawKnuckleFx(this.ctx);                            // Golden Retribution's gold afterimages and rings (engine/knuckles.js)
                     this.drawMirrorShield(this.ctx);                         // the Mirrored Glass turning a shot
@@ -90590,7 +90688,7 @@ engineMixin({
                 if (RL.at('combat')) {
                     this.drawGunnerHeat(this.ctx, cullBounds.entities);
                     this.drawBossHazards(this.ctx, cullBounds.view);   // the duel's dimming, sigils, fire, hooks (engine/boss-hazards.js)
-                    this.drawFireTrail(this.ctx, cullBounds.view);
+                    this.effects.draw('flame', this.ctx, cullBounds.view);
                     this.drawBreachGlow(this.ctx, cullBounds.view);
                     for (const p of this.projectiles) if (p.isFireball) p.draw(this.ctx);
                 }
@@ -94157,7 +94255,7 @@ engineMixin({
                     const pulse = 0.96 + 0.04 * Math.sin(now * 0.023 + (p.id || 0));
                     stamp(p, p.x, p.y, FIREBALL_LIGHT_RADIUS, (color ? 0.32 : 0.98) * pulse);
                 }
-                const trail = this._fireTrail || [], cells = this._fireCells || (this._fireCells = new Set());
+                const trail = this.effects.of('flame'), cells = this._fireCells || (this._fireCells = new Set());
                 cells.clear();   // (one reused set, numeric cell keys: no strings or sets per pass)
                 let lit = 0;
                 for (let i = trail.length - 1; i >= 0 && lit < 48; i--) {
@@ -94174,7 +94272,7 @@ engineMixin({
 
             /** Warm orange spill also reads by day or in a map with no ambient-darkness layer. */
             drawFireLightGlow(ctx) {
-                if (!this.projectiles.some(p => p.isFireball) && !(this._fireTrail && this._fireTrail.length)) return;
+                if (!this.projectiles.some(p => p.isFireball) && !this.effects.of('flame').length) return;
                 const V = this.view || this.camera, x = V.x, y = V.y;
                 const zoom = V.zoom || this.camera.zoom;
                 const hw = this.canvas.width / (2 * zoom), hh = this.canvas.height / (2 * zoom);
@@ -94564,7 +94662,7 @@ engineMixin({
                 const white = glowSprite('255, 255, 255', 0.3);
                 for (const p of this.projectiles) if (!p.isFireball && inView(p.x, p.y, 50)) lc.drawImage(white, p.x - 50, p.y - 50, 100, 100);
                 this._drawFireLights(lc, 'hole', inView);
-                for (const f of this.muzzleFlashes) {
+                for (const f of this.effects.of('muzzle')) {
                     const r = f.radius * 1.6;
                     if (inView(f.x, f.y, r)) lc.drawImage(white, f.x - r, f.y - r, r * 2, r * 2);
                 }
@@ -94794,7 +94892,7 @@ engineMixin({
                     if (p.isFireball || !inView(p.x, p.y, 40)) continue;
                     lc.globalAlpha = 0.3; drawGlow(lc, p.x, p.y, 40, hexOr(p.color, '#ffd9a0'), 0.25);
                 }
-                for (const f of this.muzzleFlashes) {
+                for (const f of this.effects.of('muzzle')) {
                     const r = f.radius * 1.4;
                     if (!inView(f.x, f.y, r)) continue;
                     lc.globalAlpha = 0.45 * Math.min(1, (f.life || 3) / 3); drawGlow(lc, f.x, f.y, r, hexOr(f.color, '#ffcc88'), 0.25);
@@ -95630,7 +95728,7 @@ engineMixin({
         });
 
     </script>
-    <script type="text/dfab" data-src="directory/new-game-state.js" data-cost="120">
+    <script type="text/dfab" data-src="directory/new-game-state.js" data-cost="119">
         // ===== LV2 DIRECTORY =====
         // GameEngine: this game's new-game defaults (resetGameState): player, quest flags, inventory, crew,
         // story, missions, phone, the last run's world. Called on exit to the main menu and before a new game.
@@ -95812,8 +95910,8 @@ engineMixin({
                 // --- TRANSIENT ENTITIES ---
                 this.projectiles = [];
                 this.stickyOrbs = [];
-                this.muzzleFlashes = []; this.casings = []; this.shotFx = [];
-                this._fireTrail = []; this._fireTrailSerial = 0; this._breachFx = null;
+                this.effects.clear();
+                this._fireTrailSerial = 0; this._breachFx = null;
                 this.loot = [];
                 this.npcs = []; this.props = []; this.lamps = []; this.enemies = []; this.corpses = [];   // the last map's (loading a map sets them)
                 this.lastKnownMarkers = []; this.noiseRipples = []; this.flitVFX = [];

@@ -179,8 +179,8 @@
                 // --- TRANSIENT ENTITIES ---
                 this.projectiles = [];
                 this.stickyOrbs = [];
-                this.muzzleFlashes = []; this.casings = []; this.shotFx = [];
-                this._fireTrail = []; this._fireTrailSerial = 0; this._breachFx = null;
+                this.effects.clear();
+                this._fireTrailSerial = 0; this._breachFx = null;
                 this.loot = [];
                 this.npcs = []; this.props = []; this.lamps = []; this.enemies = []; this.corpses = [];   // the last map's (loading a map sets them)
                 this.lastKnownMarkers = []; this.noiseRipples = []; this.flitVFX = [];

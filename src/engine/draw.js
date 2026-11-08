@@ -538,7 +538,7 @@
                     this.decals.draw(this.ctx, cullBounds.world);
                     this.drawSpills(this.ctx, cullBounds.world);              // spilt drinks (engine/spills.js)
                     this.drawPoolRipples(this.ctx, cullBounds.world);         // rings on the parks' pools (engine/pools.js)
-                    this.drawCasings(this.ctx, cullBounds.world);             // spent brass (engine/combat-effects.js)
+                    this.effects.draw('casing', this.ctx, cullBounds.world);  // spent brass (directory/effects-system.js)
                 }
                 // The sun's shadows (engine/daylight.js): buildings and trees thrown across the ground by day
                 if (RL.at('shadows')) this.drawCastShadows(this.ctx, cullBounds.world);
@@ -889,8 +889,8 @@
                 }
                 
                 if (RL.at('combat')) {
-                    this.drawMuzzleStars(this.ctx);                          // the flash's star at each muzzle
-                    this.drawShotFx(this.ctx, cullBounds.world);             // barrel smoke, embers, golden wisps (engine/combat-effects.js)
+                    this.effects.draw('muzzle', this.ctx);                   // the flash's star at each muzzle
+                    this.effects.draw('barrel', this.ctx, cullBounds.world);  // barrel smoke, embers, golden wisps (directory/effects-system.js)
                     this.drawSlashes(this.ctx);                              // a blade's gold arc (engine/status-effects.js)
                     this.drawKnuckleFx(this.ctx);                            // Golden Retribution's gold afterimages and rings (engine/knuckles.js)
                     this.drawMirrorShield(this.ctx);                         // the Mirrored Glass turning a shot
@@ -1208,7 +1208,7 @@
                 if (RL.at('combat')) {
                     this.drawGunnerHeat(this.ctx, cullBounds.entities);
                     this.drawBossHazards(this.ctx, cullBounds.view);   // the duel's dimming, sigils, fire, hooks (engine/boss-hazards.js)
-                    this.drawFireTrail(this.ctx, cullBounds.view);
+                    this.effects.draw('flame', this.ctx, cullBounds.view);
                     this.drawBreachGlow(this.ctx, cullBounds.view);
                     for (const p of this.projectiles) if (p.isFireball) p.draw(this.ctx);
                 }
