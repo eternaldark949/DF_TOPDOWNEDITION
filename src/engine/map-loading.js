@@ -275,7 +275,7 @@ engineMixin({
                 this.finCam = null;
                 this.timeSlowState = { active: false, scale: 1.0, targetScale: 1.0, duration: 0, transitionSpeed: 0.05 };
                 this.effects.clear(); this.flitVFX = []; this._resetFlitFeedback();
-                this._fireTrailSerial = 0; this._breachFx = null;
+                this._fireTrailSerial = 0;
                 this.noiseRipples = []; this.lastKnownMarkers = [];
                 this._edgeRipples = null; this._edgeTouch = null;                       // the veil's ripples (world/map-edge.js)
                 if (typeof Walker !== 'undefined') {                                   // walks are across the old floor
@@ -1352,7 +1352,7 @@ engineMixin({
                     this.roomSystem.tagLamps(this.lamps);
                 } 
                 
-                this.decals.clear(); this.spills = [];
+                this.decals.clear(); this.effects.of('spill').length = 0;
                 this.corpses = [];
                 
                 // Deactivate current map entities (non-target maps have empty arrays from lazy creation)

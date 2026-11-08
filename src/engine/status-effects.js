@@ -250,9 +250,7 @@
                 if (near.length) this.meleeStepIn(ang, this._meleeGap(near));
                 // the arc and its sparkle, in the blade's colour (gold for the Kukri); a hit adds more where it lands
                 const trail = M.trail || DEFAULT_SLASH_TRAIL;
-                const L = this.slashes || (this.slashes = []);
-                L.push(swing.slash = { x: pl.x, y: pl.y, a: ang, side, t0: _gameTimeSec, reach, arc, hit: false, secs: this._slashSecs, style: this._slashStyle, edge: swing.edge, cols: trail.cols });
-                if (L.length > 8) L.shift();
+                this.effects.spawn('slash', swing.slash = { x: pl.x, y: pl.y, a: ang, side, t0: _gameTimeSec, reach, arc, hit: false, secs: this._slashSecs, style: this._slashStyle, edge: swing.edge, cols: trail.cols });
                 swing.dust = trail.dust;
                                 for (let i = 0; i < 3; i++) {
                     const a = ang + (Math.random() - 0.5) * arc, r = reach * (0.5 + Math.random() * 0.5);
@@ -290,7 +288,7 @@
                 const ph = swingPhases(swing.style), u = ph.windup + (ph.cutEnd - ph.windup) * k / BLADE.CUT_STEPS;
                 const pose = sampleMeleeSwing(u * swing.secs, swing.side, this._bladePose || (this._bladePose = {}), swing.secs, swing.style);
                 if (!pose) return false;
-                // The blade as it's drawn: from the fist to the edge the trail follows (drawSlashes)
+                // The blade as it's drawn: from the fist to the edge the trail follows (the effects system's 'slash')
                 const c = Math.cos(pose.a), s = Math.sin(pose.a);
                 const ax = pose.handX, ay = pose.handY;
                 const bx = ax + (ex * c - ey * s) * .95, by = ay + (ex * s + ey * c) * .95;
@@ -497,46 +495,4 @@
                 return sampleMeleeSwing(_gameTimeSec - this._slashT, this._slashSide,
                     this._slashPose || (this._slashPose = {}), this._slashSecs || MELEE_SWING.duration, this._slashStyle);
             },
-
-            /** Slash arcs: a crescent of gold light where the blade went (world space) */
-            drawSlashes(ctx) {
-                const L = this.slashes; if (!L || !L.length) return;
-                const now = _gameTimeSec;
-                ctx.save(); ctx.globalCompositeOperation = 'lighter';
-                lifeKit.sweep(L, s => {
-                    const age = now - s.t0;
-                    // Times scaled from the Kukri's swing (q stretches them for a slower blade), phases by style
-                    const secs = s.secs || MELEE_SWING.duration, q = secs / MELEE_SWING.duration, life = .3 * q;
-                    const ph = swingPhases(s.style), windT = ph.windup * secs, cutT = ph.cutEnd * secs;
-                    if (age > life) { return true; }
-                    if (age < windT) return;
-                    // Keep the newest cut attached to the moving wielder, then let its last
-                    // position fade. Recovery does not paint a second, backward slash.
-                    if (s.t0 === this._slashT && age <= MELEE_SWING.duration * q && this.weaponMode === 'melee' && !this.weaponHolstered) {
-                        s.drawX = this.player.x; s.drawY = this.player.y; s.drawA = this.player.angle;
-                    }
-                    const k = 1 - age / life;
-                    // a wide sweep leaves a longer crescent: three quarters of its cut
-                    const span = s.style === 'wide' ? (cutT - windT) * .75 : .065 * q;
-                    const end = Math.min(age, cutT), start = Math.max(windT, end - span);
-                    const pose = this._slashTrailPose || (this._slashTrailPose = {});
-                    const [ex, ey] = s.edge || DEFAULT_SLASH_TRAIL.edge;
-                    ctx.save(); ctx.translate(s.drawX ?? s.x, s.drawY ?? s.y); ctx.rotate(s.drawA ?? s.a);
-                    ctx.beginPath();
-                    const n = s.style === 'wide' ? 24 : 8;                      // a smooth curve round a wide sweep
-                    for (let j = 0; j <= n; j++) {
-                        sampleMeleeSwing(start + (end - start) * j / n, s.side, pose, secs, s.style);
-                        const c = Math.cos(pose.a), sn = Math.sin(pose.a);
-                        // The edge of the real model, held at the same hand anchor.
-                        const x = pose.handX + (ex * c - ey * sn) * .95;
-                        const y = pose.handY + (ex * sn + ey * c) * .95;
-                        if (j) ctx.lineTo(x, y); else ctx.moveTo(x, y);
-                    }
-                    for (const [w, col, al] of (s.cols || DEFAULT_SLASH_TRAIL.cols)) {
-                        ctx.strokeStyle = `rgba(${col}, ${al * k})`; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.stroke();
-                    }
-                    ctx.restore();
-                });
-                ctx.restore();
-            }
         });

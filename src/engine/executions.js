@@ -72,7 +72,7 @@
                     X.struck = true;
                     if (X.blade) {                                                  // the draw-cut: a gold arc, a spray
                         this._slashT = _gameTimeSec; this._slashSide = -(this._slashSide || 1);
-                        (this.slashes || (this.slashes = [])).push({ x: pl.x, y: pl.y, a: pl.angle, side: this._slashSide, t0: _gameTimeSec, reach: 30, arc: 1.6, hit: true });
+                        this.effects.spawn('slash', { x: pl.x, y: pl.y, a: pl.angle, side: this._slashSide, t0: _gameTimeSec, reach: 30, arc: 1.6, hit: true });
                         if (typeof ambience !== 'undefined' && ambience.slash) ambience.slash(true);
                         const B = bloodOf(e);
                         if (B && this.weather) this.weather.spawnSpray(e.x, e.y, e.angle + Math.PI / 2, `rgba(${B.drop}, 1)`, 14);

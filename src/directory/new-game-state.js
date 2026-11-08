@@ -180,7 +180,7 @@
                 this.projectiles = [];
                 this.stickyOrbs = [];
                 this.effects.clear();
-                this._fireTrailSerial = 0; this._breachFx = null;
+                this._fireTrailSerial = 0;
                 this.loot = [];
                 this.npcs = []; this.props = []; this.lamps = []; this.enemies = []; this.corpses = [];   // the last map's (loading a map sets them)
                 this.lastKnownMarkers = []; this.noiseRipples = []; this.flitVFX = [];

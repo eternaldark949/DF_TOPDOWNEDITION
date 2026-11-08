@@ -36,6 +36,11 @@ const r = JSON.parse(JSON.stringify(e.run(`(() => {
   _zoomLOD = 0;
   E.types.barrel.look(E.of('barrel'), E.out.clear() || E.out, { left: -9, right: 9, top: -9, bottom: 9 }, game);
   out.look = E.out.ops.slice(0, E.out.n).map(p => p[0]);
+  // a floating number: drawn as outlined text, gone after its life (a crit's 1.1 s)
+  _gameTimeSec = 5; E.spawn('number', { target: null, x: 0, y: 0, value: 12, color: '#ffd23a', t0: 5, pop: 5, drift: 0, crit: true }, 40);
+  const tc = [], tctx = new Proxy({ globalAlpha: 1 }, { get: (t, k) => k in t ? t[k] : (...a) => tc.push([k, ...a]), set: (t, k, v) => { t[k] = v; return true; } });
+  E.draw('number', tctx); out.text = tc.filter(c => /Text$/.test(c[0])).map(c => c.slice(0, 2));
+  _gameTimeSec = 6; E.update('number'); out.numA = E.of('number').length; _gameTimeSec = 6.2; E.update('number'); out.numB = E.of('number').length;
   E.clear(); out.cleared = Object.values(E.lists).every(l => !l.length);
   return out;
 })()`)));
@@ -50,5 +55,7 @@ assert.deepEqual(r.cap, [60, 10], 'casings capped at 60, oldest first');
 assert.deepEqual([r.flash1, r.flash2], [1, 0], 'a muzzle flash lives its ticks');
 assert.equal(r.aged, 0, 'casings go after 25 s');
 assert.deepEqual(r.look, ['blend', 'rect', 'rect'], 'an ember looks like a fleck and its streak');
+assert.deepEqual(r.text, [['strokeText', '12!'], ['fillText', '12!']], 'a crit number: outlined, then filled');
+assert.deepEqual([r.numA, r.numB], [1, 0], 'a crit number lives 1.1 s');
 assert.ok(r.cleared, 'clear empties every list');
 console.log('effects system: ok');

@@ -12,7 +12,7 @@ function test(name,fn){const e=runtime(join(__dirname,'..','DFAB V8.html'),{affi
 const setup=`game._doLoadMap('ollo_test');game.running=true;game.paused=false;game.player.visible=true;
  game.activeMap={id:'gr_test',width:3000,height:3000,walls:[],buildings:[],buildingColliders:[]};
  game.player._game=game;game.player.x=1000;game.player.y=1000;game.player.angle=0;game.isDriving=false;
- game.weaponHolstered=false;game.projectiles=[];game.enemies=[];game.floatingTexts=[];_gameTimeSec=10;game.flitState.lastFlitAt=-99;
+ game.weaponHolstered=false;game.projectiles=[];game.enemies=[];game.effects.of('number').length=0;_gameTimeSec=10;game.flitState.lastFlitAt=-99;
  const wield=id=>{game.currentWeapon=createItemFromRegistry(id,game);game.weaponMode=ITEM_REGISTRY[id].weaponMode;game.shootCooldown=0;};
  const ganger=(x,y,hp=5000)=>{const g=new Ganger(x,y,{hp});g.hp=g.maxHp=hp;g.state='IDLE';game.enemies.push(g);return g;};
  const rnd=Math.random;const withRandom=(v,f)=>{Math.random=()=>v;try{return f();}finally{Math.random=rnd;}};
@@ -109,11 +109,11 @@ test('A staggered hunter neither dashes nor claws',e=>{
 
 test('The afterimages and rings draw, then fade away',e=>{
  const r=value(e,setup+`wield('golden_retribution');const g=ganger(1036,1000);game._punchCombo=2;game._punchAt=_gameTimeSec;punch();
-  const n=game.knuckleFx.length;const kinds=game.knuckleFx.map(f=>f.k).sort().join();
+  const n=game.effects.of('knuckle').length;const kinds=game.effects.of('knuckle').map(f=>f.k).sort().join();
   const ctx=new Proxy({},{get:(t,k)=>/Gradient$/.test(k)?()=>({addColorStop(){}}):t[k]??(()=>{}),set:(t,k,v)=>(t[k]=v,true)});
-  game.drawKnuckleFx(ctx);_gameTimeSec+=1;game.drawKnuckleFx(ctx);
+  game.effects.draw('knuckle',ctx);_gameTimeSec+=1;game.effects.update('knuckle');game.effects.draw('knuckle',ctx);
   drawKnuckleDuster(ctx,0,0,0,1);
-  return {n,kinds,left:game.knuckleFx.length};`);
+  return {n,kinds,left:game.effects.of('knuckle').length};`);
  assert.deepEqual(r,{n:2,kinds:'ring,trail',left:0});
 });
 

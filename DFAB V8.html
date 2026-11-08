@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '4f8c6231be41';
+        const DFAB_BUILD = '1887a06be869';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9515,7 +9515,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="basement/draw-list.js" data-cost="48">
+    <script type="text/dfab" data-src="basement/draw-list.js" data-cost="120">
         // ===== LV0 BASEMENT =====
         // The draw list: WHAT to draw, apart from HOW. A system fills a list with shape packets and never
         // touches a canvas; a renderer draws the list. canvasRenderer (below) draws it with Canvas 2D, and a
@@ -9532,6 +9532,20 @@
         //   ['sprite', image, sx, sy, sw, sh, dx, dy, dw, dh, alpha, tx, ty, rot, scx, scy]
         //                                                part of an image (sw 0: all of it, at its own size) at
         //                                                dx, dy in a frame moved to tx, ty, turned by rot, then scaled
+        //   ['frame', tx, ty, rot, scx, scy] ... ['unframe']   what's between is drawn in that frame
+        //   ['path', width, color, alpha, x0, y0, x1, y1, ...]  a line through the points
+        //   ['poly', color, alpha, x0, y0, x1, y1, ...]         a closed shape through the points, filled
+        //   ['circle', x, y, r, color, alpha]                   filled
+        //   ['ring', x, y, r, width, color, alpha]              outlined
+        //   ['arc', x, y, rx, ry, rot, a0, a1, width, color, alpha]   part of an ellipse's outline, a0 to a1
+        //   ['ellipse', x, y, rx, ry, rot, color, alpha]        filled
+        //   ['radial', x, y, r, alpha, offset, color, offset, color, ...]   a circle filled with a radial fade
+        //                                                       from its centre (the gradient's stops)
+        //   ['blob', color, alpha, x, y, rx, ry, rot, cx, cy, cr, ...]   an ellipse and circles, filled as one
+        //                                                       shape (where they overlap it is painted once)
+        //   ['shadow', color, blur]                             a soft shadow under what follows (blur 0: none)
+        //   ['screen', color, alpha]                            the whole view, in screen space (a flash)
+        //   ['text', text, x, y, font, color, alpha, outline, width]   centred on x, y; outlined first (width 0: not)
         //
         //   const out = new drawList();
         //   out.clear(); out.blend('lighter'); out.rect(x, y, 2, 2, '#ffd76a', 0.8);
@@ -9555,6 +9569,25 @@
             sprite(image, sx, sy, sw, sh, dx, dy, dw, dh, alpha, tx, ty, rot, scx, scy) {
                 this._op().push('sprite', image, sx, sy, sw, sh, dx, dy, dw, dh, alpha, tx, ty, rot, scx, scy);
             }
+            frame(tx, ty, rot = 0, scx = 1, scy = 1) { this._op().push('frame', tx, ty, rot, scx, scy); }
+            unframe() { this._op().push('unframe'); }
+            /** A line (path) or a filled shape (poly) through points: returns the packet (add them with pt). */
+            path(width, color, alpha) { const o = this._op(); o.push('path', width, color, alpha); return o; }
+            poly(color, alpha) { const o = this._op(); o.push('poly', color, alpha); return o; }
+            pt(o, x, y) { o.push(x, y); }
+            circle(x, y, r, color, alpha) { this._op().push('circle', x, y, r, color, alpha); }
+            ring(x, y, r, width, color, alpha) { this._op().push('ring', x, y, r, width, color, alpha); }
+            arc(x, y, rx, ry, rot, a0, a1, width, color, alpha) { this._op().push('arc', x, y, rx, ry, rot, a0, a1, width, color, alpha); }
+            ellipse(x, y, rx, ry, rot, color, alpha) { this._op().push('ellipse', x, y, rx, ry, rot, color, alpha); }
+            /** A radial fade: returns the packet (add its stops with stop, centre first). */
+            radial(x, y, r, alpha) { const o = this._op(); o.push('radial', x, y, r, alpha); return o; }
+            stop(o, offset, color) { o.push(offset, color); }
+            /** An ellipse and circles as one shape: returns the packet (add the circles with dot). */
+            blob(color, alpha, x, y, rx, ry, rot) { const o = this._op(); o.push('blob', color, alpha, x, y, rx, ry, rot); return o; }
+            dot(o, cx, cy, cr) { o.push(cx, cy, cr); }
+            shadow(color, blur) { this._op().push('shadow', color, blur); }
+            screen(color, alpha) { this._op().push('screen', color, alpha); }
+            text(text, x, y, font, color, alpha, outline = null, width = 0) { this._op().push('text', text, x, y, font, color, alpha, outline, width); }
         }
 
         /** Canvas 2D: a draw list onto a context, in the context's current (world) transform. */
@@ -9583,6 +9616,64 @@
                             if (o[4]) ctx.drawImage(o[1], o[2], o[3], o[4], o[5], o[6], o[7], o[8], o[9]);
                             else ctx.drawImage(o[1], o[6], o[7]);
                             ctx.restore();
+                            break;
+                        case 'frame':
+                            ctx.save(); ctx.translate(o[1], o[2]);
+                            if (o[3]) ctx.rotate(o[3]);
+                            if (o[4] !== 1 || o[5] !== 1) ctx.scale(o[4], o[5]);
+                            break;
+                        case 'unframe': ctx.restore(); break;
+                        case 'path':
+                            ctx.globalAlpha = A * o[3]; ctx.strokeStyle = o[2]; ctx.lineWidth = o[1];
+                            ctx.beginPath(); ctx.moveTo(o[4], o[5]);
+                            for (let k = 6; k < o.length; k += 2) ctx.lineTo(o[k], o[k + 1]);
+                            ctx.stroke();
+                            break;
+                        case 'poly':
+                            ctx.globalAlpha = A * o[2]; ctx.fillStyle = o[1];
+                            ctx.beginPath(); ctx.moveTo(o[3], o[4]);
+                            for (let k = 5; k < o.length; k += 2) ctx.lineTo(o[k], o[k + 1]);
+                            ctx.closePath(); ctx.fill();
+                            break;
+                        case 'circle':
+                            ctx.globalAlpha = A * o[5]; ctx.fillStyle = o[4];
+                            ctx.beginPath(); ctx.arc(o[1], o[2], o[3], 0, Math.PI * 2); ctx.fill();
+                            break;
+                        case 'ring':
+                            ctx.globalAlpha = A * o[6]; ctx.strokeStyle = o[5]; ctx.lineWidth = o[4];
+                            ctx.beginPath(); ctx.arc(o[1], o[2], o[3], 0, Math.PI * 2); ctx.stroke();
+                            break;
+                        case 'arc':
+                            ctx.globalAlpha = A * o[10]; ctx.strokeStyle = o[9]; ctx.lineWidth = o[8];
+                            ctx.beginPath(); ctx.ellipse(o[1], o[2], o[3], o[4], o[5], o[6], o[7]); ctx.stroke();
+                            break;
+                        case 'ellipse':
+                            ctx.globalAlpha = A * o[7]; ctx.fillStyle = o[6];
+                            ctx.beginPath(); ctx.ellipse(o[1], o[2], o[3], o[4], o[5], 0, Math.PI * 2); ctx.fill();
+                            break;
+                        case 'radial': {
+                            const g = ctx.createRadialGradient(o[1], o[2], 0, o[1], o[2], o[3]);
+                            for (let k = 5; k < o.length; k += 2) g.addColorStop(o[k], o[k + 1]);
+                            ctx.globalAlpha = A * o[4]; ctx.fillStyle = g;
+                            ctx.beginPath(); ctx.arc(o[1], o[2], o[3], 0, Math.PI * 2); ctx.fill();
+                            break;
+                        }
+                        case 'blob':
+                            ctx.globalAlpha = A * o[2]; ctx.fillStyle = o[1];
+                            ctx.beginPath(); ctx.ellipse(o[3], o[4], o[5], o[6], o[7], 0, Math.PI * 2);
+                            for (let k = 8; k < o.length; k += 3) { ctx.moveTo(o[k] + o[k + 2], o[k + 1]); ctx.arc(o[k], o[k + 1], o[k + 2], 0, Math.PI * 2); }
+                            ctx.fill();
+                            break;
+                        case 'shadow': ctx.shadowColor = o[1]; ctx.shadowBlur = o[2]; break;
+                        case 'screen':
+                            ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+                            ctx.globalAlpha = A * o[2]; ctx.fillStyle = o[1]; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                            ctx.restore();
+                            break;
+                        case 'text':
+                            ctx.globalAlpha = A * o[6]; ctx.font = o[4]; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                            if (o[8]) { ctx.lineJoin = 'round'; ctx.lineWidth = o[8]; ctx.strokeStyle = o[7]; ctx.strokeText(o[1], o[2], o[3]); }
+                            ctx.fillStyle = o[5]; ctx.fillText(o[1], o[2], o[3]);
                             break;
                     }
                 }
@@ -74170,24 +74261,25 @@ Object.assign(TrafficVehicle.prototype, {
             }
         }
     </script>
-    <script type="text/dfab" data-src="directory/effects-system.js" data-cost="130">
+    <script type="text/dfab" data-src="directory/effects-system.js" data-cost="334">
         // ===== LV2 DIRECTORY =====
         // The effects system: the world's short-lived effects in one place. Each EFFECT TYPE (EFFECTS, below)
         // has one list here; the system ages it on the life kit (basement/life-kit.js) and has the type say
         // what it looks like as shape packets in a draw list (basement/draw-list.js). Nothing here draws:
         // canvasRenderer does, and a WebGL renderer can read the same list.
         //
-        // EFFECT TYPE: { max, cull, step(item, game) → true when done, tick(list, game), look(list, out, view, game) }
-        //   max        how many at once: past it the oldest go (optional)
+        // EFFECT TYPE: { max, cull, step(item, game) → true when done, tick(list, game), look(list, out, view, game, pass) }
+        //   max        how many at once: past it the oldest go (optional; a spawn can name its own)
         //   cull       true: drop with lifeKit.cull (order shuffles), else lifeKit.sweep (order kept)
         //   step       one tick of one item; return true when it is done
         //   tick       one tick of the whole list, in place of step (optional)
-        //   look       fill `out` with what the list looks like now (`view`: the world rect in view)
+        //   look       fill `out` with what the list looks like now (`view`: the world rect in view; `pass`: which
+        //              of its passes, for a type drawn at more than one point of the frame)
         //
-        //   game.effects.spawn('casing', item)       // add one (the item is the type's own packet object)
+        //   game.effects.spawn('casing', item, max)  // add one (the item is the type's own packet object)
         //   game.effects.of('flame')                 // its list (lighting reads flames and flashes from here)
         //   game.effects.update('casing')            // one tick of one type (each in its place in engine/update.js)
-        //   game.effects.draw('casing', ctx, view)   // look, then the renderer
+        //   game.effects.draw('casing', ctx, view)   // look, then the renderer ('breach', ctx, view, 'glow': one pass)
         //   game.effects.clear()                     // a new map or a new game
         class effectsSystem {
             constructor(game, types) {
@@ -74195,8 +74287,8 @@ Object.assign(TrafficVehicle.prototype, {
                 for (const k in types) this.lists[k] = [];
             }
             of(type) { return this.lists[type]; }
-            spawn(type, item) {
-                const L = this.lists[type], max = this.types[type].max;
+            spawn(type, item, max = this.types[type].max) {
+                const L = this.lists[type];
                 L.push(item);
                 if (max && L.length > max) L.splice(0, L.length - max);
                 return item;
@@ -74208,12 +74300,12 @@ Object.assign(TrafficVehicle.prototype, {
                 else if (T.cull) lifeKit.cull(L, item => T.step(item, game));
                 else lifeKit.sweep(L, item => T.step(item, game));
             }
-            draw(type, ctx, view) {
+            draw(type, ctx, view, pass) {
                 const L = this.lists[type];
                 if (!L.length) return;
                 const out = this.out;
                 out.clear();
-                this.types[type].look(L, out, view, this.game);
+                this.types[type].look(L, out, view, this.game, pass);
                 canvasRenderer.flush(ctx, out);
             }
             clear() { for (const k in this.lists) this.lists[k].length = 0; }
@@ -74363,6 +74455,272 @@ Object.assign(TrafficVehicle.prototype, {
                         if (f.angle === undefined) continue;
                         const k = Math.min(1, (f.life || 0) / 3), s = (f.radius || 50) / 170 * (0.7 + 0.3 * k);
                         out.sprite(muzzleStarSprite(f.color), 0, 0, 0, 0, -24, -24, 0, 0, 0.35 + 0.65 * k, f.x, f.y, f.angle, s, s * (0.8 + 0.4 * ((f.x * 7 + f.life) % 1)));
+                    }
+                }
+            },
+
+            /**
+             * A blade's cut (engine/status-effects.js, a draw-cut in engine/executions.js): a crescent of gold light
+             * where the blade went, the newest kept on the moving wielder, then left to fade. Times are scaled from the
+             * Kukri's swing (q stretches them for a slower blade), phases by style; at most 8.
+             * ITEM: { x, y, a, side, t0, reach, arc, hit, secs, style, edge, cols }
+             */
+            slash: {
+                max: 8,
+                _pts: [],
+                step(s) {
+                    const secs = s.secs || MELEE_SWING.duration, q = secs / MELEE_SWING.duration, life = .3 * q;
+                    return _gameTimeSec - s.t0 > life;
+                },
+                look(L, out, view, game) {
+                    const now = _gameTimeSec, P = EFFECTS.slash._pts;
+                    out.blend('lighter'); out.cap('round');
+                    for (let i = L.length - 1; i >= 0; i--) {
+                        const s = L[i], age = now - s.t0;
+                        const secs = s.secs || MELEE_SWING.duration, q = secs / MELEE_SWING.duration, life = .3 * q;
+                        const ph = swingPhases(s.style), windT = ph.windup * secs, cutT = ph.cutEnd * secs;
+                        if (age > life || age < windT) continue;
+                        // The newest cut rides the moving wielder; recovery paints no second, backward slash
+                        if (s.t0 === game._slashT && age <= MELEE_SWING.duration * q && game.weaponMode === 'melee' && !game.weaponHolstered) {
+                            s.drawX = game.player.x; s.drawY = game.player.y; s.drawA = game.player.angle;
+                        }
+                        const k = 1 - age / life;
+                        // a wide sweep leaves a longer crescent: three quarters of its cut
+                        const span = s.style === 'wide' ? (cutT - windT) * .75 : .065 * q;
+                        const end = Math.min(age, cutT), start = Math.max(windT, end - span);
+                        const pose = game._slashTrailPose || (game._slashTrailPose = {});
+                        const [ex, ey] = s.edge || DEFAULT_SLASH_TRAIL.edge;
+                        const n = s.style === 'wide' ? 24 : 8;                      // a smooth curve round a wide sweep
+                        P.length = 0;
+                        for (let j = 0; j <= n; j++) {
+                            sampleMeleeSwing(start + (end - start) * j / n, s.side, pose, secs, s.style);
+                            const c = Math.cos(pose.a), sn = Math.sin(pose.a);
+                            // the edge of the real model, held at the same hand anchor
+                            P.push(pose.handX + (ex * c - ey * sn) * .95, pose.handY + (ex * sn + ey * c) * .95);
+                        }
+                        out.frame(s.drawX ?? s.x, s.drawY ?? s.y, s.drawA ?? s.a);
+                        for (const [w, col, al] of (s.cols || DEFAULT_SLASH_TRAIL.cols)) {
+                            const o = out.path(w, `rgba(${col}, ${al * k})`, 1);
+                            for (let j = 0; j < P.length; j += 2) out.pt(o, P[j], P[j + 1]);
+                        }
+                        out.unframe();
+                    }
+                }
+            },
+
+            /**
+             * Golden Retribution and Vampiric Fists (engine/knuckles.js): a punch's gold afterimages along the fist's
+             * path ('trail', a haymaker's riding the hook's arc), a haymaker's ring ('ring', a slam's bigger), and the
+             * crimson motes a drinking punch winds back to her ('drain').
+             * ITEM: { k: 'trail', x, y, a, side, t0, hay } | { k: 'ring', x, y, t0, slam } | { k: 'drain', x, y, t0, ph, sp }
+             */
+            knuckle: {
+                life(f) { return f.k === 'drain' ? VAMPIRIC.LIFE : f.k === 'trail' ? (f.hay ? 0.32 : 0.22) : 0.36; },
+                step(f, game) { return _gameTimeSec - f.t0 > EFFECTS.knuckle.life(f) || (f.k === 'drain' && !game.player); },
+                look(L, out, view, game) {
+                    const now = _gameTimeSec, R = CONFIG.PUNCH.REACH, pl = game.player;
+                    for (let i = L.length - 1; i >= 0; i--) {
+                        const f = L[i], age = now - f.t0, life = EFFECTS.knuckle.life(f);
+                        if (age > life) continue;
+                        if (f.k === 'drain') {                                         // a crimson mote, wound to her
+                            if (age < 0 || !pl) continue;
+                            const u = age / life, e2 = u * u * (3 - 2 * u);
+                            const dx = pl.x - f.x, dy = pl.y - f.y, d = Math.hypot(dx, dy) || 1;
+                            const bow = Math.sin(u * Math.PI) * f.sp * Math.sin(f.ph);           // each one curves its own way
+                            const x = f.x + dx * e2 - dy / d * bow, y = f.y + dy * e2 + dx / d * bow;
+                            const a = (u < 0.15 ? u / 0.15 : 1) * (1 - Math.max(0, u - 0.8) / 0.2), r = 2.2 - u * 0.8;
+                            const g = out.radial(x, y, r * 3, 1);
+                            out.stop(g, 0, `rgba(255, 120, 140, ${a * 0.9})`); out.stop(g, 0.4, `rgba(200, 16, 46, ${a * 0.6})`); out.stop(g, 1, 'rgba(120, 0, 20, 0)');
+                            out.circle(x, y, r * 0.5, `rgba(255, 210, 220, ${a})`, 1);
+                        } else if (f.k === 'trail') {
+                            const c = Math.cos(f.a), s = Math.sin(f.a), side = f.side === 'right' ? 1 : -1;
+                            const ox = -s * 5 * side, oy = c * 5 * side;                   // the punching hand's side
+                            const n = f.hay ? 4 : 3;
+                            for (let j = 0; j < n; j++) {
+                                const u = (j + 1) / n, d = 12 + R * u * 1.1, a = (1 - age / life) * (0.18 + 0.42 * u);
+                                // a haymaker's copies ride the hook's arc (CONFIG.HAYMAKER), a jab's the straight line
+                                const ph = (92 - 100 * u) * Math.PI / 180, H = 19 + 7 * u, lx = Math.cos(ph) * H, ly = Math.sin(ph) * H * side;
+                                const x = f.hay ? f.x + c * lx - s * ly : f.x + c * d + ox, y = f.hay ? f.y + s * lx + c * ly : f.y + s * d + oy, rr = (f.hay ? 5.4 : 4.4) * (0.7 + 0.3 * u);
+                                const g = out.radial(x, y, rr * 2.2, 1);
+                                out.stop(g, 0, `rgba(255, 238, 170, ${a})`); out.stop(g, 0.45, `rgba(255, 196, 72, ${a * 0.7})`); out.stop(g, 1, 'rgba(255, 170, 40, 0)');
+                                out.circle(x, y, rr * 0.7, `rgba(255, 226, 140, ${a * 1.2})`, 1);
+                            }
+                        } else {
+                            const u = age / life, rr = (f.slam ? 14 : 10) + u * (f.slam ? 30 : 24), a = (1 - u) * 0.9;
+                            out.shadow('#ffb732', 10);
+                            out.ring(f.x, f.y, rr, 3 * (1 - u) + 0.6, '#ffd76a', a);
+                            out.ring(f.x, f.y, rr * 0.7, 1, '#fff4cf', a);
+                            out.shadow('rgba(0, 0, 0, 0)', 0);
+                        }
+                    }
+                }
+            },
+
+            /**
+             * Spilt drink (engine/spills.js): a pool thrown out along the way it flew, a few lobes from its seed so no
+             * two are the same shape, a darker edge, a layered cocktail's second colour, the room's light caught on it,
+             * and the drops thrown ahead; it shrinks a little as it dries (SPILL.LIFE, the last SPILL.FADE).
+             * On the floor under everyone, after the decals. Gameplay reads it too (footsteps, slips).
+             * ITEM: { x, y, r, color, color2, glow, born, splash, ox, oy, seed, a, drops, map }
+             */
+            spill: {
+                step(s, game) { return _gameTimeSec - s.born > SPILL.LIFE || s.map !== (game.activeMap ? game.activeMap.id : null); },
+                look(S, out, cb, game) {
+                    const now = _gameTimeSec, mapId = game.activeMap ? game.activeMap.id : null;
+                    for (let i = S.length - 1; i >= 0; i--) {
+                        const s = S[i], age = now - s.born;
+                        if (age > SPILL.LIFE || s.map !== mapId) continue;
+                        if (cb && (s.x + 40 < cb.left || s.x - 40 > cb.right || s.y + 40 < cb.top || s.y - 40 > cb.bottom)) continue;
+                        const dry = age > SPILL.LIFE - SPILL.FADE ? 1 - (age - (SPILL.LIFE - SPILL.FADE)) / SPILL.FADE : 1;
+                        const fly = Math.min(1, (now - s.splash) / 0.2);                // the splash: the drink flies out, then lands
+                        const grow = Math.min(1, (now - s.splash) / 0.3), ease = 1 - (1 - grow) * (1 - grow);
+                        const r = s.r * (0.35 + 0.65 * ease) * (0.75 + 0.25 * dry);
+                        const rgb = hexToRgb(s.color), wet = `rgb(${rgb})`;
+                        if (s.glow) out.shadow(s.color, 8);
+                        const o = out.blob(wet, 0.6 * dry, s.x, s.y, r, r * 0.62, s.a || 0);
+                        for (let k = 0; k < 4; k++) {
+                            const a = (s.a || 0) + (k - 1.5) * 1.1 + Math.sin(s.seed + k) * 0.4, d = r * (0.5 + ((s.seed * (k + 3)) % 1) * 0.25);
+                            const lr = r * (0.22 + ((s.seed * (k + 7)) % 1) * 0.18);
+                            out.dot(o, s.x + Math.cos(a) * d, s.y + Math.sin(a) * d * 0.7, lr);
+                        }
+                        if (s.glow) out.shadow(s.color, 0);
+                        out.arc(s.x, s.y, r, r * 0.62, s.a || 0, 0, Math.PI * 2, 0.8, 'rgba(0,0,0,0.6)', 0.3 * dry);   // the edge
+                        if (s.color2) out.circle(s.x, s.y, r * 0.4, s.color2, 0.5 * dry);
+                        out.ellipse(s.x - r * 0.3, s.y - r * 0.2, r * 0.26, r * 0.09, -0.6, '#ffffff', 0.35 * dry);   // sheen
+                        for (const d of s.drops) {                                  // the drops thrown ahead
+                            const dx = s.ox + (d.x - s.ox) * fly, dy = s.oy + (d.y - s.oy) * fly;
+                            out.circle(dx, dy, d.r * (fly < 1 ? 0.8 : 1), wet, 0.8 * dry);
+                        }
+                    }
+                }
+            },
+
+            /**
+             * A wall blown in (engine/breach-fx.js spawnBreachBlast: the Double Nights penthouse ambush). One at a time.
+             * Everything moves in game time, so pause and slow motion hold it. Two passes: 'under' (scorch, debris,
+             * smoke) before the darkness, so the room's light and the blast's spill light them; 'glow' (additive: the
+             * spill, fireballs, shock rings, sparks, embers, the burning lip, a brief flash) after it.
+             */
+            breach: {
+                max: 1,
+                step(B, game) {
+                    const t = ++B.t, W = game.weather && game.weather.windVec ? game.weather.windVec : { x: 0, y: 0 };
+                    const move = (p, damp) => { p.px = p.x; p.py = p.y; if (t <= p.d) return; p.x += p.vx; p.y += p.vy; p.vx *= damp; p.vy *= damp; };
+                    for (const p of B.debris) { move(p, 0.9); if (t > p.d) { p.rot += p.vr; p.vr *= 0.92; } }
+                    for (const p of B.sparks) move(p, 0.88);
+                    for (const p of B.smoke) { move(p, 0.99); p.vx += W.x * 0.004; p.vy += W.y * 0.004; }
+                    for (const p of B.embers) { move(p, 1); p.x += Math.sin(t * 0.07 + p.ph) * 0.25; }
+                    return t * CONFIG.LOOP.STEP_MS > BREACH.DEBRIS_MS;
+                },
+                clock(B) {
+                    const ip = RenderInterp, a = ip._drawActive && ip.alpha < 1 ? ip.alpha : 1;
+                    return { a, ms: (B.t - 1 + a) * CONFIG.LOOP.STEP_MS };
+                },
+                look(list, out, cb, game, pass) {
+                    const B = list[0], { a, ms } = EFFECTS.breach.clock(B), S = CONFIG.LOOP.STEP_MS, w = B.wall;
+                    const L = (p) => p.px + (p.x - p.px) * a, T = (p) => p.py + (p.y - p.py) * a;
+                    if (pass === 'under') {
+                        const away = (x, y, m) => cb && (x < cb.left - m || x > cb.right + m || y < cb.top - m || y > cb.bottom + m);
+                        const linger = Math.min(1, (BREACH.DEBRIS_MS - ms) / 1000);
+                        for (const s of B.scorch) {
+                            const age = ms - s.d * S; if (age < 0 || away(s.x, s.y, s.r * 1.3)) continue;
+                            const sx = B.horiz ? 1.3 : 1, sy = B.horiz ? 1 : 1.3;
+                            out.image(_bScorch(), s.x - s.r * sx, s.y - s.r * sy, s.r * 2 * sx, s.r * 2 * sy, Math.min(1, age / 120) * 0.9 * linger);
+                        }
+                        for (const p of B.debris) {
+                            if (ms < p.d * S) continue;
+                            const x = L(p), y = T(p); if (away(x, y, 20)) continue;
+                            out.frame(x, y, p.rot);
+                            if (p.glass) {
+                                const o = out.poly('rgba(190, 200, 255, 0.55)', linger);
+                                out.pt(o, -p.w / 2, p.h / 2); out.pt(o, 0, -p.h / 2); out.pt(o, p.w / 2, p.h / 3);
+                            } else {
+                                out.rect(-p.w / 2, -p.h / 2, p.w, p.h, '#0e0c10', linger);
+                                if (p.gold) out.rect(-p.w / 2, -p.h / 2, p.w, 1.4, 'rgba(232, 194, 122, 0.9)', linger);
+                            }
+                            out.unframe();
+                        }
+                        for (const p of B.smoke) {
+                            const age = ms - p.d * S, life = p.life * S; if (age < 0 || age > life) continue;
+                            const R = p.r0 * (1 + age / 1000 * 0.45), x = L(p), y = T(p); if (away(x, y, R)) continue;
+                            out.image(_bSmoke(), x - R, y - R, R * 2, R * 2, 0.95 * Math.min(1, age / 260) * Math.pow(1 - age / life, 1.2));
+                        }
+                        return;
+                    }
+                    if (ms > Math.max(BREACH.LIP_MS, 4500)) return;   // only scorch and debris remain (drawn under)
+                    out.blend('lighter');
+                    const cx = w.x + w.w / 2, cy = w.y + w.h / 2;
+                    const spill = Math.max(0, 1 - ms / BREACH.SPILL_MS);
+                    if (spill > 0) {
+                        const flick = 0.85 + 0.15 * Math.sin(ms * 0.05) * Math.sin(ms * 0.031), R = BREACH.SPILL_R, al = 0.42 * Math.pow(spill, 1.8) * flick;
+                        if (B.horiz) out.image(_bPool(), cx - R * 1.25, cy - R, R * 2.5, R * 2, al);
+                        else out.image(_bPool(), cx - R, cy - R * 1.25, R * 2, R * 2.5, al);
+                    }
+                    for (const c of B.charges) {
+                        const age = ms - c.d * S; if (age < 0 || age > BREACH.FIRE_MS) continue;
+                        const u = age / BREACH.FIRE_MS, grow = 1 - Math.pow(1 - Math.min(1, age / 160), 3), fade = Math.pow(1 - u, 1.8);
+                        if (age < 70) { const R = 36 + age * 0.6; out.image(_bCore(), c.x - R, c.y - R, R * 2, R * 2, 0.85 * (1 - age / 70)); }
+                        const R = c.r * (0.45 + 0.75 * grow);
+                        out.image(_bFire(), c.x - R, c.y - R, R * 2, R * 2, 0.65 * fade);
+                        for (const l of c.lobes) {
+                            const rr = R * l.k, ox = Math.cos(l.a) * R * l.s, oy = Math.sin(l.a) * R * l.s;
+                            out.image(_bFire(), c.x + ox - rr, c.y + oy - rr, rr * 2, rr * 2, 0.38 * fade);
+                        }
+                        const ra = Math.min(1, age / 380);
+                        if (ra < 1) {                                              // the shock ring: a thin gold line, half, into the room
+                            const a0 = B.dir - Math.PI / 2;
+                            out.arc(c.x, c.y, (B.horiz ? 20 : 14) + ra * (B.horiz ? 150 : 110), (B.horiz ? 14 : 20) + ra * (B.horiz ? 110 : 150), 0, a0, a0 + Math.PI,
+                                3 * (1 - ra) + 0.6, 'rgb(255, 214, 140)', (1 - ra) * 0.7);
+                        }
+                    }
+                    out.cap('round');
+                    for (const p of B.sparks) {
+                        const age = ms - p.d * S, life = p.life * S; if (age < 0 || age > life) continue;
+                        const u = age / life, x = L(p), y = T(p);
+                        if (cb && (x < cb.left - 40 || x > cb.right + 40 || y < cb.top - 40 || y > cb.bottom + 40)) continue;
+                        out.seg(out.lines(1.8, u < 0.35 ? 'rgb(255, 245, 210)' : 'rgb(255, 170, 70)', 1 - u), x, y, x - p.vx * 2.6, y - p.vy * 2.6);
+                    }
+                    for (const p of B.embers) {
+                        const age = ms - p.d * S, life = p.life * S; if (age < 0 || age > life) continue;
+                        const x = L(p), y = T(p), al = (1 - age / life) * (0.6 + 0.4 * Math.sin(age * 0.02 + p.ph * 5));
+                        out.image(_bEmber(), x - 5, y - 5, 10, 10, al); out.rect(x - 0.8, y - 0.8, 1.6, 1.6, 'rgb(255, 230, 170)', al);
+                    }
+                    for (const p of B.debris) {                                    // hot edges, the first moments
+                        const age = ms - p.d * S; if (age < 0 || age > 900 || p.glass) continue;
+                        out.image(_bEmber(), L(p) - 6, T(p) - 6, 12, 12, (1 - age / 900) * 0.6);
+                    }
+                    const lip = Math.max(0, 1 - ms / BREACH.LIP_MS);
+                    if (lip > 0) for (const s of B.scorch) {
+                        if (ms < s.d * S) continue;
+                        const al = lip * (0.35 + 0.15 * Math.sin(ms * 0.03 + s.x + s.y));
+                        if (B.horiz) out.image(_bEmber(), s.x - 40, cy - 11, 80, 22, al); else out.image(_bEmber(), cx - 11, s.y - 40, 22, 80, al);
+                    }
+                    if (ms < 120) out.screen('#ffd9a0', 0.14 * (1 - ms / 120));   // a brief warm flash over the frame
+                }
+            },
+
+            /**
+             * Floating numbers and tags (engine/combat-fx.js): a hit's damage, a bleed's or a burn's tick, a crit,
+             * Resonance earned, SLAM! and SLIP!. Each rises and drifts, fading over its life (0.85 s; a crit 1.1 s, a
+             * big tag 1.6 s), riding its target while that lives; a merged hit pops a little bigger. Over everyone,
+             * after the health bars. A spawn names its own cap (onActorHit keeps 40).
+             * ITEM: { target, x, y, value, text?, color, t0, pop, drift, crit?, bleed?, burn?, big? }
+             */
+            number: {
+                life(t) { return t.big ? 1.6 : t.crit ? 1.1 : 0.85; },
+                step(t) { const age = _gameTimeSec - t.t0; return age > EFFECTS.number.life(t) || age < -1; },
+                look(L, out, cull) {
+                    const now = _gameTimeSec;
+                    for (let i = L.length - 1; i >= 0; i--) {
+                        const t = L[i], age = now - t.t0, life = EFFECTS.number.life(t);
+                        if (age > life || age < -1) continue;
+                        if (t.target && !t.target.dead) { t.x = t.target.x; t.y = t.target.y - 16; }   // (kept where it was when they fall)
+                        const x = t.x + t.drift * age * 14, y = t.y - age * 30;
+                        if (cull && !(x > cull.left - 40 && x < cull.right + 40 && y > cull.top - 40 && y < cull.bottom + 40)) continue;
+                        const pop = Math.max(0, 1 - (now - t.pop) / 0.12);
+                        const font = `bold ${Math.round((t.big ? 10 : t.bleed ? 8 : t.crit ? 15 : 11) + pop * (t.bleed ? 1 : t.crit ? 9 : 4) + Math.min(5, t.value / 20))}px Orbitron, sans-serif`;
+                        const s = t.text || String(Math.round(t.value)) + (t.crit ? '!' : '');
+                        out.text(s, x, y, font, t.color, 1 - Math.pow(age / life, 2), t.crit ? 'rgba(90, 10, 0, 0.85)' : 'rgba(0,0,0,0.75)', t.crit ? 4 : 3);
                     }
                 }
             }
@@ -75507,15 +75865,17 @@ Object.assign(TrafficVehicle.prototype, {
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/breach-fx.js" data-cost="145">
+    <script type="text/dfab" data-src="engine/breach-fx.js" data-cost="61">
         // GameEngine — The breach blast: a wall blown in (the Double Nights penthouse ambush, story step 4).
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         //
         // Charges ripple along the wall; each is a white-hot core, a lumpy fireball and a thin gold shock ring.
         // Warm light spills across the floor and flickers out; black-lacquer panels (some gold-trimmed) and
         // glass are thrown into the room and stay as debris; violet-grey smoke and embers linger.
-        // Two passes: drawBreachUnder (scorch, debris, smoke) before the darkness, so the room's light
-        // and the blast's own spill light them; drawBreachGlow (additive light, fire, sparks) after it.
+        // This file sets the blast up (spawnBreachBlast) and holds its sprites; the effects system's 'breach'
+        // (directory/effects-system.js) moves it and says how it looks, in two passes: 'under' (scorch, debris,
+        // smoke) before the darkness, so the room's light and the blast's own spill light them; 'glow'
+        // (additive light, fire, sparks) after it.
         const BREACH = {
             CHARGES_PER_PX: 1 / 85,  // one charge per this much wall (at least 2, at most 8)
             RIPPLE_MS: 70,           // between charges, along the wall
@@ -75582,130 +75942,8 @@ Object.assign(TrafficVehicle.prototype, {
                 }
                 B.sparks.length = Math.min(B.sparks.length, BREACH.SPARK_MAX);
                 B.smoke.length = Math.min(B.smoke.length, BREACH.SMOKE_MAX);
-                this._breachFx = B;
+                this.effects.spawn('breach', B);
             },
-
-            /** One sim tick: everything moves in game time, so pause and slow motion hold it. */
-            updateBreachFx() {
-                const B = this._breachFx;
-                if (!B) return;
-                const t = ++B.t, W = this.weather && this.weather.windVec ? this.weather.windVec : { x: 0, y: 0 };
-                const move = (p, damp) => { p.px = p.x; p.py = p.y; if (t <= p.d) return; p.x += p.vx; p.y += p.vy; p.vx *= damp; p.vy *= damp; };
-                for (const p of B.debris) { move(p, 0.9); if (t > p.d) { p.rot += p.vr; p.vr *= 0.92; } }
-                for (const p of B.sparks) move(p, 0.88);
-                for (const p of B.smoke) { move(p, 0.99); p.vx += W.x * 0.004; p.vy += W.y * 0.004; }
-                for (const p of B.embers) { move(p, 1); p.x += Math.sin(t * 0.07 + p.ph) * 0.25; }
-                if (t * CONFIG.LOOP.STEP_MS > BREACH.DEBRIS_MS) this._breachFx = null;
-            },
-
-            _breachClock(B) {
-                const ip = RenderInterp, a = ip._drawActive && ip.alpha < 1 ? ip.alpha : 1;
-                return { a, ms: (B.t - 1 + a) * CONFIG.LOOP.STEP_MS };
-            },
-
-            /** Before the darkness: scorch, debris and smoke. */
-            drawBreachUnder(ctx, cb) {
-                const B = this._breachFx;
-                if (!B) return;
-                const { a, ms } = this._breachClock(B), S = CONFIG.LOOP.STEP_MS;
-                const L = (p) => p.px + (p.x - p.px) * a, T = (p) => p.py + (p.y - p.py) * a;
-                const out = (x, y, m) => cb && (x < cb.left - m || x > cb.right + m || y < cb.top - m || y > cb.bottom + m);
-                const linger = Math.min(1, (BREACH.DEBRIS_MS - ms) / 1000);
-                ctx.save();
-                for (const s of B.scorch) {
-                    const age = ms - s.d * S; if (age < 0 || out(s.x, s.y, s.r * 1.3)) continue;
-                    ctx.globalAlpha = Math.min(1, age / 120) * 0.9 * linger;
-                    const sx = B.horiz ? 1.3 : 1, sy = B.horiz ? 1 : 1.3;
-                    ctx.drawImage(_bScorch(), s.x - s.r * sx, s.y - s.r * sy, s.r * 2 * sx, s.r * 2 * sy);
-                }
-                for (const p of B.debris) {
-                    if (ms < p.d * S) continue;
-                    const x = L(p), y = T(p); if (out(x, y, 20)) continue;
-                    ctx.save(); ctx.translate(x, y); ctx.rotate(p.rot); ctx.globalAlpha = linger;
-                    if (p.glass) {
-                        ctx.fillStyle = 'rgba(190, 200, 255, 0.55)';
-                        ctx.beginPath(); ctx.moveTo(-p.w / 2, p.h / 2); ctx.lineTo(0, -p.h / 2); ctx.lineTo(p.w / 2, p.h / 3); ctx.closePath(); ctx.fill();
-                    } else {
-                        ctx.fillStyle = '#0e0c10'; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
-                        if (p.gold) { ctx.fillStyle = 'rgba(232, 194, 122, 0.9)'; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, 1.4); }
-                    }
-                    ctx.restore();
-                }
-                for (const p of B.smoke) {
-                    const age = ms - p.d * S, life = p.life * S; if (age < 0 || age > life) continue;
-                    const R = p.r0 * (1 + age / 1000 * 0.45), x = L(p), y = T(p); if (out(x, y, R)) continue;
-                    ctx.globalAlpha = 0.95 * Math.min(1, age / 260) * Math.pow(1 - age / life, 1.2);
-                    ctx.drawImage(_bSmoke(), x - R, y - R, R * 2, R * 2);
-                }
-                ctx.restore();
-            },
-
-            /** After the darkness (additive): the light spill, fireballs, shock rings, sparks, embers, the burning lip. */
-            drawBreachGlow(ctx, cb) {
-                const B = this._breachFx;
-                if (!B) return;
-                const { a, ms } = this._breachClock(B), S = CONFIG.LOOP.STEP_MS, w = B.wall;
-                const L = (p) => p.px + (p.x - p.px) * a, T = (p) => p.py + (p.y - p.py) * a;
-                if (ms > Math.max(BREACH.LIP_MS, 4500)) return;   // only scorch and debris remain (drawn under)
-                ctx.save(); ctx.globalCompositeOperation = 'lighter';
-                const cx = w.x + w.w / 2, cy = w.y + w.h / 2;
-                const spill = Math.max(0, 1 - ms / BREACH.SPILL_MS);
-                if (spill > 0) {
-                    const flick = 0.85 + 0.15 * Math.sin(ms * 0.05) * Math.sin(ms * 0.031), R = BREACH.SPILL_R;
-                    ctx.globalAlpha = 0.42 * Math.pow(spill, 1.8) * flick;
-                    if (B.horiz) ctx.drawImage(_bPool(), cx - R * 1.25, cy - R, R * 2.5, R * 2);
-                    else ctx.drawImage(_bPool(), cx - R, cy - R * 1.25, R * 2, R * 2.5);
-                }
-                for (const c of B.charges) {
-                    const age = ms - c.d * S; if (age < 0 || age > BREACH.FIRE_MS) continue;
-                    const u = age / BREACH.FIRE_MS, grow = 1 - Math.pow(1 - Math.min(1, age / 160), 3), fade = Math.pow(1 - u, 1.8);
-                    if (age < 70) { ctx.globalAlpha = 0.85 * (1 - age / 70); const R = 36 + age * 0.6; ctx.drawImage(_bCore(), c.x - R, c.y - R, R * 2, R * 2); }
-                    const R = c.r * (0.45 + 0.75 * grow);
-                    ctx.globalAlpha = 0.65 * fade; ctx.drawImage(_bFire(), c.x - R, c.y - R, R * 2, R * 2);
-                    ctx.globalAlpha = 0.38 * fade;
-                    for (const l of c.lobes) {
-                        const rr = R * l.k, ox = Math.cos(l.a) * R * l.s, oy = Math.sin(l.a) * R * l.s;
-                        ctx.drawImage(_bFire(), c.x + ox - rr, c.y + oy - rr, rr * 2, rr * 2);
-                    }
-                    const ra = Math.min(1, age / 380);
-                    if (ra < 1) {                                              // the shock ring: a thin gold line, half, into the room
-                        ctx.globalAlpha = (1 - ra) * 0.7; ctx.strokeStyle = 'rgb(255, 214, 140)'; ctx.lineWidth = 3 * (1 - ra) + 0.6;
-                        const a0 = B.dir - Math.PI / 2;
-                        ctx.beginPath(); ctx.ellipse(c.x, c.y, (B.horiz ? 20 : 14) + ra * (B.horiz ? 150 : 110), (B.horiz ? 14 : 20) + ra * (B.horiz ? 110 : 150), 0, a0, a0 + Math.PI); ctx.stroke();
-                    }
-                }
-                ctx.lineCap = 'round'; ctx.lineWidth = 1.8;
-                for (const p of B.sparks) {
-                    const age = ms - p.d * S, life = p.life * S; if (age < 0 || age > life) continue;
-                    const u = age / life, x = L(p), y = T(p);
-                    if (cb && (x < cb.left - 40 || x > cb.right + 40 || y < cb.top - 40 || y > cb.bottom + 40)) continue;
-                    ctx.globalAlpha = 1 - u; ctx.strokeStyle = u < 0.35 ? 'rgb(255, 245, 210)' : 'rgb(255, 170, 70)';
-                    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - p.vx * 2.6, y - p.vy * 2.6); ctx.stroke();
-                }
-                ctx.fillStyle = 'rgb(255, 230, 170)';
-                for (const p of B.embers) {
-                    const age = ms - p.d * S, life = p.life * S; if (age < 0 || age > life) continue;
-                    const x = L(p), y = T(p);
-                    ctx.globalAlpha = (1 - age / life) * (0.6 + 0.4 * Math.sin(age * 0.02 + p.ph * 5));
-                    ctx.drawImage(_bEmber(), x - 5, y - 5, 10, 10); ctx.fillRect(x - 0.8, y - 0.8, 1.6, 1.6);
-                }
-                for (const p of B.debris) {                                    // hot edges, the first moments
-                    const age = ms - p.d * S; if (age < 0 || age > 900 || p.glass) continue;
-                    ctx.globalAlpha = (1 - age / 900) * 0.6; ctx.drawImage(_bEmber(), L(p) - 6, T(p) - 6, 12, 12);
-                }
-                const lip = Math.max(0, 1 - ms / BREACH.LIP_MS);
-                if (lip > 0) for (const s of B.scorch) {
-                    if (ms < s.d * S) continue;
-                    ctx.globalAlpha = lip * (0.35 + 0.15 * Math.sin(ms * 0.03 + s.x + s.y));
-                    if (B.horiz) ctx.drawImage(_bEmber(), s.x - 40, cy - 11, 80, 22); else ctx.drawImage(_bEmber(), cx - 11, s.y - 40, 22, 80);
-                }
-                ctx.restore();
-                if (ms < 120) {                                                // a brief warm flash over the frame
-                    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'lighter';
-                    ctx.globalAlpha = 0.14 * (1 - ms / 120); ctx.fillStyle = '#ffd9a0';
-                    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); ctx.restore();
-                }
-            }
         });
     </script>
     <script type="text/dfab" data-src="engine/quick-draw.js" data-cost="45">
@@ -75879,7 +76117,7 @@ engineMixin({
     }
 });
     </script>
-    <script type="text/dfab" data-src="engine/combat-fx.js" data-cost="129">
+    <script type="text/dfab" data-src="engine/combat-fx.js" data-cost="114">
         // GameEngine — Combat feedback: what a hit looks like. Every hit that lands
         // (ActorEntity.takeDamage) comes through onActorHit: a floating damage number,
         // the target's health bar, blood in the character's own colour, and a flinch.
@@ -75951,8 +76189,7 @@ engineMixin({
             earnResonance(amount, label, x, y) {
                 if (!this.resonance || !(amount > 0)) return;
                 this.resonance.earn(amount);
-                const texts = this.floatingTexts || (this.floatingTexts = []);
-                texts.push({ target: null, x: x ?? this.player.x, y: y ?? this.player.y - 30, value: 0, text: `+${Math.round(amount)} ◈${label ? ' ' + label : ''}`,
+                this.effects.spawn('number', { target: null, x: x ?? this.player.x, y: y ?? this.player.y - 30, value: 0, text: `+${Math.round(amount)} ◈${label ? ' ' + label : ''}`,
                              color: '#c9a6ff', t0: _gameTimeSec, pop: _gameTimeSec, drift: 0, big: true });
                 this._resPulse = _gameTimeSec;
                 if (this.updateUI) this.updateUI();
@@ -75967,18 +76204,18 @@ engineMixin({
             onActorHit(actor, amount, kbX = 0, kbY = 0, opts = null) {
                 if (!(amount > 0) || !actor) return;
                 const now = _gameTimeSec, type = opts && opts.type;
-                const texts = this.floatingTexts || (this.floatingTexts = []);
+                const texts = this.effects.of('number');
                 if (type === 'burn') {                                   // a Golden Child orb: small amber numbers, gathered, no flinch
                     const recent = texts.find(t => t.target === actor && t.burn && now - t.t0 < 0.6);
                     if (recent) { recent.value += amount; recent.t0 = now; }
-                    else { texts.push({ target: actor, x: actor.x, y: actor.y - 8, value: amount, color: '#ffb347', t0: now, pop: now, drift: (Math.random() - 0.5) * 1.6, bleed: true, burn: true }); if (texts.length > 40) texts.shift(); }
+                    else { this.effects.spawn('number', { target: actor, x: actor.x, y: actor.y - 8, value: amount, color: '#ffb347', t0: now, pop: now, drift: (Math.random() - 0.5) * 1.6, bleed: true, burn: true }, 40); }
                     actor._hpShowT = now;
                     return;
                 }
                 if (type === 'bleed') {
                     const recent = texts.find(t => t.target === actor && t.bleed && !t.burn && now - t.t0 < 0.6);
                     if (recent) { recent.value += amount; recent.t0 = now; }
-                    else { texts.push({ target: actor, x: actor.x, y: actor.y - 8, value: amount, color: '#ff3a5c', t0: now, pop: now, drift: (Math.random() - 0.5) * 1.6, bleed: true }); if (texts.length > 40) texts.shift(); }
+                    else { this.effects.spawn('number', { target: actor, x: actor.x, y: actor.y - 8, value: amount, color: '#ff3a5c', t0: now, pop: now, drift: (Math.random() - 0.5) * 1.6, bleed: true }, 40); }
                     actor._hpShowT = now;
                     const B = bloodOf(actor);
                     if (B && this.decals) this.decals.addDecal('blood', actor.x + (Math.random() - 0.5) * 8, actor.y + (Math.random() - 0.5) * 8, { size: 1.6 + Math.random() * 1.4, color: B.decal, dir: Math.random() * 6.28, glow: B.glow });
@@ -75991,16 +76228,14 @@ engineMixin({
                 // Damage number — hits on the same target within 0.15 s add up into one (a crit stands alone)
                 const recent = !crit && texts.find(t => t.target === actor && !t.bleed && !t.crit && now - t.t0 < 0.15);
                 if (crit) {
-                    texts.push({ target: actor, x: actor.x, y: actor.y - 16, value: amount, color: '#ffd23a', t0: now, pop: now, drift: (Math.random() - 0.5) * 0.6, crit: true });
-                    if (texts.length > 40) texts.shift();
+                    this.effects.spawn('number', { target: actor, x: actor.x, y: actor.y - 16, value: amount, color: '#ffd23a', t0: now, pop: now, drift: (Math.random() - 0.5) * 0.6, crit: true }, 40);
                     if (this.weather) this.weather.spawnSparks(actor.x, actor.y, 10);
                     this.triggerShake(3);
                     if (typeof audioSys !== 'undefined' && audioSys.sfx) audioSys.sfx('crit');
                 } else if (recent) { recent.value += amount; recent.t0 = now; recent.pop = now; }
                 else {
                     const color = actor === this.player ? '#ff5a6a' : (actor.role === 'teammate' ? '#ffb347' : '#ffffff');
-                    texts.push({ target: actor, x: actor.x, y: actor.y - 16, value: amount, color, t0: now, pop: now, drift: Math.random() - 0.5 });
-                    if (texts.length > 40) texts.shift();
+                    this.effects.spawn('number', { target: actor, x: actor.x, y: actor.y - 16, value: amount, color, t0: now, pop: now, drift: Math.random() - 0.5 }, 40);
                 }
 
                 actor._hpShowT = now;                                        // show their health bar for a while
@@ -76039,26 +76274,7 @@ engineMixin({
                     } else drawHPBar(ctx, e.x - 14, e.y - 30, 28, 3.5, Math.max(0, e.hp / e.maxHp));
                 }
                 ctx.globalAlpha = 1;
-                // Numbers: rise, drift, fade over 0.85 s; a merged hit pops a little bigger
-                const texts = this.floatingTexts;
-                if (!texts || !texts.length) return;
-                ctx.save();
-                ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
-                lifeKit.sweep(texts, (t) => {
-                    const age = now - t.t0;
-                    const life = t.big ? 1.6 : t.crit ? 1.1 : 0.85;
-                    if (age > life || age < -1) return true;
-                    if (t.target && !t.target.dead) { t.x = t.target.x; t.y = t.target.y - 16; }
-                    const x = t.x + t.drift * age * 14, y = t.y - age * 30;
-                    if (!inView(x, y)) return;
-                    const pop = Math.max(0, 1 - (now - t.pop) / 0.12);
-                    ctx.globalAlpha = 1 - Math.pow(age / life, 2);
-                    ctx.font = `bold ${Math.round((t.big ? 10 : t.bleed ? 8 : t.crit ? 15 : 11) + pop * (t.bleed ? 1 : t.crit ? 9 : 4) + Math.min(5, t.value / 20))}px Orbitron, sans-serif`;
-                    const s = t.text || String(Math.round(t.value)) + (t.crit ? '!' : '');
-                    ctx.lineWidth = t.crit ? 4 : 3; ctx.strokeStyle = t.crit ? 'rgba(90, 10, 0, 0.85)' : 'rgba(0,0,0,0.75)'; ctx.strokeText(s, x, y);
-                    ctx.fillStyle = t.color; ctx.fillText(s, x, y);
-                });
-                ctx.restore();
+                this.effects.draw('number', ctx, cull);                   // the floating numbers (directory/effects-system.js)
             },
         });
     </script>
@@ -78986,7 +79202,7 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/status-effects.js" data-cost="367">
+    <script type="text/dfab" data-src="engine/status-effects.js" data-cost="338">
         // GameEngine — Status effects and melee. Methods are added to GameEngine.prototype (see
         // engineMixin in game-engine.js).
         //
@@ -79239,9 +79455,7 @@ engineMixin({
                 if (near.length) this.meleeStepIn(ang, this._meleeGap(near));
                 // the arc and its sparkle, in the blade's colour (gold for the Kukri); a hit adds more where it lands
                 const trail = M.trail || DEFAULT_SLASH_TRAIL;
-                const L = this.slashes || (this.slashes = []);
-                L.push(swing.slash = { x: pl.x, y: pl.y, a: ang, side, t0: _gameTimeSec, reach, arc, hit: false, secs: this._slashSecs, style: this._slashStyle, edge: swing.edge, cols: trail.cols });
-                if (L.length > 8) L.shift();
+                this.effects.spawn('slash', swing.slash = { x: pl.x, y: pl.y, a: ang, side, t0: _gameTimeSec, reach, arc, hit: false, secs: this._slashSecs, style: this._slashStyle, edge: swing.edge, cols: trail.cols });
                 swing.dust = trail.dust;
                                 for (let i = 0; i < 3; i++) {
                     const a = ang + (Math.random() - 0.5) * arc, r = reach * (0.5 + Math.random() * 0.5);
@@ -79279,7 +79493,7 @@ engineMixin({
                 const ph = swingPhases(swing.style), u = ph.windup + (ph.cutEnd - ph.windup) * k / BLADE.CUT_STEPS;
                 const pose = sampleMeleeSwing(u * swing.secs, swing.side, this._bladePose || (this._bladePose = {}), swing.secs, swing.style);
                 if (!pose) return false;
-                // The blade as it's drawn: from the fist to the edge the trail follows (drawSlashes)
+                // The blade as it's drawn: from the fist to the edge the trail follows (the effects system's 'slash')
                 const c = Math.cos(pose.a), s = Math.sin(pose.a);
                 const ax = pose.handX, ay = pose.handY;
                 const bx = ax + (ex * c - ey * s) * .95, by = ay + (ex * s + ey * c) * .95;
@@ -79486,48 +79700,6 @@ engineMixin({
                 return sampleMeleeSwing(_gameTimeSec - this._slashT, this._slashSide,
                     this._slashPose || (this._slashPose = {}), this._slashSecs || MELEE_SWING.duration, this._slashStyle);
             },
-
-            /** Slash arcs: a crescent of gold light where the blade went (world space) */
-            drawSlashes(ctx) {
-                const L = this.slashes; if (!L || !L.length) return;
-                const now = _gameTimeSec;
-                ctx.save(); ctx.globalCompositeOperation = 'lighter';
-                lifeKit.sweep(L, s => {
-                    const age = now - s.t0;
-                    // Times scaled from the Kukri's swing (q stretches them for a slower blade), phases by style
-                    const secs = s.secs || MELEE_SWING.duration, q = secs / MELEE_SWING.duration, life = .3 * q;
-                    const ph = swingPhases(s.style), windT = ph.windup * secs, cutT = ph.cutEnd * secs;
-                    if (age > life) { return true; }
-                    if (age < windT) return;
-                    // Keep the newest cut attached to the moving wielder, then let its last
-                    // position fade. Recovery does not paint a second, backward slash.
-                    if (s.t0 === this._slashT && age <= MELEE_SWING.duration * q && this.weaponMode === 'melee' && !this.weaponHolstered) {
-                        s.drawX = this.player.x; s.drawY = this.player.y; s.drawA = this.player.angle;
-                    }
-                    const k = 1 - age / life;
-                    // a wide sweep leaves a longer crescent: three quarters of its cut
-                    const span = s.style === 'wide' ? (cutT - windT) * .75 : .065 * q;
-                    const end = Math.min(age, cutT), start = Math.max(windT, end - span);
-                    const pose = this._slashTrailPose || (this._slashTrailPose = {});
-                    const [ex, ey] = s.edge || DEFAULT_SLASH_TRAIL.edge;
-                    ctx.save(); ctx.translate(s.drawX ?? s.x, s.drawY ?? s.y); ctx.rotate(s.drawA ?? s.a);
-                    ctx.beginPath();
-                    const n = s.style === 'wide' ? 24 : 8;                      // a smooth curve round a wide sweep
-                    for (let j = 0; j <= n; j++) {
-                        sampleMeleeSwing(start + (end - start) * j / n, s.side, pose, secs, s.style);
-                        const c = Math.cos(pose.a), sn = Math.sin(pose.a);
-                        // The edge of the real model, held at the same hand anchor.
-                        const x = pose.handX + (ex * c - ey * sn) * .95;
-                        const y = pose.handY + (ex * sn + ey * c) * .95;
-                        if (j) ctx.lineTo(x, y); else ctx.moveTo(x, y);
-                    }
-                    for (const [w, col, al] of (s.cols || DEFAULT_SLASH_TRAIL.cols)) {
-                        ctx.strokeStyle = `rgba(${col}, ${al * k})`; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.stroke();
-                    }
-                    ctx.restore();
-                });
-                ctx.restore();
-            }
         });
     </script>
     <script type="text/dfab" data-src="engine/executions.js" data-cost="72">
@@ -79605,7 +79777,7 @@ engineMixin({
                     X.struck = true;
                     if (X.blade) {                                                  // the draw-cut: a gold arc, a spray
                         this._slashT = _gameTimeSec; this._slashSide = -(this._slashSide || 1);
-                        (this.slashes || (this.slashes = [])).push({ x: pl.x, y: pl.y, a: pl.angle, side: this._slashSide, t0: _gameTimeSec, reach: 30, arc: 1.6, hit: true });
+                        this.effects.spawn('slash', { x: pl.x, y: pl.y, a: pl.angle, side: this._slashSide, t0: _gameTimeSec, reach: 30, arc: 1.6, hit: true });
                         if (typeof ambience !== 'undefined' && ambience.slash) ambience.slash(true);
                         const B = bloodOf(e);
                         if (B && this.weather) this.weather.spawnSpray(e.x, e.y, e.angle + Math.PI / 2, `rgba(${B.drop}, 1)`, 14);
@@ -79727,7 +79899,7 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/spills.js" data-cost="118">
+    <script type="text/dfab" data-src="engine/spills.js" data-cost="83">
         // GameEngine — Spills. Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         //
         // Her glass (the Crystal Glass, the Mirrored Glass) holds a pour: cosmetics.drinkLevel, 1 full, 0 dry.
@@ -79797,7 +79969,7 @@ engineMixin({
                 const ox = (x ?? this.player.x), oy = (y ?? this.player.y);
                 const r = 4 + Math.sqrt(lost) * 34;                                // 2.5% ≈ 9 px, 7% ≈ 13 px
                 const px = ox + dx * (10 + r * 0.6), py = oy + dy * (10 + r * 0.6);
-                const spills = this.spills || (this.spills = []);
+                const spills = this.effects.of('spill');
                 const merge = spills.find(s => s.color === D.liquid && now - s.born < SPILL.LIFE - SPILL.FADE && Math.hypot(s.x - px, s.y - py) < s.r * SPILL.MERGE);
                 const drops = [];
                 const n = 2 + Math.floor(Math.random() * 3);
@@ -79809,24 +79981,23 @@ engineMixin({
                     merge.r = Math.min(30, Math.hypot(merge.r, r * 0.8)); merge.born = now; merge.drops.push(...drops.slice(0, 2));
                     merge.ox = ox; merge.oy = oy; merge.splash = now;
                 } else {
-                    if (spills.length >= SPILL.MAX) spills.shift();
-                    spills.push({ x: px, y: py, r, color: D.liquid, color2: D.liquid2 || null, glow: !!D.glow, born: now, splash: now, ox, oy,
-                                  seed: Math.random() * 1000, a: Math.atan2(dy, dx), drops, map: this.activeMap ? this.activeMap.id : null });
+                    this.effects.spawn('spill', { x: px, y: py, r, color: D.liquid, color2: D.liquid2 || null, glow: !!D.glow, born: now, splash: now, ox, oy,
+                                  seed: Math.random() * 1000, a: Math.atan2(dy, dx), drops, map: this.activeMap ? this.activeMap.id : null }, SPILL.MAX);
                 }
                 return lost;
             },
 
             /** How wet (x, y) is with spilt drink: true inside a puddle that hasn't dried (footsteps splash) */
             _inSpill(x, y) {
-                if (!this.spills || !this.spills.length) return false;
+                const S = this.effects.of('spill'); if (!S.length) return false;
                 const now = _gameTimeSec;
-                for (const s of this.spills) if (now - s.born < SPILL.LIFE - SPILL.FADE * 0.5 && Math.hypot(x - s.x, y - s.y) < s.r * 0.9) return true;
+                for (const s of S) if (now - s.born < SPILL.LIFE - SPILL.FADE * 0.5 && Math.hypot(x - s.x, y - s.y) < s.r * 0.9) return true;
                 return false;
             },
 
             /** Once a sim tick: with Grounded, a ganger who steps in a spill loses their footing (Ganger.update skips while _staggerUntil) */
             updateSpillSlips() {
-                if (!this.spills || !this.spills.length || !this.resonance || !this.enemies) return;
+                if (!this.effects.of('spill').length || !this.resonance || !this.enemies) return;
                 const secs = this.resonance.stat('slipSecs', SPILL.SLIP_SECS); if (!secs) return;
                 const now = _gameTimeSec;
                 for (const e of this.enemies) {
@@ -79836,7 +80007,7 @@ engineMixin({
                     e._staggerUntil = now + secs;
                     const m = Math.hypot(e.x - px, e.y - py);                   // they skid on the way they were going
                     if (m > 0.05) { e.knockbackVx += (e.x - px) / m * SPILL.SLIP_SKID; e.knockbackVy += (e.y - py) / m * SPILL.SLIP_SKID; }
-                    (this.floatingTexts || (this.floatingTexts = [])).push({ target: null, x: e.x, y: e.y - 24, value: 0, text: 'SLIP!', color: '#f2d57e', t0: now, pop: now, drift: 0 });
+                    this.effects.spawn('number', { target: null, x: e.x, y: e.y - 24, value: 0, text: 'SLIP!', color: '#f2d57e', t0: now, pop: now, drift: 0 });
                 }
             },
 
@@ -79850,53 +80021,6 @@ engineMixin({
                 audioSys.sfx('ui');
                 return true;
             },
-
-            /** The puddles, on the floor under everyone (after the decals) */
-            drawSpills(ctx, cb) {
-                const S = this.spills; if (!S || !S.length) return;
-                const now = _gameTimeSec, TAU = Math.PI * 2, mapId = this.activeMap ? this.activeMap.id : null;
-                lifeKit.sweep(S, s => {
-                    const age = now - s.born;
-                    if (age > SPILL.LIFE || s.map !== mapId) { return true; }
-                    if (cb && (s.x + 40 < cb.left || s.x - 40 > cb.right || s.y + 40 < cb.top || s.y - 40 > cb.bottom)) return;
-                    const dry = age > SPILL.LIFE - SPILL.FADE ? 1 - (age - (SPILL.LIFE - SPILL.FADE)) / SPILL.FADE : 1;
-                    const fly = Math.min(1, (now - s.splash) / 0.2);                // the splash: the drink flies out, then lands
-                    const grow = Math.min(1, (now - s.splash) / 0.3), ease = 1 - (1 - grow) * (1 - grow);
-                    const r = s.r * (0.35 + 0.65 * ease) * (0.75 + 0.25 * dry);  // and shrinks a little as it dries
-                    const rgb = hexToRgb(s.color);
-                    ctx.save();
-                    ctx.globalAlpha = 0.6 * dry;
-                    // The pool: thrown out along the way it flew, a few lobes from its seed so no two are the same shape
-                    ctx.fillStyle = `rgb(${rgb})`;
-                    if (s.glow) { ctx.shadowColor = s.color; ctx.shadowBlur = 8; }
-                    ctx.beginPath();
-                    ctx.ellipse(s.x, s.y, r, r * 0.62, s.a || 0, 0, TAU);
-                    for (let k = 0; k < 4; k++) {
-                        const a = (s.a || 0) + (k - 1.5) * 1.1 + Math.sin(s.seed + k) * 0.4, d = r * (0.5 + ((s.seed * (k + 3)) % 1) * 0.25);
-                        const lr = r * (0.22 + ((s.seed * (k + 7)) % 1) * 0.18), cx = s.x + Math.cos(a) * d, cy = s.y + Math.sin(a) * d * 0.7;
-                        ctx.moveTo(cx + lr, cy); ctx.arc(cx, cy, lr, 0, TAU);
-                    }
-                    ctx.fill();
-                    ctx.shadowBlur = 0;
-                    ctx.globalAlpha = 0.3 * dry; ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 0.8;   // the edge, darker where it's thin
-                    ctx.beginPath(); ctx.ellipse(s.x, s.y, r, r * 0.62, s.a || 0, 0, TAU); ctx.stroke();
-                    ctx.shadowBlur = 0;
-                    if (s.color2) {                                              // a layered cocktail keeps its second colour in the middle
-                        ctx.globalAlpha = 0.5 * dry; ctx.fillStyle = s.color2;
-                        ctx.beginPath(); ctx.arc(s.x, s.y, r * 0.4, 0, TAU); ctx.fill();
-                    }
-                    // Sheen: the room's light caught on the wet surface
-                    ctx.globalAlpha = 0.35 * dry; ctx.fillStyle = '#ffffff';
-                    ctx.beginPath(); ctx.ellipse(s.x - r * 0.3, s.y - r * 0.2, r * 0.26, r * 0.09, -0.6, 0, TAU); ctx.fill();
-                    // The drops thrown ahead (in flight for the first moment)
-                    ctx.globalAlpha = 0.8 * dry; ctx.fillStyle = `rgb(${rgb})`;
-                    for (const d of s.drops) {
-                        const dx = s.ox + (d.x - s.ox) * fly, dy = s.oy + (d.y - s.oy) * fly;
-                        ctx.beginPath(); ctx.arc(dx, dy, d.r * (fly < 1 ? 0.8 : 1), 0, TAU); ctx.fill();
-                    }
-                    ctx.restore();
-                });
-            }
         });
     </script>
     <script type="text/dfab" data-src="engine/dyer.js" data-cost="134">
@@ -80071,7 +80195,7 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/knuckles.js" data-cost="155">
+    <script type="text/dfab" data-src="engine/knuckles.js" data-cost="110">
         // GameEngine — Golden Retribution, the gilded brass knuckles (weaponMode 'fists'). Methods are added to
         // GameEngine.prototype (see engineMixin in game-engine.js).
         //
@@ -80084,12 +80208,12 @@ engineMixin({
         // collider, a haymaker's target takes SLAM more of the hit. A punch inside the Flit-Strike
         // window is always a haymaker, Flit-Strike's bonus on top. Jabs step her in like a blade does.
         // Each punch leaves gold afterimages of the fist along its path; a haymaker adds a ring burst,
-        // sparks and a clink (drawKnuckleFx, after the slashes).
+        // sparks and a clink (the effects system's 'knuckle', after the slashes).
         //
         // Vampiric Fists (an attachment, SCHEMATICS vampiric_fists, 350 scrap): any punch of hers that lands —
         // bare fists, the knuckles, fist weapons to come — heals her VAMPIRIC.LIFESTEAL of its damage, a haymaker
         // HAY_LIFESTEAL and a bleed (onPunchLanded, from CollisionSystem.resolveProjectile). Crimson motes run
-        // from the wound to her (drawKnuckleFx); the knuckle bar's studs turn garnet.
+        // from the wound to her (the effects system's 'knuckle'); the knuckle bar's studs turn garnet.
 
         const KNUCKLES = {
             ID: 'golden_retribution', EVERY: 3, HAY_MULT: 2.5, JAB_KNOCK: 1, HAY_KNOCK: 3,
@@ -80140,9 +80264,7 @@ engineMixin({
                 p.knock = hay ? KNUCKLES.HAY_KNOCK : KNUCKLES.JAB_KNOCK; p.knockDmg = st.damage || 16;
                 this.projectiles.push(p);
                 // The fist's afterimages: gold copies along its path, fading
-                const fx = this.knuckleFx || (this.knuckleFx = []);
-                fx.push({ k: 'trail', x: pl.x, y: pl.y, a: ang, side: pl.punchSide, t0: now, hay });
-                if (fx.length > 24) fx.splice(0, fx.length - 24);
+                this.effects.spawn('knuckle', { k: 'trail', x: pl.x, y: pl.y, a: ang, side: pl.punchSide, t0: now, hay }, 24);
                 this.emitNoise(pl.x, pl.y, CONFIG.NOISE.punch, 'punch');
                 this.triggerShake(hay ? 4 : 2);
                 return p;
@@ -80159,8 +80281,7 @@ engineMixin({
                     if (e.telegraphThreshold !== undefined) e.cooldown = Math.max(e.cooldown || 0, e.telegraphThreshold + 1);
                 }
                 e._slam = { until: now + KNUCKLES.SLAM_SECS, dmg: Math.round(p.damage * KNUCKLES.SLAM), by: p.owner };
-                const fx = this.knuckleFx || (this.knuckleFx = []);
-                fx.push({ k: 'ring', x: e.x, y: e.y, t0: now });
+                this.effects.spawn('knuckle', { k: 'ring', x: e.x, y: e.y, t0: now });
                 if (this.weather) this.weather.spawnSparks(e.x, e.y, 14);
                 if (typeof ambience !== 'undefined' && ambience.clink) ambience.clink();
             },
@@ -80174,10 +80295,8 @@ engineMixin({
                 const V = ITEM_REGISTRY[VAMPIRIC.ID].stats, pl = this.player;
                 const healed = pl.heal ? pl.heal(Math.max(1, Math.round(p.damage * (p.haymaker ? V.haymakerLifesteal : V.lifesteal)))) : 0;
                 if (p.haymaker && !e.dead) this.applyStatus(e, 'bleed', { dps: V.bleedDps * this.playerDamageMult(), secs: V.bleedSecs, by: pl });
-                const fx = this.knuckleFx || (this.knuckleFx = []), now = _gameTimeSec;
-                const n = p.haymaker ? VAMPIRIC.HAY_MOTES : VAMPIRIC.MOTES;
-                for (let i = 0; i < n; i++) fx.push({ k: 'drain', x: e.x, y: e.y, t0: now + i * 0.025, ph: Math.random() * 6.28, sp: 10 + Math.random() * 12 });
-                if (fx.length > 48) fx.splice(0, fx.length - 48);
+                const now = _gameTimeSec, n = p.haymaker ? VAMPIRIC.HAY_MOTES : VAMPIRIC.MOTES;
+                for (let i = 0; i < n; i++) this.effects.spawn('knuckle', { k: 'drain', x: e.x, y: e.y, t0: now + i * 0.025, ph: Math.random() * 6.28, sp: 10 + Math.random() * 12 }, 48);
                 return healed;
             },
 
@@ -80204,68 +80323,13 @@ engineMixin({
                     e.lastHitBy = S.by; e.lastHitMelee = true;
                     e.takeDamage(S.dmg, 0, 0, { punch: true, slam: true });
                     e.knockbackVx = 0; e.knockbackVy = 0;
-                    const fx = this.knuckleFx || (this.knuckleFx = []);
-                    fx.push({ k: 'ring', x: e.x, y: e.y, t0: now, slam: true });
+                    this.effects.spawn('knuckle', { k: 'ring', x: e.x, y: e.y, t0: now, slam: true });
                     if (this.weather) this.weather.spawnSparks(e.x, e.y, 10);
                     this.triggerShake(5);
                     if (typeof ambience !== 'undefined' && ambience.clink) ambience.clink();
-                    (this.floatingTexts || (this.floatingTexts = [])).push({ target: null, x: e.x, y: e.y - 26, value: 0, text: 'SLAM!', color: '#ffd76a', t0: now, pop: now, drift: 0 });
+                    this.effects.spawn('number', { target: null, x: e.x, y: e.y - 26, value: 0, text: 'SLAM!', color: '#ffd76a', t0: now, pop: now, drift: 0 });
                 }
             },
-
-            /** The gold afterimages of each punch and a haymaker's ring (world space, after the slashes) */
-            drawKnuckleFx(ctx) {
-                const L = this.knuckleFx; if (!L || !L.length) return;
-                const now = _gameTimeSec, TAU = Math.PI * 2, R = CONFIG.PUNCH.REACH;
-                lifeKit.sweep(L, f => {
-                    const age = now - f.t0;
-                    if (f.k === 'drain') {                                         // Vampiric Fists: a crimson mote, wound to her
-                        if (age < 0) return;
-                        if (age > VAMPIRIC.LIFE || !this.player) { return true; }
-                        const u = age / VAMPIRIC.LIFE, e2 = u * u * (3 - 2 * u), pl = this.player;
-                        const dx = pl.x - f.x, dy = pl.y - f.y, d = Math.hypot(dx, dy) || 1;
-                        const bow = Math.sin(u * Math.PI) * f.sp * Math.sin(f.ph);           // each one curves its own way
-                        const x = f.x + dx * e2 - dy / d * bow, y = f.y + dy * e2 + dx / d * bow;
-                        const a = (u < 0.15 ? u / 0.15 : 1) * (1 - Math.max(0, u - 0.8) / 0.2), r = 2.2 - u * 0.8;
-                        ctx.save();
-                        const g = ctx.createRadialGradient(x, y, 0, x, y, r * 3);
-                        g.addColorStop(0, `rgba(255, 120, 140, ${a * 0.9})`); g.addColorStop(0.4, `rgba(200, 16, 46, ${a * 0.6})`); g.addColorStop(1, 'rgba(120, 0, 20, 0)');
-                        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 3, 0, TAU); ctx.fill();
-                        ctx.fillStyle = `rgba(255, 210, 220, ${a})`; ctx.beginPath(); ctx.arc(x, y, r * 0.5, 0, TAU); ctx.fill();
-                        ctx.restore();
-                    } else if (f.k === 'trail') {
-                        const life = f.hay ? 0.32 : 0.22;
-                        if (age > life) { return true; }
-                        const c = Math.cos(f.a), s = Math.sin(f.a), side = f.side === 'right' ? 1 : -1;
-                        const ox = -s * 5 * side, oy = c * 5 * side;                   // the punching hand's side
-                        const n = f.hay ? 4 : 3;
-                        ctx.save();
-                        for (let j = 0; j < n; j++) {
-                            const u = (j + 1) / n, d = 12 + R * u * 1.1, a = (1 - age / life) * (0.18 + 0.42 * u);
-                            // a haymaker's copies ride the hook's arc (CONFIG.HAYMAKER), a jab's the straight line
-                            const ph = (92 - 100 * u) * Math.PI / 180, H = 19 + 7 * u, lx = Math.cos(ph) * H, ly = Math.sin(ph) * H * side;
-                            const x = f.hay ? f.x + c * lx - s * ly : f.x + c * d + ox, y = f.hay ? f.y + s * lx + c * ly : f.y + s * d + oy, rr = (f.hay ? 5.4 : 4.4) * (0.7 + 0.3 * u);
-                            const g = ctx.createRadialGradient(x, y, 0, x, y, rr * 2.2);
-                            g.addColorStop(0, `rgba(255, 238, 170, ${a})`); g.addColorStop(0.45, `rgba(255, 196, 72, ${a * 0.7})`); g.addColorStop(1, 'rgba(255, 170, 40, 0)');
-                            ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, rr * 2.2, 0, TAU); ctx.fill();
-                            ctx.fillStyle = `rgba(255, 226, 140, ${a * 1.2})`; ctx.beginPath(); ctx.arc(x, y, rr * 0.7, 0, TAU); ctx.fill();
-                        }
-                        ctx.restore();
-                    } else {
-                        const life = 0.36;
-                        if (age > life) { return true; }
-                        const u = age / life, rr = (f.slam ? 14 : 10) + u * (f.slam ? 30 : 24);
-                        ctx.save();
-                        ctx.globalAlpha = (1 - u) * 0.9;
-                        ctx.strokeStyle = '#ffd76a'; ctx.lineWidth = 3 * (1 - u) + 0.6;
-                        ctx.shadowColor = '#ffb732'; ctx.shadowBlur = 10;
-                        ctx.beginPath(); ctx.arc(f.x, f.y, rr, 0, TAU); ctx.stroke();
-                        ctx.lineWidth = 1; ctx.strokeStyle = '#fff4cf';
-                        ctx.beginPath(); ctx.arc(f.x, f.y, rr * 0.7, 0, TAU); ctx.stroke();
-                        ctx.restore();
-                    }
-                });
-            }
         });
 
         /** Gilded brass knuckles across a fist, seen from above: `a` is the forearm's way (toward the knuckles) */
@@ -84991,7 +85055,7 @@ engineMixin({
                 this.finCam = null;
                 this.timeSlowState = { active: false, scale: 1.0, targetScale: 1.0, duration: 0, transitionSpeed: 0.05 };
                 this.effects.clear(); this.flitVFX = []; this._resetFlitFeedback();
-                this._fireTrailSerial = 0; this._breachFx = null;
+                this._fireTrailSerial = 0;
                 this.noiseRipples = []; this.lastKnownMarkers = [];
                 this._edgeRipples = null; this._edgeTouch = null;                       // the veil's ripples (world/map-edge.js)
                 if (typeof Walker !== 'undefined') {                                   // walks are across the old floor
@@ -86068,7 +86132,7 @@ engineMixin({
                     this.roomSystem.tagLamps(this.lamps);
                 } 
                 
-                this.decals.clear(); this.spills = [];
+                this.decals.clear(); this.effects.of('spill').length = 0;
                 this.corpses = [];
                 
                 // Deactivate current map entities (non-target maps have empty arrays from lazy creation)
@@ -87946,7 +88010,7 @@ engineMixin({
             },
         });
     </script>
-    <script type="text/dfab" data-src="engine/update.js" data-cost="734">
+    <script type="text/dfab" data-src="engine/update.js" data-cost="735">
         // GameEngine — The per-tick simulation (update) and traffic collision helpers.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         /** Props you can use, and what the action pill says for them: type → [verb, name, name from the prop's own label].
@@ -88017,7 +88081,8 @@ engineMixin({
                 this.updateSneak();
                 this.updatePuddles();                                  // raindrop rings and splashes (engine/reflections.js)
                 this.effects.update('flame');
-                this.updateBreachFx();                                 // a wall blown in (engine/breach-fx.js)
+                this.effects.update('breach');                         // a wall blown in
+                this.effects.update('slash'); this.effects.update('knuckle'); this.effects.update('spill'); this.effects.update('number');
                 this.effects.update('barrel');
             
                 this.updateTime();
@@ -89754,7 +89819,7 @@ engineMixin({
                 this._drawForecourts(cullBounds, 'top');
                 if (RL.at('decals')) {
                     this.decals.draw(this.ctx, cullBounds.world);
-                    this.drawSpills(this.ctx, cullBounds.world);              // spilt drinks (engine/spills.js)
+                    this.effects.draw('spill', this.ctx, cullBounds.world);   // spilt drinks (engine/spills.js)
                     this.drawPoolRipples(this.ctx, cullBounds.world);         // rings on the parks' pools (engine/pools.js)
                     this.effects.draw('casing', this.ctx, cullBounds.world);  // spent brass (directory/effects-system.js)
                 }
@@ -90109,8 +90174,8 @@ engineMixin({
                 if (RL.at('combat')) {
                     this.effects.draw('muzzle', this.ctx);                   // the flash's star at each muzzle
                     this.effects.draw('barrel', this.ctx, cullBounds.world);  // barrel smoke, embers, golden wisps (directory/effects-system.js)
-                    this.drawSlashes(this.ctx);                              // a blade's gold arc (engine/status-effects.js)
-                    this.drawKnuckleFx(this.ctx);                            // Golden Retribution's gold afterimages and rings (engine/knuckles.js)
+                    this.effects.draw('slash', this.ctx);                    // a blade's gold arc
+                    this.effects.draw('knuckle', this.ctx);                  // Golden Retribution's gold afterimages and rings, Vampiric motes
                     this.drawMirrorShield(this.ctx);                         // the Mirrored Glass turning a shot
                 }
 
@@ -90387,7 +90452,7 @@ engineMixin({
                 
                 if (RenderStats.timed) this._entLap('Entities: Effects');
                 if (RL.at('particles')) this.weather.draw(this.ctx, cullBounds.view, viewZoom);
-                if (RL.at('combat')) this.drawBreachUnder(this.ctx, cullBounds.view);   // scorch, debris, smoke (engine/breach-fx.js)
+                if (RL.at('combat')) this.effects.draw('breach', this.ctx, cullBounds.view, 'under');   // scorch, debris, smoke (directory/effects-system.js)
                 if (RenderStats.timed) this._entLap('Entities: Weather');
                 
                 // Graveyard humanoid ghosts
@@ -90427,7 +90492,7 @@ engineMixin({
                     this.drawGunnerHeat(this.ctx, cullBounds.entities);
                     this.drawBossHazards(this.ctx, cullBounds.view);   // the duel's dimming, sigils, fire, hooks (engine/boss-hazards.js)
                     this.effects.draw('flame', this.ctx, cullBounds.view);
-                    this.drawBreachGlow(this.ctx, cullBounds.view);
+                    this.effects.draw('breach', this.ctx, cullBounds.view, 'glow');
                     for (const p of this.projectiles) if (p.isFireball) p.draw(this.ctx);
                 }
                 // The veil at the edge of an outdoor map (world/map-edge.js), above the darkness
@@ -95649,7 +95714,7 @@ engineMixin({
                 this.projectiles = [];
                 this.stickyOrbs = [];
                 this.effects.clear();
-                this._fireTrailSerial = 0; this._breachFx = null;
+                this._fireTrailSerial = 0;
                 this.loot = [];
                 this.npcs = []; this.props = []; this.lamps = []; this.enemies = []; this.corpses = [];   // the last map's (loading a map sets them)
                 this.lastKnownMarkers = []; this.noiseRipples = []; this.flitVFX = [];

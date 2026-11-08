@@ -11,7 +11,7 @@ function test(name,fn){const e=runtime(join(__dirname,'..','DFAB V8.html'),{affi
 const setup=`game._doLoadMap('ollo_test');game.running=true;game.paused=false;game.player.visible=true;
  game.activeMap={id:'gear_test',width:3000,height:3000,walls:[],buildings:[],buildingColliders:[]};
  game.player._game=game;game.player.x=1000;game.player.y=1000;game.player.angle=0;game.isDriving=false;
- game.weaponHolstered=false;game.projectiles=[];game.enemies=[];game.floatingTexts=[];_gameTimeSec=10;
+ game.weaponHolstered=false;game.projectiles=[];game.enemies=[];game.effects.of('number').length=0;_gameTimeSec=10;
  game.inventory.items=[];game.inventory.equippedAttachments=[];game.cosmetics.equippedAccessory=null;
  const give=id=>{const it=createItemFromRegistry(id,game);game.inventory.items.push(it);return it;};
  const wield=id=>{game.currentWeapon=give(id);game.weaponMode=ITEM_REGISTRY[id].weaponMode;game.shootCooldown=0;};

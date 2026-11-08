@@ -4,8 +4,10 @@
         // Charges ripple along the wall; each is a white-hot core, a lumpy fireball and a thin gold shock ring.
         // Warm light spills across the floor and flickers out; black-lacquer panels (some gold-trimmed) and
         // glass are thrown into the room and stay as debris; violet-grey smoke and embers linger.
-        // Two passes: drawBreachUnder (scorch, debris, smoke) before the darkness, so the room's light
-        // and the blast's own spill light them; drawBreachGlow (additive light, fire, sparks) after it.
+        // This file sets the blast up (spawnBreachBlast) and holds its sprites; the effects system's 'breach'
+        // (directory/effects-system.js) moves it and says how it looks, in two passes: 'under' (scorch, debris,
+        // smoke) before the darkness, so the room's light and the blast's own spill light them; 'glow'
+        // (additive light, fire, sparks) after it.
         const BREACH = {
             CHARGES_PER_PX: 1 / 85,  // one charge per this much wall (at least 2, at most 8)
             RIPPLE_MS: 70,           // between charges, along the wall
@@ -72,128 +74,6 @@
                 }
                 B.sparks.length = Math.min(B.sparks.length, BREACH.SPARK_MAX);
                 B.smoke.length = Math.min(B.smoke.length, BREACH.SMOKE_MAX);
-                this._breachFx = B;
+                this.effects.spawn('breach', B);
             },
-
-            /** One sim tick: everything moves in game time, so pause and slow motion hold it. */
-            updateBreachFx() {
-                const B = this._breachFx;
-                if (!B) return;
-                const t = ++B.t, W = this.weather && this.weather.windVec ? this.weather.windVec : { x: 0, y: 0 };
-                const move = (p, damp) => { p.px = p.x; p.py = p.y; if (t <= p.d) return; p.x += p.vx; p.y += p.vy; p.vx *= damp; p.vy *= damp; };
-                for (const p of B.debris) { move(p, 0.9); if (t > p.d) { p.rot += p.vr; p.vr *= 0.92; } }
-                for (const p of B.sparks) move(p, 0.88);
-                for (const p of B.smoke) { move(p, 0.99); p.vx += W.x * 0.004; p.vy += W.y * 0.004; }
-                for (const p of B.embers) { move(p, 1); p.x += Math.sin(t * 0.07 + p.ph) * 0.25; }
-                if (t * CONFIG.LOOP.STEP_MS > BREACH.DEBRIS_MS) this._breachFx = null;
-            },
-
-            _breachClock(B) {
-                const ip = RenderInterp, a = ip._drawActive && ip.alpha < 1 ? ip.alpha : 1;
-                return { a, ms: (B.t - 1 + a) * CONFIG.LOOP.STEP_MS };
-            },
-
-            /** Before the darkness: scorch, debris and smoke. */
-            drawBreachUnder(ctx, cb) {
-                const B = this._breachFx;
-                if (!B) return;
-                const { a, ms } = this._breachClock(B), S = CONFIG.LOOP.STEP_MS;
-                const L = (p) => p.px + (p.x - p.px) * a, T = (p) => p.py + (p.y - p.py) * a;
-                const out = (x, y, m) => cb && (x < cb.left - m || x > cb.right + m || y < cb.top - m || y > cb.bottom + m);
-                const linger = Math.min(1, (BREACH.DEBRIS_MS - ms) / 1000);
-                ctx.save();
-                for (const s of B.scorch) {
-                    const age = ms - s.d * S; if (age < 0 || out(s.x, s.y, s.r * 1.3)) continue;
-                    ctx.globalAlpha = Math.min(1, age / 120) * 0.9 * linger;
-                    const sx = B.horiz ? 1.3 : 1, sy = B.horiz ? 1 : 1.3;
-                    ctx.drawImage(_bScorch(), s.x - s.r * sx, s.y - s.r * sy, s.r * 2 * sx, s.r * 2 * sy);
-                }
-                for (const p of B.debris) {
-                    if (ms < p.d * S) continue;
-                    const x = L(p), y = T(p); if (out(x, y, 20)) continue;
-                    ctx.save(); ctx.translate(x, y); ctx.rotate(p.rot); ctx.globalAlpha = linger;
-                    if (p.glass) {
-                        ctx.fillStyle = 'rgba(190, 200, 255, 0.55)';
-                        ctx.beginPath(); ctx.moveTo(-p.w / 2, p.h / 2); ctx.lineTo(0, -p.h / 2); ctx.lineTo(p.w / 2, p.h / 3); ctx.closePath(); ctx.fill();
-                    } else {
-                        ctx.fillStyle = '#0e0c10'; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
-                        if (p.gold) { ctx.fillStyle = 'rgba(232, 194, 122, 0.9)'; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, 1.4); }
-                    }
-                    ctx.restore();
-                }
-                for (const p of B.smoke) {
-                    const age = ms - p.d * S, life = p.life * S; if (age < 0 || age > life) continue;
-                    const R = p.r0 * (1 + age / 1000 * 0.45), x = L(p), y = T(p); if (out(x, y, R)) continue;
-                    ctx.globalAlpha = 0.95 * Math.min(1, age / 260) * Math.pow(1 - age / life, 1.2);
-                    ctx.drawImage(_bSmoke(), x - R, y - R, R * 2, R * 2);
-                }
-                ctx.restore();
-            },
-
-            /** After the darkness (additive): the light spill, fireballs, shock rings, sparks, embers, the burning lip. */
-            drawBreachGlow(ctx, cb) {
-                const B = this._breachFx;
-                if (!B) return;
-                const { a, ms } = this._breachClock(B), S = CONFIG.LOOP.STEP_MS, w = B.wall;
-                const L = (p) => p.px + (p.x - p.px) * a, T = (p) => p.py + (p.y - p.py) * a;
-                if (ms > Math.max(BREACH.LIP_MS, 4500)) return;   // only scorch and debris remain (drawn under)
-                ctx.save(); ctx.globalCompositeOperation = 'lighter';
-                const cx = w.x + w.w / 2, cy = w.y + w.h / 2;
-                const spill = Math.max(0, 1 - ms / BREACH.SPILL_MS);
-                if (spill > 0) {
-                    const flick = 0.85 + 0.15 * Math.sin(ms * 0.05) * Math.sin(ms * 0.031), R = BREACH.SPILL_R;
-                    ctx.globalAlpha = 0.42 * Math.pow(spill, 1.8) * flick;
-                    if (B.horiz) ctx.drawImage(_bPool(), cx - R * 1.25, cy - R, R * 2.5, R * 2);
-                    else ctx.drawImage(_bPool(), cx - R, cy - R * 1.25, R * 2, R * 2.5);
-                }
-                for (const c of B.charges) {
-                    const age = ms - c.d * S; if (age < 0 || age > BREACH.FIRE_MS) continue;
-                    const u = age / BREACH.FIRE_MS, grow = 1 - Math.pow(1 - Math.min(1, age / 160), 3), fade = Math.pow(1 - u, 1.8);
-                    if (age < 70) { ctx.globalAlpha = 0.85 * (1 - age / 70); const R = 36 + age * 0.6; ctx.drawImage(_bCore(), c.x - R, c.y - R, R * 2, R * 2); }
-                    const R = c.r * (0.45 + 0.75 * grow);
-                    ctx.globalAlpha = 0.65 * fade; ctx.drawImage(_bFire(), c.x - R, c.y - R, R * 2, R * 2);
-                    ctx.globalAlpha = 0.38 * fade;
-                    for (const l of c.lobes) {
-                        const rr = R * l.k, ox = Math.cos(l.a) * R * l.s, oy = Math.sin(l.a) * R * l.s;
-                        ctx.drawImage(_bFire(), c.x + ox - rr, c.y + oy - rr, rr * 2, rr * 2);
-                    }
-                    const ra = Math.min(1, age / 380);
-                    if (ra < 1) {                                              // the shock ring: a thin gold line, half, into the room
-                        ctx.globalAlpha = (1 - ra) * 0.7; ctx.strokeStyle = 'rgb(255, 214, 140)'; ctx.lineWidth = 3 * (1 - ra) + 0.6;
-                        const a0 = B.dir - Math.PI / 2;
-                        ctx.beginPath(); ctx.ellipse(c.x, c.y, (B.horiz ? 20 : 14) + ra * (B.horiz ? 150 : 110), (B.horiz ? 14 : 20) + ra * (B.horiz ? 110 : 150), 0, a0, a0 + Math.PI); ctx.stroke();
-                    }
-                }
-                ctx.lineCap = 'round'; ctx.lineWidth = 1.8;
-                for (const p of B.sparks) {
-                    const age = ms - p.d * S, life = p.life * S; if (age < 0 || age > life) continue;
-                    const u = age / life, x = L(p), y = T(p);
-                    if (cb && (x < cb.left - 40 || x > cb.right + 40 || y < cb.top - 40 || y > cb.bottom + 40)) continue;
-                    ctx.globalAlpha = 1 - u; ctx.strokeStyle = u < 0.35 ? 'rgb(255, 245, 210)' : 'rgb(255, 170, 70)';
-                    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - p.vx * 2.6, y - p.vy * 2.6); ctx.stroke();
-                }
-                ctx.fillStyle = 'rgb(255, 230, 170)';
-                for (const p of B.embers) {
-                    const age = ms - p.d * S, life = p.life * S; if (age < 0 || age > life) continue;
-                    const x = L(p), y = T(p);
-                    ctx.globalAlpha = (1 - age / life) * (0.6 + 0.4 * Math.sin(age * 0.02 + p.ph * 5));
-                    ctx.drawImage(_bEmber(), x - 5, y - 5, 10, 10); ctx.fillRect(x - 0.8, y - 0.8, 1.6, 1.6);
-                }
-                for (const p of B.debris) {                                    // hot edges, the first moments
-                    const age = ms - p.d * S; if (age < 0 || age > 900 || p.glass) continue;
-                    ctx.globalAlpha = (1 - age / 900) * 0.6; ctx.drawImage(_bEmber(), L(p) - 6, T(p) - 6, 12, 12);
-                }
-                const lip = Math.max(0, 1 - ms / BREACH.LIP_MS);
-                if (lip > 0) for (const s of B.scorch) {
-                    if (ms < s.d * S) continue;
-                    ctx.globalAlpha = lip * (0.35 + 0.15 * Math.sin(ms * 0.03 + s.x + s.y));
-                    if (B.horiz) ctx.drawImage(_bEmber(), s.x - 40, cy - 11, 80, 22); else ctx.drawImage(_bEmber(), cx - 11, s.y - 40, 22, 80);
-                }
-                ctx.restore();
-                if (ms < 120) {                                                // a brief warm flash over the frame
-                    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'lighter';
-                    ctx.globalAlpha = 0.14 * (1 - ms / 120); ctx.fillStyle = '#ffd9a0';
-                    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); ctx.restore();
-                }
-            }
         });

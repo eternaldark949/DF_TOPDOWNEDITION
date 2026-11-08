@@ -49,7 +49,7 @@ test('The trail ends at the shared blade tip and only samples past cut positions
  const ctx=game.ctx,move=ctx.moveTo,line=ctx.lineTo;const results=[];
  for(const side of [-1,1])for(const age of [.055,.0924,.13,.1584,.205]){
   const points=[];ctx.moveTo=(x,y)=>points.push([x,y]);ctx.lineTo=(x,y)=>points.push([x,y]);
-  game._slashT=10-age;game._slashSide=side;game.slashes=[{x:0,y:0,a:0,t0:game._slashT,side,reach:36,arc:1.4}];game.drawSlashes(ctx);
+  game._slashT=10-age;game._slashSide=side;game.effects.of('slash').splice(0,Infinity,{x:0,y:0,a:0,t0:game._slashT,side,reach:36,arc:1.4});game.effects.draw('slash',ctx);
   const t=Math.min(age,MELEE_SWING.cutEnd),tip=sampleMeleeSwing(t,side),start=sampleMeleeSwing(Math.max(MELEE_SWING.windup,t-.065),side);
   const edge=p=>[p.handX+(19.4*Math.cos(p.a)-2.6*Math.sin(p.a))*.95,p.handY+(19.4*Math.sin(p.a)+2.6*Math.cos(p.a))*.95];
   results.push({first:points[0],last:points.at(-1),start:edge(start),tip:edge(tip)});
@@ -60,9 +60,9 @@ test('Holstering suppresses the attack pose and trails expire without leaking ca
  const r=value(e,setup+`
  game._slashT=10-.0924;game._slashSide=1;game.weaponHolstered=true;game.holsterAnim=game.holsterAnimTarget=0;
  drawProceduralHumanoid(game.ctx,game.player,config);const hand=proceduralHumanoid.of(game.player).geometry.fists[1].slice();
- game.slashes=[{x:0,y:0,a:0,t0:9,side:1,reach:36,arc:1.4}];
- game.ctx.setTransform(.5,.2,-.1,2,10,20);game.ctx.globalAlpha=.4;game.ctx.globalCompositeOperation='source-over';game.drawSlashes(game.ctx);
- const m=game.ctx.getTransform();return {hand,left:game.slashes.length,m:[m.a,m.b,m.c,m.d,m.e,m.f],alpha:game.ctx.globalAlpha,mode:game.ctx.globalCompositeOperation};`);
+ game.effects.of('slash').splice(0,Infinity,{x:0,y:0,a:0,t0:9,side:1,reach:36,arc:1.4});
+ game.ctx.setTransform(.5,.2,-.1,2,10,20);game.ctx.globalAlpha=.4;game.ctx.globalCompositeOperation='source-over';game.effects.draw('slash',game.ctx);game.effects.update('slash');
+ const m=game.ctx.getTransform();return {hand,left:game.effects.of('slash').length,m:[m.a,m.b,m.c,m.d,m.e,m.f],alpha:game.ctx.globalAlpha,mode:game.ctx.globalCompositeOperation};`);
  assert.ok(r.hand[0]<10);assert.equal(r.left,0);assert.deepEqual(r.m,[.5,.2,-.1,2,10,20]);assert.equal(r.alpha,.4);assert.equal(r.mode,'source-over');
 });
 console.log(JSON.stringify({passed:tests.length,tests},null,2));
