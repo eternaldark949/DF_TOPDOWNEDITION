@@ -57,6 +57,7 @@ const SCRIPTS = [
     'basement/ui-kit.js',          // LV0 Basement: uiKit (making, showing and hiding DOM panels)
     'basement/material-kit.js',    // LV0 Basement: materialKit (linked materials and finish rules)
     'basement/virtual-child.js',   // LV0 Basement: virtualChild (things that ride on a parent without being its child)
+    'basement/awareness-kit.js',   // LV0 Basement: awarenessMatrix (what a character knows of what's around them)
     'core/config.js',
     '@assets',              // generated from the assets/ folder
     'core/assets.js',

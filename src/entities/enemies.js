@@ -1489,6 +1489,9 @@
                 // AI Properties
                 this.visionRange = cfg.visionRange || 320;
                 this.visionFov = Math.PI / 2.5;
+                // What they know of what's around them (basement/awareness-kit.js): up close (50) they sense her unless
+                // she comes from behind; past that, only what's in the cone, in range and in plain sight
+                this.awareness = new awarenessMatrix(this, { evaluation_radius: () => this.visionRange, personal_space: 50, fov: () => this.visionFov, sight: (x, y, walls, buildings) => this._sightClear(x, y, walls, buildings) });
                 this.state = 'IDLE';
                 this.suspicion = 0;
                 this.suspicionDrainDelay = 0;
@@ -1559,20 +1562,12 @@
                 return true;
             }
 
-            // ... [canSeePoint method from previous turn] ...
-            canSeePoint(tx, ty, walls, buildings) {
-                const dist = Math.hypot(tx - this.x, ty - this.y);
-                if (dist > this.visionRange) return false;
-
-                const angleToPoint = Math.atan2(ty - this.y, tx - this.x);
-                let angleDiff = angleToPoint - this.angle;
-                angleDiff = normalizeAngle(angleDiff);
-
-                if (Math.abs(angleDiff) > this.visionFov / 2) return false;
-
+            /** In range, in the cone, and the way clear (not through a shut door; a restricted zone's own shot lines) */
+            canSeePoint(tx, ty, walls, buildings) { return this.awareness.canSee(tx, ty, walls, buildings); }
+            _sightClear(tx, ty, walls, buildings) {
                 if (typeof game !== 'undefined' && game.roomSystem.doorBlocks(this.x, this.y, tx, ty)) return false;   // not through a shut door
                 if (this._restrictedZoneId && typeof game !== 'undefined') return hasShotLine(this.x,this.y,tx,ty,game.activeMap);
-                return !isLineBlocked(this.x, this.y, tx, ty, walls, buildings); 
+                return !isLineBlocked(this.x, this.y, tx, ty, walls, buildings);
             }
 
             // ... [update method from previous turn] ...
@@ -1596,7 +1591,7 @@
                 }
                 if (this._staggerUntil && _gameTimeSec < this._staggerUntil) return null;   // slipped in a spill (engine/spills.js): no step, no shot
                 
-                const distToPlayer = Math.hypot(player.x - this.x, player.y - this.y);
+                const her = this.awareness.observe(player, 'her'), distToPlayer = her[AWARE.DIST];
                 const isVisible = player.visible && !player.isHidden;
                 
                 // Detection range (reduced by active buffs like Ms. Jean Soda)
@@ -1605,14 +1600,13 @@
                 // --- 1. DETECTION LOGIC ---
                 let canSee = false;
                 // Up close they sense her, unless she comes from behind, slowly or hidden, out of the light (an execution)
-                const toHer = Math.atan2(player.y - this.y, player.x - this.x);
                 const pg = player._gait, hg = typeof game !== 'undefined' ? game : null;
-                const sneaking = Math.abs(normalizeAngle(toHer - this.angle)) > Math.PI * 0.6
+                const sneaking = her[AWARE.BEHIND]
                     && ((hg && hg.sneaking && player === hg.player) || player.isHidden || ((pg ? pg.speed : 0) < 2.3 && (player.visibility ?? 0) < 0.75));
-                if (distToPlayer < 50 && isVisible && !sneaking) {
+                if (her[AWARE.CLOSE] && isVisible && !sneaking) {
                     canSee = true;
                     this.suspicion += 5;
-                } else if (isVisible && distToPlayer <= effectiveVisionRange && this.canSeePoint(player.x, player.y, walls, buildings)) {
+                } else if (isVisible && distToPlayer <= effectiveVisionRange && this.awareness.look(her, this.visionRange, walls, buildings)) {
                     canSee = true;
                     let detectSpeed = 1.0;
                     detectSpeed *= (1.0 - (distToPlayer / effectiveVisionRange));
