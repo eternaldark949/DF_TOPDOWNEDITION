@@ -54,7 +54,7 @@
             static _staticGrid = new SpatialHashGrid(200);
             static _staticRows = [];
             static _staticMembers = [];
-            static _layers = { projectile: [], vehicle: [], actor: [], dynamic: [] };
+            static _layers = { projectile: [], vehicle: [], actor: [], dynamic: [], trigger: [] };
 
             // --- SHAPE MATHS: basement/shape-kit.js, under the names the game already calls ---
             static distToSegmentSquared = shapeKit.segmentDistanceSq;
@@ -109,7 +109,8 @@
                 this._staticGrid = new SpatialHashGrid(this.spatialGrid.cellSize);
                 this._staticRows.length = 0; this._staticMembers.length = 0;
                 const L = this._layers;
-                L.projectile.length = L.vehicle.length = L.actor.length = L.dynamic.length = 0;
+                L.projectile.length = L.vehicle.length = L.actor.length = L.dynamic.length = L.trigger.length = 0;
+                this._touching.clear();
             }
             
             static stats = {
@@ -174,7 +175,7 @@
                 // 3. Refresh moving cells; unchanged standard static bodies keep their
                 // cell coverage. Bucket layers once, in the same onScreen order.
                 const L = this._layers, fixed = this._staticMembers;
-                L.projectile.length = L.vehicle.length = L.actor.length = L.dynamic.length = fixed.length = 0;
+                L.projectile.length = L.vehicle.length = L.actor.length = L.dynamic.length = L.trigger.length = fixed.length = 0;
                 for (let i = 0; i < onScreen.length; i++) {
                     const entity = onScreen[i];
                     entity._collisionOrder = i;
@@ -185,6 +186,7 @@
                         case GameEntity.LAYER.VEHICLE: L.vehicle.push(entity); break;
                         case GameEntity.LAYER.ACTOR: L.actor.push(entity); break;
                         case GameEntity.LAYER.DYNAMIC: L.dynamic.push(entity); break;
+                        case GameEntity.LAYER.TRIGGER: L.trigger.push(entity); break;
                     }
                 }
                 this._prepareStaticGrid(fixed);
@@ -195,6 +197,8 @@
                 this._processActors(onScreen, game, L.actor);
                 this._processPeopleVsCars(game, L.vehicle);
                 this._processDynamics(onScreen, game, L.dynamic);
+                this._processPairs(onScreen, game);
+                this._endContacts();
                 
                 // 5. Cleanup destroyed entities
                 GameEntity.cleanup();
@@ -268,14 +272,14 @@
                     
                     for (let wall of nearby) {
                         if (wall.collisionLayer !== GameEntity.LAYER.STATIC) continue;
-                        if (!wall.active) continue;
+                        if (!wall.active || !this._meets(vehicle, wall)) continue;
                         
                         this.stats.totalChecks++;
                         const wallOBB = this._aabbToOBB(wall);
                         wallOBB.mass = Infinity;
                         
                         const packet = this._satCollision(vehicle.getOBB(), wallOBB);
-                        if (packet) {
+                        if (packet && this._report(vehicle, wall, packet)) {
                             this._resolveVehicleCollision(vehicle, { getOBB: () => wallOBB, isStatic: true }, packet);
                             this.stats.collisionsResolved++;
                         }
@@ -287,11 +291,11 @@
                 for (let vehicle of vehicles) {
                     const nearby = this.spatialGrid.getNearby(vehicle);
                     for (let prop of nearby) {
-                        if (prop.collisionLayer !== GameEntity.LAYER.DYNAMIC || !prop.active) continue;
+                        if (prop.collisionLayer !== GameEntity.LAYER.DYNAMIC || !prop.active || !this._meets(vehicle, prop)) continue;
                         this.stats.totalChecks++;
                         const vo = vehicle.getOBB(), po = prop.getOBB();
                         const packet = this._satCollision(vo, po);
-                        if (!packet) continue;
+                        if (!packet || !this._report(vehicle, prop, packet)) continue;
                         const cp = this._contactPoint(vo, po, packet.nx, packet.ny);
                         this._solveContact(vehicle, prop, packet, cp, 0.25, 0.4);
                         prop._still = 0;
@@ -323,10 +327,11 @@
                         
                         if (checkedActorPairs.has(pairId)) continue;
                         checkedActorPairs.add(pairId);
+                        if (!this._meets(actorA, actorB)) continue;
                         
                         this.stats.totalChecks++;
                         const packet = this._circleVsCircle(actorA, actorB);
-                        if (packet) {
+                        if (packet && this._report(actorA, actorB, packet)) {
                             // Same-alliance actors get soft push (don't block each other)
                             if (actorA.alliance && actorA.alliance === actorB.alliance) {
                                 packet.depth *= 0.3; // Gentle nudge instead of hard block
@@ -347,11 +352,11 @@
                     
                     for (let wall of nearby) {
                         if (wall.collisionLayer !== GameEntity.LAYER.STATIC) continue;
-                        if (!wall.active) continue;
+                        if (!wall.active || !this._meets(actor, wall)) continue;
                         
                         this.stats.totalChecks++;
                         const packet = this._circleVsAABB(actor, wall, mapBounds);
-                        if (packet) {
+                        if (packet && this._report(actor, wall, packet)) {
                             this._resolveCircleVsStatic(actor, packet);
                             this.stats.collisionsResolved++;
                         }
@@ -367,11 +372,11 @@
                     
                     for (let prop of nearby) {
                         if (prop.collisionLayer !== GameEntity.LAYER.DYNAMIC) continue;
-                        if (!prop.active) continue;
+                        if (!prop.active || !this._meets(actor, prop)) continue;
                         
                         this.stats.totalChecks++;
                         const packet = this._circleVsOBB(actor, prop);
-                        if (packet) {
+                        if (packet && this._report(actor, prop, packet)) {
                             prop._still = 0;
                             this._resolveCircleVsDynamic(actor, prop, packet);
                             this.stats.collisionsResolved++;
@@ -394,10 +399,10 @@
                     const o = car.getOBB ? car.getOBB() : car, box = { x: o.x, y: o.y, angle: o.angle || 0, length: o.length, width: o.width, px: car._kpx, py: car._kpy };
                     const near = this.spatialGrid.getNearby(car);
                     for (const p of near) {
-                        if (p.collisionLayer !== GameEntity.LAYER.ACTOR || !p.active || p.dead || p.inCar || this._ownCarRules(p, game)) continue;
+                        if (p.collisionLayer !== GameEntity.LAYER.ACTOR || !p.active || p.dead || p.inCar || this._ownCarRules(p, game) || !this._meets(p, car)) continue;
                         this.stats.totalChecks++;
                         const c = collisionKit.circleVsMovingBox({ x: p.x, y: p.y, radius: p.radius || 10, px: p.x - (p._cvx || 0), py: p.y - (p._cvy || 0) }, box);
-                        if (!c) continue;
+                        if (!c || !this._report(p, car, c)) continue;
                         p.x = c.x; p.y = c.y;
                         if (p.hitByCar) p.hitByCar(car, c, Math.abs(car.speed || 0));
                         this.stats.collisionsResolved++;
@@ -426,10 +431,11 @@
                             checked.add(key);
                             if (asleep(propA) && asleep(propB)) continue;                    // two sleepers stay put
                             if (this._invMass(propA) === 0 && this._invMass(propB) === 0) continue;
+                            if (!this._meets(propA, propB)) continue;
                             this.stats.totalChecks++;
                             const oa = propA.getOBB(), ob = propB.getOBB();
                             const packet = this._satCollision(oa, ob);
-                            if (packet) {
+                            if (packet && this._report(propA, propB, packet)) {
                                 const cp = this._contactPoint(oa, ob, packet.nx, packet.ny);
                                 this._solveContact(propA, propB, packet, cp, Math.min(propA.restitution || 0.3, propB.restitution || 0.3), 0.35);
                                 if (packet.depth > 0.5) { propA._still = 0; propB._still = 0; }
@@ -443,12 +449,12 @@
                         const nearby = this.spatialGrid.getNearby(prop);
                         for (let wall of nearby) {
                             if (wall.collisionLayer !== GameEntity.LAYER.STATIC) continue;
-                            if (!wall.active) continue;
+                            if (!wall.active || !this._meets(prop, wall)) continue;
                             this.stats.totalChecks++;
                             const wallOBB = this._aabbToOBB(wall);
                             const po = prop.getOBB();
                             const packet = this._satCollision(po, wallOBB);
-                            if (packet) {
+                            if (packet && this._report(prop, wall, packet)) {
                                 const cp = this._contactPoint(po, wallOBB, packet.nx, packet.ny);
                                 this._solveContact(prop, null, packet, cp, prop.restitution || 0.3, 0.45);
                                 this.stats.collisionsResolved++;
@@ -458,6 +464,138 @@
                 }
             }
 
+
+
+            // =====================
+            //  BODIES: masks, ghosts, contacts (begin / stay / end), the pair table, queries
+            // =====================
+
+            /** Do these two meet at all: neither is 'no_collision', and each one's mask takes the other's group. */
+            static _meets(a, b) {
+                const A = a.body, B = b.body;
+                if (!A || !B) return true;
+                if (A.physics_type === 'no_collision' || B.physics_type === 'no_collision') return false;
+                return !!(A.mask & B.group) && !!(B.mask & A.group);
+            }
+            static _ghostly(a, b) { return !!((a.body && a.body.ghost) || (b.body && b.body.ghost)); }
+            static _touching = new Map();   // pair key -> [a, b, the tick last touching]
+            /**
+             * A contact: tell both (onCollide(other, contact, phase): 'begin' the first tick, 'stay' after; contact.nx, ny
+             * points at the one being told), and say whether
+             * to push them apart (false for a ghost: it's only told). Costs nothing when neither listens.
+             */
+            static _report(a, b, contact) {
+                if (a.onCollide || b.onCollide) {
+                    const k = a.id < b.id ? a.id + ':' + b.id : b.id + ':' + a.id, was = this._touching.get(k);
+                    const phase = was && was[2] === _simTick - 1 ? 'stay' : was && was[2] === _simTick ? null : 'begin';
+                    this._touching.set(k, [a, b, _simTick]);
+                    if (phase) {   // each is handed the contact with its normal pointing at itself (away from the other)
+                        const ca = this._centre(a), cb = this._centre(b), nx = contact.nx ?? 0, ny = contact.ny ?? 0;
+                        const toA = nx * (ca.x - cb.x) + ny * (ca.y - cb.y) >= 0 ? contact : { ...contact, nx: -nx, ny: -ny };
+                        if (a.onCollide) a.onCollide(b, toA, phase); if (b.onCollide) b.onCollide(a, { ...toA, nx: -toA.nx, ny: -toA.ny }, phase);
+                    }
+                }
+                return !this._ghostly(a, b);
+            }
+            /** Pairs that touched last tick and not this one: 'end'. */
+            static _endContacts() {
+                for (const [k, t] of this._touching) if (t[2] < _simTick) {
+                    this._touching.delete(k);
+                    const [a, b] = t;
+                    if (a.onCollide) a.onCollide(b, null, 'end'); if (b.onCollide) b.onCollide(a, null, 'end');
+                }
+            }
+
+            /**
+             * THE PAIR TABLE: anything the built-in passes above don't cover. A row is [groupA, groupB, { test, resolve }]:
+             * every active body of group A against every body of group B near it (the grid), when they meet (_meets).
+             * test(a, b) -> contact | null (default: by their shapes, `_shapeContact`); resolve(a, b, contact) (default:
+             * `_separate`, by mass; a static never moves). Ghosts are only told. Triggers (ghosts) against people, cars and
+             * props are a row already, so a TriggerEntity gets onCollide begin / stay / end with no other code.
+             * collisionWorld.addPair(groupA, groupB, opts) adds one.
+             */
+            static PAIRS = [GameEntity.LAYER.ACTOR, GameEntity.LAYER.VEHICLE, GameEntity.LAYER.DYNAMIC].map(g => [GameEntity.LAYER.TRIGGER, g, {}]);
+            static addPair(a, b, opts = {}) { this.PAIRS.push([a, b, opts]); return this; }
+            static _bucket(group, onScreen) {
+                const L = GameEntity.LAYER, Lb = this._layers;
+                if (group === L.VEHICLE) return Lb.vehicle; if (group === L.ACTOR) return Lb.actor; if (group === L.DYNAMIC) return Lb.dynamic;
+                if (group === L.TRIGGER) return Lb.trigger; if (group === L.PROJECTILE) return Lb.projectile;
+                return onScreen.filter(e => e.active && (e.body ? e.body.group : e.collisionLayer) === group);
+            }
+            static _processPairs(onScreen, game) {
+                for (const [ga, gb, opts] of this.PAIRS) {
+                    const seen = ga === gb ? new Set() : null;
+                    for (const a of this._bucket(ga, onScreen)) {
+                        if (!a.active) continue;
+                        for (const b of this.spatialGrid.getNearby(a)) {
+                            if (!b.active || b === a || (b.body ? b.body.group : b.collisionLayer) !== gb || !this._meets(a, b)) continue;
+                            if (seen) { const k = a.id < b.id ? a.id + ':' + b.id : b.id + ':' + a.id; if (seen.has(k)) continue; seen.add(k); }
+                            this.stats.totalChecks++;
+                            const c = (opts.test || this._shapeContact).call(this, a, b);
+                            if (!c || !this._report(a, b, c)) continue;
+                            (opts.resolve || this._separate).call(this, a, b, c);
+                            this.stats.collisionsResolved++;
+                        }
+                    }
+                }
+            }
+            /** The contact between two bodies by their shapes: { nx, ny (from b toward a), depth } or null. */
+            static _shapeContact(a, b) {
+                const circle = e => (e.body ? e.body.shape : '') === 'circle';
+                const box = e => e.getOBB ? e.getOBB() : (e.body && e.body.shape === 'aabb' ? this._aabbToOBB(e) : shapeKit.entityToObb(e));
+                let c;
+                if (circle(a) && circle(b)) c = this._circleVsCircle(a, b);
+                else if (circle(a)) c = this._circleVsOBB(a, { getOBB: () => box(b) });
+                else if (circle(b)) { c = this._circleVsOBB(b, { getOBB: () => box(a) }); if (c) c = { ...c, nx: -c.nx, ny: -c.ny }; }
+                else c = this._satCollision(box(a), box(b));
+                if (!c) return null;
+                const ca = this._centre(a), cb = this._centre(b);
+                if (c.nx * (ca.x - cb.x) + c.ny * (ca.y - cb.y) < 0) c = { ...c, nx: -c.nx, ny: -c.ny };   // from b toward a
+                return c;
+            }
+            /** Push two bodies apart along the contact, by mass (a static, or a zero inverse mass, doesn't move). */
+            static _separate(a, b, c) {
+                const fixed = e => !e.body || e.body.physics_type === 'static' || e.isStatic;
+                const ia = fixed(a) ? 0 : 1 / (a.mass || 1), ib = fixed(b) ? 0 : 1 / (b.mass || 1), t = ia + ib;
+                if (!t) return;
+                a.x += c.nx * c.depth * ia / t; a.y += c.ny * c.depth * ia / t;
+                b.x -= c.nx * c.depth * ib / t; b.y -= c.ny * c.depth * ib / t;
+            }
+
+            /**
+             * QUERIES (mask operations: no physics): what a ray, or a circle, touches. opts: mask (the groups to find, default
+             * all), bit (the query's own bit, checked against each body's ray_mask; default 1), ignore (a body, or a
+             * function). Ghosts are found; 'no_collision' bodies never are. Uses the step's grid: what's on screen.
+             * raycast(x0, y0, x1, y1, opts) -> [{ e, t, x, y }] nearest first;  overlap(x, y, r, opts) -> [entity]
+             */
+            static _findable(e, opts) {
+                const B = e.body, mask = opts.mask ?? 0xFFFF, bit = opts.bit ?? 1;
+                if (!e.active || !B || B.physics_type === 'no_collision' || !(mask & B.group) || !(B.ray_mask & bit)) return false;
+                return !(opts.ignore && (typeof opts.ignore === 'function' ? opts.ignore(e) : opts.ignore === e));
+            }
+            static raycast(x0, y0, x1, y1, opts = {}) {
+                const q = { getBoundingBox: () => ({ x: Math.min(x0, x1), y: Math.min(y0, y1), w: Math.abs(x1 - x0), h: Math.abs(y1 - y0) }) }, hits = [];
+                for (const e of this.spatialGrid.getNearby(q)) {
+                    if (!this._findable(e, opts)) continue;
+                    let t;
+                    if (e.body.shape === 'circle') t = this._sweepCircle(x0, y0, x1, y1, e.x, e.y, e.radius || 0);
+                    else {
+                        const o = e.getOBB ? e.getOBB() : e.body.shape === 'aabb' ? this._aabbToOBB(e) : shapeKit.entityToObb(e), a = o.angle || 0, c = Math.cos(-a), s = Math.sin(-a);
+                        const lx = (x, y) => (x - o.x) * c - (y - o.y) * s, ly = (x, y) => (x - o.x) * s + (y - o.y) * c;
+                        t = this._sweepRoundedBox(lx(x0, y0), ly(x0, y0), lx(x1, y1), ly(x1, y1), o.length / 2, o.width / 2, 0);
+                    }
+                    if (t !== null && t !== undefined) hits.push({ e, t, x: x0 + (x1 - x0) * t, y: y0 + (y1 - y0) * t });
+                }
+                return hits.sort((p, q2) => p.t - q2.t);
+            }
+            static overlap(x, y, r, opts = {}) {
+                const probe = { x, y, radius: r }, out = [];
+                for (const e of this.spatialGrid.getInRadius(x, y, r)) {
+                    if (!this._findable(e, opts)) continue;
+                    if (e.body.shape === 'circle' ? Math.hypot(e.x - x, e.y - y) < r + (e.radius || 0) : this._circleVsOBB(probe, e)) out.push(e);
+                }
+                return out;
+            }
 
             // =====================
             //  CONTACT SOLVER (rigid bodies in the plane)

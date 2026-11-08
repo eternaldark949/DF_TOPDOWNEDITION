@@ -46,6 +46,41 @@
                 OBB:    'OBB'         // Oriented bounding box (rotated rect)
             };
             
+            // === PHYSICS BODY ===
+            // Every entity has one (Blender's object physics, in this engine's terms):
+            //   physics_type   'no_collision' (skipped by everything: an Empty) | 'static' (never moves) | 'dynamic' (moves,
+            //                  doesn't spin) | 'rigid' (moves and spins) | 'character' (moved by its own code, pushes and is
+            //                  pushed; never tips) — default from the layer: STATIC → static, DYNAMIC → rigid, ACTOR →
+            //                  character, VEHICLE → dynamic, PROJECTILE → dynamic, TRIGGER → static ghost; no collision → no_collision
+            //   ghost          meets nothing physically (no push either way), but its contacts are still reported
+            //                  (onCollide) and mask queries still find it: triggers, sensors, sight
+            //   shape          'circle' | 'box' (rotates with angle) | 'aabb' (doesn't)    (default: from collisionShape)
+            //   group          the bit it belongs to (default: its collisionLayer; the game may name more: BODY_GROUPS)
+            //   mask           the groups it collides with (default: all)
+            //   ray_mask       which queries see it (a query passes its own bit; default: all): a raycast or overlap finds a
+            //                  body when the query's mask includes its group and its ray_mask includes the query's bit
+            //   mass, linear_damping, angular_damping (per tick, 0..1), lock { x, y, rot } (locked axes), ccd (swept: fast
+            //                  movers can't pass through thin things)
+            static BODY_TYPES = ['no_collision', 'static', 'dynamic', 'rigid', 'character'];
+            /** The body: what's set (`b`) wins; the rest follows the entity as it is now (its layer, shape, mass, flags). */
+            static makeBody(e, b = {}) {
+                const set = Object.assign({}, b || {}), L = GameEntity.LAYER;
+                const derived = {
+                    physics_type: () => { const layer = e.collisionLayer;
+                        return !e.hasCollision || layer === L.NONE ? 'no_collision' : e.isStatic || layer === L.STATIC || layer === L.TRIGGER ? 'static'
+                            : layer === L.DYNAMIC ? 'rigid' : layer === L.ACTOR ? 'character' : 'dynamic'; },
+                    ghost: () => !!e.isTrigger || e.collisionLayer === L.TRIGGER,
+                    shape: () => e.collisionShape === GameEntity.SHAPE.CIRCLE ? 'circle' : e.collisionShape === GameEntity.SHAPE.OBB ? 'box' : 'aabb',
+                    group: () => e.collisionLayer, mask: () => 0xFFFF, ray_mask: () => 0xFFFF,
+                    mass: () => e.mass, linear_damping: () => 0, angular_damping: () => 0,
+                    lock: () => { const r = (set.physics_type ?? derived.physics_type()) !== 'rigid'; return { x: false, y: false, rot: r }; },
+                    ccd: () => e.collisionLayer === L.PROJECTILE,
+                };
+                const body = {};
+                for (const k in derived) Object.defineProperty(body, k, { enumerable: true, get: () => set[k] ?? derived[k](), set: (v) => { set[k] = v; } });
+                return body;
+            }
+
             // Auto-increment ID
             static _nextId = 1;
             
@@ -80,6 +115,8 @@
                 this.collisionLayer = config.collisionLayer ?? GameEntity.LAYER.NONE;
                 this.collisionMask = config.collisionMask ?? 0xFFFF;
                 this.isTrigger = config.isTrigger ?? false;
+                // The physics body (Blender's terms): what the collision world needs to know, in one place
+                this.body = GameEntity.makeBody(this, config.body);
                 
                 // --- LIFECYCLE ---
                 this.active = true;

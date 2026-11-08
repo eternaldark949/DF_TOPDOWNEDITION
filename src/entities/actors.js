@@ -1193,6 +1193,12 @@
                 this.entitiesInside = new Set();
             }
             
+            /** The collision step tells it who's touching it (a ghost: nobody's pushed): onEnter on 'begin', onExit on 'end'. */
+            onCollide(other, contact, phase) {
+                if (phase === 'begin' && !this.entitiesInside.has(other)) { this.entitiesInside.add(other); if (this.onEnter) this.onEnter(other, this); }
+                else if (phase === 'end' && this.entitiesInside.delete(other) && this.onExit) this.onExit(other, this);
+            }
+
             containsEntity(entity) {
                 const bb = this.getBoundingBox();
                 const center = entity.getCenter();
