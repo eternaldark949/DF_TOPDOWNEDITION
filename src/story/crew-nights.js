@@ -28,37 +28,12 @@
 
            State: phoneSystem.feed.crew (saved and reset with the feed).
            ===================================================================== */
-        const CREW_IDS = { '747': '747', Victoria: 'victoria', Yenna: 'yenna', Sabrina: 'sabrina', Max: 'max', Josh: 'josh' };
+        const CREW_IDS = GAME_DB.story.crew.ids;   // directory/game-db/story.json, with the venues
 
         /** Where a night can be: the map it plays on, where everyone is, and who asks her there on their own */
-        const CREW_VENUES = {
-            moon_city: {
-                map: 'moon_city_nightclub', label: 'Moon City', what: 'Drinks at Moon City', host: 'Sabrina',
-                // The booth by the foyer: a U of velvet round an oval table, open to the floor
-                group: {
-                    me: { x: 535, y: 950, a: -Math.PI / 2, pose: 'sit' }, cam: { x: 590, y: 898 }, zoom: 2.5,
-                    // the two arms of the U, then standing at the open end and by the arms (leaning on the velvet)
-                    seats: [{ x: 486, y: 916, a: 0 }, { x: 584, y: 916, a: Math.PI }, { x: 505, y: 866, a: Math.PI / 2, pose: 'lean' },
-                            { x: 566, y: 866, a: Math.PI / 2, pose: 'arms_crossed' }, { x: 446, y: 912, a: 0, pose: 'lean' }, { x: 624, y: 912, a: Math.PI, pose: 'lean' }],
-                    after: { x: 535, y: 860 }
-                },
-                // Sabrina alone: two stools at the bar
-                solo: { me: { x: 510, y: 596, a: Math.PI, pose: 'sit' }, them: { x: 510, y: 659, a: Math.PI, pose: 'sit' }, cam: { x: 495, y: 628 }, zoom: 3.2, after: { x: 560, y: 628 } }
-            },
-            cozy_cafe: { map: 'cozy_cafe_interior', label: 'Cozy Cafe', what: 'Coffee at Cozy Cafe', host: '747',
-                solo: { me: { x: 167, y: 433, a: Math.PI / 2, pose: 'sit' }, them: { x: 309, y: 540, a: Math.PI, pose: 'sit' }, cam: { x: 230, y: 500 }, zoom: 2.9, after: { x: 380, y: 520 } } },
-            torque_auto: { map: 'auto_shop', label: 'Torque Auto', what: 'Wraps at Torque Auto', host: 'Victoria',
-                solo: { me: { x: 470, y: 296, a: -1.2, pose: 'arms_crossed' }, them: { x: 566, y: 288, a: -1.9, pose: 'lean' }, cam: { x: 518, y: 248 }, zoom: 2.8, after: { x: 600, y: 380 } } },   // at the wrap bay
-            biggs_park: { map: 'sdc', label: 'Biggs Park', what: 'Cans at Biggs Park', host: 'Yenna', park: { x: 8260, y: 8160, r: 600 }, inside: 'biggs_arena',
-                // The open plaza west of the pavilion, facing north up a clear lane (room for a range: cans along y≈7960)
-                solo: { me: { x: 8230, y: 8320, a: -Math.PI / 2 }, them: { x: 8290, y: 8320, a: -Math.PI / 2, pose: 'arms_crossed' }, cam: { x: 8260, y: 8250 }, zoom: 2.4, after: { x: 8230, y: 8340 } } },
-            neural_sys: { map: 'neural_sys_interior', label: 'Neural Systems', what: 'Browsing at Neural Systems', host: 'Josh',
-                solo: { me: { x: 470, y: 340, a: -Math.PI / 2 }, them: { x: 530, y: 340, a: -Math.PI / 2, pose: 'arms_crossed' }, cam: { x: 500, y: 310 }, zoom: 2.9, after: { x: 500, y: 400 } } },
-            enni_cole: { map: 'enni_cole_interior', label: 'Enni Cole', what: 'Shopping at Enni Cole', host: 'Max',
-                solo: { me: { x: 440, y: 985, a: Math.PI }, them: { x: 445, y: 1035, a: Math.PI, pose: 'arms_crossed' }, cam: { x: 415, y: 1000 }, zoom: 2.8, after: { x: 480, y: 1010 } } },
-        };
+        const CREW_VENUES = GAME_DB.story.crew.venues;   // directory/game-db/story.json
         /** Each of the crew's own place (the pins they used to send) */
-        const CREW_HOME_VENUE = { '747': 'cozy_cafe', Victoria: 'torque_auto', Sabrina: 'moon_city', Yenna: 'biggs_park', Josh: 'neural_sys', Max: 'enni_cole' };
+        const CREW_HOME_VENUE = GAME_DB.story.crew.home_venue;   // directory/game-db/story.json
 
         /* ── A group night ── */
         const CREW_OPENERS = {

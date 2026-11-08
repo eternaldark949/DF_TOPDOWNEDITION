@@ -70,6 +70,7 @@ const SCRIPTS = [
     'directory/game-db/enemies.json',   // GAME_DB.enemies: enemy kinds, drones, the bosses and their hazards, the Horde Gauntlet
     'directory/game-db/vehicles.json',  // GAME_DB.vehicles: car brands and models, the BlackMark's look, the Zibs, traffic tempers, the driving feel
     'directory/game-db/places.json',    // GAME_DB.places: the maps, their rooms and doors, the city's landmark blocks, the fireplaces
+    'directory/game-db/story.json',     // GAME_DB.story: the story's parts and steps (code in STORY_STEP_HOOKS), mission kinds, crew nights, the van's drop
     'core/config.js',                   // reads GAME_DB.vehicles and .places, so it comes after the chapters
     '@assets',              // generated from the assets/ folder
     'core/assets.js',

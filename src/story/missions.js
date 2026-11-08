@@ -7,11 +7,7 @@
            at the apartment's door.
            Bounty: Accept at Club or Cafe → hunt target in city.
            ===================================================================== */
-        const MISSION_TYPES = {
-            DELIVERY: 'delivery',
-            BOUNTY: 'bounty',
-            SALVAGE: 'salvage'
-        };
+        const MISSION_TYPES = GAME_DB.story.mission_types;   // directory/game-db/story.json
 
         class MissionSystem {
             constructor() {
