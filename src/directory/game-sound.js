@@ -34,14 +34,18 @@
                 // ('interactive') underruns on mid-range phones while the game is busy — the crackles
                 // and pops — so it trades ~10–20 ms of latency for a steady stream. Read at launch.
                 this.bufferMode = AUDIO_BUFFERS[GameSettings.audioBuffer] ? GameSettings.audioBuffer : 'balanced';
-                this.ctx = soundKit.open(AUDIO_BUFFERS[this.bufferMode]);
+                // The Basement's sound system owns the context and the mix (basement/sound-system.js): the master
+                // (the audio toggle mutes everything there), the dialogue, music and sfx channels (the Music
+                // slider sets the music's), the room's reverb, and asset sounds by packet (core/assets.js loads them).
+                this.system = new soundSystem({ latency: AUDIO_BUFFERS[this.bufferMode],
+                    levels: { master: GameSettings.audioEnabled ? 1.0 : 0.0, music: GameSettings.musicVolume ?? 0.7 }, load: (name) => loadSound(name) });
+                this.ctx = this.system.ctx;
                 this.stats = soundKit.countVoices(this.ctx);   // live voices, sounds per second and the peak, for the profiler
-
-                // MASTER GAIN BUS: the single point of mute for ALL audio (SFX + music), through a limiter.
-                // MUSIC BUS: all music (the apartment's track, the phone radio) goes through here into the
-                // master, so the Music slider sets it apart from sound effects.
-                const mix = soundKit.mixer(this.ctx, [GameSettings.audioEnabled ? 1.0 : 0.0, GameSettings.musicVolume ?? 0.7]);
-                this.masterGain = mix.master; this.limiter = mix.limiter; this.musicGain = mix.music;
+                this.masterGain = this.system.master; this.limiter = this.system.limiter;
+                this.sfxOut = this.system.out('sfx');                        // in the room (with its reverb)
+                this.sfxDry = this.system.out('sfx', { dry: true });          // beside her: the HUD's blips, her car's cabin
+                this.musicGain = this.system.out('music', { dry: true });     // the phone radio (in her ear)
+                this.musicRoom = this.system.out('music');                   // a map's speakers (in the room)
             }
 
             /** Once a frame (ambience.update): roll the per-second counters */
@@ -50,7 +54,7 @@
             /** Music slider (0..1). */
             setMusicVolume(v) {
                 GameSettings.musicVolume = Math.max(0, Math.min(1, v));
-                this.musicGain.gain.setTargetAtTime(GameSettings.musicVolume, this.ctx.currentTime, 0.05);
+                this.system.volume.set('music', GameSettings.musicVolume);
             }
         
             // Must be called after user interaction to unlock audio (browser policy)
@@ -72,7 +76,7 @@
             // Pass true/false; reads GameSettings.audioEnabled when called with no arg.
             setEnabled(on) {
                 if (typeof on === 'boolean') GameSettings.audioEnabled = on;
-                this.masterGain.gain.setTargetAtTime(GameSettings.audioEnabled ? 1.0 : 0.0, this.ctx.currentTime, 0.02);   // a fade, not a click
+                this.system.volume.set('master', GameSettings.audioEnabled ? 1.0 : 0.0);   // a fade, not a click
             }
         
             /** A one-shot sound effect: `type` names the recipe. opts.muffled = heard through a wall, opts.gain = how hard (crunch). */
@@ -86,8 +90,9 @@
 
                 // Muffled = heard through walls: a lowpass in front of the master bus
                 const c = this.ctx, now = c.currentTime;
-                let out = this.masterGain;
-                if (opts.muffled) { out = soundKit.filter(c, ['lowpass', 160]); out.connect(soundKit.gain(c, 0.6, this.masterGain)); }
+                const home = type === 'ui' ? this.sfxDry : this.sfxOut;       // a menu blip is beside her; the rest ring in the room
+                let out = home;
+                if (opts.muffled) { out = soundKit.filter(c, ['lowpass', 160]); out.connect(soundKit.gain(c, 0.6, home)); }
                 const tone = (tone_packet, t = now) => soundKit.tone(c, out, t, tone_packet);
 
                 // Tone packets: [wave, f0, f1, glide, amp, attack, decay, stop] (basement/sound-kit.js)
@@ -138,7 +143,7 @@
                 const on = !!(st && st.on);
                 if (!this._eng) {
                     if (!on) return;
-                    const c = this.ctx, bus = soundKit.gain(c, 0, this.masterGain);
+                    const c = this.ctx, bus = soundKit.gain(c, 0, this.sfxDry);   // her own motor: in the cabin, dry
                     const osc = (type, g0) => { const o = c.createOscillator(), g = c.createGain(); o.type = type; g.gain.value = g0; o.connect(g); o.start(); return { o, g }; };
                     const body1 = osc('sine', 0.5), body2 = osc('sine', 0.3), fifth = osc('triangle', 0.09), whine = osc('sine', 0);
                     const saw = osc('sawtooth', 0.07), lp = soundKit.filter(c, ['lowpass', 300, 0.8]);
@@ -182,7 +187,7 @@
                     if (L <= 0) return;
                     const c = this.ctx, src = c.createBufferSource(); src.buffer = this._noise(); src.loop = true;
                     const bp = soundKit.filter(c, ['bandpass', 1500, 9]), bp2 = soundKit.filter(c, ['bandpass', 2250, 6]);
-                    const g = soundKit.gain(c, 0, this.masterGain);
+                    const g = soundKit.gain(c, 0, this.sfxOut);
                     const lfo = c.createOscillator(), lg = c.createGain(); lfo.frequency.value = 6.5; lg.gain.value = 90;
                     lfo.connect(lg); lg.connect(bp.frequency); lfo.start();
                     src.connect(bp); src.connect(bp2); bp.connect(g); bp2.connect(g);
@@ -213,7 +218,8 @@
            fireplace) whose gains glide toward targets recomputed every frame
            from the map, the room you're in, the weather and the time of day,
            plus sparse one-shots (crackles, passing cars, horns, drips, doors).
-           Everything is generated in code; it all runs through masterGain, so
+           Everything is generated in code; it all runs through the sfx channel (the beds dry,
+           the one-shots in the room's reverb) into the master, so
            the existing audio toggle mutes it.
            ===================================================================== */
         // Footsteps, splashes and slashes vary on their own random stream, so they never shift the game's
@@ -231,7 +237,8 @@
                 const ctx = this.audio.ctx;
                 const { pink, brown } = soundKit.noiseBeds(ctx, 3);
                 this.pink = pink; this.brown = brown;
-                this.bus = soundKit.gain(ctx, 0, this.audio.masterGain);
+                this.bus = soundKit.gain(ctx, 0, this.audio.sfxDry);         // the beds are the place itself: no reverb on them
+                this.shots = soundKit.gain(ctx, 0, this.audio.sfxOut);       // its one-shots ring in the room (the bed's level)
                 const bq = (type, f, Q = 0.7) => soundKit.filter(ctx, [type, f, Q]);
                 const layer = (buf, filters, rate) => ({ g: soundKit.loop(ctx, this.bus, buf, filters, rate, Math.random() * 2.5), t: 0 });
                 const windBand = bq('bandpass', 600, 0.9);
@@ -283,7 +290,7 @@
                            throttle: car ? Math.abs(car.controlMode === 'PLAYER' ? (car.pedal || 0) : (car.manualGas || 0)) : 0 });   // her motor (auto-drive too)
 
                 const busV = vol * 1.9 * (paused ? 0.25 : 1) * (1 - 0.45 * (game.scopeK || 0));
-                if (Math.abs(busV - (this._busV ?? -1)) > 0.004) { this._busV = busV; this.bus.gain.setTargetAtTime(busV, now, 0.4); }   // only on change: a new automation event every frame keeps the audio thread busy   // scoped: the world goes quiet   // layer levels are set low; 1.9 brings the bed to about -22 dBFS
+                if (Math.abs(busV - (this._busV ?? -1)) > 0.004) { this._busV = busV; this.bus.gain.setTargetAtTime(busV, now, 0.4); this.shots.gain.setTargetAtTime(busV, now, 0.4); }   // only on change: a new automation event every frame keeps the audio thread busy   // scoped: the world goes quiet   // layer levels are set low; 1.9 brings the bed to about -22 dBFS
                 const van = map.id === 'van_interior', rolling = van && game.vanMoving !== false;   // the crew's van: rain drums on the roof, the road hums underneath
                 this._set(this.L.rain, outside && !realm ? 0.3 * rain : 0, 0.8);
                 this._set(this.L.rainIn, van ? 0.2 : outside ? 0 : 0.22 * rain, 0.8);
@@ -293,6 +300,7 @@
                 this._set(this.L.room, apt && !veranda ? 0.035 : 0, 1.0);
                 this._set(this.L.fire, 0.22 * fire, 0.5);
                 this._music(game, paused);
+                this._reverb(game, map, rs, veranda);
                 if (paused) return;
 
                 // Sparse one-shots
@@ -302,11 +310,19 @@
                 if (!outside && rain > 0 && now > this.next.drip) { this._drip(0.02 * rain); this.next.drip = now + 0.6 + Math.random() * 2.4; }
             }
 
+            /** The room she's in as reverb: its own (ROOM_REVERB), the street from a veranda, else the map's. */
+            _reverb(game, map, rs, veranda) {
+                const room = rs && rs.active ? rs.currentRoom : null;
+                const name = (room && ROOM_REVERB[room.id]) || (veranda ? 'street' : MAP_REVERB[map.id] || (map.type === 'indoor' ? 'room' : 'street'));
+                this.audio.system.reverb.setRoom(REVERB[name]);
+                this.reverbRoom = name;
+            }
+
             /** Map menu / game stop: let everything fade out. */
             silence() {
                 if (!this.ready) return;
                 const now = this.audio.ctx.currentTime;
-                this.bus.gain.setTargetAtTime(0, now, 0.3);
+                this.bus.gain.setTargetAtTime(0, now, 0.3); this.shots.gain.setTargetAtTime(0, now, 0.3);
                 if (this._mus) { this._mus.g.gain.setTargetAtTime(0, now, 0.3); this._mus.level = 0; }
             }
 
@@ -335,7 +351,7 @@
                 const M = this._mus || (this._mus = (() => {
                     const f = ctx.createBiquadFilter(), g = ctx.createGain();
                     f.type = 'lowpass'; f.frequency.value = 18000; f.Q.value = 0.5; g.gain.value = 0;
-                    f.connect(g); g.connect(this.audio.musicGain);
+                    f.connect(g); g.connect(this.audio.musicRoom);                 // the speakers are in the room: they take its reverb
                     return { f, g, src: null, name: null, loading: null, level: 0, cut: 18000, quietSince: now };
                 })());
                 // Start the track for this map (decoded once)
@@ -408,7 +424,7 @@
                 if (!this._voice(null, 0.05)) return;
                 const ctx = this.audio.ctx, f = soundKit.filter(ctx, ['bandpass', 2000 + Math.random() * 3000, 1.5]);
                 const d = 0.005 + Math.random() * 0.035;
-                soundKit.burst(ctx, this.bus, ctx.currentTime, [this.pink, f, v * (0.4 + Math.random() * 0.6), 0.002, d, Math.random() * 2.5, d + 0.05]);
+                soundKit.burst(ctx, this.shots, ctx.currentTime, [this.pink, f, v * (0.4 + Math.random() * 0.6), 0.002, d, Math.random() * 2.5, d + 0.05]);
             }
 
             _carPass(v) {
@@ -423,7 +439,7 @@
                     f.connect(pan); node = pan;
                 }
                 const src = ctx.createBufferSource(); src.buffer = this.brown; src.playbackRate.value = 1.6;
-                const g = ctx.createGain(); src.connect(f); node.connect(g); g.connect(this.bus);
+                const g = ctx.createGain(); src.connect(f); node.connect(g); g.connect(this.shots);
                 g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(v, now + 1.1); g.gain.exponentialRampToValueAtTime(0.0001, now + 2.3);
                 src.start(now, Math.random() * 2.5, 2.4);
             }
@@ -431,7 +447,7 @@
             _horn(v) {
                 if (!this._voice(null, 0.8)) return;
                 const ctx = this.audio.ctx, now = ctx.currentTime, lp = soundKit.filter(ctx, ['lowpass', 900]), g = ctx.createGain();
-                lp.connect(g); g.connect(this.bus);
+                lp.connect(g); g.connect(this.shots);
                 for (const f of [392, 397]) { const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = f * (0.9 + Math.random() * 0.2); o.connect(lp); o.start(now); o.stop(now + 0.75); }
                 g.gain.setValueAtTime(0.0001, now);
                 g.gain.exponentialRampToValueAtTime(v, now + 0.03); g.gain.setValueAtTime(v, now + 0.22); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
@@ -441,7 +457,7 @@
             _drip(v) {
                 if (!this._voice(null, 0.1)) return;
                 const ctx = this.audio.ctx;
-                soundKit.tone(ctx, this.bus, ctx.currentTime, ['sine', 1800 + Math.random() * 900, 900, 0.05, v, 0.003, 0.06, 0.07]);
+                soundKit.tone(ctx, this.shots, ctx.currentTime, ['sine', 1800 + Math.random() * 900, 900, 0.05, v, 0.003, 0.06, 0.07]);
             }
 
             /**
@@ -487,7 +503,7 @@
             }
 
             /** The foley bus (footsteps, blades, fists), made on first use */
-            _foley() { return this.foley || (this.foley = soundKit.gain(this.audio.ctx, 0.9, this.audio.masterGain)); }
+            _foley() { return this.foley || (this.foley = soundKit.gain(this.audio.ctx, 0.9, this.audio.sfxOut)); }
 
             /** A blade through the air (and, on a hit, into someone) */
             slash(hit) {
@@ -522,7 +538,7 @@
                 const ctx = this.audio.ctx, now = ctx.currentTime;
                 const bf = ctx.createBiquadFilter(); bf.type = 'bandpass'; bf.Q.value = 0.7;
                 bf.frequency.setValueAtTime(big ? 1400 : 2200, now); bf.frequency.exponentialRampToValueAtTime(big ? 600 : 1200, now + 0.4);
-                soundKit.burst(ctx, soundKit.pan(ctx, this.audio.masterGain, pan), now, [this.pink, bf, (big ? 0.3 : 0.18) * near, 0.03, big ? 0.45 : 0.25, _sndRand() * 2.5, 0.5]);
+                soundKit.burst(ctx, soundKit.pan(ctx, this.audio.sfxOut, pan), now, [this.pink, bf, (big ? 0.3 : 0.18) * near, 0.03, big ? 0.45 : 0.25, _sndRand() * 2.5, 0.5]);
             }
 
             /** Door sounds: 'creak' | 'latch' | 'whoosh', quieter with distance from the player. */
@@ -540,32 +556,52 @@
                     const f0 = 170 + Math.random() * 60;
                     o.frequency.setValueAtTime(f0, now); o.frequency.linearRampToValueAtTime(f0 * 1.25, now + 0.18);
                     o.frequency.linearRampToValueAtTime(f0 * 0.95, now + 0.34); o.frequency.linearRampToValueAtTime(f0 * 1.15, now + 0.5);
-                    o.connect(bp); bp.connect(g); g.connect(this.bus);
+                    o.connect(bp); bp.connect(g); g.connect(this.shots);
                     g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(0.05 * near, now + 0.06); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
                     o.start(now); o.stop(now + 0.56);
                 } else if (kind === 'latch') {
                     if (!this._voice(null, 0.1)) return;
-                    soundKit.burst(ctx, this.bus, now, [this.pink, ['bandpass', 3200, 3], 0.18 * near, 0.002, 0.025, Math.random() * 2.5, 0.075]);
-                    soundKit.tone(ctx, this.bus, now, ['sine', 140, 70, 0.07, 0.09 * near, 0.003, 0.08, 0.09]);
+                    soundKit.burst(ctx, this.shots, now, [this.pink, ['bandpass', 3200, 3], 0.18 * near, 0.002, 0.025, Math.random() * 2.5, 0.075]);
+                    soundKit.tone(ctx, this.shots, now, ['sine', 140, 70, 0.07, 0.09 * near, 0.003, 0.08, 0.09]);
                 } else if (kind === 'thud') {                                 // a round into a wooden leaf
                     if (!this._voice(null, 0.12)) return;
-                    soundKit.burst(ctx, this.bus, now, [this.pink, ['lowpass', 520], 0.22 * near, 0.002, 0.06, Math.random() * 2.5, 0.11]);
-                    soundKit.tone(ctx, this.bus, now, ['sine', 120, 60, 0.1, 0.12 * near, 0.003, 0.11, 0.12]);
+                    soundKit.burst(ctx, this.shots, now, [this.pink, ['lowpass', 520], 0.22 * near, 0.002, 0.06, Math.random() * 2.5, 0.11]);
+                    soundKit.tone(ctx, this.shots, now, ['sine', 120, 60, 0.1, 0.12 * near, 0.003, 0.11, 0.12]);
                 } else if (kind === 'tink') {                                 // a round glancing off glass
                     if (!this._voice(null, 0.3)) return;
-                    soundKit.tone(ctx, this.bus, now, ['sine', 2600 + Math.random() * 500, null, 0.28, 0.06 * near, 0.003, 0.28, 0.3]);
-                    soundKit.burst(ctx, this.bus, now, [this.pink, ['highpass', 4000], 0.12 * near, 0.002, 0.03, Math.random() * 2.5, 0.08]);
+                    soundKit.tone(ctx, this.shots, now, ['sine', 2600 + Math.random() * 500, null, 0.28, 0.06 * near, 0.003, 0.28, 0.3]);
+                    soundKit.burst(ctx, this.shots, now, [this.pink, ['highpass', 4000], 0.12 * near, 0.002, 0.03, Math.random() * 2.5, 0.08]);
                 } else if (kind === 'whoosh') {
                     if (!this._voice(null, 0.4)) return;
                     const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 0.8;
                     f.frequency.setValueAtTime(700, now); f.frequency.exponentialRampToValueAtTime(2600, now + 0.3);
-                    soundKit.burst(ctx, this.bus, now, [this.pink, f, 0.07 * near, 0.1, 0.35, Math.random() * 2.5, 0.4]);
+                    soundKit.burst(ctx, this.shots, now, [this.pink, f, 0.07 * near, 0.1, 0.35, Math.random() * 2.5, 0.4]);
                 }
             }
         }
         /* A soundtrack per map: `track` names a file in assets/audio (without the extension),
            `room` is where its speakers are (it's fullest there), `volume` its level; `area` {x, y, w, h}
            keeps it to one part of the map, fading in over `fade` px as you come up to it. */
+        /** The game's rooms as reverb (ROOM PACKET [decay s, predelay ms, damp Hz, wet], basement/sound-system.js).
+         *  The sound system makes each tail on the spot and fades between them as she goes. */
+        const REVERB = {
+            street:   [1.0, 24, 4200, 0.10],   // out in the city: a short slap off the buildings
+            open:     [0.6, 12, 3500, 0.05],   // a hillside: almost nothing comes back
+            room:     [0.5,  6, 6000, 0.14],   // a furnished room
+            bathroom: [1.1,  4, 9000, 0.26],   // tile and marble: bright and close
+            hall:     [2.0, 22, 5200, 0.22],   // a lobby, a club's floor
+            stone:    [3.2, 32, 4000, 0.30],   // a church, a palace: long and dark
+            cabin:    [0.25, 2, 2800, 0.10],   // the van: boxed in
+            void:     [5.5, 60, 2600, 0.38]    // the ethereal plane
+        };
+        /** Each map's room (indoor maps default to `room`, outdoor ones to `street`) and rooms that differ inside them. */
+        const MAP_REVERB = {
+            hotel_lobby: 'hall', moon_city_nightclub: 'hall', enni_cole_interior: 'hall', biggs_arena: 'hall', auto_shop: 'hall',
+            church_boss: 'stone', demoness_palace: 'stone', house_of_death: 'stone',
+            van_interior: 'cabin', keepers_hill: 'open', ethereal_plane: 'void'
+        };
+        const ROOM_REVERB = { bathroom: 'bathroom' };
+
         const MAP_MUSIC = {
             apt_949: { track: 'silver queen tst', room: 'main_room', volume: 0.5 },   // the Silver Queen suite
             // Swig (the club's cut): a 24-bar loop at 140 BPM, the kick on the first sample; the club's lights dance to it

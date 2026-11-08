@@ -32,7 +32,6 @@
         }
 
         const _assetSounds = {};
-        /** Plays an asset sound through the master bus (so the audio toggle mutes it). Resolves to the source node, or null. */
         /** A sound from assets/audio, decoded once: Promise of an AudioBuffer (null if missing or undecodable). */
         function loadSound(name) {
             const src = ASSETS.audio[name];
@@ -45,18 +44,10 @@
             return _assetSounds[name];
         }
 
+        /** Plays an asset sound: the sound system's packet ([channel, name, layer, volume, options], basement/sound-system.js),
+         *  in opts.channel (default sfx: in the room, with its reverb; opts.dry beside her). Resolves to the source node, or null. */
         function playSound(name, opts = {}) {
-            const ctx = audioSys.ctx;
-            return loadSound(name).then(buffer => {
-                if (!buffer) return null;
-                if (ctx.state === 'suspended') ctx.resume();
-                const s = ctx.createBufferSource(), g = ctx.createGain();
-                s.buffer = buffer; s.loop = !!opts.loop; s.playbackRate.value = opts.rate || 1;
-                g.gain.value = opts.volume ?? 1;
-                s.connect(g); g.connect(audioSys.masterGain);
-                s.start();
-                return s;
-            });
+            return audioSys.system.playSound([opts.channel || 'sfx', name, opts.layer ?? null, opts.volume ?? 1, opts]);
         }
 
         // Start decoding every image right away so the first frame that uses one has it ready
